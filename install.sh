@@ -4,7 +4,7 @@
 source ./utils.sh
 
 # Check dependencies
-check_dependencies "git" "zsh" "eza" "direnv" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible"
+check_dependencies "git" "zsh" "eza" "direnv" "nvm" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible"
 
 # Current directory and target directory
 CURRENT_DIR=$(pwd)
