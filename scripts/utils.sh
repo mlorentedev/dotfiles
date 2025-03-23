@@ -84,9 +84,10 @@ load_env_file() {
 }
 
 debug_print_env() {
+    local env_file="${1:-.env}"
     echo "=== Loaded Environment Variables ==="
     
-    # Print all variables from the .env file
+    # Print all variables from the env file
     while IFS='=' read -r key value; do
         # Skip comments and empty lines
         [[ "$key" =~ ^\s*#.* ]] && continue
@@ -94,7 +95,7 @@ debug_print_env() {
         
         # Print the key and its value
         echo "${key}=${value}"
-    done < "$ENV_FILE"
+    done < "$env_file"
 }
 
 # ------------------------------------------------------------------------------
@@ -143,7 +144,7 @@ check_dependencies() {
     done
     
     if [ $missing -eq 1 ]; then
-        exit_error "Missing required dependencies. Please install them and try again."
+        log_warning "Optional dependency $dep not found. Some features may not work."
     fi
 }
 

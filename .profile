@@ -27,7 +27,7 @@ if [ -d "$HOME/.local/bin" ] ; then
 fi
 
 # set Utils file
-UTILS_FILE="$HOME/.dotfiles/utils.sh"
+UTILS_FILE="$HOME/.dotfiles/scripts/utils.sh"
 if [ -f "$UTILS_FILE" ]; then
     # Add the sourcing of utils.sh to the .bashrc or .zshrc file
     if ! grep -q "source $UTILS_FILE" "$HOME/.bashrc" && ! grep -q "source $UTILS_FILE" "$HOME/.zshrc"; then

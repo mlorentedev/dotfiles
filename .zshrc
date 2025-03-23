@@ -9,19 +9,6 @@ plugins=(git)
 source $ZSH/oh-my-zsh.sh
 
 # ==========================
-#       ENVIRONMENT
-# ==========================
-export JAVA_HOME=$HOME/Apps/jdk-21.0.4
-export MAVEN_HOME=$HOME/Apps/apache-maven-3.9.4
-export PYTHON_HOME=$HOME/Apps/python-3.12.6
-export RUBY_HOME=$HOME/Apps/ruby-3.1.4
-export GEM_HOME=$RUBY_HOME/gems
-export MINIKUBE_HOME=$HOME/Apps/minikube-1.34.0
-export GO_HOME=$HOME/Apps/go-1.23.1
-
-export PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$PATH
-
-# ==========================
 #        ALIASES
 # ==========================
 alias ll='ls -alF'
@@ -29,6 +16,7 @@ alias la='ls -A'
 alias l='ls -CF'
 alias python=python3
 alias docker-compose='docker compose'
+alias setup-gh-secrets="$HOME/.dotfiles/scripts/setup-gh-secrets.sh"
 
 # Carga aliases personalizados si existen
 [[ -f ~/.zsh/aliases.zsh ]] && source ~/.zsh/aliases.zsh
@@ -58,4 +46,17 @@ eval "$(zoxide init zsh)"   # Carga zoxide
 # HIST_STAMPS="yyyy-mm-dd"             # Change history timestamp format
 # ZSH_CUSTOM=/path/to/custom-folder    # Change custom folder location
 
-PATH=~/.console-ninja/.bin:$PATH
+# ==========================
+#       ENVIRONMENT
+# ==========================
+export JAVA_HOME=$HOME/Apps/jdk-21.0.4
+export MAVEN_HOME=$HOME/Apps/apache-maven-3.9.4
+export PYTHON_HOME=$HOME/Apps/python-3.12.6
+export RUBY_HOME=$HOME/Apps/ruby-3.1.4
+export GEM_HOME=$RUBY_HOME/gems
+export MINIKUBE_HOME=$HOME/Apps/minikube-1.34.0
+export GO_HOME=$HOME/Apps/go-1.23.1
+export NINJA_HOME=$HOME/.console-ninja
+export DOTFILES_DIR=$HOME/.dotfiles
+
+export PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$NINJA_HOME/bin:$DOTFILES_DIR/scripts:$PATH

@@ -55,9 +55,10 @@ alias la='ls -A'
 alias l='ls -CF'
 alias python=python3
 alias docker-compose='docker compose'
+alias setup-gh-secrets="$HOME/.dotfiles/scripts/setup-gh-secrets.sh"
 
 # Load custom aliases if available
-[[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
+[[ -f ~/.bash/bash_aliases ]] && source ~/.bash/bash_aliases
 
 # ==========================
 #      AUTOCOMPLETION
@@ -76,7 +77,7 @@ export RUBY_HOME=$HOME/Apps/ruby-3.1.4
 export GEM_HOME=$RUBY_HOME/gems
 export MINIKUBE_HOME=$HOME/Apps/minikube-1.34.0
 export GO_HOME=$HOME/Apps/go-1.23.1
+export NINJA_HOME=$HOME/.console-ninja
+export DOTFILES_DIR=$HOME/.dotfiles
 
-export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$PATH"
-
-PATH=~/.console-ninja/.bin:$PATH
+export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$NINJA_HOME/bin:$DOTFILES_DIR/scripts:$PATH"

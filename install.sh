@@ -1,21 +1,24 @@
 #!/bin/bash
 
 # Load utility functions for logging
-source ./utils.sh
-
-# Check dependencies
-check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible"
+if [ -f ./scripts/utils.sh ]; then
+    source ./scripts/utils.sh
+else
+    echo "Error: utils.sh not found"
+    exit 1
+fi
 
 # Current directory and target directory
 CURRENT_DIR=$(pwd)
-DOTFILES_DIR="$HOME/.dotfiles"
 
 # Create necessary directories
+export DOTFILES_DIR="$HOME/.dotfiles"
 log_info "Creating necessary directories..."
 mkdir -p "$HOME/.zsh"
 mkdir -p "$HOME/.bash"
 mkdir -p "$DOTFILES_DIR"
 mkdir -p "$DOTFILES_DIR/.zsh"
+mkdir -p "$DOTFILES_DIR/scripts"
 
 # Copy all files to the dotfiles directory
 log_info "Setting up dotfiles in $DOTFILES_DIR..."
@@ -25,7 +28,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     cp -f "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/" 2>/dev/null || true
     cp -f "$CURRENT_DIR/.profile" "$DOTFILES_DIR/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
-    cp -f "$CURRENT_DIR/utils.sh" "$DOTFILES_DIR/" 2>/dev/null || true
+    cp -rf "$CURRENT_DIR/scripts/"* "$DOTFILES_DIR/scripts/" 2>/dev/null || true
 else
     log_info "Already in dotfiles directory, skipping copy..."
 fi
@@ -41,21 +44,24 @@ mkdir -p "$HOME/.zsh"
 ln -sf "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
 ln -sf "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
 ln -sf "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
-chmod +x "$DOTFILES_DIR/utils.sh"
+chmod +x "$DOTFILES_DIR/scripts/utils.sh"
+chmod +x "$DOTFILES_DIR/scripts/setup-gh-secrets.sh"
+
 
 # Update functions.zsh to source utils.sh if not already done
 if [ -f "$DOTFILES_DIR/.zsh/functions.zsh" ]; then
     if ! grep -q "source.*utils.sh" "$DOTFILES_DIR/.zsh/functions.zsh"; then
         log_info "Updating functions.zsh to source utils.sh..."
-        echo -e "\n# Source utility functions\nsource $DOTFILES_DIR/utils.sh" >> "$DOTFILES_DIR/.zsh/functions.zsh"
+        echo -e "\n# Source utility functions\nsource $DOTFILES_DIR/scripts/utils.sh" >> "$DOTFILES_DIR/.zsh/functions.zsh"
     fi
+    log_info "functions.zsh already exists, skipping creation..."
 else
     log_info "Creating functions.zsh file..."
     cat > "$DOTFILES_DIR/.zsh/functions.zsh" << EOF
-# Source the utils.sh file
-source "$DOTFILES_DIR/utils.sh"
 
-# Add any other custom functions below
+# Source the utils.sh and setup-gh-secrets.sh scripts
+source "$DOTFILES_DIR/scripts/utils.sh"
+
 EOF
 fi
 
@@ -79,14 +85,22 @@ if [ -f ~/.bash/bash_aliases ]; then
 fi
 
 # Source utility functions
-if [ -f $DOTFILES_DIR/utils.sh ]; then
-    source $DOTFILES_DIR/utils.sh
+if [ -f "$DOTFILES_DIR/scripts/utils.sh" ]; then
+    source "$DOTFILES_DIR/scripts/utils.sh"
 fi
 EOF
 fi
 
 # Link .bashrc
 ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
+
+log_info "Adding dotfiles scripts directory to PATH..."
+if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.zshrc"; then
+    echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.zshrc"
+fi
+if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.bashrc"; then
+    echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.bashrc"
+fi
 
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."
@@ -108,6 +122,8 @@ else
     log_error "functions.zsh not linked correctly!"
 fi
 
+# Check dependencies
+check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible"
 log_info "To apply changes immediately, run:"
 log_info "  - For Bash: source ~/.bashrc"
 log_info "  - For Zsh:  source ~/.zshrc"
