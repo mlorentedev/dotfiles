@@ -78,3 +78,5 @@ export MINIKUBE_HOME=$HOME/Apps/minikube-1.34.0
 export GO_HOME=$HOME/Apps/go-1.23.1
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$PATH"
+
+PATH=~/.console-ninja/.bin:$PATH

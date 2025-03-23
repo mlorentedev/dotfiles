@@ -57,3 +57,5 @@ eval "$(zoxide init zsh)"   # Carga zoxide
 # DISABLE_UNTRACKED_FILES_DIRTY="true" # Speed up large Git repos
 # HIST_STAMPS="yyyy-mm-dd"             # Change history timestamp format
 # ZSH_CUSTOM=/path/to/custom-folder    # Change custom folder location
+
+PATH=~/.console-ninja/.bin:$PATH
