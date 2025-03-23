@@ -25,3 +25,17 @@ fi
 if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
+
+# set Utils file
+UTILS_FILE="$HOME/.dotfiles/utils.sh"
+if [ -f "$UTILS_FILE" ]; then
+    # Add the sourcing of utils.sh to the .bashrc or .zshrc file
+    if ! grep -q "source $UTILS_FILE" "$HOME/.bashrc" && ! grep -q "source $UTILS_FILE" "$HOME/.zshrc"; then
+        echo "source $UTILS_FILE" >> "$HOME/.bashrc"
+        echo "source $UTILS_FILE" >> "$HOME/.zshrc"
+    fi
+fi
+
+# set PATH and EDITOR
+export PATH="$HOME/bin:$PATH"
+export EDITOR="vim"
