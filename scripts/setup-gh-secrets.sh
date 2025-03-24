@@ -1,6 +1,7 @@
 #!/bin/bash
 # setup-github-secrets.sh - Configure secrets in GitHub repository from multiple .env files
-# Usage: ./setup-github-secrets.sh
+# Usage: ./setup-github-secrets.sh [ENV_PATH]
+# If ENV_PATH is not provided, it will use default locations
 set -e
 
 # Source utilities
@@ -10,12 +11,23 @@ source "$SCRIPT_DIR/utils.sh"
 # Check dependencies
 check_dependencies "gh"
 
-# Define environment files to process
-ENV_FILES=(
-    "$(dirname "$0")/../.env"
-    "$(dirname "$0")/../frontend/.env"
-    "$(dirname "$0")/../backend/.env"
-)
+# Define environment files to process based on input parameter
+if [ -n "$1" ]; then
+    # User provided a custom .env path
+    ENV_BASE_PATH="$1"
+    ENV_FILES=("$ENV_BASE_PATH")
+    log_info "Using custom environment file: $ENV_BASE_PATH"
+else
+    # Use default paths
+    ENV_FILES=(
+        "$(dirname "$0")/.env"
+        "$(dirname "$0")/.env.local"
+        "$(dirname "$0")/.env.production"
+        "$(dirname "$0")/.env.development"
+        "$(dirname "$0")/.env.staging"
+    )
+    log_info "Using default environment file paths"
+fi
 
 # Function to process env files and set GitHub secrets
 process_env_files() {
