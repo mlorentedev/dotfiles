@@ -33,7 +33,9 @@ unset color_prompt
 
 # Set terminal title for xterm-like terminals
 case "$TERM" in
-    xterm*|rxvt*) PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1" ;;
+    xterm*|rxvt*) 
+        PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1" 
+        ;;
 esac
 
 # ==========================
@@ -55,10 +57,9 @@ alias la='ls -A'
 alias l='ls -CF'
 alias python=python3
 alias docker-compose='docker compose'
-alias setup-gh-secrets="$HOME/.dotfiles/scripts/setup-gh-secrets.sh"
 
 # Load custom aliases if available
-[[ -f ~/.bash/bash_aliases ]] && source ~/.bash/bash_aliases
+[[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
 
 # ==========================
 #      AUTOCOMPLETION
@@ -70,14 +71,49 @@ fi
 # ==========================
 #    ENVIRONMENT VARIABLES
 # ==========================
-export JAVA_HOME=$HOME/Apps/jdk-21.0.4
-export MAVEN_HOME=$HOME/Apps/apache-maven-3.9.4
-export PYTHON_HOME=$HOME/Apps/python-3.12.6
-export RUBY_HOME=$HOME/Apps/ruby-3.1.4
-export GEM_HOME=$RUBY_HOME/gems
-export MINIKUBE_HOME=$HOME/Apps/minikube-1.34.0
-export GO_HOME=$HOME/Apps/go-1.23.1
-export NINJA_HOME=$HOME/.console-ninja
-export DOTFILES_DIR=$HOME/.dotfiles
+# Development Tools Home
+export APPS_HOME="$HOME/Apps"
 
-export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$NINJA_HOME/bin:$DOTFILES_DIR/scripts:$PATH"
+# Define individual tool homes
+export JAVA_HOME="$APPS_HOME/jdk-21.0.4"
+export MAVEN_HOME="$APPS_HOME/apache-maven-3.9.4"
+export PYTHON_HOME="$APPS_HOME/python-3.12.6"
+export RUBY_HOME="$APPS_HOME/ruby-3.1.4"
+export GEM_HOME="$RUBY_HOME/gems"
+export MINIKUBE_HOME="$APPS_HOME/minikube-1.34.0"
+export GO_HOME="$APPS_HOME/go-1.23.1"
+
+# ==========================
+#       PATH CONFIGURATION
+# ==========================
+# Ensure system paths are first
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+
+# Add development tool paths
+export PATH="$PATH:$JAVA_HOME/bin"
+export PATH="$PATH:$MAVEN_HOME/bin"
+export PATH="$PATH:$PYTHON_HOME/bin"
+export PATH="$PATH:$RUBY_HOME/bin"
+export PATH="$PATH:$GEM_HOME/bin"
+export PATH="$PATH:$MINIKUBE_HOME"
+export PATH="$PATH:$GO_HOME/bin"
+
+# Add personal script directories
+export PATH="$PATH:$HOME/.console-ninja/.bin"
+export PATH="$PATH:$HOME/.dotfiles/scripts"
+
+# Debugging PATH function
+path_info() {
+    echo "=== CURRENT PATH ==="
+    echo "$PATH" | tr ':' '\n'
+    
+    echo -e "\n=== COMMAND LOCATIONS ==="
+    for cmd in java mvn python ruby gem go; do
+        location=$(command -v "$cmd" 2>/dev/null)
+        if [[ -n "$location" ]]; then
+            echo "$cmd: $location"
+        else
+            echo "$cmd: Not found"
+        fi
+    done
+}
