@@ -123,7 +123,7 @@ else
 fi
 
 # Check dependencies
-check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible"
+check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible" "pip"
 log_info "To apply changes immediately, run:"
 log_info "  - For Bash: source ~/.bashrc"
 log_info "  - For Zsh:  source ~/.zshrc"
