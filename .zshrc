@@ -5,7 +5,7 @@ export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
 plugins=(git)
 
-# Carga Oh My Zsh
+# Load Oh My Zsh
 source $ZSH/oh-my-zsh.sh
 
 # ==========================
@@ -16,9 +16,9 @@ alias la='ls -A'
 alias l='ls -CF'
 alias python=python3
 alias docker-compose='docker compose'
-alias setup-gh-secrets="$HOME/.dotfiles/scripts/setup-gh-secrets.sh"
+alias setup-gh-secrets="$HOME/.dotfiles/scripts/github-secrets-manager.sh"
 
-# Carga aliases personalizados si existen
+# Load custom aliases if they exist
 [[ -f ~/.zsh/aliases.zsh ]] && source ~/.zsh/aliases.zsh
 
 # ==========================
@@ -30,8 +30,8 @@ alias setup-gh-secrets="$HOME/.dotfiles/scripts/setup-gh-secrets.sh"
 # ==========================
 #      SHELL ENHANCEMENTS
 # ==========================
-eval "$(direnv hook zsh)"   # Carga Direnv
-eval "$(zoxide init zsh)"   # Carga zoxide
+eval "$(direnv hook zsh)"   # Load Direnv
+eval "$(zoxide init zsh)"   # Load zoxide
 
 # ==========================
 #    OPTIONAL CONFIGURATION

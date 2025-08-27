@@ -1,7 +1,7 @@
 #!/bin/bash
-# setup-github-secrets.sh - Configure secrets in GitHub repository from multiple .env files
-# Usage: ./setup-github-secrets.sh [ENV_PATH]
-# If ENV_PATH is not provided, it will use default locations
+# Uploads environment variables from .env files to GitHub repository secrets
+# Usage: ./github-secrets-manager.sh [ENV_PATH]
+# Without ENV_PATH, checks default locations
 set -e
 
 # Source utilities
@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 
 # Check dependencies
-check_dependencies "gh"
+require_command "gh" "GitHub CLI" "Visit: https://cli.github.com/"
 
 # Define environment files to process based on input parameter
 if [ -n "$1" ]; then
@@ -18,18 +18,22 @@ if [ -n "$1" ]; then
     ENV_FILES=("$ENV_BASE_PATH")
     log_info "Using custom environment file: $ENV_BASE_PATH"
 else
-    # Use default paths
+    # Use default paths relative to project root
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     ENV_FILES=(
-        "$(dirname "$0")/.env"
-        "$(dirname "$0")/.env.local"
-        "$(dirname "$0")/.env.production"
-        "$(dirname "$0")/.env.development"
-        "$(dirname "$0")/.env.staging"
+        "$PROJECT_ROOT/.env"
+        "$PROJECT_ROOT/.env.local"
+        "$PROJECT_ROOT/.env.production"
+        "$PROJECT_ROOT/.env.development"
+        "$PROJECT_ROOT/.env.staging"
     )
     log_info "Using default environment file paths"
 fi
 
-# Function to process env files and set GitHub secrets
+# Processes environment files and uploads variables as GitHub secrets
+# Input: none (uses global ENV_FILES array)
+# Output: GitHub secrets uploaded, success/warning messages
+# Usage: process_env_files
 process_env_files() {
     local processed_secrets=()
 
@@ -77,15 +81,16 @@ process_env_files() {
                 new_key=${key/_BASE64/}
                 
                 # Decode the key and store in a temp file
-                echo "$value" | base64 --decode > /tmp/ssh_key_decoded
-                chmod 600 /tmp/ssh_key_decoded
+                local temp_key="/tmp/ssh_key_decoded.$$"
+                echo "$value" | base64 --decode > "$temp_key"
+                chmod 600 "$temp_key"
                 
                 # Set the decoded key as a GitHub secret
                 log_info "Setting decoded SSH key as: $new_key"
-                gh secret set "$new_key" --repo "$REPO" < /tmp/ssh_key_decoded
+                gh secret set "$new_key" --repo "$REPO" < "$temp_key"
                 
                 # Clean up
-                rm -f /tmp/ssh_key_decoded
+                safe_remove "$temp_key"
                 
                 # Continue processing other secrets
                 continue

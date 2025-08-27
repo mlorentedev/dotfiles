@@ -1,0 +1,31 @@
+# System files
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.swo
+
+# Sensitive data
+*.secret
+*.dec
+.venv/
+.env
+.env.local
+.env.production
+.env.development
+.env.staging
+
+# Development tools
+.claude/
+node_modules/
+*.log
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Cache directories
+.cache/
+.npm/
+.yarn/
