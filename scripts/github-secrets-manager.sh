@@ -78,22 +78,28 @@ process_env_files() {
             if [[ "$key" == *"SSH_PRIVATE_KEY"* && "$key" == *"BASE64"* ]]; then
                 # Found a base64 encoded SSH key - decode it
                 log_info "Found base64 encoded SSH key: $key"
-                
+
                 # Create a non-base64 key secret name
                 new_key=${key/_BASE64/}
-                
-                # Decode the key and store in a temp file
-                local temp_key="/tmp/ssh_key_decoded.$$"
-                echo "$value" | base64 --decode > "$temp_key"
+
+                # Decode the key and store in a secure temp file
+                local temp_key
+                temp_key=$(mktemp) || exit_error "Failed to create temporary file"
                 chmod 600 "$temp_key"
-                
+
+                # Set up cleanup trap for temp file
+                trap 'rm -f "$temp_key"' EXIT
+
+                echo "$value" | base64 --decode > "$temp_key"
+
                 # Set the decoded key as a GitHub secret
                 log_info "Setting decoded SSH key as: $new_key"
                 gh secret set "$new_key" --repo "$REPO" < "$temp_key"
-                
+
                 # Clean up
-                safe_remove "$temp_key"
-                
+                rm -f "$temp_key"
+                trap - EXIT
+
                 # Continue processing other secrets
                 continue
             fi            

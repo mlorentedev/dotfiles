@@ -30,10 +30,18 @@ log_info "Setting up dotfiles in $DOTFILES_DIR..."
 if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     # Copy files to the dotfiles directory
     log_info "Copying files from $CURRENT_DIR to $DOTFILES_DIR..."
-    safe_copy "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/" 2>/dev/null || true
-    safe_copy "$CURRENT_DIR/.profile" "$DOTFILES_DIR/" 2>/dev/null || true
-    cp -rf "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
-    cp -rf "$CURRENT_DIR/scripts/"* "$DOTFILES_DIR/scripts/" 2>/dev/null || true
+    if [ -f "$CURRENT_DIR/.zshrc" ]; then
+        safe_copy "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/"
+    fi
+    if [ -f "$CURRENT_DIR/.profile" ]; then
+        safe_copy "$CURRENT_DIR/.profile" "$DOTFILES_DIR/"
+    fi
+    if [ -d "$CURRENT_DIR/.zsh" ]; then
+        cp -r "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || log_warning "No .zsh files to copy"
+    fi
+    if [ -d "$CURRENT_DIR/scripts" ]; then
+        cp -r "$CURRENT_DIR/scripts/"* "$DOTFILES_DIR/scripts/" 2>/dev/null || log_warning "No script files to copy"
+    fi
 else
     log_info "Already in dotfiles directory, skipping copy..."
 fi
@@ -59,26 +67,29 @@ chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 if [ -f "$DOTFILES_DIR/.zsh/functions.zsh" ]; then
     if ! grep -q "source.*utils.sh" "$DOTFILES_DIR/.zsh/functions.zsh"; then
         log_info "Updating functions.zsh to source utils.sh..."
-        echo -e "\n# Source utility functions\nsource $DOTFILES_DIR/scripts/utils.sh" >> "$DOTFILES_DIR/.zsh/functions.zsh"
+        {
+            echo ""
+            echo "# Source utility functions"
+            echo "source \"$DOTFILES_DIR/scripts/utils.sh\""
+        } >> "$DOTFILES_DIR/.zsh/functions.zsh"
     fi
     log_info "functions.zsh already exists, skipping creation..."
 else
     log_info "Creating functions.zsh file..."
-    cat > "$DOTFILES_DIR/.zsh/functions.zsh" << EOF
+    cat > "$DOTFILES_DIR/.zsh/functions.zsh" << 'EOF'
 
 # Source the utils.sh and setup-gh-secrets.sh scripts
-source "$DOTFILES_DIR/scripts/utils.sh"
-
 EOF
+    echo "source \"$DOTFILES_DIR/scripts/utils.sh\"" >> "$DOTFILES_DIR/.zsh/functions.zsh"
 fi
 
 # Create a bash_aliases file for bash
 log_info "Creating bash_aliases file..."
 ensure_directory "$HOME/.bash"
-cat > "$HOME/.bash/bash_aliases" << EOF
-# Bash Aliases
-$(grep "alias" "$DOTFILES_DIR/.zsh/aliases.zsh" | sed 's/alias /alias /g')
-EOF
+{
+    echo "# Bash Aliases"
+    grep "^alias " "$DOTFILES_DIR/.zsh/aliases.zsh" 2>/dev/null || true
+} > "$HOME/.bash/bash_aliases"
 
 # Create a basic .bashrc if it doesn't exist
 if [ ! -f "$DOTFILES_DIR/.bashrc" ]; then

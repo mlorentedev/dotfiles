@@ -21,6 +21,7 @@ plugins=(
 
 # Load Oh My Zsh (skip if not installed)
 if [ -f "$ZSH/oh-my-zsh.sh" ]; then
+    # shellcheck disable=SC1091
     source "$ZSH/oh-my-zsh.sh"
 fi
 
