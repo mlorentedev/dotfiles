@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Install Container Tools
-# =============================================================================
-# Installs: docker, docker-compose, lazydocker
-# =============================================================================
+
+# Install container tools: docker-compose, lazydocker
+
+
+
 
 set -e
 
@@ -24,9 +24,9 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# =============================================================================
+
 # Docker
-# =============================================================================
+
 install_docker() {
     if command_exists docker; then
         log_info "Docker already installed: $(docker --version)"
@@ -39,9 +39,9 @@ install_docker() {
     log_info "  Or run: curl -fsSL https://get.docker.com | sh"
 }
 
-# =============================================================================
+
 # Docker Compose
-# =============================================================================
+
 install_docker_compose() {
     if command_exists docker-compose || docker compose version &>/dev/null; then
         log_info "Docker Compose already installed"
@@ -59,9 +59,9 @@ install_docker_compose() {
     log_success "Docker Compose installed"
 }
 
-# =============================================================================
+
 # Lazydocker
-# =============================================================================
+
 install_lazydocker() {
     if command_exists lazydocker; then
         log_info "lazydocker already installed: $(lazydocker --version)"
@@ -75,9 +75,9 @@ install_lazydocker() {
     log_success "lazydocker installed"
 }
 
-# =============================================================================
+
 # Main
-# =============================================================================
+
 main() {
     log_info "Installing container tools..."
 

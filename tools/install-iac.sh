@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Install Infrastructure as Code Tools
-# =============================================================================
-# Installs: terraform, ansible, ansible-lint
-# =============================================================================
+
+# Install IaC tools: terraform, ansible, ansible-lint
+
+
+
 
 set -e
 
@@ -33,9 +33,9 @@ get_arch() {
     esac
 }
 
-# =============================================================================
+
 # Terraform
-# =============================================================================
+
 install_terraform() {
     if command_exists terraform; then
         log_info "terraform already installed: $(terraform version | head -1)"
@@ -58,9 +58,9 @@ install_terraform() {
     log_success "terraform installed: $version"
 }
 
-# =============================================================================
+
 # Ansible
-# =============================================================================
+
 install_ansible() {
     if command_exists ansible; then
         log_info "ansible already installed: $(ansible --version | head -1)"
@@ -83,9 +83,9 @@ install_ansible() {
     fi
 }
 
-# =============================================================================
+
 # Ansible Lint
-# =============================================================================
+
 install_ansible_lint() {
     if command_exists ansible-lint; then
         log_info "ansible-lint already installed: $(ansible-lint --version)"
@@ -106,9 +106,9 @@ install_ansible_lint() {
     fi
 }
 
-# =============================================================================
+
 # Main
-# =============================================================================
+
 main() {
     log_info "Installing Infrastructure as Code tools..."
 

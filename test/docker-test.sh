@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Docker Test Runner
-# =============================================================================
-# Builds and runs tests in Docker containers for multiple Ubuntu versions
-# =============================================================================
+# Test runner for Docker containers (Ubuntu 20.04, 22.04, 24.04)
 
 set -e
 
@@ -33,9 +29,9 @@ log_step() {
     echo -e "\n${BLUE}==>${NC} ${YELLOW}$1${NC}\n"
 }
 
-# =============================================================================
+
 # Test in Docker
-# =============================================================================
+
 test_ubuntu_version() {
     local version=$1
     local dockerfile="$SCRIPT_DIR/docker/Dockerfile.ubuntu-$version"
@@ -67,9 +63,9 @@ test_ubuntu_version() {
     fi
 }
 
-# =============================================================================
+
 # Main
-# =============================================================================
+
 main() {
     local version="${1:-22.04}"
 
@@ -85,13 +81,8 @@ main() {
         exit 1
     fi
 
-    echo -e "${BLUE}"
-    cat << "EOF"
-╔═══════════════════════════════════════════════════════════╗
-║           Docker-based Integration Tests                 ║
-╚═══════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
+    echo "Running Docker tests"
+    echo ""
 
     case "$version" in
         20.04|22.04|24.04)

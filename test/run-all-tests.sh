@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Run All Tests
-# =============================================================================
-# Comprehensive test suite for dotfiles installation
-# =============================================================================
+# Test suite for dotfiles installation
 
 set -e
 
@@ -22,9 +18,9 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 TESTS_TOTAL=0
 
-# =============================================================================
+
 # Logging
-# =============================================================================
+
 log_test_start() {
     echo -e "\n${BLUE}==> Testing: $1${NC}"
 }
@@ -53,9 +49,9 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# =============================================================================
+
 # Test Execution
-# =============================================================================
+
 run_test_script() {
     local script="$1"
     local script_path="$SCRIPT_DIR/$script"
@@ -76,9 +72,9 @@ run_test_script() {
     fi
 }
 
-# =============================================================================
+
 # Pre-flight Checks
-# =============================================================================
+
 preflight_checks() {
     log_info "Running pre-flight checks..."
 
@@ -104,9 +100,9 @@ preflight_checks() {
     log_success "Pre-flight checks passed"
 }
 
-# =============================================================================
+
 # Individual Test Categories
-# =============================================================================
+
 
 test_directory_structure() {
     log_test_start "Directory Structure"
@@ -242,45 +238,30 @@ test_shell_syntax() {
     fi
 }
 
-# =============================================================================
+
 # Summary
-# =============================================================================
+
 print_summary() {
     echo ""
-    echo "=========================================="
-    echo "           Test Results Summary"
-    echo "=========================================="
-    echo ""
-    echo "Total Tests:  $TESTS_TOTAL"
-    echo -e "Passed:       ${GREEN}$TESTS_PASSED${NC}"
-    echo -e "Failed:       ${RED}$TESTS_FAILED${NC}"
-    echo ""
+    echo "Test Results: $TESTS_PASSED/$TESTS_TOTAL passed"
 
     if [ $TESTS_FAILED -eq 0 ]; then
-        echo -e "${GREEN}✓ All tests passed!${NC}"
+        echo -e "${GREEN}All tests passed${NC}"
         return 0
     else
-        echo -e "${RED}✗ Some tests failed${NC}"
+        echo -e "${RED}$TESTS_FAILED test(s) failed${NC}"
         return 1
     fi
 }
 
-# =============================================================================
+
 # Main
-# =============================================================================
+
 main() {
-    echo -e "${BLUE}"
-    cat << "EOF"
-╔═══════════════════════════════════════════════════════════╗
-║              Dotfiles Test Suite                         ║
-╚═══════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
+    echo "Running dotfiles tests"
+    echo ""
 
     preflight_checks
-
-    echo ""
-    echo "Starting tests..."
     echo ""
 
     # Run built-in tests

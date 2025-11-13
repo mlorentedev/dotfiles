@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Install Kubernetes Tools
-# =============================================================================
-# Installs: kubectl, k9s, helm, kubectx, kubens, stern
-# =============================================================================
+
+# Install Kubernetes tools: kubectl, k9s, helm, kubectx, stern
+
+
+
 
 set -e
 
@@ -33,9 +33,9 @@ get_arch() {
     esac
 }
 
-# =============================================================================
+
 # kubectl
-# =============================================================================
+
 install_kubectl() {
     if command_exists kubectl; then
         log_info "kubectl already installed: $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
@@ -54,9 +54,9 @@ install_kubectl() {
     log_success "kubectl installed: $version"
 }
 
-# =============================================================================
+
 # k9s
-# =============================================================================
+
 install_k9s() {
     if command_exists k9s; then
         log_info "k9s already installed: $(k9s version --short 2>/dev/null || k9s version)"
@@ -78,9 +78,9 @@ install_k9s() {
     log_success "k9s installed"
 }
 
-# =============================================================================
+
 # Helm
-# =============================================================================
+
 install_helm() {
     if command_exists helm; then
         log_info "helm already installed: $(helm version --short)"
@@ -94,9 +94,9 @@ install_helm() {
     log_success "helm installed"
 }
 
-# =============================================================================
+
 # kubectx and kubens
-# =============================================================================
+
 install_kubectx() {
     if command_exists kubectx && command_exists kubens; then
         log_info "kubectx and kubens already installed"
@@ -115,9 +115,9 @@ install_kubectx() {
     log_success "kubectx and kubens installed"
 }
 
-# =============================================================================
+
 # stern (log tailing)
-# =============================================================================
+
 install_stern() {
     if command_exists stern; then
         log_info "stern already installed: $(stern --version)"
@@ -139,9 +139,9 @@ install_stern() {
     log_success "stern installed"
 }
 
-# =============================================================================
+
 # Main
-# =============================================================================
+
 main() {
     log_info "Installing Kubernetes tools to $INSTALL_DIR..."
 

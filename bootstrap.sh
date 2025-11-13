@@ -1,26 +1,10 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Dotfiles Bootstrap Script
-# =============================================================================
-# Modernized dotfiles installation using GNU Stow
-# Supports: Ubuntu 20.04+, Debian 10+, WSL2
-#
-# Usage:
-#   ./bootstrap.sh --minimal    Install only configs (bash, zsh, git, scripts)
-#   ./bootstrap.sh --tools      Install configs + DevOps toolchain
-#   ./bootstrap.sh --all        Install everything including secrets setup
-#
-# Requirements:
-#   - Bash 4.0+
-#   - curl or wget
-#   - git
-# =============================================================================
+# Dotfiles bootstrap - install configs using GNU Stow
+# Usage: ./bootstrap.sh [--minimal|--tools|--all]
 
 set -e
 
-# =============================================================================
 # Configuration
-# =============================================================================
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
 LOG_FILE="$DOTFILES_DIR/bootstrap.log"
@@ -33,10 +17,8 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m'
-
-# =============================================================================
 # Logging Functions
-# =============================================================================
+
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$LOG_FILE"
 }
@@ -56,10 +38,8 @@ log_error() {
 log_step() {
     echo -e "\n${PURPLE}==>${NC} ${CYAN}$1${NC}\n" | tee -a "$LOG_FILE"
 }
-
-# =============================================================================
 # System Detection
-# =============================================================================
+
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if [ -f /etc/os-release ]; then
@@ -76,10 +56,8 @@ detect_os() {
     fi
     log_info "Detected OS: $OS $OS_VERSION"
 }
-
-# =============================================================================
 # Dependency Checks
-# =============================================================================
+
 command_exists() {
     command -v "$1" &> /dev/null
 }
@@ -99,10 +77,8 @@ check_required_commands() {
         exit 1
     fi
 }
-
-# =============================================================================
 # Backup Existing Files
-# =============================================================================
+
 backup_existing_files() {
     log_step "Backing up existing dotfiles"
 
@@ -130,10 +106,8 @@ backup_existing_files() {
         log_info "No existing files to backup"
     fi
 }
-
-# =============================================================================
 # Install GNU Stow
-# =============================================================================
+
 install_stow() {
     if command_exists stow; then
         log_info "GNU Stow already installed: $(stow --version | head -1)"
@@ -178,10 +152,8 @@ install_stow() {
 
     log_success "GNU Stow installed"
 }
-
-# =============================================================================
 # Stow Modules
-# =============================================================================
+
 stow_module() {
     local module=$1
     local module_dir="$DOTFILES_DIR/$module"
@@ -231,10 +203,8 @@ stow_tools_modules() {
         stow_module "$module"
     done
 }
-
-# =============================================================================
 # Tool Installation
-# =============================================================================
+
 install_essential_tools() {
     log_step "Installing essential tools"
 
@@ -264,10 +234,8 @@ install_devops_tools() {
         fi
     done
 }
-
-# =============================================================================
 # Setup Oh My Zsh
-# =============================================================================
+
 setup_oh_my_zsh() {
     if [ -d "$HOME/.oh-my-zsh" ]; then
         log_info "Oh My Zsh already installed"
@@ -281,10 +249,8 @@ setup_oh_my_zsh() {
 
     log_success "Oh My Zsh installed"
 }
-
-# =============================================================================
 # Post-installation
-# =============================================================================
+
 post_install() {
     log_step "Post-installation setup"
 
@@ -300,54 +266,28 @@ post_install() {
 
     log_success "Post-installation complete"
 }
-
-# =============================================================================
 # Print Summary
-# =============================================================================
+
 print_summary() {
     echo ""
-    echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                   Installation Complete!                  ║${NC}"
-    echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
+    log_success "Installation complete"
     echo ""
-    echo -e "${CYAN}Next steps:${NC}"
+    echo "Next steps:"
+    echo "  1. Restart shell or source config files"
+    echo "  2. Run 'make test' to verify installation"
     echo ""
-    echo "  1. Restart your shell or run:"
-    echo -e "     ${YELLOW}source ~/.bashrc${NC}  (for Bash)"
-    echo -e "     ${YELLOW}source ~/.zshrc${NC}   (for Zsh)"
-    echo ""
-    echo "  2. Check installed tools:"
-    echo -e "     ${YELLOW}which stow git age direnv${NC}"
-    echo ""
-    echo "  3. Test the installation:"
-    echo -e "     ${YELLOW}make test${NC}"
-    echo ""
-
     if [ -d "$BACKUP_DIR" ]; then
-        echo -e "${YELLOW}Backup created at:${NC} $BACKUP_DIR"
-        echo ""
+        echo "Backup: $BACKUP_DIR"
     fi
-
-    echo -e "${CYAN}Log file:${NC} $LOG_FILE"
+    echo "Log: $LOG_FILE"
     echo ""
 }
-
-# =============================================================================
 # Main Installation Flow
-# =============================================================================
+
 main() {
     local mode="${1:---minimal}"
 
-    echo -e "${CYAN}"
-    cat << "EOF"
-╔═══════════════════════════════════════════════════════════╗
-║                  Dotfiles Bootstrap                       ║
-║                  Modernized with Stow                     ║
-╚═══════════════════════════════════════════════════════════╝
-EOF
-    echo -e "${NC}"
-
-    # Initialize log
+    echo "Dotfiles Bootstrap"
     echo "Bootstrap started at $(date)" > "$LOG_FILE"
 
     # System detection
