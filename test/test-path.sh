@@ -36,15 +36,15 @@ test_bash_path() {
     # Create ~/.local/bin if it doesn't exist for testing
     mkdir -p "$HOME/.local/bin"
 
-    # Source bashrc and check PATH
-    bash -c "
+    # Test with interactive bash to ensure .bashrc loads fully
+    bash -i -c "
         source '$DOTFILES_DIR/bash/.bashrc' 2>/dev/null || true
 
         # Check if ~/.local/bin is in PATH
         if [[ \":\$PATH:\" == *\":$HOME/.local/bin:\"* ]]; then
             echo 'PATH_OK'
         fi
-    " | grep -q "PATH_OK"
+    " 2>/dev/null | grep -q "PATH_OK"
 
     if [ $? -eq 0 ]; then
         log_success "Bash PATH includes ~/.local/bin"
