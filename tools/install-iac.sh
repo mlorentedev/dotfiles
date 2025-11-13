@@ -8,8 +8,8 @@
 set -e
 
 # Source utils if available
+# shellcheck disable=SC1091
 if [ -f "$(dirname "$0")/../scripts/.local/bin/utils" ]; then
-    # shellcheck source=scripts/.local/bin/utils
     source "$(dirname "$0")/../scripts/.local/bin/utils"
 else
     log_info() { echo "[INFO] $1"; }

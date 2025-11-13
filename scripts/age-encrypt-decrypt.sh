@@ -35,6 +35,7 @@ function usage() {
 # Input: none
 # Output: exits if age is not installed
 # Usage: check_dependencies
+# shellcheck disable=SC2119
 function check_dependencies() {
   require_command "age" "age" "Visit: https://github.com/FiloSottile/age"
 }

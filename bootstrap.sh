@@ -43,6 +43,7 @@ log_step() {
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if [ -f /etc/os-release ]; then
+            # shellcheck source=/dev/null
             . /etc/os-release
             OS=$ID
             OS_VERSION=$VERSION_ID
