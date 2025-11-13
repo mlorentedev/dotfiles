@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/utils.sh
 source "$SCRIPT_DIR/utils.sh"
 
+# shellcheck disable=SC2119
 PROJECT_ROOT="$(get_project_root)"
 SECRETS_DIR="${2:-$PROJECT_ROOT/sensitive}"
 KEY_PATH="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
@@ -72,6 +73,7 @@ function encrypt_file() {
 # Output: encrypted .age files, success message with count
 # Usage: encrypt_all
 function encrypt_all() {
+  # shellcheck disable=SC2119
   check_dependencies
   check_key_file
   ensure_directory "$SECRETS_DIR"
@@ -117,6 +119,7 @@ function decrypt_file() {
 # Output: decrypted .dec files, success message with count
 # Usage: decrypt_all
 function decrypt_all() {
+  # shellcheck disable=SC2119
   check_dependencies
   check_key_file
   ensure_directory "$SECRETS_DIR"
