@@ -1,0 +1,114 @@
+name: Test Dotfiles
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-ubuntu-2004:
+    name: Test on Ubuntu 20.04
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stow zsh shellcheck
+
+      - name: Run tests
+        run: |
+          chmod +x test/run-all-tests.sh
+          ./test/run-all-tests.sh
+
+      - name: Test minimal installation
+        run: |
+          chmod +x bootstrap.sh
+          ./bootstrap.sh --minimal
+
+  test-ubuntu-2204:
+    name: Test on Ubuntu 22.04
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stow zsh shellcheck
+
+      - name: Run tests
+        run: |
+          chmod +x test/run-all-tests.sh
+          ./test/run-all-tests.sh
+
+      - name: Test minimal installation
+        run: |
+          chmod +x bootstrap.sh
+          ./bootstrap.sh --minimal
+
+  test-ubuntu-latest:
+    name: Test on Ubuntu Latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stow zsh shellcheck
+
+      - name: Run tests
+        run: |
+          chmod +x test/run-all-tests.sh
+          ./test/run-all-tests.sh
+
+      - name: Test minimal installation
+        run: |
+          chmod +x bootstrap.sh
+          ./bootstrap.sh --minimal
+
+      - name: Test stow modules
+        run: |
+          cd $GITHUB_WORKSPACE
+          stow -t $HOME bash
+          test -L $HOME/.bashrc
+          stow -t $HOME zsh
+          test -L $HOME/.zshrc
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          find . -name "*.sh" -type f -exec shellcheck {} +
+          shellcheck bootstrap.sh
+          shellcheck tools/*.sh 2>/dev/null || true
+
+  docker-test:
+    name: Docker Integration Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test on Ubuntu 22.04 in Docker
+        run: |
+          chmod +x test/docker-test.sh
+          ./test/docker-test.sh 22.04

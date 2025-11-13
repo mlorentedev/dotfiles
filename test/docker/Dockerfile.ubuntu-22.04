@@ -1,0 +1,33 @@
+FROM ubuntu:22.04
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install basic dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    bash \
+    zsh \
+    vim \
+    sudo \
+    stow \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a test user
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER testuser
+WORKDIR /home/testuser
+
+# Copy dotfiles
+COPY --chown=testuser:testuser . /home/testuser/dotfiles
+
+# Set working directory to dotfiles
+WORKDIR /home/testuser/dotfiles
+
+# Run tests by default
+CMD ["./test/run-all-tests.sh"]

@@ -1,204 +1,418 @@
-# Dotfiles
+# Dotfiles - Modernized with GNU Stow
 
-My personal configuration files for development tools and shell environments. I use these across different machines to keep my setup consistent. They work with both Bash and Zsh, include aliases for common tasks, and have some handy scripts for managing secrets and GitHub repositories.
+[![Tests](https://github.com/mlorentedev/dotfiles/workflows/Test%20Dotfiles/badge.svg)](https://github.com/mlorentedev/dotfiles/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Getting Started
+Modern, tested, and automated dotfiles for DevOps engineers. Built with GNU Stow for modular configuration management.
 
-You'll need these basics before installing:
+## Features
 
-- `git`
-- `curl` or `wget`
-- `bash` or `zsh`
+- 🎯 **Modular Structure**: GNU Stow-based modules for easy management
+- 🔧 **Automated Installation**: One-command setup with tool installation
+- ✅ **Comprehensive Testing**: Unit, integration, and Docker-based tests
+- 🔐 **Secure Secrets**: Age encryption with smart wrapper and pre-commit hooks
+- 🚀 **DevOps Ready**: Pre-configured for Docker, Kubernetes, Terraform, Ansible
+- 📦 **Cross-Platform**: Ubuntu 20.04+, Debian 10+, WSL2
+- 🎨 **Modern Shell**: Starship prompt, eza, bat, fzf, zoxide integrations
+- 🔄 **CI/CD**: GitHub Actions for automated testing
 
-### Installation
+## Quick Start
 
 ```bash
-git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
+# Clone repository
+git clone https://github.com/mlorentedev/dotfiles ~/.dotfiles
 cd ~/.dotfiles
-chmod +x install.sh
-./install.sh
+
+# Minimal installation (just configs)
+make minimal
+
+# Or install with DevOps tools
+make tools
+
+# Or install everything
+make all
 ```
 
-This copies everything to `~/.dotfiles`, creates symlinks to your home directory, sets up both shell configs, and makes the scripts executable.
+## Installation Options
 
-After installing, restart your shell or run:
+### Option 1: Using Makefile (Recommended)
 
 ```bash
-# Zsh
-source ~/.zshrc
-
-# Bash
-source ~/.bashrc
+make minimal        # Install configs only
+make tools          # Install configs + DevOps tools
+make all            # Install everything including secrets
+make check          # Check dependencies
+make test           # Run all tests
 ```
 
-## What's Inside
-
-```text
-├── .bashrc              # Bash configuration
-├── .zshrc               # Zsh configuration  
-├── .profile             # Profile settings
-├── .gitconfig           # Git setup
-├── .gitignore           # What to ignore
-├── .zsh/                # Zsh files
-│   ├── aliases.zsh      # Command shortcuts
-│   ├── functions.zsh    # Custom functions
-│   └── nvm.zsh          # Node version management
-├── scripts/             # Helper scripts
-│   ├── utils.sh                    # Shared functions
-│   ├── age-encrypt-decrypt.sh      # File encryption
-│   ├── github-secrets-manager.sh   # GitHub secrets
-│   └── install-precommit.sh        # Git hooks
-├── sensitive/           # Encrypted files
-└── install.sh           # Installer
-```
-
-## Tools
-
-I use quite a few tools in my daily workflow. Check [TOOLS.md](TOOLS.md) for installation instructions.
-
-**Required:**
-
-- Git
-- Bash 4+ or Zsh 5+
-
-**Nice to have:**
-
-- Oh My Zsh (themes and plugins)
-- eza (better `ls` with colors)
-- zoxide (smart `cd`)
-- direnv (per-directory env vars)
-- age (file encryption)
-
-## What It Does
-
-### Shell Improvements
-
-- Aliases for commands I use constantly
-- Smart directory jumping with zoxide  
-- Automatic environment loading with direnv
-- Decent prompts for both shells
-- Colors everywhere
-
-### Development Setup
-
-- Java, Maven, Python, Ruby, Go paths
-- Docker and Kubernetes shortcuts
-- Quick commands for Terraform, Ansible, Helm
-- Node version management
-- GitHub CLI integration
-
-### Security Stuff  
-
-- Encrypt/decrypt files with age
-- Upload .env files to GitHub secrets
-- Keeps sensitive files out of git
-
-### Helper Scripts
-
-- Install pre-commit hooks
-- Debug PATH issues
-- Show terminal colors
-- Safe file operations
-
-## Scripts
-
-The scripts in `scripts/` get added to your PATH automatically:
-
-### `utils.sh`
-
-Library of common functions that other scripts use. Has colored output, path helpers, dependency checking, safe file operations, and progress tracking. Gets loaded automatically by other scripts.
-
-### `age-encrypt-decrypt.sh`
-
-Encrypts and decrypts files using the age tool. Takes all `*.secret` files and makes `*.secret.age` versions, or does the reverse.
+### Option 2: Using Bootstrap Script
 
 ```bash
-age-encrypt-decrypt.sh encrypt    # encrypt all *.secret files
-age-encrypt-decrypt.sh decrypt    # decrypt all *.age files
-age-encrypt-decrypt.sh encrypt /some/path  # work with different directory
+./bootstrap.sh --minimal    # Configs only
+./bootstrap.sh --tools      # Configs + tools
+./bootstrap.sh --all        # Everything
 ```
 
-Needs `age` installed and a private key at `~/.config/age/key.txt`.
-
-### `github-secrets-manager.sh`
-
-Reads .env files and uploads the variables as GitHub repository secrets. Handles multiple env files, decodes base64 SSH keys automatically, and skips duplicates.
+### Option 3: Manual Stow
 
 ```bash
-github-secrets-manager.sh                 # use default .env files
-github-secrets-manager.sh /path/to/.env   # use specific file
+# Install GNU Stow
+sudo apt-get install stow
+
+# Stow individual modules
+cd ~/.dotfiles
+stow bash zsh git shell-common scripts
 ```
 
-Needs `gh` (GitHub CLI) and you need to be logged in.
+## What's Included
 
-### `install-precommit.sh`
+### Core Modules
 
-Installs pre-commit hooks for the current git repository. Installs the pre-commit tool if needed, then sets up the hooks.
+- **bash/**: Modern Bash configuration with aliases and functions
+- **zsh/**: Zsh with Oh My Zsh, plugins, and custom config
+- **git/**: Git configuration and aliases
+- **shell-common/**: Shared shell configuration
+- **scripts/**: Utility scripts in `~/.local/bin`
+- **starship/**: Modern cross-shell prompt
 
-```bash
-install-precommit.sh
+### DevOps Tools (Installed with `--tools`)
+
+**Shell Enhancements:**
+- eza (modern ls)
+- bat (cat with syntax highlighting)
+- fzf (fuzzy finder)
+- ripgrep (fast grep)
+- zoxide (smart cd)
+- starship (prompt)
+- direnv (environment switcher)
+- age (encryption)
+
+**Container Tools:**
+- docker-compose
+- lazydocker (Docker TUI)
+
+**Kubernetes:**
+- kubectl
+- k9s (Kubernetes TUI)
+- helm
+- kubectx/kubens
+- stern (log tailing)
+
+**Infrastructure as Code:**
+- terraform
+- ansible
+- ansible-lint
+
+## Directory Structure
+
+```
+dotfiles/
+├── bash/              # Bash configuration
+│   ├── .bashrc
+│   ├── .bash_profile
+│   └── README.md
+├── zsh/               # Zsh configuration
+│   ├── .zshrc
+│   ├── .zsh/
+│   │   ├── aliases.zsh
+│   │   ├── functions.zsh
+│   │   └── nvm.zsh
+│   └── README.md
+├── git/               # Git configuration
+│   ├── .gitconfig
+│   └── README.md
+├── shell-common/      # Common shell configs
+│   ├── .profile
+│   └── README.md
+├── scripts/           # Utility scripts → ~/.local/bin
+│   ├── .local/bin/
+│   │   ├── utils
+│   │   ├── age-encrypt-decrypt
+│   │   ├── github-secrets-manager
+│   │   ├── secrets-wrapper
+│   │   └── install-precommit
+│   └── README.md
+├── starship/          # Starship prompt config
+│   ├── .config/starship.toml
+│   └── README.md
+├── test/              # Test suite
+│   ├── run-all-tests.sh
+│   ├── test-stow.sh
+│   ├── test-aliases.sh
+│   ├── test-path.sh
+│   └── docker/
+│       ├── Dockerfile.ubuntu-20.04
+│       ├── Dockerfile.ubuntu-22.04
+│       └── Dockerfile.ubuntu-24.04
+├── tools/             # Tool installation scripts
+│   ├── install-shell.sh
+│   ├── install-containers.sh
+│   ├── install-kubernetes.sh
+│   └── install-iac.sh
+├── .github/workflows/
+│   └── test.yml       # CI/CD pipeline
+├── bootstrap.sh       # Main installation script
+├── Makefile           # Common operations
+├── README.md          # This file
+└── MIGRATION.md       # Migration guide
 ```
 
-Needs Python with pip and a git repository.
+## Usage Examples
 
-### `install.sh`
-
-The main installer. Creates directories, copies files, makes symlinks, sets up both shells, adds scripts to PATH, and checks everything worked.
+### Shell Enhancements
 
 ```bash
-./install.sh
+# Smart cd with zoxide
+z dotfiles          # Jump to frequently used directories
+
+# Better ls with eza
+ls                  # Auto-aliased to eza
+ll                  # Long listing with git status
+tree                # Tree view with eza
+
+# Fuzzy finding with fzf
+Ctrl+R              # Search command history
+Ctrl+T              # Search files
+Alt+C               # Search directories
+
+# Syntax highlighting with bat
+cat file.json       # Auto-aliased to bat
 ```
 
-What it does:
-
-1. Creates `~/.dotfiles` structure
-2. Copies config files  
-3. Makes symlinks to home directory
-4. Sets up shell configs
-5. Adds scripts to PATH
-6. Checks everything
-
-## Customizing
-
-### Aliases
-
-Edit `~/.zsh/aliases.zsh` or add to your shell config:
+### DevOps Aliases
 
 ```bash
-alias ll="ls -la"
-alias myproject="cd ~/work/important-project"
+# Kubernetes
+k get pods          # kubectl shorthand
+k9s                 # Kubernetes TUI
+kubectx             # Switch context
+kubens              # Switch namespace
+
+# Docker
+d ps                # docker shorthand
+dc up -d            # docker-compose shorthand
+lazydocker          # Docker TUI
+
+# Terraform
+tf plan             # terraform shorthand
+tf apply            #
+
+# Ansible
+a -m ping           # ansible shorthand
+ap playbook.yml     # ansible-playbook shorthand
 ```
 
-### Functions  
-
-Add to `~/.zsh/functions.zsh`:
+### Secrets Management
 
 ```bash
-function backup() {
+# Encrypt secrets
+secrets-wrapper encrypt
+
+# Decrypt secrets
+secrets-wrapper decrypt
+
+# Create backup
+secrets-wrapper backup
+
+# Validate (check for leaks)
+secrets-wrapper validate
+
+# Setup direnv integration
+secrets-wrapper setup-direnv
+
+# List secrets
+secrets-wrapper list
+```
+
+## Testing
+
+### Local Testing
+
+```bash
+# Run all tests
+make test
+
+# Test individual components
+make test-stow
+make test-aliases
+make test-path
+
+# Run shellcheck
+make lint
+```
+
+### Docker Testing
+
+```bash
+# Test on Ubuntu 22.04
+make test-docker
+
+# Test on all Ubuntu versions (20.04, 22.04, 24.04)
+make test-docker-all
+```
+
+### CI/CD
+
+Tests run automatically on:
+- Push to main/master/develop
+- Pull requests
+- Manual workflow dispatch
+
+## Customization
+
+### Local Overrides
+
+Create these files for machine-specific configs (not tracked by git):
+
+```bash
+~/.bashrc.local     # Bash-specific
+~/.zshrc.local      # Zsh-specific
+~/.gitconfig.local  # Git-specific
+```
+
+### Adding Aliases
+
+Edit `~/.zsh/aliases.zsh` or add to `~/.bashrc.local`:
+
+```bash
+alias myproject='cd ~/work/my-project'
+alias deploy='./scripts/deploy.sh'
+```
+
+### Adding Functions
+
+Edit `~/.zsh/functions.zsh`:
+
+```bash
+# Quick backup
+backup() {
     cp "$1" "$1.backup-$(date +%Y%m%d)"
 }
 ```
 
-### Environment Variables
+## Common Tasks
 
-Add to `.zshrc`/`.bashrc` for shell-specific stuff, or `.profile` for everything.
+### Update Dotfiles
 
-## Security
+```bash
+make update         # Pull latest and reinstall
+```
 
-- Use `age-encrypt-decrypt.sh` to encrypt sensitive files
-- Use `github-secrets-manager.sh` to sync secrets to GitHub
-- Sensitive files are automatically gitignored
+### Backup Existing Config
+
+```bash
+make backup         # Backup to ~/.dotfiles-backup-TIMESTAMP
+```
+
+### Uninstall
+
+```bash
+make clean          # Remove symlinks
+make uninstall      # Remove symlinks (alias for clean)
+```
+
+### Check Dependencies
+
+```bash
+make check          # Show installed/missing dependencies
+```
+
+## Troubleshooting
+
+### Stow Conflicts
+
+If stow reports conflicts:
+
+```bash
+# Backup and remove conflicting files
+make backup
+rm ~/.bashrc ~/.zshrc  # etc
+
+# Then reinstall
+make minimal
+```
+
+### Shell Not Loading Config
+
+```bash
+# For Bash
+source ~/.bashrc
+
+# For Zsh
+source ~/.zshrc
+
+# Or restart shell
+exec $SHELL
+```
+
+### Path Not Updated
+
+Add to your shell config:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Then restart shell or source the config.
+
+## Requirements
+
+### Minimal
+
+- Bash 4.0+ or Zsh 5.0+
+- git
+- curl or wget
+
+### Recommended
+
+- GNU Stow (auto-installed)
+- zsh (for best experience)
+- Python 3 + pip (for pre-commit)
+
+### Optional
+
+All optional tools can be installed with `make tools`:
+- eza, bat, fzf, ripgrep, zoxide, starship, direnv, age
+- docker, docker-compose, lazydocker
+- kubectl, k9s, helm, kubectx, stern
+- terraform, ansible
+
+## Migration
+
+Migrating from old dotfiles structure? See [MIGRATION.md](MIGRATION.md) for step-by-step guide.
 
 ## Contributing
 
-Fork it, make changes, submit a pull request. Pretty standard stuff.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `make test`
+5. Submit a pull request
 
-## More Stuff
+## CI/CD
 
-- [Boilerplates](https://github.com/mlorentedev/boilerplates) - Project templates
-- [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) - Quick references  
-- [My list](https://mlorente.dev) - More detailed explanations
+The repository includes GitHub Actions workflows that:
+- Run tests on Ubuntu 20.04, 22.04, and latest
+- Test minimal installation
+- Run shellcheck on all scripts
+- Test in Docker containers
+- Verify stow functionality
 
 ## License
 
-MIT License - use it however you want.
+MIT License - See [LICENSE](LICENSE) for details.
+
+## Related Projects
+
+- [Boilerplates](https://github.com/mlorentedev/boilerplates) - Project templates
+- [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) - Quick references
+
+## Author
+
+**Miguel Lorente**
+- Website: [mlorente.dev](https://mlorente.dev)
+- GitHub: [@mlorentedev](https://github.com/mlorentedev)
+
+---
+
+Made with ❤️ for DevOps engineers who value automation and testing.
