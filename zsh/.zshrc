@@ -55,13 +55,16 @@ export PAGER=less
 # Dotfiles directory
 export DOTFILES_DIR="$HOME/.dotfiles"
 
-# Add ~/.local/bin to PATH if it exists
-if [ -d "$HOME/.local/bin" ]; then
-    PATH="$HOME/.local/bin:$PATH"
-fi
-
 # Smart PATH management - remove duplicates
 typeset -U PATH
+
+# Add ~/.local/bin to PATH if it exists and not already in PATH
+if [ -d "$HOME/.local/bin" ]; then
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) PATH="$HOME/.local/bin:$PATH" ;;
+    esac
+fi
 
 # ============================================================================
 # Load Custom Configurations

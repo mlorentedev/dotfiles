@@ -98,13 +98,13 @@ test_no_duplicates_zsh() {
         source '$DOTFILES_DIR/zsh/.zshrc' 2>/dev/null || true
         source '$DOTFILES_DIR/zsh/.zshrc' 2>/dev/null || true
 
-        # Count occurrences of .local/bin in PATH
-        count=\$(echo \"\$PATH\" | tr ':' '\n' | grep -c '.local/bin' || echo 0)
+        # Count occurrences of .local/bin in PATH (escape the dot)
+        count=\$(echo \"\$PATH\" | tr ':' '\n' | grep -c '\.local/bin' || echo 0)
 
         if [ \"\$count\" -le 1 ]; then
             echo 'NO_DUPLICATES'
         fi
-    " | grep -q "NO_DUPLICATES"
+    " 2>/dev/null | grep -q "NO_DUPLICATES"
 
     if [ $? -eq 0 ]; then
         log_success "Zsh PATH has no duplicates"
