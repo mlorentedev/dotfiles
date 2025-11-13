@@ -33,6 +33,9 @@ log_error() {
 test_bash_path() {
     log_info "Testing bash PATH configuration..."
 
+    # Create ~/.local/bin if it doesn't exist for testing
+    mkdir -p "$HOME/.local/bin"
+
     # Source bashrc and check PATH
     bash -c "
         source '$DOTFILES_DIR/bash/.bashrc' 2>/dev/null || true

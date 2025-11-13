@@ -7,14 +7,14 @@ Modern, tested, and automated dotfiles for DevOps engineers. Built with GNU Stow
 
 ## Features
 
-- 🎯 **Modular Structure**: GNU Stow-based modules for easy management
-- 🔧 **Automated Installation**: One-command setup with tool installation
-- ✅ **Comprehensive Testing**: Unit, integration, and Docker-based tests
-- 🔐 **Secure Secrets**: Age encryption with smart wrapper and pre-commit hooks
-- 🚀 **DevOps Ready**: Pre-configured for Docker, Kubernetes, Terraform, Ansible
-- 📦 **Cross-Platform**: Ubuntu 20.04+, Debian 10+, WSL2
-- 🎨 **Modern Shell**: Starship prompt, eza, bat, fzf, zoxide integrations
-- 🔄 **CI/CD**: GitHub Actions for automated testing
+- **Modular Structure**: GNU Stow-based modules for easy management
+- **Automated Installation**: One-command setup with tool installation
+- **Comprehensive Testing**: Unit, integration, and Docker-based tests
+- **Secure Secrets**: Age encryption with smart wrapper and pre-commit hooks
+- **DevOps Ready**: Pre-configured for Docker, Kubernetes, Terraform, Ansible
+- **Cross-Platform**: Ubuntu 20.04+, Debian 10+, WSL2
+- **Modern Shell**: Starship prompt, eza, bat, fzf, zoxide integrations
+- **CI/CD**: GitHub Actions for automated testing
 
 ## Quick Start
 
@@ -412,7 +412,3 @@ MIT License - See [LICENSE](LICENSE) for details.
 **Miguel Lorente**
 - Website: [mlorente.dev](https://mlorente.dev)
 - GitHub: [@mlorentedev](https://github.com/mlorentedev)
-
----
-
-Made with ❤️ for DevOps engineers who value automation and testing.
