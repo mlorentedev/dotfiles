@@ -6,6 +6,7 @@ set -e
 
 # Source utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/utils.sh
 source "$SCRIPT_DIR/utils.sh"
 
 # Check dependencies
@@ -64,7 +65,7 @@ process_env_files() {
             value="${value#\"}"
 
             # Skip already processed secrets to avoid duplicates
-            if [[ " ${processed_secrets[*]} " =~ " $key " ]]; then
+            if [[ " ${processed_secrets[*]} " =~ " ${key} " ]]; then
                 log_warning "Skipping duplicate secret: $key"
                 continue
             fi
@@ -97,7 +98,7 @@ process_env_files() {
             fi            
 
             # Mask potentially sensitive values
-            masked_value=$(echo "$value" | sed 's/./*/g')
+            masked_value="${value//?/*}"
             log_info "Setting secret: $key (value masked: $masked_value)"
 
             # Set GitHub secret

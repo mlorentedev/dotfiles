@@ -77,7 +77,7 @@ log_info "Creating bash_aliases file..."
 ensure_directory "$HOME/.bash"
 cat > "$HOME/.bash/bash_aliases" << EOF
 # Bash Aliases
-$(cat "$DOTFILES_DIR/.zsh/aliases.zsh" | grep "alias" | sed 's/alias /alias /g')
+$(grep "alias" "$DOTFILES_DIR/.zsh/aliases.zsh" | sed 's/alias /alias /g')
 EOF
 
 # Create a basic .bashrc if it doesn't exist
@@ -103,10 +103,10 @@ ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
 log_info "Adding dotfiles scripts directory to PATH..."
 if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.zshrc"; then
-    echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.zshrc"
+    echo "export PATH=\$HOME/.dotfiles/scripts:\$PATH" >> "$HOME/.zshrc"
 fi
 if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.bashrc"; then
-    echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.bashrc"
+    echo "export PATH=\$HOME/.dotfiles/scripts:\$PATH" >> "$HOME/.bashrc"
 fi
 
 # Test if files are correctly linked

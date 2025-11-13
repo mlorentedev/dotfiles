@@ -51,10 +51,10 @@ log_error() {
 # Usage: exit_error "Failed to connect" 2
 exit_error() {
     local message=$1
-    local code=${2:-1} # Default exit code is 1
-    
+    local code=${2:-1}
+
     log_error "$message"
-    exit $code
+    exit "$code"
 }
 
 # Environment functions
@@ -197,8 +197,9 @@ confirm_action() {
 # Usage: backup_file "/path/to/config.txt"
 backup_file() {
     local file=$1
-    local backup="${file}.$(date +%Y%m%d%H%M%S).bak"
-    
+    local backup
+    backup="${file}.$(date +%Y%m%d%H%M%S).bak"
+
     if [ -f "$file" ]; then
         log_info "Creating backup of $file..."
         cp "$file" "$backup"
@@ -213,7 +214,7 @@ backup_file() {
 # Output: timestamp in YYYYMMDDHHMMSS format to stdout
 # Usage: timestamp=$(get_timestamp)
 get_timestamp() {
-    echo "$(date +%Y%m%d%H%M%S)"
+    date +%Y%m%d%H%M%S
 }
 
 # Directory and path functions
@@ -224,7 +225,7 @@ get_timestamp() {
 # Usage: script_dir=$(get_script_dir)
 get_script_dir() {
     local calling_script="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
-    echo "$(cd "$(dirname "$calling_script")" && pwd)"
+    cd "$(dirname "$calling_script")" && pwd
 }
 
 # Gets the project root directory (parent of scripts directory)
@@ -233,7 +234,7 @@ get_script_dir() {
 # Usage: project_root=$(get_project_root)
 get_project_root() {
     local script_dir="${1:-$(get_script_dir)}"
-    echo "$(dirname "$script_dir")"
+    dirname "$script_dir"
 }
 
 # Creates directory if it doesn't exist
