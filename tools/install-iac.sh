@@ -9,6 +9,7 @@ set -e
 
 # Source utils if available
 if [ -f "$(dirname "$0")/../scripts/.local/bin/utils" ]; then
+    # shellcheck source=scripts/.local/bin/utils
     source "$(dirname "$0")/../scripts/.local/bin/utils"
 else
     log_info() { echo "[INFO] $1"; }
@@ -25,7 +26,8 @@ command_exists() {
 }
 
 get_arch() {
-    local arch=$(uname -m)
+    local arch
+    arch=$(uname -m)
     case "$arch" in
         x86_64) echo "amd64" ;;
         aarch64|arm64) echo "arm64" ;;
@@ -44,7 +46,8 @@ install_terraform() {
 
     log_info "Installing terraform..."
 
-    local arch=$(get_arch)
+    local arch
+    arch=$(get_arch)
     local version="1.7.0"
     local url="https://releases.hashicorp.com/terraform/${version}/terraform_${version}_linux_${arch}.zip"
 

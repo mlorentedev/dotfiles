@@ -87,8 +87,9 @@ function encrypt_all() {
     [[ ! -f "$file" ]] && continue
     encrypt_file "$file" "$pubkey"
   done
-  
-  local count=$(get_counter "processed_count")
+
+  local count
+  count=$(get_counter "processed_count")
   log_success "Encrypted $count files"
 }
 
@@ -127,8 +128,9 @@ function decrypt_all() {
     [[ ! -f "$file" ]] && continue
     decrypt_file "$file"
   done
-  
-  local count=$(get_counter "processed_count")
+
+  local count
+  count=$(get_counter "processed_count")
   log_success "Decrypted $count files"
 }
 

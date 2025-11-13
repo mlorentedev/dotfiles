@@ -9,6 +9,7 @@ set -e
 
 # Source utils if available
 if [ -f "$(dirname "$0")/../scripts/.local/bin/utils" ]; then
+    # shellcheck source=scripts/.local/bin/utils
     source "$(dirname "$0")/../scripts/.local/bin/utils"
 else
     log_info() { echo "[INFO] $1"; }
@@ -25,7 +26,8 @@ command_exists() {
 }
 
 get_arch() {
-    local arch=$(uname -m)
+    local arch
+    arch=$(uname -m)
     case "$arch" in
         x86_64) echo "amd64" ;;
         aarch64|arm64) echo "arm64" ;;
@@ -44,8 +46,10 @@ install_kubectl() {
 
     log_info "Installing kubectl..."
 
-    local arch=$(get_arch)
-    local version=$(curl -sL https://dl.k8s.io/release/stable.txt)
+    local arch
+    local version
+    arch=$(get_arch)
+    version=$(curl -sL https://dl.k8s.io/release/stable.txt)
     local url="https://dl.k8s.io/release/${version}/bin/linux/${arch}/kubectl"
 
     curl -sL "$url" -o "$INSTALL_DIR/kubectl"
@@ -65,7 +69,8 @@ install_k9s() {
 
     log_info "Installing k9s (Kubernetes TUI)..."
 
-    local arch=$(get_arch)
+    local arch
+    arch=$(get_arch)
     local version="v0.31.7"
     local url="https://github.com/derailed/k9s/releases/download/${version}/k9s_Linux_${arch}.tar.gz"
 
@@ -126,7 +131,8 @@ install_stern() {
 
     log_info "Installing stern (log tailing)..."
 
-    local arch=$(get_arch)
+    local arch
+    arch=$(get_arch)
     local version="v1.28.0"
     local url="https://github.com/stern/stern/releases/download/${version}/stern_${version#v}_linux_${arch}.tar.gz"
 

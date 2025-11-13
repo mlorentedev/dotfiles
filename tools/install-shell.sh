@@ -9,6 +9,7 @@ set -e
 
 # Source utils if available
 if [ -f "$(dirname "$0")/../scripts/.local/bin/utils" ]; then
+    # shellcheck source=scripts/.local/bin/utils
     source "$(dirname "$0")/../scripts/.local/bin/utils"
 else
     log_info() { echo "[INFO] $1"; }
@@ -28,7 +29,8 @@ command_exists() {
 }
 
 get_arch() {
-    local arch=$(uname -m)
+    local arch
+    arch=$(uname -m)
     case "$arch" in
         x86_64) echo "x86_64" ;;
         aarch64|arm64) echo "aarch64" ;;
@@ -37,7 +39,8 @@ get_arch() {
 }
 
 get_os() {
-    local os=$(uname -s)
+    local os
+    os=$(uname -s)
     case "$os" in
         Linux) echo "linux" ;;
         Darwin) echo "macos" ;;
@@ -57,8 +60,10 @@ install_eza() {
 
     log_info "Installing eza (modern ls replacement)..."
 
-    local os=$(get_os)
-    local arch=$(get_arch)
+    local os
+    local arch
+    os=$(get_os)
+    arch=$(get_arch)
 
     if [ "$os" = "linux" ] && [ "$arch" = "x86_64" ]; then
         local version="0.18.0"
@@ -80,8 +85,10 @@ install_bat() {
 
     log_info "Installing bat (cat with syntax highlighting)..."
 
-    local os=$(get_os)
-    local arch=$(get_arch)
+    local os
+    local arch
+    os=$(get_os)
+    arch=$(get_arch)
 
     if [ "$os" = "linux" ] && [ "$arch" = "x86_64" ]; then
         local version="0.24.0"
@@ -123,8 +130,10 @@ install_ripgrep() {
 
     log_info "Installing ripgrep (fast grep)..."
 
-    local os=$(get_os)
-    local arch=$(get_arch)
+    local os
+    local arch
+    os=$(get_os)
+    arch=$(get_arch)
 
     if [ "$os" = "linux" ] && [ "$arch" = "x86_64" ]; then
         local version="14.1.0"
@@ -175,8 +184,10 @@ install_direnv() {
 
     log_info "Installing direnv (environment switcher)..."
 
-    local os=$(get_os)
-    local arch=$(get_arch)
+    local os
+    local arch
+    os=$(get_os)
+    arch=$(get_arch)
 
     if [ "$os" = "linux" ]; then
         local url="https://direnv.net/install.sh"
@@ -196,8 +207,10 @@ install_age() {
 
     log_info "Installing age (encryption tool)..."
 
-    local os=$(get_os)
-    local arch=$(get_arch)
+    local os
+    local arch
+    os=$(get_os)
+    arch=$(get_arch)
 
     if [ "$os" = "linux" ] && [ "$arch" = "x86_64" ]; then
         local version="v1.1.1"

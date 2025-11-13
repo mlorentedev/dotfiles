@@ -65,7 +65,8 @@ process_env_files() {
             value="${value#\"}"
 
             # Skip already processed secrets to avoid duplicates
-            if [[ " ${processed_secrets[*]} " =~ " ${key} " ]]; then
+            local pattern=" $key "
+            if [[ " ${processed_secrets[*]} " =~ $pattern ]]; then
                 log_warning "Skipping duplicate secret: $key"
                 continue
             fi

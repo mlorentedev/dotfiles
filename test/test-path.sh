@@ -37,16 +37,14 @@ test_bash_path() {
     mkdir -p "$HOME/.local/bin"
 
     # Test with interactive bash to ensure .bashrc loads fully
-    bash -i -c "
+    if bash -i -c "
         source '$DOTFILES_DIR/bash/.bashrc' 2>/dev/null || true
 
         # Check if ~/.local/bin is in PATH
         if [[ \":\$PATH:\" == *\":$HOME/.local/bin:\"* ]]; then
             echo 'PATH_OK'
         fi
-    " 2>/dev/null | grep -q "PATH_OK"
-
-    if [ $? -eq 0 ]; then
+    " 2>/dev/null | grep -q "PATH_OK"; then
         log_success "Bash PATH includes ~/.local/bin"
         return 0
     else
@@ -65,16 +63,14 @@ test_zsh_path() {
     fi
 
     # Source zshrc and check PATH
-    zsh -c "
+    if zsh -c "
         source '$DOTFILES_DIR/zsh/.zshrc' 2>/dev/null || true
 
         # Check if ~/.local/bin is in PATH
         if [[ \":\$PATH:\" == *\":$HOME/.local/bin:\"* ]]; then
             echo 'PATH_OK'
         fi
-    " | grep -q "PATH_OK"
-
-    if [ $? -eq 0 ]; then
+    " | grep -q "PATH_OK"; then
         log_success "Zsh PATH includes ~/.local/bin"
         return 0
     else
@@ -93,7 +89,7 @@ test_no_duplicates_zsh() {
     fi
 
     # Source zshrc multiple times and check for duplicates
-    zsh -c "
+    if zsh -c "
         source '$DOTFILES_DIR/zsh/.zshrc' 2>/dev/null || true
         source '$DOTFILES_DIR/zsh/.zshrc' 2>/dev/null || true
         source '$DOTFILES_DIR/zsh/.zshrc' 2>/dev/null || true
@@ -104,9 +100,7 @@ test_no_duplicates_zsh() {
         if [ \"\$count\" -le 1 ]; then
             echo 'NO_DUPLICATES'
         fi
-    " 2>/dev/null | grep -q "NO_DUPLICATES"
-
-    if [ $? -eq 0 ]; then
+    " 2>/dev/null | grep -q "NO_DUPLICATES"; then
         log_success "Zsh PATH has no duplicates"
         return 0
     else

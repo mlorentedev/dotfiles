@@ -36,7 +36,7 @@ test_bash_aliases() {
     # Source bashrc
     if [ -f "$DOTFILES_DIR/bash/.bashrc" ]; then
         # Create a temporary bash environment (interactive to load aliases)
-        bash -i -c "
+        if bash -i -c "
             source '$DOTFILES_DIR/bash/.bashrc' 2>/dev/null || true
 
             # Check if basic aliases exist
@@ -45,9 +45,7 @@ test_bash_aliases() {
             else
                 exit 1
             fi
-        " 2>/dev/null
-
-        if [ $? -eq 0 ]; then
+        " 2>/dev/null; then
             log_success "Bash aliases loaded correctly"
             return 0
         else
@@ -72,7 +70,7 @@ test_zsh_aliases() {
     # Check if aliases file exists
     if [ -f "$DOTFILES_DIR/zsh/.zsh/aliases.zsh" ]; then
         # Create a temporary zsh environment
-        zsh -c "
+        if zsh -c "
             source '$DOTFILES_DIR/zsh/.zsh/aliases.zsh' 2>/dev/null || true
 
             # Check if basic aliases exist
@@ -81,9 +79,7 @@ test_zsh_aliases() {
             else
                 exit 1
             fi
-        "
-
-        if [ $? -eq 0 ]; then
+        "; then
             log_success "Zsh aliases loaded correctly"
             return 0
         else
