@@ -120,8 +120,8 @@ install_stow() {
     case "$OS" in
         ubuntu|debian)
             if command_exists sudo; then
-                sudo apt-get update
-                sudo apt-get install -y stow
+                sudo apt-get update -qq
+                DEBIAN_FRONTEND=noninteractive sudo apt-get install -y stow
             else
                 log_error "sudo not available and stow not installed"
                 log_error "Please install stow manually: apt-get install stow"
