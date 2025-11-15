@@ -59,4 +59,4 @@ export GO_HOME=$HOME/Apps/go-1.23.1
 export NINJA_HOME=$HOME/.console-ninja
 export DOTFILES_DIR=$HOME/.dotfiles
 
-export PATH=$HOME/.local/bin:$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:/usr/bin:/bin:$NINJA_HOME/bin:$DOTFILES_DIR/scripts:$PATH
+export PATH=$HOME/.local/bin:$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:$HOME/go/bin:/usr/bin:/bin:$NINJA_HOME/bin:$DOTFILES_DIR/scripts:$PATH
