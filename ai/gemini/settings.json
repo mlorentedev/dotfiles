@@ -1,0 +1,37 @@
+{
+  "model": {
+    "name": "gemini-2.5-pro"
+  },
+  "context": {
+    "fileFiltering": {
+      "respectGitignore": true,
+      "ignorePatterns": [
+        "**/node_modules/**",
+        "**/__pycache__/**",
+        "**/.git/**",
+        "**/*.lock",
+        "**/dist/**",
+        "**/site/**"
+      ]
+    }
+  },
+  "ui": {
+    "showMemoryUsage": true,
+    "theme": "GitHub"
+  },
+  "autoApproveToolUse": false,
+  "maxTokens": 8192,
+  "temperature": 0.2,
+  "experimental": {
+    "agentYoloMode": true,
+    "liveContext": true
+  },
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "general": {
+    "previewFeatures": true
+  }
+}

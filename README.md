@@ -43,6 +43,9 @@ source ~/.bashrc
 │   ├── aliases.zsh      # Command shortcuts
 │   ├── functions.zsh    # Custom functions
 │   └── nvm.zsh          # Node version management
+├── ai/                  # AI configuration
+│   ├── gemini/          # Gemini settings
+│   └── prompts/         # Custom prompts
 ├── scripts/             # Helper scripts
 │   ├── utils.sh                    # Shared functions
 │   ├── age-encrypt-decrypt.sh      # File encryption
@@ -152,11 +155,12 @@ The main installer. Creates directories, copies files, makes symlinks, sets up b
 What it does:
 
 1. Creates `~/.dotfiles` structure
-2. Copies config files  
+2. Copies config files
 3. Makes symlinks to home directory
 4. Sets up shell configs
 5. Adds scripts to PATH
-6. Checks everything
+6. Sets up AI configuration
+7. Checks everything
 
 ## Customizing
 
@@ -182,6 +186,10 @@ function backup() {
 ### Environment Variables
 
 Add to `.zshrc`/`.bashrc` for shell-specific stuff, or `.profile` for everything.
+
+### AI Configuration
+
+The `install.sh` script also copies the files from the `ai/` directory to `~/.gemini`. This allows you to customize the prompts and settings for the Gemini CLI.
 
 ## Security
 

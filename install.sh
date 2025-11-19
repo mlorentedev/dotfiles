@@ -101,6 +101,13 @@ fi
 # Link .bashrc
 ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
+# Setup AI configuration
+log_info "Setting up AI configuration for Gemini..."
+ensure_directory "$HOME/.gemini"
+ensure_directory "$HOME/.gemini/prompts"
+cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
+cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.gemini/prompts/" 2>/dev/null || true
+
 log_info "Adding dotfiles scripts directory to PATH..."
 if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.zshrc"; then
     echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.zshrc"

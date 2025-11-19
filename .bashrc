@@ -58,6 +58,28 @@ alias l='ls -CF'
 alias python=python3
 alias docker-compose='docker compose'
 
+# ==========================
+#   AI
+# ==========================
+alias g='gemini'
+
+function gp() {
+    local prompt_name="$1"
+    local prompt_file="$HOME/.gemini/prompts/${prompt_name}.md"
+    shift # Remove prompt name from arguments
+
+    if [ ! -f "$prompt_file" ]; then
+        echo "❌ Error: Prompt '$prompt_name' not found in ~/.gemini/prompts/"
+        echo "Available prompts:"
+        ls -1 ~/.gemini/prompts/ | sed 's/\.md//'
+        return 1
+    fi
+
+    # Pass the content of the prompt file as system instruction
+    local full_prompt="$(cat "$prompt_file")"$'\n\n'"$*"
+    gemini -i "$full_prompt"
+}
+
 # Load custom aliases if available
 [[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
 
