@@ -17,6 +17,7 @@ Thumbs.db
 
 # Development tools
 .claude/
+.gemini/
 node_modules/
 *.log
 

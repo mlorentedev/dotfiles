@@ -80,6 +80,25 @@ function gp() {
     gemini -i "$full_prompt"
 }
 
+alias c='claude'
+
+function cp() {
+    local prompt_name="$1"
+    local prompt_file="$HOME/.claude/prompts/${prompt_name}.md"
+    shift # Remove prompt name from arguments
+
+    if [ ! -f "$prompt_file" ]; then
+        echo "❌ Error: Prompt '$prompt_name' not found in ~/.claude/prompts/"
+        echo "Available prompts:"
+        ls -1 ~/.claude/prompts/ 2>/dev/null | sed 's/\.md//' || echo "No prompts found"
+        return 1
+    fi
+
+    # Pass the content of the prompt file as system instruction
+    local full_prompt="$(cat "$prompt_file")"$'\n\n'"$*"
+    claude -i "$full_prompt"
+}
+
 # Load custom aliases if available
 [[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
 

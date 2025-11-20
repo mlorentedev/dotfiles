@@ -108,6 +108,14 @@ ensure_directory "$HOME/.gemini/prompts"
 cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
 cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.gemini/prompts/" 2>/dev/null || true
 
+log_info "Setting up AI configuration for Claude..."
+ensure_directory "$HOME/.claude"
+ensure_directory "$HOME/.claude/prompts"
+cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
+cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.claude/prompts/" 2>/dev/null || true
+chmod +x "$HOME/.claude/boost.sh" 2>/dev/null || true
+chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
+
 log_info "Adding dotfiles scripts directory to PATH..."
 if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.zshrc"; then
     echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.zshrc"
