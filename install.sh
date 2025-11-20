@@ -113,7 +113,6 @@ ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/prompts"
 cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
 cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.claude/prompts/" 2>/dev/null || true
-chmod +x "$HOME/.claude/boost.sh" 2>/dev/null || true
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 
 log_info "Adding dotfiles scripts directory to PATH..."
