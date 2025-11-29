@@ -1,25 +1,20 @@
 # ~/.bashrc: executed by bash(1) for non-login shells.
 
 # ==========================
-#    EXIT IF NOT INTERACTIVE
+#    INTERACTIVE CHECK
 # ==========================
 [[ $- != *i* ]] && return
 
 # ==========================
-#      HISTORY SETTINGS
+#    HISTORY & DISPLAY
 # ==========================
 HISTCONTROL=ignoreboth
 HISTSIZE=1000
 HISTFILESIZE=2000
+shopt -s histappend
+shopt -s checkwinsize
 
-# ==========================
-#      LESS ENHANCEMENTS
-# ==========================
-command -v lesspipe &>/dev/null && eval "$(SHELL=/bin/sh lesspipe)"
-
-# ==========================
-#      PROMPT CONFIGURATION
-# ==========================
+# Prompt Configuration
 case "$TERM" in
     xterm-color|*-256color) color_prompt=yes ;;
 esac
@@ -31,91 +26,21 @@ else
 fi
 unset color_prompt
 
-# Set terminal title for xterm-like terminals
-case "$TERM" in
-    xterm*|rxvt*) 
-        PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1" 
-        ;;
-esac
-
-# ==========================
-#      COLOR SUPPORT
-# ==========================
-if command -v dircolors &>/dev/null; then
+# Color Support
+if command -v dircolors >/dev/null; then
     eval "$(dircolors -b ~/.dircolors 2>/dev/null || dircolors -b)"
     alias ls='ls --color=auto'
     alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
 fi
-
 # ==========================
-#       USEFUL ALIASES
+#       ENVIRONMENT
 # ==========================
-alias ll='ls -alF'
-alias la='ls -A'
-alias l='ls -CF'
-alias python=python3
-alias docker-compose='docker compose'
+# Base Directories
+export DOTFILES_DIR="$HOME/.dotfiles"
+export APPS_HOME="$HOME/Applications"
+export NINJA_HOME="$HOME/.console-ninja"
 
-# ==========================
-#   AI
-# ==========================
-alias g='gemini'
-
-function gp() {
-    local prompt_name="$1"
-    local prompt_file="$HOME/.gemini/prompts/${prompt_name}.md"
-    shift # Remove prompt name from arguments
-
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt '$prompt_name' not found in ~/.gemini/prompts/"
-        echo "Available prompts:"
-        ls -1 ~/.gemini/prompts/ | sed 's/\.md//'
-        return 1
-    fi
-
-    # Pass the content of the prompt file as system instruction
-    local full_prompt="$(cat "$prompt_file")"$'\n\n'"$*"
-    gemini -i "$full_prompt"
-}
-
-alias c='claude'
-
-function cp() {
-    local prompt_name="$1"
-    local prompt_file="$HOME/.claude/prompts/${prompt_name}.md"
-    shift # Remove prompt name from arguments
-
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt '$prompt_name' not found in ~/.claude/prompts/"
-        echo "Available prompts:"
-        ls -1 ~/.claude/prompts/ 2>/dev/null | sed 's/\.md//' || echo "No prompts found"
-        return 1
-    fi
-
-    # Pass the content of the prompt file as system instruction
-    local full_prompt="$(cat "$prompt_file")"$'\n\n'"$*"
-    claude -i "$full_prompt"
-}
-
-# Load custom aliases if available
-[[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
-
-# ==========================
-#      AUTOCOMPLETION
-# ==========================
-if [[ -r /usr/share/bash-completion/bash_completion ]]; then
-    source /usr/share/bash-completion/bash_completion
-fi
-
-# ==========================
-#    ENVIRONMENT VARIABLES
-# ==========================
-# Development Tools Home
-export APPS_HOME="$HOME/Apps"
-
-# Define individual tool homes
+# Tool Homes
 export JAVA_HOME="$APPS_HOME/jdk-21.0.4"
 export MAVEN_HOME="$APPS_HOME/apache-maven-3.9.4"
 export PYTHON_HOME="$APPS_HOME/python-3.12.6"
@@ -125,12 +50,12 @@ export MINIKUBE_HOME="$APPS_HOME/minikube-1.34.0"
 export GO_HOME="$APPS_HOME/go-1.23.1"
 
 # ==========================
-#       PATH CONFIGURATION
+#    PATH CONFIGURATION
 # ==========================
-# Ensure system paths are first
+# Ensure system paths are present
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 
-# Add development tool paths
+# Append Tool Paths
 export PATH="$PATH:$JAVA_HOME/bin"
 export PATH="$PATH:$MAVEN_HOME/bin"
 export PATH="$PATH:$PYTHON_HOME/bin"
@@ -138,23 +63,53 @@ export PATH="$PATH:$RUBY_HOME/bin"
 export PATH="$PATH:$GEM_HOME/bin"
 export PATH="$PATH:$MINIKUBE_HOME"
 export PATH="$PATH:$GO_HOME/bin"
+export PATH="$PATH:$HOME/go/bin"
+export PATH="$PATH:$NINJA_HOME/.bin"
+export PATH="$PATH:$DOTFILES_DIR/scripts"
 
-# Add personal script directories
-export PATH="$PATH:$HOME/.console-ninja/.bin"
-export PATH="$PATH:$HOME/.dotfiles/scripts"
+# Prepend User Local Bin
+export PATH="$HOME/.local/bin:$PATH"
 
-# Debugging PATH function
-path_info() {
-    echo "=== CURRENT PATH ==="
-    echo "$PATH" | tr ':' '\n'
-    
-    echo -e "\n=== COMMAND LOCATIONS ==="
-    for cmd in java mvn python ruby gem go; do
-        location=$(command -v "$cmd" 2>/dev/null)
-        if [[ -n "$location" ]]; then
-            echo "$cmd: $location"
-        else
-            echo "$cmd: Not found"
-        fi
-    done
+# ==========================
+#        ALIASES
+# ==========================
+if [ -f ~/.bash_aliases ]; then
+    source ~/.bash_aliases
+fi
+
+# AI Tool Aliases
+alias g='gemini'
+alias c='claude'
+
+function gp() {
+    local prompt_file="$HOME/.gemini/prompts/$1.md"
+    shift
+    if [ ! -f "$prompt_file" ]; then
+        echo "❌ Error: Prompt not found at $prompt_file"
+        return 1
+    fi
+    gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
+
+function cp() {
+    local prompt_file="$HOME/.claude/prompts/$1.md"
+    shift
+    if [ ! -f "$prompt_file" ]; then
+        echo "❌ Error: Prompt not found at $prompt_file"
+        return 1
+    fi
+    claude -i "$(cat "$prompt_file")"$'\n\n'"$*"
+}
+
+# ==========================
+#    SHELL ENHANCEMENTS
+# ==========================
+# Enable direnv and zoxide
+command -v direnv >/dev/null && eval "$(direnv hook bash)"
+command -v zoxide >/dev/null && eval "$(zoxide init bash)"
+
+# Bash Completion
+if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+fi
+complete -o nospace -C /usr/bin/terraform terraform

@@ -32,6 +32,9 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     log_info "Copying files from $CURRENT_DIR to $DOTFILES_DIR..."
     safe_copy "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.profile" "$DOTFILES_DIR/" 2>/dev/null || true
+    if [ -f "$CURRENT_DIR/.bashrc" ]; then
+        safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
+    fi    
     cp -rf "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/scripts/"* "$DOTFILES_DIR/scripts/" 2>/dev/null || true
 else
@@ -81,8 +84,10 @@ $(cat "$DOTFILES_DIR/.zsh/aliases.zsh" | grep "alias" | sed 's/alias /alias /g')
 EOF
 
 # Create a basic .bashrc if it doesn't exist
-if [ ! -f "$DOTFILES_DIR/.bashrc" ]; then
-    log_info "Creating a basic .bashrc file..."
+if [ -f "$DOTFILES_DIR/.bashrc" ]; then
+    log_info "Using existing .bashrc from dotfiles..."
+else
+    log_info "Creating a basic .bashrc file (none found in source)..."
     cat > "$DOTFILES_DIR/.bashrc" << EOF
 # ~/.bashrc: executed by bash(1) for non-login shells.
 
@@ -102,13 +107,11 @@ fi
 ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
 # Setup AI configuration
-log_info "Setting up AI configuration for Gemini..."
+log_info "Setting up AI configuration ..."
 ensure_directory "$HOME/.gemini"
 ensure_directory "$HOME/.gemini/prompts"
 cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
 cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.gemini/prompts/" 2>/dev/null || true
-
-log_info "Setting up AI configuration for Claude..."
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/prompts"
 cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
@@ -116,32 +119,33 @@ cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.claude/prompts/" 2>/dev/null || true
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 
 log_info "Adding dotfiles scripts directory to PATH..."
-if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.zshrc"; then
-    echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.zshrc"
-fi
-if ! grep -q "export PATH=\$DOTFILES_DIR/scripts:\$PATH" "$HOME/.bashrc"; then
-    echo 'export PATH=$HOME/.dotfiles/scripts:$PATH' >> "$HOME/.bashrc"
-fi
+
+add_path_safe() {
+    local file="$1"
+    local path_line='export PATH=$HOME/.dotfiles/scripts:$PATH'
+    
+    if [ -f "$file" ]; then
+        # Check if line exists ignoring whitespace
+        if ! grep -Fq "$path_line" "$file"; then
+            # Ensure file ends with newline before appending
+            [ -n "$(tail -c1 "$file")" ] && echo "" >> "$file"
+            echo "$path_line" >> "$file"
+            log_success "Added scripts to PATH in $file"
+        fi
+    fi
+}
+
+add_path_safe "$HOME/.zshrc"
+add_path_safe "$HOME/.bashrc"
 
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."
-if [ -f "$HOME/.zsh/aliases.zsh" ]; then
-    log_success "aliases.zsh linked successfully!"
-else
-    log_error "aliases.zsh not linked correctly!"
-fi
 
-if [ -f "$HOME/.bash/bash_aliases" ]; then
-    log_success "bash_aliases created successfully!"
-else
-    log_error "bash_aliases not created correctly!"
-fi
-
-if [ -f "$HOME/.zsh/functions.zsh" ]; then
-    log_success "functions.zsh linked successfully!"
-else
-    log_error "functions.zsh not linked correctly!"
-fi
+[ -f "$HOME/.zsh/aliases.zsh" ] && log_success "aliases.zsh linked successfully!" || log_error "aliases.zsh issue!"
+[ -f "$HOME/.bash/bash_aliases" ] && log_success "bash_aliases created successfully!" || log_error "bash_aliases issue!"
+[ -f "$HOME/.zsh/functions.zsh" ] && log_success "functions.zsh linked successfully!" || log_error "functions.zsh issue!"
+[ -f "$HOME/.bashrc" ] && log_success ".bashrc linked successfully!" || log_error ".bashrc issue!"
+[ -f "$HOME/.zshrc" ] && log_success ".zshrc linked successfully!" || log_error ".zshrc issue!"
 
 # Check dependencies
 check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible" "pip"

@@ -9,95 +9,86 @@ plugins=(git)
 source $ZSH/oh-my-zsh.sh
 
 # ==========================
+#       ENVIRONMENT
+# ==========================
+# Base Directories
+export DOTFILES_DIR="$HOME/.dotfiles"
+export APPS_HOME="$HOME/Applications"
+export NINJA_HOME="$HOME/.console-ninja"
+
+# Tool Homes
+export JAVA_HOME="$APPS_HOME/jdk-21.0.4"
+export MAVEN_HOME="$APPS_HOME/apache-maven-3.9.4"
+export PYTHON_HOME="$APPS_HOME/python-3.12.6"
+export RUBY_HOME="$APPS_HOME/ruby-3.1.4"
+export GEM_HOME="$RUBY_HOME/gems"
+export MINIKUBE_HOME="$APPS_HOME/minikube-1.34.0"
+export GO_HOME="$APPS_HOME/go-1.23.1"
+
+# ==========================
+#    PATH CONFIGURATION
+# ==========================
+# Start with system paths or current path
+# export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# Append Tool Paths
+export PATH="$PATH:$JAVA_HOME/bin"
+export PATH="$PATH:$MAVEN_HOME/bin"
+export PATH="$PATH:$PYTHON_HOME/bin"
+export PATH="$PATH:$RUBY_HOME/bin"
+export PATH="$PATH:$GEM_HOME/bin"
+export PATH="$PATH:$MINIKUBE_HOME"
+export PATH="$PATH:$GO_HOME/bin"
+export PATH="$PATH:$HOME/go/bin"        # Go workspace bin
+export PATH="$PATH:$NINJA_HOME/.bin"    # Console Ninja
+export PATH="$PATH:$DOTFILES_DIR/scripts"
+
+# Prepend User Local Bin (High Priority)
+export PATH="$HOME/.local/bin:$PATH"
+
+# ==========================
 #        ALIASES
 # ==========================
-alias ll='ls -alF'
-alias la='ls -A'
-alias l='ls -CF'
-alias python=python3
-alias docker-compose='docker compose'
-alias setup-gh-secrets="$HOME/.dotfiles/scripts/github-secrets-manager.sh"
-
-# ==========================
-#   AI
-# ==========================
-alias g='gemini'
-
-function gp() {
-    local prompt_name="$1"
-    local prompt_file="$HOME/.gemini/prompts/${prompt_name}.md"
-    shift # Remove prompt name from arguments
-
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt '$prompt_name' not found in ~/.gemini/prompts/"
-        echo "Available prompts:"
-        ls -1 ~/.gemini/prompts/ | sed 's/\.md//'
-        return 1
-    fi
-
-    # Pass the content of the prompt file as system instruction
-    local full_prompt="$(cat "$prompt_file")"$'\n\n'"$*"
-    gemini -i "$full_prompt"
-}
-
-alias c='claude'
-
-function cp() {
-    local prompt_name="$1"
-    local prompt_file="$HOME/.claude/prompts/${prompt_name}.md"
-    shift # Remove prompt name from arguments
-
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt '$prompt_name' not found in ~/.claude/prompts/"
-        echo "Available prompts:"
-        ls -1 ~/.claude/prompts/ 2>/dev/null | sed 's/\.md//' || echo "No prompts found"
-        return 1
-    fi
-
-    # Pass the content of the prompt file as system instruction
-    local full_prompt="$(cat "$prompt_file")"$'\n\n'"$*"
-    claude -i "$full_prompt"
-}
-
-# Load custom aliases if they exist
+# Load consolidated aliases
 [[ -f ~/.zsh/aliases.zsh ]] && source ~/.zsh/aliases.zsh
 
+# AI Tool Aliases
+alias g='gemini'
+alias c='claude'
+
+# Gemini Helper Function
+function gp() {
+    local prompt_file="$HOME/.gemini/prompts/$1.md"
+    shift
+    if [ ! -f "$prompt_file" ]; then
+        echo "❌ Error: Prompt not found at $prompt_file"
+        return 1
+    fi
+    gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
+}
+
+# Claude Helper Function
+function cp() {
+    local prompt_file="$HOME/.claude/prompts/$1.md"
+    shift
+    if [ ! -f "$prompt_file" ]; then
+        echo "❌ Error: Prompt not found at $prompt_file"
+        return 1
+    fi
+    claude -i "$(cat "$prompt_file")"$'\n\n'"$*"
+}
+
 # ==========================
-#      CUSTOM SCRIPTS
+#    SHELL ENHANCEMENTS
 # ==========================
+# Load custom functions and scripts
 [[ -f ~/.zsh/functions.zsh ]] && source ~/.zsh/functions.zsh
 [[ -f ~/.zsh/nvm.zsh ]] && source ~/.zsh/nvm.zsh
 
-# ==========================
-#      SHELL ENHANCEMENTS
-# ==========================
-eval "$(direnv hook zsh)"   # Load Direnv
-eval "$(zoxide init zsh)"   # Load zoxide
+# Initialize tools
+command -v direnv >/dev/null && eval "$(direnv hook zsh)"
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 
-# ==========================
-#    OPTIONAL CONFIGURATION
-# ==========================
-# Uncomment to enable features:
-# CASE_SENSITIVE="true"                # Case-sensitive completion
-# HYPHEN_INSENSITIVE="true"            # Hyphen and underscore interchangeable
-# ENABLE_CORRECTION="true"             # Enable command auto-correction
-# COMPLETION_WAITING_DOTS="true"       # Show waiting dots on completion
-# DISABLE_AUTO_TITLE="true"            # Disable auto-setting terminal title
-# DISABLE_UNTRACKED_FILES_DIRTY="true" # Speed up large Git repos
-# HIST_STAMPS="yyyy-mm-dd"             # Change history timestamp format
-# ZSH_CUSTOM=/path/to/custom-folder    # Change custom folder location
-
-# ==========================
-#       ENVIRONMENT
-# ==========================
-export JAVA_HOME=$HOME/Apps/jdk-21.0.4
-export MAVEN_HOME=$HOME/Apps/apache-maven-3.9.4
-export PYTHON_HOME=$HOME/Apps/python-3.12.6
-export RUBY_HOME=$HOME/Apps/ruby-3.1.4
-export GEM_HOME=$RUBY_HOME/gems
-export MINIKUBE_HOME=$HOME/Apps/minikube-1.34.0
-export GO_HOME=$HOME/Apps/go-1.23.1
-export NINJA_HOME=$HOME/.console-ninja
-export DOTFILES_DIR=$HOME/.dotfiles
-
-export PATH=$HOME/.local/bin:$JAVA_HOME/bin:$MAVEN_HOME/bin:$PYTHON_HOME/bin:$RUBY_HOME/bin:$GEM_HOME/bin:$MINIKUBE_HOME:$GO_HOME/bin:$HOME/go/bin:/usr/bin:/bin:$NINJA_HOME/bin:$DOTFILES_DIR/scripts:$PATH
+# Terraform Autocomplete
+autoload -U +X bashcompinit && bashcompinit
+complete -o nospace -C /usr/bin/terraform terraform
