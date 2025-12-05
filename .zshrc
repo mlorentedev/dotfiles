@@ -11,6 +11,7 @@ source $ZSH/oh-my-zsh.sh
 # ==========================
 #       ENVIRONMENT
 # ==========================
+export SOPS_AGE_KEY_FILE="/home/manu/.config/sops/age/keys.txt"
 # Base Directories
 export DOTFILES_DIR="$HOME/.dotfiles"
 export APPS_HOME="$HOME/Applications"
