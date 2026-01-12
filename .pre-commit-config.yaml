@@ -6,3 +6,10 @@ repos:
         entry: .github/hooks/validate-commit-msg.sh
         language: script
         stages: [commit-msg]
+
+      - id: dotfiles-test
+        name: Run dotfiles tests
+        entry: ./scripts/test.sh
+        language: script
+        pass_filenames: false
+        stages: [pre-commit]

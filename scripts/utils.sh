@@ -57,6 +57,53 @@ exit_error() {
     exit $code
 }
 
+# Silent check functions (for conditionals and shell startup)
+
+# Checks if a command exists in PATH (silent, no output)
+# Input: $1 - command name
+# Output: none, returns 0 if found, 1 if missing
+# Usage: command_exists "age" && echo "age is installed"
+command_exists() {
+    command -v "$1" &>/dev/null
+}
+
+# Checks if a file exists (silent, no output)
+# Input: $1 - file path
+# Output: none, returns 0 if exists, 1 if missing
+# Usage: file_exists "$config" && source "$config"
+file_exists() {
+    [[ -f "$1" ]]
+}
+
+# Checks if a directory exists (silent, no output)
+# Input: $1 - directory path
+# Output: none, returns 0 if exists, 1 if missing
+# Usage: dir_exists "$path" && cd "$path"
+dir_exists() {
+    [[ -d "$1" ]]
+}
+
+# Checks if a symlink exists and points to a valid target
+# Input: $1 - symlink path
+# Output: none, returns 0 if valid symlink, 1 otherwise
+# Usage: symlink_valid "$link" && echo "ok"
+symlink_valid() {
+    [[ -L "$1" && -e "$1" ]]
+}
+
+# Checks if an environment variable is set and non-empty
+# Input: $1 - variable name (not value)
+# Output: none, returns 0 if set and non-empty, 1 otherwise
+# Usage: var_is_set "GITHUB_TOKEN" && echo "configured"
+var_is_set() {
+    local var_name="$1"
+    if [[ -n "$ZSH_VERSION" ]]; then
+        [[ -n "${(P)var_name:-}" ]]
+    else
+        [[ -n "${!var_name:-}" ]]
+    fi
+}
+
 # Environment functions
 
 # Loads environment variables from .env file
@@ -112,6 +159,132 @@ debug_print_env() {
         # Print the key and its value
         echo "${key}=${value}"
     done < "$env_file"
+}
+
+# Config parsing functions
+
+# Parses a KEY=VALUE mapping file, calling a handler for each entry
+# Input: $1 - file path, $2 - callback function name (receives key, value)
+# Output: echoes count of entries processed, returns 1 if file not found
+# Usage: parse_mapping_file "config.conf" my_handler
+parse_mapping_file() {
+    local file="$1"
+    local callback="$2"
+    local count=0
+
+    [[ ! -f "$file" ]] && return 1
+
+    local line key value
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$line" || ! "$line" =~ = ]] && continue
+
+        # Split key=value
+        key="${line%%=*}"
+        value="${line#*=}"
+
+        # Trim whitespace
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+
+        # Remove surrounding quotes from value
+        value="${value#\"}"
+        value="${value%\"}"
+        value="${value#\'}"
+        value="${value%\'}"
+
+        # Call handler if provided
+        [[ -n "$callback" ]] && "$callback" "$key" "$value"
+        ((count++))
+    done < "$file"
+
+    echo "$count"
+}
+
+# Age encryption functions
+
+# Default path for age private key
+AGE_DEFAULT_KEY="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
+
+# Decrypts an age-encrypted file to stdout
+# Input: $1 - encrypted file path, $2 - key file path (optional)
+# Output: decrypted content to stdout, returns 0 on success, 1 on failure
+# Usage: value=$(age_decrypt "secret.age")
+age_decrypt() {
+    local file="$1"
+    local key_file="${2:-$AGE_DEFAULT_KEY}"
+
+    file_exists "$file" || return 1
+    file_exists "$key_file" || return 1
+    command_exists age || return 1
+
+    age -d -i "$key_file" "$file" 2>/dev/null
+}
+
+# Encrypts stdin or file to an age-encrypted output file
+# Input: $1 - output file, $2 - key file (optional), $3 - input file (optional, uses stdin if not provided)
+# Output: encrypted file, returns 0 on success, 1 on failure
+# Usage: echo "secret" | age_encrypt "output.age"
+# Usage: age_encrypt "output.age" "" "input.txt"
+age_encrypt() {
+    local output="$1"
+    local key_file="${2:-$AGE_DEFAULT_KEY}"
+    local input="$3"
+
+    file_exists "$key_file" || return 1
+    command_exists age || return 1
+
+    local pubkey
+    pubkey=$(grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null) || return 1
+
+    if [[ -n "$input" ]]; then
+        age -r "$pubkey" -o "$output" "$input" 2>/dev/null
+    else
+        age -r "$pubkey" -o "$output" 2>/dev/null
+    fi
+}
+
+# Extracts public key from age private key file
+# Input: $1 - key file path (optional, defaults to AGE_DEFAULT_KEY)
+# Output: public key string to stdout
+# Usage: pubkey=$(age_get_pubkey)
+age_get_pubkey() {
+    local key_file="${1:-$AGE_DEFAULT_KEY}"
+    grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null
+}
+
+# GitHub CLI functions
+
+# Checks if GitHub CLI is authenticated
+# Input: none
+# Output: none, returns 0 if authenticated, 1 otherwise
+# Usage: gh_is_authenticated || exit_error "Run 'gh auth login' first"
+gh_is_authenticated() {
+    command_exists gh && gh auth status &>/dev/null
+}
+
+# Gets the current repository name in owner/repo format
+# Input: none
+# Output: repository name to stdout (e.g., "owner/repo")
+# Usage: repo=$(gh_get_repo)
+gh_get_repo() {
+    gh repo view --json nameWithOwner -q ".nameWithOwner" 2>/dev/null
+}
+
+# Sets a GitHub repository secret
+# Input: $1 - secret name, $2 - secret value, $3 - repository (optional, defaults to current)
+# Output: none, returns 0 on success, 1 on failure
+# Usage: gh_set_secret "API_TOKEN" "$token"
+gh_set_secret() {
+    local name="$1"
+    local value="$2"
+    local repo="${3:-$(gh_get_repo)}"
+
+    [[ -z "$repo" ]] && return 1
+    echo "$value" | gh secret set "$name" --repo "$repo"
 }
 
 # Server connectivity functions
@@ -311,7 +484,12 @@ init_counter() {
 # Usage: increment_counter "file_count"
 increment_counter() {
     local var_name="$1"
-    local current_val="${!var_name}"
+    local current_val
+    if [[ -n "$ZSH_VERSION" ]]; then
+        current_val="${(P)var_name}"
+    else
+        current_val="${!var_name}"
+    fi
     declare -g "$var_name=$((current_val + 1))"
 }
 
@@ -321,7 +499,11 @@ increment_counter() {
 # Usage: count=$(get_counter "file_count")
 get_counter() {
     local var_name="$1"
-    echo "${!var_name}"
+    if [[ -n "$ZSH_VERSION" ]]; then
+        echo "${(P)var_name}"
+    else
+        echo "${!var_name}"
+    fi
 }
 
 # File processing functions
@@ -403,5 +585,124 @@ safe_remove() {
         log_error "Failed to remove: $file"
         return 1
     fi
+}
+
+# Enhanced file operations
+
+# Adds a line to a file if not already present
+# Input: $1 - file path, $2 - line to add
+# Output: returns 0 if line was added, 1 if already exists or file missing
+# Usage: ensure_line_in_file "$HOME/.zshrc" 'export PATH=$HOME/bin:$PATH'
+ensure_line_in_file() {
+    local file="$1"
+    local line="$2"
+
+    file_exists "$file" || return 1
+
+    if ! grep -Fq "$line" "$file"; then
+        # Ensure file ends with newline before appending
+        [[ -n "$(tail -c1 "$file")" ]] && echo "" >> "$file"
+        echo "$line" >> "$file"
+        return 0
+    fi
+    return 1
+}
+
+# Creates a secure temporary file and echoes its path
+# Input: $1 - prefix for temp file name (optional, defaults to "tmp")
+# Output: path to created temp file
+# Usage: tmp=$(create_temp_file "ssh_key")
+create_temp_file() {
+    local prefix="${1:-tmp}"
+    local tmp_file
+    tmp_file=$(mktemp "/tmp/${prefix}.XXXXXX")
+    chmod 600 "$tmp_file"
+    echo "$tmp_file"
+}
+
+# Verifies a symlink exists and is valid, logs result
+# Input: $1 - symlink path, $2 - display name (optional)
+# Output: success/error log message, returns 0 if valid, 1 otherwise
+# Usage: verify_symlink "$HOME/.zshrc" ".zshrc"
+verify_symlink() {
+    local link="$1"
+    local name="${2:-$(basename "$link")}"
+
+    if symlink_valid "$link"; then
+        log_success "$name linked successfully"
+        return 0
+    else
+        log_error "$name link issue"
+        return 1
+    fi
+}
+
+# String helper functions
+
+# Masks a sensitive value for safe logging
+# Input: $1 - value to mask, $2 - chars to show at start (optional, defaults to 0)
+# Output: masked string to stdout
+# Usage: log_info "Token: $(mask_value "$token" 4)"
+mask_value() {
+    local value="$1"
+    local show_chars="${2:-0}"
+    local len=${#value}
+
+    # If show_chars >= length, return original (nothing to mask)
+    if [[ $show_chars -ge $len ]]; then
+        echo "$value"
+        return
+    fi
+
+    if [[ $show_chars -gt 0 ]]; then
+        echo "${value:0:$show_chars}$(printf '%*s' $((len - show_chars)) | tr ' ' '*')"
+    else
+        printf '%*s' "$len" | tr ' ' '*'
+    fi
+}
+
+# Decodes a base64-encoded string
+# Input: $1 - base64-encoded string
+# Output: decoded string to stdout
+# Usage: decoded=$(base64_decode "$encoded")
+base64_decode() {
+    echo "$1" | base64 --decode
+}
+
+# Encodes a string to base64
+# Input: $1 - string to encode
+# Output: base64-encoded string to stdout
+# Usage: encoded=$(base64_encode "$value")
+base64_encode() {
+    echo -n "$1" | base64
+}
+
+# Trims leading and trailing whitespace from a string
+# Input: $1 - string to trim
+# Output: trimmed string to stdout
+# Usage: trimmed=$(trim "  hello  ")
+trim() {
+    local str="$1"
+    str="${str#"${str%%[![:space:]]*}"}"
+    str="${str%"${str##*[![:space:]]}"}"
+    echo "$str"
+}
+
+# Environment variable functions
+
+# Safely exports an environment variable
+# Input: $1 - variable name, $2 - value
+# Output: exports the variable
+# Usage: export_var "MY_TOKEN" "secret_value"
+export_var() {
+    export "$1=$2"
+}
+
+# Unsets an environment variable if it exists
+# Input: $1 - variable name
+# Output: unsets the variable
+# Usage: unset_var "MY_TOKEN"
+unset_var() {
+    unset "$1" 2>/dev/null || true
 }
 

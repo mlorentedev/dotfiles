@@ -56,6 +56,14 @@ chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/github-secrets-manager.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
+chmod +x "$DOTFILES_DIR/scripts/load-secrets.sh"
+
+# Copy sensitive directory (env-mapping.conf and encrypted files)
+log_info "Setting up sensitive directory..."
+ensure_directory "$DOTFILES_DIR/sensitive"
+if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
+    cp -rf "$CURRENT_DIR/sensitive/"* "$DOTFILES_DIR/sensitive/" 2>/dev/null || true
+fi
 
 
 # Update functions.zsh to source utils.sh if not already done
@@ -119,33 +127,18 @@ cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.claude/prompts/" 2>/dev/null || true
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 
 log_info "Adding dotfiles scripts directory to PATH..."
-
-add_path_safe() {
-    local file="$1"
-    local path_line='export PATH=$HOME/.dotfiles/scripts:$PATH'
-    
-    if [ -f "$file" ]; then
-        # Check if line exists ignoring whitespace
-        if ! grep -Fq "$path_line" "$file"; then
-            # Ensure file ends with newline before appending
-            [ -n "$(tail -c1 "$file")" ] && echo "" >> "$file"
-            echo "$path_line" >> "$file"
-            log_success "Added scripts to PATH in $file"
-        fi
-    fi
-}
-
-add_path_safe "$HOME/.zshrc"
-add_path_safe "$HOME/.bashrc"
+PATH_LINE='export PATH=$HOME/.dotfiles/scripts:$PATH'
+ensure_line_in_file "$HOME/.zshrc" "$PATH_LINE" && log_success "Added scripts to PATH in .zshrc"
+ensure_line_in_file "$HOME/.bashrc" "$PATH_LINE" && log_success "Added scripts to PATH in .bashrc"
 
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."
 
-[ -f "$HOME/.zsh/aliases.zsh" ] && log_success "aliases.zsh linked successfully!" || log_error "aliases.zsh issue!"
-[ -f "$HOME/.bash/bash_aliases" ] && log_success "bash_aliases created successfully!" || log_error "bash_aliases issue!"
-[ -f "$HOME/.zsh/functions.zsh" ] && log_success "functions.zsh linked successfully!" || log_error "functions.zsh issue!"
-[ -f "$HOME/.bashrc" ] && log_success ".bashrc linked successfully!" || log_error ".bashrc issue!"
-[ -f "$HOME/.zshrc" ] && log_success ".zshrc linked successfully!" || log_error ".zshrc issue!"
+verify_symlink "$HOME/.zsh/aliases.zsh" "aliases.zsh"
+verify_symlink "$HOME/.zsh/functions.zsh" "functions.zsh"
+verify_symlink "$HOME/.zshrc" ".zshrc"
+verify_symlink "$HOME/.bashrc" ".bashrc"
+file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || log_error "bash_aliases issue"
 
 # Check dependencies
 check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible" "pip"

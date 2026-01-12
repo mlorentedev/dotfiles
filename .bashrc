@@ -35,9 +35,11 @@ fi
 # ==========================
 #       ENVIRONMENT
 # ==========================
-export SOPS_AGE_KEY_FILE="/home/manu/.config/sops/age/keys.txt"
-# Base Directories
+# Base Directories (must be set before loading secrets)
 export DOTFILES_DIR="$HOME/.dotfiles"
+
+# Load encrypted secrets as environment variables
+[[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"
 export APPS_HOME="$HOME/Applications"
 export NINJA_HOME="$HOME/.console-ninja"
 
