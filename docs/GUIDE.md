@@ -22,8 +22,9 @@ Complete guide for using and customizing the dotfiles.
 
 ### Security Features
 
+- **Automatic secrets loading** from encrypted age files
 - **Encrypt/decrypt files** with age
-- **Upload .env files** to GitHub secrets
+- **Upload secrets** to GitHub repositories
 - **Sensitive files** automatically gitignored
 
 ## Scripts
@@ -57,6 +58,22 @@ github-secrets-manager.sh /path/to/.env   # use specific file
 
 **Requires:** `gh` (GitHub CLI) and authentication
 
+### `load-secrets.sh`
+
+Manages encrypted secrets as environment variables. Sourced automatically.
+
+```bash
+secrets_list      # Show all secrets and status
+secrets_add VAR FILE   # Add new secret
+secrets_rotate VAR     # Update secret value
+secrets_check          # Validate integrity
+secrets_clean          # Remove plaintext files
+```
+
+**Requires:** `age` and private key at `~/.config/age/key.txt`
+
+See [SECRETS.md](SECRETS.md) for full documentation.
+
 ### `install-precommit.sh`
 
 Install pre-commit hooks for current repository.
@@ -66,6 +83,14 @@ install-precommit.sh
 ```
 
 **Requires:** Python with pip and git repository
+
+### `test.sh`
+
+Run the test suite for all utility functions.
+
+```bash
+./scripts/test.sh
+```
 
 ### `install.sh`
 

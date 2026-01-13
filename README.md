@@ -28,7 +28,7 @@ source ~/.bashrc # for Bash
 
 ```text
 ├── .bashrc              # Bash configuration
-├── .zshrc               # Zsh configuration  
+├── .zshrc               # Zsh configuration
 ├── .profile             # Profile settings
 ├── .gitconfig           # Git setup
 ├── .gitignore           # What to ignore
@@ -42,17 +42,22 @@ source ~/.bashrc # for Bash
 │   └── prompts/         # Custom prompts
 ├── docs/                # Documentation
 ├── scripts/             # Helper scripts
-│   ├── utils.sh                    # Shared functions
+│   ├── utils.sh                    # Shared utility functions
+│   ├── load-secrets.sh             # Secrets management
 │   ├── age-encrypt-decrypt.sh      # File encryption
-│   ├── github-secrets-manager.sh   # GitHub secrets
-│   └── install-precommit.sh        # Git hooks
-├── sensitive/           # Encrypted files
+│   ├── github-secrets-manager.sh   # GitHub secrets sync
+│   ├── install-precommit.sh        # Git hooks setup
+│   └── test.sh                     # Test suite
+├── sensitive/           # Encrypted secrets
+│   ├── env-mapping.conf            # ENV_VAR=filename mapping
+│   └── *.secret.age                # Encrypted files
 └── install.sh           # Installer
 ```
 
 ## Documentation
 
 - **[GUIDE.md](docs/GUIDE.md)** - Complete usage and customization guide
+- **[SECRETS.md](docs/SECRETS.md)** - Secrets management with age encryption
 - **[TOOLS.md](docs/TOOLS.md)** - Tool installation instructions
 
 ## Features
@@ -74,9 +79,15 @@ See [TOOLS.md](docs/TOOLS.md) for installation instructions.
 
 ## Security
 
-- Use `age-encrypt-decrypt.sh` to encrypt sensitive files
-- Use `github-secrets-manager.sh` to sync secrets to GitHub
-- Sensitive files are automatically gitignored
+Secrets are encrypted with age and automatically loaded as environment variables on shell startup.
+
+```bash
+secrets_list     # Show loaded secrets
+secrets_add      # Add new secret
+secrets_rotate   # Update existing secret
+```
+
+See [SECRETS.md](docs/SECRETS.md) for full documentation.
 
 ## Contributing
 
