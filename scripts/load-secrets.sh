@@ -30,6 +30,7 @@ else
     var_is_set() {
         var_name="$1"
         if [[ -n "$ZSH_VERSION" ]]; then
+            # shellcheck disable=SC2296
             [[ -n "${(P)var_name:-}" ]]
         else
             [[ -n "${!var_name:-}" ]]

@@ -98,6 +98,7 @@ symlink_valid() {
 var_is_set() {
     var_name="$1"
     if [[ -n "$ZSH_VERSION" ]]; then
+        # shellcheck disable=SC2296
         [[ -n "${(P)var_name:-}" ]]
     else
         [[ -n "${!var_name:-}" ]]
@@ -484,8 +485,9 @@ init_counter() {
 # Usage: increment_counter "file_count"
 increment_counter() {
     var_name="$1"
-    current_val
+    current_val=0
     if [[ -n "$ZSH_VERSION" ]]; then
+        # shellcheck disable=SC2296
         current_val="${(P)var_name}"
     else
         current_val="${!var_name}"
@@ -500,6 +502,7 @@ increment_counter() {
 get_counter() {
     var_name="$1"
     if [[ -n "$ZSH_VERSION" ]]; then
+        # shellcheck disable=SC2296
         echo "${(P)var_name}"
     else
         echo "${!var_name}"
