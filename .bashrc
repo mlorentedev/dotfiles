@@ -73,12 +73,16 @@ export PATH="$PATH:$DOTFILES_DIR/scripts"
 # Prepend User Local Bin
 export PATH="$HOME/.local/bin:$PATH"
 
+
+
 # ==========================
 #        ALIASES
 # ==========================
 if [ -f ~/.bash_aliases ]; then
     source ~/.bash_aliases
 fi
+
+
 
 # AI Tool Aliases
 alias g='gemini'

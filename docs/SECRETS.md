@@ -2,278 +2,311 @@
 
 Complete guide for managing encrypted secrets in the dotfiles. Uses [`age`](https://github.com/FiloSottile/age) encryption with automatic environment variable loading.
 
-## Overview
+## Architecture
+
+```text
+~/.dotfiles/                    # Local installation (stable)
+~/Projects/dotfiles/            # Development repo
+
+Both directories sync via:
+- dotfiles-sync                 # Manual full sync
+- secrets_add/secrets_rotate    # Auto-sync on secret changes
+```
+
+### File Structure
 
 ```text
 sensitive/
-├── env-mapping.conf     # Maps ENV_VAR=filename (no extension)
-├── *.secret             # Original plaintext (local only, gitignored)
-├── *.secret.age         # Encrypted versions (committed to git)
-├── *.secret.dec         # Decrypted files (local only, gitignored)
-└── .secrets-audit.log   # Audit trail of changes
+├── env-mapping.conf        # Maps ENV_VAR=filename
+├── *.secret.age            # Encrypted secrets (git tracked)
+├── *.secret                # Plaintext (gitignored, temporary)
+├── *.secret.dec            # Decrypted cache (gitignored)
+└── .secrets-audit.log      # Audit trail
 ```
 
-## Quick Start
+## Quick Reference
 
-### Initial Setup
-
-1. Create an age key pair:
-
-     ```bash
-     mkdir -p ~/.config/age
-     age-keygen -o ~/.config/age/key.txt
-     chmod 600 ~/.config/age/key.txt
-     ```
-
-2. Back up the key somewhere safe (password manager, encrypted USB).
-
-3. Run the dotfiles installer:
-
-     ```bash
-     ./install.sh
-     ```
-
-4. Restart your terminal - secrets load automatically.
-
-### Adding a New Secret
+### Add a New Secret
 
 ```bash
-secrets_add API_KEY myservice.api
+secrets_add VAR_NAME filename
+# Example: secrets_add PYPI_TOKEN pypi.token
 # Enter value when prompted
-secrets_refresh  # or restart terminal
+# Auto-syncs to repo if DOTFILES_REPO_DIR is set
 ```
 
-### Rotating a Secret
+### Rotate an Existing Secret
 
 ```bash
-secrets_rotate API_KEY
-# Enter new value when prompted
-secrets_refresh
+secrets_rotate VAR_NAME
+# Example: secrets_rotate GITHUB_PERSONAL_ACCESS_TOKEN
 ```
 
-## Commands Reference
-
-After sourcing `.zshrc`/`.bashrc`, these commands are available:
-
-| Command | Description |
-|---------|-------------|
-| `secrets_help` | Show all commands and usage |
-| `secrets_list` | Show mapped variables and load status |
-| `secrets_refresh` | Force re-decrypt and reload all secrets |
-| `secrets_get VAR` | Decrypt single secret on-demand |
-| `secrets_add VAR FILE` | Add a new secret interactively |
-| `secrets_rotate VAR` | Update an existing secret's value |
-| `secrets_check` | Validate mapping integrity |
-| `secrets_clean` | Remove plaintext .dec and .secret files |
-| `secrets_audit [VAR]` | Show audit log of secret changes |
-
-### Command Details
-
-#### `secrets_list`
-
-Shows all mapped secrets and their current status:
-
-```text
-Secret mappings (/path/to/sensitive/env-mapping.conf):
-
-  * GITHUB_PERSONAL_ACCESS_TOKEN     # loaded
-  o DOCKERHUB_TOKEN                  # not loaded (file exists)
-  x MISSING_TOKEN (missing: file.secret.age)  # file not found
-```
-
-#### `secrets_check`
-
-Validates the integrity of your secrets setup:
+### Sync Changes Between Local and Repo
 
 ```bash
-secrets_check
-# Output:
-# Checking secrets integrity...
-#   ✓ GITHUB_PERSONAL_ACCESS_TOKEN
-#   ✗ BROKEN_VAR (missing: nonexistent.secret.age)
-#
-# Checking for orphaned .age files...
-#   ? orphan.secret.age (no mapping)
-#
-# Summary:
-#   Valid:    5
-#   Missing:  1
-#   Orphaned: 1
+dotfiles-sync              # Full bidirectional sync + git push/pull
+dotfiles-sync --secrets-only  # Only sync sensitive/ files
 ```
 
-#### `secrets_clean`
-
-Removes plaintext files that shouldn't be kept:
+### Upload to GitHub Secrets
 
 ```bash
-secrets_clean --dry-run  # preview what would be deleted
-secrets_clean            # actually delete
+# From env-mapping.conf (recommended)
+github-secrets-manager.sh --from-mapping
+
+# Specific secrets only
+github-secrets-manager.sh --from-mapping --select GITHUB_PERSONAL_ACCESS_TOKEN DOCKERHUB_TOKEN
+
+# List available secrets
+github-secrets-manager.sh --list
 ```
 
-#### `secrets_audit`
+## Initial Setup
 
-Shows when secrets were added or rotated:
-
-```bash
-secrets_audit                     # all entries
-secrets_audit GITHUB_TOKEN        # specific variable
-```
-
-## Mapping File Format
-
-The `sensitive/env-mapping.conf` file maps environment variables to encrypted files:
-
-```conf
-# Format: ENV_VAR_NAME=filename (without .secret.age extension)
-GITHUB_PERSONAL_ACCESS_TOKEN=github.token
-DOCKERHUB_TOKEN=dockerhub.token
-CLOUDFLARE_API_TOKEN=cloudflare.api-token
-
-# Comments start with #
-# Blank lines are ignored
-```
-
-Each line maps an environment variable to a file in `sensitive/`:
-
-- `GITHUB_PERSONAL_ACCESS_TOKEN=github.token` means:
-  - File: `sensitive/github.token.secret.age`
-  - Variable: `$GITHUB_PERSONAL_ACCESS_TOKEN`
-
-## Manual Encryption
-
-### Encrypt/Decrypt Scripts
-
-```bash
-# Encrypt all *.secret files in sensitive/
-age-encrypt-decrypt.sh encrypt
-
-# Decrypt all *.age files
-age-encrypt-decrypt.sh decrypt
-
-# Work with a different directory
-age-encrypt-decrypt.sh encrypt /path/to/directory
-```
-
-### Direct age Commands
-
-```bash
-# Get your public key
-age-keygen -y ~/.config/age/key.txt
-
-# Encrypt one file
-age -r $(age-keygen -y ~/.config/age/key.txt) -o file.secret.age file.secret
-
-# Decrypt one file
-age -d -i ~/.config/age/key.txt -o file.secret.dec file.secret.age
-```
-
-## GitHub Secrets Sync
-
-Upload secrets to GitHub repository:
-
-```bash
-# Upload from .env file
-github-secrets-manager.sh /path/to/.env
-
-# Uses current directory's .env by default
-github-secrets-manager.sh
-```
-
-**Requires:** `gh` CLI authenticated (`gh auth login`)
-
-## Setting Up on a New Machine
-
-1. Install `age`:
-
-```bash
-brew install age          # macOS
-sudo apt install age      # Ubuntu
-```
-
-1. Copy your private key:
+### 1. Create Age Key
 
 ```bash
 mkdir -p ~/.config/age
-# Copy key.txt from backup
+age-keygen -o ~/.config/age/key.txt
 chmod 600 ~/.config/age/key.txt
 ```
 
-1. Clone and install dotfiles:
+Back up `~/.config/age/key.txt` somewhere safe.
+
+### 2. Configure Shell
+
+Add to `~/.zshrc` or `~/.bashrc`:
+
+```bash
+export DOTFILES_DIR="$HOME/.dotfiles"
+export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"  # For repo sync
+```
+
+### 3. Install Dotfiles
 
 ```bash
 git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
 ./install.sh
+source ~/.zshrc
 ```
 
-1. Secrets load automatically on terminal start.
+### 4. Clone Repo for Development (Optional)
 
-## Security Best Practices
+```bash
+git clone https://github.com/mlorentedev/dotfiles.git ~/Projects/dotfiles
+```
 
-- Never commit `.secret` or `.dec` files (gitignored by default)
-- Encrypt files before committing changes
-- Back up your age key in multiple secure locations
-- Use `secrets_clean` after working with plaintext files
-- Review `secrets_audit` periodically
-- Rotate secrets if you suspect compromise
+## Commands Reference
+
+### Secret Management
+
+| Command | Description |
+|---------|-------------|
+| `secrets_add VAR FILE` | Add new secret interactively |
+| `secrets_rotate VAR` | Update existing secret value |
+| `secrets_get VAR` | Decrypt and show single secret |
+| `secrets_list` | Show all secrets and their status |
+| `secrets_check` | Validate mapping integrity |
+| `secrets_clean` | Remove plaintext files |
+| `secrets_audit [VAR]` | Show audit log |
+| `secrets_refresh` | Reload all secrets |
+| `secrets_help` | Show help |
+| `secrets_sync` | Sync secrets to repo |
+
+### Dotfiles Sync
+
+| Command | Description |
+|---------|-------------|
+| `dotfiles-sync` | Full sync: secrets + git push/pull |
+| `dotfiles-sync --secrets-only` | Only sync sensitive/ directory |
+
+### GitHub Secrets
+
+| Command | Description |
+|---------|-------------|
+| `github-secrets-manager.sh --list` | List secrets in env-mapping.conf |
+| `github-secrets-manager.sh --from-mapping` | Upload all to GitHub |
+| `github-secrets-manager.sh --from-mapping --select VAR1 VAR2` | Upload specific |
+| `github-secrets-manager.sh /path/to/.env` | Upload from .env file |
+
+## Workflow: Adding a New Secret
+
+**Step-by-step deterministic workflow:**
+
+```bash
+# 1. Add the secret (auto-syncs to repo)
+secrets_add MYSERVICE_TOKEN myservice.api
+# Enter value when prompted
+
+# 2. Verify it was added
+secrets_list | grep MYSERVICE
+
+# 3. Load it in current session
+secrets_refresh
+# Or restart terminal
+
+# 4. Verify it's loaded
+echo $MYSERVICE_TOKEN
+
+# 5. Commit and sync to remote
+cd ~/Projects/dotfiles
+git add sensitive/myservice.api.secret.age sensitive/env-mapping.conf
+git commit -m "feat: add MYSERVICE_TOKEN secret"
+dotfiles-sync
+```
+
+## Workflow: Syncing After Changes
+
+When you modify files directly in either location:
+
+```bash
+# Sync everything (bidirectional for secrets, push/pull for git)
+dotfiles-sync
+
+# What happens:
+# 1. Compares timestamps of .age files, env-mapping.conf, audit log
+# 2. Copies newer files in both directions
+# 3. git push from ~/Projects/dotfiles
+# 4. git pull to ~/.dotfiles
+```
+
+## Workflow: Upload to GitHub Repository Secrets
+
+```bash
+# Navigate to your project
+cd ~/my-project
+
+# List available secrets from dotfiles
+github-secrets-manager.sh --list
+
+# Upload specific secrets needed for this project
+github-secrets-manager.sh --from-mapping --select GITHUB_PERSONAL_ACCESS_TOKEN DOCKERHUB_TOKEN
+
+# Or upload all (be careful)
+github-secrets-manager.sh --from-mapping
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOTFILES_DIR` | `~/.dotfiles` | Local installation directory |
+| `DOTFILES_REPO_DIR` | (none) | Repo directory for sync |
+| `AGE_KEY_PATH` | `~/.config/age/key.txt` | Age private key location |
+
+## Mapping File Format
+
+`sensitive/env-mapping.conf`:
+
+```conf
+# Format: ENV_VAR_NAME=filename (without .secret.age extension)
+GITHUB_PERSONAL_ACCESS_TOKEN=github.token
+DOCKERHUB_TOKEN=dockerhub.token
+PYPI_TOKEN=pypi.token
+```
+
+Each line maps:
+- `GITHUB_PERSONAL_ACCESS_TOKEN` = environment variable name
+- `github.token` = file `sensitive/github.token.secret.age`
+
+## Testing
+
+Run the test suite to verify everything works:
+
+```bash
+./scripts/test.sh
+```
+
+### Quick Manual Tests
+
+```bash
+# 1. Test secrets loading
+secrets_list
+
+# 2. Test secrets check
+secrets_check
+
+# 3. Test sync (dry run - just check output)
+dotfiles-sync --secrets-only
+
+# 4. Test GitHub secrets list
+github-secrets-manager.sh --list
+
+# 5. Test add/rotate (use a test secret)
+secrets_add TEST_SECRET test.secret
+secrets_rotate TEST_SECRET
+# Then clean up:
+rm ~/.dotfiles/sensitive/test.secret.secret.age
+rm ~/Projects/dotfiles/sensitive/test.secret.secret.age
+# Remove from env-mapping.conf manually
+```
 
 ## Troubleshooting
 
-### Secrets not loading
+### Secret not loading
 
-1. Check key exists: `ls -la ~/.config/age/key.txt`
-2. Check permissions: `chmod 600 ~/.config/age/key.txt`
-3. Check mapping: `secrets_list`
-4. Check integrity: `secrets_check`
+```bash
+# Check the secret exists and is mapped
+secrets_list | grep VAR_NAME
+secrets_check
 
-### Bad substitution error
+# Check key is accessible
+ls -la ~/.config/age/key.txt
+age-keygen -y ~/.config/age/key.txt  # Should show public key
+```
 
-This indicates a shell compatibility issue. Ensure you're using:
+### Sync not working
 
-- Bash 4+ or Zsh 5+
+```bash
+# Verify both directories exist
+ls -la ~/.dotfiles/sensitive/
+ls -la ~/Projects/dotfiles/sensitive/
 
-### Missing age command
+# Check DOTFILES_REPO_DIR is set
+echo $DOTFILES_REPO_DIR
+```
 
-Install age. See [TOOLS.md](TOOLS.md#age-encryption) for installation instructions.
+### GitHub upload failing
+
+```bash
+# Check authentication
+gh auth status
+
+# Check you're in a git repo
+gh repo view
+
+# Try listing first
+github-secrets-manager.sh --list
+```
 
 ### Key not found
 
-The default key path is `~/.config/age/key.txt`. Override with:
-
 ```bash
-export AGE_KEY_PATH=/custom/path/to/key.txt
+# Check default location
+ls -la ~/.config/age/key.txt
+
+# Or set custom location
+export AGE_KEY_PATH=/path/to/key.txt
 ```
 
-## Architecture
+## Security Best Practices
 
-### File Loading Flow
+1. **Never commit plaintext** - `.secret` and `.dec` files are gitignored
+2. **Back up your age key** - Store in password manager or encrypted backup
+3. **Use `secrets_clean`** - Remove decrypted files after use
+4. **Review `secrets_audit`** - Check for unexpected changes
+5. **Rotate compromised secrets** - Use `secrets_rotate` immediately
+6. **Limit GitHub uploads** - Use `--select` to upload only needed secrets
 
-```text
-Terminal Start
-     │
-     ▼
-source .zshrc/.bashrc
-     │
-     ▼
-source load-secrets.sh
-     │
-     ▼
-secrets_load()
-     │
-     ├─► Read env-mapping.conf
-     │
-     ├─► For each mapping:
-     │      └─► age decrypt → export ENV_VAR
-     │
-     └─► Secrets available as env vars
-```
+## Files Reference
 
-### Files Involved
-
-| File | Purpose |
-|------|---------|
-| `scripts/load-secrets.sh` | Main secrets management script |
-| `scripts/utils.sh` | Shared utility functions |
-| `sensitive/env-mapping.conf` | Variable-to-file mapping |
-| `sensitive/*.secret.age` | Encrypted secret files |
-| `~/.config/age/key.txt` | Age private key |
+| File | Purpose | Git Tracked |
+|------|---------|-------------|
+| `sensitive/env-mapping.conf` | Variable-to-file mapping | Yes |
+| `sensitive/*.secret.age` | Encrypted secrets | Yes |
+| `sensitive/*.secret` | Plaintext (temporary) | No |
+| `sensitive/*.secret.dec` | Decrypted cache | No |
+| `sensitive/.secrets-audit.log` | Audit trail | Yes |
+| `~/.config/age/key.txt` | Age private key | No (never!) |

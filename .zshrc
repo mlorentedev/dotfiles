@@ -49,11 +49,15 @@ export PATH="$PATH:$DOTFILES_DIR/scripts"
 # Prepend User Local Bin (High Priority)
 export PATH="$HOME/.local/bin:$PATH"
 
+
+
 # ==========================
 #        ALIASES
 # ==========================
 # Load consolidated aliases
 [[ -f ~/.zsh/aliases.zsh ]] && source ~/.zsh/aliases.zsh
+
+
 
 # AI Tool Aliases
 alias g='gemini'

@@ -17,6 +17,7 @@
 #   secrets_check   - Validate mapping integrity
 #   secrets_clean   - Remove plaintext .dec and .secret files
 #   secrets_audit   - Show audit log of secret changes
+#   secrets_sync    - Sync all secrets to repo (requires DOTFILES_REPO_DIR)
 
 # Source utils.sh for helper functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -43,6 +44,32 @@ SECRETS_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}/sensitive"
 SECRETS_MAPPING_FILE="$SECRETS_DIR/env-mapping.conf"
 SECRETS_KEY_PATH="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
 SECRETS_LOADED=0
+
+# Optional: repo directory for syncing secrets (set in shell config if different from DOTFILES_DIR)
+# Example: export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
+SECRETS_REPO_DIR="${DOTFILES_REPO_DIR:+${DOTFILES_REPO_DIR}/sensitive}"
+
+# Sync file to repo if DOTFILES_REPO_DIR is configured
+_secrets_sync_to_repo() {
+    local filename="$1"
+    local sync_mapping="${2:-false}"
+    local silent="${3:-false}"
+
+    [[ -z "$SECRETS_REPO_DIR" ]] && return 0
+    [[ "$SECRETS_REPO_DIR" == "$SECRETS_DIR" ]] && return 0
+    [[ ! -d "$SECRETS_REPO_DIR" ]] && return 0
+
+    # Sync file
+    if [[ -f "$SECRETS_DIR/${filename}" ]]; then
+        cp "$SECRETS_DIR/${filename}" "$SECRETS_REPO_DIR/${filename}"
+        [[ "$silent" != "true" ]] && echo "  Synced to repo: $SECRETS_REPO_DIR/${filename}"
+    fi
+
+    # Sync mapping file if requested
+    if [[ "$sync_mapping" == "true" && -f "$SECRETS_MAPPING_FILE" ]]; then
+        cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
+    fi
+}
 
 # Handler for each mapping entry (used by parse_mapping_file)
 _secrets_load_entry() {
@@ -209,15 +236,7 @@ secrets_add() {
     echo -n "$value" > "$secret_file"
     chmod 600 "$secret_file"
 
-    local pubkey
-    pubkey=$(age_get_pubkey "$SECRETS_KEY_PATH")
-    if [[ -z "$pubkey" ]]; then
-        rm -f "$secret_file"
-        echo "Error: Could not get public key"
-        return 1
-    fi
-
-    if ! age -r "$pubkey" -o "$encrypted_file" "$secret_file" 2>/dev/null; then
+    if ! age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH" "$secret_file"; then
         rm -f "$secret_file"
         echo "Error: Encryption failed"
         return 1
@@ -235,6 +254,10 @@ secrets_add() {
     echo "Secret added successfully:"
     echo "  Variable: $var_name"
     echo "  File: ${filename}.secret.age"
+
+    # Sync to repo if configured
+    _secrets_sync_to_repo "${filename}.secret.age" true
+
     echo ""
     echo "Run 'secrets_refresh' or restart terminal to load"
 }
@@ -391,10 +414,7 @@ secrets_rotate() {
     echo -n "$value" > "$secret_file"
     chmod 600 "$secret_file"
 
-    local pubkey
-    pubkey=$(age_get_pubkey "$SECRETS_KEY_PATH")
-
-    if ! age -r "$pubkey" -o "$encrypted_file" "$secret_file" 2>/dev/null; then
+    if ! age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH" "$secret_file"; then
         # Restore backup
         [[ -f "$backup_file" ]] && mv "$backup_file" "$encrypted_file"
         rm -f "$secret_file"
@@ -409,7 +429,63 @@ secrets_rotate() {
     _secrets_audit_log "$var_name" "rotated"
 
     echo "Secret rotated successfully: $var_name"
+
+    # Sync to repo if configured
+    _secrets_sync_to_repo "${filename}.secret.age" false
+
     echo "Run 'secrets_refresh' or restart terminal to reload"
+}
+
+# Sync all secrets to repo
+# Usage: secrets_sync
+secrets_sync() {
+    if [[ -z "$SECRETS_REPO_DIR" ]]; then
+        echo "Error: DOTFILES_REPO_DIR not set"
+        echo "Set it in your shell config: export DOTFILES_REPO_DIR=\"\$HOME/Projects/dotfiles\""
+        return 1
+    fi
+
+    if [[ "$SECRETS_REPO_DIR" == "$SECRETS_DIR" ]]; then
+        echo "DOTFILES_REPO_DIR is same as SECRETS_DIR, nothing to sync"
+        return 0
+    fi
+
+    if [[ ! -d "$SECRETS_REPO_DIR" ]]; then
+        echo "Error: Repo directory not found: $SECRETS_REPO_DIR"
+        return 1
+    fi
+
+    echo "Syncing secrets to repo: $SECRETS_REPO_DIR"
+    echo ""
+
+    local count=0
+
+    # Sync all .age files
+    for file in "$SECRETS_DIR"/*.secret.age; do
+        [[ -f "$file" ]] || continue
+        local basename
+        basename=$(basename "$file")
+        cp "$file" "$SECRETS_REPO_DIR/$basename"
+        echo "  $basename"
+        ((count++))
+    done
+
+    # Sync mapping file
+    if [[ -f "$SECRETS_MAPPING_FILE" ]]; then
+        cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
+        echo "  env-mapping.conf"
+        ((count++))
+    fi
+
+    # Sync audit log
+    if [[ -f "$SECRETS_AUDIT_FILE" ]]; then
+        cp "$SECRETS_AUDIT_FILE" "$SECRETS_REPO_DIR/.secrets-audit.log"
+        echo "  .secrets-audit.log"
+        ((count++))
+    fi
+
+    echo ""
+    echo "Synced $count files to repo"
 }
 
 # Show help for all secrets commands
@@ -436,6 +512,9 @@ MANAGEMENT
   secrets_clean         Remove plaintext .dec and .secret files
                         Use --dry-run to preview without deleting
 
+  secrets_sync          Sync all secrets to repo (requires DOTFILES_REPO_DIR)
+                        Copies: *.secret.age, env-mapping.conf, .secrets-audit.log
+
 AUDIT
   secrets_audit [VAR]   Show audit log (when secrets were added/rotated)
                         Without VAR shows all entries
@@ -445,9 +524,21 @@ FILES
   Encrypted:  $DOTFILES_DIR/sensitive/*.secret.age
   Audit log:  $DOTFILES_DIR/sensitive/.secrets-audit.log
 
+REPO SYNC
+  Set DOTFILES_REPO_DIR to auto-sync secrets to your repo:
+    export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
+
+  When configured:
+    - secrets_add/secrets_rotate auto-sync .age files and mapping
+    - Audit log is synced automatically on changes
+    - Use secrets_sync for manual full sync
+
 EXAMPLES
-  # Add a new secret
+  # Add a new secret (auto-syncs to repo if configured)
   secrets_add STRIPE_KEY stripe.api
+
+  # Sync everything to repo manually
+  secrets_sync
 
   # Check for issues
   secrets_check
@@ -471,6 +562,9 @@ _secrets_audit_log() {
     local timestamp
     timestamp=$(date -Iseconds)
     echo "$timestamp|$var_name|$action" >> "$SECRETS_AUDIT_FILE"
+
+    # Sync audit log to repo (silent)
+    _secrets_sync_to_repo ".secrets-audit.log" false true
 }
 
 # Show audit log for secrets

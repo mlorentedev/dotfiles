@@ -57,6 +57,7 @@ chmod +x "$DOTFILES_DIR/scripts/github-secrets-manager.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/load-secrets.sh"
+chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 
 # Copy sensitive directory (env-mapping.conf and encrypted files)
 log_info "Setting up sensitive directory..."

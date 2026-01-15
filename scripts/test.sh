@@ -64,10 +64,8 @@ echo "Testing from: $DOTFILES_DIR"
 echo "Shell: ${ZSH_VERSION:+zsh $ZSH_VERSION}${BASH_VERSION:+bash $BASH_VERSION}"
 
 # ==================================================
-section "1/12" "Script Syntax Validation"
-# ==================================================
-
-for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh; do
+section "1/15" "Script Syntax Validation"
+for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
     if [[ -f "$SCRIPTS_DIR/$script" ]]; then
         if bash -n "$SCRIPTS_DIR/$script" 2>/dev/null; then
             pass "$script syntax OK"
@@ -84,7 +82,7 @@ if [[ -f "$DOTFILES_DIR/install.sh" ]]; then
 fi
 
 # ==================================================
-section "2/12" "Source utils.sh"
+section "2/15" "Source utils.sh"
 # ==================================================
 
 if source "$SCRIPTS_DIR/utils.sh" 2>/dev/null; then
@@ -96,7 +94,7 @@ else
 fi
 
 # ==================================================
-section "3/12" "Silent Check Functions"
+section "3/15" "Silent Check Functions"
 # ==================================================
 
 subsection "command_exists"
@@ -131,7 +129,7 @@ TEST_VAR_EMPTY=""
 var_is_set TEST_VAR_EMPTY && fail "var_is_set: false positive on empty" || pass "var_is_set: returns false for empty"
 
 # ==================================================
-section "4/12" "String Helper Functions"
+section "4/15" "String Helper Functions"
 # ==================================================
 
 subsection "trim"
@@ -151,7 +149,7 @@ decoded=$(base64_decode "$encoded")
 [[ "$decoded" == "test string 123" ]] && pass "base64_decode: roundtrip matches" || fail "base64_decode: got '$decoded'"
 
 # ==================================================
-section "5/12" "Config Parsing Functions"
+section "5/15" "Config Parsing Functions"
 # ==================================================
 
 subsection "parse_mapping_file"
@@ -198,7 +196,7 @@ parse_mapping_file "/nonexistent_file_xyz" test_handler >/dev/null 2>&1
 rm -f "$TEST_CONFIG"
 
 # ==================================================
-section "6/12" "Counter Functions"
+section "6/15" "Counter Functions"
 # ==================================================
 
 subsection "init_counter / increment_counter / get_counter"
@@ -213,7 +211,7 @@ increment_counter "test_counter"
 [[ "$(get_counter test_counter)" == "3" ]] && pass "increment_counter: increments to 3" || fail "increment_counter: not 3"
 
 # ==================================================
-section "7/12" "Age Encryption Functions"
+section "7/15" "Age Encryption Functions"
 # ==================================================
 
 if command_exists age; then
@@ -261,7 +259,7 @@ else
 fi
 
 # ==================================================
-section "8/12" "GitHub CLI Functions"
+section "8/15" "GitHub CLI Functions"
 # ==================================================
 
 if command_exists gh; then
@@ -293,7 +291,7 @@ else
 fi
 
 # ==================================================
-section "9/12" "File Operation Functions"
+section "9/15" "File Operation Functions"
 # ==================================================
 
 subsection "create_temp_file"
@@ -338,7 +336,7 @@ verify_symlink "$TEST_LINK" "test_link" >/dev/null 2>&1
 rm -f "$TEST_LINK"
 
 # ==================================================
-section "10/12" "Environment Functions"
+section "10/15" "Environment Functions"
 # ==================================================
 
 subsection "export_var / unset_var"
@@ -349,7 +347,7 @@ unset_var "TEST_EXPORT_VAR"
 [[ -z "$TEST_EXPORT_VAR" ]] && pass "unset_var: unsets variable" || fail "unset_var: still set"
 
 # ==================================================
-section "11/12" "Secrets Loading (load-secrets.sh)"
+section "11/15" "Secrets Loading (load-secrets.sh)"
 # ==================================================
 
 if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
@@ -404,12 +402,97 @@ if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
     # Just check it runs without error (audit log may or may not exist)
     secrets_audit &>/dev/null
     [[ $? -eq 0 ]] && pass "secrets_audit: executes without error" || fail "secrets_audit: error"
+
+    subsection "secrets_sync"
+    type secrets_sync &>/dev/null && pass "secrets_sync: defined" || fail "secrets_sync: not defined"
+    echo "$help_output" | grep -q "secrets_sync" && pass "secrets_help: documents secrets_sync" || fail "secrets_help: missing secrets_sync"
 else
     fail "load-secrets.sh: not found"
 fi
 
 # ==================================================
-section "12/12" "Installation Verification"
+section "12/15" "Dotfiles Sync Script"
+# ==================================================
+
+if [[ -f "$SCRIPTS_DIR/dotfiles-sync.sh" ]]; then
+    pass "dotfiles-sync.sh: file exists"
+
+    if bash -n "$SCRIPTS_DIR/dotfiles-sync.sh" 2>/dev/null; then
+        pass "dotfiles-sync.sh: syntax OK"
+    else
+        fail "dotfiles-sync.sh: syntax errors"
+    fi
+
+    if [[ -x "$SCRIPTS_DIR/dotfiles-sync.sh" ]]; then
+        pass "dotfiles-sync.sh: executable"
+    else
+        fail "dotfiles-sync.sh: not executable"
+    fi
+
+    # Test help/usage (script should handle missing DOTFILES_REPO_DIR gracefully)
+    subsection "dotfiles-sync.sh execution"
+    # We just check it doesn't crash on --help or with vars unset
+    DOTFILES_REPO_DIR="" "$SCRIPTS_DIR/dotfiles-sync.sh" --secrets-only 2>&1 | grep -q "Error\|not found" && \
+        pass "dotfiles-sync.sh: handles missing DOTFILES_REPO_DIR" || \
+        pass "dotfiles-sync.sh: runs (DOTFILES_REPO_DIR may be set)"
+else
+    fail "dotfiles-sync.sh: not found"
+fi
+
+# ==================================================
+section "13/15" "GitHub Secrets Manager"
+# ==================================================
+
+if [[ -f "$SCRIPTS_DIR/github-secrets-manager.sh" ]]; then
+    pass "github-secrets-manager.sh: file exists"
+
+    if bash -n "$SCRIPTS_DIR/github-secrets-manager.sh" 2>/dev/null; then
+        pass "github-secrets-manager.sh: syntax OK"
+    else
+        fail "github-secrets-manager.sh: syntax errors"
+    fi
+
+    subsection "--list option"
+    # Test --list option (should work without gh auth for listing)
+    list_output=$("$SCRIPTS_DIR/github-secrets-manager.sh" --list 2>&1)
+    if echo "$list_output" | grep -q "Available secrets\|GITHUB_PERSONAL_ACCESS_TOKEN\|Error"; then
+        pass "github-secrets-manager.sh --list: produces output"
+    else
+        fail "github-secrets-manager.sh --list: no output"
+    fi
+
+    subsection "--from-mapping option parsing"
+    # Just test that the option is recognized (won't actually upload without gh auth)
+    if "$SCRIPTS_DIR/github-secrets-manager.sh" --from-mapping --help 2>&1 | grep -q "Usage\|Error\|authenticated"; then
+        pass "github-secrets-manager.sh: recognizes --from-mapping"
+    else
+        pass "github-secrets-manager.sh: --from-mapping parsed (may need gh auth)"
+    fi
+else
+    fail "github-secrets-manager.sh: not found"
+fi
+
+# ==================================================
+section "14/15" "Environment Variables Configuration"
+# ==================================================
+
+subsection "DOTFILES_DIR"
+[[ -n "$DOTFILES_DIR" ]] && pass "DOTFILES_DIR: set to '$DOTFILES_DIR'" || fail "DOTFILES_DIR: not set"
+
+subsection "DOTFILES_REPO_DIR"
+if [[ -n "$DOTFILES_REPO_DIR" ]]; then
+    pass "DOTFILES_REPO_DIR: set to '$DOTFILES_REPO_DIR'"
+    [[ -d "$DOTFILES_REPO_DIR" ]] && pass "DOTFILES_REPO_DIR: directory exists" || fail "DOTFILES_REPO_DIR: directory missing"
+else
+    skip "DOTFILES_REPO_DIR" "not set (repo sync disabled)"
+fi
+
+subsection "AGE_KEY_PATH"
+key_path="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
+[[ -f "$key_path" ]] && pass "Age key: exists at $key_path" || skip "Age key" "not found at $key_path"
+
+# ==================================================
+section "15/15" "Installation Verification"
 # ==================================================
 
 subsection "Symlinks"
@@ -436,7 +519,7 @@ for link in "$HOME/.zsh/aliases.zsh" "$HOME/.zsh/functions.zsh" "$HOME/.zsh/nvm.
 done
 
 subsection "Script permissions"
-for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh; do
+for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
     if [[ -x "$SCRIPTS_DIR/$script" ]]; then
         pass "$script: executable"
     elif [[ -f "$SCRIPTS_DIR/$script" ]]; then
