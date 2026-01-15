@@ -13,6 +13,7 @@ source $ZSH/oh-my-zsh.sh
 # ==========================
 # Base Directories (must be set before loading secrets)
 export DOTFILES_DIR="$HOME/.dotfiles"
+export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
 
 # Load encrypted secrets as environment variables
 [[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"

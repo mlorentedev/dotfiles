@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Bidirectional sync between dotfiles repo and local installation
+# Bidirectional sync between dotfiles repo and installation
 # Usage: dotfiles-sync.sh [--secrets-only]
 #
 # Syncs:
@@ -39,18 +39,18 @@ validate_dirs() {
 
 # Sync secrets bidirectionally (newest wins)
 sync_secrets() {
-    local local_dir="$DOTFILES_LOCAL/$SENSITIVE_DIR"
-    local repo_dir="$DOTFILES_REPO/$SENSITIVE_DIR"
+    local_dir="$DOTFILES_LOCAL/$SENSITIVE_DIR"
+    repo_dir="$DOTFILES_REPO/$SENSITIVE_DIR"
 
     [[ -d "$local_dir" ]] || { log_warning "Local sensitive dir not found"; return 0; }
     [[ -d "$repo_dir" ]] || { log_warning "Repo sensitive dir not found"; return 0; }
 
     log_info "Syncing secrets..."
 
-    local synced=0
+    synced=0
 
     # Sync .age files, env-mapping.conf, and audit log
-    local files_to_sync=(
+    files_to_sync=(
         "env-mapping.conf"
         ".secrets-audit.log"
     )
@@ -58,9 +58,9 @@ sync_secrets() {
     # Add all .age files from both directories
     for f in "$local_dir"/*.secret.age "$repo_dir"/*.secret.age; do
         [[ -f "$f" ]] || continue
-        local basename="${f##*/}"
+        basename="${f##*/}"
         # Add to array if not already present
-        local found=0
+        found=0
         for existing in "${files_to_sync[@]}"; do
             [[ "$existing" == "$basename" ]] && { found=1; break; }
         done
@@ -68,24 +68,24 @@ sync_secrets() {
     done
 
     for file in "${files_to_sync[@]}"; do
-        local local_file="$local_dir/$file"
-        local repo_file="$repo_dir/$file"
+        local_file="$local_dir/$file"
+        repo_file="$repo_dir/$file"
 
         # Both exist - sync newer to older
         if [[ -f "$local_file" && -f "$repo_file" ]]; then
             if [[ "$local_file" -nt "$repo_file" ]]; then
                 cat "$local_file" > "$repo_file"
-                log_info "  $file (local → repo)"
+                log_info "  $file (→ repo)"
                 ((synced++))
             elif [[ "$repo_file" -nt "$local_file" ]]; then
                 cat "$repo_file" > "$local_file"
                 log_info "  $file (repo → local)"
                 ((synced++))
             fi
-        # Only in local - copy to repo
+        # Only in - copy to repo
         elif [[ -f "$local_file" ]]; then
             cat "$local_file" > "$repo_file"
-            log_info "  $file (local → repo) [new]"
+            log_info "  $file (→ repo) [new]"
             ((synced++))
         # Only in repo - copy to local
         elif [[ -f "$repo_file" ]]; then
@@ -103,7 +103,7 @@ sync_secrets() {
 sync_git() {
     log_info "Pushing from repo..."
     if git -C "$DOTFILES_REPO" diff --quiet && git -C "$DOTFILES_REPO" diff --cached --quiet; then
-        log_info "  No local changes to push"
+        log_info "  No changes to push"
     else
         log_warning "  Uncommitted changes in repo - commit first"
         return 1

@@ -50,8 +50,8 @@ log_error() {
 # Output: error message to stdout, then exits
 # Usage: exit_error "Failed to connect" 2
 exit_error() {
-    local message=$1
-    local code=${2:-1} # Default exit code is 1
+    message=$1
+    code=${2:-1} # Default exit code is 1
     
     log_error "$message"
     exit $code
@@ -96,7 +96,7 @@ symlink_valid() {
 # Output: none, returns 0 if set and non-empty, 1 otherwise
 # Usage: var_is_set "GITHUB_TOKEN" && echo "configured"
 var_is_set() {
-    local var_name="$1"
+    var_name="$1"
     if [[ -n "$ZSH_VERSION" ]]; then
         [[ -n "${(P)var_name:-}" ]]
     else
@@ -111,7 +111,7 @@ var_is_set() {
 # Output: environment variables loaded into shell
 # Usage: load_env_file ".env"
 load_env_file() {
-    local env_file="$1"
+    env_file="$1"
     
     # Check if file exists
     if [ ! -f "$env_file" ]; then
@@ -147,7 +147,7 @@ load_env_file() {
 # Output: formatted list of environment variables to stdout
 # Usage: debug_print_env ".env.local"
 debug_print_env() {
-    local env_file="${1:-.env}"
+    env_file="${1:-.env}"
     echo "=== Loaded Environment Variables ==="
     
     # Print all variables from the env file
@@ -168,13 +168,13 @@ debug_print_env() {
 # Output: echoes count of entries processed, returns 1 if file not found
 # Usage: parse_mapping_file "config.conf" my_handler
 parse_mapping_file() {
-    local file="$1"
-    local callback="$2"
-    local count=0
+    file="$1"
+    callback="$2"
+    count=0
 
     [[ ! -f "$file" ]] && return 1
 
-    local line key value
+    line key value
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -214,8 +214,8 @@ AGE_DEFAULT_KEY="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
 # Output: decrypted content to stdout, returns 0 on success, 1 on failure
 # Usage: value=$(age_decrypt "secret.age")
 age_decrypt() {
-    local file="$1"
-    local key_file="${2:-$AGE_DEFAULT_KEY}"
+    file="$1"
+    key_file="${2:-$AGE_DEFAULT_KEY}"
 
     file_exists "$file" || return 1
     file_exists "$key_file" || return 1
@@ -230,14 +230,14 @@ age_decrypt() {
 # Usage: echo "secret" | age_encrypt "output.age"
 # Usage: age_encrypt "output.age" "" "input.txt"
 age_encrypt() {
-    local output="$1"
-    local key_file="${2:-$AGE_DEFAULT_KEY}"
-    local input="$3"
+    output="$1"
+    key_file="${2:-$AGE_DEFAULT_KEY}"
+    input="$3"
 
     file_exists "$key_file" || return 1
     command_exists age || return 1
 
-    local pubkey
+    pubkey
     pubkey=$(grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null) || return 1
 
     if [[ -n "$input" ]]; then
@@ -252,7 +252,7 @@ age_encrypt() {
 # Output: public key string to stdout
 # Usage: pubkey=$(age_get_pubkey)
 age_get_pubkey() {
-    local key_file="${1:-$AGE_DEFAULT_KEY}"
+    key_file="${1:-$AGE_DEFAULT_KEY}"
     grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null
 }
 
@@ -279,9 +279,9 @@ gh_get_repo() {
 # Output: none, returns 0 on success, 1 on failure
 # Usage: gh_set_secret "API_TOKEN" "$token"
 gh_set_secret() {
-    local name="$1"
-    local value="$2"
-    local repo="${3:-$(gh_get_repo)}"
+    name="$1"
+    value="$2"
+    repo="${3:-$(gh_get_repo)}"
 
     [[ -z "$repo" ]] && return 1
     echo "$value" | gh secret set "$name" --repo "$repo"
@@ -294,7 +294,7 @@ gh_set_secret() {
 # Output: success/error messages, returns 0 if connected, 1 if failed
 # Usage: check_server_connectivity "user@server.com"
 check_server_connectivity() {
-    local server=$1
+    server=$1
     
     log_info "Checking SSH connectivity to $server..."
     
@@ -312,8 +312,8 @@ check_server_connectivity() {
 # Output: error message if not found, returns 0 if found, 1 if missing
 # Usage: check_command "git" "git-core"
 check_command() {
-    local cmd=$1
-    local package=${2:-$cmd}
+    cmd=$1
+    package=${2:-$cmd}
     
     if ! command -v "$cmd" &> /dev/null; then
         log_error "$cmd not found. Please install $package."
@@ -328,8 +328,8 @@ check_command() {
 # Output: error messages for missing commands, returns 0 if all found, 1 if any missing
 # Usage: check_dependencies "git" "curl" "jq"
 check_dependencies() {
-    local deps=("$@")
-    local missing=0
+    deps=("$@")
+    missing=0
     
     for dep in "${deps[@]}"; do
         if ! check_command "$dep"; then
@@ -349,7 +349,7 @@ check_dependencies() {
 # Output: confirmation prompt, returns 0 if confirmed, 1 if cancelled
 # Usage: confirm_action "Delete all files?"
 confirm_action() {
-    local message=${1:-"Are you sure you want to continue?"}
+    message=${1:-"Are you sure you want to continue?"}
     
     echo -e "${YELLOW}$message (y/n)${NC}"
     read -r confirm
@@ -369,8 +369,8 @@ confirm_action() {
 # Output: success/warning messages, backup file created
 # Usage: backup_file "/path/to/config.txt"
 backup_file() {
-    local file=$1
-    local backup="${file}.$(date +%Y%m%d%H%M%S).bak"
+    file=$1
+    backup="${file}.$(date +%Y%m%d%H%M%S).bak"
     
     if [ -f "$file" ]; then
         log_info "Creating backup of $file..."
@@ -396,7 +396,7 @@ get_timestamp() {
 # Output: absolute directory path to stdout
 # Usage: script_dir=$(get_script_dir)
 get_script_dir() {
-    local calling_script="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+    calling_script="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
     echo "$(cd "$(dirname "$calling_script")" && pwd)"
 }
 
@@ -405,7 +405,7 @@ get_script_dir() {
 # Output: absolute path to project root to stdout
 # Usage: project_root=$(get_project_root)
 get_project_root() {
-    local script_dir="${1:-$(get_script_dir)}"
+    script_dir="${1:-$(get_script_dir)}"
     echo "$(dirname "$script_dir")"
 }
 
@@ -414,7 +414,7 @@ get_project_root() {
 # Output: info/success messages, exits on failure
 # Usage: ensure_directory "/path/to/new/dir"
 ensure_directory() {
-    local dir="$1"
+    dir="$1"
     
     if [[ ! -d "$dir" ]]; then
         log_info "Creating directory: $dir"
@@ -431,8 +431,8 @@ ensure_directory() {
 # Output: exits with error if file not found
 # Usage: check_file_exists "/path/to/file" "Config file missing"
 check_file_exists() {
-    local file="$1"
-    local error_msg="${2:-File not found: $file}"
+    file="$1"
+    error_msg="${2:-File not found: $file}"
     
     if [[ ! -f "$file" ]]; then
         exit_error "$error_msg"
@@ -446,9 +446,9 @@ check_file_exists() {
 # Output: info message if found, exits with error if not found
 # Usage: require_command "git" "git-core" "Visit: https://git-scm.com"
 require_command() {
-    local cmd="$1"
-    local package="${2:-$cmd}"
-    local install_msg="${3:-Please install $package}"
+    cmd="$1"
+    package="${2:-$cmd}"
+    install_msg="${3:-Please install $package}"
     
     if ! command -v "$cmd" &> /dev/null; then
         exit_error "$cmd is not installed. $install_msg"
@@ -474,7 +474,7 @@ check_git_repo() {
 # Output: creates global variable with initial value 0
 # Usage: init_counter "file_count"
 init_counter() {
-    local var_name="$1"
+    var_name="$1"
     declare -g "$var_name=0"
 }
 
@@ -483,8 +483,8 @@ init_counter() {
 # Output: increments the global variable value
 # Usage: increment_counter "file_count"
 increment_counter() {
-    local var_name="$1"
-    local current_val
+    var_name="$1"
+    current_val
     if [[ -n "$ZSH_VERSION" ]]; then
         current_val="${(P)var_name}"
     else
@@ -498,7 +498,7 @@ increment_counter() {
 # Output: current counter value to stdout
 # Usage: count=$(get_counter "file_count")
 get_counter() {
-    local var_name="$1"
+    var_name="$1"
     if [[ -n "$ZSH_VERSION" ]]; then
         echo "${(P)var_name}"
     else
@@ -513,10 +513,10 @@ get_counter() {
 # Output: number of files processed to stdout, returns 1 if directory not found
 # Usage: count=$(process_files "/path/to/dir" "*.txt" "my_function")
 process_files() {
-    local dir="$1"
-    local pattern="$2"
-    local callback="$3"
-    local count=0
+    dir="$1"
+    pattern="$2"
+    callback="$3"
+    count=0
     
     if [[ ! -d "$dir" ]]; then
         log_warning "Directory not found: $dir"
@@ -542,8 +542,8 @@ process_files() {
 # Output: success/error messages, returns 0 on success, 1 on failure
 # Usage: safe_copy "source.txt" "backup/source.txt"
 safe_copy() {
-    local src="$1"
-    local dest="$2"
+    src="$1"
+    dest="$2"
     
     if cp "$src" "$dest" 2>/dev/null; then
         log_success "Copied: $(basename "$src") → $(basename "$dest")"
@@ -559,8 +559,8 @@ safe_copy() {
 # Output: success/error messages, returns 0 on success, 1 on failure
 # Usage: safe_move "old_file.txt" "new_location/file.txt"
 safe_move() {
-    local src="$1"
-    local dest="$2"
+    src="$1"
+    dest="$2"
     
     if mv "$src" "$dest" 2>/dev/null; then
         log_success "Moved: $(basename "$src") → $(basename "$dest")"
@@ -576,7 +576,7 @@ safe_move() {
 # Output: success/error messages, returns 0 on success, 1 on failure
 # Usage: safe_remove "temp_file.txt"
 safe_remove() {
-    local file="$1"
+    file="$1"
     
     if rm -f "$file" 2>/dev/null; then
         log_success "Removed: $(basename "$file")"
@@ -594,8 +594,8 @@ safe_remove() {
 # Output: returns 0 if line was added, 1 if already exists or file missing
 # Usage: ensure_line_in_file "$HOME/.zshrc" 'export PATH=$HOME/bin:$PATH'
 ensure_line_in_file() {
-    local file="$1"
-    local line="$2"
+    file="$1"
+    line="$2"
 
     file_exists "$file" || return 1
 
@@ -613,8 +613,8 @@ ensure_line_in_file() {
 # Output: path to created temp file
 # Usage: tmp=$(create_temp_file "ssh_key")
 create_temp_file() {
-    local prefix="${1:-tmp}"
-    local tmp_file
+    prefix="${1:-tmp}"
+    tmp_file
     tmp_file=$(mktemp "/tmp/${prefix}.XXXXXX")
     chmod 600 "$tmp_file"
     echo "$tmp_file"
@@ -625,8 +625,8 @@ create_temp_file() {
 # Output: success/error log message, returns 0 if valid, 1 otherwise
 # Usage: verify_symlink "$HOME/.zshrc" ".zshrc"
 verify_symlink() {
-    local link="$1"
-    local name="${2:-$(basename "$link")}"
+    link="$1"
+    name="${2:-$(basename "$link")}"
 
     if symlink_valid "$link"; then
         log_success "$name linked successfully"
@@ -644,9 +644,9 @@ verify_symlink() {
 # Output: masked string to stdout
 # Usage: log_info "Token: $(mask_value "$token" 4)"
 mask_value() {
-    local value="$1"
-    local show_chars="${2:-0}"
-    local len=${#value}
+    value="$1"
+    show_chars="${2:-0}"
+    len=${#value}
 
     # If show_chars >= length, return original (nothing to mask)
     if [[ $show_chars -ge $len ]]; then
@@ -682,7 +682,7 @@ base64_encode() {
 # Output: trimmed string to stdout
 # Usage: trimmed=$(trim "  hello  ")
 trim() {
-    local str="$1"
+    str="$1"
     str="${str#"${str%%[![:space:]]*}"}"
     str="${str%"${str##*[![:space:]]}"}"
     echo "$str"

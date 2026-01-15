@@ -28,7 +28,7 @@ else
     command_exists() { command -v "$1" &>/dev/null; }
     file_exists() { [[ -f "$1" ]]; }
     var_is_set() {
-        local var_name="$1"
+        var_name="$1"
         if [[ -n "$ZSH_VERSION" ]]; then
             [[ -n "${(P)var_name:-}" ]]
         else
@@ -51,9 +51,9 @@ SECRETS_REPO_DIR="${DOTFILES_REPO_DIR:+${DOTFILES_REPO_DIR}/sensitive}"
 
 # Sync file to repo if DOTFILES_REPO_DIR is configured
 _secrets_sync_to_repo() {
-    local filename="$1"
-    local sync_mapping="${2:-false}"
-    local silent="${3:-false}"
+    filename="$1"
+    sync_mapping="${2:-false}"
+    silent="${3:-false}"
 
     [[ -z "$SECRETS_REPO_DIR" ]] && return 0
     [[ "$SECRETS_REPO_DIR" == "$SECRETS_DIR" ]] && return 0
@@ -61,25 +61,25 @@ _secrets_sync_to_repo() {
 
     # Sync file
     if [[ -f "$SECRETS_DIR/${filename}" ]]; then
-        cp "$SECRETS_DIR/${filename}" "$SECRETS_REPO_DIR/${filename}"
+        command cp "$SECRETS_DIR/${filename}" "$SECRETS_REPO_DIR/${filename}"
         [[ "$silent" != "true" ]] && echo "  Synced to repo: $SECRETS_REPO_DIR/${filename}"
     fi
 
     # Sync mapping file if requested
     if [[ "$sync_mapping" == "true" && -f "$SECRETS_MAPPING_FILE" ]]; then
-        cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
+        command cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
     fi
 }
 
 # Handler for each mapping entry (used by parse_mapping_file)
 _secrets_load_entry() {
-    local var_name="$1"
-    local filename="$2"
-    local encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+    var_name="$1"
+    filename="$2"
+    encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
     file_exists "$encrypted_file" || return 1
 
-    local value
+    value
     value=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n')
 
     if [[ -n "$value" ]]; then
@@ -101,7 +101,7 @@ secrets_load() {
         parse_mapping_file "$SECRETS_MAPPING_FILE" _secrets_load_entry >/dev/null
     else
         # Fallback parsing
-        local line key value
+        line key value
         while IFS= read -r line || [[ -n "$line" ]]; do
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -118,7 +118,7 @@ secrets_load() {
 secrets_refresh() {
     # Unset existing vars first
     if file_exists "$SECRETS_MAPPING_FILE"; then
-        local line var_name
+        line var_name
         while IFS= read -r line || [[ -n "$line" ]]; do
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -142,7 +142,7 @@ secrets_list() {
     echo "Secret mappings ($SECRETS_MAPPING_FILE):"
     echo ""
 
-    local line var_name filename encrypted_file
+    line var_name filename encrypted_file
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -165,13 +165,13 @@ secrets_list() {
 
 # Get a single secret on-demand (for rarely used secrets)
 secrets_get() {
-    local var_name="$1"
+    var_name="$1"
 
     file_exists "$SECRETS_MAPPING_FILE" || { echo "Mapping file not found" >&2; return 1; }
     file_exists "$SECRETS_KEY_PATH" || { echo "Key file not found" >&2; return 1; }
     command_exists age || { echo "age not installed" >&2; return 1; }
 
-    local filename
+    filename
     filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | cut -d'=' -f2)
 
     if [[ -z "$filename" ]]; then
@@ -179,7 +179,7 @@ secrets_get() {
         return 1
     fi
 
-    local encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+    encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
     if ! file_exists "$encrypted_file"; then
         echo "Encrypted file not found: $encrypted_file" >&2
@@ -192,8 +192,8 @@ secrets_get() {
 # Add a new secret interactively
 # Usage: secrets_add VAR_NAME filename
 secrets_add() {
-    local var_name="$1"
-    local filename="$2"
+    var_name="$1"
+    filename="$2"
 
     # Validate inputs
     if [[ -z "$var_name" || -z "$filename" ]]; then
@@ -213,8 +213,8 @@ secrets_add() {
         return 1
     fi
 
-    local secret_file="$SECRETS_DIR/${filename}.secret"
-    local encrypted_file="${secret_file}.age"
+    secret_file="$SECRETS_DIR/${filename}.secret"
+    encrypted_file="${secret_file}.age"
 
     # Check if files already exist
     if file_exists "$encrypted_file"; then
@@ -273,8 +273,8 @@ secrets_check() {
     echo "Checking secrets integrity..."
     echo ""
 
-    local valid=0 missing=0 orphaned=0
-    local line var_name filename encrypted_file
+    valid=0 missing=0 orphaned=0
+    line var_name filename encrypted_file
 
     # Check each mapping has corresponding .age file
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -299,7 +299,7 @@ secrets_check() {
     # Check for .age files without mappings
     echo ""
     echo "Checking for orphaned .age files..."
-    local base_name
+    base_name
     for age_file in "$SECRETS_DIR"/*.secret.age; do
         file_exists "$age_file" || continue
         base_name=$(basename "$age_file" .secret.age)
@@ -321,10 +321,10 @@ secrets_check() {
 # Remove .dec and .secret plaintext files
 # Usage: secrets_clean [--dry-run]
 secrets_clean() {
-    local dry_run=false
+    dry_run=false
     [[ "$1" == "--dry-run" ]] && dry_run=true
 
-    local dec_count=0 secret_count=0
+    dec_count=0 secret_count=0
 
     echo "Scanning for plaintext files in $SECRETS_DIR..."
     echo ""
@@ -367,7 +367,7 @@ secrets_clean() {
 # Rotate (update) an existing secret
 # Usage: secrets_rotate VAR_NAME
 secrets_rotate() {
-    local var_name="$1"
+    var_name="$1"
 
     if [[ -z "$var_name" ]]; then
         echo "Usage: secrets_rotate VAR_NAME"
@@ -380,7 +380,7 @@ secrets_rotate() {
     command_exists age || { echo "Error: age not installed" >&2; return 1; }
 
     # Find the mapping
-    local filename
+    filename
     filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | cut -d'=' -f2)
 
     if [[ -z "$filename" ]]; then
@@ -389,13 +389,13 @@ secrets_rotate() {
         return 1
     fi
 
-    local secret_file="$SECRETS_DIR/${filename}.secret"
-    local encrypted_file="${secret_file}.age"
-    local backup_file="${encrypted_file}.bak"
+    secret_file="$SECRETS_DIR/${filename}.secret"
+    encrypted_file="${secret_file}.age"
+    backup_file="${encrypted_file}.bak"
 
     # Backup existing encrypted file
     if file_exists "$encrypted_file"; then
-        cp "$encrypted_file" "$backup_file"
+        command cp "$encrypted_file" "$backup_file"
     fi
 
     # Prompt for new value
@@ -458,28 +458,27 @@ secrets_sync() {
     echo "Syncing secrets to repo: $SECRETS_REPO_DIR"
     echo ""
 
-    local count=0
+    count=0
 
     # Sync all .age files
     for file in "$SECRETS_DIR"/*.secret.age; do
         [[ -f "$file" ]] || continue
-        local basename
-        basename=$(basename "$file")
-        cp "$file" "$SECRETS_REPO_DIR/$basename"
-        echo "  $basename"
+        filename="${file##*/}"
+        command cp "$file" "$SECRETS_REPO_DIR/$filename"
+        echo "  $filename"
         ((count++))
     done
 
     # Sync mapping file
     if [[ -f "$SECRETS_MAPPING_FILE" ]]; then
-        cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
+        command cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
         echo "  env-mapping.conf"
         ((count++))
     fi
 
     # Sync audit log
     if [[ -f "$SECRETS_AUDIT_FILE" ]]; then
-        cp "$SECRETS_AUDIT_FILE" "$SECRETS_REPO_DIR/.secrets-audit.log"
+        command cp "$SECRETS_AUDIT_FILE" "$SECRETS_REPO_DIR/.secrets-audit.log"
         echo "  .secrets-audit.log"
         ((count++))
     fi
@@ -557,9 +556,9 @@ SECRETS_AUDIT_FILE="$SECRETS_DIR/.secrets-audit.log"
 
 # Internal: Write to audit log
 _secrets_audit_log() {
-    local var_name="$1"
-    local action="$2"
-    local timestamp
+    var_name="$1"
+    action="$2"
+    timestamp
     timestamp=$(date -Iseconds)
     echo "$timestamp|$var_name|$action" >> "$SECRETS_AUDIT_FILE"
 
@@ -570,7 +569,7 @@ _secrets_audit_log() {
 # Show audit log for secrets
 # Usage: secrets_audit [VAR_NAME]
 secrets_audit() {
-    local filter="$1"
+    filter="$1"
 
     if ! file_exists "$SECRETS_AUDIT_FILE"; then
         echo "No audit log found (no secrets have been added/rotated yet)"

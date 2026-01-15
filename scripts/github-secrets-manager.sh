@@ -51,7 +51,8 @@ if $LIST_ONLY; then
     echo ""
     while IFS='=' read -r var_name filename || [[ -n "$var_name" ]]; do
         [[ -z "$var_name" || "$var_name" =~ ^# ]] && continue
-        local encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+        [[ "$var_name" =~ ^GITHUB_ ]] && continue  # GitHub reserves this prefix
+        encrypted_file="$SECRETS_DIR/${filename}.secret.age"
         if file_exists "$encrypted_file"; then
             echo "  $var_name"
         else
@@ -94,7 +95,7 @@ declare -a PROCESSED_SECRETS=()
 
 # Check if variable is selected (when --select is used)
 is_selected() {
-    local var="$1"
+    var="$1"
     [[ ${#SELECTED_VARS[@]} -eq 0 ]] && return 0  # No filter = all selected
     for sel in "${SELECTED_VARS[@]}"; do
         [[ "$sel" == "$var" ]] && return 0
@@ -104,8 +105,8 @@ is_selected() {
 
 # Handler for each env entry
 process_secret() {
-    local key="$1"
-    local value="$2"
+    key="$1"
+    value="$2"
 
     # Check if selected
     is_selected "$key" || return 0
@@ -120,8 +121,8 @@ process_secret() {
     if [[ "$key" == *"SSH_PRIVATE_KEY"* && "$key" == *"BASE64"* ]]; then
         log_info "Found base64 encoded SSH key: $key"
 
-        local new_key="${key/_BASE64/}"
-        local tmp
+        new_key="${key/_BASE64/}"
+        tmp
         tmp=$(create_temp_file "ssh_key")
 
         base64_decode "$value" > "$tmp"
@@ -145,11 +146,12 @@ if $USE_MAPPING; then
 
     while IFS='=' read -r var_name filename || [[ -n "$var_name" ]]; do
         [[ -z "$var_name" || "$var_name" =~ ^# ]] && continue
+        [[ "$var_name" =~ ^GITHUB_ ]] && { log_warning "Skipping $var_name (GITHUB_ prefix reserved)"; continue; }
 
         # Check if selected
         is_selected "$var_name" || continue
 
-        local encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+        encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
         if ! file_exists "$encrypted_file"; then
             log_warning "Missing file for $var_name: ${filename}.secret.age"
@@ -157,7 +159,6 @@ if $USE_MAPPING; then
         fi
 
         # Decrypt and get value
-        local value
         value=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH")
 
         if [[ -z "$value" ]]; then

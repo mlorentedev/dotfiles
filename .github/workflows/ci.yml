@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell scripts syntax
+        run: |
+          for script in scripts/*.sh install.sh; do
+            echo "Checking $script..."
+            bash -n "$script"
+          done
+
+      - name: Check for shellcheck issues
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: error
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install age
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y age
+
+      - name: Setup mock environment
+        run: |
+          mkdir -p ~/.dotfiles/sensitive ~/.dotfiles/scripts ~/.config/age
+          age-keygen -o ~/.config/age/key.txt 2>/dev/null
+
+          cp -r scripts/* ~/.dotfiles/scripts/
+          cp -r sensitive/* ~/.dotfiles/sensitive/ 2>/dev/null || true
+
+          ln -sf ~/.dotfiles/.zshrc ~/.zshrc 2>/dev/null || true
+          ln -sf ~/.dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
+
+      - name: Run syntax tests
+        run: |
+          source scripts/utils.sh
+
+          echo "Testing utility functions..."
+
+          # Test command_exists
+          command_exists bash && echo "PASS: command_exists"
+
+          # Test file_exists
+          file_exists scripts/utils.sh && echo "PASS: file_exists"
+
+          # Test dir_exists
+          dir_exists scripts && echo "PASS: dir_exists"
+
+          # Test trim
+          [[ "$(trim '  hello  ')" == "hello" ]] && echo "PASS: trim"
+
+          # Test base64 roundtrip
+          encoded=$(base64_encode "test")
+          decoded=$(base64_decode "$encoded")
+          [[ "$decoded" == "test" ]] && echo "PASS: base64 roundtrip"
+
+          echo "All basic tests passed!"

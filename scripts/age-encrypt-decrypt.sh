@@ -34,7 +34,7 @@ encrypt_all() {
     check_file_exists "$AGE_DEFAULT_KEY" "Private key not found: $AGE_DEFAULT_KEY. Generate: age-keygen -o $AGE_DEFAULT_KEY"
     ensure_directory "$SECRETS_DIR"
 
-    local pubkey
+    pubkey
     pubkey=$(age_get_pubkey)
     [[ -z "$pubkey" ]] && exit_error "Could not extract public key from $AGE_DEFAULT_KEY"
 
@@ -45,7 +45,7 @@ encrypt_all() {
     for file in "$SECRETS_DIR"/*.secret; do
         file_exists "$file" || continue
 
-        local outfile="${file}.age"
+        outfile="${file}.age"
         log_info "Encrypting: $(basename "$file") -> $(basename "$outfile")"
 
         if age_encrypt "$outfile" "$AGE_DEFAULT_KEY" "$file"; then
@@ -71,7 +71,7 @@ decrypt_all() {
     for file in "$SECRETS_DIR"/*.age; do
         file_exists "$file" || continue
 
-        local outfile="${file%.age}.dec"
+        outfile="${file%.age}.dec"
         log_info "Decrypting: $(basename "$file") -> $(basename "$outfile")"
 
         if age_decrypt "$file" "$AGE_DEFAULT_KEY" > "$outfile"; then
