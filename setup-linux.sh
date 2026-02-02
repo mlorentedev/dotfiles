@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# install.sh: Install dotfiles and set up environment
-# Usage: ./install.sh
+# setup-linux.sh: Install dotfiles and set up environment
+# Usage: ./setup-linux.sh
 
 set -e
 
@@ -148,10 +148,10 @@ done
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
-# Add claude-init alias
-CLAUDE_INIT_LINE='alias claude-init="$HOME/.claude/init-project.sh"'
-ensure_line_in_file "$HOME/.zshrc" "$CLAUDE_INIT_LINE" 2>/dev/null || true
-ensure_line_in_file "$HOME/.bashrc" "$CLAUDE_INIT_LINE" 2>/dev/null || true
+# Add project-init alias (AI-agnostic naming)
+PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
+ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
+ensure_line_in_file "$HOME/.bashrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
 
 log_info "Adding dotfiles scripts directory to PATH..."
 PATH_LINE='export PATH=$HOME/.dotfiles/scripts:$PATH'

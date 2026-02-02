@@ -2,7 +2,7 @@
 
 # Comprehensive test suite for dotfiles
 # Usage: ./scripts/test-dotfiles.sh
-# Run after: ./install.sh
+# Run after: ./setup-linux.sh
 
 set -o pipefail
 
@@ -79,8 +79,8 @@ for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-man
     fi
 done
 
-if [[ -f "$DOTFILES_DIR/install.sh" ]]; then
-    bash -n "$DOTFILES_DIR/install.sh" 2>/dev/null && pass "install.sh syntax OK" || fail "install.sh syntax errors"
+if [[ -f "$DOTFILES_DIR/setup-linux.sh" ]]; then
+    bash -n "$DOTFILES_DIR/setup-linux.sh" 2>/dev/null && pass "setup-linux.sh syntax OK" || fail "setup-linux.sh syntax errors"
 fi
 
 # ==================================================

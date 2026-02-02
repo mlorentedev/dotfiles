@@ -1,18 +1,20 @@
 #!/bin/bash
 # ~/.claude/init-project.sh
-# Initialize a new project with Claude Code configuration
+# Purpose: Initialize a new project with Dual AI Memory (Claude & Gemini)
+# Usage: ./init-project.sh [project-name] [stack]
 
 set -e
 
 PROJECT_NAME="${1:-.}"
 STACK="${2:-python}"
-CLAUDE_HOME="${HOME}/.claude"
+# Using .claude as the central config hub (backward compatibility)
+AI_CONFIG_HOME="${HOME}/.claude"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
 log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -29,25 +31,39 @@ fi
 log_info "Creating project structure..."
 mkdir -p src tests docs scripts tasks .claude/skills
 
-# Copy CLAUDE.md as project instructions
-if [[ -f "$CLAUDE_HOME/CLAUDE.md" ]]; then
-    cp "$CLAUDE_HOME/CLAUDE.md" .
-    log_success "Copied CLAUDE.md"
+# --- AI MEMORY INJECTION ---
+
+# Copy CLAUDE.md
+if [[ -f "$AI_CONFIG_HOME/CLAUDE.md" ]]; then
+    cp "$AI_CONFIG_HOME/CLAUDE.md" .
+    log_success "Injected CLAUDE.md"
+else
+    log_info "CLAUDE.md not found in global config"
 fi
 
-# Copy skills (each skill is a directory with SKILL.md)
-if [[ -d "$CLAUDE_HOME/skills" ]]; then
-    for skill_dir in "$CLAUDE_HOME/skills/"*/; do
+# Copy GEMINI.md
+if [[ -f "$AI_CONFIG_HOME/GEMINI.md" ]]; then
+    cp "$AI_CONFIG_HOME/GEMINI.md" .
+    log_success "Injected GEMINI.md"
+else
+    log_info "GEMINI.md not found in global config"
+fi
+
+# Copy skills (Claude Code specific)
+if [[ -d "$AI_CONFIG_HOME/skills" ]]; then
+    for skill_dir in "$AI_CONFIG_HOME/skills/"*/; do
         if [[ -d "$skill_dir" ]]; then
             skill_name=$(basename "$skill_dir")
             mkdir -p ".claude/skills/$skill_name"
+            # Using cp -r with error suppression in case directory is empty
             cp -r "$skill_dir"* ".claude/skills/$skill_name/" 2>/dev/null || true
         fi
     done
-    log_success "Copied skills to .claude/skills/"
+    log_success "Injected skills to .claude/skills/"
 fi
 
-# Initialize tasks
+# --- TASK MANAGEMENT ---
+
 cat > tasks/todo.md << 'EOF'
 # Project Tasks
 
@@ -74,7 +90,8 @@ EOF
 
 log_success "Created tasks/todo.md and tasks/lessons.md"
 
-# Stack-specific initialization
+# --- STACK INITIALIZATION ---
+
 case $STACK in
     python)
         log_info "Initializing Python project..."
@@ -94,16 +111,16 @@ case $STACK in
 .PHONY: build test lint run
 
 build:
-	go build -o bin/app ./cmd/...
+    go build -o bin/app ./cmd/...
 
 test:
-	go test -v -race -cover ./...
+    go test -v -race -cover ./...
 
 lint:
-	golangci-lint run
+    golangci-lint run
 
 run:
-	go run ./cmd/main.go
+    go run ./cmd/main.go
 EOF
         ;;
     node|ts)
@@ -117,6 +134,8 @@ EOF
         log_info "No stack-specific initialization for: $STACK"
         ;;
 esac
+
+# --- GIT & IGNORE ---
 
 # Git initialization
 if [[ ! -d .git ]]; then
@@ -162,9 +181,9 @@ EOF
     log_success "Created .gitignore"
 fi
 
-log_success "Project initialized with Claude Code configuration"
+log_success "Project initialized with Dual AI Configuration"
 log_info "Structure:"
-echo "  CLAUDE.md              - Project instructions"
-echo "  .claude/skills/        - Custom skills (/audit, /refactor, /test, /doc, /docker)"
-echo "  tasks/todo.md          - Task tracking"
-echo "  tasks/lessons.md       - Learning log"
+echo "  CLAUDE.md / GEMINI.md      - AI Memory files (Dual-Core)"
+echo "  .claude/skills/            - Custom skills"
+echo "  tasks/todo.md              - Task tracking"
+echo "  tasks/lessons.md           - Learning log"

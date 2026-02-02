@@ -4,28 +4,51 @@ Personal configuration files for development tools, shell environments, and AI c
 
 ## Quick Start
 
+### Linux / macOS
+
 ```bash
 git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
-./install.sh
+./setup-linux.sh
 source ~/.zshrc
+```
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/mlorentedev/dotfiles.git
+cd dotfiles
+
+# Option 1: One-time bypass (no permanent changes)
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+
+# Option 2: Set policy for current user (recommended, persistent)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\setup-windows.ps1
+
+# Restart PowerShell, then verify
+project-init test-project python
 ```
 
 ## Features
 
-- **Shell Configuration:** Aliases, functions, PATH management for Bash/Zsh
-- **Secrets Management:** Age-encrypted secrets loaded as environment variables
+- **Shell Configuration:** Aliases, functions, PATH management for Bash/Zsh (Linux/macOS) and PowerShell (Windows)
+- **Secrets Management:** Age-encrypted secrets loaded as environment variables (Linux/macOS)
 - **AI Integration:** Claude Code and Gemini CLI with custom skills
-- **Project Initialization:** `claude-init` command to bootstrap new projects
+- **Project Initialization:** `project-init` command to bootstrap new projects with dual AI configuration
 
 ## Structure
 
 ```text
+├── setup-linux.sh              # Linux/macOS setup script
+├── setup-windows.ps1           # Windows setup script (PowerShell)
+├── powershell/                 # Windows shell configs
+│   └── profile.ps1             # PowerShell profile template
 ├── scripts/                    # Shell utilities (added to PATH)
 │   ├── utils.sh                # Shared function library
 │   ├── load-secrets.sh         # Secrets → env vars
 │   ├── init-project.sh         # Project bootstrapper (bash)
-│   ├── init-project.bat        # Project bootstrapper (Windows)
+│   ├── init-project.ps1        # Project bootstrapper (PowerShell)
 │   ├── github-secrets-manager.sh
 │   ├── age-encrypt-decrypt.sh
 │   └── dotfiles-sync.sh
@@ -65,10 +88,10 @@ See [docs/SECRETS.md](docs/SECRETS.md) for full documentation.
 ### Claude Code
 
 ```bash
-# Initialize new project with Claude configuration
-claude-init my-project python
-claude-init my-project go
-claude-init . node
+# Initialize new project with dual AI configuration
+project-init my-project python
+project-init my-project go
+project-init . node
 
 # Available skills (slash commands)
 /audit      # Security audit
@@ -102,26 +125,25 @@ dotfiles-sync --secrets-only    # Only sync sensitive/
 
 ## Windows Setup
 
-Dotfiles (shell config, secrets) are Linux/macOS specific. On Windows, only Claude Code is configured:
+Windows uses PowerShell for setup (no admin rights required, no symlinks):
 
-```batch
-:: 1. Clone the repository
+```powershell
+# 1. Clone the repository
 git clone https://github.com/mlorentedev/dotfiles.git
 cd dotfiles
 
-:: 2. Run setup (copies skills to %USERPROFILE%\.claude\)
-scripts\windows-setup.bat
+# 2. Run setup (one-time execution policy bypass)
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 
-:: 3. Initialize projects
-%USERPROFILE%\.claude\init-project.bat my-project python
+# 3. Restart PowerShell, then initialize projects
+project-init my-project python
 ```
 
-**Alternative with Git Bash:** If you have Git for Windows, you can use the bash scripts directly:
-
-```bash
-# In Git Bash
-./scripts/init-project.sh my-project python
-```
+Features on Windows:
+- Claude and Gemini configuration deployed to `~\.claude\` and `~\.gemini\`
+- PowerShell profile with aliases (`c`, `g`, `k`) and `project-init` function
+- Scripts folder added to User PATH
+- Git configuration copied (if not already present)
 
 ## Requirements
 

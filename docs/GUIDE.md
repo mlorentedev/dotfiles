@@ -92,12 +92,25 @@ Run the test suite for all utility functions.
 ./scripts/test.sh
 ```
 
-### `install.sh`
+### `setup-linux.sh`
 
-Main installer - creates directories, symlinks, sets up shells, and configures AI tools.
+Main Linux/macOS installer - creates directories, symlinks, sets up shells, and configures AI tools.
 
 ```bash
-./install.sh
+./setup-linux.sh
+```
+
+### `setup-windows.ps1`
+
+Windows installer (PowerShell) - copies files, sets up PowerShell profile, configures AI tools. No admin required.
+
+```powershell
+# One-time bypass
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+
+# Or set policy permanently
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\setup-windows.ps1
 ```
 
 ## Customization
@@ -141,7 +154,15 @@ Both Gemini and Claude CLIs are configured with aliases and custom skills.
 - Alias: `c` → `claude`
 - Skills: `~/.claude/skills/` (SKILL.md with YAML frontmatter)
 - Config: `~/.claude/CLAUDE.md`
-- Init script: `~/.claude/init-project.sh`
+- Init script: `~/.claude/init-project.sh` (Linux/macOS) or `~/scripts/init-project.ps1` (Windows)
+
+**Project initialization:**
+
+```bash
+# Linux/macOS or Windows PowerShell
+project-init my-project python
+project-init . node
+```
 
 **Using skills:**
 
@@ -151,7 +172,7 @@ claude
 > /audit src/auth.py
 > /refactor this function
 
-# Gemini - use gp function
+# Gemini - use gp function (Linux/macOS)
 gp audit "$(cat src/auth.py)"
 gp refactor "$(cat src/utils.py)"
 ```

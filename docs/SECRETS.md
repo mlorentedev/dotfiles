@@ -88,7 +88,7 @@ export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"  # For repo sync
 ```bash
 git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
-./install.sh
+./setup-linux.sh
 source ~/.zshrc
 ```
 

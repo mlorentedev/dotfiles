@@ -24,20 +24,39 @@ Complete guide for setting up and using AI coding assistants (Claude Code and Ge
 
 ### 1. Install Dotfiles
 
+#### Linux / macOS
+
 ```bash
 git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
-./install.sh
+./setup-linux.sh
 source ~/.zshrc
 ```
 
+#### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/mlorentedev/dotfiles.git
+cd dotfiles
+
+# Option 1: One-time bypass
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+
+# Option 2: Set policy for current user (recommended)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\setup-windows.ps1
+
+# Restart PowerShell after setup
+```
+
 This automatically:
-- Copies `ai/claude/*` to `~/.claude/`
-- Copies `ai/gemini/*` to `~/.gemini/`
-- Copies `scripts/init-project.sh` to `~/.claude/`
+- Copies `ai/claude/*` to `~/.claude/` (or `~\.claude\` on Windows)
+- Copies `ai/gemini/*` to `~/.gemini/` (or `~\.gemini\` on Windows)
+- Copies `scripts/init-project.sh` to `~/.claude/` (Linux/macOS)
+- Copies `scripts/init-project.ps1` to `~/scripts/` (Windows)
 - Copies `ai/skills/*` to `~/.claude/skills/` (full SKILL.md with YAML frontmatter)
 - Converts skills to `~/.gemini/prompts/` (YAML frontmatter stripped, flat markdown)
-- Creates the `claude-init` alias
+- Creates the `project-init` alias/function
 
 ### 2. Install AI Tools
 
@@ -61,15 +80,21 @@ export GEMINI_API_KEY="your-api-key"
 
 ## Project Setup Workflow
 
-### Option A: Use claude-init (Recommended)
+### Option A: Use project-init (Recommended)
 
 ```bash
 # Create new project with full configuration
-claude-init my-project python
+project-init my-project python
 
 # Or initialize current directory
 cd existing-project
-claude-init . go
+project-init . go
+```
+
+On Windows (PowerShell):
+```powershell
+project-init my-project python
+project-init . node
 ```
 
 This creates:
@@ -263,10 +288,12 @@ Record mistakes and prevention rules:
 
 After installation, these aliases are available:
 
+### Linux / macOS (Bash/Zsh)
+
 ```bash
 c              # claude (Claude Code CLI)
 g              # gemini (Gemini CLI)
-claude-init    # Initialize project with Claude config
+project-init   # Initialize project with dual AI config
 
 # Gemini prompt function
 gp <skill> <args>   # Gemini with skill (e.g., gp audit "code here")
@@ -274,6 +301,18 @@ gp <skill> <args>   # Gemini with skill (e.g., gp audit "code here")
 # Claude uses slash commands inside session:
 #   claude
 #   > /audit src/auth.py
+```
+
+### Windows (PowerShell)
+
+```powershell
+c              # claude (Claude Code CLI)
+g              # gemini (Gemini CLI)
+k              # kubectl
+project-init   # Initialize project with dual AI config (function)
+
+# Example:
+project-init my-project python
 ```
 
 ## Workflow: Daily Development
@@ -302,6 +341,8 @@ gp <skill> <args>   # Gemini with skill (e.g., gp audit "code here")
 
 ## Workflow: Syncing Across Machines
 
+### Linux / macOS
+
 ```bash
 # On machine A - after customizing skills
 dotfiles-sync
@@ -309,12 +350,24 @@ dotfiles-sync
 # On machine B - pull updates
 cd ~/.dotfiles
 git pull
-./install.sh
+./setup-linux.sh
+```
+
+### Windows
+
+```powershell
+# Pull updates
+cd path\to\dotfiles
+git pull
+.\setup-windows.ps1
+# Restart PowerShell
 ```
 
 ## Troubleshooting
 
 ### Skills not loading
+
+#### Linux / macOS
 
 ```bash
 # Verify skills exist
@@ -322,7 +375,18 @@ ls -la ~/.claude/skills/
 
 # Re-run install
 cd ~/Projects/dotfiles
-./install.sh
+./setup-linux.sh
+```
+
+#### Windows
+
+```powershell
+# Verify skills exist
+Get-ChildItem "$env:USERPROFILE\.claude\skills"
+
+# Re-run install
+cd path\to\dotfiles
+.\setup-windows.ps1
 ```
 
 ### CLAUDE.md not being read
