@@ -127,30 +127,33 @@ Add to `.zshrc`/`.bashrc` for shell-specific, or `.profile` for global.
 
 ### AI Configuration
 
-Both Gemini and Claude CLIs are configured with aliases and custom prompts.
+Both Gemini and Claude CLIs are configured with aliases and custom skills.
 
 **Gemini:**
 
 - Alias: `g` → `gemini`
-- Prompt function: `gp <prompt-name> <args>`
-- Config: `~/.gemini/GEMINI.md`, `~/.gemini/settings.json`
-- Prompts: `~/.gemini/prompts/`
+- Prompt function: `gp <skill-name> <args>`
+- Config: `~/.gemini/GEMINI.md`
+- Skills: `~/.gemini/prompts/` (flat markdown, YAML stripped)
 
 **Claude:**
 
 - Alias: `c` → `claude`
-- Prompt function: `cp <prompt-name> <args>`
-- Config: `~/.claude/CLAUDE.md`, `~/.claude/settings.json`
-- Prompts: `~/.claude/prompts/`
+- Skills: `~/.claude/skills/` (SKILL.md with YAML frontmatter)
+- Config: `~/.claude/CLAUDE.md`
+- Init script: `~/.claude/init-project.sh`
 
-**Using custom prompts:**
-
-1. Create a markdown file in `~/.gemini/prompts/` or `~/.claude/prompts/`
-2. Invoke with the prompt function:
+**Using skills:**
 
 ```bash
-gp architect "design a microservices system"
-cp architect "design a microservices system"
+# Claude Code - use slash commands in session
+claude
+> /audit src/auth.py
+> /refactor this function
+
+# Gemini - use gp function
+gp audit "$(cat src/auth.py)"
+gp refactor "$(cat src/utils.py)"
 ```
 
-The prompt file content is prepended as system instructions.
+See [AI.md](AI.md) for full documentation.

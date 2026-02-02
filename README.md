@@ -1,104 +1,148 @@
 # Dotfiles
 
-My personal configuration files for development tools and shell environments. I use these across different machines to keep my setup consistent. They work with both Bash and Zsh, include aliases for common tasks, and have some handy scripts for managing secrets and GitHub repositories.
+Personal configuration files for development tools, shell environments, and AI coding assistants. Works with Bash and Zsh, includes encrypted secrets management with age, and provides Claude Code/Gemini CLI integration.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
-chmod +x install.sh
 ./install.sh
+source ~/.zshrc
 ```
-
-After installing, restart your shell or run:
-
-```bash
-source ~/.zshrc  # for Zsh
-source ~/.bashrc # for Bash
-```
-
-## Prerequisites
-
-- `git`
-- `curl` or `wget`
-- `bash` or `zsh`
-
-## What's Inside
-
-```text
-├── .bashrc              # Bash configuration
-├── .zshrc               # Zsh configuration
-├── .profile             # Profile settings
-├── .gitconfig           # Git setup
-├── .gitignore           # What to ignore
-├── .zsh/                # Zsh files
-│   ├── aliases.zsh      # Command shortcuts
-│   ├── functions.zsh    # Custom functions
-│   └── nvm.zsh          # Node version management
-├── ai/                  # AI configuration
-│   ├── gemini/          # Gemini settings
-│   ├── claude/          # Claude settings
-│   └── prompts/         # Custom prompts
-├── docs/                # Documentation
-├── scripts/             # Helper scripts
-│   ├── utils.sh                    # Shared utility functions
-│   ├── load-secrets.sh             # Secrets management
-│   ├── age-encrypt-decrypt.sh      # File encryption
-│   ├── github-secrets-manager.sh   # GitHub secrets sync
-│   ├── install-precommit.sh        # Git hooks setup
-│   └── test.sh                     # Test suite
-├── sensitive/           # Encrypted secrets
-│   ├── env-mapping.conf            # ENV_VAR=filename mapping
-│   └── *.secret.age                # Encrypted files
-└── install.sh           # Installer
-```
-
-## Documentation
-
-- **[GUIDE.md](docs/GUIDE.md)** - Complete usage and customization guide
-- **[SECRETS.md](docs/SECRETS.md)** - Secrets management with age encryption
-- **[TOOLS.md](docs/TOOLS.md)** - Tool installation instructions
 
 ## Features
 
-Shell improvements, development setup, security features, and AI integration. See [GUIDE.md](docs/GUIDE.md) for details.
+- **Shell Configuration:** Aliases, functions, PATH management for Bash/Zsh
+- **Secrets Management:** Age-encrypted secrets loaded as environment variables
+- **AI Integration:** Claude Code and Gemini CLI with custom skills
+- **Project Initialization:** `claude-init` command to bootstrap new projects
 
-## Tools
+## Structure
 
-**Required:**
-
-- Git
-- Bash 4+ or Zsh 5+
-
-**Recommended:**
-
-- Oh My Zsh, eza, zoxide, direnv, age
-
-See [TOOLS.md](docs/TOOLS.md) for installation instructions.
-
-## Security
-
-Secrets are encrypted with age and automatically loaded as environment variables on shell startup.
-
-```bash
-secrets_list     # Show loaded secrets
-secrets_add      # Add new secret
-secrets_rotate   # Update existing secret
+```text
+├── scripts/                    # Shell utilities (added to PATH)
+│   ├── utils.sh                # Shared function library
+│   ├── load-secrets.sh         # Secrets → env vars
+│   ├── init-project.sh         # Project bootstrapper (bash)
+│   ├── init-project.bat        # Project bootstrapper (Windows)
+│   ├── github-secrets-manager.sh
+│   ├── age-encrypt-decrypt.sh
+│   └── dotfiles-sync.sh
+├── sensitive/                  # Encrypted secrets
+│   ├── env-mapping.conf        # ENV_VAR=filename mapping
+│   └── *.secret.age            # Encrypted files (tracked)
+├── ai/
+│   ├── claude/                 # Claude Code configuration
+│   │   └── CLAUDE.md           # Master instructions
+│   ├── gemini/                 # Gemini CLI configuration
+│   │   └── GEMINI.md           # Master instructions
+│   └── skills/                 # Shared AI skills
+│       ├── audit/SKILL.md      # /audit - Security review
+│       ├── refactor/SKILL.md   # /refactor - Code cleanup
+│       ├── test/SKILL.md       # /test - Test generation
+│       ├── doc/SKILL.md        # /doc - Documentation
+│       └── docker/SKILL.md     # /docker - Containerization
+├── .zsh/                       # Zsh modules
+└── docs/                       # Documentation
 ```
 
-See [SECRETS.md](docs/SECRETS.md) for full documentation.
+## Secrets Management
 
-## Contributing
+Secrets are encrypted with [age](https://github.com/FiloSottile/age) and automatically loaded on shell startup.
 
-Fork it, make changes, submit a pull request.
+```bash
+secrets_add VAR_NAME filename   # Add new secret
+secrets_rotate VAR_NAME         # Update existing
+secrets_list                    # Show all secrets
+secrets_check                   # Validate integrity
+```
+
+See [docs/SECRETS.md](docs/SECRETS.md) for full documentation.
+
+## AI Tools
+
+### Claude Code
+
+```bash
+# Initialize new project with Claude configuration
+claude-init my-project python
+claude-init my-project go
+claude-init . node
+
+# Available skills (slash commands)
+/audit      # Security audit
+/refactor   # Code refactoring
+/test       # Test generation
+/doc        # Documentation
+/docker     # Containerization
+```
+
+### Gemini CLI
+
+```bash
+# Use prompts via gp function
+gp audit "$(cat src/main.py)"
+gp refactor "$(cat src/utils.go)"
+```
+
+See [docs/AI.md](docs/AI.md) for complete setup guide.
+
+## Syncing
+
+Two-directory model for stability:
+
+- `~/.dotfiles/` - Stable local installation
+- `~/Projects/dotfiles/` - Development repository
+
+```bash
+dotfiles-sync                   # Bidirectional sync + git push/pull
+dotfiles-sync --secrets-only    # Only sync sensitive/
+```
+
+## Windows Setup
+
+Dotfiles (shell config, secrets) are Linux/macOS specific. On Windows, only Claude Code is configured:
+
+```batch
+:: 1. Clone the repository
+git clone https://github.com/mlorentedev/dotfiles.git
+cd dotfiles
+
+:: 2. Run setup (copies skills to %USERPROFILE%\.claude\)
+scripts\windows-setup.bat
+
+:: 3. Initialize projects
+%USERPROFILE%\.claude\init-project.bat my-project python
+```
+
+**Alternative with Git Bash:** If you have Git for Windows, you can use the bash scripts directly:
+
+```bash
+# In Git Bash
+./scripts/init-project.sh my-project python
+```
+
+## Requirements
+
+**Linux/macOS:** git, bash/zsh
+
+**Windows:** git
+
+**Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
+
+## Documentation
+
+- [AI.md](docs/AI.md) - AI tools setup and workflow
+- [SECRETS.md](docs/SECRETS.md) - Secrets management guide
+- [GUIDE.md](docs/GUIDE.md) - General usage and customization
 
 ## Related Projects
 
 - [Boilerplates](https://github.com/mlorentedev/boilerplates) - Project templates
-- [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) - Quick references  
+- [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) - Quick references
 - [My list](https://mlorente.dev) - More detailed explanations
 
 ## License
 
-MIT License - use it however you want.
+MIT

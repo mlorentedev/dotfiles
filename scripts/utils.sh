@@ -175,7 +175,7 @@ parse_mapping_file() {
 
     [[ ! -f "$file" ]] && return 1
 
-    line key value
+    local line key value
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -238,7 +238,7 @@ age_encrypt() {
     file_exists "$key_file" || return 1
     command_exists age || return 1
 
-    pubkey
+    local pubkey
     pubkey=$(grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null) || return 1
 
     if [[ -n "$input" ]]; then
@@ -617,7 +617,7 @@ ensure_line_in_file() {
 # Usage: tmp=$(create_temp_file "ssh_key")
 create_temp_file() {
     prefix="${1:-tmp}"
-    tmp_file
+    local tmp_file
     tmp_file=$(mktemp "/tmp/${prefix}.XXXXXX")
     chmod 600 "$tmp_file"
     echo "$tmp_file"

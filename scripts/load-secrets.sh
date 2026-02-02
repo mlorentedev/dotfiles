@@ -46,9 +46,10 @@ SECRETS_MAPPING_FILE="$SECRETS_DIR/env-mapping.conf"
 SECRETS_KEY_PATH="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
 SECRETS_LOADED=0
 
-# Optional: repo directory for syncing secrets (set in shell config if different from DOTFILES_DIR)
-# Example: export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
-SECRETS_REPO_DIR="${DOTFILES_REPO_DIR:+${DOTFILES_REPO_DIR}/sensitive}"
+# Helper to get repo dir dynamically
+_get_secrets_repo_dir() {
+    echo "${DOTFILES_REPO_DIR:+${DOTFILES_REPO_DIR}/sensitive}"
+}
 
 # Sync file to repo if DOTFILES_REPO_DIR is configured
 _secrets_sync_to_repo() {
@@ -56,19 +57,22 @@ _secrets_sync_to_repo() {
     sync_mapping="${2:-false}"
     silent="${3:-false}"
 
-    [[ -z "$SECRETS_REPO_DIR" ]] && return 0
-    [[ "$SECRETS_REPO_DIR" == "$SECRETS_DIR" ]] && return 0
-    [[ ! -d "$SECRETS_REPO_DIR" ]] && return 0
+    local repo_dir
+    repo_dir="$(_get_secrets_repo_dir)"
+
+    [[ -z "$repo_dir" ]] && return 0
+    [[ "$repo_dir" == "$SECRETS_DIR" ]] && return 0
+    [[ ! -d "$repo_dir" ]] && return 0
 
     # Sync file
     if [[ -f "$SECRETS_DIR/${filename}" ]]; then
-        command cp "$SECRETS_DIR/${filename}" "$SECRETS_REPO_DIR/${filename}"
-        [[ "$silent" != "true" ]] && echo "  Synced to repo: $SECRETS_REPO_DIR/${filename}"
+        command cp "$SECRETS_DIR/${filename}" "$repo_dir/${filename}"
+        [[ "$silent" != "true" ]] && echo "  Synced to repo: $repo_dir/${filename}"
     fi
 
     # Sync mapping file if requested
     if [[ "$sync_mapping" == "true" && -f "$SECRETS_MAPPING_FILE" ]]; then
-        command cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
+        command cp "$SECRETS_MAPPING_FILE" "$repo_dir/env-mapping.conf"
     fi
 }
 
@@ -80,7 +84,7 @@ _secrets_load_entry() {
 
     file_exists "$encrypted_file" || return 1
 
-    value
+    local value
     value=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n')
 
     if [[ -n "$value" ]]; then
@@ -102,7 +106,7 @@ secrets_load() {
         parse_mapping_file "$SECRETS_MAPPING_FILE" _secrets_load_entry >/dev/null
     else
         # Fallback parsing
-        line key value
+        local line key value
         while IFS= read -r line || [[ -n "$line" ]]; do
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -119,7 +123,7 @@ secrets_load() {
 secrets_refresh() {
     # Unset existing vars first
     if file_exists "$SECRETS_MAPPING_FILE"; then
-        line var_name
+        local line var_name
         while IFS= read -r line || [[ -n "$line" ]]; do
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -143,7 +147,7 @@ secrets_list() {
     echo "Secret mappings ($SECRETS_MAPPING_FILE):"
     echo ""
 
-    line var_name filename encrypted_file
+    local line var_name filename encrypted_file
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -172,7 +176,7 @@ secrets_get() {
     file_exists "$SECRETS_KEY_PATH" || { echo "Key file not found" >&2; return 1; }
     command_exists age || { echo "age not installed" >&2; return 1; }
 
-    filename
+    local filename
     filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | cut -d'=' -f2)
 
     if [[ -z "$filename" ]]; then
@@ -275,7 +279,7 @@ secrets_check() {
     echo ""
 
     valid=0 missing=0 orphaned=0
-    line var_name filename encrypted_file
+    local line var_name filename encrypted_file
 
     # Check each mapping has corresponding .age file
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -300,7 +304,7 @@ secrets_check() {
     # Check for .age files without mappings
     echo ""
     echo "Checking for orphaned .age files..."
-    base_name
+    local base_name
     for age_file in "$SECRETS_DIR"/*.secret.age; do
         file_exists "$age_file" || continue
         base_name=$(basename "$age_file" .secret.age)
@@ -381,7 +385,7 @@ secrets_rotate() {
     command_exists age || { echo "Error: age not installed" >&2; return 1; }
 
     # Find the mapping
-    filename
+    local filename
     filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | cut -d'=' -f2)
 
     if [[ -z "$filename" ]]; then
@@ -440,46 +444,49 @@ secrets_rotate() {
 # Sync all secrets to repo
 # Usage: secrets_sync
 secrets_sync() {
-    if [[ -z "$SECRETS_REPO_DIR" ]]; then
+    local repo_dir
+    repo_dir="$(_get_secrets_repo_dir)"
+
+    if [[ -z "$repo_dir" ]]; then
         echo "Error: DOTFILES_REPO_DIR not set"
         echo "Set it in your shell config: export DOTFILES_REPO_DIR=\"\$HOME/Projects/dotfiles\""
         return 1
     fi
 
-    if [[ "$SECRETS_REPO_DIR" == "$SECRETS_DIR" ]]; then
+    if [[ "$repo_dir" == "$SECRETS_DIR" ]]; then
         echo "DOTFILES_REPO_DIR is same as SECRETS_DIR, nothing to sync"
         return 0
     fi
 
-    if [[ ! -d "$SECRETS_REPO_DIR" ]]; then
-        echo "Error: Repo directory not found: $SECRETS_REPO_DIR"
+    if [[ ! -d "$repo_dir" ]]; then
+        echo "Error: Repo directory not found: $repo_dir"
         return 1
     fi
 
-    echo "Syncing secrets to repo: $SECRETS_REPO_DIR"
+    echo "Syncing secrets to repo: $repo_dir"
     echo ""
 
-    count=0
+    local count=0
 
     # Sync all .age files
     for file in "$SECRETS_DIR"/*.secret.age; do
         [[ -f "$file" ]] || continue
         filename="${file##*/}"
-        command cp "$file" "$SECRETS_REPO_DIR/$filename"
+        command cp "$file" "$repo_dir/$filename"
         echo "  $filename"
         ((count++))
     done
 
     # Sync mapping file
     if [[ -f "$SECRETS_MAPPING_FILE" ]]; then
-        command cp "$SECRETS_MAPPING_FILE" "$SECRETS_REPO_DIR/env-mapping.conf"
+        command cp "$SECRETS_MAPPING_FILE" "$repo_dir/env-mapping.conf"
         echo "  env-mapping.conf"
         ((count++))
     fi
 
     # Sync audit log
     if [[ -f "$SECRETS_AUDIT_FILE" ]]; then
-        command cp "$SECRETS_AUDIT_FILE" "$SECRETS_REPO_DIR/.secrets-audit.log"
+        command cp "$SECRETS_AUDIT_FILE" "$repo_dir/.secrets-audit.log"
         echo "  .secrets-audit.log"
         ((count++))
     fi
@@ -559,7 +566,7 @@ SECRETS_AUDIT_FILE="$SECRETS_DIR/.secrets-audit.log"
 _secrets_audit_log() {
     var_name="$1"
     action="$2"
-    timestamp
+    local timestamp
     timestamp=$(date -Iseconds)
     echo "$timestamp|$var_name|$action" >> "$SECRETS_AUDIT_FILE"
 

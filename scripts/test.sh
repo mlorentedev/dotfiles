@@ -45,7 +45,9 @@ subsection() {
 }
 
 # Determine paths
-if [[ -d "$HOME/.dotfiles" ]]; then
+if [[ -n "$DOTFILES_DIR" ]]; then
+    echo "Using custom DOTFILES_DIR: $DOTFILES_DIR"
+elif [[ -d "$HOME/.dotfiles" ]]; then
     DOTFILES_DIR="$HOME/.dotfiles"
 elif [[ -d "$(dirname "${BASH_SOURCE[0]}")/.." ]]; then
     DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

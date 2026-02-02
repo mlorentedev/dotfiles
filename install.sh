@@ -116,16 +116,42 @@ fi
 ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
 # Setup AI configuration
-log_info "Setting up AI configuration ..."
+log_info "Setting up AI configuration..."
+
+# Gemini CLI
 ensure_directory "$HOME/.gemini"
 ensure_directory "$HOME/.gemini/prompts"
 cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
-cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.gemini/prompts/" 2>/dev/null || true
+# Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
+for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
+    if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
+        skill_name=$(basename "$skill_dir")
+        # Copy SKILL.md as flat file, stripping YAML frontmatter
+        sed '/^---$/,/^---$/d' "${skill_dir}SKILL.md" > "$HOME/.gemini/prompts/${skill_name}.md"
+    fi
+done
+log_success "Gemini CLI configured"
+
+# Claude Code
 ensure_directory "$HOME/.claude"
-ensure_directory "$HOME/.claude/prompts"
+ensure_directory "$HOME/.claude/skills"
 cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
-cp -rf "$CURRENT_DIR/ai/prompts/"* "$HOME/.claude/prompts/" 2>/dev/null || true
+cp -f "$CURRENT_DIR/scripts/init-project.sh" "$HOME/.claude/" 2>/dev/null || true
+# Copy skill directories (each skill has its own dir with SKILL.md)
+for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
+    if [ -d "$skill_dir" ]; then
+        skill_name=$(basename "$skill_dir")
+        ensure_directory "$HOME/.claude/skills/$skill_name"
+        cp -rf "$skill_dir"* "$HOME/.claude/skills/$skill_name/" 2>/dev/null || true
+    fi
+done
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
+log_success "Claude Code configured with skills"
+
+# Add claude-init alias
+CLAUDE_INIT_LINE='alias claude-init="$HOME/.claude/init-project.sh"'
+ensure_line_in_file "$HOME/.zshrc" "$CLAUDE_INIT_LINE" 2>/dev/null || true
+ensure_line_in_file "$HOME/.bashrc" "$CLAUDE_INIT_LINE" 2>/dev/null || true
 
 log_info "Adding dotfiles scripts directory to PATH..."
 PATH_LINE='export PATH=$HOME/.dotfiles/scripts:$PATH'

@@ -16,8 +16,6 @@ Thumbs.db
 .env.staging
 
 # Development tools
-.claude/
-.gemini/
 node_modules/
 *.log
 
@@ -30,3 +28,10 @@ node_modules/
 .cache/
 .npm/
 .yarn/
+
+# AI
+.claude/
+.gemini/
+.ai/
+CLAUDE.md
+GEMINI.md

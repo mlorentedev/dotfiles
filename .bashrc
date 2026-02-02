@@ -99,15 +99,10 @@ function gp() {
     gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
 
-function cp() {
-    local prompt_file="$HOME/.claude/prompts/$1.md"
-    shift
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt not found at $prompt_file"
-        return 1
-    fi
-    claude -i "$(cat "$prompt_file")"$'\n\n'"$*"
-}
+# Claude Code - use slash commands inside session:
+#   claude
+#   > /audit src/auth.py
+#   > /refactor this function
 
 # ==========================
 #    SHELL ENHANCEMENTS
