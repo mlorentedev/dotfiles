@@ -408,3 +408,156 @@ type gp
 # Verify prompts directory
 ls -la ~/.gemini/prompts/
 ```
+
+## Claude Code Plugins
+
+Plugins extend Claude Code with specialized capabilities. Install once per machine to maintain consistent environment.
+
+### Essential Plugins (Recommended)
+
+Install these on every new machine for a complete setup:
+
+```bash
+# Memory System (Long-term context across sessions)
+claude /install claude-mem@thedotmack
+
+# Code Quality & Security
+claude /install code-simplifier@claude-plugins-official
+claude /install security-guidance@claude-plugins-official
+claude /install code-review@claude-plugins-official
+
+# Git Workflow
+claude /install github@claude-plugins-official
+claude /install commit-commands@claude-plugins-official
+claude /install pr-review-toolkit@claude-plugins-official
+
+# LSP Support (install based on your languages)
+claude /install gopls-lsp@claude-plugins-official      # Go
+claude /install pyright-lsp@claude-plugins-official    # Python
+claude /install typescript-lsp@claude-plugins-official # TypeScript
+claude /install rust-analyzer-lsp@claude-plugins-official # Rust
+```
+
+### Plugin Reference
+
+| Plugin | Source | Purpose |
+|--------|--------|---------|
+| `claude-mem` | thedotmack | Long-term memory across sessions |
+| `code-simplifier` | official | Simplify complex code |
+| `security-guidance` | official | Security best practices |
+| `code-review` | official | Automated code review |
+| `github` | official | GitHub API integration |
+| `commit-commands` | official | Git commit helpers |
+| `pr-review-toolkit` | official | PR review workflow |
+| `gopls-lsp` | official | Go language server |
+| `pyright-lsp` | official | Python language server |
+| `typescript-lsp` | official | TypeScript language server |
+
+### Optional Plugins (Project-Specific)
+
+```bash
+# Frontend Development
+claude /install frontend-design@claude-plugins-official
+
+# Feature Development Workflow
+claude /install feature-dev@claude-plugins-official
+
+# External Integrations
+claude /install linear@claude-plugins-official    # Project management
+claude /install playwright@claude-plugins-official # E2E testing
+claude /install supabase@claude-plugins-official  # Supabase backend
+claude /install slack@claude-plugins-official     # Slack notifications
+```
+
+### Verify Installation
+
+```bash
+# List installed plugins
+cat ~/.claude/plugins/installed_plugins.json | jq '.plugins | keys'
+
+# Check enabled plugins
+cat ~/.claude/settings.json | jq '.enabledPlugins'
+```
+
+## Claude-Mem Plugin (Long-Term Memory)
+
+The `claude-mem` plugin provides persistent memory across sessions. Essential for maintaining context in ongoing projects.
+
+### How It Works
+
+**Automatic Hooks** (no configuration needed):
+
+| Hook | Event | Action |
+|------|-------|--------|
+| `SessionStart` | Session begins | Loads relevant context from previous sessions |
+| `PostToolUse` | After each tool use | Saves observations indexed for search |
+| `Stop` | Session ends | Summarizes and persists session data |
+
+### Memory Search (MCP Tools)
+
+Three-step workflow for efficient token usage:
+
+```
+1. search(query, limit, project) → Returns IDs (~50-100 tokens/result)
+2. timeline(anchor=ID)           → Context around results
+3. get_observations([IDs])       → Full details for filtered IDs
+```
+
+### Planning Skills
+
+| Skill | Command | Use Case |
+|-------|---------|----------|
+| `make-plan` | `/claude-mem:make-plan` | Create plan with documentation discovery |
+| `do` | `/claude-mem:do` | Execute plan with subagent orchestration |
+
+**When to use make-plan + do:**
+- Complex tasks with unfamiliar APIs
+- Large migrations or refactors
+- When you need to copy from documentation, not invent
+
+### make-plan vs Native Plan Mode
+
+| Aspect | Native `EnterPlanMode` | `claude-mem:make-plan` |
+|--------|------------------------|------------------------|
+| Memory | Current session only | Persists across sessions |
+| Documentation | Manual exploration | Auto-discovery (Phase 0) |
+| Verification | Optional | Mandatory between phases |
+| Anti-patterns | Not tracked | Explicit guards |
+
+### do Execution Protocol
+
+Each phase follows:
+1. **Implementation Subagent** → Copy from docs, cite sources
+2. **Verification Subagent** → Prove the phase worked
+3. **Anti-pattern Subagent** → Grep for known bad patterns
+4. **Code Quality Subagent** → Review changes
+5. **Commit Subagent** → Only if verification passes
+
+### Example Workflow
+
+```bash
+# 1. Create a plan
+claude
+> /claude-mem:make-plan Add OAuth2 authentication with Google provider
+
+# (Creates phased plan with doc references, saved to memory)
+
+# 2. Execute the plan
+> /claude-mem:do #plan-id
+
+# (Orchestrates subagents, verifies each phase, commits incrementally)
+```
+
+### Memory Configuration
+
+Plugin enabled in `~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "claude-mem@thedotmack": true
+  }
+}
+```
+
+Data stored by background worker service. No additional configuration required.
