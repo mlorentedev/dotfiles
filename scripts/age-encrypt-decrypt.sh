@@ -34,7 +34,6 @@ encrypt_all() {
     check_file_exists "$AGE_DEFAULT_KEY" "Private key not found: $AGE_DEFAULT_KEY. Generate: age-keygen -o $AGE_DEFAULT_KEY"
     ensure_directory "$SECRETS_DIR"
 
-    pubkey
     pubkey=$(age_get_pubkey)
     [[ -z "$pubkey" ]] && exit_error "Could not extract public key from $AGE_DEFAULT_KEY"
 

@@ -241,6 +241,7 @@ age_encrypt() {
     local pubkey
     pubkey=$(grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null) || return 1
 
+    rm -f "$output"
     if [[ -n "$input" ]]; then
         age -r "$pubkey" -o "$output" "$input" 2>/dev/null
     else

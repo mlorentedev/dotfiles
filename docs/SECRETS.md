@@ -299,6 +299,103 @@ export AGE_KEY_PATH=/path/to/key.txt
 4. **Review `secrets_audit`** - Check for unexpected changes
 5. **Rotate compromised secrets** - Use `secrets_rotate` immediately
 6. **Limit GitHub uploads** - Use `--select` to upload only needed secrets
+7. **USB backup monthly** - Run `backup-secrets-to-usb.sh` at least once a month
+
+## Physical Backup (USB + VeraCrypt)
+
+Keep an offline backup of your secrets on an encrypted USB drive.
+
+### Initial Setup (one-time)
+
+#### 1. Install VeraCrypt
+
+```bash
+# Ubuntu/Debian
+sudo add-apt-repository ppa:unit193/encryption
+sudo apt update
+sudo apt install veracrypt
+
+# Or download from https://veracrypt.fr/en/Downloads.html
+```
+
+#### 2. Format USB with VeraCrypt
+
+1. Open VeraCrypt GUI: `veracrypt`
+2. **Tools → Volume Creation Wizard**
+3. **Create a volume within a partition/drive** → Next
+4. **Standard VeraCrypt volume** → Next
+5. **Select Device** → choose your USB (e.g., `/dev/sdb1`)
+6. Encryption: **AES** + **SHA-512** (defaults) → Next
+7. Set a strong **password** → Next
+8. Filesystem: **FAT** (max compatibility with Windows/Linux) → Next
+9. Move mouse for entropy → **Format**
+
+#### 3. Copy age key to USB
+
+```bash
+# Mount the encrypted USB
+veracrypt /dev/sdb1 /media/veracrypt1
+
+# Copy your private key
+cp ~/.config/age/key.txt /media/veracrypt1/
+```
+
+### Regular Backup
+
+**Run this monthly** (or after adding important secrets):
+
+```bash
+# 1. Mount encrypted USB
+veracrypt /dev/sdb1 /media/veracrypt1
+
+# 2. Backup secrets
+bash ~/Projects/dotfiles/scripts/backup-secrets-to-usb.sh /media/veracrypt1
+
+# 3. Dismount
+veracrypt -d /media/veracrypt1
+```
+
+### USB Contents After Backup
+
+```text
+/media/veracrypt1/
+├── key.txt              # Age private key
+├── age-standalone.sh    # Standalone decrypt script
+└── secrets/             # All .secret and .secret.age files
+```
+
+### Restore on Any Linux System
+
+```bash
+# 1. Install required tools
+sudo apt install age veracrypt
+
+# 2. Mount USB
+sudo mkdir -p /media/secrets
+veracrypt /dev/sdX1 /media/secrets
+
+# 3. Decrypt secrets
+cd /media/secrets
+./age-standalone.sh decrypt
+
+# 4. Your secrets are now in secrets/*.dec
+```
+
+### VeraCrypt Quick Reference
+
+| Action | Command |
+|--------|---------|
+| Mount | `veracrypt /dev/sdX1 /media/veracrypt1` |
+| Dismount | `veracrypt -d /media/veracrypt1` |
+| Dismount all | `veracrypt -d` |
+| List mounted | `veracrypt -l` |
+
+### Windows Compatibility
+
+1. Download VeraCrypt from https://veracrypt.fr
+2. Install or use portable version
+3. Select Device → Mount → Enter password
+4. USB appears as a new drive letter
 
 ## Files Reference
 
