@@ -21,27 +21,27 @@ NC='\033[0m'
 
 # Test result functions
 pass() {
-    echo -e "  ${GREEN}PASS${NC}: $1"
-    ((TESTS_PASSED++))
+    printf '  %bPASS%b: %s\n' "$GREEN" "$NC" "$1"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
 }
 
 fail() {
-    echo -e "  ${RED}FAIL${NC}: $1"
-    ((TESTS_FAILED++))
+    printf '  %bFAIL%b: %s\n' "$RED" "$NC" "$1"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
 }
 
 skip() {
-    echo -e "  ${YELLOW}SKIP${NC}: $1 - $2"
-    ((TESTS_SKIPPED++))
+    printf '  %bSKIP%b: %s - %s\n' "$YELLOW" "$NC" "$1" "$2"
+    TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
 }
 
 section() {
     echo ""
-    echo -e "${BLUE}[$1]${NC} $2"
+    printf '%b[%s]%b %s\n' "$BLUE" "$1" "$NC" "$2"
 }
 
 subsection() {
-    echo -e "  ${CYAN}--- $1 ---${NC}"
+    printf '  %b--- %s ---%b\n' "$CYAN" "$1" "$NC"
 }
 
 # Determine paths
@@ -87,7 +87,7 @@ fi
 section "2/15" "Source utils.sh"
 # ==================================================
 
-if source "$SCRIPTS_DIR/utils.sh" 2>/dev/null; then
+if . "$SCRIPTS_DIR/utils.sh" 2>/dev/null; then
     pass "utils.sh sourced successfully"
 else
     fail "Failed to source utils.sh"
@@ -123,10 +123,12 @@ symlink_valid "$TEST_LINK" && fail "symlink_valid: broken symlink passed" || pas
 rm -f "$TEST_LINK"
 
 subsection "var_is_set"
+# shellcheck disable=SC2034
 TEST_VAR_SET="hello"
 var_is_set TEST_VAR_SET && pass "var_is_set: detects set variable" || fail "var_is_set: failed on set var"
 unset TEST_VAR_UNSET 2>/dev/null
 var_is_set TEST_VAR_UNSET && fail "var_is_set: false positive on unset" || pass "var_is_set: returns false for unset"
+# shellcheck disable=SC2034
 TEST_VAR_EMPTY=""
 var_is_set TEST_VAR_EMPTY && fail "var_is_set: false positive on empty" || pass "var_is_set: returns false for empty"
 
@@ -184,12 +186,16 @@ rm -f /tmp/parse_count_$$
 
 [[ "$count" == "6" ]] && pass "parse_mapping_file: correct count ($count)" || fail "parse_mapping_file: expected 6, got $count"
 [[ "${#PARSED_KEYS[@]}" == "6" ]] && pass "parse_mapping_file: array has 6 keys" || fail "parse_mapping_file: array has ${#PARSED_KEYS[@]} keys"
-[[ "${PARSED_KEYS[0]}" == "KEY1" ]] && pass "parse_mapping_file: first key" || fail "parse_mapping_file: first key '${PARSED_KEYS[0]}'"
-[[ "${PARSED_VALUES[0]}" == "value1" ]] && pass "parse_mapping_file: first value" || fail "parse_mapping_file: first value '${PARSED_VALUES[0]}'"
-[[ "${PARSED_KEYS[2]}" == "KEY3" ]] && pass "parse_mapping_file: trims key whitespace" || fail "parse_mapping_file: key whitespace '${PARSED_KEYS[2]}'"
-[[ "${PARSED_VALUES[2]}" == "value3" ]] && pass "parse_mapping_file: trims value whitespace" || fail "parse_mapping_file: value whitespace '${PARSED_VALUES[2]}'"
-[[ "${PARSED_VALUES[3]}" == "quoted value" ]] && pass "parse_mapping_file: removes double quotes" || fail "parse_mapping_file: double quotes '${PARSED_VALUES[3]}'"
-[[ "${PARSED_VALUES[4]}" == "single quoted" ]] && pass "parse_mapping_file: removes single quotes" || fail "parse_mapping_file: single quotes '${PARSED_VALUES[4]}'"
+
+# zsh arrays are 1-indexed, bash arrays are 0-indexed
+if [[ -n "$ZSH_VERSION" ]]; then _i=1; else _i=0; fi
+
+[[ "${PARSED_KEYS[$_i]}" == "KEY1" ]] && pass "parse_mapping_file: first key" || fail "parse_mapping_file: first key '${PARSED_KEYS[$_i]}'"
+[[ "${PARSED_VALUES[$_i]}" == "value1" ]] && pass "parse_mapping_file: first value" || fail "parse_mapping_file: first value '${PARSED_VALUES[$_i]}'"
+[[ "${PARSED_KEYS[$((_i + 2))]}" == "KEY3" ]] && pass "parse_mapping_file: trims key whitespace" || fail "parse_mapping_file: key whitespace '${PARSED_KEYS[$((_i + 2))]}'"
+[[ "${PARSED_VALUES[$((_i + 2))]}" == "value3" ]] && pass "parse_mapping_file: trims value whitespace" || fail "parse_mapping_file: value whitespace '${PARSED_VALUES[$((_i + 2))]}'"
+[[ "${PARSED_VALUES[$((_i + 3))]}" == "quoted value" ]] && pass "parse_mapping_file: removes double quotes" || fail "parse_mapping_file: double quotes '${PARSED_VALUES[$((_i + 3))]}'"
+[[ "${PARSED_VALUES[$((_i + 4))]}" == "single quoted" ]] && pass "parse_mapping_file: removes single quotes" || fail "parse_mapping_file: single quotes '${PARSED_VALUES[$((_i + 4))]}'"
 
 # Test missing file
 parse_mapping_file "/nonexistent_file_xyz" test_handler >/dev/null 2>&1
@@ -274,7 +280,7 @@ if command_exists gh; then
         subsection "gh_get_repo"
         # Save current dir and go to a repo
         ORIG_DIR=$(pwd)
-        cd "$DOTFILES_DIR" 2>/dev/null || cd "$HOME/Projects/dotfiles" 2>/dev/null
+        cd "$DOTFILES_DIR" 2>/dev/null || cd "$HOME/Projects/dotfiles" 2>/dev/null || true
 
         repo=$(gh_get_repo 2>/dev/null)
         if [[ -n "$repo" ]]; then
@@ -283,7 +289,7 @@ if command_exists gh; then
             pass "gh_get_repo: returns empty (no remote configured)"
         fi
 
-        cd "$ORIG_DIR"
+        cd "$ORIG_DIR" || true
     else
         skip "gh_is_authenticated" "not logged in (run: gh auth login)"
         skip "gh_get_repo" "requires authentication"
@@ -356,19 +362,19 @@ if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
     pass "load-secrets.sh: file exists"
 
     # Source it
-    source "$SCRIPTS_DIR/load-secrets.sh"
+    . "$SCRIPTS_DIR/load-secrets.sh"
 
     subsection "Function definitions"
-    type secrets_load &>/dev/null && pass "secrets_load: defined" || fail "secrets_load: not defined"
-    type secrets_list &>/dev/null && pass "secrets_list: defined" || fail "secrets_list: not defined"
-    type secrets_get &>/dev/null && pass "secrets_get: defined" || fail "secrets_get: not defined"
-    type secrets_refresh &>/dev/null && pass "secrets_refresh: defined" || fail "secrets_refresh: not defined"
-    type secrets_add &>/dev/null && pass "secrets_add: defined" || fail "secrets_add: not defined"
-    type secrets_rotate &>/dev/null && pass "secrets_rotate: defined" || fail "secrets_rotate: not defined"
-    type secrets_check &>/dev/null && pass "secrets_check: defined" || fail "secrets_check: not defined"
-    type secrets_clean &>/dev/null && pass "secrets_clean: defined" || fail "secrets_clean: not defined"
-    type secrets_help &>/dev/null && pass "secrets_help: defined" || fail "secrets_help: not defined"
-    type secrets_audit &>/dev/null && pass "secrets_audit: defined" || fail "secrets_audit: not defined"
+    type secrets_load >/dev/null 2>&1 && pass "secrets_load: defined" || fail "secrets_load: not defined"
+    type secrets_list >/dev/null 2>&1 && pass "secrets_list: defined" || fail "secrets_list: not defined"
+    type secrets_get >/dev/null 2>&1 && pass "secrets_get: defined" || fail "secrets_get: not defined"
+    type secrets_refresh >/dev/null 2>&1 && pass "secrets_refresh: defined" || fail "secrets_refresh: not defined"
+    type secrets_add >/dev/null 2>&1 && pass "secrets_add: defined" || fail "secrets_add: not defined"
+    type secrets_rotate >/dev/null 2>&1 && pass "secrets_rotate: defined" || fail "secrets_rotate: not defined"
+    type secrets_check >/dev/null 2>&1 && pass "secrets_check: defined" || fail "secrets_check: not defined"
+    type secrets_clean >/dev/null 2>&1 && pass "secrets_clean: defined" || fail "secrets_clean: not defined"
+    type secrets_help >/dev/null 2>&1 && pass "secrets_help: defined" || fail "secrets_help: not defined"
+    type secrets_audit >/dev/null 2>&1 && pass "secrets_audit: defined" || fail "secrets_audit: not defined"
 
     subsection "env-mapping.conf"
     if [[ -f "$SENSITIVE_DIR/env-mapping.conf" ]]; then
@@ -402,11 +408,11 @@ if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
 
     subsection "secrets_audit"
     # Just check it runs without error (audit log may or may not exist)
-    secrets_audit &>/dev/null
+    secrets_audit >/dev/null 2>&1
     [[ $? -eq 0 ]] && pass "secrets_audit: executes without error" || fail "secrets_audit: error"
 
     subsection "secrets_sync"
-    type secrets_sync &>/dev/null && pass "secrets_sync: defined" || fail "secrets_sync: not defined"
+    type secrets_sync >/dev/null 2>&1 && pass "secrets_sync: defined" || fail "secrets_sync: not defined"
     echo "$help_output" | grep -q "secrets_sync" && pass "secrets_help: documents secrets_sync" || fail "secrets_help: missing secrets_sync"
 else
     fail "load-secrets.sh: not found"
@@ -532,7 +538,7 @@ for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-man
 done
 
 subsection "Directories"
-[[ -d "$DOTFILES_DIR" ]] && pass "~/.dotfiles: exists" || fail "~/.dotfiles: missing"
+[[ -d "$DOTFILES_DIR" ]] && pass "\$HOME/.dotfiles: exists" || fail "\$HOME/.dotfiles: missing"
 [[ -d "$SCRIPTS_DIR" ]] && pass "scripts/: exists" || fail "scripts/: missing"
 [[ -d "$SENSITIVE_DIR" ]] && pass "sensitive/: exists" || fail "sensitive/: missing"
 
@@ -544,17 +550,17 @@ echo ""
 echo "========================================"
 echo "            TEST SUMMARY"
 echo "========================================"
-echo -e "  ${GREEN}PASSED${NC}: $TESTS_PASSED"
-echo -e "  ${RED}FAILED${NC}: $TESTS_FAILED"
-echo -e "  ${YELLOW}SKIPPED${NC}: $TESTS_SKIPPED"
+printf '  %bPASSED%b: %s\n' "$GREEN" "$NC" "$TESTS_PASSED"
+printf '  %bFAILED%b: %s\n' "$RED" "$NC" "$TESTS_FAILED"
+printf '  %bSKIPPED%b: %s\n' "$YELLOW" "$NC" "$TESTS_SKIPPED"
 TOTAL=$((TESTS_PASSED + TESTS_FAILED + TESTS_SKIPPED))
 echo "  TOTAL:  $TOTAL"
 echo "========================================"
 
 if [[ $TESTS_FAILED -eq 0 ]]; then
-    echo -e "${GREEN}All tests passed!${NC}"
+    printf '%bAll tests passed!%b\n' "$GREEN" "$NC"
     exit 0
 else
-    echo -e "${RED}Some tests failed. Review output above.${NC}"
+    printf '%bSome tests failed. Review output above.%b\n' "$RED" "$NC"
     exit 1
 fi

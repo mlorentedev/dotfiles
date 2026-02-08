@@ -18,7 +18,7 @@ export NC='\033[0m'
 # Output: colored info message to stdout
 # Usage: log_info "Starting process"
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    printf '%b[INFO]%b %s\n' "$BLUE" "$NC" "$1"
 }
 
 # Prints a success message with green color
@@ -26,7 +26,7 @@ log_info() {
 # Output: colored success message to stdout
 # Usage: log_success "Task completed"
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    printf '%b[SUCCESS]%b %s\n' "$GREEN" "$NC" "$1"
 }
 
 # Prints a warning message with yellow color
@@ -34,7 +34,7 @@ log_success() {
 # Output: colored warning message to stdout
 # Usage: log_warning "File not found"
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    printf '%b[WARNING]%b %s\n' "$YELLOW" "$NC" "$1"
 }
 
 # Prints an error message with red color
@@ -42,7 +42,7 @@ log_warning() {
 # Output: colored error message to stdout
 # Usage: log_error "Operation failed"
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$1"
 }
 
 # Logs error message and exits with specified code
@@ -64,7 +64,7 @@ exit_error() {
 # Output: none, returns 0 if found, 1 if missing
 # Usage: command_exists "age" && echo "age is installed"
 command_exists() {
-    command -v "$1" &>/dev/null
+    command -v "$1" >/dev/null 2>&1
 }
 
 # Checks if a file exists (silent, no output)
@@ -199,7 +199,7 @@ parse_mapping_file() {
 
         # Call handler if provided
         [[ -n "$callback" ]] && "$callback" "$key" "$value"
-        ((count++))
+        count=$((count + 1))
     done < "$file"
 
     echo "$count"
@@ -265,7 +265,7 @@ age_get_pubkey() {
 # Output: none, returns 0 if authenticated, 1 otherwise
 # Usage: gh_is_authenticated || exit_error "Run 'gh auth login' first"
 gh_is_authenticated() {
-    command_exists gh && gh auth status &>/dev/null
+    command_exists gh && gh auth status >/dev/null 2>&1
 }
 
 # Gets the current repository name in owner/repo format
@@ -317,11 +317,11 @@ check_command() {
     cmd=$1
     package=${2:-$cmd}
     
-    if ! command -v "$cmd" &> /dev/null; then
+    if ! command -v "$cmd" >/dev/null 2>&1; then
         log_error "$cmd not found. Please install $package."
         return 1
     fi
-    
+
     return 0
 }
 
@@ -353,7 +353,7 @@ check_dependencies() {
 confirm_action() {
     message=${1:-"Are you sure you want to continue?"}
     
-    echo -e "${YELLOW}$message (y/n)${NC}"
+    printf '%b%s (y/n)%b\n' "$YELLOW" "$message" "$NC"
     read -r confirm
     
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
@@ -398,8 +398,14 @@ get_timestamp() {
 # Output: absolute directory path to stdout
 # Usage: script_dir=$(get_script_dir)
 get_script_dir() {
-    calling_script="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
-    echo "$(cd "$(dirname "$calling_script")" && pwd)"
+    local calling_script
+    if [[ -n "$ZSH_VERSION" ]]; then
+        # shellcheck disable=SC2296,SC2154
+        calling_script="${funcfiletrace[1]%:*}"
+    else
+        calling_script="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+    fi
+    (cd "$(dirname "$calling_script")" && pwd)
 }
 
 # Gets the project root directory (parent of scripts directory)
@@ -452,7 +458,7 @@ require_command() {
     package="${2:-$cmd}"
     install_msg="${3:-Please install $package}"
     
-    if ! command -v "$cmd" &> /dev/null; then
+    if ! command -v "$cmd" >/dev/null 2>&1; then
         exit_error "$cmd is not installed. $install_msg"
     else
         log_info "$cmd is available"
@@ -476,8 +482,7 @@ check_git_repo() {
 # Output: creates global variable with initial value 0
 # Usage: init_counter "file_count"
 init_counter() {
-    var_name="$1"
-    declare -g "$var_name=0"
+    eval "$1=0"
 }
 
 # Increments a counter variable by 1
@@ -486,14 +491,14 @@ init_counter() {
 # Usage: increment_counter "file_count"
 increment_counter() {
     var_name="$1"
-    current_val=0
+    local current_val=0
     if [[ -n "$ZSH_VERSION" ]]; then
-        # shellcheck disable=SC2296
+        # shellcheck disable=SC2296,SC2034
         current_val="${(P)var_name}"
     else
-        current_val="${!var_name}"
+        eval "current_val=\${$var_name}"
     fi
-    declare -g "$var_name=$((current_val + 1))"
+    eval "$var_name=\$((current_val + 1))"
 }
 
 # Gets the current value of a counter variable
@@ -533,7 +538,7 @@ process_files() {
         if [[ -n "$callback" ]]; then
             "$callback" "$file"
         fi
-        ((count++))
+        count=$((count + 1))
     done
     
     echo "$count"
@@ -659,9 +664,11 @@ mask_value() {
     fi
 
     if [[ $show_chars -gt 0 ]]; then
-        echo "${value:0:$show_chars}$(printf '%*s' $((len - show_chars)) | tr ' ' '*')"
+        # shellcheck disable=SC2183
+        echo "${value:0:$show_chars}$(printf '%*s' $((len - show_chars)) '' | tr ' ' '*')"
     else
-        printf '%*s' "$len" | tr ' ' '*'
+        # shellcheck disable=SC2183
+        printf '%*s' "$len" '' | tr ' ' '*'
     fi
 }
 

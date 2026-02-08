@@ -6,8 +6,8 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/utils.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+. "$SCRIPT_DIR/utils.sh"
 
 PROJECT_ROOT="$(get_project_root "$SCRIPT_DIR")"
 SECRETS_DIR="$PROJECT_ROOT/sensitive"

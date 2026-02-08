@@ -22,10 +22,10 @@
 # Source utils.sh for helper functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/utils.sh" ]]; then
-    source "$SCRIPT_DIR/utils.sh"
+    . "$SCRIPT_DIR/utils.sh"
 else
     # Minimal fallback if utils.sh not found
-    command_exists() { command -v "$1" &>/dev/null; }
+    command_exists() { command -v "$1" >/dev/null 2>&1; }
     file_exists() { [[ -f "$1" ]]; }
     var_is_set() {
         var_name="$1"
@@ -89,7 +89,7 @@ _secrets_load_entry() {
 
     if [[ -n "$value" ]]; then
         export_var "$var_name" "$value"
-        ((SECRETS_LOADED++))
+        SECRETS_LOADED=$((SECRETS_LOADED + 1))
     fi
 }
 
@@ -102,7 +102,7 @@ secrets_load() {
     SECRETS_LOADED=0
 
     # Use parse_mapping_file if available, otherwise fallback
-    if declare -f parse_mapping_file >/dev/null 2>&1; then
+    if type parse_mapping_file >/dev/null 2>&1; then
         parse_mapping_file "$SECRETS_MAPPING_FILE" _secrets_load_entry >/dev/null
     else
         # Fallback parsing
@@ -294,10 +294,10 @@ secrets_check() {
 
         if file_exists "$encrypted_file"; then
             echo "  ✓ $var_name"
-            ((valid++))
+            valid=$((valid + 1))
         else
             echo "  ✗ $var_name (missing: ${filename}.secret.age)"
-            ((missing++))
+            missing=$((missing + 1))
         fi
     done < "$SECRETS_MAPPING_FILE"
 
@@ -310,7 +310,7 @@ secrets_check() {
         base_name=$(basename "$age_file" .secret.age)
         if ! grep -q "=${base_name}$" "$SECRETS_MAPPING_FILE" 2>/dev/null; then
             echo "  ? ${base_name}.secret.age (no mapping)"
-            ((orphaned++))
+            orphaned=$((orphaned + 1))
         fi
     done
 
@@ -343,7 +343,7 @@ secrets_clean() {
             rm -f "$file"
             echo "  Removed: $(basename "$file")"
         fi
-        ((dec_count++))
+        dec_count=$((dec_count + 1))
     done
 
     # Find .secret files (plaintext, not .secret.age)
@@ -357,7 +357,7 @@ secrets_clean() {
             rm -f "$file"
             echo "  Removed: $(basename "$file")"
         fi
-        ((secret_count++))
+        secret_count=$((secret_count + 1))
     done
 
     echo ""
@@ -474,21 +474,21 @@ secrets_sync() {
         filename="${file##*/}"
         command cp "$file" "$repo_dir/$filename"
         echo "  $filename"
-        ((count++))
+        count=$((count + 1))
     done
 
     # Sync mapping file
     if [[ -f "$SECRETS_MAPPING_FILE" ]]; then
         command cp "$SECRETS_MAPPING_FILE" "$repo_dir/env-mapping.conf"
         echo "  env-mapping.conf"
-        ((count++))
+        count=$((count + 1))
     fi
 
     # Sync audit log
     if [[ -f "$SECRETS_AUDIT_FILE" ]]; then
         command cp "$SECRETS_AUDIT_FILE" "$repo_dir/.secrets-audit.log"
         echo "  .secrets-audit.log"
-        ((count++))
+        count=$((count + 1))
     fi
 
     echo ""

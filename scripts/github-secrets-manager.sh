@@ -13,8 +13,8 @@
 set -e
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/utils.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+. "$SCRIPT_DIR/utils.sh"
 
 # Configuration
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
@@ -91,7 +91,7 @@ else
 fi
 
 # Track processed secrets to avoid duplicates
-declare -a PROCESSED_SECRETS=()
+PROCESSED_SECRETS=()
 
 # Check if variable is selected (when --select is used)
 is_selected() {

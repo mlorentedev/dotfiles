@@ -6,18 +6,18 @@
 set -e
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/utils.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+. "$SCRIPT_DIR/utils.sh"
 
 log_info "Installing pre-commit dependencies..."
 
 # Check if pre-commit is available, install if needed
-if ! command -v pre-commit &> /dev/null; then
+if ! command -v pre-commit >/dev/null 2>&1; then
   log_info "Installing pre-commit with pip"
   
-  if command -v pip &> /dev/null; then
+  if command -v pip >/dev/null 2>&1; then
     pip install pre-commit
-  elif command -v pip3 &> /dev/null; then
+  elif command -v pip3 >/dev/null 2>&1; then
     pip3 install pre-commit
   else
     exit_error "pip is not available. Please install pip first."

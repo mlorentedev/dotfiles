@@ -9,7 +9,7 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 KEY_PATH="${AGE_KEY_PATH:-$SCRIPT_DIR/key.txt}"
 SECRETS_DIR="${2:-$SCRIPT_DIR/secrets}"
 
@@ -19,9 +19,9 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
-log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
+log_info()    { printf '%b[INFO]%b %s\n' "$BLUE" "$NC" "$1"; }
+log_success() { printf '%b[OK]%b %s\n' "$GREEN" "$NC" "$1"; }
+log_error()   { printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$1"; }
 
 die() {
     log_error "$1"
@@ -47,7 +47,7 @@ usage() {
 }
 
 check_requirements() {
-    command -v age &>/dev/null || die "age not installed. Install: sudo apt install age"
+    command -v age >/dev/null 2>&1 || die "age not installed. Install: sudo apt install age"
     [[ -f "$KEY_PATH" ]] || die "Key not found: $KEY_PATH"
     [[ -d "$SECRETS_DIR" ]] || die "Directory not found: $SECRETS_DIR"
 }
@@ -72,7 +72,7 @@ encrypt_all() {
 
         rm -f "$outfile"
         age -r "$pubkey" -o "$outfile" "$file" || die "Failed to encrypt $file"
-        ((++count))
+        count=$((count + 1))
     done
 
     log_success "Encrypted $count files"
@@ -93,7 +93,7 @@ decrypt_all() {
 
         rm -f "$outfile"
         age -d -i "$KEY_PATH" -o "$outfile" "$file" || die "Failed to decrypt $file"
-        ((++count))
+        count=$((count + 1))
     done
 
     log_success "Decrypted $count files"

@@ -25,10 +25,10 @@ else
     RED='' GREEN='' YELLOW='' BLUE='' NC=''
 fi
 
-log_info()    { echo -e "${BLUE}→${NC} $1"; }
-log_success() { echo -e "${GREEN}✓${NC} $1"; }
-log_warning() { echo -e "${YELLOW}!${NC} $1"; }
-log_error()   { echo -e "${RED}✗${NC} $1" >&2; }
+log_info()    { printf '%b→%b %s\n' "$BLUE" "$NC" "$1"; }
+log_success() { printf '%b✓%b %s\n' "$GREEN" "$NC" "$1"; }
+log_warning() { printf '%b!%b %s\n' "$YELLOW" "$NC" "$1"; }
+log_error()   { printf '%b✗%b %s\n' "$RED" "$NC" "$1" >&2; }
 
 # Validate directories exist
 validate_dirs() {
@@ -76,22 +76,22 @@ sync_secrets() {
             if [[ "$local_file" -nt "$repo_file" ]]; then
                 cat "$local_file" > "$repo_file"
                 log_info "  $file (→ repo)"
-                ((synced++))
+                synced=$((synced + 1))
             elif [[ "$repo_file" -nt "$local_file" ]]; then
                 cat "$repo_file" > "$local_file"
                 log_info "  $file (repo → local)"
-                ((synced++))
+                synced=$((synced + 1))
             fi
         # Only in - copy to repo
         elif [[ -f "$local_file" ]]; then
             cat "$local_file" > "$repo_file"
             log_info "  $file (→ repo) [new]"
-            ((synced++))
+            synced=$((synced + 1))
         # Only in repo - copy to local
         elif [[ -f "$repo_file" ]]; then
             cat "$repo_file" > "$local_file"
             log_info "  $file (repo → local) [new]"
-            ((synced++))
+            synced=$((synced + 1))
         fi
     done
 

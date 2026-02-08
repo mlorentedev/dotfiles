@@ -16,9 +16,9 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_info() { printf '%b[INFO]%b %s\n' "$BLUE" "$NC" "$1"; }
+log_success() { printf '%b[SUCCESS]%b %s\n' "$GREEN" "$NC" "$1"; }
+log_error() { printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$1"; }
 
 # Create project directory if not current
 if [[ "$PROJECT_NAME" != "." ]]; then
@@ -95,16 +95,16 @@ log_success "Created tasks/todo.md and tasks/lessons.md"
 case $STACK in
     python)
         log_info "Initializing Python project..."
-        if command -v poetry &> /dev/null; then
+        if command -v poetry >/dev/null 2>&1; then
             poetry init -n --name "$PROJECT_NAME" 2>/dev/null || true
             poetry add --group dev typer rich pydantic pytest pytest-cov mypy ruff 2>/dev/null || true
-        elif command -v uv &> /dev/null; then
+        elif command -v uv >/dev/null 2>&1; then
             uv init 2>/dev/null || true
         fi
         ;;
     go)
         log_info "Initializing Go project..."
-        if command -v go &> /dev/null; then
+        if command -v go >/dev/null 2>&1; then
             go mod init "$PROJECT_NAME" 2>/dev/null || true
         fi
         cat > Makefile << 'EOF'
@@ -125,7 +125,7 @@ EOF
         ;;
     node|ts)
         log_info "Initializing Node/TypeScript project..."
-        if command -v npm &> /dev/null; then
+        if command -v npm >/dev/null 2>&1; then
             npm init -y 2>/dev/null || true
             npm i -D typescript @types/node tsx vitest 2>/dev/null || true
         fi

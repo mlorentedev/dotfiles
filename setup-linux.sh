@@ -7,7 +7,7 @@ set -e
 
 # Load utility functions for logging
 if [ -f ./scripts/utils.sh ]; then
-    source ./scripts/utils.sh
+    . ./scripts/utils.sh
 else
     echo "Error: utils.sh not found"
     exit 1
@@ -71,7 +71,7 @@ fi
 if [ -f "$DOTFILES_DIR/.zsh/functions.zsh" ]; then
     if ! grep -q "source.*utils.sh" "$DOTFILES_DIR/.zsh/functions.zsh"; then
         log_info "Updating functions.zsh to source utils.sh..."
-        echo -e "\n# Source utility functions\nsource $DOTFILES_DIR/scripts/utils.sh" >> "$DOTFILES_DIR/.zsh/functions.zsh"
+        printf '\n# Source utility functions\n. %s/scripts/utils.sh\n' "$DOTFILES_DIR" >> "$DOTFILES_DIR/.zsh/functions.zsh"
     fi
     log_info "functions.zsh already exists, skipping creation..."
 else
@@ -79,7 +79,7 @@ else
     cat > "$DOTFILES_DIR/.zsh/functions.zsh" << EOF
 
 # Source the utils.sh and setup-gh-secrets.sh scripts
-source "$DOTFILES_DIR/scripts/utils.sh"
+. "$DOTFILES_DIR/scripts/utils.sh"
 
 EOF
 fi
@@ -102,12 +102,12 @@ else
 
 # Source aliases
 if [ -f ~/.bash/bash_aliases ]; then
-    source ~/.bash/bash_aliases
+    . ~/.bash/bash_aliases
 fi
 
 # Source utility functions
 if [ -f "$DOTFILES_DIR/scripts/utils.sh" ]; then
-    source "$DOTFILES_DIR/scripts/utils.sh"
+    . "$DOTFILES_DIR/scripts/utils.sh"
 fi
 EOF
 fi
