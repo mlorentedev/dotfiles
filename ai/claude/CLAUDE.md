@@ -198,6 +198,26 @@ STOP and fix if detected:
 5. **Post-Implementation Review:** Append a brief section on Security/Performance.
 6. After corrections, update `tasks/lessons.md`.
 
+## Knowledge Vault (Source of Truth)
+
+All operational knowledge (ADRs, runbooks, troubleshooting, architecture docs) lives in the Obsidian vault, NOT in project repos. The vault is usually located at `~/Projects/knowledge/`. Project-specific documentation lives under `10_projects/` in the vault.
+
+**Rules:**
+- When asked to create or modify ADRs, runbooks, troubleshooting guides, or operational docs → do it in the vault, never in a project repo's `docs/`
+- Project repos may contain lightweight pointers to the vault, not the actual content
+- Use `[[wikilinks]]` for internal vault links (Obsidian convention)
+- File naming: english, `lowercase-kebab-case.md`
+- If the vault path is not found, ask the user where it is located
+
+**Post-Change Vault Sync (IMPORTANT):**
+After completing any significant change in a project repo, proactively check if vault documentation needs updating:
+- New architectural decision? → Create/update ADR in the vault
+- Changed deployment procedure? → Update the relevant runbook in the vault
+- Fixed a tricky bug? → Add it to troubleshooting in the vault
+- Added/removed a service or dependency? → Update the project `_index.md` in the vault
+- Changed infrastructure (DNS, networking, hardware)? → Update infra docs in the vault
+- Ask the user: *"Should I update the vault docs to reflect this change?"* if unsure
+
 ## Operational Rules (from past corrections)
 
 ### Interaction Discipline

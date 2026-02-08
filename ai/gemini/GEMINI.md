@@ -180,7 +180,15 @@ Stop generation and warn if you detect:
 
 * After ANY correction: update `tasks/lessons.md` with the pattern and prevention rule.
 
-## 9. Output Protocol
+## 9. Knowledge Vault (Source of Truth)
+
+All operational knowledge (ADRs, runbooks, troubleshooting, architecture docs) lives in the Obsidian vault, NOT in project repos. The vault is usually at `~/Projects/knowledge/`. Project-specific documentation lives under `10_projects/`.
+
+**Rules:** Create/edit operational docs in the vault, never in repo `docs/`. Project repos have lightweight pointers only. Use `[[wikilinks]]`. File naming: `lowercase-kebab-case.md`. If the vault is not found, ask the user where it is.
+
+**Post-Change Vault Sync:** After completing any significant project change, proactively check if vault docs need updating (new ADR, changed deployment, fixed bug, added service, infra change). Ask the user if unsure.
+
+## 10. Output Protocol
 
 1. **Classify Task:** Determine if Low Load (Execute) or High Load (Mentor).
 2. **If High Load:** Apply Socratic Guardrail & Pause.
