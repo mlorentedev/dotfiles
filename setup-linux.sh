@@ -148,6 +148,14 @@ done
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
+# Create convenience symlinks for versioned-only binaries
+PYTHON_DIR=$(ls -d "$HOME/Applications"/python-* 2>/dev/null | sort -V | tail -1)
+if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/python" ]; then
+    log_info "Creating python symlink..."
+    ln -s python3 "$PYTHON_DIR/bin/python"
+    log_success "python -> python3 symlink created"
+fi
+
 # Register MCP servers (requires Claude Code CLI and Node.js)
 if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
     log_info "Registering Claude Code MCP servers..."
