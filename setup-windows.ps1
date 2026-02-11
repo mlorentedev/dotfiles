@@ -104,6 +104,22 @@ if (Test-Path $skillsSource) {
     Write-Success "Deployed skills to $ClaudeHome\skills\"
 }
 
+# Register MCP servers (requires Claude Code CLI and Node.js)
+$claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
+$npxCmd = Get-Command npx -ErrorAction SilentlyContinue
+if ($claudeCmd -and $npxCmd) {
+    Write-Info "Registering Claude Code MCP servers..."
+    try {
+        & claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>$null
+        & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
+        Write-Success "MCP servers registered"
+    } catch {
+        Write-Warn "Failed to register MCP servers: $_"
+    }
+} else {
+    Write-Warn "Claude Code CLI or npx not found, skipping MCP server registration"
+}
+
 # ============================================================================
 # 3. DEPLOY GEMINI CONFIGURATION
 # ============================================================================

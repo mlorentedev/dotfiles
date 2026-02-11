@@ -163,8 +163,7 @@ Features on Windows:
 
 - [Boilerplates](https://github.com/mlorentedev/boilerplates) - Project templates
 - [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) - Quick references
-- [My list](https://mlorente.dev) - More detailed explanations
 
 ## License
 
-MIT
+- [MIT License](LICENSE) - Free to use and modify with attribution.

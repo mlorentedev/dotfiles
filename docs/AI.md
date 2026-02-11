@@ -56,6 +56,7 @@ This automatically:
 - Copies `scripts/init-project.ps1` to `~/scripts/` (Windows)
 - Copies `ai/skills/*` to `~/.claude/skills/` (full SKILL.md with YAML frontmatter)
 - Converts skills to `~/.gemini/prompts/` (YAML frontmatter stripped, flat markdown)
+- Registers MCP servers (user scope, available in all projects)
 - Creates the `project-init` alias/function
 
 ### 2. Install AI Tools
@@ -408,6 +409,49 @@ type gp
 # Verify prompts directory
 ls -la ~/.gemini/prompts/
 ```
+
+## MCP Servers
+
+MCP (Model Context Protocol) servers extend Claude Code with external tool integrations. The setup scripts register these automatically at user scope (available in all projects).
+
+### Registered Servers
+
+| Server | Type | Package/URL | Purpose |
+|--------|------|-------------|---------|
+| `drawio` | stdio | `@drawio/mcp` | Generate draw.io diagrams (XML, CSV, Mermaid) |
+| `socket` | http | `https://mcp.socket.dev/` | Dependency security analysis |
+
+### Prerequisites
+
+- Claude Code CLI installed (`claude`)
+- Node.js/npm installed (`npx`)
+
+### Manual Registration
+
+If the setup script skipped MCP registration (tools not installed yet), run manually:
+
+```bash
+claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp
+claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/
+```
+
+### Verify MCP Servers
+
+```bash
+# List registered servers and check connectivity
+claude mcp list
+
+# Inside Claude Code session
+/mcp
+```
+
+### Adding New MCP Servers
+
+1. Add the `claude mcp add` command to both setup scripts:
+   - `setup-linux.sh` (in the MCP servers section)
+   - `setup-windows.ps1` (in the MCP servers section)
+2. Update this table
+3. Commit and sync
 
 ## Claude Code Plugins
 

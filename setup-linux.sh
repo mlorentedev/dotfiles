@@ -148,6 +148,16 @@ done
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
+# Register MCP servers (requires Claude Code CLI and Node.js)
+if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
+    log_info "Registering Claude Code MCP servers..."
+    claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>/dev/null || true
+    claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>/dev/null || true
+    log_success "MCP servers registered"
+else
+    log_warning "Claude Code CLI or npx not found, skipping MCP server registration"
+fi
+
 # Add project-init alias (AI-agnostic naming)
 PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
 ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
