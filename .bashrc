@@ -51,7 +51,7 @@ export PYTHON_HOME="$APPS_HOME/python-3.12.6"
 export RUBY_HOME="$APPS_HOME/ruby-3.1.4"
 export GEM_HOME="$RUBY_HOME/gems"
 export MINIKUBE_HOME="$APPS_HOME/minikube-1.34.0"
-export GO_HOME="$APPS_HOME/go-1.23.1"
+export GO_HOME="$APPS_HOME/go-1.26.0"
 
 # ==========================
 #    PATH CONFIGURATION
@@ -59,19 +59,19 @@ export GO_HOME="$APPS_HOME/go-1.23.1"
 # Ensure system paths are present
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 
-# Append Tool Paths
-export PATH="$PATH:$JAVA_HOME/bin"
-export PATH="$PATH:$MAVEN_HOME/bin"
-export PATH="$PATH:$PYTHON_HOME/bin"
-export PATH="$PATH:$RUBY_HOME/bin"
-export PATH="$PATH:$GEM_HOME/bin"
-export PATH="$PATH:$MINIKUBE_HOME"
-export PATH="$PATH:$GO_HOME/bin"
-export PATH="$PATH:$HOME/go/bin"
-export PATH="$PATH:$NINJA_HOME/.bin"
-export PATH="$PATH:$DOTFILES_DIR/scripts"
+# Prepend Tool Paths (priority over system)
+export PATH="$JAVA_HOME/bin:$PATH"
+export PATH="$MAVEN_HOME/bin:$PATH"
+export PATH="$PYTHON_HOME/bin:$PATH"
+export PATH="$RUBY_HOME/bin:$PATH"
+export PATH="$GEM_HOME/bin:$PATH"
+export PATH="$MINIKUBE_HOME:$PATH"
+export PATH="$GO_HOME/bin:$PATH"
+export PATH="$HOME/go/bin:$PATH"
+export PATH="$NINJA_HOME/.bin:$PATH"
+export PATH="$DOTFILES_DIR/scripts:$PATH"
 
-# Prepend User Local Bin
+# Prepend User Local Bin (highest priority)
 export PATH="$HOME/.local/bin:$PATH"
 
 # bun

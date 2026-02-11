@@ -21,7 +21,7 @@ Improve code structure without changing behavior.
 2. Add type annotations (no `Any`, no `interface{}`)
 3. Rename variables descriptively (no `x`, `data`, `temp`)
 4. Extract magic numbers to constants
-5. Use modern language idioms (Python 3.12+, Go 1.22+, ESNext)
+5. Use modern language idioms (Python 3.12+, Go 1.26+, ESNext)
 
 ## Output
 
