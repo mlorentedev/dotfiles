@@ -419,6 +419,7 @@ MCP (Model Context Protocol) servers extend Claude Code with external tool integ
 | Server | Type | Package/URL | Purpose |
 |--------|------|-------------|---------|
 | `drawio` | stdio | `@drawio/mcp` | Generate draw.io diagrams (XML, CSV, Mermaid) |
+| `excalidraw` | stdio | `@cmd8/excalidraw-mcp` | Create/edit Excalidraw diagrams (nodes, edges, shapes) |
 | `socket` | http | `https://mcp.socket.dev/` | Dependency security analysis |
 
 ### Prerequisites
@@ -432,6 +433,7 @@ If the setup script skipped MCP registration (tools not installed yet), run manu
 
 ```bash
 claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp
+claude mcp add --transport stdio excalidraw --scope user -- npx -y @cmd8/excalidraw-mcp
 claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/
 ```
 
