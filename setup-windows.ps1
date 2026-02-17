@@ -111,7 +111,7 @@ if ($claudeCmd -and $npxCmd) {
     Write-Info "Registering Claude Code MCP servers..."
     try {
         & claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>$null
-        & claude mcp add --transport stdio excalidraw --scope user -- npx -y @cmd8/excalidraw-mcp 2>$null
+        & claude mcp add --transport stdio excalidraw --scope user -- npx -y @cmd8/excalidraw-mcp@1.1.1 2>$null
         & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
         Write-Success "MCP servers registered"
     } catch {

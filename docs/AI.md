@@ -433,7 +433,7 @@ If the setup script skipped MCP registration (tools not installed yet), run manu
 
 ```bash
 claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp
-claude mcp add --transport stdio excalidraw --scope user -- npx -y @cmd8/excalidraw-mcp
+claude mcp add --transport stdio excalidraw --scope user -- npx -y @cmd8/excalidraw-mcp@1.1.1
 claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/
 ```
 
