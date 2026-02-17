@@ -37,7 +37,7 @@ jobs:
       - name: Install age
         run: |
           sudo apt-get update
-          sudo apt-get install -y age
+          sudo apt-get install -y age zsh
 
       - name: Install bats-core
         run: |
