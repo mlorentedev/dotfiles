@@ -326,6 +326,9 @@ secrets_check() {
 # Remove .dec and .secret plaintext files
 # Usage: secrets_clean [--dry-run]
 secrets_clean() {
+    # zsh errors on glob with no matches by default; disable that
+    [[ -n "${ZSH_VERSION:-}" ]] && setopt NULL_GLOB
+
     dry_run=false
     [[ "$1" == "--dry-run" ]] && dry_run=true
 
