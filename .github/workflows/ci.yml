@@ -19,11 +19,15 @@ jobs:
             bash -n "$script"
           done
 
-      - name: Check for shellcheck issues
+      - name: Check for shellcheck issues (scripts/)
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: './scripts'
           severity: error
+
+      - name: Check for shellcheck issues (root scripts)
+        run: |
+          shellcheck --severity=error setup-linux.sh
 
   test:
     runs-on: ubuntu-latest
@@ -34,6 +38,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y age
+
+      - name: Install bats-core
+        run: |
+          BATS_VERSION="1.13.0"
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          tar -xzf bats.tar.gz
+          sudo "bats-core-${BATS_VERSION}/install.sh" /usr/local
+          rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
+          bats --version
 
       - name: Setup mock environment
         run: |
@@ -46,27 +59,6 @@ jobs:
           ln -sf ~/.dotfiles/.zshrc ~/.zshrc 2>/dev/null || true
           ln -sf ~/.dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
 
-      - name: Run syntax tests
+      - name: Run bats test suite
         run: |
-          source scripts/utils.sh
-
-          echo "Testing utility functions..."
-
-          # Test command_exists
-          command_exists bash && echo "PASS: command_exists"
-
-          # Test file_exists
-          file_exists scripts/utils.sh && echo "PASS: file_exists"
-
-          # Test dir_exists
-          dir_exists scripts && echo "PASS: dir_exists"
-
-          # Test trim
-          [[ "$(trim '  hello  ')" == "hello" ]] && echo "PASS: trim"
-
-          # Test base64 roundtrip
-          encoded=$(base64_encode "test")
-          decoded=$(base64_decode "$encoded")
-          [[ "$decoded" == "test" ]] && echo "PASS: base64 roundtrip"
-
-          echo "All basic tests passed!"
+          bats tests/*.bats
