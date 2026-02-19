@@ -162,6 +162,9 @@ if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
     claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>/dev/null || true
     claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>/dev/null || true
     log_success "MCP servers registered"
+    log_info "Installing Claude Code plugins..."
+    claude /install claude-mem@thedotmack 2>/dev/null || true
+    log_success "Claude Code plugins installed"
 else
     log_warning "Claude Code CLI or npx not found, skipping MCP server registration"
 fi
