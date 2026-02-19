@@ -113,9 +113,7 @@ if ($claudeCmd -and $npxCmd) {
         & claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>$null
         & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
         Write-Success "MCP servers registered"
-        Write-Info "Installing Claude Code plugins..."
-        & claude /install claude-mem@thedotmack 2>$null
-        Write-Success "Claude Code plugins installed"
+        Write-Warn "Claude Code plugins require manual installation. Run in Claude Code: /install claude-mem@thedotmack"
     } catch {
         Write-Warn "Failed to register MCP servers or install plugins: $_"
     }
