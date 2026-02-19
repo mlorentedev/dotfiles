@@ -26,4 +26,4 @@
 - [x] **CI bats test execution**: Replaced 5 inline tests with full bats suite (95 tests) + shellcheck for root scripts.
 - [x] **Project-specific CLAUDE.md**: Populated `.claude/CLAUDE.md` with shell compat rules, verification commands, key file map, and workflows.
 - [x] **tasks/lessons.md**: Created with 4 seed entries from shell hardening work.
-- [x] **Windows MCP parity**: Added excalidraw MCP server registration to `setup-windows.ps1`.
+- [x] **Windows MCP parity**: Verified MCP server registrations match between Linux and Windows setup scripts.

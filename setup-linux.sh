@@ -160,7 +160,6 @@ fi
 if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
     log_info "Registering Claude Code MCP servers..."
     claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>/dev/null || true
-    claude mcp add --transport stdio excalidraw --scope user -- npx -y @cmd8/excalidraw-mcp@1.1.1 2>/dev/null || true
     claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>/dev/null || true
     log_success "MCP servers registered"
 else
