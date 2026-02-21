@@ -162,9 +162,30 @@ if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
     claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>/dev/null || true
     claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>/dev/null || true
     log_success "MCP servers registered"
-    log_warning "Claude Code plugins require manual installation. Run in Claude Code: /install claude-mem@thedotmack"
 else
     log_warning "Claude Code CLI or npx not found, skipping MCP server registration"
+fi
+
+# Claude Code plugins (requires claude CLI)
+if command -v claude >/dev/null 2>&1; then
+    log_info "Installing Claude Code plugins..."
+    for plugin in \
+        "claude-mem@thedotmack" \
+        "code-simplifier@claude-plugins-official" \
+        "github@claude-plugins-official" \
+        "security-guidance@claude-plugins-official" \
+        "claude-md-management@claude-plugins-official" \
+        "claude-code-setup@claude-plugins-official" \
+        "frontend-design@claude-plugins-official" \
+        "ralph-loop@claude-plugins-official" \
+        "code-review@claude-plugins-official" \
+        "commit-commands@claude-plugins-official" \
+        "pr-review-toolkit@claude-plugins-official"; do
+        claude plugin install "$plugin" >/dev/null 2>&1 || true
+    done
+    log_success "Claude Code plugins installed"
+else
+    log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
 # Add project-init alias (AI-agnostic naming)

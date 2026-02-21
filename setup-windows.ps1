@@ -113,12 +113,39 @@ if ($claudeCmd -and $npxCmd) {
         & claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>$null
         & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
         Write-Success "MCP servers registered"
-        Write-Warn "Claude Code plugins require manual installation. Run in Claude Code: /install claude-mem@thedotmack"
     } catch {
-        Write-Warn "Failed to register MCP servers or install plugins: $_"
+        Write-Warn "Failed to register MCP servers: $_"
     }
 } else {
     Write-Warn "Claude Code CLI or npx not found, skipping MCP server registration"
+}
+
+# Claude Code plugins (requires claude CLI)
+if ($claudeCmd) {
+    Write-Info "Installing Claude Code plugins..."
+    $plugins = @(
+        "claude-mem@thedotmack",
+        "code-simplifier@claude-plugins-official",
+        "github@claude-plugins-official",
+        "security-guidance@claude-plugins-official",
+        "claude-md-management@claude-plugins-official",
+        "claude-code-setup@claude-plugins-official",
+        "frontend-design@claude-plugins-official",
+        "ralph-loop@claude-plugins-official",
+        "code-review@claude-plugins-official",
+        "commit-commands@claude-plugins-official",
+        "pr-review-toolkit@claude-plugins-official"
+    )
+    foreach ($plugin in $plugins) {
+        try {
+            & claude plugin install $plugin 2>$null | Out-Null
+        } catch {
+            # Silently continue if a plugin fails
+        }
+    }
+    Write-Success "Claude Code plugins installed"
+} else {
+    Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
 
 # ============================================================================

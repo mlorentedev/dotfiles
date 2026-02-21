@@ -455,70 +455,51 @@ claude mcp list
 
 ## Claude Code Plugins
 
-Plugins extend Claude Code with specialized capabilities. Install once per machine to maintain consistent environment.
+Plugins extend Claude Code with specialized capabilities. Plugins are **automatically installed** by `setup-linux.sh` and `setup-windows.ps1` on every new machine.
 
-### Essential Plugins (Recommended)
+### Essential Plugins (Automated)
 
-Install these on every new machine for a complete setup:
-
-```bash
-# Memory System (Long-term context across sessions)
-claude /install claude-mem@thedotmack
-
-# Code Quality & Security
-claude /install code-simplifier@claude-plugins-official
-claude /install security-guidance@claude-plugins-official
-claude /install code-review@claude-plugins-official
-
-# Git Workflow
-claude /install github@claude-plugins-official
-claude /install commit-commands@claude-plugins-official
-claude /install pr-review-toolkit@claude-plugins-official
-
-# LSP Support (install based on your languages)
-claude /install gopls-lsp@claude-plugins-official      # Go
-claude /install pyright-lsp@claude-plugins-official    # Python
-claude /install typescript-lsp@claude-plugins-official # TypeScript
-claude /install rust-analyzer-lsp@claude-plugins-official # Rust
-```
-
-### Plugin Reference
+These are installed automatically by the setup scripts:
 
 | Plugin | Source | Purpose |
 |--------|--------|---------|
 | `claude-mem` | thedotmack | Long-term memory across sessions |
-| `code-simplifier` | official | Simplify complex code |
-| `security-guidance` | official | Security best practices |
-| `code-review` | official | Automated code review |
+| `code-simplifier` | official | Simplify and refine complex code |
 | `github` | official | GitHub API integration |
-| `commit-commands` | official | Git commit helpers |
-| `pr-review-toolkit` | official | PR review workflow |
-| `gopls-lsp` | official | Go language server |
-| `pyright-lsp` | official | Python language server |
-| `typescript-lsp` | official | TypeScript language server |
+| `security-guidance` | official | Security best practices and vulnerability detection |
+| `claude-md-management` | official | CLAUDE.md file management and maintenance |
+| `claude-code-setup` | official | Project setup and configuration assistance |
+| `frontend-design` | official | Frontend component design and implementation |
+| `ralph-loop` | official | Iterative development loop with feedback |
+| `code-review` | official | Automated code review and suggestions |
+| `commit-commands` | official | Git commit message helpers and conventions |
+| `pr-review-toolkit` | official | Pull request review workflow and checklists |
+
+### Language-Specific Plugins (Optional)
+
+Install per-machine based on the languages you work with. These are NOT automated because they vary by environment:
+
+```bash
+claude /install gopls-lsp@claude-plugins-official        # Go
+claude /install pyright-lsp@claude-plugins-official       # Python
+claude /install typescript-lsp@claude-plugins-official    # TypeScript
+```
 
 ### Optional Plugins (Project-Specific)
 
+Install on demand for specific project needs:
+
 ```bash
-# Frontend Development
-claude /install frontend-design@claude-plugins-official
-
-# Feature Development Workflow
-claude /install feature-dev@claude-plugins-official
-
-# External Integrations
-claude /install linear@claude-plugins-official    # Project management
-claude /install playwright@claude-plugins-official # E2E testing
-claude /install supabase@claude-plugins-official  # Supabase backend
-claude /install slack@claude-plugins-official     # Slack notifications
+claude /install feature-dev@claude-plugins-official    # Feature development workflow
+claude /install linear@claude-plugins-official         # Linear project management
+claude /install playwright@claude-plugins-official     # E2E testing
+claude /install supabase@claude-plugins-official       # Supabase backend
+claude /install slack@claude-plugins-official          # Slack notifications
 ```
 
 ### Verify Installation
 
 ```bash
-# List installed plugins
-cat ~/.claude/plugins/installed_plugins.json | jq '.plugins | keys'
-
 # Check enabled plugins
 cat ~/.claude/settings.json | jq '.enabledPlugins'
 ```
