@@ -104,7 +104,8 @@ git clone https://github.com/mlorentedev/dotfiles.git ~/Projects/dotfiles
 
 | Command | Description |
 |---------|-------------|
-| `secrets_add VAR FILE` | Add new secret interactively |
+| `secrets_add VAR FILE` | Add new env var secret interactively |
+| `secrets_add_file VAR FILE DEST` | Add new file secret (kubeconfig, SSH keys, certs) |
 | `secrets_rotate VAR` | Update existing secret value |
 | `secrets_get VAR` | Decrypt and show single secret |
 | `secrets_list` | Show all secrets and their status |
@@ -205,11 +206,58 @@ github-secrets-manager.sh --from-mapping
 GITHUB_PERSONAL_ACCESS_TOKEN=github.token
 DOCKERHUB_TOKEN=dockerhub.token
 PYPI_TOKEN=pypi.token
+
+# File secrets: @VAR_NAME=filename>dest_path
+@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config
 ```
+
+### Environment Variable Secrets (default)
 
 Each line maps:
 - `GITHUB_PERSONAL_ACCESS_TOKEN` = environment variable name
 - `github.token` = file `sensitive/github.token.secret.age`
+
+The decrypted value is exported as `export GITHUB_PERSONAL_ACCESS_TOKEN=<value>`.
+
+### File Secrets (prefix `@`)
+
+For multiline secrets (kubeconfig, SSH keys, certificates) that need to be deployed as files:
+
+- `@` prefix marks it as a file secret (stripped from the env var name)
+- `>` separates the encrypted filename from the destination path
+- `~` is expanded to `$HOME` at runtime
+- The env var points to the deployed file path (e.g., `KUBECONFIG=~/.kube/kubelab.config`)
+- Files are deployed with `chmod 600`
+- Caching: skips re-decrypt if dest file is newer than the `.age` source
+- `secrets_refresh` removes the deployed file to force re-decrypt
+- File secrets are skipped by `github-secrets-manager.sh` (not suitable for GitHub Actions)
+
+## Workflow: Adding a File Secret
+
+**Step-by-step for deploying an encrypted file (e.g., kubeconfig):**
+
+```bash
+# Option A: Interactive (recommended)
+secrets_add_file KUBECONFIG kubelab.kubeconfig ~/.kube/kubelab.config
+# Enter source file path when prompted
+# Auto-encrypts, adds mapping, syncs to repo
+
+# Option B: Manual
+# 1. Encrypt the file
+age -r $(age-keygen -y ~/.config/age/key.txt) -o sensitive/kubelab.kubeconfig.secret.age ~/.kube/config
+
+# 2. Add mapping to env-mapping.conf
+echo '@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config' >> sensitive/env-mapping.conf
+
+# 3. Deploy
+secrets_refresh
+echo $KUBECONFIG  # → ~/.kube/kubelab.config
+
+# 4. Commit
+git add sensitive/kubelab.kubeconfig.secret.age sensitive/env-mapping.conf
+git commit -m "feat: add kubeconfig file secret"
+dotfiles-sync
+```
 
 ## Testing
 

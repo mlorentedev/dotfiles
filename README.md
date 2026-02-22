@@ -75,9 +75,10 @@ project-init test-project python
 Secrets are encrypted with [age](https://github.com/FiloSottile/age) and automatically loaded on shell startup.
 
 ```bash
-secrets_add VAR_NAME filename   # Add new secret
+secrets_add VAR_NAME filename   # Add new env var secret
+secrets_add_file VAR FILE DEST  # Add new file secret (kubeconfig, SSH keys, certs)
 secrets_rotate VAR_NAME         # Update existing
-secrets_list                    # Show all secrets
+secrets_list                    # Show all secrets (env vars + file secrets)
 secrets_check                   # Validate integrity
 ```
 

@@ -224,6 +224,15 @@ All operational knowledge (ADRs, runbooks, troubleshooting, architecture docs) l
 - File naming: english, `lowercase-kebab-case.md`
 - If the vault path is not found, ask the user where it is located
 
+**Task Management — Vault + Repo Separation:**
+- **Repo `tasks/todo.md`**: active/pending tasks for that repo's scope only
+- **Repo `tasks/completed.md`**: archived completed tasks with full detail (zero info loss)
+- **Vault `10_projects/<product>/_index.md`**: product specs WITH full task roadmap (source of truth for each product)
+- **Rule**: every task ID lives in exactly ONE place. No duplication between repo and vault.
+- **Stubs**: when a repo's todo.md references vault products, use short stubs with vault links (not full task lists)
+- **Sync discipline**: when completing tasks in either location, update the corresponding counts/status in the other. When a product is extracted from a repo, move the task detail to the vault spec — never leave it only in git history.
+- **Conventions**: `[x]` must include date (`✓ YYYY-MM-DD`), `[!]` must reference blocker by task ID
+
 **Post-Change Vault Sync (IMPORTANT):**
 After completing any significant change in a project repo, proactively check if vault documentation needs updating:
 - New architectural decision? → Create/update ADR in the vault
@@ -231,6 +240,7 @@ After completing any significant change in a project repo, proactively check if 
 - Fixed a tricky bug? → Add it to troubleshooting in the vault
 - Added/removed a service or dependency? → Update the project `_index.md` in the vault
 - Changed infrastructure (DNS, networking, hardware)? → Update infra docs in the vault
+- Completed/added tasks for a vault-tracked product? → Update the product's `_index.md` roadmap
 - Ask the user: *"Should I update the vault docs to reflect this change?"* if unsure
 
 ## Operational Rules (from past corrections)
