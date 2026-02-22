@@ -36,6 +36,7 @@ teardown() {
         type secrets_help >/dev/null 2>&1 && echo "help:ok"
         type secrets_audit >/dev/null 2>&1 && echo "audit:ok"
         type secrets_sync >/dev/null 2>&1 && echo "sync:ok"
+        type secrets_add_file >/dev/null 2>&1 && echo "add_file:ok"
     ' -- "$SCRIPTS_DIR"
     [[ "$output" == *"load:ok"* ]]
     [[ "$output" == *"list:ok"* ]]
@@ -48,6 +49,7 @@ teardown() {
     [[ "$output" == *"help:ok"* ]]
     [[ "$output" == *"audit:ok"* ]]
     [[ "$output" == *"sync:ok"* ]]
+    [[ "$output" == *"add_file:ok"* ]]
 }
 
 @test "secrets_help shows usage information" {
@@ -98,6 +100,98 @@ teardown() {
     [[ "$output" == *"DOTFILES_REPO_DIR"* ]]
 }
 
+# --- File secret helpers (bash) ---
+
+@test "_is_file_secret detects @ prefix" {
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        _is_file_secret "@KUBECONFIG" && echo "yes" || echo "no"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"yes"* ]]
+}
+
+@test "_is_file_secret rejects without @ prefix" {
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        _is_file_secret "KUBECONFIG" && echo "yes" || echo "no"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"no"* ]]
+}
+
+@test "_parse_file_secret_value splits filename and dest_path" {
+    run bash -c '
+        export HOME="/home/testuser"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        _parse_file_secret_value "kubelab.kubeconfig>~/.kube/kubelab.config"
+        echo "file=$_FS_FILENAME"
+        echo "dest=$_FS_DEST_PATH"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"file=kubelab.kubeconfig"* ]]
+    [[ "$output" == *"dest=/home/testuser/.kube/kubelab.config"* ]]
+}
+
+@test "secrets_list shows File Secrets section" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config
+CONF
+    # Create the .age files so they show as valid
+    touch "$SECRETS_DIR/my.token.secret.age"
+    touch "$SECRETS_DIR/kubelab.kubeconfig.secret.age"
+
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_list
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"Environment Variables:"* ]]
+    [[ "$output" == *"File Secrets:"* ]]
+    [[ "$output" == *"KUBECONFIG"* ]]
+}
+
+@test "secrets_check detects missing file secret .age" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config
+CONF
+
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_check
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"KUBECONFIG"* ]]
+    [[ "$output" == *"missing"* ]]
+}
+
+@test "secrets_check validates file secret with .age present" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config
+CONF
+    touch "$SECRETS_DIR/kubelab.kubeconfig.secret.age"
+
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_check
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"KUBECONFIG [file]"* ]]
+    [[ "$output" == *"Valid:    1"* ]]
+}
+
+@test "secrets_add_file validates inputs" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_add_file' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "secrets_help mentions FILE SECRETS and secrets_add_file" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_help' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"FILE SECRETS"* ]]
+    [[ "$output" == *"secrets_add_file"* ]]
+}
+
 # --- Zsh compatibility ---
 
 @test "load-secrets.sh sources under zsh" {
@@ -127,4 +221,31 @@ teardown() {
         secrets_clean --dry-run
     ' -- "$SCRIPTS_DIR"
     [[ "$output" == *"Dry run"* ]]
+}
+
+# --- File secret helpers (zsh) ---
+
+@test "_is_file_secret works under zsh" {
+    run zsh -c '
+        . "$1/utils.sh"; . "$1/load-secrets.sh"
+        _is_file_secret "@KUBECONFIG" && echo "yes" || echo "no"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"yes"* ]]
+}
+
+@test "_parse_file_secret_value works under zsh" {
+    run zsh -c '
+        export HOME="/home/testuser"
+        . "$1/utils.sh"; . "$1/load-secrets.sh"
+        _parse_file_secret_value "kubelab.kubeconfig>~/.kube/kubelab.config"
+        echo "file=$_FS_FILENAME"
+        echo "dest=$_FS_DEST_PATH"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"file=kubelab.kubeconfig"* ]]
+    [[ "$output" == *"dest=/home/testuser/.kube/kubelab.config"* ]]
+}
+
+@test "secrets_add_file validates inputs under zsh" {
+    run zsh -c '. "$1/utils.sh"; . "$1/load-secrets.sh"; secrets_add_file' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"Usage"* ]]
 }

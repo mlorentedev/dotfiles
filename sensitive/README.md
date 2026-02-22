@@ -15,10 +15,11 @@ sensitive/
 ## Quick Commands
 
 ```bash
-secrets_list     # Show all secrets
-secrets_add      # Add new secret
-secrets_rotate   # Update secret
-secrets_check    # Validate integrity
+secrets_list       # Show all secrets (env vars + file secrets)
+secrets_add        # Add new env var secret
+secrets_add_file   # Add new file secret (kubeconfig, SSH keys, certs)
+secrets_rotate     # Update secret
+secrets_check      # Validate integrity
 ```
 
 ## USB Backup

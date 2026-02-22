@@ -51,6 +51,7 @@ if $LIST_ONLY; then
     echo ""
     while IFS='=' read -r var_name filename || [[ -n "$var_name" ]]; do
         [[ -z "$var_name" || "$var_name" =~ ^# ]] && continue
+        [[ "$var_name" == @* ]] && continue  # File secrets not suitable for GitHub Actions
         [[ "$var_name" =~ ^GITHUB_ ]] && continue  # GitHub reserves this prefix
         encrypted_file="$SECRETS_DIR/${filename}.secret.age"
         if file_exists "$encrypted_file"; then
@@ -146,6 +147,7 @@ if $USE_MAPPING; then
 
     while IFS='=' read -r var_name filename || [[ -n "$var_name" ]]; do
         [[ -z "$var_name" || "$var_name" =~ ^# ]] && continue
+        [[ "$var_name" == @* ]] && continue  # File secrets not suitable for GitHub Actions
         [[ "$var_name" =~ ^GITHUB_ ]] && { log_warning "Skipping $var_name (GITHUB_ prefix reserved)"; continue; }
 
         # Check if selected

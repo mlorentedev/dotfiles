@@ -46,6 +46,67 @@ SECRETS_MAPPING_FILE="$SECRETS_DIR/env-mapping.conf"
 SECRETS_KEY_PATH="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
 SECRETS_LOADED=0
 
+# --- File-secret helpers ---
+
+# Check if a mapping key is a file secret (prefixed with @)
+_is_file_secret() {
+    case "$1" in
+        @*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Parse a file-secret value "filename>dest_path" into variables
+# Sets _FS_FILENAME and _FS_DEST_PATH (avoids subshell for bash/zsh compat)
+_parse_file_secret_value() {
+    _FS_FILENAME="${1%%>*}"
+    _FS_DEST_PATH="${1#*>}"
+    # Expand ~ to $HOME
+    case "$_FS_DEST_PATH" in
+        "~"/*) _FS_DEST_PATH="$HOME/${_FS_DEST_PATH#"~/"}" ;;
+        "~") _FS_DEST_PATH="$HOME" ;;
+    esac
+}
+
+# Deploy a file secret: decrypt .age -> dest with caching
+_secrets_load_file_entry() {
+    raw_var="$1"
+    raw_value="$2"
+
+    # Strip @ prefix for env var name
+    var_name="${raw_var#@}"
+
+    _parse_file_secret_value "$raw_value"
+    local filename="$_FS_FILENAME"
+    local dest_path="$_FS_DEST_PATH"
+    local encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+
+    file_exists "$encrypted_file" || return 1
+
+    # Cache: skip if dest is newer than encrypted source
+    if [[ -f "$dest_path" && "$dest_path" -nt "$encrypted_file" ]]; then
+        export_var "$var_name" "$dest_path"
+        SECRETS_LOADED=$((SECRETS_LOADED + 1))
+        return 0
+    fi
+
+    # Ensure parent directory exists
+    local dest_dir
+    dest_dir="$(dirname "$dest_path")"
+    [[ -d "$dest_dir" ]] || mkdir -p "$dest_dir"
+
+    # Decrypt to destination
+    if age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" > "$dest_path" 2>/dev/null; then
+        chmod 600 "$dest_path"
+        export_var "$var_name" "$dest_path"
+        SECRETS_LOADED=$((SECRETS_LOADED + 1))
+    else
+        # Remove potentially corrupt partial file
+        rm -f "$dest_path"
+        return 1
+    fi
+}
+
 # Helper to get repo dir dynamically
 _get_secrets_repo_dir() {
     echo "${DOTFILES_REPO_DIR:+${DOTFILES_REPO_DIR}/sensitive}"
@@ -80,6 +141,13 @@ _secrets_sync_to_repo() {
 _secrets_load_entry() {
     var_name="$1"
     filename="$2"
+
+    # Dispatch file secrets to dedicated handler
+    if _is_file_secret "$var_name"; then
+        _secrets_load_file_entry "$var_name" "$filename"
+        return $?
+    fi
+
     encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
     file_exists "$encrypted_file" || return 1
@@ -123,13 +191,22 @@ secrets_load() {
 secrets_refresh() {
     # Unset existing vars first
     if file_exists "$SECRETS_MAPPING_FILE"; then
-        local line var_name
+        local line var_name raw_value
         while IFS= read -r line || [[ -n "$line" ]]; do
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "$line" || ! "$line" =~ = ]] && continue
             var_name="${line%%=*}"
             var_name="${var_name// }"
-            unset_var "$var_name"
+            if _is_file_secret "$var_name"; then
+                # Strip @ for unset, remove deployed file to force re-decrypt
+                raw_value="${line#*=}"
+                raw_value="${raw_value// }"
+                _parse_file_secret_value "$raw_value"
+                rm -f "$_FS_DEST_PATH"
+                unset_var "${var_name#@}"
+            else
+                unset_var "$var_name"
+            fi
         done < "$SECRETS_MAPPING_FILE"
     fi
 
@@ -147,7 +224,9 @@ secrets_list() {
     echo "Secret mappings ($SECRETS_MAPPING_FILE):"
     echo ""
 
-    local line var_name filename encrypted_file
+    # Pass 1: Environment variable secrets
+    echo "Environment Variables:"
+    local line var_name filename encrypted_file has_file_secrets=false
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "$line" || ! "$line" =~ = ]] && continue
@@ -156,6 +235,12 @@ secrets_list() {
         filename="${line#*=}"
         var_name="${var_name// }"
         filename="${filename// }"
+
+        if _is_file_secret "$var_name"; then
+            has_file_secrets=true
+            continue
+        fi
+
         encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
         if ! file_exists "$encrypted_file"; then
@@ -166,6 +251,35 @@ secrets_list() {
             echo "  o $var_name (not loaded)"
         fi
     done < "$SECRETS_MAPPING_FILE"
+
+    # Pass 2: File secrets
+    if [[ "$has_file_secrets" == "true" ]]; then
+        echo ""
+        echo "File Secrets:"
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$line" || ! "$line" =~ = ]] && continue
+
+            var_name="${line%%=*}"
+            filename="${line#*=}"
+            var_name="${var_name// }"
+            filename="${filename// }"
+
+            _is_file_secret "$var_name" || continue
+
+            local clean_var="${var_name#@}"
+            _parse_file_secret_value "$filename"
+            encrypted_file="$SECRETS_DIR/${_FS_FILENAME}.secret.age"
+
+            if ! file_exists "$encrypted_file"; then
+                echo "  x $clean_var -> $_FS_DEST_PATH (missing: ${_FS_FILENAME}.secret.age)"
+            elif [[ -f "$_FS_DEST_PATH" ]]; then
+                echo "  * $clean_var -> $_FS_DEST_PATH (deployed)"
+            else
+                echo "  o $clean_var -> $_FS_DEST_PATH (not deployed)"
+            fi
+        done < "$SECRETS_MAPPING_FILE"
+    fi
 }
 
 # Get a single secret on-demand (for rarely used secrets)
@@ -176,22 +290,38 @@ secrets_get() {
     file_exists "$SECRETS_KEY_PATH" || { echo "Key file not found" >&2; return 1; }
     command_exists age || { echo "age not installed" >&2; return 1; }
 
-    local filename
-    filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | cut -d'=' -f2)
+    # Try exact match first, then with @ prefix for file secrets
+    local filename is_file=false
+    filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    if [[ -z "$filename" ]]; then
+        filename=$(grep "^@${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+        [[ -n "$filename" ]] && is_file=true
+    fi
 
     if [[ -z "$filename" ]]; then
         echo "No mapping found for: $var_name" >&2
         return 1
     fi
 
-    encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+    # File secrets: extract filename portion before >
+    local actual_filename="$filename"
+    if [[ "$is_file" == "true" ]]; then
+        actual_filename="${filename%%>*}"
+    fi
+
+    encrypted_file="$SECRETS_DIR/${actual_filename}.secret.age"
 
     if ! file_exists "$encrypted_file"; then
         echo "Encrypted file not found: $encrypted_file" >&2
         return 1
     fi
 
-    age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n'
+    if [[ "$is_file" == "true" ]]; then
+        # File secrets: output full multiline content
+        age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH"
+    else
+        age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n'
+    fi
 }
 
 # Add a new secret interactively
@@ -290,14 +420,28 @@ secrets_check() {
         filename="${line#*=}"
         var_name="${var_name// }"
         filename="${filename// }"
-        encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
-        if file_exists "$encrypted_file"; then
-            echo "  ✓ $var_name"
-            valid=$((valid + 1))
+        # File secrets: extract filename portion before >
+        if _is_file_secret "$var_name"; then
+            local clean_var="${var_name#@}"
+            local fs_filename="${filename%%>*}"
+            encrypted_file="$SECRETS_DIR/${fs_filename}.secret.age"
+            if file_exists "$encrypted_file"; then
+                echo "  ✓ $clean_var [file]"
+                valid=$((valid + 1))
+            else
+                echo "  ✗ $clean_var [file] (missing: ${fs_filename}.secret.age)"
+                missing=$((missing + 1))
+            fi
         else
-            echo "  ✗ $var_name (missing: ${filename}.secret.age)"
-            missing=$((missing + 1))
+            encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+            if file_exists "$encrypted_file"; then
+                echo "  ✓ $var_name"
+                valid=$((valid + 1))
+            else
+                echo "  ✗ $var_name (missing: ${filename}.secret.age)"
+                missing=$((missing + 1))
+            fi
         fi
     done < "$SECRETS_MAPPING_FILE"
 
@@ -308,7 +452,9 @@ secrets_check() {
     for age_file in "$SECRETS_DIR"/*.secret.age; do
         file_exists "$age_file" || continue
         base_name=$(basename "$age_file" .secret.age)
-        if ! grep -q "=${base_name}$" "$SECRETS_MAPPING_FILE" 2>/dev/null; then
+        # Check both env-var format (=name$) and file-secret format (=name>)
+        if ! grep -q "=${base_name}$" "$SECRETS_MAPPING_FILE" 2>/dev/null &&
+           ! grep -q "=${base_name}>" "$SECRETS_MAPPING_FILE" 2>/dev/null; then
             echo "  ? ${base_name}.secret.age (no mapping)"
             orphaned=$((orphaned + 1))
         fi
@@ -498,6 +644,83 @@ secrets_sync() {
     echo "Synced $count files to repo"
 }
 
+# Add a new file secret interactively
+# Usage: secrets_add_file VAR_NAME filename dest_path
+secrets_add_file() {
+    var_name="$1"
+    filename="$2"
+    dest_path="$3"
+
+    # Validate inputs
+    if [[ -z "$var_name" || -z "$filename" || -z "$dest_path" ]]; then
+        echo "Usage: secrets_add_file VAR_NAME filename dest_path"
+        echo "Example: secrets_add_file KUBECONFIG kubelab.kubeconfig ~/.kube/kubelab.config"
+        return 1
+    fi
+
+    # Check dependencies
+    file_exists "$SECRETS_KEY_PATH" || { echo "Error: Key file not found at $SECRETS_KEY_PATH" >&2; return 1; }
+    command_exists age || { echo "Error: age not installed" >&2; return 1; }
+
+    # Check if mapping already exists
+    if grep -q "^@${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null; then
+        echo "Error: File secret mapping already exists for $var_name"
+        return 1
+    fi
+
+    encrypted_file="$SECRETS_DIR/${filename}.secret.age"
+
+    # Check if encrypted file already exists
+    if file_exists "$encrypted_file"; then
+        echo "Error: Encrypted file already exists: $encrypted_file"
+        return 1
+    fi
+
+    # Prompt for source file path
+    printf "Enter path to source file: "
+    read -r source_path
+    # Expand ~ manually
+    case "$source_path" in
+        "~"/*) source_path="$HOME/${source_path#"~/"}" ;;
+        "~") source_path="$HOME" ;;
+    esac
+
+    if [[ ! -f "$source_path" ]]; then
+        echo "Error: Source file not found: $source_path"
+        return 1
+    fi
+
+    # Encrypt source file
+    if ! age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH" "$source_path"; then
+        echo "Error: Encryption failed"
+        return 1
+    fi
+
+    # Collapse $HOME back to ~ for mapping portability (literal ~ is intentional)
+    local mapping_dest="$dest_path"
+    # shellcheck disable=SC2088
+    case "$mapping_dest" in
+        "$HOME"/*) mapping_dest="~/${mapping_dest#"$HOME/"}" ;;
+    esac
+
+    # Add mapping with @ prefix
+    echo "@${var_name}=${filename}>${mapping_dest}" >> "$SECRETS_MAPPING_FILE"
+
+    # Update audit log
+    _secrets_audit_log "$var_name" "added (file)"
+
+    echo "File secret added successfully:"
+    echo "  Variable:  $var_name"
+    echo "  Encrypted: ${filename}.secret.age"
+    echo "  Deploys to: $dest_path"
+
+    # Sync to repo if configured
+    _secrets_sync_to_repo "${filename}.secret.age" true
+
+    echo ""
+    echo "Run 'secrets_refresh' or restart terminal to deploy"
+}
+
 # Show help for all secrets commands
 # Usage: secrets_help
 secrets_help() {
@@ -558,6 +781,22 @@ EXAMPLES
 
   # Clean up plaintext files after encryption
   secrets_clean
+
+FILE SECRETS
+  Deploy encrypted files (kubeconfig, SSH keys, certificates) to specific paths.
+
+  Mapping format:  @VAR_NAME=filename>dest_path
+  Example:         @KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config
+
+  secrets_add_file VAR FILE DEST
+                        Add a new file secret interactively
+                        Example: secrets_add_file KUBECONFIG kubelab.kubeconfig ~/.kube/kubelab.config
+
+  File secrets are:
+    - Decrypted to dest_path at shell startup (with caching via -nt)
+    - Env var points to the deployed file path
+    - Shown separately in secrets_list as "File Secrets:"
+    - Skipped by github-secrets-manager (not suitable for GitHub Actions)
 
 EOF
 }
