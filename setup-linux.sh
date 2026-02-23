@@ -139,6 +139,14 @@ for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
         sed '/^---$/,/^---$/d' "${skill_dir}SKILL.md" > "$HOME/.gemini/prompts/${skill_name}.md"
     fi
 done
+# Force copy master files (Neural Hive Protocol)
+rm -f "$HOME/.gemini/GEMINI.md"
+cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
+if grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"; then
+    log_success "GEMINI.md deployed successfully (verified)"
+else
+    echo "❌ Error: GEMINI.md deployment failed verification"
+fi
 log_success "Gemini CLI configured"
 
 # Claude Code
@@ -154,6 +162,14 @@ for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
         cp -rf "$skill_dir"* "$HOME/.claude/skills/$skill_name/" 2>/dev/null || true
     fi
 done
+# Force copy master files (Neural Hive Protocol)
+rm -f "$HOME/.claude/CLAUDE.md"
+cp "$CURRENT_DIR/ai/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+if grep -q "CORE PRINCIPLE" "$HOME/.claude/CLAUDE.md"; then
+    log_success "CLAUDE.md deployed successfully (verified)"
+else
+    echo "❌ Error: CLAUDE.md deployment failed verification"
+fi
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 

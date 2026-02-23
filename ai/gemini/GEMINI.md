@@ -163,13 +163,13 @@ Stop generation and warn if you detect:
 
 ## 8. "Neural Hive" Protocol (The Loop)
 
-**CORE PRINCIPLE:** Code lives in Git. Knowledge lives in `~/Projects/knowledge/`.
+**CORE PRINCIPLE:** Code lives in Git. Knowledge lives in `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
 **LANGUAGE:** All Vault content MUST be in English.
 **COMMIT POLICY:** Agents NEVER commit. Stage changes only.
 **NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
 
 ### Phase 1: Context Sync (Read First)
-1.  **Locate Vault:** Resolve `~/Projects/knowledge/`.
+1.  **Locate Vault:** Resolve `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
 2.  **Master Map:** If unsure about structure, read `knowledge/README.md`.
 3.  **Project Context:** Read `10_projects/<repo>/00-context.md`.
 4.  **Global Rules:** Read `00_meta/patterns/*.md`.
