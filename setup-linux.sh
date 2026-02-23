@@ -46,6 +46,13 @@ log_info "Creating symbolic links for main dotfiles..."
 ln -sf "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
 ln -sf "$DOTFILES_DIR/.profile" "$HOME/.profile" 2>/dev/null || true
 
+# SSH config and public key
+log_info "Setting up SSH config..."
+ensure_directory "$HOME/.ssh"
+ln -sf "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
+chmod 600 "$DOTFILES_DIR/ssh/config"
+cp -n "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true
+
 # Create symbolic links for .zsh directory and utils.sh
 log_info "Setting up .zsh directory and utils.sh..."
 ensure_directory "$HOME/.zsh"

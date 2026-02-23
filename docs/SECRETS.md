@@ -107,7 +107,7 @@ git clone https://github.com/mlorentedev/dotfiles.git ~/Projects/dotfiles
 | `secrets_add VAR FILE` | Add new env var secret interactively |
 | `secrets_add_file VAR FILE DEST` | Add new file secret (kubeconfig, SSH keys, certs) |
 | `secrets_rotate VAR` | Update existing secret value |
-| `secrets_get VAR` | Decrypt and show single secret |
+| `secrets_show VAR` | Show secret value (memory/disk, `--raw` for .age decrypt) |
 | `secrets_list` | Show all secrets and their status |
 | `secrets_check` | Validate mapping integrity |
 | `secrets_clean` | Remove plaintext files |
@@ -257,6 +257,34 @@ echo $KUBECONFIG  # → ~/.kube/kubelab.config
 git add sensitive/kubelab.kubeconfig.secret.age sensitive/env-mapping.conf
 git commit -m "feat: add kubeconfig file secret"
 dotfiles-sync
+```
+
+## SSH Setup (New Machine)
+
+SSH config and public key live in `ssh/` (plain, not encrypted). The private key is a file secret in `sensitive/id_ed25519.secret.age`.
+
+### Linux / macOS
+
+Everything is automatic:
+
+```bash
+./setup-linux.sh        # symlinks ssh/config, copies pub key
+source ~/.zshrc          # file secret deploys private key to ~/.ssh/id_ed25519
+ssh rpi4                 # test
+```
+
+### Windows
+
+Config and public key are automatic:
+
+```powershell
+.\setup-windows.ps1     # copies ssh/config and pub key to %USERPROFILE%\.ssh\
+```
+
+Private key requires manual decryption (one-time):
+
+```powershell
+age -d -i "$env:USERPROFILE\.config\age\key.txt" sensitive\id_ed25519.secret.age > "$env:USERPROFILE\.ssh\id_ed25519"
 ```
 
 ## Testing

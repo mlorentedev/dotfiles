@@ -16,6 +16,7 @@ sensitive/
 
 ```bash
 secrets_list       # Show all secrets (env vars + file secrets)
+secrets_show VAR   # Show secret content (--raw to decrypt from .age)
 secrets_add        # Add new env var secret
 secrets_add_file   # Add new file secret (kubeconfig, SSH keys, certs)
 secrets_rotate     # Update secret

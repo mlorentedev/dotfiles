@@ -27,7 +27,7 @@ teardown() {
         source "$1/load-secrets.sh"
         type secrets_load >/dev/null 2>&1 && echo "load:ok"
         type secrets_list >/dev/null 2>&1 && echo "list:ok"
-        type secrets_get >/dev/null 2>&1 && echo "get:ok"
+        type secrets_show >/dev/null 2>&1 && echo "show:ok"
         type secrets_refresh >/dev/null 2>&1 && echo "refresh:ok"
         type secrets_add >/dev/null 2>&1 && echo "add:ok"
         type secrets_rotate >/dev/null 2>&1 && echo "rotate:ok"
@@ -40,7 +40,7 @@ teardown() {
     ' -- "$SCRIPTS_DIR"
     [[ "$output" == *"load:ok"* ]]
     [[ "$output" == *"list:ok"* ]]
-    [[ "$output" == *"get:ok"* ]]
+    [[ "$output" == *"show:ok"* ]]
     [[ "$output" == *"refresh:ok"* ]]
     [[ "$output" == *"add:ok"* ]]
     [[ "$output" == *"rotate:ok"* ]]
@@ -248,4 +248,239 @@ CONF
 @test "secrets_add_file validates inputs under zsh" {
     run zsh -c '. "$1/utils.sh"; . "$1/load-secrets.sh"; secrets_add_file' -- "$SCRIPTS_DIR"
     [[ "$output" == *"Usage"* ]]
+}
+
+# --- secrets_show (bash) ---
+
+@test "secrets_show is defined after sourcing" {
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        type secrets_show >/dev/null 2>&1 && echo "ok"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"ok"* ]]
+}
+
+@test "secrets_show without args shows usage" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_show' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "secrets_show --help shows help" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_show --help' -- "$SCRIPTS_DIR"
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"--raw"* ]]
+}
+
+@test "secrets_show unknown option errors" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_show --bogus' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Unknown option"* ]]
+}
+
+@test "secrets_show reports missing mapping" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_show NONEXISTENT
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"No mapping found"* ]]
+}
+
+@test "secrets_show default mode shows env var from memory" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        export TOKEN="supersecret123"
+        secrets_show TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -eq 0 ]]
+    [[ "$output" == "supersecret123" ]]
+}
+
+@test "secrets_show default mode reports unloaded env var" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        unset TOKEN
+        secrets_show TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"not loaded"* ]]
+}
+
+@test "secrets_show default mode shows file secret from disk" {
+    local dest_file="/tmp/bats_deployed_secret_$$"
+    echo "file-content-here" > "$dest_file"
+    cat > "$SECRETS_DIR/env-mapping.conf" <<CONF
+@MYFILE=myfile.data>${dest_file}
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_show MYFILE
+    ' -- "$SCRIPTS_DIR"
+    rm -f "$dest_file"
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"file-content-here"* ]]
+}
+
+@test "secrets_show default mode reports undeployed file secret" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+@MYFILE=myfile.data>/tmp/nonexistent_deployed_$$
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_show MYFILE
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"not deployed"* ]]
+}
+
+@test "secrets_show env var fallback decrypts from .age when not loaded" {
+    # Create a real age key and encrypt a test value
+    age-keygen -o "$SECRETS_DIR/test_key.txt" 2>/dev/null
+    local pubkey
+    pubkey=$(grep -o 'age1[0-9a-z]*' "$SECRETS_DIR/test_key.txt")
+    echo -n "fallback_secret_value" | age -r "$pubkey" -o "$SECRETS_DIR/my.token.secret.age"
+
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_KEY_PATH="'"$SECRETS_DIR"'/test_key.txt"
+        unset TOKEN
+        secrets_show TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -eq 0 ]]
+    [[ "$output" == "fallback_secret_value" ]]
+}
+
+@test "secrets_show file secret fallback decrypts from .age when not deployed" {
+    # Create a real age key and encrypt a test file
+    age-keygen -o "$SECRETS_DIR/test_key.txt" 2>/dev/null
+    local pubkey
+    pubkey=$(grep -o 'age1[0-9a-z]*' "$SECRETS_DIR/test_key.txt")
+    echo "fallback_file_content" | age -r "$pubkey" -o "$SECRETS_DIR/myfile.data.secret.age"
+
+    local dest_file="/tmp/bats_fallback_deployed_$$"
+    rm -f "$dest_file"
+    cat > "$SECRETS_DIR/env-mapping.conf" <<CONF
+@MYFILE=myfile.data>${dest_file}
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_KEY_PATH="'"$SECRETS_DIR"'/test_key.txt"
+        secrets_show MYFILE
+    ' -- "$SCRIPTS_DIR"
+    rm -f "$dest_file"
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"fallback_file_content"* ]]
+}
+
+@test "secrets_show --raw reports missing key file" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_KEY_PATH="/tmp/nonexistent_key_$$"
+        secrets_show --raw TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Key file not found"* ]]
+}
+
+@test "secrets_show --raw reports missing .age file" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    # Create a fake key file so it passes that check
+    touch "$SECRETS_DIR/fake_key.txt"
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_KEY_PATH="'"$SECRETS_DIR"'/fake_key.txt"
+        secrets_show --raw TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Encrypted file not found"* ]]
+}
+
+@test "secrets_help mentions secrets_show" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_help' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"secrets_show"* ]]
+}
+
+# --- secrets_show (zsh) ---
+
+@test "secrets_show is defined under zsh" {
+    run zsh -c '
+        . "$1/utils.sh"; . "$1/load-secrets.sh"
+        type secrets_show >/dev/null 2>&1 && echo "ok"
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"ok"* ]]
+}
+
+@test "secrets_show validates inputs under zsh" {
+    run zsh -c '. "$1/utils.sh"; . "$1/load-secrets.sh"; secrets_show' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "secrets_show default mode works under zsh" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run zsh -c '
+        . "$1/utils.sh"; . "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        export TOKEN="zsh_secret_val"
+        secrets_show TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -eq 0 ]]
+    [[ "$output" == "zsh_secret_val" ]]
+}
+
+@test "secrets_show file secret works under zsh" {
+    local dest_file="/tmp/bats_zsh_deployed_$$"
+    echo "zsh-file-content" > "$dest_file"
+    cat > "$SECRETS_DIR/env-mapping.conf" <<CONF
+@MYFILE=myfile.data>${dest_file}
+CONF
+    run zsh -c '
+        . "$1/utils.sh"; . "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_show MYFILE
+    ' -- "$SCRIPTS_DIR"
+    rm -f "$dest_file"
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"zsh-file-content"* ]]
 }

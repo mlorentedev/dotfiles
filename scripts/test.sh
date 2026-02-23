@@ -367,12 +367,12 @@ if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
     subsection "Function definitions"
     type secrets_load >/dev/null 2>&1 && pass "secrets_load: defined" || fail "secrets_load: not defined"
     type secrets_list >/dev/null 2>&1 && pass "secrets_list: defined" || fail "secrets_list: not defined"
-    type secrets_get >/dev/null 2>&1 && pass "secrets_get: defined" || fail "secrets_get: not defined"
     type secrets_refresh >/dev/null 2>&1 && pass "secrets_refresh: defined" || fail "secrets_refresh: not defined"
     type secrets_add >/dev/null 2>&1 && pass "secrets_add: defined" || fail "secrets_add: not defined"
     type secrets_rotate >/dev/null 2>&1 && pass "secrets_rotate: defined" || fail "secrets_rotate: not defined"
     type secrets_check >/dev/null 2>&1 && pass "secrets_check: defined" || fail "secrets_check: not defined"
     type secrets_clean >/dev/null 2>&1 && pass "secrets_clean: defined" || fail "secrets_clean: not defined"
+    type secrets_show >/dev/null 2>&1 && pass "secrets_show: defined" || fail "secrets_show: not defined"
     type secrets_help >/dev/null 2>&1 && pass "secrets_help: defined" || fail "secrets_help: not defined"
     type secrets_audit >/dev/null 2>&1 && pass "secrets_audit: defined" || fail "secrets_audit: not defined"
 
@@ -414,6 +414,7 @@ if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
     subsection "secrets_sync"
     type secrets_sync >/dev/null 2>&1 && pass "secrets_sync: defined" || fail "secrets_sync: not defined"
     echo "$help_output" | grep -q "secrets_sync" && pass "secrets_help: documents secrets_sync" || fail "secrets_help: missing secrets_sync"
+    echo "$help_output" | grep -q "secrets_show" && pass "secrets_help: documents secrets_show" || fail "secrets_help: missing secrets_show"
 else
     fail "load-secrets.sh: not found"
 fi

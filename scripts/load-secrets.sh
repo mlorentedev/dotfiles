@@ -11,7 +11,7 @@
 #   secrets_help    - Show all commands and usage
 #   secrets_list    - Show mapped variables and their load status
 #   secrets_refresh - Force re-decrypt and reload all secrets
-#   secrets_get     - Decrypt single secret on-demand
+#   secrets_show    - Show secret content (memory/disk, fallback .age)
 #   secrets_add     - Add a new secret interactively
 #   secrets_rotate  - Update an existing secret's value
 #   secrets_check   - Validate mapping integrity
@@ -282,45 +282,111 @@ secrets_list() {
     fi
 }
 
-# Get a single secret on-demand (for rarely used secrets)
-secrets_get() {
-    var_name="$1"
+# Show secret content from memory/disk (default) or from .age file (--raw)
+# Usage: secrets_show [--raw] VAR_NAME
+secrets_show() {
+    local raw_mode=false var_name=""
 
-    file_exists "$SECRETS_MAPPING_FILE" || { echo "Mapping file not found" >&2; return 1; }
-    file_exists "$SECRETS_KEY_PATH" || { echo "Key file not found" >&2; return 1; }
-    command_exists age || { echo "age not installed" >&2; return 1; }
+    # Parse args: support both "secrets_show --raw VAR" and "secrets_show VAR --raw"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --raw) raw_mode=true ;;
+            --help|-h)
+                echo "Usage: secrets_show [--raw] VAR_NAME"
+                echo "  Default: show value from memory (env var) or deployed file"
+                echo "  --raw:   decrypt directly from .age file"
+                return 0
+                ;;
+            --*)
+                echo "Unknown option: $1" >&2
+                echo "Usage: secrets_show [--raw] VAR_NAME" >&2
+                return 1
+                ;;
+            *) var_name="$1" ;;
+        esac
+        shift
+    done
 
-    # Try exact match first, then with @ prefix for file secrets
-    local filename is_file=false
-    filename=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
-    if [[ -z "$filename" ]]; then
-        filename=$(grep "^@${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
-        [[ -n "$filename" ]] && is_file=true
+    if [[ -z "$var_name" ]]; then
+        echo "Usage: secrets_show [--raw] VAR_NAME" >&2
+        return 1
     fi
 
-    if [[ -z "$filename" ]]; then
+    file_exists "$SECRETS_MAPPING_FILE" || { echo "Mapping file not found" >&2; return 1; }
+
+    # Lookup: try exact match first, then with @ prefix for file secrets
+    local mapping_value="" is_file=false
+    mapping_value=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    if [[ -z "$mapping_value" ]]; then
+        mapping_value=$(grep "^@${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+        [[ -n "$mapping_value" ]] && is_file=true
+    fi
+
+    if [[ -z "$mapping_value" ]]; then
         echo "No mapping found for: $var_name" >&2
         return 1
     fi
 
-    # File secrets: extract filename portion before >
-    local actual_filename="$filename"
-    if [[ "$is_file" == "true" ]]; then
-        actual_filename="${filename%%>*}"
-    fi
+    if [[ "$raw_mode" == "true" ]]; then
+        # --raw: decrypt directly from .age
+        file_exists "$SECRETS_KEY_PATH" || { echo "Key file not found: $SECRETS_KEY_PATH" >&2; return 1; }
+        command_exists age || { echo "age not installed" >&2; return 1; }
 
-    encrypted_file="$SECRETS_DIR/${actual_filename}.secret.age"
+        local actual_filename="$mapping_value"
+        if [[ "$is_file" == "true" ]]; then
+            actual_filename="${mapping_value%%>*}"
+        fi
 
-    if ! file_exists "$encrypted_file"; then
-        echo "Encrypted file not found: $encrypted_file" >&2
-        return 1
-    fi
+        local encrypted_file="$SECRETS_DIR/${actual_filename}.secret.age"
+        if ! file_exists "$encrypted_file"; then
+            echo "Encrypted file not found: $encrypted_file" >&2
+            return 1
+        fi
 
-    if [[ "$is_file" == "true" ]]; then
-        # File secrets: output full multiline content
-        age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH"
+        if [[ "$is_file" == "true" ]]; then
+            age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH"
+        else
+            age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n'
+        fi
     else
-        age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n'
+        # Default: read from memory/disk (fast), fallback to .age decrypt
+        if [[ "$is_file" == "true" ]]; then
+            _parse_file_secret_value "$mapping_value"
+            if [[ -f "$_FS_DEST_PATH" ]]; then
+                cat "$_FS_DEST_PATH"
+                return 0
+            fi
+            # Fallback: try .age decrypt
+            local fs_filename="${mapping_value%%>*}"
+            local encrypted_file="$SECRETS_DIR/${fs_filename}.secret.age"
+            if file_exists "$SECRETS_KEY_PATH" && command_exists age && file_exists "$encrypted_file"; then
+                age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" && return 0
+            fi
+            echo "File not deployed: $_FS_DEST_PATH (run secrets_refresh)" >&2
+            return 1
+        else
+            if var_is_set "$var_name"; then
+                if [[ -n "$ZSH_VERSION" ]]; then
+                    # shellcheck disable=SC2296
+                    printf '%s' "${(P)var_name}"
+                else
+                    printf '%s' "${!var_name}"
+                fi
+                return 0
+            fi
+            # Fallback: try .age decrypt
+            local encrypted_file="$SECRETS_DIR/${mapping_value}.secret.age"
+            if file_exists "$SECRETS_KEY_PATH" && command_exists age && file_exists "$encrypted_file"; then
+                local decrypted
+                decrypted=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n')
+                if [[ -n "$decrypted" ]]; then
+                    printf '%s' "$decrypted"
+                    return 0
+                fi
+            fi
+            echo "Variable not loaded: $var_name (run secrets_refresh)" >&2
+            return 1
+        fi
     fi
 }
 
@@ -730,7 +796,8 @@ Secrets Management Commands
 
 LOADING & VIEWING
   secrets_list          Show all mapped secrets and their load status
-  secrets_get VAR       Get a single secret value on-demand
+  secrets_show VAR      Show secret value (from memory/disk, fallback .age)
+                        Use --raw to always decrypt from .age file
   secrets_refresh       Force reload all secrets from encrypted files
 
 MANAGEMENT
