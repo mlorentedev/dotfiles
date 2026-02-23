@@ -36,6 +36,8 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
         safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
     fi    
     cp -rf "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
+    ensure_directory "$DOTFILES_DIR/ssh"
+    cp -rf "$CURRENT_DIR/ssh/"* "$DOTFILES_DIR/ssh/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/scripts/"* "$DOTFILES_DIR/scripts/" 2>/dev/null || true
 else
     log_info "Already in dotfiles directory, skipping copy..."
@@ -161,6 +163,25 @@ if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/p
     log_info "Creating python symlink..."
     ln -s python3 "$PYTHON_DIR/bin/python"
     log_success "python -> python3 symlink created"
+fi
+
+# GitHub Copilot CLI (requires gh)
+if command -v gh >/dev/null 2>&1; then
+    log_info "Installing GitHub Copilot CLI extension..."
+    gh extension install github/gh-copilot 2>/dev/null || true
+    ensure_directory "$HOME/.copilot"
+    cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
+    # Also copy to .github in home if needed, or just let gh manage it
+    # cp -f "$CURRENT_DIR/ai/copilot/copilot-instructions.md" "$HOME/.copilot/copilot-instructions.md" 2>/dev/null || true
+    log_success "GitHub Copilot CLI configured"
+    
+    # Aliases
+    log_info "Adding Copilot aliases to .zshrc/.bashrc..."
+    COPILOT_SUGGEST='eval "$(gh copilot alias -- bash)"'
+    ensure_line_in_file "$HOME/.zshrc" "$COPILOT_SUGGEST"
+    ensure_line_in_file "$HOME/.bashrc" "$COPILOT_SUGGEST"
+else
+    log_warning "GitHub CLI (gh) not found, skipping Copilot installation"
 fi
 
 # Register MCP servers (requires Claude Code CLI and Node.js)

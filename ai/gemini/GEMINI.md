@@ -161,32 +161,55 @@ Stop generation and warn if you detect:
 | Cyclomatic complexity | < 10 |
 | Nesting depth | < 4 levels |
 
-## 8. Workflow Protocol
+## 8. "Neural Hive" Protocol (The Loop)
 
-### Plan Mode (Default for Non-Trivial Tasks)
+**CORE PRINCIPLE:** Code lives in Git. Knowledge lives in `~/Projects/knowledge/`.
+**LANGUAGE:** All Vault content MUST be in English.
+**COMMIT POLICY:** Agents NEVER commit. Stage changes only.
+**NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
 
-1. **Specs:** Write specs to `tasks/todo.md`.
-2. **Verify:** Confirm architectural alignment.
-3. **Execute:** Mark items `[x]` as completed.
-4. **Review:** Add outcomes.
+### Phase 1: Context Sync (Read First)
+1.  **Locate Vault:** Resolve `~/Projects/knowledge/`.
+2.  **Master Map:** If unsure about structure, read `knowledge/README.md`.
+3.  **Project Context:** Read `10_projects/<repo>/00-context.md`.
+4.  **Global Rules:** Read `00_meta/patterns/*.md`.
+5.  **Tactical Plan:** Read `10_projects/<repo>/11-tasks.md` (Active Backlog).
 
-### Autonomous Execution
+### Phase 2: Execution (The Work)
+*   **Plan:** Create a sub-task checklist in memory (or scratchpad).
+*   **Act:** Implement code/tests in the repo.
+*   **Verify:** Run tests.
+*   **Document Dynamic:**
+    *   New architectural decision? -> Create `30-architecture/adr-XXX.md`.
+    *   New operational procedure? -> Create `40-runbooks/guide-XXX.md`.
+    *   Fixing a bug? -> Create `50-troubleshooting/error-name.md`.
+    *   Useful trick? -> Add to `90-lessons.md` or `60-resources/`.
+    *   New repeated pattern? -> Create/Update `00_meta/patterns/`.
 
-* Analyze `stderr` → Fix → Retry automatically.
-* Fix failing CI without hand-holding.
-* Zero context switching for the user.
+### Phase 3: Knowledge Crystallization (Write Back)
+*   **Update Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar: `Progress: [======....] 60%`.
+*   **Update Strategy (`10-roadmap.md`):** ONLY if a major milestone/phase is completed.
+*   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` using the **Lesson Template**.
+*   **Promotion:** Evaluate if the lesson is global. If YES, create `00_meta/patterns/pattern-<topic>.md`.
 
-### Self-Improvement Loop
+## 9. Vault Structure & Standards
 
-* After ANY correction: update `tasks/lessons.md` with the pattern and prevention rule.
+### File Hierarchy
+*   `00_meta/templates/` -> Standard `.md` templates (USE THEM).
+*   `10_projects/<repo>/` -> Development Context.
+*   `50_work/` -> FAE Operations (Products, Clients, Tickets).
 
-## 9. Knowledge Vault (Source of Truth)
+### Frontmatter Law
+ALL Markdown files created in the vault MUST have this YAML header:
 
-All operational knowledge (ADRs, runbooks, troubleshooting, architecture docs) lives in the Obsidian vault, NOT in project repos. The vault is usually at `~/Projects/knowledge/`. Project-specific documentation lives under `10_projects/`.
-
-**Rules:** Create/edit operational docs in the vault, never in repo `docs/`. Project repos have lightweight pointers only. Use `[[wikilinks]]`. File naming: `lowercase-kebab-case.md`. If the vault is not found, ask the user where it is.
-
-**Post-Change Vault Sync:** After completing any significant project change, proactively check if vault docs need updating (new ADR, changed deployment, fixed bug, added service, infra change). Ask the user if unsure.
+```yaml
+---
+id: "unique-slug" # e.g. T-2024-ACME-001 or project-name
+type: [project, ticket, adr, lesson, pattern]
+status: [active, done, archived]
+tags: [tag1, tag2]
+---
+```
 
 ## 10. Output Protocol
 

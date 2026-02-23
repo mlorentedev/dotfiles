@@ -48,49 +48,6 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
     2. Provide a hint or the general area of the fix.
     3. Ask: *"Do you want the fix, or do you want to attempt applying this logic first?"*
 
-## Workflow Protocol
-
-### Plan Mode (Default for Non-Trivial Tasks)
-
-Trigger: Any task with 3+ steps, architectural decisions, or refactoring.
-
-1. Write specs to `tasks/todo.md` with checkable items.
-2. **Architecture Check:** Validate design against "Decision Hierarchy" before coding.
-3. Mark items `[x]` as completed.
-4. Add "Review" section with outcomes.
-
-### Verification Before Done
-
-* Never mark complete without proving it works.
-* Run tests, check logs, demonstrate correctness.
-* Diff behavior between main and changes.
-* **Self-Correction:** Ask "Would a Staff Engineer approve this PR?"
-
-### Autonomous Execution
-
-* Analyze `stderr` → Fix → Retry automatically.
-* Fix failing CI without hand-holding.
-* Zero context switching for the user.
-
-### Self-Improvement Loop
-
-After ANY correction: update `tasks/lessons.md` with the pattern and prevention rule.
-
-### End-of-Session Improvement
-
-After completing work in a session, proactively:
-1. Summarize what was accomplished.
-2. Suggest concrete improvements to CLAUDE.md, workflows, or project docs if new patterns were discovered.
-3. Flag any recurring friction points that could be automated or documented.
-
-This creates a continuous refinement loop where each session makes the next one more effective.
-
-### Simplicity Bias
-
-* Prefer the simplest working solution. When building something, pause and ask: "Is there a simpler approach?"
-* If a solution requires more than 3 new abstractions, stop and justify the complexity before proceeding.
-* When in doubt, write straightforward code over clever code.
-
 ## Technical Standards
 
 ### Python (3.12+)
@@ -204,6 +161,56 @@ STOP and fix if detected:
 | Cyclomatic complexity | < 10 |
 | Nesting depth | < 4 levels |
 
+## "Neural Hive" Protocol (The Loop)
+
+**CORE PRINCIPLE:** Code lives in Git. Knowledge lives in `~/Projects/knowledge/`.
+**LANGUAGE:** All Vault content MUST be in English.
+**COMMIT POLICY:** Agents NEVER commit. Stage changes only.
+**NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
+
+### Phase 1: Context Sync (Read First)
+1.  **Locate Vault:** Resolve `~/Projects/knowledge/`.
+2.  **Master Map:** If unsure about structure, read `knowledge/README.md`.
+3.  **Project Context:** Read `10_projects/<repo>/00-context.md`.
+4.  **Global Rules:** Read `00_meta/patterns/*.md`.
+5.  **Tactical Plan:** Read `10_projects/<repo>/11-tasks.md` (Active Backlog).
+
+### Phase 2: Execution (The Work)
+*   **Plan:** Create a sub-task checklist in memory (or scratchpad).
+*   **Act:** Implement code/tests in the repo.
+*   **Verify:** Run tests.
+*   **Document Dynamic:**
+    *   New architectural decision? -> Create `30-architecture/adr-XXX.md`.
+    *   New operational procedure? -> Create `40-runbooks/guide-XXX.md`.
+    *   Fixing a bug? -> Create `50-troubleshooting/error-name.md`.
+    *   Useful trick? -> Add to `90-lessons.md` or `60-resources/`.
+    *   New repeated pattern? -> Create/Update `00_meta/patterns/`.
+
+### Phase 3: Knowledge Crystallization (Write Back)
+*   **Update Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar: `Progress: [======....] 60%`.
+*   **Update Strategy (`10-roadmap.md`):** ONLY if a major milestone/phase is completed.
+*   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` using the **Lesson Template**.
+*   **Promotion:** Evaluate if the lesson is global. If YES, create `00_meta/patterns/pattern-<topic>.md`.
+
+## Vault Structure & Standards
+
+### File Hierarchy
+*   `00_meta/templates/` -> Standard `.md` templates (USE THEM).
+*   `10_projects/<repo>/` -> Development Context.
+*   `50_work/` -> FAE Operations (Products, Clients, Tickets).
+
+### Frontmatter Law
+ALL Markdown files created in the vault MUST have this YAML header:
+
+```yaml
+---
+id: "unique-slug" # e.g. T-2024-ACME-001 or project-name
+type: [project, ticket, adr, lesson, pattern]
+status: [active, done, archived]
+tags: [tag1, tag2]
+---
+```
+
 ## Response Protocol
 
 1. **Classify Task:** Determine if Low Load (Execute) or High Load (Mentor).
@@ -212,36 +219,6 @@ STOP and fix if detected:
 4. Include tests for new functionality.
 5. **Post-Implementation Review:** Append a brief section on Security/Performance.
 6. After corrections, update `tasks/lessons.md`.
-
-## Knowledge Vault (Source of Truth)
-
-All operational knowledge (ADRs, runbooks, troubleshooting, architecture docs) lives in the Obsidian vault, NOT in project repos. The vault is usually located at `~/Projects/knowledge/`. Project-specific documentation lives under `10_projects/` in the vault.
-
-**Rules:**
-- When asked to create or modify ADRs, runbooks, troubleshooting guides, or operational docs → do it in the vault, never in a project repo's `docs/`
-- Project repos may contain lightweight pointers to the vault, not the actual content
-- Use `[[wikilinks]]` for internal vault links (Obsidian convention)
-- File naming: english, `lowercase-kebab-case.md`
-- If the vault path is not found, ask the user where it is located
-
-**Task Management — Vault + Repo Separation:**
-- **Repo `tasks/todo.md`**: active/pending tasks for that repo's scope only
-- **Repo `tasks/completed.md`**: archived completed tasks with full detail (zero info loss)
-- **Vault `10_projects/<product>/_index.md`**: product specs WITH full task roadmap (source of truth for each product)
-- **Rule**: every task ID lives in exactly ONE place. No duplication between repo and vault.
-- **Stubs**: when a repo's todo.md references vault products, use short stubs with vault links (not full task lists)
-- **Sync discipline**: when completing tasks in either location, update the corresponding counts/status in the other. When a product is extracted from a repo, move the task detail to the vault spec — never leave it only in git history.
-- **Conventions**: `[x]` must include date (`✓ YYYY-MM-DD`), `[!]` must reference blocker by task ID
-
-**Post-Change Vault Sync (IMPORTANT):**
-After completing any significant change in a project repo, proactively check if vault documentation needs updating:
-- New architectural decision? → Create/update ADR in the vault
-- Changed deployment procedure? → Update the relevant runbook in the vault
-- Fixed a tricky bug? → Add it to troubleshooting in the vault
-- Added/removed a service or dependency? → Update the project `_index.md` in the vault
-- Changed infrastructure (DNS, networking, hardware)? → Update infra docs in the vault
-- Completed/added tasks for a vault-tracked product? → Update the product's `_index.md` roadmap
-- Ask the user: *"Should I update the vault docs to reflect this change?"* if unsure
 
 ## Operational Rules (from past corrections)
 
@@ -268,22 +245,3 @@ After completing any significant change in a project repo, proactively check if 
 
 * **Hardware debugging: evidence first.** Do NOT guess root causes for hardware/firmware issues. First gather evidence: read working reference code, check firmware docs, ask for observed behavior. Avoid cycling through hypotheses.
 * **MATLAB gotchas.** Use `uint16`/`uint32` (not `uint`). Watch import scoping in test files. Verify file extensions exactly (`.tif` vs `.tiff`). Always run tests after changes.
-
-<claude-mem-context>
-# Recent Activity
-
-<!-- This section is auto-generated by claude-mem. Edit content outside the tags. -->
-
-### Feb 3, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #22 | 8:43 PM | 🔵 | Dotfiles AI architecture implements dual-agent system with 22 reusable skills | ~640 |
-| #13 | 8:42 PM | 🔵 | User's CLAUDE.md protocol defines adaptive mentoring and competence retention workflow | ~711 |
-
-### Feb 16, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #2359 | 5:32 PM | 🔵 | Existing Claude Development Guidelines Documented | ~617 |
-</claude-mem-context>

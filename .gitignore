@@ -33,5 +33,5 @@ node_modules/
 .claude/
 .gemini/
 .ai/
-CLAUDE.md
 GEMINI.md
+CLAUDE.md
