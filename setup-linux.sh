@@ -55,6 +55,20 @@ ln -sf "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
 chmod 600 "$DOTFILES_DIR/ssh/config"
 cp -n "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true
 
+# Git configuration
+log_info "Setting up Git configuration..."
+if [ -f "$DOTFILES_DIR/.gitconfig" ]; then
+    if [ -f "$HOME/.gitconfig" ]; then
+        log_warning ".gitconfig already exists at $HOME/.gitconfig, skipping"
+        log_info "To update manually: cp '$DOTFILES_DIR/.gitconfig' '$HOME/.gitconfig'"
+    else
+        cp "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
+        log_success "Deployed .gitconfig"
+    fi
+else
+    log_warning ".gitconfig not found in dotfiles"
+fi
+
 # Create symbolic links for .zsh directory and utils.sh
 log_info "Setting up .zsh directory and utils.sh..."
 ensure_directory "$HOME/.zsh"

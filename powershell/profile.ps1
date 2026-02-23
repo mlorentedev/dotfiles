@@ -50,7 +50,7 @@ function project-init {
 }
 
 # Quick navigation to projects (customize paths as needed)
-function gprj { Set-Location "$env:USERPROFILE\Projects" }
+function gprj { Set-Location "$env:USERPROFILE\Apps" }
 
 # Git shortcuts
 function gs { git status }

@@ -87,7 +87,11 @@ Write-Info "Deploying Claude configuration..."
 $claudeMdSource = "$DotfilesDir\ai\claude\CLAUDE.md"
 if (Test-Path $claudeMdSource) {
     Copy-Item $claudeMdSource "$ClaudeHome\" -Force
-    Write-Success "Deployed CLAUDE.md"
+    if (Select-String -Path "$ClaudeHome\CLAUDE.md" -Pattern "CORE PRINCIPLE" -Quiet) {
+        Write-Success "CLAUDE.md deployed successfully (verified)"
+    } else {
+        Write-Err "CLAUDE.md deployment failed verification"
+    }
 } else {
     Write-Warn "CLAUDE.md not found at $claudeMdSource"
 }
@@ -158,7 +162,11 @@ Write-Info "Deploying Gemini configuration..."
 $geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
 if (Test-Path $geminiMdSource) {
     Copy-Item $geminiMdSource "$GeminiHome\" -Force
-    Write-Success "Deployed GEMINI.md"
+    if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern "CORE PRINCIPLE" -Quiet) {
+        Write-Success "GEMINI.md deployed successfully (verified)"
+    } else {
+        Write-Err "GEMINI.md deployment failed verification"
+    }
 } else {
     Write-Warn "GEMINI.md not found at $geminiMdSource"
 }
@@ -311,13 +319,43 @@ Write-Info "Deploying scripts..."
 $initProjectSource = "$DotfilesDir\scripts\init-project.ps1"
 if (Test-Path $initProjectSource) {
     Copy-Item $initProjectSource "$ScriptsDir\" -Force
-    Write-Success "Deployed init-project.ps1 to $ScriptsDir\"
+    Copy-Item $initProjectSource "$ClaudeHome\" -Force
+    Write-Success "Deployed init-project.ps1 to $ScriptsDir\ and $ClaudeHome\"
 } else {
     Write-Warn "init-project.ps1 not found at $initProjectSource"
 }
 
 # ============================================================================
-# 8. SUMMARY
+# 8. GITHUB COPILOT CLI
+# ============================================================================
+
+Write-Info "Setting up GitHub Copilot CLI..."
+
+$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+if ($ghCmd) {
+    Write-Info "Installing GitHub Copilot CLI extension..."
+    try {
+        & gh extension install github/gh-copilot 2>$null
+    } catch {
+        # Extension may already be installed
+    }
+
+    $CopilotHome = "$env:USERPROFILE\.copilot"
+    Ensure-Directory $CopilotHome
+
+    $copilotSource = "$DotfilesDir\ai\copilot"
+    if (Test-Path $copilotSource) {
+        Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Success "Deployed Copilot config to $CopilotHome\"
+    }
+
+    Write-Success "GitHub Copilot CLI configured"
+} else {
+    Write-Warn "GitHub CLI (gh) not found, skipping Copilot installation"
+}
+
+# ============================================================================
+# 9. SUMMARY
 # ============================================================================
 
 Write-Host ""
@@ -331,6 +369,7 @@ Write-Host "  - Claude skills:  $ClaudeHome\skills\"
 Write-Host "  - Gemini config:  $GeminiHome\GEMINI.md"
 Write-Host "  - Gemini prompts: $GeminiHome\prompts\"
 Write-Host "  - Scripts:        $ScriptsDir\"
+Write-Host "  - Copilot config: $env:USERPROFILE\.copilot\"
 Write-Host "  - Profile:        $profileTarget"
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
