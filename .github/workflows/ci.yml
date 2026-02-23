@@ -50,7 +50,7 @@ jobs:
           $failed = $false
           foreach ($script in $scripts) {
             Write-Host "Analyzing $script..." -ForegroundColor Cyan
-            $results = Invoke-ScriptAnalyzer -Path $script -Severity Error,Warning
+            $results = Invoke-ScriptAnalyzer -Path $script -Settings .PSScriptAnalyzerSettings.psd1 -Severity Error,Warning
             if ($results) {
               $results | Format-Table -AutoSize
               $failed = $true
