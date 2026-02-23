@@ -34,4 +34,4 @@ veracrypt -d /media/veracrypt1
 
 ## Full Documentation
 
-See [docs/SECRETS.md](../docs/SECRETS.md) for complete setup and usage guide.
+Full secrets management runbook is in the private knowledge vault (`10_projects/dotfiles/02-runbooks/secrets-management.md`).

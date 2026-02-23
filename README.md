@@ -1,6 +1,6 @@
 # Dotfiles
 
-Personal configuration files for development tools, shell environments, and AI coding assistants. Works with Bash and Zsh, includes encrypted secrets management with age, and provides Claude Code/Gemini CLI integration.
+Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Works across Linux, macOS, and Windows.
 
 ## Quick Start
 
@@ -18,153 +18,94 @@ source ~/.zshrc
 ```powershell
 git clone https://github.com/mlorentedev/dotfiles.git
 cd dotfiles
-
-# Option 1: One-time bypass (no permanent changes)
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
-
-# Option 2: Set policy for current user (recommended, persistent)
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\setup-windows.ps1
-
-# Restart PowerShell, then verify
-project-init test-project python
+# Restart PowerShell after setup
 ```
 
 ## Features
 
-- **Shell Configuration:** Aliases, functions, PATH management for Bash/Zsh (Linux/macOS) and PowerShell (Windows)
-- **Secrets Management:** Age-encrypted secrets loaded as environment variables (Linux/macOS)
-- **AI Integration:** Claude Code and Gemini CLI with custom skills
-- **Project Initialization:** `project-init` command to bootstrap new projects with dual AI configuration
+- **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
+- **Encrypted secrets** — Age-encrypted tokens and file secrets, auto-loaded at login
+- **AI integration** — Claude Code + Gemini CLI with 21 custom skills
+- **Cross-platform** — Symlinks on Linux/macOS, copies on Windows (no admin required)
+- **Tested** — 106 BATS tests + ShellCheck in CI
 
 ## Structure
 
 ```text
-├── setup-linux.sh              # Linux/macOS setup script
-├── setup-windows.ps1           # Windows setup script (PowerShell)
-├── powershell/                 # Windows shell configs
-│   └── profile.ps1             # PowerShell profile template
+├── setup-linux.sh              # Linux/macOS setup (symlinks)
+├── setup-windows.ps1           # Windows setup (copies)
 ├── scripts/                    # Shell utilities (added to PATH)
 │   ├── utils.sh                # Shared function library
-│   ├── load-secrets.sh         # Secrets → env vars
+│   ├── load-secrets.sh         # Secrets → env vars (sourced at login)
+│   ├── dotfiles-sync.sh        # Bidirectional sync between dirs
 │   ├── init-project.sh         # Project bootstrapper (bash)
 │   ├── init-project.ps1        # Project bootstrapper (PowerShell)
 │   ├── github-secrets-manager.sh
-│   ├── age-encrypt-decrypt.sh
-│   └── dotfiles-sync.sh
+│   └── age-encrypt-decrypt.sh
 ├── sensitive/                  # Encrypted secrets
 │   ├── env-mapping.conf        # ENV_VAR=filename mapping
 │   └── *.secret.age            # Encrypted files (tracked)
 ├── ai/
-│   ├── claude/                 # Claude Code configuration
-│   │   └── CLAUDE.md           # Master instructions
-│   ├── gemini/                 # Gemini CLI configuration
-│   │   └── GEMINI.md           # Master instructions
-│   └── skills/                 # Shared AI skills
-│       ├── audit/SKILL.md      # /audit - Security review
-│       ├── refactor/SKILL.md   # /refactor - Code cleanup
-│       ├── test/SKILL.md       # /test - Test generation
-│       ├── doc/SKILL.md        # /doc - Documentation
-│       └── docker/SKILL.md     # /docker - Containerization
-├── .zsh/                       # Zsh modules
-└── docs/                       # Documentation
+│   ├── claude/CLAUDE.md        # Master Claude instructions
+│   ├── gemini/GEMINI.md        # Master Gemini instructions
+│   └── skills/                 # 21 shared AI skills
+├── ssh/                        # SSH config + public key
+├── powershell/profile.ps1      # Windows PowerShell profile
+├── tests/*.bats                # BATS test suite
+└── .zsh/                       # Zsh modules
 ```
 
-## Secrets Management
+## Key Commands
 
-Secrets are encrypted with [age](https://github.com/FiloSottile/age) and automatically loaded on shell startup.
+### Secrets
 
 ```bash
-secrets_add VAR_NAME filename   # Add new env var secret
-secrets_add_file VAR FILE DEST  # Add new file secret (kubeconfig, SSH keys, certs)
-secrets_rotate VAR_NAME         # Update existing
-secrets_list                    # Show all secrets (env vars + file secrets)
-secrets_check                   # Validate integrity
+secrets_add VAR_NAME filename       # Add new env var secret
+secrets_add_file VAR FILE DEST      # Add file secret (kubeconfig, SSH keys)
+secrets_rotate VAR_NAME             # Rotate existing secret
+secrets_show VAR_NAME               # Show value (memory/disk/.age fallback)
+secrets_list                        # List all secrets and status
+secrets_check                       # Validate mapping integrity
 ```
 
-See [docs/SECRETS.md](docs/SECRETS.md) for full documentation.
-
-## AI Tools
-
-### Claude Code
+### AI Tools
 
 ```bash
-# Initialize new project with dual AI configuration
-project-init my-project python
-project-init my-project go
-project-init . node
-
-# Available skills (slash commands)
-/audit      # Security audit
-/refactor   # Code refactoring
-/test       # Test generation
-/doc        # Documentation
-/docker     # Containerization
+project-init my-project python      # Bootstrap project with dual AI config
+claude                               # Start Claude Code session
+> /audit src/auth.py                 # Use skills via slash commands
+gp audit "$(cat src/main.py)"       # Gemini prompt function
 ```
 
-### Gemini CLI
+### Sync
 
 ```bash
-# Use prompts via gp function
-gp audit "$(cat src/main.py)"
-gp refactor "$(cat src/utils.go)"
+dotfiles-sync                       # Bidirectional sync + git push/pull
+dotfiles-sync --secrets-only        # Only sync sensitive/ files
 ```
-
-See [docs/AI.md](docs/AI.md) for complete setup guide.
-
-## Syncing
-
-Two-directory model for stability:
-
-- `~/.dotfiles/` - Stable local installation
-- `~/Projects/dotfiles/` - Development repository
-
-```bash
-dotfiles-sync                   # Bidirectional sync + git push/pull
-dotfiles-sync --secrets-only    # Only sync sensitive/
-```
-
-## Windows Setup
-
-Windows uses PowerShell for setup (no admin rights required, no symlinks):
-
-```powershell
-# 1. Clone the repository
-git clone https://github.com/mlorentedev/dotfiles.git
-cd dotfiles
-
-# 2. Run setup (one-time execution policy bypass)
-powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
-
-# 3. Restart PowerShell, then initialize projects
-project-init my-project python
-```
-
-Features on Windows:
-- Claude and Gemini configuration deployed to `~\.claude\` and `~\.gemini\`
-- PowerShell profile with aliases (`c`, `g`, `k`) and `project-init` function
-- Scripts folder added to User PATH
-- Git configuration copied (if not already present)
 
 ## Requirements
 
 **Linux/macOS:** git, bash/zsh
 
-**Windows:** git
+**Windows:** git, PowerShell
 
 **Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
 
 ## Documentation
 
-- [AI.md](docs/AI.md) - AI tools setup and workflow
-- [SECRETS.md](docs/SECRETS.md) - Secrets management guide
-- [GUIDE.md](docs/GUIDE.md) - General usage and customization
+Detailed documentation lives in the private knowledge vault:
+
+- **Runbooks** — Secrets management, AI tools setup, tool installation
+- **Troubleshooting** — Common issues with secrets and AI tools
+- **ADRs** — Architecture decisions (age encryption, dual-shell, BATS testing, two-directory sync, symlinks vs copies)
 
 ## Related Projects
 
-- [Boilerplates](https://github.com/mlorentedev/boilerplates) - Project templates
-- [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) - Quick references
+- [Boilerplates](https://github.com/mlorentedev/boilerplates) — Project templates
+- [Cheatsheets](https://github.com/mlorentedev/cheat-sheets) — Quick references
 
 ## License
 
-- [MIT License](LICENSE) - Free to use and modify with attribution.
+[MIT License](LICENSE) — Free to use and modify with attribution.
