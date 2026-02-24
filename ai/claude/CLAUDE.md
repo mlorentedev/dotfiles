@@ -166,6 +166,7 @@ STOP and fix if detected:
 **CORE PRINCIPLE:** Code lives in Git. Knowledge lives in `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
 **LANGUAGE:** All Vault content MUST be in English.
 **COMMIT POLICY:** Agents NEVER commit. Stage changes only.
+**CO-AUTHORSHIP:** NEVER include `Co-Authored-By` trailers in commit messages. No Claude attribution in git history.
 **NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
 
 ### Phase 1: Context Sync (Read First)
