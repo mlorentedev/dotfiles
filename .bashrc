@@ -35,6 +35,7 @@ fi
 # ==========================
 #       ENVIRONMENT
 # ==========================
+export EDITOR=nano
 # Base Directories (must be set before loading secrets)
 export DOTFILES_DIR="$HOME/.dotfiles"
 export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
