@@ -249,12 +249,17 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
-# Deploy auto-memory symlinks (persist Claude Code memory across machines)
-if [ -d "$CURRENT_DIR/ai/claude/memory" ]; then
-    log_info "Deploying auto-memory symlinks..."
-    for memory_dir in "$CURRENT_DIR/ai/claude/memory"/*/; do
-        [ -d "$memory_dir" ] || continue
-        project_name=$(basename "$memory_dir")
+# Deploy auto-memory symlinks (vault → Claude Code)
+# Memory lives in the knowledge vault, not in this repo (see ADR-007)
+VAULT_PROJECTS="$HOME/Projects/knowledge/10_projects"
+if [ -d "$VAULT_PROJECTS" ]; then
+    log_info "Deploying auto-memory symlinks from vault..."
+    for project_dir in "$VAULT_PROJECTS"/*/; do
+        [ -d "$project_dir" ] || continue
+        memory_source="${project_dir}memory"
+        [ -d "$memory_source" ] || continue
+
+        project_name=$(basename "$project_dir")
         project_path="$HOME/Projects/$project_name"
         encoded_path=$(printf '%s' "$project_path" | sed 's|/|-|g')
         target_dir="$HOME/.claude/projects/$encoded_path/memory"
@@ -270,8 +275,31 @@ if [ -d "$CURRENT_DIR/ai/claude/memory" ]; then
             rmdir "$target_dir" 2>/dev/null || true
         fi
 
-        ln -s "${memory_dir%/}" "$target_dir"
+        ln -s "$memory_source" "$target_dir"
         log_success "Linked auto-memory: $project_name"
+    done
+
+    # Migrate orphan memories: local Claude Code memories not yet in vault
+    for claude_project in "$HOME/.claude/projects"/*/; do
+        [ -d "$claude_project" ] || continue
+        memory_dir="${claude_project}memory"
+        # Skip if no memory, already a symlink, or empty
+        [ -d "$memory_dir" ] && [ ! -L "$memory_dir" ] && [ "$(ls -A "$memory_dir" 2>/dev/null)" ] || continue
+
+        # Extract project name from encoded path (last segment after Projects-)
+        encoded_name=$(basename "$claude_project")
+        project_name=$(printf '%s' "$encoded_name" | sed 's/.*-Projects-//')
+        [ -n "$project_name" ] || continue
+
+        vault_memory="$VAULT_PROJECTS/$project_name/memory"
+        # Only migrate if the vault project exists but has no memory dir yet
+        if [ -d "$VAULT_PROJECTS/$project_name" ] && [ ! -d "$vault_memory" ]; then
+            log_info "Migrating orphan memory: $project_name → vault"
+            cp -r "$memory_dir" "$vault_memory"
+            mv "$memory_dir" "${memory_dir}.migrated.$(date +%s)"
+            ln -s "$vault_memory" "$memory_dir"
+            log_success "Migrated and linked: $project_name"
+        fi
     done
 fi
 

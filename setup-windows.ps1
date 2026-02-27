@@ -155,20 +155,49 @@ if ($claudeCmd) {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
 
-# Deploy auto-memory (persist Claude Code memory across machines)
-$MemorySourceDir = Join-Path $PSScriptRoot "ai\claude\memory"
-if (Test-Path $MemorySourceDir) {
-    Write-Info "Deploying auto-memory files..."
-    $memoryDirs = Get-ChildItem -Path $MemorySourceDir -Directory
-    foreach ($memDir in $memoryDirs) {
-        $projectName = $memDir.Name
+# Deploy auto-memory from vault (see ADR-007)
+$VaultProjects = Join-Path $env:USERPROFILE "Projects\knowledge\10_projects"
+if (Test-Path $VaultProjects) {
+    Write-Info "Deploying auto-memory from vault..."
+    $projectDirs = Get-ChildItem -Path $VaultProjects -Directory
+    foreach ($projDir in $projectDirs) {
+        $memorySource = Join-Path $projDir.FullName "memory"
+        if (-not (Test-Path $memorySource)) { continue }
+
+        $projectName = $projDir.Name
         $projectPath = Join-Path $env:USERPROFILE "Projects\$projectName"
         $encodedPath = $projectPath.Replace('\', '-').Replace(':', '')
         $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encodedPath\memory"
 
         Ensure-Directory $targetDir
-        Copy-Item "$($memDir.FullName)\*" $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item "$memorySource\*" $targetDir -Recurse -Force -ErrorAction SilentlyContinue
         Write-Success "Deployed auto-memory: $projectName"
+    }
+
+    # Migrate orphan memories: local Claude Code memories not yet in vault
+    $claudeProjects = Join-Path $env:USERPROFILE ".claude\projects"
+    if (Test-Path $claudeProjects) {
+        $claudeDirs = Get-ChildItem -Path $claudeProjects -Directory
+        foreach ($cpDir in $claudeDirs) {
+            $memDir = Join-Path $cpDir.FullName "memory"
+            if (-not (Test-Path $memDir)) { continue }
+            if ((Get-Item $memDir).Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            $files = Get-ChildItem -Path $memDir -ErrorAction SilentlyContinue
+            if (-not $files) { continue }
+
+            $encodedName = $cpDir.Name
+            if ($encodedName -match 'Projects-(.+)$') {
+                $projectName = $Matches[1]
+                $vaultMemory = Join-Path $VaultProjects "$projectName\memory"
+                $vaultProject = Join-Path $VaultProjects $projectName
+                if ((Test-Path $vaultProject) -and -not (Test-Path $vaultMemory)) {
+                    Write-Info "Migrating orphan memory: $projectName -> vault"
+                    Copy-Item $memDir $vaultMemory -Recurse -Force
+                    Rename-Item $memDir "$($memDir).migrated"
+                    Write-Success "Migrated: $projectName"
+                }
+            }
+        }
     }
 }
 
