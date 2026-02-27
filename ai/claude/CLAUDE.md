@@ -175,6 +175,7 @@ STOP and fix if detected:
 3.  **Project Context:** Read `10_projects/<repo>/00-context.md`.
 4.  **Global Rules:** Read `00_meta/patterns/*.md`.
 5.  **Tactical Plan:** Read `10_projects/<repo>/11-tasks.md` (Active Backlog).
+6.  **Auto-Memory:** If exists, read `10_projects/<repo>/memory/MEMORY.md` (Claude Code persistent memory, synced via Obsidian).
 
 ### Phase 2: Execution (The Work)
 *   **Plan:** Create a sub-task checklist in memory (or scratchpad).
