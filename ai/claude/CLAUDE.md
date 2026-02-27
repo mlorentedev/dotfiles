@@ -212,6 +212,26 @@ tags: [tag1, tag2]
 ---
 ```
 
+## MCP Server Usage Rules
+
+### Context7 (Library Documentation)
+
+**Auto-invoke when:** Writing or debugging code that uses third-party libraries/frameworks.
+
+* Use `resolve-library-id` first to get the Context7 ID, then `query` for docs.
+* Always specify the library version in prompts (e.g., "Next.js 14", "Go 1.26").
+* Prefer Context7 over WebSearch for API/library documentation — it returns version-accurate, hallucination-free results.
+* Skip for stdlib or well-known patterns already in this CLAUDE.md.
+
+### Sequential Thinking (Complex Reasoning)
+
+**Auto-invoke when:** The Socratic Guardrail triggers (High Cognitive Load tasks).
+
+* Use for: architectural decisions, multi-step debugging, schema design, concurrency reasoning, trade-off analysis.
+* Structure as: describe problem → generate hypotheses → verify each → branch alternatives → commit to best option.
+* Do NOT use for: boilerplate, single-file edits, syntax fixes, CSS changes.
+* Pairs well with Context7: use Sequential Thinking to plan, Context7 to validate API choices.
+
 ## Response Protocol
 
 1. **Classify Task:** Determine if Low Load (Execute) or High Load (Mentor).

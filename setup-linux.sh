@@ -219,6 +219,8 @@ if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
     log_info "Registering Claude Code MCP servers..."
     claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>/dev/null || true
     claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>/dev/null || true
+    claude mcp add --transport stdio sequential-thinking --scope user -- npx -y @modelcontextprotocol/server-sequential-thinking 2>/dev/null || true
+    claude mcp add --transport http context7 --scope user -- https://mcp.context7.com/mcp 2>/dev/null || true
     log_success "MCP servers registered"
 else
     log_warning "Claude Code CLI or npx not found, skipping MCP server registration"
@@ -231,6 +233,7 @@ if command -v claude >/dev/null 2>&1; then
         "claude-mem@thedotmack" \
         "code-simplifier@claude-plugins-official" \
         "github@claude-plugins-official" \
+        "gopls-lsp@claude-plugins-official" \
         "security-guidance@claude-plugins-official" \
         "claude-md-management@claude-plugins-official" \
         "claude-code-setup@claude-plugins-official" \
@@ -244,6 +247,32 @@ if command -v claude >/dev/null 2>&1; then
     log_success "Claude Code plugins installed"
 else
     log_warning "Claude Code CLI not found, skipping plugin installation"
+fi
+
+# Deploy auto-memory symlinks (persist Claude Code memory across machines)
+if [ -d "$CURRENT_DIR/ai/claude/memory" ]; then
+    log_info "Deploying auto-memory symlinks..."
+    for memory_dir in "$CURRENT_DIR/ai/claude/memory"/*/; do
+        [ -d "$memory_dir" ] || continue
+        project_name=$(basename "$memory_dir")
+        project_path="$HOME/Projects/$project_name"
+        encoded_path=$(printf '%s' "$project_path" | sed 's|/|-|g')
+        target_dir="$HOME/.claude/projects/$encoded_path/memory"
+
+        ensure_directory "$HOME/.claude/projects/$encoded_path"
+
+        if [ -L "$target_dir" ]; then
+            rm "$target_dir"
+        elif [ -d "$target_dir" ] && [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then
+            log_warning "Backing up existing memory for $project_name"
+            mv "$target_dir" "${target_dir}.bak.$(date +%s)"
+        elif [ -d "$target_dir" ]; then
+            rmdir "$target_dir" 2>/dev/null || true
+        fi
+
+        ln -s "${memory_dir%/}" "$target_dir"
+        log_success "Linked auto-memory: $project_name"
+    done
 fi
 
 # Add project-init alias (AI-agnostic naming)

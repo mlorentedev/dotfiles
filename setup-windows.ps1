@@ -116,6 +116,8 @@ if ($claudeCmd -and $npxCmd) {
     try {
         & claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>$null
         & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
+        & claude mcp add --transport stdio sequential-thinking --scope user -- npx -y @modelcontextprotocol/server-sequential-thinking 2>$null
+        & claude mcp add --transport http context7 --scope user -- https://mcp.context7.com/mcp 2>$null
         Write-Success "MCP servers registered"
     } catch {
         Write-Warn "Failed to register MCP servers: $_"
@@ -131,6 +133,7 @@ if ($claudeCmd) {
         "claude-mem@thedotmack",
         "code-simplifier@claude-plugins-official",
         "github@claude-plugins-official",
+        "gopls-lsp@claude-plugins-official",
         "security-guidance@claude-plugins-official",
         "claude-md-management@claude-plugins-official",
         "claude-code-setup@claude-plugins-official",
@@ -150,6 +153,23 @@ if ($claudeCmd) {
     Write-Success "Claude Code plugins installed"
 } else {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
+}
+
+# Deploy auto-memory (persist Claude Code memory across machines)
+$MemorySourceDir = Join-Path $PSScriptRoot "ai\claude\memory"
+if (Test-Path $MemorySourceDir) {
+    Write-Info "Deploying auto-memory files..."
+    $memoryDirs = Get-ChildItem -Path $MemorySourceDir -Directory
+    foreach ($memDir in $memoryDirs) {
+        $projectName = $memDir.Name
+        $projectPath = Join-Path $env:USERPROFILE "Projects\$projectName"
+        $encodedPath = $projectPath.Replace('\', '-').Replace(':', '')
+        $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encodedPath\memory"
+
+        Ensure-Directory $targetDir
+        Copy-Item "$($memDir.FullName)\*" $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Success "Deployed auto-memory: $projectName"
+    }
 }
 
 # ============================================================================
