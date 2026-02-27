@@ -33,6 +33,7 @@ param()
 # ============================================================================
 
 $DotfilesDir = $PSScriptRoot
+$DotfilesDest = "$env:USERPROFILE\.dotfiles"
 $ClaudeHome = "$env:USERPROFILE\.claude"
 $GeminiHome = "$env:USERPROFILE\.gemini"
 $ScriptsDir = "$env:USERPROFILE\scripts"
@@ -76,6 +77,21 @@ Ensure-Directory "$GeminiHome\prompts"
 Ensure-Directory $ScriptsDir
 
 Write-Success "Directories created"
+
+# ============================================================================
+# 1b. DEPLOY VERSIONS.CONF
+# ============================================================================
+
+Write-Info "Deploying versions.conf..."
+
+$versionsSource = "$DotfilesDir\versions.conf"
+if (Test-Path $versionsSource) {
+    Ensure-Directory $DotfilesDest
+    Copy-Item $versionsSource "$DotfilesDest\" -Force
+    Write-Success "versions.conf deployed to $DotfilesDest\"
+} else {
+    Write-Warn "versions.conf not found at $versionsSource"
+}
 
 # ============================================================================
 # 2. DEPLOY CLAUDE CONFIGURATION

@@ -30,6 +30,7 @@ log_info "Setting up dotfiles in $DOTFILES_DIR..."
 if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     # Copy files to the dotfiles directory
     log_info "Copying files from $CURRENT_DIR to $DOTFILES_DIR..."
+    safe_copy "$CURRENT_DIR/versions.conf" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.profile" "$DOTFILES_DIR/" 2>/dev/null || true
     if [ -f "$CURRENT_DIR/.bashrc" ]; then

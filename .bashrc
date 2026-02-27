@@ -45,14 +45,17 @@ export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
 export APPS_HOME="$HOME/Applications"
 export NINJA_HOME="$HOME/.console-ninja"
 
-# Tool Homes
-export JAVA_HOME="$APPS_HOME/jdk-21.0.4"
-export MAVEN_HOME="$APPS_HOME/apache-maven-3.9.4"
-export PYTHON_HOME="$APPS_HOME/python-3.12.6"
-export RUBY_HOME="$APPS_HOME/ruby-3.1.4"
+# Tool Versions (single source of truth)
+[[ -f "$DOTFILES_DIR/versions.conf" ]] && . "$DOTFILES_DIR/versions.conf"
+
+# Tool Homes (constructed from versions.conf)
+export JAVA_HOME="$APPS_HOME/jdk-${JAVA_VERSION:-21.0.4}"
+export MAVEN_HOME="$APPS_HOME/apache-maven-${MAVEN_VERSION:-3.9.4}"
+export PYTHON_HOME="$APPS_HOME/python-${PYTHON_VERSION:-3.12.6}"
+export RUBY_HOME="$APPS_HOME/ruby-${RUBY_VERSION:-3.1.4}"
 export GEM_HOME="$RUBY_HOME/gems"
-export MINIKUBE_HOME="$APPS_HOME/minikube-1.34.0"
-export GO_HOME="$APPS_HOME/go-1.26.0"
+export MINIKUBE_HOME="$APPS_HOME/minikube-${MINIKUBE_VERSION:-1.34.0}"
+export GO_HOME="$APPS_HOME/go-${GO_VERSION:-1.26.0}"
 
 # ==========================
 #    PATH CONFIGURATION

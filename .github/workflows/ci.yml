@@ -72,7 +72,7 @@ jobs:
 
       - name: Install bats-core
         run: |
-          BATS_VERSION="1.13.0"
+          source versions.conf
           curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
           tar -xzf bats.tar.gz
           sudo "bats-core-${BATS_VERSION}/install.sh" /usr/local
@@ -84,6 +84,7 @@ jobs:
           mkdir -p ~/.dotfiles/sensitive ~/.dotfiles/scripts ~/.config/age
           age-keygen -o ~/.config/age/key.txt 2>/dev/null
 
+          cp versions.conf ~/.dotfiles/
           cp -r scripts/* ~/.dotfiles/scripts/
           cp -r sensitive/* ~/.dotfiles/sensitive/ 2>/dev/null || true
 
