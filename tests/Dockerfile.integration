@@ -1,0 +1,52 @@
+# Dockerfile.integration - Container-based integration test for setup-linux.sh
+# Builds a clean Ubuntu environment, runs the full bootstrap, then verifies side effects.
+#
+# Usage:
+#   source versions.conf
+#   docker build --build-arg BATS_VERSION=$BATS_VERSION \
+#     -f tests/Dockerfile.integration -t dotfiles-integration-test .
+#   docker run --rm dotfiles-integration-test
+
+FROM ubuntu:24.04
+
+ARG BATS_VERSION=1.13.0
+
+# Minimal dependencies that setup-linux.sh actually needs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    zsh \
+    git \
+    age \
+    curl \
+    sed \
+    grep \
+    coreutils \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install bats-core from source
+RUN curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o /tmp/bats.tar.gz \
+    && tar -xzf /tmp/bats.tar.gz -C /tmp \
+    && /tmp/bats-core-${BATS_VERSION}/install.sh /usr/local \
+    && rm -rf /tmp/bats.tar.gz /tmp/bats-core-${BATS_VERSION}
+
+# Non-root user (setup-linux.sh uses $HOME)
+RUN useradd -m -s /bin/bash testuser
+USER testuser
+WORKDIR /home/testuser
+
+# Generate age key so load-secrets.sh doesn't fail
+RUN mkdir -p /home/testuser/.config/age \
+    && age-keygen -o /home/testuser/.config/age/key.txt 2>/dev/null
+
+# Copy repo to ~/dotfiles-repo (NOT ~/.dotfiles) to trigger the copy branch
+COPY --chown=testuser:testuser . /home/testuser/dotfiles-repo
+
+# Marker for verify-setup.bats to detect it's running inside the container
+ENV DOTFILES_INTEGRATION_TEST=1
+
+# Run setup — if this fails, the build fails (first verification layer)
+RUN cd /home/testuser/dotfiles-repo && bash setup-linux.sh
+
+# Second verification layer: bats assertions
+ENTRYPOINT ["bats", "/home/testuser/dotfiles-repo/tests/verify-setup.bats"]

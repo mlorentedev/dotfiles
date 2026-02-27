@@ -36,6 +36,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     if [ -f "$CURRENT_DIR/.bashrc" ]; then
         safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
     fi    
+    safe_copy "$CURRENT_DIR/.gitconfig" "$DOTFILES_DIR/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
     ensure_directory "$DOTFILES_DIR/ssh"
     cp -rf "$CURRENT_DIR/ssh/"* "$DOTFILES_DIR/ssh/" 2>/dev/null || true
@@ -189,7 +190,7 @@ chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
 # Create convenience symlinks for versioned-only binaries
-PYTHON_DIR=$(ls -d "$HOME/Applications"/python-* 2>/dev/null | sort -V | tail -1)
+PYTHON_DIR=$(ls -d "$HOME/Applications"/python-* 2>/dev/null | sort -V | tail -1) || true
 if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/python" ]; then
     log_info "Creating python symlink..."
     ln -s python3 "$PYTHON_DIR/bin/python"
