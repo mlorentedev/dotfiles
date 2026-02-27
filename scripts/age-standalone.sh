@@ -7,7 +7,7 @@
 # Expects key.txt in the same directory as this script
 # or set AGE_KEY_PATH environment variable
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 KEY_PATH="${AGE_KEY_PATH:-$SCRIPT_DIR/key.txt}"
@@ -100,7 +100,8 @@ decrypt_all() {
 }
 
 # Main
-case "$1" in
+ACTION="${1:-}"
+case "$ACTION" in
     encrypt) encrypt_all ;;
     decrypt) decrypt_all ;;
     *) usage ;;

@@ -7,7 +7,7 @@
 #   - Git changes (push from repo, pull to local)
 #   - Secrets: *.secret.age, env-mapping.conf, .secrets-audit.log
 
-set -e
+set -euo pipefail
 
 # Configuration
 DOTFILES_LOCAL="${DOTFILES_DIR:-$HOME/.dotfiles}"
@@ -140,7 +140,7 @@ main() {
     echo ""
 
     # If --secrets-only, stop here
-    [[ "$1" == "--secrets-only" ]] && { log_success "Secrets sync complete"; exit 0; }
+    [[ "${1:-}" == "--secrets-only" ]] && { log_success "Secrets sync complete"; exit 0; }
 
     # Sync git
     sync_git || exit 1

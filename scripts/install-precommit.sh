@@ -3,7 +3,7 @@
 # Installs pre-commit hooks for the current git repository
 # Usage: ./install-precommit.sh
 
-set -e
+set -euo pipefail
 
 # Source utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"

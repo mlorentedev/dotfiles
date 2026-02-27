@@ -4,7 +4,7 @@
 # Usage: ./backup-secrets-to-usb.sh /media/user/USB
 # The USB should already contain key.txt in its root
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPT_DIR/utils.sh"
@@ -25,7 +25,7 @@ usage() {
     exit 1
 }
 
-[[ -z "$1" ]] && usage
+[[ -z "${1:-}" ]] && usage
 
 USB_PATH="$1"
 USB_SECRETS="$USB_PATH/secrets"

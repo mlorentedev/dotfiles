@@ -10,7 +10,7 @@
 #
 # Without options, reads from .env files
 
-set -e
+set -euo pipefail
 
 # Source utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"

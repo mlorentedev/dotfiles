@@ -3,7 +3,7 @@
 # Purpose: Initialize a new project with Dual AI Memory (Claude & Gemini)
 # Usage: ./init-project.sh [project-name] [stack]
 
-set -e
+set -euo pipefail
 
 PROJECT_NAME="${1:-.}"
 STACK="${2:-python}"

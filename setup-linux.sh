@@ -3,7 +3,7 @@
 # setup-linux.sh: Install dotfiles and set up environment
 # Usage: ./setup-linux.sh
 
-set -e
+set -euo pipefail
 
 # Load utility functions for logging
 if [ -f ./scripts/utils.sh ]; then

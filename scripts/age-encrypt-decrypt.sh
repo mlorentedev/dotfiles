@@ -5,7 +5,7 @@
 # Needs your private key at ~/.config/age/key.txt
 # Usage: ./age-encrypt-decrypt.sh encrypt | decrypt [directory]
 
-set -e
+set -euo pipefail
 
 # Source utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -84,10 +84,11 @@ decrypt_all() {
 }
 
 # Main
-case "$1" in
+ACTION="${1:-}"
+case "$ACTION" in
     encrypt) encrypt_all ;;
     decrypt) decrypt_all ;;
     *) usage ;;
 esac
 
-log_success "Operation completed: $1"
+log_success "Operation completed: $ACTION"
