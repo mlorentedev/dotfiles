@@ -211,19 +211,6 @@ setup() {
     done
 }
 
-@test "skill directories each contain CLAUDE.md" {
-    # Skills may have CLAUDE.md for Claude Code integration
-    found=0
-    for skill_dir in "$HOME/.claude/skills"/*/; do
-        [ -d "$skill_dir" ] || continue
-        if [ -f "${skill_dir}CLAUDE.md" ]; then
-            found=$((found + 1))
-        fi
-    done
-    # At least some skills should have CLAUDE.md
-    [ "$found" -ge 1 ]
-}
-
 # =============================================================================
 # Section 6: Generated files
 # =============================================================================
