@@ -96,6 +96,7 @@ fi
 # AI Tool Aliases
 alias g='gemini'
 alias c='claude'
+alias obsidian='obsidian --no-sandbox'
 
 function gp() {
     local prompt_file="$HOME/.gemini/prompts/$1.md"

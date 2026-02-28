@@ -74,6 +74,7 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # AI Tool Aliases
 alias g='gemini'
 alias c='claude'
+alias obsidian='obsidian --no-sandbox'
 
 # Gemini Helper Function
 function gp() {
