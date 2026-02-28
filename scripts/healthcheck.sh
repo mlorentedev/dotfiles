@@ -65,7 +65,7 @@ echo "========================================"
 echo "Checking from: $DOTFILES_DIR"
 
 # ==================================================
-section "1/6" "Core Tools in PATH"
+section "1/7" "Core Tools in PATH"
 
 CORE_TOOLS="git zsh bash curl wget jq eza direnv node npm zoxide docker kubectl terraform"
 for tool in $CORE_TOOLS; do
@@ -77,7 +77,7 @@ for tool in $CORE_TOOLS; do
 done
 
 # ==================================================
-section "2/6" "Versioned Tool Paths"
+section "2/7" "Versioned Tool Paths"
 
 check_tool_home() {
     local name="$1"
@@ -118,7 +118,7 @@ else
 fi
 
 # ==================================================
-section "3/6" "Version Match (versions.conf)"
+section "3/7" "Version Match (versions.conf)"
 
 check_version_match() {
     local name="$1"
@@ -146,7 +146,7 @@ check_version_match "Minikube" "${MINIKUBE_VERSION:-}" "$APPS_HOME/minikube-${MI
 check_version_match "Go" "${GO_VERSION:-}" "$APPS_HOME/go-${GO_VERSION:-}"
 
 # ==================================================
-section "4/6" "Key Symlinks"
+section "4/7" "Key Symlinks"
 
 check_symlink() {
     local path="$1"
@@ -171,7 +171,7 @@ check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
 # ==================================================
-section "5/6" "Environment Variables"
+section "5/7" "Environment Variables"
 
 ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME RUBY_HOME GO_HOME MINIKUBE_HOME GEM_HOME"
 for var in $ENV_VARS; do
@@ -183,7 +183,7 @@ for var in $ENV_VARS; do
 done
 
 # ==================================================
-section "6/6" "Optional Tools"
+section "6/7" "Optional Tools"
 
 OPTIONAL_TOOLS="age gh claude gemini bats shellcheck helm ansible pip"
 for tool in $OPTIONAL_TOOLS; do
@@ -191,6 +191,61 @@ for tool in $OPTIONAL_TOOLS; do
         pass "$tool found"
     else
         skip "$tool" "not installed"
+    fi
+done
+
+# ==================================================
+section "7/7" "Knowledge Vault"
+
+VAULT_DIR="${VAULT_DIR:-$HOME/Projects/knowledge}"
+
+if [ -d "$VAULT_DIR" ]; then
+    pass "Vault directory exists ($VAULT_DIR)"
+else
+    fail "Vault directory missing: $VAULT_DIR"
+fi
+
+if [ -d "$VAULT_DIR/.obsidian" ]; then
+    pass ".obsidian/ configured"
+else
+    fail ".obsidian/ directory missing"
+fi
+
+if [ -f "$VAULT_DIR/.obsidian/types.json" ]; then
+    pass "types.json present"
+else
+    fail "types.json missing (property schema)"
+fi
+
+if command_exists obsidian; then
+    pass "Obsidian CLI in PATH"
+else
+    fail "Obsidian CLI not in PATH"
+fi
+
+if [ -x "$SCRIPT_DIR/vault-health.sh" ]; then
+    pass "vault-health.sh exists and executable"
+else
+    fail "vault-health.sh missing or not executable"
+fi
+
+LINTER_CONFIG="$VAULT_DIR/.obsidian/plugins/obsidian-linter/data.json"
+if [ -f "$LINTER_CONFIG" ]; then
+    if grep -q '"lintOnSave": true' "$LINTER_CONFIG" 2>/dev/null; then
+        pass "Linter lintOnSave enabled"
+    else
+        fail "Linter lintOnSave disabled"
+    fi
+else
+    skip "Linter config" "obsidian-linter not installed"
+fi
+
+VAULT_DIRS="00_meta 10_projects 40_resources"
+for dir in $VAULT_DIRS; do
+    if [ -d "$VAULT_DIR/$dir" ]; then
+        pass "Vault directory: $dir/"
+    else
+        fail "Vault directory missing: $dir/"
     fi
 done
 

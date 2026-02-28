@@ -97,7 +97,7 @@ symlink_valid() {
 # Usage: var_is_set "GITHUB_TOKEN" && echo "configured"
 var_is_set() {
     var_name="$1"
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         # shellcheck disable=SC2296
         [[ -n "${(P)var_name:-}" ]]
     else
@@ -399,7 +399,7 @@ get_timestamp() {
 # Usage: script_dir=$(get_script_dir)
 get_script_dir() {
     local calling_script
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         # shellcheck disable=SC2296,SC2154
         calling_script="${funcfiletrace[1]%:*}"
     else
@@ -492,7 +492,7 @@ init_counter() {
 increment_counter() {
     var_name="$1"
     local current_val=0
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         # shellcheck disable=SC2296,SC2034
         current_val="${(P)var_name}"
     else
@@ -507,7 +507,7 @@ increment_counter() {
 # Usage: count=$(get_counter "file_count")
 get_counter() {
     var_name="$1"
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         # shellcheck disable=SC2296
         echo "${(P)var_name}"
     else
