@@ -251,6 +251,24 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
+# Register Claude Code SessionStart hook for vault health
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+if [ -f "$CLAUDE_SETTINGS" ] && command -v jq >/dev/null 2>&1; then
+    if jq -e '.hooks.SessionStart' "$CLAUDE_SETTINGS" >/dev/null 2>&1; then
+        log_info "SessionStart hook already configured, skipping"
+    else
+        log_info "Adding SessionStart hook to Claude Code settings..."
+        HOOK_ENTRY='{"matcher":"","hooks":[{"type":"command","command":"$HOME/.dotfiles/scripts/claude-session-start.sh","timeout":30}]}'
+        jq --argjson hook "[$HOOK_ENTRY]" '.hooks.SessionStart = $hook' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" \
+            && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+        log_success "SessionStart hook registered"
+    fi
+elif [ ! -f "$CLAUDE_SETTINGS" ]; then
+    log_warning "Claude Code settings.json not found, skipping hook registration"
+else
+    log_warning "jq not found, skipping hook registration (install jq and re-run)"
+fi
+
 # Deploy auto-memory symlinks (vault → Claude Code)
 # Memory lives in the knowledge vault, not in this repo (see ADR-007)
 VAULT_PROJECTS="$HOME/Projects/knowledge/10_projects"
