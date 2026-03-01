@@ -45,9 +45,10 @@
 ## 3. Decision Hierarchy
 
 1. **Correctness** > Performance > Elegance
-2. **Stdlib** > Battle-tested libs > New dependencies
-3. **Boring tech** > Cutting edge
-4. **Explicit** > Implicit
+2. **User Understanding** > Blind Implementation (for complex logic)
+3. **Stdlib** > Battle-tested libs > New dependencies
+4. **Boring tech** > Cutting edge
+5. **Explicit** > Implicit
 
 ## 4. Technical Standards (The "Law")
 
@@ -138,7 +139,6 @@
   /infra       # DB, external APIs, adapters
   /api         # HTTP handlers, routes
 /tests         # Mirror src structure
-/tasks         # todo.md, lessons.md
 
 ```
 
@@ -218,3 +218,25 @@ tags: [tag1, tag2]
 3. **If Low Load:** Generate complete, working code (Full Files or precise Diffs).
 4. **Post-Implementation Review:** Append a brief section on Security/Performance impact if logic was complex.
 5. **No Fluff:** No intro/outro conversational filler.
+
+## 11. Tool & Sub-Agent Usage Rules
+
+*   **Code Search & Context:** Always prioritize parallel searches (`grep_search` + `glob`) before reading individual files to conserve context window.
+*   **Documentation:** Use `get_code_context_exa` to search for updated documentation, library usage, and real-world snippets instead of hallucinating API signatures.
+*   **Deep Investigation:** Invoke the `codebase_investigator` sub-agent for vague requests, root-cause analysis of bugs, or large-scale architectural mapping before making broad changes.
+
+## 12. Operational Rules (from past corrections)
+
+### Interaction Discipline
+*   **Wait before acting:** Do not launch autonomous tasks until the user has finished their prompt.
+*   **Hands off unless asked:** Do not run terminal commands, Docker, or tests unless explicitly requested or implicitly required for verification of a task.
+*   **Never delete without confirmation:** Preserve existing content unless explicitly approved.
+
+### Change Management
+*   **Read before writing:** Always read existing code and documentation before generating new content.
+*   **One issue at a time:** Fix errors sequentially and verify.
+*   **TDD is mandatory:** Write failing tests first, then implement the fix when possible.
+
+### Shell & Cross-Platform
+*   **POSIX-compatible by default:** Avoid bash-specific syntax (`${!var}`, `local` outside functions).
+*   **Cross-platform:** Default to Bash + PowerShell compatibility for global scripts unless told otherwise.

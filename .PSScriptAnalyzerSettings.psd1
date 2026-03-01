@@ -2,6 +2,7 @@
     ExcludeRules = @(
         'PSAvoidUsingWriteHost',
         'PSUseApprovedVerbs',
-        'PSAvoidUsingEmptyCatchBlock'
+        'PSAvoidUsingEmptyCatchBlock',
+        'PSUseShouldProcessForStateChangingFunctions'
     )
 }

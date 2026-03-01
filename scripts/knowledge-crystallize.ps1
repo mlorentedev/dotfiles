@@ -91,18 +91,18 @@ function Get-MemoryFilePath {
 }
 
 # Remove duplicate # currentDate sections (keep last)
-function Remove-DuplicateDates {
+function Remove-DuplicateDate {
     param([string]$FilePath)
     $content = Get-Content $FilePath -Raw
     $pattern = '(# currentDate\r?\nToday''s date is [^\n]+\r?\n?)'
-    $matches = [regex]::Matches($content, $pattern)
+    $dateMatches = [regex]::Matches($content, $pattern)
 
-    if ($matches.Count -le 1) { return }
+    if ($dateMatches.Count -le 1) { return }
 
-    Write-Info "Removing $($matches.Count - 1) duplicate # currentDate entries..."
+    Write-Info "Removing $($dateMatches.Count - 1) duplicate # currentDate entries..."
 
     # Keep only the last occurrence: remove all, then re-append the last
-    $last = $matches[$matches.Count - 1].Value
+    $last = $dateMatches[$dateMatches.Count - 1].Value
     $cleaned = [regex]::Replace($content, $pattern, '')
     $cleaned = $cleaned.TrimEnd() + "`n`n" + $last.TrimEnd() + "`n"
     Set-Content -Path $FilePath -Value $cleaned -Encoding UTF8 -NoNewline
@@ -159,7 +159,7 @@ function Test-MemoryFileSize {
     param([string]$FilePath, [int]$Limit = 150)
     $lines = (Get-Content $FilePath | Measure-Object -Line).Lines
     if ($lines -gt $Limit) {
-        Write-Warn "MEMORY.md has $lines lines (limit: $Limit) — run /crystallize to trim"
+        Write-Warn "MEMORY.md has $lines lines (limit: $Limit) - run /crystallize to trim"
         return $false
     }
     Write-Success "MEMORY.md line count: $lines / $Limit"
@@ -172,8 +172,8 @@ function Write-Checklist {
     Write-Host "=== Knowledge Crystallization Checklist ===" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Manual steps (AI-assisted, run in Claude Code):"
-    Write-Host "  [ ] /insights  — audit observation backlog"
-    Write-Host "  [ ] /crystallize — promote observations to vault lessons"
+    Write-Host "  [ ] /insights  - audit observation backlog"
+    Write-Host "  [ ] /crystallize - promote observations to vault lessons"
     Write-Host "  [ ] Check ~/Projects/knowledge/00_meta/patterns/ for new patterns"
     Write-Host "  [ ] Update 11-tasks.md backlog progress bar"
     Write-Host ""
@@ -186,9 +186,9 @@ function Write-Checklist {
 
 # Core logic: process one project's MEMORY.md
 function Invoke-ProjectCrystallize {
-    param([string]$ProjectPath, [string]$MemoryFile, [string]$Today)
+    param([string]$MemoryFile, [string]$Today)
 
-    Remove-DuplicateDates -FilePath $MemoryFile
+    Remove-DuplicateDate  -FilePath $MemoryFile
     Update-CurrentDate    -FilePath $MemoryFile -Today $Today
     Set-LastCrystallized  -FilePath $MemoryFile -Today $Today
     Test-MemoryFileSize   -FilePath $MemoryFile | Out-Null
@@ -221,8 +221,7 @@ if ($All) {
         if ($projectPath) {
             Write-Info "[$encodedName] -> $projectPath"
             try {
-                Invoke-ProjectCrystallize -ProjectPath $projectPath `
-                    -MemoryFile $memoryFile -Today $Today
+                Invoke-ProjectCrystallize -MemoryFile $memoryFile -Today $Today
                 $processed++
             } catch {
                 Write-Warn "Failed to process $projectPath`: $_"
@@ -260,6 +259,6 @@ if ($All) {
     }
 
     Write-Info "MEMORY.md: $memoryFile"
-    Invoke-ProjectCrystallize -ProjectPath $ProjectDir -MemoryFile $memoryFile -Today $Today
+    Invoke-ProjectCrystallize -MemoryFile $memoryFile -Today $Today
     Write-Checklist
 }

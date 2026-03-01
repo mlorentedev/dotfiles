@@ -135,7 +135,6 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
   /infra       # DB, external APIs, adapters
   /api         # HTTP handlers, routes
 /tests         # Mirror src structure
-/tasks         # todo.md, lessons.md
 
 ```
 

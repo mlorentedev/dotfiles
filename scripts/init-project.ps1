@@ -68,7 +68,7 @@ $ProjectRoot = Get-Location
 
 Write-Info "Creating project structure..."
 
-$Directories = @("src", "tests", "docs", "scripts", "tasks", ".claude\skills")
+$Directories = @("src", "tests", "scripts", ".claude\skills")
 foreach ($dir in $Directories) {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
@@ -109,10 +109,26 @@ if (Test-Path "$ClaudeHome\skills") {
 }
 
 # ============================================================================
-# TASK MANAGEMENT
+# KNOWLEDGE VAULT INTEGRATION
 # ============================================================================
 
-$TodoContent = @"
+$KnowledgeHome = "$env:USERPROFILE\Projects\knowledge"
+$ProjectBaseName = Split-Path -Leaf $ProjectRoot
+$ProjectKbDir = "$KnowledgeHome\10_projects\$ProjectBaseName"
+
+Write-Info "Initializing Knowledge Vault structure..."
+
+if (-not (Test-Path $ProjectKbDir)) {
+    New-Item -ItemType Directory -Path $ProjectKbDir -Force | Out-Null
+}
+
+$TasksContent = @"
+---
+id: "$ProjectBaseName-tasks"
+type: project
+status: active
+tags: []
+---
 # Project Tasks
 
 ## Pending
@@ -126,6 +142,12 @@ $TodoContent = @"
 "@
 
 $LessonsContent = @"
+---
+id: "$ProjectBaseName-lessons"
+type: lesson
+status: active
+tags: []
+---
 # Lessons Learned
 
 *Record mistakes and prevention rules here. Review at session start.*
@@ -136,9 +158,9 @@ $LessonsContent = @"
 
 "@
 
-Set-Content -Path "tasks\todo.md" -Value $TodoContent -Encoding UTF8
-Set-Content -Path "tasks\lessons.md" -Value $LessonsContent -Encoding UTF8
-Write-Success "Created tasks\todo.md and tasks\lessons.md"
+Set-Content -Path "$ProjectKbDir\11-tasks.md" -Value $TasksContent -Encoding UTF8
+Set-Content -Path "$ProjectKbDir\90-lessons.md" -Value $LessonsContent -Encoding UTF8
+Write-Success "Created Knowledge Vault entries in 10_projects\$ProjectBaseName"
 
 # ============================================================================
 # STACK INITIALIZATION
@@ -284,5 +306,4 @@ Write-Host ""
 Write-Host "Structure:" -ForegroundColor Cyan
 Write-Host "  CLAUDE.md / GEMINI.md      - AI Memory files (Dual-Core)"
 Write-Host "  .claude\skills\            - Custom skills"
-Write-Host "  tasks\todo.md              - Task tracking"
-Write-Host "  tasks\lessons.md           - Learning log"
+Write-Host "  Knowledge Vault updated    - 11-tasks.md & 90-lessons.md in knowledge/10_projects/"

@@ -29,7 +29,7 @@ fi
 
 # Base structure
 log_info "Creating project structure..."
-mkdir -p src tests docs scripts tasks .claude/skills
+mkdir -p src tests scripts .claude/skills
 
 # --- AI MEMORY INJECTION ---
 
@@ -62,9 +62,22 @@ if [[ -d "$AI_CONFIG_HOME/skills" ]]; then
     log_success "Injected skills to .claude/skills/"
 fi
 
-# --- TASK MANAGEMENT ---
+# --- KNOWLEDGE VAULT INTEGRATION ---
+KNOWLEDGE_HOME="${HOME}/Projects/knowledge"
+# Ensure we get the actual project name, even if PROJECT_NAME is "."
+ACTUAL_PROJECT_NAME=$(basename "$(pwd)")
+PROJECT_KB_DIR="${KNOWLEDGE_HOME}/10_projects/${ACTUAL_PROJECT_NAME}"
 
-cat > tasks/todo.md << 'EOF'
+log_info "Initializing Knowledge Vault structure..."
+mkdir -p "$PROJECT_KB_DIR"
+
+cat > "$PROJECT_KB_DIR/11-tasks.md" << EOF
+---
+id: "${ACTUAL_PROJECT_NAME}-tasks"
+type: project
+status: active
+tags: []
+---
 # Project Tasks
 
 ## Pending
@@ -77,7 +90,13 @@ cat > tasks/todo.md << 'EOF'
 
 EOF
 
-cat > tasks/lessons.md << 'EOF'
+cat > "$PROJECT_KB_DIR/90-lessons.md" << EOF
+---
+id: "${ACTUAL_PROJECT_NAME}-lessons"
+type: lesson
+status: active
+tags: []
+---
 # Lessons Learned
 
 *Record mistakes and prevention rules here. Review at session start.*
@@ -88,7 +107,7 @@ cat > tasks/lessons.md << 'EOF'
 
 EOF
 
-log_success "Created tasks/todo.md and tasks/lessons.md"
+log_success "Created Knowledge Vault entries in 10_projects/${ACTUAL_PROJECT_NAME}"
 
 # --- STACK INITIALIZATION ---
 
@@ -185,5 +204,4 @@ log_success "Project initialized with Dual AI Configuration"
 log_info "Structure:"
 echo "  CLAUDE.md / GEMINI.md      - AI Memory files (Dual-Core)"
 echo "  .claude/skills/            - Custom skills"
-echo "  tasks/todo.md              - Task tracking"
-echo "  tasks/lessons.md           - Learning log"
+echo "  Knowledge Vault updated    - 11-tasks.md & 90-lessons.md in knowledge/10_projects/"
