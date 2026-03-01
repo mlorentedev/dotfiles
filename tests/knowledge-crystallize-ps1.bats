@@ -71,7 +71,7 @@ setup() {
         \$ErrorActionPreference = 'Stop'
         try {
             Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            \$results = Invoke-ScriptAnalyzer -Path '$PS1_SCRIPT' -Severity Error,Warning
+            \$results = Invoke-ScriptAnalyzer -Path '\$PS1_SCRIPT' -Settings '\$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1' -Severity Error,Warning
             if (\$results) {
                 \$results | Format-Table -AutoSize
                 exit 1
