@@ -16,3 +16,7 @@ alias gbp="cd $HOME/Projects/boilerplates"        # Go to boilerplates
 alias ls="eza --group-directories-first"          # Basic listing with eza
 alias ll="eza --group-directories-first -l"       # Long format listing
 alias lla="eza --group-directories-first -la"     # Long format with hidden files
+
+# AI knowledge maintenance
+alias kc="knowledge-crystallize.sh"               # Stamp current project MEMORY.md
+alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
