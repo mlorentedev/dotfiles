@@ -227,7 +227,7 @@ if ($All) {
                 Write-Warn "Failed to process $projectPath`: $_"
             }
         } else {
-            Write-Warn "[$encodedName] -> not found on disk (different machine or deleted — skipping)"
+            Write-Warn "[$encodedName] -> not found on disk (different machine or deleted - skipping)"
             $skipped++
         }
         Write-Host ""
