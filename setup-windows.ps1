@@ -390,6 +390,14 @@ if (Test-Path $initProjectSource) {
     Write-Warn "init-project.ps1 not found at $initProjectSource"
 }
 
+$crystallizeSource = "$DotfilesDir\scripts\knowledge-crystallize.ps1"
+if (Test-Path $crystallizeSource) {
+    Copy-Item $crystallizeSource "$ScriptsDir\" -Force
+    Write-Success "Deployed knowledge-crystallize.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "knowledge-crystallize.ps1 not found at $crystallizeSource"
+}
+
 # ============================================================================
 # 8. GITHUB COPILOT CLI
 # ============================================================================

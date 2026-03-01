@@ -83,6 +83,9 @@ chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/load-secrets.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
+chmod +x "$DOTFILES_DIR/scripts/claude-session-start.sh"
+chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
+chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
 
 # Copy sensitive directory (env-mapping.conf and encrypted files)
 log_info "Setting up sensitive directory..."

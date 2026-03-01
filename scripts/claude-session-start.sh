@@ -77,6 +77,49 @@ else
 vault-health.sh not found at $VAULT_HEALTH — run dotfiles setup to install."
 fi
 
+# --- Knowledge maintenance health check ---
+# Derives MEMORY.md path from CWD using Claude Code's path encoding convention.
+# Warns if MEMORY.md is stale or too large.
+
+encode_project_path() {
+    printf '%s' "$1" | tr '/' '-'
+}
+
+check_knowledge_health() {
+    local encoded memory_file today line_count last_date days_since today_epoch last_epoch
+    encoded=$(encode_project_path "$CWD")
+    memory_file="$HOME/.claude/projects/$encoded/memory/MEMORY.md"
+
+    [ -f "$memory_file" ] || return 0
+
+    today=$(date +%Y-%m-%d)
+    line_count=$(wc -l < "$memory_file")
+    last_date=$(grep '^## Last Crystallized:' "$memory_file" | tail -1 | sed 's/## Last Crystallized: //' || true)
+
+    if [ "$line_count" -gt 150 ]; then
+        CONTEXT_LINES="$CONTEXT_LINES
+MEMORY.md has $line_count lines (limit: 150) — run /crystallize to trim"
+    fi
+
+    if [ -z "$last_date" ]; then
+        CONTEXT_LINES="$CONTEXT_LINES
+Knowledge crystallization never run — run: ./scripts/knowledge-crystallize.sh"
+    else
+        # POSIX-compatible date diff (GNU date on Linux, BSD date on macOS)
+        today_epoch=$(date -d "$today" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$today" +%s 2>/dev/null || echo 0)
+        last_epoch=$(date -d "$last_date" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$last_date" +%s 2>/dev/null || echo 0)
+        if [ "$today_epoch" -gt 0 ] && [ "$last_epoch" -gt 0 ]; then
+            days_since=$(( (today_epoch - last_epoch) / 86400 ))
+            if [ "$days_since" -gt 14 ]; then
+                CONTEXT_LINES="$CONTEXT_LINES
+Knowledge crystallization ${days_since} days ago — consider running /crystallize"
+            fi
+        fi
+    fi
+}
+
+check_knowledge_health
+
 # Return context to Claude via hook output format
 jq -n --arg ctx "$CONTEXT_LINES" '{
   "hookSpecificOutput": {
