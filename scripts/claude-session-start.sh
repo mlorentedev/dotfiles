@@ -37,14 +37,40 @@ find_vault_root() {
 }
 
 VAULT_ROOT=$(find_vault_root "$CWD") || true
+KNOWLEDGE_VAULT="$HOME/Projects/knowledge"
+CONTEXT_LINES=""
 
-if [ -z "$VAULT_ROOT" ]; then
-    # Not inside a vault — exit cleanly, no context to add
+# --- Hive: detect project and suggest vault queries ---
+# If CWD is a git repo, check if there's a matching vault project entry.
+detect_hive_project() {
+    local repo_name vault_project_dir
+    repo_name=$(basename "$CWD")
+    vault_project_dir="$KNOWLEDGE_VAULT/10_projects/$repo_name"
+
+    if [ -d "$vault_project_dir" ]; then
+        CONTEXT_LINES="$CONTEXT_LINES
+[hive] Project '$repo_name' found in vault. Use hive-vault MCP tools for on-demand context:
+  - vault_query(project=\"$repo_name\", section=\"context\") — project overview
+  - vault_query(project=\"$repo_name\", section=\"tasks\") — active backlog
+  - vault_search(query=\"...\") — search across vault
+  - vault_query(project=\"_meta\", path=\"patterns/...\") — cross-project patterns"
+    fi
+}
+
+if [ -d "$CWD/.git" ]; then
+    detect_hive_project
+fi
+
+if [ -z "$VAULT_ROOT" ] && [ -z "$CONTEXT_LINES" ]; then
+    # Not inside a vault and no project detected — exit cleanly
     exit 0
 fi
 
-VAULT_NAME=$(basename "$VAULT_ROOT")
-CONTEXT_LINES="Obsidian vault detected: $VAULT_NAME ($VAULT_ROOT)"
+if [ -n "$VAULT_ROOT" ]; then
+    VAULT_NAME=$(basename "$VAULT_ROOT")
+    CONTEXT_LINES="Obsidian vault detected: $VAULT_NAME ($VAULT_ROOT)
+$CONTEXT_LINES"
+fi
 
 # Try running vault-health.sh if available
 VAULT_HEALTH="$SCRIPT_DIR/vault-health.sh"
