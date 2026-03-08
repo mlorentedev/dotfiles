@@ -227,8 +227,9 @@ if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
     claude mcp add --transport stdio sequential-thinking --scope user -- npx -y @modelcontextprotocol/server-sequential-thinking 2>/dev/null || true
     claude mcp add --transport http context7 --scope user -- https://mcp.context7.com/mcp 2>/dev/null || true
     # Hive vault server (pypi.org/project/hive-vault)
-    if command -v uvx >/dev/null 2>&1; then
-        claude mcp add --transport stdio hive-vault --scope user -- uvx hive-vault 2>/dev/null || true
+    if command -v uv >/dev/null 2>&1; then
+        uv tool install --upgrade hive-vault 2>/dev/null || true
+        claude mcp add --transport stdio hive --scope user -- uvx hive-vault 2>/dev/null || true
     fi
     log_success "MCP servers registered"
 else

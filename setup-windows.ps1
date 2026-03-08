@@ -134,6 +134,12 @@ if ($claudeCmd -and $npxCmd) {
         & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
         & claude mcp add --transport stdio sequential-thinking --scope user -- npx -y @modelcontextprotocol/server-sequential-thinking 2>$null
         & claude mcp add --transport http context7 --scope user -- https://mcp.context7.com/mcp 2>$null
+        # Hive vault server (pypi.org/project/hive-vault)
+        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+        if ($uvCmd) {
+            & uv tool install --upgrade hive-vault 2>$null
+            & claude mcp add --transport stdio hive --scope user -- uvx hive-vault 2>$null
+        }
         Write-Success "MCP servers registered"
     } catch {
         Write-Warn "Failed to register MCP servers: $_"
