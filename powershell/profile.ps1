@@ -11,6 +11,11 @@
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value gemini
 
+# Aider tiers (OpenRouter)
+function ai { aider @Args }
+function aic { aider --model openrouter/qwen/qwen3-coder-next @Args }
+function aia { aider --architect --model openrouter/deepseek/deepseek-v3.2-speciale @Args }
+
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
@@ -19,7 +24,7 @@ Set-Alias -Name g -Value gemini
 function project-init {
     <#
     .SYNOPSIS
-    Initialize a new project with Dual AI Memory (Claude & Gemini)
+    Initialize a new project with AI Memory (Claude, Gemini & Aider)
     .DESCRIPTION
     Creates project structure and copies AI configurations from global config.
     .PARAMETER ProjectName

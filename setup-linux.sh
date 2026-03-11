@@ -192,6 +192,25 @@ fi
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
+# Aider (AI pair programming)
+log_info "Setting up Aider configuration..."
+if [ -f "$CURRENT_DIR/ai/aider/aider.conf.yml" ]; then
+    cp "$CURRENT_DIR/ai/aider/aider.conf.yml" "$HOME/.aider.conf.yml"
+    log_success "Deployed .aider.conf.yml"
+fi
+if [ -f "$CURRENT_DIR/ai/aider/aider.model.settings.yml" ]; then
+    cp "$CURRENT_DIR/ai/aider/aider.model.settings.yml" "$HOME/.aider.model.settings.yml"
+    log_success "Deployed .aider.model.settings.yml"
+fi
+# Install aider via uv (requires Python 3.12 — audioop removed in 3.13)
+if command -v uv >/dev/null 2>&1; then
+    log_info "Installing aider-chat via uv..."
+    uv tool install --python 3.12 aider-chat 2>/dev/null || true
+    log_success "Aider installed"
+else
+    log_warning "uv not found, skipping aider installation"
+fi
+
 # Create convenience symlinks for versioned-only binaries
 PYTHON_DIR=$(ls -d "$HOME/Applications"/python-* 2>/dev/null | sort -V | tail -1) || true
 if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/python" ]; then

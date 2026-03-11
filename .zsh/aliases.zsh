@@ -20,3 +20,8 @@ alias lla="eza --group-directories-first -la"     # Long format with hidden file
 # AI knowledge maintenance
 alias kc="knowledge-crystallize.sh"               # Stamp current project MEMORY.md
 alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
+
+# Aider tiers (OpenRouter)
+alias ai="aider"                                                                          # daily: DeepSeek V3.2
+alias aic="aider --model openrouter/qwen/qwen3-coder-next"                                # coding: Qwen3 Coder
+alias aia="aider --architect --model openrouter/deepseek/deepseek-v3.2-speciale"           # architecture: DeepSeek Speciale

@@ -1,0 +1,33 @@
+# Aider model settings for OpenRouter providers
+# Deployed to ~/.aider.model.settings.yml by setup scripts
+# Docs: https://aider.chat/docs/config/adv-model-settings.html
+
+# --- Tier: daily (default) ---
+- name: openrouter/deepseek/deepseek-v3.2
+  edit_format: diff
+  use_repo_map: true
+  extra_params:
+    extra_body:
+      provider:
+        data_collection: "deny"
+        require_parameters: true
+
+# --- Tier: coding ---
+- name: openrouter/qwen/qwen3-coder-next
+  edit_format: diff
+  use_repo_map: true
+  extra_params:
+    extra_body:
+      provider:
+        data_collection: "deny"
+        require_parameters: true
+
+# --- Tier: architecture (architect model) ---
+- name: openrouter/deepseek/deepseek-v3.2-speciale
+  edit_format: diff
+  use_repo_map: true
+  extra_params:
+    extra_body:
+      provider:
+        data_collection: "deny"
+        require_parameters: true
