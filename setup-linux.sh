@@ -37,7 +37,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
         safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
     fi    
     safe_copy "$CURRENT_DIR/.gitconfig" "$DOTFILES_DIR/" 2>/dev/null || true
-    cp -rf "$CURRENT_DIR/.zsh/"* "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
+    cp -rf "$CURRENT_DIR/.zsh/." "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
     ensure_directory "$DOTFILES_DIR/ssh"
     cp -rf "$CURRENT_DIR/ssh/"* "$DOTFILES_DIR/ssh/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/scripts/"* "$DOTFILES_DIR/scripts/" 2>/dev/null || true
@@ -55,18 +55,12 @@ log_info "Setting up SSH config..."
 ensure_directory "$HOME/.ssh"
 ln -sf "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
 chmod 600 "$DOTFILES_DIR/ssh/config"
-cp -n "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true
+cp "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true
 
 # Git configuration
 log_info "Setting up Git configuration..."
 if [ -f "$DOTFILES_DIR/.gitconfig" ]; then
-    if [ -f "$HOME/.gitconfig" ]; then
-        log_warning ".gitconfig already exists at $HOME/.gitconfig, skipping"
-        log_info "To update manually: cp '$DOTFILES_DIR/.gitconfig' '$HOME/.gitconfig'"
-    else
-        cp "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
-        log_success "Deployed .gitconfig"
-    fi
+    safe_copy "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
 else
     log_warning ".gitconfig not found in dotfiles"
 fi
@@ -117,7 +111,7 @@ log_info "Creating bash_aliases file..."
 ensure_directory "$HOME/.bash"
 cat > "$HOME/.bash/bash_aliases" << EOF
 # Bash Aliases
-$(cat "$DOTFILES_DIR/.zsh/aliases.zsh" | grep "alias" | sed 's/alias /alias /g')
+$(grep -v '^\s*#' "$DOTFILES_DIR/.zsh/aliases.zsh" | grep "^alias ")
 EOF
 
 # Create a basic .bashrc if it doesn't exist
@@ -155,7 +149,7 @@ for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
     if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
         skill_name=$(basename "$skill_dir")
         # Copy SKILL.md as flat file, stripping YAML frontmatter
-        sed '/^---$/,/^---$/d' "${skill_dir}SKILL.md" > "$HOME/.gemini/prompts/${skill_name}.md"
+        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
     fi
 done
 # Force copy master files (Neural Hive Protocol)
@@ -232,8 +226,8 @@ if command -v gh >/dev/null 2>&1; then
     # Aliases
     log_info "Adding Copilot aliases to .zshrc/.bashrc..."
     COPILOT_SUGGEST='eval "$(gh copilot alias -- bash)"'
-    ensure_line_in_file "$HOME/.zshrc" "$COPILOT_SUGGEST"
-    ensure_line_in_file "$HOME/.bashrc" "$COPILOT_SUGGEST"
+    [ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$COPILOT_SUGGEST"
+    [ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$COPILOT_SUGGEST"
 else
     log_warning "GitHub CLI (gh) not found, skipping Copilot installation"
 fi
@@ -285,7 +279,7 @@ if [ -f "$CLAUDE_SETTINGS" ] && command -v jq >/dev/null 2>&1; then
         log_info "SessionStart hook already configured, skipping"
     else
         log_info "Adding SessionStart hook to Claude Code settings..."
-        HOOK_ENTRY='{"matcher":"","hooks":[{"type":"command","command":"$HOME/.dotfiles/scripts/claude-session-start.sh","timeout":30}]}'
+        HOOK_ENTRY=$(jq -n --arg cmd "$HOME/.dotfiles/scripts/claude-session-start.sh" '{"matcher":"","hooks":[{"type":"command","command":$cmd,"timeout":30}]}')
         jq --argjson hook "[$HOOK_ENTRY]" '.hooks.SessionStart = $hook' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" \
             && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
         log_success "SessionStart hook registered"
@@ -342,23 +336,22 @@ if [ -d "$VAULT_PROJECTS" ]; then
         # Only migrate if the vault project exists but has no memory dir yet
         if [ -d "$VAULT_PROJECTS/$project_name" ] && [ ! -d "$vault_memory" ]; then
             log_info "Migrating orphan memory: $project_name → vault"
-            cp -r "$memory_dir" "$vault_memory"
-            mv "$memory_dir" "${memory_dir}.migrated.$(date +%s)"
-            ln -s "$vault_memory" "$memory_dir"
-            log_success "Migrated and linked: $project_name"
+            mv "$memory_dir" "$vault_memory" && ln -s "$vault_memory" "$memory_dir" \
+                && log_success "Migrated and linked: $project_name" \
+                || log_error "Failed to migrate memory for $project_name"
         fi
     done
 fi
 
 # Add project-init alias (AI-agnostic naming)
 PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
-ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
-ensure_line_in_file "$HOME/.bashrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
+[ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
+[ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
 
 log_info "Adding dotfiles scripts directory to PATH..."
 PATH_LINE='export PATH=$HOME/.dotfiles/scripts:$PATH'
-ensure_line_in_file "$HOME/.zshrc" "$PATH_LINE" && log_success "Added scripts to PATH in .zshrc"
-ensure_line_in_file "$HOME/.bashrc" "$PATH_LINE" && log_success "Added scripts to PATH in .bashrc"
+[ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$PATH_LINE" && log_success "Added scripts to PATH in .zshrc"
+[ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$PATH_LINE" && log_success "Added scripts to PATH in .bashrc"
 
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."

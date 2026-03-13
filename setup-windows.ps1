@@ -438,6 +438,108 @@ if (Test-Path $crystallizeSource) {
     Write-Warn "knowledge-crystallize.ps1 not found at $crystallizeSource"
 }
 
+$sessionStartSource = "$DotfilesDir\scripts\claude-session-start.ps1"
+if (Test-Path $sessionStartSource) {
+    Copy-Item $sessionStartSource "$ScriptsDir\" -Force
+    Write-Success "Deployed claude-session-start.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "claude-session-start.ps1 not found at $sessionStartSource"
+}
+
+$syncSource = "$DotfilesDir\scripts\dotfiles-sync.ps1"
+if (Test-Path $syncSource) {
+    Copy-Item $syncSource "$ScriptsDir\" -Force
+    Write-Success "Deployed dotfiles-sync.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "dotfiles-sync.ps1 not found at $syncSource"
+}
+
+$loadSecretsSource = "$DotfilesDir\scripts\load-secrets.ps1"
+if (Test-Path $loadSecretsSource) {
+    Ensure-Directory "$DotfilesDest\scripts"
+    Copy-Item $loadSecretsSource "$DotfilesDest\scripts\" -Force
+    Write-Success "Deployed load-secrets.ps1 to $DotfilesDest\scripts\"
+    Write-Info "To load secrets at startup, add to your PowerShell profile:"
+    Write-Info "  . `"$DotfilesDest\scripts\load-secrets.ps1`""
+} else {
+    Write-Warn "load-secrets.ps1 not found at $loadSecretsSource"
+}
+
+# ============================================================================
+# 7b. DEPLOY SECRETS SYSTEM
+# ============================================================================
+
+Write-Info "Setting up secrets system..."
+
+$sensitiveSource = "$DotfilesDir\sensitive"
+$sensitiveDest = "$DotfilesDest\sensitive"
+
+if (Test-Path $sensitiveSource) {
+    Ensure-Directory $sensitiveDest
+
+    # Copy env-mapping.conf
+    $mappingSource = "$sensitiveSource\env-mapping.conf"
+    if (Test-Path $mappingSource) {
+        Copy-Item $mappingSource "$sensitiveDest\" -Force
+        Write-Success "Deployed env-mapping.conf"
+    }
+
+    # Copy all .secret.age files
+    $ageFiles = Get-ChildItem -Path $sensitiveSource -Filter '*.secret.age' -ErrorAction SilentlyContinue
+    if ($ageFiles) {
+        foreach ($ageFile in $ageFiles) {
+            Copy-Item $ageFile.FullName "$sensitiveDest\" -Force
+        }
+        Write-Success "Deployed $($ageFiles.Count) encrypted secret files"
+    }
+} else {
+    Write-Warn "Sensitive directory not found at $sensitiveSource"
+}
+
+# ============================================================================
+# 7c. REGISTER SESSIONSTART HOOK
+# ============================================================================
+
+Write-Info "Registering Claude Code SessionStart hook..."
+
+$ClaudeSettings = "$ClaudeHome\settings.json"
+$sessionStartCmd = "$DotfilesDest\scripts\claude-session-start.ps1"
+
+if (Test-Path $ClaudeSettings) {
+    try {
+        $settings = Get-Content $ClaudeSettings -Raw | ConvertFrom-Json
+
+        if ($settings.hooks -and $settings.hooks.SessionStart) {
+            Write-Info "SessionStart hook already configured, skipping"
+        } else {
+            # Build the hook entry
+            $hookEntry = @{
+                matcher = ''
+                hooks = @(
+                    @{
+                        type = 'command'
+                        command = "pwsh -NoProfile -File `"$sessionStartCmd`""
+                        timeout = 30
+                    }
+                )
+            }
+
+            # Ensure hooks object exists
+            if (-not $settings.hooks) {
+                $settings | Add-Member -NotePropertyName 'hooks' -NotePropertyValue @{} -Force
+            }
+
+            $settings.hooks | Add-Member -NotePropertyName 'SessionStart' -NotePropertyValue @($hookEntry) -Force
+            $settings | ConvertTo-Json -Depth 10 | Set-Content $ClaudeSettings -Encoding UTF8
+            Write-Success "SessionStart hook registered"
+        }
+    } catch {
+        Write-Warn "Failed to register SessionStart hook: $_"
+    }
+} else {
+    Write-Warn "Claude Code settings.json not found, skipping hook registration"
+}
+
 # ============================================================================
 # 8. GITHUB COPILOT CLI
 # ============================================================================
@@ -482,6 +584,7 @@ Write-Host "  - Claude skills:  $ClaudeHome\skills\"
 Write-Host "  - Gemini config:  $GeminiHome\GEMINI.md"
 Write-Host "  - Gemini prompts: $GeminiHome\prompts\"
 Write-Host "  - Scripts:        $ScriptsDir\"
+Write-Host "  - Secrets:        $DotfilesDest\sensitive\"
 Write-Host "  - Copilot config: $env:USERPROFILE\.copilot\"
 Write-Host "  - Profile:        $profileTarget"
 Write-Host ""

@@ -176,7 +176,7 @@ switch ($Stack) {
 
         if ($poetry) {
             & poetry init -n --name (Split-Path -Leaf $ProjectRoot) 2>$null
-            & poetry add --group dev pytest pytest-cov mypy ruff 2>$null
+            & poetry add --group dev typer rich pydantic pytest pytest-cov mypy ruff 2>$null
         } elseif ($uv) {
             & uv init 2>$null
         } else {

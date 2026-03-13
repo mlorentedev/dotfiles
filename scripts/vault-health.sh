@@ -108,10 +108,10 @@ fi
 section "2/5" "Orphans & Dead-Ends"
 
 ORPHAN_OUTPUT=$(obsidian_cmd orphans --vault "$VAULT_NAME" 2>/dev/null || true)
-ORPHAN_COUNT=$(echo "$ORPHAN_OUTPUT" | grep -c '.' 2>/dev/null || echo "0")
+ORPHAN_COUNT=$(echo "$ORPHAN_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
 
 DEADEND_OUTPUT=$(obsidian_cmd dead-ends --vault "$VAULT_NAME" 2>/dev/null || true)
-DEADEND_COUNT=$(echo "$DEADEND_OUTPUT" | grep -c '.' 2>/dev/null || echo "0")
+DEADEND_COUNT=$(echo "$DEADEND_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
 
 if [ "$TOTAL_FILES" -gt 0 ]; then
     ORPHAN_PCT=$((ORPHAN_COUNT * 100 / TOTAL_FILES))
@@ -151,7 +151,7 @@ fi
 section "3/5" "Unresolved Links"
 
 UNRESOLVED_OUTPUT=$(obsidian_cmd unresolved --vault "$VAULT_NAME" 2>/dev/null || true)
-UNRESOLVED_COUNT=$(echo "$UNRESOLVED_OUTPUT" | grep -c '.' 2>/dev/null || echo "0")
+UNRESOLVED_COUNT=$(echo "$UNRESOLVED_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
 
 if [ "$UNRESOLVED_COUNT" -eq 0 ]; then
     pass "No unresolved links"
@@ -172,6 +172,10 @@ section "4/5" "Frontmatter Coverage"
 
 check_frontmatter_field() {
     local field="$1"
+    if [ "$TOTAL_FILES" -eq 0 ]; then
+        skip "$field" "no markdown files"
+        return
+    fi
     local count
     count=$(grep -rl "^${field}:" "$VAULT_DIR" --include='*.md' 2>/dev/null | grep -vc '.obsidian' || echo "0")
     local pct=$((count * 100 / TOTAL_FILES))
@@ -197,7 +201,7 @@ fi
 section "5/5" "Tag Hygiene"
 
 TAG_OUTPUT=$(obsidian_cmd tags --vault "$VAULT_NAME" 2>/dev/null || true)
-TAG_COUNT=$(echo "$TAG_OUTPUT" | grep -c '.' 2>/dev/null || echo "0")
+TAG_COUNT=$(echo "$TAG_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
 info "Total unique tags: $TAG_COUNT"
 
 if [ "$VERBOSE" = true ] && [ "$TAG_COUNT" -gt 0 ]; then

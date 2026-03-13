@@ -63,3 +63,51 @@ setup() {
 @test "aliases.zsh defines kca alias" {
     grep -q 'alias kca=' "$ALIASES_FILE"
 }
+
+# --- Navigation aliases ---
+
+@test "aliases.zsh gprj points to Projects directory" {
+    grep 'alias gprj=' "$ALIASES_FILE" | grep -q 'Projects'
+}
+
+@test "aliases.zsh gprj does not point to Apps" {
+    ! grep 'alias gprj=' "$ALIASES_FILE" | grep -q 'Apps'
+}
+
+# --- Git shortcuts ---
+
+@test "aliases.zsh defines gs alias" {
+    grep -q 'alias gs=' "$ALIASES_FILE"
+}
+
+@test "aliases.zsh defines gd alias" {
+    grep -q 'alias gd=' "$ALIASES_FILE"
+}
+
+@test "aliases.zsh defines gl alias" {
+    grep -q 'alias gl=' "$ALIASES_FILE"
+}
+
+@test "aliases.zsh defines gp alias" {
+    grep -q 'alias gp=' "$ALIASES_FILE"
+}
+
+# --- Parity: navigation aliases in profile.ps1 ---
+
+@test "parity: gprj points to Projects in both aliases.zsh and profile.ps1" {
+    ps_file="$DOTFILES_DIR/powershell/profile.ps1"
+    grep 'alias gprj=' "$ALIASES_FILE" | grep -q 'Projects'
+    grep 'function gprj' "$ps_file" | grep -q 'Projects'
+}
+
+@test "parity: git shortcuts exist in both aliases.zsh and profile.ps1" {
+    ps_file="$DOTFILES_DIR/powershell/profile.ps1"
+    grep -q 'alias gs=' "$ALIASES_FILE"
+    grep -q 'function gs' "$ps_file"
+    grep -q 'alias gd=' "$ALIASES_FILE"
+    grep -q 'function gd' "$ps_file"
+    grep -q 'alias gl=' "$ALIASES_FILE"
+    grep -q 'function gl' "$ps_file"
+    grep -q 'alias gp=' "$ALIASES_FILE"
+    grep -q 'function gp' "$ps_file"
+}

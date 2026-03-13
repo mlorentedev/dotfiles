@@ -74,22 +74,22 @@ sync_secrets() {
         # Both exist - sync newer to older
         if [[ -f "$local_file" && -f "$repo_file" ]]; then
             if [[ "$local_file" -nt "$repo_file" ]]; then
-                cat "$local_file" > "$repo_file"
+                cat "$local_file" > "${repo_file}.tmp" && mv "${repo_file}.tmp" "$repo_file"
                 log_info "  $file (→ repo)"
                 synced=$((synced + 1))
             elif [[ "$repo_file" -nt "$local_file" ]]; then
-                cat "$repo_file" > "$local_file"
+                cat "$repo_file" > "${local_file}.tmp" && mv "${local_file}.tmp" "$local_file"
                 log_info "  $file (repo → local)"
                 synced=$((synced + 1))
             fi
         # Only in - copy to repo
         elif [[ -f "$local_file" ]]; then
-            cat "$local_file" > "$repo_file"
+            cat "$local_file" > "${repo_file}.tmp" && mv "${repo_file}.tmp" "$repo_file"
             log_info "  $file (→ repo) [new]"
             synced=$((synced + 1))
         # Only in repo - copy to local
         elif [[ -f "$repo_file" ]]; then
-            cat "$repo_file" > "$local_file"
+            cat "$repo_file" > "${local_file}.tmp" && mv "${local_file}.tmp" "$local_file"
             log_info "  $file (repo → local) [new]"
             synced=$((synced + 1))
         fi

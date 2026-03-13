@@ -123,7 +123,6 @@ process_secret() {
         log_info "Found base64 encoded SSH key: $key"
 
         new_key="${key/_BASE64/}"
-        tmp
         tmp=$(create_temp_file "ssh_key")
 
         base64_decode "$value" > "$tmp"

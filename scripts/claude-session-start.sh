@@ -38,6 +38,7 @@ find_vault_root() {
 
 VAULT_ROOT=$(find_vault_root "$CWD") || true
 KNOWLEDGE_VAULT="$HOME/Projects/knowledge"
+VAULT_NAME=""
 CONTEXT_LINES=""
 
 # --- Hive: detect project and suggest vault queries ---

@@ -54,14 +54,28 @@ function project-init {
     }
 }
 
-# Quick navigation to projects (customize paths as needed)
-function gprj { Set-Location "$env:USERPROFILE\Apps" }
+# Quick navigation to projects
+function gprj { Set-Location "$env:USERPROFILE\Projects" }
+function gcs { Set-Location "$env:USERPROFILE\Projects\cheat-sheets" }
+function gbp { Set-Location "$env:USERPROFILE\Projects\boilerplates" }
 
 # Git shortcuts
 function gs { git status }
 function gd { git diff }
 function gl { git log --oneline -10 }
 function gp { git pull }
+
+# GitHub Copilot CLI aliases
+if (Get-Command gh -ErrorAction SilentlyContinue) {
+    function ghcs { gh copilot suggest @args }
+    function ghce { gh copilot explain @args }
+}
+
+# Enhanced listing (requires eza)
+if (Get-Command eza -ErrorAction SilentlyContinue) {
+    function ll { eza -la --icons @args }
+    function lla { eza -la --icons --git @args }
+}
 
 # ============================================================================
 # PATH AUGMENTATION (informational - actual PATH is set by setup script)

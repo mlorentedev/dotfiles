@@ -80,7 +80,7 @@ decode_path() {
     # Step 2: filesystem scan under $HOME (handles dashes in directory names)
     local tmp_file result
     tmp_file=$(mktemp)
-    find "$HOME" -maxdepth 5 -type d 2>/dev/null > "$tmp_file" || true
+    find "$HOME/Projects" -maxdepth 5 -type d 2>/dev/null > "$tmp_file" || true
 
     result=""
     while IFS= read -r dir; do

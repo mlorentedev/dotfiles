@@ -123,7 +123,7 @@ load_env_file() {
     # Read file line by line, handling multiline and quoted values
     while IFS= read -r line || [ -n "$line" ]; do
         # Skip comments and empty lines
-        [[ "$line" =~ ^\s*#.* ]] && continue
+        [[ "$line" =~ ^[[:space:]]*#.* ]] && continue
         [[ -z "$line" ]] && continue
 
         # Extract key and value
@@ -154,7 +154,7 @@ debug_print_env() {
     # Print all variables from the env file
     while IFS='=' read -r key value; do
         # Skip comments and empty lines
-        [[ "$key" =~ ^\s*#.* ]] && continue
+        [[ "$key" =~ ^[[:space:]]*#.* ]] && continue
         [[ -z "$key" ]] && continue
         
         # Print the key and its value
@@ -241,11 +241,18 @@ age_encrypt() {
     local pubkey
     pubkey=$(grep -o 'age1[0-9a-z]*' "$key_file" 2>/dev/null) || return 1
 
-    rm -f "$output"
+    local tmp_output="${output}.tmp.$$"
     if [[ -n "$input" ]]; then
-        age -r "$pubkey" -o "$output" "$input" 2>/dev/null
+        age -r "$pubkey" -o "$tmp_output" "$input" 2>/dev/null
     else
-        age -r "$pubkey" -o "$output" 2>/dev/null
+        age -r "$pubkey" -o "$tmp_output" 2>/dev/null
+    fi
+    local rc=$?
+    if [ $rc -eq 0 ]; then
+        mv "$tmp_output" "$output"
+    else
+        rm -f "$tmp_output"
+        return $rc
     fi
 }
 
@@ -330,17 +337,17 @@ check_command() {
 # Output: error messages for missing commands, returns 0 if all found, 1 if any missing
 # Usage: check_dependencies "git" "curl" "jq"
 check_dependencies() {
-    deps=("$@")
-    missing=0
-    
+    local deps=("$@")
+    local missing=()
+
     for dep in "${deps[@]}"; do
         if ! check_command "$dep"; then
-            missing=1
+            missing+=("$dep")
         fi
     done
-    
-    if [ $missing -eq 1 ]; then
-        log_warning "Optional dependency $dep not found. Some features may not work."
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        log_warning "Optional dependencies not found: ${missing[*]}. Some features may not work."
     fi
 }
 

@@ -38,6 +38,7 @@ else
     }
     export_var() { export "$1=$2"; }
     unset_var() { unset "$1" 2>/dev/null || true; }
+    log_warning() { printf '[WARNING] %s\n' "$1" >&2; }
 fi
 
 # Configuration
@@ -93,7 +94,10 @@ _secrets_load_file_entry() {
     # Ensure parent directory exists
     local dest_dir
     dest_dir="$(dirname "$dest_path")"
-    [[ -d "$dest_dir" ]] || mkdir -p "$dest_dir"
+    if [[ ! -d "$dest_dir" ]] && ! mkdir -p "$dest_dir"; then
+        log_warning "Failed to create directory $dest_dir for file secret ${var_name#@}"
+        return 1
+    fi
 
     # Decrypt to destination
     if age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" > "$dest_path" 2>/dev/null; then
@@ -153,11 +157,16 @@ _secrets_load_entry() {
     file_exists "$encrypted_file" || return 1
 
     local value
-    value=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n')
+    if ! value=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n'); then
+        log_warning "Failed to decrypt secret for $var_name ($encrypted_file)"
+        return 1
+    fi
 
     if [[ -n "$value" ]]; then
         export_var "$var_name" "$value"
         SECRETS_LOADED=$((SECRETS_LOADED + 1))
+    else
+        log_warning "Decrypted value is empty for $var_name ($encrypted_file)"
     fi
 }
 
@@ -414,8 +423,7 @@ secrets_add() {
         return 1
     fi
 
-    secret_file="$SECRETS_DIR/${filename}.secret"
-    encrypted_file="${secret_file}.age"
+    encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
     # Check if files already exist
     if file_exists "$encrypted_file"; then
@@ -433,18 +441,11 @@ secrets_add() {
         return 1
     fi
 
-    # Write and encrypt
-    echo -n "$value" > "$secret_file"
-    chmod 600 "$secret_file"
-
-    if ! age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH" "$secret_file"; then
-        rm -f "$secret_file"
+    # Encrypt directly from stdin (no plaintext touches disk)
+    if ! printf '%s' "$value" | age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH"; then
         echo "Error: Encryption failed"
         return 1
     fi
-
-    # Remove plaintext
-    rm -f "$secret_file"
 
     # Add mapping
     echo "${var_name}=${filename}" >> "$SECRETS_MAPPING_FILE"
@@ -538,9 +539,6 @@ secrets_check() {
 # Remove .dec and .secret plaintext files
 # Usage: secrets_clean [--dry-run]
 secrets_clean() {
-    # zsh errors on glob with no matches by default; disable that
-    [[ -n "${ZSH_VERSION:-}" ]] && setopt NULL_GLOB
-
     dry_run=false
     [[ "$1" == "--dry-run" ]] && dry_run=true
 
@@ -550,8 +548,8 @@ secrets_clean() {
     echo ""
 
     # Find .dec files
-    for file in "$SECRETS_DIR"/*.dec "$SECRETS_DIR"/*.secret.dec; do
-        file_exists "$file" || continue
+    # Use a subshell so zsh NULL_GLOB doesn't leak into the parent shell
+    while IFS= read -r file; do
         if $dry_run; then
             echo "  Would remove: $(basename "$file")"
         else
@@ -559,13 +557,15 @@ secrets_clean() {
             echo "  Removed: $(basename "$file")"
         fi
         dec_count=$((dec_count + 1))
-    done
+    done < <(
+        [[ -n "${ZSH_VERSION:-}" ]] && setopt NULL_GLOB
+        for f in "$SECRETS_DIR"/*.dec "$SECRETS_DIR"/*.secret.dec; do
+            file_exists "$f" && printf '%s\n' "$f"
+        done
+    )
 
     # Find .secret files (plaintext, not .secret.age)
-    for file in "$SECRETS_DIR"/*.secret; do
-        file_exists "$file" || continue
-        # Skip if it's actually a .secret.age file pattern match
-        [[ "$file" == *.secret.age ]] && continue
+    while IFS= read -r file; do
         if $dry_run; then
             echo "  Would remove: $(basename "$file")"
         else
@@ -573,7 +573,14 @@ secrets_clean() {
             echo "  Removed: $(basename "$file")"
         fi
         secret_count=$((secret_count + 1))
-    done
+    done < <(
+        [[ -n "${ZSH_VERSION:-}" ]] && setopt NULL_GLOB
+        for f in "$SECRETS_DIR"/*.secret; do
+            file_exists "$f" || continue
+            [[ "$f" == *.secret.age ]] && continue
+            printf '%s\n' "$f"
+        done
+    )
 
     echo ""
     if $dry_run; then
@@ -609,8 +616,7 @@ secrets_rotate() {
         return 1
     fi
 
-    secret_file="$SECRETS_DIR/${filename}.secret"
-    encrypted_file="${secret_file}.age"
+    encrypted_file="$SECRETS_DIR/${filename}.secret.age"
     backup_file="${encrypted_file}.bak"
 
     # Backup existing encrypted file
@@ -630,20 +636,16 @@ secrets_rotate() {
         return 1
     fi
 
-    # Write and encrypt
-    echo -n "$value" > "$secret_file"
-    chmod 600 "$secret_file"
-
-    if ! age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH" "$secret_file"; then
+    # Encrypt directly from stdin (no plaintext touches disk)
+    if ! printf '%s' "$value" | age_encrypt "$encrypted_file" "$SECRETS_KEY_PATH"; then
         # Restore backup
         [[ -f "$backup_file" ]] && mv "$backup_file" "$encrypted_file"
-        rm -f "$secret_file"
         echo "Error: Encryption failed, restored backup"
         return 1
     fi
 
-    # Cleanup
-    rm -f "$secret_file" "$backup_file"
+    # Cleanup backup
+    rm -f "$backup_file"
 
     # Update audit log
     _secrets_audit_log "$var_name" "rotated"
