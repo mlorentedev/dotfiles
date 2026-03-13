@@ -26,9 +26,9 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
 - **Encrypted secrets** — Age-encrypted tokens and file secrets, auto-loaded at login
-- **AI integration** — Claude Code + Gemini CLI with 21 custom skills
+- **AI integration** — Claude Code + Gemini CLI with 21 custom skills + Aider (3-tier OpenRouter)
 - **Cross-platform** — Symlinks on Linux/macOS, copies on Windows (no admin required)
-- **Tested** — 106 BATS tests + ShellCheck in CI
+- **Tested** — 316 BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
 
@@ -37,8 +37,12 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ├── setup-windows.ps1           # Windows setup (copies)
 ├── scripts/                    # Shell utilities (added to PATH)
 │   ├── utils.sh                # Shared function library
-│   ├── load-secrets.sh         # Secrets → env vars (sourced at login)
-│   ├── dotfiles-sync.sh        # Bidirectional sync between dirs
+│   ├── load-secrets.sh         # Secrets → env vars (Linux, sourced at login)
+│   ├── load-secrets.ps1        # Secrets → env vars (Windows)
+│   ├── dotfiles-sync.sh        # Bidirectional sync (Linux)
+│   ├── dotfiles-sync.ps1       # Bidirectional sync (Windows)
+│   ├── claude-session-start.sh # Claude SessionStart hook (Linux)
+│   ├── claude-session-start.ps1# Claude SessionStart hook (Windows)
 │   ├── init-project.sh         # Project bootstrapper (bash)
 │   ├── init-project.ps1        # Project bootstrapper (PowerShell)
 │   ├── github-secrets-manager.sh
@@ -49,6 +53,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ├── ai/
 │   ├── claude/CLAUDE.md        # Master Claude instructions
 │   ├── gemini/GEMINI.md        # Master Gemini instructions
+│   ├── aider/                  # Aider config (3-tier via OpenRouter)
 │   └── skills/                 # 21 shared AI skills
 ├── ssh/                        # SSH config + public key
 ├── powershell/profile.ps1      # Windows PowerShell profile
@@ -76,6 +81,9 @@ project-init my-project python      # Bootstrap project with dual AI config
 claude                               # Start Claude Code session
 > /audit src/auth.py                 # Use skills via slash commands
 gp audit "$(cat src/main.py)"       # Gemini prompt function
+ai                                   # Aider daily tier (DeepSeek V3.2)
+aic                                  # Aider coding tier (Qwen3 Coder)
+aia                                  # Aider architecture tier (DeepSeek Speciale)
 ```
 
 ### Sync
