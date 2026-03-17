@@ -275,12 +275,15 @@ if (Test-Path $aiderSource) {
     }
 }
 
-# Install uv (Python package manager — provides uvx)
+# Install uv (Python package manager -- provides uvx)
 $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
 if (-not $uvCmd) {
     Write-Info "Installing uv..."
     try {
-        Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression 2>$null
+        $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
+        Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
+        & $uvInstaller 2>$null
+        Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
         # Refresh PATH for current session
         $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
         $uvCmd = Get-Command uv -ErrorAction SilentlyContinue

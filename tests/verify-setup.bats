@@ -285,8 +285,8 @@ setup() {
 # Section 10: Graceful skips (optional tools not present)
 # =============================================================================
 
-@test "no copilot directory created (gh absent)" {
-    [ ! -d "$HOME/.copilot" ]
+@test "copilot directory created (gh installed)" {
+    [ -d "$HOME/.copilot" ]
 }
 
 @test "no MCP servers registered (claude CLI absent)" {
