@@ -137,6 +137,114 @@ fi
 # Link .bashrc
 ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
+# ============================================================================
+# DEVELOPER TOOLS (user-level installs to ~/.local/bin)
+# ============================================================================
+
+log_info "Installing developer tools..."
+ensure_directory "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+
+# age (file encryption — required by secrets system)
+if ! command -v age >/dev/null 2>&1; then
+    log_info "Installing age..."
+    curl -Lo /tmp/age.tar.gz "https://dl.filippo.io/age/latest?for=linux/amd64" 2>/dev/null \
+        && tar xzf /tmp/age.tar.gz -C /tmp \
+        && cp /tmp/age/age /tmp/age/age-keygen "$HOME/.local/bin/" \
+        && rm -rf /tmp/age.tar.gz /tmp/age \
+        && log_success "age installed" \
+        || log_warning "age installation failed"
+else
+    log_info "age already installed"
+fi
+
+# eza (modern ls replacement)
+if ! command -v eza >/dev/null 2>&1; then
+    log_info "Installing eza..."
+    curl -Lo /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" 2>/dev/null \
+        && tar xzf /tmp/eza.tar.gz -C "$HOME/.local/bin/" \
+        && chmod +x "$HOME/.local/bin/eza" \
+        && rm -f /tmp/eza.tar.gz \
+        && log_success "eza installed" \
+        || log_warning "eza installation failed"
+else
+    log_info "eza already installed"
+fi
+
+# jq (JSON processor — required by Claude hook registration)
+if ! command -v jq >/dev/null 2>&1; then
+    log_info "Installing jq..."
+    curl -Lo "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" 2>/dev/null \
+        && chmod +x "$HOME/.local/bin/jq" \
+        && log_success "jq installed" \
+        || log_warning "jq installation failed"
+else
+    log_info "jq already installed"
+fi
+
+# gh (GitHub CLI — required by Copilot setup)
+if ! command -v gh >/dev/null 2>&1; then
+    log_info "Installing GitHub CLI..."
+    GH_VERSION=$(curl -sI "https://github.com/cli/cli/releases/latest" 2>/dev/null | grep -i '^location:' | sed 's|.*/v||;s/[[:space:]]*$//')
+    if [ -n "$GH_VERSION" ]; then
+        curl -Lo /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" 2>/dev/null \
+            && tar xzf /tmp/gh.tar.gz -C /tmp \
+            && cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" "$HOME/.local/bin/" \
+            && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" \
+            && log_success "GitHub CLI installed" \
+            || log_warning "GitHub CLI installation failed"
+    else
+        log_warning "Could not determine gh version, skipping"
+    fi
+else
+    log_info "gh already installed"
+fi
+
+# zoxide (smarter cd)
+if ! command -v zoxide >/dev/null 2>&1; then
+    log_info "Installing zoxide..."
+    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh 2>/dev/null \
+        && log_success "zoxide installed" \
+        || log_warning "zoxide installation failed"
+else
+    log_info "zoxide already installed"
+fi
+
+# direnv (per-directory environment variables)
+if ! command -v direnv >/dev/null 2>&1; then
+    log_info "Installing direnv..."
+    curl -sfL https://direnv.net/install.sh | bin_path="$HOME/.local/bin" bash 2>/dev/null \
+        && log_success "direnv installed" \
+        || log_warning "direnv installation failed"
+else
+    log_info "direnv already installed"
+fi
+
+# ShellCheck (shell script linter)
+if ! command -v shellcheck >/dev/null 2>&1; then
+    log_info "Installing shellcheck..."
+    curl -Lo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/latest/download/shellcheck-stable.linux.x86_64.tar.xz" 2>/dev/null \
+        && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
+        && cp /tmp/shellcheck-stable/shellcheck "$HOME/.local/bin/" \
+        && rm -rf /tmp/shellcheck.tar.xz /tmp/shellcheck-stable \
+        && log_success "shellcheck installed" \
+        || log_warning "shellcheck installation failed"
+else
+    log_info "shellcheck already installed"
+fi
+
+# bats (Bash Automated Testing System)
+if ! command -v bats >/dev/null 2>&1; then
+    log_info "Installing bats..."
+    git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core 2>/dev/null \
+        && /tmp/bats-core/install.sh "$HOME/.local" 2>/dev/null \
+        && rm -rf /tmp/bats-core \
+        && log_success "bats installed" \
+        || log_warning "bats installation failed"
+else
+    log_info "bats already installed"
+fi
+
 # Setup AI configuration
 log_info "Setting up AI configuration..."
 
@@ -196,6 +304,37 @@ if [ -f "$CURRENT_DIR/ai/aider/aider.model.settings.yml" ]; then
     cp "$CURRENT_DIR/ai/aider/aider.model.settings.yml" "$HOME/.aider.model.settings.yml"
     log_success "Deployed .aider.model.settings.yml"
 fi
+# Install uv (Python package manager — provides uvx)
+if ! command -v uv >/dev/null 2>&1; then
+    log_info "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null || true
+    export PATH="$HOME/.local/bin:$PATH"
+    if command -v uv >/dev/null 2>&1; then
+        log_success "uv installed"
+    else
+        log_warning "uv installation failed"
+    fi
+else
+    log_info "uv already installed"
+fi
+
+# Install poetry via uv
+if ! command -v poetry >/dev/null 2>&1; then
+    if command -v uv >/dev/null 2>&1; then
+        log_info "Installing poetry via uv..."
+        uv tool install poetry 2>/dev/null || true
+        if command -v poetry >/dev/null 2>&1; then
+            log_success "Poetry installed"
+        else
+            log_warning "Poetry installation failed"
+        fi
+    else
+        log_warning "uv not available, skipping poetry installation"
+    fi
+else
+    log_info "poetry already installed"
+fi
+
 # Install aider via uv (requires Python 3.12 — audioop removed in 3.13)
 if command -v uv >/dev/null 2>&1; then
     log_info "Installing aider-chat via uv..."

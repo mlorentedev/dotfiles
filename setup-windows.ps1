@@ -94,6 +94,38 @@ if (Test-Path $versionsSource) {
 }
 
 # ============================================================================
+# 1c. DEVELOPER TOOLS (via winget)
+# ============================================================================
+
+Write-Info "Installing developer tools..."
+
+$wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+if ($wingetCmd) {
+    $tools = @(
+        @{ Name = "age"; Cmd = "age"; Id = "FiloSottile.age" },
+        @{ Name = "eza"; Cmd = "eza"; Id = "eza-community.eza" },
+        @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
+        @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
+        @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" }
+    )
+    foreach ($tool in $tools) {
+        if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
+            Write-Info "Installing $($tool.Name)..."
+            try {
+                & winget install $tool.Id --accept-package-agreements --accept-source-agreements 2>$null | Out-Null
+                Write-Success "$($tool.Name) installed"
+            } catch {
+                Write-Warn "Failed to install $($tool.Name): $_"
+            }
+        } else {
+            Write-Info "$($tool.Name) already installed"
+        }
+    }
+} else {
+    Write-Warn "winget not found, skipping developer tools installation"
+}
+
+# ============================================================================
 # 2. DEPLOY CLAUDE CONFIGURATION
 # ============================================================================
 
@@ -241,6 +273,46 @@ if (Test-Path $aiderSource) {
         Copy-Item $aiderModelSettings "$env:USERPROFILE\.aider.model.settings.yml" -Force
         Write-Success "Deployed .aider.model.settings.yml"
     }
+}
+
+# Install uv (Python package manager — provides uvx)
+$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+if (-not $uvCmd) {
+    Write-Info "Installing uv..."
+    try {
+        Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression 2>$null
+        # Refresh PATH for current session
+        $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+        if ($uvCmd) {
+            Write-Success "uv installed"
+        } else {
+            Write-Warn "uv installation failed"
+        }
+    } catch {
+        Write-Warn "Failed to install uv: $_"
+    }
+} else {
+    Write-Info "uv already installed"
+}
+
+# Install poetry via uv
+$poetryCmd = Get-Command poetry -ErrorAction SilentlyContinue
+if (-not $poetryCmd) {
+    $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+    if ($uvCmd) {
+        Write-Info "Installing poetry via uv..."
+        try {
+            & uv tool install poetry 2>$null
+            Write-Success "Poetry installed"
+        } catch {
+            Write-Warn "Failed to install poetry: $_"
+        }
+    } else {
+        Write-Warn "uv not available, skipping poetry installation"
+    }
+} else {
+    Write-Info "poetry already installed"
 }
 
 # Install aider via uv (requires Python 3.12 - audioop removed in 3.13)
