@@ -99,8 +99,8 @@ sync_secrets() {
     return 0
 }
 
-# Sync git repos
-sync_git() {
+# Push repo to remote, then copy files to local installation (ADR-005)
+sync_repo_to_local() {
     log_info "Pushing from repo..."
     if git -C "$DOTFILES_REPO" diff --quiet && git -C "$DOTFILES_REPO" diff --cached --quiet; then
         log_info "  No changes to push"
@@ -116,11 +116,14 @@ sync_git() {
     fi
 
     echo ""
-    log_info "Pulling to local..."
-    if git -C "$DOTFILES_LOCAL" pull; then
-        log_success "Pull complete"
+    log_info "Copying repo → local..."
+    if rsync -a --delete \
+        --exclude='.git/' \
+        --exclude='sensitive/' \
+        "$DOTFILES_REPO/" "$DOTFILES_LOCAL/"; then
+        log_success "Copy complete"
     else
-        log_error "Pull failed"
+        log_error "Copy failed"
         return 1
     fi
 }
@@ -142,8 +145,8 @@ main() {
     # If --secrets-only, stop here
     [[ "${1:-}" == "--secrets-only" ]] && { log_success "Secrets sync complete"; exit 0; }
 
-    # Sync git
-    sync_git || exit 1
+    # Push repo + copy to local (ADR-005: ~/.dotfiles is not a git repo)
+    sync_repo_to_local || exit 1
 
     echo ""
     log_success "Sync complete. Run 'source ~/.zshrc' or 'source ~/.bashrc' to reload."
