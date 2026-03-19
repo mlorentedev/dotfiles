@@ -60,7 +60,8 @@ cp "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null ||
 # Git configuration
 log_info "Setting up Git configuration..."
 if [ -f "$DOTFILES_DIR/.gitconfig" ]; then
-    safe_copy "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
+    ln -sf "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
+    log_success "Linked: .gitconfig → ~/.gitconfig"
 else
     log_warning ".gitconfig not found in dotfiles"
 fi

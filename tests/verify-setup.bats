@@ -224,9 +224,9 @@ setup() {
     [ -f "$HOME/.gitconfig" ]
 }
 
-@test ".gitconfig is a regular file (not a symlink)" {
-    [ -f "$HOME/.gitconfig" ]
-    [ ! -L "$HOME/.gitconfig" ]
+@test ".gitconfig is a symlink to dotfiles" {
+    [ -L "$HOME/.gitconfig" ]
+    [ "$(readlink "$HOME/.gitconfig")" = "$HOME/.dotfiles/.gitconfig" ]
 }
 
 # =============================================================================
