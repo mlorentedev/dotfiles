@@ -4,7 +4,7 @@
 
 # --- VPN access (Headscale mesh) ---
 Host rpi4
-  Hostname 100.64.0.5
+  Hostname 100.64.0.10
   User manu
   IdentityFile ~/.ssh/id_ed25519
 
@@ -14,16 +14,14 @@ Host rpi3
   IdentityFile ~/.ssh/id_ed25519
 
 Host ace1
-  Hostname 172.16.1.2
+  Hostname 100.64.0.11
   User manu
   IdentityFile ~/.ssh/id_ed25519
-  ProxyJump rpi4
 
 Host ace2
-  Hostname 172.16.1.5
+  Hostname 100.64.0.5
   User manu
   IdentityFile ~/.ssh/id_ed25519
-  ProxyJump rpi4
 
 Host bee
   Hostname 100.64.0.3
@@ -35,19 +33,9 @@ Host jet1
   User manu
   IdentityFile ~/.ssh/id_ed25519
 
-Host k3s-server
+Host aws1
   Hostname 100.64.0.4
-  User manu
-  IdentityFile ~/.ssh/id_ed25519
-
-Host k3s-agent-1
-  Hostname 100.64.0.7
-  User manu
-  IdentityFile ~/.ssh/id_ed25519
-
-Host k3s-agent-2
-  Hostname 100.64.0.9
-  User manu
+  User deployer
   IdentityFile ~/.ssh/id_ed25519
 
 Host vps
@@ -90,23 +78,10 @@ Host jet1-lan
   IdentityFile ~/.ssh/id_ed25519
   ProxyJump rpi4-lan
 
-Host k3s-server-lan
-  Hostname 172.16.1.10
-  User manu
+Host aws1-pub
+  Hostname 3.77.204.105
+  User deployer
   IdentityFile ~/.ssh/id_ed25519
-  ProxyJump rpi4-lan
-
-Host k3s-agent-1-lan
-  Hostname 172.16.1.11
-  User manu
-  IdentityFile ~/.ssh/id_ed25519
-  ProxyJump rpi4-lan
-
-Host k3s-agent-2-lan
-  Hostname 172.16.1.12
-  User manu
-  IdentityFile ~/.ssh/id_ed25519
-  ProxyJump rpi4-lan
 
 Host vps-pub
   Hostname 162.55.57.175
