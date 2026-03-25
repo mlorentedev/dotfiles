@@ -139,13 +139,66 @@ Knowledge crystallization never run — run: ./scripts/knowledge-crystallize.sh"
             days_since=$(( (today_epoch - last_epoch) / 86400 ))
             if [ "$days_since" -gt 14 ]; then
                 CONTEXT_LINES="$CONTEXT_LINES
-Knowledge crystallization ${days_since} days ago — consider running /crystallize"
+CRYSTALLIZE NEEDED (${days_since} days stale)"
             fi
         fi
     fi
 }
 
 check_knowledge_health
+
+# --- Memory temperature scan ---
+# Reads file modification times to classify memory files as HOT/WARM/COLD.
+# Read-only — never modifies files.
+
+check_memory_temperature() {
+    local encoded memory_dir now file_epoch days_ago fname label
+    local temp_report="" has_cold_archive=false
+
+    encoded=$(encode_project_path "$CWD")
+    memory_dir="$HOME/.claude/projects/$encoded/memory"
+
+    [ -d "$memory_dir" ] || return 0
+
+    now=$(date +%s)
+
+    for f in "$memory_dir"/*.md; do
+        [ -f "$f" ] || continue
+        [ "$(basename "$f")" = "MEMORY.md" ] && continue
+
+        # Get file modification time (Linux/macOS compatible)
+        file_epoch=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+        [ "$file_epoch" -eq 0 ] && continue
+
+        days_ago=$(( (now - file_epoch) / 86400 ))
+        fname=$(basename "$f")
+
+        if [ "$days_ago" -le 7 ]; then
+            label="HOT"
+        elif [ "$days_ago" -le 30 ]; then
+            label="WARM"
+        elif [ "$days_ago" -le 60 ]; then
+            label="COLD"
+        else
+            label="ARCHIVE"
+            has_cold_archive=true
+        fi
+
+        temp_report="${temp_report}
+  ${label}: ${fname} (${days_ago}d ago)"
+    done
+
+    if [ -n "$temp_report" ]; then
+        CONTEXT_LINES="$CONTEXT_LINES
+Memory temperature:${temp_report}"
+        if $has_cold_archive; then
+            CONTEXT_LINES="$CONTEXT_LINES
+ARCHIVE NEEDED: Move memory files >60d old to memory/archive/ and update MEMORY.md index"
+        fi
+    fi
+}
+
+check_memory_temperature
 
 # Return context to Claude via hook output format
 jq -n --arg ctx "$CONTEXT_LINES" '{

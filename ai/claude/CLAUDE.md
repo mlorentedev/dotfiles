@@ -193,6 +193,39 @@ STOP and fix if detected:
 *   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` using the **Lesson Template**.
 *   **Promotion:** Evaluate if the lesson is global. If YES, create `00_meta/patterns/pattern-<topic>.md`.
 
+## Auto-Maintenance Rules
+
+Self-maintaining knowledge across sessions. Zero manual intervention required.
+
+### Session Handoff (MANDATORY at session end)
+
+At the END of every session where meaningful work was done, OVERWRITE the `## Session Handoff` section in MEMORY.md. This MUST be the first section after the H1 heading.
+
+**Fields (in this exact order, overwrite the entire section):**
+- `> Updated: YYYY-MM-DD`
+- `**Last task:** [1-line what was worked on]`
+- `**Decisions:** [key decisions, or "None"]`
+- `**Open threads:** [unfinished work, or "None"]`
+- `**Next action:** [concrete first step for next session]`
+
+Rules:
+- OVERWRITE entirely each session. Never append.
+- Max 8 lines. Handoff, not journal.
+- Skip if session was trivial (quick question, no state change).
+- Exception to MEMORY.md "index-only" rule: this section holds ephemeral continuity data.
+
+### Auto-Crystallize
+
+If session start context includes `CRYSTALLIZE NEEDED`, run `/crystallize` BEFORE any user task. Inform briefly: "Auto-crystallizing (N days stale)."
+
+### Auto-Archive Cold Memories
+
+If session start context reports memory files needing archive (>60 days cold):
+1. Create `memory/archive/` if needed.
+2. Move flagged files there.
+3. Remove their entries from MEMORY.md.
+4. Inform briefly: "Archived N cold memory files."
+
 ## Vault Structure & Standards
 
 ### File Hierarchy
