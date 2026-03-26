@@ -187,16 +187,19 @@ setup() {
 }
 
 @test "~/.gemini/GEMINI.md deployed with marker" {
+    command -v gemini >/dev/null 2>&1 || skip "gemini not installed"
     [ -f "$HOME/.gemini/GEMINI.md" ]
     grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"
 }
 
 @test "~/.gemini/prompts has at least 18 files" {
+    command -v gemini >/dev/null 2>&1 || skip "gemini not installed"
     count=$(find "$HOME/.gemini/prompts" -mindepth 1 -maxdepth 1 -type f -name '*.md' | wc -l)
     [ "$count" -ge 18 ]
 }
 
 @test "Gemini prompts have no YAML frontmatter" {
+    command -v gemini >/dev/null 2>&1 || skip "gemini not installed"
     # setup-linux.sh strips frontmatter with sed '/^---$/,/^---$/d'
     for prompt in "$HOME/.gemini/prompts"/*.md; do
         [ -f "$prompt" ] || continue
