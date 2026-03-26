@@ -26,8 +26,8 @@ setup() {
     grep -q 'versions.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh has all 7 sections" {
-    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 7 ]]
+@test "healthcheck.sh has all 8 sections" {
+    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 8 ]]
 }
 
 @test "healthcheck.sh uses set -euo pipefail" {
