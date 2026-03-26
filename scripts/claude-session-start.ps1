@@ -92,6 +92,50 @@ function Get-EncodedProjectPath {
     return $Path.Replace('\', '-').Replace(':', '').Replace('/', '-')
 }
 
+# --- Auto-create memory junction if vault has memory/ for this project ---
+# Runs before health check so the junction exists when health check reads it.
+function Ensure-MemoryJunction {
+    $encoded = Get-EncodedProjectPath -Path $CWD
+    $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encoded\memory"
+
+    # Already linked? Skip.
+    if (Test-Path $targetDir) {
+        $item = Get-Item $targetDir -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { return }
+        if ((Get-ChildItem $targetDir -ErrorAction SilentlyContinue).Count -gt 0) { return }
+    }
+
+    # Try 10_projects/<name>/memory/ (personal projects convention)
+    $projectName = Split-Path -Leaf $CWD
+    $vaultMemory = Join-Path $KnowledgeVault "10_projects\$projectName\memory"
+    if (-not (Test-Path $vaultMemory)) {
+        # Try CWD/memory/ (work projects where CWD is inside the vault)
+        if ($CWD.StartsWith($KnowledgeVault, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $vaultMemory = Join-Path $CWD "memory"
+        }
+    }
+
+    if (-not (Test-Path $vaultMemory)) { return }
+
+    # Create parent dir and junction
+    $parentDir = Split-Path $targetDir -Parent
+    if (-not (Test-Path $parentDir)) { New-Item $parentDir -ItemType Directory -Force | Out-Null }
+
+    # Remove empty target dir if it exists (no files, not a junction)
+    if ((Test-Path $targetDir) -and (Get-ChildItem $targetDir -ErrorAction SilentlyContinue).Count -eq 0) {
+        Remove-Item $targetDir -Force -ErrorAction SilentlyContinue
+    }
+
+    try {
+        New-Item -ItemType Junction -Path $targetDir -Target $vaultMemory -Force | Out-Null
+        $script:ContextLines += "`n[auto-memory] Created junction for $projectName"
+    } catch {
+        # Non-fatal — session continues without junction
+    }
+}
+
+Ensure-MemoryJunction
+
 function Test-KnowledgeHealth {
     $encoded = Get-EncodedProjectPath -Path $CWD
     $memoryFile = Join-Path $env:USERPROFILE ".claude\projects\$encoded\memory\MEMORY.md"

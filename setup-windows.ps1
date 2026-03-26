@@ -256,7 +256,7 @@ if (Test-Path $VaultRoot) {
 
         Ensure-Directory $parentDir
 
-        # Handle existing target: junction → recreate, real dir with files → backup, empty → remove
+        # Handle existing target: junction=recreate, real dir with files=backup, empty=remove
         if (Test-Path $targetDir) {
             $item = Get-Item $targetDir -Force
             if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {

@@ -112,6 +112,48 @@ encode_project_path() {
     printf '%s' "$1" | tr '/' '-'
 }
 
+# --- Auto-create memory symlink if vault has memory/ for this project ---
+# Runs before health check so the symlink exists when health check reads it.
+ensure_memory_symlink() {
+    local encoded target_dir project_name vault_memory parent_dir
+    encoded=$(encode_project_path "$CWD")
+    target_dir="$HOME/.claude/projects/$encoded/memory"
+
+    # Already linked? Skip.
+    if [ -L "$target_dir" ]; then return 0; fi
+    if [ -d "$target_dir" ] && [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then return 0; fi
+
+    # Try 10_projects/<name>/memory/ (personal projects convention)
+    project_name=$(basename "$CWD")
+    vault_memory="$KNOWLEDGE_VAULT/10_projects/$project_name/memory"
+
+    if [ ! -d "$vault_memory" ]; then
+        # Try CWD/memory/ (work projects where CWD is inside the vault)
+        case "$CWD" in
+            "$KNOWLEDGE_VAULT"*) vault_memory="$CWD/memory" ;;
+            *) vault_memory="" ;;
+        esac
+    fi
+
+    [ -d "$vault_memory" ] || return 0
+
+    # Create parent dir and symlink
+    parent_dir="$HOME/.claude/projects/$encoded"
+    mkdir -p "$parent_dir"
+
+    # Remove empty target dir if it exists (no files, not a symlink)
+    if [ -d "$target_dir" ] && [ -z "$(ls -A "$target_dir" 2>/dev/null)" ]; then
+        rmdir "$target_dir" 2>/dev/null || true
+    fi
+
+    if ln -s "$vault_memory" "$target_dir" 2>/dev/null; then
+        CONTEXT_LINES="$CONTEXT_LINES
+[auto-memory] Created symlink for $project_name"
+    fi
+}
+
+ensure_memory_symlink
+
 check_knowledge_health() {
     local encoded memory_file today line_count last_date days_since today_epoch last_epoch
     encoded=$(encode_project_path "$CWD")
