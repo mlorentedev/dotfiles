@@ -337,58 +337,53 @@ if ($uvCmd) {
 }
 
 # ============================================================================
-# 3. DEPLOY GEMINI CONFIGURATION (skip if gemini not installed)
+# 3. DEPLOY GEMINI CONFIGURATION (config deploy is always safe)
 # ============================================================================
 
-$geminiCmd = Get-Command gemini -ErrorAction SilentlyContinue
-if ($geminiCmd) {
-    Write-Info "Deploying Gemini configuration..."
+Write-Info "Deploying Gemini configuration..."
 
-    Ensure-Directory $GeminiHome
-    Ensure-Directory "$GeminiHome\prompts"
+Ensure-Directory $GeminiHome
+Ensure-Directory "$GeminiHome\prompts"
 
-    # Bulk copy all Gemini config files
-    $geminiSource = "$DotfilesDir\ai\gemini"
-    if (Test-Path $geminiSource) {
-        Copy-Item "$geminiSource\*" "$GeminiHome\" -Recurse -Force -ErrorAction SilentlyContinue
-    }
+# Bulk copy all Gemini config files
+$geminiSource = "$DotfilesDir\ai\gemini"
+if (Test-Path $geminiSource) {
+    Copy-Item "$geminiSource\*" "$GeminiHome\" -Recurse -Force -ErrorAction SilentlyContinue
+}
 
-    # Force copy GEMINI.md (Neural Hive Protocol)
-    $geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
-    if (Test-Path $geminiMdSource) {
-        Copy-Item $geminiMdSource "$GeminiHome\" -Force
-        if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern "CORE PRINCIPLE" -Quiet) {
-            Write-Success "GEMINI.md deployed successfully (verified)"
-        } else {
-            Write-Err "GEMINI.md deployment failed verification"
-        }
+# Force copy GEMINI.md (Neural Hive Protocol)
+$geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
+if (Test-Path $geminiMdSource) {
+    Copy-Item $geminiMdSource "$GeminiHome\" -Force
+    if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern "CORE PRINCIPLE" -Quiet) {
+        Write-Success "GEMINI.md deployed successfully (verified)"
     } else {
-        Write-Warn "GEMINI.md not found at $geminiMdSource"
-    }
-
-    # Extract Gemini prompts (strip YAML frontmatter from skills)
-    if (Test-Path $skillsSource) {
-        $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
-        foreach ($skillDir in $skillDirs) {
-            $skillMd = "$($skillDir.FullName)\SKILL.md"
-            if (Test-Path $skillMd) {
-                $content = Get-Content $skillMd -Raw
-
-                # Strip YAML frontmatter (content between --- markers)
-                if ($content -match '^---\r?\n[\s\S]*?\r?\n---\r?\n(.*)$') {
-                    $strippedContent = $Matches[1]
-                } else {
-                    $strippedContent = $content
-                }
-
-                $targetFile = "$GeminiHome\prompts\$($skillDir.Name).md"
-                Set-Content -Path $targetFile -Value $strippedContent.Trim() -Encoding UTF8
-            }
-        }
-        Write-Success "Extracted Gemini prompts to $GeminiHome\prompts\"
+        Write-Err "GEMINI.md deployment failed verification"
     }
 } else {
-    Write-Warn "Gemini CLI not found, skipping Gemini configuration"
+    Write-Warn "GEMINI.md not found at $geminiMdSource"
+}
+
+# Extract Gemini prompts (strip YAML frontmatter from skills)
+if (Test-Path $skillsSource) {
+    $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
+    foreach ($skillDir in $skillDirs) {
+        $skillMd = "$($skillDir.FullName)\SKILL.md"
+        if (Test-Path $skillMd) {
+            $content = Get-Content $skillMd -Raw
+
+            # Strip YAML frontmatter (content between --- markers)
+            if ($content -match '^---\r?\n[\s\S]*?\r?\n---\r?\n(.*)$') {
+                $strippedContent = $Matches[1]
+            } else {
+                $strippedContent = $content
+            }
+
+            $targetFile = "$GeminiHome\prompts\$($skillDir.Name).md"
+            Set-Content -Path $targetFile -Value $strippedContent.Trim() -Encoding UTF8
+        }
+    }
+    Write-Success "Extracted Gemini prompts to $GeminiHome\prompts\"
 }
 
 # ============================================================================

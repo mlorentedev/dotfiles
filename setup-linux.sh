@@ -249,31 +249,27 @@ fi
 # Setup AI configuration
 log_info "Setting up AI configuration..."
 
-# Gemini CLI (skip if gemini not installed)
-if command -v gemini >/dev/null 2>&1; then
-    ensure_directory "$HOME/.gemini"
-    ensure_directory "$HOME/.gemini/prompts"
-    cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
-    # Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
-    for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
-        if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
-            skill_name=$(basename "$skill_dir")
-            # Copy SKILL.md as flat file, stripping YAML frontmatter
-            tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
-        fi
-    done
-    # Force copy master files (Neural Hive Protocol)
-    rm -f "$HOME/.gemini/GEMINI.md"
-    cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
-    if grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"; then
-        log_success "GEMINI.md deployed successfully (verified)"
-    else
-        echo "❌ Error: GEMINI.md deployment failed verification"
+# Gemini CLI config (config deploy is always safe, even without gemini installed)
+ensure_directory "$HOME/.gemini"
+ensure_directory "$HOME/.gemini/prompts"
+cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
+# Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
+for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
+    if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
+        skill_name=$(basename "$skill_dir")
+        # Copy SKILL.md as flat file, stripping YAML frontmatter
+        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
     fi
-    log_success "Gemini CLI configured"
+done
+# Force copy master files (Neural Hive Protocol)
+rm -f "$HOME/.gemini/GEMINI.md"
+cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
+if grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"; then
+    log_success "GEMINI.md deployed successfully (verified)"
 else
-    log_warning "Gemini CLI not found, skipping Gemini configuration"
+    echo "❌ Error: GEMINI.md deployment failed verification"
 fi
+log_success "Gemini CLI configured"
 
 # Claude Code
 ensure_directory "$HOME/.claude"
