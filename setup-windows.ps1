@@ -72,8 +72,6 @@ Write-Info "Creating directories..."
 
 Ensure-Directory $ClaudeHome
 Ensure-Directory "$ClaudeHome\skills"
-Ensure-Directory $GeminiHome
-Ensure-Directory "$GeminiHome\prompts"
 Ensure-Directory $ScriptsDir
 
 Write-Success "Directories created"
@@ -131,7 +129,13 @@ if ($wingetCmd) {
 
 Write-Info "Deploying Claude configuration..."
 
-# Copy CLAUDE.md
+# Bulk copy all Claude config files
+$claudeSource = "$DotfilesDir\ai\claude"
+if (Test-Path $claudeSource) {
+    Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Force copy CLAUDE.md (Neural Hive Protocol)
 $claudeMdSource = "$DotfilesDir\ai\claude\CLAUDE.md"
 if (Test-Path $claudeMdSource) {
     Copy-Item $claudeMdSource "$ClaudeHome\" -Force
@@ -333,44 +337,58 @@ if ($uvCmd) {
 }
 
 # ============================================================================
-# 3. DEPLOY GEMINI CONFIGURATION
+# 3. DEPLOY GEMINI CONFIGURATION (skip if gemini not installed)
 # ============================================================================
 
-Write-Info "Deploying Gemini configuration..."
+$geminiCmd = Get-Command gemini -ErrorAction SilentlyContinue
+if ($geminiCmd) {
+    Write-Info "Deploying Gemini configuration..."
 
-# Copy GEMINI.md
-$geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
-if (Test-Path $geminiMdSource) {
-    Copy-Item $geminiMdSource "$GeminiHome\" -Force
-    if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern "CORE PRINCIPLE" -Quiet) {
-        Write-Success "GEMINI.md deployed successfully (verified)"
+    Ensure-Directory $GeminiHome
+    Ensure-Directory "$GeminiHome\prompts"
+
+    # Bulk copy all Gemini config files
+    $geminiSource = "$DotfilesDir\ai\gemini"
+    if (Test-Path $geminiSource) {
+        Copy-Item "$geminiSource\*" "$GeminiHome\" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Force copy GEMINI.md (Neural Hive Protocol)
+    $geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
+    if (Test-Path $geminiMdSource) {
+        Copy-Item $geminiMdSource "$GeminiHome\" -Force
+        if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern "CORE PRINCIPLE" -Quiet) {
+            Write-Success "GEMINI.md deployed successfully (verified)"
+        } else {
+            Write-Err "GEMINI.md deployment failed verification"
+        }
     } else {
-        Write-Err "GEMINI.md deployment failed verification"
+        Write-Warn "GEMINI.md not found at $geminiMdSource"
+    }
+
+    # Extract Gemini prompts (strip YAML frontmatter from skills)
+    if (Test-Path $skillsSource) {
+        $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
+        foreach ($skillDir in $skillDirs) {
+            $skillMd = "$($skillDir.FullName)\SKILL.md"
+            if (Test-Path $skillMd) {
+                $content = Get-Content $skillMd -Raw
+
+                # Strip YAML frontmatter (content between --- markers)
+                if ($content -match '^---\r?\n[\s\S]*?\r?\n---\r?\n(.*)$') {
+                    $strippedContent = $Matches[1]
+                } else {
+                    $strippedContent = $content
+                }
+
+                $targetFile = "$GeminiHome\prompts\$($skillDir.Name).md"
+                Set-Content -Path $targetFile -Value $strippedContent.Trim() -Encoding UTF8
+            }
+        }
+        Write-Success "Extracted Gemini prompts to $GeminiHome\prompts\"
     }
 } else {
-    Write-Warn "GEMINI.md not found at $geminiMdSource"
-}
-
-# Extract Gemini prompts (strip YAML frontmatter from skills)
-if (Test-Path $skillsSource) {
-    $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
-    foreach ($skillDir in $skillDirs) {
-        $skillMd = "$($skillDir.FullName)\SKILL.md"
-        if (Test-Path $skillMd) {
-            $content = Get-Content $skillMd -Raw
-
-            # Strip YAML frontmatter (content between --- markers)
-            if ($content -match '^---\r?\n[\s\S]*?\r?\n---\r?\n(.*)$') {
-                $strippedContent = $Matches[1]
-            } else {
-                $strippedContent = $content
-            }
-
-            $targetFile = "$GeminiHome\prompts\$($skillDir.Name).md"
-            Set-Content -Path $targetFile -Value $strippedContent.Trim() -Encoding UTF8
-        }
-    }
-    Write-Success "Extracted Gemini prompts to $GeminiHome\prompts\"
+    Write-Warn "Gemini CLI not found, skipping Gemini configuration"
 }
 
 # ============================================================================
@@ -636,10 +654,15 @@ if ($ghCmd) {
     $copilotSource = "$DotfilesDir\ai\copilot"
     if (Test-Path $copilotSource) {
         Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Success "Deployed Copilot config to $CopilotHome\"
+        if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
+            (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern "Engineering Discipline" -Quiet)) {
+            Write-Success "Copilot instructions deployed successfully (verified)"
+        } else {
+            Write-Err "Copilot instructions deployment failed verification"
+        }
     }
 
-    Write-Success "GitHub Copilot CLI configured"
+    Write-Success "GitHub Copilot CLI configured (aliases ghcs/ghce in profile.ps1)"
 } else {
     Write-Warn "GitHub CLI (gh) not found, skipping Copilot installation"
 }

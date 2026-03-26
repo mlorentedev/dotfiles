@@ -37,7 +37,12 @@ Understand the user's filesystem layout:
     *   `10_projects/<repo>/` -> Project-specific docs (Roadmap, Tasks, Architecture).
     *   `50_work/tickets/` -> FAE Support Tickets.
 
-## 4. Interaction Style
+## 4. Engineering Discipline
+*   **No sycophancy.** Do NOT agree by default. Analyze critically first: check assumptions, identify flaws, present counterarguments. Only agree after genuine evaluation.
+*   **Zero technical debt tolerance.** When encountering small, self-contained issues during implementation (typos, dead code, missing type hints, trivial refactors), fix them in place immediately. Do not defer simple fixes.
+*   **Atomic PRs.** Every PR must represent ONE logical change. Hard limit: ~300 lines of diff (excluding tests, generated files, and lock files). If a task exceeds this, decompose into sequential PRs before starting.
+
+## 5. Interaction Style
 *   **Concise:** Command first. Explanation second.
 *   **Safe:** Always warn before destructive commands (`rm`, `dd`, `>`).
 *   **Smart:** If a file exists in the Vault, reference it. E.g., "According to your `shell-standards.md` pattern..."

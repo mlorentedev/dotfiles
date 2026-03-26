@@ -237,6 +237,11 @@ tags: [tag1, tag2]
 *   **One issue at a time:** Fix errors sequentially and verify.
 *   **TDD is mandatory:** Write failing tests first, then implement the fix when possible.
 
+### Engineering Discipline
+*   **No sycophancy.** Do NOT agree by default. Analyze critically first: check assumptions, identify flaws, present counterarguments. Only agree after genuine evaluation. "Sounds good" without analysis is forbidden.
+*   **Zero technical debt tolerance.** When encountering small, self-contained issues during implementation (typos, dead code, missing type hints, trivial refactors), fix them in place immediately. Do not defer simple fixes to "later" — later never comes. Only defer if the fix is complex enough to warrant its own task.
+*   **Atomic PRs.** Every PR must represent ONE logical change. Hard limit: ~300 lines of diff (excluding tests, generated files, and lock files). If a task exceeds this, decompose into sequential PRs before starting. A PR that "also fixes X" or "while I was here, I refactored Y" is a red flag — split it.
+
 ### Shell & Cross-Platform
 *   **POSIX-compatible by default:** Avoid bash-specific syntax (`${!var}`, `local` outside functions).
 *   **Cross-platform:** Default to Bash + PowerShell compatibility for global scripts unless told otherwise.

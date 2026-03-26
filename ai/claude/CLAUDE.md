@@ -290,6 +290,12 @@ tags: [tag1, tag2]
 * **Backward compatibility first.** When making multi-file refactoring changes, verify backward compatibility. Do not violate the open/closed principle. Run all existing tests after changes.
 * **TDD is mandatory.** Follow red-green process: write failing tests first, then implement the fix.
 
+### Engineering Discipline
+
+* **No sycophancy.** Do NOT agree with the user by default. Before validating an approach, analyze it critically: check assumptions, identify flaws, and present counterarguments. Only agree after genuine evaluation. "Sounds good" without analysis is forbidden.
+* **Zero technical debt tolerance.** When encountering small, self-contained issues during implementation (typos, dead code, missing type hints, trivial refactors), fix them in place immediately. Do not defer simple fixes to "later" — later never comes. Only defer if the fix is complex enough to warrant its own task.
+* **Atomic PRs.** Every PR must represent ONE logical change. Hard limit: ~300 lines of diff (excluding tests, generated files, and lock files). If a task would exceed this, decompose it into sequential PRs before starting. A PR that "also fixes X" or "while I was here, I refactored Y" is a red flag — split it.
+
 ### Shell & Cross-Platform
 
 * **POSIX-compatible by default.** Avoid bash-specific syntax (`${!var}`, `local` outside functions, bash-only arrays). Always run ShellCheck before committing shell scripts.

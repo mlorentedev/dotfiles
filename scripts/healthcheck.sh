@@ -65,7 +65,7 @@ echo "========================================"
 echo "Checking from: $DOTFILES_DIR"
 
 # ==================================================
-section "1/7" "Core Tools in PATH"
+section "1/8" "Core Tools in PATH"
 
 CORE_TOOLS="git zsh bash curl wget jq eza direnv node npm zoxide docker kubectl terraform"
 for tool in $CORE_TOOLS; do
@@ -77,7 +77,7 @@ for tool in $CORE_TOOLS; do
 done
 
 # ==================================================
-section "2/7" "Versioned Tool Paths"
+section "2/8" "Versioned Tool Paths"
 
 check_tool_home() {
     local name="$1"
@@ -101,7 +101,6 @@ check_tool_home() {
 check_tool_home "JAVA_HOME" "${JAVA_HOME:-}" "java"
 check_tool_home "MAVEN_HOME" "${MAVEN_HOME:-}" "mvn"
 check_tool_home "PYTHON_HOME" "${PYTHON_HOME:-}" "python3"
-check_tool_home "RUBY_HOME" "${RUBY_HOME:-}" "ruby"
 check_tool_home "GO_HOME" "${GO_HOME:-}" "go"
 
 # Minikube has no bin/ subdirectory
@@ -118,7 +117,7 @@ else
 fi
 
 # ==================================================
-section "3/7" "Version Match (versions.conf)"
+section "3/8" "Version Match (versions.conf)"
 
 check_version_match() {
     local name="$1"
@@ -141,12 +140,11 @@ APPS_HOME="${APPS_HOME:-$HOME/Applications}"
 check_version_match "Java" "${JAVA_VERSION:-}" "$APPS_HOME/jdk-${JAVA_VERSION:-}"
 check_version_match "Maven" "${MAVEN_VERSION:-}" "$APPS_HOME/apache-maven-${MAVEN_VERSION:-}"
 check_version_match "Python" "${PYTHON_VERSION:-}" "$APPS_HOME/python-${PYTHON_VERSION:-}"
-check_version_match "Ruby" "${RUBY_VERSION:-}" "$APPS_HOME/ruby-${RUBY_VERSION:-}"
 check_version_match "Minikube" "${MINIKUBE_VERSION:-}" "$APPS_HOME/minikube-${MINIKUBE_VERSION:-}"
 check_version_match "Go" "${GO_VERSION:-}" "$APPS_HOME/go-${GO_VERSION:-}"
 
 # ==================================================
-section "4/7" "Key Symlinks"
+section "4/8" "Key Symlinks"
 
 check_symlink() {
     local path="$1"
@@ -171,9 +169,9 @@ check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
 # ==================================================
-section "5/7" "Environment Variables"
+section "5/8" "Environment Variables"
 
-ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME RUBY_HOME GO_HOME MINIKUBE_HOME GEM_HOME"
+ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME GO_HOME MINIKUBE_HOME"
 for var in $ENV_VARS; do
     if var_is_set "$var"; then
         pass "$var is set"
@@ -183,7 +181,7 @@ for var in $ENV_VARS; do
 done
 
 # ==================================================
-section "6/7" "Optional Tools"
+section "6/8" "Optional Tools"
 
 OPTIONAL_TOOLS="age gh claude gemini bats shellcheck helm ansible pip"
 for tool in $OPTIONAL_TOOLS; do
@@ -195,7 +193,7 @@ for tool in $OPTIONAL_TOOLS; do
 done
 
 # ==================================================
-section "7/7" "Knowledge Vault"
+section "7/8" "Knowledge Vault"
 
 VAULT_DIR="${VAULT_DIR:-$HOME/Projects/knowledge}"
 
@@ -248,6 +246,55 @@ for dir in $VAULT_DIRS; do
         fail "Vault directory missing: $dir/"
     fi
 done
+
+# ==================================================
+section "8/8" "Secrets Integrity"
+
+SECRETS_DIR="${DOTFILES_DIR}/sensitive"
+SECRETS_MAPPING="$SECRETS_DIR/env-mapping.conf"
+
+if [ -f "$SECRETS_MAPPING" ]; then
+    pass "env-mapping.conf exists"
+
+    # Check each mapping entry has a corresponding .age file
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        case "$_line" in
+            "#"*|"") continue ;;
+        esac
+        [ -z "$_line" ] && continue
+        echo "$_line" | grep -q '=' || continue
+
+        _var="${_line%%=*}"
+        _val="${_line#*=}"
+        # Strip spaces
+        _var="$(echo "$_var" | tr -d ' ')"
+        _val="$(echo "$_val" | tr -d ' ')"
+
+        # File secrets: extract filename before >
+        case "$_var" in
+            @*) _fname="${_val%%>*}" ; _var="${_var#@} [file]" ;;
+            *)  _fname="$_val" ;;
+        esac
+
+        if [ -f "$SECRETS_DIR/${_fname}.secret.age" ]; then
+            pass "$_var -> ${_fname}.secret.age"
+        else
+            fail "$_var -> ${_fname}.secret.age (missing)"
+        fi
+    done < "$SECRETS_MAPPING"
+
+    # Check for orphaned .age files (no mapping entry)
+    for _age_file in "$SECRETS_DIR"/*.secret.age; do
+        [ -f "$_age_file" ] || continue
+        _base=$(basename "$_age_file" .secret.age)
+        if ! grep -q "=${_base}$" "$SECRETS_MAPPING" 2>/dev/null &&
+           ! grep -q "=${_base}>" "$SECRETS_MAPPING" 2>/dev/null; then
+            fail "Orphan: ${_base}.secret.age (no mapping)"
+        fi
+    done
+else
+    fail "env-mapping.conf not found"
+fi
 
 # ==================================================
 echo ""

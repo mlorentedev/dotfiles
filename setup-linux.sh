@@ -249,27 +249,31 @@ fi
 # Setup AI configuration
 log_info "Setting up AI configuration..."
 
-# Gemini CLI
-ensure_directory "$HOME/.gemini"
-ensure_directory "$HOME/.gemini/prompts"
-cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
-# Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
-for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
-    if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
-        skill_name=$(basename "$skill_dir")
-        # Copy SKILL.md as flat file, stripping YAML frontmatter
-        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
+# Gemini CLI (skip if gemini not installed)
+if command -v gemini >/dev/null 2>&1; then
+    ensure_directory "$HOME/.gemini"
+    ensure_directory "$HOME/.gemini/prompts"
+    cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
+    # Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
+    for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
+        if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
+            skill_name=$(basename "$skill_dir")
+            # Copy SKILL.md as flat file, stripping YAML frontmatter
+            tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
+        fi
+    done
+    # Force copy master files (Neural Hive Protocol)
+    rm -f "$HOME/.gemini/GEMINI.md"
+    cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
+    if grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"; then
+        log_success "GEMINI.md deployed successfully (verified)"
+    else
+        echo "❌ Error: GEMINI.md deployment failed verification"
     fi
-done
-# Force copy master files (Neural Hive Protocol)
-rm -f "$HOME/.gemini/GEMINI.md"
-cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
-if grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"; then
-    log_success "GEMINI.md deployed successfully (verified)"
+    log_success "Gemini CLI configured"
 else
-    echo "❌ Error: GEMINI.md deployment failed verification"
+    log_warning "Gemini CLI not found, skipping Gemini configuration"
 fi
-log_success "Gemini CLI configured"
 
 # Claude Code
 ensure_directory "$HOME/.claude"
@@ -359,8 +363,11 @@ if command -v gh >/dev/null 2>&1; then
     gh extension install github/gh-copilot 2>/dev/null || true
     ensure_directory "$HOME/.copilot"
     cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
-    # Also copy to .github in home if needed, or just let gh manage it
-    # cp -f "$CURRENT_DIR/ai/copilot/copilot-instructions.md" "$HOME/.copilot/copilot-instructions.md" 2>/dev/null || true
+    if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q "Engineering Discipline" "$HOME/.copilot/copilot-instructions.md"; then
+        log_success "Copilot instructions deployed successfully (verified)"
+    else
+        echo "❌ Error: Copilot instructions deployment failed verification"
+    fi
     log_success "GitHub Copilot CLI configured"
     
     # Aliases

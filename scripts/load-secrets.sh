@@ -82,7 +82,10 @@ _secrets_load_file_entry() {
     local dest_path="$_FS_DEST_PATH"
     local encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
-    file_exists "$encrypted_file" || return 1
+    if ! file_exists "$encrypted_file"; then
+        log_warning "Missing secret file for ${var_name#@}: ${filename}.secret.age"
+        return 1
+    fi
 
     # Cache: skip if dest is newer than encrypted source
     if [[ -f "$dest_path" && "$dest_path" -nt "$encrypted_file" ]]; then
@@ -154,7 +157,10 @@ _secrets_load_entry() {
 
     encrypted_file="$SECRETS_DIR/${filename}.secret.age"
 
-    file_exists "$encrypted_file" || return 1
+    if ! file_exists "$encrypted_file"; then
+        log_warning "Missing secret file for $var_name: ${filename}.secret.age"
+        return 1
+    fi
 
     local value
     if ! value=$(age_decrypt "$encrypted_file" "$SECRETS_KEY_PATH" | tr -d '\n'); then
@@ -194,6 +200,17 @@ secrets_load() {
             _secrets_load_entry "$key" "$value"
         done < "$SECRETS_MAPPING_FILE"
     fi
+
+    # Warn about orphaned .secret.age files (no mapping entry)
+    local _age_file _base_name
+    for _age_file in "$SECRETS_DIR"/*.secret.age; do
+        file_exists "$_age_file" || continue
+        _base_name=$(basename "$_age_file" .secret.age)
+        if ! grep -q "=${_base_name}$" "$SECRETS_MAPPING_FILE" 2>/dev/null &&
+           ! grep -q "=${_base_name}>" "$SECRETS_MAPPING_FILE" 2>/dev/null; then
+            log_warning "Orphan secret (no mapping): ${_base_name}.secret.age"
+        fi
+    done
 }
 
 # Force reload all secrets
