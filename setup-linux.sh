@@ -435,17 +435,19 @@ fi
 
 # Deploy auto-memory symlinks (vault → Claude Code)
 # Memory lives in the knowledge vault, not in this repo (see ADR-007)
-VAULT_PROJECTS="$HOME/Projects/knowledge/10_projects"
-if [ -d "$VAULT_PROJECTS" ]; then
+# Scans both 10_projects/ and 50_work/ for memory directories.
+VAULT_ROOT="$HOME/Projects/knowledge"
+VAULT_PROJECTS="$VAULT_ROOT/10_projects"
+VAULT_WORK="$VAULT_ROOT/50_work"
+if [ -d "$VAULT_ROOT" ]; then
     log_info "Deploying auto-memory symlinks from vault..."
-    for project_dir in "$VAULT_PROJECTS"/*/; do
-        [ -d "$project_dir" ] || continue
-        memory_source="${project_dir}memory"
-        [ -d "$memory_source" ] || continue
 
-        project_name=$(basename "$project_dir")
-        project_path="$HOME/Projects/$project_name"
-        encoded_path=$(printf '%s' "$project_path" | sed 's|/|-|g')
+    # Helper: create symlink for a vault memory dir
+    _link_memory() {
+        local memory_source="$1" cwd_path="$2" project_name="$3"
+        local encoded_path target_dir
+
+        encoded_path=$(printf '%s' "$cwd_path" | sed 's|/|-|g')
         target_dir="$HOME/.claude/projects/$encoded_path/memory"
 
         ensure_directory "$HOME/.claude/projects/$encoded_path"
@@ -461,7 +463,30 @@ if [ -d "$VAULT_PROJECTS" ]; then
 
         ln -s "$memory_source" "$target_dir"
         log_success "Linked auto-memory: $project_name"
-    done
+    }
+
+    # 10_projects/*: convention — repo at ~/Projects/<name>
+    if [ -d "$VAULT_PROJECTS" ]; then
+        for project_dir in "$VAULT_PROJECTS"/*/; do
+            [ -d "$project_dir" ] || continue
+            memory_source="${project_dir}memory"
+            [ -d "$memory_source" ] || continue
+
+            project_name=$(basename "$project_dir")
+            cwd_path="$HOME/Projects/$project_name"
+            _link_memory "$memory_source" "$cwd_path" "$project_name"
+        done
+    fi
+
+    # 50_work/**/memory: work projects — CWD is the vault path itself
+    if [ -d "$VAULT_WORK" ]; then
+        find "$VAULT_WORK" -type d -name "memory" 2>/dev/null | while read -r memory_source; do
+            project_dir=$(dirname "$memory_source")
+            project_name=$(basename "$project_dir")
+            cwd_path="$project_dir"
+            _link_memory "$memory_source" "$cwd_path" "$project_name"
+        done
+    fi
 
     # Migrate orphan memories: local Claude Code memories not yet in vault
     for claude_project in "$HOME/.claude/projects"/*/; do

@@ -213,23 +213,65 @@ if ($claudeCmd) {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
 
-# Deploy auto-memory from vault (see ADR-007)
-$VaultProjects = Join-Path $env:USERPROFILE "Projects\knowledge\10_projects"
-if (Test-Path $VaultProjects) {
-    Write-Info "Deploying auto-memory from vault..."
-    $projectDirs = Get-ChildItem -Path $VaultProjects -Directory
-    foreach ($projDir in $projectDirs) {
-        $memorySource = Join-Path $projDir.FullName "memory"
-        if (-not (Test-Path $memorySource)) { continue }
+# Deploy auto-memory junctions from vault (see ADR-007)
+# Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
+# Scans both 10_projects/ and 50_work/ for memory directories.
+$VaultRoot = Join-Path $env:USERPROFILE "Projects\knowledge"
+$VaultProjects = Join-Path $VaultRoot "10_projects"
+if (Test-Path $VaultRoot) {
+    Write-Info "Deploying auto-memory junctions from vault..."
 
-        $projectName = $projDir.Name
-        $projectPath = Join-Path $env:USERPROFILE "Projects\$projectName"
-        $encodedPath = $projectPath.Replace('\', '-').Replace(':', '')
+    # Collect all memory/ dirs: 10_projects/* and recursive scan of 50_work/
+    $memoryDirs = @()
+    if (Test-Path $VaultProjects) {
+        foreach ($projDir in (Get-ChildItem -Path $VaultProjects -Directory)) {
+            $mem = Join-Path $projDir.FullName "memory"
+            if (Test-Path $mem) { $memoryDirs += @{ Source = $mem; ProjectDir = $projDir.FullName; Scope = '10_projects' } }
+        }
+    }
+    $VaultWork = Join-Path $VaultRoot "50_work"
+    if (Test-Path $VaultWork) {
+        Get-ChildItem -Path $VaultWork -Filter "memory" -Directory -Recurse | ForEach-Object {
+            $memoryDirs += @{ Source = $_.FullName; ProjectDir = $_.Parent.FullName; Scope = '50_work' }
+        }
+    }
+
+    foreach ($entry in $memoryDirs) {
+        $memorySource = $entry.Source
+        $projectDir = $entry.ProjectDir
+        $projectName = Split-Path -Leaf $projectDir
+
+        # Determine CWD path based on vault scope
+        if ($entry.Scope -eq '10_projects') {
+            # Convention: repo lives at ~/Projects/<name>
+            $cwdPath = Join-Path $env:USERPROFILE "Projects\$projectName"
+        } else {
+            # Work projects: CWD is the vault path itself
+            $cwdPath = $projectDir
+        }
+
+        $encodedPath = $cwdPath.Replace('\', '-').Replace(':', '')
         $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encodedPath\memory"
+        $parentDir = Split-Path $targetDir -Parent
 
-        Ensure-Directory $targetDir
-        Copy-Item "$memorySource\*" $targetDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Success "Deployed auto-memory: $projectName"
+        Ensure-Directory $parentDir
+
+        # Handle existing target: junction → recreate, real dir with files → backup, empty → remove
+        if (Test-Path $targetDir) {
+            $item = Get-Item $targetDir -Force
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                # cmd rmdir removes the junction point without deleting target contents
+                cmd /c rmdir $targetDir 2>&1 | Out-Null
+            } elseif ((Get-ChildItem $targetDir -ErrorAction SilentlyContinue).Count -gt 0) {
+                Write-Warn "Backing up existing memory for $projectName"
+                Rename-Item $targetDir "$($targetDir).bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
+            } else {
+                Remove-Item $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        New-Item -ItemType Junction -Path $targetDir -Target $memorySource -Force | Out-Null
+        Write-Success "Linked auto-memory: $projectName"
     }
 
     # Migrate orphan memories: local Claude Code memories not yet in vault
@@ -251,8 +293,9 @@ if (Test-Path $VaultProjects) {
                 if ((Test-Path $vaultProject) -and -not (Test-Path $vaultMemory)) {
                     Write-Info "Migrating orphan memory: $projectName -> vault"
                     Copy-Item $memDir $vaultMemory -Recurse -Force
-                    Rename-Item $memDir "$($memDir).migrated"
-                    Write-Success "Migrated: $projectName"
+                    Remove-Item $memDir -Recurse -Force
+                    New-Item -ItemType Junction -Path $memDir -Target $vaultMemory -Force | Out-Null
+                    Write-Success "Migrated and linked: $projectName"
                 }
             }
         }
