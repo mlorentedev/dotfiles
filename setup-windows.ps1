@@ -585,6 +585,14 @@ if (Test-Path $syncSource) {
     Write-Warn "dotfiles-sync.ps1 not found at $syncSource"
 }
 
+$obsCliSource = "$DotfilesDir\scripts\obs-cli.ps1"
+if (Test-Path $obsCliSource) {
+    Copy-Item $obsCliSource "$ScriptsDir\" -Force
+    Write-Success "Deployed obs-cli.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "obs-cli.ps1 not found at $obsCliSource"
+}
+
 $loadSecretsSource = "$DotfilesDir\scripts\load-secrets.ps1"
 if (Test-Path $loadSecretsSource) {
     Ensure-Directory "$DotfilesDest\scripts"

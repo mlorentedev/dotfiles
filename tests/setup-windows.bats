@@ -72,6 +72,10 @@ setup() {
     grep -q 'dotfiles-sync.ps1' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 deploys obs-cli.ps1" {
+    grep -q 'obs-cli.ps1' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys load-secrets.ps1" {
     grep -q 'load-secrets.ps1' "$PS1_SCRIPT"
 }
