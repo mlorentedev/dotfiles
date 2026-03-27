@@ -43,6 +43,7 @@ CONTEXT_LINES=""
 
 # --- Hive: detect project and suggest vault queries ---
 # If CWD is a git repo, check if there's a matching vault project entry.
+# Checks: 1) personal projects (10_projects/), 2) work SDK projects (50_work/45-development/).
 detect_hive_project() {
     local repo_name vault_project_dir
     repo_name=$(basename "$CWD")
@@ -55,7 +56,51 @@ detect_hive_project() {
   - vault_query(project=\"$repo_name\", section=\"tasks\") — active backlog
   - vault_search(query=\"...\") — search across vault
   - vault_query(project=\"_meta\", path=\"patterns/...\") — cross-project patterns"
+        return 0
     fi
+
+    # Fallback: check work SDK projects under 50_work/45-development/
+    find_work_sdk_project
+}
+
+# Detect work SDK nested repos by matching path segments against vault family/component dirs.
+# Heuristic: slugify and compare CWD path segments against 45-development/<family>/<component>.
+find_work_sdk_project() {
+    local dev_dir="$KNOWLEDGE_VAULT/50_work/45-development"
+    [ -d "$dev_dir" ] || return 0
+
+    local cwd_slug family_dir family_name family_slug cwd_path_slug comp_dir comp_name comp_slug
+    # Slugify CWD: lowercase, remove non-alphanumeric except /
+    cwd_path_slug=$(printf '%s' "$CWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9/')
+
+    for family_dir in "$dev_dir"/*/; do
+        [ -d "$family_dir" ] || continue
+        family_name=$(basename "$family_dir")
+        family_slug=$(printf '%s' "$family_name" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
+
+        if printf '%s' "$cwd_path_slug" | grep -q "$family_slug"; then
+            # Family matches — look for component
+            for comp_dir in "$family_dir"*/; do
+                [ -d "$comp_dir" ] || continue
+                comp_name=$(basename "$comp_dir")
+                comp_slug=$(printf '%s' "$comp_name" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
+
+                if printf '%s' "$cwd_path_slug" | grep -q "$comp_slug"; then
+                    CONTEXT_LINES="$CONTEXT_LINES
+[hive] Work SDK '$comp_name' (family: $family_name) found in vault. Use Hive MCP:
+  - vault_query(project=\"_meta\", path=\"50_work/45-development/$family_name/$comp_name/00-context.md\") — project context
+  - vault_query(project=\"_meta\", path=\"50_work/45-development/$family_name/$comp_name/memory/MEMORY.md\") — session memory
+  - vault_query(project=\"_meta\", path=\"patterns/workflow-protocol\") — session protocol"
+                    return 0
+                fi
+            done
+            # Family matched but no component — suggest family context
+            CONTEXT_LINES="$CONTEXT_LINES
+[hive] Work SDK family '$family_name' found in vault. Use Hive MCP:
+  - vault_query(project=\"_meta\", path=\"50_work/45-development/$family_name/00-context.md\") — all repos in family"
+            return 0
+        fi
+    done
 }
 
 if [ -d "$CWD/.git" ]; then
@@ -128,11 +173,34 @@ ensure_memory_symlink() {
     vault_memory="$KNOWLEDGE_VAULT/10_projects/$project_name/memory"
 
     if [ ! -d "$vault_memory" ]; then
-        # Try CWD/memory/ (work projects where CWD is inside the vault)
+        # Try CWD/memory/ (knowledge sessions where CWD is inside the vault)
         case "$CWD" in
             "$KNOWLEDGE_VAULT"*) vault_memory="$CWD/memory" ;;
             *) vault_memory="" ;;
         esac
+    fi
+
+    # Try 50_work/45-development/<family>/<component>/memory/ for nested work SDK repos
+    if [ -z "$vault_memory" ] || [ ! -d "$vault_memory" ]; then
+        local dev_dir="$KNOWLEDGE_VAULT/50_work/45-development"
+        if [ -d "$dev_dir" ]; then
+            local cwd_path_slug sdk_family_dir sdk_family_slug sdk_comp_dir sdk_comp_slug
+            cwd_path_slug=$(printf '%s' "$CWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9/')
+            for sdk_family_dir in "$dev_dir"/*/; do
+                [ -d "$sdk_family_dir" ] || continue
+                sdk_family_slug=$(basename "$sdk_family_dir" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
+                if printf '%s' "$cwd_path_slug" | grep -q "$sdk_family_slug"; then
+                    for sdk_comp_dir in "$sdk_family_dir"*/; do
+                        [ -d "$sdk_comp_dir" ] || continue
+                        sdk_comp_slug=$(basename "$sdk_comp_dir" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
+                        if printf '%s' "$cwd_path_slug" | grep -q "$sdk_comp_slug"; then
+                            vault_memory="$sdk_comp_dir/memory"
+                            break 2
+                        fi
+                    done
+                fi
+            done
+        fi
     fi
 
     [ -d "$vault_memory" ] || return 0

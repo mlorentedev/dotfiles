@@ -171,27 +171,30 @@ STOP and fix if detected:
 ### Phase 1: Context Sync (Read First)
 1.  **Locate Vault:** Resolve `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
 2.  **Master Map:** If unsure about structure, read `knowledge/README.md`.
-3.  **Project Context:** Read `10_projects/<repo>/00-context.md`.
-4.  **Global Rules:** Read `00_meta/patterns/*.md`.
-5.  **Tactical Plan:** Read `10_projects/<repo>/11-tasks.md` (Active Backlog).
-6.  **Auto-Memory:** If exists, read `10_projects/<repo>/memory/MEMORY.md` (Claude Code persistent memory, synced via Obsidian).
+3.  **Project Context:** Determine the current area and read its `00-context.md`:
+    - Personal coding project (CWD = `~/Projects/<repo>/`) → `10_projects/<repo>/00-context.md`
+    - FAE/work knowledge session (CWD inside vault `50_work/`) → `50_work/<area>/00-context.md` or use Hive MCP `vault_query`
+    - Work SDK coding session (CWD = `~/Projects/<Family>/<component>/`) → `50_work/45-development/<family>/<component>/00-context.md`
+4.  **Global Rules:** Read `00_meta/patterns/*.md` — apply to ALL session types and domains.
+5.  **Tactical Plan:** Read `11-tasks.md` in the current project area.
+6.  **Auto-Memory:** If exists, read `memory/MEMORY.md` in the current project area (Claude Code persistent memory, synced via Obsidian).
 
 ### Phase 2: Execution (The Work)
 *   **Plan:** Create a sub-task checklist in memory (or scratchpad).
 *   **Act:** Implement code/tests in the repo.
 *   **Verify:** Run tests.
-*   **Document Dynamic:**
-    *   New architectural decision? -> Create `30-architecture/adr-XXX.md`.
-    *   New operational procedure? -> Create `40-runbooks/guide-XXX.md`.
-    *   Fixing a bug? -> Create `50-troubleshooting/error-name.md`.
-    *   Useful trick? -> Add to `90-lessons.md` or `60-resources/`.
-    *   New repeated pattern? -> Create/Update `00_meta/patterns/`.
+*   **Document Dynamic** — applies uniformly to personal, FAE, and work SDK sessions:
+    *   New architectural decision? → Create `30-architecture/adr-XXX.md` in the **current project area**.
+    *   New operational procedure? → Create `40-runbooks/guide-XXX.md` in the **current project area**.
+    *   Fixing a bug? → Create `50-troubleshooting/error-name.md` in the **current project area**.
+    *   Useful trick? → Add to `90-lessons.md` in the **current project area** or `60-resources/`.
+    *   New repeated pattern (recurs in >1 project/area)? → Promote to `00_meta/patterns/pattern-<topic>.md`.
 
 ### Phase 3: Knowledge Crystallization (Write Back)
-*   **Update Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar: `Progress: [======....] 60%`.
+*   **Update Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar: `Progress: [======....] 60%`. File lives in the **current project area**.
 *   **Update Strategy (`10-roadmap.md`):** ONLY if a major milestone/phase is completed.
-*   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` using the **Lesson Template**.
-*   **Promotion:** Evaluate if the lesson is global. If YES, create `00_meta/patterns/pattern-<topic>.md`.
+*   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` in the **current project area** using the **Lesson Template**.
+*   **Promotion:** If the lesson recurs in >1 project/area, promote to `00_meta/patterns/pattern-<topic>.md`.
 
 ## Auto-Maintenance Rules
 
@@ -229,9 +232,13 @@ If session start context reports memory files needing archive (>60 days cold):
 ## Vault Structure & Standards
 
 ### File Hierarchy
-*   `00_meta/templates/` -> Standard `.md` templates (USE THEM).
-*   `10_projects/<repo>/` -> Development Context.
-*   `50_work/` -> FAE Operations (Products, Clients, Tickets).
+*   `00_meta/templates/` → Standard `.md` templates (USE THEM).
+*   `00_meta/patterns/` → Universal rules — apply to ALL session types and domains.
+*   `10_projects/<repo>/` → Personal coding projects context.
+*   `50_work/` → FAE/work knowledge (products, clients, tickets).
+*   `50_work/45-development/<family>/<component>/` → Work SDK coding projects context.
+
+See `00_meta/patterns/workflow-protocol.md` for the full session taxonomy, path conventions, and daily action protocol.
 
 ### Frontmatter Law
 ALL Markdown files created in the vault MUST have this YAML header:

@@ -29,7 +29,13 @@ param(
 
     [Parameter(Position=1)]
     [ValidateSet("python", "go", "node", "ts", "none")]
-    [string]$Stack = "python"
+    [string]$Stack = "python",
+
+    [switch]$WorkSdk,
+
+    [string]$Family = "",
+
+    [string]$Component = ""
 )
 
 # ============================================================================
@@ -38,6 +44,125 @@ param(
 
 $ClaudeHome = "$env:USERPROFILE\.claude"
 $GeminiHome = "$env:USERPROFILE\.gemini"
+$Today = Get-Date -Format 'yyyy-MM-dd'
+
+# ============================================================================
+# --WorkSdk MODE: vault-only entry for nested work SDK repos
+# ============================================================================
+
+if ($WorkSdk) {
+    if (-not $Family -or -not $Component) {
+        Write-Err "Usage: init-project.ps1 -WorkSdk -Family <family-slug> -Component <component>"
+        exit 1
+    }
+
+    $KnowledgeHome = "$env:USERPROFILE\Projects\knowledge"
+    $SdkDir = "$KnowledgeHome\50_work\45-development\$Family\$Component"
+
+    Write-Info "Creating work SDK vault entry: 50_work/45-development/$Family/$Component"
+
+    foreach ($subDir in @('30-architecture', '40-runbooks', '50-troubleshooting', 'memory')) {
+        New-Item -ItemType Directory -Path "$SdkDir\$subDir" -Force | Out-Null
+    }
+
+    Set-Content -Path "$SdkDir\00-context.md" -Encoding UTF8 -Value @"
+---
+id: "$Family-$Component"
+type: project
+status: active
+source_path:
+  code: "`${PROJECTS_PATH}/<ProductFamily>/<component>"
+  onedrive: "`${ONEDRIVE_PATH}/Products/<ProductFamily>"
+stack: []
+tags: [work, sdk, $Family]
+created: "$Today"
+---
+
+# ${Component}: Work SDK Context
+
+> **Goal:** [Describe this repo's purpose within the $Family product family]
+
+## Technical Stack
+- **Language:**
+- **Key Tools:**
+
+## Repos in this Family
+See [[../00-context|$Family family context]] for all repos.
+
+## Critical Links
+- **Real repo path:** Fill in source_path above with actual `$env:USERPROFILE\Projects\...` path
+
+## Knowledge Structure
+- [[30-architecture]]: ADRs and Technical Decisions
+- [[40-runbooks]]: Operational Guides
+- [[50-troubleshooting]]: Known Issues
+- [[memory/MEMORY]]: Session memory
+- [[90-lessons]]: Lessons Learned
+"@
+
+    Set-Content -Path "$SdkDir\memory\MEMORY.md" -Encoding UTF8 -Value @"
+# $Component — Work SDK Session Memory
+
+## Session Handoff
+> Updated: $Today
+**Last task:** Vault entry initialized
+**Decisions:** None
+**Open threads:** Fill source_path in 00-context.md with real repo path
+**Next action:** Open Claude in real repo — session hook creates junction automatically
+
+## User Preferences
+- Follow global CLAUDE.md + workflow-protocol.md rules
+
+## Last Crystallized: $Today
+"@
+
+    Set-Content -Path "$SdkDir\90-lessons.md" -Encoding UTF8 -Value @"
+---
+id: "$Family-$Component-lessons"
+type: lesson
+status: active
+tags: [work, sdk, $Family]
+---
+# Lessons Learned — $Component
+
+*Record non-trivial bugs and decisions here. Promoted to 00_meta/patterns/ if recurring.*
+"@
+
+    # Create parent family context if it doesn't exist
+    $FamilyContext = "$KnowledgeHome\50_work\45-development\$Family\00-context.md"
+    if (-not (Test-Path $FamilyContext)) {
+        Set-Content -Path $FamilyContext -Encoding UTF8 -Value @"
+---
+id: "$Family"
+type: project
+status: active
+tags: [work, sdk, product-family]
+created: "$Today"
+---
+
+# ${Family}: Product Family Context
+
+> Umbrella context for all repos in the $Family product family.
+
+## Repos
+
+| Component | Vault Path | Real Path |
+|-----------|-----------|-----------|
+| $Component | [[$Component/00-context]] | Fill in source_path |
+
+## Work Context
+- Product knowledge: [[../../20-products/$Family/00-overview|product overview]] (if exists)
+"@
+        Write-Success "Created family context: $FamilyContext"
+    }
+
+    Write-Success "Work SDK vault entry created: $SdkDir"
+    Write-Host ""
+    Write-Host "Next steps:" -ForegroundColor Cyan
+    Write-Host "  1. Fill in source_path in $SdkDir\00-context.md"
+    Write-Host "  2. Open Claude in the real repo — session hook creates junction automatically"
+    exit 0
+}
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -118,49 +243,152 @@ $ProjectKbDir = "$KnowledgeHome\10_projects\$ProjectBaseName"
 
 Write-Info "Initializing Knowledge Vault structure..."
 
-if (-not (Test-Path $ProjectKbDir)) {
-    New-Item -ItemType Directory -Path $ProjectKbDir -Force | Out-Null
+foreach ($subDir in @('30-architecture', '40-runbooks', '50-troubleshooting', 'memory')) {
+    New-Item -ItemType Directory -Path "$ProjectKbDir\$subDir" -Force | Out-Null
 }
 
-$TasksContent = @"
+# 00-context.md
+if (-not (Test-Path "$ProjectKbDir\00-context.md")) {
+    Set-Content -Path "$ProjectKbDir\00-context.md" -Encoding UTF8 -Value @"
+---
+id: "$ProjectBaseName"
+type: project
+status: active
+repo_url: ""
+stack: [$Stack]
+tags: []
+created: "$Today"
+---
+
+# ${ProjectBaseName}: Project Context
+
+> **Goal:** [Concise, single-sentence project description]
+
+## Technical Stack
+- **Language:** $Stack
+- **Frameworks:**
+- **Infrastructure:**
+- **Key Tools:**
+
+## Critical Links
+- **Repository:** ~/Projects/$ProjectBaseName
+- **Production:**
+
+## Knowledge Structure
+- [[10-roadmap]]: Planning & Strategy
+- [[11-tasks]]: Active Backlog
+- [[30-architecture]]: ADRs and Technical Decisions
+- [[40-runbooks]]: Operational Guides
+- [[50-troubleshooting]]: Known Issues
+- [[90-lessons]]: Lessons Learned
+
+## Development Flow
+1. Feature branch from ``main``
+2. PR with tests
+3. Merge → deploy
+"@
+}
+
+# 10-roadmap.md
+if (-not (Test-Path "$ProjectKbDir\10-roadmap.md")) {
+    Set-Content -Path "$ProjectKbDir\10-roadmap.md" -Encoding UTF8 -Value @"
+---
+id: "$ProjectBaseName-roadmap"
+type: roadmap
+status: active
+created: "$Today"
+---
+
+# ${ProjectBaseName}: Roadmap and Vision
+
+> **Vision:** [One-sentence vision]
+
+## Strategic Themes
+
+### 1. [Theme Name]
+* **Goal:**
+* **Status:** Not started
+* **Next:**
+"@
+}
+
+# 11-tasks.md
+if (-not (Test-Path "$ProjectKbDir\11-tasks.md")) {
+    Set-Content -Path "$ProjectKbDir\11-tasks.md" -Encoding UTF8 -Value @"
 ---
 id: "$ProjectBaseName-tasks"
 type: project
 status: active
 tags: []
 ---
-# Project Tasks
+# ${ProjectBaseName}: Active Backlog
+
+Progress: [..........] 0%
 
 ## Pending
 
-- [ ] Initial setup complete
+- [ ] Fill in 00-context.md with project details
 
 ## In Progress
 
 ## Done
-
 "@
+}
 
-$LessonsContent = @"
+# 90-lessons.md
+if (-not (Test-Path "$ProjectKbDir\90-lessons.md")) {
+    Set-Content -Path "$ProjectKbDir\90-lessons.md" -Encoding UTF8 -Value @"
 ---
 id: "$ProjectBaseName-lessons"
 type: lesson
 status: active
 tags: []
 ---
-# Lessons Learned
+# Lessons Learned — $ProjectBaseName
 
-*Record mistakes and prevention rules here. Review at session start.*
-
-## Patterns to Avoid
-
-## Corrections Log
-
+*Non-trivial bugs and decisions. Promoted to 00_meta/patterns/ if recurring across projects.*
 "@
+}
 
-Set-Content -Path "$ProjectKbDir\11-tasks.md" -Value $TasksContent -Encoding UTF8
-Set-Content -Path "$ProjectKbDir\90-lessons.md" -Value $LessonsContent -Encoding UTF8
-Write-Success "Created Knowledge Vault entries in 10_projects\$ProjectBaseName"
+# memory/MEMORY.md
+if (-not (Test-Path "$ProjectKbDir\memory\MEMORY.md")) {
+    Set-Content -Path "$ProjectKbDir\memory\MEMORY.md" -Encoding UTF8 -Value @"
+# $ProjectBaseName
+
+## Session Handoff
+> Updated: $Today
+**Last task:** Project initialized via init-project.ps1
+**Decisions:** None
+**Open threads:** Fill 00-context.md with actual project details
+**Next action:** Run /crystallize after first sprint
+
+## User Preferences
+- Follow global CLAUDE.md + workflow-protocol.md rules
+
+## Architecture Map
+- See [[00-context]] for stack and entry points
+
+## Last Crystallized: $Today
+"@
+}
+
+# Create memory junction immediately — don't wait for first Claude session
+$EncodedCwd = $ProjectRoot.Path.Replace('\', '-').Replace(':', '').Replace('/', '-')
+$ClaudeProjectDir = "$env:USERPROFILE\.claude\projects\$EncodedCwd"
+if (-not (Test-Path $ClaudeProjectDir)) {
+    New-Item -ItemType Directory -Path $ClaudeProjectDir -Force | Out-Null
+}
+$JunctionPath = "$ClaudeProjectDir\memory"
+if (-not (Test-Path $JunctionPath)) {
+    try {
+        New-Item -ItemType Junction -Path $JunctionPath -Target "$ProjectKbDir\memory" -Force | Out-Null
+        Write-Success "Created memory junction → vault"
+    } catch {
+        Write-Warn "Could not create memory junction (non-fatal): $_"
+    }
+}
+
+Write-Success "Created Knowledge Vault entry in 10_projects\$ProjectBaseName"
 
 # ============================================================================
 # STACK INITIALIZATION

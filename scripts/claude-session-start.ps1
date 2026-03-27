@@ -37,6 +37,7 @@ $KnowledgeVault = Join-Path $env:USERPROFILE 'Projects\knowledge'
 $ContextLines = ''
 
 # --- Hive: detect project and suggest vault queries ---
+# Checks: 1) personal projects (10_projects/), 2) work SDK projects (50_work/45-development/).
 function Find-HiveProject {
     param([string]$Path)
 
@@ -52,6 +53,48 @@ function Find-HiveProject {
   - vault_search(query="...") - search across vault
   - vault_query(project="_meta", path="patterns/...") - cross-project patterns
 "@
+        return
+    }
+
+    # Fallback: check work SDK projects under 50_work/45-development/
+    Find-WorkSdkProject -Path $Path
+}
+
+# Detect work SDK nested repos by matching slugified path segments against vault family/component dirs.
+function Find-WorkSdkProject {
+    param([string]$Path)
+
+    $devDir = Join-Path $KnowledgeVault '50_work\45-development'
+    if (-not (Test-Path $devDir)) { return }
+
+    $cwdSlug = $Path.ToLower() -replace '[^a-z0-9/\\]', ''
+
+    foreach ($familyDir in (Get-ChildItem $devDir -Directory -ErrorAction SilentlyContinue)) {
+        $familySlug = $familyDir.Name.ToLower() -replace '[^a-z0-9]', ''
+
+        if ($cwdSlug -match $familySlug) {
+            foreach ($compDir in (Get-ChildItem $familyDir.FullName -Directory -ErrorAction SilentlyContinue)) {
+                $compSlug = $compDir.Name.ToLower() -replace '[^a-z0-9]', ''
+
+                if ($cwdSlug -match $compSlug) {
+                    $script:ContextLines += @"
+
+[hive] Work SDK '$($compDir.Name)' (family: $($familyDir.Name)) found in vault. Use Hive MCP:
+  - vault_query(project="_meta", path="50_work/45-development/$($familyDir.Name)/$($compDir.Name)/00-context.md") - project context
+  - vault_query(project="_meta", path="50_work/45-development/$($familyDir.Name)/$($compDir.Name)/memory/MEMORY.md") - session memory
+  - vault_query(project="_meta", path="patterns/workflow-protocol") - session protocol
+"@
+                    return
+                }
+            }
+            # Family matched but no component
+            $script:ContextLines += @"
+
+[hive] Work SDK family '$($familyDir.Name)' found in vault. Use Hive MCP:
+  - vault_query(project="_meta", path="50_work/45-development/$($familyDir.Name)/00-context.md") - all repos in family
+"@
+            return
+        }
     }
 }
 
@@ -108,10 +151,31 @@ function Ensure-MemoryJunction {
     # Try 10_projects/<name>/memory/ (personal projects convention)
     $projectName = Split-Path -Leaf $CWD
     $vaultMemory = Join-Path $KnowledgeVault "10_projects\$projectName\memory"
+
     if (-not (Test-Path $vaultMemory)) {
-        # Try CWD/memory/ (work projects where CWD is inside the vault)
+        # Try CWD/memory/ (knowledge sessions where CWD is inside the vault)
         if ($CWD.StartsWith($KnowledgeVault, [System.StringComparison]::OrdinalIgnoreCase)) {
             $vaultMemory = Join-Path $CWD "memory"
+        }
+    }
+
+    # Try 50_work/45-development/<family>/<component>/memory/ for nested work SDK repos
+    if (-not (Test-Path $vaultMemory)) {
+        $devDir = Join-Path $KnowledgeVault '50_work\45-development'
+        if (Test-Path $devDir) {
+            $cwdSlug = $CWD.ToLower() -replace '[^a-z0-9/\\]', ''
+            :sdkSearch foreach ($familyDir in (Get-ChildItem $devDir -Directory -ErrorAction SilentlyContinue)) {
+                $familySlug = $familyDir.Name.ToLower() -replace '[^a-z0-9]', ''
+                if ($cwdSlug -match $familySlug) {
+                    foreach ($compDir in (Get-ChildItem $familyDir.FullName -Directory -ErrorAction SilentlyContinue)) {
+                        $compSlug = $compDir.Name.ToLower() -replace '[^a-z0-9]', ''
+                        if ($cwdSlug -match $compSlug) {
+                            $vaultMemory = Join-Path $compDir.FullName "memory"
+                            break sdkSearch
+                        }
+                    }
+                }
+            }
         }
     }
 
