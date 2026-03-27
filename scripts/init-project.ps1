@@ -160,7 +160,7 @@ created: "$Today"
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Cyan
     Write-Host "  1. Fill in source_path in $SdkDir\00-context.md"
-    Write-Host "  2. Open Claude in the real repo — session hook creates junction automatically"
+    Write-Host "  2. Open Claude in the real repo - session hook creates junction automatically"
     exit 0
 }
 
@@ -372,7 +372,7 @@ if (-not (Test-Path "$ProjectKbDir\memory\MEMORY.md")) {
 "@
 }
 
-# Create memory junction immediately — don't wait for first Claude session
+# Create memory junction immediately - don't wait for first Claude session
 $EncodedCwd = $ProjectRoot.Path.Replace('\', '-').Replace(':', '').Replace('/', '-')
 $ClaudeProjectDir = "$env:USERPROFILE\.claude\projects\$EncodedCwd"
 if (-not (Test-Path $ClaudeProjectDir)) {
@@ -382,7 +382,7 @@ $JunctionPath = "$ClaudeProjectDir\memory"
 if (-not (Test-Path $JunctionPath)) {
     try {
         New-Item -ItemType Junction -Path $JunctionPath -Target "$ProjectKbDir\memory" -Force | Out-Null
-        Write-Success "Created memory junction → vault"
+        Write-Success "Created memory junction -> vault"
     } catch {
         Write-Warn "Could not create memory junction (non-fatal): $_"
     }
