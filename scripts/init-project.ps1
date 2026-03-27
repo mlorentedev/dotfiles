@@ -101,14 +101,14 @@ See [[../00-context|$Family family context]] for all repos.
 "@
 
     Set-Content -Path "$SdkDir\memory\MEMORY.md" -Encoding UTF8 -Value @"
-# $Component — Work SDK Session Memory
+# $Component - Work SDK Session Memory
 
 ## Session Handoff
 > Updated: $Today
 **Last task:** Vault entry initialized
 **Decisions:** None
 **Open threads:** Fill source_path in 00-context.md with real repo path
-**Next action:** Open Claude in real repo — session hook creates junction automatically
+**Next action:** Open Claude in real repo -- session hook creates junction automatically
 
 ## User Preferences
 - Follow global CLAUDE.md + workflow-protocol.md rules
@@ -123,7 +123,7 @@ type: lesson
 status: active
 tags: [work, sdk, $Family]
 ---
-# Lessons Learned — $Component
+# Lessons Learned - $Component
 
 *Record non-trivial bugs and decisions here. Promoted to 00_meta/patterns/ if recurring.*
 "@
@@ -285,7 +285,7 @@ created: "$Today"
 ## Development Flow
 1. Feature branch from ``main``
 2. PR with tests
-3. Merge → deploy
+3. Merge -> deploy
 "@
 }
 
@@ -344,7 +344,7 @@ type: lesson
 status: active
 tags: []
 ---
-# Lessons Learned — $ProjectBaseName
+# Lessons Learned - $ProjectBaseName
 
 *Non-trivial bugs and decisions. Promoted to 00_meta/patterns/ if recurring across projects.*
 "@
