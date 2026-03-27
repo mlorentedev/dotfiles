@@ -272,6 +272,23 @@ tags: [tag1, tag2]
 * Do NOT use for: boilerplate, single-file edits, syntax fixes, CSS changes.
 * Pairs well with Context7: use Sequential Thinking to plan, Context7 to validate API choices.
 
+### Obsidian CLI (Vault Graph Queries)
+
+**Available via:** `obs-cli.sh <command>` (Linux) / `obs-cli.ps1 <command>` (Windows).
+Requires Obsidian GUI running. Falls back with exit 2 if GUI is down.
+Set `OBS_VAULT` env var to override default vault (default: `knowledge`).
+
+**Unique commands (not covered by Hive MCP):**
+* `backlinks file="path/to/note.md"` — notes linking to a given file
+* `orphans` — files with no incoming links
+* `dead-ends` — files with no outgoing links
+* `unresolved` — broken wikilinks
+* `tags` / `tags:rename old=X new=Y` — list or bulk-rename tags
+* `eval "expression"` — execute JS against Obsidian internal API
+
+**When to use:** Vault maintenance, graph analysis, bulk tag operations.
+**When NOT to use:** File CRUD and search — use Hive MCP instead (headless, always available).
+
 ## Response Protocol
 
 1. **Classify Task:** Determine if Low Load (Execute) or High Load (Mentor).

@@ -46,6 +46,7 @@ jobs:
             'setup-windows.ps1',
             'scripts/init-project.ps1',
             'scripts/knowledge-crystallize.ps1',
+            'scripts/obs-cli.ps1',
             'powershell/profile.ps1'
           )
           $failed = $false
