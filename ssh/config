@@ -34,7 +34,7 @@ Host jet1
   IdentityFile ~/.ssh/id_ed25519
 
 Host aws1
-  Hostname 100.64.0.4
+  Hostname aws1.kubelab.internal
   User deployer
   IdentityFile ~/.ssh/id_ed25519
 
@@ -78,10 +78,7 @@ Host jet1-lan
   IdentityFile ~/.ssh/id_ed25519
   ProxyJump rpi4-lan
 
-Host aws1-pub
-  Hostname 3.77.204.105
-  User deployer
-  IdentityFile ~/.ssh/id_ed25519
+# aws1-pub removed — use `terraform output public_ip` for bootstrap access
 
 Host vps-pub
   Hostname 162.55.57.175
