@@ -1,6 +1,6 @@
 ---
 name: dispatching-parallel-agents
-description: Use when facing 2+ independent tasks that can run concurrently without shared state or sequential dependencies. Dispatches one agent per problem domain.
+description: Use when facing 2+ independent tasks that can run concurrently without shared state or sequential dependencies.
 ---
 
 # Dispatching Parallel Agents

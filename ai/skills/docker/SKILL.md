@@ -1,6 +1,6 @@
 ---
 name: docker
-description: Generate production-ready Dockerfile and docker-compose.yml. Use when containerizing applications, setting up local development environments, or creating multi-service deployments. Applies security best practices (non-root, multi-stage, no secrets in images).
+description: Use when containerizing applications, setting up local development environments, or creating multi-service Docker deployments.
 ---
 
 # Docker Configuration

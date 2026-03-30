@@ -148,16 +148,24 @@ if (Test-Path $claudeMdSource) {
     Write-Warn "CLAUDE.md not found at $claudeMdSource"
 }
 
-# Copy skills (full directories)
+# Sync skills: remove stale skill directories not in source, then copy current
 $skillsSource = "$DotfilesDir\ai\skills"
 if (Test-Path $skillsSource) {
+    # Remove stale skills from target that no longer exist in source
+    $existingSkills = Get-ChildItem "$ClaudeHome\skills" -Directory -ErrorAction SilentlyContinue
+    foreach ($existing in $existingSkills) {
+        if (-not (Test-Path "$skillsSource\$($existing.Name)")) {
+            Remove-Item $existing.FullName -Recurse -Force
+        }
+    }
+    # Copy current skills
     $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
     foreach ($skillDir in $skillDirs) {
         $targetDir = "$ClaudeHome\skills\$($skillDir.Name)"
         Ensure-Directory $targetDir
         Copy-Item "$($skillDir.FullName)\*" $targetDir -Recurse -Force -ErrorAction SilentlyContinue
     }
-    Write-Success "Deployed skills to $ClaudeHome\skills\"
+    Write-Success "Synced skills to $ClaudeHome\skills\"
 }
 
 # Register MCP servers (requires Claude Code CLI and Node.js)
@@ -407,8 +415,16 @@ if (Test-Path $geminiMdSource) {
     Write-Warn "GEMINI.md not found at $geminiMdSource"
 }
 
-# Extract Gemini prompts (strip YAML frontmatter from skills)
+# Sync Gemini prompts: remove stale, then extract from current skills
 if (Test-Path $skillsSource) {
+    # Remove stale skill-derived prompts not in source
+    $existingPrompts = Get-ChildItem "$GeminiHome\prompts\*.md" -ErrorAction SilentlyContinue
+    foreach ($prompt in $existingPrompts) {
+        if (-not (Test-Path "$skillsSource\$($prompt.BaseName)")) {
+            Remove-Item $prompt.FullName -Force
+        }
+    }
+    # Extract SKILL.md content as flat prompts (strip YAML frontmatter)
     $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
     foreach ($skillDir in $skillDirs) {
         $skillMd = "$($skillDir.FullName)\SKILL.md"
@@ -426,7 +442,7 @@ if (Test-Path $skillsSource) {
             Set-Content -Path $targetFile -Value $strippedContent.Trim() -Encoding UTF8
         }
     }
-    Write-Success "Extracted Gemini prompts to $GeminiHome\prompts\"
+    Write-Success "Synced Gemini prompts to $GeminiHome\prompts\"
 }
 
 # ============================================================================
@@ -711,6 +727,25 @@ if ($ghCmd) {
     Write-Success "GitHub Copilot CLI configured (aliases ghcs/ghce in profile.ps1)"
 } else {
     Write-Warn "GitHub CLI (gh) not found, skipping Copilot installation"
+}
+
+# Weekly vault maintenance scheduled task (Sundays 10:00 AM)
+Write-Info "Setting up weekly vault maintenance task..."
+$taskName = "DotfilesVaultMaintenance"
+$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if (-not $existingTask) {
+    try {
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" `
+            -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$DotfilesDir\scripts\vault-maintenance-weekly.ps1`""
+        $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "10:07AM"
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+            -Description "Weekly vault maintenance - knowledge crystallization and health checks" -Force | Out-Null
+        Write-Success "Installed weekly vault maintenance task (Sundays 10:07)"
+    } catch {
+        Write-Warn "Could not register scheduled task (may need admin): $_"
+    }
+} else {
+    Write-Info "Weekly vault maintenance task already installed"
 }
 
 # ============================================================================

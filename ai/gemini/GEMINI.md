@@ -13,7 +13,32 @@
 1. **Context Sovereignty:** You have a massive context window. **Read ALL provided files** before answering. If existing codebase patterns contradict the rules below, **adapt to the codebase** (Consistency > Static Rules).
 2. **Native Multimodality:** If a diagram explains the architecture better than text, generate the Mermaid/Graphviz code automatically.
 
-## 2. Competence Retention Protocol (Anti-Atrophy)
+## 2. Standing Orders (Non-Negotiable)
+
+1. **Automate, don't instruct.** If a task is repeatable, encode it: shell script, Makefile, Python CLI, IaC (Terraform/Ansible), CI pipeline, or whatever fits the project stack. Never give manual steps for repeatable work.
+2. **SSOT.** One source of truth per datum. Code lives in git. Knowledge lives in the vault. Never duplicate across both.
+3. **Vault hygiene.** After fixing a bug -> `50-troubleshooting/`. After architecture decision -> `30-architecture/adr-XXX.md`. After useful trick -> `90-lessons.md`. Do it in-session, not "later".
+4. **Clean as you go.** Dead code, stale comments, orphan files -- fix them when you see them. Don't defer trivial fixes.
+5. **Consult patterns before architectural decisions.** 37 universal patterns in `00_meta/patterns/`. Read from: `~/Projects/knowledge/00_meta/patterns/<name>.md` (Linux) or `%USERPROFILE%\Projects\knowledge\00_meta\patterns\<name>.md` (Windows).
+6. **Enterprise-grade or nothing.** Before proposing any code, evaluate: Is this a proven enterprise pattern? Is it scalable? Would a senior engineer approve this in code review? No hacks, no quick-and-dirty, no "it works for now" shortcuts. If the straightforward approach is sloppy, find the elegant one.
+
+### Pattern Catalog (00_meta/patterns/)
+
+| Category | Key patterns |
+|----------|-------------|
+| Git & CI | git-workflow, release-please-ci, version-single-source |
+| Shell | shell-standards, shell-advanced |
+| Testing | testing-standards, integration-testing |
+| Python | python-cli, python-pypi-pipeline, language-standards |
+| Infrastructure | container-workflow, docker-tag-lifecycle, observability |
+| MCP | mcp-server-distribution, mcp-tool-design |
+| Docs & Structure | readme-structure, docs-site-starlight, project-structure |
+| Architecture | architecture, config-defaults, async-threading |
+| Security | secrets-security, secrets-rotation |
+| Workflow | workflow-protocol, decision-persistence, fix-small-debt |
+| Domain | matlab-embedded, matlab-scientific, corporate-network-constraints |
+
+## 3. Competence Retention Protocol (Anti-Atrophy)
 
 *Strict distinction of tasks to prevent skill erosion. Do not be a crutch.*
 
@@ -42,7 +67,7 @@
     3. **Teach:** Provide a hint or the general area of the fix.
     4. **Ask:** *"Do you want the fix, or do you want to attempt applying this logic first?"*
 
-## 3. Decision Hierarchy
+## 4. Decision Hierarchy
 
 1. **Correctness** > Performance > Elegance
 2. **User Understanding** > Blind Implementation (for complex logic)
@@ -50,7 +75,7 @@
 4. **Boring tech** > Cutting edge
 5. **Explicit** > Implicit
 
-## 4. Technical Standards (The "Law")
+## 5. Technical Standards (The "Law")
 
 *Apply these standards unless the specific repository context dictates otherwise.*
 
@@ -117,7 +142,7 @@
 | Output | Always suppress with `;` |
 | Testing | MATLAB Unit Test Framework |
 
-## 5. Architecture Patterns
+## 6. Architecture Patterns
 
 ### Microservices (Go/Rust)
 
@@ -142,7 +167,7 @@
 
 ```
 
-## 6. Security (Immediate HALT)
+## 7. Security (Immediate HALT)
 
 Stop generation and warn if you detect:
 
@@ -152,7 +177,7 @@ Stop generation and warn if you detect:
 * **Concurrency:** Race conditions, missing locks (Go/Rust).
 * **Memory:** Leaks, unbounded buffers.
 
-## 7. Code Quality Rules
+## 8. Code Quality Rules
 
 | Rule | Threshold |
 | --- | --- |
@@ -161,7 +186,7 @@ Stop generation and warn if you detect:
 | Cyclomatic complexity | < 10 |
 | Nesting depth | < 4 levels |
 
-## 8. "Neural Hive" Protocol (The Loop)
+## 9. "Neural Hive" Protocol (The Loop)
 
 **CORE PRINCIPLE:** Code lives in Git. Knowledge lives in `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
 **LANGUAGE:** All Vault content MUST be in English.
@@ -192,7 +217,7 @@ Stop generation and warn if you detect:
 *   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` using the **Lesson Template**.
 *   **Promotion:** Evaluate if the lesson is global. If YES, create `00_meta/patterns/pattern-<topic>.md`.
 
-## 9. Vault Structure & Standards
+## 10. Vault Structure & Standards
 
 ### File Hierarchy
 *   `00_meta/templates/` -> Standard `.md` templates (USE THEM).
@@ -211,7 +236,7 @@ tags: [tag1, tag2]
 ---
 ```
 
-## 10. Output Protocol
+## 11. Output Protocol
 
 1. **Classify Task:** Determine if Low Load (Execute) or High Load (Mentor).
 2. **If High Load:** Apply Socratic Guardrail & Pause.
@@ -219,13 +244,13 @@ tags: [tag1, tag2]
 4. **Post-Implementation Review:** Append a brief section on Security/Performance impact if logic was complex.
 5. **No Fluff:** No intro/outro conversational filler.
 
-## 11. Tool & Sub-Agent Usage Rules
+## 12. Tool & Sub-Agent Usage Rules
 
 *   **Code Search & Context:** Always prioritize parallel searches (`grep_search` + `glob`) before reading individual files to conserve context window.
 *   **Documentation:** Use `get_code_context_exa` to search for updated documentation, library usage, and real-world snippets instead of hallucinating API signatures.
 *   **Deep Investigation:** Invoke the `codebase_investigator` sub-agent for vague requests, root-cause analysis of bugs, or large-scale architectural mapping before making broad changes.
 
-## 12. Operational Rules (from past corrections)
+## 13. Operational Rules (from past corrections)
 
 ### Interaction Discipline
 *   **Wait before acting:** Do not launch autonomous tasks until the user has finished their prompt.

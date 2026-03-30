@@ -253,6 +253,12 @@ log_info "Setting up AI configuration..."
 ensure_directory "$HOME/.gemini"
 ensure_directory "$HOME/.gemini/prompts"
 cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
+# Sync Gemini prompts: remove stale skill-derived prompts not in source
+for target_file in "$HOME/.gemini/prompts/"*.md; do
+    [ -f "$target_file" ] || continue
+    prompt_name=$(basename "$target_file" .md)
+    [ -d "$CURRENT_DIR/ai/skills/$prompt_name" ] || rm -f "$target_file"
+done
 # Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
 for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
     if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
@@ -276,6 +282,12 @@ ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
 cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
 cp -f "$CURRENT_DIR/scripts/init-project.sh" "$HOME/.claude/" 2>/dev/null || true
+# Sync Claude skills: remove stale skill directories not in source
+for target_dir in "$HOME/.claude/skills/"*/; do
+    [ -d "$target_dir" ] || continue
+    skill_name=$(basename "$target_dir")
+    [ -d "$CURRENT_DIR/ai/skills/$skill_name" ] || rm -rf "$target_dir"
+done
 # Copy skill directories (each skill has its own dir with SKILL.md)
 for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
     if [ -d "$skill_dir" ]; then
@@ -515,6 +527,20 @@ fi
 PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
 [ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
 [ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
+
+# Weekly vault maintenance cron (Sundays 10:00 AM)
+log_info "Setting up weekly vault maintenance cron..."
+if command -v crontab >/dev/null 2>&1; then
+    CRON_CMD="7 10 * * 0 $CURRENT_DIR/scripts/vault-maintenance-weekly.sh"
+    if crontab -l 2>/dev/null | grep -q "vault-maintenance-weekly"; then
+        log_info "Weekly vault maintenance cron already installed"
+    else
+        (crontab -l 2>/dev/null; echo "$CRON_CMD # dotfiles: vault-maintenance-weekly") | crontab -
+        log_success "Installed weekly vault maintenance cron (Sundays 10:07)"
+    fi
+else
+    log_warning "crontab not available, skipping weekly maintenance cron"
+fi
 
 log_info "Adding dotfiles scripts directory to PATH..."
 PATH_LINE='export PATH=$HOME/.dotfiles/scripts:$PATH'

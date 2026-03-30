@@ -1,6 +1,6 @@
 ---
 name: crystallize
-description: Full AI-assisted knowledge crystallization ritual. Use when /insights shows unvaulted observations, stale MEMORY.md, or after completing a significant sprint. Promotes observations to vault lessons, detects new patterns, trims MEMORY.md, and stamps Last Crystallized.
+description: Use when /insights shows unvaulted observations, stale MEMORY.md, or after completing a significant sprint. Addresses knowledge gaps between session observations and vault lessons.
 ---
 
 # /crystallize — Knowledge Crystallization Ritual

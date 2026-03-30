@@ -190,7 +190,7 @@ check_frontmatter_field() {
 }
 
 if [ "$TOTAL_FILES" -gt 0 ]; then
-    for field in id type status tags created; do
+    for field in id type status tags created owner; do
         check_frontmatter_field "$field"
     done
 else

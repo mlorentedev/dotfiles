@@ -176,9 +176,9 @@ setup() {
     grep -q "CORE PRINCIPLE" "$HOME/.claude/CLAUDE.md"
 }
 
-@test "~/.claude/skills has at least 18 directories" {
+@test "~/.claude/skills has at least 15 directories" {
     count=$(find "$HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)
-    [ "$count" -ge 18 ]
+    [ "$count" -ge 15 ]
 }
 
 @test "~/.claude/init-project.sh exists and is executable" {
@@ -191,9 +191,9 @@ setup() {
     grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"
 }
 
-@test "~/.gemini/prompts has at least 18 files" {
+@test "~/.gemini/prompts has at least 15 files" {
     count=$(find "$HOME/.gemini/prompts" -mindepth 1 -maxdepth 1 -type f -name '*.md' | wc -l)
-    [ "$count" -ge 18 ]
+    [ "$count" -ge 15 ]
 }
 
 @test "Gemini prompts have no YAML frontmatter" {

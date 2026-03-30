@@ -1,6 +1,6 @@
 ---
 name: test
-description: Generate comprehensive test suites with edge cases, failure modes, and proper mocking. Use when creating tests for functions, classes, or modules. Supports pytest (Python), testing package (Go), vitest/jest (JS/TS), and built-in test (Rust).
+description: Use when creating tests for functions, classes, or modules. Covers edge cases, failure modes, boundary conditions, and proper mocking. Supports pytest (Python), testing package (Go), vitest/jest (JS/TS), and built-in test (Rust).
 ---
 
 # Test Generation

@@ -1,6 +1,6 @@
 ---
 name: debug-hardware
-description: Debug hardware and firmware issues (cameras, sensors, registers, embedded). Use when troubleshooting device communication, register configuration, signal processing, or firmware behavior. Evidence-first approach — no guessing.
+description: Use when troubleshooting hardware or firmware issues -- device communication, register configuration, signal processing, camera/sensor behavior, or embedded systems.
 ---
 
 # Hardware Debugging
