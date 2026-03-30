@@ -530,12 +530,16 @@ PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
 
 # Weekly vault maintenance cron (Sundays 10:00 AM)
 log_info "Setting up weekly vault maintenance cron..."
-CRON_CMD="7 10 * * 0 $CURRENT_DIR/scripts/vault-maintenance-weekly.sh"
-if crontab -l 2>/dev/null | grep -q "vault-maintenance-weekly"; then
-    log_info "Weekly vault maintenance cron already installed"
+if command -v crontab >/dev/null 2>&1; then
+    CRON_CMD="7 10 * * 0 $CURRENT_DIR/scripts/vault-maintenance-weekly.sh"
+    if crontab -l 2>/dev/null | grep -q "vault-maintenance-weekly"; then
+        log_info "Weekly vault maintenance cron already installed"
+    else
+        (crontab -l 2>/dev/null; echo "$CRON_CMD # dotfiles: vault-maintenance-weekly") | crontab -
+        log_success "Installed weekly vault maintenance cron (Sundays 10:07)"
+    fi
 else
-    (crontab -l 2>/dev/null; echo "$CRON_CMD # dotfiles: vault-maintenance-weekly") | crontab -
-    log_success "Installed weekly vault maintenance cron (Sundays 10:07)"
+    log_warning "crontab not available, skipping weekly maintenance cron"
 fi
 
 log_info "Adding dotfiles scripts directory to PATH..."
