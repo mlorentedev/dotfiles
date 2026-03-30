@@ -1,6 +1,6 @@
 ---
 name: prd-to-issues
-description: Use when creating GitHub issues from a PRD, syncing PRD to GitHub, or converting requirements to issues. Creates epics and stories with labels, linking, and re-sync markers.
+description: Use when creating GitHub issues from a PRD, syncing an existing PRD to GitHub, or converting requirements documents into tracked issues.
 ---
 
 # PRD to GitHub Issues

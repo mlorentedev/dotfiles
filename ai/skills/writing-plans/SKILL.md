@@ -1,23 +1,23 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code. Creates detailed implementation plans with bite-sized tasks.
+description: Use when you have a spec or requirements for a multi-step task, before touching code. Use after brainstorming or requirements gathering to create an actionable implementation plan.
 ---
 
 # Writing Plans
 
 Create implementation plans assuming the engineer has zero codebase context. Document everything needed: files to touch, code, testing, verification steps.
 
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
-
 ## Task Granularity
 
 Each step is one action (2-5 minutes):
 
-- "Write the failing test" - step
-- "Run it to verify it fails" - step
-- "Implement minimal code to pass" - step
-- "Run tests to verify pass" - step
-- "Commit" - step
+- "Write the failing test" -- step
+- "Run it to verify it fails" -- step
+- "Implement minimal code to pass" -- step
+- "Run tests to verify pass" -- step
+- "Commit" -- step
+
+Each task follows the **RED-GREEN-REFACTOR** cycle: write a failing test first, implement minimal code to pass, then refactor. See `test-driven-development` for the full discipline, anti-patterns, and rationalization counters.
 
 ## Plan Header Template
 
@@ -45,11 +45,11 @@ Each step is one action (2-5 minutes):
 
 **Step 1: Write failing test**
 
-```python
+` ` `python
 def test_specific_behavior():
     result = function(input)
     assert result == expected
-```
+` ` `
 
 **Step 2: Run test to verify failure**
 
@@ -58,10 +58,10 @@ Expected: FAIL with "function not defined"
 
 **Step 3: Write minimal implementation**
 
-```python
+` ` `python
 def function(input):
     return expected
-```
+` ` `
 
 **Step 4: Run test to verify pass**
 
@@ -70,10 +70,10 @@ Expected: PASS
 
 **Step 5: Commit**
 
-```bash
+` ` `bash
 git add tests/path/test.py src/path/file.py
 git commit -m "feat: add specific feature"
-```
+` ` `
 ```
 
 ## Rules
@@ -83,6 +83,8 @@ git commit -m "feat: add specific feature"
 - Exact commands with expected output
 - DRY, YAGNI, TDD, frequent commits
 
-## Execution
+## Pipeline
 
-After saving plan, use `executing-plans` skill to implement task-by-task.
+- Previous: Requirements, spec, or design document
+- Next: `/executing-plans` to implement task-by-task
+- Quality gate: `/verification-before-completion` before claiming done

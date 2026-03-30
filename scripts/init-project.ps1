@@ -70,6 +70,7 @@ if ($WorkSdk) {
 id: "$Family-$Component"
 type: project
 status: active
+owner: manu
 source_path:
   code: "`${PROJECTS_PATH}/<ProductFamily>/<component>"
   onedrive: "`${ONEDRIVE_PATH}/Products/<ProductFamily>"
@@ -121,6 +122,7 @@ See [[../00-context|$Family family context]] for all repos.
 id: "$Family-$Component-lessons"
 type: lesson
 status: active
+owner: manu
 tags: [work, sdk, $Family]
 ---
 # Lessons Learned - $Component
@@ -136,6 +138,7 @@ tags: [work, sdk, $Family]
 id: "$Family"
 type: project
 status: active
+owner: manu
 tags: [work, sdk, product-family]
 created: "$Today"
 ---
@@ -254,6 +257,7 @@ if (-not (Test-Path "$ProjectKbDir\00-context.md")) {
 id: "$ProjectBaseName"
 type: project
 status: active
+owner: manu
 repo_url: ""
 stack: [$Stack]
 tags: []
@@ -296,6 +300,7 @@ if (-not (Test-Path "$ProjectKbDir\10-roadmap.md")) {
 id: "$ProjectBaseName-roadmap"
 type: roadmap
 status: active
+owner: manu
 created: "$Today"
 ---
 
@@ -319,6 +324,7 @@ if (-not (Test-Path "$ProjectKbDir\11-tasks.md")) {
 id: "$ProjectBaseName-tasks"
 type: project
 status: active
+owner: manu
 tags: []
 ---
 # ${ProjectBaseName}: Active Backlog
@@ -342,6 +348,7 @@ if (-not (Test-Path "$ProjectKbDir\90-lessons.md")) {
 id: "$ProjectBaseName-lessons"
 type: lesson
 status: active
+owner: manu
 tags: []
 ---
 # Lessons Learned - $ProjectBaseName

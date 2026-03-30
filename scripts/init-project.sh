@@ -27,6 +27,7 @@ if [ "${1:-}" = "--work-sdk" ]; then
 id: "${FAMILY}-${COMPONENT}"
 type: project
 status: active
+owner: manu
 source_path:
   code: "\${PROJECTS_PATH}/<ProductFamily>/<component>"
   onedrive: "\${ONEDRIVE_PATH}/Products/<ProductFamily>"
@@ -82,6 +83,7 @@ EOF
 id: "${FAMILY}-${COMPONENT}-lessons"
 type: lesson
 status: active
+owner: manu
 tags: [work, sdk, $FAMILY]
 ---
 # Lessons Learned — ${COMPONENT}
@@ -97,6 +99,7 @@ EOF
 id: "${FAMILY}"
 type: project
 status: active
+owner: manu
 tags: [work, sdk, product-family]
 created: "$TODAY"
 ---
@@ -201,6 +204,7 @@ cat > "$PROJECT_KB_DIR/00-context.md" << EOF
 id: "${ACTUAL_PROJECT_NAME}"
 type: project
 status: active
+owner: manu
 repo_url: ""
 stack: [$STACK]
 tags: []
@@ -243,6 +247,7 @@ cat > "$PROJECT_KB_DIR/10-roadmap.md" << EOF
 id: "${ACTUAL_PROJECT_NAME}-roadmap"
 type: roadmap
 status: active
+owner: manu
 created: "$TODAY"
 ---
 
@@ -266,6 +271,7 @@ cat > "$PROJECT_KB_DIR/11-tasks.md" << EOF
 id: "${ACTUAL_PROJECT_NAME}-tasks"
 type: project
 status: active
+owner: manu
 tags: []
 ---
 # ${ACTUAL_PROJECT_NAME}: Active Backlog
@@ -289,6 +295,7 @@ cat > "$PROJECT_KB_DIR/90-lessons.md" << EOF
 id: "${ACTUAL_PROJECT_NAME}-lessons"
 type: lesson
 status: active
+owner: manu
 tags: []
 ---
 # Lessons Learned — ${ACTUAL_PROJECT_NAME}

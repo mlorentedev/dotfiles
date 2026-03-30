@@ -1,45 +1,86 @@
 ---
 name: insights
-description: Read-only weekly audit of the AI knowledge workflow. Checks MEMORY.md health, counts unvaulted observations by type, identifies gaps vs vault lessons, and reports what needs attention. Run weekly; use /crystallize when this shows issues.
+description: Use when checking AI workflow health, vault structural integrity, or knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale MEMORY.md, unvaulted observations, vault structural issues, or before starting a major sprint.
 ---
 
-# /insights — AI Workflow Health Audit
+# /insights -- AI Workflow Health Audit
 
-Quick, read-only audit of the Neural Hive knowledge loop state. No files modified.
+Quick, read-only audit of the Neural Hive knowledge loop and vault structural health. No files modified.
+
+## Modes
+
+- **Quick** (default): MEMORY.md health + vault structural health + backlog snapshot. ~2 minutes.
+- **Full** (`/insights full`): Everything in quick + observation inventory + vault gap analysis + decision persistence + pattern coverage. ~5 minutes.
 
 ## Protocol
 
-### Step 1 — MEMORY.md Health
+### Step 1 -- MEMORY.md Health
+
 - Read `~/.claude/projects/<encoded-cwd>/memory/MEMORY.md`
 - Report: line count, Last Crystallized date, days since last crystallization
-- Flag: lines > 150 → WARNING, Last Crystallized > 14 days → WARNING
+- Flag: lines > 150 -> WARNING, Last Crystallized > 14 days -> WARNING
 
-### Step 2 — Observation Inventory
-- Run `/mem-search` to count recent observations by type:
-  - 🔵 Discovery (informational, low urgency)
-  - ✅ Change (recorded, low urgency)
-  - 🔴 Bugfix (should be vaulted)
-  - ⚖️ Decision (should be vaulted)
-  - 🟣 Feature (notable, may need vaulting)
-- Show counts for the past 14 days
+### Step 2 -- Vault Structural Health
 
-### Step 3 — Vault Gap Analysis
+Run `vault_health(include_usage=True)` via Hive MCP.
+
+If Obsidian GUI is running, also run:
+```bash
+obs-cli.sh unresolved    # Broken wikilinks
+obs-cli.sh orphans       # No incoming links
+```
+
+Report:
+```
+Vault structural health:
+  Health tests: N passed, M failed
+  Unresolved links: X [OK|ACTION NEEDED]
+  Orphan notes: Y [OK|ACTION NEEDED]
+  Frontmatter compliance: Z% [OK|WARNING]
+```
+
+If failures detected -> recommend `/vault-doctor`.
+
+### Step 3 -- Backlog Snapshot
+
+- Read `~/Projects/knowledge/10_projects/<repo>/11-tasks.md` via Hive MCP
+- Report: active items count, progress bar, any overdue P0/P1 items
+
+### -- Quick mode stops here --
+
+### Step 4 -- Observation Inventory (full mode)
+
+- Run `mem-search` to count recent observations by type (past 14 days):
+  - Discovery, Change, Bugfix, Decision, Feature
+- Show counts and highlight unvaulted bugfixes and decisions
+
+### Step 5 -- Vault Gap Analysis (full mode)
+
 - Read `~/Projects/knowledge/10_projects/<repo>/90-lessons.md`
-- Identify 🔴 and ⚖️ observations NOT yet documented in vault lessons
+- Identify bugfix and decision observations NOT documented in vault lessons
 - List each gap: ID, type, title
 
-### Step 4 — Pattern Opportunities
+### Step 6 -- Decision Persistence Check (full mode)
+
+- Search recent session observations for decisions
+- For each decision, verify it was written to the affected vault file (ADR, context, tasks)
+- Flag unpersisted decisions:
+
+```
+Decision persistence:
+  3 decisions this sprint
+  - #14631 "Decision Persistence Pattern" -> PERSISTED (pattern-decision-persistence.md)
+  - #15064 "AI Agent Instruction Updates" -> NOT PERSISTED -> ACTION NEEDED
+```
+
+### Step 7 -- Pattern Opportunities (full mode)
+
 - For lessons in `90-lessons.md` that appear relevant to multiple projects:
   - Check `~/Projects/knowledge/00_meta/patterns/` for existing patterns
   - Identify lessons that warrant a new global pattern
+- For existing patterns: check if recent lessons should be added to them
 
-### Step 5 — Backlog Snapshot
-- Read `~/Projects/knowledge/10_projects/<repo>/11-tasks.md`
-- Report: active items count, progress bar, any overdue P0/P1 items
-
-### Step 6 — Report
-
-Print a structured summary:
+### Step 8 -- Report
 
 ```
 === AI Workflow Insights ===
@@ -48,34 +89,42 @@ MEMORY.md health:
   Lines: X / 150 [OK|WARNING]
   Last Crystallized: YYYY-MM-DD (N days ago) [OK|WARNING]
 
-Observation inventory (last 14 days):
-  🔵 Discoveries: N
-  ✅ Changes: N
-  🔴 Bugfixes: N (X unvaulted → ACTION NEEDED)
-  ⚖️ Decisions: N (X unvaulted → ACTION NEEDED)
-  🟣 Features: N
-
-Vault gaps (🔴/⚖️ not in 90-lessons.md):
-  - #ID: <title>
-  - ...
-
-Pattern opportunities:
-  - <lesson title> → consider pattern-<topic>.md
+Vault structural health:
+  Health tests: N passed, M failed [OK|ACTION NEEDED]
+  Unresolved links: X [OK|ACTION NEEDED]
+  Orphan notes: Y [OK|WARNING]
 
 Backlog: X active items (Progress: [====......] 40%)
 
-Recommendation: [No action needed | Run /crystallize]
+[Full mode only:]
+Observation inventory (last 14 days):
+  Discoveries: N | Changes: N | Bugfixes: N (X unvaulted) | Decisions: N (X unvaulted) | Features: N
+
+Vault gaps (not in 90-lessons.md):
+  - #ID: <title>
+
+Decision persistence:
+  X/Y decisions persisted [OK|ACTION NEEDED]
+
+Pattern opportunities:
+  - <lesson title> -> consider pattern-<topic>.md
+
+Recommendation: [No action needed | Run /crystallize | Run /vault-doctor | Run both]
 ```
 
 ## When to Use
 
-Run **weekly** as a maintenance habit. Takes ~2 minutes.
+Run **weekly** as a maintenance habit (quick mode). Run **full mode** before sprints or after major work.
 
-If the report shows:
-- 0 unvaulted 🔴/⚖️ obs AND MEMORY.md healthy → no action needed
-- Any warnings → run `/crystallize` to resolve
+| Trigger | Mode |
+|---------|------|
+| Weekly check-in | Quick |
+| Before starting a major sprint | Full |
+| After completing a major sprint | Full |
+| SessionStart shows vault health warnings | Quick |
+| Preparing for `/crystallize` | Full |
 
-## Difference from /crystallize
+## Pipeline
 
-`/insights` is **read-only** — audit and report only, nothing written.
-`/crystallize` is **write mode** — executes the full maintenance ritual.
+- This skill is **read-only** -- it detects issues, never fixes them.
+- When issues found -> `/crystallize` (knowledge gaps) or `/vault-doctor` (structural issues)

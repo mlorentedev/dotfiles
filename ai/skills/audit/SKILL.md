@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Security audit and code review for vulnerabilities, performance issues, and bad practices. Use when reviewing code for security (SQL injection, XSS, hardcoded secrets, CSRF), performance (N+1 queries, memory leaks, blocking async), or code quality (complexity, error handling, type safety).
+description: Use when reviewing code for security vulnerabilities (SQL injection, XSS, hardcoded secrets, CSRF), performance issues (N+1 queries, memory leaks, blocking async), or code quality concerns (complexity, error handling, type safety).
 ---
 
 # Security Audit

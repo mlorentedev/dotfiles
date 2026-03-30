@@ -1,6 +1,6 @@
 ---
 name: executing-plans
-description: Use when you have a written implementation plan to execute. Provides batch execution with review checkpoints between tasks.
+description: Use when you have a written implementation plan to execute, typically after /writing-plans produces a plan file.
 ---
 
 # Executing Plans
