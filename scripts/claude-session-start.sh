@@ -23,6 +23,19 @@ if [ -z "$CWD" ]; then
     CWD="$(pwd)"
 fi
 
+# --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
+# Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
+# missing zod runtime dep. Silent on healthy installs.
+CLAUDE_MEM_HEAL="$SCRIPT_DIR/claude-mem-heal.sh"
+CONTEXT_LINES=""
+if [ -x "$CLAUDE_MEM_HEAL" ]; then
+    HEAL_OUTPUT=$(bash "$CLAUDE_MEM_HEAL" 2>&1) || true
+    if [ -n "$HEAL_OUTPUT" ]; then
+        CONTEXT_LINES="[claude-mem] self-healed plugin install:
+$HEAL_OUTPUT"
+    fi
+fi
+
 # Walk up from CWD to find an Obsidian vault (.obsidian/ directory)
 find_vault_root() {
     local dir="$1"
@@ -39,7 +52,6 @@ find_vault_root() {
 VAULT_ROOT=$(find_vault_root "$CWD") || true
 KNOWLEDGE_VAULT="$HOME/Projects/knowledge"
 VAULT_NAME=""
-CONTEXT_LINES=""
 
 # --- Hive: detect project and suggest vault queries ---
 # If CWD is a git repo, check if there's a matching vault project entry.
