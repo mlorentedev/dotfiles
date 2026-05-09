@@ -81,7 +81,7 @@ find_work_sdk_project() {
     local dev_dir="$KNOWLEDGE_VAULT/50_work/45-development"
     [ -d "$dev_dir" ] || return 0
 
-    local cwd_slug family_dir family_name family_slug cwd_path_slug comp_dir comp_name comp_slug
+    local family_dir family_name family_slug cwd_path_slug comp_dir comp_name comp_slug
     # Slugify CWD: lowercase, remove non-alphanumeric except /
     cwd_path_slug=$(printf '%s' "$CWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9/')
 
