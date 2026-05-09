@@ -297,6 +297,25 @@ tags: [tag1, tag2]
 * Do NOT use for: boilerplate, single-file edits, syntax fixes, CSS changes.
 * Pairs well with Context7: use Sequential Thinking to plan, Context7 to validate API choices.
 
+### Hive (Obsidian Vault Operations)
+
+**Auto-invoke for any read/search/write against the vault.** Hive saves tokens
+by returning excerpts (not full files) and offloading work server-side.
+
+* `vault_search` over `grep`+`Read` (5–10× cheaper, returns excerpts).
+* `vault_query(section=context|tasks|lessons|roadmap)` over `Read` of whole files.
+* `vault_patch` / `vault_write` over `Edit`/`Write` — auto-commits as `vault: patch …`.
+* `capture_lesson` over manual `90-lessons.md` writes.
+* `vault_health` over Bash + `vault-validate.py`.
+* `delegate_task` for bulk summaries — keeps main context lean.
+* `vault_list` before `ls`/`find` to browse structure.
+
+Native `Read`/`Edit`/`Write`/`grep` remain correct for code repos, scripts,
+configs — anything outside the vault. Vault auto-commits are intentional;
+do NOT also create a manual git commit for vault edits.
+
+See `00_meta/patterns/pattern-hive-first-vault-access.md` for full rationale.
+
 ### Obsidian CLI (Vault Graph Queries)
 
 **Available via:** `obs-cli.sh <command>` (Linux) / `obs-cli.ps1 <command>` (Windows).
