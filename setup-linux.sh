@@ -155,6 +155,13 @@ else
     log_info "tmux installed: $(tmux -V)"
 fi
 
+# xclip (X11 clipboard bridge — required for tmux mouse-copy to system clipboard)
+if ! command -v xclip >/dev/null 2>&1; then
+    log_warning "xclip not installed. Run: sudo apt install -y xclip  (needed for tmux clipboard integration on X11)"
+else
+    log_info "xclip installed: $(xclip -version 2>&1 | head -n1)"
+fi
+
 # age (file encryption — required by secrets system)
 if ! command -v age >/dev/null 2>&1; then
     log_info "Installing age..."
