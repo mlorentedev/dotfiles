@@ -33,3 +33,11 @@ setup() {
     grep -qE '^set -g base-index 1' "$CONFIG_FILE"
     grep -qE '^setw -g pane-base-index 1' "$CONFIG_FILE"
 }
+
+@test "tmux.conf binds 'y' to copy selection to system clipboard via xclip" {
+    grep -qE "^bind -T copy-mode-vi y .*copy-pipe-and-cancel .*xclip" "$CONFIG_FILE"
+}
+
+@test "tmux.conf pipes mouse-drag-end selection to system clipboard" {
+    grep -qE "^bind -T copy-mode-vi MouseDragEnd1Pane .*copy-pipe-and-cancel .*xclip" "$CONFIG_FILE"
+}
