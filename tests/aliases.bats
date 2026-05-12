@@ -111,3 +111,32 @@ setup() {
     grep -q 'alias gp=' "$ALIASES_FILE"
     grep -q 'function gp' "$ps_file"
 }
+
+# --- tmux aliases ---
+
+@test "aliases.zsh defines tx alias (attach-or-create with -A)" {
+    grep -qE "^alias tx=.*new.*-A.*-s" "$ALIASES_FILE"
+}
+
+@test "aliases.zsh defines txl, txa, txk aliases" {
+    grep -qE "^alias txl=" "$ALIASES_FILE"
+    grep -qE "^alias txa=" "$ALIASES_FILE"
+    grep -qE "^alias txk=" "$ALIASES_FILE"
+}
+
+# --- tmux functions (sshmux) ---
+
+@test "functions.zsh defines sshmux function" {
+    fn_file="$DOTFILES_DIR/.zsh/functions.zsh"
+    grep -qE "^sshmux\(\)" "$fn_file"
+}
+
+@test "sshmux uses ssh -t with remote tmux new-session -A" {
+    fn_file="$DOTFILES_DIR/.zsh/functions.zsh"
+    grep -qE 'ssh -t.*tmux new-session -A' "$fn_file"
+}
+
+@test "sshmux prints usage when no host given" {
+    fn_file="$DOTFILES_DIR/.zsh/functions.zsh"
+    grep -qE 'Usage: sshmux' "$fn_file"
+}

@@ -65,7 +65,7 @@ echo "========================================"
 echo "Checking from: $DOTFILES_DIR"
 
 # ==================================================
-section "1/8" "Core Tools in PATH"
+section "1/9" "Core Tools in PATH"
 
 CORE_TOOLS="git zsh bash curl wget jq eza direnv node npm zoxide docker kubectl terraform"
 for tool in $CORE_TOOLS; do
@@ -77,7 +77,7 @@ for tool in $CORE_TOOLS; do
 done
 
 # ==================================================
-section "2/8" "Versioned Tool Paths"
+section "2/9" "Versioned Tool Paths"
 
 check_tool_home() {
     local name="$1"
@@ -117,7 +117,7 @@ else
 fi
 
 # ==================================================
-section "3/8" "Version Match (versions.conf)"
+section "3/9" "Version Match (versions.conf)"
 
 check_version_match() {
     local name="$1"
@@ -144,7 +144,7 @@ check_version_match "Minikube" "${MINIKUBE_VERSION:-}" "$APPS_HOME/minikube-${MI
 check_version_match "Go" "${GO_VERSION:-}" "$APPS_HOME/go-${GO_VERSION:-}"
 
 # ==================================================
-section "4/8" "Key Symlinks"
+section "4/9" "Key Symlinks"
 
 check_symlink() {
     local path="$1"
@@ -169,7 +169,7 @@ check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
 # ==================================================
-section "5/8" "Environment Variables"
+section "5/9" "Environment Variables"
 
 ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME GO_HOME MINIKUBE_HOME"
 for var in $ENV_VARS; do
@@ -181,7 +181,7 @@ for var in $ENV_VARS; do
 done
 
 # ==================================================
-section "6/8" "Optional Tools"
+section "6/9" "Optional Tools"
 
 OPTIONAL_TOOLS="age gh claude gemini bats shellcheck helm ansible pip"
 for tool in $OPTIONAL_TOOLS; do
@@ -193,7 +193,7 @@ for tool in $OPTIONAL_TOOLS; do
 done
 
 # ==================================================
-section "7/8" "Knowledge Vault"
+section "7/9" "Knowledge Vault"
 
 VAULT_DIR="${VAULT_DIR:-$HOME/Projects/knowledge}"
 
@@ -248,7 +248,7 @@ for dir in $VAULT_DIRS; do
 done
 
 # ==================================================
-section "8/8" "Secrets Integrity"
+section "8/9" "Secrets Integrity"
 
 SECRETS_DIR="${DOTFILES_DIR}/sensitive"
 SECRETS_MAPPING="$SECRETS_DIR/env-mapping.conf"
@@ -294,6 +294,27 @@ if [ -f "$SECRETS_MAPPING" ]; then
     done
 else
     fail "env-mapping.conf not found"
+fi
+
+# ==================================================
+section "9/9" "tmux"
+# ==================================================
+if ! command -v tmux >/dev/null 2>&1; then
+    fail "tmux not installed (run: sudo apt install -y tmux)"
+else
+    pass "tmux installed: $(tmux -V)"
+    if [ -L "$HOME/.tmux.conf" ]; then
+        _tmux_target="$(readlink "$HOME/.tmux.conf")"
+        if [ -f "$_tmux_target" ]; then
+            pass "$HOME/.tmux.conf -> $_tmux_target"
+        else
+            fail "$HOME/.tmux.conf symlink broken: target $_tmux_target missing"
+        fi
+    elif [ -f "$HOME/.tmux.conf" ]; then
+        fail "$HOME/.tmux.conf is a regular file, expected symlink (run setup-linux.sh)"
+    else
+        fail "$HOME/.tmux.conf missing (run setup-linux.sh)"
+    fi
 fi
 
 # ==================================================

@@ -516,6 +516,8 @@ if (Test-Path $gitconfigSource) {
     Write-Warn ".gitconfig not found at $gitconfigSource"
 }
 
+# tmux: intentionally skipped on Windows (Linux-only -- see tmux.conf in repo root)
+
 # ============================================================================
 # 5b. SSH CONFIG
 # ============================================================================

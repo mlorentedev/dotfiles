@@ -85,3 +85,21 @@ setup() {
     grep -q 'shellcheck already installed' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'bats already installed' "$DOTFILES_DIR/setup-linux.sh"
 }
+
+# --- tmux integration ---
+
+@test "setup-linux.sh copies tmux.conf into deploy dir" {
+    grep -qE 'safe_copy "\$CURRENT_DIR/tmux\.conf" "\$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh symlinks tmux.conf to ~/.tmux.conf" {
+    grep -qE 'ln -sf "\$DOTFILES_DIR/tmux\.conf" "\$HOME/\.tmux\.conf"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh checks for tmux presence" {
+    grep -qE 'command -v tmux' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh tells user how to install tmux when missing" {
+    grep -qE 'sudo apt install -y tmux' "$DOTFILES_DIR/setup-linux.sh"
+}

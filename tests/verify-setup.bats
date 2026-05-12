@@ -294,3 +294,31 @@ setup() {
     # Just verify it didn't crash — the container built successfully
     true
 }
+
+# =============================================================================
+# Section 11: tmux
+# =============================================================================
+
+@test "tmux binary present in container" {
+    command -v tmux
+}
+
+@test "tmux.conf copied to ~/.dotfiles" {
+    [ -f "$DOTFILES_DIR/tmux.conf" ]
+}
+
+@test "~/.tmux.conf is a symlink to ~/.dotfiles/tmux.conf" {
+    [ -L "$HOME/.tmux.conf" ]
+    [ "$(readlink "$HOME/.tmux.conf")" = "$DOTFILES_DIR/tmux.conf" ]
+}
+
+@test "tmux parses deployed config (smoke)" {
+    local socket="verify_$$"
+    # kill-server is best-effort: if the 'true' session ended already, the
+    # server is gone — that's not a parse failure. The exit code of
+    # new-session is the real signal (non-zero => parse error in config).
+    run tmux -f "$HOME/.tmux.conf" -L "$socket" new-session -d -s s 'true'
+    local rc=$status
+    tmux -L "$socket" kill-server 2>/dev/null || true
+    [ "$rc" -eq 0 ]
+}

@@ -37,6 +37,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
         safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
     fi    
     safe_copy "$CURRENT_DIR/.gitconfig" "$DOTFILES_DIR/" 2>/dev/null || true
+    safe_copy "$CURRENT_DIR/tmux.conf" "$DOTFILES_DIR/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/.zsh/." "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
     ensure_directory "$DOTFILES_DIR/ssh"
     cp -rf "$CURRENT_DIR/ssh/"* "$DOTFILES_DIR/ssh/" 2>/dev/null || true
@@ -72,6 +73,7 @@ ensure_directory "$HOME/.zsh"
 ln -sf "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
 ln -sf "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
 ln -sf "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
+ln -sf "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/github-secrets-manager.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
@@ -145,6 +147,13 @@ ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 log_info "Installing developer tools..."
 ensure_directory "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
+
+# tmux (system package — this script avoids sudo, so user installs it once)
+if ! command -v tmux >/dev/null 2>&1; then
+    log_warning "tmux not installed. Run: sudo apt install -y tmux"
+else
+    log_info "tmux installed: $(tmux -V)"
+fi
 
 # age (file encryption — required by secrets system)
 if ! command -v age >/dev/null 2>&1; then

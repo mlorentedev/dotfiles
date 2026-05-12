@@ -31,3 +31,9 @@ alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
 alias ai="aider"                                                                          # daily: DeepSeek V3.2
 alias aic="aider --model openrouter/qwen/qwen3-coder-next"                                # coding: Qwen3 Coder
 alias aia="aider --architect --model openrouter/deepseek/deepseek-v3.2-speciale"           # architecture: DeepSeek Speciale
+
+# tmux session management
+alias tx='tmux new -A -s'         # attach-or-create by name: tx dotfiles
+alias txl='tmux ls'               # list sessions
+alias txa='tmux a'                # attach to most recent
+alias txk='tmux kill-session -t'  # kill named session: txk dotfiles
