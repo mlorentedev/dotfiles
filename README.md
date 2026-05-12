@@ -93,9 +93,44 @@ dotfiles-sync                       # Bidirectional sync + git push/pull
 dotfiles-sync --secrets-only        # Only sync sensitive/ files
 ```
 
+### tmux
+
+Two use cases this setup is tuned for: **(1) split-pane multiplexing** (editor + aider + tests side by side) and **(2) session persistence** (close the laptop / drop SSH and come back to the same state).
+
+```bash
+# --- The 6 commands you actually need ---
+
+tx dotfiles                # Start (or re-attach) a session named "dotfiles"
+                           # Inside tmux now: prompt shows [dotfiles]
+
+# Split for editor + AI + tests:
+#   C-b %                  Split vertically  (editor | aider)
+#   C-b "                  Split horizontally (... above tests)
+#   C-b h/j/k/l            Move between panes (vim-style)
+#   C-b z                  Zoom current pane fullscreen (toggle)
+
+# Pause / resume:
+#   C-b d                  Detach — session keeps running in background
+tx dotfiles                # Re-attach later (same command). Layout preserved.
+
+# --- The rest (use occasionally) ---
+
+txl                        # List all sessions
+txa                        # Attach to most recent (no name needed)
+txk <name>                 # Kill a named session
+sshmux <host> [session]    # SSH + attach-or-create remote tmux (survives drops)
+
+# Inside tmux:
+#   C-b r                  Reload ~/.tmux.conf after editing
+#   C-b x                  Close current pane
+#   C-b [                  Scroll mode (q to exit, / to search)
+```
+
+Full reference and pane-layout recipes: `~/Projects/knowledge/10_projects/dotfiles/40-runbooks/guide-tmux.md`.
+
 ## Requirements
 
-**Linux/macOS:** git, bash/zsh
+**Linux/macOS:** git, bash/zsh, tmux (`sudo apt install tmux`)
 
 **Windows:** git, PowerShell
 

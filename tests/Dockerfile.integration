@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     grep \
     coreutils \
     ca-certificates \
+    tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Install bats-core from source
