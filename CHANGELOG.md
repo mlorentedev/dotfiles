@@ -1,0 +1,133 @@
+# Changelog
+
+Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit by hand.
+
+## Features
+
+- 2026-05-12: feat(tmux): add focus-events, vi visual-mode bindings, slower status refresh (c23ec99)
+- 2026-05-11: feat(tmux): copy selection to system clipboard via xclip (fd361f6)
+- 2026-05-11: feat(tmux): integrate tmux with versioned config and Linux install (239e715)
+- 2026-05-08: feat(scripts): add claude-mem-heal for upstream v12/v13 packaging bugs (053bad8)
+- 2026-03-29: feat: skills ecosystem overhaul — 23 to 17 skills, CSO audit, Standing Orders (61c4b38)
+- 2026-03-27: feat: add obs-cli wrapper for Obsidian CLI (Linux + Windows) (91ba19d)
+- 2026-03-26: feat: unified workflow protocol — area-agnostic CLAUDE.md, full vault entry in init-project, work SDK detection in session hooks (3884d4f)
+- 2026-03-26: feat(hooks): auto-create memory junction/symlink on session start (999a478)
+- 2026-03-26: feat(setup): bidirectional memory sync on Windows via junctions (ef53bd4)
+- 2026-03-25: feat(ai,secrets): add engineering discipline rules, secrets reconciliation, cleanup (a9fb76a)
+- 2026-03-24: feat(claude): add self-maintaining memory system (0204133)
+- 2026-03-16: feat(setup): auto-install 10 developer tools on Linux and 7 on Windows (e1e4746)
+- 2026-03-10: feat(ai): add aider integration with 3-tier OpenRouter model config (c515c69)
+- 2026-03-07: feat(setup): add hive MCP server with auto-upgrade to both Linux and Windows (3ddc041)
+- 2026-02-28: feat(ai): add kc / kca shortcuts for quick access as aliases (e153f7e)
+- 2026-02-28: feat(ai): knowledge crystallization system — bash + PowerShell + auto-discovery (067ee84)
+- 2026-02-27: feat(setup): auto-register Claude Code SessionStart hook (03cb64e)
+- 2026-02-27: feat: add Claude Code SessionStart hook for vault health context (917c03b)
+- 2026-02-27: feat: add vault-health.sh and integrate Obsidian CLI checks (fc85d1d)
+- 2026-02-27: feat(shell): add obsidian alias with --no-sandbox for Linux AppImage (dfe4c37)
+- 2026-02-26: feat(ci): add container-based integration test for setup-linux.sh (465fd2a)
+- 2026-02-26: feat: add versions.conf and healthcheck.sh (P1 backlog) (72fdb29)
+- 2026-02-26: feat(shell): standardize set -euo pipefail across standalone scripts (fd5ef7e)
+- 2026-02-26: feat(ai): add auto-memory to Neural Hive context sync phase (b01af3e)
+- 2026-02-26: feat: persist MCP servers globally and auto-memory via vault (46abe35)
+- 2026-02-26: feat: persist MCP servers and auto-memory across machines (ffd56fa)
+- 2026-02-23: feat(claude): add no Co-Authored-By policy to global CLAUDE.md (4befe55)
+- 2026-02-23: feat: set nano as default UNIX editor (3fa1bea)
+- 2026-02-22: feat(ai): implement neural hive protocol and standardize vault (6c32d26)
+- 2026-02-22: feat: add PSScriptAnalyzer linting to CI for PowerShell scripts (34b94d5)
+- 2026-02-22: feat: add PSScriptAnalyzer linting to CI for PowerShell scripts (4197b4d)
+- 2026-02-22: feat: add secrets_show command and SSH config deployment (9712196)
+- 2026-02-21: feat: add file-based secrets support for kubeconfig and multiline files (9da08d8)
+- 2026-02-21: feat: add prd, qa-plan, prd-to-issues skills and automate plugin installation (e1a9ad9)
+- 2026-02-21: feat: add prd skill for interactive requirements gathering (ce7263e)
+- 2026-02-18: feat: auto-install claude-mem plugin in setup scripts (8af28a7)
+- 2026-02-16: feat: apply Anthropic Claude Code best practices across project and global config (5bb8aae)
+- 2026-02-16: feat: apply Anthropic Claude Code best practices across project and global config (0fd3557)
+- 2026-02-13: feat: add POLLEX_API_KEY (4e2bafe)
+- 2026-02-11: feat: add excalidraw MCP server registration to setup scripts (2148176)
+- 2026-02-10: feat: auto-create python symlink in setup for version-agnostic command (37950fe)
+- 2026-02-10: feat: upgrade Go to 1.26.0 and prepend tool paths for system override (83e938a)
+- 2026-02-08: feat: add bun PATH to .bashrc and .zshrc for persistent installation (c7d7590)
+- 2026-02-04: feat: add USB backup of secrets with VeraCrypt support (032965b)
+- 2026-02-02: feat: add Windows PowerShell support and rename setup scripts   - Add setup-windows.ps1, powershell/profile.ps1, scripts/init-project.ps1   - Rename install.sh → setup-linux.sh, change claude-init → project-init   - Delete obsolete .bat files   - Update all documentation (5a568af)
+- 2026-02-01: feat: consolidate AI configuration and implement Claude Code skills   - Refactor CLAUDE.md and GEMINI.md   - Restructure skills to official format (SKILL.md with YAML frontmatter)   - Add skills: audit, refactor, test, doc, docker   - Update install.sh to copy skill directories and extract Gemini prompts   - Update init-project.sh for new skill structure   - Add docs/AI.md with complete setup and workflow guide   - Clean up deprecated versioned files (6037ada)
+- 2026-01-14: feat: implement dotfiles sync and enhance secrets management 	- Add `dotfiles-sync` workflow for local vs repo synchronization 	- Update `github-secrets-manager` to support uploading from `env-mapping.conf` 	- Add auto-sync capabilities to `secrets_add` and `secrets_rotate` 	- Register `PYPI_TOKEN` in secrets mapping 	- Update documentation and test suite (87eab20)
+- 2026-01-14: feat: implement dotfiles sync and enhance secrets management 	- Add `dotfiles-sync` workflow for local vs repo synchronization 	- Update `github-secrets-manager` to support uploading from `env-mapping.conf` 	- Add auto-sync capabilities to `secrets_add` and `secrets_rotate` 	- Register `PYPI_TOKEN` in secrets mapping 	- Update documentation and test suite (290c362)
+- 2026-01-11: feat: add secrets availability in bash based on encrypted files with a config file mapping, add test suite as part of precommit hook. (09235cb)
+- 2025-11-19: feat: introduce Claude AI aliases and prompt function,  and restructure documentation. (6280f4c)
+- 2025-11-19: feat: initial commit with Claude optimization (25e7324)
+- 2025-11-18: feat: support gemini-cli with custom GEMINI.md and prompts for easy use common to all projects (5018898)
+- 2025-03-23: feat: add env file path as input parameter to setup-gh-secrets (5a3f6c6)
+
+## Bug Fixes
+
+- 2026-05-12: fix(secrets): keep env, deployed, and repo in sync after every mutation (295b6f3)
+- 2026-05-08: fix(scripts): remove unused cwd_slug local in claude-session-start (f030959)
+- 2026-03-29: fix(ci): update skill count threshold from 18 to 15 after ecosystem overhaul (103ec41)
+- 2026-03-29: fix(ci): guard crontab call for environments without cron (8262808)
+- 2026-03-27: fix(ci): replace remaining non-ASCII chars in init-project.ps1 (27dc6af)
+- 2026-03-26: fix(ssh): aws1 uses MagicDNS instead of hardcoded Tailscale IP (c6ab454)
+- 2026-03-26: fix(ci): replace non-ASCII chars in init-project.ps1 to pass PSScriptAnalyzer (60417ce)
+- 2026-03-25: fix(setup): always deploy AI config regardless of CLI presence (c3be688)
+- 2026-03-25: fix(tests): skip Gemini integration tests when CLI not installed (13c07a1)
+- 2026-03-25: fix(tests): update healthcheck section count from 7 to 8 (f2c1c13)
+- 2026-03-22: fix(ssh): sync config with live host inventory (14edd90)
+- 2026-03-18: fix(setup): symlink .gitconfig instead of copying (6c60d20)
+- 2026-03-17: fix(sync): replace git pull with rsync for local installation (73cdc2e)
+- 2026-03-16: fix(ci): resolve 3 CI failures from developer tools addition (971e01e)
+- 2026-03-12: fix: resolve 26 bugs and close Windows/Linux parity gaps (82481ef)
+- 2026-02-28: fix(ci): remove non-ascii characters to resolve PSScriptAnalyzer BOM error (b36fac7)
+- 2026-02-26: fix(ci): remove false CLAUDE.md assertion from integration tests (e2cbd36)
+- 2026-02-23: fix: close setup parity gaps between Linux and Windows (866314e)
+- 2026-02-22: fix: harden AI rules deployment and fix SSH directory copy (0736c74)
+- 2026-02-18: fix: replace non-interactive claude plugin install with manual instruction (add9285)
+- 2026-02-16: fix: handle zsh nomatch error in secrets_clean glob patterns (791c0e6)
+- 2026-02-16: fix: install zsh in CI for zsh compatibility tests (409c347)
+- 2026-02-07: fix: harden all shell scripts for POSIX/zsh compatibility and add 95 bats-core tests (196a4e5)
+- 2026-01-15: fix: add shellcheck disable for zsh-specific syntax (544a8fe)
+- 2026-01-14: fix: remove local keyword, skip GITHUB_ secrets, add CI workflow (6886c3b)
+- 2025-03-23: fix: issue in .bashrc (4496a06)
+
+## Refactoring
+
+- 2026-02-28: refactor(ai): align project init and agent prompts with Neural Hive protocol (2e1eda8)
+- 2025-11-28: refactor: standardize shell configs and fix APPS_HOME path (ed02dc3)
+
+## Documentation
+
+- 2026-03-12: docs(readme): update test count, add aider aliases and new scripts (6e687b1)
+- 2026-01-12: docs: add SECRETS.md and reorganize documentation structure (c84292e)
+
+## Tests
+
+- 2026-02-28: test(ci): pass PSScriptAnalyzer settings to bats test (b4b178c)
+
+## Chores
+
+- 2025-12-05: chore: add sops age key file path as env variable (f4a58a7)
+- 2025-11-19: chore: Remove claude boost.sh script and its installation command from install.sh. (7f96a05)
+- 2025-11-14: chore: prioritize ~/go/bin in $PATH to use correct go-task v3 from v2 (ad8a9a8)
+- 2025-08-29: chore: add zoho codes (bdc088a)
+- 2025-08-29: chore: add cloudflare token (9ac5a47)
+- 2025-08-26: chore: add pre-commit hooks and validation script (117dbc9)
+- 2025-08-26: chore: add sensitive scripts and refactor documentation (141b1f3)
+- 2025-06-20: chore: add age encryption for secrets (3f7ba2d)
+- 2025-03-23: chore: add gh secrets configuration from env file (12391d1)
+- 2025-03-23: chore: add node dependencies checkout (e91d2f2)
+- 2025-03-23: chore: add dependencies checkout for aliases (79dacc2)
+- 2025-03-22: chore: add custom functions to zsh terminal (32de27b)
+
+## Other
+
+- 2026-03-01: secrets: add openrouter api key (0df59eb)
+- 2026-02-22: doc: migrate docs/ to private vault and extract ADRs (5a045cb)
+- 2026-02-21: doc: minor details (01abc2b)
+- 2026-02-18: doc: remove excalidraw MCP server from all configs and docs (babdcb1)
+- 2026-02-10: git commit -m "feat: add drawio MCP server registration to setup scripts" (7340e37)
+- 2026-02-08: doc: update LLM files with obsidian vault info (d002719)
+- 2026-02-07: doc: add backlog file (4e88cd0)
+- 2026-02-04: doc: add claude code plugins installation (81e88dd)
+- 2025-03-24: bug: remove --icon flag from eza aliases (250bd8c)
+- 2025-03-23: bug: fix issue in nvm alias inizialiation (fc73945)
+- 2024-11-01: First commit (c40614f)
+- 2024-11-01: Initial commit (3cb97d3)
+

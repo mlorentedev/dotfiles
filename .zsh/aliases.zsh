@@ -29,6 +29,7 @@ alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
 
 # Repo maintenance
 alias dch="diff-check.sh"                         # Detect drift between repo and ~/.dotfiles
+alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from git log
 
 # Aider tiers (OpenRouter)
 alias ai="aider"                                                                          # daily: DeepSeek V3.2
