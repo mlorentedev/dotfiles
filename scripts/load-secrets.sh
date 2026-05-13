@@ -114,31 +114,59 @@ _secrets_load_file_entry() {
     fi
 }
 
-# Helper to get repo dir dynamically
+# Resolve the repo's sensitive/ dir for sync operations.
+# Priority: $DOTFILES_REPO_DIR (explicit) → $HOME/Projects/dotfiles (auto-detected default).
+# Returns empty string if neither path has a sensitive/ subdir.
 _get_secrets_repo_dir() {
-    echo "${DOTFILES_REPO_DIR:+${DOTFILES_REPO_DIR}/sensitive}"
+    if [[ -n "${DOTFILES_REPO_DIR:-}" && -d "${DOTFILES_REPO_DIR}/sensitive" ]]; then
+        echo "${DOTFILES_REPO_DIR}/sensitive"
+        return
+    fi
+    local default_repo="$HOME/Projects/dotfiles"
+    if [[ -d "${default_repo}/sensitive" ]]; then
+        echo "${default_repo}/sensitive"
+        return
+    fi
+    echo ""
 }
 
-# Sync file to repo if DOTFILES_REPO_DIR is configured
+# Sync (or remove) a file to/from the repo's sensitive/ dir.
+# Args:
+#   $1 filename       — relative to SECRETS_DIR (e.g. "github.token.secret.age")
+#   $2 sync_mapping   — true|false, also copy env-mapping.conf to repo (default false)
+#   $3 silent         — true|false, suppress success/skip notices (default false)
+#   $4 mode           — copy|delete, "delete" removes the file from the repo (default copy)
 _secrets_sync_to_repo() {
     filename="$1"
     sync_mapping="${2:-false}"
     silent="${3:-false}"
+    mode="${4:-copy}"
 
     local repo_dir
     repo_dir="$(_get_secrets_repo_dir)"
 
-    [[ -z "$repo_dir" ]] && return 0
-    [[ "$repo_dir" == "$SECRETS_DIR" ]] && return 0
-    [[ ! -d "$repo_dir" ]] && return 0
-
-    # Sync file
-    if [[ -f "$SECRETS_DIR/${filename}" ]]; then
-        command cp "$SECRETS_DIR/${filename}" "$repo_dir/${filename}"
-        [[ "$silent" != "true" ]] && echo "  Synced to repo: $repo_dir/${filename}"
+    if [[ -z "$repo_dir" ]]; then
+        [[ "$silent" != "true" ]] && \
+            echo "  Note: repo not synced (set DOTFILES_REPO_DIR or clone to ~/Projects/dotfiles)" >&2
+        return 0
     fi
+    [[ "$repo_dir" == "$SECRETS_DIR" ]] && return 0
 
-    # Sync mapping file if requested
+    case "$mode" in
+        copy)
+            if [[ -f "$SECRETS_DIR/${filename}" ]]; then
+                command cp "$SECRETS_DIR/${filename}" "$repo_dir/${filename}"
+                [[ "$silent" != "true" ]] && echo "  Synced to repo: $repo_dir/${filename}"
+            fi
+            ;;
+        delete)
+            if [[ -f "$repo_dir/${filename}" ]]; then
+                rm -f "$repo_dir/${filename}"
+                [[ "$silent" != "true" ]] && echo "  Removed from repo: $repo_dir/${filename}"
+            fi
+            ;;
+    esac
+
     if [[ "$sync_mapping" == "true" && -f "$SECRETS_MAPPING_FILE" ]]; then
         command cp "$SECRETS_MAPPING_FILE" "$repo_dir/env-mapping.conf"
     fi
@@ -470,15 +498,15 @@ secrets_add() {
     # Update audit log
     _secrets_audit_log "$var_name" "added"
 
-    echo "Secret added successfully:"
-    echo "  Variable: $var_name"
-    echo "  File: ${filename}.secret.age"
-
     # Sync to repo if configured
     _secrets_sync_to_repo "${filename}.secret.age" true
 
-    echo ""
-    echo "Run 'secrets_refresh' or restart terminal to load"
+    # Auto-export into current shell so $var_name is immediately usable
+    export_var "$var_name" "$value"
+
+    echo "Secret added successfully:"
+    echo "  Variable: $var_name (exported in current shell)"
+    echo "  File: ${filename}.secret.age"
 }
 
 # Validate mapping integrity - check for missing .age files or orphaned mappings
@@ -667,12 +695,99 @@ secrets_rotate() {
     # Update audit log
     _secrets_audit_log "$var_name" "rotated"
 
-    echo "Secret rotated successfully: $var_name"
+    # Sync to repo if configured (sync_mapping=true is defensive — keeps repo idempotent)
+    _secrets_sync_to_repo "${filename}.secret.age" true
 
-    # Sync to repo if configured
-    _secrets_sync_to_repo "${filename}.secret.age" false
+    # Auto-export the new value so the env doesn't drift from disk
+    export_var "$var_name" "$value"
 
-    echo "Run 'secrets_refresh' or restart terminal to reload"
+    echo "Secret rotated successfully: $var_name (env updated in current shell)"
+}
+
+# Remove a secret (plain or file): unmap, delete .age, sync deletion to repo,
+# unset the env var. For file secrets, also removes the deployed plaintext file.
+# Usage: secrets_remove VAR_NAME [--yes|-y]
+secrets_remove() {
+    var_name="$1"
+    local skip_confirm=false
+    [[ "$2" == "--yes" || "$2" == "-y" ]] && skip_confirm=true
+
+    if [[ -z "$var_name" ]]; then
+        echo "Usage: secrets_remove VAR_NAME [--yes]"
+        echo "Example: secrets_remove OLD_API_TOKEN"
+        return 1
+    fi
+
+    file_exists "$SECRETS_MAPPING_FILE" || { echo "Mapping file not found" >&2; return 1; }
+
+    # Locate mapping: try plain VAR= first, then @VAR= for file secrets
+    local mapping_line is_file=false
+    mapping_line=$(grep "^${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1)
+    if [[ -z "$mapping_line" ]]; then
+        mapping_line=$(grep "^@${var_name}=" "$SECRETS_MAPPING_FILE" 2>/dev/null | head -1)
+        [[ -n "$mapping_line" ]] && is_file=true
+    fi
+
+    if [[ -z "$mapping_line" ]]; then
+        echo "Error: No mapping found for $var_name" >&2
+        return 1
+    fi
+
+    # Extract filename (strip @VAR= prefix and >dest suffix)
+    local mapping_value="${mapping_line#*=}"
+    local fs_filename="${mapping_value%%>*}"
+    local fs_dest=""
+    if [[ "$is_file" == "true" ]]; then
+        fs_dest="${mapping_value#*>}"
+        case "$fs_dest" in
+            "~"/*) fs_dest="$HOME/${fs_dest#"~/"}" ;;
+            "~") fs_dest="$HOME" ;;
+        esac
+    fi
+
+    local encrypted_file="$SECRETS_DIR/${fs_filename}.secret.age"
+
+    if [[ "$skip_confirm" != "true" ]]; then
+        echo "About to remove: $var_name"
+        echo "  Encrypted file: $encrypted_file"
+        [[ "$is_file" == "true" ]] && echo "  Deployed file:  $fs_dest"
+        echo "  Mapping line:   $mapping_line"
+        printf "Continue? [y/N]: "
+        read -r reply
+        if [[ "$reply" != "y" && "$reply" != "Y" ]]; then
+            echo "Aborted"
+            return 1
+        fi
+    fi
+
+    # Remove encrypted file from deployed sensitive/
+    if [[ -f "$encrypted_file" ]]; then
+        rm -f "$encrypted_file"
+        echo "Removed: $encrypted_file"
+    fi
+
+    # Remove deployed plaintext (file secret only)
+    if [[ "$is_file" == "true" && -n "$fs_dest" && -f "$fs_dest" ]]; then
+        rm -f "$fs_dest"
+        echo "Removed: $fs_dest"
+    fi
+
+    # Strip mapping line in-place (|| true: grep -v exits 1 if every line matches)
+    local tmp_mapping="${SECRETS_MAPPING_FILE}.tmp.$$"
+    if [[ "$is_file" == "true" ]]; then
+        grep -v "^@${var_name}=" "$SECRETS_MAPPING_FILE" > "$tmp_mapping" || true
+    else
+        grep -v "^${var_name}=" "$SECRETS_MAPPING_FILE" > "$tmp_mapping" || true
+    fi
+    mv "$tmp_mapping" "$SECRETS_MAPPING_FILE"
+
+    # Sync deletion + updated mapping to repo
+    _secrets_sync_to_repo "${fs_filename}.secret.age" true false delete
+
+    _secrets_audit_log "$var_name" "removed"
+    unset_var "$var_name"
+
+    echo "Secret removed: $var_name"
 }
 
 # Sync all secrets to repo
@@ -682,13 +797,13 @@ secrets_sync() {
     repo_dir="$(_get_secrets_repo_dir)"
 
     if [[ -z "$repo_dir" ]]; then
-        echo "Error: DOTFILES_REPO_DIR not set"
+        echo "Error: no repo found (DOTFILES_REPO_DIR unset and \$HOME/Projects/dotfiles/sensitive missing)"
         echo "Set it in your shell config: export DOTFILES_REPO_DIR=\"\$HOME/Projects/dotfiles\""
         return 1
     fi
 
     if [[ "$repo_dir" == "$SECRETS_DIR" ]]; then
-        echo "DOTFILES_REPO_DIR is same as SECRETS_DIR, nothing to sync"
+        echo "Repo sensitive/ is the same as SECRETS_DIR, nothing to sync"
         return 0
     fi
 
@@ -794,16 +909,16 @@ secrets_add_file() {
     # Update audit log
     _secrets_audit_log "$var_name" "added (file)"
 
-    echo "File secret added successfully:"
-    echo "  Variable:  $var_name"
-    echo "  Encrypted: ${filename}.secret.age"
-    echo "  Deploys to: $dest_path"
-
     # Sync to repo if configured
     _secrets_sync_to_repo "${filename}.secret.age" true
 
-    echo ""
-    echo "Run 'secrets_refresh' or restart terminal to deploy"
+    # Auto-deploy: secrets_refresh handles decrypt-to-disk + env export for file secrets
+    secrets_refresh >/dev/null 2>&1
+
+    echo "File secret added successfully:"
+    echo "  Variable:   $var_name (deployed in current shell)"
+    echo "  Encrypted:  ${filename}.secret.age"
+    echo "  Deploys to: $dest_path"
 }
 
 # Show help for all secrets commands
@@ -826,6 +941,11 @@ MANAGEMENT
   secrets_rotate VAR    Update an existing secret's value
                         Example: secrets_rotate GITHUB_TOKEN
 
+  secrets_remove VAR    Remove a secret (mapping + .age + repo sync)
+                        For file secrets, also removes the deployed plaintext file
+                        Example: secrets_remove OLD_API_TOKEN
+                        Use --yes to skip the confirmation prompt
+
   secrets_check         Validate mapping integrity (find missing/orphaned files)
 
   secrets_clean         Remove plaintext .dec and .secret files
@@ -844,13 +964,18 @@ FILES
   Audit log:  $DOTFILES_DIR/sensitive/.secrets-audit.log
 
 REPO SYNC
-  Set DOTFILES_REPO_DIR to auto-sync secrets to your repo:
-    export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
+  Auto-detected: $HOME/Projects/dotfiles (override with DOTFILES_REPO_DIR).
+  If neither is found, ops complete normally and a one-line note goes to stderr.
 
-  When configured:
-    - secrets_add/secrets_rotate auto-sync .age files and mapping
-    - Audit log is synced automatically on changes
-    - Use secrets_sync for manual full sync
+  When a repo is detected:
+    - secrets_add/secrets_rotate/secrets_remove auto-sync .age files and mapping
+    - secrets_remove also propagates the deletion to the repo
+    - Audit log is synced automatically on every change
+    - Use secrets_sync for a manual full re-sync (.age + mapping + audit log)
+
+POST-OP STATE
+  All mutating commands (add/rotate/remove/add_file) auto-update the current
+  shell's env so $VAR matches disk immediately. No manual secrets_refresh needed.
 
 EXAMPLES
   # Add a new secret (auto-syncs to repo if configured)

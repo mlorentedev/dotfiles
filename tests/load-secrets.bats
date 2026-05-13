@@ -37,6 +37,7 @@ teardown() {
         type secrets_audit >/dev/null 2>&1 && echo "audit:ok"
         type secrets_sync >/dev/null 2>&1 && echo "sync:ok"
         type secrets_add_file >/dev/null 2>&1 && echo "add_file:ok"
+        type secrets_remove >/dev/null 2>&1 && echo "remove:ok"
     ' -- "$SCRIPTS_DIR"
     [[ "$output" == *"load:ok"* ]]
     [[ "$output" == *"list:ok"* ]]
@@ -50,6 +51,7 @@ teardown() {
     [[ "$output" == *"audit:ok"* ]]
     [[ "$output" == *"sync:ok"* ]]
     [[ "$output" == *"add_file:ok"* ]]
+    [[ "$output" == *"remove:ok"* ]]
 }
 
 @test "secrets_help shows usage information" {
@@ -90,14 +92,17 @@ teardown() {
     [[ "$output" == *"Dry run complete"* ]]
 }
 
-@test "secrets_sync requires DOTFILES_REPO_DIR" {
+@test "secrets_sync errors when no repo can be resolved" {
+    # HOME points to a path with no Projects/dotfiles, so auto-detect must also fail
     run bash -c '
         unset DOTFILES_REPO_DIR
+        export HOME="/tmp/bats_no_repo_anywhere_$$"
         source "$1/utils.sh"
         source "$1/load-secrets.sh"
         secrets_sync
     ' -- "$SCRIPTS_DIR"
-    [[ "$output" == *"DOTFILES_REPO_DIR"* ]]
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"no repo found"* ]]
 }
 
 # --- File secret helpers (bash) ---
@@ -483,4 +488,150 @@ CONF
     rm -f "$dest_file"
     [[ $status -eq 0 ]]
     [[ "$output" == *"zsh-file-content"* ]]
+}
+
+# --- secrets_remove + repo sync auto-detect ---
+
+@test "secrets_remove validates inputs" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_remove' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "secrets_remove rejects unknown var" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    run bash -c '
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        secrets_remove NONEXISTENT --yes
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"No mapping found"* ]]
+}
+
+@test "secrets_remove --yes drops mapping line and .age file (plain)" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+KEEPER=keeper.token
+CONF
+    touch "$SECRETS_DIR/my.token.secret.age"
+    touch "$SECRETS_DIR/keeper.token.secret.age"
+
+    run bash -c '
+        unset DOTFILES_REPO_DIR
+        export HOME="/tmp/bats_no_repo_$$"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_AUDIT_FILE="'"$SECRETS_DIR"'/.audit"
+        secrets_remove TOKEN --yes
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -eq 0 ]]
+    [[ ! -f "$SECRETS_DIR/my.token.secret.age" ]]
+    [[ -f "$SECRETS_DIR/keeper.token.secret.age" ]]
+    ! grep -q "^TOKEN=" "$SECRETS_DIR/env-mapping.conf"
+    grep -q "^KEEPER=" "$SECRETS_DIR/env-mapping.conf"
+}
+
+@test "secrets_remove --yes drops file secret mapping and deployed file" {
+    local dest_file="/tmp/bats_remove_dest_$$"
+    echo "deployed-content" > "$dest_file"
+    cat > "$SECRETS_DIR/env-mapping.conf" <<CONF
+@MYFILE=myfile.data>${dest_file}
+CONF
+    touch "$SECRETS_DIR/myfile.data.secret.age"
+
+    run bash -c '
+        unset DOTFILES_REPO_DIR
+        export HOME="/tmp/bats_no_repo_$$"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_AUDIT_FILE="'"$SECRETS_DIR"'/.audit"
+        secrets_remove MYFILE --yes
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -eq 0 ]]
+    [[ ! -f "$SECRETS_DIR/myfile.data.secret.age" ]]
+    [[ ! -f "$dest_file" ]]
+    ! grep -q "^@MYFILE=" "$SECRETS_DIR/env-mapping.conf"
+}
+
+@test "secrets_remove aborts on negative confirmation" {
+    cat > "$SECRETS_DIR/env-mapping.conf" <<'CONF'
+TOKEN=my.token
+CONF
+    touch "$SECRETS_DIR/my.token.secret.age"
+
+    run bash -c '
+        unset DOTFILES_REPO_DIR
+        export HOME="/tmp/bats_no_repo_$$"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        SECRETS_MAPPING_FILE="'"$SECRETS_DIR"'/env-mapping.conf"
+        SECRETS_AUDIT_FILE="'"$SECRETS_DIR"'/.audit"
+        echo "n" | secrets_remove TOKEN
+    ' -- "$SCRIPTS_DIR"
+    [[ $status -ne 0 ]]
+    [[ "$output" == *"Aborted"* ]]
+    [[ -f "$SECRETS_DIR/my.token.secret.age" ]]
+    grep -q "^TOKEN=" "$SECRETS_DIR/env-mapping.conf"
+}
+
+@test "_get_secrets_repo_dir prefers DOTFILES_REPO_DIR when its sensitive/ exists" {
+    local repo="/tmp/bats_repo_$$"
+    mkdir -p "$repo/sensitive"
+    run bash -c '
+        export DOTFILES_REPO_DIR="'"$repo"'"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        _get_secrets_repo_dir
+    ' -- "$SCRIPTS_DIR"
+    rm -rf "$repo"
+    [[ "$output" == "$repo/sensitive" ]]
+}
+
+@test "_get_secrets_repo_dir auto-detects \$HOME/Projects/dotfiles when DOTFILES_REPO_DIR unset" {
+    local fake_home="/tmp/bats_home_$$"
+    mkdir -p "$fake_home/Projects/dotfiles/sensitive"
+    run bash -c '
+        unset DOTFILES_REPO_DIR
+        export HOME="'"$fake_home"'"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        _get_secrets_repo_dir
+    ' -- "$SCRIPTS_DIR"
+    rm -rf "$fake_home"
+    [[ "$output" == "$fake_home/Projects/dotfiles/sensitive" ]]
+}
+
+@test "_get_secrets_repo_dir returns empty when no repo found" {
+    run bash -c '
+        unset DOTFILES_REPO_DIR
+        export HOME="/tmp/bats_nohome_$$"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        _get_secrets_repo_dir
+    ' -- "$SCRIPTS_DIR"
+    [[ -z "$output" ]]
+}
+
+@test "_secrets_sync_to_repo warns on stderr when no repo resolved" {
+    run bash -c '
+        unset DOTFILES_REPO_DIR
+        export HOME="/tmp/bats_nohome_$$"
+        source "$1/utils.sh"; source "$1/load-secrets.sh"
+        SECRETS_DIR="'"$SECRETS_DIR"'"
+        _secrets_sync_to_repo "any.secret.age" false false 2>&1 1>/dev/null
+    ' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"repo not synced"* ]]
+}
+
+@test "secrets_help mentions secrets_remove" {
+    run bash -c 'source "$1/utils.sh"; source "$1/load-secrets.sh"; secrets_help' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"secrets_remove"* ]]
+}
+
+@test "secrets_remove defined under zsh" {
+    run zsh -c '. "$1/utils.sh"; . "$1/load-secrets.sh"; type secrets_remove >/dev/null && echo ok' -- "$SCRIPTS_DIR"
+    [[ "$output" == *"ok"* ]]
 }
