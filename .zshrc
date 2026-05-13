@@ -1,3 +1,7 @@
+# Optional startup profiling. Enable with: DOTFILES_PROFILE=1 zsh -i -c exit
+# Pairs with the zprof dump at the bottom of this file.
+[[ -n "${DOTFILES_PROFILE:-}" ]] && zmodload zsh/zprof
+
 # ==========================
 #       OH MY ZSH SETUP
 # ==========================
@@ -102,3 +106,6 @@ command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 # Terraform Autocomplete
 autoload -U +X bashcompinit && bashcompinit
 complete -o nospace -C /usr/bin/terraform terraform
+
+# Dump zprof results at end of startup if profiling is enabled
+[[ -n "${DOTFILES_PROFILE:-}" ]] && zprof | head -25

@@ -1,5 +1,13 @@
 # ~/.bashrc: executed by bash(1) for non-login shells.
 
+# Optional startup profiling. Enable with: DOTFILES_PROFILE=1 bash -i -c exit
+# Bash has no built-in profiler — emit timestamped xtrace to a tmp file.
+if [[ -n "${DOTFILES_PROFILE:-}" ]]; then
+    PS4='+ $EPOCHREALTIME ${BASH_SOURCE}:${LINENO}: '
+    exec 3>&2 2>"/tmp/bashrc-profile.$$.log"
+    set -x
+fi
+
 # ==========================
 #    INTERACTIVE CHECK
 # ==========================
@@ -121,3 +129,10 @@ if [ -f /usr/share/bash-completion/bash_completion ]; then
     . /usr/share/bash-completion/bash_completion
 fi
 complete -o nospace -C /usr/bin/terraform terraform
+
+# Stop xtrace and surface the profile log path if profiling was enabled
+if [[ -n "${DOTFILES_PROFILE:-}" ]]; then
+    set +x
+    exec 2>&3 3>&-
+    echo "bashrc profile written to /tmp/bashrc-profile.$$.log"
+fi
