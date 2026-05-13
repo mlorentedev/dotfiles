@@ -27,6 +27,9 @@ alias gp="git pull"
 alias kc="knowledge-crystallize.sh"               # Stamp current project MEMORY.md
 alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
 
+# Repo maintenance
+alias dch="diff-check.sh"                         # Detect drift between repo and ~/.dotfiles
+
 # Aider tiers (OpenRouter)
 alias ai="aider"                                                                          # daily: DeepSeek V3.2
 alias aic="aider --model openrouter/qwen/qwen3-coder-next"                                # coding: Qwen3 Coder

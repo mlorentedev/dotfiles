@@ -26,8 +26,8 @@ setup() {
     grep -q 'versions.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh has all 9 sections" {
-    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 9 ]]
+@test "healthcheck.sh has all 10 sections" {
+    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 10 ]]
 }
 
 @test "healthcheck.sh uses set -euo pipefail" {
@@ -58,10 +58,10 @@ setup() {
     fi
 }
 
-# --- tmux section 9/9 ---
+# --- tmux section 9/10 ---
 
-@test "healthcheck.sh has section 9/9 for tmux" {
-    grep -qE 'section "9/9" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh has section 9/10 for tmux" {
+    grep -qE 'section "9/10" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies tmux binary" {
@@ -70,4 +70,14 @@ setup() {
 
 @test "healthcheck.sh verifies ~/.tmux.conf symlink target" {
     grep -qE 'readlink "\$HOME/\.tmux\.conf"' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+# --- drift section 10/10 ---
+
+@test "healthcheck.sh has section 10/10 for drift" {
+    grep -qE 'section "10/10" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+@test "healthcheck.sh invokes diff-check.sh" {
+    grep -q 'diff-check.sh' "$SCRIPTS_DIR/healthcheck.sh"
 }
