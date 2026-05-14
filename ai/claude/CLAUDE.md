@@ -316,6 +316,21 @@ do NOT also create a manual git commit for vault edits.
 
 See `00_meta/patterns/pattern-hive-first-vault-access.md` for full rationale.
 
+### claude-mem (Conversation Memory & Cross-Session Recall)
+
+**Active by default in every session, every project, every machine.** Captures observations automatically via session hooks — no explicit writes needed during routine work. claude-mem stores conversation flow; the vault stores crystallized knowledge. They are complementary, not interchangeable.
+
+* `/mem-search "query"` — find solutions/decisions from past sessions ("did we solve this before?").
+* `/timeline-report` — narrative history of a project from accumulated observations.
+* `/knowledge-agent` — build a topic-focused brain from observations.
+* `/how-it-works` — explain what claude-mem is doing if asked.
+
+**Do NOT write strategic decisions, lessons, or ADRs to claude-mem.** Those go to vault via `capture_lesson` / `vault_write`. See `pattern-decision-persistence.md` — claude-mem is a conversation log, not a source of truth.
+
+**Default protocol:** BOTH claude-mem AND vault active simultaneously. claude-mem records as you work; vault gets explicit writes for crystallization. See `00_meta/patterns/pattern-dual-memory.md` for full rationale.
+
+**Runtime note:** In Claude Code's default `worker` runtime, manual writes (`observation_add`, `memory_add`) are blocked. Automatic hook capture works regardless — observations from each session appear in the next session start. Slash commands above are read-only and always available. To enable manual writes in parallel to vault, set `CLAUDE_MEM_RUNTIME=server-beta` in `~/.claude/settings.json` (affects all projects). Default worker mode is sufficient for the dual-memory protocol.
+
 ### Obsidian CLI (Vault Graph Queries)
 
 **Available via:** `obs-cli.sh <command>` (Linux) / `obs-cli.ps1 <command>` (Windows).
