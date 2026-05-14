@@ -327,7 +327,7 @@ if (Test-Path $VaultSkillsDir) {
                 cmd /c rmdir $target 2>&1 | Out-Null
             } elseif ((Get-ChildItem $target -ErrorAction SilentlyContinue).Count -gt 0) {
                 $backup = "$target.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
-                Write-Warn "$skillName exists at $target — backing up to $backup"
+                Write-Warn "$skillName exists at $target - backing up to $backup"
                 Rename-Item $target $backup
             } else {
                 Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
