@@ -539,6 +539,41 @@ if [ -d "$VAULT_ROOT" ]; then
     done
 fi
 
+# Deploy vault-hosted skill symlinks (vault → Claude Code)
+# Vault skills live in $VAULT_ROOT/00_meta/skills/<name>/SKILL.md per pattern-spec-driven-development.
+# Symlink each into ~/.claude/skills/ for Claude Code discovery. Idempotent.
+VAULT_SKILLS_DIR="$VAULT_ROOT/00_meta/skills"
+if [ -d "$VAULT_SKILLS_DIR" ]; then
+    log_info "Linking vault-hosted skills to Claude Code..."
+    for skill_dir in "$VAULT_SKILLS_DIR"/*/; do
+        [ -d "$skill_dir" ] || continue
+        skill_source="${skill_dir%/}"
+        skill_name=$(basename "$skill_source")
+        target="$HOME/.claude/skills/$skill_name"
+
+        if [ -L "$target" ]; then
+            current_target=$(readlink "$target")
+            if [ "$current_target" != "$skill_source" ]; then
+                rm "$target"
+                ln -s "$skill_source" "$target"
+                log_success "Re-linked vault skill: $skill_name"
+            fi
+        elif [ -d "$target" ] && [ -n "$(ls -A "$target" 2>/dev/null)" ]; then
+            log_warning "$skill_name exists at $target — backing up"
+            mv "$target" "${target}.bak.$(date +%s)"
+            ln -s "$skill_source" "$target"
+            log_success "Linked vault skill: $skill_name"
+        elif [ -d "$target" ]; then
+            rmdir "$target" 2>/dev/null || true
+            ln -s "$skill_source" "$target"
+            log_success "Linked vault skill: $skill_name"
+        else
+            ln -s "$skill_source" "$target"
+            log_success "Linked vault skill: $skill_name"
+        fi
+    done
+fi
+
 # Add project-init alias (AI-agnostic naming)
 PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
 [ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true

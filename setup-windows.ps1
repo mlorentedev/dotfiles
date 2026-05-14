@@ -310,6 +310,35 @@ if (Test-Path $VaultRoot) {
     }
 }
 
+# Deploy vault-hosted skill junctions (vault -> Claude Code)
+# Vault skills live in $VaultRoot\00_meta\skills\<name>\SKILL.md per pattern-spec-driven-development.
+# Junction each into $env:USERPROFILE\.claude\skills\ for Claude Code discovery. Idempotent.
+$VaultSkillsDir = Join-Path $VaultRoot "00_meta\skills"
+if (Test-Path $VaultSkillsDir) {
+    Write-Info "Linking vault-hosted skills to Claude Code..."
+    Get-ChildItem -Path $VaultSkillsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+        $skillSource = $_.FullName
+        $skillName = $_.Name
+        $target = Join-Path $ClaudeHome "skills\$skillName"
+
+        if (Test-Path $target) {
+            $item = Get-Item $target -Force
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                cmd /c rmdir $target 2>&1 | Out-Null
+            } elseif ((Get-ChildItem $target -ErrorAction SilentlyContinue).Count -gt 0) {
+                $backup = "$target.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
+                Write-Warn "$skillName exists at $target - backing up to $backup"
+                Rename-Item $target $backup
+            } else {
+                Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        New-Item -ItemType Junction -Path $target -Target $skillSource -Force | Out-Null
+        Write-Success "Linked vault skill: $skillName"
+    }
+}
+
 # ============================================================================
 # 2b. DEPLOY AIDER CONFIGURATION
 # ============================================================================
