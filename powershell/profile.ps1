@@ -109,6 +109,12 @@ function prompt {
 # ENVIRONMENT VARIABLES
 # ============================================================================
 
+# Structural paths declared in env-contract.json. Setting them explicitly
+# silences `doctor.ps1` warnings and makes the install location unambiguous
+# to every subshell.
+$env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
+$env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
+
 # Uncomment and set if needed:
 # $env:GEMINI_API_KEY = "your-api-key"
 # $env:ANTHROPIC_API_KEY = "your-api-key"
