@@ -103,3 +103,22 @@ setup() {
 @test "setup-linux.sh tells user how to install tmux when missing" {
     grep -qE 'sudo apt install -y tmux' "$DOTFILES_DIR/setup-linux.sh"
 }
+
+# --- SessionStart hook registration (issue #20 prevention) ---
+
+@test "setup-linux.sh registers SessionStart hook in Claude settings" {
+    grep -q 'SessionStart' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# Hook command must point at the canonical deploy directory under ~/.dotfiles/scripts,
+# matching where the install step actually lands claude-session-start.sh.
+@test "setup-linux.sh SessionStart hook command points at dotfiles scripts dir" {
+    grep -qE 'EXPECTED_HOOK_COMMAND="\$HOME/\.dotfiles/scripts/claude-session-start\.sh"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# Hook registration must reconcile (compare and rewrite) rather than skip when
+# any SessionStart entry already exists. Mirrors the Windows guard.
+@test "setup-linux.sh SessionStart hook self-heals on path drift" {
+    grep -q 'EXISTING_HOOK_COMMAND' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qE '\[ "\$EXISTING_HOOK_COMMAND" = "\$EXPECTED_HOOK_COMMAND" \]' "$DOTFILES_DIR/setup-linux.sh"
+}
