@@ -80,13 +80,17 @@ heal_zod() {
     fi
 
     # Use a subshell so we don't leak the cd. Suppress output unless verbose.
+    # --ignore-scripts is mandatory: other deps in the plugin (e.g.
+    # tree-sitter) trigger node-gyp on postinstall and fail on machines
+    # without a C++ build toolchain (Windows MSBuild, Linux build-essential).
+    # We only need zod's pure-JS files; no postinstall is required for it.
     if [ "$VERBOSE" -eq 1 ]; then
-        ( cd "$plugin_dir" && npm install --no-save --no-package-lock --no-audit --no-fund zod@^4.3.6 ) || {
+        ( cd "$plugin_dir" && npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts zod@^4.3.6 ) || {
             log "ERROR: npm install zod failed in $plugin_dir"
             return 0
         }
     else
-        ( cd "$plugin_dir" && npm install --no-save --no-package-lock --no-audit --no-fund --silent zod@^4.3.6 >/dev/null 2>&1 ) || {
+        ( cd "$plugin_dir" && npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts --silent zod@^4.3.6 >/dev/null 2>&1 ) || {
             log "ERROR: npm install zod failed in $plugin_dir"
             return 0
         }

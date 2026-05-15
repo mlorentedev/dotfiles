@@ -36,6 +36,22 @@ if (-not $CWD) {
 $KnowledgeVault = Join-Path $env:USERPROFILE 'Projects\knowledge'
 $ContextLines = ''
 
+# --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
+# Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
+# missing zod runtime dep. Silent on healthy installs. Mirrors the bash side.
+$ClaudeMemHeal = Join-Path $PSScriptRoot 'claude-mem-heal.ps1'
+if (Test-Path $ClaudeMemHeal) {
+    try {
+        $healOutput = & pwsh -NoProfile -File $ClaudeMemHeal 2>&1 | Out-String
+        $healOutput = $healOutput.Trim()
+        if ($healOutput) {
+            $ContextLines = "[claude-mem] self-healed plugin install:`n$healOutput"
+        }
+    } catch {
+        # Non-fatal -- session continues even if heal fails
+    }
+}
+
 # --- Hive: detect project and suggest vault queries ---
 # Checks: 1) personal projects (10_projects/), 2) work SDK projects (50_work/45-development/).
 function Find-HiveProject {
