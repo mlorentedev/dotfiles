@@ -129,16 +129,33 @@ while IFS= read -r entry; do
     esac
 done < <(jq -r '.required_path_entries.linux[]' "$CONTRACT")
 
-# 3. Required binaries
+# 3. Required binaries (with optional version pinning)
 echo
 echo "Required binaries:"
-while IFS=$'\t' read -r name; do
-    if command -v "$name" >/dev/null 2>&1; then
-        log_pass "$name on PATH"
-    else
+# Same '|' separator rationale as the env_vars loop above: '\t' would
+# collapse empty optional columns (min_version, version_pattern).
+while IFS='|' read -r name min_version version_pattern; do
+    if ! command -v "$name" >/dev/null 2>&1; then
         log_fail "$name missing"
+        continue
     fi
-done < <(jq -r '.required_binaries[] | .name' "$CONTRACT")
+    if [ -z "$min_version" ]; then
+        log_pass "$name on PATH"
+        continue
+    fi
+    # Version check: run `<name> --version`, apply pattern, compare with sort -V.
+    raw=$("$name" --version 2>&1 | head -1)
+    if [[ "$raw" =~ $version_pattern ]]; then
+        actual="${BASH_REMATCH[1]}"
+        if [ "$(printf '%s\n%s\n' "$min_version" "$actual" | sort -V | head -1)" = "$min_version" ]; then
+            log_pass "$name $actual (>= $min_version)"
+        else
+            log_fail "$name $actual is older than minimum $min_version"
+        fi
+    else
+        log_warn "$name on PATH but version unparseable: '$raw' (pattern: $version_pattern)"
+    fi
+done < <(jq -r '.required_binaries[] | [.name, (.min_version // ""), (.version_pattern // "")] | join("|")' "$CONTRACT")
 
 # 4. Optional binaries
 echo

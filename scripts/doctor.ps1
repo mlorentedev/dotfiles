@@ -134,14 +134,38 @@ foreach ($entry in $data.required_path_entries.windows) {
     }
 }
 
-# 3. Required binaries
+# 3. Required binaries (with optional version pinning)
 Write-Host ""
 Write-Host "Required binaries:"
 foreach ($b in $data.required_binaries) {
-    if (Get-Command $b.name -ErrorAction SilentlyContinue) {
-        Write-Pass "$($b.name) on PATH"
-    } else {
+    if (-not (Get-Command $b.name -ErrorAction SilentlyContinue)) {
         Write-Fail "$($b.name) missing"
+        continue
+    }
+    $minVersion = if ($b.PSObject.Properties.Match('min_version').Count -gt 0) { $b.min_version } else { '' }
+    $pattern = if ($b.PSObject.Properties.Match('version_pattern').Count -gt 0) { $b.version_pattern } else { '' }
+    if ([string]::IsNullOrEmpty($minVersion)) {
+        Write-Pass "$($b.name) on PATH"
+        continue
+    }
+    # Run `<name> --version` and apply pattern. Some tools write version to
+    # stderr, hence the 2>&1 merge.
+    $raw = (& $b.name --version 2>&1 | Select-Object -First 1) | Out-String
+    $raw = $raw.Trim()
+    if ($raw -match $pattern) {
+        $actual = $Matches[1]
+        try {
+            $cmp = [Version]::Parse($actual).CompareTo([Version]::Parse($minVersion))
+            if ($cmp -ge 0) {
+                Write-Pass "$($b.name) $actual (>= $minVersion)"
+            } else {
+                Write-Fail "$($b.name) $actual is older than minimum $minVersion"
+            }
+        } catch {
+            Write-Warn "$($b.name) version compare failed for '$actual' vs '$minVersion': $_"
+        }
+    } else {
+        Write-Warn "$($b.name) on PATH but version unparseable: '$raw' (pattern: $pattern)"
     }
 }
 

@@ -210,3 +210,23 @@ setup() {
     grep -q 'doctor\.sh' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
+
+# SessionStart hooks must run a silent doctor and surface only drift.
+@test "parity: both SessionStart hooks invoke silent doctor" {
+    grep -q 'doctor\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
+    grep -q 'doctor\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
+}
+
+# Required binaries in the contract must include min_version pins.
+@test "env-contract.json pins min_version for required binaries" {
+    if command -v jq >/dev/null 2>&1; then
+        run jq -e '.required_binaries | all(has("min_version"))' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+    fi
+}
+
+# Both doctors must implement the binary version-check logic.
+@test "parity: both doctors check binary versions against min_version" {
+    grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.sh"
+    grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.ps1"
+}

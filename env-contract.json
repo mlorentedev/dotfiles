@@ -45,8 +45,19 @@
     ]
   },
   "required_binaries": [
-    { "name": "git", "required": true },
-    { "name": "jq", "required": true }
+    {
+      "name": "git",
+      "required": true,
+      "min_version": "2.30.0",
+      "version_pattern": "git version ([0-9]+\\.[0-9]+\\.[0-9]+)"
+    },
+    {
+      "name": "jq",
+      "required": true,
+      "min_version": "1.6",
+      "_pattern_note": "regex must be valid in both bash ERE (no `(?:..)`) and .NET; capture group 1 holds the version. Group 2 is intentionally captured-but-unused for the optional patch component.",
+      "version_pattern": "jq-?([0-9]+\\.[0-9]+(\\.[0-9]+)?)"
+    }
   ],
   "optional_binaries": [
     { "name": "claude", "purpose": "Claude Code CLI (MCP registration, plugins)" },
