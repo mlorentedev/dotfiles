@@ -170,3 +170,63 @@ setup() {
     grep -q 'claude-mem-heal\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
     grep -q 'claude-mem-heal\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
+
+# --- doctor + env-contract.json (cross-OS parity) ---
+
+@test "env-contract.json exists and is valid JSON with required sections" {
+    [ -f "$DOTFILES_DIR/env-contract.json" ]
+    if command -v jq >/dev/null 2>&1; then
+        run jq -e '.env_vars | length > 0' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+        run jq -e '.required_path_entries.linux | length > 0' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+        run jq -e '.required_path_entries.windows | length > 0' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+        run jq -e '.required_binaries | length > 0' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+    fi
+}
+
+@test "doctor.sh and doctor.ps1 both exist (cross-OS parity)" {
+    [ -f "$DOTFILES_DIR/scripts/doctor.sh" ]
+    [ -f "$DOTFILES_DIR/scripts/doctor.ps1" ]
+}
+
+@test "doctor.sh has valid bash syntax" {
+    bash -n "$DOTFILES_DIR/scripts/doctor.sh"
+}
+
+@test "doctor.sh supports --check and --fix modes" {
+    grep -q -- '--check' "$DOTFILES_DIR/scripts/doctor.sh"
+    grep -q -- '--fix' "$DOTFILES_DIR/scripts/doctor.sh"
+}
+
+@test "doctor.ps1 supports -Fix switch" {
+    grep -q '\[switch\]\$Fix' "$DOTFILES_DIR/scripts/doctor.ps1"
+}
+
+# Setup scripts must invoke the doctor before printing 'Setup Complete'.
+@test "parity: both setup scripts invoke doctor post-setup" {
+    grep -q 'doctor\.sh' "$DOTFILES_DIR/setup-linux.sh"
+    grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+# SessionStart hooks must run a silent doctor and surface only drift.
+@test "parity: both SessionStart hooks invoke silent doctor" {
+    grep -q 'doctor\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
+    grep -q 'doctor\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
+}
+
+# Required binaries in the contract must include min_version pins.
+@test "env-contract.json pins min_version for required binaries" {
+    if command -v jq >/dev/null 2>&1; then
+        run jq -e '.required_binaries | all(has("min_version"))' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+    fi
+}
+
+# Both doctors must implement the binary version-check logic.
+@test "parity: both doctors check binary versions against min_version" {
+    grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.sh"
+    grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.ps1"
+}

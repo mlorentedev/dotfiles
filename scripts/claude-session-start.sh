@@ -36,6 +36,24 @@ $HEAL_OUTPUT"
     fi
 fi
 
+# --- Silent doctor: surface env-contract drift to Claude only when detected ---
+# Runs check-only; suppresses [ok]/[info] lines and only forwards [warn]/[fail].
+DOCTOR_SCRIPT="$SCRIPT_DIR/doctor.sh"
+if [ -x "$DOCTOR_SCRIPT" ] && command -v jq >/dev/null 2>&1; then
+    DOCTOR_DRIFT=$(bash "$DOCTOR_SCRIPT" 2>&1 | grep -E '^  \[(warn|fail)\]' || true)
+    if [ -n "$DOCTOR_DRIFT" ]; then
+        if [ -n "$CONTEXT_LINES" ]; then
+            CONTEXT_LINES="$CONTEXT_LINES
+
+[doctor] env-contract drift detected (run scripts/doctor.sh --fix):
+$DOCTOR_DRIFT"
+        else
+            CONTEXT_LINES="[doctor] env-contract drift detected (run scripts/doctor.sh --fix):
+$DOCTOR_DRIFT"
+        fi
+    fi
+fi
+
 # Walk up from CWD to find an Obsidian vault (.obsidian/ directory)
 find_vault_root() {
     local dir="$1"

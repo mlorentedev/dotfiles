@@ -52,6 +52,26 @@ if (Test-Path $ClaudeMemHeal) {
     }
 }
 
+# --- Silent doctor: surface env-contract drift only when detected ---
+# Runs check-only; keeps only [warn]/[fail] lines.
+$DoctorScript = Join-Path $PSScriptRoot 'doctor.ps1'
+if (Test-Path $DoctorScript) {
+    try {
+        $doctorOut = & pwsh -NoProfile -File $DoctorScript 2>&1 | Out-String
+        $drift = ($doctorOut -split "`n" | Where-Object { $_ -match '^\s+\[(warn|fail)\]' }) -join "`n"
+        if ($drift) {
+            $driftBlock = "[doctor] env-contract drift detected (run scripts/doctor.ps1 -Fix):`n$drift"
+            if ($ContextLines) {
+                $ContextLines = "$ContextLines`n`n$driftBlock"
+            } else {
+                $ContextLines = $driftBlock
+            }
+        }
+    } catch {
+        # Non-fatal
+    }
+}
+
 # --- Hive: detect project and suggest vault queries ---
 # Checks: 1) personal projects (10_projects/), 2) work SDK projects (50_work/45-development/).
 function Find-HiveProject {
