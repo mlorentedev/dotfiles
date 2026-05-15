@@ -653,6 +653,14 @@ if (Test-Path $sessionStartSource) {
     Write-Warn "claude-session-start.ps1 not found at $sessionStartSource"
 }
 
+$memHealSource = "$DotfilesDir\scripts\claude-mem-heal.ps1"
+if (Test-Path $memHealSource) {
+    Copy-Item $memHealSource "$ScriptsDir\" -Force
+    Write-Success "Deployed claude-mem-heal.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "claude-mem-heal.ps1 not found at $memHealSource"
+}
+
 $syncSource = "$DotfilesDir\scripts\dotfiles-sync.ps1"
 if (Test-Path $syncSource) {
     Copy-Item $syncSource "$ScriptsDir\" -Force

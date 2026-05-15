@@ -68,6 +68,10 @@ setup() {
     grep -q 'claude-session-start.ps1' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 deploys claude-mem-heal.ps1" {
+    grep -q 'claude-mem-heal.ps1' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys dotfiles-sync.ps1" {
     grep -q 'dotfiles-sync.ps1' "$PS1_SCRIPT"
 }

@@ -149,3 +149,24 @@ setup() {
     grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-windows.ps1"
 }
+
+# --- claude-mem-heal cross-OS parity ---
+
+@test "claude-mem-heal.ps1 exists alongside the bash version" {
+    [ -f "$DOTFILES_DIR/scripts/claude-mem-heal.sh" ]
+    [ -f "$DOTFILES_DIR/scripts/claude-mem-heal.ps1" ]
+}
+
+# Both heal scripts must use --ignore-scripts to avoid triggering native
+# postinstalls (tree-sitter -> node-gyp -> MSBuild on Windows, build-essential
+# on Linux). Only zod's pure-JS files are needed.
+@test "claude-mem-heal scripts both use --ignore-scripts on npm install" {
+    grep -q -- '--ignore-scripts' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -q -- '--ignore-scripts' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
+# Both SessionStart hooks must invoke the heal at session start.
+@test "parity: both SessionStart hooks invoke claude-mem-heal" {
+    grep -q 'claude-mem-heal\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
+    grep -q 'claude-mem-heal\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
+}
