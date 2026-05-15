@@ -661,6 +661,22 @@ if (Test-Path $memHealSource) {
     Write-Warn "claude-mem-heal.ps1 not found at $memHealSource"
 }
 
+$doctorSource = "$DotfilesDir\scripts\doctor.ps1"
+if (Test-Path $doctorSource) {
+    Copy-Item $doctorSource "$ScriptsDir\" -Force
+    Write-Success "Deployed doctor.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "doctor.ps1 not found at $doctorSource"
+}
+
+$contractSource = "$DotfilesDir\env-contract.json"
+if (Test-Path $contractSource) {
+    Copy-Item $contractSource "$DotfilesDest\" -Force
+    Write-Success "Deployed env-contract.json to $DotfilesDest\"
+} else {
+    Write-Warn "env-contract.json not found at $contractSource"
+}
+
 $syncSource = "$DotfilesDir\scripts\dotfiles-sync.ps1"
 if (Test-Path $syncSource) {
     Copy-Item $syncSource "$ScriptsDir\" -Force
@@ -835,6 +851,26 @@ if ($existingTask -and ($existingTaskArgument -eq $expectedTaskArgument)) {
     } catch {
         Write-Warn "Could not register scheduled task (may need admin): $_"
     }
+}
+
+# ============================================================================
+# 8c. POST-SETUP DOCTOR
+# ============================================================================
+# Final assertion against env-contract.json -- catches drift between what
+# setup just deployed and what's actually in place / on PATH / in env vars.
+
+$doctorScript = "$ScriptsDir\doctor.ps1"
+if (Test-Path $doctorScript) {
+    Write-Info "Running post-setup doctor check..."
+    Write-Host ""
+    & pwsh -NoProfile -File $doctorScript
+    $doctorExit = $LASTEXITCODE
+    Write-Host ""
+    if ($doctorExit -ne 0) {
+        Write-Warn "doctor reported one or more required items missing (exit $doctorExit) -- review output above"
+    }
+} else {
+    Write-Warn "doctor.ps1 not deployed at $doctorScript, skipping post-setup check"
 }
 
 # ============================================================================

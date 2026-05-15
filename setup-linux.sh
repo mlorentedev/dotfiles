@@ -652,6 +652,25 @@ file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || 
 
 # Check dependencies
 check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible" "pip"
+
+# Deploy env-contract.json so doctor.sh can find it under $DOTFILES_DIR.
+if [ -f "$CURRENT_DIR/env-contract.json" ]; then
+    cp -f "$CURRENT_DIR/env-contract.json" "$DOTFILES_DIR/env-contract.json"
+    log_success "Deployed env-contract.json to $DOTFILES_DIR/"
+fi
+
+# Final assertion against env-contract.json -- catches drift between what
+# setup just deployed and what's actually in place / on PATH / in env vars.
+DOCTOR_SCRIPT="$DOTFILES_DIR/scripts/doctor.sh"
+if [ -x "$DOCTOR_SCRIPT" ] && command -v jq >/dev/null 2>&1; then
+    log_info "Running post-setup doctor check..."
+    echo
+    bash "$DOCTOR_SCRIPT" || log_warning "doctor reported one or more required items missing -- review output above"
+    echo
+elif [ -f "$DOCTOR_SCRIPT" ]; then
+    log_warning "doctor.sh present but not executable or jq missing, skipping post-setup check"
+fi
+
 log_info "To apply changes immediately, run:"
 log_info "  - For Bash: source ~/.bashrc"
 log_info "  - For Zsh:  source ~/.zshrc"
