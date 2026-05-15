@@ -47,6 +47,7 @@ export EDITOR=nano
 # Base Directories (must be set before loading secrets)
 export DOTFILES_DIR="$HOME/.dotfiles"
 export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
+export CLAUDE_CONFIG_DIR="$HOME/.claude"
 
 # Load encrypted secrets as environment variables
 [[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"

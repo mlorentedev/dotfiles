@@ -54,12 +54,29 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 2
 fi
 
-# Helpers
-log_pass() { [ "$VERBOSE" -eq 1 ] && printf '  [ok]   %s\n' "$1"; return 0; }
-log_warn() { printf '  [warn] %s\n' "$1"; ISSUES=$((ISSUES + 1)); }
-log_fail() { printf '  [fail] %s\n' "$1"; ISSUES=$((ISSUES + 1)); EXIT_CODE=1; }
+# Helpers. Each call also bumps per-section counters so we can print a
+# one-line section summary in non-verbose mode (otherwise the section
+# header appears with no body when every item passes -- looks broken).
+SEC_OK=0; SEC_WARN=0; SEC_FAIL=0; SEC_INFO=0
+section_reset() { SEC_OK=0; SEC_WARN=0; SEC_FAIL=0; SEC_INFO=0; }
+section_summary() {
+    local total=$((SEC_OK + SEC_WARN + SEC_FAIL + SEC_INFO))
+    if [ "$total" -eq 0 ]; then return 0; fi
+    if [ "$SEC_WARN" -eq 0 ] && [ "$SEC_FAIL" -eq 0 ]; then
+        if [ "$SEC_INFO" -gt 0 ]; then
+            printf '  (%d checks: %d ok, %d info)\n' "$total" "$SEC_OK" "$SEC_INFO"
+        else
+            printf '  (%d checks, all ok)\n' "$total"
+        fi
+    else
+        printf '  (%d total: %d ok, %d warn, %d fail)\n' "$total" "$SEC_OK" "$SEC_WARN" "$SEC_FAIL"
+    fi
+}
+log_pass() { SEC_OK=$((SEC_OK + 1)); [ "$VERBOSE" -eq 1 ] && printf '  [ok]   %s\n' "$1"; return 0; }
+log_warn() { SEC_WARN=$((SEC_WARN + 1)); printf '  [warn] %s\n' "$1"; ISSUES=$((ISSUES + 1)); }
+log_fail() { SEC_FAIL=$((SEC_FAIL + 1)); printf '  [fail] %s\n' "$1"; ISSUES=$((ISSUES + 1)); EXIT_CODE=1; }
 log_fix()  { printf '  [fix]  %s\n' "$1"; APPLIED=$((APPLIED + 1)); }
-log_info() { printf '  [info] %s\n' "$1"; }
+log_info() { SEC_INFO=$((SEC_INFO + 1)); printf '  [info] %s\n' "$1"; }
 
 expand_path() {
     # Expand $HOME and ${HOME} in a string; leave other vars alone.
@@ -71,6 +88,7 @@ echo "doctor [$MODE] using $CONTRACT"
 # 1. Env vars
 echo
 echo "Environment variables:"
+section_reset
 # Use '|' as field separator: bash collapses consecutive whitespace IFS
 # characters (including tab) even when set explicitly, which would erase
 # the empty `required_on` column. '|' is non-whitespace, so empty fields
@@ -118,9 +136,12 @@ while IFS='|' read -r name required required_on default validation; do
     fi
 done < <(jq -r '.env_vars[] | [.name, (.required // false), (.required_on // ""), (.default.linux // "null"), (.validation // "")] | join("|")' "$CONTRACT")
 
+section_summary
+
 # 2. PATH entries
 echo
 echo "PATH entries:"
+section_reset
 while IFS= read -r entry; do
     expanded=$(expand_path "$entry")
     case ":$PATH:" in
@@ -128,10 +149,12 @@ while IFS= read -r entry; do
         *) log_warn "$expanded not in PATH -- check shell profile" ;;
     esac
 done < <(jq -r '.required_path_entries.linux[]' "$CONTRACT")
+section_summary
 
 # 3. Required binaries (with optional version pinning)
 echo
 echo "Required binaries:"
+section_reset
 # Same '|' separator rationale as the env_vars loop above: '\t' would
 # collapse empty optional columns (min_version, version_pattern).
 while IFS='|' read -r name min_version version_pattern; do
@@ -156,10 +179,12 @@ while IFS='|' read -r name min_version version_pattern; do
         log_warn "$name on PATH but version unparseable: '$raw' (pattern: $version_pattern)"
     fi
 done < <(jq -r '.required_binaries[] | [.name, (.min_version // ""), (.version_pattern // "")] | join("|")' "$CONTRACT")
+section_summary
 
 # 4. Optional binaries
 echo
 echo "Optional binaries:"
+section_reset
 while IFS=$'\t' read -r name purpose; do
     if command -v "$name" >/dev/null 2>&1; then
         log_pass "$name on PATH ($purpose)"
@@ -167,6 +192,9 @@ while IFS=$'\t' read -r name purpose; do
         log_info "$name missing -- $purpose"
     fi
 done < <(jq -r '.optional_binaries[] | [.name, .purpose] | @tsv' "$CONTRACT")
+# Optional-binaries section uses log_info for misses (not warn/fail), so
+# count those manually so the section summary reflects them.
+section_summary
 
 # 5. --fix mode: invoke known heals
 if [ "$MODE" = "fix" ]; then

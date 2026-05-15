@@ -37,11 +37,28 @@ $script:Issues = 0
 $script:Applied = 0
 $script:ExitCode = 0
 
-function Write-Pass { param([string]$Msg) if ($script:Verbose) { Write-Host "  [ok]   $Msg" } }
-function Write-Warn { param([string]$Msg) Write-Host "  [warn] $Msg" -ForegroundColor Yellow; $script:Issues++ }
-function Write-Fail { param([string]$Msg) Write-Host "  [fail] $Msg" -ForegroundColor Red;    $script:Issues++; $script:ExitCode = 1 }
+# Per-section counters so the section summary line shows even when every
+# item is silent ([ok] in non-verbose) -- mirrors doctor.sh.
+$script:SecOk = 0; $script:SecWarn = 0; $script:SecFail = 0; $script:SecInfo = 0
+function Reset-Section { $script:SecOk = 0; $script:SecWarn = 0; $script:SecFail = 0; $script:SecInfo = 0 }
+function Write-SectionSummary {
+    $total = $script:SecOk + $script:SecWarn + $script:SecFail + $script:SecInfo
+    if ($total -eq 0) { return }
+    if ($script:SecWarn -eq 0 -and $script:SecFail -eq 0) {
+        if ($script:SecInfo -gt 0) {
+            Write-Host "  ($total checks: $($script:SecOk) ok, $($script:SecInfo) info)"
+        } else {
+            Write-Host "  ($total checks, all ok)"
+        }
+    } else {
+        Write-Host "  ($total total: $($script:SecOk) ok, $($script:SecWarn) warn, $($script:SecFail) fail)"
+    }
+}
+function Write-Pass { param([string]$Msg) $script:SecOk++; if ($script:Verbose) { Write-Host "  [ok]   $Msg" } }
+function Write-Warn { param([string]$Msg) $script:SecWarn++; Write-Host "  [warn] $Msg" -ForegroundColor Yellow; $script:Issues++ }
+function Write-Fail { param([string]$Msg) $script:SecFail++; Write-Host "  [fail] $Msg" -ForegroundColor Red;    $script:Issues++; $script:ExitCode = 1 }
 function Write-Fix  { param([string]$Msg) Write-Host "  [fix]  $Msg" -ForegroundColor Cyan;   $script:Applied++ }
-function Write-Inf  { param([string]$Msg) Write-Host "  [info] $Msg" }
+function Write-Inf  { param([string]$Msg) $script:SecInfo++; Write-Host "  [info] $Msg" }
 
 function Expand-ContractPath {
     param([string]$Value)
@@ -73,6 +90,7 @@ Write-Host "doctor [$script:Mode] using $contract"
 # 1. Env vars
 Write-Host ""
 Write-Host "Environment variables:"
+Reset-Section
 foreach ($v in $data.env_vars) {
     # Skip vars scoped to the other OS
     if ($v.PSObject.Properties.Match('required_on').Count -gt 0 -and $v.required_on -eq 'linux') {
@@ -121,9 +139,12 @@ foreach ($v in $data.env_vars) {
     }
 }
 
+Write-SectionSummary
+
 # 2. PATH entries
 Write-Host ""
 Write-Host "PATH entries:"
+Reset-Section
 $pathEntries = $env:PATH -split ';'
 foreach ($entry in $data.required_path_entries.windows) {
     $expanded = Expand-ContractPath $entry
@@ -134,9 +155,12 @@ foreach ($entry in $data.required_path_entries.windows) {
     }
 }
 
+Write-SectionSummary
+
 # 3. Required binaries (with optional version pinning)
 Write-Host ""
 Write-Host "Required binaries:"
+Reset-Section
 foreach ($b in $data.required_binaries) {
     if (-not (Get-Command $b.name -ErrorAction SilentlyContinue)) {
         Write-Fail "$($b.name) missing"
@@ -169,9 +193,12 @@ foreach ($b in $data.required_binaries) {
     }
 }
 
+Write-SectionSummary
+
 # 4. Optional binaries
 Write-Host ""
 Write-Host "Optional binaries:"
+Reset-Section
 foreach ($b in $data.optional_binaries) {
     if (Get-Command $b.name -ErrorAction SilentlyContinue) {
         Write-Pass "$($b.name) on PATH ($($b.purpose))"
@@ -179,6 +206,7 @@ foreach ($b in $data.optional_binaries) {
         Write-Inf "$($b.name) missing -- $($b.purpose)"
     }
 }
+Write-SectionSummary
 
 # 5. Fix mode: invoke known heals
 if ($script:Mode -eq 'fix') {

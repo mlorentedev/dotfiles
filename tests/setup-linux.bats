@@ -230,3 +230,27 @@ setup() {
     grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.sh"
     grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.ps1"
 }
+
+# Doctor sections must emit a one-line summary so non-verbose runs never
+# show an empty header (regression guard for the post-#24 UX bug).
+@test "parity: both doctors emit per-section summaries" {
+    grep -q 'section_summary' "$DOTFILES_DIR/scripts/doctor.sh"
+    grep -q 'Write-SectionSummary' "$DOTFILES_DIR/scripts/doctor.ps1"
+}
+
+# Profiles must export the structural env vars declared in env-contract.json,
+# so a fresh shell silences doctor without needing --fix every session.
+@test ".zshrc exports DOTFILES_DIR and CLAUDE_CONFIG_DIR" {
+    grep -q 'export DOTFILES_DIR=' "$DOTFILES_DIR/.zshrc"
+    grep -q 'export CLAUDE_CONFIG_DIR=' "$DOTFILES_DIR/.zshrc"
+}
+
+@test ".bashrc exports DOTFILES_DIR and CLAUDE_CONFIG_DIR" {
+    grep -q 'export DOTFILES_DIR=' "$DOTFILES_DIR/.bashrc"
+    grep -q 'export CLAUDE_CONFIG_DIR=' "$DOTFILES_DIR/.bashrc"
+}
+
+@test "powershell/profile.ps1 sets DOTFILES_DIR and CLAUDE_CONFIG_DIR" {
+    grep -q '\$env:DOTFILES_DIR' "$DOTFILES_DIR/powershell/profile.ps1"
+    grep -q '\$env:CLAUDE_CONFIG_DIR' "$DOTFILES_DIR/powershell/profile.ps1"
+}
