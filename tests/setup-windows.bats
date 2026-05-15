@@ -92,6 +92,20 @@ setup() {
     grep -q 'SessionStart' "$PS1_SCRIPT"
 }
 
+# SessionStart hook command must point at the deploy directory ($ScriptsDir),
+# not the dotfiles staging area. Regression guard for issue #20.
+@test "setup-windows.ps1 SessionStart hook command uses ScriptsDir, not DotfilesDest" {
+    grep -Eq '\$sessionStartCmd\s*=\s*"\$ScriptsDir' "$PS1_SCRIPT"
+    ! grep -Eq '\$sessionStartCmd\s*=\s*"\$DotfilesDest' "$PS1_SCRIPT"
+}
+
+# Hook registration must reconcile (compare and rewrite) rather than skip when
+# any SessionStart entry already exists; skip-if-exists makes wrong paths sticky.
+@test "setup-windows.ps1 SessionStart hook self-heals on path drift" {
+    grep -q '\$expectedHookCommand' "$PS1_SCRIPT"
+    grep -Eq '\$existingHookCommand\s+-eq\s+\$expectedHookCommand' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys SSH config" {
     grep -q 'Setting up SSH config' "$PS1_SCRIPT"
 }

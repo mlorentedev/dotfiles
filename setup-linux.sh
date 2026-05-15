@@ -95,10 +95,11 @@ fi
 # Update functions.zsh to source utils.sh if not already done
 if [ -f "$DOTFILES_DIR/.zsh/functions.zsh" ]; then
     if ! grep -q "source.*utils.sh" "$DOTFILES_DIR/.zsh/functions.zsh"; then
-        log_info "Updating functions.zsh to source utils.sh..."
+        log_info "Appending utils.sh source to existing functions.zsh..."
         printf '\n# Source utility functions\n. %s/scripts/utils.sh\n' "$DOTFILES_DIR" >> "$DOTFILES_DIR/.zsh/functions.zsh"
+    else
+        log_info "functions.zsh already sources utils.sh, skipping"
     fi
-    log_info "functions.zsh already exists, skipping creation..."
 else
     log_info "Creating functions.zsh file..."
     cat > "$DOTFILES_DIR/.zsh/functions.zsh" << EOF
@@ -444,13 +445,21 @@ else
 fi
 
 # Register Claude Code SessionStart hook for vault health
+# Self-healing: compare existing command against expected and rewrite if they
+# diverge — never trust "an entry exists" to mean "the entry is correct".
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+EXPECTED_HOOK_COMMAND="$HOME/.dotfiles/scripts/claude-session-start.sh"
 if [ -f "$CLAUDE_SETTINGS" ] && command -v jq >/dev/null 2>&1; then
-    if jq -e '.hooks.SessionStart' "$CLAUDE_SETTINGS" >/dev/null 2>&1; then
-        log_info "SessionStart hook already configured, skipping"
+    EXISTING_HOOK_COMMAND=$(jq -r '.hooks.SessionStart[0].hooks[0].command // ""' "$CLAUDE_SETTINGS" 2>/dev/null)
+    if [ "$EXISTING_HOOK_COMMAND" = "$EXPECTED_HOOK_COMMAND" ]; then
+        log_info "SessionStart hook already correctly configured, skipping"
     else
-        log_info "Adding SessionStart hook to Claude Code settings..."
-        HOOK_ENTRY=$(jq -n --arg cmd "$HOME/.dotfiles/scripts/claude-session-start.sh" '{"matcher":"","hooks":[{"type":"command","command":$cmd,"timeout":30}]}')
+        if [ -n "$EXISTING_HOOK_COMMAND" ]; then
+            log_info "SessionStart hook points to '$EXISTING_HOOK_COMMAND'; updating to '$EXPECTED_HOOK_COMMAND'"
+        else
+            log_info "Adding SessionStart hook to Claude Code settings..."
+        fi
+        HOOK_ENTRY=$(jq -n --arg cmd "$EXPECTED_HOOK_COMMAND" '{"matcher":"","hooks":[{"type":"command","command":$cmd,"timeout":30}]}')
         jq --argjson hook "[$HOOK_ENTRY]" '.hooks.SessionStart = $hook' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" \
             && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
         log_success "SessionStart hook registered"

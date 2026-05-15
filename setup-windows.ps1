@@ -689,28 +689,36 @@ if (Test-Path $sensitiveSource) {
 Write-Info "Registering Claude Code SessionStart hook..."
 
 $ClaudeSettings = "$ClaudeHome\settings.json"
-$sessionStartCmd = "$DotfilesDest\scripts\claude-session-start.ps1"
+$sessionStartCmd = "$ScriptsDir\claude-session-start.ps1"
+$expectedHookCommand = "pwsh -NoProfile -File `"$sessionStartCmd`""
 
 if (Test-Path $ClaudeSettings) {
     try {
         $settings = Get-Content $ClaudeSettings -Raw | ConvertFrom-Json
 
-        if ($settings.hooks -and $settings.hooks.SessionStart) {
-            Write-Info "SessionStart hook already configured, skipping"
+        $existingHookCommand = $null
+        if ($settings.hooks -and $settings.hooks.SessionStart -and $settings.hooks.SessionStart[0] -and $settings.hooks.SessionStart[0].hooks) {
+            $existingHookCommand = $settings.hooks.SessionStart[0].hooks[0].command
+        }
+
+        if ($existingHookCommand -eq $expectedHookCommand) {
+            Write-Info "SessionStart hook already correctly configured, skipping"
         } else {
-            # Build the hook entry
+            if ($existingHookCommand) {
+                Write-Info "SessionStart hook points to '$existingHookCommand'; updating to '$expectedHookCommand'"
+            }
+
             $hookEntry = @{
                 matcher = ''
                 hooks = @(
                     @{
                         type = 'command'
-                        command = "pwsh -NoProfile -File `"$sessionStartCmd`""
+                        command = $expectedHookCommand
                         timeout = 30
                     }
                 )
             }
 
-            # Ensure hooks object exists
             if (-not $settings.hooks) {
                 $settings | Add-Member -NotePropertyName 'hooks' -NotePropertyValue @{} -Force
             }
