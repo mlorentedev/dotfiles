@@ -1,0 +1,32 @@
+{
+  "_comment": "Single source of truth for Claude Code MCP servers registered by setup-linux.sh and setup-windows.ps1. Add new servers here; both setup scripts pick them up automatically. Args is a space-separated string of arguments passed after `--` to `claude mcp add`.",
+  "servers": [
+    {
+      "name": "drawio",
+      "transport": "stdio",
+      "args": "npx -y @drawio/mcp"
+    },
+    {
+      "name": "socket",
+      "transport": "http",
+      "args": "https://mcp.socket.dev/"
+    },
+    {
+      "name": "sequential-thinking",
+      "transport": "stdio",
+      "args": "npx -y @modelcontextprotocol/server-sequential-thinking"
+    },
+    {
+      "name": "context7",
+      "transport": "http",
+      "args": "https://mcp.context7.com/mcp"
+    },
+    {
+      "name": "hive",
+      "transport": "stdio",
+      "args": "uvx hive-vault",
+      "prerequisite_binary": "uv",
+      "prerequisite_command": "uv tool install --upgrade hive-vault"
+    }
+  ]
+}

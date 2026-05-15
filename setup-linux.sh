@@ -404,21 +404,55 @@ else
     log_warning "GitHub CLI (gh) not found, skipping Copilot installation"
 fi
 
-# Register MCP servers (requires Claude Code CLI and Node.js)
-if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
-    log_info "Registering Claude Code MCP servers..."
-    claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>/dev/null || true
-    claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>/dev/null || true
-    claude mcp add --transport stdio sequential-thinking --scope user -- npx -y @modelcontextprotocol/server-sequential-thinking 2>/dev/null || true
-    claude mcp add --transport http context7 --scope user -- https://mcp.context7.com/mcp 2>/dev/null || true
-    # Hive vault server (pypi.org/project/hive-vault)
-    if command -v uv >/dev/null 2>&1; then
-        uv tool install --upgrade hive-vault 2>/dev/null || true
-        claude mcp add --transport stdio hive --scope user -- uvx hive-vault 2>/dev/null || true
+# Register MCP servers (requires Claude Code CLI, Node.js, jq)
+# Idempotent: server list lives in mcp-servers.json (SSOT shared with Windows);
+# `claude mcp get` is used to skip already-registered entries, and `add` errors
+# are surfaced rather than swallowed.
+MCP_CONFIG="$DOTFILES_DIR/mcp-servers.json"
+if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    if [ ! -f "$MCP_CONFIG" ]; then
+        log_warning "mcp-servers.json not found at $MCP_CONFIG, skipping MCP registration"
+    else
+        log_info "Registering Claude Code MCP servers from $MCP_CONFIG..."
+        mcp_added=0
+        mcp_skipped=0
+        mcp_failed=0
+        while IFS=$'\t' read -r mcp_name mcp_transport mcp_args mcp_prereq_bin mcp_prereq_cmd; do
+            # Check prerequisite binary, run prerequisite command if specified
+            if [ -n "$mcp_prereq_bin" ]; then
+                if ! command -v "$mcp_prereq_bin" >/dev/null 2>&1; then
+                    log_warning "MCP $mcp_name: prerequisite '$mcp_prereq_bin' not found, skipping"
+                    mcp_failed=$((mcp_failed + 1))
+                    continue
+                fi
+                if [ -n "$mcp_prereq_cmd" ]; then
+                    # shellcheck disable=SC2086
+                    if ! $mcp_prereq_cmd >/dev/null 2>&1; then
+                        log_warning "MCP $mcp_name: prerequisite command failed: $mcp_prereq_cmd"
+                    fi
+                fi
+            fi
+            # Idempotence: skip if `claude mcp get` already knows this name
+            if claude mcp get "$mcp_name" >/dev/null 2>&1; then
+                log_info "MCP $mcp_name already registered, skipping"
+                mcp_skipped=$((mcp_skipped + 1))
+                continue
+            fi
+            # Word-split args intentionally; entries in mcp-servers.json are
+            # tokenized for `claude mcp add` argv after `--`.
+            # shellcheck disable=SC2086
+            if mcp_err=$(claude mcp add --transport "$mcp_transport" "$mcp_name" --scope user -- $mcp_args 2>&1); then
+                log_success "Registered MCP $mcp_name"
+                mcp_added=$((mcp_added + 1))
+            else
+                log_warning "Failed to register MCP $mcp_name: $mcp_err"
+                mcp_failed=$((mcp_failed + 1))
+            fi
+        done < <(jq -r '.servers[] | [.name, .transport, .args, (.prerequisite_binary // ""), (.prerequisite_command // "")] | @tsv' "$MCP_CONFIG")
+        log_success "MCP servers: $mcp_added added, $mcp_skipped already present, $mcp_failed failed"
     fi
-    log_success "MCP servers registered"
 else
-    log_warning "Claude Code CLI or npx not found, skipping MCP server registration"
+    log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
 fi
 
 # Claude Code plugins (requires claude CLI)
