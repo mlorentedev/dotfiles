@@ -122,3 +122,30 @@ setup() {
     grep -q 'EXISTING_HOOK_COMMAND' "$DOTFILES_DIR/setup-linux.sh"
     grep -qE '\[ "\$EXISTING_HOOK_COMMAND" = "\$EXPECTED_HOOK_COMMAND" \]' "$DOTFILES_DIR/setup-linux.sh"
 }
+
+# --- MCP server registration (SSOT + idempotence) ---
+
+@test "mcp-servers.json exists and is valid JSON with at least one server" {
+    [ -f "$DOTFILES_DIR/mcp-servers.json" ]
+    if command -v jq >/dev/null 2>&1; then
+        run jq -e '.servers | length > 0' "$DOTFILES_DIR/mcp-servers.json"
+        [ "$status" -eq 0 ]
+    fi
+}
+
+# MCP server list must live in mcp-servers.json, not hardcoded in setup-linux.sh.
+@test "setup-linux.sh MCP registration reads from mcp-servers.json" {
+    grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-linux.sh"
+    ! grep -qE 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# MCP registration must check existence before adding, not blindly retry.
+@test "setup-linux.sh MCP registration checks existence with claude mcp get" {
+    grep -q 'claude mcp get' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# Both setup scripts must read the same SSOT.
+@test "parity: both setup scripts source mcp-servers.json" {
+    grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-linux.sh"
+    grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-windows.ps1"
+}

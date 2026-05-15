@@ -106,6 +106,28 @@ setup() {
     grep -Eq '\$existingHookCommand\s+-eq\s+\$expectedHookCommand' "$PS1_SCRIPT"
 }
 
+# --- Scheduled task self-heal (same class as #20) ---
+
+# DotfilesVaultMaintenance task must reconcile arguments, not skip when present;
+# otherwise a stale task pointing at a moved/renamed script stays broken forever.
+@test "setup-windows.ps1 vault maintenance task self-heals on argument drift" {
+    grep -q '\$expectedTaskArgument' "$PS1_SCRIPT"
+    grep -Eq '\$existingTaskArgument\s+-eq\s+\$expectedTaskArgument' "$PS1_SCRIPT"
+}
+
+# --- MCP server registration (SSOT + idempotence) ---
+
+# MCP server list must live in mcp-servers.json, not hardcoded in the setup script.
+@test "setup-windows.ps1 MCP registration reads from mcp-servers.json" {
+    grep -q 'mcp-servers\.json' "$PS1_SCRIPT"
+    ! grep -Eq 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$PS1_SCRIPT"
+}
+
+# MCP registration must check existence before adding, not blindly retry.
+@test "setup-windows.ps1 MCP registration checks existence with claude mcp get" {
+    grep -q 'claude mcp get' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys SSH config" {
     grep -q 'Setting up SSH config' "$PS1_SCRIPT"
 }

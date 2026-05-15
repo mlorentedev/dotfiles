@@ -168,28 +168,57 @@ if (Test-Path $skillsSource) {
     Write-Success "Synced skills to $ClaudeHome\skills\"
 }
 
-# Register MCP servers (requires Claude Code CLI and Node.js)
+# Register MCP servers (requires Claude Code CLI, Node.js)
+# Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
+# `claude mcp get` is used to skip already-registered entries, and `add` errors
+# are surfaced rather than swallowed.
+$mcpConfig = "$DotfilesDir\mcp-servers.json"
 $claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
 $npxCmd = Get-Command npx -ErrorAction SilentlyContinue
-if ($claudeCmd -and $npxCmd) {
-    Write-Info "Registering Claude Code MCP servers..."
+if (-not ($claudeCmd -and $npxCmd)) {
+    Write-Warn "Claude Code CLI or npx not found, skipping MCP server registration"
+} elseif (-not (Test-Path $mcpConfig)) {
+    Write-Warn "mcp-servers.json not found at $mcpConfig, skipping MCP registration"
+} else {
+    Write-Info "Registering Claude Code MCP servers from $mcpConfig..."
+    $mcpAdded = 0
+    $mcpSkipped = 0
+    $mcpFailed = 0
     try {
-        & claude mcp add --transport stdio drawio --scope user -- npx -y @drawio/mcp 2>$null
-        & claude mcp add --transport http socket --scope user -- https://mcp.socket.dev/ 2>$null
-        & claude mcp add --transport stdio sequential-thinking --scope user -- npx -y @modelcontextprotocol/server-sequential-thinking 2>$null
-        & claude mcp add --transport http context7 --scope user -- https://mcp.context7.com/mcp 2>$null
-        # Hive vault server (pypi.org/project/hive-vault)
-        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-        if ($uvCmd) {
-            & uv tool install --upgrade hive-vault 2>$null
-            & claude mcp add --transport stdio hive --scope user -- uvx hive-vault 2>$null
+        $servers = (Get-Content $mcpConfig -Raw | ConvertFrom-Json).servers
+        foreach ($srv in $servers) {
+            if ($srv.prerequisite_binary) {
+                $prereqCmd = Get-Command $srv.prerequisite_binary -ErrorAction SilentlyContinue
+                if (-not $prereqCmd) {
+                    Write-Warn "MCP $($srv.name): prerequisite '$($srv.prerequisite_binary)' not found, skipping"
+                    $mcpFailed++
+                    continue
+                }
+                if ($srv.prerequisite_command) {
+                    $prereqParts = $srv.prerequisite_command -split '\s+'
+                    & $prereqParts[0] @($prereqParts[1..($prereqParts.Length - 1)]) 2>&1 | Out-Null
+                }
+            }
+            $null = & claude mcp get $srv.name 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Info "MCP $($srv.name) already registered, skipping"
+                $mcpSkipped++
+                continue
+            }
+            $argParts = $srv.args -split '\s+'
+            $mcpErr = & claude mcp add --transport $srv.transport $srv.name --scope user -- @argParts 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "Registered MCP $($srv.name)"
+                $mcpAdded++
+            } else {
+                Write-Warn "Failed to register MCP $($srv.name): $mcpErr"
+                $mcpFailed++
+            }
         }
-        Write-Success "MCP servers registered"
+        Write-Success "MCP servers: $mcpAdded added, $mcpSkipped already present, $mcpFailed failed"
     } catch {
         Write-Warn "Failed to register MCP servers: $_"
     }
-} else {
-    Write-Warn "Claude Code CLI or npx not found, skipping MCP server registration"
 }
 
 # Claude Code plugins (requires claude CLI)
@@ -768,23 +797,36 @@ if ($ghCmd) {
     Write-Warn "GitHub CLI (gh) not found, skipping Copilot installation"
 }
 
-# Weekly vault maintenance scheduled task (Sundays 10:00 AM)
+# Weekly vault maintenance scheduled task (Sundays 10:07 AM)
+# Self-healing: compare existing action arguments against expected and rewrite
+# when they diverge -- guards against stale tasks pointing at moved/renamed scripts.
 Write-Info "Setting up weekly vault maintenance task..."
 $taskName = "DotfilesVaultMaintenance"
+$expectedTaskScript = "$DotfilesDir\scripts\vault-maintenance-weekly.ps1"
+$expectedTaskArgument = "-NoProfile -ExecutionPolicy Bypass -File `"$expectedTaskScript`""
 $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-if (-not $existingTask) {
+$existingTaskArgument = $null
+if ($existingTask -and $existingTask.Actions -and $existingTask.Actions[0]) {
+    $existingTaskArgument = $existingTask.Actions[0].Arguments
+}
+if ($existingTask -and ($existingTaskArgument -eq $expectedTaskArgument)) {
+    Write-Info "Weekly vault maintenance task already correctly configured, skipping"
+} else {
+    if ($existingTask) {
+        Write-Info "Weekly vault maintenance task arguments drifted ('$existingTaskArgument' != expected); re-registering"
+    }
     try {
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-            -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$DotfilesDir\scripts\vault-maintenance-weekly.ps1`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $expectedTaskArgument
         $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "10:07AM"
         Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
             -Description "Weekly vault maintenance - knowledge crystallization and health checks" -Force | Out-Null
         Write-Success "Installed weekly vault maintenance task (Sundays 10:07)"
+        if (-not (Test-Path $expectedTaskScript)) {
+            Write-Warn "Task registered but target script does not exist: $expectedTaskScript"
+        }
     } catch {
         Write-Warn "Could not register scheduled task (may need admin): $_"
     }
-} else {
-    Write-Info "Weekly vault maintenance task already installed"
 }
 
 # ============================================================================
