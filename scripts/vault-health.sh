@@ -81,7 +81,29 @@ echo "========================================"
 echo "Vault: $VAULT_NAME ($VAULT_DIR)"
 
 # ==================================================
-section "1/5" "Vault Connectivity"
+section "1/6" "Working Tree Integrity"
+
+# GUI-independent check: detect files deleted from working tree but still in HEAD.
+# Triggered by 2026-05-13 incident — SKILL.md vanished from disk, git status showed `D`.
+# Pattern `^.D ` matches Y-column=D (unstaged delete), NOT X-column=D (intentional `git rm`).
+if [ ! -d "$VAULT_DIR" ]; then
+    skip "Working tree integrity" "vault dir not found"
+elif [ ! -d "$VAULT_DIR/.git" ]; then
+    skip "Working tree integrity" "vault is not a git repo"
+else
+    DELETED_LINES=$(git -C "$VAULT_DIR" status --short 2>/dev/null | grep '^.D ' || true)
+    if [ -z "$DELETED_LINES" ]; then
+        pass "Working tree clean — no files deleted from disk"
+    else
+        DELETED_COUNT=$(printf '%s\n' "$DELETED_LINES" | wc -l | tr -d ' ')
+        fail "$DELETED_COUNT file(s) deleted from working tree but still in HEAD — likely sync/watcher race"
+        printf '%s\n' "$DELETED_LINES" | sed 's|^|        |'
+        printf '        Recovery: cd %s && git checkout -- <file>\n' "$VAULT_DIR"
+    fi
+fi
+
+# ==================================================
+section "2/6" "Vault Connectivity"
 
 if ! command_exists obsidian; then
     log_error "Obsidian CLI not found in PATH"
@@ -105,7 +127,7 @@ else
 fi
 
 # ==================================================
-section "2/5" "Orphans & Dead-Ends"
+section "3/6" "Orphans & Dead-Ends"
 
 ORPHAN_OUTPUT=$(obsidian_cmd orphans --vault "$VAULT_NAME" 2>/dev/null || true)
 ORPHAN_COUNT=$(echo "$ORPHAN_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
@@ -148,7 +170,7 @@ if [ "$VERBOSE" = true ]; then
 fi
 
 # ==================================================
-section "3/5" "Unresolved Links"
+section "4/6" "Unresolved Links"
 
 UNRESOLVED_OUTPUT=$(obsidian_cmd unresolved --vault "$VAULT_NAME" 2>/dev/null || true)
 UNRESOLVED_COUNT=$(echo "$UNRESOLVED_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
@@ -168,7 +190,7 @@ if [ "$VERBOSE" = true ] && [ "$UNRESOLVED_COUNT" -gt 0 ]; then
 fi
 
 # ==================================================
-section "4/5" "Frontmatter Coverage"
+section "5/6" "Frontmatter Coverage"
 
 check_frontmatter_field() {
     local field="$1"
@@ -198,7 +220,7 @@ else
 fi
 
 # ==================================================
-section "5/5" "Tag Hygiene"
+section "6/6" "Tag Hygiene"
 
 TAG_OUTPUT=$(obsidian_cmd tags --vault "$VAULT_NAME" 2>/dev/null || true)
 TAG_COUNT=$(echo "$TAG_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")

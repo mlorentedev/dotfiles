@@ -200,6 +200,36 @@ function Ensure-MemoryJunction {
 
 Ensure-MemoryJunction
 
+function Test-VaultIntegrity {
+    param([string]$VaultPath)
+
+    # GUI-independent check: detect files deleted from working tree but still in HEAD.
+    # Triggered by 2026-05-13 incident - SKILL.md vanished from disk, git status showed D.
+    # Pattern '^.D ' matches Y-column=D (unstaged delete), NOT X-column=D (intentional git rm).
+    if (-not (Test-Path (Join-Path $VaultPath '.git'))) { return }
+
+    try {
+        $deletedLines = @(& git -C $VaultPath status --short 2>$null | Where-Object { $_ -match '^.D ' })
+    } catch {
+        return
+    }
+
+    if ($deletedLines.Count -gt 0) {
+        $count = $deletedLines.Count
+        $list = ($deletedLines | ForEach-Object { "        $_" }) -join "`n"
+        $script:ContextLines += @"
+
+Vault integrity: $count file(s) deleted from working tree but still in HEAD - likely sync/watcher race
+$list
+        Recovery: cd $VaultPath; git checkout -- <file>
+"@
+    }
+}
+
+if ($VaultRoot) {
+    Test-VaultIntegrity -VaultPath $VaultRoot
+}
+
 function Test-KnowledgeHealth {
     $encoded = Get-EncodedProjectPath -Path $CWD
     $memoryFile = Join-Path $env:USERPROFILE ".claude\projects\$encoded\memory\MEMORY.md"
