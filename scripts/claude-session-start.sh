@@ -141,8 +141,17 @@ if [ -x "$VAULT_HEALTH" ]; then
     HEALTH_EXIT=${HEALTH_EXIT:-0}
 
     if [ "$HEALTH_EXIT" -eq 2 ]; then
-        CONTEXT_LINES="$CONTEXT_LINES
+        # GUI down: GUI-dependent checks skipped, but integrity check (git-based) ran anyway.
+        # Scan HEALTH_OUTPUT for any FAIL lines so integrity alerts still surface.
+        INTEGRITY_FAILS=$(echo "$HEALTH_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep 'FAIL' || echo "")
+        if [ -n "$INTEGRITY_FAILS" ]; then
+            CONTEXT_LINES="$CONTEXT_LINES
+Obsidian GUI not running — GUI-dependent checks skipped. Integrity issues found:
+$INTEGRITY_FAILS"
+        else
+            CONTEXT_LINES="$CONTEXT_LINES
 Obsidian GUI not running — vault health skipped. Run 'vault-health.sh' manually when GUI is up."
+        fi
     elif [ "$HEALTH_EXIT" -eq 0 ]; then
         CONTEXT_LINES="$CONTEXT_LINES
 Vault health: ALL CHECKS PASSED"
