@@ -115,8 +115,58 @@ find_work_sdk_project() {
     done
 }
 
+# --- Spec-Driven Development: detect repo specs/ and surface in-flight work ---
+# Counts active vs archived specs under $CWD/specs/ and flags any spec
+# containing unresolved [AGENT-DRAFT] or [AGENT-SUGGESTION] tags.
+# Discovery without proactive nag — silent if no specs/.
+detect_repo_specs() {
+    local specs_dir d name active_count archive_count drafts_specs draft_count msg
+    specs_dir="$CWD/specs"
+    [ -d "$specs_dir" ] || return 0
+
+    active_count=0
+    drafts_specs=""
+    for d in "$specs_dir"/*/; do
+        [ -d "$d" ] || continue
+        name=$(basename "$d")
+        [ "$name" = "archive" ] && continue
+        active_count=$((active_count + 1))
+        if grep -rlE '\[AGENT-DRAFT\]|\[AGENT-SUGGESTION\]' "$d" >/dev/null 2>&1; then
+            drafts_specs="$drafts_specs $name"
+        fi
+    done
+
+    archive_count=0
+    if [ -d "$specs_dir/archive" ]; then
+        for d in "$specs_dir/archive"/*/; do
+            [ -d "$d" ] || continue
+            archive_count=$((archive_count + 1))
+        done
+    fi
+
+    # Silent if entirely empty
+    if [ "$active_count" -eq 0 ] && [ "$archive_count" -eq 0 ]; then
+        return 0
+    fi
+
+    msg="[specs] $active_count active, $archive_count archived"
+    if [ -n "$drafts_specs" ]; then
+        drafts_specs="${drafts_specs# }"
+        draft_count=$(printf '%s' "$drafts_specs" | wc -w | tr -d ' ')
+        msg="$msg — $draft_count with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags:"
+        for name in $drafts_specs; do
+            msg="$msg
+  - $name"
+        done
+    fi
+
+    CONTEXT_LINES="$CONTEXT_LINES
+$msg"
+}
+
 if [ -d "$CWD/.git" ]; then
     detect_hive_project
+    detect_repo_specs
 fi
 
 if [ -z "$VAULT_ROOT" ] && [ -z "$CONTEXT_LINES" ]; then
