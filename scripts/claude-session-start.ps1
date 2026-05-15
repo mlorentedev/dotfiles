@@ -98,9 +98,57 @@ function Find-WorkSdkProject {
     }
 }
 
+# --- Spec-Driven Development: detect repo specs/ and surface in-flight work ---
+# Counts active vs archived specs under $RepoPath/specs/ and flags any spec
+# containing unresolved [AGENT-DRAFT] or [AGENT-SUGGESTION] tags.
+# Discovery without proactive nag - silent if no specs/.
+function Test-RepoSpecs {
+    param([string]$RepoPath)
+
+    $specsDir = Join-Path $RepoPath 'specs'
+    if (-not (Test-Path $specsDir -PathType Container)) { return }
+
+    $activeCount = 0
+    $draftsSpecs = New-Object System.Collections.Generic.List[string]
+
+    foreach ($d in (Get-ChildItem $specsDir -Directory -ErrorAction SilentlyContinue)) {
+        if ($d.Name -eq 'archive') { continue }
+        $activeCount++
+        $hasTags = $false
+        $files = Get-ChildItem $d.FullName -File -Recurse -ErrorAction SilentlyContinue
+        foreach ($f in $files) {
+            $content = Get-Content $f.FullName -Raw -ErrorAction SilentlyContinue
+            if ($content -match '\[AGENT-DRAFT\]|\[AGENT-SUGGESTION\]') {
+                $hasTags = $true
+                break
+            }
+        }
+        if ($hasTags) { $draftsSpecs.Add($d.Name) }
+    }
+
+    $archiveCount = 0
+    $archiveDir = Join-Path $specsDir 'archive'
+    if (Test-Path $archiveDir -PathType Container) {
+        $archiveCount = @(Get-ChildItem $archiveDir -Directory -ErrorAction SilentlyContinue).Count
+    }
+
+    if ($activeCount -eq 0 -and $archiveCount -eq 0) { return }
+
+    $msg = "[specs] $activeCount active, $archiveCount archived"
+    if ($draftsSpecs.Count -gt 0) {
+        $msg += " - $($draftsSpecs.Count) with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags:"
+        foreach ($name in $draftsSpecs) {
+            $msg += "`n  - $name"
+        }
+    }
+
+    $script:ContextLines += "`n$msg"
+}
+
 # Check if CWD is a git repo
 if (Test-Path (Join-Path $CWD '.git')) {
     Find-HiveProject -Path $CWD
+    Test-RepoSpecs -RepoPath $CWD
 }
 
 # --- Walk up to find Obsidian vault ---
