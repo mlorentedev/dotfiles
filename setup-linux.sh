@@ -301,11 +301,20 @@ ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
 cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
 cp -f "$CURRENT_DIR/scripts/init-project.sh" "$HOME/.claude/" 2>/dev/null || true
-# Sync Claude skills: remove stale skill directories not in source
+# Sync Claude skills: remove stale skill directories not in source.
+# CRITICAL: For symlinks (vault-hosted skills, see link_vault_skills below),
+# unlink only — never rm -rf through a symlink with trailing slash, which
+# POSIX rm follows and would delete vault content. The vault-skills loop
+# below re-creates the symlink if the source still exists.
 for target_dir in "$HOME/.claude/skills/"*/; do
-    [ -d "$target_dir" ] || continue
-    skill_name=$(basename "$target_dir")
-    [ -d "$CURRENT_DIR/ai/skills/$skill_name" ] || rm -rf "$target_dir"
+    target_path="${target_dir%/}"
+    [ -e "$target_path" ] || [ -L "$target_path" ] || continue
+    skill_name=$(basename "$target_path")
+    if [ -L "$target_path" ]; then
+        unlink "$target_path"
+    elif [ ! -d "$CURRENT_DIR/ai/skills/$skill_name" ]; then
+        rm -rf "$target_path"
+    fi
 done
 # Copy skill directories (each skill has its own dir with SKILL.md)
 for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
