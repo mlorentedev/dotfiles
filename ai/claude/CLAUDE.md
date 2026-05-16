@@ -111,33 +111,13 @@ STOP and fix if detected:
 **CO-AUTHORSHIP:** NEVER include `Co-Authored-By` trailers in commit messages. No Claude attribution in git history.
 **NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
 
-### Phase 1: Context Sync (Read First)
-1.  **Locate Vault:** Resolve `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
-2.  **Master Map:** If unsure about structure, read `knowledge/README.md`.
-3.  **Project Context:** Determine the current area and read its `00-context.md`:
-    - Personal coding project (CWD = `~/Projects/<repo>/`) → `10_projects/<repo>/00-context.md`
-    - FAE/work knowledge session (CWD inside vault `50_work/`) → `50_work/<area>/00-context.md` or use Hive MCP `vault_query`
-    - Work SDK coding session (CWD = `~/Projects/<Family>/<component>/`) → `50_work/45-development/<family>/<component>/00-context.md`
-4.  **Global Rules:** Read `00_meta/patterns/*.md` — apply to ALL session types and domains.
-5.  **Tactical Plan:** Read `11-tasks.md` in the current project area.
-6.  **Auto-Memory:** If exists, read `memory/MEMORY.md` in the current project area (Claude Code persistent memory, synced via Obsidian).
+### Loop summary
 
-### Phase 2: Execution (The Work)
-*   **Plan:** Create a sub-task checklist in memory (or scratchpad).
-*   **Act:** Implement code/tests in the repo.
-*   **Verify:** Run tests.
-*   **Document Dynamic** — applies uniformly to personal, FAE, and work SDK sessions:
-    *   New architectural decision? → Create `30-architecture/adr-XXX.md` in the **current project area**.
-    *   New operational procedure? → Create `40-runbooks/guide-XXX.md` in the **current project area**.
-    *   Fixing a bug? → Create `50-troubleshooting/error-name.md` in the **current project area**.
-    *   Useful trick? → Add to `90-lessons.md` in the **current project area** or `60-resources/`.
-    *   New repeated pattern (recurs in >1 project/area)? → Promote to `00_meta/patterns/pattern-<topic>.md`.
+1. **Sync** — MEMORY.md auto-loads; read `11-tasks.md` and project `00-context.md` for the current area.
+2. **Act** — implement, test, verify in the repo.
+3. **Crystallize** — overwrite Session Handoff in MEMORY.md; route lessons to `90-lessons.md`; promote recurring patterns to `00_meta/patterns/`.
 
-### Phase 3: Knowledge Crystallization (Write Back)
-*   **Update Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar: `Progress: [======....] 60%`. File lives in the **current project area**.
-*   **Update Strategy (`10-roadmap.md`):** ONLY if a major milestone/phase is completed.
-*   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` in the **current project area** using the **Lesson Template**.
-*   **Promotion:** If the lesson recurs in >1 project/area, promote to `00_meta/patterns/pattern-<topic>.md`.
+For the full session taxonomy (knowledge vs coding), path conventions per domain (personal / FAE / work SDK), document placement table (ADR / runbook / troubleshooting / lesson), and the new-project setup commands, query `00_meta/patterns/workflow-protocol.md`.
 
 ## Auto-Maintenance Rules
 
@@ -174,26 +154,7 @@ If session start context reports memory files needing archive (>60 days cold):
 
 ## Vault Structure & Standards
 
-### File Hierarchy
-*   `00_meta/templates/` → Standard `.md` templates (USE THEM).
-*   `00_meta/patterns/` → Universal rules — apply to ALL session types and domains.
-*   `10_projects/<repo>/` → Personal coding projects context.
-*   `50_work/` → FAE/work knowledge (products, clients, tickets).
-*   `50_work/45-development/<family>/<component>/` → Work SDK coding projects context.
-
-See `00_meta/patterns/workflow-protocol.md` for the full session taxonomy, path conventions, and daily action protocol.
-
-### Frontmatter Law
-ALL Markdown files created in the vault MUST have this YAML header:
-
-```yaml
----
-id: "unique-slug" # e.g. T-2024-ACME-001 or project-name
-type: [project, ticket, adr, lesson, pattern]
-status: [active, done, archived]
-tags: [tag1, tag2]
----
-```
+When creating or placing a vault file, query `00_meta/patterns/workflow-protocol.md` (Sections 2 & 9) for the file hierarchy (`00_meta/`, `10_projects/`, `50_work/`) and document-placement table, and `00_meta/patterns/ai-protocol.md` (Section 5) for the mandatory frontmatter law (`id`, `type`, `status`, `tags`).
 
 ## MCP Server Usage Rules
 
