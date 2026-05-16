@@ -31,6 +31,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     # Copy files to the dotfiles directory
     log_info "Copying files from $CURRENT_DIR to $DOTFILES_DIR..."
     safe_copy "$CURRENT_DIR/versions.conf" "$DOTFILES_DIR/" 2>/dev/null || true
+    safe_copy "$CURRENT_DIR/mcp-servers.json" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.profile" "$DOTFILES_DIR/" 2>/dev/null || true
     if [ -f "$CURRENT_DIR/.bashrc" ]; then
@@ -83,6 +84,7 @@ chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 chmod +x "$DOTFILES_DIR/scripts/claude-session-start.sh"
 chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
 chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
+chmod +x "$DOTFILES_DIR/scripts/doctor.sh"
 
 # Copy sensitive directory (env-mapping.conf and encrypted files)
 log_info "Setting up sensitive directory..."
