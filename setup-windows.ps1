@@ -151,11 +151,20 @@ if (Test-Path $claudeMdSource) {
 # Sync skills: remove stale skill directories not in source, then copy current
 $skillsSource = "$DotfilesDir\ai\skills"
 if (Test-Path $skillsSource) {
-    # Remove stale skills from target that no longer exist in source
+    # Remove stale skills from target that no longer exist in source.
+    # CRITICAL: Junction directories (vault-hosted skills, see vault-skills loop
+    # later in this script) must be detected via the ReparsePoint attribute and
+    # removed with .Delete() only. Remove-Item -Recurse -Force on a junction in
+    # Windows PowerShell 5.1 historically follows the link and deletes the target
+    # contents. The vault-skills loop below re-creates the junction if still valid.
     $existingSkills = Get-ChildItem "$ClaudeHome\skills" -Directory -ErrorAction SilentlyContinue
     foreach ($existing in $existingSkills) {
         if (-not (Test-Path "$skillsSource\$($existing.Name)")) {
-            Remove-Item $existing.FullName -Recurse -Force
+            if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                $existing.Delete()
+            } else {
+                Remove-Item $existing.FullName -Recurse -Force
+            }
         }
     }
     # Copy current skills
