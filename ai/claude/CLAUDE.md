@@ -75,93 +75,11 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 
 ## Technical Standards
 
-### Python (3.12+)
-
-| Requirement | Tool/Pattern |
-|-------------|--------------|
-| Type hints | `mypy --strict` |
-| Data models | Pydantic v2 |
-| Dependencies| Poetry or uv |
-| Formatting | Ruff |
-| Testing | pytest + pytest-cov |
-| CLI | Typer + Rich |
-| Async HTTP | httpx (not requests) |
-
-### Go (1.26+)
-
-| Requirement | Pattern |
-|-------------|---------|
-| Error handling| `if err != nil` with context wrapping |
-| Context | Propagate `context.Context` in all I/O |
-| Testing | Table-driven tests with `t.Run` |
-| Generics | Prefer over `interface{}` |
-| HTTP | stdlib `net/http` or Chi |
-
-### TypeScript (ESNext)
-
-| Requirement | Pattern |
-|-------------|---------|
-| Strict mode | `strict: true` in tsconfig |
-| Runtime validation| Zod |
-| Async | `async/await` exclusively |
-| Variables | `const` default, no `var`, no `==` |
-
-### Java (21+ LTS)
-
-| Requirement | Pattern |
-|-------------|---------|
-| Version | JDK 21+ (LTS) strict |
-| Build Tool | Gradle (Kotlin DSL) or Maven |
-| Null Safety | `Optional<T>`, never return `null` |
-| Concurrency | Virtual Threads (Project Loom) |
-| Testing | JUnit 5 + AssertJ + Mockito |
-| Style | Google Java Format / Spotless |
-| Records | Use `record` for DTOs |
-
-### Astro (Frontend)
-
-| Requirement | Pattern |
-|-------------|---------|
-| Architecture| Islands Architecture (Zero JS default) |
-| Interactivity| `client:visible` or `client:idle` |
-| Components | `.astro` preferred over React/Vue |
-| Content | Content Collections + Zod |
-| State | Nano Stores |
-
-### Matlab (Scientific)
-
-| Requirement | Pattern |
-|-------------|---------|
-| Performance | Vectorization over Loops (Strict) |
-| Linting | `checkcode` / MLint clean |
-| Variables | `camelCase`, descriptive names |
-| Output | Always suppress with `;` |
-| Testing | MATLAB Unit Test Framework |
+When writing or reviewing code, query `00_meta/patterns/language-standards.md` for the per-language toolchain and conventions (Python 3.12+, Go 1.26+, TypeScript ESNext, Java 21+, Astro, Matlab).
 
 ## Architecture Patterns
 
-### Microservices (Go/Rust)
-
-```text
-/cmd           # Entry points (main.go)
-/internal      # Private packages
-/pkg           # Public libraries
-/api           # OpenAPI/gRPC specs
-/deployments   # K8s manifests, Helm charts
-
-```
-
-### Monolith (Python/Node)
-
-```text
-/src
-  /domain      # Pure business logic (no I/O)
-  /application # Use cases, orchestration
-  /infra       # DB, external APIs, adapters
-  /api         # HTTP handlers, routes
-/tests         # Mirror src structure
-
-```
+When scaffolding a new project or reviewing service layout, query `00_meta/patterns/architecture.md` for canonical directory structures (microservices Go/Rust, monolith Python/Node).
 
 ## Security (Immediate Flags)
 
