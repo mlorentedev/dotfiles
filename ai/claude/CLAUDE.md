@@ -184,8 +184,9 @@ For full reasoning structure and pairing with Context7, query `00_meta/patterns/
 * `vault_patch` / `vault_write` over `Edit`/`Write` — do NOT also create a manual git commit (Hive already committed).
 * `capture_lesson` over manual `90-lessons.md` writes.
 * Native `Read`/`Edit`/`Write`/`grep` remain correct for code repos and configs outside the vault.
+* **If Hive hangs or exceeds ~10-20s (queries) / ~30s (writes):** abandon the call and fall back to native `Read`/`Edit`/`Write`/`grep` against the vault path. Use manual `git add` + `git commit -m "vault: …"` in fallback mode. Do NOT retry Hive in the same session — the server may be wedged.
 
-For the full tool list and edge cases, query `00_meta/patterns/pattern-hive-first-vault-access.md`.
+For the full tool list, edge cases, and failure-mode protocol, query `00_meta/patterns/pattern-hive-first-vault-access.md`.
 
 ### claude-mem (Conversation Memory & Cross-Session Recall)
 
