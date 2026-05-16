@@ -221,7 +221,15 @@ if (-not ($claudeCmd -and $npxCmd)) {
     }
 }
 
-# Claude Code plugins (requires claude CLI)
+# Claude Code plugins (requires claude CLI).
+# Idempotent: cache the installed-plugins list ONCE before the loop and skip
+# entries already present. CRITICAL: every `claude plugin install` writes to
+# %USERPROFILE%\.claude\.claude.json. The CLI does NOT preserve all fields
+# on rewrite — subscription metadata (organizationType, organizationRateLimitTier),
+# the projects map, and onboarding flags get silently dropped. Re-running
+# install for already-installed plugins triggers silent .claude.json truncation
+# and forces re-authentication in every project. Same idempotence pattern as
+# MCP registration above.
 if ($claudeCmd) {
     Write-Info "Installing Claude Code plugins..."
     $plugins = @(
@@ -238,14 +246,22 @@ if ($claudeCmd) {
         "commit-commands@claude-plugins-official",
         "pr-review-toolkit@claude-plugins-official"
     )
+    $installedPlugins = try { (& claude plugin list 2>$null) -join "`n" } catch { "" }
+    $pluginsAdded = 0
+    $pluginsSkipped = 0
     foreach ($plugin in $plugins) {
+        if ($installedPlugins -match [regex]::Escape($plugin)) {
+            $pluginsSkipped++
+            continue
+        }
         try {
             & claude plugin install $plugin 2>$null | Out-Null
+            $pluginsAdded++
         } catch {
             # Silently continue if a plugin fails
         }
     }
-    Write-Success "Claude Code plugins installed"
+    Write-Success "Claude Code plugins ready ($pluginsAdded added, $pluginsSkipped already present)"
 } else {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
