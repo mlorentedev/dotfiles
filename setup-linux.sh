@@ -466,9 +466,22 @@ else
     log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
 fi
 
-# Claude Code plugins (requires claude CLI)
+# Claude Code plugins (requires claude CLI).
+# Idempotent: cache the installed-plugins list ONCE before the loop and skip
+# entries already present. CRITICAL: every `claude plugin install` call
+# writes to ~/.claude/.claude.json. The CLI's deserialize-modify-serialize
+# cycle does NOT preserve fields outside its internal struct — subscription
+# metadata (`organizationType: claude_max`, `organizationRateLimitTier`),
+# the `projects` map, and onboarding flags get silently dropped. Re-running
+# `plugin install` for plugins that are already installed is the trigger
+# for `.claude.json` truncation (75k -> 1.5k), which makes Claude Code
+# prompt for re-authentication in every project (subscription state lost).
+# Same idempotence pattern as MCP registration (line 447).
 if command -v claude >/dev/null 2>&1; then
     log_info "Installing Claude Code plugins..."
+    installed_plugins=$(claude plugin list 2>/dev/null || true)
+    plugins_added=0
+    plugins_skipped=0
     for plugin in \
         "claude-mem@thedotmack" \
         "code-simplifier@claude-plugins-official" \
@@ -482,9 +495,15 @@ if command -v claude >/dev/null 2>&1; then
         "code-review@claude-plugins-official" \
         "commit-commands@claude-plugins-official" \
         "pr-review-toolkit@claude-plugins-official"; do
-        claude plugin install "$plugin" >/dev/null 2>&1 || true
+        if printf '%s' "$installed_plugins" | grep -qF "$plugin"; then
+            plugins_skipped=$((plugins_skipped + 1))
+        else
+            if claude plugin install "$plugin" >/dev/null 2>&1; then
+                plugins_added=$((plugins_added + 1))
+            fi
+        fi
     done
-    log_success "Claude Code plugins installed"
+    log_success "Claude Code plugins ready ($plugins_added added, $plugins_skipped already present)"
 else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
