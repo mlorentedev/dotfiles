@@ -234,7 +234,7 @@ if (-not ($claudeCmd -and $npxCmd)) {
 # Idempotent: cache the installed-plugins list ONCE before the loop and skip
 # entries already present. CRITICAL: every `claude plugin install` writes to
 # %USERPROFILE%\.claude\.claude.json. The CLI does NOT preserve all fields
-# on rewrite — subscription metadata (organizationType, organizationRateLimitTier),
+# on rewrite -- subscription metadata (organizationType, organizationRateLimitTier),
 # the projects map, and onboarding flags get silently dropped. Re-running
 # install for already-installed plugins triggers silent .claude.json truncation
 # and forces re-authentication in every project. Same idempotence pattern as
