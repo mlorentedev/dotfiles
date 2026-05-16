@@ -111,33 +111,13 @@ STOP and fix if detected:
 **CO-AUTHORSHIP:** NEVER include `Co-Authored-By` trailers in commit messages. No Claude attribution in git history.
 **NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
 
-### Phase 1: Context Sync (Read First)
-1.  **Locate Vault:** Resolve `the knowledge base directory (usually `~/Projects/knowledge/` on Linux or `%USERPROFILE%\Projects\knowledge\` on Windows)`.
-2.  **Master Map:** If unsure about structure, read `knowledge/README.md`.
-3.  **Project Context:** Determine the current area and read its `00-context.md`:
-    - Personal coding project (CWD = `~/Projects/<repo>/`) → `10_projects/<repo>/00-context.md`
-    - FAE/work knowledge session (CWD inside vault `50_work/`) → `50_work/<area>/00-context.md` or use Hive MCP `vault_query`
-    - Work SDK coding session (CWD = `~/Projects/<Family>/<component>/`) → `50_work/45-development/<family>/<component>/00-context.md`
-4.  **Global Rules:** Read `00_meta/patterns/*.md` — apply to ALL session types and domains.
-5.  **Tactical Plan:** Read `11-tasks.md` in the current project area.
-6.  **Auto-Memory:** If exists, read `memory/MEMORY.md` in the current project area (Claude Code persistent memory, synced via Obsidian).
+### Loop summary
 
-### Phase 2: Execution (The Work)
-*   **Plan:** Create a sub-task checklist in memory (or scratchpad).
-*   **Act:** Implement code/tests in the repo.
-*   **Verify:** Run tests.
-*   **Document Dynamic** — applies uniformly to personal, FAE, and work SDK sessions:
-    *   New architectural decision? → Create `30-architecture/adr-XXX.md` in the **current project area**.
-    *   New operational procedure? → Create `40-runbooks/guide-XXX.md` in the **current project area**.
-    *   Fixing a bug? → Create `50-troubleshooting/error-name.md` in the **current project area**.
-    *   Useful trick? → Add to `90-lessons.md` in the **current project area** or `60-resources/`.
-    *   New repeated pattern (recurs in >1 project/area)? → Promote to `00_meta/patterns/pattern-<topic>.md`.
+1. **Sync** — MEMORY.md auto-loads; read `11-tasks.md` and project `00-context.md` for the current area.
+2. **Act** — implement, test, verify in the repo.
+3. **Crystallize** — overwrite Session Handoff in MEMORY.md; route lessons to `90-lessons.md`; promote recurring patterns to `00_meta/patterns/`.
 
-### Phase 3: Knowledge Crystallization (Write Back)
-*   **Update Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar: `Progress: [======....] 60%`. File lives in the **current project area**.
-*   **Update Strategy (`10-roadmap.md`):** ONLY if a major milestone/phase is completed.
-*   **Lessons:** If you solved a non-trivial bug, append to `90-lessons.md` in the **current project area** using the **Lesson Template**.
-*   **Promotion:** If the lesson recurs in >1 project/area, promote to `00_meta/patterns/pattern-<topic>.md`.
+For the full session taxonomy (knowledge vs coding), path conventions per domain (personal / FAE / work SDK), document placement table (ADR / runbook / troubleshooting / lesson), and the new-project setup commands, query `00_meta/patterns/workflow-protocol.md`.
 
 ## Auto-Maintenance Rules
 
@@ -174,97 +154,58 @@ If session start context reports memory files needing archive (>60 days cold):
 
 ## Vault Structure & Standards
 
-### File Hierarchy
-*   `00_meta/templates/` → Standard `.md` templates (USE THEM).
-*   `00_meta/patterns/` → Universal rules — apply to ALL session types and domains.
-*   `10_projects/<repo>/` → Personal coding projects context.
-*   `50_work/` → FAE/work knowledge (products, clients, tickets).
-*   `50_work/45-development/<family>/<component>/` → Work SDK coding projects context.
-
-See `00_meta/patterns/workflow-protocol.md` for the full session taxonomy, path conventions, and daily action protocol.
-
-### Frontmatter Law
-ALL Markdown files created in the vault MUST have this YAML header:
-
-```yaml
----
-id: "unique-slug" # e.g. T-2024-ACME-001 or project-name
-type: [project, ticket, adr, lesson, pattern]
-status: [active, done, archived]
-tags: [tag1, tag2]
----
-```
+When creating or placing a vault file, query `00_meta/patterns/workflow-protocol.md` (Sections 2 & 9) for the file hierarchy (`00_meta/`, `10_projects/`, `50_work/`) and document-placement table, and `00_meta/patterns/ai-protocol.md` (Section 5) for the mandatory frontmatter law (`id`, `type`, `status`, `tags`).
 
 ## MCP Server Usage Rules
 
 ### Context7 (Library Documentation)
 
-**Auto-invoke when:** Writing or debugging code that uses third-party libraries/frameworks.
+**When:** Writing or debugging code with third-party libraries/frameworks (even well-known ones — training data may be stale).
 
-* Use `resolve-library-id` first to get the Context7 ID, then `query` for docs.
-* Always specify the library version in prompts (e.g., "Next.js 14", "Go 1.26").
-* Prefer Context7 over WebSearch for API/library documentation — it returns version-accurate, hallucination-free results.
-* Skip for stdlib or well-known patterns already in this CLAUDE.md.
+* `resolve-library-id` first → then `query-docs` with the resolved ID.
+* Always specify the library version in the prompt.
+
+For tool flow detail, anti-patterns and pairing rules, query `00_meta/patterns/pattern-mcp-context7.md`.
 
 ### Sequential Thinking (Complex Reasoning)
 
-**Auto-invoke when:** The Socratic Guardrail triggers (High Cognitive Load tasks).
+**When:** The Socratic Guardrail triggers (architectural decisions, multi-step debugging, schema design, concurrency, trade-off analysis).
 
-* Use for: architectural decisions, multi-step debugging, schema design, concurrency reasoning, trade-off analysis.
-* Structure as: describe problem → generate hypotheses → verify each → branch alternatives → commit to best option.
-* Do NOT use for: boilerplate, single-file edits, syntax fixes, CSS changes.
-* Pairs well with Context7: use Sequential Thinking to plan, Context7 to validate API choices.
+* Structure as: problem → hypotheses → verify → branch → commit.
+* Skip for boilerplate, single-file edits, syntax fixes, CSS.
+
+For full reasoning structure and pairing with Context7, query `00_meta/patterns/pattern-mcp-sequential-thinking.md`.
 
 ### Hive (Obsidian Vault Operations)
 
-**Auto-invoke for any read/search/write against the vault.** Hive saves tokens
-by returning excerpts (not full files) and offloading work server-side.
+**When:** Any read/search/write against the vault. Hive returns excerpts (5–10× cheaper than `grep`+`Read`) and auto-commits writes as `vault: patch …`.
 
-* `vault_search` over `grep`+`Read` (5–10× cheaper, returns excerpts).
-* `vault_query(section=context|tasks|lessons|roadmap)` over `Read` of whole files.
-* `vault_patch` / `vault_write` over `Edit`/`Write` — auto-commits as `vault: patch …`.
+* `vault_search` over `grep`+`Read`; `vault_query` over `Read` of whole files.
+* `vault_patch` / `vault_write` over `Edit`/`Write` — do NOT also create a manual git commit (Hive already committed).
 * `capture_lesson` over manual `90-lessons.md` writes.
-* `vault_health` over Bash + `vault-validate.py`.
-* `delegate_task` for bulk summaries — keeps main context lean.
-* `vault_list` before `ls`/`find` to browse structure.
+* Native `Read`/`Edit`/`Write`/`grep` remain correct for code repos and configs outside the vault.
 
-Native `Read`/`Edit`/`Write`/`grep` remain correct for code repos, scripts,
-configs — anything outside the vault. Vault auto-commits are intentional;
-do NOT also create a manual git commit for vault edits.
-
-See `00_meta/patterns/pattern-hive-first-vault-access.md` for full rationale.
+For the full tool list and edge cases, query `00_meta/patterns/pattern-hive-first-vault-access.md`.
 
 ### claude-mem (Conversation Memory & Cross-Session Recall)
 
-**Active by default in every session, every project, every machine.** Captures observations automatically via session hooks — no explicit writes needed during routine work. claude-mem stores conversation flow; the vault stores crystallized knowledge. They are complementary, not interchangeable.
+**Active by default in every session.** Captures observations automatically via session hooks — conversation flow → claude-mem, crystallized knowledge → vault. Never duplicate across both.
 
-* `/mem-search "query"` — find solutions/decisions from past sessions ("did we solve this before?").
-* `/timeline-report` — narrative history of a project from accumulated observations.
-* `/knowledge-agent` — build a topic-focused brain from observations.
-* `/how-it-works` — explain what claude-mem is doing if asked.
+* `/mem-search "query"` — find solutions from past sessions.
+* `/timeline-report`, `/knowledge-agent`, `/how-it-works` — narrative history, topic brains, self-explanation.
+* **Do NOT** write strategic decisions, lessons or ADRs to claude-mem — those go to vault via `capture_lesson` / `vault_write`.
+* Default `worker` runtime blocks manual writes (`observation_add`, `memory_add`); hook capture works regardless. Set `CLAUDE_MEM_RUNTIME=server-beta` in `~/.claude/settings.json` to enable manual writes.
 
-**Do NOT write strategic decisions, lessons, or ADRs to claude-mem.** Those go to vault via `capture_lesson` / `vault_write`. See `pattern-decision-persistence.md` — claude-mem is a conversation log, not a source of truth.
-
-**Default protocol:** BOTH claude-mem AND vault active simultaneously. claude-mem records as you work; vault gets explicit writes for crystallization. See `00_meta/patterns/pattern-dual-memory.md` for full rationale.
-
-**Runtime note:** In Claude Code's default `worker` runtime, manual writes (`observation_add`, `memory_add`) are blocked. Automatic hook capture works regardless — observations from each session appear in the next session start. Slash commands above are read-only and always available. To enable manual writes in parallel to vault, set `CLAUDE_MEM_RUNTIME=server-beta` in `~/.claude/settings.json` (affects all projects). Default worker mode is sufficient for the dual-memory protocol.
+For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.md`.
 
 ### Obsidian CLI (Vault Graph Queries)
 
-**Available via:** `obs-cli.sh <command>` (Linux) / `obs-cli.ps1 <command>` (Windows).
-Requires Obsidian GUI running. Falls back with exit 2 if GUI is down.
-Set `OBS_VAULT` env var to override default vault (default: `knowledge`).
+**When:** Graph queries Hive cannot answer (orphans, backlinks, dead-ends, unresolved links, bulk tag rename).
 
-**Unique commands (not covered by Hive MCP):**
-* `backlinks file="path/to/note.md"` — notes linking to a given file
-* `orphans` — files with no incoming links
-* `dead-ends` — files with no outgoing links
-* `unresolved` — broken wikilinks
-* `tags` / `tags:rename old=X new=Y` — list or bulk-rename tags
-* `eval "expression"` — execute JS against Obsidian internal API
+* `obs-cli.sh <cmd>` (Linux) / `obs-cli.ps1 <cmd>` (Windows). Requires Obsidian GUI; exits 2 if GUI down.
+* For file CRUD or text search, use Hive instead (headless, always available).
 
-**When to use:** Vault maintenance, graph analysis, bulk tag operations.
-**When NOT to use:** File CRUD and search — use Hive MCP instead (headless, always available).
+For the full command list and `vault-health.sh` integration, query `00_meta/patterns/pattern-obsidian-cli.md`.
 
 ## Response Protocol
 
