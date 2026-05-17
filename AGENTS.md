@@ -258,7 +258,9 @@ For frontmatter conventions per type, query `00_meta/patterns/ai-protocol.md` (S
 **When:** Writing or debugging code with third-party libraries/frameworks (even well-known ones — training data may be stale).
 
 * `resolve-library-id` first → then `query-docs` with the resolved ID.
-* Always specify the library version in the prompt.
+* Always specify the library version in the prompt (e.g., "Next.js 14", "Go 1.26").
+* **Prefer Context7 over WebSearch** for API/library documentation — version-accurate, hallucination-free results.
+* **Skip** for stdlib or well-known patterns already covered in this file.
 
 For tool flow detail and anti-patterns, query `00_meta/patterns/pattern-mcp-context7.md`.
 
@@ -268,6 +270,7 @@ For tool flow detail and anti-patterns, query `00_meta/patterns/pattern-mcp-cont
 
 * Structure as: problem → hypotheses → verify → branch → commit.
 * Skip for boilerplate, single-file edits, syntax fixes, CSS.
+* **Pairs well with Context7:** use Sequential Thinking to plan, Context7 to validate API choices along the way.
 
 For reasoning structure, query `00_meta/patterns/pattern-mcp-sequential-thinking.md`.
 
@@ -278,15 +281,26 @@ For reasoning structure, query `00_meta/patterns/pattern-mcp-sequential-thinking
 * `vault_search` over `grep`+`Read`; `vault_query` over `Read` of whole files.
 * `vault_patch` / `vault_write` over `Edit`/`Write` — do NOT also create a manual git commit (Hive already committed).
 * `capture_lesson` over manual `90-lessons.md` writes.
+* `vault_health` over Bash + `vault-validate.py`.
+* `delegate_task` for bulk summaries — keeps the main context lean.
+* `vault_list` before `ls`/`find` to browse vault structure.
 * Native `Read`/`Edit`/`Write`/`grep` remain correct for code repos and configs outside the vault.
+* **Failure-mode fallback:** if Hive hangs or exceeds ~10-20s (queries) / ~30s (writes), abandon the call and fall back to native `Read`/`Edit`/`Write`/`grep` against the vault path. Use manual `git add` + `git commit -m "vault: …"` in fallback mode. Do NOT retry Hive in the same session — the server may be wedged.
 
-For the full tool list and edge cases, query `00_meta/patterns/pattern-hive-first-vault-access.md`.
+For the full tool list, edge cases, and failure-mode protocol, query `00_meta/patterns/pattern-hive-first-vault-access.md`.
 
 ### Obsidian CLI (Vault Graph Queries)
 
 **When:** Graph queries Hive cannot answer (orphans, backlinks, dead-ends, unresolved links, bulk tag rename).
 
-* `obs-cli.sh <cmd>` (Linux) / `obs-cli.ps1 <cmd>` (Windows). Requires Obsidian GUI; exits 2 if GUI down.
+* `obs-cli.sh <cmd>` (Linux) / `obs-cli.ps1 <cmd>` (Windows). Requires Obsidian GUI; exits 2 if GUI down. `OBS_VAULT` env overrides default vault.
+* **Unique commands** (not covered by Hive MCP):
+  * `backlinks file="path/to/note.md"` — notes linking to a given file
+  * `orphans` — files with no incoming links
+  * `dead-ends` — files with no outgoing links
+  * `unresolved` — broken wikilinks
+  * `tags` / `tags:rename old=X new=Y` — list or bulk-rename tags
+  * `eval "expression"` — execute JS against Obsidian's internal API
 * For file CRUD or text search, use Hive instead (headless, always available).
 
 For the full command list and `vault-health.sh` integration, query `00_meta/patterns/pattern-obsidian-cli.md`.
