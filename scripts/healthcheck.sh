@@ -65,7 +65,7 @@ echo "========================================"
 echo "Checking from: $DOTFILES_DIR"
 
 # ==================================================
-section "1/10" "Core Tools in PATH"
+section "1/11" "Core Tools in PATH"
 
 CORE_TOOLS="git zsh bash curl wget jq eza direnv node npm zoxide docker kubectl terraform"
 for tool in $CORE_TOOLS; do
@@ -77,7 +77,7 @@ for tool in $CORE_TOOLS; do
 done
 
 # ==================================================
-section "2/10" "Versioned Tool Paths"
+section "2/11" "Versioned Tool Paths"
 
 check_tool_home() {
     local name="$1"
@@ -117,7 +117,7 @@ else
 fi
 
 # ==================================================
-section "3/10" "Version Match (versions.conf)"
+section "3/11" "Version Match (versions.conf)"
 
 check_version_match() {
     local name="$1"
@@ -144,7 +144,7 @@ check_version_match "Minikube" "${MINIKUBE_VERSION:-}" "$APPS_HOME/minikube-${MI
 check_version_match "Go" "${GO_VERSION:-}" "$APPS_HOME/go-${GO_VERSION:-}"
 
 # ==================================================
-section "4/10" "Key Symlinks"
+section "4/11" "Key Symlinks"
 
 check_symlink() {
     local path="$1"
@@ -169,7 +169,7 @@ check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
 # ==================================================
-section "5/10" "Environment Variables"
+section "5/11" "Environment Variables"
 
 ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME GO_HOME MINIKUBE_HOME"
 for var in $ENV_VARS; do
@@ -181,7 +181,7 @@ for var in $ENV_VARS; do
 done
 
 # ==================================================
-section "6/10" "Optional Tools"
+section "6/11" "Optional Tools"
 
 OPTIONAL_TOOLS="age gh claude gemini bats shellcheck helm ansible pip"
 for tool in $OPTIONAL_TOOLS; do
@@ -193,7 +193,7 @@ for tool in $OPTIONAL_TOOLS; do
 done
 
 # ==================================================
-section "7/10" "Knowledge Vault"
+section "7/11" "Knowledge Vault"
 
 VAULT_DIR="${VAULT_DIR:-$HOME/Projects/knowledge}"
 
@@ -248,7 +248,7 @@ for dir in $VAULT_DIRS; do
 done
 
 # ==================================================
-section "8/10" "Secrets Integrity"
+section "8/11" "Secrets Integrity"
 
 SECRETS_DIR="${DOTFILES_DIR}/sensitive"
 SECRETS_MAPPING="$SECRETS_DIR/env-mapping.conf"
@@ -297,7 +297,7 @@ else
 fi
 
 # ==================================================
-section "9/10" "tmux"
+section "9/11" "tmux"
 # ==================================================
 if ! command -v tmux >/dev/null 2>&1; then
     fail "tmux not installed (run: sudo apt install -y tmux)"
@@ -318,7 +318,31 @@ else
 fi
 
 # ==================================================
-section "10/10" "Repo ↔ Deploy-Dir Drift"
+section "10/11" "OpenCode"
+# ==================================================
+OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
+if command -v opencode >/dev/null 2>&1; then
+    pass "opencode in PATH: $(opencode --version 2>&1 | head -1)"
+elif [ -x "$OPENCODE_BIN" ]; then
+    fail "opencode binary exists at $OPENCODE_BIN but not in PATH (reload shell or check .zshrc/.bashrc)"
+else
+    fail "opencode binary missing (run setup-linux.sh)"
+fi
+if [ -f "$OPENCODE_CFG" ]; then
+    pass "opencode.jsonc deployed: $OPENCODE_CFG"
+    # shellcheck disable=SC2016  # intentional: literal $schema string match
+    if grep -q '"\$schema":' "$OPENCODE_CFG"; then
+        pass "opencode.jsonc has \$schema declaration"
+    else
+        fail "opencode.jsonc missing \$schema declaration (run setup-linux.sh to redeploy)"
+    fi
+else
+    fail "opencode.jsonc missing: $OPENCODE_CFG (run setup-linux.sh)"
+fi
+
+# ==================================================
+section "11/11" "Repo ↔ Deploy-Dir Drift"
 # ==================================================
 if [ -x "$SCRIPT_DIR/diff-check.sh" ]; then
     if "$SCRIPT_DIR/diff-check.sh" >/dev/null 2>&1; then

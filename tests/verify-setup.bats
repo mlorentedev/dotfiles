@@ -171,9 +171,9 @@ setup() {
 # Section 5: AI configs
 # =============================================================================
 
-@test "~/.claude/CLAUDE.md deployed with marker" {
+@test "~/.claude/CLAUDE.md deployed with AGENTS.md pointer marker" {
     [ -f "$HOME/.claude/CLAUDE.md" ]
-    grep -q "CORE PRINCIPLE" "$HOME/.claude/CLAUDE.md"
+    grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"
 }
 
 @test "~/.claude/skills has at least 15 directories" {
@@ -186,9 +186,9 @@ setup() {
     [ -x "$HOME/.claude/init-project.sh" ]
 }
 
-@test "~/.gemini/GEMINI.md deployed with marker" {
+@test "~/.gemini/GEMINI.md deployed with AGENTS.md pointer marker" {
     [ -f "$HOME/.gemini/GEMINI.md" ]
-    grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"
+    grep -q 'First, read `AGENTS.md`' "$HOME/.gemini/GEMINI.md"
 }
 
 @test "~/.gemini/prompts has at least 15 files" {
