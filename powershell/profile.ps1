@@ -11,10 +11,12 @@
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value gemini
 
-# Aider tiers (OpenRouter)
-function ai { aider @Args }
-function aic { aider --model openrouter/qwen/qwen3-coder-next @Args }
-function aia { aider --architect --model openrouter/deepseek/deepseek-v3.2-speciale @Args }
+# OpenCode (primary AI coding agent -- install is admin-only on Windows, so
+# the alias is conditional. On machines without opencode installed, this
+# block is a no-op and `oc` reports "command not found" as expected.)
+if (Get-Command opencode -ErrorAction SilentlyContinue) {
+    Set-Alias -Name oc -Value opencode
+}
 
 # ============================================================================
 # FUNCTIONS
@@ -24,7 +26,7 @@ function aia { aider --architect --model openrouter/deepseek/deepseek-v3.2-speci
 function project-init {
     <#
     .SYNOPSIS
-    Initialize a new project with AI Memory (Claude, Gemini & Aider)
+    Initialize a new project with AI Memory (Claude, Gemini, OpenCode)
     .DESCRIPTION
     Creates project structure and copies AI configurations from global config.
     .PARAMETER ProjectName

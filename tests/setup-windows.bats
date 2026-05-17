@@ -44,8 +44,9 @@ setup() {
     grep -q 'Deploying versions.conf' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys Aider configuration" {
-    grep -q 'Deploying Aider configuration' "$PS1_SCRIPT"
+@test "setup-windows.ps1 no longer deploys Aider configuration (sunset)" {
+    ! grep -q 'Deploying Aider configuration' "$PS1_SCRIPT"
+    ! grep -q 'Installing aider-chat via uv' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 registers MCP servers" {

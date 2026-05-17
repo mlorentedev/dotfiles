@@ -20,48 +20,24 @@ setup() {
     grep -q 'Set-Alias.*-Name g -Value gemini' "$PROFILE_SCRIPT"
 }
 
-# --- Aider tier functions ---
+# --- OpenCode alias (admin-conditional on Windows; aider sunset) ---
 
-@test "profile.ps1 defines ai function for daily tier" {
-    grep -q 'function ai {' "$PROFILE_SCRIPT"
+@test "profile.ps1 defines conditional oc alias for opencode" {
+    # Guarded by Get-Command — non-admin Windows machines without opencode
+    # skip the alias rather than producing broken references.
+    grep -qE 'if \(Get-Command opencode' "$PROFILE_SCRIPT"
+    grep -qE 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
 }
 
-@test "profile.ps1 ai function calls aider" {
-    grep 'function ai {' "$PROFILE_SCRIPT" | grep -q 'aider'
+@test "profile.ps1 no longer defines aider tier functions (sunset)" {
+    ! grep -qE '^function (ai|aic|aia) ' "$PROFILE_SCRIPT"
 }
 
-@test "profile.ps1 defines aic function for coding tier" {
-    grep -q 'function aic {' "$PROFILE_SCRIPT"
-}
+# --- Parity check: oc alias exists in both shells ---
 
-@test "profile.ps1 aic function uses qwen coder model" {
-    grep 'function aic {' "$PROFILE_SCRIPT" | grep -q 'qwen.*coder'
-}
-
-@test "profile.ps1 defines aia function for architecture tier" {
-    grep -q 'function aia {' "$PROFILE_SCRIPT"
-}
-
-@test "profile.ps1 aia function uses architect mode" {
-    grep 'function aia {' "$PROFILE_SCRIPT" | grep -q '\-\-architect'
-}
-
-@test "profile.ps1 aia function uses deepseek speciale" {
-    grep 'function aia {' "$PROFILE_SCRIPT" | grep -q 'speciale'
-}
-
-# --- Parity check: same models in bash and PowerShell ---
-
-@test "parity: aic uses same model in aliases.zsh and profile.ps1" {
-    bash_model=$(grep 'alias aic=' "$DOTFILES_DIR/.zsh/aliases.zsh" | grep -oP 'openrouter/[^ "]+')
-    ps_model=$(grep 'function aic {' "$PROFILE_SCRIPT" | grep -oP 'openrouter/[^ }]+')
-    [[ "$bash_model" = "$ps_model" ]]
-}
-
-@test "parity: aia uses same model in aliases.zsh and profile.ps1" {
-    bash_model=$(grep 'alias aia=' "$DOTFILES_DIR/.zsh/aliases.zsh" | grep -oP 'openrouter/[^ "]+')
-    ps_model=$(grep 'function aia {' "$PROFILE_SCRIPT" | grep -oP 'openrouter/[^ }]+')
-    [[ "$bash_model" = "$ps_model" ]]
+@test "parity: oc alias defined in both aliases.zsh and profile.ps1" {
+    grep -qE '^alias oc=' "$DOTFILES_DIR/.zsh/aliases.zsh"
+    grep -qE 'Set-Alias -Name oc' "$PROFILE_SCRIPT"
 }
 
 # --- Other functions ---
