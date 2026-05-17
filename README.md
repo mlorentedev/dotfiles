@@ -26,7 +26,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
 - **Encrypted secrets** — Age-encrypted tokens and file secrets, auto-loaded at login
-- **AI integration** — Claude Code + Gemini CLI with 21 custom skills + Aider (3-tier OpenRouter)
+- **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 21 custom skills, unified by `AGENTS.md` SSOT
 - **Cross-platform** — Symlinks on Linux/macOS, copies on Windows (no admin required)
 - **Tested** — 316 BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
@@ -50,10 +50,12 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ├── sensitive/                  # Encrypted secrets
 │   ├── env-mapping.conf        # ENV_VAR=filename mapping
 │   └── *.secret.age            # Encrypted files (tracked)
+├── AGENTS.md                   # Cross-agent SSOT (canonical system prompt)
 ├── ai/
-│   ├── claude/CLAUDE.md        # Master Claude instructions
-│   ├── gemini/GEMINI.md        # Master Gemini instructions
-│   ├── aider/                  # Aider config (3-tier via OpenRouter)
+│   ├── claude/CLAUDE.md        # Claude Code extensions (pointer to AGENTS.md)
+│   ├── gemini/GEMINI.md        # Gemini extensions (pointer to AGENTS.md)
+│   ├── copilot/                # Copilot extensions (pointer to AGENTS.md)
+│   ├── opencode/opencode.jsonc # OpenCode config (Go + OpenRouter providers + MCP)
 │   └── skills/                 # 21 shared AI skills
 ├── ssh/                        # SSH config + public key
 ├── powershell/profile.ps1      # Windows PowerShell profile
@@ -81,9 +83,7 @@ project-init my-project python      # Bootstrap project with dual AI config
 claude                               # Start Claude Code session
 > /audit src/auth.py                 # Use skills via slash commands
 gp audit "$(cat src/main.py)"       # Gemini prompt function
-ai                                   # Aider daily tier (DeepSeek V3.2)
-aic                                  # Aider coding tier (Qwen3 Coder)
-aia                                  # Aider architecture tier (DeepSeek Speciale)
+oc                                   # OpenCode TUI (Go subscription, DeepSeek V4 Pro default)
 ```
 
 ### Sync
@@ -95,7 +95,7 @@ dotfiles-sync --secrets-only        # Only sync sensitive/ files
 
 ### tmux
 
-Two use cases this setup is tuned for: **(1) split-pane multiplexing** (editor + aider + tests side by side) and **(2) session persistence** (close the laptop / drop SSH and come back to the same state).
+Two use cases this setup is tuned for: **(1) split-pane multiplexing** (editor + AI agent + tests side by side) and **(2) session persistence** (close the laptop / drop SSH and come back to the same state).
 
 ```bash
 # --- The 6 commands you actually need ---
@@ -104,7 +104,7 @@ tx dotfiles                # Start (or re-attach) a session named "dotfiles"
                            # Inside tmux now: prompt shows [dotfiles]
 
 # Split for editor + AI + tests:
-#   C-b %                  Split vertically  (editor | aider)
+#   C-b %                  Split vertically  (editor | agent)
 #   C-b "                  Split horizontally (... above tests)
 #   C-b h/j/k/l            Move between panes (vim-style)
 #   C-b z                  Zoom current pane fullscreen (toggle)

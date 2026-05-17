@@ -394,24 +394,12 @@ if (Test-Path $VaultSkillsDir) {
 }
 
 # ============================================================================
-# 2b. DEPLOY AIDER CONFIGURATION
+# 2b. PYTHON TOOLING (uv + poetry)
 # ============================================================================
-
-Write-Info "Deploying Aider configuration..."
-
-$aiderSource = "$DotfilesDir\ai\aider"
-if (Test-Path $aiderSource) {
-    $aiderConf = "$aiderSource\aider.conf.yml"
-    if (Test-Path $aiderConf) {
-        Copy-Item $aiderConf "$env:USERPROFILE\.aider.conf.yml" -Force
-        Write-Success "Deployed .aider.conf.yml"
-    }
-    $aiderModelSettings = "$aiderSource\aider.model.settings.yml"
-    if (Test-Path $aiderModelSettings) {
-        Copy-Item $aiderModelSettings "$env:USERPROFILE\.aider.model.settings.yml" -Force
-        Write-Success "Deployed .aider.model.settings.yml"
-    }
-}
+# uv is required by the hive MCP server (uvx hive-vault). poetry is general
+# Python tooling. Aider was removed in chore/aider-sunset-full (2026-05-16);
+# OpenCode integration on Windows is a separate follow-up (admin-conditional,
+# not automated here).
 
 # Install uv (Python package manager -- provides uvx)
 $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
@@ -454,20 +442,6 @@ if (-not $poetryCmd) {
     }
 } else {
     Write-Info "poetry already installed"
-}
-
-# Install aider via uv (requires Python 3.12 - audioop removed in 3.13)
-$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-if ($uvCmd) {
-    Write-Info "Installing aider-chat via uv..."
-    try {
-        & uv tool install --python 3.12 aider-chat 2>$null
-        Write-Success "Aider installed"
-    } catch {
-        Write-Warn "Failed to install aider: $_"
-    }
-} else {
-    Write-Warn "uv not found, skipping aider installation"
 }
 
 # ============================================================================

@@ -65,6 +65,6 @@
     { "name": "npm", "purpose": "claude-mem-heal zod install" },
     { "name": "age", "purpose": "secrets encryption" },
     { "name": "gh", "purpose": "GitHub CLI + Copilot extension" },
-    { "name": "uv", "purpose": "Python tool installs (aider, hive-vault)" }
+    { "name": "uv", "purpose": "Python tool installs (hive-vault, general Python workflows)" }
   ]
 }
