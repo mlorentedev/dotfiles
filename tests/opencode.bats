@@ -45,17 +45,24 @@ setup() {
     [[ $(awk '/^# OpenCode/,/^# GitHub Copilot/' "$SETUP_SCRIPT" | grep -c '2>/dev/null || true') -eq 0 ]]
 }
 
-# --- Regression: aider coexistence (PR1 keeps aider; sunset is PR2) ---
+# --- Regression: aider sunset (PR2) ---
 
-@test "setup-linux.sh STILL has aider install block (PR1 coexistence)" {
-    grep -q "# Aider (AI pair programming)" "$SETUP_SCRIPT"
-    grep -q "uv tool install --python 3.12 aider-chat" "$SETUP_SCRIPT"
+@test "setup-linux.sh no longer installs aider" {
+    ! grep -q "uv tool install --python 3.12 aider-chat" "$SETUP_SCRIPT"
+    ! grep -q "# Aider (AI pair programming)" "$SETUP_SCRIPT"
 }
 
-@test ".zsh/aliases.zsh STILL has aider aliases (PR1 coexistence)" {
-    grep -q '^alias ai="aider"' "$ALIASES_FILE"
-    grep -q '^alias aic="aider' "$ALIASES_FILE"
-    grep -q '^alias aia="aider' "$ALIASES_FILE"
+@test "setup-linux.sh keeps uv install (used by hive MCP server)" {
+    grep -q "Installing uv" "$SETUP_SCRIPT"
+    grep -q "https://astral.sh/uv/install.sh" "$SETUP_SCRIPT"
+}
+
+@test "ai/aider/ directory removed from repo" {
+    [[ ! -d "$DOTFILES_DIR/ai/aider" ]]
+}
+
+@test ".zsh/aliases.zsh no longer has aider tier aliases" {
+    ! grep -qE '^alias (ai|aic|aia)=' "$ALIASES_FILE"
 }
 
 # --- opencode.jsonc structure ---

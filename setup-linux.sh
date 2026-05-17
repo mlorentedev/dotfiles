@@ -335,16 +335,7 @@ fi
 chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
-# Aider (AI pair programming)
-log_info "Setting up Aider configuration..."
-if [ -f "$CURRENT_DIR/ai/aider/aider.conf.yml" ]; then
-    cp "$CURRENT_DIR/ai/aider/aider.conf.yml" "$HOME/.aider.conf.yml"
-    log_success "Deployed .aider.conf.yml"
-fi
-if [ -f "$CURRENT_DIR/ai/aider/aider.model.settings.yml" ]; then
-    cp "$CURRENT_DIR/ai/aider/aider.model.settings.yml" "$HOME/.aider.model.settings.yml"
-    log_success "Deployed .aider.model.settings.yml"
-fi
+# Python tooling (uv + poetry) — used by hive MCP server (uvx hive-vault) and general Python workflows
 # Install uv (Python package manager — provides uvx)
 if ! command -v uv >/dev/null 2>&1; then
     log_info "Installing uv..."
@@ -374,15 +365,6 @@ if ! command -v poetry >/dev/null 2>&1; then
     fi
 else
     log_info "poetry already installed"
-fi
-
-# Install aider via uv (requires Python 3.12 — audioop removed in 3.13)
-if command -v uv >/dev/null 2>&1; then
-    log_info "Installing aider-chat via uv..."
-    uv tool install --python 3.12 aider-chat 2>/dev/null || true
-    log_success "Aider installed"
-else
-    log_warning "uv not found, skipping aider installation"
 fi
 
 # Create convenience symlinks for versioned-only binaries

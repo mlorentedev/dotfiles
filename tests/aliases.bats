@@ -32,26 +32,14 @@ setup() {
     grep -q 'alias tf="terraform"' "$ALIASES_FILE"
 }
 
-# --- Aider tier aliases ---
+# --- OpenCode alias (replaces aider tiers) ---
 
-@test "aliases.zsh defines ai alias for daily tier" {
-    grep -q 'alias ai="aider"' "$ALIASES_FILE"
+@test "aliases.zsh defines oc alias for opencode" {
+    grep -q '^alias oc="opencode"' "$ALIASES_FILE"
 }
 
-@test "aliases.zsh defines aic alias for coding tier" {
-    grep -q 'alias aic=.*qwen.*coder' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh defines aia alias for architecture tier" {
-    grep -q 'alias aia=.*architect.*speciale' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh aic uses openrouter provider" {
-    grep 'alias aic=' "$ALIASES_FILE" | grep -q 'openrouter/'
-}
-
-@test "aliases.zsh aia uses openrouter provider" {
-    grep 'alias aia=' "$ALIASES_FILE" | grep -q 'openrouter/'
+@test "aliases.zsh no longer defines aider tier aliases (sunset)" {
+    ! grep -qE '^alias (ai|aic|aia)=' "$ALIASES_FILE"
 }
 
 # --- Knowledge aliases ---

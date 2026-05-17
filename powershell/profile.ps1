@@ -11,10 +11,8 @@
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value gemini
 
-# Aider tiers (OpenRouter)
-function ai { aider @Args }
-function aic { aider --model openrouter/qwen/qwen3-coder-next @Args }
-function aia { aider --architect --model openrouter/deepseek/deepseek-v3.2-speciale @Args }
+# OpenCode (primary AI coding agent — replaces aider)
+Set-Alias -Name oc -Value opencode
 
 # ============================================================================
 # FUNCTIONS
