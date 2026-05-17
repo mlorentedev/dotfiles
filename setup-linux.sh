@@ -289,8 +289,8 @@ done
 # Force copy master files (Neural Hive Protocol)
 rm -f "$HOME/.gemini/GEMINI.md"
 cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
-if grep -q "CORE PRINCIPLE" "$HOME/.gemini/GEMINI.md"; then
-    log_success "GEMINI.md deployed successfully (verified)"
+if grep -q 'First, read `AGENTS.md`' "$HOME/.gemini/GEMINI.md"; then
+    log_success "GEMINI.md deployed successfully (verified pointer to AGENTS.md)"
 else
     echo "❌ Error: GEMINI.md deployment failed verification"
 fi
@@ -327,8 +327,8 @@ done
 # Force copy master files (Neural Hive Protocol)
 rm -f "$HOME/.claude/CLAUDE.md"
 cp "$CURRENT_DIR/ai/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-if grep -q "CORE PRINCIPLE" "$HOME/.claude/CLAUDE.md"; then
-    log_success "CLAUDE.md deployed successfully (verified)"
+if grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"; then
+    log_success "CLAUDE.md deployed successfully (verified pointer to AGENTS.md)"
 else
     echo "❌ Error: CLAUDE.md deployment failed verification"
 fi
