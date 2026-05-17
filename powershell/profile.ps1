@@ -11,7 +11,7 @@
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value gemini
 
-# OpenCode (primary AI coding agent — install is admin-only on Windows, so
+# OpenCode (primary AI coding agent -- install is admin-only on Windows, so
 # the alias is conditional. On machines without opencode installed, this
 # block is a no-op and `oc` reports "command not found" as expected.)
 if (Get-Command opencode -ErrorAction SilentlyContinue) {
