@@ -1,0 +1,82 @@
+// OpenCode configuration — managed by dotfiles.
+//
+// SSOT: ai/opencode/opencode.jsonc (this file).
+// Deploy target: ~/.config/opencode/opencode.jsonc (via setup-linux.sh).
+// Schema: https://opencode.ai/config.json
+// Spec: specs/AI-011-opencode-bootstrap/
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Default model — restricted to OpenCode Go catalog.
+  // A/B testing kimi-k2.6 vs deepseek-v4-pro during first month of use.
+  "model": "opencode-go/deepseek-v4-pro",
+
+  "provider": {
+    // Layer 1 of the PAYG guardrail (see spec ## Risks):
+    // explicit `models` block restricts /models picker to Go catalog only.
+    // No Sonnet / GPT-5 / Opus / Gemini Pro shown — no accidental PAYG billing.
+    // Layers 2 (workspace $0 PAYG cap) and 3 (no payment method) live in
+    // the Zen dashboard — documented in the runbook.
+    "opencode-go": {
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro (Go default)"
+        },
+        "kimi-k2.6": {
+          "name": "Kimi K2.6 (A/B candidate)"
+        }
+      }
+    },
+
+    // OpenRouter for existing $5 credit reuse + frontier on-demand.
+    // OPENROUTER_API_KEY auto-detected from environment, loaded by
+    // scripts/load-secrets.sh from sensitive/openrouter.secret.age.
+    // No `models` override — uses OpenRouter's preloaded catalog;
+    // selection happens interactively via /models in the TUI.
+    "openrouter": {}
+
+    // Future: Ollama local provider — pending AI-010-ollama-native.
+    // Uncomment and adjust models list once Ollama is installed natively.
+    // "ollama": {
+    //   "npm": "@ai-sdk/openai-compatible",
+    //   "name": "Ollama (local)",
+    //   "options": { "baseURL": "http://localhost:11434/v1" },
+    //   "models": {
+    //     "qwen2.5-coder:14b": { "name": "Qwen2.5 Coder 14B" },
+    //     "deepseek-coder-v2:16b": { "name": "DeepSeek Coder V2 16B" }
+    //   }
+    // }
+  },
+
+  // MCP servers — mirror of mcp-servers.json (Claude Code SSOT).
+  // Coexistence constraint: do not run `oc` and `claude` in parallel
+  // on the same repo until hive MCP adds a lock-file to auto-commit
+  // (tracked as follow-up in repo `hive`).
+  "mcp": {
+    "drawio": {
+      "type": "local",
+      "command": ["npx", "-y", "@drawio/mcp"],
+      "enabled": true
+    },
+    "socket": {
+      "type": "remote",
+      "url": "https://mcp.socket.dev/",
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    },
+    "hive": {
+      "type": "local",
+      "command": ["uvx", "hive-vault"],
+      "enabled": true
+    }
+  }
+}

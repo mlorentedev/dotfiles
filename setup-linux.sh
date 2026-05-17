@@ -393,6 +393,55 @@ if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/p
     log_success "python -> python3 symlink created"
 fi
 
+# OpenCode (secondary AI coding agent — see ADR-009 and specs/AI-011-opencode-bootstrap)
+# Idempotent per pattern-setup-script-idempotence:
+#   - install only if absent (no forced re-install on every run)
+#   - reconcile config (not skip-if-exists) so source-of-truth wins on drift
+#   - no silenced errors; failures surface as log_warning
+log_info "Setting up OpenCode configuration..."
+OPENCODE_BIN_DIR="$HOME/.opencode/bin"
+OPENCODE_BINARY="$OPENCODE_BIN_DIR/opencode"
+
+if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$OPENCODE_BINARY" ]; then
+    log_info "Installing opencode via official install script..."
+    if curl -fsSL https://opencode.ai/install | bash; then
+        log_success "opencode installed to $OPENCODE_BIN_DIR"
+    else
+        log_warning "opencode install failed — re-run setup or install manually (https://opencode.ai/docs/)"
+    fi
+else
+    log_info "opencode already installed"
+fi
+
+# Ensure $HOME/.opencode/bin on PATH (defensive; install script also tries this)
+OPENCODE_PATH_LINE='export PATH="$HOME/.opencode/bin:$PATH"'
+[ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$OPENCODE_PATH_LINE"
+[ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$OPENCODE_PATH_LINE"
+
+# Deploy opencode.jsonc — reconcile-not-skip per pattern-setup-script-idempotence
+ensure_directory "$HOME/.config/opencode"
+OPENCODE_CONFIG_SRC="$CURRENT_DIR/ai/opencode/opencode.jsonc"
+OPENCODE_CONFIG_DST="$HOME/.config/opencode/opencode.jsonc"
+if [ -f "$OPENCODE_CONFIG_SRC" ]; then
+    if [ -f "$OPENCODE_CONFIG_DST" ] && cmp -s "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_DST"; then
+        log_info "opencode.jsonc already in sync"
+    else
+        cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_DST"
+        log_success "Deployed opencode.jsonc to $OPENCODE_CONFIG_DST"
+    fi
+else
+    log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
+fi
+
+# Post-deploy assertion — binary reachable + version reports
+if [ -x "$OPENCODE_BINARY" ] || command -v opencode >/dev/null 2>&1; then
+    OPENCODE_VERSION=$("$OPENCODE_BINARY" --version 2>&1 | head -1 || echo "unknown")
+    log_success "opencode ready: $OPENCODE_VERSION"
+    log_info "First-time use: launch \`opencode\` and run /connect to authenticate (Go subscription)"
+else
+    log_warning "opencode binary not reachable at $OPENCODE_BINARY after install — agent unavailable"
+fi
+
 # GitHub Copilot CLI (requires gh)
 if command -v gh >/dev/null 2>&1; then
     log_info "Installing GitHub Copilot CLI extension..."

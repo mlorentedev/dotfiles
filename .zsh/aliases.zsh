@@ -31,10 +31,13 @@ alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
 alias dch="diff-check.sh"                         # Detect drift between repo and ~/.dotfiles
 alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from git log
 
-# Aider tiers (OpenRouter)
+# Aider tiers (OpenRouter) — sunset planned in PR2, kept here during PR1 coexistence (see ADR-009 / spec AI-011)
 alias ai="aider"                                                                          # daily: DeepSeek V3.2
 alias aic="aider --model openrouter/qwen/qwen3-coder-next"                                # coding: Qwen3 Coder
 alias aia="aider --architect --model openrouter/deepseek/deepseek-v3.2-speciale"           # architecture: DeepSeek Speciale
+
+# OpenCode (secondary AI coding agent — replaces aider after PR2)
+alias oc="opencode"                                                                       # TUI: opencode Go subscription
 
 # tmux session management
 alias tx='tmux new -A -s'         # attach-or-create by name: tx dotfiles
