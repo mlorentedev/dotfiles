@@ -285,8 +285,13 @@ setup() {
 # Section 10: Graceful skips (optional tools not present)
 # =============================================================================
 
-@test "copilot directory created (gh installed)" {
-    [ -d "$HOME/.copilot" ]
+@test "copilot config NOT deployed when gh-copilot extension is absent" {
+    # Post-BUG-001 (PR #40): setup-linux.sh uses detect-and-act. The
+    # gh-copilot extension is no longer auto-installed; ~/.copilot is created
+    # only if the extension is genuinely present. In the integration container
+    # gh is installed (as a dev tool) but gh-copilot is not, so the directory
+    # should NOT exist — confirming the skip path is silent and correct.
+    [ ! -d "$HOME/.copilot" ]
 }
 
 @test "no MCP servers registered (claude CLI absent)" {
