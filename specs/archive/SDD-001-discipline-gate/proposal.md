@@ -1,9 +1,11 @@
 ---
 id: "SDD-001-discipline-gate"
 type: spec
-status: draft
+status: archived
 created: "2026-05-18"
-tags: [spec, proposal]
+archived: "2026-05-18"
+merged_pr: 49
+tags: [spec, proposal, sdd, archived]
 template_version: "1.0"
 ---
 
