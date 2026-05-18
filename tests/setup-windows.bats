@@ -222,6 +222,29 @@ setup() {
     grep -q 'ajeetdsouza.zoxide' "$PS1_SCRIPT"
 }
 
+# --- Cross-platform parity: AI config deploy verification ---
+# AI-013 refactored CLAUDE.md/GEMINI.md/copilot-instructions.md to pointer-style
+# files starting with 'First, read `AGENTS.md`'. The old marker 'CORE PRINCIPLE'
+# no longer exists in any deployed file. setup-linux.sh was updated; this guard
+# keeps setup-windows.ps1 in lockstep (regression class: BUG-001 + BUG-002).
+
+@test "parity: both scripts verify CLAUDE.md deploy with AGENTS.md pointer marker" {
+    grep -qF "grep -q 'First, read \`AGENTS.md\`' \"\$HOME/.claude/CLAUDE.md\"" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "Select-String -Path \"\$ClaudeHome\\CLAUDE.md\" -Pattern 'First, read \`AGENTS.md\`'" "$PS1_SCRIPT"
+}
+
+@test "parity: both scripts verify GEMINI.md deploy with AGENTS.md pointer marker" {
+    grep -qF "grep -q 'First, read \`AGENTS.md\`' \"\$HOME/.gemini/GEMINI.md\"" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "Select-String -Path \"\$GeminiHome\\GEMINI.md\" -Pattern 'First, read \`AGENTS.md\`'" "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 has no stale 'CORE PRINCIPLE' verify-pattern references" {
+    # AGENTS.md itself may mention 'CORE PRINCIPLE' as documentation text -- that
+    # is fine. The bug is using it as a Select-String -Pattern, which post-AI-013
+    # never matches the deployed file and emits a spurious [ERROR] every run.
+    ! grep -qF -- '-Pattern "CORE PRINCIPLE"' "$PS1_SCRIPT"
+}
+
 # --- PSScriptAnalyzer ---
 
 @test "setup-windows.ps1 passes PSScriptAnalyzer (if pwsh available)" {
