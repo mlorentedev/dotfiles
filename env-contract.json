@@ -64,7 +64,8 @@
     { "name": "npx", "purpose": "MCP server stdio transports" },
     { "name": "npm", "purpose": "claude-mem-heal zod install" },
     { "name": "age", "purpose": "secrets encryption" },
-    { "name": "gh", "purpose": "GitHub CLI + Copilot extension" },
+    { "name": "gh", "purpose": "GitHub CLI (PR/issue management; Copilot CLI is the standalone `copilot` binary, not a gh extension since BUG-003)" },
+    { "name": "copilot", "purpose": "GitHub Copilot CLI (agentic assistant; winget GitHub.Copilot on Windows, manual install on Linux)" },
     { "name": "uv", "purpose": "Python tool installs (hive-vault, general Python workflows)" }
   ]
 }

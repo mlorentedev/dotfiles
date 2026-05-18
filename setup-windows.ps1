@@ -104,7 +104,8 @@ if ($wingetCmd) {
         @{ Name = "eza"; Cmd = "eza"; Id = "eza-community.eza" },
         @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
         @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
-        @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" }
+        @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
+        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" }
     )
     foreach ($tool in $tools) {
         if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
@@ -119,6 +120,11 @@ if ($wingetCmd) {
             Write-Info "$($tool.Name) already installed"
         }
     }
+    # Refresh PATH so freshly-installed winget tools are visible to subsequent
+    # blocks of this same setup run (otherwise Get-Command misses them until
+    # the next shell start; first introduced for BUG-003 so the Copilot config
+    # deploy block sees the just-installed `copilot` binary).
+    $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
 } else {
     Write-Warn "winget not found, skipping developer tools installation"
 }
@@ -792,43 +798,33 @@ if (Test-Path $ClaudeSettings) {
 
 Write-Info "Setting up GitHub Copilot CLI..."
 
-# Detect-and-act: deploy config only when gh AND the gh-copilot extension
-# are actually installed. The script does NOT auto-install the extension --
-# gh is widely used for PR/issue management on machines that do not want
-# Copilot. To enable: gh extension install github/gh-copilot, then re-run.
-# Verification string updated for AI-013 pointer-style copilot-instructions.md.
-$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
-if ($ghCmd) {
-    $copilotInstalled = $false
-    try {
-        $extensions = & gh extension list 2>$null
-        $copilotInstalled = ($extensions -match 'github/gh-copilot')
-    } catch {
-        $copilotInstalled = $false
-    }
+# BUG-003: detect the new standalone `copilot` CLI (winget GitHub.Copilot,
+# agentic interface, closer to Claude Code than to the legacy gh-copilot
+# extension's suggest/explain wrappers). The dev tools winget block above
+# auto-installs it; this block deploys config when the binary is on PATH.
+# Note: AWS Copilot CLI (Amazon.CopilotCLI) also exposes itself as `copilot`.
+# If both are installed, Get-Command resolves to the first on PATH. Out-of-
+# scope to disambiguate here; <1% population.
+$copilotCmd = Get-Command copilot -ErrorAction SilentlyContinue
+if ($copilotCmd) {
+    Write-Info "GitHub Copilot CLI detected at $($copilotCmd.Source), deploying configuration..."
+    $CopilotHome = "$env:USERPROFILE\.copilot"
+    Ensure-Directory $CopilotHome
 
-    if ($copilotInstalled) {
-        Write-Info "GitHub Copilot CLI extension detected, deploying configuration..."
-        $CopilotHome = "$env:USERPROFILE\.copilot"
-        Ensure-Directory $CopilotHome
-
-        $copilotSource = "$DotfilesDir\ai\copilot"
-        if (Test-Path $copilotSource) {
-            Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
-            if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
-                (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet)) {
-                Write-Success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
-            } else {
-                Write-Warn "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
-            }
+    $copilotSource = "$DotfilesDir\ai\copilot"
+    if (Test-Path $copilotSource) {
+        Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
+        if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
+            (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet)) {
+            Write-Success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
+        } else {
+            Write-Warn "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
         }
-
-        Write-Success "GitHub Copilot CLI configured (aliases ghcs/ghce in profile.ps1)"
-    } else {
-        Write-Info "GitHub Copilot CLI extension not installed, skipping Copilot config (install with: gh extension install github/gh-copilot)"
     }
+
+    Write-Success "GitHub Copilot CLI configured (aliases cop/cops in profile.ps1)"
 } else {
-    Write-Warn "GitHub CLI (gh) not found, skipping Copilot setup"
+    Write-Info "GitHub Copilot CLI not installed; the dev tools block above attempts auto-install via winget GitHub.Copilot. Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
 }
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)

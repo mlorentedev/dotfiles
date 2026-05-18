@@ -67,10 +67,14 @@ function gd { git diff }
 function gl { git log --oneline -10 }
 function gp { git pull }
 
-# GitHub Copilot CLI aliases
-if (Get-Command gh -ErrorAction SilentlyContinue) {
-    function ghcs { gh copilot suggest @args }
-    function ghce { gh copilot explain @args }
+# GitHub Copilot CLI v2 aliases (BUG-003: standalone agentic `copilot`, not gh extension)
+# - cop  -> interactive agent (default safe: tool use needs confirmation)
+# - cops -> single-shot non-interactive prompt; --allow-all-tools is REQUIRED by
+#          the CLI for non-interactive mode and gives the agent edit/exec power.
+#          Use 'cop' instead when you want per-tool confirmation.
+if (Get-Command copilot -ErrorAction SilentlyContinue) {
+    Set-Alias -Name cop -Value copilot
+    function cops { copilot -p "$args" --allow-all-tools -s }
 }
 
 # Enhanced listing (requires eza)

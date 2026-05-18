@@ -57,6 +57,24 @@ setup() {
     grep -q 'Setting up GitHub Copilot CLI' "$PS1_SCRIPT"
 }
 
+# --- BUG-003: drop gh-copilot extension path, detect new copilot CLI v2 ---
+# The legacy 'gh extension install github/gh-copilot' product was the v1 wrapper
+# around suggest/explain. The new 'copilot' standalone CLI (winget GitHub.Copilot,
+# binary `copilot`) is agentic (closer to Claude Code). Setup detects the new one
+# via 'Get-Command copilot' and stops referencing the old extension entirely.
+
+@test "setup-windows.ps1 detects copilot via Get-Command, not gh extension list" {
+    grep -qF "Get-Command copilot" "$PS1_SCRIPT"
+    ! grep -qF "gh extension list" "$PS1_SCRIPT"
+    ! grep -qF "github/gh-copilot" "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 auto-installs GitHub.Copilot via winget" {
+    grep -qF "GitHub.Copilot" "$PS1_SCRIPT"
+    # In the dev tools winget block, the binary check uses `copilot`
+    grep -qE 'Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys init-project.ps1" {
     grep -q 'init-project.ps1' "$PS1_SCRIPT"
 }
@@ -243,6 +261,14 @@ setup() {
     # is fine. The bug is using it as a Select-String -Pattern, which post-AI-013
     # never matches the deployed file and emits a spurious [ERROR] every run.
     ! grep -qF -- '-Pattern "CORE PRINCIPLE"' "$PS1_SCRIPT"
+}
+
+@test "parity: both setup scripts detect copilot via binary, not gh extension" {
+    grep -qF "command -v copilot" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "Get-Command copilot" "$PS1_SCRIPT"
+    # Neither should still reference the legacy extension path
+    ! grep -qF "github/gh-copilot" "$DOTFILES_DIR/setup-linux.sh"
+    ! grep -qF "github/gh-copilot" "$PS1_SCRIPT"
 }
 
 # --- PSScriptAnalyzer ---
