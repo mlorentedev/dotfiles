@@ -35,6 +35,12 @@ alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from
 alias oc="opencode"                                                                       # TUI: opencode Go subscription
 alias oclog='tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)" | grep --line-buffered -vE "file\.watcher\.updated|bus type=message\.part\.delta"'  # live tail of newest opencode log, filtered
 
+# GitHub Copilot CLI v2 (BUG-003: standalone agentic CLI, replaces ghcs/ghce wrappers)
+# cop  -> interactive agent (tool use requires confirmation, safe default)
+# cops -> single-shot non-interactive prompt with --allow-all-tools (required by CLI for -p mode)
+alias cop="copilot"
+cops() { copilot -p "$*" --allow-all-tools -s; }
+
 # tmux session management
 alias tx='tmux new -A -s'         # attach-or-create by name: tx dotfiles
 alias txl='tmux ls'               # list sessions

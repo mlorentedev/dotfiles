@@ -49,6 +49,28 @@ setup() {
     ! grep -qE '^alias (ai|aic|aia)=' "$ALIASES_FILE"
 }
 
+# --- Copilot CLI v2 aliases (BUG-003: rename from ghcs/ghce) ---
+# The old aliases wrapped 'gh copilot suggest/explain' which do not exist in
+# the new standalone 'copilot' CLI. Rename to 'cop' (interactive agentic CLI)
+# and 'cops' (single-shot non-interactive prompt with --allow-all-tools).
+
+@test "aliases.zsh defines cop alias for copilot" {
+    grep -qE '^alias cop="copilot"' "$ALIASES_FILE"
+}
+
+@test "aliases.zsh defines cops function for single-shot copilot prompt" {
+    grep -qE '^cops\(\)' "$ALIASES_FILE"
+    grep -qF 'copilot -p' "$ALIASES_FILE"
+    grep -qF -- '--allow-all-tools' "$ALIASES_FILE"
+}
+
+@test "aliases.zsh no longer defines ghcs/ghce (renamed in BUG-003)" {
+    # Anchor to start-of-line + alias/function definition forms only -- comments
+    # mentioning the old names (e.g. "replaces ghcs/ghce wrappers") are fine.
+    ! grep -qE '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
+    ! grep -qE '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
+}
+
 # --- Knowledge aliases ---
 
 @test "aliases.zsh defines kc alias" {
@@ -105,6 +127,22 @@ setup() {
     grep -q 'function gl' "$ps_file"
     grep -q 'alias gp=' "$ALIASES_FILE"
     grep -q 'function gp' "$ps_file"
+}
+
+@test "parity: cop and cops exist in both aliases.zsh and profile.ps1" {
+    ps_file="$DOTFILES_DIR/powershell/profile.ps1"
+    grep -qE '^alias cop="copilot"' "$ALIASES_FILE"
+    grep -qE 'Set-Alias -Name cop -Value copilot' "$ps_file"
+    grep -qE '^cops\(\)' "$ALIASES_FILE"
+    grep -qE 'function cops' "$ps_file"
+}
+
+@test "parity: ghcs/ghce removed from both aliases.zsh and profile.ps1" {
+    ps_file="$DOTFILES_DIR/powershell/profile.ps1"
+    ! grep -qE '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
+    ! grep -qE '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
+    ! grep -qE '^\s*function ghcs' "$ps_file"
+    ! grep -qE '^\s*function ghce' "$ps_file"
 }
 
 # --- tmux aliases ---

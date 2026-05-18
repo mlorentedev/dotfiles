@@ -501,33 +501,33 @@ else
     log_warning "ghostty config source missing: $GHOSTTY_CONFIG_SRC"
 fi
 
-# GitHub Copilot CLI (detect-and-act: deploy config only when the extension
-# is actually installed; the script does NOT auto-install the extension on
-# Linux — gh is widely used for PR/issue management without Copilot intent.
-# To enable: gh extension install github/gh-copilot, then re-run setup).
-# Verification string updated for AI-013 pointer-style copilot-instructions.md.
-if command -v gh >/dev/null 2>&1; then
-    if gh extension list 2>/dev/null | grep -q "github/gh-copilot"; then
-        log_info "GitHub Copilot CLI extension detected, deploying configuration..."
-        ensure_directory "$HOME/.copilot"
-        cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
-        if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q 'First, read `AGENTS.md`' "$HOME/.copilot/copilot-instructions.md"; then
-            log_success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
-        else
-            log_warning "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
-        fi
-        log_success "GitHub Copilot CLI configured"
-
-        # Aliases
-        log_info "Adding Copilot aliases to .zshrc/.bashrc..."
-        COPILOT_SUGGEST='eval "$(gh copilot alias -- bash)"'
-        [ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$COPILOT_SUGGEST"
-        [ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$COPILOT_SUGGEST"
-    else
-        log_info "GitHub Copilot CLI extension not installed, skipping Copilot config (install with: gh extension install github/gh-copilot)"
+# GitHub Copilot CLI (BUG-003: standalone agentic CLI, drops legacy gh-copilot
+# extension path). Linux side is detect-and-act -- no auto-install (distros vary;
+# user installs via snap/apt/curl per https://docs.github.com/copilot/how-tos/copilot-cli).
+# Verification string set by AI-013 (pointer-style copilot-instructions.md).
+#
+# Cleanup (idempotent): the previous setup added 'eval "$(gh copilot alias -- bash)"'
+# to .zshrc/.bashrc. That subcommand does not exist in the new standalone CLI, so
+# the line errors silently on every shell startup. Strip it if present.
+for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    if [ -f "$rc" ] && grep -qF 'eval "$(gh copilot alias -- bash)"' "$rc"; then
+        sed -i '/eval "$(gh copilot alias -- bash)"/d' "$rc"
+        log_info "Removed stale gh-copilot eval line from $rc"
     fi
+done
+
+if command -v copilot >/dev/null 2>&1; then
+    log_info "GitHub Copilot CLI detected, deploying configuration..."
+    ensure_directory "$HOME/.copilot"
+    cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
+    if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q 'First, read `AGENTS.md`' "$HOME/.copilot/copilot-instructions.md"; then
+        log_success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
+    else
+        log_warning "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
+    fi
+    log_success "GitHub Copilot CLI configured (aliases cop/cops in .zsh/aliases.zsh)"
 else
-    log_warning "GitHub CLI (gh) not found, skipping Copilot setup"
+    log_info "GitHub Copilot CLI not installed, skipping Copilot config (install via snap/apt/curl: https://docs.github.com/copilot/how-tos/copilot-cli)"
 fi
 
 # Register MCP servers (requires Claude Code CLI, Node.js, jq)
