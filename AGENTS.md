@@ -327,6 +327,34 @@ Per-feature specs live at `specs/<feature-id>/` in this repo; archived at `specs
 
 `<feature-id>` format: `^[A-Z]+-\d+(-[a-z0-9-]+)?$` (e.g., `AI-001-ollama-public`) or `^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$` (e.g., `2026-05-13-cleanup`).
 
+### Discipline Gate (NON-NEGOTIABLE)
+
+Before creating ANY branch for code changes in this repo, evaluate against `pattern-spec-driven-development.md` "Trigger Criteria". SDD is mandatory if ANY of these apply:
+
+- Change produces ~50–300 LOC of production diff (excluding tests, generated files, lockfiles)
+- Change touches a public contract (API, CLI flag, exported type, alias name, file path, deployed config schema)
+- Change adds or removes a dependency
+- Change is the first step of a multi-PR sequence
+- The change warrants a Socratic Guardrail pause (architectural decisions, schema design, concurrency, breaking changes)
+
+**If trigger met, follow this order — no shortcuts:**
+
+1. Add vault entry to `10_projects/<repo>/11-tasks.md` (the "vault gate")
+2. Run `init-spec.{sh,ps1} <feature-id>` to scaffold `specs/<feature-id>/` (the script enforces the vault-gate check; bypass only with `-ForceNoVault` + explicit user-facing justification)
+3. Fill `proposal.md` (why + what + acceptance criteria) **before** writing implementation code
+4. Fill `tasks.md` in TDD order
+5. Implement; tick boxes as you go
+6. Fill `verification.md` with evidence (commit hashes, test outputs, smoke results)
+7. On merge: move folder to `specs/archive/<feature-id>/` and tick the vault entry with the PR link
+
+**Banned phrases when planning work in this session:**
+
+- "I'll do vault hygiene later"
+- "Will add the spec entry after merge"
+- "Let me commit first and document later"
+
+Standing Order #3 (vault hygiene) is **in-session, not 'later'**. Every "later" is debt that compounds and historically gets forgotten between sessions. If a vault hygiene action genuinely cannot fit in the current turn, create an explicit tracked task for the debt — never leave it as a verbal promise.
+
 ## Response Protocol
 
 1. **Classify Task:** Determine if Low Load (Execute) or High Load (Mentor).

@@ -23,15 +23,23 @@ if [ -z "$CWD" ]; then
     CWD="$(pwd)"
 fi
 
+# SDD discipline reminder -- unconditional, first in additionalContext (SDD-001).
+# Surfaces the Discipline Gate to every Claude Code session regardless of CWD,
+# repo, or vault state. Cross-OS parity with claude-session-start.ps1. All
+# subsequent diagnostic blocks (claude-mem, doctor, hive, specs, vault, memory)
+# APPEND to CONTEXT_LINES defensively so they cannot wipe this reminder.
+CONTEXT_LINES='[sdd] Before your first tool call, read `AGENTS.md` at the repo root (or `~/Projects/dotfiles/AGENTS.md` as fallback) and apply its "Spec-Driven Development" (including the Discipline Gate) and "Standing Orders" sections. SDD applies by default for PR-sized changes (~50-300 LOC, public contract, new dep, multi-PR sequence). Skip ONLY for: typos, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, documentation-only changes. When in doubt, ASK the user.'
+
 # --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
 # Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
 # missing zod runtime dep. Silent on healthy installs.
 CLAUDE_MEM_HEAL="$SCRIPT_DIR/claude-mem-heal.sh"
-CONTEXT_LINES=""
 if [ -x "$CLAUDE_MEM_HEAL" ]; then
     HEAL_OUTPUT=$(bash "$CLAUDE_MEM_HEAL" 2>&1) || true
     if [ -n "$HEAL_OUTPUT" ]; then
-        CONTEXT_LINES="[claude-mem] self-healed plugin install:
+        CONTEXT_LINES="$CONTEXT_LINES
+
+[claude-mem] self-healed plugin install:
 $HEAL_OUTPUT"
     fi
 fi
@@ -187,14 +195,15 @@ if [ -d "$CWD/.git" ]; then
     detect_repo_specs
 fi
 
-if [ -z "$VAULT_ROOT" ] && [ -z "$CONTEXT_LINES" ]; then
-    # Not inside a vault and no project detected — exit cleanly
-    exit 0
-fi
+# Note: previous versions exited silently here when both VAULT_ROOT and
+# CONTEXT_LINES were empty. After SDD-001 the [sdd] reminder is always present,
+# so CONTEXT_LINES is never empty -- the early-exit branch is now dead code and
+# was removed. The hook always emits the additionalContext envelope.
 
 if [ -n "$VAULT_ROOT" ]; then
     VAULT_NAME=$(basename "$VAULT_ROOT")
     CONTEXT_LINES="Obsidian vault detected: $VAULT_NAME ($VAULT_ROOT)
+
 $CONTEXT_LINES"
 fi
 

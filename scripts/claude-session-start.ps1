@@ -34,7 +34,12 @@ if (-not $CWD) {
 }
 
 $KnowledgeVault = Join-Path $env:USERPROFILE 'Projects\knowledge'
-$ContextLines = ''
+# SDD discipline reminder -- unconditional, first in additionalContext (SDD-001).
+# Surfaces the Discipline Gate to every Claude Code session regardless of CWD,
+# repo, or vault state. Cross-OS parity with claude-session-start.sh. All
+# subsequent diagnostic blocks (claude-mem, doctor, hive, specs, vault, memory)
+# APPEND to $ContextLines defensively so they cannot wipe this reminder.
+$ContextLines = '[sdd] Before your first tool call, read `AGENTS.md` at the repo root (or `~/Projects/dotfiles/AGENTS.md` as fallback) and apply its "Spec-Driven Development" (including the Discipline Gate) and "Standing Orders" sections. SDD applies by default for PR-sized changes (~50-300 LOC, public contract, new dep, multi-PR sequence). Skip ONLY for: typos, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, documentation-only changes. When in doubt, ASK the user.'
 
 # --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
 # Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
@@ -45,7 +50,8 @@ if (Test-Path $ClaudeMemHeal) {
         $healOutput = & pwsh -NoProfile -File $ClaudeMemHeal 2>&1 | Out-String
         $healOutput = $healOutput.Trim()
         if ($healOutput) {
-            $ContextLines = "[claude-mem] self-healed plugin install:`n$healOutput"
+            $healBlock = "[claude-mem] self-healed plugin install:`n$healOutput"
+            $ContextLines = "$ContextLines`n`n$healBlock"
         }
     } catch {
         # Non-fatal -- session continues even if heal fails
@@ -203,14 +209,14 @@ function Find-VaultRoot {
 
 $VaultRoot = Find-VaultRoot -Path $CWD
 
-if (-not $VaultRoot -and -not $ContextLines) {
-    # Not inside a vault and no project detected - exit cleanly
-    exit 0
-}
+# Note: previous versions exited silently here when both $VaultRoot and
+# $ContextLines were empty. After SDD-001 the [sdd] reminder is always present,
+# so $ContextLines is never empty -- the early-exit branch is now dead code and
+# was removed. The hook always emits the additionalContext envelope.
 
 if ($VaultRoot) {
     $VaultName = Split-Path -Leaf $VaultRoot
-    $ContextLines = "Obsidian vault detected: $VaultName ($VaultRoot)" + $ContextLines
+    $ContextLines = "Obsidian vault detected: $VaultName ($VaultRoot)`n`n" + $ContextLines
 }
 
 # --- Knowledge maintenance health check ---
