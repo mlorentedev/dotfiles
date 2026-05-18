@@ -139,10 +139,10 @@ if (Test-Path $claudeSource) {
 $claudeMdSource = "$DotfilesDir\ai\claude\CLAUDE.md"
 if (Test-Path $claudeMdSource) {
     Copy-Item $claudeMdSource "$ClaudeHome\" -Force
-    if (Select-String -Path "$ClaudeHome\CLAUDE.md" -Pattern "CORE PRINCIPLE" -Quiet) {
-        Write-Success "CLAUDE.md deployed successfully (verified)"
+    if (Select-String -Path "$ClaudeHome\CLAUDE.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet) {
+        Write-Success "CLAUDE.md deployed successfully (verified pointer to AGENTS.md)"
     } else {
-        Write-Err "CLAUDE.md deployment failed verification"
+        Write-Err "CLAUDE.md deployment failed verification (expected pointer to AGENTS.md)"
     }
 } else {
     Write-Warn "CLAUDE.md not found at $claudeMdSource"
@@ -463,10 +463,10 @@ if (Test-Path $geminiSource) {
 $geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
 if (Test-Path $geminiMdSource) {
     Copy-Item $geminiMdSource "$GeminiHome\" -Force
-    if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern "CORE PRINCIPLE" -Quiet) {
-        Write-Success "GEMINI.md deployed successfully (verified)"
+    if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet) {
+        Write-Success "GEMINI.md deployed successfully (verified pointer to AGENTS.md)"
     } else {
-        Write-Err "GEMINI.md deployment failed verification"
+        Write-Err "GEMINI.md deployment failed verification (expected pointer to AGENTS.md)"
     }
 } else {
     Write-Warn "GEMINI.md not found at $geminiMdSource"
