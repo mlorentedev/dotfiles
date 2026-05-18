@@ -41,3 +41,7 @@ setup() {
 @test "tmux.conf pipes mouse-drag-end selection to system clipboard" {
     grep -qE "^bind -T copy-mode-vi MouseDragEnd1Pane .*copy-pipe-and-cancel .*xclip" "$CONFIG_FILE"
 }
+
+@test "tmux.conf enables truecolor passthrough for ghostty" {
+    grep -qE 'xterm-ghostty:Tc' "$CONFIG_FILE"
+}
