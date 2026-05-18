@@ -33,6 +33,7 @@ alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from
 
 # OpenCode (primary AI coding agent — replaces aider)
 alias oc="opencode"                                                                       # TUI: opencode Go subscription
+alias oclog='tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)" | grep --line-buffered -vE "file\.watcher\.updated|bus type=message\.part\.delta"'  # live tail of newest opencode log, filtered
 
 # tmux session management
 alias tx='tmux new -A -s'         # attach-or-create by name: tx dotfiles

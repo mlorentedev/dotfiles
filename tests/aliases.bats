@@ -38,6 +38,13 @@ setup() {
     grep -q '^alias oc="opencode"' "$ALIASES_FILE"
 }
 
+@test "aliases.zsh defines oclog alias for live opencode log tailing" {
+    # Surfaced 2026-05-17 during AI-011-validation -- visibility into
+    # opencode TUI while it shows "thinking..." for a long time.
+    grep -q "^alias oclog='tail -F" "$ALIASES_FILE"
+    grep -q 'opencode/log' "$ALIASES_FILE"
+}
+
 @test "aliases.zsh no longer defines aider tier aliases (sunset)" {
     ! grep -qE '^alias (ai|aic|aia)=' "$ALIASES_FILE"
 }
