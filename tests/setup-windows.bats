@@ -122,11 +122,14 @@ setup() {
     ! grep -Eq '\$sessionStartCmd\s*=\s*"\$DotfilesDest' "$PS1_SCRIPT"
 }
 
-# Hook registration must reconcile (compare and rewrite) rather than skip when
-# any SessionStart entry already exists; skip-if-exists makes wrong paths sticky.
+# Hook registration must self-heal -- never trust "an entry exists" to mean
+# "the entry is correct". Post-SDD-002 (PR #51): Merge-ClaudeSettings ALWAYS
+# rewrites hooks.SessionStart from the template (with __HOOK_COMMAND__
+# substituted), which is a stronger guarantee than the previous compare-then-
+# rewrite -- self-heal runs unconditionally on every setup invocation.
 @test "setup-windows.ps1 SessionStart hook self-heals on path drift" {
-    grep -q '\$expectedHookCommand' "$PS1_SCRIPT"
-    grep -Eq '\$existingHookCommand\s+-eq\s+\$expectedHookCommand' "$PS1_SCRIPT"
+    grep -qF '$expectedHookCommand' "$PS1_SCRIPT"
+    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
 }
 
 # --- Scheduled task self-heal (same class as #20) ---
@@ -269,6 +272,59 @@ setup() {
     # Neither should still reference the legacy extension path
     ! grep -qF "github/gh-copilot" "$DOTFILES_DIR/setup-linux.sh"
     ! grep -qF "github/gh-copilot" "$PS1_SCRIPT"
+}
+
+# --- SDD-002: settings.json template merge ---
+# Both setup scripts read ai/claude/settings.json as SSOT for the dotfiles-owned
+# subset of ~/.claude/settings.json. Per-key merge policy documented in
+# specs/SDD-002-settings-portability/proposal.md.
+
+@test "SDD-002: setup-windows.ps1 defines Merge-ClaudeSettings function" {
+    grep -qE '^function Merge-ClaudeSettings' "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-windows.ps1 calls Merge-ClaudeSettings (not inline hashtable)" {
+    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
+    # The legacy inline hook hashtable must be gone
+    ! grep -qE '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-windows.ps1 references the template path ai\\claude\\settings.json" {
+    grep -qF 'ai\claude\settings.json' "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-windows.ps1 bulk copy of ai/claude/* excludes settings.json" {
+    # -- separator before pattern starting with dash so grep does not parse it
+    # as a flag (same fix pattern as the BUG-002 CORE PRINCIPLE assert).
+    grep -qF -- "-Exclude 'settings.json'" "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-linux.sh defines merge_claude_settings function" {
+    grep -qE '^merge_claude_settings\(\)' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: setup-linux.sh calls merge_claude_settings (not inline HOOK_ENTRY)" {
+    grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
+    # The legacy inline HOOK_ENTRY jq -n heredoc must be gone
+    ! grep -qF 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: setup-linux.sh references the template path ai/claude/settings.json" {
+    grep -qF 'ai/claude/settings.json' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: setup-linux.sh bulk copy of ai/claude/* skips settings.json" {
+    grep -qF "= \"settings.json\" ] && continue" "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: parity -- both scripts log the bootstrap message" {
+    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$PS1_SCRIPT"
+    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: parity -- both scripts substitute __HOOK_COMMAND__ placeholder" {
+    grep -qF '__HOOK_COMMAND__' "$PS1_SCRIPT"
+    grep -qF 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- PSScriptAnalyzer ---

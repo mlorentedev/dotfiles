@@ -116,11 +116,14 @@ setup() {
     grep -qE 'EXPECTED_HOOK_COMMAND="\$HOME/\.dotfiles/scripts/claude-session-start\.sh"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-# Hook registration must reconcile (compare and rewrite) rather than skip when
-# any SessionStart entry already exists. Mirrors the Windows guard.
+# Hook registration must self-heal -- never trust "an entry exists" to mean
+# "the entry is correct". Post-SDD-002 (PR #51): merge_claude_settings ALWAYS
+# rewrites .hooks.SessionStart from the template (with __HOOK_COMMAND__
+# substituted), which is a stronger guarantee than the previous compare-then-
+# rewrite. Mirrors the Windows guard.
 @test "setup-linux.sh SessionStart hook self-heals on path drift" {
-    grep -q 'EXISTING_HOOK_COMMAND' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qE '\[ "\$EXISTING_HOOK_COMMAND" = "\$EXPECTED_HOOK_COMMAND" \]' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'EXPECTED_HOOK_COMMAND' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- MCP server registration (SSOT + idempotence) ---

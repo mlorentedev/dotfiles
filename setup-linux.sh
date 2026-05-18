@@ -304,7 +304,14 @@ log_success "Gemini CLI configured"
 # Claude Code
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
-cp -rf "$CURRENT_DIR/ai/claude/"* "$HOME/.claude/" 2>/dev/null || true
+# Bulk copy ai/claude/* EXCEPT settings.json (SDD-002: handled by
+# merge_claude_settings below, which substitutes __HOOK_COMMAND__ and applies
+# the per-key merge policy preserving user customizations).
+for _claude_src in "$CURRENT_DIR/ai/claude/"*; do
+    [ "$(basename "$_claude_src")" = "settings.json" ] && continue
+    cp -rf "$_claude_src" "$HOME/.claude/" 2>/dev/null || true
+done
+unset _claude_src
 cp -f "$CURRENT_DIR/scripts/init-project.sh" "$HOME/.claude/" 2>/dev/null || true
 # Sync Claude skills: remove stale skill directories not in source.
 # CRITICAL: For symlinks (vault-hosted skills, see link_vault_skills below),
@@ -623,31 +630,75 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
-# Register Claude Code SessionStart hook for vault health
-# Self-healing: compare existing command against expected and rewrite if they
-# diverge — never trust "an entry exists" to mean "the entry is correct".
-CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-EXPECTED_HOOK_COMMAND="$HOME/.dotfiles/scripts/claude-session-start.sh"
-if [ -f "$CLAUDE_SETTINGS" ] && command -v jq >/dev/null 2>&1; then
-    EXISTING_HOOK_COMMAND=$(jq -r '.hooks.SessionStart[0].hooks[0].command // ""' "$CLAUDE_SETTINGS" 2>/dev/null)
-    if [ "$EXISTING_HOOK_COMMAND" = "$EXPECTED_HOOK_COMMAND" ]; then
-        log_info "SessionStart hook already correctly configured, skipping"
-    else
-        if [ -n "$EXISTING_HOOK_COMMAND" ]; then
-            log_info "SessionStart hook points to '$EXISTING_HOOK_COMMAND'; updating to '$EXPECTED_HOOK_COMMAND'"
-        else
-            log_info "Adding SessionStart hook to Claude Code settings..."
-        fi
-        HOOK_ENTRY=$(jq -n --arg cmd "$EXPECTED_HOOK_COMMAND" '{"matcher":"","hooks":[{"type":"command","command":$cmd,"timeout":30}]}')
-        jq --argjson hook "[$HOOK_ENTRY]" '.hooks.SessionStart = $hook' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" \
-            && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
-        log_success "SessionStart hook registered"
+# Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
+# per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
+# when target missing. Preserves user customizations (Read paths,
+# additionalDirectories, third-party hooks like claude-mem / GitGuardian) by only
+# touching the keys declared as "ours" in the template. The template's
+# __HOOK_COMMAND__ placeholder is replaced via jq --arg before any merge / write.
+merge_claude_settings() {
+    local template_path="$1"
+    local target_path="$2"
+    local hook_command="$3"
+
+    if [ ! -f "$template_path" ]; then
+        log_warning "Claude settings template not found at $template_path, skipping merge"
+        return 0
     fi
-elif [ ! -f "$CLAUDE_SETTINGS" ]; then
-    log_warning "Claude Code settings.json not found, skipping hook registration"
-else
-    log_warning "jq not found, skipping hook registration (install jq and re-run)"
-fi
+
+    if ! command -v jq >/dev/null 2>&1; then
+        log_warning "jq not found, skipping settings merge (install jq and re-run)"
+        return 0
+    fi
+
+    local template_substituted
+    template_substituted=$(jq --arg cmd "$hook_command" \
+        '(.hooks.SessionStart[0].hooks[0].command) = $cmd' \
+        "$template_path" 2>/dev/null)
+    if [ -z "$template_substituted" ]; then
+        log_warning "Claude settings template substitution failed, skipping merge"
+        return 0
+    fi
+
+    if [ ! -f "$target_path" ]; then
+        log_info "Bootstrapping ~/.claude/settings.json from template (file did not exist)"
+        echo "$template_substituted" > "$target_path"
+        log_success "Claude settings.json bootstrapped from template"
+        return 0
+    fi
+
+    # Per-key merge via single jq invocation. Policy table in proposal.md:
+    # model, effortLevel: template wins. permissions.allow: UNION (deduped).
+    # hooks.SessionStart: template wins (replace). enabledPlugins: object
+    # merge (template wins on conflict). All other keys: existing preserved.
+    local merged
+    merged=$(jq --argjson tmpl "$template_substituted" '
+        .model = $tmpl.model
+        | .effortLevel = $tmpl.effortLevel
+        | .permissions = (.permissions // {})
+        | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
+        | .hooks = (.hooks // {})
+        | .hooks.SessionStart = $tmpl.hooks.SessionStart
+        | .enabledPlugins = ((.enabledPlugins // {}) + $tmpl.enabledPlugins)
+    ' "$target_path" 2>/dev/null)
+    if [ -z "$merged" ]; then
+        log_warning "Claude settings merge produced empty output, skipping write"
+        return 0
+    fi
+
+    echo "$merged" > "$target_path"
+    log_success "Claude settings.json merged from template (user customizations preserved)"
+}
+
+# SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
+# settings.json lives at ai/claude/settings.json. Previous inline `HOOK_ENTRY`
+# heredoc + `jq --argjson` is gone -- merge_claude_settings reads the template,
+# substitutes __HOOK_COMMAND__, applies per-key policy, bootstraps if missing.
+log_info "Applying Claude settings.json template + registering SessionStart hook..."
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
+EXPECTED_HOOK_COMMAND="$HOME/.dotfiles/scripts/claude-session-start.sh"
+merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_HOOK_COMMAND"
 
 # Deploy auto-memory symlinks (vault → Claude Code)
 # Memory lives in the knowledge vault, not in this repo (see ADR-007)

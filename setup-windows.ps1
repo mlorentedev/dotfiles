@@ -54,6 +54,90 @@ function Ensure-Directory {
     }
 }
 
+# Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
+# per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
+# when target missing. Preserves user customizations (Read paths,
+# additionalDirectories, third-party hooks like claude-mem / GitGuardian) by only
+# touching the keys declared as "ours" in the template. The template's
+# __HOOK_COMMAND__ placeholder is replaced with the OS-specific hook command
+# before any merge / write.
+function Merge-ClaudeSettings {
+    [CmdletBinding()]
+    # "Settings" is the canonical Claude Code config-file name (settings.json);
+    # the function operates on the whole file, not one setting -- using
+    # `Setting` (singular) would be misleading. Plural noun warning suppressed.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
+    param(
+        [Parameter(Mandatory)][string]$TemplatePath,
+        [Parameter(Mandatory)][string]$TargetPath,
+        [Parameter(Mandatory)][string]$HookCommand
+    )
+
+    if (-not (Test-Path $TemplatePath)) {
+        Write-Warn "Claude settings template not found at $TemplatePath, skipping merge"
+        return
+    }
+
+    # Read template, JSON-escape the hook command, substitute __HOOK_COMMAND__
+    $escapedCommand = ($HookCommand -replace '\\', '\\') -replace '"', '\"'
+    $templateRaw = (Get-Content $TemplatePath -Raw) -replace '__HOOK_COMMAND__', $escapedCommand
+    try {
+        $template = $templateRaw | ConvertFrom-Json -AsHashtable
+    } catch {
+        Write-Warn "Claude settings template is not valid JSON after placeholder substitution: $_"
+        return
+    }
+
+    # Bootstrap if target missing
+    if (-not (Test-Path $TargetPath)) {
+        Write-Info "Bootstrapping ~/.claude/settings.json from template (file did not exist)"
+        $template | ConvertTo-Json -Depth 10 | Set-Content $TargetPath -Encoding UTF8
+        Write-Success "Claude settings.json bootstrapped from template"
+        return
+    }
+
+    # Read existing target
+    try {
+        $existing = Get-Content $TargetPath -Raw | ConvertFrom-Json -AsHashtable
+    } catch {
+        Write-Warn "Claude settings.json at $TargetPath is not valid JSON, skipping merge: $_"
+        return
+    }
+    if ($null -eq $existing) { $existing = @{} }
+
+    # Per-key merge policy (table in proposal.md)
+    if ($template.ContainsKey('model')) { $existing['model'] = $template['model'] }
+    if ($template.ContainsKey('effortLevel')) { $existing['effortLevel'] = $template['effortLevel'] }
+
+    # permissions.allow: UNION (template + existing, deduped)
+    if ($template.ContainsKey('permissions') -and $template['permissions'].ContainsKey('allow')) {
+        if (-not $existing.ContainsKey('permissions')) { $existing['permissions'] = @{} }
+        if (-not $existing['permissions'].ContainsKey('allow')) { $existing['permissions']['allow'] = @() }
+        $merged = @(@($existing['permissions']['allow']) + @($template['permissions']['allow']) | Select-Object -Unique)
+        $existing['permissions']['allow'] = $merged
+    }
+
+    # hooks.SessionStart: TEMPLATE wins (replace entire array). Other hook
+    # surfaces (PreToolUse, PostToolUse, Stop) are untouched -- third parties
+    # register there.
+    if ($template.ContainsKey('hooks') -and $template['hooks'].ContainsKey('SessionStart')) {
+        if (-not $existing.ContainsKey('hooks')) { $existing['hooks'] = @{} }
+        $existing['hooks']['SessionStart'] = $template['hooks']['SessionStart']
+    }
+
+    # enabledPlugins: object merge (template wins on conflict). User-added
+    # plugins beyond the 14 universal ones survive.
+    if ($template.ContainsKey('enabledPlugins')) {
+        if (-not $existing.ContainsKey('enabledPlugins')) { $existing['enabledPlugins'] = @{} }
+        foreach ($plugin in $template['enabledPlugins'].Keys) {
+            $existing['enabledPlugins'][$plugin] = $template['enabledPlugins'][$plugin]
+        }
+    }
+
+    $existing | ConvertTo-Json -Depth 10 | Set-Content $TargetPath -Encoding UTF8
+    Write-Success "Claude settings.json merged from template (user customizations preserved)"
+}
+
 # ============================================================================
 # BANNER
 # ============================================================================
@@ -135,10 +219,12 @@ if ($wingetCmd) {
 
 Write-Info "Deploying Claude configuration..."
 
-# Bulk copy all Claude config files
+# Bulk copy all Claude config files EXCEPT settings.json (SDD-002: handled by
+# Merge-ClaudeSettings below, which substitutes __HOOK_COMMAND__ and applies the
+# per-key merge policy preserving user customizations).
 $claudeSource = "$DotfilesDir\ai\claude"
 if (Test-Path $claudeSource) {
-    Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
 }
 
 # Force copy CLAUDE.md (Neural Hive Protocol)
@@ -744,53 +830,19 @@ if (Test-Path $sensitiveSource) {
 # 7c. REGISTER SESSIONSTART HOOK
 # ============================================================================
 
-Write-Info "Registering Claude Code SessionStart hook..."
+Write-Info "Applying Claude settings.json template + registering SessionStart hook..."
 
+# SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
+# settings.json lives at ai/claude/settings.json. The previous inline hashtable
+# for the hook entry is gone -- Merge-ClaudeSettings reads the template,
+# substitutes __HOOK_COMMAND__, and applies the per-key policy. Bootstraps a
+# fresh settings.json if missing (closes the v1 doble-paso friction).
 $ClaudeSettings = "$ClaudeHome\settings.json"
+$ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
 $sessionStartCmd = "$ScriptsDir\claude-session-start.ps1"
 $expectedHookCommand = "pwsh -NoProfile -File `"$sessionStartCmd`""
 
-if (Test-Path $ClaudeSettings) {
-    try {
-        $settings = Get-Content $ClaudeSettings -Raw | ConvertFrom-Json
-
-        $existingHookCommand = $null
-        if ($settings.hooks -and $settings.hooks.SessionStart -and $settings.hooks.SessionStart[0] -and $settings.hooks.SessionStart[0].hooks) {
-            $existingHookCommand = $settings.hooks.SessionStart[0].hooks[0].command
-        }
-
-        if ($existingHookCommand -eq $expectedHookCommand) {
-            Write-Info "SessionStart hook already correctly configured, skipping"
-        } else {
-            if ($existingHookCommand) {
-                Write-Info "SessionStart hook points to '$existingHookCommand'; updating to '$expectedHookCommand'"
-            }
-
-            $hookEntry = @{
-                matcher = ''
-                hooks = @(
-                    @{
-                        type = 'command'
-                        command = $expectedHookCommand
-                        timeout = 30
-                    }
-                )
-            }
-
-            if (-not $settings.hooks) {
-                $settings | Add-Member -NotePropertyName 'hooks' -NotePropertyValue @{} -Force
-            }
-
-            $settings.hooks | Add-Member -NotePropertyName 'SessionStart' -NotePropertyValue @($hookEntry) -Force
-            $settings | ConvertTo-Json -Depth 10 | Set-Content $ClaudeSettings -Encoding UTF8
-            Write-Success "SessionStart hook registered"
-        }
-    } catch {
-        Write-Warn "Failed to register SessionStart hook: $_"
-    }
-} else {
-    Write-Warn "Claude Code settings.json not found, skipping hook registration"
-}
+Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings -HookCommand $expectedHookCommand
 
 # ============================================================================
 # 8. GITHUB COPILOT CLI

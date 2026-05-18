@@ -1,0 +1,41 @@
+{
+  "model": "opus",
+  "effortLevel": "xhigh",
+  "permissions": {
+    "allow": [
+      "mcp__hive__vault_query",
+      "mcp__hive__vault_write",
+      "mcp__sequential-thinking__sequentialthinking"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__HOOK_COMMAND__",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "code-review@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "explanatory-output-style@claude-plugins-official": true,
+    "learning-output-style@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true
+  }
+}
