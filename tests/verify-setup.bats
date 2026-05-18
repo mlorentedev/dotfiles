@@ -307,6 +307,17 @@ setup() {
     [ ! -f "$HOME/.config/opencode/commands/creating-skills.md" ]
 }
 
+@test "ghostty config deployed to ~/.config/ghostty/config (TERM-001)" {
+    # Post-TERM-001: setup-linux.sh copies terminal/ghostty/config to the
+    # XDG location. The deploy is unconditional (config is inert without the
+    # binary), so the integration container should still have the file
+    # even when ghostty is not installed.
+    [ -f "$HOME/.config/ghostty/config" ]
+    grep -qE '^font-family =' "$HOME/.config/ghostty/config"
+    grep -qE '^theme =' "$HOME/.config/ghostty/config"
+    grep -qE '^confirm-close-surface = true' "$HOME/.config/ghostty/config"
+}
+
 @test "no MCP servers registered (claude CLI absent)" {
     # setup-linux.sh skips MCP registration when claude is not found
     # Just verify it didn't crash — the container built successfully

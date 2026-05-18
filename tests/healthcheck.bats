@@ -26,8 +26,8 @@ setup() {
     grep -q 'versions.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh has all 11 sections" {
-    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 11 ]]
+@test "healthcheck.sh has all 12 sections" {
+    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 12 ]]
 }
 
 @test "healthcheck.sh uses set -euo pipefail" {
@@ -58,10 +58,10 @@ setup() {
     fi
 }
 
-# --- tmux section 9/11 ---
+# --- tmux section 9/12 ---
 
-@test "healthcheck.sh has section 9/11 for tmux" {
-    grep -qE 'section "9/11" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh has section 9/12 for tmux" {
+    grep -qE 'section "9/12" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies tmux binary" {
@@ -72,10 +72,28 @@ setup() {
     grep -qE 'readlink "\$HOME/\.tmux\.conf"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-# --- drift section 11/11 ---
+# --- ghostty section 11/12 (TERM-001) ---
 
-@test "healthcheck.sh has section 11/11 for drift" {
-    grep -qE 'section "11/11" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh has section 11/12 for ghostty" {
+    grep -qE 'section "11/12" "Ghostty"' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+@test "healthcheck.sh verifies ghostty binary presence" {
+    grep -qE 'command -v ghostty' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+@test "healthcheck.sh verifies ghostty config deployed" {
+    grep -qE 'HOME/\.config/ghostty/config' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+@test "healthcheck.sh verifies ghostty version match against versions.conf" {
+    grep -qE 'GHOSTTY_VERSION=' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+# --- drift section 12/12 ---
+
+@test "healthcheck.sh has section 12/12 for drift" {
+    grep -qE 'section "12/12" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh invokes diff-check.sh" {
