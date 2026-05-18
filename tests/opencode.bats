@@ -171,12 +171,12 @@ setup() {
 
 # --- healthcheck.sh integration ---
 
-@test "healthcheck.sh has OpenCode section (10/11)" {
-    grep -q 'section "10/11" "OpenCode"' "$HEALTHCHECK"
+@test "healthcheck.sh has OpenCode section (10/12)" {
+    grep -q 'section "10/12" "OpenCode"' "$HEALTHCHECK"
 }
 
 @test "healthcheck.sh OpenCode section checks binary + config + schema" {
-    awk '/section "10\/11" "OpenCode"/,/section "11\/11"/' "$HEALTHCHECK" | grep -q 'opencode --version'
-    awk '/section "10\/11" "OpenCode"/,/section "11\/11"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
-    awk '/section "10\/11" "OpenCode"/,/section "11\/11"/' "$HEALTHCHECK" | grep -q '\$schema'
+    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'opencode --version'
+    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
+    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q '\$schema'
 }

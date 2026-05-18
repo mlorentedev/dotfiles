@@ -466,6 +466,41 @@ else
     log_warning "opencode binary not reachable at $OPENCODE_BINARY after install — agent unavailable"
 fi
 
+# Ghostty terminal emulator (TERM-001 — Linux only, Ubuntu universe).
+# Detect-and-act with warn-not-fail: this script avoids sudo (same convention
+# as tmux / xclip), so apt install is NOT attempted here -- the user runs the
+# one-liner once per machine. Config is deployed unconditionally though, so
+# the moment the user runs `sudo apt install -y ghostty` the canonical config
+# is already in place.
+GHOSTTY_VERSION_PINNED="${GHOSTTY_VERSION:-1.3.0}"
+if ! command -v ghostty >/dev/null 2>&1; then
+    log_warning "ghostty not installed. Run: sudo apt install -y ghostty  (Ubuntu 26.04+ universe; needed for the recommended opencode TUI host)"
+else
+    INSTALLED_GHOSTTY=$(ghostty --version 2>&1 | head -1 | awk '{print $2}' | sed 's/-.*//')
+    if [ "$INSTALLED_GHOSTTY" = "$GHOSTTY_VERSION_PINNED" ]; then
+        log_info "ghostty installed: $(ghostty --version 2>&1 | head -1)"
+    else
+        log_warning "ghostty version drift: installed=$INSTALLED_GHOSTTY pinned=$GHOSTTY_VERSION_PINNED (sudo apt install --only-upgrade ghostty if you want to track the pin)"
+    fi
+fi
+
+# Deploy ghostty config — reconcile-not-skip pattern (same as opencode.jsonc).
+# Inert if ghostty is not installed: the file lives at ~/.config/ghostty/
+# regardless and gets read the moment the binary is.
+ensure_directory "$HOME/.config/ghostty"
+GHOSTTY_CONFIG_SRC="$CURRENT_DIR/terminal/ghostty/config"
+GHOSTTY_CONFIG_DST="$HOME/.config/ghostty/config"
+if [ -f "$GHOSTTY_CONFIG_SRC" ]; then
+    if [ -f "$GHOSTTY_CONFIG_DST" ] && cmp -s "$GHOSTTY_CONFIG_SRC" "$GHOSTTY_CONFIG_DST"; then
+        log_info "ghostty config already in sync"
+    else
+        cp "$GHOSTTY_CONFIG_SRC" "$GHOSTTY_CONFIG_DST"
+        log_success "Deployed ghostty config to $GHOSTTY_CONFIG_DST"
+    fi
+else
+    log_warning "ghostty config source missing: $GHOSTTY_CONFIG_SRC"
+fi
+
 # GitHub Copilot CLI (detect-and-act: deploy config only when the extension
 # is actually installed; the script does NOT auto-install the extension on
 # Linux — gh is widely used for PR/issue management without Copilot intent.

@@ -65,7 +65,7 @@ echo "========================================"
 echo "Checking from: $DOTFILES_DIR"
 
 # ==================================================
-section "1/11" "Core Tools in PATH"
+section "1/12" "Core Tools in PATH"
 
 CORE_TOOLS="git zsh bash curl wget jq eza direnv node npm zoxide docker kubectl terraform"
 for tool in $CORE_TOOLS; do
@@ -77,7 +77,7 @@ for tool in $CORE_TOOLS; do
 done
 
 # ==================================================
-section "2/11" "Versioned Tool Paths"
+section "2/12" "Versioned Tool Paths"
 
 check_tool_home() {
     local name="$1"
@@ -117,7 +117,7 @@ else
 fi
 
 # ==================================================
-section "3/11" "Version Match (versions.conf)"
+section "3/12" "Version Match (versions.conf)"
 
 check_version_match() {
     local name="$1"
@@ -144,7 +144,7 @@ check_version_match "Minikube" "${MINIKUBE_VERSION:-}" "$APPS_HOME/minikube-${MI
 check_version_match "Go" "${GO_VERSION:-}" "$APPS_HOME/go-${GO_VERSION:-}"
 
 # ==================================================
-section "4/11" "Key Symlinks"
+section "4/12" "Key Symlinks"
 
 check_symlink() {
     local path="$1"
@@ -169,7 +169,7 @@ check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
 # ==================================================
-section "5/11" "Environment Variables"
+section "5/12" "Environment Variables"
 
 ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME GO_HOME MINIKUBE_HOME"
 for var in $ENV_VARS; do
@@ -181,7 +181,7 @@ for var in $ENV_VARS; do
 done
 
 # ==================================================
-section "6/11" "Optional Tools"
+section "6/12" "Optional Tools"
 
 OPTIONAL_TOOLS="age gh claude gemini bats shellcheck helm ansible pip"
 for tool in $OPTIONAL_TOOLS; do
@@ -193,7 +193,7 @@ for tool in $OPTIONAL_TOOLS; do
 done
 
 # ==================================================
-section "7/11" "Knowledge Vault"
+section "7/12" "Knowledge Vault"
 
 VAULT_DIR="${VAULT_DIR:-$HOME/Projects/knowledge}"
 
@@ -248,7 +248,7 @@ for dir in $VAULT_DIRS; do
 done
 
 # ==================================================
-section "8/11" "Secrets Integrity"
+section "8/12" "Secrets Integrity"
 
 SECRETS_DIR="${DOTFILES_DIR}/sensitive"
 SECRETS_MAPPING="$SECRETS_DIR/env-mapping.conf"
@@ -297,7 +297,7 @@ else
 fi
 
 # ==================================================
-section "9/11" "tmux"
+section "9/12" "tmux"
 # ==================================================
 if ! command -v tmux >/dev/null 2>&1; then
     fail "tmux not installed (run: sudo apt install -y tmux)"
@@ -318,7 +318,7 @@ else
 fi
 
 # ==================================================
-section "10/11" "OpenCode"
+section "10/12" "OpenCode"
 # ==================================================
 OPENCODE_BIN="$HOME/.opencode/bin/opencode"
 OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
@@ -342,7 +342,36 @@ else
 fi
 
 # ==================================================
-section "11/11" "Repo ↔ Deploy-Dir Drift"
+section "11/12" "Ghostty"
+# ==================================================
+GHOSTTY_CFG="$HOME/.config/ghostty/config"
+GHOSTTY_PINNED="$(grep -E '^GHOSTTY_VERSION=' "$DOTFILES_DIR/versions.conf" 2>/dev/null | cut -d= -f2)"
+if command -v ghostty >/dev/null 2>&1; then
+    pass "ghostty in PATH: $(ghostty --version 2>&1 | head -1)"
+    INSTALLED_GHOSTTY=$(ghostty --version 2>&1 | head -1 | awk '{print $2}' | sed 's/-.*//')
+    if [ -n "$GHOSTTY_PINNED" ] && [ "$INSTALLED_GHOSTTY" = "$GHOSTTY_PINNED" ]; then
+        pass "ghostty version matches versions.conf ($GHOSTTY_PINNED)"
+    elif [ -n "$GHOSTTY_PINNED" ]; then
+        fail "ghostty version drift: installed=$INSTALLED_GHOSTTY pinned=$GHOSTTY_PINNED"
+    else
+        skip "GHOSTTY_VERSION not set in versions.conf — version match not verified"
+    fi
+else
+    skip "ghostty not installed (sudo apt install -y ghostty)"
+fi
+if [ -f "$GHOSTTY_CFG" ]; then
+    pass "ghostty config deployed: $GHOSTTY_CFG"
+    if grep -q '^theme =' "$GHOSTTY_CFG" && grep -q '^font-family =' "$GHOSTTY_CFG"; then
+        pass "ghostty config has theme + font-family"
+    else
+        fail "ghostty config missing theme or font-family (run setup-linux.sh to redeploy)"
+    fi
+else
+    fail "ghostty config missing: $GHOSTTY_CFG (run setup-linux.sh)"
+fi
+
+# ==================================================
+section "12/12" "Repo ↔ Deploy-Dir Drift"
 # ==================================================
 if [ -x "$SCRIPT_DIR/diff-check.sh" ]; then
     if "$SCRIPT_DIR/diff-check.sh" >/dev/null 2>&1; then
