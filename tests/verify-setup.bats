@@ -294,6 +294,19 @@ setup() {
     [ ! -d "$HOME/.copilot" ]
 }
 
+@test "opencode commands deployed to ~/.config/opencode/commands/ (AI-012)" {
+    # Post-AI-012: setup-linux.sh copies ai/opencode/commands/*.md to the
+    # global opencode commands directory. 12 portable commands expected
+    # (5 Claude-only skills are skipped by scripts/skills-to-opencode.sh).
+    [ -d "$HOME/.config/opencode/commands" ]
+    local count
+    count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
+    [ "$count" -eq 12 ]
+    # Spot check: audit.md present (portable), creating-skills.md absent (skip-list).
+    [ -f "$HOME/.config/opencode/commands/audit.md" ]
+    [ ! -f "$HOME/.config/opencode/commands/creating-skills.md" ]
+}
+
 @test "no MCP servers registered (claude CLI absent)" {
     # setup-linux.sh skips MCP registration when claude is not found
     # Just verify it didn't crash — the container built successfully

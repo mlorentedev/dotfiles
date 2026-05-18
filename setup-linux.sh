@@ -420,6 +420,43 @@ else
     log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
 fi
 
+# Deploy opencode commands (AI-012: skills→commands port).
+# Source: ai/opencode/commands/*.md (kept in sync with ai/skills/ via
+# scripts/skills-to-opencode.sh; CI gate enforces parity). Target: the
+# OpenCode global commands directory, so /audit, /test, /writing-plans,
+# etc. are available from any repo where the user launches `oc`.
+OPENCODE_CMDS_SRC="$CURRENT_DIR/ai/opencode/commands"
+OPENCODE_CMDS_DST="$HOME/.config/opencode/commands"
+if [ -d "$OPENCODE_CMDS_SRC" ]; then
+    ensure_directory "$OPENCODE_CMDS_DST"
+    cmds_added=0
+    cmds_skipped=0
+    cmds_removed=0
+    for src in "$OPENCODE_CMDS_SRC"/*.md; do
+        [ -f "$src" ] || continue
+        dst="$OPENCODE_CMDS_DST/$(basename "$src")"
+        if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+            cmds_skipped=$((cmds_skipped + 1))
+        else
+            cp "$src" "$dst"
+            cmds_added=$((cmds_added + 1))
+        fi
+    done
+    # Remove orphan commands on disk that no longer exist in the repo
+    # (e.g. a skill was added to the skip-list and its command should
+    # disappear from the user's deployed set).
+    for dst in "$OPENCODE_CMDS_DST"/*.md; do
+        [ -f "$dst" ] || continue
+        if [ ! -f "$OPENCODE_CMDS_SRC/$(basename "$dst")" ]; then
+            rm -f "$dst"
+            cmds_removed=$((cmds_removed + 1))
+        fi
+    done
+    log_success "opencode commands: $cmds_added added, $cmds_skipped already in sync, $cmds_removed orphans removed"
+else
+    log_info "opencode commands source missing: $OPENCODE_CMDS_SRC (skipping; run scripts/skills-to-opencode.sh to generate)"
+fi
+
 # Post-deploy assertion — binary reachable + version reports
 if [ -x "$OPENCODE_BINARY" ] || command -v opencode >/dev/null 2>&1; then
     OPENCODE_VERSION=$("$OPENCODE_BINARY" --version 2>&1 | head -1 || echo "unknown")
