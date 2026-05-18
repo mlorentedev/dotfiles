@@ -29,6 +29,10 @@ jobs:
         run: |
           shellcheck --severity=error setup-linux.sh
 
+      - name: Verify opencode commands in sync with Claude skills (AI-012)
+        run: |
+          ./scripts/skills-to-opencode.sh --check
+
   lint-powershell:
     runs-on: ubuntu-latest
     steps:
