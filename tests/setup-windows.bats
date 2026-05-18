@@ -122,11 +122,14 @@ setup() {
     ! grep -Eq '\$sessionStartCmd\s*=\s*"\$DotfilesDest' "$PS1_SCRIPT"
 }
 
-# Hook registration must reconcile (compare and rewrite) rather than skip when
-# any SessionStart entry already exists; skip-if-exists makes wrong paths sticky.
+# Hook registration must self-heal -- never trust "an entry exists" to mean
+# "the entry is correct". Post-SDD-002 (PR #51): Merge-ClaudeSettings ALWAYS
+# rewrites hooks.SessionStart from the template (with __HOOK_COMMAND__
+# substituted), which is a stronger guarantee than the previous compare-then-
+# rewrite -- self-heal runs unconditionally on every setup invocation.
 @test "setup-windows.ps1 SessionStart hook self-heals on path drift" {
-    grep -q '\$expectedHookCommand' "$PS1_SCRIPT"
-    grep -Eq '\$existingHookCommand\s+-eq\s+\$expectedHookCommand' "$PS1_SCRIPT"
+    grep -qF '$expectedHookCommand' "$PS1_SCRIPT"
+    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
 }
 
 # --- Scheduled task self-heal (same class as #20) ---
@@ -291,7 +294,9 @@ setup() {
 }
 
 @test "SDD-002: setup-windows.ps1 bulk copy of ai/claude/* excludes settings.json" {
-    grep -qF "-Exclude 'settings.json'" "$PS1_SCRIPT"
+    # -- separator before pattern starting with dash so grep does not parse it
+    # as a flag (same fix pattern as the BUG-002 CORE PRINCIPLE assert).
+    grep -qF -- "-Exclude 'settings.json'" "$PS1_SCRIPT"
 }
 
 @test "SDD-002: setup-linux.sh defines merge_claude_settings function" {
