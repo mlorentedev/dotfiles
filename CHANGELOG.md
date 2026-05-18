@@ -4,6 +4,22 @@ Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit 
 
 ## Features
 
+- 2026-05-17: feat(AI-012): port Claude skills to OpenCode commands (d326954)
+- 2026-05-17: feat(aliases): add oclog for live opencode log tailing (91ebdf7)
+- 2026-05-16: feat(agents-md): salvage MCP rules from stale refactor branches (c6e049b)
+- 2026-05-16: feat(AI-011): bootstrap opencode + canonical AGENTS.md migration (0d7fed8)
+- 2026-05-15: feat(doctor): SessionStart silent doctor + binary version pinning (4e9798a)
+- 2026-05-15: feat(doctor): declarative env contract + doctor.sh/ps1 with --check/--fix (d6ced62)
+- 2026-05-14: feat(scripts): add init-repo-standards generator (SDD-010) (adfd638)
+- 2026-05-14: feat(scripts): SessionStart hook surfaces repo specs/ state (SDD-016) (eb32d75)
+- 2026-05-14: feat(scripts): vault working-tree integrity check at session start (SDD-017) (c39e6f6)
+- 2026-05-14: feat(scripts): add init-repo-agents bootstrap for AGENTS.md (SDD-013) (a7f9b9a)
+- 2026-05-13: feat(claude-md): add claude-mem MCP rules + dual-memory protocol pointer (c8a93f6)
+- 2026-05-13: feat(setup): auto-link vault-hosted skills into ~/.claude/skills/ (2137ffa)
+- 2026-05-13: feat(scripts): add init-spec + archive-spec for SDD per-feature workflow (d77021b)
+- 2026-05-12: feat(scripts): opt-in shell startup profiling (8a83e1c)
+- 2026-05-12: feat(scripts): add changelog-gen.sh + initial CHANGELOG.md (63d4a36)
+- 2026-05-12: feat(scripts): add diff-check.sh to detect repo ↔ deploy-dir drift (3f7af6a)
 - 2026-05-12: feat(tmux): add focus-events, vi visual-mode bindings, slower status refresh (c23ec99)
 - 2026-05-11: feat(tmux): copy selection to system clipboard via xclip (fd361f6)
 - 2026-05-11: feat(tmux): integrate tmux with versioned config and Linux install (239e715)
@@ -60,6 +76,20 @@ Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit 
 
 ## Bug Fixes
 
+- 2026-05-17: fix(BUG-001): update integration test for detect-and-act Copilot logic (5dfed05)
+- 2026-05-17: fix(BUG-001): correct Copilot verification + gate config on extension presence (22fe726)
+- 2026-05-17: fix(tmux): pass truecolor through to ghostty (TERM=xterm-ghostty) (fa36796)
+- 2026-05-16: fix(lint): replace em dash with ASCII in profile.ps1 OpenCode comment (9d284b9)
+- 2026-05-16: fix(AI-011): update CLAUDE/GEMINI deployment marker after AGENTS.md migration (a875103)
+- 2026-05-15: fix(setup-windows): replace em dash with ASCII to satisfy PSScriptAnalyzer (464eecf)
+- 2026-05-15: fix(setup): idempotent claude plugin install to stop .claude.json truncation (0d805f9)
+- 2026-05-15: fix(setup): stop deleting vault content via symlink follow in skill sync (022d535)
+- 2026-05-15: fix(setup-linux): close mcp-servers.json + doctor.sh parity gaps from Windows-side work (2775aa8)
+- 2026-05-15: fix(doctor): persist structural env vars in profiles + section summaries (3176804)
+- 2026-05-15: fix(scripts): claude-mem-heal Windows parity (zod/v3 plugin bug) (1b4288b)
+- 2026-05-15: fix(setup): idempotent MCP registration + self-healing scheduled task (4f8a2c6)
+- 2026-05-15: fix(setup): self-healing SessionStart hook + LF gitattributes (closes #20) (b5a3f6c)
+- 2026-05-13: fix(setup): use ASCII hyphen in Write-Warn to satisfy PSScriptAnalyzer (001efa3)
 - 2026-05-12: fix(secrets): keep env, deployed, and repo in sync after every mutation (295b6f3)
 - 2026-05-08: fix(scripts): remove unused cwd_slug local in claude-session-start (f030959)
 - 2026-03-29: fix(ci): update skill count threshold from 18 to 15 after ecosystem overhaul (103ec41)
@@ -89,6 +119,9 @@ Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit 
 
 ## Refactoring
 
+- 2026-05-15: refactor(claude-md): compact MCP Server Usage Rules to bullets + links (f96afd8)
+- 2026-05-15: refactor(claude-md): trim Neural Hive Loop phases + Vault Structure (e6b4b8e)
+- 2026-05-15: refactor(claude-md): replace duplicated standards with vault pointers (b7422b0)
 - 2026-02-28: refactor(ai): align project init and agent prompts with Neural Hive protocol (2e1eda8)
 - 2025-11-28: refactor: standardize shell configs and fix APPS_HOME path (ed02dc3)
 
@@ -103,6 +136,9 @@ Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit 
 
 ## Chores
 
+- 2026-05-17: chore(TERM-001): scaffold + filled proposal for Ghostty Linux bootstrap (11270f3)
+- 2026-05-17: chore(AI-011): archive spec + correct opencode.jsonc Layer 1 comment (f9d2497)
+- 2026-05-16: chore(AI-011): full aider sunset — Linux, Windows, README, env-contract (1a6a15f)
 - 2025-12-05: chore: add sops age key file path as env variable (f4a58a7)
 - 2025-11-19: chore: Remove claude boost.sh script and its installation command from install.sh. (7f96a05)
 - 2025-11-14: chore: prioritize ~/go/bin in $PATH to use correct go-task v3 from v2 (ad8a9a8)
