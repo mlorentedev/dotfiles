@@ -2,6 +2,11 @@
 
 # setup-linux.sh: Install dotfiles and set up environment
 # Usage: ./setup-linux.sh
+#
+# Philosophy: opportunistic configuration. The script attempts to set up
+# every supported tool and warns when something is not available, rather
+# than requiring opt-in flags. Heavy / disk-intensive installs (e.g.
+# future Ollama, Ghostty) may add explicit flags case by case.
 
 set -euo pipefail
 
@@ -424,26 +429,33 @@ else
     log_warning "opencode binary not reachable at $OPENCODE_BINARY after install — agent unavailable"
 fi
 
-# GitHub Copilot CLI (requires gh)
+# GitHub Copilot CLI (detect-and-act: deploy config only when the extension
+# is actually installed; the script does NOT auto-install the extension on
+# Linux — gh is widely used for PR/issue management without Copilot intent.
+# To enable: gh extension install github/gh-copilot, then re-run setup).
+# Verification string updated for AI-013 pointer-style copilot-instructions.md.
 if command -v gh >/dev/null 2>&1; then
-    log_info "Installing GitHub Copilot CLI extension..."
-    gh extension install github/gh-copilot 2>/dev/null || true
-    ensure_directory "$HOME/.copilot"
-    cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
-    if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q "Engineering Discipline" "$HOME/.copilot/copilot-instructions.md"; then
-        log_success "Copilot instructions deployed successfully (verified)"
+    if gh extension list 2>/dev/null | grep -q "github/gh-copilot"; then
+        log_info "GitHub Copilot CLI extension detected, deploying configuration..."
+        ensure_directory "$HOME/.copilot"
+        cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
+        if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q 'First, read `AGENTS.md`' "$HOME/.copilot/copilot-instructions.md"; then
+            log_success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
+        else
+            log_warning "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
+        fi
+        log_success "GitHub Copilot CLI configured"
+
+        # Aliases
+        log_info "Adding Copilot aliases to .zshrc/.bashrc..."
+        COPILOT_SUGGEST='eval "$(gh copilot alias -- bash)"'
+        [ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$COPILOT_SUGGEST"
+        [ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$COPILOT_SUGGEST"
     else
-        echo "❌ Error: Copilot instructions deployment failed verification"
+        log_info "GitHub Copilot CLI extension not installed, skipping Copilot config (install with: gh extension install github/gh-copilot)"
     fi
-    log_success "GitHub Copilot CLI configured"
-    
-    # Aliases
-    log_info "Adding Copilot aliases to .zshrc/.bashrc..."
-    COPILOT_SUGGEST='eval "$(gh copilot alias -- bash)"'
-    [ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$COPILOT_SUGGEST"
-    [ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$COPILOT_SUGGEST"
 else
-    log_warning "GitHub CLI (gh) not found, skipping Copilot installation"
+    log_warning "GitHub CLI (gh) not found, skipping Copilot setup"
 fi
 
 # Register MCP servers (requires Claude Code CLI, Node.js, jq)

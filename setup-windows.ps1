@@ -792,32 +792,43 @@ if (Test-Path $ClaudeSettings) {
 
 Write-Info "Setting up GitHub Copilot CLI..."
 
+# Detect-and-act: deploy config only when gh AND the gh-copilot extension
+# are actually installed. The script does NOT auto-install the extension --
+# gh is widely used for PR/issue management on machines that do not want
+# Copilot. To enable: gh extension install github/gh-copilot, then re-run.
+# Verification string updated for AI-013 pointer-style copilot-instructions.md.
 $ghCmd = Get-Command gh -ErrorAction SilentlyContinue
 if ($ghCmd) {
-    Write-Info "Installing GitHub Copilot CLI extension..."
+    $copilotInstalled = $false
     try {
-        & gh extension install github/gh-copilot 2>$null
+        $extensions = & gh extension list 2>$null
+        $copilotInstalled = ($extensions -match 'github/gh-copilot')
     } catch {
-        # Extension may already be installed
+        $copilotInstalled = $false
     }
 
-    $CopilotHome = "$env:USERPROFILE\.copilot"
-    Ensure-Directory $CopilotHome
+    if ($copilotInstalled) {
+        Write-Info "GitHub Copilot CLI extension detected, deploying configuration..."
+        $CopilotHome = "$env:USERPROFILE\.copilot"
+        Ensure-Directory $CopilotHome
 
-    $copilotSource = "$DotfilesDir\ai\copilot"
-    if (Test-Path $copilotSource) {
-        Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
-        if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
-            (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern "Engineering Discipline" -Quiet)) {
-            Write-Success "Copilot instructions deployed successfully (verified)"
-        } else {
-            Write-Err "Copilot instructions deployment failed verification"
+        $copilotSource = "$DotfilesDir\ai\copilot"
+        if (Test-Path $copilotSource) {
+            Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
+            if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
+                (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet)) {
+                Write-Success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
+            } else {
+                Write-Warn "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
+            }
         }
-    }
 
-    Write-Success "GitHub Copilot CLI configured (aliases ghcs/ghce in profile.ps1)"
+        Write-Success "GitHub Copilot CLI configured (aliases ghcs/ghce in profile.ps1)"
+    } else {
+        Write-Info "GitHub Copilot CLI extension not installed, skipping Copilot config (install with: gh extension install github/gh-copilot)"
+    }
 } else {
-    Write-Warn "GitHub CLI (gh) not found, skipping Copilot installation"
+    Write-Warn "GitHub CLI (gh) not found, skipping Copilot setup"
 }
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
