@@ -3,7 +3,7 @@
 // SSOT: ai/opencode/opencode.jsonc (this file).
 // Deploy target: ~/.config/opencode/opencode.jsonc (via setup-linux.sh).
 // Schema: https://opencode.ai/config.json
-// Spec: specs/AI-011-opencode-bootstrap/
+// Spec: specs/archive/AI-011-opencode-bootstrap/ (archived 2026-05-17)
 {
   "$schema": "https://opencode.ai/config.json",
 
@@ -12,11 +12,13 @@
   "model": "opencode-go/deepseek-v4-pro",
 
   "provider": {
-    // Layer 1 of the PAYG guardrail (see spec ## Risks):
-    // explicit `models` block restricts /models picker to Go catalog only.
-    // No Sonnet / GPT-5 / Opus / Gemini Pro shown — no accidental PAYG billing.
-    // Layers 2 (workspace $0 PAYG cap) and 3 (no payment method) live in
-    // the Zen dashboard — documented in the runbook.
+    // Display metadata for default + A/B candidate models.
+    // EMPIRICAL FINDING (2026-05-17 AI-011-validation): this `models` block
+    // does NOT restrict the /models picker — it enriches display names only.
+    // The actual catalog restriction is enforced by the Go subscription itself
+    // (~12 cheap Chinese LLMs, no frontier models routable via opencode-go).
+    // Real PAYG protection: Layer 2 (workspace $0 PAYG cap) + Layer 3 (no
+    // PAYG payment method) in the Zen dashboard — see runbook for details.
     "opencode-go": {
       "models": {
         "deepseek-v4-pro": {
