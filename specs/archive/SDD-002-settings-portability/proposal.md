@@ -1,9 +1,11 @@
 ---
 id: "SDD-002-settings-portability"
 type: spec
-status: draft
+status: archived
 created: "2026-05-18"
-tags: [spec, proposal, sdd, settings, portability]
+archived: "2026-05-18"
+merged_pr: 51
+tags: [spec, proposal, sdd, settings, portability, archived]
 template_version: "1.0"
 ---
 
