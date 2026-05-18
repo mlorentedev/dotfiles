@@ -271,6 +271,57 @@ setup() {
     ! grep -qF "github/gh-copilot" "$PS1_SCRIPT"
 }
 
+# --- SDD-002: settings.json template merge ---
+# Both setup scripts read ai/claude/settings.json as SSOT for the dotfiles-owned
+# subset of ~/.claude/settings.json. Per-key merge policy documented in
+# specs/SDD-002-settings-portability/proposal.md.
+
+@test "SDD-002: setup-windows.ps1 defines Merge-ClaudeSettings function" {
+    grep -qE '^function Merge-ClaudeSettings' "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-windows.ps1 calls Merge-ClaudeSettings (not inline hashtable)" {
+    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
+    # The legacy inline hook hashtable must be gone
+    ! grep -qE '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-windows.ps1 references the template path ai\\claude\\settings.json" {
+    grep -qF 'ai\claude\settings.json' "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-windows.ps1 bulk copy of ai/claude/* excludes settings.json" {
+    grep -qF "-Exclude 'settings.json'" "$PS1_SCRIPT"
+}
+
+@test "SDD-002: setup-linux.sh defines merge_claude_settings function" {
+    grep -qE '^merge_claude_settings\(\)' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: setup-linux.sh calls merge_claude_settings (not inline HOOK_ENTRY)" {
+    grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
+    # The legacy inline HOOK_ENTRY jq -n heredoc must be gone
+    ! grep -qF 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: setup-linux.sh references the template path ai/claude/settings.json" {
+    grep -qF 'ai/claude/settings.json' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: setup-linux.sh bulk copy of ai/claude/* skips settings.json" {
+    grep -qF "= \"settings.json\" ] && continue" "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: parity -- both scripts log the bootstrap message" {
+    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$PS1_SCRIPT"
+    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "SDD-002: parity -- both scripts substitute __HOOK_COMMAND__ placeholder" {
+    grep -qF '__HOOK_COMMAND__' "$PS1_SCRIPT"
+    grep -qF 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 # --- PSScriptAnalyzer ---
 
 @test "setup-windows.ps1 passes PSScriptAnalyzer (if pwsh available)" {
