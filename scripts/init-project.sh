@@ -390,6 +390,32 @@ if [[ ! -d .git ]]; then
     log_success "Initialized git repository"
 fi
 
+# Activate pre-commit hooks (gitleaks) if pre-commit is available
+if command -v pre-commit >/dev/null 2>&1 && [[ -f .pre-commit-config.yaml ]]; then
+    pre-commit install >/dev/null 2>&1 && log_success "Activated pre-commit hooks"
+fi
+
+# Create .pre-commit-config.yaml (gitleaks for agent-touched repos)
+if [[ ! -f .pre-commit-config.yaml ]]; then
+    cat > .pre-commit-config.yaml << 'EOF'
+# Threat model: code repo. Agents may paste secrets into test fixtures, env
+# samples, or doc snippets. gitleaks blocks them before they reach git history.
+#
+# Setup (one-time):
+#   pre-commit install
+#
+# Bypass (only with explicit user approval):
+#   SKIP=gitleaks git commit ...
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+EOF
+    log_success "Created .pre-commit-config.yaml (gitleaks v8.30.1)"
+fi
+
 # Create .gitignore if not exists
 if [[ ! -f .gitignore ]]; then
     cat > .gitignore << 'EOF'

@@ -1,4 +1,19 @@
+# Threat model: agent-touched repo. CLAUDE.md / AGENTS.md / skill bodies may
+# accidentally quote API keys, JWTs, or PEM blocks from chat. gitleaks blocks
+# them before they reach git history.
+#
+# Setup (one-time):
+#   cd ~/Projects/dotfiles && pre-commit install
+#
+# Bypass (only with explicit user approval):
+#   SKIP=gitleaks git commit ...
+
 repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
   - repo: local
     hooks:
       - id: validate-commit-msg
