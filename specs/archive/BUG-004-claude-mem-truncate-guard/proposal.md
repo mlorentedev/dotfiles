@@ -1,8 +1,10 @@
 ---
 id: "BUG-004-claude-mem-truncate-guard"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-19"
+archived: "2026-05-19"
+merged_pr: 57
 tags: [spec, proposal, bug, defense-in-depth, claude-cli, cross-os]
 template_version: "1.0"
 ---
