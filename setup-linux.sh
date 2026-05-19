@@ -588,17 +588,53 @@ else
     log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
 fi
 
+# BUG-004: defense-in-depth wrapper around `claude plugin install`. The bash
+# idempotence guard below (`grep -qF "$plugin"` against `claude plugin list`)
+# yields a false negative for claude-mem@thedotmack -- it never appears in
+# that listing (different marketplace, `@thedotmack` vs `@claude-plugins-official`).
+# Every setup run installs claude-mem again, which triggers upstream
+# anthropics/claude-code#59870: the CLI's deserialize-modify-serialize cycle
+# drops fields outside its internal struct (organizationType,
+# organizationRateLimitTier, projects map, onboarding flags), shrinking
+# ~/.claude/.claude.json from ~75 KB to ~1.5 KB and forcing re-authentication.
+# snapshot_claude_json copies the file to a tempfile BEFORE the install;
+# restore_claude_json_if_truncated restores it AFTER, iff the snapshot was
+# >= 10 KB and the new file is < 50% of the snapshot size. Complementary to
+# SDD-021 session-start canary in claude-session-start.sh (same 10240-byte
+# threshold, same upstream issue). See dotfiles#33 for the original incomplete
+# trigger fix that motivated this layer.
+snapshot_claude_json() {
+    local claude_json="$HOME/.claude/.claude.json"
+    [ -f "$claude_json" ] || return 0
+    local backup
+    backup=$(mktemp "${TMPDIR:-/tmp}/.claude.json.bug004.XXXXXX")
+    cp -f "$claude_json" "$backup"
+    printf '%s' "$backup"
+}
+
+restore_claude_json_if_truncated() {
+    local backup="$1"
+    [ -n "$backup" ] && [ -f "$backup" ] || return 0
+    local claude_json="$HOME/.claude/.claude.json"
+    if [ -f "$claude_json" ]; then
+        local snapshot_size new_size half
+        snapshot_size=$(stat -c %s "$backup" 2>/dev/null || echo 0)
+        new_size=$(stat -c %s "$claude_json" 2>/dev/null || echo 0)
+        half=$((snapshot_size / 2))
+        if [ "$snapshot_size" -ge 10240 ] && [ "$new_size" -lt "$half" ]; then
+            cp -f "$backup" "$claude_json"
+            log_warning ".claude.json shrunk from $snapshot_size to $new_size bytes after install (upstream #59870); restored from backup"
+        fi
+    fi
+    rm -f "$backup"
+}
+
 # Claude Code plugins (requires claude CLI).
 # Idempotent: cache the installed-plugins list ONCE before the loop and skip
-# entries already present. CRITICAL: every `claude plugin install` call
-# writes to ~/.claude/.claude.json. The CLI's deserialize-modify-serialize
-# cycle does NOT preserve fields outside its internal struct — subscription
-# metadata (`organizationType: claude_max`, `organizationRateLimitTier`),
-# the `projects` map, and onboarding flags get silently dropped. Re-running
-# `plugin install` for plugins that are already installed is the trigger
-# for `.claude.json` truncation (75k -> 1.5k), which makes Claude Code
-# prompt for re-authentication in every project (subscription state lost).
-# Same idempotence pattern as MCP registration (line 447).
+# entries already present. The wrapper above (BUG-004) catches the
+# false-negative case where the idempotence guard misses a plugin (e.g.
+# claude-mem@thedotmack) and the resulting `claude plugin install` call
+# truncates .claude.json. Same idempotence pattern as MCP registration (line 447).
 if command -v claude >/dev/null 2>&1; then
     log_info "Installing Claude Code plugins..."
     installed_plugins=$(claude plugin list 2>/dev/null || true)
@@ -620,9 +656,13 @@ if command -v claude >/dev/null 2>&1; then
         if printf '%s' "$installed_plugins" | grep -qF "$plugin"; then
             plugins_skipped=$((plugins_skipped + 1))
         else
+            # BUG-004: wrap the install with snapshot/restore so the upstream
+            # truncation bug (#59870) cannot drop subscription state.
+            _snap=$(snapshot_claude_json)
             if claude plugin install "$plugin" >/dev/null 2>&1; then
                 plugins_added=$((plugins_added + 1))
             fi
+            restore_claude_json_if_truncated "$_snap"
         fi
     done
     log_success "Claude Code plugins ready ($plugins_added added, $plugins_skipped already present)"

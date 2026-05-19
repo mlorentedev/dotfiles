@@ -54,6 +54,49 @@ function Ensure-Directory {
     }
 }
 
+# BUG-004: defense-in-depth wrapper around `claude plugin install`. Snapshots
+# ~/.claude/.claude.json before the action; if the post-action size drops below
+# 50% of the snapshot (and the snapshot was >= 10 KB), restores the snapshot.
+# Defends against upstream anthropics/claude-code#59870: the CLI's deserialize-
+# modify-serialize cycle drops fields outside its internal struct (organizationType,
+# organizationRateLimitTier, projects map, onboarding flags), shrinking the file
+# from ~75 KB to ~1.5 KB and forcing re-authentication in every project. The
+# existing `installedPlugins -match` idempotence guard against `claude plugin list`
+# yields a false negative for claude-mem@thedotmack (not present in that listing),
+# so every setup run triggers a real install of claude-mem and hits #59870 --
+# this wrapper is the second layer that catches the false-negative case.
+# Complementary to SDD-021 session-start canary in claude-session-start.ps1
+# (same 10240-byte threshold, same upstream issue, different detection moment).
+# See dotfiles#33 for the original incomplete trigger fix.
+function Backup-AndRestoreClaudeJson {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][scriptblock]$Action
+    )
+    $claudeJson = Join-Path $env:USERPROFILE '.claude\.claude.json'
+    $backup = $null
+    $snapshotSize = 0
+    if (Test-Path $claudeJson) {
+        $snapshotSize = (Get-Item $claudeJson).Length
+        $backup = [System.IO.Path]::GetTempFileName()
+        Copy-Item $claudeJson $backup -Force
+    }
+    try {
+        & $Action
+    } finally {
+        if ($backup -and (Test-Path $backup)) {
+            if ((Test-Path $claudeJson) -and $snapshotSize -ge 10240) {
+                $newSize = (Get-Item $claudeJson).Length
+                if ($newSize -lt ($snapshotSize / 2)) {
+                    Copy-Item $backup $claudeJson -Force
+                    Write-Warn ".claude.json shrunk from $snapshotSize to $newSize bytes after install (upstream #59870); restored from backup"
+                }
+            }
+            Remove-Item $backup -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,
@@ -355,12 +398,18 @@ if ($claudeCmd) {
             $pluginsSkipped++
             continue
         }
-        try {
-            & claude plugin install $plugin 2>$null | Out-Null
-            $pluginsAdded++
-        } catch {
-            # Silently continue if a plugin fails
+        # BUG-004: wrap the install with the snapshot/restore guard so the upstream
+        # truncation bug (#59870) cannot drop subscription state. The existing
+        # `installedPlugins -match` idempotence above does NOT catch claude-mem
+        # (it does not appear in `claude plugin list` output).
+        Backup-AndRestoreClaudeJson -Action {
+            try {
+                & claude plugin install $plugin 2>$null | Out-Null
+            } catch {
+                # Silently continue if a plugin fails
+            }
         }
+        $pluginsAdded++
     }
     Write-Success "Claude Code plugins ready ($pluginsAdded added, $pluginsSkipped already present)"
 } else {

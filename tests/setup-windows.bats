@@ -154,6 +154,43 @@ setup() {
     grep -q 'claude mcp get' "$PS1_SCRIPT"
 }
 
+# --- BUG-004: defense-in-depth around claude plugin install (truncate guard) ---
+# Every `claude plugin install` call triggers upstream anthropics/claude-code#59870:
+# the CLI's deserialize-modify-serialize cycle drops fields outside its internal
+# struct (organizationType, organizationRateLimitTier, projects map, onboarding
+# flags), shrinking ~/.claude/.claude.json from ~75 KB to ~1.5 KB and forcing
+# re-authentication. The existing idempotence guard (`-match [regex]::Escape`
+# against `claude plugin list` output) yields a false negative for
+# claude-mem@thedotmack because it does not appear in that listing -- so every
+# run installs it again, triggering the truncation. The fix is defense in depth:
+# snapshot .claude.json before the call, restore if it shrinks >50% from a
+# baseline of >=10 KB. Complementary to SDD-021's session-start canary at
+# claude-session-start.ps1 (same 10240 threshold, same upstream issue).
+
+@test "setup-windows.ps1 defines Backup-AndRestoreClaudeJson helper (BUG-004)" {
+    grep -q 'function Backup-AndRestoreClaudeJson' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 cites upstream issue 59870 in the truncate guard (BUG-004)" {
+    grep -qF '#59870' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
+    grep -qF '10240' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 wraps claude plugin install with Backup-AndRestoreClaudeJson (BUG-004)" {
+    # Structural check: the helper invocation appears within 5 lines preceding
+    # the `claude plugin install` call in the foreach loop.
+    grep -B5 'claude plugin install' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
+@test "setup-windows.ps1 still preserves the upstream idempotence guard (BUG-004)" {
+    # Defense in depth -- the wrapper does NOT replace the existing guard.
+    grep -qF 'installedPlugins -match' "$PS1_SCRIPT"
+    grep -qF 'claude plugin list' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys SSH config" {
     grep -q 'Setting up SSH config' "$PS1_SCRIPT"
 }

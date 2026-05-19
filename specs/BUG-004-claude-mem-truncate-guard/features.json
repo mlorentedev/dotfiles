@@ -1,0 +1,37 @@
+[
+  {
+    "id": "BUG-004-f1",
+    "behavior": "setup-windows.ps1 preserves .claude.json size across two consecutive runs on an authenticated machine (>=50 KB baseline)",
+    "verification": "bats tests/setup-windows.bats -f 'preserves .claude.json'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-004-f2",
+    "behavior": "setup-linux.sh preserves .claude.json size across two consecutive runs on an authenticated machine",
+    "verification": "bats tests/setup-linux.bats -f 'preserves .claude.json'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-004-f3",
+    "behavior": "Synthetic truncation triggers a single [WARNING] line citing upstream #59870 and restores the snapshot",
+    "verification": "bats tests/setup-windows.bats -f 'synthetic truncation'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-004-f4",
+    "behavior": "Fresh-machine path (no .claude.json) is a no-op (no temp file, no warning)",
+    "verification": "bats tests/setup-windows.bats -f 'fresh machine'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-004-f5",
+    "behavior": "Pre-call size below 10 KB does NOT trigger restoration even on large relative shrink",
+    "verification": "bats tests/setup-windows.bats -f '10 KB floor'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
