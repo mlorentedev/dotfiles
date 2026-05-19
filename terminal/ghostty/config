@@ -1,8 +1,8 @@
-# Font (Nerd Font para iconos de opencode / claude-code)
+# Font (Nerd Font for opencode / claude-code glyphs)
 font-family = JetBrainsMono Nerd Font Mono
 font-size = 12
 
-# Tema (lista completa: `ghostty +list-themes`)
+# Theme (full list: `ghostty +list-themes`)
 theme = Catppuccin Mocha
 
 # UX
@@ -11,7 +11,7 @@ window-padding-x = 8
 window-padding-y = 8
 mouse-hide-while-typing = true
 
-# Confirmación al cerrar si hay procesos vivos (evita matar sesiones tmux por error)
+# Confirm before close if live processes exist (prevents accidental tmux session kills)
 confirm-close-surface = true
 
-# Shell se autodetecta desde $SHELL — no override
+# Shell autodetected from $SHELL — no override
