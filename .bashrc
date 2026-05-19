@@ -113,6 +113,19 @@ function gp() {
     gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
 
+# qq / qf: one-shot opencode wrappers. Mirrors .zsh/aliases.zsh for bash users.
+# Bash leaves `foo?` literal when no match exists (no zsh-style nomatch error),
+# so no `noglob` wrapper is needed here.
+#   qq -> qwen3.6-plus     (multilingual, ES-friendly, balanced)
+#   qf -> deepseek-v4-flash (faster, never-rate-limited per opencode-go docs)
+_qq_call() {
+    local model="$1" name="$2"; shift 2
+    [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
+    opencode run -m "$model" "$*"
+}
+qq() { _qq_call opencode-go/qwen3.6-plus qq "$@"; }
+qf() { _qq_call opencode-go/deepseek-v4-flash qf "$@"; }
+
 # Claude Code - use slash commands inside session:
 #   claude
 #   > /audit src/auth.py

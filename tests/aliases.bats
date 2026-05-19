@@ -64,6 +64,29 @@ setup() {
     grep -qF -- '--allow-all-tools' "$ALIASES_FILE"
 }
 
+# --- qq / qf: cross-platform quick-question wrappers ---
+# Names are "qq"/"qf" (not "??"/"?f") because PowerShell 7+ reserves "??" as
+# the null-coalescing operator; this is the cross-platform compromise.
+# zsh aliases use `noglob` so `qq por que tardas tanto?` works without quotes.
+
+@test "aliases.zsh defines qq alias pinning qwen3.6-plus via noglob" {
+    grep -qE "^alias qq='noglob _qq_call opencode-go/qwen3.6-plus" "$ALIASES_FILE"
+}
+
+@test "aliases.zsh defines qf alias pinning deepseek-v4-flash via noglob" {
+    grep -qE "^alias qf='noglob _qq_call opencode-go/deepseek-v4-flash" "$ALIASES_FILE"
+}
+
+@test "aliases.zsh _qq_call helper invokes opencode run" {
+    grep -qE '^_qq_call\(\)' "$ALIASES_FILE"
+    grep -qF 'opencode run' "$ALIASES_FILE"
+}
+
+@test "aliases.zsh _qq_call prints usage when called with no args" {
+    # Single usage string parameterized by the alias name ($name).
+    grep -qF 'usage: %s' "$ALIASES_FILE"
+}
+
 @test "aliases.zsh no longer defines ghcs/ghce (renamed in BUG-003)" {
     # Anchor to start-of-line + alias/function definition forms only -- comments
     # mentioning the old names (e.g. "replaces ghcs/ghce wrappers") are fine.
@@ -135,6 +158,27 @@ setup() {
     grep -qE 'Set-Alias -Name cop -Value copilot' "$ps_file"
     grep -qE '^cops\(\)' "$ALIASES_FILE"
     grep -qE 'function cops' "$ps_file"
+}
+
+@test "parity: qq + qf wrappers exist in aliases.zsh, .bashrc, and profile.ps1" {
+    ps_file="$DOTFILES_DIR/powershell/profile.ps1"
+    bashrc_file="$DOTFILES_DIR/.bashrc"
+    # zsh: aliases wrapping noglob _qq_call
+    grep -qE "^alias qq='noglob _qq_call" "$ALIASES_FILE"
+    grep -qE "^alias qf='noglob _qq_call" "$ALIASES_FILE"
+    # bash: functions delegating to _qq_call
+    grep -qE '^qq\(\)' "$bashrc_file"
+    grep -qE '^qf\(\)' "$bashrc_file"
+    # PowerShell: standalone functions
+    grep -qE 'function qq' "$ps_file"
+    grep -qE 'function qf' "$ps_file"
+    # All three name the same models so behavior matches across shells.
+    grep -qF 'opencode-go/qwen3.6-plus' "$ALIASES_FILE"
+    grep -qF 'opencode-go/qwen3.6-plus' "$bashrc_file"
+    grep -qF 'opencode-go/qwen3.6-plus' "$ps_file"
+    grep -qF 'opencode-go/deepseek-v4-flash' "$ALIASES_FILE"
+    grep -qF 'opencode-go/deepseek-v4-flash' "$bashrc_file"
+    grep -qF 'opencode-go/deepseek-v4-flash' "$ps_file"
 }
 
 @test "parity: ghcs/ghce removed from both aliases.zsh and profile.ps1" {
