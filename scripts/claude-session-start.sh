@@ -355,6 +355,60 @@ CRYSTALLIZE NEEDED (${days_since} days stale)"
 
 check_knowledge_health
 
+# --- Vault baseline integrity (SDD-017b) ---
+# SDD-017 catches working-tree D entries (unstaged deletes). This catches
+# already-auto-committed deletes: when Obsidian-git plugin commits a deletion
+# before the next session-start, `git status` is clean but a canonical file
+# is gone. Checks:
+#   (a) Every 00_meta/skills/<name>/ directory must contain a non-empty SKILL.md
+#   (b) Static list of always-required canonical files must exist
+# Trigger incident: 2026-05-13 + 2026-05-15 setup-linux.sh skill-sync deleted
+# vault SKILL.md content via rm -rf <symlink-trailing-slash> bug (fixed in
+# dotfiles#32). This is the defensive layer if a different trigger regresses.
+check_vault_baseline() {
+    [ -n "$VAULT_ROOT" ] || return 0
+    [ -d "$VAULT_ROOT/00_meta" ] || return 0
+
+    local issues=""
+
+    if [ -d "$VAULT_ROOT/00_meta/skills" ]; then
+        for skill_dir in "$VAULT_ROOT/00_meta/skills"/*/; do
+            [ -d "$skill_dir" ] || continue
+            local skill_md="${skill_dir}SKILL.md"
+            local skill_name
+            skill_name=$(basename "$skill_dir")
+            if [ ! -f "$skill_md" ]; then
+                issues="${issues}
+        MISSING: 00_meta/skills/${skill_name}/SKILL.md (skill dir exists but SKILL.md gone)"
+            elif [ ! -s "$skill_md" ]; then
+                issues="${issues}
+        EMPTY: 00_meta/skills/${skill_name}/SKILL.md (0 bytes — likely truncated)"
+            fi
+        done
+    fi
+
+    local critical_files=(
+        "00_meta/patterns/_index.md"
+        "00_meta/skills/README.md"
+        "README.md"
+        "AGENTS.md"
+    )
+    for cf in "${critical_files[@]}"; do
+        if [ ! -f "$VAULT_ROOT/$cf" ]; then
+            issues="${issues}
+        MISSING: $cf (canonical file)"
+        fi
+    done
+
+    if [ -n "$issues" ]; then
+        CONTEXT_LINES="$CONTEXT_LINES
+Vault baseline FAIL — canonical artifacts missing (likely auto-committed delete):$issues
+        Recovery: cd $VAULT_ROOT; git log --diff-filter=D --name-only --pretty=format: -5 | sort -u; git show <commit>:<path> > <path>"
+    fi
+}
+
+check_vault_baseline
+
 # --- Memory temperature scan ---
 # Reads file modification times to classify memory files as HOT/WARM/COLD.
 # Read-only — never modifies files.
@@ -407,6 +461,30 @@ ARCHIVE NEEDED: Move memory files >60d old to memory/archive/ and update MEMORY.
 }
 
 check_memory_temperature
+
+# --- .claude.json size monitor (SDD-021) ---
+# Defensive layer for the `claude plugin install` truncation bug (dotfiles#33 trigger
+# fix, anthropics/claude-code#59870 upstream). If `~/.claude/.claude.json` drops below
+# 10 KB, flag it — healthy size is ~75 KB, post-truncation is ~1.5 KB. Catches
+# recurrence even if a different `claude` CLI subcommand introduces the same strip
+# behavior (e.g. mcp add/remove, plugin uninstall).
+check_claude_json_size() {
+    local claude_json="$HOME/.claude/.claude.json"
+    local threshold=10240  # 10 KB
+    local size
+
+    [ -f "$claude_json" ] || return 0
+
+    # stat -c works on Linux, stat -f on macOS/BSD
+    size=$(stat -c %s "$claude_json" 2>/dev/null || stat -f %z "$claude_json" 2>/dev/null || echo 0)
+
+    if [ "$size" -gt 0 ] && [ "$size" -lt "$threshold" ]; then
+        CONTEXT_LINES="$CONTEXT_LINES
+[claude.json] WARNING: ~/.claude/.claude.json is ${size} bytes (threshold ${threshold}). Healthy state is ~75 KB; truncation bug (anthropics/claude-code#59870) reduces it to ~1.5 KB and silently drops subscription state. Recovery: ls -t ~/.claude/backups/.claude.json.backup.* | head -1 && cp <newest-backup> ~/.claude/.claude.json"
+    fi
+}
+
+check_claude_json_size
 
 # Return context to Claude via hook output format
 jq -n --arg ctx "$CONTEXT_LINES" '{
