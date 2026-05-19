@@ -489,6 +489,38 @@ if (-not (Test-Path ".git")) {
     }
 }
 
+# Activate pre-commit hooks (gitleaks) if pre-commit is available
+$precommit = Get-Command pre-commit -ErrorAction SilentlyContinue
+if ($precommit -and (Test-Path ".pre-commit-config.yaml")) {
+    & pre-commit install 2>&1 | Out-Null
+    Write-Success "Activated pre-commit hooks"
+}
+
+# ============================================================================
+# PRE-COMMIT CONFIG (gitleaks for agent-touched repos)
+# ============================================================================
+
+if (-not (Test-Path ".pre-commit-config.yaml")) {
+    $PreCommitContent = @"
+# Threat model: code repo. Agents may paste secrets into test fixtures, env
+# samples, or doc snippets. gitleaks blocks them before they reach git history.
+#
+# Setup (one-time):
+#   pre-commit install
+#
+# Bypass (only with explicit user approval):
+#   `$env:SKIP='gitleaks'; git commit ...
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+"@
+    Set-Content -Path ".pre-commit-config.yaml" -Value $PreCommitContent -Encoding UTF8
+    Write-Success "Created .pre-commit-config.yaml (gitleaks v8.30.1)"
+}
+
 # ============================================================================
 # GITIGNORE
 # ============================================================================
