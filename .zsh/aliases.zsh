@@ -35,6 +35,20 @@ alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from
 alias oc="opencode"                                                                       # TUI: opencode Go subscription
 alias oclog='tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)" | grep --line-buffered -vE "file\.watcher\.updated|bus type=message\.part\.delta"'  # live tail of newest opencode log, filtered
 
+# qq / qf: cross-platform one-shot quick-question wrappers. Each invocation is
+# a fresh session; for follow-ups use `opencode run -c` directly or the TUI.
+#   qq -> qwen3.6-plus     (multilingual, ES-friendly, balanced)
+#   qf -> deepseek-v4-flash (faster, never-rate-limited per opencode-go docs)
+# Aliases are wrapped in `noglob` so `qq por que tardas tanto?` works without
+# quotes -- zsh would otherwise try to glob-expand the trailing `?`.
+_qq_call() {
+  local model="$1" name="$2"; shift 2
+  [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
+  opencode run -m "$model" "$*"
+}
+alias qq='noglob _qq_call opencode-go/qwen3.6-plus qq'
+alias qf='noglob _qq_call opencode-go/deepseek-v4-flash qf'
+
 # GitHub Copilot CLI v2 (BUG-003: standalone agentic CLI, replaces ghcs/ghce wrappers)
 # cop  -> interactive agent (tool use requires confirmation, safe default)
 # cops -> single-shot non-interactive prompt with --allow-all-tools (required by CLI for -p mode)

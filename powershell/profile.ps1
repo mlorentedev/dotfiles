@@ -16,6 +16,27 @@ Set-Alias -Name g -Value gemini
 # block is a no-op and `oc` reports "command not found" as expected.)
 if (Get-Command opencode -ErrorAction SilentlyContinue) {
     Set-Alias -Name oc -Value opencode
+
+    # qq / qf: one-shot quick-question wrappers. Mirrors .zsh/aliases.zsh and
+    # .bashrc. One-shot: each call is a fresh session.
+    #   qq -> qwen3.6-plus     (multilingual, ES-friendly, balanced)
+    #   qf -> deepseek-v4-flash (faster, never-rate-limited per opencode-go docs)
+    # Note: '??' is the null-coalescing operator in PowerShell 7+, so the
+    # name 'qq' is the cross-platform compromise (works in bash, zsh, pwsh).
+    function qq {
+        if ($args.Count -eq 0) {
+            Write-Error 'usage: qq <consulta libre>'
+            return
+        }
+        opencode run -m opencode-go/qwen3.6-plus ($args -join ' ')
+    }
+    function qf {
+        if ($args.Count -eq 0) {
+            Write-Error 'usage: qf <consulta libre>'
+            return
+        }
+        opencode run -m opencode-go/deepseek-v4-flash ($args -join ' ')
+    }
 }
 
 # ============================================================================
