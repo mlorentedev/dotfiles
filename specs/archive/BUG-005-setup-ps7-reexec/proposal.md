@@ -1,8 +1,10 @@
 ---
 id: "BUG-005-setup-ps7-reexec"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-19"
+archived: "2026-05-19"
+merged_pr: 58
 tags: [spec, proposal, bug, windows, powershell, portability]
 template_version: "1.0"
 ---
