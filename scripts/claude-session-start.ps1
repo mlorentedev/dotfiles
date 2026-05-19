@@ -354,6 +354,80 @@ function Test-KnowledgeHealth {
 
 Test-KnowledgeHealth
 
+# --- Vault baseline integrity (SDD-017b) ---
+# SDD-017 catches working-tree D entries (unstaged deletes). This catches
+# already-auto-committed deletes: when Obsidian-git plugin commits a deletion
+# before next session-start, `git status` is clean but a canonical file is gone.
+# Checks: (a) Every 00_meta/skills/<name>/ dir must have a non-empty SKILL.md
+#         (b) Static list of always-required canonical files must exist
+function Test-VaultBaseline {
+    if (-not $VaultRoot) { return }
+    $metaDir = Join-Path $VaultRoot '00_meta'
+    if (-not (Test-Path $metaDir)) { return }
+
+    $issues = @()
+
+    $skillsDir = Join-Path $metaDir 'skills'
+    if (Test-Path $skillsDir) {
+        Get-ChildItem -Path $skillsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            $skillMd = Join-Path $_.FullName 'SKILL.md'
+            if (-not (Test-Path $skillMd)) {
+                $issues += "        MISSING: 00_meta/skills/$($_.Name)/SKILL.md (skill dir exists but SKILL.md gone)"
+            } elseif ((Get-Item $skillMd).Length -eq 0) {
+                $issues += "        EMPTY: 00_meta/skills/$($_.Name)/SKILL.md (0 bytes - likely truncated)"
+            }
+        }
+    }
+
+    $criticalFiles = @(
+        '00_meta/patterns/_index.md',
+        '00_meta/skills/README.md',
+        'README.md',
+        'AGENTS.md'
+    )
+    foreach ($cf in $criticalFiles) {
+        if (-not (Test-Path (Join-Path $VaultRoot $cf))) {
+            $issues += "        MISSING: $cf (canonical file)"
+        }
+    }
+
+    if ($issues.Count -gt 0) {
+        $list = $issues -join "`n"
+        $script:ContextLines += @"
+
+Vault baseline FAIL - canonical artifacts missing (likely auto-committed delete):
+$list
+        Recovery: cd $VaultRoot; git log --diff-filter=D --name-only --pretty=format: -5 | Sort-Object -Unique
+"@
+    }
+}
+
+Test-VaultBaseline
+
+# --- .claude.json size monitor (SDD-021) ---
+# Defensive layer for the `claude plugin install` truncation bug (dotfiles#33 trigger
+# fix, anthropics/claude-code#59870 upstream). If `~/.claude/.claude.json` drops below
+# 10 KB, flag it - healthy is ~75 KB, post-truncation is ~1.5 KB. Catches recurrence
+# even if a different `claude` CLI subcommand introduces the same strip behavior.
+function Test-ClaudeJsonSize {
+    $claudeJson = Join-Path $env:USERPROFILE '.claude\.claude.json'
+    $threshold = 10240  # 10 KB
+
+    if (-not (Test-Path $claudeJson)) { return }
+
+    try {
+        $size = (Get-Item $claudeJson).Length
+    } catch {
+        return
+    }
+
+    if ($size -gt 0 -and $size -lt $threshold) {
+        $script:ContextLines += "`n[claude.json] WARNING: ~/.claude/.claude.json is $size bytes (threshold $threshold). Healthy state is ~75 KB; truncation bug (anthropics/claude-code#59870) reduces it to ~1.5 KB and silently drops subscription state. Recovery: pick newest from ~/.claude/backups/.claude.json.backup.* and copy back."
+    }
+}
+
+Test-ClaudeJsonSize
+
 # Return context to Claude via hook output format
 $output = @{
     hookSpecificOutput = @{
