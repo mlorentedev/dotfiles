@@ -29,6 +29,39 @@
 param()
 
 # ============================================================================
+# BUG-005: AUTO-REEXEC UNDER PWSH IF RUNNING ON WINDOWS POWERSHELL 5.1
+# ============================================================================
+# SDD-002 (PR #51) added Merge-ClaudeSettings which uses
+# `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0
+# (https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-70)
+# that does NOT exist in Windows PowerShell 5.1. The natural Windows command
+# `PowerShell -ExecutionPolicy Bypass -File .\setup-windows.ps1` resolves
+# `PowerShell` to 5.1, the Merge function's wide try/catch swallows the
+# ParameterBindingException as if it were a JSON parse error, and the
+# settings.json merge is silently skipped.
+#
+# Defense: detect the host version up front; if pwsh (7+) is on PATH,
+# re-exec under it; otherwise fail loud with an install hint. The current
+# script has an empty param() block, so forwarding @args is sufficient; if
+# named parameters are added later, forward $PSBoundParameters explicitly.
+
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($pwshCmd) {
+        Write-Host "[INFO] Windows PowerShell $($PSVersionTable.PSVersion) detected; re-executing under pwsh ($($pwshCmd.Source)) for full feature compatibility (BUG-005)" -ForegroundColor Yellow
+        & $pwshCmd.Source -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
+        exit $LASTEXITCODE
+    } else {
+        Write-Host "[ERROR] Windows PowerShell $($PSVersionTable.PSVersion) detected and pwsh (PowerShell 7+) is not installed." -ForegroundColor Red
+        Write-Host "        This script requires PowerShell 7+ for ConvertFrom-Json -AsHashtable" -ForegroundColor Red
+        Write-Host "        support in Merge-ClaudeSettings (introduced by SDD-002 / PR #51)." -ForegroundColor Red
+        Write-Host "        Install via: winget install Microsoft.PowerShell" -ForegroundColor Red
+        Write-Host "        Then re-run this script." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# ============================================================================
 # CONFIGURATION
 # ============================================================================
 

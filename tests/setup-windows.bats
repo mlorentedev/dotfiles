@@ -191,6 +191,39 @@ setup() {
     grep -qF 'claude plugin list' "$PS1_SCRIPT"
 }
 
+# --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
+# SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
+# `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that
+# does NOT exist in Windows PowerShell 5.1. When the user invokes
+# `PowerShell -ExecutionPolicy Bypass -File .\setup-windows.ps1` (Windows
+# default `PowerShell` resolves to 5.1.x), the inner try/catch swallows the
+# ParameterBindingException as if it were a JSON parse error and the per-key
+# merge from ai/claude/settings.json is silently skipped. Preamble at the top
+# of the script detects PSVersion.Major < 7 and re-execs under pwsh, or fails
+# loud with winget install hint if pwsh is missing.
+
+@test "setup-windows.ps1 detects PowerShell version major (BUG-005)" {
+    grep -qF 'PSVersionTable.PSVersion.Major' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 re-execs under pwsh when PS < 7 (BUG-005)" {
+    grep -qF 'Get-Command pwsh' "$PS1_SCRIPT"
+    grep -qF '$PSCommandPath' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 fails loud with winget hint when pwsh missing (BUG-005)" {
+    grep -qF 'winget install Microsoft.PowerShell' "$PS1_SCRIPT"
+    grep -qE 'exit\s+1' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 cites BUG-005 in the preamble inline comment" {
+    grep -qF 'BUG-005' "$PS1_SCRIPT"
+}
+
+@test "negative parity: setup-linux.sh does not reference PSVersion (BUG-005 is Windows-only)" {
+    ! grep -qF 'PSVersion' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 deploys SSH config" {
     grep -q 'Setting up SSH config' "$PS1_SCRIPT"
 }
