@@ -174,6 +174,51 @@ setup() {
     grep -q 'claude-mem-heal\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 
+# --- BUG-004: defense-in-depth around claude plugin install (truncate guard) ---
+# Linux mirror of the Windows guard. Every `claude plugin install` call triggers
+# upstream anthropics/claude-code#59870, dropping subscription fields out of
+# ~/.claude/.claude.json. The bash idempotence guard (`grep -qF` against
+# `claude plugin list` output) yields a false negative for claude-mem@thedotmack
+# because it does not appear in that listing -- so every run installs it again,
+# truncating .claude.json from ~75 KB to ~1.5 KB. Defense in depth: snapshot
+# before the call, restore if shrinks >50% from a baseline of >=10 KB.
+
+@test "setup-linux.sh defines snapshot_claude_json + restore_claude_json_if_truncated (BUG-004)" {
+    grep -q 'snapshot_claude_json()' "$DOTFILES_DIR/setup-linux.sh"
+    grep -q 'restore_claude_json_if_truncated()' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh cites upstream issue 59870 in the truncate guard (BUG-004)" {
+    grep -qF '#59870' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
+    grep -qF '10240' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh wraps claude plugin install with snapshot+restore (BUG-004)" {
+    # snapshot called before, restore called after, both within the foreach loop body.
+    grep -B5 'claude plugin install "\$plugin"' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
+    grep -A10 'claude plugin install "\$plugin"' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
+}
+
+@test "setup-linux.sh still preserves the upstream idempotence guard (BUG-004)" {
+    # Defense in depth -- the wrapper does NOT replace the existing guard.
+    grep -qF 'grep -qF "$plugin"' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'claude plugin list' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "parity: both setup scripts cite upstream issue 59870 in the truncate guard (BUG-004)" {
+    grep -qF '#59870' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF '#59870' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+@test "parity: both setup scripts wrap claude plugin install with a snapshot helper (BUG-004)" {
+    # Windows uses the combined PS-idiomatic name; bash uses snapshot_/restore_ pair.
+    grep -q 'Backup-AndRestoreClaudeJson' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -q 'snapshot_claude_json' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 # --- doctor + env-contract.json (cross-OS parity) ---
 
 @test "env-contract.json exists and is valid JSON with required sections" {
