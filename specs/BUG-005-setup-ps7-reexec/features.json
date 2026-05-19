@@ -1,0 +1,30 @@
+[
+  {
+    "id": "BUG-005-f1",
+    "behavior": "Windows PowerShell 5.1 + pwsh installed -> setup-windows.ps1 re-executes under pwsh and proceeds (no AsHashtable warning)",
+    "verification": "bats tests/setup-windows.bats -f 'reexec under pwsh'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-005-f2",
+    "behavior": "Windows PowerShell 5.1 + pwsh NOT installed -> setup-windows.ps1 exits 1 with actionable winget hint",
+    "verification": "bats tests/setup-windows.bats -f 'fail loud'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-005-f3",
+    "behavior": "pwsh 7+ direct invocation -> preamble no-op, script proceeds with existing behavior",
+    "verification": "bats tests/setup-windows.bats -f 'pwsh direct'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-005-f4",
+    "behavior": "setup-linux.sh remains untouched (BUG-005 is Windows-only, Linux immune by construction)",
+    "verification": "bats tests/setup-windows.bats -f 'negative parity'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
