@@ -1,7 +1,7 @@
 ---
 id: "TERM-001-ghostty-bootstrap"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-18"
 tags: [spec, proposal, terminal, ghostty]
 template_version: "1.0"
