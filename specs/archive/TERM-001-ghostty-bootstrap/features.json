@@ -1,0 +1,72 @@
+[
+  {
+    "id": "TERM-001-ghostty-bootstrap-f1",
+    "behavior": "ghostty binary is installed and resolvable on PATH",
+    "verification": "command -v ghostty",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f2",
+    "behavior": "ghostty version matches GHOSTTY_VERSION from versions.conf (suffix-stripped)",
+    "verification": "test \"$(ghostty --version 2>&1 | head -1 | awk '{print $2}' | sed 's/-.*//')\" = \"$(grep -E '^GHOSTTY_VERSION=' versions.conf | cut -d= -f2)\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f3",
+    "behavior": "~/.config/ghostty/config contains font-family, theme, and confirm-close-surface keys",
+    "verification": "bats tests/ghostty.bats -f 'declares (font-family|theme|confirm-close-surface)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f4",
+    "behavior": "ghostty +validate-config exits 0 against the deployed config (skip if binary absent)",
+    "verification": "bats tests/ghostty.bats -f 'parses cleanly with the installed binary'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f5",
+    "behavior": "repo terminal/ghostty/config matches deployed ~/.dotfiles/terminal/ghostty/config (two-tier sync)",
+    "verification": "cmp -s ~/Projects/dotfiles/terminal/ghostty/config ~/.dotfiles/terminal/ghostty/config",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f6",
+    "behavior": "healthcheck.sh has Section 11/12 'Ghostty' with binary + version + config checks",
+    "verification": "grep -q 'Ghostty' scripts/healthcheck.sh && grep -q 'GHOSTTY_VERSION' scripts/healthcheck.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f7",
+    "behavior": "tests/ghostty.bats has at least 6 assertions (10 shipped)",
+    "verification": "test \"$(grep -c '^@test' tests/ghostty.bats)\" -ge 6",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f8",
+    "behavior": "Full bats suite remains green",
+    "verification": "bats tests/*.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f9",
+    "behavior": "Theme name not in kebab-case (Catppuccin Mocha, not catppuccin-mocha)",
+    "verification": "bats tests/ghostty.bats -f 'valid known name'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TERM-001-ghostty-bootstrap-f10",
+    "behavior": "Vault runbook guide-ghostty-setup.md exists with GUI steps + SSH workaround + workflow sections",
+    "verification": "test -f ~/Projects/knowledge/10_projects/dotfiles/40-runbooks/guide-ghostty-setup.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
