@@ -412,7 +412,6 @@ if ($claudeCmd) {
     $plugins = @(
         "claude-mem@thedotmack",
         "code-simplifier@claude-plugins-official",
-        "github@claude-plugins-official",
         "gopls-lsp@claude-plugins-official",
         "security-guidance@claude-plugins-official",
         "claude-md-management@claude-plugins-official",
