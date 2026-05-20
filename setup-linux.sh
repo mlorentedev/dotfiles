@@ -896,6 +896,16 @@ fi
 
 # Final assertion against env-contract.json -- catches drift between what
 # setup just deployed and what's actually in place / on PATH / in env vars.
+#
+# Pre-export the REFACTOR-002 path vars so doctor sees what the deployed RC
+# files WILL set on the next shell. Without this, every fresh setup run reports
+# 4 false warnings because the running shell hasn't re-sourced .zshrc/.bashrc.
+# Values must match the corresponding `export` lines in .zshrc + .bashrc.
+export SCRIPTS_DIR="${SCRIPTS_DIR:-$DOTFILES_DIR/scripts}"
+export GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
+export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
+export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
+
 DOCTOR_SCRIPT="$DOTFILES_DIR/scripts/doctor.sh"
 if [ -x "$DOCTOR_SCRIPT" ] && command -v jq >/dev/null 2>&1; then
     log_info "Running post-setup doctor check..."

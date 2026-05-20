@@ -997,6 +997,17 @@ if ($existingTask -and ($existingTaskArgument -eq $expectedTaskArgument)) {
 # ============================================================================
 # Final assertion against env-contract.json -- catches drift between what
 # setup just deployed and what's actually in place / on PATH / in env vars.
+#
+# Pre-export the REFACTOR-002 path vars so doctor sees what the deployed
+# profile.ps1 WILL set on the next pwsh session. Without this, every fresh
+# setup run reports 4 false warnings because `& pwsh -NoProfile` skips the
+# deployed profile entirely. Values must match the corresponding lines in
+# powershell/profile.ps1. PowerShell propagates parent $env: to child procs.
+
+if (-not $env:SCRIPTS_DIR)   { $env:SCRIPTS_DIR   = "$env:DOTFILES_DIR\scripts" }
+if (-not $env:GEMINI_HOME)   { $env:GEMINI_HOME   = "$env:USERPROFILE\.gemini" }
+if (-not $env:COPILOT_HOME)  { $env:COPILOT_HOME  = "$env:USERPROFILE\.copilot" }
+if (-not $env:OPENCODE_HOME) { $env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode" }
 
 $doctorScript = "$ScriptsDir\doctor.ps1"
 if (Test-Path $doctorScript) {
