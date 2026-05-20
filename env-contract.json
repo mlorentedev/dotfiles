@@ -14,10 +14,50 @@
     {
       "name": "CLAUDE_CONFIG_DIR",
       "required": false,
-      "description": "Override for Claude Code's config dir. When unset, ~/.claude is assumed. Used by claude-mem-heal to locate the plugin cache.",
+      "description": "Override for Claude Code's config dir. When unset, ~/.claude is assumed. Used by claude-mem-heal to locate the plugin cache. Canonical for Claude (upstream contract — Claude Code CLI reads it at startup); intentionally NOT renamed to CLAUDE_HOME (see REFACTOR-002).",
       "default": {
         "linux": "$HOME/.claude",
         "windows": "$env:USERPROFILE\\.claude"
+      },
+      "validation": "path_exists"
+    },
+    {
+      "name": "SCRIPTS_DIR",
+      "required": false,
+      "description": "Deployed scripts directory. Used by RC files to extend PATH and by doctor/healthcheck for script location lookups.",
+      "default": {
+        "linux": "$HOME/.dotfiles/scripts",
+        "windows": "$env:USERPROFILE\\.dotfiles\\scripts"
+      },
+      "validation": "path_exists"
+    },
+    {
+      "name": "GEMINI_HOME",
+      "required": false,
+      "description": "Gemini CLI config dir. Deployed by setup scripts from ai/gemini/.",
+      "default": {
+        "linux": "$HOME/.gemini",
+        "windows": "$env:USERPROFILE\\.gemini"
+      },
+      "validation": "path_exists"
+    },
+    {
+      "name": "COPILOT_HOME",
+      "required": false,
+      "description": "GitHub Copilot CLI v2 config dir. Deployed by setup scripts from ai/copilot/ when the `copilot` binary is detected.",
+      "default": {
+        "linux": "$HOME/.copilot",
+        "windows": "$env:USERPROFILE\\.copilot"
+      },
+      "validation": "path_exists"
+    },
+    {
+      "name": "OPENCODE_HOME",
+      "required": false,
+      "description": "OpenCode config dir (XDG-style, intentionally inconsistent with the .X pattern because that is where OpenCode deploys per its schema). Deployed by setup scripts from ai/opencode/.",
+      "default": {
+        "linux": "$HOME/.config/opencode",
+        "windows": "$env:USERPROFILE\\.config\\opencode"
       },
       "validation": "path_exists"
     },

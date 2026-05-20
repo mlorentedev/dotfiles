@@ -48,6 +48,12 @@ export EDITOR=nano
 export DOTFILES_DIR="$HOME/.dotfiles"
 export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
 export CLAUDE_CONFIG_DIR="$HOME/.claude"
+# Per-agent install dirs + scripts deploy target (REFACTOR-002).
+# Declared in env-contract.json; doctor.{sh,ps1} validates on every run.
+export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
+export GEMINI_HOME="$HOME/.gemini"
+export COPILOT_HOME="$HOME/.copilot"
+export OPENCODE_HOME="$HOME/.config/opencode"
 
 # Load encrypted secrets as environment variables
 [[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"
