@@ -138,6 +138,10 @@ Full reference and pane-layout recipes: `~/Projects/knowledge/10_projects/dotfil
 
 **Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
 
+## Contributing
+
+PRs ≥50 LOC of production diff must include an active `specs/<feature-id>/` folder (Spec-Driven Development). The `spec-gate` CI check enforces this; failures link back to `AGENTS.md` "Discipline Gate". Escape hatch: add the `skip-sdd` label AND a non-empty `## SDD skip rationale` section in the PR body. Optional local pre-push hook: `./scripts/install-precommit.sh --with-sdd-gate`.
+
 ## Documentation
 
 Detailed documentation lives in the private knowledge vault:

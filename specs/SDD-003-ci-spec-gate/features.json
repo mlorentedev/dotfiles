@@ -1,0 +1,93 @@
+[
+  {
+    "id": "SDD-003-ci-spec-gate-f1",
+    "behavior": "check-spec-gate.sh exits 0 when production diff < threshold regardless of specs folder presence",
+    "verification": "bats tests/check-spec-gate.bats -f 'exits 0 when diff is below threshold'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f2",
+    "behavior": "check-spec-gate.sh exits 0 when diff >= threshold AND active specs/<feature-id>/ folder is touched",
+    "verification": "bats tests/check-spec-gate.bats -f 'exits 0 when diff >= threshold AND specs folder is touched'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f3",
+    "behavior": "check-spec-gate.sh exits 1 when diff >= threshold AND no specs folder is touched, with AGENTS.md reference in stderr",
+    "verification": "bats tests/check-spec-gate.bats -f 'exits 1 when diff >= threshold AND no specs folder'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f4",
+    "behavior": "skip-sdd label + non-empty SDD skip rationale section bypasses the gate (logged in output)",
+    "verification": "bats tests/check-spec-gate.bats -f 'exits 0 with skip-sdd label AND non-empty rationale'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f5",
+    "behavior": "skip-sdd label with empty rationale fails the gate",
+    "verification": "bats tests/check-spec-gate.bats -f 'exits 1 when skip-sdd label present but rationale empty'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f6",
+    "behavior": "dependencies label (dependabot/renovate) bypasses the gate unconditionally",
+    "verification": "bats tests/check-spec-gate.bats -f 'exits 0 when dependencies label present'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f7",
+    "behavior": "tests/, specs/archive/, *.lock, package-lock.json, pnpm-lock.yaml, go.sum, .gitignore, CHANGELOG.md, and *generated* paths are excluded from LOC count",
+    "verification": "bats tests/check-spec-gate.bats -f 'excludes (tests|specs/archive|lockfiles)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f8",
+    "behavior": "specs/archive/ alone (no active spec) does not satisfy the gate",
+    "verification": "bats tests/check-spec-gate.bats -f 'specs/archive/ is not counted'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f9",
+    "behavior": ".github/workflows/spec-gate.yml runs the script on pull_request events",
+    "verification": "grep -q 'check-spec-gate.sh' .github/workflows/spec-gate.yml && yamllint .github/workflows/spec-gate.yml || python3 -c 'import yaml; yaml.safe_load(open(\".github/workflows/spec-gate.yml\"))'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f10",
+    "behavior": ".github/pull_request_template.md exists with SDD checklist + skip-rationale section header",
+    "verification": "grep -q 'SDD checklist' .github/pull_request_template.md && grep -q '## SDD skip rationale' .github/pull_request_template.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f11",
+    "behavior": "install-precommit.sh --with-sdd-gate installs the pre-push hook type",
+    "verification": "bats tests/install-precommit.bats -f 'includes pre-push hook-type when --with-sdd-gate set'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f12",
+    "behavior": "Full bats suite remains green after these changes (no regression)",
+    "verification": "bats tests/*.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-003-ci-spec-gate-f13",
+    "behavior": "shellcheck (severity=error) passes on new scripts",
+    "verification": "shellcheck --severity=error scripts/check-spec-gate.sh scripts/install-precommit.sh",
+    "state": "pending",
+    "evidence": ""
+  }
+]

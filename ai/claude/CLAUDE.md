@@ -68,3 +68,11 @@ Claude reads memory in this order at session start:
 4. **Auto memory:** `~/.claude/projects/<project-hash>/memory/MEMORY.md` (cross-session continuity).
 
 If both `CLAUDE.md` and `AGENTS.md` exist in a repo, `AGENTS.md` is authoritative for behavioural rules; `CLAUDE.md` overlays Claude-specific tooling notes on top.
+
+## Model Tier (per AGENTS.md "Model Selection")
+
+- **Top:** `claude-opus-4-7` — hard debug / architecture / root-cause / Socratic Guardrail triggers
+- **Mid:** `claude-sonnet-4-6` — mechanical refactor / docs / single-file fixes / test scaffolding
+- **Low:** `claude-haiku-4-5-20251001` — syntax lookups / quick questions
+
+Subagent declaration: `model: opus|sonnet|haiku` in frontmatter. Main session: `/model` slash command.

@@ -47,6 +47,38 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 | Workflow | workflow-protocol, decision-persistence, fix-small-debt |
 | Domain | matlab-embedded, matlab-scientific, corporate-network-constraints |
 
+## Model Selection (Task-Aware)
+
+Match model power to task complexity. Goal: maximum capability where it matters, minimum token cost where it doesn't. Provider-agnostic principle; concrete model names live in per-agent overlay files.
+
+### Tier Mapping
+
+| Tier | Use for | Why |
+|---|---|---|
+| **Top** | Hard debugging, root-cause analysis, distributed systems, concurrency, security review, schema design, novel architecture, complex refactors with semantic risk | Reasoning depth dominates; a wrong answer is expensive to undo |
+| **Mid** | Mechanical refactors, single-file fixes, documentation, boilerplate generation, regex / JSON parsing, test scaffolding, comment-only edits | Capability is sufficient; token savings real |
+| **Low** | Syntax lookups, quick questions, autocomplete, one-line transforms, "what's the flag for X" | Latency + cost dominate; capability is overkill |
+
+### Trigger Heuristics
+
+Agents SHOULD **propose** a tier change when they detect a task-class shift mid-session. The user decides. Examples:
+
+- "Architectural design is done; remaining work is 6 file edits applying the schema. Want to switch to Mid for the implementation phase?"
+- "This was supposed to be a refactor but we hit a concurrency bug. Want to switch to Top for the debug?"
+
+Do NOT auto-switch silently. Auto-switching breaks the user's expectations about cost and capability — the proposal IS the value.
+
+### Per-Provider Overlays
+
+Concrete model identifiers per tier live in the agent-specific overlay files:
+
+- `ai/claude/CLAUDE.md` — Claude Code (subagent frontmatter `model: opus|sonnet|haiku`; main session `/model` slash)
+- `ai/opencode/opencode.jsonc` — OpenCode (TUI `/models` picker; `qq` / `qf` wrappers for quick-questions)
+- `ai/gemini/GEMINI.md` — Gemini CLI (per-prompt `--model` flag)
+- `ai/copilot/copilot-instructions.md` — GitHub Copilot CLI v2 (TBD; concrete schema pending AI-017/AI-018 audit)
+
+Model names rotate; tier semantics are stable. When a provider releases a new flagship or sunsets a tier, edit ONLY the relevant overlay — `AGENTS.md` does not need a corresponding patch.
+
 ## Competence Retention Protocol (Anti-Atrophy)
 
 Strict distinction of tasks to prevent skill erosion. Do not be a crutch.

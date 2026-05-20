@@ -145,9 +145,11 @@ setup() {
 
 # --- Per-agent pointer files (AI-013 fold-in) ---
 
-@test "ai/claude/CLAUDE.md is a pointer to AGENTS.md (≤ 70 lines)" {
+@test "ai/claude/CLAUDE.md is a pointer to AGENTS.md (≤ 80 lines)" {
+    # Threshold bumped 70→80 in AI-019 (model-tier overlay added ~8 lines).
+    # Future per-agent extensions should justify each bump in the spec.
     grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/claude/CLAUDE.md"
-    [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 70 ]]
+    [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 80 ]]
 }
 
 @test "ai/gemini/GEMINI.md is a pointer to AGENTS.md (≤ 50 lines)" {

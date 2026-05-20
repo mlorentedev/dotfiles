@@ -1,0 +1,33 @@
+name: spec-gate
+
+# SDD Tier 4 enforcement: every PR >=50 LOC of production diff must include
+# an active specs/<feature-id>/ folder. See AGENTS.md "Discipline Gate".
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+    branches: [main]
+
+jobs:
+  spec-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base ref
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+
+      - name: Run SDD spec-gate
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          SDD_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          SDD_PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          ./scripts/check-spec-gate.sh \
+            --base-ref "origin/$BASE_REF" \
+            --head-ref HEAD \
+            --explain

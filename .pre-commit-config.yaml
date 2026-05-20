@@ -28,3 +28,12 @@ repos:
         language: script
         pass_filenames: false
         stages: [pre-commit]
+
+      - id: sdd-spec-gate
+        name: SDD spec-gate (Tier 4)
+        entry: ./scripts/check-spec-gate.sh
+        args: ['--base-ref', 'origin/main', '--head-ref', 'HEAD']
+        language: script
+        pass_filenames: false
+        stages: [pre-push]
+        always_run: true
