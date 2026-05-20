@@ -308,7 +308,7 @@ setup() {
 }
 
 @test "ghostty config deployed to ~/.config/ghostty/config (TERM-001)" {
-    # Post-TERM-001: setup-linux.sh copies terminal/ghostty/config to the
+    # Post-TERM-001: setup-linux.sh copies terminals/ghostty/config to the
     # XDG location. The deploy is unconditional (config is inert without the
     # binary), so the integration container should still have the file
     # even when ghostty is not installed.

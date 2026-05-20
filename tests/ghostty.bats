@@ -3,11 +3,11 @@
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
-    export CONFIG_FILE="$DOTFILES_DIR/terminal/ghostty/config"
+    export CONFIG_FILE="$DOTFILES_DIR/terminals/ghostty/config"
     export VERSIONS_FILE="$DOTFILES_DIR/versions.conf"
 }
 
-@test "terminal/ghostty/config exists in repo" {
+@test "terminals/ghostty/config exists in repo" {
     [ -f "$CONFIG_FILE" ]
 }
 
@@ -63,5 +63,5 @@ setup() {
 }
 
 @test "setup-linux.sh references the canonical repo path for ghostty config" {
-    grep -qE 'terminal/ghostty/config' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qE 'terminals/ghostty/config' "$DOTFILES_DIR/setup-linux.sh"
 }
