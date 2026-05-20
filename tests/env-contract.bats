@@ -83,3 +83,19 @@ setup() {
         [ "$zsh_val" = "$bash_val" ]
     done
 }
+
+# Post-setup doctor false-warning fix: setup-linux.sh must pre-export the 4
+# REFACTOR-002 path vars before invoking doctor, otherwise the running shell
+# (which hasn't re-sourced the new RC yet) sees them as unset and the user
+# gets 4 cosmetic warnings on every fresh setup run.
+@test "setup-linux.sh pre-exports the 4 path vars before post-setup doctor check" {
+    local setup="$DOTFILES_DIR/setup-linux.sh"
+    # The pre-export block lives immediately before the DOCTOR_SCRIPT line.
+    # Use a single sed expression to extract that window, then grep within it.
+    local window
+    window=$(awk '/Pre-export the REFACTOR-002 path vars/,/^DOCTOR_SCRIPT=/' "$setup")
+    [[ "$window" == *"export SCRIPTS_DIR="* ]]
+    [[ "$window" == *"export GEMINI_HOME="* ]]
+    [[ "$window" == *"export COPILOT_HOME="* ]]
+    [[ "$window" == *"export OPENCODE_HOME="* ]]
+}
