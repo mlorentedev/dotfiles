@@ -24,3 +24,11 @@ In addition to the Response Protocol in `AGENTS.md`:
 
 * Generate **full files or precise diffs** — Gemini's context window makes full-file outputs cheaper for the user to review than diffs in many cases. Choose based on file size and change density.
 * **No Fluff:** No intro/outro conversational filler. Markdown headings and code fences only when they aid scanning.
+
+## Model Tier (per AGENTS.md "Model Selection")
+
+- **Top:** `gemini-2.5-pro` — hard debug / architecture / root-cause (TBD — empirically verify on next Gemini session)
+- **Mid:** `gemini-2.5-flash` — mechanical refactor / docs / single-file fixes
+- **Low:** `gemini-2.5-flash-lite` — syntax lookups / autocomplete
+
+Selection: per-prompt `--model` flag on the Gemini CLI. Model IDs marked TBD pending empirical verification.

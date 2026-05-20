@@ -4,6 +4,12 @@
 // Deploy target: ~/.config/opencode/opencode.jsonc (via setup-linux.sh).
 // Schema: https://opencode.ai/config.json
 // Spec: specs/archive/AI-011-opencode-bootstrap/ (archived 2026-05-17)
+//
+// Model Tier (per AGENTS.md "Model Selection"):
+//   Top: opencode-go/deepseek-v4-pro  — hard debug / architecture / root-cause
+//   Mid: opencode-go/qwen3.6-plus     — refactor / docs / multilingual (ES) quick-questions via `qq`
+//   Low: opencode-go/deepseek-v4-flash — autocomplete / one-line transforms via `qf` (~97 tok/s)
+// Selection: TUI `/models` picker. Wrappers `qq` / `qf` defined in .zsh/aliases.zsh + .bashrc + powershell/profile.ps1.
 {
   "$schema": "https://opencode.ai/config.json",
 

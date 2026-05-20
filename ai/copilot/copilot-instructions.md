@@ -31,3 +31,9 @@
 * **FAE tickets:** `50_work/tickets/`.
 
 Full vault hierarchy and frontmatter law live in `AGENTS.md` § Vault Structure & Standards.
+
+## Model Tier (per AGENTS.md "Model Selection")
+
+- **Top / Mid / Low:** TBD — concrete model identifiers pending AI-017 (skills port) and AI-018 (MCP deploy) audits on a Windows admin machine where `copilot` v2 is installed. Until then, follow AGENTS.md tier semantics and use whatever default the v2 CLI provides.
+
+When AI-017/AI-018 close, replace this block with the literal model IDs.
