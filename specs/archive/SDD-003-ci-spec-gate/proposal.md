@@ -1,7 +1,7 @@
 ---
 id: "SDD-003-ci-spec-gate"
 type: spec
-status: draft
+status: archived
 created: "2026-05-19"
 tags: [spec, proposal, sdd, ci]
 template_version: "1.0"
@@ -62,3 +62,5 @@ A new `.github/pull_request_template.md` lists the SDD checklist (vault entry, s
 - Related patterns: `00_meta/patterns/pattern-spec-driven-development.md` (the pattern being enforced).
 - Prior tiers: PR [#49](https://github.com/mlorentedev/dotfiles/pull/49) (Tier 1+2), PR [#51](https://github.com/mlorentedev/dotfiles/pull/51) (Tier 3).
 - Convention precedent: `scripts/diff-check.sh` and `scripts/doctor.sh` follow the same reusable-helper-plus-CI-caller pattern.
+
+<!-- archived 2026-05-20 — PR: https://github.com/mlorentedev/dotfiles/pull/60 -->

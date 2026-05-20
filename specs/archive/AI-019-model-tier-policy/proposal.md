@@ -1,7 +1,7 @@
 ---
 id: "AI-019-model-tier-policy"
 type: spec
-status: draft
+status: archived
 created: "2026-05-19"
 tags: [spec, proposal, agents, model-selection]
 template_version: "1.0"
@@ -63,3 +63,5 @@ Per-agent overlays gain a ≤6-line "## Model Tier (per AGENTS.md)" section list
 - Vault: `10_projects/dotfiles/30-architecture/dotfiles-architecture-map.md` (AUDIT-004) — locates where each per-agent overlay lives.
 - Related: `00_meta/patterns/pattern-spec-driven-development.md` (SDD-003 gate enforcing this PR).
 - Behavioural precedent: `AGENTS.md` "Operating Mode" + "Competence Retention Protocol" already encode task-class branching; this PR extends to model-tier branching.
+
+<!-- archived 2026-05-20 — PR: https://github.com/mlorentedev/dotfiles/pull/60 -->
