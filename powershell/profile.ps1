@@ -141,6 +141,11 @@ function prompt {
 # to every subshell.
 $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
 $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
+# Per-agent install dirs + scripts deploy target (REFACTOR-002).
+$env:SCRIPTS_DIR = "$env:DOTFILES_DIR\scripts"
+$env:GEMINI_HOME = "$env:USERPROFILE\.gemini"
+$env:COPILOT_HOME = "$env:USERPROFILE\.copilot"
+$env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode"
 
 # Uncomment and set if needed:
 # $env:GEMINI_API_KEY = "your-api-key"
