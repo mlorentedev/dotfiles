@@ -99,3 +99,16 @@ setup() {
     [[ "$window" == *"export COPILOT_HOME="* ]]
     [[ "$window" == *"export OPENCODE_HOME="* ]]
 }
+
+@test "setup-windows.ps1 pre-exports the 4 path vars before post-setup doctor check" {
+    local setup="$DOTFILES_DIR/setup-windows.ps1"
+    # Same bug class as setup-linux.sh, but `& pwsh -NoProfile` skips the
+    # deployed profile so the child process doesn't see the new vars.
+    # Cross-OS parity: same fix shape, PowerShell syntax.
+    local window
+    window=$(awk '/Pre-export the REFACTOR-002 path vars/,/\$doctorScript = /' "$setup")
+    [[ "$window" == *"\$env:SCRIPTS_DIR"* ]]
+    [[ "$window" == *"\$env:GEMINI_HOME"* ]]
+    [[ "$window" == *"\$env:COPILOT_HOME"* ]]
+    [[ "$window" == *"\$env:OPENCODE_HOME"* ]]
+}
