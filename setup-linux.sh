@@ -643,7 +643,6 @@ if command -v claude >/dev/null 2>&1; then
     for plugin in \
         "claude-mem@thedotmack" \
         "code-simplifier@claude-plugins-official" \
-        "github@claude-plugins-official" \
         "gopls-lsp@claude-plugins-official" \
         "security-guidance@claude-plugins-official" \
         "claude-md-management@claude-plugins-official" \

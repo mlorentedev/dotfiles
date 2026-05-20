@@ -68,10 +68,10 @@ setup() {
     [[ "$status" -ne 0 ]]
 }
 
-# --- enabledPlugins: 14 universal plugins, all true ---
+# --- enabledPlugins: 13 universal plugins, all true (was 14 pre-BUG-007) ---
 
-@test "template enabledPlugins has exactly 14 universal plugins" {
-    [[ "$(jq '.enabledPlugins | length' "$SETTINGS_TEMPLATE")" == "14" ]]
+@test "template enabledPlugins has exactly 13 universal plugins" {
+    [[ "$(jq '.enabledPlugins | length' "$SETTINGS_TEMPLATE")" == "13" ]]
 }
 
 @test "template enabledPlugins values all set to true" {
@@ -79,13 +79,32 @@ setup() {
 }
 
 @test "template enabledPlugins includes core plugins from the existing user setup" {
-    # Sample the 5 most-used: code-review, commit-commands, github, pr-review-toolkit, claude-md-management.
-    # Asserting a sample catches accidental removal while keeping the test list maintainable.
+    # Sample 5 representative plugins. Asserting a sample catches accidental
+    # removal while keeping the test list maintainable. (`github` was on this
+    # list pre-BUG-007; replaced with `feature-dev` which is also widely used.)
     jq -e '.enabledPlugins["code-review@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
     jq -e '.enabledPlugins["commit-commands@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
-    jq -e '.enabledPlugins["github@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    jq -e '.enabledPlugins["feature-dev@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
     jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
     jq -e '.enabledPlugins["claude-md-management@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+}
+
+# Inverse assertion (BUG-007, incident → guard pattern from SDD-006):
+# `github@claude-plugins-official` is broken/unused and was removed. CI MUST
+# fail if it ever returns to the template (accidental re-add, copy-paste
+# from old docs, etc.). The setup scripts' plugin install loop is checked
+# below as a cross-OS parity guard.
+@test "template enabledPlugins must NOT include github (BUG-007 removed)" {
+    run jq -e '.enabledPlugins["github@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    [ "$status" -ne 0 ]
+}
+
+@test "setup-linux.sh plugin install loop must NOT include github (BUG-007 removed)" {
+    ! grep -qE '"github@claude-plugins-official"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-windows.ps1 plugin install loop must NOT include github (BUG-007 removed)" {
+    ! grep -qE '"github@claude-plugins-official"' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- Negative assertions: user/machine-specific keys MUST NOT be in template ---
