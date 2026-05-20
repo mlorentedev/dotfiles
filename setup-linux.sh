@@ -495,7 +495,7 @@ fi
 # Inert if ghostty is not installed: the file lives at ~/.config/ghostty/
 # regardless and gets read the moment the binary is.
 ensure_directory "$HOME/.config/ghostty"
-GHOSTTY_CONFIG_SRC="$CURRENT_DIR/terminal/ghostty/config"
+GHOSTTY_CONFIG_SRC="$CURRENT_DIR/terminals/ghostty/config"
 GHOSTTY_CONFIG_DST="$HOME/.config/ghostty/config"
 if [ -f "$GHOSTTY_CONFIG_SRC" ]; then
     if [ -f "$GHOSTTY_CONFIG_DST" ] && cmp -s "$GHOSTTY_CONFIG_SRC" "$GHOSTTY_CONFIG_DST"; then
