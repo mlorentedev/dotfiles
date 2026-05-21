@@ -259,6 +259,24 @@ if (Test-Path -LiteralPath $marketplaceReal -PathType Container) {
     Write-Skip 'claude-mem marketplace junction' 'marketplace not installed'
 }
 
+# BUG-015: assert the claude-mem hook's path-resolution cascade succeeds.
+# The upstream hook command is bash; run the same one-liner via Git Bash so
+# this check reflects what the hook ACTUALLY does at runtime. Prevention
+# layer: detects breakage BEFORE the user encounters the intermittent
+# UserPromptSubmit "printf: write error: Permission denied" symptom.
+$bashCmd = Get-Command bash -ErrorAction SilentlyContinue
+if ($bashCmd) {
+    $cmHookProbe = '_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; _E="${PLUGIN_ROOT:-}"; _P=$({ [ -n "$_E" ] && printf ''%s\n'' "$_E"; ls -dt "$_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null; printf ''%s\n'' "$_C/plugins/marketplaces/thedotmack-claude-mem/plugin"; } | while IFS= read -r _R; do _R="${_R%/}"; [ -d "$_R/plugin/scripts" ] && _Q="$_R/plugin" || _Q="$_R"; [ -f "$_Q/scripts/bun-runner.js" ] && [ -f "$_Q/scripts/worker-service.cjs" ] && { printf ''%s\n'' "$_Q"; break; }; done); [ -n "$_P" ] && printf ''%s'' "$_P" || exit 1'
+    $resolved = & bash -c $cmHookProbe 2>&1
+    if ($LASTEXITCODE -eq 0 -and $resolved) {
+        Write-Pass "claude-mem hook path resolves to: $resolved (BUG-015)"
+    } else {
+        Write-Fail 'claude-mem hook path resolution FAILED -- run claude-mem-heal.ps1 (BUG-015)'
+    }
+} else {
+    Write-Skip 'claude-mem hook path check' 'bash not available (install Git for Windows)'
+}
+
 # ==================================================
 # 5/12 Environment Variables
 # ==================================================
