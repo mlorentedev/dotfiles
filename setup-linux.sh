@@ -649,6 +649,17 @@ fi
 # also wrapped because it goes through the same #59870 path.
 if command -v claude >/dev/null 2>&1; then
     log_info "Installing Claude Code plugins..."
+    # BUG-014: register the `thedotmack` marketplace BEFORE the plugin install
+    # loop. Without this, `claude plugin install claude-mem@thedotmack` cannot
+    # resolve `@thedotmack` (only `claude-plugins-official` is registered by
+    # default) and fails silently inside the loop's `|| true`. The CLI is
+    # idempotent ("Marketplace 'thedotmack' already on disk" + exit 0 on
+    # re-run), so we call it unconditionally. Wrapped per BUG-011 — every
+    # `claude` CLI invocation in setup must be snapshot-guarded.
+    _snap=$(snapshot_claude_json)
+    claude plugin marketplace add thedotmack/claude-mem >/dev/null 2>&1 || true
+    restore_claude_json_if_truncated "$_snap"
+
     # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
     # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
     _snap=$(snapshot_claude_json)

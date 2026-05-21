@@ -228,6 +228,24 @@ setup() {
     grep -B5 'claude plugin list' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
+# --- BUG-014: register thedotmack marketplace before plugin install ---
+# Windows side of the BUG-014 cross-OS fix. setup-windows.ps1 lists
+# claude-mem@thedotmack in the plugin install loop but never registers the
+# thedotmack marketplace first. The install fails silently (try/catch).
+# Fix: invoke `claude plugin marketplace add thedotmack/claude-mem` BEFORE the
+# install loop, wrapped with Backup-AndRestoreClaudeJson.
+
+@test "setup-windows.ps1 registers thedotmack marketplace before plugin install (BUG-014)" {
+    add_line=$(grep -n 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    install_line=$(grep -n 'claude plugin install \$plugin' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$add_line" ] && [ -n "$install_line" ]
+    [ "$add_line" -lt "$install_line" ]
+}
+
+@test "setup-windows.ps1 wraps claude plugin marketplace add with Backup-AndRestoreClaudeJson (BUG-014)" {
+    grep -B5 'claude plugin marketplace add thedotmack' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
 # SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
 # `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that

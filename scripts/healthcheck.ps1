@@ -225,12 +225,33 @@ Test-DeployedFile (Join-Path $env:USERPROFILE '.claude\CLAUDE.md')  'CLAUDE.md'
 Test-DeployedFile (Join-Path $env:USERPROFILE '.gemini\GEMINI.md')  'GEMINI.md'
 Test-DeployedFile (Join-Path $env:USERPROFILE '.ssh\config')        'SSH config'
 
-# BUG-012 marketplace junction (claude-mem plugin discovery compat)
+# BUG-014 canonical install-state assertion (primary).
+# The BUG-012 junction check below validates a proxy artifact (filesystem
+# junction) and PASSes even when the plugin is never registered in
+# installed_plugins.json. This primary check closes that false-positive class
+# by grepping the canonical install record.
+$installedPluginsJson = Join-Path $env:USERPROFILE '.claude\plugins\installed_plugins.json'
+if (Test-Path -LiteralPath $installedPluginsJson) {
+    if (Select-String -Path $installedPluginsJson -SimpleMatch 'claude-mem@thedotmack' -Quiet) {
+        Write-Pass 'claude-mem@thedotmack installed (BUG-014 canonical check)'
+    } else {
+        Write-Fail "claude-mem@thedotmack NOT in installed_plugins.json -- re-run setup-windows.ps1 (BUG-014)"
+    }
+} else {
+    Write-Skip 'claude-mem install state' 'installed_plugins.json missing (Claude Code never ran)'
+}
+
+# BUG-012 marketplace junction (claude-mem plugin discovery compat) -- SECONDARY
+# diagnostic. Different failure class than BUG-014: install OK in
+# installed_plugins.json but plugin hooks still break because the legacy
+# junction is missing (UserPromptSubmit fails). Kept after BUG-014 so a true
+# install miss surfaces as FAIL on the primary check; this only flags the
+# narrower discovery-path issue.
 $marketplaceLegacy = Join-Path $env:USERPROFILE '.claude\plugins\marketplaces\thedotmack'
 $marketplaceReal   = Join-Path $env:USERPROFILE '.claude\plugins\marketplaces\thedotmack-claude-mem'
 if (Test-Path -LiteralPath $marketplaceReal -PathType Container) {
     if (Test-Path -LiteralPath $marketplaceLegacy) {
-        Write-Pass 'claude-mem marketplace legacy junction present (BUG-012)'
+        Write-Pass 'claude-mem marketplace legacy junction present (BUG-012 secondary)'
     } else {
         Write-Fail "claude-mem marketplace legacy junction missing: $marketplaceLegacy (run claude-mem-heal.ps1)"
     }

@@ -437,6 +437,22 @@ if ($claudeCmd) {
         "commit-commands@claude-plugins-official",
         "pr-review-toolkit@claude-plugins-official"
     )
+    # BUG-014: register the `thedotmack` marketplace BEFORE the install loop.
+    # Without this, `claude plugin install claude-mem@thedotmack` cannot resolve
+    # `@thedotmack` (only `claude-plugins-official` is registered by default)
+    # and fails silently inside the loop's try/catch. The CLI is idempotent
+    # ("Marketplace 'thedotmack' already on disk" + exit 0 on re-run), so we
+    # call it unconditionally. Wrapped per BUG-011 — every `claude` CLI
+    # invocation in setup must be snapshot-guarded.
+    Backup-AndRestoreClaudeJson -Action {
+        try {
+            & claude plugin marketplace add thedotmack/claude-mem 2>$null | Out-Null
+        } catch {
+            # Network failure or transient CLI issue — let the install loop fail
+            # loud-but-recoverable rather than blocking the rest of setup.
+        }
+    }
+
     # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
     # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
     $installedPlugins = Backup-AndRestoreClaudeJson -Action {

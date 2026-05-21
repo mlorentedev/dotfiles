@@ -286,6 +286,32 @@ setup() {
     grep -B5 'claude plugin list' "$DOTFILES_DIR/setup-windows.ps1" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
+# --- BUG-014: register thedotmack marketplace before plugin install ---
+# setup-{linux,windows} list `claude-mem@thedotmack` in the plugin install loop,
+# but neither script ever registers the `thedotmack` marketplace first. On a
+# fresh machine `claude plugin marketplace list` shows only `claude-plugins-official`
+# (bundled default), so `claude plugin install claude-mem@thedotmack` cannot
+# resolve `@thedotmack` and fails silently inside the existing try/catch.
+# The fix is to invoke `claude plugin marketplace add thedotmack/claude-mem`
+# BEFORE the install loop, wrapped with the existing BUG-011 snapshot guard.
+
+@test "setup-linux.sh registers thedotmack marketplace before plugin install (BUG-014)" {
+    add_line=$(grep -n 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    install_line=$(grep -n 'claude plugin install "\$plugin"' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$add_line" ] && [ -n "$install_line" ]
+    [ "$add_line" -lt "$install_line" ]
+}
+
+@test "setup-linux.sh wraps claude plugin marketplace add with snapshot+restore (BUG-014)" {
+    grep -B5 'claude plugin marketplace add thedotmack' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
+    grep -A5 'claude plugin marketplace add thedotmack' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
+}
+
+@test "parity: both setup scripts register thedotmack marketplace before plugin install (BUG-014)" {
+    grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
 # --- doctor + env-contract.json (cross-OS parity) ---
 
 @test "env-contract.json exists and is valid JSON with required sections" {
