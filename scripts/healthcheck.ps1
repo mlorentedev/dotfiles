@@ -437,7 +437,7 @@ if (Test-Command 'opencode') {
     $ocVersion = (& opencode --version 2>&1 | Select-Object -First 1)
     Write-Pass "opencode in PATH: $ocVersion"
 } else {
-    Write-Skip 'opencode binary' 'not installed (AI-014 admin-conditional; deploy via setup-windows.ps1 when ready)'
+    Write-Skip 'opencode binary' 'not installed (winget install SST.opencode, or re-run setup-windows.ps1)'
 }
 
 if (Test-Path -LiteralPath $opencodeCfg -PathType Leaf) {
@@ -448,7 +448,7 @@ if (Test-Path -LiteralPath $opencodeCfg -PathType Leaf) {
         Write-Fail 'opencode.jsonc missing $schema declaration (run setup-windows.ps1 to redeploy)'
     }
 } else {
-    Write-Skip 'opencode.jsonc' "not deployed at $opencodeCfg (AI-014 pending)"
+    Write-Skip 'opencode.jsonc' "not deployed at $opencodeCfg (run setup-windows.ps1)"
 }
 
 # ==================================================

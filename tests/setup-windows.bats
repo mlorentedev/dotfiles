@@ -263,6 +263,30 @@ setup() {
     grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
 }
 
+# --- AI-014: OpenCode Windows bootstrap (mirror of AI-011 Linux side) ---
+# setup-windows.ps1 must install OpenCode via winget SST.opencode (cleaner
+# than the Linux curl-bash equivalent), deploy ai/opencode/opencode.jsonc
+# reconcile-not-skip, and sync ai/opencode/commands/*.md to the user's
+# OpenCode commands directory.
+
+@test "setup-windows.ps1 installs OpenCode via winget SST.opencode (AI-014)" {
+    grep -qF 'SST.opencode' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 deploys opencode.jsonc with reconcile-not-skip (AI-014)" {
+    # The deploy block compares SHA256 hashes before overwriting and lands at
+    # %USERPROFILE%\.config\opencode\opencode.jsonc.
+    grep -qF 'opencode.jsonc' "$PS1_SCRIPT"
+    grep -B5 'opencode.jsonc already in sync' "$PS1_SCRIPT" | grep -q 'Get-FileHash'
+}
+
+@test "setup-windows.ps1 syncs OpenCode commands with orphan removal (AI-014)" {
+    # The commands sync writes to .config\opencode\commands and removes any
+    # .md file present in the destination that does not exist in the source.
+    grep -qF '.config\opencode\commands' "$PS1_SCRIPT"
+    grep -qF 'cmds_removed' "$PS1_SCRIPT" || grep -qF '$cmdsRemoved' "$PS1_SCRIPT"
+}
+
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
 # SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
 # `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that
