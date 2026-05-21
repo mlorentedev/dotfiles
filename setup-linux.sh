@@ -952,6 +952,10 @@ export SCRIPTS_DIR="${SCRIPTS_DIR:-$DOTFILES_DIR/scripts}"
 export GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
 export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
 export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
+# BUG-021 (2026-05-21): pre-export DOTFILES_REPO_DIR so doctor + diff-check.sh
+# (REFACTOR-003 sec 12) see it set even when the running shell's profile
+# hasn't been re-evaluated post-deploy. Mirror of the setup-windows.ps1 fix.
+export DOTFILES_REPO_DIR="${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"
 
 DOCTOR_SCRIPT="$DOTFILES_DIR/scripts/doctor.sh"
 if [ -x "$DOCTOR_SCRIPT" ] && command -v jq >/dev/null 2>&1; then
