@@ -202,6 +202,34 @@ setup() {
     grep -qF 'claude-mem#2607' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
 
+# --- BUG-017: hooks.json EPIPE race patch (mirror of BUG-016 for hooks) ---
+# claude-mem v13.x ships plugin/hooks/hooks.json with 6 hooks all using the
+# same `break; }; done` cascade-pipe pattern as the .mcp.json that BUG-016
+# fixed. heal_hooks_json / Repair-HooksJson applies the minimal `head -n1`
+# substitution to all hook commands in one pass.
+
+@test "parity: both heal scripts define a hooks.json repair function (BUG-017)" {
+    grep -q 'heal_hooks_json' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -q 'Repair-HooksJson' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
+@test "parity: both heal scripts substitute break; }; done -> head -n1 (BUG-017)" {
+    # The substitution literal must appear in both heal scripts' source.
+    grep -qF 'break; }; done' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'break; }; done' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
+@test "parity: both heal scripts walk hooks.json AND plugin/hooks/hooks.json (BUG-017)" {
+    grep -q 'hooks/hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    # PowerShell uses single-backslash path separator inside single-quoted strings.
+    # In bash single-quote -> grep BRE, two backslashes match one literal backslash.
+    grep -q 'hooks\\hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
 # --- BUG-012: legacy marketplace junction/symlink for plugin discovery ---
 # Claude Code clones the claude-mem marketplace under the GitHub repo name
 # `thedotmack-claude-mem/`, but the plugin's bundled hooks.json hardcodes

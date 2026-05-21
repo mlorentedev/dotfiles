@@ -191,11 +191,41 @@ function Repair-ZodDep {
     }
 }
 
+# BUG-017 (2026-05-21): patch hooks.json against the same EPIPE race that
+# BUG-016 closed for .mcp.json. The 6 upstream hooks (Setup, SessionStart x2,
+# UserPromptSubmit, PostToolUse, PreToolUse, Stop) all use the
+# `{ printf; ls; printf; } | while ... break` pipe cascade. When the consumer
+# breaks early, unconsumed producer writes EPIPE on Git Bash Windows.
+# Minimal substitution: `break; }; done` -> `}; done | head -n1` keeps the
+# loop running to completion, then head takes the first printed match.
+function Repair-HooksJson {
+    param([string]$Target)
+
+    if (-not (Test-Path $Target)) {
+        Write-HealVerbose "no hooks.json at $Target"
+        return
+    }
+    $content = Get-Content $Target -Raw -ErrorAction SilentlyContinue
+    if (-not $content) { return }
+    $broken = 'break; }; done'
+    $fixed  = '}; done | head -n1'
+    if (-not $content.Contains($broken)) {
+        Write-HealVerbose "hooks.json already healthy: $Target"
+        return
+    }
+    $count = ([regex]::Matches($content, [regex]::Escape($broken))).Count
+    $patched = $content.Replace($broken, $fixed)
+    Set-Content -Path $Target -Value $patched -Encoding UTF8 -NoNewline
+    Write-HealLog "patched hooks.json (BUG-017, $count hook(s) -> head -n1 race-free form): $Target"
+}
+
 function Repair-PluginDir {
     param([string]$Dir)
 
     if (-not (Test-Path $Dir -PathType Container)) { return }
     Repair-McpJson -Target (Join-Path $Dir '.mcp.json')
+    Repair-HooksJson -Target (Join-Path $Dir 'hooks\hooks.json')
+    Repair-HooksJson -Target (Join-Path $Dir 'plugin\hooks\hooks.json')
     Repair-ZodDep -PluginDir $Dir
 }
 
