@@ -230,6 +230,26 @@ setup() {
     grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
 
+# --- BUG-020: DOTFILES_REPO_DIR cross-OS export parity ---
+# .bashrc + .zshrc export it; powershell/profile.ps1 was missing it.
+# Required by diff-check.{sh,ps1} (REFACTOR-003) to locate the repo root.
+# Without it, diff-check falls back to script's parent dir (deploy location,
+# not a git repo) and exits 2 -- healthcheck sec 12 then reports a setup
+# error rather than drift / no-drift.
+
+@test "parity: all 3 profiles export DOTFILES_REPO_DIR (BUG-020)" {
+    grep -qF 'export DOTFILES_REPO_DIR=' "$DOTFILES_DIR/.bashrc"
+    grep -qF 'export DOTFILES_REPO_DIR=' "$DOTFILES_DIR/.zshrc"
+    grep -qF '$env:DOTFILES_REPO_DIR' "$DOTFILES_DIR/powershell/profile.ps1"
+}
+
+@test "env-contract.json declares DOTFILES_REPO_DIR (BUG-020)" {
+    if command -v jq >/dev/null 2>&1; then
+        run jq -e '.env_vars | map(select(.name == "DOTFILES_REPO_DIR")) | length == 1' "$DOTFILES_DIR/env-contract.json"
+        [ "$status" -eq 0 ]
+    fi
+}
+
 # --- BUG-018: ALL 5 `hook claude-code <X>` hooks missing continue directive ---
 # After BUG-017 closed the EPIPE race, every claude-mem hook that terminates
 # with `node ... hook claude-code <event>"` blocks Claude Code because the

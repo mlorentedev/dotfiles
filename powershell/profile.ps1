@@ -164,6 +164,13 @@ function prompt {
 # silences `doctor.ps1` warnings and makes the install location unambiguous
 # to every subshell.
 $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
+# BUG-020: cross-OS parity with .bashrc/.zshrc which both export
+# DOTFILES_REPO_DIR. diff-check.ps1 (REFACTOR-003) needs it to locate the
+# repo root; without it, the script falls back to parent of $PSScriptRoot
+# which is $env:USERPROFILE\scripts (the deploy location, NOT a git repo)
+# and exits 2 -- which is what healthcheck.ps1 sec 12 was reporting after
+# REFACTOR-003 wired in the drift check.
+$env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles"
 $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
 # Per-agent install dirs + scripts deploy target (REFACTOR-002).
 $env:SCRIPTS_DIR = "$env:DOTFILES_DIR\scripts"
