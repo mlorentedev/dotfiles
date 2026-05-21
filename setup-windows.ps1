@@ -265,7 +265,10 @@ if ($wingetCmd) {
         @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
         @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
         @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
-        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" }
+        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" },
+        # AI-014: OpenCode (secondary AI agent, ADR-009). User-scope winget
+        # package, no admin. Cleaner than the Linux curl-bash equivalent.
+        @{ Name = "OpenCode"; Cmd = "opencode"; Id = "SST.opencode" }
     )
     foreach ($tool in $tools) {
         if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
@@ -683,6 +686,74 @@ if (-not $obsidianCmd) {
     }
 } else {
     Write-Info "Obsidian CLI already installed at $($obsidianCmd.Source)"
+}
+
+# ============================================================================
+# 2d. OPENCODE CONFIG + COMMANDS (AI-014)
+# ============================================================================
+# Binary install is handled in section 1c via winget SST.opencode. This block
+# deploys the canonical config + skill-derived commands using the same
+# reconcile-not-skip pattern as setup-linux.sh (AI-011, lines 415-465).
+# Both files: SHA256 byte-equality test before overwrite so user-side edits
+# that match upstream do not trigger a noisy "Deployed" log.
+
+$opencodeConfigSrc = "$DotfilesDir\ai\opencode\opencode.jsonc"
+$opencodeConfigDst = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
+$opencodeCfgDir    = Split-Path $opencodeConfigDst -Parent
+Ensure-Directory $opencodeCfgDir
+if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
+    $needsCopy = $true
+    if (Test-Path -LiteralPath $opencodeConfigDst -PathType Leaf) {
+        $srcHash = (Get-FileHash -LiteralPath $opencodeConfigSrc -Algorithm SHA256).Hash
+        $dstHash = (Get-FileHash -LiteralPath $opencodeConfigDst -Algorithm SHA256).Hash
+        if ($srcHash -eq $dstHash) {
+            Write-Info "opencode.jsonc already in sync"
+            $needsCopy = $false
+        }
+    }
+    if ($needsCopy) {
+        Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigDst -Force
+        Write-Success "Deployed opencode.jsonc to $opencodeConfigDst"
+    }
+} else {
+    Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
+}
+
+# Commands sync: add new, leave unchanged, remove orphans. Mirror of the bash
+# loop in setup-linux.sh: cmds_added/cmds_skipped/cmds_removed counters.
+$opencodeCmdsSrc = "$DotfilesDir\ai\opencode\commands"
+$opencodeCmdsDst = Join-Path $env:USERPROFILE '.config\opencode\commands'
+if (Test-Path -LiteralPath $opencodeCmdsSrc -PathType Container) {
+    Ensure-Directory $opencodeCmdsDst
+    $cmdsAdded   = 0
+    $cmdsSkipped = 0
+    $cmdsRemoved = 0
+    foreach ($src in Get-ChildItem -LiteralPath $opencodeCmdsSrc -Filter '*.md' -File -ErrorAction SilentlyContinue) {
+        $dst = Join-Path $opencodeCmdsDst $src.Name
+        $sameContent = $false
+        if (Test-Path -LiteralPath $dst -PathType Leaf) {
+            $sH = (Get-FileHash -LiteralPath $src.FullName -Algorithm SHA256).Hash
+            $dH = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
+            if ($sH -eq $dH) { $sameContent = $true }
+        }
+        if ($sameContent) {
+            $cmdsSkipped++
+        } else {
+            Copy-Item -LiteralPath $src.FullName -Destination $dst -Force
+            $cmdsAdded++
+        }
+    }
+    # Orphan removal: any *.md in destination not present in source.
+    foreach ($dst in Get-ChildItem -LiteralPath $opencodeCmdsDst -Filter '*.md' -File -ErrorAction SilentlyContinue) {
+        $srcPath = Join-Path $opencodeCmdsSrc $dst.Name
+        if (-not (Test-Path -LiteralPath $srcPath -PathType Leaf)) {
+            Remove-Item -LiteralPath $dst.FullName -Force
+            $cmdsRemoved++
+        }
+    }
+    Write-Success "opencode commands: $cmdsAdded added, $cmdsSkipped already in sync, $cmdsRemoved orphans removed"
+} else {
+    Write-Info "opencode commands source missing: $opencodeCmdsSrc (skipping)"
 }
 
 # ============================================================================
