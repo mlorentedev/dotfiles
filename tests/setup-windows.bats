@@ -91,6 +91,23 @@ setup() {
     grep -q 'claude-mem-heal.ps1' "$PS1_SCRIPT"
 }
 
+# BUG-012: claude-mem-heal.ps1 creates a Junction `marketplaces\thedotmack`
+# pointing at `marketplaces\thedotmack-claude-mem` so the plugin's hardcoded
+# `marketplaces/thedotmack/plugin/scripts/...` fallback paths resolve when
+# CLAUDE_PLUGIN_ROOT is unset/stale (the UserPromptSubmit hook failure mode).
+@test "claude-mem-heal.ps1 creates legacy marketplace junction (BUG-012)" {
+    local heal="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF 'thedotmack-claude-mem' "$heal"
+    grep -qF -- '-ItemType Junction' "$heal"
+}
+
+# Junction creation must be guarded: only create when target dir missing AND
+# source dir present. Mirrors the heal script's idempotence pattern.
+@test "claude-mem-heal.ps1 junction creation is idempotent-guarded (BUG-012)" {
+    local heal="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -B5 -A5 -- '-ItemType Junction' "$heal" | grep -qE 'Test-Path|-not'
+}
+
 @test "setup-windows.ps1 deploys dotfiles-sync.ps1" {
     grep -q 'dotfiles-sync.ps1' "$PS1_SCRIPT"
 }
