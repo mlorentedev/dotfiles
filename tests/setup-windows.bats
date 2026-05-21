@@ -208,6 +208,26 @@ setup() {
     grep -qF 'claude plugin list' "$PS1_SCRIPT"
 }
 
+# --- BUG-011: extend the BUG-004 guard to every claude CLI call site ---
+# BUG-004 covered only `claude plugin install`. The same upstream truncation
+# (anthropics/claude-code#59870) fires on `claude mcp get`, `claude mcp add`, and
+# `claude plugin list` because they go through the same deserialize-modify-
+# serialize cycle. With ~9 MCP servers, each unwrapped setup run triggered
+# ~18 chances of truncation. These asserts lock in the wrap on every call site.
+
+@test "setup-windows.ps1 wraps claude mcp add with Backup-AndRestoreClaudeJson (BUG-011)" {
+    grep -B15 'claude mcp add --transport' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
+@test "setup-windows.ps1 wraps claude mcp get with Backup-AndRestoreClaudeJson (BUG-011)" {
+    # Same scriptblock typically wraps both mcp get and mcp add inside one iteration.
+    grep -B15 'claude mcp get' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
+@test "setup-windows.ps1 wraps claude plugin list with Backup-AndRestoreClaudeJson (BUG-011)" {
+    grep -B5 'claude plugin list' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
 # SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
 # `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that

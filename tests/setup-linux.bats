@@ -247,6 +247,43 @@ setup() {
     grep -q 'snapshot_claude_json' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# --- BUG-011: extend the BUG-004 guard to every claude CLI call site ---
+# BUG-004 covered only `claude plugin install`. The same upstream truncation
+# (anthropics/claude-code#59870) fires on `claude mcp get`, `claude mcp add`, and
+# `claude plugin list` because they go through the same deserialize-modify-
+# serialize cycle. With ~9 MCP servers, each setup run unwrapped triggered
+# ~18 chances of truncation. These asserts lock in the wrap on every call site.
+
+@test "setup-linux.sh defines snapshot helpers BEFORE the MCP loop (BUG-011)" {
+    # No forward references: helper definitions must precede first use.
+    helper_line=$(grep -n '^snapshot_claude_json()' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    mcp_get_line=$(grep -n 'claude mcp get' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$helper_line" ] && [ -n "$mcp_get_line" ]
+    [ "$helper_line" -lt "$mcp_get_line" ]
+}
+
+@test "setup-linux.sh wraps claude mcp add with snapshot+restore (BUG-011)" {
+    # snapshot called within 15 lines before mcp add (header comments + mcp get
+    # idempotence path live between); restore within 10 lines after.
+    grep -B15 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
+    grep -A10 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
+}
+
+@test "setup-linux.sh wraps claude plugin list with snapshot+restore (BUG-011)" {
+    grep -B5 'claude plugin list 2>/dev/null' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
+    grep -A5 'claude plugin list 2>/dev/null' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
+}
+
+@test "parity: both setup scripts wrap claude mcp add with the snapshot guard (BUG-011)" {
+    grep -B15 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
+    grep -B15 'claude mcp add --transport' "$DOTFILES_DIR/setup-windows.ps1" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
+@test "parity: both setup scripts wrap claude plugin list with the snapshot guard (BUG-011)" {
+    grep -B5 'claude plugin list' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
+    grep -B5 'claude plugin list' "$DOTFILES_DIR/setup-windows.ps1" | grep -q 'Backup-AndRestoreClaudeJson'
+}
+
 # --- doctor + env-contract.json (cross-OS parity) ---
 
 @test "env-contract.json exists and is valid JSON with required sections" {

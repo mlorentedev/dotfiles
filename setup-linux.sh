@@ -537,67 +537,19 @@ else
     log_info "GitHub Copilot CLI not installed, skipping Copilot config (install via snap/apt/curl: https://docs.github.com/copilot/how-tos/copilot-cli)"
 fi
 
-# Register MCP servers (requires Claude Code CLI, Node.js, jq)
-# Idempotent: server list lives in mcp-servers.json (SSOT shared with Windows);
-# `claude mcp get` is used to skip already-registered entries, and `add` errors
-# are surfaced rather than swallowed.
-MCP_CONFIG="$DOTFILES_DIR/mcp-servers.json"
-if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-    if [ ! -f "$MCP_CONFIG" ]; then
-        log_warning "mcp-servers.json not found at $MCP_CONFIG, skipping MCP registration"
-    else
-        log_info "Registering Claude Code MCP servers from $MCP_CONFIG..."
-        mcp_added=0
-        mcp_skipped=0
-        mcp_failed=0
-        while IFS=$'\t' read -r mcp_name mcp_transport mcp_args mcp_prereq_bin mcp_prereq_cmd; do
-            # Check prerequisite binary, run prerequisite command if specified
-            if [ -n "$mcp_prereq_bin" ]; then
-                if ! command -v "$mcp_prereq_bin" >/dev/null 2>&1; then
-                    log_warning "MCP $mcp_name: prerequisite '$mcp_prereq_bin' not found, skipping"
-                    mcp_failed=$((mcp_failed + 1))
-                    continue
-                fi
-                if [ -n "$mcp_prereq_cmd" ]; then
-                    # shellcheck disable=SC2086
-                    if ! $mcp_prereq_cmd >/dev/null 2>&1; then
-                        log_warning "MCP $mcp_name: prerequisite command failed: $mcp_prereq_cmd"
-                    fi
-                fi
-            fi
-            # Idempotence: skip if `claude mcp get` already knows this name
-            if claude mcp get "$mcp_name" >/dev/null 2>&1; then
-                log_info "MCP $mcp_name already registered, skipping"
-                mcp_skipped=$((mcp_skipped + 1))
-                continue
-            fi
-            # Word-split args intentionally; entries in mcp-servers.json are
-            # tokenized for `claude mcp add` argv after `--`.
-            # shellcheck disable=SC2086
-            if mcp_err=$(claude mcp add --transport "$mcp_transport" "$mcp_name" --scope user -- $mcp_args 2>&1); then
-                log_success "Registered MCP $mcp_name"
-                mcp_added=$((mcp_added + 1))
-            else
-                log_warning "Failed to register MCP $mcp_name: $mcp_err"
-                mcp_failed=$((mcp_failed + 1))
-            fi
-        done < <(jq -r '.servers[] | [.name, .transport, .args, (.prerequisite_binary // ""), (.prerequisite_command // "")] | @tsv' "$MCP_CONFIG")
-        log_success "MCP servers: $mcp_added added, $mcp_skipped already present, $mcp_failed failed"
-    fi
-else
-    log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
-fi
-
-# BUG-004: defense-in-depth wrapper around `claude plugin install`. The bash
-# idempotence guard below (`grep -qF "$plugin"` against `claude plugin list`)
-# yields a false negative for claude-mem@thedotmack -- it never appears in
-# that listing (different marketplace, `@thedotmack` vs `@claude-plugins-official`).
-# Every setup run installs claude-mem again, which triggers upstream
-# anthropics/claude-code#59870: the CLI's deserialize-modify-serialize cycle
-# drops fields outside its internal struct (organizationType,
-# organizationRateLimitTier, projects map, onboarding flags), shrinking
-# ~/.claude/.claude.json from ~75 KB to ~1.5 KB and forcing re-authentication.
-# snapshot_claude_json copies the file to a tempfile BEFORE the install;
+# BUG-004 + BUG-011: defense-in-depth wrapper around EVERY `claude <subcommand>`
+# invocation in this script. The Claude Code CLI's deserialize-modify-serialize
+# cycle drops fields outside its internal struct (organizationType,
+# organizationRateLimitTier, projects map, onboarding flags) -- upstream bug
+# anthropics/claude-code#59870 -- shrinking ~/.claude/.claude.json from ~75 KB
+# to ~1.5 KB and forcing re-authentication. The bug fires on ANY subcommand
+# (`plugin install`, `plugin list`, `mcp get`, `mcp add`), not just install.
+#
+# BUG-004 (PR #57) wrapped only `claude plugin install`. BUG-011 extends the
+# guard to every other call site (MCP loop iterations + plugin list pre-fetch)
+# after the user empirically observed truncation recurrence in an MCP-only path.
+#
+# snapshot_claude_json copies the file to a tempfile BEFORE the call;
 # restore_claude_json_if_truncated restores it AFTER, iff the snapshot was
 # >= 10 KB and the new file is < 50% of the snapshot size. Complementary to
 # SDD-021 session-start canary in claude-session-start.sh (same 10240-byte
@@ -629,15 +581,79 @@ restore_claude_json_if_truncated() {
     rm -f "$backup"
 }
 
+# Register MCP servers (requires Claude Code CLI, Node.js, jq)
+# Idempotent: server list lives in mcp-servers.json (SSOT shared with Windows);
+# `claude mcp get` is used to skip already-registered entries, and `add` errors
+# are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
+# invocation is wrapped with snapshot_claude_json / restore_claude_json_if_truncated
+# because both subcommands hit the same #59870 truncation path as `plugin install`.
+MCP_CONFIG="$DOTFILES_DIR/mcp-servers.json"
+if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    if [ ! -f "$MCP_CONFIG" ]; then
+        log_warning "mcp-servers.json not found at $MCP_CONFIG, skipping MCP registration"
+    else
+        log_info "Registering Claude Code MCP servers from $MCP_CONFIG..."
+        mcp_added=0
+        mcp_skipped=0
+        mcp_failed=0
+        while IFS=$'\t' read -r mcp_name mcp_transport mcp_args mcp_prereq_bin mcp_prereq_cmd; do
+            # Check prerequisite binary, run prerequisite command if specified
+            if [ -n "$mcp_prereq_bin" ]; then
+                if ! command -v "$mcp_prereq_bin" >/dev/null 2>&1; then
+                    log_warning "MCP $mcp_name: prerequisite '$mcp_prereq_bin' not found, skipping"
+                    mcp_failed=$((mcp_failed + 1))
+                    continue
+                fi
+                if [ -n "$mcp_prereq_cmd" ]; then
+                    # shellcheck disable=SC2086
+                    if ! $mcp_prereq_cmd >/dev/null 2>&1; then
+                        log_warning "MCP $mcp_name: prerequisite command failed: $mcp_prereq_cmd"
+                    fi
+                fi
+            fi
+            # BUG-011: snapshot before both `mcp get` and `mcp add` (one snapshot
+            # per iteration -- legitimate `mcp add` additions are <<50% of file
+            # size, so restore only fires on the real #59870 truncation).
+            _snap=$(snapshot_claude_json)
+            # Idempotence: skip if `claude mcp get` already knows this name
+            if claude mcp get "$mcp_name" >/dev/null 2>&1; then
+                log_info "MCP $mcp_name already registered, skipping"
+                mcp_skipped=$((mcp_skipped + 1))
+                restore_claude_json_if_truncated "$_snap"
+                continue
+            fi
+            # Word-split args intentionally; entries in mcp-servers.json are
+            # tokenized for `claude mcp add` argv after `--`.
+            # shellcheck disable=SC2086
+            if mcp_err=$(claude mcp add --transport "$mcp_transport" "$mcp_name" --scope user -- $mcp_args 2>&1); then
+                log_success "Registered MCP $mcp_name"
+                mcp_added=$((mcp_added + 1))
+            else
+                log_warning "Failed to register MCP $mcp_name: $mcp_err"
+                mcp_failed=$((mcp_failed + 1))
+            fi
+            restore_claude_json_if_truncated "$_snap"
+        done < <(jq -r '.servers[] | [.name, .transport, .args, (.prerequisite_binary // ""), (.prerequisite_command // "")] | @tsv' "$MCP_CONFIG")
+        log_success "MCP servers: $mcp_added added, $mcp_skipped already present, $mcp_failed failed"
+    fi
+else
+    log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
+fi
+
 # Claude Code plugins (requires claude CLI).
 # Idempotent: cache the installed-plugins list ONCE before the loop and skip
-# entries already present. The wrapper above (BUG-004) catches the
+# entries already present. The wrapper above (BUG-004/011) catches the
 # false-negative case where the idempotence guard misses a plugin (e.g.
 # claude-mem@thedotmack) and the resulting `claude plugin install` call
-# truncates .claude.json. Same idempotence pattern as MCP registration (line 447).
+# truncates .claude.json. BUG-011: the pre-loop `claude plugin list` is now
+# also wrapped because it goes through the same #59870 path.
 if command -v claude >/dev/null 2>&1; then
     log_info "Installing Claude Code plugins..."
+    # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
+    # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
+    _snap=$(snapshot_claude_json)
     installed_plugins=$(claude plugin list 2>/dev/null || true)
+    restore_claude_json_if_truncated "$_snap"
     plugins_added=0
     plugins_skipped=0
     for plugin in \
