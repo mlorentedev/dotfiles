@@ -653,6 +653,39 @@ if (-not $poetryCmd) {
 }
 
 # ============================================================================
+# 2c. OBSIDIAN CLI (BUG-013)
+# ============================================================================
+# @vorillaz/obsidian-cli provides the `obsidian` binary used by obs-cli.ps1 and
+# the vault-health workflow. npm global install writes to %APPDATA%\npm
+# (user-writable, no admin). Idempotent: skip if `obsidian` already on PATH.
+# Guarded on `npm` availability so machines without Node.js gracefully skip.
+
+$obsidianCmd = Get-Command obsidian -ErrorAction SilentlyContinue
+if (-not $obsidianCmd) {
+    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+    if ($npmCmd) {
+        Write-Info "Installing Obsidian CLI (@vorillaz/obsidian-cli) via npm..."
+        try {
+            & npm install -g '@vorillaz/obsidian-cli' 2>$null | Out-Null
+            # Refresh PATH so the freshly-installed binary is visible in this
+            # session (same trick as the winget block in section 1c).
+            $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
+            if (Get-Command obsidian -ErrorAction SilentlyContinue) {
+                Write-Success "Obsidian CLI installed"
+            } else {
+                Write-Warn "Obsidian CLI install completed but binary not on PATH (restart shell)"
+            }
+        } catch {
+            Write-Warn "Failed to install Obsidian CLI: $_"
+        }
+    } else {
+        Write-Warn "npm not available, skipping Obsidian CLI install (install Node.js then re-run)"
+    }
+} else {
+    Write-Info "Obsidian CLI already installed at $($obsidianCmd.Source)"
+}
+
+# ============================================================================
 # 3. DEPLOY GEMINI CONFIGURATION (config deploy is always safe)
 # ============================================================================
 

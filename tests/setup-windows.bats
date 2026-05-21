@@ -246,6 +246,23 @@ setup() {
     grep -B5 'claude plugin marketplace add thedotmack' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
+# --- BUG-013: install Obsidian CLI on Windows ---
+# `@vorillaz/obsidian-cli` provides the `obsidian` binary used by
+# obs-cli.ps1 and the vault-health workflow. setup-windows.ps1 must install
+# it idempotently via npm global (user scope, no admin), gated on npm
+# availability so machines without Node.js gracefully skip.
+
+@test "setup-windows.ps1 installs Obsidian CLI via npm (BUG-013)" {
+    grep -qF "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 Obsidian CLI install is gated on npm + idempotent (BUG-013)" {
+    # idempotence: skip if `obsidian` already on PATH
+    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command obsidian"
+    # gating: only run if npm is available
+    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
+}
+
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
 # SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
 # `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that
