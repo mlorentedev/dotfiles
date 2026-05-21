@@ -188,13 +188,15 @@ setup() {
 }
 
 @test "claude-mem-heal.sh symlink creation is guarded on both source+target (BUG-012)" {
-    # Source dir (thedotmack-claude-mem) must exist; target (thedotmack) must NOT.
-    grep -B2 -A6 'ln -s.*thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.sh" | grep -qF 'thedotmack-claude-mem'
+    # Source dir (thedotmack-claude-mem) must be checked; target (thedotmack)
+    # must be checked too -- both guards required for idempotence.
+    grep -Eq '\[ ! -d "\$actual" \]' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -Eq '\[ -e "\$legacy" \]' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
 }
 
 @test "claude-mem-heal.ps1 creates legacy marketplace junction (BUG-012)" {
     grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF '-ItemType Junction' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF -- '-ItemType Junction' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
 
 @test "parity: both heal scripts implement legacy marketplace link (BUG-012)" {

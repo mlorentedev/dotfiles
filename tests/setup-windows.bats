@@ -98,14 +98,14 @@ setup() {
 @test "claude-mem-heal.ps1 creates legacy marketplace junction (BUG-012)" {
     local heal="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
     grep -qF 'thedotmack-claude-mem' "$heal"
-    grep -qF '-ItemType Junction' "$heal"
+    grep -qF -- '-ItemType Junction' "$heal"
 }
 
 # Junction creation must be guarded: only create when target dir missing AND
 # source dir present. Mirrors the heal script's idempotence pattern.
 @test "claude-mem-heal.ps1 junction creation is idempotent-guarded (BUG-012)" {
     local heal="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -B5 -A5 '\-ItemType Junction' "$heal" | grep -qE 'Test-Path|-not'
+    grep -B5 -A5 -- '-ItemType Junction' "$heal" | grep -qE 'Test-Path|-not'
 }
 
 @test "setup-windows.ps1 deploys dotfiles-sync.ps1" {
