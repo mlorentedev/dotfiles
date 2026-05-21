@@ -493,6 +493,20 @@ setup() {
     grep -qF 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# --- REFACTOR-003: diff-check.ps1 deploy + dch alias + sec 12 wiring ---
+# Windows port of diff-check.sh closes the permanent SKIP in healthcheck.ps1
+# section 12/12. Mirrors PR #10 (Linux side, 2026-05-12).
+
+@test "REFACTOR-003: setup-windows.ps1 deploys diff-check.ps1 to ScriptsDir" {
+    grep -qF 'diff-check.ps1' "$PS1_SCRIPT"
+    grep -B5 'Deployed diff-check.ps1' "$PS1_SCRIPT" | grep -q 'Copy-Item'
+}
+
+@test "REFACTOR-003: powershell/profile.ps1 declares dch function" {
+    grep -qF 'function dch' "$DOTFILES_DIR/powershell/profile.ps1"
+    grep -B2 -A6 'function dch' "$DOTFILES_DIR/powershell/profile.ps1" | grep -qF 'diff-check.ps1'
+}
+
 # --- WIN-001: healthcheck.ps1 wiring as final step ---
 
 @test "WIN-001: setup-windows.ps1 invokes healthcheck.ps1 after doctor" {
