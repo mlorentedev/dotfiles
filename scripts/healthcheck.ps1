@@ -120,9 +120,13 @@ Write-Host "Checking from: $script:DotfilesDir"
 # ==================================================
 # 1/12 Core Tools in PATH
 # ==================================================
+# Required = installed by setup-windows.ps1 (winget array) + the bootstrap
+# prerequisites git/pwsh. Workflow-dependent tools (node/npm/docker/kubectl/
+# terraform/direnv) moved to section 6 (Optional) because dotfiles does not
+# deploy them on Windows -- they're user choice per task.
 Write-Section '1/12' 'Core Tools in PATH'
 
-$coreTools = @('git', 'pwsh', 'curl', 'jq', 'eza', 'direnv', 'node', 'npm', 'zoxide', 'docker', 'kubectl', 'terraform')
+$coreTools = @('git', 'pwsh', 'curl', 'jq', 'eza', 'gh', 'zoxide')
 foreach ($tool in $coreTools) {
     if (Test-Command $tool) {
         Write-Pass "$tool found"
@@ -165,28 +169,37 @@ if ($env:MINIKUBE_HOME -and (Test-Path -LiteralPath $env:MINIKUBE_HOME -PathType
 # ==================================================
 # 3/12 Version Match (versions.conf)
 # ==================================================
+# Linux deploys language toolchains under $APPS_HOME/{jdk-VERSION,go-VERSION,...}
+# and pins versions via versions.conf. Windows installs language toolchains via
+# winget into user-chosen paths and does NOT use $APPS_HOME. So this section is
+# only meaningful when $env:APPS_HOME is explicitly set; otherwise SKIP the
+# whole block (a single line, not 5 individual SKIPs).
 Write-Section '3/12' 'Version Match (versions.conf)'
 
-$appsHome = if ($env:APPS_HOME) { $env:APPS_HOME } else { Join-Path $env:USERPROFILE 'Applications' }
+if (-not $env:APPS_HOME) {
+    Write-Skip 'version match' '$env:APPS_HOME not set (Windows uses winget, not $APPS_HOME -- skip section)'
+} else {
+    $appsHome = $env:APPS_HOME
 
-function Test-VersionMatch {
-    param([string]$Name, [string]$Expected, [string]$DirPath)
-    if (-not $Expected) {
-        Write-Skip "$Name version" 'not set in versions.conf'
-        return
+    function Test-VersionMatch {
+        param([string]$Name, [string]$Expected, [string]$DirPath)
+        if (-not $Expected) {
+            Write-Skip "$Name version" 'not set in versions.conf'
+            return
+        }
+        if (Test-Path -LiteralPath $DirPath -PathType Container) {
+            Write-Pass "$Name version $Expected (directory exists)"
+        } else {
+            Write-Fail "$Name expected version $Expected but directory missing: $DirPath"
+        }
     }
-    if (Test-Path -LiteralPath $DirPath -PathType Container) {
-        Write-Pass "$Name version $Expected (directory exists)"
-    } else {
-        Write-Fail "$Name expected version $Expected but directory missing: $DirPath"
-    }
+
+    Test-VersionMatch 'Java'     $script:Versions['JAVA_VERSION']     (Join-Path $appsHome "jdk-$($script:Versions['JAVA_VERSION'])")
+    Test-VersionMatch 'Maven'    $script:Versions['MAVEN_VERSION']    (Join-Path $appsHome "apache-maven-$($script:Versions['MAVEN_VERSION'])")
+    Test-VersionMatch 'Python'   $script:Versions['PYTHON_VERSION']   (Join-Path $appsHome "python-$($script:Versions['PYTHON_VERSION'])")
+    Test-VersionMatch 'Minikube' $script:Versions['MINIKUBE_VERSION'] (Join-Path $appsHome "minikube-$($script:Versions['MINIKUBE_VERSION'])")
+    Test-VersionMatch 'Go'       $script:Versions['GO_VERSION']       (Join-Path $appsHome "go-$($script:Versions['GO_VERSION'])")
 }
-
-Test-VersionMatch 'Java'     $script:Versions['JAVA_VERSION']     (Join-Path $appsHome "jdk-$($script:Versions['JAVA_VERSION'])")
-Test-VersionMatch 'Maven'    $script:Versions['MAVEN_VERSION']    (Join-Path $appsHome "apache-maven-$($script:Versions['MAVEN_VERSION'])")
-Test-VersionMatch 'Python'   $script:Versions['PYTHON_VERSION']   (Join-Path $appsHome "python-$($script:Versions['PYTHON_VERSION'])")
-Test-VersionMatch 'Minikube' $script:Versions['MINIKUBE_VERSION'] (Join-Path $appsHome "minikube-$($script:Versions['MINIKUBE_VERSION'])")
-Test-VersionMatch 'Go'       $script:Versions['GO_VERSION']       (Join-Path $appsHome "go-$($script:Versions['GO_VERSION'])")
 
 # ==================================================
 # 4/12 Key Files / Junctions
@@ -228,10 +241,15 @@ if (Test-Path -LiteralPath $marketplaceReal -PathType Container) {
 # ==================================================
 # 5/12 Environment Variables
 # ==================================================
+# DOTFILES_DIR is the only Windows-required env var (set by powershell/profile.ps1).
+# APPS_HOME + language _HOME vars are Linux-deploy-pattern vars; on Windows they
+# are optional (user may set them per workflow) -- SKIP if unset, not FAIL.
 Write-Section '5/12' 'Environment Variables'
 
-$envVars = @('DOTFILES_DIR', 'APPS_HOME', 'JAVA_HOME', 'MAVEN_HOME', 'PYTHON_HOME', 'GO_HOME', 'MINIKUBE_HOME')
-foreach ($v in $envVars) {
+$requiredVars = @('DOTFILES_DIR')
+$optionalVars = @('APPS_HOME', 'JAVA_HOME', 'MAVEN_HOME', 'PYTHON_HOME', 'GO_HOME', 'MINIKUBE_HOME')
+
+foreach ($v in $requiredVars) {
     $val = [Environment]::GetEnvironmentVariable($v)
     if ($val) {
         Write-Pass "$v is set"
@@ -240,12 +258,27 @@ foreach ($v in $envVars) {
     }
 }
 
+foreach ($v in $optionalVars) {
+    $val = [Environment]::GetEnvironmentVariable($v)
+    if ($val) {
+        Write-Pass "$v is set"
+    } else {
+        Write-Skip $v 'optional on Windows (Linux-deploy var)'
+    }
+}
+
 # ==================================================
 # 6/12 Optional Tools
 # ==================================================
 Write-Section '6/12' 'Optional Tools'
 
-$optionalTools = @('age', 'gh', 'claude', 'gemini', 'bats', 'helm', 'ansible', 'pip', 'copilot', 'opencode', 'uv')
+$optionalTools = @(
+    'age', 'claude', 'gemini', 'bats', 'helm', 'ansible', 'pip', 'copilot', 'opencode', 'uv',
+    # Workflow-dependent tools moved here from sec 1 (Windows doesn't deploy
+    # them by default; they're user choice per workflow). Linux's sec 1 keeps
+    # them required because setup-linux.sh installs the standard dev set.
+    'node', 'npm', 'docker', 'kubectl', 'terraform', 'direnv'
+)
 foreach ($tool in $optionalTools) {
     if (Test-Command $tool) {
         Write-Pass "$tool found"
