@@ -98,6 +98,18 @@ if (Get-Command copilot -ErrorAction SilentlyContinue) {
     function cops { copilot -p "$args" --allow-all-tools -s }
 }
 
+# Healthcheck (WIN-001): mirrors the Linux `hc` alias. Runs the full 12-section
+# structural verification of the deployed dotfiles install.
+function hc {
+    $healthcheck = "$env:SCRIPTS_DIR\healthcheck.ps1"
+    if (Test-Path $healthcheck) {
+        & pwsh -NoProfile -File $healthcheck
+    } else {
+        Write-Host "[ERROR] healthcheck.ps1 not found at $healthcheck" -ForegroundColor Red
+        Write-Host "Run setup-windows.ps1 from your dotfiles repository first." -ForegroundColor Yellow
+    }
+}
+
 # Enhanced listing (requires eza)
 if (Get-Command eza -ErrorAction SilentlyContinue) {
     function ll { eza -la --icons @args }

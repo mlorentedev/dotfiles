@@ -434,6 +434,26 @@ setup() {
     grep -qF 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# --- WIN-001: healthcheck.ps1 wiring as final step ---
+
+@test "WIN-001: setup-windows.ps1 invokes healthcheck.ps1 after doctor" {
+    grep -qF 'healthcheck.ps1' "$PS1_SCRIPT"
+    grep -qF 'Running post-setup healthcheck' "$PS1_SCRIPT"
+}
+
+@test "WIN-001: setup-windows.ps1 healthcheck block is non-fatal (Write-Warn, no exit)" {
+    # Capture the healthcheck block (between 8d header and section 9 SUMMARY)
+    # and assert it warns instead of exiting.
+    sed -n '/8d\. POST-SETUP HEALTHCHECK/,/9\. SUMMARY/p' "$PS1_SCRIPT" | grep -qF 'Write-Warn'
+    ! sed -n '/8d\. POST-SETUP HEALTHCHECK/,/9\. SUMMARY/p' "$PS1_SCRIPT" | grep -qE '^\s*exit\s+[0-9]'
+}
+
+@test "WIN-001: setup-windows.ps1 healthcheck block runs after doctor block" {
+    doctor_line=$(grep -n '8c\. POST-SETUP DOCTOR' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    health_line=$(grep -n '8d\. POST-SETUP HEALTHCHECK' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [[ -n "$doctor_line" ]] && [[ -n "$health_line" ]] && [[ "$health_line" -gt "$doctor_line" ]]
+}
+
 # --- PSScriptAnalyzer ---
 
 @test "setup-windows.ps1 passes PSScriptAnalyzer (if pwsh available)" {

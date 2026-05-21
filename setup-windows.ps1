@@ -1043,6 +1043,27 @@ if (Test-Path $doctorScript) {
 }
 
 # ============================================================================
+# 8d. POST-SETUP HEALTHCHECK (WIN-001)
+# ============================================================================
+# Full structural health check after doctor. Non-fatal: surfaces deploy gaps
+# but does NOT alter setup's $LASTEXITCODE. Linux setup-linux.sh does not
+# auto-invoke healthcheck.sh today; that parity is tracked by WIN-001b.
+
+$healthcheckScript = "$ScriptsDir\healthcheck.ps1"
+if (Test-Path $healthcheckScript) {
+    Write-Info "Running post-setup healthcheck..."
+    Write-Host ""
+    & pwsh -NoProfile -File $healthcheckScript
+    $healthcheckExit = $LASTEXITCODE
+    Write-Host ""
+    if ($healthcheckExit -ne 0) {
+        Write-Warn "healthcheck reported one or more FAIL items (exit $healthcheckExit) -- review output above; use 'hc' alias to re-run"
+    }
+} else {
+    Write-Warn "healthcheck.ps1 not deployed at $healthcheckScript, skipping post-setup check"
+}
+
+# ============================================================================
 # 9. SUMMARY
 # ============================================================================
 
