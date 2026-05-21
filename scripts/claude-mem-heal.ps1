@@ -207,16 +207,39 @@ function Repair-HooksJson {
     }
     $content = Get-Content $Target -Raw -ErrorAction SilentlyContinue
     if (-not $content) { return }
-    $broken = 'break; }; done'
-    $fixed  = '}; done | head -n1'
-    if (-not $content.Contains($broken)) {
+
+    $broken017 = 'break; }; done'
+    $fixed017  = '}; done | head -n1'
+    # BUG-018: ALL hooks that terminate with `hook claude-code <X>"` lack
+    # Claude Code's {"continue":true,"suppressOutput":true} directive. The
+    # bun-runner empty-stdin diagnostic (upstream claude-mem#2188) goes to
+    # stdout and Claude Code blocks the operation. User empirically hit
+    # UserPromptSubmit first and Stop minutes later -- regex captures all
+    # 5 (session-init / context / observation / file-context / summarize).
+    # Setup hook's version-check.js terminator is left untouched -- not on
+    # the user hot path (fires only on plugin install/update).
+    $pattern018     = 'hook claude-code ([a-z][a-z-]*)"'
+    $replacement018 = 'hook claude-code $1 2>/dev/null; echo ''{\"continue\":true,\"suppressOutput\":true}''"'
+
+    $has017 = $content.Contains($broken017)
+    $has018 = $content -match $pattern018
+    if (-not $has017 -and -not $has018) {
         Write-HealVerbose "hooks.json already healthy: $Target"
         return
     }
-    $count = ([regex]::Matches($content, [regex]::Escape($broken))).Count
-    $patched = $content.Replace($broken, $fixed)
+
+    $patched = $content
+    if ($has017) {
+        $count017 = ([regex]::Matches($patched, [regex]::Escape($broken017))).Count
+        $patched = $patched.Replace($broken017, $fixed017)
+        Write-HealLog "patched hooks.json (BUG-017, $count017 hook(s) -> head -n1 race-free form): $Target"
+    }
+    if ($has018) {
+        $count018 = ([regex]::Matches($patched, $pattern018)).Count
+        $patched = $patched -replace $pattern018, $replacement018
+        Write-HealLog "patched hooks.json ($count018 hook(s) -> BUG-018 continue directive): $Target"
+    }
     Set-Content -Path $Target -Value $patched -Encoding UTF8 -NoNewline
-    Write-HealLog "patched hooks.json (BUG-017, $count hook(s) -> head -n1 race-free form): $Target"
 }
 
 function Repair-PluginDir {

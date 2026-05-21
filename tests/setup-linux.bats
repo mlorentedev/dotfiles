@@ -230,6 +230,28 @@ setup() {
     grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
 
+# --- BUG-018: ALL 5 `hook claude-code <X>` hooks missing continue directive ---
+# After BUG-017 closed the EPIPE race, every claude-mem hook that terminates
+# with `node ... hook claude-code <event>"` blocks Claude Code because the
+# stdout output is not a {"continue":true} directive (upstream bun-runner
+# stdout vs Claude Code hook protocol mismatch, claude-mem#2188).
+# The regex-based substitution catches all 5 in one pass: session-init
+# (UserPromptSubmit), context (SessionStart), observation (PostToolUse),
+# file-context (PreToolUse), summarize (Stop).
+
+@test "parity: both heal scripts append continue directive to ALL hook claude-code <X> terminators (BUG-018)" {
+    # The substitution must use a regex capture so all 5 event terminators get
+    # the same treatment in one pass.
+    grep -q 'hook claude-code' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -q 'hook claude-code' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    # The replacement must contain the {"continue":true} directive (literal in
+    # both heal scripts, with JSON-escaped quotes \").
+    grep -qF 'continue' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'continue' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF 'BUG-018' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'BUG-018' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
 # --- BUG-012: legacy marketplace junction/symlink for plugin discovery ---
 # Claude Code clones the claude-mem marketplace under the GitHub repo name
 # `thedotmack-claude-mem/`, but the plugin's bundled hooks.json hardcodes
