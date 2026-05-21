@@ -31,9 +31,35 @@ VERBOSE=0
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CACHE_ROOT="$CLAUDE_DIR/plugins/cache/thedotmack/claude-mem"
 MARKETPLACE_DIR="$CLAUDE_DIR/plugins/marketplaces/thedotmack/plugin"
+MARKETPLACE_DIR_ACTUAL="$CLAUDE_DIR/plugins/marketplaces/thedotmack-claude-mem/plugin"
 
 log() { printf '[claude-mem-heal] %s\n' "$1"; }
 verbose() { if [ "$VERBOSE" -eq 1 ]; then log "$1"; fi; }
+
+# BUG-012: Claude Code clones the claude-mem marketplace under the GitHub repo
+# name `thedotmack-claude-mem/`, but the plugin's bundled hooks.json hardcodes
+# the legacy fallback `marketplaces/thedotmack/plugin/scripts/...`. Without a
+# compatibility symlink, plugin hooks fail discovery when CLAUDE_PLUGIN_ROOT
+# is unset (UserPromptSubmit blocked). Create the legacy path as a symlink to
+# the actual install. Idempotent: only acts when source dir exists and target
+# path is absent.
+ensure_marketplace_compat_symlink() {
+    legacy="$CLAUDE_DIR/plugins/marketplaces/thedotmack"
+    actual="$CLAUDE_DIR/plugins/marketplaces/thedotmack-claude-mem"
+    if [ ! -d "$actual" ]; then
+        verbose "no thedotmack-claude-mem marketplace at $actual"
+        return 0
+    fi
+    if [ -e "$legacy" ] || [ -L "$legacy" ]; then
+        verbose "legacy marketplace path already present: $legacy"
+        return 0
+    fi
+    if ln -s "$actual" "$legacy" 2>/dev/null; then
+        log "created legacy marketplace symlink: $legacy -> thedotmack-claude-mem"
+    else
+        log "ERROR: failed to create $legacy symlink"
+    fi
+}
 
 # Replace a broken .mcp.json with the v10.6.3 form. Idempotent: only
 # rewrites if the file contains the offending ${_R%/} pattern.
@@ -115,6 +141,8 @@ else
     verbose "no cache dir at $CACHE_ROOT"
 fi
 
+ensure_marketplace_compat_symlink
 heal_dir "$MARKETPLACE_DIR"
+heal_dir "$MARKETPLACE_DIR_ACTUAL"
 
 exit 0

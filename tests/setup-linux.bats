@@ -174,6 +174,34 @@ setup() {
     grep -q 'claude-mem-heal\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 
+# --- BUG-012: legacy marketplace junction/symlink for plugin discovery ---
+# Claude Code clones the claude-mem marketplace under the GitHub repo name
+# `thedotmack-claude-mem/`, but the plugin's bundled hooks.json hardcodes
+# the legacy fallback `marketplaces/thedotmack/plugin/scripts/...`. Without
+# a compatibility junction/symlink, UserPromptSubmit hooks fail to find
+# bun-runner.js. Both heal scripts create the link defensively at session
+# start, gated on `thedotmack/` missing AND `thedotmack-claude-mem/` present.
+
+@test "claude-mem-heal.sh creates legacy marketplace symlink (BUG-012)" {
+    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -Eq 'ln -s' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+}
+
+@test "claude-mem-heal.sh symlink creation is guarded on both source+target (BUG-012)" {
+    # Source dir (thedotmack-claude-mem) must exist; target (thedotmack) must NOT.
+    grep -B2 -A6 'ln -s.*thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.sh" | grep -qF 'thedotmack-claude-mem'
+}
+
+@test "claude-mem-heal.ps1 creates legacy marketplace junction (BUG-012)" {
+    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF '-ItemType Junction' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
+@test "parity: both heal scripts implement legacy marketplace link (BUG-012)" {
+    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
 # --- BUG-004: defense-in-depth around claude plugin install (truncate guard) ---
 # Linux mirror of the Windows guard. Every `claude plugin install` call triggers
 # upstream anthropics/claude-code#59870, dropping subscription fields out of

@@ -50,6 +50,7 @@ $script:VerboseOutput = $VerboseOutput.IsPresent
 $ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
 $CacheRoot = Join-Path $ClaudeDir 'plugins\cache\thedotmack\claude-mem'
 $MarketplaceDir = Join-Path $ClaudeDir 'plugins\marketplaces\thedotmack\plugin'
+$MarketplaceDirActual = Join-Path $ClaudeDir 'plugins\marketplaces\thedotmack-claude-mem\plugin'
 
 function Write-HealLog {
     param([string]$Message)
@@ -59,6 +60,34 @@ function Write-HealLog {
 function Write-HealVerbose {
     param([string]$Message)
     if ($script:VerboseOutput) { Write-HealLog $Message }
+}
+
+# BUG-012: Claude Code clones the claude-mem marketplace under the GitHub repo
+# name `thedotmack-claude-mem\`, but the plugin's bundled hooks.json hardcodes
+# the legacy fallback `marketplaces\thedotmack\plugin\scripts\...`. Without a
+# compatibility junction, plugin hooks fail discovery when CLAUDE_PLUGIN_ROOT
+# is unset (UserPromptSubmit blocked with `printf: write error: Permission
+# denied` under Git Bash on Windows). Create a Junction so the legacy path
+# resolves to the actual install. Idempotent: skip if source dir missing or
+# target path already present. Junction requires no admin privileges on NTFS.
+function Repair-MarketplaceCompatJunction {
+    $legacy = Join-Path $ClaudeDir 'plugins\marketplaces\thedotmack'
+    $actual = Join-Path $ClaudeDir 'plugins\marketplaces\thedotmack-claude-mem'
+
+    if (-not (Test-Path $actual -PathType Container)) {
+        Write-HealVerbose "no thedotmack-claude-mem marketplace at $actual"
+        return
+    }
+    if (Test-Path $legacy) {
+        Write-HealVerbose "legacy marketplace path already present: $legacy"
+        return
+    }
+    try {
+        $null = New-Item -ItemType Junction -Path $legacy -Target $actual -ErrorAction Stop
+        Write-HealLog "created legacy marketplace junction: $legacy -> thedotmack-claude-mem"
+    } catch {
+        Write-HealLog "ERROR: failed to create junction ${legacy}: $($_.Exception.Message)"
+    }
 }
 
 # Replace a broken .mcp.json with the v10.6.3 form. Idempotent: only
@@ -158,6 +187,8 @@ if (Test-Path $CacheRoot -PathType Container) {
     Write-HealVerbose "no cache dir at $CacheRoot"
 }
 
+Repair-MarketplaceCompatJunction
 Repair-PluginDir -Dir $MarketplaceDir
+Repair-PluginDir -Dir $MarketplaceDirActual
 
 exit 0
