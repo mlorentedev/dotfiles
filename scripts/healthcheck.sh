@@ -191,6 +191,11 @@ fi
 # user encounters the intermittent UserPromptSubmit fail.
 _cmhook_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 _cmhook_E="${PLUGIN_ROOT:-}"
+# BUG-022 (2026-05-21): probe itself used the same `break; }; done` cascade
+# as the upstream hooks (which BUG-017 patched away). Apply the same
+# `head -n1` fix locally so the probe is race-free and reports actual state
+# instead of spurious failures. On Linux SIGPIPE is silent so the race rarely
+# fires here, but cross-OS parity with healthcheck.ps1 matters.
 _cmhook_P=$({
     [ -n "$_cmhook_E" ] && printf '%s\n' "$_cmhook_E"
     ls -dt "$_cmhook_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null
@@ -198,8 +203,8 @@ _cmhook_P=$({
 } | while IFS= read -r _r; do
     _r="${_r%/}"
     [ -d "$_r/plugin/scripts" ] && _q="$_r/plugin" || _q="$_r"
-    [ -f "$_q/scripts/bun-runner.js" ] && [ -f "$_q/scripts/worker-service.cjs" ] && { printf '%s\n' "$_q"; break; }
-done)
+    [ -f "$_q/scripts/bun-runner.js" ] && [ -f "$_q/scripts/worker-service.cjs" ] && printf '%s\n' "$_q"
+done | head -n1)
 if [ -n "$_cmhook_P" ]; then
     pass "claude-mem hook path resolves to: $_cmhook_P (BUG-015)"
 else

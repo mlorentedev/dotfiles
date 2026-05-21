@@ -1164,10 +1164,16 @@ if ($existingTask -and ($existingTaskArgument -eq $expectedTaskArgument)) {
 # deployed profile entirely. Values must match the corresponding lines in
 # powershell/profile.ps1. PowerShell propagates parent $env: to child procs.
 
-if (-not $env:SCRIPTS_DIR)   { $env:SCRIPTS_DIR   = "$env:DOTFILES_DIR\scripts" }
-if (-not $env:GEMINI_HOME)   { $env:GEMINI_HOME   = "$env:USERPROFILE\.gemini" }
-if (-not $env:COPILOT_HOME)  { $env:COPILOT_HOME  = "$env:USERPROFILE\.copilot" }
-if (-not $env:OPENCODE_HOME) { $env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode" }
+if (-not $env:SCRIPTS_DIR)       { $env:SCRIPTS_DIR       = "$env:DOTFILES_DIR\scripts" }
+if (-not $env:GEMINI_HOME)       { $env:GEMINI_HOME       = "$env:USERPROFILE\.gemini" }
+if (-not $env:COPILOT_HOME)      { $env:COPILOT_HOME      = "$env:USERPROFILE\.copilot" }
+if (-not $env:OPENCODE_HOME)     { $env:OPENCODE_HOME     = "$env:USERPROFILE\.config\opencode" }
+# BUG-021 (2026-05-21): added DOTFILES_REPO_DIR pre-export -- BUG-020 (PR #86)
+# added the export to profile.ps1 but the running shell doesn't reload profile,
+# so doctor + diff-check.ps1 (via healthcheck sec 12) still see the var unset
+# until next shell restart. Mirror the same pre-export pattern as the other
+# 4 vars to surface PASS immediately in the post-setup checks.
+if (-not $env:DOTFILES_REPO_DIR) { $env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles" }
 
 $doctorScript = "$ScriptsDir\doctor.ps1"
 if (Test-Path $doctorScript) {
