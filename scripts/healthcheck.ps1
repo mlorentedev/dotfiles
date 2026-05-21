@@ -341,13 +341,12 @@ if (Test-Command 'obsidian') {
     Write-Fail 'Obsidian CLI not in PATH'
 }
 
-# vault-health.sh is Linux-only (no .ps1 sibling yet); skip with explanation
-$vaultHealthSh = Join-Path $script:ScriptDir 'vault-health.sh'
-if (Test-Path -LiteralPath $vaultHealthSh) {
-    Write-Skip 'vault-health.sh' 'Linux-only script (no .ps1 sibling; runs under WSL or Git Bash if needed)'
-} else {
-    Write-Fail "vault-health.sh missing at $vaultHealthSh"
-}
+# WIN-002a: vault-health.sh is Linux-only by design (no .ps1 sibling). On
+# Windows the .sh is intentionally NOT deployed to $ScriptsDir, so an
+# existence check always FAILs and a Skip-when-present/Fail-when-missing
+# branch is inverted relative to its leading comment. Collapse to an
+# unconditional Skip with the same rationale.
+Write-Skip 'vault-health.sh' 'Linux-only script (no .ps1 sibling; runs under WSL or Git Bash if needed)'
 
 $linterConfig = Join-Path $obsidianDir 'plugins\obsidian-linter\data.json'
 if (Test-Path -LiteralPath $linterConfig -PathType Leaf) {
