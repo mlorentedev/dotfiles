@@ -148,17 +148,43 @@ heal_zod() {
 # breaks early, unconsumed producer writes EPIPE on Git Bash Windows.
 # Minimal substitution: `break; }; done` -> `}; done | head -n1` keeps the
 # loop running to completion, then head takes the first printed match.
+#
+# BUG-018 (2026-05-21): after BUG-017 closed the EPIPE race, the
+# UserPromptSubmit hook STILL blocked because its command terminates with
+# `node ... hook claude-code session-init` and does NOT emit Claude Code's
+# `{"continue":true,"suppressOutput":true}` directive. bun-runner.js's
+# empty-stdin diagnostic (upstream claude-mem#2188) goes to stdout, Claude
+# Code reads it as non-continue, blocks the prompt. Heal appends the
+# directive in the same pass.
 heal_hooks_json() {
     target="$1"
     [ -f "$target" ] || { verbose "no hooks.json at $target"; return 0; }
-    if ! grep -qF 'break; }; done' "$target" 2>/dev/null; then
+    # Detect either BUG-017 signature (break; }; done) or BUG-018 signature
+    # (UserPromptSubmit terminator without the continue directive).
+    has_017=$(grep -cF 'break; }; done' "$target" 2>/dev/null || echo 0)
+    has_018=$(grep -cE 'session-init"$|session-init"[^}]*$' "$target" 2>/dev/null | head -1)
+    has_018=${has_018:-0}
+    # Simpler: also check explicitly for the un-patched session-init terminator.
+    if ! grep -qF 'break; }; done' "$target" && \
+       ! grep -qF 'session-init"' "$target"; then
         verbose "hooks.json already healthy: $target"
         return 0
     fi
-    # Use a temp file -- sed -i with portable escaping for the pipe delim.
+    # Use `#` as sed delimiter -- `|` appears literally in the replacement
+    # (`done | head -n1`) and would confuse `s|...|...|g`.
+    #
+    # BUG-018 substitution is GENERIC across all 5 `hook claude-code <X>"`
+    # terminators (UserPromptSubmit/session-init, SessionStart/context,
+    # PostToolUse/observation, PreToolUse/file-context, Stop/summarize).
+    # The user empirically hit UserPromptSubmit first (BUG-018 narrow scope)
+    # then Stop minutes later (originally deferred as BUG-018b -- now folded
+    # in via regex capture). Setup hook (`version-check.js`) is left untouched:
+    # it only fires on plugin install/update, not user hot path.
     tmp="$target.tmp.$$"
-    sed 's|break; }; done|}; done | head -n1|g' "$target" > "$tmp" && mv "$tmp" "$target"
-    log "patched hooks.json (BUG-017, head -n1 race-free form): $target"
+    sed -e 's#break; }; done#}; done | head -n1#g' \
+        -e 's#hook claude-code \([a-z][a-z-]*\)"#hook claude-code \1 2>/dev/null; echo '\''{\\"continue\\":true,\\"suppressOutput\\":true}'\''"#g' \
+        "$target" > "$tmp" && mv "$tmp" "$target"
+    log "patched hooks.json (BUG-017 head-n1 + BUG-018 continue-directive on all 5 hooks): $target"
 }
 
 heal_dir() {
