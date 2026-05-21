@@ -479,7 +479,24 @@ Write-Skip 'ghostty' 'Windows port not yet scheduled (TERM-001 is Linux-only; op
 # 12/12 Repo - Deploy-Dir Drift
 # ==================================================
 Write-Section '12/12' 'Repo - Deploy-Dir Drift'
-Write-Skip 'diff-check' 'diff-check.ps1 not implemented (REFACTOR-003 queued)'
+
+# REFACTOR-003: invoke diff-check.ps1 (port of diff-check.sh). Non-fatal:
+# surfaces drift as FAIL line but does NOT alter healthcheck's overall
+# exit code beyond the existing FAIL-count semantics.
+$diffCheckScript = Join-Path $script:ScriptDir 'diff-check.ps1'
+if (Test-Path -LiteralPath $diffCheckScript -PathType Leaf) {
+    # Capture output; suppress the script's own colored echoes since we want
+    # the healthcheck pass/fail framing only.
+    $null = & pwsh -NoProfile -File $diffCheckScript 2>&1
+    $diffExit = $LASTEXITCODE
+    switch ($diffExit) {
+        0 { Write-Pass 'No drift between repo and deploy-dir' }
+        1 { Write-Fail 'Drift detected -- run setup-windows.ps1 or `dch -VerboseOutput` to see details' }
+        default { Write-Fail "diff-check.ps1 exited with code $diffExit (setup error)" }
+    }
+} else {
+    Write-Skip 'diff-check' "diff-check.ps1 not deployed at $diffCheckScript (run setup-windows.ps1)"
+}
 
 # ==================================================
 Write-Host ''

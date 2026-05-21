@@ -980,6 +980,16 @@ if (Test-Path $doctorSource) {
     Write-Warn "doctor.ps1 not found at $doctorSource"
 }
 
+# REFACTOR-003: deploy diff-check.ps1 (Windows port of diff-check.sh).
+# Closes the section 12/12 SKIP in healthcheck.ps1.
+$diffCheckSource = "$DotfilesDir\scripts\diff-check.ps1"
+if (Test-Path $diffCheckSource) {
+    Copy-Item $diffCheckSource "$ScriptsDir\" -Force
+    Write-Success "Deployed diff-check.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "diff-check.ps1 not found at $diffCheckSource"
+}
+
 # WIN-001 follow-up: PR #71 added the post-setup invocation in section 8d but
 # omitted the deploy. Without this Copy-Item, $ScriptsDir\healthcheck.ps1 never
 # exists and section 8d silently warns "not deployed, skipping" on every run.

@@ -128,8 +128,14 @@ setup() {
     grep -qF "TERM-002" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 12/12 (drift) emits SKIP with REFACTOR-003 reference" {
-    grep -qF "REFACTOR-003" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 12/12 invokes diff-check.ps1 (REFACTOR-003)" {
+    # Pre-REFACTOR-003 this was a SKIP with REFACTOR-003 in the message.
+    # Post-REFACTOR-003 the section invokes diff-check.ps1 and switches on
+    # the exit code (0 = PASS no drift, 1 = FAIL drift, other = setup error).
+    grep -qF 'diff-check.ps1' "$PS1_SCRIPT"
+    grep -qF 'REFACTOR-003' "$PS1_SCRIPT"
+    # The invocation must be inside the sec 12 block.
+    sed -n "/Write-Section '12\/12' 'Repo - Deploy-Dir Drift'/,/^# ==/p" "$PS1_SCRIPT" | grep -qF 'diff-check.ps1'
 }
 
 # --- Cross-section content asserts ---
