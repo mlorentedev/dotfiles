@@ -943,6 +943,20 @@ elif [ -f "$DOCTOR_SCRIPT" ]; then
     log_warning "doctor.sh present but not executable or jq missing, skipping post-setup check"
 fi
 
+# WIN-001b: mirror PR #71 setup-windows.ps1 section 8d on the Linux side.
+# Full structural health check after doctor. Non-fatal: surfaces deploy gaps
+# but does NOT alter setup's exit code. Matches the Windows auto-wire so the
+# cross-OS contract stays symmetric.
+HEALTHCHECK_SCRIPT="$DOTFILES_DIR/scripts/healthcheck.sh"
+if [ -x "$HEALTHCHECK_SCRIPT" ]; then
+    log_info "Running post-setup healthcheck..."
+    echo
+    bash "$HEALTHCHECK_SCRIPT" || log_warning "healthcheck reported one or more FAIL items -- review output above; use 'hc' alias to re-run"
+    echo
+elif [ -f "$HEALTHCHECK_SCRIPT" ]; then
+    log_warning "healthcheck.sh present but not executable, skipping post-setup check"
+fi
+
 log_info "To apply changes immediately, run:"
 log_info "  - For Bash: source ~/.bashrc"
 log_info "  - For Zsh:  source ~/.zshrc"

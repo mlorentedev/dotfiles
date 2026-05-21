@@ -352,6 +352,27 @@ setup() {
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
+# WIN-001b: cross-OS parity for the post-setup healthcheck auto-invoke.
+# setup-windows.ps1 has wired healthcheck.ps1 after doctor since PR #71 (WIN-001).
+# setup-linux.sh now mirrors that wiring with bash healthcheck.sh so the
+# cross-OS contract stays symmetric.
+@test "parity: both setup scripts invoke healthcheck post-setup (WIN-001b)" {
+    grep -qF 'healthcheck.sh' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'healthcheck.ps1' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+@test "WIN-001b: setup-linux.sh healthcheck block runs after doctor block" {
+    doctor_line=$(grep -n 'Running post-setup doctor check' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    health_line=$(grep -n 'Running post-setup healthcheck' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$doctor_line" ] && [ -n "$health_line" ]
+    [ "$health_line" -gt "$doctor_line" ]
+}
+
+@test "WIN-001b: setup-linux.sh healthcheck block is non-fatal (log_warning, no hard exit)" {
+    # The healthcheck failure path must emit a warning, not call exit non-zero.
+    grep -B1 -A1 'healthcheck reported one or more FAIL' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'log_warning'
+}
+
 # SessionStart hooks must run a silent doctor and surface only drift.
 @test "parity: both SessionStart hooks invoke silent doctor" {
     grep -q 'doctor\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
