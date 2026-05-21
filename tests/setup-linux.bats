@@ -223,7 +223,9 @@ setup() {
 
 @test "parity: both heal scripts walk hooks.json AND plugin/hooks/hooks.json (BUG-017)" {
     grep -q 'hooks/hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -q 'hooks\\\\hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    # PowerShell uses single-backslash path separator inside single-quoted strings.
+    # In bash single-quote -> grep BRE, two backslashes match one literal backslash.
+    grep -q 'hooks\\hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
     grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
     grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
