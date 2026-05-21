@@ -1,7 +1,7 @@
 ---
 id: "WIN-001-healthcheck-ps1"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-21"
 tags: [spec, proposal, windows, healthcheck, parity]
 template_version: "1.0"
@@ -77,3 +77,5 @@ Three observable behavior changes after this PR:
 - Doctor sibling: `scripts/doctor.ps1` (env-contract drift only; healthcheck does what doctor does NOT)
 - Related: `BUG-005-setup-ps7-reexec` (PR #58) — the pwsh 7+ guarantee healthcheck.ps1 inherits
 - Audit context: `[[30-architecture/audit-002-cross-os-duplication]]` flagged healthcheck as a missing cross-OS pair
+
+<!-- archived 2026-05-20 — PR: https://github.com/mlorentedev/dotfiles/pull/71 -->
