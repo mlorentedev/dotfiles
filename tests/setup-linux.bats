@@ -174,6 +174,34 @@ setup() {
     grep -q 'claude-mem-heal\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 
+# --- BUG-016: claude-mem-heal Repair-McpJson refresh for v13.x cascade pattern ---
+# Original heal (PR #57) only detected v12.7.4's ${_R%/} pattern. v13.0.0+
+# ships a different broken pattern (cascading-printf via `sh -c` -- root cause
+# of the EPIPE race in thedotmack/claude-mem#2607). Heal silently no-ops on
+# v13.x installs. BUG-016 extends detection AND replaces with a race-free
+# form using `done | head -n1` (Option A from upstream issue, applied locally).
+
+@test "claude-mem-heal scripts detect v13.x cascade pattern (BUG-016)" {
+    # Both heal scripts must look for `while IFS=` (the v13.x signature)
+    # in addition to the v12.7.4 ${_R%/} literal.
+    grep -q 'while IFS=' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -q 'while IFS=' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
+@test "claude-mem-heal scripts write the race-free head -n1 form (BUG-016)" {
+    # The replacement .mcp.json template must contain `head -n1` to
+    # consume the entire producer pipe and avoid the EPIPE race.
+    grep -q 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -q 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
+@test "parity: both heal scripts reference BUG-016 + thedotmack/claude-mem#2607 (BUG-016)" {
+    grep -qF 'BUG-016' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'BUG-016' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    grep -qF 'claude-mem#2607' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'claude-mem#2607' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+}
+
 # --- BUG-012: legacy marketplace junction/symlink for plugin discovery ---
 # Claude Code clones the claude-mem marketplace under the GitHub repo name
 # `thedotmack-claude-mem/`, but the plugin's bundled hooks.json hardcodes

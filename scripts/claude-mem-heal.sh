@@ -61,14 +61,26 @@ ensure_marketplace_compat_symlink() {
     fi
 }
 
-# Replace a broken .mcp.json with the v10.6.3 form. Idempotent: only
-# rewrites if the file contains the offending ${_R%/} pattern.
+# Replace a broken .mcp.json with a healthy form. BUG-016 (2026-05-21):
+# extended to detect v13.x cascading-printf pattern alongside v12.7.4's
+# `${_R%/}` literal. v13.x triggers the upstream EPIPE race documented in
+# thedotmack/claude-mem#2607 (causes `/mcp ... -32000` failures intermittently).
+#
+# The healthy form mirrors the v13.x cascade structure (so it works whether
+# or not Claude Code sets CLAUDE_PLUGIN_ROOT) but pipes the consumer's
+# matches through `head -n1` instead of breaking the inner `while` loop --
+# this drains the entire producer pipe, eliminating the EPIPE writes that
+# trigger the upstream bug.
+#
+# Idempotent: skips when neither v12.7.4 nor v13.x signature present.
 heal_mcp_json() {
     target="$1"
     [ -f "$target" ] || { verbose "no .mcp.json at $target"; return 0; }
 
     # shellcheck disable=SC2016 # literal pattern, intentionally not expanded
-    if ! grep -qF '${_R%/}' "$target" 2>/dev/null; then
+    has_v12=$(grep -cF '${_R%/}' "$target" 2>/dev/null || echo 0)
+    has_v13=$(grep -cE '"sh".*"-c"|while IFS= read' "$target" 2>/dev/null || echo 0)
+    if [ "$has_v12" -eq 0 ] && [ "$has_v13" -eq 0 ]; then
         verbose ".mcp.json already healthy: $target"
         return 0
     fi
@@ -78,15 +90,20 @@ heal_mcp_json() {
   "mcpServers": {
     "mcp-search": {
       "type": "stdio",
-      "command": "node",
+      "command": "sh",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.cjs"
+        "-c",
+        "_C=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"; _E=\"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}\"; _P=$({ [ -n \"$_E\" ] && printf '%s\\n' \"$_E\"; ls -dt \"$_C/plugins/cache/thedotmack/claude-mem\"/[0-9]*/ 2>/dev/null; printf '%s\\n' \"$_C/plugins/marketplaces/thedotmack-claude-mem/plugin\" \"$_C/plugins/marketplaces/thedotmack/plugin\"; } | while IFS= read -r _R; do _R=\"${_R%/}\"; [ -d \"$_R/plugin/scripts\" ] && _Q=\"$_R/plugin\" || _Q=\"$_R\"; [ -f \"$_Q/scripts/mcp-server.cjs\" ] && printf '%s\\n' \"$_Q\"; done | head -n1); [ -n \"$_P\" ] || { echo 'claude-mem: mcp server not found' >&2; exit 1; }; exec node \"$_P/scripts/mcp-server.cjs\""
       ]
     }
   }
 }
 EOF
-    log "patched .mcp.json: $target"
+    if [ "$has_v13" -gt 0 ]; then
+        log "patched .mcp.json (v13.x cascade -> head -n1 race-free form): $target"
+    else
+        log "patched .mcp.json (v12.7.4 \${_R%/} -> head -n1 race-free form): $target"
+    fi
 }
 
 # Install the zod runtime dep if package.json declares it but it isn't
