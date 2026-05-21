@@ -184,6 +184,28 @@ else
     skip "claude-mem install state -- installed_plugins.json missing (Claude Code never ran)"
 fi
 
+# BUG-015: assert the claude-mem hook's path-resolution cascade actually
+# returns a valid path. Reproduces the same one-liner the upstream
+# hooks.json runs (cache version dir -> marketplace junction) and reports
+# whether _P would be populated. Prevention layer: detects breakage BEFORE
+# user encounters the intermittent UserPromptSubmit fail.
+_cmhook_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+_cmhook_E="${PLUGIN_ROOT:-}"
+_cmhook_P=$({
+    [ -n "$_cmhook_E" ] && printf '%s\n' "$_cmhook_E"
+    ls -dt "$_cmhook_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null
+    printf '%s\n' "$_cmhook_C/plugins/marketplaces/thedotmack-claude-mem/plugin"
+} | while IFS= read -r _r; do
+    _r="${_r%/}"
+    [ -d "$_r/plugin/scripts" ] && _q="$_r/plugin" || _q="$_r"
+    [ -f "$_q/scripts/bun-runner.js" ] && [ -f "$_q/scripts/worker-service.cjs" ] && { printf '%s\n' "$_q"; break; }
+done)
+if [ -n "$_cmhook_P" ]; then
+    pass "claude-mem hook path resolves to: $_cmhook_P (BUG-015)"
+else
+    fail "claude-mem hook path resolution FAILED -- run claude-mem-heal.sh (BUG-015)"
+fi
+
 # ==================================================
 section "5/12" "Environment Variables"
 

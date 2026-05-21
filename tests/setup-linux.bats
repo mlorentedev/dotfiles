@@ -367,6 +367,19 @@ setup() {
     grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
 }
 
+# --- BUG-015: detection layer for claude-mem hook intermittent fails ---
+# The originally proposed prevention via PLUGIN_ROOT export was empirically
+# invalidated: setting PLUGIN_ROOT adds a third producer to the upstream
+# hooks' `{ printf; ls; printf; } | while ... break` pipe, tightening the
+# race that causes `printf: write error: Permission denied` on Git Bash.
+# The root cause is unfixable from outside (upstream hook pattern issue).
+# We keep ONLY the detection assertion: both healthchecks actually run
+# the hook resolution and report.
+@test "parity: both healthchecks include BUG-015 hook resolution assertion" {
+    grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+}
+
 # WIN-001b: cross-OS parity for the post-setup healthcheck auto-invoke.
 # setup-windows.ps1 has wired healthcheck.ps1 after doctor since PR #71 (WIN-001).
 # setup-linux.sh now mirrors that wiring with bash healthcheck.sh so the
