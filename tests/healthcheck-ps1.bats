@@ -150,6 +150,22 @@ setup() {
     grep -qF 'BUG-012' "$PS1_SCRIPT"
 }
 
+# --- BUG-014: install-state assertion for claude-mem ---
+# The BUG-012 junction check above validates a proxy artifact (filesystem
+# junction) but cannot detect the case where the marketplace dir is present
+# but the plugin is never installed (installed_plugins.json omits claude-mem).
+# BUG-014 adds a canonical assertion against installed_plugins.json so a
+# false-positive PASS becomes a true FAIL when the plugin is actually missing.
+
+@test "healthcheck.ps1 checks installed_plugins.json for claude-mem@thedotmack (BUG-014)" {
+    grep -qF 'installed_plugins.json' "$PS1_SCRIPT"
+    grep -qF 'claude-mem@thedotmack' "$PS1_SCRIPT"
+}
+
+@test "healthcheck.ps1 references BUG-014 install-state check" {
+    grep -qF 'BUG-014' "$PS1_SCRIPT"
+}
+
 # --- Exit code policy ---
 
 @test "healthcheck.ps1 exits 0 on success" {

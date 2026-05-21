@@ -168,6 +168,22 @@ check_symlink "$HOME/.zsh/aliases.zsh" ".zsh/aliases.zsh"
 check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
+# BUG-014 canonical install-state assertion (placed in sec 4 for cross-OS
+# parity with healthcheck.ps1). Greps the canonical install record; PASS only
+# when claude-mem is actually registered. Closes the false-positive class
+# where the marketplace dir exists on disk but the plugin was never installed
+# (e.g. after a .claude.json truncation event before BUG-004's snapshot guard).
+installed_plugins_json="$HOME/.claude/plugins/installed_plugins.json"
+if [ -f "$installed_plugins_json" ]; then
+    if grep -qF 'claude-mem@thedotmack' "$installed_plugins_json"; then
+        pass "claude-mem@thedotmack installed (BUG-014 canonical check)"
+    else
+        fail "claude-mem@thedotmack NOT in installed_plugins.json -- re-run setup-linux.sh (BUG-014)"
+    fi
+else
+    skip "claude-mem install state -- installed_plugins.json missing (Claude Code never ran)"
+fi
+
 # ==================================================
 section "5/12" "Environment Variables"
 

@@ -99,3 +99,17 @@ setup() {
 @test "healthcheck.sh invokes diff-check.sh" {
     grep -q 'diff-check.sh' "$SCRIPTS_DIR/healthcheck.sh"
 }
+
+# --- BUG-014: install-state assertion for claude-mem ---
+# Linux side of the BUG-014 cross-OS healthcheck fix. Asserts a canonical
+# `claude-mem@thedotmack` membership check against installed_plugins.json
+# in sec 4. Mirrors the Windows healthcheck.ps1 assertion.
+
+@test "healthcheck.sh checks installed_plugins.json for claude-mem@thedotmack (BUG-014)" {
+    grep -qF 'installed_plugins.json' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qF 'claude-mem@thedotmack' "$SCRIPTS_DIR/healthcheck.sh"
+}
+
+@test "healthcheck.sh references BUG-014 install-state check" {
+    grep -qF 'BUG-014' "$SCRIPTS_DIR/healthcheck.sh"
+}
