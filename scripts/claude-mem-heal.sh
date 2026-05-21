@@ -141,10 +141,32 @@ heal_zod() {
     log "installed missing zod dep in $plugin_dir"
 }
 
+# BUG-017 (2026-05-21): patch hooks.json against the same EPIPE race that
+# BUG-016 closed for .mcp.json. The 6 upstream hooks (Setup, SessionStart x2,
+# UserPromptSubmit, PostToolUse, PreToolUse, Stop) all use the
+# `{ printf; ls; printf; } | while ... break` pipe cascade. When the consumer
+# breaks early, unconsumed producer writes EPIPE on Git Bash Windows.
+# Minimal substitution: `break; }; done` -> `}; done | head -n1` keeps the
+# loop running to completion, then head takes the first printed match.
+heal_hooks_json() {
+    target="$1"
+    [ -f "$target" ] || { verbose "no hooks.json at $target"; return 0; }
+    if ! grep -qF 'break; }; done' "$target" 2>/dev/null; then
+        verbose "hooks.json already healthy: $target"
+        return 0
+    fi
+    # Use a temp file -- sed -i with portable escaping for the pipe delim.
+    tmp="$target.tmp.$$"
+    sed 's|break; }; done|}; done | head -n1|g' "$target" > "$tmp" && mv "$tmp" "$target"
+    log "patched hooks.json (BUG-017, head -n1 race-free form): $target"
+}
+
 heal_dir() {
     dir="$1"
     [ -d "$dir" ] || return 0
     heal_mcp_json "$dir/.mcp.json"
+    heal_hooks_json "$dir/hooks/hooks.json"
+    heal_hooks_json "$dir/plugin/hooks/hooks.json"
     heal_zod "$dir"
 }
 
