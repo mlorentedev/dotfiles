@@ -50,6 +50,16 @@ setup() {
     grep -q 'function prompt' "$PROFILE_SCRIPT"
 }
 
+# --- WIN-001: hc function (healthcheck alias mirror of Linux `hc`) ---
+
+@test "profile.ps1 defines hc function (WIN-001 healthcheck alias)" {
+    grep -qE '^function hc' "$PROFILE_SCRIPT"
+}
+
+@test "profile.ps1 hc function references SCRIPTS_DIR\\healthcheck.ps1" {
+    grep -qF 'healthcheck.ps1' "$PROFILE_SCRIPT"
+}
+
 @test "profile.ps1 valid PowerShell syntax (if pwsh available)" {
     if ! command -v pwsh >/dev/null 2>&1; then
         skip "pwsh not available"
