@@ -860,6 +860,17 @@ if (Test-Path $doctorSource) {
     Write-Warn "doctor.ps1 not found at $doctorSource"
 }
 
+# WIN-001 follow-up: PR #71 added the post-setup invocation in section 8d but
+# omitted the deploy. Without this Copy-Item, $ScriptsDir\healthcheck.ps1 never
+# exists and section 8d silently warns "not deployed, skipping" on every run.
+$healthcheckSource = "$DotfilesDir\scripts\healthcheck.ps1"
+if (Test-Path $healthcheckSource) {
+    Copy-Item $healthcheckSource "$ScriptsDir\" -Force
+    Write-Success "Deployed healthcheck.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "healthcheck.ps1 not found at $healthcheckSource"
+}
+
 $contractSource = "$DotfilesDir\env-contract.json"
 if (Test-Path $contractSource) {
     Copy-Item $contractSource "$DotfilesDest\" -Force
