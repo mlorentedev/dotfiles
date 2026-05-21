@@ -352,6 +352,21 @@ setup() {
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
+# BUG-013b: cross-OS parity for the Obsidian CLI (@vorillaz/obsidian-cli)
+# install. Windows side shipped in PR #77 via npm global. Linux side
+# mirrors with the same idempotent + gated-on-npm pattern.
+@test "parity: both setup scripts install Obsidian CLI via npm (BUG-013/b)" {
+    grep -qF "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+@test "setup-linux.sh Obsidian CLI install is gated on npm + idempotent (BUG-013b)" {
+    # idempotence: skip if `obsidian` already on PATH
+    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v obsidian"
+    # gating: only run if npm is available
+    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
+}
+
 # WIN-001b: cross-OS parity for the post-setup healthcheck auto-invoke.
 # setup-windows.ps1 has wired healthcheck.ps1 after doctor since PR #71 (WIN-001).
 # setup-linux.sh now mirrors that wiring with bash healthcheck.sh so the
