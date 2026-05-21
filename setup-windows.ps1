@@ -348,7 +348,10 @@ if (Test-Path $skillsSource) {
 # Register MCP servers (requires Claude Code CLI, Node.js)
 # Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
 # `claude mcp get` is used to skip already-registered entries, and `add` errors
-# are surfaced rather than swallowed.
+# are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
+# invocation is wrapped with Backup-AndRestoreClaudeJson because both subcommands
+# hit the same #59870 deserialize-modify-serialize truncation path as
+# `plugin install`.
 $mcpConfig = "$DotfilesDir\mcp-servers.json"
 $claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
 $npxCmd = Get-Command npx -ErrorAction SilentlyContinue
@@ -376,14 +379,24 @@ if (-not ($claudeCmd -and $npxCmd)) {
                     & $prereqParts[0] @($prereqParts[1..($prereqParts.Length - 1)]) 2>&1 | Out-Null
                 }
             }
-            $null = & claude mcp get $srv.name 2>&1
+            # BUG-011: wrap the idempotence-check `claude mcp get` with the same
+            # guard used for install -- the CLI rewrites .claude.json on any
+            # invocation. $LASTEXITCODE is automatic and survives the scriptblock.
+            Backup-AndRestoreClaudeJson -Action {
+                $null = & claude mcp get $srv.name 2>&1
+            }
             if ($LASTEXITCODE -eq 0) {
                 Write-Info "MCP $($srv.name) already registered, skipping"
                 $mcpSkipped++
                 continue
             }
             $argParts = $srv.args -split '\s+'
-            $mcpErr = & claude mcp add --transport $srv.transport $srv.name --scope user -- @argParts 2>&1
+            # BUG-011: wrap `claude mcp add` -- the unwrapped call here was the
+            # residual #59870 trigger after BUG-004 (PR #57) closed only the
+            # plugin-install path.
+            $mcpErr = Backup-AndRestoreClaudeJson -Action {
+                & claude mcp add --transport $srv.transport $srv.name --scope user -- @argParts 2>&1
+            }
             if ($LASTEXITCODE -eq 0) {
                 Write-Success "Registered MCP $($srv.name)"
                 $mcpAdded++
@@ -406,7 +419,9 @@ if (-not ($claudeCmd -and $npxCmd)) {
 # the projects map, and onboarding flags get silently dropped. Re-running
 # install for already-installed plugins triggers silent .claude.json truncation
 # and forces re-authentication in every project. Same idempotence pattern as
-# MCP registration above.
+# MCP registration above. BUG-011: the pre-loop `claude plugin list` is now
+# also wrapped because it goes through the same #59870 deserialize-modify-
+# serialize path.
 if ($claudeCmd) {
     Write-Info "Installing Claude Code plugins..."
     $plugins = @(
@@ -422,7 +437,11 @@ if ($claudeCmd) {
         "commit-commands@claude-plugins-official",
         "pr-review-toolkit@claude-plugins-official"
     )
-    $installedPlugins = try { (& claude plugin list 2>$null) -join "`n" } catch { "" }
+    # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
+    # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
+    $installedPlugins = Backup-AndRestoreClaudeJson -Action {
+        try { (& claude plugin list 2>$null) -join "`n" } catch { "" }
+    }
     $pluginsAdded = 0
     $pluginsSkipped = 0
     foreach ($plugin in $plugins) {
