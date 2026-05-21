@@ -442,13 +442,13 @@ if ($claudeCmd) {
     # `@thedotmack` (only `claude-plugins-official` is registered by default)
     # and fails silently inside the loop's try/catch. The CLI is idempotent
     # ("Marketplace 'thedotmack' already on disk" + exit 0 on re-run), so we
-    # call it unconditionally. Wrapped per BUG-011 — every `claude` CLI
+    # call it unconditionally. Wrapped per BUG-011 -- every `claude` CLI
     # invocation in setup must be snapshot-guarded.
     Backup-AndRestoreClaudeJson -Action {
         try {
             & claude plugin marketplace add thedotmack/claude-mem 2>$null | Out-Null
         } catch {
-            # Network failure or transient CLI issue — let the install loop fail
+            # Network failure or transient CLI issue -- let the install loop fail
             # loud-but-recoverable rather than blocking the rest of setup.
         }
     }
