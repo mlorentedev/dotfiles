@@ -102,6 +102,7 @@ hc                                  # Run healthcheck (versions, paths, symlinks
 dch                                 # Drift check: repo vs ~/.dotfiles deploy dir
 profile-shell                       # Measure shell startup time (zsh default)
 profile-shell --shell bash --detail # Per-function breakdown via zprof/xtrace
+vault help                          # Vault tooling dispatcher (health / maintenance / check-escapes)
 ```
 
 ### tmux
