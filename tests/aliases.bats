@@ -94,6 +94,15 @@ setup() {
     ! grep -qE '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
 }
 
+# CHORE-001: shell-profile.sh discoverability via `profile-shell` alias.
+# Dormant-but-load-bearing diagnostic tool (shell startup profiling); was
+# orphan-by-metric per AUDIT-005 but kept by anti-scope rule. Alias makes
+# it discoverable when interactive shell startup feels slow.
+@test "aliases.zsh defines profile-shell alias for shell-profile.sh (CHORE-001)" {
+    grep -qE '^alias profile-shell=' "$ALIASES_FILE"
+    grep -qF 'shell-profile.sh' "$ALIASES_FILE"
+}
+
 # --- Knowledge aliases ---
 
 @test "aliases.zsh defines kc alias" {

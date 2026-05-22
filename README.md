@@ -95,6 +95,15 @@ dotfiles-sync                       # Bidirectional sync + git push/pull
 dotfiles-sync --secrets-only        # Only sync sensitive/ files
 ```
 
+### Diagnostics
+
+```bash
+hc                                  # Run healthcheck (versions, paths, symlinks, env vars)
+dch                                 # Drift check: repo vs ~/.dotfiles deploy dir
+profile-shell                       # Measure shell startup time (zsh default)
+profile-shell --shell bash --detail # Per-function breakdown via zprof/xtrace
+```
+
 ### tmux
 
 Two use cases this setup is tuned for: **(1) split-pane multiplexing** (editor + AI agent + tests side by side) and **(2) session persistence** (close the laptop / drop SSH and come back to the same state).
