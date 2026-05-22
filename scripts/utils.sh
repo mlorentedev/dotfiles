@@ -724,3 +724,17 @@ unset_var() {
     unset "$1" 2>/dev/null || true
 }
 
+# Obsidian helpers
+
+# Emits the canonical "Cannot reach Obsidian GUI" error + start hint, then
+# exits 2. Caller owns the probe shape; this owns the user-facing message
+# so it stays in one place across obs-cli.sh and vault-health.sh.
+# Input: none
+# Output: error log + info hint to stderr/stdout, then exit 2
+# Usage: <your_probe> || fail_obsidian_gui
+fail_obsidian_gui() {
+    log_error "Cannot reach Obsidian GUI. Is Obsidian running?"
+    log_info "Start Obsidian or run: obsidian --no-sandbox &"
+    exit 2
+}
+
