@@ -30,9 +30,10 @@ setup() {
     grep -q "opencode binary not reachable" "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh adds opencode PATH via ensure_line_in_file (no manual sed)" {
-    grep -q 'ensure_line_in_file "\$HOME/.zshrc" "\$OPENCODE_PATH_LINE"' "$SETUP_SCRIPT"
-    grep -q 'ensure_line_in_file "\$HOME/.bashrc" "\$OPENCODE_PATH_LINE"' "$SETUP_SCRIPT"
+@test "opencode PATH is baked into repo .zshrc and .bashrc (SSOT, no setup-time mutation)" {
+    grep -q 'export PATH="\$HOME/.opencode/bin:\$PATH"' "$DOTFILES_DIR/.zshrc"
+    grep -q 'export PATH="\$HOME/.opencode/bin:\$PATH"' "$DOTFILES_DIR/.bashrc"
+    ! grep -q 'ensure_line_in_file.*OPENCODE_PATH_LINE' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh opencode install URL uses opencode.ai (not anomalyco fork)" {

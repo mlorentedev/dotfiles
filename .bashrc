@@ -156,3 +156,12 @@ if [[ -n "${DOTFILES_PROFILE:-}" ]]; then
     exec 2>&3 3>&-
     echo "bashrc profile written to /tmp/bashrc-profile.$$.log"
 fi
+
+# opencode CLI
+export PATH="$HOME/.opencode/bin:$PATH"
+
+# AI-agnostic project init alias
+alias project-init="$HOME/.claude/init-project.sh"
+
+# Dotfiles scripts on PATH
+export PATH="$HOME/.dotfiles/scripts:$PATH"
