@@ -478,6 +478,27 @@ setup() {
     grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
+# BUG-023: the BUG-015 probe must use the race-free materialize+break form,
+# NOT the BUG-022 `done | head -n1` pipe (which races under `set -euo
+# pipefail` when 2+ candidates match -> EPIPE on leftover printfs -> exit
+# 141 mid-section). Locks the new pattern present AND the old pattern
+# absent so a future "simplification" can't regress us back.
+@test "BUG-023: healthcheck.sh probe uses materialize+break (no pipe-to-head race)" {
+    # Positive: the materialized candidates variable + heredoc loop is there.
+    grep -qF '_cmhook_cands=$(' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    grep -qF 'done <<<"$_cmhook_cands"' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    # Negative: the broken pipe-to-head form must not reappear in the probe.
+    ! grep -qF 'done | head -n1' "$DOTFILES_DIR/scripts/healthcheck.sh"
+}
+
+@test "BUG-023: healthcheck.ps1 bash one-liner mirrors the race-free form" {
+    # Positive: the PS1 bash sub-invocation uses the same materialize+break.
+    grep -qF '_CANDS=$(' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+    grep -qF 'done <<<"$_CANDS"' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+    # Negative: lock out the broken pipe-to-head form so PS1 stays in parity.
+    ! grep -qF 'done | head -n1' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+}
+
 # WIN-001b: cross-OS parity for the post-setup healthcheck auto-invoke.
 # setup-windows.ps1 has wired healthcheck.ps1 after doctor since PR #71 (WIN-001).
 # setup-linux.sh now mirrors that wiring with bash healthcheck.sh so the
