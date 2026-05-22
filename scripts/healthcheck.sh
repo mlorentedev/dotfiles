@@ -191,20 +191,27 @@ fi
 # user encounters the intermittent UserPromptSubmit fail.
 _cmhook_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 _cmhook_E="${PLUGIN_ROOT:-}"
-# BUG-022 (2026-05-21): probe itself used the same `break; }; done` cascade
-# as the upstream hooks (which BUG-017 patched away). Apply the same
-# `head -n1` fix locally so the probe is race-free and reports actual state
-# instead of spurious failures. On Linux SIGPIPE is silent so the race rarely
-# fires here, but cross-OS parity with healthcheck.ps1 matters.
-_cmhook_P=$({
+# BUG-023 (2026-05-21): the BUG-022 pipe-to-head form still raced under
+# `set -euo pipefail` when 2+ candidates matched: the consumer closed
+# after the first line, leftover printfs in the while loop got EPIPE,
+# pipefail propagated 141 to the $() and set -e killed the script
+# mid-section 4/12. Race-free pattern: materialize all candidates into a
+# variable (no pipe), then iterate in pure bash with `break` -- no
+# consumer-close, no EPIPE. Supersedes the BUG-022 approach.
+_cmhook_cands=$({
     [ -n "$_cmhook_E" ] && printf '%s\n' "$_cmhook_E"
     ls -dt "$_cmhook_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null
     printf '%s\n' "$_cmhook_C/plugins/marketplaces/thedotmack-claude-mem/plugin"
-} | while IFS= read -r _r; do
+})
+_cmhook_P=""
+while IFS= read -r _r; do
     _r="${_r%/}"
     [ -d "$_r/plugin/scripts" ] && _q="$_r/plugin" || _q="$_r"
-    [ -f "$_q/scripts/bun-runner.js" ] && [ -f "$_q/scripts/worker-service.cjs" ] && printf '%s\n' "$_q"
-done | head -n1)
+    if [ -f "$_q/scripts/bun-runner.js" ] && [ -f "$_q/scripts/worker-service.cjs" ]; then
+        _cmhook_P="$_q"
+        break
+    fi
+done <<<"$_cmhook_cands"
 if [ -n "$_cmhook_P" ]; then
     pass "claude-mem hook path resolves to: $_cmhook_P (BUG-015)"
 else

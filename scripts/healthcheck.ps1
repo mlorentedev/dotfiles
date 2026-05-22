@@ -266,12 +266,17 @@ if (Test-Path -LiteralPath $marketplaceReal -PathType Container) {
 # UserPromptSubmit "printf: write error: Permission denied" symptom.
 $bashCmd = Get-Command bash -ErrorAction SilentlyContinue
 if ($bashCmd) {
-    # BUG-022 (2026-05-21): the probe itself used the same `break; }; done`
-    # cascade pattern as the upstream hook, hitting the EPIPE race when
-    # called from setup. Apply the same `head -n1` fix (Option A from
-    # claude-mem#2607) so the probe is race-free and reports the actual
-    # state of the install rather than spurious failures.
-    $cmHookProbe = '_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; _E="${PLUGIN_ROOT:-}"; _P=$({ [ -n "$_E" ] && printf ''%s\n'' "$_E"; ls -dt "$_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null; printf ''%s\n'' "$_C/plugins/marketplaces/thedotmack-claude-mem/plugin"; } | while IFS= read -r _R; do _R="${_R%/}"; [ -d "$_R/plugin/scripts" ] && _Q="$_R/plugin" || _Q="$_R"; [ -f "$_Q/scripts/bun-runner.js" ] && [ -f "$_Q/scripts/worker-service.cjs" ] && printf ''%s\n'' "$_Q"; done | head -n1); [ -n "$_P" ] && printf ''%s'' "$_P" || exit 1'
+    # BUG-023 (2026-05-21): the BUG-022 pipe-to-head form still raced
+    # under Linux `set -euo pipefail` when 2+ candidates matched (the
+    # consumer closed after the first line, leftover printfs got EPIPE,
+    # pipefail killed the script). Cross-OS parity: rewrite to
+    # materialize candidates first, then iterate in pure bash with
+    # `break` -- no consumer-close, no pipe race. Git Bash on Windows
+    # doesn't set pipefail in this sub-context so it never observed the
+    # symptom, but the race-free form keeps both probes structurally
+    # identical (lesson: probe must use the race-free pattern, not
+    # faithfully reproduce broken upstream behaviour).
+    $cmHookProbe = '_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; _E="${PLUGIN_ROOT:-}"; _CANDS=$({ [ -n "$_E" ] && printf ''%s\n'' "$_E"; ls -dt "$_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null; printf ''%s\n'' "$_C/plugins/marketplaces/thedotmack-claude-mem/plugin"; }); _P=""; while IFS= read -r _R; do _R="${_R%/}"; [ -d "$_R/plugin/scripts" ] && _Q="$_R/plugin" || _Q="$_R"; if [ -f "$_Q/scripts/bun-runner.js" ] && [ -f "$_Q/scripts/worker-service.cjs" ]; then _P="$_Q"; break; fi; done <<<"$_CANDS"; [ -n "$_P" ] && printf ''%s'' "$_P" || exit 1'
     $resolved = & bash -c $cmHookProbe 2>&1
     if ($LASTEXITCODE -eq 0 -and $resolved) {
         Write-Pass "claude-mem hook path resolves to: $resolved (BUG-015)"
