@@ -111,11 +111,7 @@ if ! command_exists obsidian; then
 fi
 
 # Test CLI connectivity by running a simple command
-if ! obsidian_cmd vault 2>/dev/null | grep -q .; then
-    log_error "Cannot reach Obsidian GUI. Is Obsidian running?"
-    echo "  Hint: Start Obsidian or run: obsidian --no-sandbox &"
-    exit 2
-fi
+obsidian_cmd vault 2>/dev/null | grep -q . || fail_obsidian_gui
 pass "Obsidian CLI connected to vault '$VAULT_NAME'"
 
 if [ -d "$VAULT_DIR" ]; then

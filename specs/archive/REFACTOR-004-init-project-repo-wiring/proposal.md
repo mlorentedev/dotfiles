@@ -1,7 +1,7 @@
 ---
 id: "REFACTOR-004-init-project-repo-wiring"
 type: spec
-status: implementing
+status: archived
 created: "2026-05-21"
 tags: [spec, refactor, init-project, cross-os, audit-005-followup]
 template_version: "1.0"

@@ -42,10 +42,6 @@ if ! command_exists obsidian; then
 fi
 
 # Connectivity check: verify GUI is running
-if ! obsidian --no-sandbox vault --vault "$OBS_VAULT" >/dev/null 2>&1; then
-    log_error "Cannot reach Obsidian GUI. Is Obsidian running?"
-    log_info "Start Obsidian or run: obsidian --no-sandbox &"
-    exit 2
-fi
+obsidian --no-sandbox vault --vault "$OBS_VAULT" >/dev/null 2>&1 || fail_obsidian_gui
 
 exec obsidian --no-sandbox "$@" --vault "$OBS_VAULT"
