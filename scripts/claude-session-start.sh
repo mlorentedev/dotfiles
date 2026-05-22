@@ -15,6 +15,44 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
+# --- SDD-004: session-start-config.json reader ---
+# Single source of truth for thresholds + injector flags. Lives at repo root
+# (one level above scripts/). Override via SESSION_START_CONFIG env var.
+# If the file or jq is missing, the script falls back to historical hardcoded
+# defaults so SessionStart never breaks on a partial dotfiles install.
+CONFIG_PATH="${SESSION_START_CONFIG:-$SCRIPT_DIR/../session-start-config.json}"
+if [ -f "$CONFIG_PATH" ] && command -v jq >/dev/null 2>&1; then
+    CFG_AVAILABLE=1
+else
+    CFG_AVAILABLE=0
+fi
+
+# Read a numeric threshold from session-start-config.json; echoes the default
+# if config absent or key missing. Usage: VAR=$(cfg_threshold key default)
+cfg_threshold() {
+    local key="$1" default="$2"
+    if [ "$CFG_AVAILABLE" = "1" ]; then
+        jq -r ".thresholds.$key // $default" "$CONFIG_PATH" 2>/dev/null
+    else
+        echo "$default"
+    fi
+}
+
+# Check if an injector is enabled in session-start-config.json. Defaults to
+# true if the config or key is absent (preserves historical "all on" behavior).
+# Helper is provided for future incremental gating; current PR does NOT wrap
+# any injector — adding gates is a low-risk per-injector follow-up.
+# Usage: cfg_injector_enabled key && { ... }
+cfg_injector_enabled() {
+    local key="$1" val
+    if [ "$CFG_AVAILABLE" = "1" ]; then
+        val=$(jq -r ".injectors.$key.enabled // true" "$CONFIG_PATH" 2>/dev/null)
+        [ "$val" = "true" ]
+    else
+        return 0
+    fi
+}
+
 # Read hook input from stdin
 INPUT=$(cat)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || echo "")
@@ -331,9 +369,11 @@ check_knowledge_health() {
     line_count=$(wc -l < "$memory_file")
     last_date=$(grep '^## Last Crystallized:' "$memory_file" | tail -1 | sed 's/## Last Crystallized: //' || true)
 
-    if [ "$line_count" -gt 150 ]; then
+    local mem_max_lines
+    mem_max_lines=$(cfg_threshold memory_md_max_lines 150)
+    if [ "$line_count" -gt "$mem_max_lines" ]; then
         CONTEXT_LINES="$CONTEXT_LINES
-MEMORY.md has $line_count lines (limit: 150) — run /crystallize to trim"
+MEMORY.md has $line_count lines (limit: $mem_max_lines) — run /crystallize to trim"
     fi
 
     if [ -z "$last_date" ]; then
@@ -345,7 +385,9 @@ Knowledge crystallization never run — run: ./scripts/knowledge-crystallize.sh"
         last_epoch=$(date -d "$last_date" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$last_date" +%s 2>/dev/null || echo 0)
         if [ "$today_epoch" -gt 0 ] && [ "$last_epoch" -gt 0 ]; then
             days_since=$(( (today_epoch - last_epoch) / 86400 ))
-            if [ "$days_since" -gt 14 ]; then
+            local stale_max
+            stale_max=$(cfg_threshold crystallize_max_days 14)
+            if [ "$days_since" -gt "$stale_max" ]; then
                 CONTEXT_LINES="$CONTEXT_LINES
 CRYSTALLIZE NEEDED (${days_since} days stale)"
             fi
@@ -423,6 +465,10 @@ check_memory_temperature() {
     [ -d "$memory_dir" ] || return 0
 
     now=$(date +%s)
+    local hot_days warm_days cold_days
+    hot_days=$(cfg_threshold memory_temp_hot_days 7)
+    warm_days=$(cfg_threshold memory_temp_warm_days 30)
+    cold_days=$(cfg_threshold memory_temp_cold_days 60)
 
     for f in "$memory_dir"/*.md; do
         [ -f "$f" ] || continue
@@ -435,11 +481,11 @@ check_memory_temperature() {
         days_ago=$(( (now - file_epoch) / 86400 ))
         fname=$(basename "$f")
 
-        if [ "$days_ago" -le 7 ]; then
+        if [ "$days_ago" -le "$hot_days" ]; then
             label="HOT"
-        elif [ "$days_ago" -le 30 ]; then
+        elif [ "$days_ago" -le "$warm_days" ]; then
             label="WARM"
-        elif [ "$days_ago" -le 60 ]; then
+        elif [ "$days_ago" -le "$cold_days" ]; then
             label="COLD"
         else
             label="ARCHIVE"
@@ -470,8 +516,8 @@ check_memory_temperature
 # behavior (e.g. mcp add/remove, plugin uninstall).
 check_claude_json_size() {
     local claude_json="$HOME/.claude/.claude.json"
-    local threshold=10240  # 10 KB
-    local size
+    local threshold size
+    threshold=$(cfg_threshold claude_json_min_bytes 10240)
 
     [ -f "$claude_json" ] || return 0
 

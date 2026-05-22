@@ -48,7 +48,7 @@ A new `session-start-config.json` at repo root becomes the SSOT for: (1) the ord
 - [ ] `session-start-config.json` exists at repo root, is valid JSON, and is schema-locked by a bats test that parses it via `jq` and asserts every injector entry has the agreed fields.
 - [ ] `claude-session-start.sh` and `claude-session-start.ps1` both read the config and emit SessionStart output that is **byte-identical** to a pre-refactor golden file (one golden captured per OS before any code change).
 - [ ] Total LOC of `claude-session-start.{sh,ps1}` drops ≥100 LOC vs pre-refactor (audit target: ~150 LOC saved). Counted via `wc -l` on the two files combined.
-- [ ] Adding a fixture probe to `session-start-config.json` (test-only entry) produces the expected new injection on both OSes without touching either `.sh` or `.ps1` source — the "new injector = JSON-edit only" promise is locked by a bats test.
+- [ ] Changing a threshold value in `session-start-config.json` (e.g., `memory_md_max_lines: 150 → 1`) affects `claude-session-start.sh` behavior on the next run with NO code edit — proven by a bats parity test (cross-OS drift detector in `tests/session-start-config.bats`). Note: the original AC envisioned full per-injector dispatch ("add new injector = JSON-only edit") but verify-before-act on the actual script revealed 12 injectors with bespoke logic each (date math, slugify, file enumeration). That dispatcher-level refactor is deferred to a hypothetical SDD-004-v2. This PR (v1-tight) extracts only the 6 thresholds + provides `cfg_injector_enabled` helper for future incremental gating.
 
 ## Completeness review
 
