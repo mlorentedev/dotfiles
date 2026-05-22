@@ -30,6 +30,7 @@ alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
 # Repo maintenance
 alias dch="diff-check.sh"                         # Detect drift between repo and ~/.dotfiles
 alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from git log
+alias profile-shell="shell-profile.sh"            # Measure shell startup (use --detail for per-function breakdown via zprof/xtrace)
 
 # OpenCode (primary AI coding agent — replaces aider)
 alias oc="opencode"                                                                       # TUI: opencode Go subscription
