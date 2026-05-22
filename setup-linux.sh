@@ -427,11 +427,6 @@ else
     log_info "opencode already installed"
 fi
 
-# Ensure $HOME/.opencode/bin on PATH (defensive; install script also tries this)
-OPENCODE_PATH_LINE='export PATH="$HOME/.opencode/bin:$PATH"'
-[ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$OPENCODE_PATH_LINE"
-[ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$OPENCODE_PATH_LINE"
-
 # Deploy opencode.jsonc — reconcile-not-skip per pattern-setup-script-idempotence
 ensure_directory "$HOME/.config/opencode"
 OPENCODE_CONFIG_SRC="$CURRENT_DIR/ai/opencode/opencode.jsonc"
@@ -899,11 +894,6 @@ if [ -d "$VAULT_SKILLS_DIR" ]; then
     done
 fi
 
-# Add project-init alias (AI-agnostic naming)
-PROJECT_INIT_LINE='alias project-init="$HOME/.claude/init-project.sh"'
-[ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
-[ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$PROJECT_INIT_LINE" 2>/dev/null || true
-
 # Weekly vault maintenance cron (Sundays 10:00 AM)
 log_info "Setting up weekly vault maintenance cron..."
 if command -v crontab >/dev/null 2>&1; then
@@ -917,11 +907,6 @@ if command -v crontab >/dev/null 2>&1; then
 else
     log_warning "crontab not available, skipping weekly maintenance cron"
 fi
-
-log_info "Adding dotfiles scripts directory to PATH..."
-PATH_LINE='export PATH=$HOME/.dotfiles/scripts:$PATH'
-[ -f "$HOME/.zshrc" ] && ensure_line_in_file "$HOME/.zshrc" "$PATH_LINE" && log_success "Added scripts to PATH in .zshrc"
-[ -f "$HOME/.bashrc" ] && ensure_line_in_file "$HOME/.bashrc" "$PATH_LINE" && log_success "Added scripts to PATH in .bashrc"
 
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."
