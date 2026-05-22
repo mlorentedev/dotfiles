@@ -34,8 +34,12 @@ setup() {
     grep -q 'command_exists obsidian' "$SCRIPTS_DIR/obs-cli.sh"
 }
 
-@test "obs-cli.sh exits 2 when GUI not running" {
-    grep -q 'exit 2' "$SCRIPTS_DIR/obs-cli.sh"
+@test "obs-cli.sh exits 2 when GUI not running (via fail_obsidian_gui)" {
+    # After the AUDIT-005 extraction, the canonical "exit 2 + error message"
+    # lives in utils.sh::fail_obsidian_gui. obs-cli.sh delegates via `|| fail_obsidian_gui`.
+    grep -q 'fail_obsidian_gui' "$SCRIPTS_DIR/obs-cli.sh"
+    grep -q '^fail_obsidian_gui()' "$SCRIPTS_DIR/utils.sh"
+    grep -q 'exit 2' "$SCRIPTS_DIR/utils.sh"
 }
 
 @test "obs-cli.sh passes --no-sandbox flag" {
