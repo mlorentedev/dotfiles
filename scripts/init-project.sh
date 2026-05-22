@@ -130,6 +130,23 @@ EOF
     exit 0
 fi
 
+# REFACTOR-004: parse --skip-{agents,standards,github} flags before positional
+# args so existing call signatures (project-name + stack) still work.
+SKIP_AGENTS=0
+SKIP_STANDARDS=0
+SKIP_GITHUB=0
+_POSITIONAL=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --skip-agents) SKIP_AGENTS=1; shift ;;
+        --skip-standards) SKIP_STANDARDS=1; shift ;;
+        --skip-github) SKIP_GITHUB=1; shift ;;
+        --) shift; while [ $# -gt 0 ]; do _POSITIONAL+=("$1"); shift; done ;;
+        *) _POSITIONAL+=("$1"); shift ;;
+    esac
+done
+set -- "${_POSITIONAL[@]:-}"
+
 PROJECT_NAME="${1:-.}"
 STACK="${2:-python}"
 # Using .claude as the central config hub (backward compatibility)
@@ -452,6 +469,32 @@ htmlcov/
 coverage.out
 EOF
     log_success "Created .gitignore"
+fi
+
+# --- REPO BOOTSTRAP (REFACTOR-004) ---
+# Wire the standalone init-repo-* helpers into the default init-project flow.
+# Each invocation is non-fatal: a helper failure logs a warning and continues
+# rather than aborting the whole init. github-defaults is auto-skipped when no
+# `origin` remote is configured (typical for a brand-new local repo).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+if [ "$SKIP_AGENTS" = "0" ] && [ -x "$SCRIPT_DIR/init-repo-agents.sh" ]; then
+    log_info "Bootstrapping AGENTS.md (init-repo-agents)..."
+    "$SCRIPT_DIR/init-repo-agents.sh" --repo "$(pwd)" || log_error "init-repo-agents failed (non-fatal); continuing"
+fi
+
+if [ "$SKIP_STANDARDS" = "0" ] && [ -x "$SCRIPT_DIR/init-repo-standards.sh" ]; then
+    log_info "Bootstrapping docs/standards.md (init-repo-standards)..."
+    "$SCRIPT_DIR/init-repo-standards.sh" --repo "$(pwd)" || log_error "init-repo-standards failed (non-fatal); continuing"
+fi
+
+if [ "$SKIP_GITHUB" = "0" ] && [ -x "$SCRIPT_DIR/init-repo-github-defaults.sh" ]; then
+    if git config --get remote.origin.url >/dev/null 2>&1; then
+        log_info "Applying GitHub defaults (init-repo-github-defaults)..."
+        "$SCRIPT_DIR/init-repo-github-defaults.sh" || log_error "init-repo-github-defaults failed (non-fatal); continuing"
+    else
+        log_info "No origin remote yet; skipping init-repo-github-defaults (add a remote then re-run it manually)"
+    fi
 fi
 
 log_success "Project initialized with Dual AI Configuration"

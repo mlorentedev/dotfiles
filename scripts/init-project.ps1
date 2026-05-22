@@ -35,7 +35,14 @@ param(
 
     [string]$Family = "",
 
-    [string]$Component = ""
+    [string]$Component = "",
+
+    # REFACTOR-004: opt-out switches for the wired init-repo-* helpers.
+    [switch]$SkipAgents,
+
+    [switch]$SkipStandards,
+
+    [switch]$SkipGithub
 )
 
 # ============================================================================
@@ -561,6 +568,46 @@ coverage.out
 "@
     Set-Content -Path ".gitignore" -Value $GitignoreContent -Encoding UTF8
     Write-Success "Created .gitignore"
+}
+
+# ============================================================================
+# REPO BOOTSTRAP (REFACTOR-004)
+# ============================================================================
+# Wire the standalone init-repo-* helpers into the default init-project flow.
+# Each invocation is non-fatal: a helper failure emits a warning and continues
+# rather than aborting the whole init. github-defaults is auto-skipped when no
+# `origin` remote is configured (typical for a brand-new local repo).
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+if (-not $SkipAgents) {
+    $agentsScript = Join-Path $ScriptDir 'init-repo-agents.ps1'
+    if (Test-Path $agentsScript) {
+        Write-Info "Bootstrapping AGENTS.md (init-repo-agents)..."
+        try { & $agentsScript -Repo (Get-Location).Path } catch { Write-Warn "init-repo-agents failed (non-fatal); continuing" }
+    }
+}
+
+if (-not $SkipStandards) {
+    $standardsScript = Join-Path $ScriptDir 'init-repo-standards.ps1'
+    if (Test-Path $standardsScript) {
+        Write-Info "Bootstrapping docs/standards.md (init-repo-standards)..."
+        try { & $standardsScript -Repo (Get-Location).Path } catch { Write-Warn "init-repo-standards failed (non-fatal); continuing" }
+    }
+}
+
+if (-not $SkipGithub) {
+    $githubScript = Join-Path $ScriptDir 'init-repo-github-defaults.ps1'
+    if (Test-Path $githubScript) {
+        $hasOrigin = $false
+        try { git config --get remote.origin.url *> $null; if ($LASTEXITCODE -eq 0) { $hasOrigin = $true } } catch { $hasOrigin = $false }
+        if ($hasOrigin) {
+            Write-Info "Applying GitHub defaults (init-repo-github-defaults)..."
+            try { & $githubScript } catch { Write-Warn "init-repo-github-defaults failed (non-fatal); continuing" }
+        } else {
+            Write-Info "No origin remote yet; skipping init-repo-github-defaults (add a remote then re-run it manually)"
+        }
+    }
 }
 
 # ============================================================================
