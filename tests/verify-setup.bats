@@ -262,22 +262,22 @@ setup() {
 }
 
 # =============================================================================
-# Section 9: ensure_line_in_file side effects
+# Section 9: rc file SSOT (lines baked into repo .bashrc/.zshrc — BUG-024)
 # =============================================================================
 
-@test "scripts PATH added to .zshrc" {
-    grep -q 'export PATH=\$HOME/.dotfiles/scripts:\$PATH' "$HOME/.zshrc"
+@test "scripts PATH in .zshrc" {
+    grep -q 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.zshrc"
 }
 
-@test "project-init alias added to .zshrc" {
+@test "project-init alias in .zshrc" {
     grep -q 'alias project-init=' "$HOME/.zshrc"
 }
 
-@test "scripts PATH added to .bashrc" {
-    grep -q 'export PATH=\$HOME/.dotfiles/scripts:\$PATH' "$HOME/.bashrc"
+@test "scripts PATH in .bashrc" {
+    grep -q 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.bashrc"
 }
 
-@test "project-init alias added to .bashrc" {
+@test "project-init alias in .bashrc" {
     grep -q 'alias project-init=' "$HOME/.bashrc"
 }
 
