@@ -1,0 +1,26 @@
+{
+  "_comment": "SSOT for claude-session-start.{sh,ps1} (SDD-004). Both readers source this file at startup. Add or disable injectors here; do NOT touch the per-OS hook scripts unless you are adding new probe logic. See specs/archive/SDD-004-session-start-config/ for the contract.",
+  "version": 1,
+  "thresholds": {
+    "claude_json_min_bytes": 10240,
+    "memory_md_max_lines": 150,
+    "crystallize_max_days": 14,
+    "memory_temp_hot_days": 7,
+    "memory_temp_warm_days": 30,
+    "memory_temp_cold_days": 60
+  },
+  "injectors": {
+    "sdd_reminder": { "enabled": true, "comment": "Unconditional Discipline Gate reminder (SDD-001), first in additionalContext" },
+    "claude_mem_heal": { "enabled": true, "comment": "Self-heal claude-mem plugin upstream regressions (.mcp.json, missing zod)" },
+    "doctor_drift": { "enabled": true, "comment": "Surface env-contract drift via scripts/doctor.{sh,ps1}" },
+    "hive_project": { "enabled": true, "comment": "Detect vault project match for CWD (10_projects + 50_work/45-development)" },
+    "specs_summary": { "enabled": true, "comment": "Count active vs archived specs and flag [AGENT-DRAFT]/[AGENT-SUGGESTION] tags" },
+    "vault_root_detection": { "enabled": true, "comment": "Walk up from CWD to find Obsidian vault (.obsidian/)" },
+    "vault_health": { "enabled": true, "comment": "Run vault-health.sh and surface FAIL lines / integrity issues" },
+    "auto_memory_symlink": { "enabled": true, "comment": "Create ~/.claude/projects/<encoded>/memory symlink to vault project memory" },
+    "knowledge_health": { "enabled": true, "comment": "MEMORY.md size + crystallize staleness (thresholds: memory_md_max_lines, crystallize_max_days)" },
+    "vault_baseline": { "enabled": true, "comment": "Canonical artifact integrity check (SKILL.md, patterns/_index.md, AGENTS.md...)" },
+    "memory_temperature": { "enabled": true, "comment": "HOT/WARM/COLD/ARCHIVE buckets via memory_temp_*_days thresholds" },
+    "claude_json_size": { "enabled": true, "comment": "Warn if ~/.claude/.claude.json drops below claude_json_min_bytes (upstream truncation bug)" }
+  }
+}
