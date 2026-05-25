@@ -295,7 +295,7 @@ if ($bashCmd) {
 # are optional (user may set them per workflow) -- SKIP if unset, not FAIL.
 Write-Section '5/12' 'Environment Variables'
 
-$requiredVars = @('DOTFILES_DIR')
+$requiredVars = @('DOTFILES_DIR', 'ANTIGRAVITY_ENDPOINT', 'CLOUDCODE_URL', 'GEMINI_DIR')
 $optionalVars = @('APPS_HOME', 'JAVA_HOME', 'MAVEN_HOME', 'PYTHON_HOME', 'GO_HOME', 'MINIKUBE_HOME')
 
 foreach ($v in $requiredVars) {
@@ -506,6 +506,60 @@ if (Test-Path -LiteralPath $diffCheckScript -PathType Leaf) {
     }
 } else {
     Write-Skip 'diff-check' "diff-check.ps1 not deployed at $diffCheckScript (run setup-windows.ps1)"
+}
+
+# ==================================================
+# 13/13 Antigravity CLI Health
+# ==================================================
+Write-Section '13/13' 'Antigravity CLI Health'
+
+if (Test-Command 'agy') {
+    # Verify production endpoint
+    $agyEndpoint = [Environment]::GetEnvironmentVariable('ANTIGRAVITY_ENDPOINT')
+    if ($agyEndpoint -eq 'https://cloudcode-pa.googleapis.com') {
+        Write-Pass 'ANTIGRAVITY_ENDPOINT set to production'
+    } else {
+        Write-Fail "ANTIGRAVITY_ENDPOINT is not production: $agyEndpoint"
+    }
+
+    $geminiHome = if ($env:GEMINI_HOME) { $env:GEMINI_HOME } else { Join-Path $env:USERPROFILE '.gemini' }
+    $agyData = if ($env:AGY_APP_DATA) { $env:AGY_APP_DATA } else { Join-Path $geminiHome 'antigravity-cli' }
+
+    # Verify valid MCP config (Flat-file strategy BUG-100 parity)
+    $masterConfig = Join-Path $geminiHome 'mcp_config.json'
+    if (Test-Path $masterConfig -PathType Leaf) {
+        if (Get-Command jq -ErrorAction SilentlyContinue) {
+            $null = Get-Content $masterConfig -Raw | jq '.' 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Pass 'Master mcp_config.json is valid (flat file)'
+            } else {
+                Write-Fail 'Master mcp_config.json invalid JSON'
+            }
+        } else {
+            Write-Pass 'Master mcp_config.json exists (jq not available for validation)'
+        }
+    } else {
+        Write-Fail "Master mcp_config.json missing at $masterConfig"
+    }
+
+    $agyConfig = Join-Path $agyData 'mcp_config.json'
+    if (Test-Path $agyConfig -PathType Leaf) {
+        Write-Pass 'Agy mcp_config.json copy exists'
+    } else {
+        Write-Fail "Agy mcp_config.json missing at $agyConfig"
+    }
+
+    # Verify legacy compatibility
+    if (Test-Command 'gemini') {
+        $null = & gemini --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Pass 'Legacy gemini-cli is compatible'
+        } else {
+            Write-Fail 'Legacy gemini-cli schema error (settings.json incompatible)'
+        }
+    }
+} else {
+    Write-Skip 'Antigravity CLI' 'not installed'
 }
 
 # ==================================================

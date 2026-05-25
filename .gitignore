@@ -33,6 +33,9 @@ node_modules/
 .claude/
 .gemini/
 .ai/
-GEMINI.md
+AGY.md
 CLAUDE.md
 .aider*
+
+# Added by ggshield
+.cache_ggshield

@@ -757,18 +757,90 @@ if (Test-Path -LiteralPath $opencodeCmdsSrc -PathType Container) {
 }
 
 # ============================================================================
-# 3. DEPLOY GEMINI CONFIGURATION (config deploy is always safe)
+# 3. DEPLOY GEMINI & ANTIGRAVITY CONFIGURATION (config deploy is always safe)
 # ============================================================================
 
-Write-Info "Deploying Gemini configuration..."
+Write-Info "Deploying Gemini & Antigravity configuration..."
 
 Ensure-Directory $GeminiHome
 Ensure-Directory "$GeminiHome\prompts"
+$AgyAppData = Join-Path $GeminiHome "antigravity-cli"
+Ensure-Directory $AgyAppData
+
+# Force production endpoint to avoid staging timeouts (BUG-100 parity)
+[Environment]::SetEnvironmentVariable("ANTIGRAVITY_ENDPOINT", "https://cloudcode-pa.googleapis.com", "User")
+[Environment]::SetEnvironmentVariable("CLOUDCODE_URL", "https://cloudcode-pa.googleapis.com", "User")
+[Environment]::SetEnvironmentVariable("GEMINI_DIR", "$GeminiHome", "User")
+$env:ANTIGRAVITY_ENDPOINT = "https://cloudcode-pa.googleapis.com"
+$env:CLOUDCODE_URL = "https://cloudcode-pa.googleapis.com"
+$env:GEMINI_DIR = "$GeminiHome"
+
+# 1. Deploy settings.json (Dual Compatibility)
+$agySettingsSrc = "$DotfilesDir\ai\agy\settings.json"
+if (Test-Path $agySettingsSrc) {
+    Copy-Item $agySettingsSrc "$AgyAppData\settings.json" -Force
+    
+    # Legacy Gemini CLI compatible config
+    if (Get-Command jq -ErrorAction SilentlyContinue) {
+        & jq '.model = { "name": "gemini-3.5-flash" }' $agySettingsSrc | Set-Content "$GeminiHome\settings.json" -Encoding UTF8
+    } else {
+        Copy-Item $agySettingsSrc "$GeminiHome\settings.json" -Force
+    }
+    Write-Success "Deployed Antigravity and Legacy Gemini settings"
+}
+
+# 2. Consolidate MCP servers (Flat-file strategy BUG-100 parity)
+$mcpServersSrc = "$DotfilesDir\ai\agy\mcp_servers.json"
+$rootMcpSrc = "$DotfilesDir\mcp-servers.json"
+if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq -ErrorAction SilentlyContinue)) {
+    Write-Info "Consolidating Antigravity MCP servers..."
+    
+    # Recover OpenRouter key
+    $oldKey = $env:OPENROUTER_API_KEY
+    if ([string]::IsNullOrEmpty($oldKey)) {
+        if (Test-Path "$GeminiHome\settings.json") {
+            $oldKey = & jq -r '.OPENROUTER_API_KEY // .mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GeminiHome\settings.json" 2>$null | Where-Object { $_ -ne "null" }
+        }
+    }
+    
+    # Initialize from template
+    $mcpConfigJson = Get-Content $mcpServersSrc -Raw | ConvertFrom-Json
+    if (-not [string]::IsNullOrEmpty($oldKey)) {
+        $mcpConfigJson.servers."hive-vault".env.OPENROUTER_API_KEY = $oldKey
+    }
+    
+    # Merge from root mcp-servers.json
+    $rootServers = (Get-Content $rootMcpSrc -Raw | ConvertFrom-Json).servers
+    foreach ($srv in $rootServers) {
+        if ($srv.name -eq "hive") { continue }
+        if ($srv.transport -ne "stdio") { continue }
+        
+        $parts = $srv.args -split '\s+'
+        $cmd = $parts[0]
+        $args = $parts[1..($parts.Length-1)]
+        $mcpConfigJson.servers | Add-Member -MemberType NoteProperty -Name $srv.name -Value @{ command = $cmd; args = $args } -Force
+    }
+    
+    $masterConfig = Join-Path $GeminiHome "mcp_config.json"
+    $mcpConfigJson | ConvertTo-Json -Depth 10 | Set-Content $masterConfig -Encoding UTF8
+    
+    # Backward compatibility "copy" (Windows uses copies instead of symlinks)
+    Copy-Item $masterConfig "$AgyAppData\mcp_config.json" -Force
+    
+    # Register Hive as plugin
+    $hivePluginDir = Join-Path $AgyAppData "plugins\hive-vault"
+    Ensure-Directory $hivePluginDir
+    '{"name": "hive-vault"}' | Set-Content (Join-Path $hivePluginDir "plugin.json") -Encoding UTF8
+    $hiveMcp = @{ mcpServers = @{ "hive-vault" = $mcpConfigJson.servers."hive-vault" } }
+    $hiveMcp | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $hivePluginDir "mcp_config.json") -Encoding UTF8
+    
+    Write-Success "Consolidated Antigravity MCP configuration"
+}
 
 # Bulk copy all Gemini config files
 $geminiSource = "$DotfilesDir\ai\gemini"
 if (Test-Path $geminiSource) {
-    Copy-Item "$geminiSource\*" "$GeminiHome\" -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item "$geminiSource\*" "$GeminiHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
 }
 
 # Force copy GEMINI.md (Neural Hive Protocol)

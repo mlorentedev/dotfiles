@@ -65,7 +65,7 @@ echo "========================================"
 echo "Checking from: $DOTFILES_DIR"
 
 # ==================================================
-section "1/12" "Core Tools in PATH"
+section "1/13" "Core Tools in PATH"
 
 CORE_TOOLS="git zsh bash curl wget jq eza direnv node npm zoxide docker kubectl terraform"
 for tool in $CORE_TOOLS; do
@@ -77,7 +77,7 @@ for tool in $CORE_TOOLS; do
 done
 
 # ==================================================
-section "2/12" "Versioned Tool Paths"
+section "2/13" "Versioned Tool Paths"
 
 check_tool_home() {
     local name="$1"
@@ -117,7 +117,7 @@ else
 fi
 
 # ==================================================
-section "3/12" "Version Match (versions.conf)"
+section "3/13" "Version Match (versions.conf)"
 
 check_version_match() {
     local name="$1"
@@ -144,7 +144,7 @@ check_version_match "Minikube" "${MINIKUBE_VERSION:-}" "$APPS_HOME/minikube-${MI
 check_version_match "Go" "${GO_VERSION:-}" "$APPS_HOME/go-${GO_VERSION:-}"
 
 # ==================================================
-section "4/12" "Key Symlinks"
+section "4/13" "Key Symlinks"
 
 check_symlink() {
     local path="$1"
@@ -168,11 +168,7 @@ check_symlink "$HOME/.zsh/aliases.zsh" ".zsh/aliases.zsh"
 check_symlink "$HOME/.zsh/functions.zsh" ".zsh/functions.zsh"
 check_symlink "$HOME/.ssh/config" ".ssh/config"
 
-# BUG-014 canonical install-state assertion (placed in sec 4 for cross-OS
-# parity with healthcheck.ps1). Greps the canonical install record; PASS only
-# when claude-mem is actually registered. Closes the false-positive class
-# where the marketplace dir exists on disk but the plugin was never installed
-# (e.g. after a .claude.json truncation event before BUG-004's snapshot guard).
+# BUG-014 canonical install-state assertion
 installed_plugins_json="$HOME/.claude/plugins/installed_plugins.json"
 if [ -f "$installed_plugins_json" ]; then
     if grep -qF 'claude-mem@thedotmack' "$installed_plugins_json"; then
@@ -184,20 +180,9 @@ else
     skip "claude-mem install state -- installed_plugins.json missing (Claude Code never ran)"
 fi
 
-# BUG-015: assert the claude-mem hook's path-resolution cascade actually
-# returns a valid path. Reproduces the same one-liner the upstream
-# hooks.json runs (cache version dir -> marketplace junction) and reports
-# whether _P would be populated. Prevention layer: detects breakage BEFORE
-# user encounters the intermittent UserPromptSubmit fail.
+# BUG-015: assert the claude-mem hook's path-resolution cascade
 _cmhook_C="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 _cmhook_E="${PLUGIN_ROOT:-}"
-# BUG-023 (2026-05-21): the BUG-022 pipe-to-head form still raced under
-# `set -euo pipefail` when 2+ candidates matched: the consumer closed
-# after the first line, leftover printfs in the while loop got EPIPE,
-# pipefail propagated 141 to the $() and set -e killed the script
-# mid-section 4/12. Race-free pattern: materialize all candidates into a
-# variable (no pipe), then iterate in pure bash with `break` -- no
-# consumer-close, no EPIPE. Supersedes the BUG-022 approach.
 _cmhook_cands=$({
     [ -n "$_cmhook_E" ] && printf '%s\n' "$_cmhook_E"
     ls -dt "$_cmhook_C/plugins/cache/thedotmack/claude-mem"/[0-9]*/ 2>/dev/null
@@ -219,7 +204,7 @@ else
 fi
 
 # ==================================================
-section "5/12" "Environment Variables"
+section "5/13" "Environment Variables"
 
 ENV_VARS="DOTFILES_DIR APPS_HOME JAVA_HOME MAVEN_HOME PYTHON_HOME GO_HOME MINIKUBE_HOME"
 for var in $ENV_VARS; do
@@ -231,9 +216,9 @@ for var in $ENV_VARS; do
 done
 
 # ==================================================
-section "6/12" "Optional Tools"
+section "6/13" "Optional Tools"
 
-OPTIONAL_TOOLS="age gh claude gemini bats shellcheck helm ansible pip"
+OPTIONAL_TOOLS="age gh claude gemini agy bats shellcheck helm ansible pip"
 for tool in $OPTIONAL_TOOLS; do
     if command_exists "$tool"; then
         pass "$tool found"
@@ -243,7 +228,7 @@ for tool in $OPTIONAL_TOOLS; do
 done
 
 # ==================================================
-section "7/12" "Knowledge Vault"
+section "7/13" "Knowledge Vault"
 
 VAULT_DIR="${VAULT_DIR:-$HOME/Projects/knowledge}"
 
@@ -298,7 +283,7 @@ for dir in $VAULT_DIRS; do
 done
 
 # ==================================================
-section "8/12" "Secrets Integrity"
+section "8/13" "Secrets Integrity"
 
 SECRETS_DIR="${DOTFILES_DIR}/sensitive"
 SECRETS_MAPPING="$SECRETS_DIR/env-mapping.conf"
@@ -306,7 +291,6 @@ SECRETS_MAPPING="$SECRETS_DIR/env-mapping.conf"
 if [ -f "$SECRETS_MAPPING" ]; then
     pass "env-mapping.conf exists"
 
-    # Check each mapping entry has a corresponding .age file
     while IFS= read -r _line || [ -n "$_line" ]; do
         case "$_line" in
             "#"*|"") continue ;;
@@ -316,11 +300,9 @@ if [ -f "$SECRETS_MAPPING" ]; then
 
         _var="${_line%%=*}"
         _val="${_line#*=}"
-        # Strip spaces
         _var="$(echo "$_var" | tr -d ' ')"
         _val="$(echo "$_val" | tr -d ' ')"
 
-        # File secrets: extract filename before >
         case "$_var" in
             @*) _fname="${_val%%>*}" ; _var="${_var#@} [file]" ;;
             *)  _fname="$_val" ;;
@@ -333,7 +315,6 @@ if [ -f "$SECRETS_MAPPING" ]; then
         fi
     done < "$SECRETS_MAPPING"
 
-    # Check for orphaned .age files (no mapping entry)
     for _age_file in "$SECRETS_DIR"/*.secret.age; do
         [ -f "$_age_file" ] || continue
         _base=$(basename "$_age_file" .secret.age)
@@ -347,8 +328,8 @@ else
 fi
 
 # ==================================================
-section "9/12" "tmux"
-# ==================================================
+section "9/13" "tmux"
+
 if ! command -v tmux >/dev/null 2>&1; then
     fail "tmux not installed (run: sudo apt install -y tmux)"
 else
@@ -368,8 +349,8 @@ else
 fi
 
 # ==================================================
-section "10/12" "OpenCode"
-# ==================================================
+section "10/13" "OpenCode"
+
 OPENCODE_BIN="$HOME/.opencode/bin/opencode"
 OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
 if command -v opencode >/dev/null 2>&1; then
@@ -381,7 +362,6 @@ else
 fi
 if [ -f "$OPENCODE_CFG" ]; then
     pass "opencode.jsonc deployed: $OPENCODE_CFG"
-    # shellcheck disable=SC2016  # intentional: literal $schema string match
     if grep -q '"\$schema":' "$OPENCODE_CFG"; then
         pass "opencode.jsonc has \$schema declaration"
     else
@@ -392,8 +372,8 @@ else
 fi
 
 # ==================================================
-section "11/12" "Ghostty"
-# ==================================================
+section "11/13" "Ghostty"
+
 GHOSTTY_CFG="$HOME/.config/ghostty/config"
 GHOSTTY_PINNED="$(grep -E '^GHOSTTY_VERSION=' "$DOTFILES_DIR/versions.conf" 2>/dev/null | cut -d= -f2)"
 if command -v ghostty >/dev/null 2>&1; then
@@ -421,8 +401,8 @@ else
 fi
 
 # ==================================================
-section "12/12" "Repo ↔ Deploy-Dir Drift"
-# ==================================================
+section "12/13" "Repo ↔ Deploy-Dir Drift"
+
 if [ -x "$SCRIPT_DIR/diff-check.sh" ]; then
     if "$SCRIPT_DIR/diff-check.sh" >/dev/null 2>&1; then
         pass "no drift between repo and $DOTFILES_DIR"
@@ -434,6 +414,61 @@ else
 fi
 
 # ==================================================
+section "13/13" "Antigravity CLI Health"
+
+if command_exists agy; then
+    # Verify production endpoint (with fallback for check)
+    _agy_endpoint="${ANTIGRAVITY_ENDPOINT:-https://cloudcode-pa.googleapis.com}"
+    if [ "$_agy_endpoint" = "https://cloudcode-pa.googleapis.com" ]; then
+        pass "ANTIGRAVITY_ENDPOINT set to production"
+    else
+        fail "ANTIGRAVITY_ENDPOINT is not production: $_agy_endpoint"
+    fi
+
+    # Verify AGY_APP_DATA is absolute (with fallback to default location)
+    _agy_data="${AGY_APP_DATA:-$HOME/.gemini/antigravity-cli}"
+    if [[ "$_agy_data" == /* ]]; then
+        pass "AGY_APP_DATA is absolute"
+    else
+        fail "AGY_APP_DATA is relative or unset: $_agy_data"
+    fi
+
+    # Verify valid MCP config (Flat-file strategy BUG-100)
+    _master_config="$GEMINI_HOME/mcp_config.json"
+    if [ -f "$_master_config" ] && [ ! -L "$_master_config" ]; then
+        if jq '.' "$_master_config" >/dev/null 2>&1; then
+            pass "Master mcp_config.json is valid (flat file)"
+        else
+            fail "Master mcp_config.json invalid JSON"
+        fi
+    else
+        fail "Master mcp_config.json missing or is a symlink (recursion risk)"
+    fi
+
+    if [ -L "$_agy_data/mcp_config.json" ]; then
+        _target=$(readlink -f "$_agy_data/mcp_config.json")
+        if [ "$_target" = "$_master_config" ]; then
+             pass "Agy mcp_config.json symlink is correct"
+        else
+             fail "Agy mcp_config.json points to wrong target: $_target"
+        fi
+    else
+        fail "Agy mcp_config.json is not a symlink"
+    fi
+
+    # Verify legacy compatibility
+    if command_exists gemini; then
+        if gemini --version >/dev/null 2>&1; then
+            pass "Legacy gemini-cli is compatible"
+        else
+            fail "Legacy gemini-cli schema error (settings.json incompatible)"
+        fi
+    fi
+else
+    skip "Antigravity CLI Health" "agy not in PATH"
+fi
+
+# ============================================================
 echo ""
 echo "========================================"
 printf 'Results: %b%d passed%b, %b%d failed%b, %b%d skipped%b\n' \

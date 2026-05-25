@@ -23,6 +23,11 @@ export CLAUDE_CONFIG_DIR="$HOME/.claude"
 # Per-agent install dirs + scripts deploy target (REFACTOR-002).
 # Declared in env-contract.json; doctor.{sh,ps1} validates on every run.
 export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
+export AGY_HOME="$HOME/.gemini/antigravity-cli"
+export AGY_APP_DATA="$AGY_HOME"
+export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
+export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
+export GEMINI_DIR="$HOME/.gemini"
 export GEMINI_HOME="$HOME/.gemini"
 export COPILOT_HOME="$HOME/.copilot"
 export OPENCODE_HOME="$HOME/.config/opencode"
@@ -79,7 +84,7 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 
 # AI Tool Aliases
-alias g='gemini'
+alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
@@ -91,7 +96,7 @@ function gp() {
         echo "❌ Error: Prompt not found at $prompt_file"
         return 1
     fi
-    gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
+    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
 
 # Claude Code - use slash commands inside session:

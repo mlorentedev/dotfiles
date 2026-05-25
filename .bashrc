@@ -51,7 +51,7 @@ export CLAUDE_CONFIG_DIR="$HOME/.claude"
 # Per-agent install dirs + scripts deploy target (REFACTOR-002).
 # Declared in env-contract.json; doctor.{sh,ps1} validates on every run.
 export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-export GEMINI_HOME="$HOME/.gemini"
+export AGY_HOME="$HOME/.gemini/antigravity-cli"
 export COPILOT_HOME="$HOME/.copilot"
 export OPENCODE_HOME="$HOME/.config/opencode"
 
@@ -105,7 +105,7 @@ fi
 
 
 # AI Tool Aliases
-alias g='gemini'
+alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
@@ -116,7 +116,7 @@ function gp() {
         echo "❌ Error: Prompt not found at $prompt_file"
         return 1
     fi
-    gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
+    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
 
 # qq / qf: one-shot opencode wrappers. Mirrors .zsh/aliases.zsh for bash users.

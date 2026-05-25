@@ -183,12 +183,12 @@ else
     log_info "CLAUDE.md not found in global config"
 fi
 
-# Copy GEMINI.md
-if [[ -f "$AI_CONFIG_HOME/GEMINI.md" ]]; then
-    cp "$AI_CONFIG_HOME/GEMINI.md" .
-    log_success "Injected GEMINI.md"
+# Copy AGY.md
+if [[ -f "$AI_CONFIG_HOME/AGY.md" ]]; then
+    cp "$AI_CONFIG_HOME/AGY.md" .
+    log_success "Injected AGY.md"
 else
-    log_info "GEMINI.md not found in global config"
+    log_info "AGY.md not found in global config"
 fi
 
 # Copy skills (Claude Code specific)
@@ -499,6 +499,6 @@ fi
 
 log_success "Project initialized with Dual AI Configuration"
 log_info "Structure:"
-echo "  CLAUDE.md / GEMINI.md      - AI Memory files (Dual-Core)"
+echo "  CLAUDE.md / AGY.md         - AI Memory files (Dual-Core)"
 echo "  .claude/skills/            - Custom skills"
 echo "  Knowledge Vault updated    - 11-tasks.md & 90-lessons.md in knowledge/10_projects/"

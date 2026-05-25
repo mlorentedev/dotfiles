@@ -270,36 +270,154 @@ else
     log_info "bats already installed"
 fi
 
-# Setup AI configuration
-log_info "Setting up AI configuration..."
+# Setup Antigravity CLI configuration
+log_info "Setting up Antigravity CLI configuration..."
+# Ensure absolute paths (required by Antigravity Go runtime)
+export GEMINI_HOME="$HOME/.gemini"
+export GEMINI_DIR="$HOME/.gemini"
+export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
+# Force production endpoint to avoid 'daily-' staging timeouts found in logs
+export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
+export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
 
-# Gemini CLI config (config deploy is always safe, even without gemini installed)
-ensure_directory "$HOME/.gemini"
-ensure_directory "$HOME/.gemini/prompts"
-cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
-# Sync Gemini prompts: remove stale skill-derived prompts not in source
-for target_file in "$HOME/.gemini/prompts/"*.md; do
+ensure_directory "$GEMINI_HOME"
+ensure_directory "$GEMINI_HOME/config"
+ensure_directory "$GEMINI_HOME/prompts"
+ensure_directory "$AGY_APP_DATA"
+
+# 1. Deploy settings.json (Dual Compatibility)
+if [ -f "$CURRENT_DIR/ai/agy/settings.json" ]; then
+    # Antigravity specific config
+    cp "$CURRENT_DIR/ai/agy/settings.json" "$AGY_APP_DATA/settings.json"
+    
+    # Legacy Gemini CLI compatible config (patching model string to object)
+    if command -v jq >/dev/null 2>&1; then
+        jq '.model = { "name": "gemini-3.5-flash" }' "$CURRENT_DIR/ai/agy/settings.json" > "$GEMINI_HOME/settings.json"
+    else
+        cp "$CURRENT_DIR/ai/agy/settings.json" "$GEMINI_HOME/settings.json"
+    fi
+    log_success "Deployed Antigravity and Legacy Gemini settings"
+fi
+
+# 2. Consolidate MCP servers (idempotent merge)
+# Logic: Start with ai/agy/mcp_servers.json, recover key from old config, add servers from mcp-servers.json
+if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
+    log_info "Consolidating Antigravity MCP servers..."
+    
+    # Recover OpenRouter key (idempotent recovery)
+    # 1. Try current env (if already loaded)
+    # 2. Try existing settings.json (Gemini format)
+    # 3. Try existing mcp_config.json (Antigravity format)
+    # 4. Fallback: Decrypt from sensitive/ directory
+    OLD_KEY="${OPENROUTER_API_KEY:-}"
+    if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ]; then
+        OLD_KEY=$(jq -r '.OPENROUTER_API_KEY // .mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/settings.json" 2>/dev/null | grep -v "null")
+    fi
+    if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ]; then
+        OLD_KEY=$(jq -r '.servers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$AGY_APP_DATA/mcp_config.json" 2>/dev/null | grep -v "null")
+    fi
+    if ([ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ]) && [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
+        # Last resort: try to decrypt directly
+        source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1
+        OLD_KEY=$(secrets_show OPENROUTER_API_KEY 2>/dev/null || echo "")
+    fi
+    
+    # Initialize base from repo template
+    NEW_MCP_CONFIG=$(jq --arg key "$OLD_KEY" '
+        .servers["hive-vault"].env.OPENROUTER_API_KEY = (if $key != "" and $key != "null" then $key else .servers["hive-vault"].env.OPENROUTER_API_KEY end)
+    ' "$CURRENT_DIR/ai/agy/mcp_servers.json")
+    
+    # Merge stdio servers from root mcp-servers.json
+    # Convert "args": "cmd arg1 arg2" string -> "command": "cmd", "args": ["arg1", "arg2"] array
+    while IFS=$'\t' read -r name transport args; do
+        [ "$name" = "hive" ] && continue # Skip "hive" (legacy) in favor of "hive-vault" (Agy)
+        [ "$transport" != "stdio" ] && continue # SSE/HTTP transport handled via plugins
+        
+        cmd=$(echo "$args" | awk '{print $1}')
+        cmd_args=$(echo "$args" | cut -d' ' -f2-)
+        
+        NEW_MCP_CONFIG=$(echo "$NEW_MCP_CONFIG" | jq --arg name "$name" --arg cmd "$cmd" --argjson args "$(echo "$cmd_args" | jq -R 'split(" ")')" \
+            '.servers[$name] = { "command": $cmd, "args": $args }')
+    done < <(jq -r '.servers[] | [.name, .transport, .args] | @tsv' "$CURRENT_DIR/mcp-servers.json")
+
+    # 1. Write the master consolidated config to the GEMINI_HOME root (Flat-file strategy BUG-100)
+    # This bypasses the agy 1.0.2 bug where config/ becomes a circular symlink.
+    MASTER_CONFIG="$GEMINI_HOME/mcp_config.json"
+    [ -L "$MASTER_CONFIG" ] && rm -f "$MASTER_CONFIG"
+    echo "$NEW_MCP_CONFIG" > "$MASTER_CONFIG"
+    log_success "Deployed master MCP config to $MASTER_CONFIG"
+    
+    # 2. Establish backward compatibility symlink in AGY_APP_DATA
+    # Use realpath to ensure we are pointing to the actual file
+    REAL_CONFIG=$(realpath "$MASTER_CONFIG")
+    rm -f "$AGY_APP_DATA/mcp_config.json"
+    ln -sf "$REAL_CONFIG" "$AGY_APP_DATA/mcp_config.json"
+    
+    # 3. Register Hive as a native plugin for UI visibility (Agy 1.0.2+ preference)
+    HIVE_PLUGIN_DIR="$AGY_APP_DATA/plugins/hive-vault"
+    ensure_directory "$HIVE_PLUGIN_DIR"
+    echo '{"name": "hive-vault"}' > "$HIVE_PLUGIN_DIR/plugin.json"
+    # Create plugin-specific MCP config (shadows the main one but ensures UI discovery)
+    echo "$NEW_MCP_CONFIG" | jq '{ "mcpServers": { "hive-vault": .servers["hive-vault"] } }' > "$HIVE_PLUGIN_DIR/mcp_config.json"
+    
+    log_success "Consolidated Antigravity MCP configuration and registered Hive plugin"
+fi
+
+# Cleanup obsolete/redundant files
+log_info "Cleaning up obsolete Antigravity files..."
+# Remove local .antigravitycli if it exists in workspace (global is SSOT)
+[ -d "$CURRENT_DIR/.antigravitycli" ] && rm -rf "$CURRENT_DIR/.antigravitycli"
+# Remove legacy migration markers if present
+rm -f "$GEMINI_HOME/config/.migrated" 2>/dev/null
+
+# Sync Agy prompts: remove stale skill-derived prompts not in source
+for target_file in "$GEMINI_HOME/prompts/"*.md; do
     [ -f "$target_file" ] || continue
     prompt_name=$(basename "$target_file" .md)
     [ -d "$CURRENT_DIR/ai/skills/$prompt_name" ] || rm -f "$target_file"
 done
-# Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
+
+# Sync native Shared Skills for Antigravity (recognized as 'Shared' in agy)
+ensure_directory "$HOME/.gemini/skills"
+# Remove stale shared skills
+for target_dir in "$HOME/.gemini/skills/"*/; do
+    skill_name=$(basename "$target_dir")
+    [ -d "$CURRENT_DIR/ai/skills/$skill_name" ] || rm -rf "$target_dir"
+done
+
+# Extract SKILL.md content as flat prompts for Agy (strip YAML frontmatter)
+# AND copy as native skills to Shared path
 for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
     if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
         skill_name=$(basename "$skill_dir")
-        # Copy SKILL.md as flat file, stripping YAML frontmatter
-        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
+        
+        # 1. Flat prompt for 'gp' alias
+        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$GEMINI_HOME/prompts/${skill_name}.md"
+        
+        # 2. Native Antigravity skill (Shared)
+        ensure_directory "$HOME/.gemini/skills/$skill_name"
+        cp -rf "$skill_dir"* "$HOME/.gemini/skills/$skill_name/" 2>/dev/null || true
     fi
 done
+
 # Force copy master files (Neural Hive Protocol)
-rm -f "$HOME/.gemini/GEMINI.md"
-cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
-if grep -q 'First, read `AGENTS.md`' "$HOME/.gemini/GEMINI.md"; then
-    log_success "GEMINI.md deployed successfully (verified pointer to AGENTS.md)"
+rm -f "$GEMINI_HOME/AGY.md"
+cp "$CURRENT_DIR/ai/agy/AGY.md" "$GEMINI_HOME/AGY.md"
+if grep -q 'First, read `AGENTS.md`' "$GEMINI_HOME/AGY.md"; then
+    log_success "AGY.md deployed successfully (verified pointer to AGENTS.md)"
 else
-    echo "❌ Error: GEMINI.md deployment failed verification"
+    echo "❌ Error: AGY.md deployment failed verification"
 fi
-log_success "Gemini CLI configured"
+
+# Sync Plugins (Import from Gemini/Claude for continuity)
+if command -v agy >/dev/null 2>&1; then
+    log_info "Synchronizing Antigravity plugins..."
+    # Import legacy plugins if not already present
+    agy plugin import gemini >/dev/null 2>&1 || true
+    log_success "Antigravity plugins synchronized"
+fi
+
+log_success "Antigravity CLI configuration complete"
 
 # Claude Code
 ensure_directory "$HOME/.claude"

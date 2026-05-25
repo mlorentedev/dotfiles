@@ -9,7 +9,7 @@
 
 # AI Tools
 Set-Alias -Name c -Value claude
-Set-Alias -Name g -Value gemini
+Set-Alias -Name g -Value agy
 
 # OpenCode (primary AI coding agent -- install is admin-only on Windows, so
 # the alias is conditional. On machines without opencode installed, this
@@ -59,7 +59,7 @@ function dch {
 function project-init {
     <#
     .SYNOPSIS
-    Initialize a new project with AI Memory (Claude, Gemini, OpenCode)
+    Initialize a new project with AI Memory (Claude, Antigravity, OpenCode)
     .DESCRIPTION
     Creates project structure and copies AI configurations from global config.
     .PARAMETER ProjectName
@@ -174,7 +174,7 @@ $env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles"
 $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
 # Per-agent install dirs + scripts deploy target (REFACTOR-002).
 $env:SCRIPTS_DIR = "$env:DOTFILES_DIR\scripts"
-$env:GEMINI_HOME = "$env:USERPROFILE\.gemini"
+$env:AGY_HOME = "$env:USERPROFILE\.gemini\antigravity-cli"
 $env:COPILOT_HOME = "$env:USERPROFILE\.copilot"
 $env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode"
 
