@@ -51,9 +51,13 @@ export CLAUDE_CONFIG_DIR="$HOME/.claude"
 # Per-agent install dirs + scripts deploy target (REFACTOR-002).
 # Declared in env-contract.json; doctor.{sh,ps1} validates on every run.
 export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-export GEMINI_HOME="$HOME/.gemini"
+export AGY_HOME="$HOME/.gemini/antigravity-cli"
 export COPILOT_HOME="$HOME/.copilot"
 export OPENCODE_HOME="$HOME/.config/opencode"
+
+# AI provider endpoints — NaN community (primary, OpenAI-compatible).
+# API key in $NAN_API_KEY (loaded by load-secrets.sh from sensitive/nan.api-key.secret.age).
+export NAN_BASE_URL="https://api.nan.builders/v1"
 
 # Load encrypted secrets as environment variables
 [[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"
@@ -105,7 +109,7 @@ fi
 
 
 # AI Tool Aliases
-alias g='gemini'
+alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
@@ -116,21 +120,30 @@ function gp() {
         echo "❌ Error: Prompt not found at $prompt_file"
         return 1
     fi
-    gemini -i "$(cat "$prompt_file")"$'\n\n'"$*"
+    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
 
 # qq / qf: one-shot opencode wrappers. Mirrors .zsh/aliases.zsh for bash users.
 # Bash leaves `foo?` literal when no match exists (no zsh-style nomatch error),
 # so no `noglob` wrapper is needed here.
-#   qq -> qwen3.6-plus     (multilingual, ES-friendly, balanced)
-#   qf -> deepseek-v4-flash (faster, never-rate-limited per opencode-go docs)
+#   qq -> nan/qwen3.6           (default daily, multilingual, 262K ctx)
+#   qf -> nan/deepseek-v4-flash (long-context 500K)
 _qq_call() {
     local model="$1" name="$2"; shift 2
     [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
     opencode run -m "$model" "$*"
 }
-qq() { _qq_call opencode-go/qwen3.6-plus qq "$@"; }
-qf() { _qq_call opencode-go/deepseek-v4-flash qf "$@"; }
+qq() { _qq_call nan/qwen3.6 qq "$@"; }
+qf() { _qq_call nan/deepseek-v4-flash qf "$@"; }
+
+# oc / ocfull: opencode TUI dispatch. --pure bypasses MCPs+skills+plugins,
+# avoiding the tool-resolution hang on complex queries (empirical 2026-05-25).
+alias oc='opencode --pure'
+alias ocfull='opencode'
+
+# dbg: deepseek con reasoning chain VISIBLE (opencode TUI oculta reasoning_content).
+# Mirror de .zsh/aliases.zsh. Mismo script subyacente.
+dbg() { /home/manu/Projects/dotfiles/scripts/nan-debug.sh "$@"; }
 
 # Claude Code - use slash commands inside session:
 #   claude

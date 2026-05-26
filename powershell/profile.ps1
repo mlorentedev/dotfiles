@@ -9,18 +9,26 @@
 
 # AI Tools
 Set-Alias -Name c -Value claude
-Set-Alias -Name g -Value gemini
+Set-Alias -Name g -Value agy
+
+# AI provider endpoints -- NaN community (primary, OpenAI-compatible).
+# API key in $env:NAN_API_KEY (loaded by load-secrets.ps1 from sensitive/nan.api-key.secret.age).
+$env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 
 # OpenCode (primary AI coding agent -- install is admin-only on Windows, so
 # the alias is conditional. On machines without opencode installed, this
 # block is a no-op and `oc` reports "command not found" as expected.)
 if (Get-Command opencode -ErrorAction SilentlyContinue) {
-    Set-Alias -Name oc -Value opencode
+    # oc / ocfull: opencode TUI dispatch. --pure bypasses MCPs+skills+plugins,
+    # avoiding the tool-resolution hang on complex queries (empirical 2026-05-25).
+    # Set-Alias does not support args, so we use functions to pass --pure flag.
+    function oc     { opencode --pure @args }
+    function ocfull { opencode @args }
 
     # qq / qf: one-shot quick-question wrappers. Mirrors .zsh/aliases.zsh and
     # .bashrc. One-shot: each call is a fresh session.
-    #   qq -> qwen3.6-plus     (multilingual, ES-friendly, balanced)
-    #   qf -> deepseek-v4-flash (faster, never-rate-limited per opencode-go docs)
+    #   qq -> nan/qwen3.6           (default daily, multilingual, 262K ctx)
+    #   qf -> nan/deepseek-v4-flash (long-context 500K)
     # Note: '??' is the null-coalescing operator in PowerShell 7+, so the
     # name 'qq' is the cross-platform compromise (works in bash, zsh, pwsh).
     function qq {
@@ -28,14 +36,29 @@ if (Get-Command opencode -ErrorAction SilentlyContinue) {
             Write-Error 'usage: qq <consulta libre>'
             return
         }
-        opencode run -m opencode-go/qwen3.6-plus ($args -join ' ')
+        opencode run -m nan/qwen3.6 ($args -join ' ')
     }
     function qf {
         if ($args.Count -eq 0) {
             Write-Error 'usage: qf <consulta libre>'
             return
         }
-        opencode run -m opencode-go/deepseek-v4-flash ($args -join ' ')
+        opencode run -m nan/deepseek-v4-flash ($args -join ' ')
+    }
+
+    # dbg: deepseek con reasoning chain VISIBLE (opencode TUI oculta reasoning_content).
+    # Windows uses bash via WSL or git-bash for the underlying nan-debug.sh.
+    function dbg {
+        if ($args.Count -eq 0) {
+            Write-Error 'usage: dbg <consulta libre>'
+            return
+        }
+        $script = Join-Path $env:USERPROFILE 'Projects\dotfiles\scripts\nan-debug.sh'
+        if (Test-Path -LiteralPath $script) {
+            bash $script ($args -join ' ')
+        } else {
+            Write-Error "nan-debug.sh not found at $script"
+        }
     }
 }
 
@@ -59,7 +82,7 @@ function dch {
 function project-init {
     <#
     .SYNOPSIS
-    Initialize a new project with AI Memory (Claude, Gemini, OpenCode)
+    Initialize a new project with AI Memory (Claude, Antigravity, OpenCode)
     .DESCRIPTION
     Creates project structure and copies AI configurations from global config.
     .PARAMETER ProjectName
@@ -174,7 +197,7 @@ $env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles"
 $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
 # Per-agent install dirs + scripts deploy target (REFACTOR-002).
 $env:SCRIPTS_DIR = "$env:DOTFILES_DIR\scripts"
-$env:GEMINI_HOME = "$env:USERPROFILE\.gemini"
+$env:AGY_HOME = "$env:USERPROFILE\.gemini\antigravity-cli"
 $env:COPILOT_HOME = "$env:USERPROFILE\.copilot"
 $env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode"
 

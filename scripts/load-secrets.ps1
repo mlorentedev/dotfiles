@@ -246,9 +246,160 @@ function Show-SecretsList {
     }
 }
 
-# Export functions as aliases for discoverability
+# Helper: read a SecureString value from the user and return as plain string.
+# Plain text is held in memory only for the duration of one encrypt call and
+# is never written to disk in plaintext (age reads from stdin).
+function Read-SecretValue {
+    param([string]$Prompt)
+    $secure = Read-Host -Prompt $Prompt -AsSecureString
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
+}
+
+# Helper: encrypt $Value to $OutputFile using the public key parsed from KeyPath.
+# Mirrors age_encrypt() in scripts/utils.sh.
+function Invoke-AgeEncrypt {
+    param(
+        [Parameter(Mandatory)][string]$OutputFile,
+        [Parameter(Mandatory)][string]$Value
+    )
+
+    if (-not (Test-Path $script:KeyPath)) {
+        Write-Host "Error: Key file not found at $script:KeyPath" -ForegroundColor Red
+        return $false
+    }
+    if (-not (Get-Command age -ErrorAction SilentlyContinue)) {
+        Write-Host "Error: age not installed" -ForegroundColor Red
+        return $false
+    }
+
+    # Parse public key (age1...) from identity file
+    $pubkey = (Select-String -Path $script:KeyPath -Pattern 'age1[0-9a-z]+').Matches.Value | Select-Object -First 1
+    if (-not $pubkey) {
+        Write-Host "Error: could not parse public key from $script:KeyPath" -ForegroundColor Red
+        return $false
+    }
+
+    $tmpOut = "$OutputFile.tmp.$PID"
+    try {
+        $Value | & age -r $pubkey -o $tmpOut 2>$null
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $tmpOut)) {
+            Move-Item -LiteralPath $tmpOut -Destination $OutputFile -Force
+            return $true
+        }
+    } catch {
+        # fall through
+    }
+    Remove-Item -LiteralPath $tmpOut -Force -ErrorAction SilentlyContinue
+    return $false
+}
+
+# Add a new secret: encrypt value, append mapping, export into current shell.
+# Mirrors secrets_add() in scripts/load-secrets.sh.
+# Usage: Add-Secret VAR_NAME filename     (or alias `secrets_add`)
+function Add-Secret {
+    param(
+        [Parameter(Mandatory)][string]$VarName,
+        [Parameter(Mandatory)][string]$FileName
+    )
+
+    if (-not (Test-Path $script:MappingFile)) {
+        Write-Host "Error: Mapping file not found at $script:MappingFile" -ForegroundColor Red
+        return
+    }
+
+    # Idempotency: bail if mapping already exists (point to rotate instead)
+    $existing = Select-String -Path $script:MappingFile -Pattern "^${VarName}=" -SimpleMatch
+    if ($existing) {
+        Write-Host "Error: Mapping already exists for $VarName" -ForegroundColor Red
+        Write-Host "Use 'secrets_rotate $VarName' to update the value"
+        return
+    }
+
+    $encryptedFile = Join-Path $script:SecretsDir "$FileName.secret.age"
+    if (Test-Path $encryptedFile) {
+        Write-Host "Error: Encrypted file already exists: $encryptedFile" -ForegroundColor Red
+        return
+    }
+
+    $value = Read-SecretValue -Prompt "Enter value for $VarName"
+    if (-not $value) {
+        Write-Host "Error: Value cannot be empty" -ForegroundColor Red
+        return
+    }
+
+    if (-not (Invoke-AgeEncrypt -OutputFile $encryptedFile -Value $value)) {
+        Write-Host "Error: Encryption failed" -ForegroundColor Red
+        return
+    }
+
+    Add-Content -LiteralPath $script:MappingFile -Value "${VarName}=${FileName}"
+    [Environment]::SetEnvironmentVariable($VarName, $value, 'Process')
+
+    Write-Host "Secret added successfully:" -ForegroundColor Green
+    Write-Host "  Variable: $VarName (exported in current shell)"
+    Write-Host "  File: ${FileName}.secret.age"
+}
+
+# Rotate an existing secret: backup, re-encrypt new value, restore on failure.
+# Mirrors secrets_rotate() in scripts/load-secrets.sh.
+# Usage: Update-Secret VAR_NAME     (or alias `secrets_rotate`)
+function Update-Secret {
+    param([Parameter(Mandatory)][string]$VarName)
+
+    if (-not (Test-Path $script:MappingFile)) {
+        Write-Host "Error: Mapping file not found at $script:MappingFile" -ForegroundColor Red
+        return
+    }
+
+    $match = Select-String -Path $script:MappingFile -Pattern "^${VarName}=" | Select-Object -First 1
+    if (-not $match) {
+        Write-Host "Error: No mapping found for $VarName" -ForegroundColor Red
+        Write-Host "Use 'secrets_add $VarName <filename>' to create a new secret"
+        return
+    }
+
+    $fileName = ($match.Line -split '=', 2)[1].Trim()
+    $encryptedFile = Join-Path $script:SecretsDir "$fileName.secret.age"
+    $backupFile = "$encryptedFile.bak"
+
+    if (Test-Path $encryptedFile) {
+        Copy-Item -LiteralPath $encryptedFile -Destination $backupFile -Force
+    }
+
+    Write-Host "Rotating secret: $VarName"
+    $value = Read-SecretValue -Prompt "Enter new value"
+
+    if (-not $value) {
+        Write-Host "Error: Value cannot be empty" -ForegroundColor Red
+        Remove-Item -LiteralPath $backupFile -Force -ErrorAction SilentlyContinue
+        return
+    }
+
+    if (-not (Invoke-AgeEncrypt -OutputFile $encryptedFile -Value $value)) {
+        # Restore backup
+        if (Test-Path $backupFile) {
+            Move-Item -LiteralPath $backupFile -Destination $encryptedFile -Force
+        }
+        Write-Host "Error: Encryption failed, restored backup" -ForegroundColor Red
+        return
+    }
+
+    Remove-Item -LiteralPath $backupFile -Force -ErrorAction SilentlyContinue
+    [Environment]::SetEnvironmentVariable($VarName, $value, 'Process')
+
+    Write-Host "Secret rotated successfully: $VarName (env updated in current shell)" -ForegroundColor Green
+}
+
+# Export functions as aliases for discoverability + cross-shell parity with .sh
 Set-Alias -Name secrets_refresh -Value Invoke-SecretsRefresh -Scope Global
-Set-Alias -Name secrets_list -Value Show-SecretsList -Scope Global
+Set-Alias -Name secrets_list    -Value Show-SecretsList     -Scope Global
+Set-Alias -Name secrets_add     -Value Add-Secret           -Scope Global
+Set-Alias -Name secrets_rotate  -Value Update-Secret        -Scope Global
 
 # Auto-load secrets when this file is sourced (dot-sourced)
 Import-AllSecrets

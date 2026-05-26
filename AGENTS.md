@@ -2,7 +2,7 @@
 
 > **Single Source of Truth for AI coding agents in this repo.**
 >
-> Claude Code, OpenCode, Copilot, Cursor, Codex, and Gemini all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. See [`30-architecture/adr-009-multi-agent-runtime`](https://github.com/mlorentedev/dotfiles) (in vault) for the rationale.
+> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. See [`30-architecture/adr-009-multi-agent-runtime`](https://github.com/mlorentedev/dotfiles) (in vault) for the rationale.
 
 ## Identity
 
@@ -74,7 +74,7 @@ Concrete model identifiers per tier live in the agent-specific overlay files:
 
 - `ai/claude/CLAUDE.md` — Claude Code (subagent frontmatter `model: opus|sonnet|haiku`; main session `/model` slash)
 - `ai/opencode/opencode.jsonc` — OpenCode (TUI `/models` picker; `qq` / `qf` wrappers for quick-questions)
-- `ai/gemini/GEMINI.md` — Gemini CLI (per-prompt `--model` flag)
+- `ai/agy/AGY.md` — Antigravity CLI (agy) (per-prompt `--model` flag)
 - `ai/copilot/copilot-instructions.md` — GitHub Copilot CLI v2 (TBD; concrete schema pending AI-017/AI-018 audit)
 
 Model names rotate; tier semantics are stable. When a provider releases a new flagship or sunsets a tier, edit ONLY the relevant overlay — `AGENTS.md` does not need a corresponding patch.

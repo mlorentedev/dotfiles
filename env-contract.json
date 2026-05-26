@@ -42,12 +42,12 @@
       "validation": "path_exists"
     },
     {
-      "name": "GEMINI_HOME",
+      "name": "AGY_HOME",
       "required": false,
-      "description": "Gemini CLI config dir. Deployed by setup scripts from ai/gemini/.",
+      "description": "Antigravity CLI config dir. Deployed by setup scripts from ai/agy/.",
       "default": {
-        "linux": "$HOME/.gemini",
-        "windows": "$env:USERPROFILE\\.gemini"
+        "linux": "$HOME/.gemini/antigravity-cli",
+        "windows": "$env:USERPROFILE\\.gemini\\antigravity-cli"
       },
       "validation": "path_exists"
     },

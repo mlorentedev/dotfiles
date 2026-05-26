@@ -52,34 +52,34 @@ else
     log_info "Already in dotfiles directory, skipping copy..."
 fi
 
-# Create symbolic links to main dotfiles
-log_info "Creating symbolic links for main dotfiles..."
-ln -sf "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
-ln -sf "$DOTFILES_DIR/.profile" "$HOME/.profile" 2>/dev/null || true
+# Deploy dotfiles via deploy_file (SDD-007 IaC strategy: atomic copy + idempotent).
+# Edit-in-repo workflow: never modify ~/.zshrc directly — edit in repo, re-run setup.
+log_info "Deploying main dotfiles..."
+deploy_file "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
+[ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
 
 # SSH config and public key
 log_info "Setting up SSH config..."
 ensure_directory "$HOME/.ssh"
-ln -sf "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
-chmod 600 "$DOTFILES_DIR/ssh/config"
+deploy_file "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
+chmod 600 "$HOME/.ssh/config"
 cp "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true
 
 # Git configuration
 log_info "Setting up Git configuration..."
 if [ -f "$DOTFILES_DIR/.gitconfig" ]; then
-    ln -sf "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
-    log_success "Linked: .gitconfig → ~/.gitconfig"
+    deploy_file "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
 else
     log_warning ".gitconfig not found in dotfiles"
 fi
 
-# Create symbolic links for .zsh directory and utils.sh
+# Deploy .zsh directory contents
 log_info "Setting up .zsh directory and utils.sh..."
 ensure_directory "$HOME/.zsh"
-ln -sf "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
-ln -sf "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
-ln -sf "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
-ln -sf "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
+deploy_file "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
+deploy_file "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
+deploy_file "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
+deploy_file "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/github-secrets-manager.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
@@ -145,8 +145,8 @@ fi
 EOF
 fi
 
-# Link .bashrc
-ln -sf "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
+# Deploy .bashrc
+deploy_file "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
 # ============================================================================
 # DEVELOPER TOOLS (user-level installs to ~/.local/bin)
@@ -270,36 +270,153 @@ else
     log_info "bats already installed"
 fi
 
-# Setup AI configuration
-log_info "Setting up AI configuration..."
+# Antigravity CLI (agy) install is user-managed (no official curl-install URL
+# confirmed). If agy is not in PATH, log a clear hint and continue — we still
+# deploy the config files so that when agy is installed manually it picks them up.
+if ! command -v agy >/dev/null 2>&1; then
+    log_warning "agy (Antigravity CLI) not on PATH — install from https://antigravity.google then re-run setup"
+fi
 
-# Gemini CLI config (config deploy is always safe, even without gemini installed)
-ensure_directory "$HOME/.gemini"
-ensure_directory "$HOME/.gemini/prompts"
-cp -rf "$CURRENT_DIR/ai/gemini/"* "$HOME/.gemini/" 2>/dev/null || true
-# Sync Gemini prompts: remove stale skill-derived prompts not in source
-for target_file in "$HOME/.gemini/prompts/"*.md; do
+# Setup Antigravity CLI configuration (fresh-install model, SDD-007).
+# Strategy: write canonical config to where agy reads from (~/.gemini/config/),
+# use deploy_file (atomic + idempotent), no symlinks. Closes #100.
+log_info "Setting up Antigravity CLI configuration..."
+export GEMINI_HOME="$HOME/.gemini"
+export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
+# NOTE: ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL kept for backward compat. Empirical
+# finding (cli log 2026-05-25): agy 1.0.2 issues `loadCodeAssist` and
+# `fetchAvailableModels` calls to `daily-cloudcode-pa.googleapis.com` regardless
+# of these env vars — appears to be hardcoded metadata-plane routing. The chat
+# completion itself goes through a separate gRPC channel whose endpoint is not
+# clearly env-overridable. Setting these has no observed effect on routing.
+export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
+export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
+
+ensure_directory "$GEMINI_HOME"
+ensure_directory "$GEMINI_HOME/config"
+ensure_directory "$GEMINI_HOME/prompts"
+ensure_directory "$AGY_APP_DATA"
+
+# 1. Deploy agy settings.json + ignore file
+if [ -f "$CURRENT_DIR/ai/agy/settings.json" ]; then
+    deploy_file "$CURRENT_DIR/ai/agy/settings.json" "$AGY_APP_DATA/settings.json"
+fi
+if [ -f "$CURRENT_DIR/.geminiignore" ]; then
+    deploy_file "$CURRENT_DIR/.geminiignore" "$GEMINI_HOME/.geminiignore"
+fi
+
+# 2. Consolidate MCP servers — master at ~/.gemini/config/mcp_config.json (agy's canonical read path)
+if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
+    log_info "Consolidating Antigravity MCP servers..."
+
+    # Recover OpenRouter key: env → existing config → secrets vault.
+    # NOTE: canonical agy schema uses `mcpServers` (not `servers`) per Antigravity docs.
+    OLD_KEY="${OPENROUTER_API_KEY:-}"
+    if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ]; then
+        # `|| true` keeps the assignment safe under set -e even when grep
+        # returns 1 (no matches) or jq fails on a missing config file
+        # (fresh-install path on CI containers without the master MCP yet).
+        OLD_KEY=$(jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/config/mcp_config.json" 2>/dev/null | grep -v "null" || true)
+    fi
+    if ([ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]) && [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
+        # Soft-source: avoid set -e tripping when load-secrets internals fail
+        # in CI containers without an age key / sensitive/ vault available.
+        (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1) || true
+        OLD_KEY=$( (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1 && secrets_show OPENROUTER_API_KEY 2>/dev/null) || echo "" )
+    fi
+
+    NEW_MCP_CONFIG=$(jq --arg key "$OLD_KEY" '
+        .mcpServers["hive-vault"].env.OPENROUTER_API_KEY = (if $key != "" and $key != "null" then $key else .mcpServers["hive-vault"].env.OPENROUTER_API_KEY end)
+    ' "$CURRENT_DIR/ai/agy/mcp_servers.json")
+
+    # Merge stdio servers from root mcp-servers.json into mcpServers map
+    while IFS=$'\t' read -r name transport args; do
+        [ "$name" = "hive" ] && continue
+        [ "$transport" != "stdio" ] && continue
+
+        cmd=$(echo "$args" | awk '{print $1}')
+        cmd_args=$(echo "$args" | cut -d' ' -f2-)
+
+        NEW_MCP_CONFIG=$(echo "$NEW_MCP_CONFIG" | jq --arg name "$name" --arg cmd "$cmd" --argjson args "$(echo "$cmd_args" | jq -R 'split(" ")')" \
+            '.mcpServers[$name] = { "command": $cmd, "args": $args }')
+    done < <(jq -r '.servers[] | [.name, .transport, .args] | @tsv' "$CURRENT_DIR/mcp-servers.json")
+
+    # Write master config to agy's canonical read path. No symlinks (BUG-100).
+    # Idempotent: write to tempfile then deploy_file (skips when content matches).
+    MASTER_CONFIG="$GEMINI_HOME/config/mcp_config.json"
+    [ -L "$MASTER_CONFIG" ] && rm -f "$MASTER_CONFIG"
+    _mcp_tmp="$(mktemp)"
+    echo "$NEW_MCP_CONFIG" > "$_mcp_tmp"
+    deploy_file "$_mcp_tmp" "$MASTER_CONFIG"
+    rm -f "$_mcp_tmp"
+
+    # Hive plugin: discovery file at canonical plugin path
+    HIVE_PLUGIN_DIR="$AGY_APP_DATA/plugins/hive-vault"
+    ensure_directory "$HIVE_PLUGIN_DIR"
+    echo '{"name": "hive-vault"}' > "$HIVE_PLUGIN_DIR/plugin.json"
+    echo "$NEW_MCP_CONFIG" | jq '{ "mcpServers": { "hive-vault": .mcpServers["hive-vault"] } }' > "$HIVE_PLUGIN_DIR/mcp_config.json"
+
+    log_success "Consolidated Antigravity MCP configuration and registered Hive plugin"
+fi
+
+# Drop project-local agy state cache from the workspace if agy leaked one
+[ -d "$CURRENT_DIR/.antigravitycli" ] && rm -rf "$CURRENT_DIR/.antigravitycli"
+[ -d "$CURRENT_DIR/.antigravitycli.bak" ] && rm -rf "$CURRENT_DIR/.antigravitycli.bak"
+rm -f "$GEMINI_HOME/config/.migrated" 2>/dev/null
+
+# SDD-007 one-time migration: drop orphan master at the pre-SDD-007 path
+# (~/.gemini/mcp_config.json). Canonical path is now ~/.gemini/config/mcp_config.json.
+if [ -f "$GEMINI_HOME/mcp_config.json" ] && [ ! -L "$GEMINI_HOME/mcp_config.json" ]; then
+    log_info "Removing orphan master from pre-SDD-007 path: $GEMINI_HOME/mcp_config.json"
+    rm -f "$GEMINI_HOME/mcp_config.json"
+fi
+# Drop the old AGY_APP_DATA symlink/copy of mcp_config.json (replaced by canonical path)
+[ -e "$AGY_APP_DATA/mcp_config.json" ] && rm -f "$AGY_APP_DATA/mcp_config.json"
+
+# Sync Agy prompts: remove stale skill-derived prompts not in source
+for target_file in "$GEMINI_HOME/prompts/"*.md; do
     [ -f "$target_file" ] || continue
     prompt_name=$(basename "$target_file" .md)
     [ -d "$CURRENT_DIR/ai/skills/$prompt_name" ] || rm -f "$target_file"
 done
-# Extract SKILL.md content as flat prompts for Gemini (strip YAML frontmatter)
+
+# Sync native Shared Skills for Antigravity (recognized as 'Shared' in agy)
+ensure_directory "$HOME/.gemini/skills"
+# Remove stale shared skills
+for target_dir in "$HOME/.gemini/skills/"*/; do
+    skill_name=$(basename "$target_dir")
+    [ -d "$CURRENT_DIR/ai/skills/$skill_name" ] || rm -rf "$target_dir"
+done
+
+# Extract SKILL.md content as flat prompts for Agy (strip YAML frontmatter)
+# AND copy as native skills to Shared path
 for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
     if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
         skill_name=$(basename "$skill_dir")
-        # Copy SKILL.md as flat file, stripping YAML frontmatter
-        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$HOME/.gemini/prompts/${skill_name}.md"
+        
+        # 1. Flat prompt for 'gp' alias
+        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$GEMINI_HOME/prompts/${skill_name}.md"
+        
+        # 2. Native Antigravity skill (Shared)
+        ensure_directory "$HOME/.gemini/skills/$skill_name"
+        cp -rf "$skill_dir"* "$HOME/.gemini/skills/$skill_name/" 2>/dev/null || true
     fi
 done
+
 # Force copy master files (Neural Hive Protocol)
-rm -f "$HOME/.gemini/GEMINI.md"
-cp "$CURRENT_DIR/ai/gemini/GEMINI.md" "$HOME/.gemini/GEMINI.md"
-if grep -q 'First, read `AGENTS.md`' "$HOME/.gemini/GEMINI.md"; then
-    log_success "GEMINI.md deployed successfully (verified pointer to AGENTS.md)"
+rm -f "$GEMINI_HOME/AGY.md"
+cp "$CURRENT_DIR/ai/agy/AGY.md" "$GEMINI_HOME/AGY.md"
+if grep -q 'First, read `AGENTS.md`' "$GEMINI_HOME/AGY.md"; then
+    log_success "AGY.md deployed successfully (verified pointer to AGENTS.md)"
 else
-    echo "❌ Error: GEMINI.md deployment failed verification"
+    echo "❌ Error: AGY.md deployment failed verification"
 fi
-log_success "Gemini CLI configured"
+
+# Note: legacy `agy plugin import gemini` removed (SDD-007). Fresh-install model:
+# we don't carry over from legacy gemini-cli on every setup run. If the user
+# needs a one-time migration, they run it manually once.
+
+log_success "Antigravity CLI configuration complete"
 
 # Claude Code
 ensure_directory "$HOME/.claude"
@@ -911,10 +1028,13 @@ fi
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."
 
-verify_symlink "$HOME/.zsh/aliases.zsh" "aliases.zsh"
-verify_symlink "$HOME/.zsh/functions.zsh" "functions.zsh"
-verify_symlink "$HOME/.zshrc" ".zshrc"
-verify_symlink "$HOME/.bashrc" ".bashrc"
+check_deployed "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh" "aliases.zsh"
+check_deployed "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh" "functions.zsh"
+check_deployed "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
+# NOTE: .bashrc intentionally NOT under strict check_deployed -- tool installers
+# (opencode, bun, NVM, ggshield) append PATH/init lines to ~/.bashrc post-deploy,
+# producing legitimate drift. Just verify existence.
+[ -f "$HOME/.bashrc" ] && log_success ".bashrc exists (drift expected from installers)" || log_error ".bashrc missing (run setup-linux.sh)"
 file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || log_error "bash_aliases issue"
 
 # Check dependencies
@@ -935,6 +1055,9 @@ fi
 # Values must match the corresponding `export` lines in .zshrc + .bashrc.
 export SCRIPTS_DIR="${SCRIPTS_DIR:-$DOTFILES_DIR/scripts}"
 export GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
+# AGY_HOME (SSOT name per env-contract.json) lives inside GEMINI_HOME, since
+# agy inherits the legacy ~/.gemini/ path for backwards compat with gemini-cli.
+export AGY_HOME="${AGY_HOME:-$GEMINI_HOME/antigravity-cli}"
 export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
 export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
 # BUG-021 (2026-05-21): pre-export DOTFILES_REPO_DIR so doctor + diff-check.sh

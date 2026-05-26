@@ -1,0 +1,44 @@
+# Antigravity / agy ignore file — paths agy must NEVER read or index.
+# Mirrors .gitignore intent for sensitive + non-source paths.
+# Deployed to ~/.gemini/.geminiignore by setup-linux.sh.
+
+# Secrets — never feed encrypted blobs or mappings to the model
+sensitive/
+.secrets/
+*.secret.age
+*.secret
+*.dec
+.env
+.env.*
+
+# Git internals
+.git/
+
+# Build / dependency caches
+node_modules/
+.venv/
+.cache/
+.npm/
+.yarn/
+target/
+dist/
+build/
+
+# AI tool state (cross-contamination between agents)
+.claude/
+.antigravitycli/
+.antigravitycli.bak/
+.aider*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# OS junk
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.swo
+*.log

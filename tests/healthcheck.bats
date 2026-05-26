@@ -26,8 +26,8 @@ setup() {
     grep -q 'versions.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh has all 12 sections" {
-    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 12 ]]
+@test "healthcheck.sh has all 13 sections" {
+    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 13 ]]
 }
 
 @test "healthcheck.sh uses set -euo pipefail" {
@@ -61,21 +61,23 @@ setup() {
 # --- tmux section 9/12 ---
 
 @test "healthcheck.sh has section 9/12 for tmux" {
-    grep -qE 'section "9/12" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "9/13" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies tmux binary" {
     grep -qE 'command -v tmux' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh verifies ~/.tmux.conf symlink target" {
-    grep -qE 'readlink "\$HOME/\.tmux\.conf"' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh verifies ~/.tmux.conf via check_deployed (SDD-007)" {
+    # Post-SDD-007 IaC migration: tmux.conf is deployed via deploy_file (copy)
+    # not symlinked; check_deployed asserts content match against repo source.
+    grep -qE 'check_deployed.*tmux\.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 # --- ghostty section 11/12 (TERM-001) ---
 
 @test "healthcheck.sh has section 11/12 for ghostty" {
-    grep -qE 'section "11/12" "Ghostty"' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "11/13" "Ghostty"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies ghostty binary presence" {
@@ -93,7 +95,7 @@ setup() {
 # --- drift section 12/12 ---
 
 @test "healthcheck.sh has section 12/12 for drift" {
-    grep -qE 'section "12/12" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "12/13" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh invokes diff-check.sh" {

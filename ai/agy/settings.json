@@ -1,0 +1,74 @@
+{
+  "allowNonWorkspaceAccess": true,
+  "model": "Gemini 3.5 Flash (High)",
+  "notifications": true,
+  "permissions": {
+    "allow": [
+      "command(agy)"
+    ]
+  },
+  "trustedWorkspaces": [
+    "/home/manu/Projects/*"
+  ],
+  "workspace": {
+    "autoSave": true,
+    "excludePatterns": [
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/out/**",
+      "**/.pydantic_cache/**",
+      "**/.pytest_cache/**",
+      "**/.mypy_cache/**"
+    ],
+    "maxFileSizeMB": 15
+  },
+  "safety": {
+    "toolPermission": "request-review",
+    "sandboxMode": false,
+    "dangerouslySkipPermissions": false,
+    "allowedCommands": ["git", "npm run build", "pytest", "go test", "ls", "cat", "grep"]
+  },
+  "modelConfigs": {
+    "defaultModel": "gemini-3.5-flash",
+    "customAliases": {
+      "chat-base": {
+        "modelConfig": {
+          "generateContentConfig": {
+            "temperature": 0.7,
+            "topP": 0.95,
+            "topK": 40,
+            "thinkingConfig": {
+              "thinkingLevel": "HIGH"
+            }
+          }
+        }
+      }
+    }
+  },
+  "context": {
+    "fileName": [
+      "AGENTS.md",
+      "GEMINI.md",
+      "AGY.md",
+      "MEMORY.md"
+    ],
+    "autoLoadContext": true,
+    "maxContextTokens": 2000000
+  },
+  "performance": {
+    "streamResponses": true,
+    "showThinkingSteps": true,
+    "keep_thinking": false,
+    "networkTimeoutMs": 60000,
+    "maxRetries": 2,
+    "maxConcurrentSubagents": 4,
+    "telemetryEnabled": false
+  },
+  "ui": {
+    "showMemoryUsage": false,
+    "theme": "GitHub",
+    "verbosity": "normal"
+  }
+}
