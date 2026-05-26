@@ -36,6 +36,22 @@ setup() {
     ! grep -qE '^function (ai|aic|aia) ' "$PROFILE_SCRIPT"
 }
 
+# --- Secrets sourcing (cross-OS parity: .bashrc sources load-secrets.sh) ---
+
+@test "profile.ps1 sources load-secrets.ps1 (cross-OS parity with .bashrc)" {
+    # .bashrc:63 sources load-secrets.sh. PowerShell parity requires profile.ps1
+    # to dot-source load-secrets.ps1 so $env:NAN_API_KEY / OPENROUTER_API_KEY /
+    # etc. are populated for opencode (reads {env:NAN_API_KEY} from opencode.jsonc),
+    # agy, and copilot. Without this, opencode.jsonc references resolve to empty.
+    grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+    grep -qF 'Test-Path -LiteralPath' "$PROFILE_SCRIPT"
+}
+
+@test "parity: load-secrets sourced in both .bashrc and profile.ps1" {
+    grep -qE 'load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
+    grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+}
+
 # --- Parity check: oc alias exists in both shells ---
 
 @test "parity: oc with --pure defined in both aliases.zsh and profile.ps1" {

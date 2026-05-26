@@ -201,9 +201,19 @@ $env:AGY_HOME = "$env:USERPROFILE\.gemini\antigravity-cli"
 $env:COPILOT_HOME = "$env:USERPROFILE\.copilot"
 $env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode"
 
-# Uncomment and set if needed:
-# $env:GEMINI_API_KEY = "your-api-key"
-# $env:ANTHROPIC_API_KEY = "your-api-key"
+# AI provider endpoint -- NaN community (primary, OpenAI-compatible).
+# Mirrors NAN_BASE_URL set in .bashrc/.zshrc. API key comes from the
+# load-secrets.ps1 sourcing below (sensitive/nan.api-key.secret.age).
+$env:NAN_BASE_URL = 'https://api.nan.builders/v1'
+
+# Load encrypted secrets as environment variables (cross-OS parity with .bashrc:62-63).
+# load-secrets.ps1 decrypts sensitive/*.secret.age via age and sets each value
+# with SetEnvironmentVariable(..., 'Process') -- session-scoped, never persisted
+# to the user registry. Mandatory for opencode (reads {env:NAN_API_KEY} from
+# opencode.jsonc) and agy (reads ANTHROPIC_API_KEY etc. from environment).
+$_secretsScript = Join-Path $env:DOTFILES_DIR 'scripts\load-secrets.ps1'
+if (Test-Path -LiteralPath $_secretsScript) { . $_secretsScript }
+Remove-Variable -Name _secretsScript -ErrorAction SilentlyContinue
 
 # ============================================================================
 # STARTUP MESSAGE
