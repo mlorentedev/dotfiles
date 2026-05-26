@@ -1055,6 +1055,9 @@ fi
 # Values must match the corresponding `export` lines in .zshrc + .bashrc.
 export SCRIPTS_DIR="${SCRIPTS_DIR:-$DOTFILES_DIR/scripts}"
 export GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
+# AGY_HOME (SSOT name per env-contract.json) lives inside GEMINI_HOME, since
+# agy inherits the legacy ~/.gemini/ path for backwards compat with gemini-cli.
+export AGY_HOME="${AGY_HOME:-$GEMINI_HOME/antigravity-cli}"
 export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
 export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
 # BUG-021 (2026-05-21): pre-export DOTFILES_REPO_DIR so doctor + diff-check.sh

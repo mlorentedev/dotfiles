@@ -1239,6 +1239,9 @@ if ($existingTask -and ($existingTaskArgument -eq $expectedTaskArgument)) {
 
 if (-not $env:SCRIPTS_DIR)       { $env:SCRIPTS_DIR       = "$env:DOTFILES_DIR\scripts" }
 if (-not $env:GEMINI_HOME)       { $env:GEMINI_HOME       = "$env:USERPROFILE\.gemini" }
+# AGY_HOME (SSOT name per env-contract.json) lives inside GEMINI_HOME, since
+# agy inherits the legacy ~/.gemini/ path for backwards compat with gemini-cli.
+if (-not $env:AGY_HOME)          { $env:AGY_HOME          = "$env:GEMINI_HOME\antigravity-cli" }
 if (-not $env:COPILOT_HOME)      { $env:COPILOT_HOME      = "$env:USERPROFILE\.copilot" }
 if (-not $env:OPENCODE_HOME)     { $env:OPENCODE_HOME     = "$env:USERPROFILE\.config\opencode" }
 # BUG-021 (2026-05-21): added DOTFILES_REPO_DIR pre-export -- BUG-020 (PR #86)

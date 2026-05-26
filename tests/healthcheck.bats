@@ -27,7 +27,7 @@ setup() {
 }
 
 @test "healthcheck.sh has all 13 sections" {
-    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 12 ]]
+    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 13 ]]
 }
 
 @test "healthcheck.sh uses set -euo pipefail" {
@@ -68,8 +68,10 @@ setup() {
     grep -qE 'command -v tmux' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh verifies ~/.tmux.conf symlink target" {
-    grep -qE 'readlink "\$HOME/\.tmux\.conf"' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh verifies ~/.tmux.conf via check_deployed (SDD-007)" {
+    # Post-SDD-007 IaC migration: tmux.conf is deployed via deploy_file (copy)
+    # not symlinked; check_deployed asserts content match against repo source.
+    grep -qE 'check_deployed.*tmux\.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 # --- ghostty section 11/12 (TERM-001) ---
