@@ -1031,7 +1031,10 @@ log_success "Installation completed! Verifying file links..."
 check_deployed "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh" "aliases.zsh"
 check_deployed "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh" "functions.zsh"
 check_deployed "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
-check_deployed "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc" ".bashrc"
+# NOTE: .bashrc intentionally NOT under strict check_deployed -- tool installers
+# (opencode, bun, NVM, ggshield) append PATH/init lines to ~/.bashrc post-deploy,
+# producing legitimate drift. Just verify existence.
+[ -f "$HOME/.bashrc" ] && log_success ".bashrc exists (drift expected from installers)" || log_error ".bashrc missing (run setup-linux.sh)"
 file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || log_error "bash_aliases issue"
 
 # Check dependencies

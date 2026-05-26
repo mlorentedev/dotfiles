@@ -34,8 +34,8 @@ setup() {
 
 # --- OpenCode alias (replaces aider tiers, sunset) ---
 
-@test "aliases.zsh defines oc alias for opencode" {
-    grep -q '^alias oc="opencode"' "$ALIASES_FILE"
+@test "aliases.zsh defines oc alias for opencode (SDD-007: --pure default)" {
+    grep -qE '^alias oc="opencode( --pure)?"' "$ALIASES_FILE"
 }
 
 @test "aliases.zsh defines oclog alias for live opencode log tailing" {
