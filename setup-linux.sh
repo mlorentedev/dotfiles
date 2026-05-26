@@ -313,7 +313,10 @@ if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
     # NOTE: canonical agy schema uses `mcpServers` (not `servers`) per Antigravity docs.
     OLD_KEY="${OPENROUTER_API_KEY:-}"
     if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ]; then
-        OLD_KEY=$(jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/config/mcp_config.json" 2>/dev/null | grep -v "null")
+        # `|| true` keeps the assignment safe under set -e even when grep
+        # returns 1 (no matches) or jq fails on a missing config file
+        # (fresh-install path on CI containers without the master MCP yet).
+        OLD_KEY=$(jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/config/mcp_config.json" 2>/dev/null | grep -v "null" || true)
     fi
     if ([ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]) && [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
         # Soft-source: avoid set -e tripping when load-secrets internals fail

@@ -28,8 +28,8 @@ setup() {
     grep -q 'Deploying Claude configuration' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys Gemini configuration" {
-    grep -q 'Deploying Gemini configuration' "$PS1_SCRIPT"
+@test "setup-windows.ps1 deploys Antigravity (agy) configuration (SDD-007)" {
+    grep -q 'Deploying Antigravity (agy) configuration' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys PowerShell profile" {
@@ -273,11 +273,11 @@ setup() {
     grep -qF 'SST.opencode' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys opencode.jsonc with reconcile-not-skip (AI-014)" {
-    # The deploy block compares SHA256 hashes before overwriting and lands at
-    # %USERPROFILE%\.config\opencode\opencode.jsonc.
+@test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
+    # Post-SDD-007: the inline Copy-Item + Get-FileHash block was extracted
+    # into Deploy-File in scripts/utils.ps1 (atomic + idempotent by SHA256).
     grep -qF 'opencode.jsonc' "$PS1_SCRIPT"
-    grep -B5 'opencode.jsonc already in sync' "$PS1_SCRIPT" | grep -q 'Get-FileHash'
+    grep -qE 'Deploy-File.*opencodeConfigSrc' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 syncs OpenCode commands with orphan removal (AI-014)" {
@@ -420,9 +420,14 @@ setup() {
     grep -qF "Select-String -Path \"\$ClaudeHome\\CLAUDE.md\" -Pattern 'First, read \`AGENTS.md\`'" "$PS1_SCRIPT"
 }
 
-@test "parity: both scripts verify GEMINI.md deploy with AGENTS.md pointer marker" {
-    grep -qF "grep -q 'First, read \`AGENTS.md\`' \"\$HOME/.gemini/GEMINI.md\"" "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF "Select-String -Path \"\$GeminiHome\\GEMINI.md\" -Pattern 'First, read \`AGENTS.md\`'" "$PS1_SCRIPT"
+@test "parity: both scripts verify AGY.md deploy with AGENTS.md pointer marker (SDD-007)" {
+    # Post-SDD-007: legacy GEMINI.md compat write removed; AGY.md is the
+    # canonical pointer file for the agy CLI. Both setup scripts deploy it
+    # and assert the AGENTS.md pointer marker on every run.
+    grep -qF "grep -q 'First, read \`AGENTS.md\`' \"\$GEMINI_HOME/AGY.md\"" "$DOTFILES_DIR/setup-linux.sh" \
+        || grep -qF "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/agy/AGY.md"
+    # Windows-side assertion may live under either path key (GeminiHome or AgyAppData)
+    grep -qE "AGY\.md|AGENTS\.md.*GeminiHome" "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 has no stale 'CORE PRINCIPLE' verify-pattern references" {

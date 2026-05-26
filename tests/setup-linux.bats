@@ -92,8 +92,8 @@ setup() {
     grep -qE 'safe_copy "\$CURRENT_DIR/tmux\.conf" "\$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh symlinks tmux.conf to ~/.tmux.conf" {
-    grep -qE 'ln -sf "\$DOTFILES_DIR/tmux\.conf" "\$HOME/\.tmux\.conf"' "$DOTFILES_DIR/setup-linux.sh"
+@test "setup-linux.sh deploys tmux.conf to ~/.tmux.conf via deploy_file (SDD-007)" {
+    grep -qE 'deploy_file "\$DOTFILES_DIR/tmux\.conf" "\$HOME/\.tmux\.conf"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh checks for tmux presence" {
