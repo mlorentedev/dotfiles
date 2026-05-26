@@ -153,6 +153,18 @@ setup() {
     [[ -f "$AGENTS_MD" ]]
 }
 
+@test "setup-linux.sh deploys AGENTS.md to ~/.config/opencode/ (opencode global SSOT)" {
+    # opencode reads ~/.config/opencode/AGENTS.md natively (per upstream docs).
+    # Unlike claude/agy/copilot which use pointer files, opencode loads the
+    # canonical filename so we copy the full SSOT verbatim.
+    grep -qF '$HOME/.config/opencode/AGENTS.md' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'AGENTS.md source missing' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-windows.ps1 deploys AGENTS.md to ~/.config/opencode/ (cross-OS parity)" {
+    grep -qF "'.config\\opencode\\AGENTS.md'" "$DOTFILES_DIR/setup-windows.ps1"
+}
+
 @test "AGENTS.md contains Standing Orders section" {
     grep -q "^## Standing Orders" "$AGENTS_MD"
 }

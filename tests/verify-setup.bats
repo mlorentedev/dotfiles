@@ -304,6 +304,15 @@ setup() {
     [ ! -d "$HOME/.copilot" ]
 }
 
+@test "AGENTS.md deployed to ~/.config/opencode/AGENTS.md (cross-agent SSOT)" {
+    # opencode reads AGENTS.md natively (per upstream docs). Deploying the
+    # repo-root canonical SSOT verbatim gives opencode the same system prompt
+    # claude/agy/copilot get via their pointer files.
+    [ -f "$HOME/.config/opencode/AGENTS.md" ]
+    grep -q '^# AGENTS.md' "$HOME/.config/opencode/AGENTS.md"
+    grep -q 'Single Source of Truth' "$HOME/.config/opencode/AGENTS.md"
+}
+
 @test "opencode commands deployed to ~/.config/opencode/commands/ (AI-012)" {
     # Post-AI-012: setup-linux.sh copies ai/opencode/commands/*.md to the
     # global opencode commands directory. 12 portable commands expected

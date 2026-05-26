@@ -728,6 +728,24 @@ if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
     Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
 }
 
+# Deploy the canonical AGENTS.md as opencode's global system prompt.
+# OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
+# claude/agy/copilot which use pointer files, opencode reads the filename
+# "AGENTS.md" natively so we copy the full SSOT (~22KB) verbatim.
+# Linux parity: setup-linux.sh:584+
+$agentsSrc = Join-Path $DotfilesDir 'AGENTS.md'
+$agentsDst = Join-Path $env:USERPROFILE '.config\opencode\AGENTS.md'
+if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
+    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
+        [void](Deploy-File -Source $agentsSrc -Destination $agentsDst)
+    } else {
+        Copy-Item -LiteralPath $agentsSrc -Destination $agentsDst -Force
+        Write-Success "Deployed AGENTS.md to $agentsDst (fallback)"
+    }
+} else {
+    Write-Warn "AGENTS.md source missing at $agentsSrc"
+}
+
 # Commands sync: add new, leave unchanged, remove orphans. Mirror of the bash
 # loop in setup-linux.sh: cmds_added/cmds_skipped/cmds_removed counters.
 $opencodeCmdsSrc = "$DotfilesDir\ai\opencode\commands"
