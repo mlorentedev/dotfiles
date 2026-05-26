@@ -846,6 +846,17 @@ $projAgyBak = Join-Path $DotfilesDir ".antigravitycli.bak"
 if (Test-Path $projAgyCli) { Remove-Item -Recurse -Force $projAgyCli -ErrorAction SilentlyContinue }
 if (Test-Path $projAgyBak) { Remove-Item -Recurse -Force $projAgyBak -ErrorAction SilentlyContinue }
 
+# Deploy AGY.md (Neural Hive Protocol pointer to AGENTS.md). Linux-parity.
+$agyMdSource = Join-Path $DotfilesDir 'ai\agy\AGY.md'
+if (Test-Path $agyMdSource) {
+    Copy-Item -LiteralPath $agyMdSource -Destination (Join-Path $GeminiHome 'AGY.md') -Force
+    if (Select-String -Path (Join-Path $GeminiHome 'AGY.md') -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet) {
+        Write-Success "AGY.md deployed successfully (verified pointer to AGENTS.md)"
+    } else {
+        Write-Err "AGY.md deployment failed verification (expected pointer to AGENTS.md)"
+    }
+}
+
 # Sync Gemini prompts: remove stale, then extract from current skills
 if (Test-Path $skillsSource) {
     # Remove stale skill-derived prompts not in source

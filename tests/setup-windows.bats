@@ -424,10 +424,10 @@ setup() {
     # Post-SDD-007: legacy GEMINI.md compat write removed; AGY.md is the
     # canonical pointer file for the agy CLI. Both setup scripts deploy it
     # and assert the AGENTS.md pointer marker on every run.
-    grep -qF "grep -q 'First, read \`AGENTS.md\`' \"\$GEMINI_HOME/AGY.md\"" "$DOTFILES_DIR/setup-linux.sh" \
-        || grep -qF "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/agy/AGY.md"
-    # Windows-side assertion may live under either path key (GeminiHome or AgyAppData)
-    grep -qE "AGY\.md|AGENTS\.md.*GeminiHome" "$PS1_SCRIPT"
+    grep -qF 'First, read `AGENTS.md`' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "AGY.md" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'First, read `AGENTS.md`' "$PS1_SCRIPT"
+    grep -qF "AGY.md" "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 has no stale 'CORE PRINCIPLE' verify-pattern references" {
