@@ -111,8 +111,11 @@ setup() {
     grep -q 'ollama.kubelab.live' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc default model is nan/deepseek-v4-flash (NaN 1M-context)" {
-    grep -qE '"model":\s*"nan/deepseek-v4-flash"' "$OPENCODE_CFG"
+@test "opencode.jsonc default model is nan/qwen3.6 (NaN, fast multimodal default)" {
+    # Per opencode.jsonc comments: qwen3.6 chosen empirically (~0.8s wall, no
+    # forced reasoning) over deepseek-v4-flash (~3s + 30+ reason tokens). Switch
+    # to deepseek-v4-flash via /models for >256K context jobs.
+    grep -qE '"model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc exposes 3 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
@@ -137,8 +140,11 @@ setup() {
 
 # --- Alias ---
 
-@test ".zsh/aliases.zsh has oc alias for opencode" {
-    grep -q '^alias oc="opencode"' "$ALIASES_FILE"
+@test ".zsh/aliases.zsh has oc alias for opencode (--pure: skip MCPs/plugins)" {
+    # --pure bypasses MCP+plugins to avoid the tool-resolution hang on complex
+    # queries (empirical 2026-05-25). Mirror in .bashrc and powershell/profile.ps1.
+    # Hypothesis still under investigation: hang may be Ghostty-on-Linux specific.
+    grep -q '^alias oc="opencode --pure"' "$ALIASES_FILE"
 }
 
 # --- AGENTS.md (SSOT cross-agent per ADR-009) ---

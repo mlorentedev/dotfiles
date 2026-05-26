@@ -16,17 +16,20 @@ setup() {
     grep -q 'Set-Alias.*-Name c -Value claude' "$PROFILE_SCRIPT"
 }
 
-@test "profile.ps1 has gemini alias" {
-    grep -q 'Set-Alias.*-Name g -Value gemini' "$PROFILE_SCRIPT"
+@test "profile.ps1 has agy alias (g -> agy, post-SDD-007 Antigravity migration)" {
+    # gemini-cli replaced by Google Antigravity CLI ('agy'). The single-letter
+    # alias 'g' carries forward — same finger pattern, new binary.
+    grep -q 'Set-Alias.*-Name g -Value agy' "$PROFILE_SCRIPT"
 }
 
 # --- OpenCode alias (admin-conditional on Windows; aider sunset) ---
 
-@test "profile.ps1 defines conditional oc alias for opencode" {
+@test "profile.ps1 defines conditional oc function for opencode (--pure)" {
     # Guarded by Get-Command — non-admin Windows machines without opencode
-    # skip the alias rather than producing broken references.
+    # skip the alias rather than producing broken references. Function form
+    # (not Set-Alias) so the --pure flag can be passed; mirrors bash/zsh.
     grep -qE 'if \(Get-Command opencode' "$PROFILE_SCRIPT"
-    grep -qE 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
+    grep -qE 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
 }
 
 @test "profile.ps1 no longer defines aider tier functions (sunset)" {
@@ -35,9 +38,12 @@ setup() {
 
 # --- Parity check: oc alias exists in both shells ---
 
-@test "parity: oc alias defined in both aliases.zsh and profile.ps1" {
-    grep -qE '^alias oc=' "$DOTFILES_DIR/.zsh/aliases.zsh"
-    grep -qE 'Set-Alias -Name oc' "$PROFILE_SCRIPT"
+@test "parity: oc with --pure defined in both aliases.zsh and profile.ps1" {
+    # Cross-OS parity is the architectural invariant: same finger pattern,
+    # same effective command. Zsh uses alias; PowerShell uses a function
+    # because Set-Alias cannot pass arguments. Both invoke `opencode --pure`.
+    grep -qE '^alias oc="opencode --pure"' "$DOTFILES_DIR/.zsh/aliases.zsh"
+    grep -qE 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
 }
 
 # --- Other functions ---

@@ -49,7 +49,10 @@ fail() {
 }
 
 skip() {
-    printf '  %bSKIP%b: %s - %s\n' "$YELLOW" "$NC" "$1" "$2"
+    # $2 is optional. Under `set -u`, callers passing only the test name
+    # (e.g. skip "Antigravity CLI Health" when agy not in PATH) would
+    # otherwise abort the script with `$2: unbound variable`.
+    printf '  %bSKIP%b: %s%s\n' "$YELLOW" "$NC" "$1" "${2:+ - $2}"
     CHECKS_SKIPPED=$((CHECKS_SKIPPED + 1))
 }
 

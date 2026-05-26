@@ -3,10 +3,11 @@
     Post-setup tool and version verification for Windows. Cross-OS sibling of healthcheck.sh.
 
 .DESCRIPTION
-    Runs 12 sections of structural assertions against a deployed dotfiles install
-    on Windows. Sections 9 (tmux), 11 (ghostty), 12 (drift) emit SKIP with
-    explanation because those tools are Linux-only by design or pending follow-up
-    specs (WIN-001b, REFACTOR-003, TERM-002).
+    Runs 13 sections of structural assertions against a deployed dotfiles install
+    on Windows. Sections 9 (tmux), 11 (ghostty) emit SKIP with explanation
+    because those tools are Linux-only by design or pending follow-up specs
+    (WIN-001b, REFACTOR-003, TERM-002). Section 13 (Antigravity CLI Health)
+    added in SDD-007.
 
     Numbered identically to healthcheck.sh so bats parity asserts work cross-OS.
 
@@ -118,13 +119,13 @@ Write-Host '========================================'
 Write-Host "Checking from: $script:DotfilesDir"
 
 # ==================================================
-# 1/12 Core Tools in PATH
+# 1/13 Core Tools in PATH
 # ==================================================
 # Required = installed by setup-windows.ps1 (winget array) + the bootstrap
 # prerequisites git/pwsh. Workflow-dependent tools (node/npm/docker/kubectl/
 # terraform/direnv) moved to section 6 (Optional) because dotfiles does not
 # deploy them on Windows -- they're user choice per task.
-Write-Section '1/12' 'Core Tools in PATH'
+Write-Section '1/13' 'Core Tools in PATH'
 
 $coreTools = @('git', 'pwsh', 'curl', 'jq', 'eza', 'gh', 'zoxide')
 foreach ($tool in $coreTools) {
@@ -136,9 +137,9 @@ foreach ($tool in $coreTools) {
 }
 
 # ==================================================
-# 2/12 Versioned Tool Paths
+# 2/13 Versioned Tool Paths
 # ==================================================
-Write-Section '2/12' 'Versioned Tool Paths'
+Write-Section '2/13' 'Versioned Tool Paths'
 
 Test-BinaryInDir -Name 'JAVA_HOME'   -Dir $env:JAVA_HOME   -Binary 'java'
 Test-BinaryInDir -Name 'MAVEN_HOME'  -Dir $env:MAVEN_HOME  -Binary 'mvn'
@@ -167,14 +168,14 @@ if ($env:MINIKUBE_HOME -and (Test-Path -LiteralPath $env:MINIKUBE_HOME -PathType
 }
 
 # ==================================================
-# 3/12 Version Match (versions.conf)
+# 3/13 Version Match (versions.conf)
 # ==================================================
 # Linux deploys language toolchains under $APPS_HOME/{jdk-VERSION,go-VERSION,...}
 # and pins versions via versions.conf. Windows installs language toolchains via
 # winget into user-chosen paths and does NOT use $APPS_HOME. So this section is
 # only meaningful when $env:APPS_HOME is explicitly set; otherwise SKIP the
 # whole block (a single line, not 5 individual SKIPs).
-Write-Section '3/12' 'Version Match (versions.conf)'
+Write-Section '3/13' 'Version Match (versions.conf)'
 
 if (-not $env:APPS_HOME) {
     Write-Skip 'version match' '$env:APPS_HOME not set (Windows uses winget, not $APPS_HOME -- skip section)'
@@ -202,11 +203,11 @@ if (-not $env:APPS_HOME) {
 }
 
 # ==================================================
-# 4/12 Key Files / Junctions
+# 4/13 Key Files / Junctions
 # ==================================================
 # Windows uses file copies + the .dotfiles junction (BUG-012) instead of POSIX
 # symlinks. We check existence rather than symlink-ness.
-Write-Section '4/12' 'Key Files / Junctions'
+Write-Section '4/13' 'Key Files / Junctions'
 
 function Test-DeployedFile {
     param([string]$Path, [string]$Name)
@@ -288,12 +289,12 @@ if ($bashCmd) {
 }
 
 # ==================================================
-# 5/12 Environment Variables
+# 5/13 Environment Variables
 # ==================================================
 # DOTFILES_DIR is the only Windows-required env var (set by powershell/profile.ps1).
 # APPS_HOME + language _HOME vars are Linux-deploy-pattern vars; on Windows they
 # are optional (user may set them per workflow) -- SKIP if unset, not FAIL.
-Write-Section '5/12' 'Environment Variables'
+Write-Section '5/13' 'Environment Variables'
 
 $requiredVars = @('DOTFILES_DIR', 'ANTIGRAVITY_ENDPOINT', 'CLOUDCODE_URL', 'GEMINI_DIR')
 $optionalVars = @('APPS_HOME', 'JAVA_HOME', 'MAVEN_HOME', 'PYTHON_HOME', 'GO_HOME', 'MINIKUBE_HOME')
@@ -317,9 +318,9 @@ foreach ($v in $optionalVars) {
 }
 
 # ==================================================
-# 6/12 Optional Tools
+# 6/13 Optional Tools
 # ==================================================
-Write-Section '6/12' 'Optional Tools'
+Write-Section '6/13' 'Optional Tools'
 
 $optionalTools = @(
     'age', 'claude', 'gemini', 'bats', 'helm', 'ansible', 'pip', 'copilot', 'opencode', 'uv',
@@ -337,9 +338,9 @@ foreach ($tool in $optionalTools) {
 }
 
 # ==================================================
-# 7/12 Knowledge Vault
+# 7/13 Knowledge Vault
 # ==================================================
-Write-Section '7/12' 'Knowledge Vault'
+Write-Section '7/13' 'Knowledge Vault'
 
 $vaultDir = if ($env:VAULT_DIR) { $env:VAULT_DIR } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
 
@@ -396,9 +397,9 @@ foreach ($subdir in @('00_meta', '10_projects', '40_resources')) {
 }
 
 # ==================================================
-# 8/12 Secrets Integrity
+# 8/13 Secrets Integrity
 # ==================================================
-Write-Section '8/12' 'Secrets Integrity'
+Write-Section '8/13' 'Secrets Integrity'
 
 $secretsDir = Join-Path $script:DotfilesDir 'sensitive'
 $mappingFile = Join-Path $secretsDir 'env-mapping.conf'
@@ -449,15 +450,15 @@ if (Test-Path -LiteralPath $mappingFile -PathType Leaf) {
 }
 
 # ==================================================
-# 9/12 tmux
+# 9/13 tmux
 # ==================================================
-Write-Section '9/12' 'tmux'
+Write-Section '9/13' 'tmux'
 Write-Skip 'tmux' 'Linux-only by design (no Windows port planned; use WSL if needed)'
 
 # ==================================================
-# 10/12 OpenCode
+# 10/13 OpenCode
 # ==================================================
-Write-Section '10/12' 'OpenCode'
+Write-Section '10/13' 'OpenCode'
 
 $opencodeCfg = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
 
@@ -480,15 +481,15 @@ if (Test-Path -LiteralPath $opencodeCfg -PathType Leaf) {
 }
 
 # ==================================================
-# 11/12 Ghostty
+# 11/13 Ghostty
 # ==================================================
-Write-Section '11/12' 'Ghostty'
+Write-Section '11/13' 'Ghostty'
 Write-Skip 'ghostty' 'Windows port not yet scheduled (TERM-001 is Linux-only; open TERM-002 to enable this section)'
 
 # ==================================================
-# 12/12 Repo - Deploy-Dir Drift
+# 12/13 Repo - Deploy-Dir Drift
 # ==================================================
-Write-Section '12/12' 'Repo - Deploy-Dir Drift'
+Write-Section '12/13' 'Repo - Deploy-Dir Drift'
 
 # REFACTOR-003: invoke diff-check.ps1 (port of diff-check.sh). Non-fatal:
 # surfaces drift as FAIL line but does NOT alter healthcheck's overall
@@ -523,7 +524,6 @@ if (Test-Command 'agy') {
     }
 
     $geminiHome = if ($env:GEMINI_HOME) { $env:GEMINI_HOME } else { Join-Path $env:USERPROFILE '.gemini' }
-    $agyData = if ($env:AGY_APP_DATA) { $env:AGY_APP_DATA } else { Join-Path $geminiHome 'antigravity-cli' }
 
     # Verify master MCP config at agy's canonical read path (SDD-007).
     $masterConfig = Join-Path $geminiHome 'config\mcp_config.json'

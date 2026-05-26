@@ -192,17 +192,18 @@ setup() {
     [[ -f "$SH_SCRIPT" ]]
 }
 
-@test "healthcheck.ps1 and .sh both have 12 sections" {
+@test "healthcheck.ps1 and .sh both have 13 sections" {
+    # 13 sections post-SDD-007 (added "Antigravity CLI Health" as section 13).
     local sh_sections
-    sh_sections=$(grep -cE 'section "[0-9]+/12"' "$SH_SCRIPT")
-    [[ "$sh_sections" -eq 12 ]] || {
-        echo "healthcheck.sh has $sh_sections sections, expected 12"
+    sh_sections=$(grep -cE 'section "[0-9]+/13"' "$SH_SCRIPT")
+    [[ "$sh_sections" -eq 13 ]] || {
+        echo "healthcheck.sh has $sh_sections sections, expected 13"
         return 1
     }
     local ps1_sections
-    ps1_sections=$(grep -cE "Write-Section '[0-9]+/12'" "$PS1_SCRIPT")
-    [[ "$ps1_sections" -eq 12 ]] || {
-        echo "healthcheck.ps1 has $ps1_sections sections, expected 12"
+    ps1_sections=$(grep -cE "Write-Section '[0-9]+/13'" "$PS1_SCRIPT")
+    [[ "$ps1_sections" -eq 13 ]] || {
+        echo "healthcheck.ps1 has $ps1_sections sections, expected 13"
         return 1
     }
 }

@@ -96,42 +96,46 @@ setup() {
 }
 
 # =============================================================================
-# Section 3: Symlinks
+# Section 3: Deployed files (regular files, post-SDD-007 copy-only model)
 # =============================================================================
+# Per SDD-007 / BUG-100: setup deploys via deploy_file() (atomic copy), no
+# symlinks. The previous model symlinked $HOME -> $DOTFILES_DIR but caused
+# circular-symlink + staging-latency bugs (BUG-100). Asserting "regular file
+# AND NOT a symlink" makes the copy-only invariant explicit.
 
-@test "~/.zshrc is a symlink to ~/.dotfiles/.zshrc" {
-    [ -L "$HOME/.zshrc" ]
-    readlink "$HOME/.zshrc" | grep -q '\.dotfiles/.zshrc'
+@test "~/.zshrc is a regular file (copied from ~/.dotfiles/.zshrc)" {
+    [ -f "$HOME/.zshrc" ]
+    [ ! -L "$HOME/.zshrc" ]
 }
 
-@test "~/.bashrc is a symlink to ~/.dotfiles/.bashrc" {
-    [ -L "$HOME/.bashrc" ]
-    readlink "$HOME/.bashrc" | grep -q '\.dotfiles/.bashrc'
+@test "~/.bashrc is a regular file (copied from ~/.dotfiles/.bashrc)" {
+    [ -f "$HOME/.bashrc" ]
+    [ ! -L "$HOME/.bashrc" ]
 }
 
-@test "~/.profile is a symlink to ~/.dotfiles/.profile" {
-    [ -L "$HOME/.profile" ]
-    readlink "$HOME/.profile" | grep -q '\.dotfiles/.profile'
+@test "~/.profile is a regular file (copied from ~/.dotfiles/.profile)" {
+    [ -f "$HOME/.profile" ]
+    [ ! -L "$HOME/.profile" ]
 }
 
-@test "~/.zsh/aliases.zsh is a symlink" {
-    [ -L "$HOME/.zsh/aliases.zsh" ]
-    readlink "$HOME/.zsh/aliases.zsh" | grep -q '\.dotfiles/.zsh/aliases.zsh'
+@test "~/.zsh/aliases.zsh is a regular file" {
+    [ -f "$HOME/.zsh/aliases.zsh" ]
+    [ ! -L "$HOME/.zsh/aliases.zsh" ]
 }
 
-@test "~/.zsh/functions.zsh is a symlink" {
-    [ -L "$HOME/.zsh/functions.zsh" ]
-    readlink "$HOME/.zsh/functions.zsh" | grep -q '\.dotfiles/.zsh/functions.zsh'
+@test "~/.zsh/functions.zsh is a regular file" {
+    [ -f "$HOME/.zsh/functions.zsh" ]
+    [ ! -L "$HOME/.zsh/functions.zsh" ]
 }
 
-@test "~/.zsh/nvm.zsh is a symlink" {
-    [ -L "$HOME/.zsh/nvm.zsh" ]
-    readlink "$HOME/.zsh/nvm.zsh" | grep -q '\.dotfiles/.zsh/nvm.zsh'
+@test "~/.zsh/nvm.zsh is a regular file" {
+    [ -f "$HOME/.zsh/nvm.zsh" ]
+    [ ! -L "$HOME/.zsh/nvm.zsh" ]
 }
 
-@test "~/.ssh/config is a symlink" {
-    [ -L "$HOME/.ssh/config" ]
-    readlink "$HOME/.ssh/config" | grep -q '\.dotfiles/ssh/config'
+@test "~/.ssh/config is a regular file" {
+    [ -f "$HOME/.ssh/config" ]
+    [ ! -L "$HOME/.ssh/config" ]
 }
 
 # =============================================================================
@@ -162,8 +166,11 @@ setup() {
     [ -x "$DOTFILES_DIR/scripts/dotfiles-sync.sh" ]
 }
 
-@test "ssh/config has 600 permissions" {
-    perms=$(stat -c '%a' "$DOTFILES_DIR/ssh/config")
+@test "~/.ssh/config has 600 permissions (user-facing, what SSH actually reads)" {
+    # Post-SDD-007 copy-only model: $DOTFILES_DIR/ssh/config inherits cp's
+    # default perms (644), but setup-linux.sh:65 chmods $HOME/.ssh/config
+    # to 600 after deploy. That's the file SSH actually reads — assert there.
+    perms=$(stat -c '%a' "$HOME/.ssh/config")
     [ "$perms" = "600" ]
 }
 
@@ -186,9 +193,12 @@ setup() {
     [ -x "$HOME/.claude/init-project.sh" ]
 }
 
-@test "~/.gemini/GEMINI.md deployed with AGENTS.md pointer marker" {
-    [ -f "$HOME/.gemini/GEMINI.md" ]
-    grep -q 'First, read `AGENTS.md`' "$HOME/.gemini/GEMINI.md"
+@test "~/.gemini/AGY.md deployed with AGENTS.md pointer marker (post-SDD-007 rename)" {
+    # gemini-cli → agy (Google Antigravity CLI). Identity file renamed from
+    # GEMINI.md → AGY.md but lives in the same dir ($HOME/.gemini) because
+    # agy still reads ANTIGRAVITY_ENDPOINT-relative config from there.
+    [ -f "$HOME/.gemini/AGY.md" ]
+    grep -q 'First, read `AGENTS.md`' "$HOME/.gemini/AGY.md"
 }
 
 @test "~/.gemini/prompts has at least 15 files" {
@@ -224,9 +234,9 @@ setup() {
     [ -f "$HOME/.gitconfig" ]
 }
 
-@test ".gitconfig is a symlink to dotfiles" {
-    [ -L "$HOME/.gitconfig" ]
-    [ "$(readlink "$HOME/.gitconfig")" = "$HOME/.dotfiles/.gitconfig" ]
+@test ".gitconfig is a regular file (post-SDD-007 copy-only deploy)" {
+    [ -f "$HOME/.gitconfig" ]
+    [ ! -L "$HOME/.gitconfig" ]
 }
 
 # =============================================================================
@@ -336,9 +346,9 @@ setup() {
     [ -f "$DOTFILES_DIR/tmux.conf" ]
 }
 
-@test "~/.tmux.conf is a symlink to ~/.dotfiles/tmux.conf" {
-    [ -L "$HOME/.tmux.conf" ]
-    [ "$(readlink "$HOME/.tmux.conf")" = "$DOTFILES_DIR/tmux.conf" ]
+@test "~/.tmux.conf is a regular file (post-SDD-007 copy-only deploy)" {
+    [ -f "$HOME/.tmux.conf" ]
+    [ ! -L "$HOME/.tmux.conf" ]
 }
 
 @test "tmux parses deployed config (smoke)" {
