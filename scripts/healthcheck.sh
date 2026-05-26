@@ -359,6 +359,7 @@ else
 fi
 if [ -f "$OPENCODE_CFG" ]; then
     pass "opencode.jsonc deployed: $OPENCODE_CFG"
+    # shellcheck disable=SC2016  # literal "$schema" string match, no expansion intended
     if grep -q '"\$schema":' "$OPENCODE_CFG"; then
         pass "opencode.jsonc has \$schema declaration"
     else
