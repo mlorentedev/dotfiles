@@ -93,6 +93,21 @@ chmod +x "$DOTFILES_DIR/scripts/doctor.sh"
 
 # Copy sensitive directory (env-mapping.conf and encrypted files)
 log_info "Setting up sensitive directory..."
+
+# Preflight: warn if age identity key is missing. Without it, load-secrets.sh
+# silently no-ops at shell startup (Invoke-AgeDecrypt returns null on failure)
+# so $NAN_API_KEY / $OPENROUTER_API_KEY / etc. stay empty -- opencode + agy
+# then 401 with no clear cause. Non-fatal: encrypted files still get deployed
+# so a key imported later still works without re-running setup.
+AGE_KEY="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
+if [ ! -f "$AGE_KEY" ]; then
+    log_warning "age identity key not found at $AGE_KEY"
+    log_warning "  Encrypted secrets will deploy but won't decrypt at shell startup."
+    log_warning "  To enable: place your age identity at \$HOME/.config/age/key.txt"
+    log_warning "  (or set AGE_KEY_PATH). Generate: age-keygen -o ~/.config/age/key.txt"
+    log_warning "  See: docs/SECRETS.md"
+fi
+
 ensure_directory "$DOTFILES_DIR/sensitive"
 if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     cp -rf "$CURRENT_DIR/sensitive/"* "$DOTFILES_DIR/sensitive/" 2>/dev/null || true
