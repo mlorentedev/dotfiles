@@ -83,6 +83,23 @@ created: "2026-05-25"
 - [ ] `verification.md` filled in with evidence per AC
 - [ ] PR opened from `feature/antigravity-integration`, references this spec folder, closes issue #100
 
+## Post-merge follow-ups (discovered exercising the merged PR #102 on Windows)
+
+Three bugs surfaced when re-running setup-windows.ps1 on a real Windows machine after PR #102 merged — all from the same SDD-007 migration that wasn't completed end-to-end. Addressed in PR #105 (this PR):
+
+- [x] **MCP loop StrictMode-safe**. `$srv.prerequisite_binary` threw under `Set-StrictMode -Version Latest` for every MCP entry that omits the field (only `hive` declares it). Linux side already handles this via `jq '(.prerequisite_binary // "")'`. Fix: probe `PSObject.Properties['name']` first so missing fields read as `$null` instead of erroring. — `setup-windows.ps1:380-394`.
+- [x] **GEMINI.md orphan cleanup**. Pre-SDD-007 installs deployed `~/.gemini/GEMINI.md`; the rename to `AGY.md` (sec 6) never removed the old file. Added explicit `rm -f` in both `setup-windows.ps1` and `setup-linux.sh` before the AGY.md deploy (idempotent — no-op if absent). — `setup-windows.ps1:857-863`, `setup-linux.sh:407-413`.
+- [x] **Lingering GEMINI.md references** in tooling that asserted the old name post-rename:
+  - `scripts/healthcheck.ps1:226` — Test-DeployedFile checked `GEMINI.md` → always FAIL. Updated to `AGY.md`.
+  - `scripts/init-project.ps1:225-231, 621` — injected `GEMINI.md` into new projects + summary text. Updated to `AGY.md` (Linux side at `init-project.sh:186-191` was already correct — was missing parity).
+
+Bats regression coverage:
+
+- [x] `tests/setup-windows.bats`: two new tests — StrictMode-safe MCP probe; GEMINI.md cleanup line present.
+- [x] `tests/init-project-ps1.bats`: assert AGY.md injection + regression guard against the old GEMINI.md path returning (`! grep 'Injected GEMINI\.md'`).
+
+Empirical verification on a real Windows machine: two consecutive `setup-windows.ps1` runs produced identical state — second run's only difference was the `[INFO] Removed legacy GEMINI.md` line on the first run. AC5 idempotency holds on Windows.
+
 ## Machine-readable features
 
 Optional sibling `features.json` per [[pattern-feature-list-as-primitive]] — defer unless harness consumes it.
