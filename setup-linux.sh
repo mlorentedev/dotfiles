@@ -582,6 +582,23 @@ else
     log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
 fi
 
+# Deploy the canonical AGENTS.md as opencode's global system prompt.
+# OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
+# claude/agy/copilot which use pointer files, opencode reads the filename
+# "AGENTS.md" natively so we copy the full SSOT (~22KB) verbatim.
+AGENTS_SRC="$CURRENT_DIR/AGENTS.md"
+AGENTS_DST="$HOME/.config/opencode/AGENTS.md"
+if [ -f "$AGENTS_SRC" ]; then
+    if [ -f "$AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$AGENTS_DST"; then
+        log_info "AGENTS.md (opencode) already in sync"
+    else
+        cp "$AGENTS_SRC" "$AGENTS_DST"
+        log_success "Deployed AGENTS.md to $AGENTS_DST"
+    fi
+else
+    log_warning "AGENTS.md source missing at $AGENTS_SRC"
+fi
+
 # Deploy opencode commands (AI-012: skills→commands port).
 # Source: ai/opencode/commands/*.md (kept in sync with ai/skills/ via
 # scripts/skills-to-opencode.sh; CI gate enforces parity). Target: the
