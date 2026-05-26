@@ -59,83 +59,87 @@ setup() {
     grep -q '^function Write-Section' "$PS1_SCRIPT"
 }
 
-# --- 12 sections present (parity with healthcheck.sh) ---
+# --- 13 sections present (parity with healthcheck.sh; sec 13 added in SDD-007) ---
 
-@test "healthcheck.ps1 has all 12 sections numbered 1/12..12/12" {
-    for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
-        grep -qF "Write-Section '${n}/12'" "$PS1_SCRIPT" || {
-            echo "Missing: Write-Section '${n}/12'"
+@test "healthcheck.ps1 has all 13 sections numbered 1/13..13/13" {
+    for n in 1 2 3 4 5 6 7 8 9 10 11 12 13; do
+        grep -qF "Write-Section '${n}/13'" "$PS1_SCRIPT" || {
+            echo "Missing: Write-Section '${n}/13'"
             return 1
         }
     done
 }
 
-@test "healthcheck.ps1 section 1/12 covers Core Tools in PATH" {
-    grep -qF "Write-Section '1/12' 'Core Tools in PATH'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 1/13 covers Core Tools in PATH" {
+    grep -qF "Write-Section '1/13' 'Core Tools in PATH'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 2/12 covers Versioned Tool Paths" {
-    grep -qF "Write-Section '2/12' 'Versioned Tool Paths'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 2/13 covers Versioned Tool Paths" {
+    grep -qF "Write-Section '2/13' 'Versioned Tool Paths'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 3/12 covers Version Match" {
-    grep -qF "Write-Section '3/12' 'Version Match (versions.conf)'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 3/13 covers Version Match" {
+    grep -qF "Write-Section '3/13' 'Version Match (versions.conf)'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 4/12 covers Key Files / Junctions (Windows-specific naming)" {
-    grep -qF "Write-Section '4/12' 'Key Files / Junctions'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 4/13 covers Key Files / Junctions (Windows-specific naming)" {
+    grep -qF "Write-Section '4/13' 'Key Files / Junctions'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 5/12 covers Environment Variables" {
-    grep -qF "Write-Section '5/12' 'Environment Variables'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 5/13 covers Environment Variables" {
+    grep -qF "Write-Section '5/13' 'Environment Variables'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 6/12 covers Optional Tools" {
-    grep -qF "Write-Section '6/12' 'Optional Tools'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 6/13 covers Optional Tools" {
+    grep -qF "Write-Section '6/13' 'Optional Tools'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 7/12 covers Knowledge Vault" {
-    grep -qF "Write-Section '7/12' 'Knowledge Vault'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 7/13 covers Knowledge Vault" {
+    grep -qF "Write-Section '7/13' 'Knowledge Vault'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 8/12 covers Secrets Integrity" {
-    grep -qF "Write-Section '8/12' 'Secrets Integrity'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 8/13 covers Secrets Integrity" {
+    grep -qF "Write-Section '8/13' 'Secrets Integrity'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 9/12 covers tmux" {
-    grep -qF "Write-Section '9/12' 'tmux'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 9/13 covers tmux" {
+    grep -qF "Write-Section '9/13' 'tmux'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 10/12 covers OpenCode" {
-    grep -qF "Write-Section '10/12' 'OpenCode'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 10/13 covers OpenCode" {
+    grep -qF "Write-Section '10/13' 'OpenCode'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 11/12 covers Ghostty" {
-    grep -qF "Write-Section '11/12' 'Ghostty'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 11/13 covers Ghostty" {
+    grep -qF "Write-Section '11/13' 'Ghostty'" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 12/12 covers drift" {
-    grep -qF "Write-Section '12/12' 'Repo - Deploy-Dir Drift'" "$PS1_SCRIPT"
+@test "healthcheck.ps1 section 12/13 covers drift" {
+    grep -qF "Write-Section '12/13' 'Repo - Deploy-Dir Drift'" "$PS1_SCRIPT"
+}
+
+@test "healthcheck.ps1 section 13/13 covers Antigravity CLI Health (SDD-007)" {
+    grep -qF "Write-Section '13/13' 'Antigravity CLI Health'" "$PS1_SCRIPT"
 }
 
 # --- Linux-only sections emit SKIP with explanation (per WIN-001 design) ---
 
-@test "healthcheck.ps1 section 9/12 (tmux) emits SKIP with explanation" {
+@test "healthcheck.ps1 section 9/13 (tmux) emits SKIP with explanation" {
     grep -qF "Linux-only by design" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 11/12 (ghostty) emits SKIP with TERM-002 reference" {
+@test "healthcheck.ps1 section 11/13 (ghostty) emits SKIP with TERM-002 reference" {
     grep -qF "TERM-002" "$PS1_SCRIPT"
 }
 
-@test "healthcheck.ps1 section 12/12 invokes diff-check.ps1 (REFACTOR-003)" {
+@test "healthcheck.ps1 section 12/13 invokes diff-check.ps1 (REFACTOR-003)" {
     # Pre-REFACTOR-003 this was a SKIP with REFACTOR-003 in the message.
     # Post-REFACTOR-003 the section invokes diff-check.ps1 and switches on
     # the exit code (0 = PASS no drift, 1 = FAIL drift, other = setup error).
     grep -qF 'diff-check.ps1' "$PS1_SCRIPT"
     grep -qF 'REFACTOR-003' "$PS1_SCRIPT"
     # The invocation must be inside the sec 12 block.
-    sed -n "/Write-Section '12\/12' 'Repo - Deploy-Dir Drift'/,/^# ==/p" "$PS1_SCRIPT" | grep -qF 'diff-check.ps1'
+    sed -n "/Write-Section '12\/13' 'Repo - Deploy-Dir Drift'/,/^# ==/p" "$PS1_SCRIPT" | grep -qF 'diff-check.ps1'
 }
 
 # --- Cross-section content asserts ---
