@@ -24,12 +24,16 @@ setup() {
 
 # --- OpenCode alias (admin-conditional on Windows; aider sunset) ---
 
-@test "profile.ps1 defines conditional oc function for opencode (--pure)" {
-    # Guarded by Get-Command — non-admin Windows machines without opencode
-    # skip the alias rather than producing broken references. Function form
-    # (not Set-Alias) so the --pure flag can be passed; mirrors bash/zsh.
+@test "profile.ps1 defines conditional oc alias for opencode (plain, no --pure)" {
+    # Guarded by Get-Command -- non-admin Windows machines without opencode
+    # skip the alias rather than producing broken references. Plain Set-Alias
+    # (no --pure) because empirically opencode launched bare from a Windows
+    # terminal works correctly with MCPs+plugins (2026-05-26). Linux keeps
+    # --pure pending Ghostty hypothesis investigation (Phase 2.4 backlog).
     grep -qE 'if \(Get-Command opencode' "$PROFILE_SCRIPT"
-    grep -qE 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
+    grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
+    # Regression guard: ensure --pure isn't quietly reintroduced for Windows.
+    ! grep -qE 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
 }
 
 @test "profile.ps1 no longer defines aider tier functions (sunset)" {
@@ -52,14 +56,16 @@ setup() {
     grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
 }
 
-# --- Parity check: oc alias exists in both shells ---
+# --- Cross-OS oc behaviour (intentional asymmetry, documented) ---
 
-@test "parity: oc with --pure defined in both aliases.zsh and profile.ps1" {
-    # Cross-OS parity is the architectural invariant: same finger pattern,
-    # same effective command. Zsh uses alias; PowerShell uses a function
-    # because Set-Alias cannot pass arguments. Both invoke `opencode --pure`.
+@test "oc is defined on both POSIX and PowerShell (intentional asymmetry on --pure)" {
+    # Same finger pattern, different underlying invocation:
+    #   Linux/.zsh : alias oc="opencode --pure"   (Ghostty hang workaround)
+    #   Windows    : Set-Alias -Name oc -Value opencode  (no hang observed)
+    # Tracked as Phase 2.4: once the Linux hang root cause is found (Ghostty
+    # hypothesis), the --pure workaround drops everywhere and parity restores.
     grep -qE '^alias oc="opencode --pure"' "$DOTFILES_DIR/.zsh/aliases.zsh"
-    grep -qE 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
+    grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
 }
 
 # --- Other functions ---

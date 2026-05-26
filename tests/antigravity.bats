@@ -23,6 +23,17 @@ setup() {
     command -v agy
 }
 
+@test "ai/agy/AGY.md H1 is '# AGY.md' (regression: GEMINI.md->AGY.md rename completeness)" {
+    # SDD-007 renamed the file; the H1 and body content lagged. This test
+    # locks in that the body actually reflects the file's new identity.
+    [[ "$(head -n1 "$DOTFILES_DIR/ai/agy/AGY.md")" == "# AGY.md" ]]
+    # No stray "Gemini-specific" / "GEMINI.md" body references in the
+    # canonical SSOT (archived specs and the cleanup logic in setup-*.{sh,ps1}
+    # are excluded by file scope).
+    ! grep -qF 'Gemini-specific' "$DOTFILES_DIR/ai/agy/AGY.md"
+    ! grep -qF '# GEMINI.md' "$DOTFILES_DIR/ai/agy/AGY.md"
+}
+
 @test "ANTIGRAVITY_ENDPOINT is set to production in .zshrc" {
     grep -q 'export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"' "$DOTFILES_DIR/.zshrc"
 }
