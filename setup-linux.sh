@@ -340,8 +340,26 @@ if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
         OLD_KEY=$( (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1 && secrets_show OPENROUTER_API_KEY 2>/dev/null) || echo "" )
     fi
 
-    NEW_MCP_CONFIG=$(jq --arg key "$OLD_KEY" '
+    # Substitute ${VAULT_PATH} placeholder with the canonical Linux vault dir.
+    # Committed JSON uses a placeholder so the same source works cross-OS;
+    # agy does NOT expand env vars inside JSON values, so the substitution
+    # must happen here at write time. Path is by convention: $HOME/Projects/knowledge.
+    VAULT_PATH_DEFAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
+
+    # Preflight: WARN (non-fatal) if the vault dir is missing. hive-vault MCP
+    # will fail at first tool call without it, but encrypted secrets + AGY.md +
+    # everything else still deploys cleanly so creating the vault later doesn't
+    # require a setup re-run. Mirrors the age-key preflight in #106.
+    if [ ! -d "$VAULT_PATH_DEFAULT" ]; then
+        log_warning "Obsidian vault not found at $VAULT_PATH_DEFAULT"
+        log_warning "  hive-vault MCP will error at runtime until this dir exists."
+        log_warning "  Either clone/sync your vault to $VAULT_PATH_DEFAULT, or override via"
+        log_warning "  the VAULT_PATH env var in your shell."
+    fi
+
+    NEW_MCP_CONFIG=$(jq --arg key "$OLD_KEY" --arg vault "$VAULT_PATH_DEFAULT" '
         .mcpServers["hive-vault"].env.OPENROUTER_API_KEY = (if $key != "" and $key != "null" then $key else .mcpServers["hive-vault"].env.OPENROUTER_API_KEY end)
+        | .mcpServers["hive-vault"].env.VAULT_PATH = $vault
     ' "$CURRENT_DIR/ai/agy/mcp_servers.json")
 
     # Merge stdio servers from root mcp-servers.json into mcpServers map

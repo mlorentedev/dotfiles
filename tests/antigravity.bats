@@ -23,6 +23,45 @@ setup() {
     command -v agy
 }
 
+@test "ai/agy/mcp_servers.json hive uses uvx (PyPI) not local repo (parity with claude root config)" {
+    # Pre-fix: agy spawned `uv run --directory /home/<user>/Projects/hive hive-vault`
+    # which required a local hive checkout and bombed on Windows with "system
+    # cannot find the path specified". claude root config has always used
+    # `uvx hive-vault` (PyPI). agy now matches -- cross-agent behaviour parity.
+    local cmd
+    cmd=$(jq -r '.mcpServers["hive-vault"].command' "$DOTFILES_DIR/ai/agy/mcp_servers.json")
+    [ "$cmd" = "uvx" ]
+    # Regression guard: --directory must not return.
+    ! jq -r '.mcpServers["hive-vault"].args | join(" ")' "$DOTFILES_DIR/ai/agy/mcp_servers.json" | grep -qE '\-\-directory'
+}
+
+@test "ai/agy/mcp_servers.json VAULT_PATH is the placeholder, not a hardcoded user path" {
+    # The committed JSON must NOT contain /home/<user> or C:\Users\<user>.
+    # Setup scripts substitute the placeholder with the OS-appropriate path.
+    local vault
+    vault=$(jq -r '.mcpServers["hive-vault"].env.VAULT_PATH' "$DOTFILES_DIR/ai/agy/mcp_servers.json")
+    [ "$vault" = '${VAULT_PATH}' ]
+    ! grep -qE '/home/[a-z]+/|C:\\\\Users\\\\' "$DOTFILES_DIR/ai/agy/mcp_servers.json"
+}
+
+@test "setup-linux.sh substitutes \${VAULT_PATH} and preflights vault dir" {
+    grep -qF 'VAULT_PATH_DEFAULT' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'Obsidian vault not found at' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-windows.ps1 substitutes \${VAULT_PATH} and preflights vault dir (cross-OS parity)" {
+    grep -qF 'Projects\knowledge' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'Obsidian vault not found at' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+@test "setup-windows.ps1 syncs Shared Skills to ~/.gemini/skills (closes 0-skills-on-Windows bug)" {
+    # setup-linux.sh:398-419 deploys to ~/.gemini/skills (Shared path); parity
+    # was missing on Windows -> agy displayed "0 skills". This test locks the
+    # cross-OS parity.
+    grep -qF 'Synced Shared Skills to' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'sharedSkillsDir' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
 @test "ai/agy/AGY.md H1 is '# AGY.md' (regression: GEMINI.md->AGY.md rename completeness)" {
     # SDD-007 renamed the file; the H1 and body content lagged. This test
     # locks in that the body actually reflects the file's new identity.

@@ -100,6 +100,17 @@ Bats regression coverage:
 
 Empirical verification on a real Windows machine: two consecutive `setup-windows.ps1` runs produced identical state — second run's only difference was the `[INFO] Removed legacy GEMINI.md` line on the first run. AC5 idempotency holds on Windows.
 
+## Post-launch agy bugs (discovered when user first ran agy on Windows post-merge)
+
+Two cross-OS bugs surfaced when the user actually launched `agy` on Windows after PRs #102-#109 merged. Addressed in PR #110.
+
+- [x] **hive-vault MCP "system cannot find the path specified"**. Root cause: `ai/agy/mcp_servers.json` shipped Linux-hardcoded paths `command: "uv"` + `args: ["run", "--directory", "/home/<user>/Projects/hive", "hive-vault"]`. The `--directory` pointed at the hive MCP server SOURCE repo — agy on Linux only worked because the author had the hive checkout at that exact path. Claude's root `mcp-servers.json` has always used `uvx hive-vault` (PyPI). Aligned both agents: agy now uses `uvx hive-vault` (no local repo dependency); `env.VAULT_PATH` is the `${VAULT_PATH}` placeholder, substituted per-OS at setup time. Added preflight (mirrors #106 age-key pattern): both setups WARN if the vault dir is missing — non-fatal so a vault created later still works without setup re-run.
+- [x] **agy displayed "0 skills" on Windows**. `setup-linux.sh:398-419` deploys to `~/.gemini/skills` (the Shared path agy reads); the equivalent block was missing in `setup-windows.ps1`. Added: remove-stale + recursive copy, mirror of the Linux behaviour. Cross-OS Skills parity restored.
+
+Architectural principle reinforced: **claude / agy / opencode / copilot must behave the same.** hive-vault is now invoked identically by claude and agy (`uvx hive-vault`); the only differences across agents are unavoidable tool-specific config schemas, not behavioural divergence in how shared services are spawned.
+
+Bats regression coverage (`tests/antigravity.bats` +5 tests): asserts uvx-not-uv-run, VAULT_PATH placeholder presence (not hardcoded user path), preflight presence cross-OS, Skills sync presence on Windows.
+
 ## Machine-readable features
 
 Optional sibling `features.json` per [[pattern-feature-list-as-primitive]] — defer unless harness consumes it.
