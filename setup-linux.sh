@@ -270,6 +270,13 @@ else
     log_info "bats already installed"
 fi
 
+# Antigravity CLI (agy) install is user-managed (no official curl-install URL
+# confirmed). If agy is not in PATH, log a clear hint and continue — we still
+# deploy the config files so that when agy is installed manually it picks them up.
+if ! command -v agy >/dev/null 2>&1; then
+    log_warning "agy (Antigravity CLI) not on PATH — install from https://antigravity.google then re-run setup"
+fi
+
 # Setup Antigravity CLI configuration (fresh-install model, SDD-007).
 # Strategy: write canonical config to where agy reads from (~/.gemini/config/),
 # use deploy_file (atomic + idempotent), no symlinks. Closes #100.
@@ -309,8 +316,10 @@ if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
         OLD_KEY=$(jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/config/mcp_config.json" 2>/dev/null | grep -v "null")
     fi
     if ([ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]) && [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
-        source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1
-        OLD_KEY=$(secrets_show OPENROUTER_API_KEY 2>/dev/null || echo "")
+        # Soft-source: avoid set -e tripping when load-secrets internals fail
+        # in CI containers without an age key / sensitive/ vault available.
+        (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1) || true
+        OLD_KEY=$( (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1 && secrets_show OPENROUTER_API_KEY 2>/dev/null) || echo "" )
     fi
 
     NEW_MCP_CONFIG=$(jq --arg key "$OLD_KEY" '

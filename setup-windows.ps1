@@ -820,8 +820,9 @@ if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq
 
         $parts = $srv.args -split '\s+'
         $cmd = $parts[0]
-        $args = $parts[1..($parts.Length-1)]
-        $mcpConfigJson.mcpServers | Add-Member -MemberType NoteProperty -Name $srv.name -Value @{ command = $cmd; args = $args } -Force
+        # NOTE: $args is an automatic PowerShell variable; use serverArgs to avoid PSAvoidAssignmentToAutomaticVariable
+        $serverArgs = $parts[1..($parts.Length-1)]
+        $mcpConfigJson.mcpServers | Add-Member -MemberType NoteProperty -Name $srv.name -Value @{ command = $cmd; args = $serverArgs } -Force
     }
 
     # Write master to canonical path. No symlinks, no copies elsewhere.
