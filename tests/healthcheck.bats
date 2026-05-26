@@ -26,7 +26,7 @@ setup() {
     grep -q 'versions.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh has all 12 sections" {
+@test "healthcheck.sh has all 13 sections" {
     [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 12 ]]
 }
 
@@ -61,7 +61,7 @@ setup() {
 # --- tmux section 9/12 ---
 
 @test "healthcheck.sh has section 9/12 for tmux" {
-    grep -qE 'section "9/12" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "9/13" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies tmux binary" {
@@ -75,7 +75,7 @@ setup() {
 # --- ghostty section 11/12 (TERM-001) ---
 
 @test "healthcheck.sh has section 11/12 for ghostty" {
-    grep -qE 'section "11/12" "Ghostty"' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "11/13" "Ghostty"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies ghostty binary presence" {
@@ -93,7 +93,7 @@ setup() {
 # --- drift section 12/12 ---
 
 @test "healthcheck.sh has section 12/12 for drift" {
-    grep -qE 'section "12/12" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "12/13" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh invokes diff-check.sh" {
