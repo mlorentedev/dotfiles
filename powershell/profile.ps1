@@ -19,11 +19,13 @@ $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 # the alias is conditional. On machines without opencode installed, this
 # block is a no-op and `oc` reports "command not found" as expected.)
 if (Get-Command opencode -ErrorAction SilentlyContinue) {
-    # oc / ocfull: opencode TUI dispatch. --pure bypasses MCPs+skills+plugins,
-    # avoiding the tool-resolution hang on complex queries (empirical 2026-05-25).
-    # Set-Alias does not support args, so we use functions to pass --pure flag.
-    function oc     { opencode --pure @args }
-    function ocfull { opencode @args }
+    # oc: opencode TUI dispatch. Plain (no --pure flag) -- Windows PowerShell
+    # does NOT exhibit the Linux tool-resolution hang. Empirical 2026-05-26:
+    # opencode launched bare from a Windows terminal works correctly with
+    # MCPs+plugins enabled. The Linux side keeps `opencode --pure` pending
+    # the Ghostty hypothesis investigation (Phase 2.4 backlog) -- documented
+    # cross-OS asymmetry, not parity drift.
+    Set-Alias -Name oc -Value opencode
 
     # qq / qf: one-shot quick-question wrappers. Mirrors .zsh/aliases.zsh and
     # .bashrc. One-shot: each call is a fresh session.
