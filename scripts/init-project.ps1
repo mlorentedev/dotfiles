@@ -222,12 +222,12 @@ if (Test-Path "$ClaudeHome\CLAUDE.md") {
     Write-Warn "CLAUDE.md not found in global config ($ClaudeHome)"
 }
 
-# Copy GEMINI.md
-if (Test-Path "$GeminiHome\GEMINI.md") {
-    Copy-Item "$GeminiHome\GEMINI.md" "." -Force
-    Write-Success "Injected GEMINI.md"
+# Copy AGY.md (post-SDD-007: agy replaces gemini-cli; Linux parity at init-project.sh:186-191)
+if (Test-Path "$GeminiHome\AGY.md") {
+    Copy-Item "$GeminiHome\AGY.md" "." -Force
+    Write-Success "Injected AGY.md"
 } else {
-    Write-Warn "GEMINI.md not found in global config ($GeminiHome)"
+    Write-Warn "AGY.md not found in global config ($GeminiHome) -- run setup-windows.ps1"
 }
 
 # Copy skills (Claude Code specific)
@@ -618,6 +618,6 @@ Write-Host ""
 Write-Success "Project initialized with Dual AI Configuration"
 Write-Host ""
 Write-Host "Structure:" -ForegroundColor Cyan
-Write-Host "  CLAUDE.md / GEMINI.md      - AI Memory files (Dual-Core)"
+Write-Host "  CLAUDE.md / AGY.md         - AI Memory files (Dual-Core)"
 Write-Host "  .claude\skills\            - Custom skills"
 Write-Host "  Knowledge Vault updated    - 11-tasks.md & 90-lessons.md in knowledge/10_projects/"

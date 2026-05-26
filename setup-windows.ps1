@@ -378,15 +378,23 @@ if (-not ($claudeCmd -and $npxCmd)) {
     try {
         $servers = (Get-Content $mcpConfig -Raw | ConvertFrom-Json).servers
         foreach ($srv in $servers) {
-            if ($srv.prerequisite_binary) {
-                $prereqCmd = Get-Command $srv.prerequisite_binary -ErrorAction SilentlyContinue
+            # mcp-servers.json only declares prerequisite_binary/_command for
+            # MCPs that need a runtime install (e.g. hive needs uv). Under
+            # `Set-StrictMode -Version Latest` direct $srv.prerequisite_binary
+            # access throws for servers that omit the field. Probe via
+            # PSObject.Properties so missing fields are $null, not an error.
+            # Linux side handles this via jq `(.prerequisite_binary // "")`.
+            $prereqBin = if ($srv.PSObject.Properties['prerequisite_binary']) { $srv.prerequisite_binary } else { $null }
+            $prereqCmdStr = if ($srv.PSObject.Properties['prerequisite_command']) { $srv.prerequisite_command } else { $null }
+            if ($prereqBin) {
+                $prereqCmd = Get-Command $prereqBin -ErrorAction SilentlyContinue
                 if (-not $prereqCmd) {
-                    Write-Warn "MCP $($srv.name): prerequisite '$($srv.prerequisite_binary)' not found, skipping"
+                    Write-Warn "MCP $($srv.name): prerequisite '$prereqBin' not found, skipping"
                     $mcpFailed++
                     continue
                 }
-                if ($srv.prerequisite_command) {
-                    $prereqParts = $srv.prerequisite_command -split '\s+'
+                if ($prereqCmdStr) {
+                    $prereqParts = $prereqCmdStr -split '\s+'
                     & $prereqParts[0] @($prereqParts[1..($prereqParts.Length - 1)]) 2>&1 | Out-Null
                 }
             }
@@ -845,6 +853,15 @@ $projAgyCli = Join-Path $DotfilesDir ".antigravitycli"
 $projAgyBak = Join-Path $DotfilesDir ".antigravitycli.bak"
 if (Test-Path $projAgyCli) { Remove-Item -Recurse -Force $projAgyCli -ErrorAction SilentlyContinue }
 if (Test-Path $projAgyBak) { Remove-Item -Recurse -Force $projAgyBak -ErrorAction SilentlyContinue }
+
+# SDD-007 one-time migration: gemini-cli -> agy. Remove the legacy
+# ~/.gemini/GEMINI.md identity file so it doesn't linger as an orphan
+# pointing to the retired binary. Safe to repeat (no-op if absent).
+$geminiMdLegacy = Join-Path $GeminiHome 'GEMINI.md'
+if (Test-Path $geminiMdLegacy) {
+    Remove-Item -LiteralPath $geminiMdLegacy -Force -ErrorAction SilentlyContinue
+    Write-Info "Removed legacy GEMINI.md (SDD-007 migration: agy replaces gemini-cli)"
+}
 
 # Deploy AGY.md (Neural Hive Protocol pointer to AGENTS.md). Linux-parity.
 $agyMdSource = Join-Path $DotfilesDir 'ai\agy\AGY.md'
@@ -1309,7 +1326,7 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Restart PowerShell to load the new profile"
 Write-Host "  2. Verify setup:"
 Write-Host "       Test-Path `"$ClaudeHome\CLAUDE.md`""
-Write-Host "       Test-Path `"$GeminiHome\GEMINI.md`""
+Write-Host "       Test-Path `"$GeminiHome\AGY.md`""
 Write-Host "       `$env:PATH -like `"*scripts*`""
 Write-Host "  3. Initialize a project:"
 Write-Host "       project-init test-project python"
