@@ -84,8 +84,13 @@ setup() {
     grep -qE '^function hc' "$PROFILE_SCRIPT"
 }
 
-@test "profile.ps1 hc function references SCRIPTS_DIR\\healthcheck.ps1" {
-    grep -qF 'healthcheck.ps1' "$PROFILE_SCRIPT"
+@test "profile.ps1 hc function probes both deploy locations (Phase 2.7 contract drift workaround)" {
+    # Until env-contract drift is resolved, hc must look at the actual deploy
+    # location ($USERPROFILE\scripts -- where setup-windows.ps1 puts it AND
+    # the dir added to PATH) BEFORE the env-contract path. Without this fix
+    # hc was permanently FAIL-on-not-found on Windows.
+    grep -qF 'scripts\healthcheck.ps1' "$PROFILE_SCRIPT"
+    grep -qF '$env:USERPROFILE' "$PROFILE_SCRIPT"
 }
 
 @test "profile.ps1 valid PowerShell syntax (if pwsh available)" {
