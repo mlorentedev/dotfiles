@@ -403,6 +403,14 @@ for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
     fi
 done
 
+# SDD-007 one-time migration: gemini-cli -> agy. Remove the legacy
+# ~/.gemini/GEMINI.md identity file so it doesn't linger as an orphan
+# pointing to the retired binary. Safe to repeat (no-op if absent).
+if [ -f "$GEMINI_HOME/GEMINI.md" ]; then
+    rm -f "$GEMINI_HOME/GEMINI.md"
+    log_info "Removed legacy GEMINI.md (SDD-007 migration: agy replaces gemini-cli)"
+fi
+
 # Force copy master files (Neural Hive Protocol)
 rm -f "$GEMINI_HOME/AGY.md"
 cp "$CURRENT_DIR/ai/agy/AGY.md" "$GEMINI_HOME/AGY.md"

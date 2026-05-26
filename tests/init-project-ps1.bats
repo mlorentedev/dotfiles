@@ -69,8 +69,10 @@ setup() {
     grep -q 'CLAUDE.md' "$PS1_SCRIPT"
 }
 
-@test "init-project.ps1 injects GEMINI.md" {
-    grep -q 'GEMINI.md' "$PS1_SCRIPT"
+@test "init-project.ps1 injects AGY.md (post-SDD-007: agy replaces gemini-cli)" {
+    grep -q 'AGY.md' "$PS1_SCRIPT"
+    # Asserting the OLD file is NOT referenced (regression guard):
+    ! grep -qE 'Injected GEMINI\.md|GEMINI\.md.*not found' "$PS1_SCRIPT"
 }
 
 @test "init-project.ps1 initializes git" {

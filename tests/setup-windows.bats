@@ -53,6 +53,23 @@ setup() {
     grep -q 'Registering Claude Code MCP servers' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 MCP loop is StrictMode-safe (probes PSObject.Properties)" {
+    # Under Set-StrictMode -Version Latest, $srv.prerequisite_binary throws when
+    # the field is absent. Only the hive MCP declares this property; the other
+    # servers (sequential-thinking, context7) don't. The loop must probe via
+    # PSObject.Properties to treat missing fields as $null, matching Linux which
+    # uses jq's `(.prerequisite_binary // "")` null-coalesce.
+    grep -qF "PSObject.Properties['prerequisite_binary']" "$PS1_SCRIPT"
+    grep -qF "PSObject.Properties['prerequisite_command']" "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 removes legacy GEMINI.md (SDD-007 migration)" {
+    # Pre-SDD-007 setups deployed ~/.gemini/GEMINI.md. After agy replaced
+    # gemini-cli, AGY.md is the new identity file. Without explicit cleanup the
+    # orphan GEMINI.md lingers and confuses any tool that picks up either file.
+    grep -qF 'Removed legacy GEMINI.md' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 sets up GitHub Copilot CLI" {
     grep -q 'Setting up GitHub Copilot CLI' "$PS1_SCRIPT"
 }

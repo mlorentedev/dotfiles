@@ -223,7 +223,7 @@ Test-DeployedFile (Join-Path $env:USERPROFILE '.dotfiles')          '.dotfiles d
 # (Microsoft.PowerShell_profile.ps1 under pwsh 7, profile.ps1 under WinPS 5.1).
 Test-DeployedFile $PROFILE                                          "PowerShell profile ($([System.IO.Path]::GetFileName($PROFILE)))"
 Test-DeployedFile (Join-Path $env:USERPROFILE '.claude\CLAUDE.md')  'CLAUDE.md'
-Test-DeployedFile (Join-Path $env:USERPROFILE '.gemini\GEMINI.md')  'GEMINI.md'
+Test-DeployedFile (Join-Path $env:USERPROFILE '.gemini\AGY.md')     'AGY.md'
 Test-DeployedFile (Join-Path $env:USERPROFILE '.ssh\config')        'SSH config'
 
 # BUG-014 canonical install-state assertion (primary).
