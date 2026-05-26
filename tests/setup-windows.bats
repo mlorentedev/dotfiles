@@ -63,6 +63,22 @@ setup() {
     grep -qF "PSObject.Properties['prerequisite_command']" "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 preflights the age identity key (warn, not fail)" {
+    # Without ~/.config/age/key.txt, load-secrets.ps1 silently no-ops at
+    # shell startup and opencode/agy 401 with no clue. Preflight WARNs (must
+    # not abort -- encrypted files still deploy so a key imported later works).
+    grep -qF 'age identity key not found' "$PS1_SCRIPT"
+    grep -qF 'AGE_KEY_PATH' "$PS1_SCRIPT"
+    grep -qF 'docs/SECRETS.md' "$PS1_SCRIPT"
+    # Must use Write-Warn (non-fatal), not Write-Err.
+    grep -B2 'age identity key not found' "$PS1_SCRIPT" | grep -q 'Test-Path'
+}
+
+@test "parity: age key preflight present in both setup-windows.ps1 and setup-linux.sh" {
+    grep -qF 'age identity key not found' "$PS1_SCRIPT"
+    grep -qF 'age identity key not found' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 removes legacy GEMINI.md (SDD-007 migration)" {
     # Pre-SDD-007 setups deployed ~/.gemini/GEMINI.md. After agy replaced
     # gemini-cli, AGY.md is the new identity file. Without explicit cleanup the

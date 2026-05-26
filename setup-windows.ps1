@@ -1132,6 +1132,21 @@ if (Test-Path $loadSecretsSource) {
 
 Write-Info "Setting up secrets system..."
 
+# Preflight: warn if age identity key is missing. Without it, load-secrets.ps1
+# silently no-ops at shell startup (Invoke-AgeDecrypt returns $null on failure)
+# so $env:NAN_API_KEY / OPENROUTER_API_KEY / etc. stay empty -- opencode + agy
+# then 401 with no clear cause. Non-fatal: encrypted files still get deployed
+# so a key imported later still works without re-running setup. Mirrors the
+# Linux preflight in setup-linux.sh.
+$ageKey = if ($env:AGE_KEY_PATH) { $env:AGE_KEY_PATH } else { Join-Path $env:USERPROFILE '.config\age\key.txt' }
+if (-not (Test-Path -LiteralPath $ageKey)) {
+    Write-Warn "age identity key not found at $ageKey"
+    Write-Warn "  Encrypted secrets will deploy but won't decrypt at shell startup."
+    Write-Warn "  To enable: place your age identity at `$env:USERPROFILE\.config\age\key.txt"
+    Write-Warn "  (or set `$env:AGE_KEY_PATH). Generate: age-keygen -o `$HOME\.config\age\key.txt"
+    Write-Warn "  See: docs/SECRETS.md"
+}
+
 $sensitiveSource = "$DotfilesDir\sensitive"
 $sensitiveDest = "$DotfilesDest\sensitive"
 
