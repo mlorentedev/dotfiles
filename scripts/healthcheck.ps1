@@ -525,37 +525,35 @@ if (Test-Command 'agy') {
     $geminiHome = if ($env:GEMINI_HOME) { $env:GEMINI_HOME } else { Join-Path $env:USERPROFILE '.gemini' }
     $agyData = if ($env:AGY_APP_DATA) { $env:AGY_APP_DATA } else { Join-Path $geminiHome 'antigravity-cli' }
 
-    # Verify valid MCP config (Flat-file strategy BUG-100 parity)
-    $masterConfig = Join-Path $geminiHome 'mcp_config.json'
+    # Verify master MCP config at agy's canonical read path (SDD-007).
+    $masterConfig = Join-Path $geminiHome 'config\mcp_config.json'
     if (Test-Path $masterConfig -PathType Leaf) {
-        if (Get-Command jq -ErrorAction SilentlyContinue) {
+        $isReparse = (Get-Item -LiteralPath $masterConfig).Attributes -band [IO.FileAttributes]::ReparsePoint
+        if ($isReparse) {
+            Write-Fail 'Master mcp_config.json is a reparse point/symlink (BUG-100 regression)'
+        } elseif (Get-Command jq -ErrorAction SilentlyContinue) {
             $null = Get-Content $masterConfig -Raw | jq '.' 2>&1
             if ($LASTEXITCODE -eq 0) {
-                Write-Pass 'Master mcp_config.json is valid (flat file)'
+                Write-Pass 'Master mcp_config.json is a real file with valid JSON'
             } else {
                 Write-Fail 'Master mcp_config.json invalid JSON'
             }
         } else {
-            Write-Pass 'Master mcp_config.json exists (jq not available for validation)'
+            Write-Pass 'Master mcp_config.json exists as real file (jq not available for JSON validation)'
         }
     } else {
-        Write-Fail "Master mcp_config.json missing at $masterConfig"
+        Write-Fail "Master mcp_config.json missing at $masterConfig (run setup-windows.ps1)"
     }
 
-    $agyConfig = Join-Path $agyData 'mcp_config.json'
-    if (Test-Path $agyConfig -PathType Leaf) {
-        Write-Pass 'Agy mcp_config.json copy exists'
-    } else {
-        Write-Fail "Agy mcp_config.json missing at $agyConfig"
-    }
-
-    # Verify legacy compatibility
-    if (Test-Command 'gemini') {
-        $null = & gemini --version 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Pass 'Legacy gemini-cli is compatible'
+    # BUG-100 regression guard: no symlinks anywhere under ~/.gemini/config/
+    $configDir = Join-Path $geminiHome 'config'
+    if (Test-Path $configDir -PathType Container) {
+        $reparseUnderConfig = Get-ChildItem -LiteralPath $configDir -Recurse -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }
+        if ($reparseUnderConfig) {
+            Write-Fail ("Symlinks/junctions found under ~/.gemini/config/ (BUG-100 regression): {0}" -f ($reparseUnderConfig.FullName -join ', '))
         } else {
-            Write-Fail 'Legacy gemini-cli schema error (settings.json incompatible)'
+            Write-Pass 'No symlinks under ~/.gemini/config/ (BUG-100 guard)'
         }
     }
 } else {

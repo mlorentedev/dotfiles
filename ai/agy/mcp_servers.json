@@ -1,5 +1,5 @@
 {
-  "servers": {
+  "mcpServers": {
     "hive-vault": {
       "command": "uv",
       "args": [
@@ -11,8 +11,10 @@
       "env": {
         "VAULT_PATH": "/home/manu/Projects/knowledge",
         "HIVE_OLLAMA_ENDPOINT": "http://ollama.kubelab.live:11434",
-        "OPENROUTER_API_KEY": "PLACEHOLDER_OPENROUTER_API_KEY"
-      }
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "timeout": 30000,
+      "trust": false
     }
   }
 }

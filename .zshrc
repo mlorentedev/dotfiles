@@ -32,6 +32,10 @@ export GEMINI_HOME="$HOME/.gemini"
 export COPILOT_HOME="$HOME/.copilot"
 export OPENCODE_HOME="$HOME/.config/opencode"
 
+# AI provider endpoints — NaN community (primary, OpenAI-compatible).
+# API key in $NAN_API_KEY (loaded by load-secrets.sh from sensitive/nan.api-key.secret.age).
+export NAN_BASE_URL="https://api.nan.builders/v1"
+
 # Load encrypted secrets as environment variables
 [[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"
 export APPS_HOME="$HOME/Applications"

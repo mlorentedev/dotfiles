@@ -441,6 +441,81 @@ ensure_directory() {
     fi
 }
 
+# Deploys a file from repo source to home target with atomic + idempotent semantics.
+# Replaces `ln -sf` for config-deploy paths (SDD-007 IaC strategy).
+# Input: $1 - source path (must exist), $2 - target path
+# Behavior:
+#   - skips silently if cmp -s matches (idempotent: 2nd setup run is a no-op)
+#   - removes any existing symlink at target (drift recovery from old strategy)
+#   - writes via tempfile + mv (atomic; no partial state)
+#   - logs "Deployed" only on actual change
+# Output: returns 0 on success, 1 on error
+# Usage: deploy_file "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
+deploy_file() {
+    src="$1"
+    dst="$2"
+
+    if [[ ! -f "$src" ]]; then
+        log_error "deploy_file: source missing: $src"
+        return 1
+    fi
+
+    # Idempotency: regular file already matches source
+    if [[ -f "$dst" ]] && [[ ! -L "$dst" ]] && cmp -s "$src" "$dst"; then
+        return 0
+    fi
+
+    # Drift recovery: old strategy left a symlink here. Remove before write.
+    if [[ -L "$dst" ]]; then
+        rm -f "$dst"
+    fi
+
+    # Ensure parent directory exists
+    dst_dir="$(dirname "$dst")"
+    [[ -d "$dst_dir" ]] || mkdir -p "$dst_dir"
+
+    # Atomic write via tempfile in same dir (cross-fs mv safe)
+    tmp="$(mktemp "${dst}.XXXXXX")"
+    if cp "$src" "$tmp" && mv -f "$tmp" "$dst"; then
+        log_success "Deployed: $dst"
+        return 0
+    fi
+
+    rm -f "$tmp" >/dev/null 2>&1
+    log_error "deploy_file: failed to deploy $src -> $dst"
+    return 1
+}
+
+# Asserts a deployed file matches its repo source (drift detection for healthcheck.sh).
+# Pair of deploy_file: if the user edited ~/.zshrc directly instead of in the repo,
+# this surfaces it loudly instead of silently losing the edit on next setup-linux.sh run.
+# Input: $1 - repo source path, $2 - deployed target path, $3 - display name (optional)
+# Output: pass/fail log line, returns 0 if match, 1 if drift
+# Usage: check_deployed "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
+check_deployed() {
+    src="$1"
+    dst="$2"
+    name="${3:-$(basename "$dst")}"
+
+    if [[ ! -f "$dst" ]]; then
+        log_error "$name missing at $dst (run setup-linux.sh)"
+        return 1
+    fi
+
+    if [[ -L "$dst" ]]; then
+        log_error "$name is a symlink (expected regular file — run setup-linux.sh)"
+        return 1
+    fi
+
+    if cmp -s "$src" "$dst"; then
+        log_success "$name deployed (matches repo)"
+        return 0
+    fi
+
+    log_error "$name has drifted from $src (edit in repo + run setup-linux.sh)"
+    return 1
+}
+
 # Checks if file exists and exits if not found
 # Input: $1 - file path, $2 - custom error message (optional)
 # Output: exits with error if file not found

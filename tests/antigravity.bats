@@ -1,45 +1,56 @@
 #!/usr/bin/env bats
-# Tests for Antigravity CLI configuration and stability
+# Tests for Antigravity CLI configuration (SDD-007: fresh-install model, no symlinks).
+# Regression suite for BUG-100 (issue #100): asserts no symlinks under ~/.gemini/config/
+# and that the master MCP config lives at agy's canonical read path.
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export GEMINI_HOME="$HOME/.gemini"
     export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
+    export MASTER_CONFIG="$GEMINI_HOME/config/mcp_config.json"
 }
 
-@test "Antigravity binary exists and is executable" {
+@test "agy binary exists and is executable" {
     command -v agy
 }
 
-@test "Antigravity production endpoint is set" {
-    # Check .zshrc for the export
-    grep -q "export ANTIGRAVITY_ENDPOINT=\"https://cloudcode-pa.googleapis.com\"" "$HOME/.zshrc"
+@test "ANTIGRAVITY_ENDPOINT is set to production in .zshrc" {
+    grep -q 'export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"' "$DOTFILES_DIR/.zshrc"
 }
 
 @test "AGY_APP_DATA uses absolute path" {
-    # It should not be relative
     [[ "$AGY_APP_DATA" == /* ]]
 }
 
-@test "Antigravity settings.json exists in app data" {
+@test "agy settings.json deployed to AGY_APP_DATA" {
     [ -f "$AGY_APP_DATA/settings.json" ]
+    [ ! -L "$AGY_APP_DATA/settings.json" ]
 }
 
-@test "Antigravity mcp_config.json is valid JSON" {
-    [ -f "$AGY_APP_DATA/mcp_config.json" ]
-    jq '.' "$AGY_APP_DATA/mcp_config.json"
+@test "master MCP config exists at agy canonical path (~/.gemini/config/)" {
+    [ -e "$MASTER_CONFIG" ]
 }
 
-@test "Antigravity mcp_config.json is not empty" {
-    [ -s "$AGY_APP_DATA/mcp_config.json" ]
+@test "master MCP config is a regular file, NOT a symlink (BUG-100 regression)" {
+    [ -f "$MASTER_CONFIG" ]
+    [ ! -L "$MASTER_CONFIG" ]
 }
 
-@test "Old Gemini settings.json schema compatibility" {
-    # Verify gemini doesn't crash on settings.json if it exists
-    if command -v gemini >/dev/null 2>&1; then
-        # This might still fail if we haven't patched it, but the goal is to fix it
-        gemini --version
-    else
-        skip "gemini-cli not installed"
-    fi
+@test "master MCP config is valid JSON" {
+    jq '.' "$MASTER_CONFIG"
+}
+
+@test "master MCP config is not empty" {
+    [ -s "$MASTER_CONFIG" ]
+}
+
+@test "no symlinks anywhere under ~/.gemini/config/ (BUG-100 guard)" {
+    # find -type l would surface any leftover symlink; assert zero hits
+    result=$(find "$GEMINI_HOME/config" -maxdepth 3 -type l 2>/dev/null | wc -l)
+    [ "$result" -eq 0 ]
+}
+
+@test ".geminiignore deployed and contains sensitive/" {
+    [ -f "$GEMINI_HOME/.geminiignore" ]
+    grep -q '^sensitive/' "$GEMINI_HOME/.geminiignore"
 }

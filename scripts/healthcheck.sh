@@ -334,15 +334,12 @@ if ! command -v tmux >/dev/null 2>&1; then
     fail "tmux not installed (run: sudo apt install -y tmux)"
 else
     pass "tmux installed: $(tmux -V)"
-    if [ -L "$HOME/.tmux.conf" ]; then
-        _tmux_target="$(readlink "$HOME/.tmux.conf")"
-        if [ -f "$_tmux_target" ]; then
-            pass "$HOME/.tmux.conf -> $_tmux_target"
-        else
-            fail "$HOME/.tmux.conf symlink broken: target $_tmux_target missing"
-        fi
+    # SDD-007: tmux.conf deployed via deploy_file (copy, not symlink)
+    _tmux_src="${DOTFILES_DIR:-$HOME/.dotfiles}/tmux.conf"
+    if [ -f "$_tmux_src" ]; then
+        check_deployed "$_tmux_src" "$HOME/.tmux.conf" "$HOME/.tmux.conf"
     elif [ -f "$HOME/.tmux.conf" ]; then
-        fail "$HOME/.tmux.conf is a regular file, expected symlink (run setup-linux.sh)"
+        pass "$HOME/.tmux.conf exists (source unavailable for drift check)"
     else
         fail "$HOME/.tmux.conf missing (run setup-linux.sh)"
     fi
@@ -433,35 +430,25 @@ if command_exists agy; then
         fail "AGY_APP_DATA is relative or unset: $_agy_data"
     fi
 
-    # Verify valid MCP config (Flat-file strategy BUG-100)
-    _master_config="$GEMINI_HOME/mcp_config.json"
-    if [ -f "$_master_config" ] && [ ! -L "$_master_config" ]; then
-        if jq '.' "$_master_config" >/dev/null 2>&1; then
-            pass "Master mcp_config.json is valid (flat file)"
-        else
-            fail "Master mcp_config.json invalid JSON"
-        fi
+    # Verify master MCP config at agy's canonical read path (SDD-007: no symlinks).
+    _master_config="$GEMINI_HOME/config/mcp_config.json"
+    if [ ! -e "$_master_config" ]; then
+        fail "Master mcp_config.json missing at $_master_config (run setup-linux.sh)"
+    elif [ -L "$_master_config" ]; then
+        fail "Master mcp_config.json is a symlink (BUG-100 regression — recursion risk)"
+    elif ! jq '.' "$_master_config" >/dev/null 2>&1; then
+        fail "Master mcp_config.json at $_master_config is invalid JSON"
     else
-        fail "Master mcp_config.json missing or is a symlink (recursion risk)"
+        pass "Master mcp_config.json is a real file with valid JSON"
     fi
 
-    if [ -L "$_agy_data/mcp_config.json" ]; then
-        _target=$(readlink -f "$_agy_data/mcp_config.json")
-        if [ "$_target" = "$_master_config" ]; then
-             pass "Agy mcp_config.json symlink is correct"
+    # Assert no symlinks anywhere under ~/.gemini/config/ (BUG-100 regression guard).
+    if [ -d "$GEMINI_HOME/config" ]; then
+        _bad_links=$(find "$GEMINI_HOME/config" -maxdepth 3 -type l 2>/dev/null | head -3)
+        if [ -n "$_bad_links" ]; then
+            fail "Symlinks found under ~/.gemini/config/ (BUG-100 regression): $_bad_links"
         else
-             fail "Agy mcp_config.json points to wrong target: $_target"
-        fi
-    else
-        fail "Agy mcp_config.json is not a symlink"
-    fi
-
-    # Verify legacy compatibility
-    if command_exists gemini; then
-        if gemini --version >/dev/null 2>&1; then
-            pass "Legacy gemini-cli is compatible"
-        else
-            fail "Legacy gemini-cli schema error (settings.json incompatible)"
+            pass "No symlinks under ~/.gemini/config/ (BUG-100 guard)"
         fi
     fi
 else

@@ -97,27 +97,42 @@ setup() {
     grep -q '"\$schema": "https://opencode.ai/config.json"' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc has opencode-go provider (Go subscription, restricted catalog)" {
-    grep -q '"opencode-go":' "$OPENCODE_CFG"
+@test "opencode.jsonc has nan provider (NaN community, primary daily)" {
+    grep -q '"nan":' "$OPENCODE_CFG"
+    grep -q 'api.nan.builders/v1' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc has openrouter provider (env-detected OPENROUTER_API_KEY)" {
+@test "opencode.jsonc has openrouter provider (frontier fallback, PAYG)" {
     grep -q '"openrouter":' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc default model is in Go catalog (deepseek-v4-pro or kimi)" {
-    grep -qE '"model":\s*"opencode-go/(deepseek-v4-pro|kimi-k2\.6)"' "$OPENCODE_CFG"
+@test "opencode.jsonc has ollama provider (homelab via VPN)" {
+    grep -q '"ollama":' "$OPENCODE_CFG"
+    grep -q 'ollama.kubelab.live' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc does NOT expose Zen PAYG frontier models (guardrail layer 1)" {
-    # Should not list Sonnet, GPT-5, Opus, Gemini Pro under opencode-go
-    ! grep -qE 'claude-(opus|sonnet)|gpt-[45]|gemini-[23]\.[0-9]+-pro' "$OPENCODE_CFG"
+@test "opencode.jsonc default model is nan/deepseek-v4-flash (NaN 1M-context)" {
+    grep -qE '"model":\s*"nan/deepseek-v4-flash"' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc mirrors all 5 MCP servers from mcp-servers.json" {
-    for srv in drawio socket sequential-thinking context7 hive; do
-        grep -q "\"$srv\":" "$OPENCODE_CFG"
+@test "opencode.jsonc exposes 3 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
+    for m in deepseek-v4-flash qwen3.6 gemma4; do
+        grep -qE "\"$m\":" "$OPENCODE_CFG" || { echo "missing chat model $m" >&2; false; }
     done
+    # Non-chat models must NOT appear (would break config load)
+    ! grep -qE '"qwen3-embedding":|"kokoro":|"whisper":' "$OPENCODE_CFG"
+}
+
+@test "opencode.jsonc no longer references opencode-go (Go subscription cancelled per SDD-007)" {
+    ! grep -q '"opencode-go":' "$OPENCODE_CFG"
+}
+
+@test "opencode.jsonc mirrors the 3 active MCP servers (hive, context7, sequential-thinking)" {
+    for srv in sequential-thinking context7 hive; do
+        grep -qE "\"$srv\":" "$OPENCODE_CFG" || { echo "missing MCP $srv" >&2; false; }
+    done
+    # drawio + socket intentionally removed (see opencode.jsonc comment)
+    ! grep -qE '^\s*"drawio":|^\s*"socket":' "$OPENCODE_CFG"
 }
 
 # --- Alias ---
@@ -153,9 +168,9 @@ setup() {
     [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 80 ]]
 }
 
-@test "ai/gemini/GEMINI.md is a pointer to AGENTS.md (≤ 50 lines)" {
-    grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/gemini/GEMINI.md"
-    [[ $(wc -l < "$DOTFILES_DIR/ai/gemini/GEMINI.md") -le 50 ]]
+@test "ai/agy/AGY.md is a pointer to AGENTS.md (≤ 50 lines)" {
+    grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/agy/AGY.md"
+    [[ $(wc -l < "$DOTFILES_DIR/ai/agy/AGY.md") -le 50 ]]
 }
 
 @test "ai/copilot/copilot-instructions.md is a pointer (no template-placeholder bug)" {
@@ -174,12 +189,12 @@ setup() {
 
 # --- healthcheck.sh integration ---
 
-@test "healthcheck.sh has OpenCode section (10/12)" {
-    grep -q 'section "10/12" "OpenCode"' "$HEALTHCHECK"
+@test "healthcheck.sh has OpenCode section (10/13)" {
+    grep -q 'section "10/13" "OpenCode"' "$HEALTHCHECK"
 }
 
 @test "healthcheck.sh OpenCode section checks binary + config + schema" {
-    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'opencode --version'
-    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
-    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q '\$schema'
+    awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'opencode --version'
+    awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
+    awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q '\$schema'
 }

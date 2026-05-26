@@ -87,6 +87,14 @@ function Ensure-Directory {
     }
 }
 
+# SDD-007: dot-source shared deploy helpers (Deploy-File / Test-FileDrift).
+# Same SHA256-based idempotent copy pattern previously inlined throughout this
+# script; centralizing in utils.ps1 keeps cross-OS parity with scripts/utils.sh.
+$utilsPs1Path = Join-Path $PSScriptRoot 'scripts\utils.ps1'
+if (Test-Path -LiteralPath $utilsPs1Path -PathType Leaf) {
+    . $utilsPs1Path
+}
+
 # BUG-004: defense-in-depth wrapper around `claude plugin install`. Snapshots
 # ~/.claude/.claude.json before the action; if the post-action size drops below
 # 50% of the snapshot (and the snapshot was >= 10 KB), restores the snapshot.
@@ -699,21 +707,14 @@ if (-not $obsidianCmd) {
 
 $opencodeConfigSrc = "$DotfilesDir\ai\opencode\opencode.jsonc"
 $opencodeConfigDst = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
-$opencodeCfgDir    = Split-Path $opencodeConfigDst -Parent
-Ensure-Directory $opencodeCfgDir
 if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
-    $needsCopy = $true
-    if (Test-Path -LiteralPath $opencodeConfigDst -PathType Leaf) {
-        $srcHash = (Get-FileHash -LiteralPath $opencodeConfigSrc -Algorithm SHA256).Hash
-        $dstHash = (Get-FileHash -LiteralPath $opencodeConfigDst -Algorithm SHA256).Hash
-        if ($srcHash -eq $dstHash) {
-            Write-Info "opencode.jsonc already in sync"
-            $needsCopy = $false
-        }
-    }
-    if ($needsCopy) {
+    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
+        [void](Deploy-File -Source $opencodeConfigSrc -Destination $opencodeConfigDst)
+    } else {
+        # Fallback when utils.ps1 wasn't dot-sourced (older checkout)
+        Ensure-Directory (Split-Path $opencodeConfigDst -Parent)
         Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigDst -Force
-        Write-Success "Deployed opencode.jsonc to $opencodeConfigDst"
+        Write-Success "Deployed opencode.jsonc to $opencodeConfigDst (fallback)"
     }
 } else {
     Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
@@ -760,14 +761,15 @@ if (Test-Path -LiteralPath $opencodeCmdsSrc -PathType Container) {
 # 3. DEPLOY GEMINI & ANTIGRAVITY CONFIGURATION (config deploy is always safe)
 # ============================================================================
 
-Write-Info "Deploying Gemini & Antigravity configuration..."
+Write-Info "Deploying Antigravity (agy) configuration..."
 
 Ensure-Directory $GeminiHome
+Ensure-Directory "$GeminiHome\config"
 Ensure-Directory "$GeminiHome\prompts"
 $AgyAppData = Join-Path $GeminiHome "antigravity-cli"
 Ensure-Directory $AgyAppData
 
-# Force production endpoint to avoid staging timeouts (BUG-100 parity)
+# Force production endpoint
 [Environment]::SetEnvironmentVariable("ANTIGRAVITY_ENDPOINT", "https://cloudcode-pa.googleapis.com", "User")
 [Environment]::SetEnvironmentVariable("CLOUDCODE_URL", "https://cloudcode-pa.googleapis.com", "User")
 [Environment]::SetEnvironmentVariable("GEMINI_DIR", "$GeminiHome", "User")
@@ -775,86 +777,73 @@ $env:ANTIGRAVITY_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 $env:CLOUDCODE_URL = "https://cloudcode-pa.googleapis.com"
 $env:GEMINI_DIR = "$GeminiHome"
 
-# 1. Deploy settings.json (Dual Compatibility)
+# 1. Deploy agy settings.json (SDD-007: no legacy Gemini-CLI compat write)
 $agySettingsSrc = "$DotfilesDir\ai\agy\settings.json"
 if (Test-Path $agySettingsSrc) {
     Copy-Item $agySettingsSrc "$AgyAppData\settings.json" -Force
-    
-    # Legacy Gemini CLI compatible config
-    if (Get-Command jq -ErrorAction SilentlyContinue) {
-        & jq '.model = { "name": "gemini-3.5-flash" }' $agySettingsSrc | Set-Content "$GeminiHome\settings.json" -Encoding UTF8
-    } else {
-        Copy-Item $agySettingsSrc "$GeminiHome\settings.json" -Force
-    }
-    Write-Success "Deployed Antigravity and Legacy Gemini settings"
+    Write-Success "Deployed agy settings.json"
 }
 
-# 2. Consolidate MCP servers (Flat-file strategy BUG-100 parity)
+# Deploy .geminiignore
+$geminiIgnoreSrc = "$DotfilesDir\.geminiignore"
+if (Test-Path $geminiIgnoreSrc) {
+    Copy-Item $geminiIgnoreSrc "$GeminiHome\.geminiignore" -Force
+    Write-Success "Deployed .geminiignore"
+}
+
+# 2. Consolidate MCP servers - master at ~/.gemini/config/mcp_config.json (agy's canonical read path)
 $mcpServersSrc = "$DotfilesDir\ai\agy\mcp_servers.json"
 $rootMcpSrc = "$DotfilesDir\mcp-servers.json"
 if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq -ErrorAction SilentlyContinue)) {
     Write-Info "Consolidating Antigravity MCP servers..."
-    
-    # Recover OpenRouter key
+
+    # Recover OpenRouter key from existing master config.
+    # NOTE: canonical agy schema uses `mcpServers` (not `servers`).
     $oldKey = $env:OPENROUTER_API_KEY
     if ([string]::IsNullOrEmpty($oldKey)) {
-        if (Test-Path "$GeminiHome\settings.json") {
-            $oldKey = & jq -r '.OPENROUTER_API_KEY // .mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GeminiHome\settings.json" 2>$null | Where-Object { $_ -ne "null" }
+        $existingMaster = Join-Path $GeminiHome "config\mcp_config.json"
+        if (Test-Path $existingMaster) {
+            $oldKey = & jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' $existingMaster 2>$null | Where-Object { $_ -ne "null" }
         }
     }
-    
-    # Initialize from template
+
     $mcpConfigJson = Get-Content $mcpServersSrc -Raw | ConvertFrom-Json
-    if (-not [string]::IsNullOrEmpty($oldKey)) {
-        $mcpConfigJson.servers."hive-vault".env.OPENROUTER_API_KEY = $oldKey
+    if (-not [string]::IsNullOrEmpty($oldKey) -and $oldKey -ne '${OPENROUTER_API_KEY}') {
+        $mcpConfigJson.mcpServers."hive-vault".env.OPENROUTER_API_KEY = $oldKey
     }
-    
-    # Merge from root mcp-servers.json
+
+    # Merge stdio servers from root mcp-servers.json into mcpServers map
     $rootServers = (Get-Content $rootMcpSrc -Raw | ConvertFrom-Json).servers
     foreach ($srv in $rootServers) {
         if ($srv.name -eq "hive") { continue }
         if ($srv.transport -ne "stdio") { continue }
-        
+
         $parts = $srv.args -split '\s+'
         $cmd = $parts[0]
         $args = $parts[1..($parts.Length-1)]
-        $mcpConfigJson.servers | Add-Member -MemberType NoteProperty -Name $srv.name -Value @{ command = $cmd; args = $args } -Force
+        $mcpConfigJson.mcpServers | Add-Member -MemberType NoteProperty -Name $srv.name -Value @{ command = $cmd; args = $args } -Force
     }
-    
-    $masterConfig = Join-Path $GeminiHome "mcp_config.json"
+
+    # Write master to canonical path. No symlinks, no copies elsewhere.
+    $masterConfig = Join-Path $GeminiHome "config\mcp_config.json"
     $mcpConfigJson | ConvertTo-Json -Depth 10 | Set-Content $masterConfig -Encoding UTF8
-    
-    # Backward compatibility "copy" (Windows uses copies instead of symlinks)
-    Copy-Item $masterConfig "$AgyAppData\mcp_config.json" -Force
-    
-    # Register Hive as plugin
+    Write-Success "Deployed master MCP config to $masterConfig"
+
+    # Hive plugin discovery file
     $hivePluginDir = Join-Path $AgyAppData "plugins\hive-vault"
     Ensure-Directory $hivePluginDir
     '{"name": "hive-vault"}' | Set-Content (Join-Path $hivePluginDir "plugin.json") -Encoding UTF8
-    $hiveMcp = @{ mcpServers = @{ "hive-vault" = $mcpConfigJson.servers."hive-vault" } }
+    $hiveMcp = @{ mcpServers = @{ "hive-vault" = $mcpConfigJson.mcpServers."hive-vault" } }
     $hiveMcp | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $hivePluginDir "mcp_config.json") -Encoding UTF8
-    
-    Write-Success "Consolidated Antigravity MCP configuration"
+
+    Write-Success "Registered Hive plugin"
 }
 
-# Bulk copy all Gemini config files
-$geminiSource = "$DotfilesDir\ai\gemini"
-if (Test-Path $geminiSource) {
-    Copy-Item "$geminiSource\*" "$GeminiHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
-}
-
-# Force copy GEMINI.md (Neural Hive Protocol)
-$geminiMdSource = "$DotfilesDir\ai\gemini\GEMINI.md"
-if (Test-Path $geminiMdSource) {
-    Copy-Item $geminiMdSource "$GeminiHome\" -Force
-    if (Select-String -Path "$GeminiHome\GEMINI.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet) {
-        Write-Success "GEMINI.md deployed successfully (verified pointer to AGENTS.md)"
-    } else {
-        Write-Err "GEMINI.md deployment failed verification (expected pointer to AGENTS.md)"
-    }
-} else {
-    Write-Warn "GEMINI.md not found at $geminiMdSource"
-}
+# Drop project-local agy state cache from the workspace if agy leaked one
+$projAgyCli = Join-Path $DotfilesDir ".antigravitycli"
+$projAgyBak = Join-Path $DotfilesDir ".antigravitycli.bak"
+if (Test-Path $projAgyCli) { Remove-Item -Recurse -Force $projAgyCli -ErrorAction SilentlyContinue }
+if (Test-Path $projAgyBak) { Remove-Item -Recurse -Force $projAgyBak -ErrorAction SilentlyContinue }
 
 # Sync Gemini prompts: remove stale, then extract from current skills
 if (Test-Path $skillsSource) {
