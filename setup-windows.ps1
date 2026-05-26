@@ -838,6 +838,27 @@ if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq
         $mcpConfigJson.mcpServers."hive-vault".env.OPENROUTER_API_KEY = $oldKey
     }
 
+    # Substitute ${VAULT_PATH} placeholder with the canonical Windows vault dir.
+    # The committed JSON uses ${VAULT_PATH} so it's OS-portable; agy does NOT
+    # expand env vars inside JSON values, so substitution must happen here
+    # before write. The path itself is by convention: $USERPROFILE\Projects\knowledge.
+    $vaultPath = Join-Path $env:USERPROFILE 'Projects\knowledge'
+    $hiveEntry = $mcpConfigJson.mcpServers."hive-vault"
+    if ($hiveEntry -and $hiveEntry.env.PSObject.Properties['VAULT_PATH']) {
+        $hiveEntry.env.VAULT_PATH = $vaultPath
+    }
+
+    # Preflight: WARN (non-fatal) if the vault dir doesn't exist on disk.
+    # hive-vault MCP server will fail at first tool call without it, but
+    # encrypted secrets + AGY.md + everything else still deploys cleanly so
+    # creating the vault later doesn't require a setup re-run.
+    if (-not (Test-Path -LiteralPath $vaultPath -PathType Container)) {
+        Write-Warn "Obsidian vault not found at $vaultPath"
+        Write-Warn "  hive-vault MCP will error at runtime until this dir exists."
+        Write-Warn "  Either clone/sync your vault to $vaultPath, or override via"
+        Write-Warn "  the VAULT_PATH env var in your profile."
+    }
+
     # Merge stdio servers from root mcp-servers.json into mcpServers map
     $rootServers = (Get-Content $rootMcpSrc -Raw | ConvertFrom-Json).servers
     foreach ($srv in $rootServers) {
@@ -920,6 +941,32 @@ if (Test-Path $skillsSource) {
         }
     }
     Write-Success "Synced Gemini prompts to $GeminiHome\prompts\"
+}
+
+# Sync native Shared Skills for Antigravity (recognized as 'Shared' in agy).
+# Cross-OS parity with setup-linux.sh:398-419. Without this block, agy shows
+# "0 skills" on Windows even though the Linux side ships the full skill set.
+# Target: $GeminiHome\skills\<name>\SKILL.md (Shared path).
+if (Test-Path $skillsSource) {
+    $sharedSkillsDir = Join-Path $GeminiHome 'skills'
+    Ensure-Directory $sharedSkillsDir
+
+    # Remove stale shared skills (source dir no longer exists)
+    foreach ($target in Get-ChildItem $sharedSkillsDir -Directory -ErrorAction SilentlyContinue) {
+        if (-not (Test-Path (Join-Path $skillsSource $target.Name))) {
+            Remove-Item -Recurse -Force $target.FullName -ErrorAction SilentlyContinue
+        }
+    }
+
+    # Copy each skill directory (recursive, idempotent)
+    foreach ($skillDir in Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue) {
+        $skillMd = Join-Path $skillDir.FullName 'SKILL.md'
+        if (-not (Test-Path $skillMd)) { continue }
+        $dst = Join-Path $sharedSkillsDir $skillDir.Name
+        Ensure-Directory $dst
+        Copy-Item -Path (Join-Path $skillDir.FullName '*') -Destination $dst -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Write-Success "Synced Shared Skills to $sharedSkillsDir\"
 }
 
 # ============================================================================

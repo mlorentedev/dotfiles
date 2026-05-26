@@ -1,15 +1,12 @@
 {
   "mcpServers": {
     "hive-vault": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "run",
-        "--directory",
-        "/home/manu/Projects/hive",
         "hive-vault"
       ],
       "env": {
-        "VAULT_PATH": "/home/manu/Projects/knowledge",
+        "VAULT_PATH": "${VAULT_PATH}",
         "HIVE_OLLAMA_ENDPOINT": "http://ollama.kubelab.live:11434",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
