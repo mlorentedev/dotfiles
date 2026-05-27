@@ -1237,6 +1237,18 @@ if (Test-Path $sensitiveSource) {
     Write-Warn "Sensitive directory not found at $sensitiveSource"
 }
 
+# Eager-load secrets: dot-source load-secrets.ps1 NOW (after the .secret.age
+# files + env-mapping.conf are at $DotfilesDest\sensitive) so every subsequent
+# block in this setup has $env:NAN_API_KEY / OPENROUTER_API_KEY / VAULT_PATH /
+# TS_AUTHKEY / etc. available. Cross-OS parity with setup-linux.sh:115-122.
+# Wrapped to swallow internal failures (no age key, no env-mapping, etc.) so
+# setup never aborts on secrets issues -- preflight already warned the user.
+$loadSecretsDeployed = Join-Path $DotfilesDest 'scripts\load-secrets.ps1'
+if (Test-Path -LiteralPath $loadSecretsDeployed) {
+    $env:DOTFILES_DIR = $DotfilesDest
+    try { . $loadSecretsDeployed 2>&1 | Out-Null } catch { }
+}
+
 # ============================================================================
 # 7c. REGISTER SESSIONSTART HOOK
 # ============================================================================
