@@ -212,19 +212,22 @@ Write-SectionSummary
 if ($script:Mode -eq 'fix') {
     Write-Host ""
     Write-Host "Heal scripts:"
-    $heal = Join-Path $PSScriptRoot 'claude-mem-heal.ps1'
-    if (Test-Path $heal) {
-        $healOut = & pwsh -NoProfile -File $heal 2>&1 | Out-String
-        $healOut = $healOut.Trim()
-        if ($healOut) {
-            Write-Host "  [fix]  claude-mem-heal:" -ForegroundColor Cyan
-            $healOut -split "`n" | ForEach-Object { Write-Host "         $_" }
-            $script:Applied++
+    foreach ($healName in @('claude-mem-heal.ps1', 'profile-heal.ps1')) {
+        $heal = Join-Path $PSScriptRoot $healName
+        $shortName = $healName -replace '\.ps1$', ''
+        if (Test-Path $heal) {
+            $healOut = & pwsh -NoProfile -File $heal 2>&1 | Out-String
+            $healOut = $healOut.Trim()
+            if ($healOut) {
+                Write-Host "  [fix]  ${shortName}:" -ForegroundColor Cyan
+                $healOut -split "`n" | ForEach-Object { Write-Host "         $_" }
+                $script:Applied++
+            } else {
+                Write-Pass "${shortName}: nothing to heal"
+            }
         } else {
-            Write-Pass "claude-mem-heal: nothing to heal"
+            Write-Inf "$healName not deployed (skipping)"
         }
-    } else {
-        Write-Inf "claude-mem-heal.ps1 not deployed (skipping)"
     }
 }
 

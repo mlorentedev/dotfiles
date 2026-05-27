@@ -579,6 +579,67 @@ setup() {
     [[ -n "$doctor_line" ]] && [[ -n "$health_line" ]] && [[ "$health_line" -gt "$doctor_line" ]]
 }
 
+# --- BUG-021: profile-section fail-fast (root cause of BUG-020 accumulation) ---
+# Section 4 "DEPLOY POWERSHELL PROFILE" used to swallow OOM/-replace failures and
+# print "[SUCCESS] Updated dotfiles section in PowerShell profile" regardless. On
+# a corrupted 26 MB profile this allowed silent partial writes to compound until
+# the deployed file hit 689K lines and every shell startup hit a parser error.
+# The contract these tests pin: the profile-section block must (a) fail-fast on
+# I/O error, (b) preflight known corruption signals (size, marker count), and
+# (c) point users at the recovery script (profile-heal.ps1 from BUG-020).
+
+@test "BUG-021: profile-section block is wrapped in try/catch with exit 1 on failure" {
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE '\btry\s*\{'
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE '\bcatch\s*\{'
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE 'exit\s+1'
+}
+
+@test "BUG-021: profile-section I/O uses -ErrorAction Stop (terminating errors only)" {
+    # Without -ErrorAction Stop, Get-Content/Set-Content emit non-terminating
+    # errors that bypass try/catch. Stop promotes them so the catch fires.
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE 'Get-Content[^|]*-ErrorAction Stop'
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE 'Set-Content[^|]*-ErrorAction Stop'
+}
+
+@test "BUG-021: profile preflight aborts when existing profile size > 1 MB" {
+    # Healthy profile is ~7 KB. 1 MB is ~140x — a reliable corruption signal.
+    # Abort BEFORE Get-Content -Raw OOMs on the 26 MB nightmare scenario.
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE '\.Length\s+-gt\s+1MB'
+}
+
+@test "BUG-021: profile preflight aborts when marker count > 2 (BUG-020 corruption signal)" {
+    # A healthy profile has exactly 1 start + 1 end marker pair. Anything > 2
+    # of either marker means a previous setup run left orphan blocks. Refuse to
+    # touch it — defer to profile-heal.ps1 (BUG-020).
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE 'Select-String|-AllMatches|Matches\('
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE 'markerCount|MarkerCount'
+}
+
+@test "BUG-021: preflight error message points at profile-heal.ps1 (BUG-020 recovery handoff)" {
+    # When preflight aborts, the user needs a one-line escape hatch. The
+    # recovery script (BUG-020) is named profile-heal.ps1 in scripts/.
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qF 'profile-heal.ps1'
+}
+
+@test "parity: both setups exit non-zero on profile-write failure" {
+    # Linux: setup-linux.sh:11 already has 'set -euo pipefail' which propagates
+    # deploy_file's non-zero exits. Asserts the safety net is still in place.
+    grep -qE '^set -euo pipefail' "$DOTFILES_DIR/setup-linux.sh"
+    # Windows: try/catch + exit 1 in the profile-section block (covered structurally
+    # by BUG-021 test #1; this parity test asserts both legs of the contract exist).
+    awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
+        | grep -qE '\bcatch\s*\{'
+}
+
 # --- PSScriptAnalyzer ---
 
 @test "setup-windows.ps1 passes PSScriptAnalyzer (if pwsh available)" {
