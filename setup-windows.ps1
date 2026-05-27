@@ -983,35 +983,66 @@ if (Test-Path $profileSource) {
     $profileDir = Split-Path -Parent $profileTarget
     Ensure-Directory $profileDir
 
-    # Read source profile
-    $sourceContent = Get-Content $profileSource -Raw
-
     # Marker for dotfiles section
     $startMarker = "# >>> DOTFILES PROFILE >>>"
     $endMarker = "# <<< DOTFILES PROFILE <<<"
 
+    # BUG-021 preflight: refuse to touch a corrupted profile (size or marker
+    # count outside healthy bounds). The previous version of this block
+    # swallowed -replace OOM and printed [SUCCESS] regardless, which let
+    # BUG-020 (26 MB / 689K-line profile) accumulate silently across runs.
     if (Test-Path $profileTarget) {
-        $existingContent = Get-Content $profileTarget -Raw
-
-        # Check if our section already exists
-        if ($existingContent -match [regex]::Escape($startMarker)) {
-            # Replace existing section
-            $pattern = [regex]::Escape($startMarker) + "[\s\S]*?" + [regex]::Escape($endMarker)
-            $newSection = "$startMarker`r`n$sourceContent`r`n$endMarker"
-            $newContent = $existingContent -replace $pattern, $newSection
-            Set-Content -Path $profileTarget -Value $newContent -Encoding UTF8
-            Write-Success "Updated dotfiles section in PowerShell profile"
-        } else {
-            # Append our section
-            $appendContent = "`r`n`r`n$startMarker`r`n$sourceContent`r`n$endMarker"
-            Add-Content -Path $profileTarget -Value $appendContent -Encoding UTF8
-            Write-Success "Appended dotfiles section to PowerShell profile"
+        $profileInfo = Get-Item -LiteralPath $profileTarget -ErrorAction Stop
+        if ($profileInfo.Length -gt 1MB) {
+            Write-Err ("PowerShell profile is suspiciously large ({0:N0} bytes); refusing to modify in place." -f $profileInfo.Length)
+            Write-Err "Likely BUG-020 corruption. Run: scripts\profile-heal.ps1 to reconstruct from SSOT, then re-run setup-windows.ps1."
+            exit 1
         }
-    } else {
-        # Create new profile with our section
-        $newContent = "$startMarker`r`n$sourceContent`r`n$endMarker"
-        Set-Content -Path $profileTarget -Value $newContent -Encoding UTF8
-        Write-Success "Created PowerShell profile at $profileTarget"
+
+        $rawForPreflight = Get-Content -LiteralPath $profileTarget -Raw -ErrorAction Stop
+        $startMatches = [regex]::Matches($rawForPreflight, [regex]::Escape($startMarker))
+        $endMatches = [regex]::Matches($rawForPreflight, [regex]::Escape($endMarker))
+        $startMarkerCount = $startMatches.Count
+        $endMarkerCount = $endMatches.Count
+        if ($startMarkerCount -gt 2 -or $endMarkerCount -gt 2) {
+            Write-Err ("PowerShell profile has unbalanced/duplicate dotfiles markers (start={0}, end={1}); refusing to modify." -f $startMarkerCount, $endMarkerCount)
+            Write-Err "Likely BUG-020 corruption from a previous silent partial write. Run: scripts\profile-heal.ps1, then re-run setup-windows.ps1."
+            exit 1
+        }
+    }
+
+    try {
+        # Read source profile (fail-fast if missing -- -ErrorAction Stop
+        # promotes Get-Content's non-terminating error so the catch fires).
+        $sourceContent = Get-Content -LiteralPath $profileSource -Raw -ErrorAction Stop
+
+        if (Test-Path $profileTarget) {
+            $existingContent = Get-Content -LiteralPath $profileTarget -Raw -ErrorAction Stop
+
+            # Check if our section already exists
+            if ($existingContent -match [regex]::Escape($startMarker)) {
+                # Replace existing section
+                $pattern = [regex]::Escape($startMarker) + "[\s\S]*?" + [regex]::Escape($endMarker)
+                $newSection = "$startMarker`r`n$sourceContent`r`n$endMarker"
+                $newContent = $existingContent -replace $pattern, $newSection
+                Set-Content -LiteralPath $profileTarget -Value $newContent -Encoding UTF8 -ErrorAction Stop
+                Write-Success "Updated dotfiles section in PowerShell profile"
+            } else {
+                # Append our section
+                $appendContent = "`r`n`r`n$startMarker`r`n$sourceContent`r`n$endMarker"
+                Add-Content -LiteralPath $profileTarget -Value $appendContent -Encoding UTF8 -ErrorAction Stop
+                Write-Success "Appended dotfiles section to PowerShell profile"
+            }
+        } else {
+            # Create new profile with our section
+            $newContent = "$startMarker`r`n$sourceContent`r`n$endMarker"
+            Set-Content -LiteralPath $profileTarget -Value $newContent -Encoding UTF8 -ErrorAction Stop
+            Write-Success "Created PowerShell profile at $profileTarget"
+        }
+    } catch {
+        Write-Err "Failed to update PowerShell profile: $($_.Exception.Message)"
+        Write-Err "If the profile appears corrupted, run scripts\profile-heal.ps1 then re-run setup-windows.ps1."
+        exit 1
     }
 } else {
     Write-Warn "Profile template not found at $profileSource"
@@ -1125,6 +1156,17 @@ if (Test-Path $memHealSource) {
     Write-Success "Deployed claude-mem-heal.ps1 to $ScriptsDir\"
 } else {
     Write-Warn "claude-mem-heal.ps1 not found at $memHealSource"
+}
+
+# BUG-020: profile-heal.ps1 reconstructs a corrupted PowerShell profile from
+# the SSOT. Invoked by doctor.ps1 -Fix and pointed at by setup-windows.ps1's
+# preflight error message (BUG-021).
+$profileHealSource = "$DotfilesDir\scripts\profile-heal.ps1"
+if (Test-Path $profileHealSource) {
+    Copy-Item $profileHealSource "$ScriptsDir\" -Force
+    Write-Success "Deployed profile-heal.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "profile-heal.ps1 not found at $profileHealSource"
 }
 
 $doctorSource = "$DotfilesDir\scripts\doctor.ps1"
