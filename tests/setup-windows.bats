@@ -63,6 +63,20 @@ setup() {
     grep -qF "PSObject.Properties['prerequisite_command']" "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 eager-sources load-secrets.ps1 after sensitive deploy" {
+    # Every block AFTER sensitive/ copy must see $env:NAN_API_KEY / VAULT_PATH /
+    # TS_AUTHKEY etc. populated. Cross-OS parity with setup-linux.sh's same
+    # eager source. Wrapped in try/catch so setup never aborts on secrets issues.
+    grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
+    grep -qE '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
+    grep -qF 'try { . $loadSecretsDeployed' "$PS1_SCRIPT"
+}
+
+@test "parity: both setups eager-load secrets after sensitive deploy" {
+    grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
+    grep -qF 'Eager-load secrets' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 preflights the age identity key (warn, not fail)" {
     # Without ~/.config/age/key.txt, load-secrets.ps1 silently no-ops at
     # shell startup and opencode/agy 401 with no clue. Preflight WARNs (must
