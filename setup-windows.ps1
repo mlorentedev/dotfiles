@@ -685,7 +685,7 @@ if (-not $obsidianCmd) {
     if ($npmCmd) {
         Write-Info "Installing Obsidian CLI (@vorillaz/obsidian-cli) via npm..."
         try {
-            & npm install -g '@vorillaz/obsidian-cli' 2>$null | Out-Null
+            & npm install -g 'obsidian-cli' 2>$null | Out-Null
             # Refresh PATH so the freshly-installed binary is visible in this
             # session (same trick as the winget block in section 1c).
             $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
@@ -1021,11 +1021,16 @@ if (Test-Path $profileSource) {
 
             # Check if our section already exists
             if ($existingContent -match [regex]::Escape($startMarker)) {
-                # Replace existing section
-                $pattern = [regex]::Escape($startMarker) + "[\s\S]*?" + [regex]::Escape($endMarker)
+                # Replace existing section using index-based split (BUG-022:
+                # PowerShell -replace with [\s\S]*? expands large strings
+                # instead of replacing — see debug-replace*.ps1 traces).
                 $newSection = "$startMarker`r`n$sourceContent`r`n$endMarker"
-                $newContent = $existingContent -replace $pattern, $newSection
-                Set-Content -LiteralPath $profileTarget -Value $newContent -Encoding UTF8 -ErrorAction Stop
+                $markerIdx = $existingContent.IndexOf($startMarker)
+                $endIdx = $existingContent.IndexOf($endMarker, $markerIdx)
+                $before = $existingContent.Substring(0, $markerIdx)
+                $after = $existingContent.Substring($endIdx + $endMarker.Length)
+                $newContent = $before + $newSection + $after
+                Set-Content -LiteralPath $profileTarget -Value $newContent -Encoding UTF8 -NoNewline -ErrorAction Stop
                 Write-Success "Updated dotfiles section in PowerShell profile"
             } else {
                 # Append our section
@@ -1036,7 +1041,7 @@ if (Test-Path $profileSource) {
         } else {
             # Create new profile with our section
             $newContent = "$startMarker`r`n$sourceContent`r`n$endMarker"
-            Set-Content -LiteralPath $profileTarget -Value $newContent -Encoding UTF8 -ErrorAction Stop
+            Set-Content -LiteralPath $profileTarget -Value $newContent -Encoding UTF8 -NoNewline -ErrorAction Stop
             Write-Success "Created PowerShell profile at $profileTarget"
         }
     } catch {

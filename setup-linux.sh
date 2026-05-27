@@ -564,15 +564,16 @@ if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/p
     log_success "python -> python3 symlink created"
 fi
 
-# BUG-013b: install @vorillaz/obsidian-cli via npm global. Mirror of the
+# BUG-013b: install obsidian-cli via npm global. Mirror of the
 # Windows side shipped in PR #77. The CLI provides the `obsidian` binary
 # used by obs-cli.sh and the vault-health workflow. Idempotent: skip when
 # `obsidian` is already on PATH. Gated on `npm` so machines without
 # Node.js gracefully skip with a clear hint.
+# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
 if ! command -v obsidian >/dev/null 2>&1; then
     if command -v npm >/dev/null 2>&1; then
-        log_info "Installing Obsidian CLI (@vorillaz/obsidian-cli) via npm..."
-        if npm install -g '@vorillaz/obsidian-cli' >/dev/null 2>&1; then
+        log_info "Installing Obsidian CLI (obsidian-cli) via npm..."
+        if npm install -g 'obsidian-cli' >/dev/null 2>&1; then
             log_success "Obsidian CLI installed"
         else
             log_warning "Failed to install Obsidian CLI (npm install -g exited non-zero)"

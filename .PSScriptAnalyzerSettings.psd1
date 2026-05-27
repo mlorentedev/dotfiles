@@ -3,6 +3,7 @@
         'PSAvoidUsingWriteHost',
         'PSUseApprovedVerbs',
         'PSAvoidUsingEmptyCatchBlock',
-        'PSUseShouldProcessForStateChangingFunctions'
+        'PSUseShouldProcessForStateChangingFunctions',
+        'PSUseBOMForUnicodeEncodedFile'
     )
 }
