@@ -55,7 +55,7 @@ function Deploy-File {
     }
 
     # Ensure parent directory exists
-    $dstDir = Split-Path -LiteralPath $Destination -Parent
+    $dstDir = Split-Path -Path $Destination -Parent
     if ($dstDir -and -not (Test-Path -LiteralPath $dstDir)) {
         New-Item -ItemType Directory -Path $dstDir -Force | Out-Null
     }

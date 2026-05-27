@@ -1065,9 +1065,15 @@ $gitconfigTarget = "$env:USERPROFILE\.gitconfig"
 if (Test-Path $gitconfigSource) {
     # Check if target already exists
     if (Test-Path $gitconfigTarget) {
-        Write-Warn ".gitconfig already exists at $gitconfigTarget"
-        Write-Info "Skipping to avoid overwriting existing configuration"
-        Write-Info "To update manually: Copy-Item '$gitconfigSource' '$gitconfigTarget' -Force"
+        $srcHash = (Get-FileHash -LiteralPath $gitconfigSource -Algorithm SHA256).Hash
+        $dstHash = (Get-FileHash -LiteralPath $gitconfigTarget -Algorithm SHA256).Hash
+        if ($srcHash -eq $dstHash) {
+            Write-Info ".gitconfig already exists and matches repo (no action needed)"
+        } else {
+            Write-Warn ".gitconfig already exists at $gitconfigTarget (differs from repo version)"
+            Write-Info "Skipping to avoid overwriting existing configuration"
+            Write-Info "To merge manually: Copy-Item '$gitconfigSource' '$gitconfigTarget' -Force"
+        }
     } else {
         Copy-Item $gitconfigSource $gitconfigTarget -Force
         Write-Success "Deployed .gitconfig"
