@@ -294,20 +294,21 @@ setup() {
 }
 
 # --- BUG-013: install Obsidian CLI on Windows ---
-# `@vorillaz/obsidian-cli` provides the `obsidian` binary used by
+# `obsidian-cli` (npm) provides the `obsidian` binary used by
 # obs-cli.ps1 and the vault-health workflow. setup-windows.ps1 must install
 # it idempotently via npm global (user scope, no admin), gated on npm
 # availability so machines without Node.js gracefully skip.
+# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
 
 @test "setup-windows.ps1 installs Obsidian CLI via npm (BUG-013)" {
-    grep -qF "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT"
+    grep -qF "npm install -g 'obsidian-cli'" "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 Obsidian CLI install is gated on npm + idempotent (BUG-013)" {
     # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command obsidian"
+    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command obsidian"
     # gating: only run if npm is available
-    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
+    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
 }
 
 # --- AI-014: OpenCode Windows bootstrap (mirror of AI-011 Linux side) ---

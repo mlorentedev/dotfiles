@@ -450,19 +450,19 @@ setup() {
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# BUG-013b: cross-OS parity for the Obsidian CLI (@vorillaz/obsidian-cli)
-# install. Windows side shipped in PR #77 via npm global. Linux side
-# mirrors with the same idempotent + gated-on-npm pattern.
+# BUG-013b: cross-OS parity for the Obsidian CLI install.
+# Windows side ships via npm global `obsidian-cli` (fixed from 404 @vorillaz/obsidian-cli).
+# Linux side mirrors with the same idempotent + gated-on-npm pattern.
 @test "parity: both setup scripts install Obsidian CLI via npm (BUG-013/b)" {
-    grep -qF "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup-linux.sh Obsidian CLI install is gated on npm + idempotent (BUG-013b)" {
     # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v obsidian"
+    grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v obsidian"
     # gating: only run if npm is available
-    grep -B10 "npm install -g '@vorillaz/obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
+    grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
 }
 
 # --- BUG-015: detection layer for claude-mem hook intermittent fails ---
@@ -491,12 +491,17 @@ setup() {
     ! grep -qF 'done | head -n1' "$DOTFILES_DIR/scripts/healthcheck.sh"
 }
 
-@test "BUG-023: healthcheck.ps1 bash one-liner mirrors the race-free form" {
-    # Positive: the PS1 bash sub-invocation uses the same materialize+break.
-    grep -qF '_CANDS=$(' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-    grep -qF 'done <<<"$_CANDS"' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+@test "BUG-023: healthcheck.ps1 uses native PowerShell probe (not bash)" {
+    # The bash one-liner was removed (BUG-015): CLAUDE_CONFIG_DIR not
+    # inherited into bash subshell on Windows. Native PS probe checks the
+    # same candidate directories for bun-runner.js + worker-service.cjs.
+    ! grep -qF '_CANDS=$(' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+    ! grep -qF 'done <<<"$_CANDS"' "$DOTFILES_DIR/scripts/healthcheck.ps1"
     # Negative: lock out the broken pipe-to-head form so PS1 stays in parity.
     ! grep -qF 'done | head -n1' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+    # Positive: native PS probe uses Get-ChildItem and Test-Path.
+    grep -qF 'Get-ChildItem' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+    grep -qF 'Test-Path' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
 # WIN-001b: cross-OS parity for the post-setup healthcheck auto-invoke.
