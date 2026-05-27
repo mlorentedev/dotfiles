@@ -44,7 +44,19 @@ Per user directive (Q3 answer): the PR MUST repatriate and migrate ALL skills to
 
 Failure modes, dependencies, and unknowns to clarify before implementation. If any item here is unresolved, do not move to `tasks.md` yet.
 
-- **🚨 BLOCKER — Bootstrap dependency on vault clone present**: with Option D chosen (no committed `.rendered-skills/`; render-all.sh executes at setup time reading from vault), `setup-{linux,windows}` now hard-depends on `~/Projects/knowledge` (or `%USERPROFILE%\Projects\knowledge`) existing with current vault content. First-install via IDEAS-005 `install.sh` (once shipped) MUST clone vault before invoking setup, OR setup MUST abort with clear actionable error when vault is absent. Decide: (a) `install.sh` clones vault as prerequisite, (b) `setup-{linux,windows}` checks for vault presence at `~/Projects/knowledge` and aborts with instructions, (c) vendored fallback (vault-snapshot embedded in dotfiles repo, used only when vault unreachable). **MUST resolve before any code is written.**
+- **🟢 RESOLVED 2026-05-26 — Bootstrap dependency, option (b) chosen**: `setup-{linux,windows}` performs preflight check for BOTH prerequisites before invoking `render-all.sh`:
+  1. **Vault clone present**: `~/Projects/knowledge` (Linux/macOS) or `%USERPROFILE%\Projects\knowledge` (Windows) exists with `00_meta/skills/` populated (test: `[ -d ~/Projects/knowledge/00_meta/skills ]` / `Test-Path "$env:USERPROFILE\Projects\knowledge\00_meta\skills"`).
+  2. **Obsidian binary installed**: detect via `command -v obsidian` (Linux/macOS) / `Get-Command obsidian -ErrorAction SilentlyContinue` OR Application bundle probe (Windows). Reason: vault editing/sync requires Obsidian GUI; setup already checks for it in `healthcheck` section 7/7 — keep that contract.
+
+  If either missing, setup aborts with **exit code 2** and prints an actionable error block:
+  ```
+  [FATAL] Skill pipeline requires Obsidian + vault clone.
+    → Install Obsidian: https://obsidian.md
+    → Clone vault:      git clone <vault-repo> ~/Projects/knowledge
+    → Re-run:           scripts/setup-{linux,windows}.{sh,ps1}
+  ```
+
+  Rationale: vault is **private repo** (cannot vendor into public dotfiles → option c rejected). Option (a) `install.sh` is not yet shipped (IDEAS-005 still backlog → coupling deferred). New-machine bootstrap is rare; explicit 2-step is acceptable cost. Tracked: `vault/10_projects/dotfiles/11-tasks.md § Cross-Provider Harness Wave 2`.
 - **🟡 Phase 2.6 coupling**: SDD-008 leans on Phase 2.6 ("formal idempotence CI job: run-twice-and-diff GHA") for drift detection. Phase 2.6 is planned but not yet shipped. Decide: (a) include Phase 2.6 implementation as part of SDD-008 scope (expands LOC ~80), (b) accept weaker gate until 2.6 ships separately (drift detection only on `setup` re-run locally), (c) split SDD-008 into 008a (pipeline) and 008b (idempotence gate) for sequential PRs. Non-blocker for code start but blocks "Acceptance criteria" definition for the drift gate.
 - **🟡 Migration history preservation across repos**: 17 cross-repo moves from `dotfiles/ai/skills/<name>/` to `vault/00_meta/skills/<name>/`. `git mv` does not preserve history across separate repos. Options: (a) accept history loss + add reference table in each skill README pointing to pre-migration dotfiles commit hash, (b) `git filter-repo` extraction + injection (technically complex; can corrupt repos if mishandled), (c) migration script that copies content + commits each with a `Co-authored-by`-style reference to the original dotfiles hash. Choose at implementation time. Non-blocker for spec authoring.
 
