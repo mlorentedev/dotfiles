@@ -56,3 +56,5 @@ After this PR:
 - PR: [#120](https://github.com/mlorentedev/dotfiles/pull/120)
 - Companion script: `scripts/claude-mem-heal.ps1` (similar heal pattern, prior art for the doctor.ps1 invocation loop)
 - Linux equivalent (clean-copy): `scripts/utils.sh` `deploy_file()` at line 454
+
+## Follow-up (BUG-022)
