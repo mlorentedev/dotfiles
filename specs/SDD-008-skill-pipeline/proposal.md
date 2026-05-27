@@ -15,13 +15,9 @@ template_version: "1.0"
 
 <!-- from 10_projects/dotfiles/11-tasks.md:193: SDD-008-skill-pipeline (Tier 1, cross-OS, ~250 LOC est.) — Compile-once-deploy-everywhere pattern for cross-agent skill distribution; eliminates symlink/junction fragility (BUG-100 precedent class). -->
 
-[AGENT-DRAFT — review before archive]
-
 Today skills are distributed via two inconsistent mechanisms: symlink/junction for vault-hosted SDD skills (`spec`, `adversarial-review`, `enrich-us`) and mechanical copy via script for opencode commands (per AI-012). BUG-100 already proved that cross-agent symlink fragility is a real bug class — agy v1.0.2 broke because our deploy strategy was "fighting the agent's expected filesystem layout" (per SDD-007 proposal). Without a unified pipeline, every new agent (Cursor, Codex, Devin, future tooling) repeats the deploy decision ad-hoc, and any improvement to a skill's content (e.g., extending `/spec` with an agent-side proactive trigger) does not propagate deterministically to the N target agents — behavior diverges silently across agents and the SSOT promise breaks without anyone noticing until the next BUG-100-class incident.
 
 ## What
-
-[AGENT-DRAFT — review before archive]
 
 After this PR, the system exhibits five observable behavior changes:
 
@@ -53,8 +49,6 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 - **🟡 Migration history preservation across repos**: 17 cross-repo moves from `dotfiles/ai/skills/<name>/` to `vault/00_meta/skills/<name>/`. `git mv` does not preserve history across separate repos. Options: (a) accept history loss + add reference table in each skill README pointing to pre-migration dotfiles commit hash, (b) `git filter-repo` extraction + injection (technically complex; can corrupt repos if mishandled), (c) migration script that copies content + commits each with a `Co-authored-by`-style reference to the original dotfiles hash. Choose at implementation time. Non-blocker for spec authoring.
 
 ## Acceptance criteria
-
-[AGENT-DRAFT — review before archive]
 
 Observable outcomes. Each must be testable.
 

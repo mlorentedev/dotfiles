@@ -1,8 +1,9 @@
 ---
 id: "SDD-007-ai-tooling-consolidation"
 type: spec
-status: draft
+status: archived
 created: "2026-05-25"
+archived: "2026-05-26"
 tags: [spec, proposal, sdd-007, cross-os, iac, deploy-strategy, ai-tooling, bug-100-resolution, audit-002-followup, tool-consolidation]
 template_version: "1.0"
 ---
@@ -14,8 +15,6 @@ template_version: "1.0"
 > **Naming**: file lives at `<repo>/specs/SDD-007-iac-deploy-strategy/proposal.md`.
 
 ## Why
-
-[AGENT-DRAFT — review before archive]
 
 **Two threads converge here.**
 
@@ -32,13 +31,9 @@ OpenCode covers everything aider delivered; agy covers the Gemini-family slot le
 
 ## What
 
-[AGENT-DRAFT — review before archive]
-
 Introduce `deploy_file SRC DEST` in `scripts/utils.sh` (atomic cp via tempfile+mv, idempotent: skip if `cmp -s` matches, log only on change). Replace all ~14 config-deploy `ln -sf` calls in `setup-linux.sh` with `deploy_file`. The Antigravity section uses the same helper and writes the master MCP config to `~/.gemini/config/mcp_config.json` (the path `agy` actually reads from per agentpedia/Dazbo/Composio docs) instead of the current flat-file at `~/.gemini/mcp_config.json` with a sibling symlink. `setup-windows.ps1` already uses copies; this PR only aligns its target paths for `~/.gemini/config/`. Workflow consequence: **edits happen in the repo, never in `~`**. The two-tier deploy verification rule (currently a "guardrail when remembered") becomes a universal precondition trivially enforced by drift assertions in `scripts/healthcheck.sh`.
 
 ## Out of scope
-
-[AGENT-DRAFT — review before archive]
 
 - **Vault→home symlinks** under `link_vault_skills` / `deploy_auto_memory_symlinks` (setup-linux.sh lines ~902-1010): these point `~/Projects/knowledge/...` (Obsidian vault) → `~/.claude/projects/<hash>/memory/`. They are intentional **cross-system bindings**, not config deploy. Vault is the canonical store; copying would create drift between vault and Claude memory. Stays as symlinks.
 - **Secret file deployments via `secrets_add_file`** (`~/.ssh/id_ed25519`, `~/.config/age/key.txt`): these need canonical absolute paths for OpenSSH/age to find them; the secrets loader already handles them separately from config deploy.
@@ -48,8 +43,6 @@ Introduce `deploy_file SRC DEST` in `scripts/utils.sh` (atomic cp via tempfile+m
 
 ## Risks / open questions
 
-[AGENT-DRAFT — review before archive]
-
 - **R1 (BLOCKER — must be assertion-covered before merge):** Edit-in-`~` regression. After this PR, `vim ~/.zshrc; source ~/.zshrc` makes a change live for the current session but the change is **lost on next `setup-linux.sh` run**. Mitigation: `scripts/healthcheck.sh` adds a `check_deployed` assertion (per managed file: `cmp -s repo/path ~/path`); diff means user edited `~` directly. This converts silent drift into a loud red healthcheck. **Without this, the migration is net-negative** because losing an edit silently is worse than a symlink clobber that surfaces as an error.
 - **R2:** First-run setup-linux.sh wall-time increase. Bulk `cp` vs `ln -sf` adds ~200-400ms across 14 files. Acceptable. No mitigation needed.
 - **R3 (BLOCKER — must resolve before tasks.md freeze):** Healthcheck noise. Today some files in `~/.claude/` and `~/.gemini/` are intentionally clobbered by CLIs (claude-session-start state, agy plugin caches). If `check_deployed` flags every CLI-managed file as drift, the signal/noise collapses. **Solution**: maintain an explicit `DEPLOYED_FILES` array in `scripts/utils.sh` or `setup-linux.sh`. Healthcheck iterates that array only — files not in it are CLI-managed and excluded from drift detection. Trade-off: adding a new deployed file is now a two-place edit (`deploy_file` call + `DEPLOYED_FILES` entry). Decision: accepted; better than the alternative.
@@ -58,18 +51,14 @@ Introduce `deploy_file SRC DEST` in `scripts/utils.sh` (atomic cp via tempfile+m
 
 ## Acceptance criteria
 
-[AGENT-DRAFT — review before archive]
-
-- [ ] **AC1**: No `ln -sf` invocations for config-deploy paths in `setup-linux.sh` after this PR. Vault→home symlinks (memory/skills) remain. Verified by: `grep -E '^\s*ln -sf' setup-linux.sh | grep -vE 'vault|skills|memory' | wc -l` returns 0.
-- [ ] **AC2**: `deploy_file SRC DEST` exists in `scripts/utils.sh`, is atomic (tempfile + mv), idempotent (skip if cmp matches), logs only on actual change. Covered by `tests/iac-deploy.bats` (≥4 test cases: fresh-deploy, idempotent-second-run, change-detection, atomic-rollback-on-error).
-- [ ] **AC3**: `scripts/healthcheck.sh` asserts content equivalence between each entry of a `DEPLOYED_FILES` registry and its target in `~`. Drift = healthcheck fail. Excludes CLI-managed files (anything under `~/.gemini/antigravity-cli/` / `~/.claude/projects/`).
-- [ ] **AC4 (BUG-100 closure)**: `~/.gemini/config/mcp_config.json` is a **regular file** (not a symlink), readable as valid JSON, contains all servers from `mcp-servers.json`. No path under `~/.gemini/config/` is a symlink. `readlink -e ~/.gemini/config/mcp_config.json` resolves in ≤1 hop (i.e., is the file itself). `tests/antigravity.bats` adds a regression test for this. Issue #100 closeable.
-- [ ] **AC5**: `setup-linux.sh` is idempotent on the local dev machine: running it twice produces zero `cp` log lines on the second run (everything already up-to-date). Verified by manual smoke test logged in `verification.md`.
-- [ ] **AC6 (cross-OS parity)**: `setup-windows.ps1` writes its master MCP config to `$env:USERPROFILE\.gemini\config\mcp_config.json` (mirror of Linux path), not the previous Windows-specific location. Existing Windows healthcheck section is updated.
+- [x] **AC1**: No `ln -sf` invocations for config-deploy paths in `setup-linux.sh` after this PR. Vault→home symlinks (memory/skills) remain. Verified by: `grep -E '^\s*ln -sf' setup-linux.sh | grep -vE 'vault|skills|memory' | wc -l` returns 0.
+- [x] **AC2**: `deploy_file SRC DEST` exists in `scripts/utils.sh`, is atomic (tempfile + mv), idempotent (skip if cmp matches), logs only on actual change. Covered by `tests/iac-deploy.bats` (≥4 test cases: fresh-deploy, idempotent-second-run, change-detection, atomic-rollback-on-error).
+- [x] **AC3**: `scripts/healthcheck.sh` asserts content equivalence between each entry of a `DEPLOYED_FILES` registry and its target in `~`. Drift = healthcheck fail. Excludes CLI-managed files (anything under `~/.gemini/antigravity-cli/` / `~/.claude/projects/`).
+- [x] **AC4 (BUG-100 closure)**: `~/.gemini/config/mcp_config.json` is a **regular file** (not a symlink), readable as valid JSON, contains all servers from `mcp-servers.json`. No path under `~/.gemini/config/` is a symlink. `readlink -e ~/.gemini/config/mcp_config.json` resolves in ≤1 hop (i.e., is the file itself). `tests/antigravity.bats` adds a regression test for this. Issue #100 closeable.
+- [x] **AC5**: `setup-linux.sh` is idempotent on the local dev machine: running it twice produces zero `cp` log lines on the second run (everything already up-to-date). Verified by manual smoke test logged in `verification.md`.
+- [x] **AC6 (cross-OS parity)**: `setup-windows.ps1` writes its master MCP config to `$env:USERPROFILE\.gemini\config\mcp_config.json` (mirror of Linux path), not the previous Windows-specific location. Existing Windows healthcheck section is updated.
 
 ## Completeness review
-
-[AGENT-DRAFT — review before archive]
 
 Standard items:
 - **Rate limit / cost guard**: N/A (local-only deploy operations).
