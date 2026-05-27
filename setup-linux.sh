@@ -113,6 +113,18 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     cp -rf "$CURRENT_DIR/sensitive/"* "$DOTFILES_DIR/sensitive/" 2>/dev/null || true
 fi
 
+# Eager-load secrets: source load-secrets.sh NOW (after sensitive/ deploy is in
+# place at $DOTFILES_DIR/sensitive) so every subsequent block in this setup
+# has $NAN_API_KEY / $OPENROUTER_API_KEY / $VAULT_PATH / $TS_AUTHKEY / etc.
+# available. Soft-source (subshell + `|| true`) so failures (no age key, no
+# env-mapping yet, etc.) don't abort setup. Replaces the lazy on-demand
+# sourcing previously scattered through this script (e.g. the agy MCP
+# OPENROUTER_API_KEY recovery block).
+if [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1 || true
+fi
+
 
 # Update functions.zsh to source utils.sh if not already done
 if [ -f "$DOTFILES_DIR/.zsh/functions.zsh" ]; then
