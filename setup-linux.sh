@@ -297,11 +297,18 @@ else
     log_info "bats already installed"
 fi
 
-# Antigravity CLI (agy) install is user-managed (no official curl-install URL
-# confirmed). If agy is not in PATH, log a clear hint and continue — we still
-# deploy the config files so that when agy is installed manually it picks them up.
+# Antigravity CLI (agy) install — idempotent per pattern-setup-script-idempotence.
+# Official install URL: https://antigravity.google/cli/install.sh
+# If agy is not in PATH, install it automatically; otherwise skip.
 if ! command -v agy >/dev/null 2>&1; then
-    log_warning "agy (Antigravity CLI) not on PATH — install from https://antigravity.google then re-run setup"
+    log_info "Installing Antigravity CLI (agy)..."
+    if curl -fsSL https://antigravity.google/cli/install.sh | bash 2>/dev/null; then
+        log_success "agy installed"
+    else
+        log_warning "agy install failed — re-run setup or install manually (https://antigravity.google)"
+    fi
+else
+    log_info "agy already installed"
 fi
 
 # Setup Antigravity CLI configuration (fresh-install model, SDD-007).
@@ -1100,7 +1107,10 @@ log_success "Installation completed! Verifying file links..."
 
 check_deployed "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh" "aliases.zsh"
 check_deployed "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh" "functions.zsh"
-check_deployed "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
+# NOTE: .zshrc intentionally NOT under strict check_deployed -- setup-linux.sh
+# may legitimately modify it (e.g. stripping stale gh-copilot eval lines via
+# sed -i). Same rationale as .bashrc: tool installers append PATH/init lines,
+# producing legitimate drift that should not abort the bootstrap.
 # NOTE: .bashrc intentionally NOT under strict check_deployed -- tool installers
 # (opencode, bun, NVM, ggshield) append PATH/init lines to ~/.bashrc post-deploy,
 # producing legitimate drift. Just verify existence.
