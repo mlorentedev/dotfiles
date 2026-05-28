@@ -8,7 +8,31 @@
     "allow": [
       "mcp__hive__vault_query",
       "mcp__hive__vault_write",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "WebSearch",
+      "Bash(gh pr view:*)",
+      "Bash(source:*)",
+      "Bash(terragrunt plan:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(kubectl get:*)",
+      "Bash(aws sts get-caller-identity:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(helm search repo:*)",
+      "Bash(helm show chart:*)",
+      "Bash(nslookup:*)",
+      "Bash(dig:*)",
+      "Bash(gh auth status:*)",
+      "Skill(bender-config)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(gh search:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh pr diff:*)"
     ]
   },
   "hooks": {
