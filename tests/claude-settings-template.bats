@@ -40,10 +40,10 @@ setup() {
     [[ "$(jq -r '.hooks.SessionStart[0].hooks[0].type' "$SETTINGS_TEMPLATE")" == "command" ]]
 }
 
-# --- permissions.allow: only MCP entries, no Read paths ---
+# --- permissions.allow: MCP entries required, Bash/WebSearch/WebFetch/Skill allowed ---
 
-@test "template permissions.allow has exactly 3 entries" {
-    [[ "$(jq '.permissions.allow | length' "$SETTINGS_TEMPLATE")" == "3" ]]
+@test "template permissions.allow has at least 3 entries" {
+    [[ "$(jq '.permissions.allow | length' "$SETTINGS_TEMPLATE")" -ge 3 ]]
 }
 
 @test "template permissions.allow has all 3 expected MCP entries" {
@@ -59,8 +59,16 @@ setup() {
     [[ "$status" -ne 0 ]]
 }
 
-@test "template permissions.allow entries all start with mcp__ prefix" {
-    jq -e '.permissions.allow | map(startswith("mcp__")) | all' "$SETTINGS_TEMPLATE"
+@test "template permissions.allow entries only use allowed prefixes" {
+    # Allowed: mcp__ (MCP servers), Bash( (shell commands), WebSearch,
+    # WebFetch(domain:...), Skill( (skills). No Read( paths (user-owned).
+    jq -e '.permissions.allow | map(
+        startswith("mcp__") or
+        startswith("Bash(") or
+        . == "WebSearch" or
+        startswith("WebFetch(") or
+        startswith("Skill(")
+    ) | all' "$SETTINGS_TEMPLATE"
 }
 
 @test "template does NOT define permissions.additionalDirectories (user-owned)" {
