@@ -27,7 +27,7 @@ Promote GH #103's design into a vault-grounded spec with five resolved decisions
 4. **STATE.md format** — **YAML** for human-readability + native multi-line strings; JSON-schema validation at runtime.
 5. **Minimal viable subset** — initial cross-cutting rules: identity, decision hierarchy, security halts, response protocol. Provider-specific tooling lives in `INSTRUCT.md`.
 
-Phase 1 audit (per public-review feedback) adopts a **three-bucket classification**: `maps_directly`, `maps_weakly`, `requires_manual_validation` — making the migration safer than a binary shared/extension split.
+Phase 1 audit (per public-review feedback) adopts a **three-bucket classification**: `maps_directly`, `maps_weakly`, `requires_manual_validation` — making the migration safer than a binary shared/extension split. To partially address @m13v's "splitting moves the rot" critique without taking on instrumentation cost, the audit also records a qualitative `fires_observed` column (`yes` / `no` / `unknown`) per rule — based on manual review of recent sessions, NOT telemetry. This catches dead lines without coupling the spec to MEMORY-001.
 
 ## Out of scope
 
@@ -39,21 +39,27 @@ Phase 1 audit (per public-review feedback) adopts a **three-bucket classificatio
 ## Risks / open questions
 
 - **R1 (incorporated from @unitedideas)**: Some Claude-only rules (MCP env+secret refs, hooks, lifecycle, per-agent restrictions) do NOT map to a clean shared/extension split. Phase 1 audit MUST use the three-bucket classification. Without it, the rollout flattens nuance into noise.
-- **R2 (incorporated from @m13v)**: Cross-provider SSOT is not validated by usage telemetry — no signal on which lines of `AGENTS.md` actually fire per turn. Two defensible answers:
+- **R2 (incorporated from @m13v)**: Cross-provider SSOT is not validated by usage telemetry — no signal on which lines of `AGENTS.md` actually fire per turn. Three defensible answers:
   - **(a) Add Phase 0**: instrument session-end hook (via MEMORY-001) to log which AGENTS.md lines were quoted/referenced over 50 sessions; refactor with attribution data in hand. Cost: probably equal to or greater than IDEAS-007 itself.
-  - **(b) Pragmatic-rejection (default for this spec)**: dotfiles is a personal toolkit, not a team product; the refactor will surface line-fire patterns empirically as agents diverge. Accept the lack of telemetry; document the limit.
-  - **Decision**: default to (b) UNLESS user opts for (a) in spec-fill phase. Either way, the choice is OWNED in the spec, not glossed over.
+  - **(b) Pragmatic-rejection**: dotfiles is a personal toolkit, not a team product; the refactor will surface line-fire patterns empirically as agents diverge. Accept the lack of telemetry; document the limit.
+  - **(c) Qualitative audit (default for this spec)**: during Phase 1, manually annotate each rule with `fires_observed: yes/no/unknown` based on recent session review. No instrumentation cost; catches ~80% of dead-line value at ~5% of (a)'s cost. Surfaces candidates for deletion before they get reorganized.
+  - **Decision**: default to (c). Path (a) reserved for if (c) reveals enough ambiguity to justify telemetry investment — owned in the spec, not glossed over.
 - **R3**: Backwards compat during migration. Existing Claude sessions must not break when `CLAUDE.md` slims down. Mitigation: ship the pointer (`CLAUDE.md` → `.agent/claude-code/INSTRUCT.md`) before removing content from `CLAUDE.md`.
 - **R4**: Multi-machine sync. `.agent/` per-repo follows git; `~/.config/agent-harness/` syncs via dotfiles. Both work today.
 
 ## Acceptance criteria
 
 - [ ] Five open questions answered (with rationale) in PR body.
-- [ ] Phase 1 audit ships a CSV/JSON file with three columns: `rule`, `bucket (direct/weak/manual)`, `target_layer (AGENTS.md / .agent/<id>/INSTRUCT.md / registry)`.
+- [ ] Phase 1 audit ships a CSV/JSON file with **four** columns: `rule`, `bucket (direct/weak/manual)`, `target_layer (AGENTS.md / .agent/<id>/INSTRUCT.md / registry)`, `fires_observed (yes/no/unknown)`.
+- [ ] Audit explicitly classifies each sensitive category surfaced by @unitedideas, with rationale:
+  - **MCP env+secret refs** → reference-only, never copy values; stay in `AGENTS.md` as references; secrets resolved at runtime via `load-secrets.sh`.
+  - **Claude Code hooks + lifecycle** → Claude-only, move to `.agent/claude-code/INSTRUCT.md`.
+  - **Per-agent restrictions** (e.g. allowed-tools whitelists) → registry-level metadata in `~/.config/agent-harness/`.
+  - **Session/memory artifacts** (handoffs, MEMORY.md content) → context, NOT instructions; documented as "load as context only, never quote as rule" in the registry schema.
 - [ ] Migration report references @unitedideas's checklist shape: <https://bringyour.ai/codex-import-checklist.json>.
-- [ ] R2 telemetry decision documented (path a or b chosen).
+- [ ] R2 telemetry decision documented (path a, b, or c chosen).
 - [ ] `.agent/claude-code/INSTRUCT.md` exists in dotfiles repo (Layer 2 proof-of-concept).
-- [ ] `CLAUDE.md` slims down to a pointer with backwards-compat preserved (Claude Code sessions don't regress — verified by smoke test).
+- [ ] `CLAUDE.md` slims down to a pointer with backwards-compat preserved. **Smoke test (MUST pass before merge):** (1) launch fresh Claude Code session in dotfiles repo; (2) verify SessionStart hook injects vault health + claude-mem context (grep `vault_health` + `claude-mem-context` in transcript); (3) verify `agy` and `opencode` CLIs spawn without error; (4) verify `~/.claude/CLAUDE.md` → `AGENTS.md` pointer resolves via existing `read AGENTS.md FIRST` instruction. Any of the 4 failing = blocks merge.
 - [ ] Bats covers the discovery mechanism (env-var override + runtime-detection).
 
 ## References
