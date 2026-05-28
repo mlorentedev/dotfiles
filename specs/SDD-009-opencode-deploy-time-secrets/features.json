@@ -1,0 +1,58 @@
+[
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f1",
+    "behavior": "utils.sh exports substitute_env_placeholders <file> function",
+    "verification": "bash -c 'source scripts/utils.sh && type substitute_env_placeholders >/dev/null'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f2",
+    "behavior": "utils.ps1 declares Substitute-EnvPlaceholders function",
+    "verification": "grep -q 'function Substitute-EnvPlaceholders' scripts/utils.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f3",
+    "behavior": "setup-linux.sh calls helper on staged opencode.jsonc before deploy",
+    "verification": "grep -q 'substitute_env_placeholders \"$OPENCODE_CONFIG_TMP\"' setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f4",
+    "behavior": "setup-windows.ps1 calls helper on staged opencode.jsonc before deploy",
+    "verification": "grep -qE 'Substitute-EnvPlaceholders.*opencodeConfigTmp' setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f5",
+    "behavior": "Deployed opencode.jsonc has zero {env: tokens for resolvable keys; unresolved (e.g. OLLAMA pending secret) left intact with warning",
+    "verification": "~/.local/bin/bats tests/sdd-009-deploy-time-secrets.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f6",
+    "behavior": "Bats + Pester fixtures assert byte-equivalent substitution on both OSes",
+    "verification": "test -f tests/sdd-009-deploy-time-secrets.bats && test -f tests/sdd-009-deploy-time-secrets.Tests.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f7",
+    "behavior": "Audit confirms opencode.jsonc:40,97 are the only live {env:VAR} consumers (all other matches are docs)",
+    "verification": "grep -rn '{env:' --include='*.sh' --include='*.ps1' --include='*.jsonc' --include='*.json' . 2>/dev/null | grep -v 'specs/\\|archive\\|\\.md:\\|README' | grep -c 'opencode.jsonc' | grep -q '^2$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-009-opencode-deploy-time-secrets-f8",
+    "behavior": "load-secrets.{sh,ps1} unchanged in this PR (other agents still need env-var injection)",
+    "verification": "git diff --name-only main...HEAD | grep -v '^scripts/load-secrets' >/dev/null && ! (git diff --name-only main...HEAD | grep -q '^scripts/load-secrets')",
+    "state": "pending",
+    "evidence": ""
+  }
+]

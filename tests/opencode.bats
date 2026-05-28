@@ -23,7 +23,14 @@ setup() {
 }
 
 @test "setup-linux.sh opencode config deploy uses reconcile-not-skip (cmp -s)" {
-    grep -q 'cmp -s "\$OPENCODE_CONFIG_SRC" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
+    # Post-SDD-009: cmp compares the staged-substituted tmp file (not the raw
+    # source) against the deployed file, so substitution-driven content changes
+    # still trigger a redeploy without breaking idempotence.
+    grep -q 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
+}
+
+@test "setup-linux.sh opencode deploy calls substitute_env_placeholders (SDD-009)" {
+    grep -q 'substitute_env_placeholders "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh opencode block has post-deploy assertion" {

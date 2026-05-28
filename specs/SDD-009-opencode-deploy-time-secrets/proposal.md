@@ -1,7 +1,7 @@
 ---
 id: "SDD-009-opencode-deploy-time-secrets"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -33,7 +33,8 @@ Two new helper functions (`substitute_env_placeholders` in `utils.sh`, `Substitu
 - **R1**: Plaintext secret at rest in deployed config. Mitigation: never committed (gitignore'd), never synced via dotfiles-sync, file mode 600 on Linux. Trust model documented.
 - **R2**: Placeholder regex must distinguish `{env:VAR}` from genuine string content that happens to look similar (low risk in JSON/JSONC but worth a test).
 - **R3**: Idempotency. Re-running setup must re-substitute fresh values (in case secret rotated). Helper rewrites every invocation, not just on file-missing.
-- **R4**: Audit step. Find other `{env:VAR}` consumers in the repo. Likely opencode.jsonc only; proposal confirms via grep.
+- **R4**: Audit step. Find other `{env:VAR}` consumers in the repo. **Confirmed 2026-05-27 via grep**: `ai/opencode/opencode.jsonc:40` (`NAN_API_KEY`) and `ai/opencode/opencode.jsonc:97` (`OLLAMA_API_KEY`) are the only live consumers. All other matches are documentation / spec references.
+- **R6 (discovered during impl)**: `OLLAMA_API_KEY` has no encrypted secret today (`sensitive/ollama.api-key.secret.age` does not exist; `env-mapping.conf` line is commented). Helper semantics: substitute resolvable placeholders, leave unresolved ones intact + warn. Opencode's runtime env resolver still acts as fallback for the unresolved ones.
 - **R5**: Cross-OS parity. The bats/Pester tests must verify byte-equivalent substitution given the same input + same `env-mapping.conf` entry.
 
 ## Acceptance criteria
@@ -42,7 +43,7 @@ Two new helper functions (`substitute_env_placeholders` in `utils.sh`, `Substitu
 - [ ] `utils.ps1` exports `Substitute-EnvPlaceholders -Path <file>` function.
 - [ ] `setup-linux.sh` calls helper before deploying opencode.jsonc (line ~600).
 - [ ] `setup-windows.ps1` calls helper before deploying opencode.jsonc (line ~716).
-- [ ] Deployed `opencode.jsonc` has zero `{env:` tokens remaining (asserted by bats grep).
+- [ ] Deployed `opencode.jsonc` has zero `{env:` tokens **for keys with a resolvable mapping** remaining (asserted by bats grep). Unresolved placeholders (mapping commented in `env-mapping.conf` OR `.secret.age` missing) are left intact with a `log_warning`, falling back to opencode's runtime env resolver. Discovered during implementation: `OLLAMA_API_KEY` placeholder ships unresolved today because the homelab secret is not yet encrypted (per existing `# OLLAMA_API_KEY=ollama.api-key` commented line); `NAN_API_KEY` substitutes successfully.
 - [ ] Bats + Pester: fake age secret in fixture → asserts substituted value byte-equivalent on both OSes.
 - [ ] Audit list in PR body: every other `{env:VAR}` consumer in the repo (or "opencode.jsonc only" if grep confirms).
 - [ ] `load-secrets.{sh,ps1}` UNCHANGED.

@@ -324,8 +324,14 @@ setup() {
 @test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
     # Post-SDD-007: the inline Copy-Item + Get-FileHash block was extracted
     # into Deploy-File in scripts/utils.ps1 (atomic + idempotent by SHA256).
+    # Post-SDD-009: Deploy-File now operates on the staged-substituted tmp
+    # file ($opencodeConfigTmp) rather than the raw source.
     grep -qF 'opencode.jsonc' "$PS1_SCRIPT"
-    grep -qE 'Deploy-File.*opencodeConfigSrc' "$PS1_SCRIPT"
+    grep -qE 'Deploy-File.*opencodeConfigTmp' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 opencode deploy calls Substitute-EnvPlaceholders (SDD-009)" {
+    grep -qE 'Substitute-EnvPlaceholders.*opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 syncs OpenCode commands with orphan removal (AI-014)" {
