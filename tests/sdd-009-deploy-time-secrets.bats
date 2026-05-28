@@ -170,6 +170,40 @@ EOF
     [[ $status -ne 0 ]]
 }
 
+# --- Regression: must not abort under `set -euo pipefail` (caller setup-linux.sh) ---
+
+@test "survives set -euo pipefail with unresolved placeholders (CI integration regression)" {
+    # setup-linux.sh sources utils.sh under `set -euo pipefail`, so the helper
+    # must tolerate grep "no match" returns (which arise legitimately when a
+    # {env:VAR} has no mapping line, e.g. OLLAMA_API_KEY commented today).
+    # A prior version of the helper exited 1 here, killing the entire setup.
+    run bash -c '
+        set -euo pipefail
+        source "$1/utils.sh"
+        export SECRETS_DIR="$2"
+        export SECRETS_MAPPING_FILE="$2/env-mapping.conf"
+        export AGE_KEY_PATH="$3"
+        substitute_env_placeholders "$4"
+        echo SURVIVED
+    ' -- "$SCRIPTS_DIR" "$SECRETS_DIR" "$AGE_KEY_PATH" "$TARGET_FILE"
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"SURVIVED"* ]]
+}
+
+@test "survives set -euo pipefail with file containing zero placeholders" {
+    cat > "$TARGET_FILE" <<'EOF'
+{ "model": "gpt-4" }
+EOF
+    run bash -c '
+        set -euo pipefail
+        source "$1/utils.sh"
+        substitute_env_placeholders "$2"
+        echo SURVIVED
+    ' -- "$SCRIPTS_DIR" "$TARGET_FILE"
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"SURVIVED"* ]]
+}
+
 # --- Cross-OS contract: utils.ps1 must export the parity function ---
 
 @test "utils.ps1 declares Substitute-EnvPlaceholders function" {

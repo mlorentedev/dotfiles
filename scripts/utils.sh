@@ -295,7 +295,10 @@ substitute_env_placeholders() {
     key_file="${AGE_KEY_PATH:-$AGE_DEFAULT_KEY}"
 
     # Extract every {env:NAME} token (unique). Empty exit short-circuits.
-    tokens=$(grep -oE '\{env:[A-Z_][A-Z0-9_]*\}' "$file" 2>/dev/null | sort -u)
+    # `|| true` on each pipeline: grep returns 1 on "no match", which under
+    # the caller's `set -euo pipefail` would kill setup. The empty-result
+    # case is a legitimate code path here, not an error.
+    tokens=$(grep -oE '\{env:[A-Z_][A-Z0-9_]*\}' "$file" 2>/dev/null | sort -u || true)
     [ -z "$tokens" ] && return 0
 
     if [ ! -f "$mapping_file" ]; then
@@ -309,7 +312,9 @@ substitute_env_placeholders() {
         name=${token#\{env:}
         name=${name%\}}
         # Mapping line: NAME=<filename-without-.secret.age>. Skip comments.
-        secret_name=$(grep -E "^${name}=" "$mapping_file" 2>/dev/null | head -1 | cut -d= -f2-)
+        # `|| true` for the same set-e reason: commented / missing mapping
+        # lines must drop into the unresolved branch, not abort setup.
+        secret_name=$(grep -E "^${name}=" "$mapping_file" 2>/dev/null | head -1 | cut -d= -f2- || true)
         if [ -z "$secret_name" ]; then
             unresolved="$unresolved $name"
             continue
