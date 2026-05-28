@@ -21,7 +21,13 @@
 //            in .zsh/aliases.zsh + .bashrc + powershell/profile.ps1.
 {
   "$schema": "https://opencode.ai/config.json",
-
+  // Performance tuning (2026-05-27): lsp and snapshot disabled to reduce memory
+  // footprint and startup time; snapshot disables undo-tracking internal git repo.
+  "lsp": false,
+  "snapshot": false,
+  "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
+  // Explicit fast model for title generation — avoids fallback delay.
+  "small_model": "nan/qwen3.6",
   // Default model — NaN community (subscription, OpenAI-compatible @ api.nan.builders/v1).
   // Rate limits: 100 rpm, max 5 concurrent. See ai/nan/README.md.
   // qwen3.6 chosen empirically (scripts/nan-bench.sh): 4× faster than deepseek-v4-flash
@@ -38,7 +44,11 @@
       "options": {
         "baseURL": "https://api.nan.builders/v1",
         "apiKey": "{env:NAN_API_KEY}",
-        "model": "qwen3.6"
+        "model": "qwen3.6",
+        // Reduced from 300s default — NaN is fast, fail fast on network issues.
+        "timeout": 60000,
+        // Reduced from 30s default — qwen3.6 streams quickly.
+        "chunkTimeout": 10000
       },
       "models": {
         "deepseek-v4-flash": {
@@ -119,6 +129,10 @@
   // environments (Claude Code / opencode / agy).
   // Coexistence constraint: do not run `oc` and `claude` in parallel on
   // the same repo until hive MCP adds a lock-file to auto-commit.
+  // File watcher — skip noisy directories to reduce I/O.
+  "watcher": {
+    "ignore": ["node_modules/**", "dist/**", ".git/**", "*.log", "build/**"]
+  },
   "mcp": {
     "sequential-thinking": {
       "type": "local",
@@ -128,7 +142,9 @@
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
-      "enabled": true
+      "enabled": true,
+      // Prevent indefinite hangs on tool discovery.
+      "timeout": 3000
     },
     "hive": {
       "type": "local",
