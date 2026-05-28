@@ -716,14 +716,26 @@ if (-not $obsidianCmd) {
 $opencodeConfigSrc = "$DotfilesDir\ai\opencode\opencode.jsonc"
 $opencodeConfigDst = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
 if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $opencodeConfigSrc -Destination $opencodeConfigDst)
+    # SDD-009: stage source to a temp file, substitute {env:VAR} placeholders
+    # with age-decrypted values (mirror of bash setup-linux.sh logic), then
+    # deploy the substituted artifact. Deploy-File's SHA256 check then
+    # operates on rendered-vs-deployed (not source-vs-deployed) so idempotence
+    # still works after substitution.
+    $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
+    Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
+    if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
+        [void](Substitute-EnvPlaceholders -Path $opencodeConfigTmp)
     } else {
-        # Fallback when utils.ps1 wasn't dot-sourced (older checkout)
+        Write-Warn "Substitute-EnvPlaceholders missing; deploying opencode.jsonc with literal {env:VAR} placeholders intact"
+    }
+    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
+        [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
+    } else {
         Ensure-Directory (Split-Path $opencodeConfigDst -Parent)
-        Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigDst -Force
+        Copy-Item -LiteralPath $opencodeConfigTmp -Destination $opencodeConfigDst -Force
         Write-Success "Deployed opencode.jsonc to $opencodeConfigDst (fallback)"
     }
+    Remove-Item -LiteralPath $opencodeConfigTmp -Force -ErrorAction SilentlyContinue
 } else {
     Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
 }

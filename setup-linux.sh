@@ -605,16 +605,28 @@ else
     log_info "opencode already installed"
 fi
 
-# Deploy opencode.jsonc — reconcile-not-skip per pattern-setup-script-idempotence
+# Deploy opencode.jsonc with deploy-time {env:VAR} substitution (SDD-009).
+# Source ships placeholders like {env:NAN_API_KEY}; we substitute the literal
+# age-decrypted value at deploy time so the deployed config is self-contained
+# (no runtime env-var propagation needed when opencode launches from a
+# non-shell parent). Placeholders without a resolvable mapping are left intact
+# and opencode's runtime resolver acts as fallback.
 ensure_directory "$HOME/.config/opencode"
 OPENCODE_CONFIG_SRC="$CURRENT_DIR/ai/opencode/opencode.jsonc"
 OPENCODE_CONFIG_DST="$HOME/.config/opencode/opencode.jsonc"
 if [ -f "$OPENCODE_CONFIG_SRC" ]; then
-    if [ -f "$OPENCODE_CONFIG_DST" ] && cmp -s "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_DST"; then
+    OPENCODE_CONFIG_TMP=$(mktemp)
+    cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
+    substitute_env_placeholders "$OPENCODE_CONFIG_TMP"
+    if [ -f "$OPENCODE_CONFIG_DST" ] && cmp -s "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"; then
         log_info "opencode.jsonc already in sync"
+        rm -f "$OPENCODE_CONFIG_TMP"
     else
-        cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_DST"
-        log_success "Deployed opencode.jsonc to $OPENCODE_CONFIG_DST"
+        # mktemp creates the staged file at mode 600 and mv preserves it, so
+        # the deployed config inherits owner-only perms without an explicit
+        # chmod (which would also need a defensive `|| true` under set -e).
+        mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
+        log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
     fi
 else
     log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
