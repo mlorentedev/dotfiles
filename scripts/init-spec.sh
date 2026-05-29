@@ -69,7 +69,12 @@ if ! REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
     printf '[ERROR] Not in a git repo. cd into a repo first.\n' >&2
     exit 1
 fi
-REPO_NAME="$(basename "$REPO_ROOT")"
+# Canonical repo name = basename of the MAIN worktree. In a linked git worktree,
+# --show-toplevel points at the worktree dir (e.g. "dotfiles-harness"), not the
+# repo, which would break the vault project lookup below (10_projects/<repo>/).
+# --git-common-dir always resolves to the main repo's .git, so its parent dir is
+# the canonical repo root. (BUG-024)
+REPO_NAME="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
 SPEC_DIR="$REPO_ROOT/specs/$FEATURE_ID"
 
 # --- No clobber ---
