@@ -11,6 +11,8 @@ owner: manu
 
 # ADR-001: Custom Skills Over BMAD Framework
 
+> **Supersession proposed by [ADR-013](adr-013-agent-artifact-deploy-engine.md)** (status: `proposed` — not yet in effect). ADR-013 generalizes skill deploy into a manifest-driven agent-artifact engine of which skills are one consumer. This ADR remains `accepted` until ADR-013 is accepted.
+
 ## Context
 
 The dotfiles project needed a complete product development pipeline for AI-assisted workflows. Two approaches were evaluated:
