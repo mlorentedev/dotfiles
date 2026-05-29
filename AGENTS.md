@@ -2,7 +2,7 @@
 
 > **Single Source of Truth for AI coding agents in this repo.**
 >
-> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. See [`30-architecture/adr-009-multi-agent-runtime`](https://github.com/mlorentedev/dotfiles) (in vault) for the rationale.
+> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. See [`docs/adr/adr-009-multi-agent-runtime.md`](docs/adr/adr-009-multi-agent-runtime.md) for the rationale.
 
 ## Identity
 

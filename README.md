@@ -138,7 +138,7 @@ sshmux <host> [session]    # SSH + attach-or-create remote tmux (survives drops)
 #   C-b [                  Scroll mode (q to exit, / to search)
 ```
 
-Full reference and pane-layout recipes: `~/Projects/knowledge/10_projects/dotfiles/40-runbooks/guide-tmux.md`.
+Full reference and pane-layout recipes: [`docs/runbooks/guide-tmux.md`](docs/runbooks/guide-tmux.md).
 
 ## Requirements
 
@@ -154,11 +154,14 @@ PRs ≥50 LOC of production diff must include an active `specs/<feature-id>/` fo
 
 ## Documentation
 
-Detailed documentation lives in the private knowledge vault:
+Project-bound knowledge lives in [`docs/`](docs/) (docs-as-code):
 
-- **Runbooks** — Secrets management, AI tools setup, tool installation
-- **Troubleshooting** — Common issues with secrets and AI tools
-- **ADRs** — Architecture decisions (age encryption, dual-shell, BATS testing, two-directory sync, symlinks vs copies)
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (age encryption, dual-shell, BATS testing, two-directory sync, symlinks vs copies, multi-agent runtime, model-tier policy, …) plus the repo audits and architecture map
+- [`docs/runbooks/`](docs/runbooks/) — operational procedures (secrets management, AI tools setup, tool installation, tmux, Ghostty, OpenCode)
+- [`docs/troubleshooting/`](docs/troubleshooting/) — known issues and their fixes (secrets, AI tools, Hive MCP, claude-mem)
+- [`docs/lessons.md`](docs/lessons.md) — accumulated gotchas and post-mortems
+
+Strategic context, roadmap, and session memory live in the maintainer's cross-project knowledge store and are intentionally not committed here.
 
 ## Related Projects
 
