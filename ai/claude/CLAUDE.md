@@ -53,6 +53,7 @@ For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.m
 
 ## Claude Code Tooling Notes
 
+* **No attribution / English-only (overrides Claude default).** Per `AGENTS.md` § Operational Rules → "Overrides of Harness Defaults": no `Co-Authored-By` / "Generated with" / 🤖 footers on commits, PRs, or issues; English only in git/GitHub artifacts — even when the harness default suggests otherwise.
 * **Skills.** `~/.claude/skills/<skill>/SKILL.md` auto-load via slash commands. Skill auto-loading is a Claude Code feature, not portable. Skill **content** is portable: `AI-012-opencode-commands-port` mechanically transforms each skill into an OpenCode command in `ai/opencode/commands/*.md`.
 * **TaskCreate / TaskUpdate / TaskList.** Use for non-trivial multi-step work (≥3 distinct steps). Mark `in_progress` BEFORE starting; mark `completed` immediately on finish. Don't batch updates.
 * **AskUserQuestion.** Use for branching decisions with 2-4 mutually exclusive options. Always include "(Recommended)" on the preferred option.

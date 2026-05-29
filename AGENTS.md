@@ -398,6 +398,14 @@ Standing Order #3 (vault hygiene) is **in-session, not 'later'**. Every "later" 
 
 ## Operational Rules (from past corrections)
 
+### Overrides of Harness Defaults (non-negotiable)
+
+These rules **counter agent harness defaults** that would otherwise silently win at runtime (e.g. a CLI whose default appends `Co-Authored-By` to commits). They are re-affirmed here because a default not explicitly overridden is the default that ships. Canonical source: `00_meta/patterns/pattern-git-workflow.md` §6–§7. *(Hand-maintained today; HARNESS-001 (#156) will generate this block from the pattern.)*
+
+* **No AI attribution.** No `Co-Authored-By` trailers, no "Generated with" / "🤖" footers, no bot-style emojis — in commits, PR descriptions, or issue comments. All git/GitHub artifacts must appear human-authored.
+* **English only** in git/GitHub artifacts: commit messages, branch names, PR/issue titles and bodies, and code comments. (Conversation with the user may be in any language; the durable record is English.)
+* **No internal phase/milestone references** in branch names, commit messages, or PR titles (e.g. `phase-3.1`). Phase tracking lives in the issue tracker, not in git history.
+
 ### Interaction Discipline
 
 * **Wait before acting.** Do not launch exploration, implementation, or autonomous tasks until the user has finished their prompt.
