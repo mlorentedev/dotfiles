@@ -7,6 +7,8 @@ created: "2026-03-29"
 
 # ADR-008: Skills Ecosystem Overhaul
 
+> **Supersession proposed by [ADR-013](adr-013-agent-artifact-deploy-engine.md)** (status: `proposed` — not yet in effect). ADR-013 subsumes the skills ecosystem into a manifest-driven agent-artifact deploy engine. This ADR remains `accepted` until ADR-013 is accepted.
+
 ## Status: Accepted
 
 ## Date: 2026-03-29
