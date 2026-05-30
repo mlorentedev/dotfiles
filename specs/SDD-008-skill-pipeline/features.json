@@ -1,0 +1,58 @@
+[
+  {
+    "id": "SDD-008-f1-zero-symlinks",
+    "behavior": "AC1 — after setup, no deployed skill path is a symlink (find -type l empty across ~/.claude/skills, ~/.config/opencode/commands, ~/.gemini/skills).",
+    "verification": "test -z \"$(find \"$HOME/.claude/skills\" \"$HOME/.config/opencode/commands\" \"$HOME/.gemini/skills\" -type l 2>/dev/null)\"",
+    "state": "pending",
+    "evidence": "Phase 5 (deploy wiring + de-symlink) not yet implemented."
+  },
+  {
+    "id": "SDD-008-f2-single-ssot",
+    "behavior": "AC2 — vault 00_meta/skills is the single SSOT; the 17 ai/skills are migrated away (repo holds at most a README stub).",
+    "verification": "test ! -d ai/skills || [ \"$(ls -1 ai/skills | grep -vc '^README')\" -eq 0 ]",
+    "state": "pending",
+    "evidence": "Phase 4 (atomic vault migration) gated on parallel-session vault activity."
+  },
+  {
+    "id": "SDD-008-f3-drift-check",
+    "behavior": "AC3 — compile-harness.sh --check detects rendered-skill drift offline (no vault) from the committed source-of-record.",
+    "verification": "bats tests/compile-harness.bats -f 'render: --check'",
+    "state": "verifying",
+    "evidence": "Phases 1-3: 2 render --check tests green (clean tree passes; tamper + offline)."
+  },
+  {
+    "id": "SDD-008-f4-provenance",
+    "behavior": "AC4 (reconciled) — rendered outputs carry provenance with source path + sha256: as `generated_*` frontmatter fields (skill/command) or a leading comment (prompt). A leading comment would break the YAML frontmatter agents parse.",
+    "verification": "bats tests/compile-harness.bats -f 'render: --refresh renders'",
+    "state": "verifying",
+    "evidence": "Phase 1: provenance asserted in claude + opencode outputs."
+  },
+  {
+    "id": "SDD-008-f5-schema",
+    "behavior": "AC5 (reconciled) — malformed / missing-required frontmatter fails --refresh with file context. Required = name + description (the universal subset), not the proposal's id/type/allowed-tools (which would fail all 17 repo skills).",
+    "verification": "bats tests/compile-harness.bats -f 'schema:'",
+    "state": "verifying",
+    "evidence": "Phase 2: harness/skill-frontmatter.schema.json + validator; 2 tests (missing name, unterminated frontmatter)."
+  },
+  {
+    "id": "SDD-008-f6-targets",
+    "behavior": "AC6 — per-skill targets[] limits which agents receive output; agy gets native skill + flat prompt; copilot gets a marker-injected catalog that also honors targets[].",
+    "verification": "bats tests/compile-harness.bats -f 'targets|catalog|agy'",
+    "state": "verifying",
+    "evidence": "Phases 1+3: targets opt-out, agy renderers, copilot catalog tests green."
+  },
+  {
+    "id": "SDD-008-f7-pattern-doc",
+    "behavior": "AC7 — vault 00_meta/patterns/pattern-cross-agent-skill-pipeline.md exists and cross-links pattern-spec-driven-development.md.",
+    "verification": "test -f \"$HOME/Projects/knowledge/00_meta/patterns/pattern-cross-agent-skill-pipeline.md\"",
+    "state": "pending",
+    "evidence": "Phase 6 (vault write) gated on parallel-session vault activity."
+  },
+  {
+    "id": "SDD-008-f8-smoke",
+    "behavior": "AC8 — after setup, deployed /spec is discoverable in claude + opencode (round-trip vault -> render -> deploy -> discovery).",
+    "verification": "bats tests/skills-pipeline.bats -f 'smoke'",
+    "state": "pending",
+    "evidence": "Phase 6 (post-deploy smoke) depends on Phases 4-5."
+  }
+]
