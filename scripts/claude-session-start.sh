@@ -367,7 +367,9 @@ check_knowledge_health() {
 
     today=$(date +%Y-%m-%d)
     line_count=$(wc -l < "$memory_file")
-    last_date=$(grep '^## Last Crystallized:' "$memory_file" | tail -1 | sed 's/## Last Crystallized: //' || true)
+    # Marker may be indented (e.g. when MEMORY.md is embedded in a YAML `content: |`
+    # block, as in the knowledge vault) — anchor allows leading whitespace (BUG-022).
+    last_date=$(grep -E '^[[:space:]]*## Last Crystallized:' "$memory_file" | tail -1 | sed -E 's/^[[:space:]]*## Last Crystallized: //' || true)
 
     local mem_max_lines
     mem_max_lines=$(cfg_threshold memory_md_max_lines 150)
@@ -429,11 +431,13 @@ check_vault_baseline() {
         done
     fi
 
+    # AGENTS.md is intentionally NOT listed: per ADR-010 it is single-SSOT in
+    # dotfiles and deployed (not duplicated) to runtime targets — the vault never
+    # carries its own copy, so requiring it here is a false positive (BUG-023).
     local critical_files=(
         "00_meta/patterns/_index.md"
         "00_meta/skills/README.md"
         "README.md"
-        "AGENTS.md"
     )
     for cf in "${critical_files[@]}"; do
         if [ ! -f "$VAULT_ROOT/$cf" ]; then
