@@ -118,8 +118,11 @@ run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
 }
 
 @test "setup-linux.sh no longer deploys skills from the removed ai/skills tree" {
-    ! grep -q 'ai/skills/' "$BATS_TEST_DIRNAME/../setup-linux.sh"
-    ! grep -q 'ai/opencode/commands' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    # assert no ACTIVE code path reads the deleted sources (historical mentions
+    # in comments are allowed; the deploy is now compile-harness.sh --deploy)
+    ! grep -qF '"$CURRENT_DIR/ai/skills/' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    ! grep -qF '"$CURRENT_DIR/ai/opencode/commands' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    ! grep -qF 'OPENCODE_CMDS_SRC=' "$BATS_TEST_DIRNAME/../setup-linux.sh"
 }
 
 @test "AC4: injection past the line cap fails (ai/claude/CLAUDE.md)" {
