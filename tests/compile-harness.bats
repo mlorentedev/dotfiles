@@ -136,6 +136,9 @@ seed_skills_fixture() {
     "agents": [ { "agent": "claude",   "render": "skill",   "out_dir": "out/claude" },
                 { "agent": "opencode", "render": "command", "out_dir": "out/opencode" } ] } }
 EOF
+    cat > "$REPO/harness/skill-frontmatter.schema.json" <<'EOF'
+{ "required": ["name", "description"] }
+EOF
     mkdir -p "$VAULT/00_meta/skills/demo-skill"
     cat > "$VAULT/00_meta/skills/demo-skill/SKILL.md" <<'EOF'
 ---
@@ -197,4 +200,27 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     [ -f "$REPO/out/claude/claude-only/SKILL.md" ]
     [ ! -f "$REPO/out/opencode/claude-only.md" ]
+}
+
+@test "schema: a skill missing required 'name' fails --refresh with file context (AC5)" {
+    seed_skills_fixture
+    cat > "$VAULT/00_meta/skills/demo-skill/SKILL.md" <<'EOF'
+---
+description: Missing name on purpose.
+---
+
+# Demo
+EOF
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"name"* ]]
+    [[ "$output" == *"SKILL.md"* ]]
+}
+
+@test "schema: unterminated frontmatter fails --refresh (AC5)" {
+    seed_skills_fixture
+    printf -- '---\nname: x\ndescription: y\n' > "$VAULT/00_meta/skills/demo-skill/SKILL.md"
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"frontmatter"* ]]
 }

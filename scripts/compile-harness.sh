@@ -182,6 +182,30 @@ skill_out_path() {
     esac
 }
 
+# Validate a SKILL.md's YAML frontmatter against the committed schema's
+# `required` keys. Required = universal subset (name, description); vault skills
+# carry more. Fails loudly with file context so a malformed skill never renders.
+validate_skill_frontmatter() {
+    local f="$1" schema="$2" req
+    [[ -f "$schema" ]] || { printf '[ERROR] skill schema not found: %s\n' "$schema" >&2; return 1; }
+    if [[ "$(sed -n '1p' "$f")" != "---" ]]; then
+        printf '[ERROR] %s:1: missing YAML frontmatter (expected --- on line 1)\n' "$f" >&2; return 1
+    fi
+    if ! awk 'NR>1 && /^---[[:space:]]*$/{found=1; exit} END{exit !found}' "$f"; then
+        printf '[ERROR] %s:1: unterminated frontmatter (no closing ---)\n' "$f" >&2; return 1
+    fi
+    while IFS= read -r req; do
+        if ! awk -v k="$req" '
+                /^---[[:space:]]*$/ { n++; next }
+                n==1 && $0 ~ ("^" k ":[[:space:]]*[^[:space:]]") { found=1 }
+                n>=2 { exit }
+                END { exit found?0:1 }' "$f"; then
+            printf '[ERROR] %s: required frontmatter key "%s" missing or empty\n' "$f" "$req" >&2
+            return 1
+        fi
+    done < <(jq -r '.required[]' "$schema")
+}
+
 # --- modes ---
 
 do_refresh() {
@@ -233,12 +257,14 @@ EOF
 
     # 3. skills (kind: render): vault SKILL.md -> committed record -> agent outputs
     if has_skills; then
-        local sk_vsub sk_recdir sk_dir name agent render out_dir outp
+        local sk_vsub sk_recdir sk_schema sk_dir name agent render out_dir outp
         sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
         sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
-        # 3a. vault skills -> committed source-of-record
+        sk_schema="$REPO_ROOT/$(jq -r '.skills.schema // "harness/skill-frontmatter.schema.json"' "$MANIFEST")"
+        # 3a. validate frontmatter, then vault skills -> committed source-of-record
         for sk_dir in "$VAULT_PATH/$sk_vsub"/*/; do
             [[ -f "$sk_dir/SKILL.md" ]] || continue
+            validate_skill_frontmatter "$sk_dir/SKILL.md" "$sk_schema"
             name="$(basename "$sk_dir")"
             mkdir -p "$sk_recdir/$name"
             cp "$sk_dir/SKILL.md" "$sk_recdir/$name/SKILL.md"
