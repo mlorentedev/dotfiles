@@ -44,6 +44,8 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     fi    
     safe_copy "$CURRENT_DIR/.gitconfig" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/tmux.conf" "$DOTFILES_DIR/" 2>/dev/null || true
+    safe_copy "$CURRENT_DIR/.inputrc" "$DOTFILES_DIR/" 2>/dev/null || true
+    safe_copy "$CURRENT_DIR/.editorconfig" "$DOTFILES_DIR/" 2>/dev/null || true
     cp -rf "$CURRENT_DIR/.zsh/." "$DOTFILES_DIR/.zsh/" 2>/dev/null || true
     ensure_directory "$DOTFILES_DIR/ssh"
     cp -rf "$CURRENT_DIR/ssh/"* "$DOTFILES_DIR/ssh/" 2>/dev/null || true
