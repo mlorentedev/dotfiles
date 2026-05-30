@@ -10,6 +10,20 @@ setup() {
     export CONFIG_JSON="$DOTFILES_DIR/session-start-config.json"
     export SH_SCRIPT="$DOTFILES_DIR/scripts/claude-session-start.sh"
     export PS1_SCRIPT="$DOTFILES_DIR/scripts/claude-session-start.ps1"
+
+    # Headless-safe (#167): the hook -> vault-health.sh probes the vault via the
+    # `obsidian` CLI (PATH). On a machine where Obsidian is installed this LAUNCHES
+    # the real GUI, which never returns headless (40+ min hang). Shadow `obsidian`
+    # with a stub that reports GUI-down so vault-health exits 2 (handled) instead
+    # of launching. Deterministic + hermetic for every test that runs the hook.
+    STUB_BIN="$(mktemp -d)"
+    printf '#!/usr/bin/env bash\nexit 1\n' > "$STUB_BIN/obsidian"
+    chmod +x "$STUB_BIN/obsidian"
+    export PATH="$STUB_BIN:$PATH"
+}
+
+teardown() {
+    [ -n "${STUB_BIN:-}" ] && rm -rf "$STUB_BIN"
 }
 
 # --- Schema: session-start-config.json shape ---
@@ -93,12 +107,19 @@ setup() {
 
 @test "byte-equivalence: refactor preserves output (3 CWD scenarios)" {
     if ! command -v jq >/dev/null 2>&1; then skip "jq required"; fi
-    if ! git -C "$DOTFILES_DIR" rev-parse --verify main >/dev/null 2>&1; then
-        skip "git main ref not available"
+    # Compare against origin/main when available (truer baseline than a possibly
+    # stale local main — avoids false DIFFs when local main lags; #167 defect 2).
+    local base_ref=""
+    if git -C "$DOTFILES_DIR" rev-parse --verify origin/main >/dev/null 2>&1; then
+        base_ref="origin/main"
+    elif git -C "$DOTFILES_DIR" rev-parse --verify main >/dev/null 2>&1; then
+        base_ref="main"
+    else
+        skip "no main / origin/main ref available"
     fi
 
     local pre="$DOTFILES_DIR/scripts/claude-session-start.sh.pre-refactor"
-    git -C "$DOTFILES_DIR" show main:scripts/claude-session-start.sh > "$pre"
+    git -C "$DOTFILES_DIR" show "$base_ref:scripts/claude-session-start.sh" > "$pre"
     chmod +x "$pre"
 
     local failures=0
