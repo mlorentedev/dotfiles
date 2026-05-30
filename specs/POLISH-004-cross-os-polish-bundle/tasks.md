@@ -9,20 +9,17 @@ created: "2026-05-13"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/POLISH-004-cross-os-polish-bundle`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/polish-004-editorconfig-inputrc`
+- [x] `proposal.md` complete; acceptance criteria testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+- [x] `.editorconfig` at repo root: `root=true`; `[*]` UTF-8 + LF + trim + final newline + 4-space; markdown no-trim; `*.{ps1,psm1,psd1,bat,cmd}` CRLF; yaml/json 2-space; Makefile/go tab. Anti-scope: existing files not reformatted.
+- [x] `.inputrc` at repo root: `$include /etc/inputrc` + completion-ignore-case + show-all-if-ambiguous/unmodified + colored-stats + arrow-key history-search.
+- [x] `setup-linux.sh` deploys `.inputrc` → `$HOME/.inputrc` via `deploy_file` (dotfiles deploy block).
+- [x] `tests/inputrc.bats` (4 tests): repo files exist + `.inputrc` content + `.editorconfig` root/CRLF + setup deploy wiring.
+- [x] README "Features" mentions `.editorconfig` + `.inputrc`.
 
 ## Closing
 

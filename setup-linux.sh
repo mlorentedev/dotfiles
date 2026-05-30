@@ -80,6 +80,8 @@ deploy_file "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
 deploy_file "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
 deploy_file "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
 deploy_file "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
+# readline config (POLISH-004): case-insensitive completion + smart history.
+deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/github-secrets-manager.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
