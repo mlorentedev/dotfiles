@@ -9,12 +9,23 @@
 # Modes:
 #   --refresh   vault section  -> harness/enforced/<id>.md (source-of-record)
 #                              -> injected, marker-delimited, into each target.
+#               Skills (SDD-008): vault 00_meta/skills/<n> -> harness/skills/<n>
+#               committed records (frontmatter validated). NO render here.
 #               Requires the vault. Asserts per-file line caps. Run by setup.
-#   --check     offline: render from harness/enforced/<id>.md and diff against
-#               each target's region. NO vault access. Used by CI / healthcheck.
+#   --deploy    offline: render committed skill records to their per-agent $HOME
+#               paths (de-symlinking first) and inject the copilot catalog into
+#               the $HOME instructions file. NO vault access. Run by setup.
+#   --check     offline: enforced regions diffed against harness/enforced/; skill
+#               records validated to render cleanly. NO vault. CI / healthcheck.
 #   --help
 #
-# Spec: specs/ENGINE-001-deploy-engine-core/proposal.md
+# Skills use option A (SDD-008): the committed record under harness/skills/ is the
+# SSOT; agent-native outputs are NOT committed — they are rendered per-machine at
+# deploy time. This sidesteps the symlink fragility of BUG-100 (deploy is a copy,
+# never a symlink) while keeping CI able to verify drift offline (--check).
+#
+# Spec: specs/ENGINE-001-deploy-engine-core/proposal.md,
+#       specs/SDD-008-skill-pipeline/proposal.md
 set -euo pipefail
 
 BEGIN_PREFIX='<!-- BEGIN HARNESS GENERATED'
@@ -22,13 +33,18 @@ END_MARKER='<!-- END HARNESS GENERATED -->'
 
 usage() {
     cat <<EOF
-Usage: compile-harness.sh (--refresh | --check | --help)
+Usage: compile-harness.sh (--refresh | --deploy | --check | --help)
 
-  --refresh   Extract enforced sections from the vault, write source-of-record
-              files under harness/enforced/, and inject them into each target's
-              managed region. Requires the vault. Asserts line caps.
-  --check     Offline drift check: render from harness/enforced/ and diff each
-              target's managed region. No vault needed (CI / healthcheck).
+  --refresh   Extract enforced sections from the vault into harness/enforced/
+              and inject them into each target's managed region; copy vault
+              skills into committed records under harness/skills/ (frontmatter
+              validated). Requires the vault. Asserts line caps. No \$HOME write.
+  --deploy    Offline: render committed skill records to their per-agent \$HOME
+              paths (replacing any pre-existing symlink with a regular copy) and
+              inject the copilot catalog into the \$HOME instructions file.
+  --check     Offline drift check: enforced regions diffed against
+              harness/enforced/; skill records validated to render cleanly.
+              No vault needed (CI / healthcheck).
   --help      This help.
 EOF
 }
@@ -182,13 +198,23 @@ render_skill() {
     ' "$record"
 }
 
-# Output path (repo-relative) for a rendered skill.
+# Output path (base-relative) for a rendered skill. <base> is repo- or
+# $HOME-relative depending on caller. command/prompt -> a single file;
+# skill -> a directory holding SKILL.md (+ verbatim auxiliary files).
 skill_out_path() {
     local out_dir="$1" render="$2" name="$3"
     case "$render" in
         command|prompt) printf '%s/%s.md' "$out_dir" "$name" ;;
         *)              printf '%s/%s/SKILL.md' "$out_dir" "$name" ;;
     esac
+}
+
+# True if a deployed output carries our provenance marker. Used by --deploy to
+# safely prune only files we generated (skill/command carry a `generated: true`
+# frontmatter field; prompt carries a leading `generated: true; from:` comment).
+is_generated_output() {
+    [[ -f "$1" ]] || return 1
+    grep -q 'generated: true' "$1" 2>/dev/null
 }
 
 # Validate a SKILL.md's YAML frontmatter against the committed schema's
@@ -286,50 +312,135 @@ EOF
         printf '[refresh] injected -> %s (%s)\n' "$file" "$(wc -l < "$REPO_ROOT/$file" | tr -d ' ')L"
     done < <(jq -r '.targets[].file' "$MANIFEST")
 
-    # 3. skills (kind: render): vault SKILL.md -> committed record -> agent outputs
+    # 3. skills (option A): vault 00_meta/skills/<n> -> committed record only.
+    #    Rendering to agent-native $HOME paths happens at deploy time (--deploy),
+    #    NOT here — records are the committed SSOT; deployed copies are derived.
     if has_skills; then
-        local sk_vsub sk_recdir sk_schema sk_dir name agent render out_dir outp
+        local sk_vsub sk_recdir sk_schema sk_dir name rec
         sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
         sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
         sk_schema="$REPO_ROOT/$(jq -r '.skills.schema // "harness/skill-frontmatter.schema.json"' "$MANIFEST")"
-        # 3a. validate frontmatter, then vault skills -> committed source-of-record
+        if [[ ! -d "$VAULT_PATH/$sk_vsub" ]]; then
+            printf '[ERROR] --refresh needs the vault skills dir: %s\n' "$VAULT_PATH/$sk_vsub" >&2
+            exit 2
+        fi
+        mkdir -p "$sk_recdir"
+        # validate frontmatter, then copy the WHOLE skill dir to the record
+        # (SKILL.md + any auxiliary reference files / scripts), verbatim.
         for sk_dir in "$VAULT_PATH/$sk_vsub"/*/; do
             [[ -f "$sk_dir/SKILL.md" ]] || continue
             validate_skill_frontmatter "$sk_dir/SKILL.md" "$sk_schema"
             name="$(basename "$sk_dir")"
+            rm -rf "${sk_recdir:?}/$name"
             mkdir -p "$sk_recdir/$name"
-            cp "$sk_dir/SKILL.md" "$sk_recdir/$name/SKILL.md"
+            cp -rf "$sk_dir"* "$sk_recdir/$name/"
+            printf '[refresh] skill record: %s/%s\n' "$(jq -r '.skills.record_dir' "$MANIFEST")" "$name"
         done
-        # 3b. record -> per-agent committed outputs (honoring per-skill targets[])
-        while IFS=$'\t' read -r agent render out_dir; do
-            for sk_dir in "$sk_recdir"/*/; do
-                [[ -f "$sk_dir/SKILL.md" ]] || continue
-                name="$(basename "$sk_dir")"
-                skill_targets_agent "$sk_dir/SKILL.md" "$agent" || continue
-                outp="$REPO_ROOT/$(skill_out_path "$out_dir" "$render" "$name")"
-                mkdir -p "$(dirname "$outp")"
-                render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$outp"
-                printf '[refresh] skill -> %s\n' "$(skill_out_path "$out_dir" "$render" "$name")"
-            done
-        done < <(jq -r '.skills.agents[] | "\(.agent)\t\(.render)\t\(.out_dir)"' "$MANIFEST")
+        # drop stale records whose vault source no longer exists
+        for rec in "$sk_recdir"/*/; do
+            [[ -d "$rec" ]] || continue
+            name="$(basename "$rec")"
+            [[ -d "$VAULT_PATH/$sk_vsub/$name" ]] || { rm -rf "$rec"; printf '[refresh] dropped stale record: %s\n' "$name"; }
+        done
+    fi
 
-        # 3c. catalog target (e.g. copilot): one marker-injected section listing skills
-        if jq -e '.skills.catalog' "$MANIFEST" >/dev/null 2>&1; then
-            local cat_agent cat_file tmpcat cat_sha cat_begin
-            cat_agent="$(jq -r '.skills.catalog.agent' "$MANIFEST")"
-            cat_file="$REPO_ROOT/$(jq -r '.skills.catalog.file' "$MANIFEST")"
-            validate_markers "$cat_file"
+    printf '[refresh] OK\n'
+}
+
+# --- deploy (offline): render committed records to per-agent $HOME paths ---
+do_deploy() {
+    require_tools
+    if ! has_skills; then
+        printf '[deploy] no skills block in manifest; nothing to deploy\n'
+        return 0
+    fi
+    local sk_vsub sk_recdir agent render dir sk_dir name outp destdir
+    sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
+    sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
+    if [[ ! -d "$sk_recdir" ]]; then
+        printf '[ERROR] no skill records at %s (run --refresh first)\n' "$sk_recdir" >&2
+        exit 2
+    fi
+
+    # 1. render each record -> its per-agent $HOME path, de-symlinking first so a
+    #    pre-existing vault symlink (BUG-100) becomes a regular copy.
+    while IFS=$'\t' read -r agent render dir; do
+        for sk_dir in "$sk_recdir"/*/; do
+            [[ -f "$sk_dir/SKILL.md" ]] || continue
+            name="$(basename "$sk_dir")"
+            skill_targets_agent "$sk_dir/SKILL.md" "$agent" || continue
+            outp="$HOME/$(skill_out_path "$dir" "$render" "$name")"
+            case "$render" in
+                command|prompt)
+                    [[ -L "$outp" ]] && rm -f "$outp"
+                    mkdir -p "$(dirname "$outp")"
+                    render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$outp"
+                    ;;
+                *)
+                    destdir="$(dirname "$outp")"   # $HOME/<dir>/<name>
+                    [[ -L "$destdir" ]] && rm -f "$destdir"
+                    mkdir -p "$destdir"
+                    cp -rf "$sk_dir"* "$destdir/" 2>/dev/null || true   # aux files verbatim
+                    render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$outp"
+                    ;;
+            esac
+            printf '[deploy] skill -> %s\n' "$outp"
+        done
+    done < <(jq -r '.skills.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
+
+    # 2. prune our own stale outputs (skill removed, or targets[] dropped this
+    #    agent). Safe: only files carrying our provenance marker are removed.
+    deploy_prune "$sk_recdir"
+
+    # 3. copilot catalog: inject into the $HOME instructions file (not committed).
+    if jq -e '.skills.catalog' "$MANIFEST" >/dev/null 2>&1; then
+        local cat_agent cat_file tmpcat cat_sha cat_begin
+        cat_agent="$(jq -r '.skills.catalog.agent' "$MANIFEST")"
+        cat_file="$HOME/$(jq -r '.skills.catalog.file' "$MANIFEST")"
+        if [[ -f "$cat_file" ]] && validate_markers "$cat_file" 2>/dev/null; then
             tmpcat="$(mktemp)"
             build_skill_catalog "$sk_recdir" "$cat_agent" > "$tmpcat"
             cat_sha="$(sha_of "$tmpcat")"
             cat_begin="$BEGIN_PREFIX (sha256:$cat_sha) — skill catalog from vault $sk_vsub; edit there + re-run setup, do NOT edit between markers -->"
             replace_region "$cat_file" "$cat_begin" "$tmpcat"
             rm -f "$tmpcat"
-            printf '[refresh] catalog -> %s\n' "$(jq -r '.skills.catalog.file' "$MANIFEST")"
+            printf '[deploy] catalog -> %s\n' "$cat_file"
+        else
+            printf '[deploy] catalog target absent or unmarked, skipping: %s\n' "$cat_file" >&2
         fi
     fi
+    printf '[deploy] OK\n'
+}
 
-    printf '[refresh] OK\n'
+# Remove previously-deployed outputs that are now stale: the skill no longer has
+# a record, or its targets[] no longer includes that agent. Only touches files
+# that carry our provenance marker (never user-authored skills).
+deploy_prune() {
+    local sk_recdir="$1" agent render dir f sd name
+    while IFS=$'\t' read -r agent render dir; do
+        case "$render" in
+            command|prompt)
+                for f in "$HOME/$dir"/*.md; do
+                    [[ -f "$f" ]] || continue
+                    is_generated_output "$f" || continue
+                    name="$(basename "$f" .md)"
+                    if [[ ! -f "$sk_recdir/$name/SKILL.md" ]] || ! skill_targets_agent "$sk_recdir/$name/SKILL.md" "$agent"; then
+                        rm -f "$f"; printf '[deploy] pruned stale -> %s\n' "$f"
+                    fi
+                done
+                ;;
+            *)
+                for sd in "$HOME/$dir"/*/; do
+                    [[ -d "$sd" ]] || continue
+                    is_generated_output "$sd/SKILL.md" || continue
+                    name="$(basename "$sd")"
+                    if [[ ! -f "$sk_recdir/$name/SKILL.md" ]] || ! skill_targets_agent "$sk_recdir/$name/SKILL.md" "$agent"; then
+                        rm -rf "$sd"; printf '[deploy] pruned stale -> %s\n' "$sd"
+                    fi
+                done
+                ;;
+        esac
+    done < <(jq -r '.skills.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
 }
 
 do_check() {
@@ -351,53 +462,35 @@ do_check() {
         rm -f "$expected" "$actual"
     done < <(jq -r '.targets[].file' "$MANIFEST")
 
-    # skills (kind: render): recompute outputs from committed record, diff vs deployed
+    # skills (option A): validate each committed record renders cleanly. There are
+    # no committed agent outputs to diff — records are the SSOT and deployed copies
+    # derive from them at --deploy time. Offline: needs only the committed record +
+    # schema. (On-machine deployed-vs-record comparison lives in healthcheck.)
     if has_skills; then
-        local sk_vsub sk_recdir agent render out_dir sk_dir name outp exp rel
+        local sk_vsub sk_recdir sk_schema sk_dir name render tmp
         sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
         sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
-        while IFS=$'\t' read -r agent render out_dir; do
+        sk_schema="$REPO_ROOT/$(jq -r '.skills.schema // "harness/skill-frontmatter.schema.json"' "$MANIFEST")"
+        if [[ ! -d "$sk_recdir" ]]; then
+            printf '[DRIFT] no skill records at %s (run --refresh)\n' "$sk_recdir" >&2
+            drift=1
+        else
             for sk_dir in "$sk_recdir"/*/; do
                 [[ -f "$sk_dir/SKILL.md" ]] || continue
                 name="$(basename "$sk_dir")"
-                skill_targets_agent "$sk_dir/SKILL.md" "$agent" || continue
-                rel="$(skill_out_path "$out_dir" "$render" "$name")"
-                outp="$REPO_ROOT/$rel"
-                if [[ ! -f "$outp" ]]; then
-                    printf '[DRIFT] missing rendered skill: %s (run --refresh)\n' "$rel" >&2
+                if ! validate_skill_frontmatter "$sk_dir/SKILL.md" "$sk_schema"; then
                     drift=1; continue
                 fi
-                exp="$(mktemp)"
-                render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$exp"
-                if ! diff -u "$outp" "$exp" >/dev/null 2>&1; then
-                    printf '[DRIFT] %s: rendered skill differs from source-of-record (run --refresh)\n' "$rel" >&2
-                    diff -u "$outp" "$exp" | sed 's/^/    /' >&2 || true
-                    drift=1
-                else
-                    printf '[check] OK -> %s\n' "$rel"
-                fi
-                rm -f "$exp"
+                for render in $(jq -r '.skills.deploy[].render' "$MANIFEST" | sort -u); do
+                    tmp="$(mktemp)"
+                    if ! render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$tmp" 2>/dev/null; then
+                        printf '[DRIFT] record %s fails to render as %s (run --refresh)\n' "$name" "$render" >&2
+                        drift=1
+                    fi
+                    rm -f "$tmp"
+                done
+                printf '[check] OK -> record %s\n' "$name"
             done
-        done < <(jq -r '.skills.agents[] | "\(.agent)\t\(.render)\t\(.out_dir)"' "$MANIFEST")
-
-        # catalog target (e.g. copilot): recompute + diff the marker region
-        if jq -e '.skills.catalog' "$MANIFEST" >/dev/null 2>&1; then
-            local cat_agent cat_file crel cexp cact
-            cat_agent="$(jq -r '.skills.catalog.agent' "$MANIFEST")"
-            crel="$(jq -r '.skills.catalog.file' "$MANIFEST")"
-            cat_file="$REPO_ROOT/$crel"
-            if ! validate_markers "$cat_file"; then drift=1; else
-                cexp="$(mktemp)"; cact="$(mktemp)"
-                build_skill_catalog "$sk_recdir" "$cat_agent" > "$cexp"
-                region_content "$cat_file" > "$cact"
-                if ! diff -u "$cexp" "$cact" >/dev/null 2>&1; then
-                    printf '[DRIFT] %s: skill catalog differs from source-of-record (run --refresh)\n' "$crel" >&2
-                    drift=1
-                else
-                    printf '[check] OK -> %s (catalog)\n' "$crel"
-                fi
-                rm -f "$cexp" "$cact"
-            fi
         fi
     fi
 
@@ -411,6 +504,7 @@ do_check() {
 # --- dispatch ---
 case "${1:-}" in
     --refresh) do_refresh ;;
+    --deploy)  do_deploy ;;
     --check)   do_check ;;
     -h|--help) usage ;;
     *)         usage >&2; exit 2 ;;
