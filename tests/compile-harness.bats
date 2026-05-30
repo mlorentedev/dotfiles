@@ -113,6 +113,15 @@ run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
     grep -q 'compile-harness.sh" --refresh' "$BATS_TEST_DIRNAME/../setup-linux.sh"
 }
 
+@test "setup-linux.sh runs compile-harness --deploy to render skills from records" {
+    grep -q 'compile-harness.sh" --deploy' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+}
+
+@test "setup-linux.sh no longer deploys skills from the removed ai/skills tree" {
+    ! grep -q 'ai/skills/' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    ! grep -q 'ai/opencode/commands' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+}
+
 @test "AC4: injection past the line cap fails (ai/claude/CLAUDE.md)" {
     mkdir -p "$REPO/ai/claude"
     cat > "$REPO/harness/manifest.json" <<'EOF'
