@@ -17,6 +17,14 @@ template_version: "1.0"
 
 Today skills are distributed via two inconsistent mechanisms: symlink/junction for vault-hosted SDD skills (`spec`, `adversarial-review`, `enrich-us`) and mechanical copy via script for opencode commands (per AI-012). BUG-100 already proved that cross-agent symlink fragility is a real bug class — agy v1.0.2 broke because our deploy strategy was "fighting the agent's expected filesystem layout" (per SDD-007 proposal). Without a unified pipeline, every new agent (Cursor, Codex, Devin, future tooling) repeats the deploy decision ad-hoc, and any improvement to a skill's content (e.g., extending `/spec` with an agent-side proactive trigger) does not propagate deterministically to the N target agents — behavior diverges silently across agents and the SSOT promise breaks without anyone noticing until the next BUG-100-class incident.
 
+## Engine (post-ENGINE-001 reconciliation, 2026-05-29)
+
+> This spec predates **ENGINE-001** (PR #172, merged 2026-05-29). SDD-008 is now a **consumer of that engine**, not a parallel pipeline. Wherever this document says `scripts/skills/render-all.sh`, read it as **`scripts/compile-harness.sh` extended with a new manifest target `kind: render`** — `--refresh` to render, `--check` for offline drift. Concretely:
+>
+> - **Skills are a new target kind.** ENGINE-001 ships `kind: native|pointer` (marker-region injection into one hand-authored file). Skills need **`kind: render`**: a whole-file/dir transform taking one vault `00_meta/skills/<name>/SKILL.md` → N agent-native whole files at agent-specific paths. Same `harness/manifest.json`, same `--refresh`/`--check` surface, same `healthcheck` drift guard. One engine, two deploy modes.
+> - **Committed source-of-record resolves the CI-blindness risk.** ENGINE-001 commits its rendered output so `--check` runs fully offline; applying the same here lets dotfiles CI verify skill drift with **no vault access** — superseding this spec's original "rely on the Phase 2.6 idempotence gate" stance (see Risks, now RESOLVED).
+> - **Vault SSOT + compile-commit, not symlink** — unchanged; already the engine's directionality invariant (vault upstream → committed repo artifacts → deploy as copy).
+
 ## What
 
 After this PR, the system exhibits five observable behavior changes:
@@ -57,7 +65,7 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
   ```
 
   Rationale: vault is **private repo** (cannot vendor into public dotfiles → option c rejected). Option (a) `install.sh` is not yet shipped (IDEAS-005 still backlog → coupling deferred). New-machine bootstrap is rare; explicit 2-step is acceptable cost. Tracked: `vault/10_projects/dotfiles/11-tasks.md § Cross-Provider Harness Wave 2`.
-- **🟡 Phase 2.6 coupling**: SDD-008 leans on Phase 2.6 ("formal idempotence CI job: run-twice-and-diff GHA") for drift detection. Phase 2.6 is planned but not yet shipped. Decide: (a) include Phase 2.6 implementation as part of SDD-008 scope (expands LOC ~80), (b) accept weaker gate until 2.6 ships separately (drift detection only on `setup` re-run locally), (c) split SDD-008 into 008a (pipeline) and 008b (idempotence gate) for sequential PRs. Non-blocker for code start but blocks "Acceptance criteria" definition for the drift gate.
+- **🟢 RESOLVED 2026-05-29 — Phase 2.6 coupling no longer needed**: superseded by ENGINE-001's committed source-of-record. Drift is detected by `compile-harness.sh --check` (offline, no vault) wired into `scripts/healthcheck.sh` exactly as the no-attribution blocks are (ADR-013). The dotfiles CI does not need vault access and does not need the run-twice idempotence GHA for *this* gate — `--check` compares committed rendered outputs against the committed source-of-record. AC3 below is the drift gate.
 - **🟡 Migration history preservation across repos**: 17 cross-repo moves from `dotfiles/ai/skills/<name>/` to `vault/00_meta/skills/<name>/`. `git mv` does not preserve history across separate repos. Options: (a) accept history loss + add reference table in each skill README pointing to pre-migration dotfiles commit hash, (b) `git filter-repo` extraction + injection (technically complex; can corrupt repos if mishandled), (c) migration script that copies content + commits each with a `Co-authored-by`-style reference to the original dotfiles hash. Choose at implementation time. Non-blocker for spec authoring.
 
 ## Acceptance criteria
