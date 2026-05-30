@@ -125,3 +125,76 @@ EOF
     [ "$status" -ne 0 ]
     [[ "$output" == *"cap"* ]]
 }
+
+# --- SDD-008: kind: render (skills) ---
+
+seed_skills_fixture() {
+    cat > "$REPO/harness/manifest.json" <<'EOF'
+{ "version": 1, "vault_subpath": "00_meta/patterns",
+  "enforced": [], "targets": [],
+  "skills": { "vault_subpath": "00_meta/skills", "record_dir": "harness/skills",
+    "agents": [ { "agent": "claude",   "render": "skill",   "out_dir": "out/claude" },
+                { "agent": "opencode", "render": "command", "out_dir": "out/opencode" } ] } }
+EOF
+    mkdir -p "$VAULT/00_meta/skills/demo-skill"
+    cat > "$VAULT/00_meta/skills/demo-skill/SKILL.md" <<'EOF'
+---
+name: demo-skill
+description: Demo skill for the render pipeline.
+---
+
+# Demo Skill
+
+Body line one.
+EOF
+}
+
+@test "render: --refresh renders a vault skill to claude + opencode with provenance" {
+    seed_skills_fixture
+    run_refresh
+    [ "$status" -eq 0 ]
+    [ -f "$REPO/harness/skills/demo-skill/SKILL.md" ]
+    # claude output keeps name:, carries provenance
+    grep -q '^name: demo-skill' "$REPO/out/claude/demo-skill/SKILL.md"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$REPO/out/claude/demo-skill/SKILL.md"
+    grep -q '^generated_from: 00_meta/skills/demo-skill/SKILL.md' "$REPO/out/claude/demo-skill/SKILL.md"
+    # opencode command drops name:, keeps description + provenance
+    [ -f "$REPO/out/opencode/demo-skill.md" ]
+    ! grep -q '^name:' "$REPO/out/opencode/demo-skill.md"
+    grep -q '^description:' "$REPO/out/opencode/demo-skill.md"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$REPO/out/opencode/demo-skill.md"
+}
+
+@test "render: --check passes after refresh, fails after a rendered output is hand-edited" {
+    seed_skills_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check; [ "$status" -eq 0 ]
+    sed -i 's/Body line one./TAMPERED/' "$REPO/out/claude/demo-skill/SKILL.md"
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"DRIFT"* ]]
+}
+
+@test "render: --check works offline (no vault) from the committed record" {
+    seed_skills_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run env VAULT_PATH="$TMP/nonexistent" "$SCRIPT" --check
+    [ "$status" -eq 0 ]
+}
+
+@test "render: per-skill targets[] limits which agents receive output" {
+    seed_skills_fixture
+    mkdir -p "$VAULT/00_meta/skills/claude-only"
+    cat > "$VAULT/00_meta/skills/claude-only/SKILL.md" <<'EOF'
+---
+name: claude-only
+description: Only for claude.
+targets: [claude]
+---
+
+# Claude Only
+EOF
+    run_refresh; [ "$status" -eq 0 ]
+    [ -f "$REPO/out/claude/claude-only/SKILL.md" ]
+    [ ! -f "$REPO/out/opencode/claude-only.md" ]
+}

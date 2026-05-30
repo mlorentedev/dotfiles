@@ -140,6 +140,48 @@ sha_of() { sha256sum "$1" | cut -c1-16; }
 
 target_inject() { jq -r --arg f "$1" '.targets[] | select(.file==$f) | .inject[]' "$MANIFEST"; }
 
+# --- skills (kind: render) ---
+# Skills are whole-file transforms: one vault 00_meta/skills/<name>/SKILL.md ->
+# N agent-native outputs (committed in-repo; setup copies them to $HOME). Drift
+# is checked offline against the committed source-of-record under harness/skills/.
+# A leading HTML provenance comment would break the YAML frontmatter agents
+# parse, so provenance is injected as `generated_*` frontmatter fields instead.
+
+has_skills() { jq -e '.skills' "$MANIFEST" >/dev/null 2>&1; }
+
+# Does this skill target this agent? Reads `targets:` from SKILL.md frontmatter.
+# Absent `targets:` => all agents (default).
+skill_targets_agent() {
+    local skill_md="$1" agent="$2" line
+    line="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^targets:/{print; exit}' "$skill_md")"
+    [[ -z "$line" ]] && return 0
+    case "$line" in *"$agent"*) return 0 ;; *) return 1 ;; esac
+}
+
+# Render one skill record to an agent-native string on stdout.
+# Args: <render_kind> <record_SKILL.md> <vault-relative-source-path>
+render_skill() {
+    local kind="$1" record="$2" srcpath="$3" sha
+    sha="$(sha_of "$record")"
+    awk -v kind="$kind" -v gf="$srcpath" -v gs="$sha" '
+        /^---[[:space:]]*$/ {
+            fm++
+            if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
+        }
+        fm==1 && kind=="command" && /^name:/ { next }   # opencode commands key off filename
+        { print }
+    ' "$record"
+}
+
+# Output path (repo-relative) for a rendered skill.
+skill_out_path() {
+    local out_dir="$1" render="$2" name="$3"
+    case "$render" in
+        command) printf '%s/%s.md' "$out_dir" "$name" ;;
+        *)       printf '%s/%s/SKILL.md' "$out_dir" "$name" ;;
+    esac
+}
+
 # --- modes ---
 
 do_refresh() {
@@ -189,6 +231,32 @@ EOF
         printf '[refresh] injected -> %s (%s)\n' "$file" "$(wc -l < "$REPO_ROOT/$file" | tr -d ' ')L"
     done < <(jq -r '.targets[].file' "$MANIFEST")
 
+    # 3. skills (kind: render): vault SKILL.md -> committed record -> agent outputs
+    if has_skills; then
+        local sk_vsub sk_recdir sk_dir name agent render out_dir outp
+        sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
+        sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
+        # 3a. vault skills -> committed source-of-record
+        for sk_dir in "$VAULT_PATH/$sk_vsub"/*/; do
+            [[ -f "$sk_dir/SKILL.md" ]] || continue
+            name="$(basename "$sk_dir")"
+            mkdir -p "$sk_recdir/$name"
+            cp "$sk_dir/SKILL.md" "$sk_recdir/$name/SKILL.md"
+        done
+        # 3b. record -> per-agent committed outputs (honoring per-skill targets[])
+        while IFS=$'\t' read -r agent render out_dir; do
+            for sk_dir in "$sk_recdir"/*/; do
+                [[ -f "$sk_dir/SKILL.md" ]] || continue
+                name="$(basename "$sk_dir")"
+                skill_targets_agent "$sk_dir/SKILL.md" "$agent" || continue
+                outp="$REPO_ROOT/$(skill_out_path "$out_dir" "$render" "$name")"
+                mkdir -p "$(dirname "$outp")"
+                render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$outp"
+                printf '[refresh] skill -> %s\n' "$(skill_out_path "$out_dir" "$render" "$name")"
+            done
+        done < <(jq -r '.skills.agents[] | "\(.agent)\t\(.render)\t\(.out_dir)"' "$MANIFEST")
+    fi
+
     printf '[refresh] OK\n'
 }
 
@@ -210,6 +278,36 @@ do_check() {
         fi
         rm -f "$expected" "$actual"
     done < <(jq -r '.targets[].file' "$MANIFEST")
+
+    # skills (kind: render): recompute outputs from committed record, diff vs deployed
+    if has_skills; then
+        local sk_vsub sk_recdir agent render out_dir sk_dir name outp exp rel
+        sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
+        sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
+        while IFS=$'\t' read -r agent render out_dir; do
+            for sk_dir in "$sk_recdir"/*/; do
+                [[ -f "$sk_dir/SKILL.md" ]] || continue
+                name="$(basename "$sk_dir")"
+                skill_targets_agent "$sk_dir/SKILL.md" "$agent" || continue
+                rel="$(skill_out_path "$out_dir" "$render" "$name")"
+                outp="$REPO_ROOT/$rel"
+                if [[ ! -f "$outp" ]]; then
+                    printf '[DRIFT] missing rendered skill: %s (run --refresh)\n' "$rel" >&2
+                    drift=1; continue
+                fi
+                exp="$(mktemp)"
+                render_skill "$render" "$sk_dir/SKILL.md" "$sk_vsub/$name/SKILL.md" > "$exp"
+                if ! diff -u "$outp" "$exp" >/dev/null 2>&1; then
+                    printf '[DRIFT] %s: rendered skill differs from source-of-record (run --refresh)\n' "$rel" >&2
+                    diff -u "$outp" "$exp" | sed 's/^/    /' >&2 || true
+                    drift=1
+                else
+                    printf '[check] OK -> %s\n' "$rel"
+                fi
+                rm -f "$exp"
+            done
+        done < <(jq -r '.skills.agents[] | "\(.agent)\t\(.render)\t\(.out_dir)"' "$MANIFEST")
+    fi
 
     if [[ "$drift" -ne 0 ]]; then
         printf '[check] FAIL: harness drift detected\n' >&2
