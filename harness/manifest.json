@@ -19,5 +19,17 @@
       "file": "ai/claude/CLAUDE.md",
       "inject": ["no-attribution", "english-only", "no-phase-references"]
     }
-  ]
+  ],
+  "skills": {
+    "vault_subpath": "00_meta/skills",
+    "record_dir": "harness/skills",
+    "schema": "harness/skill-frontmatter.schema.json",
+    "deploy": [
+      { "agent": "claude",   "render": "skill",   "dir": ".claude/skills" },
+      { "agent": "opencode", "render": "command", "dir": ".config/opencode/commands" },
+      { "agent": "agy",      "render": "skill",   "dir": ".gemini/skills" },
+      { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" }
+    ],
+    "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
+  }
 }
