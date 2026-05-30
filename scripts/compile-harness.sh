@@ -215,6 +215,28 @@ validate_skill_frontmatter() {
     done < <(jq -r '.required[]' "$schema")
 }
 
+# Read a single-line frontmatter value from a SKILL.md (empty if absent).
+skill_field() {
+    awk -v k="$2" '
+        /^---[[:space:]]*$/ { n++; next }
+        n==1 && $0 ~ ("^" k ":") { sub(/^[^:]*:[[:space:]]*/,""); print; exit }
+        n>=2 { exit }' "$1"
+}
+
+# Build a markdown skill catalog (one bullet per skill targeting <agent>), for
+# agents with no per-skill mechanism (e.g. copilot's single instructions file).
+# Deterministic order (glob sorts). Args: <record_dir> <agent>
+build_skill_catalog() {
+    local recdir="$1" agent="$2" sk_dir name desc
+    for sk_dir in "$recdir"/*/; do
+        [[ -f "$sk_dir/SKILL.md" ]] || continue
+        name="$(basename "$sk_dir")"
+        skill_targets_agent "$sk_dir/SKILL.md" "$agent" || continue
+        desc="$(skill_field "$sk_dir/SKILL.md" description)"
+        printf -- '- **%s** — %s\n' "$name" "$desc"
+    done
+}
+
 # --- modes ---
 
 do_refresh() {
@@ -290,6 +312,21 @@ EOF
                 printf '[refresh] skill -> %s\n' "$(skill_out_path "$out_dir" "$render" "$name")"
             done
         done < <(jq -r '.skills.agents[] | "\(.agent)\t\(.render)\t\(.out_dir)"' "$MANIFEST")
+
+        # 3c. catalog target (e.g. copilot): one marker-injected section listing skills
+        if jq -e '.skills.catalog' "$MANIFEST" >/dev/null 2>&1; then
+            local cat_agent cat_file tmpcat cat_sha cat_begin
+            cat_agent="$(jq -r '.skills.catalog.agent' "$MANIFEST")"
+            cat_file="$REPO_ROOT/$(jq -r '.skills.catalog.file' "$MANIFEST")"
+            validate_markers "$cat_file"
+            tmpcat="$(mktemp)"
+            build_skill_catalog "$sk_recdir" "$cat_agent" > "$tmpcat"
+            cat_sha="$(sha_of "$tmpcat")"
+            cat_begin="$BEGIN_PREFIX (sha256:$cat_sha) — skill catalog from vault $sk_vsub; edit there + re-run setup, do NOT edit between markers -->"
+            replace_region "$cat_file" "$cat_begin" "$tmpcat"
+            rm -f "$tmpcat"
+            printf '[refresh] catalog -> %s\n' "$(jq -r '.skills.catalog.file' "$MANIFEST")"
+        fi
     fi
 
     printf '[refresh] OK\n'
@@ -342,6 +379,26 @@ do_check() {
                 rm -f "$exp"
             done
         done < <(jq -r '.skills.agents[] | "\(.agent)\t\(.render)\t\(.out_dir)"' "$MANIFEST")
+
+        # catalog target (e.g. copilot): recompute + diff the marker region
+        if jq -e '.skills.catalog' "$MANIFEST" >/dev/null 2>&1; then
+            local cat_agent cat_file crel cexp cact
+            cat_agent="$(jq -r '.skills.catalog.agent' "$MANIFEST")"
+            crel="$(jq -r '.skills.catalog.file' "$MANIFEST")"
+            cat_file="$REPO_ROOT/$crel"
+            if ! validate_markers "$cat_file"; then drift=1; else
+                cexp="$(mktemp)"; cact="$(mktemp)"
+                build_skill_catalog "$sk_recdir" "$cat_agent" > "$cexp"
+                region_content "$cat_file" > "$cact"
+                if ! diff -u "$cexp" "$cact" >/dev/null 2>&1; then
+                    printf '[DRIFT] %s: skill catalog differs from source-of-record (run --refresh)\n' "$crel" >&2
+                    drift=1
+                else
+                    printf '[check] OK -> %s (catalog)\n' "$crel"
+                fi
+                rm -f "$cexp" "$cact"
+            fi
+        fi
     fi
 
     if [[ "$drift" -ne 0 ]]; then

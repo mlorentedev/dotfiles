@@ -136,11 +136,14 @@ seed_skills_fixture() {
     "agents": [ { "agent": "claude",   "render": "skill",   "out_dir": "out/claude" },
                 { "agent": "opencode", "render": "command", "out_dir": "out/opencode" },
                 { "agent": "agy",      "render": "skill",   "out_dir": "out/agy-skills" },
-                { "agent": "agy",      "render": "prompt",  "out_dir": "out/agy-prompts" } ] } }
+                { "agent": "agy",      "render": "prompt",  "out_dir": "out/agy-prompts" } ],
+    "catalog": { "agent": "copilot", "file": "out/copilot-instructions.md" } } }
 EOF
     cat > "$REPO/harness/skill-frontmatter.schema.json" <<'EOF'
 { "required": ["name", "description"] }
 EOF
+    mkdir -p "$REPO/out"
+    printf 'intro\n\n## Skills\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n\noutro\n' > "$REPO/out/copilot-instructions.md"
     mkdir -p "$VAULT/00_meta/skills/demo-skill"
     cat > "$VAULT/00_meta/skills/demo-skill/SKILL.md" <<'EOF'
 ---
@@ -239,4 +242,28 @@ EOF
     ! grep -q '^description:' "$REPO/out/agy-prompts/demo-skill.md"
     grep -q 'sha256:' "$REPO/out/agy-prompts/demo-skill.md"
     grep -q 'Body line one.' "$REPO/out/agy-prompts/demo-skill.md"
+}
+
+@test "render: copilot catalog lists targeted skills, excludes opt-outs, drift-checks (AC6)" {
+    seed_skills_fixture
+    mkdir -p "$VAULT/00_meta/skills/claude-only"
+    cat > "$VAULT/00_meta/skills/claude-only/SKILL.md" <<'EOF'
+---
+name: claude-only
+description: Only for claude.
+targets: [claude]
+---
+
+# Claude Only
+EOF
+    run_refresh; [ "$status" -eq 0 ]
+    grep -qF -- '**demo-skill**' "$REPO/out/copilot-instructions.md"
+    grep -qF -- 'Demo skill for the render pipeline.' "$REPO/out/copilot-instructions.md"
+    ! grep -q 'claude-only' "$REPO/out/copilot-instructions.md"   # opt-out honored
+    grep -qE 'BEGIN HARNESS GENERATED \(sha256:[0-9a-f]{16}\)' "$REPO/out/copilot-instructions.md"
+    run "$SCRIPT" --check; [ "$status" -eq 0 ]
+    sed -i 's/demo-skill/TAMPERED/' "$REPO/out/copilot-instructions.md"
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"DRIFT"* ]]
 }
