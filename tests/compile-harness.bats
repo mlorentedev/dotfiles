@@ -134,7 +134,9 @@ seed_skills_fixture() {
   "enforced": [], "targets": [],
   "skills": { "vault_subpath": "00_meta/skills", "record_dir": "harness/skills",
     "agents": [ { "agent": "claude",   "render": "skill",   "out_dir": "out/claude" },
-                { "agent": "opencode", "render": "command", "out_dir": "out/opencode" } ] } }
+                { "agent": "opencode", "render": "command", "out_dir": "out/opencode" },
+                { "agent": "agy",      "render": "skill",   "out_dir": "out/agy-skills" },
+                { "agent": "agy",      "render": "prompt",  "out_dir": "out/agy-prompts" } ] } }
 EOF
     cat > "$REPO/harness/skill-frontmatter.schema.json" <<'EOF'
 { "required": ["name", "description"] }
@@ -223,4 +225,18 @@ EOF
     run_refresh
     [ "$status" -ne 0 ]
     [[ "$output" == *"frontmatter"* ]]
+}
+
+@test "render: agy native skill keeps frontmatter; agy flat prompt strips it (AC6)" {
+    seed_skills_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # native agy skill: full SKILL.md with provenance frontmatter
+    grep -q '^name: demo-skill' "$REPO/out/agy-skills/demo-skill/SKILL.md"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$REPO/out/agy-skills/demo-skill/SKILL.md"
+    # flat agy prompt: frontmatter stripped, provenance as leading comment, body kept
+    [ -f "$REPO/out/agy-prompts/demo-skill.md" ]
+    ! grep -q '^name:' "$REPO/out/agy-prompts/demo-skill.md"
+    ! grep -q '^description:' "$REPO/out/agy-prompts/demo-skill.md"
+    grep -q 'sha256:' "$REPO/out/agy-prompts/demo-skill.md"
+    grep -q 'Body line one.' "$REPO/out/agy-prompts/demo-skill.md"
 }

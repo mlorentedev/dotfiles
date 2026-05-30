@@ -160,9 +160,18 @@ skill_targets_agent() {
 
 # Render one skill record to an agent-native string on stdout.
 # Args: <render_kind> <record_SKILL.md> <vault-relative-source-path>
+#   skill   -> full SKILL.md + provenance frontmatter fields (claude, agy native)
+#   command -> drop `name:` (opencode commands key off filename) + provenance
+#   prompt  -> strip YAML frontmatter entirely, prepend provenance comment (agy
+#              flat prompts in ~/.gemini/prompts/, mirrors setup's sed strip)
 render_skill() {
     local kind="$1" record="$2" srcpath="$3" sha
     sha="$(sha_of "$record")"
+    if [[ "$kind" == "prompt" ]]; then
+        printf '<!-- generated: true; from: %s; sha256:%s; edit the vault source + re-run setup -->\n\n' "$srcpath" "$sha"
+        awk '/^---[[:space:]]*$/{fm++; next} fm>=2{print} fm==0{print}' "$record"
+        return
+    fi
     awk -v kind="$kind" -v gf="$srcpath" -v gs="$sha" '
         /^---[[:space:]]*$/ {
             fm++
@@ -177,8 +186,8 @@ render_skill() {
 skill_out_path() {
     local out_dir="$1" render="$2" name="$3"
     case "$render" in
-        command) printf '%s/%s.md' "$out_dir" "$name" ;;
-        *)       printf '%s/%s/SKILL.md' "$out_dir" "$name" ;;
+        command|prompt) printf '%s/%s.md' "$out_dir" "$name" ;;
+        *)              printf '%s/%s/SKILL.md' "$out_dir" "$name" ;;
     esac
 }
 
