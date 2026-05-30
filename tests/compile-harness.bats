@@ -109,6 +109,12 @@ run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
     grep -q 'compile-harness.sh" --check' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
 }
 
+@test "AC1: healthcheck.sh asserts deployed skills are symlink-free (SDD-008)" {
+    grep -q 'deployed skill path is a symlink' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
+    grep -qF '.claude/skills' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
+    grep -qF '.config/opencode/commands' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
+}
+
 @test "setup-linux.sh runs compile-harness --refresh during deploy" {
     grep -q 'compile-harness.sh" --refresh' "$BATS_TEST_DIRNAME/../setup-linux.sh"
 }
