@@ -1,7 +1,7 @@
 ---
 id: "ENGINE-001-deploy-engine-core"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-28"
 tags: [spec, proposal, engine-001, harness-001, deploy-engine, cross-agent, tracer-bullet]
 template_version: "1.0"
