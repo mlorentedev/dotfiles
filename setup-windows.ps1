@@ -328,7 +328,7 @@ if (Test-Path $claudeMdSource) {
 }
 
 # Skills (claude, opencode, agy) are deployed from the committed vault skill
-# records by Deploy-SkillRecords near the end of this script (SDD-008, option A),
+# records by Deploy-SkillRecord near the end of this script (SDD-008, option A),
 # replacing the former ai\skills copy loops. Deploy is a regular copy that
 # de-junctions any pre-existing vault junction first (BUG-100), honoring each
 # skill's targets[].
@@ -571,7 +571,7 @@ if (Test-Path $VaultRoot) {
 
 # Vault-hosted skills are no longer junctioned into ~/.claude/skills (that was
 # the BUG-100 fragility source). They are migrated into the vault SSOT, compiled
-# into committed records, and rendered to a regular copy by Deploy-SkillRecords
+# into committed records, and rendered to a regular copy by Deploy-SkillRecord
 # near the end of this script (SDD-008, option A).
 
 # ============================================================================
@@ -713,7 +713,7 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
 }
 
 # OpenCode commands are deployed from the committed vault skill records by
-# Deploy-SkillRecords near the end of this script (SDD-008, option A): each
+# Deploy-SkillRecord near the end of this script (SDD-008, option A): each
 # record whose targets[] includes opencode is rendered to a
 # .config\opencode\commands\<n>.md command file (name: dropped), with stale
 # commands pruned. This replaces the former ai\opencode\commands copy loop; the
@@ -851,7 +851,7 @@ if (Test-Path $agyMdSource) {
 
 # Agy skills (native Shared skills under $GeminiHome\skills and frontmatter-
 # stripped flat prompts under $GeminiHome\prompts) are deployed from the
-# committed vault skill records by Deploy-SkillRecords near the end of this
+# committed vault skill records by Deploy-SkillRecord near the end of this
 # script (SDD-008, option A), honoring each skill's targets[]. The former
 # ai\skills extraction loops are gone.
 Ensure-Directory (Join-Path $GeminiHome 'skills')
@@ -1304,7 +1304,7 @@ function Convert-SkillRecord {
     return ($out -join "`n")
 }
 
-function Deploy-SkillRecords {
+function Deploy-SkillRecord {
     param([string]$DotfilesDir)
     $manifestPath = Join-Path $DotfilesDir 'harness\manifest.json'
     if (-not (Test-Path -LiteralPath $manifestPath)) { Write-Warn "harness manifest not found: $manifestPath"; return }
@@ -1404,7 +1404,7 @@ function Deploy-SkillRecords {
     Write-Success "Skills deployed from records (claude / opencode / agy / copilot)"
 }
 
-Deploy-SkillRecords -DotfilesDir $DotfilesDir
+Deploy-SkillRecord -DotfilesDir $DotfilesDir
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
 # Self-healing: compare existing action arguments against expected and rewrite
