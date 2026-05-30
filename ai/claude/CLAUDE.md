@@ -53,7 +53,18 @@ For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.m
 
 ## Claude Code Tooling Notes
 
-* **No attribution / English-only (overrides Claude default).** Per `AGENTS.md` § Operational Rules → "Overrides of Harness Defaults": no `Co-Authored-By` / "Generated with" / 🤖 footers on commits, PRs, or issues; English only in git/GitHub artifacts — even when the harness default suggests otherwise.
+* **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
+<!-- BEGIN HARNESS GENERATED (sha256:82589eb0b0204879) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+- **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
+- No `Co-Authored-By` trailers referencing AI agents.
+- No bot-style emojis or "Generated with" footers.
+- All artifacts must appear human-authored.
+- **English only** in git/GitHub artifacts: commit messages, branch names, PR/issue titles and bodies, and code comments. Conversation with the user may be in any language; the durable record is English.
+- **No internal phase/milestone references** in branch names, commit messages, or PR titles.
+  - Bad: `feat/phase-3.1-scaffold`, `chore: scaffold repo (Phase 3.1)`
+  - Good: `feat/scaffold-pyhydra3d`, `chore: scaffold PyHydra3D repository`
+- Phase tracking belongs in the vault backlog (`11-tasks.md`), not in git history.
+<!-- END HARNESS GENERATED -->
 * **Skills.** `~/.claude/skills/<skill>/SKILL.md` auto-load via slash commands. Skill auto-loading is a Claude Code feature, not portable. Skill **content** is portable: `AI-012-opencode-commands-port` mechanically transforms each skill into an OpenCode command in `ai/opencode/commands/*.md`.
 * **TaskCreate / TaskUpdate / TaskList.** Use for non-trivial multi-step work (≥3 distinct steps). Mark `in_progress` BEFORE starting; mark `completed` immediately on finish. Don't batch updates.
 * **AskUserQuestion.** Use for branching decisions with 2-4 mutually exclusive options. Always include "(Recommended)" on the preferred option.

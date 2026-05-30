@@ -414,6 +414,18 @@ else
     skip "diff-check.sh not found at $SCRIPT_DIR/diff-check.sh"
 fi
 
+# Harness override drift (ENGINE-001): generated blocks vs their source-of-record.
+# Offline (no vault); run from the repo so git resolves regardless of CWD.
+if [ -x "$SCRIPT_DIR/compile-harness.sh" ]; then
+    if ( cd "$DOTFILES_DIR" && "$SCRIPT_DIR/compile-harness.sh" --check ) >/dev/null 2>&1; then
+        pass "harness override blocks match their source-of-record (no drift)"
+    else
+        fail "harness override drift (run: $SCRIPT_DIR/compile-harness.sh --refresh, then re-deploy)"
+    fi
+else
+    skip "compile-harness.sh not found at $SCRIPT_DIR/compile-harness.sh"
+fi
+
 # ==================================================
 section "13/13" "Antigravity CLI Health"
 
