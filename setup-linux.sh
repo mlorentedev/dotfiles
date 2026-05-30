@@ -478,6 +478,20 @@ fi
 
 log_success "Antigravity CLI configuration complete"
 
+# Harness deploy engine (ENGINE-001 / HARNESS-001): re-render the generated
+# "Overrides of Harness Defaults" blocks in AGENTS.md + ai/claude/CLAUDE.md from
+# the vault SSOT before deploying agent configs. Committed blocks are the fallback
+# when the vault is absent (fresh machine), so this only re-renders when possible.
+if [ -d "${VAULT_PATH:-$HOME/Projects/knowledge}/00_meta/patterns" ]; then
+    if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --refresh ) >/dev/null 2>&1; then
+        log_success "Harness override blocks refreshed from vault SSOT"
+    else
+        log_warning "compile-harness --refresh failed; deploying committed blocks"
+    fi
+else
+    log_info "Vault absent; deploying committed harness override blocks"
+fi
+
 # Claude Code
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "vault_subpath": "00_meta/patterns",
+  "enforced": [
+    { "id": "no-attribution",      "source": "pattern-git-workflow.md#6-attribution-policy" },
+    { "id": "english-only",        "source": "pattern-git-workflow.md#8-language-policy" },
+    { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" }
+  ],
+  "targets": [
+    {
+      "agent": "agents",
+      "kind": "native",
+      "file": "AGENTS.md",
+      "inject": ["no-attribution", "english-only", "no-phase-references"]
+    },
+    {
+      "agent": "claude",
+      "kind": "pointer",
+      "file": "ai/claude/CLAUDE.md",
+      "inject": ["no-attribution", "english-only", "no-phase-references"]
+    }
+  ]
+}

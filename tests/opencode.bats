@@ -186,11 +186,14 @@ setup() {
 
 # --- Per-agent pointer files (AI-013 fold-in) ---
 
-@test "ai/claude/CLAUDE.md is a pointer to AGENTS.md (≤ 80 lines)" {
+@test "ai/claude/CLAUDE.md is a pointer to AGENTS.md (≤ 100 lines)" {
     # Threshold bumped 70→80 in AI-019 (model-tier overlay added ~8 lines).
+    # Bumped 80→100 in ENGINE-001: the HARNESS engine injects the generated
+    # "Overrides of Harness Defaults" block (no-attribution + english-only +
+    # no-phase-refs) sourced from the vault, which needs the extra headroom.
     # Future per-agent extensions should justify each bump in the spec.
     grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/claude/CLAUDE.md"
-    [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 80 ]]
+    [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 100 ]]
 }
 
 @test "ai/agy/AGY.md is a pointer to AGENTS.md (≤ 50 lines)" {

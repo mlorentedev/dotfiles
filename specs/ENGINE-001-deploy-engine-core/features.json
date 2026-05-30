@@ -1,0 +1,51 @@
+[
+  {
+    "id": "check-detects-drift",
+    "behavior": "AC1 — compile-harness.sh --check exits 0 on a freshly-refreshed tree; exits non-zero (with a diff summary) after a deployed block is hand-edited.",
+    "verification": "bats tests/compile-harness.bats -f 'AC1'",
+    "state": "verifying",
+    "evidence": ""
+  },
+  {
+    "id": "refresh-idempotent-sha-markers",
+    "behavior": "AC2 — Re-running --refresh is idempotent (no diff); generated blocks carry BEGIN/END HARNESS markers with source path + sha256 prefix.",
+    "verification": "bats tests/compile-harness.bats -f 'AC2'",
+    "state": "verifying",
+    "evidence": ""
+  },
+  {
+    "id": "record-committed-offline-check",
+    "behavior": "AC3 — harness/enforced/*.md exists and is committed; --check renders from it with no vault access (VAULT_PATH at an empty dir).",
+    "verification": "bats tests/compile-harness.bats -f 'AC3'",
+    "state": "verifying",
+    "evidence": ""
+  },
+  {
+    "id": "line-cap-breach-fails",
+    "behavior": "AC4 — Injecting past the 100-line cap on ai/claude/CLAUDE.md makes --refresh fail with a clear error.",
+    "verification": "bats tests/compile-harness.bats -f 'AC4'",
+    "state": "verifying",
+    "evidence": ""
+  },
+  {
+    "id": "missing-end-marker-fails-loud",
+    "behavior": "AC5 — A missing END marker makes --refresh fail loudly (no silent append).",
+    "verification": "bats tests/compile-harness.bats -f 'AC5'",
+    "state": "verifying",
+    "evidence": ""
+  },
+  {
+    "id": "healthcheck-guards-drift",
+    "behavior": "AC6 — healthcheck.sh wires the offline harness drift check (compile-harness.sh --check) so a tampered deployed block is flagged with no vault.",
+    "verification": "bats tests/compile-harness.bats -f 'AC6'",
+    "state": "verifying",
+    "evidence": ""
+  },
+  {
+    "id": "override-text-deployed",
+    "behavior": "AC7 — The no-attribution override text appears in deployed ai/claude/CLAUDE.md + AGENTS.md between the markers.",
+    "verification": "grep -q 'No AI attribution' AGENTS.md && grep -q 'No AI attribution' ai/claude/CLAUDE.md",
+    "state": "verifying",
+    "evidence": ""
+  }
+]
