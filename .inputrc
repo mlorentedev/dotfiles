@@ -1,0 +1,17 @@
+# readline config (POLISH-004) — case-insensitive completion + smart history.
+# Deployed to ~/.inputrc by setup-linux.sh. Applies to bash and any readline app.
+$include /etc/inputrc
+
+# Tab-completion: case-insensitive, show options on first ambiguous tab.
+set completion-ignore-case on
+set show-all-if-ambiguous on
+set show-all-if-unmodified on
+
+# Visual aids.
+set colored-stats on
+set colored-completion-prefix on
+set mark-symlinked-directories on
+
+# History search by the current line prefix on Up/Down arrows.
+"\e[A": history-search-backward
+"\e[B": history-search-forward

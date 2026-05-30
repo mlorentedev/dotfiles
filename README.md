@@ -28,6 +28,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 - **Encrypted secrets** — Age-encrypted tokens and file secrets, auto-loaded at login
 - **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 21 custom skills, unified by `AGENTS.md` SSOT
 - **Cross-platform** — Symlinks on Linux/macOS, copies on Windows (no admin required)
+- **Editor & shell ergonomics** — `.editorconfig` for cross-IDE consistency + `.inputrc` for case-insensitive tab-completion and arrow-key history search
 - **Tested** — 316 BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
