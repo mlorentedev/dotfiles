@@ -1,7 +1,7 @@
 ---
 id: "SDD-008-skill-pipeline"
 type: spec
-status: draft
+status: archived
 created: "2026-05-26"
 tags: [spec, proposal, sdd-008, cross-os, ai-tooling, skill-distribution, pipeline, bug-100-followup]
 template_version: "1.0"
