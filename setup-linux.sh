@@ -429,35 +429,13 @@ fi
 # Drop the old AGY_APP_DATA symlink/copy of mcp_config.json (replaced by canonical path)
 [ -e "$AGY_APP_DATA/mcp_config.json" ] && rm -f "$AGY_APP_DATA/mcp_config.json"
 
-# Sync Agy prompts: remove stale skill-derived prompts not in source
-for target_file in "$GEMINI_HOME/prompts/"*.md; do
-    [ -f "$target_file" ] || continue
-    prompt_name=$(basename "$target_file" .md)
-    [ -d "$CURRENT_DIR/ai/skills/$prompt_name" ] || rm -f "$target_file"
-done
-
-# Sync native Shared Skills for Antigravity (recognized as 'Shared' in agy)
+# Agy skills (native Shared skills + flat prompts) are deployed from the vault
+# skill records by `compile-harness.sh --deploy` (SDD-008), which renders each
+# committed record under harness/skills/ to ~/.gemini/skills/<n>/ and a
+# frontmatter-stripped flat prompt to ~/.gemini/prompts/<n>.md, honoring each
+# skill's targets[]. The single --deploy call near the end of this script does
+# this for every agent at once; no per-agent skill loop here.
 ensure_directory "$HOME/.gemini/skills"
-# Remove stale shared skills
-for target_dir in "$HOME/.gemini/skills/"*/; do
-    skill_name=$(basename "$target_dir")
-    [ -d "$CURRENT_DIR/ai/skills/$skill_name" ] || rm -rf "$target_dir"
-done
-
-# Extract SKILL.md content as flat prompts for Agy (strip YAML frontmatter)
-# AND copy as native skills to Shared path
-for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
-    if [ -d "$skill_dir" ] && [ -f "${skill_dir}SKILL.md" ]; then
-        skill_name=$(basename "$skill_dir")
-        
-        # 1. Flat prompt for 'gp' alias
-        tr -d '\r' < "${skill_dir}SKILL.md" | sed '/^---$/,/^---$/d' > "$GEMINI_HOME/prompts/${skill_name}.md"
-        
-        # 2. Native Antigravity skill (Shared)
-        ensure_directory "$HOME/.gemini/skills/$skill_name"
-        cp -rf "$skill_dir"* "$HOME/.gemini/skills/$skill_name/" 2>/dev/null || true
-    fi
-done
 
 # SDD-007 one-time migration: gemini-cli -> agy. Remove the legacy
 # ~/.gemini/GEMINI.md identity file so it doesn't linger as an orphan
@@ -508,29 +486,11 @@ for _claude_src in "$CURRENT_DIR/ai/claude/"*; do
 done
 unset _claude_src
 cp -f "$CURRENT_DIR/scripts/init-project.sh" "$HOME/.claude/" 2>/dev/null || true
-# Sync Claude skills: remove stale skill directories not in source.
-# CRITICAL: For symlinks (vault-hosted skills, see link_vault_skills below),
-# unlink only — never rm -rf through a symlink with trailing slash, which
-# POSIX rm follows and would delete vault content. The vault-skills loop
-# below re-creates the symlink if the source still exists.
-for target_dir in "$HOME/.claude/skills/"*/; do
-    target_path="${target_dir%/}"
-    [ -e "$target_path" ] || [ -L "$target_path" ] || continue
-    skill_name=$(basename "$target_path")
-    if [ -L "$target_path" ]; then
-        unlink "$target_path"
-    elif [ ! -d "$CURRENT_DIR/ai/skills/$skill_name" ]; then
-        rm -rf "$target_path"
-    fi
-done
-# Copy skill directories (each skill has its own dir with SKILL.md)
-for skill_dir in "$CURRENT_DIR/ai/skills/"*/; do
-    if [ -d "$skill_dir" ]; then
-        skill_name=$(basename "$skill_dir")
-        ensure_directory "$HOME/.claude/skills/$skill_name"
-        cp -rf "$skill_dir"* "$HOME/.claude/skills/$skill_name/" 2>/dev/null || true
-    fi
-done
+# Claude skills are deployed from the vault skill records by
+# `compile-harness.sh --deploy` (SDD-008): each committed record under
+# harness/skills/ is rendered (with provenance) to ~/.claude/skills/<n>/,
+# de-symlinking any pre-existing vault symlink first (BUG-100). The single
+# --deploy call near the end of this script handles every agent at once.
 # Force copy master files (Neural Hive Protocol)
 rm -f "$HOME/.claude/CLAUDE.md"
 cp "$CURRENT_DIR/ai/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
@@ -667,42 +627,13 @@ else
     log_warning "AGENTS.md source missing at $AGENTS_SRC"
 fi
 
-# Deploy opencode commands (AI-012: skills→commands port).
-# Source: ai/opencode/commands/*.md (kept in sync with ai/skills/ via
-# scripts/skills-to-opencode.sh; CI gate enforces parity). Target: the
-# OpenCode global commands directory, so /audit, /test, /writing-plans,
-# etc. are available from any repo where the user launches `oc`.
-OPENCODE_CMDS_SRC="$CURRENT_DIR/ai/opencode/commands"
-OPENCODE_CMDS_DST="$HOME/.config/opencode/commands"
-if [ -d "$OPENCODE_CMDS_SRC" ]; then
-    ensure_directory "$OPENCODE_CMDS_DST"
-    cmds_added=0
-    cmds_skipped=0
-    cmds_removed=0
-    for src in "$OPENCODE_CMDS_SRC"/*.md; do
-        [ -f "$src" ] || continue
-        dst="$OPENCODE_CMDS_DST/$(basename "$src")"
-        if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
-            cmds_skipped=$((cmds_skipped + 1))
-        else
-            cp "$src" "$dst"
-            cmds_added=$((cmds_added + 1))
-        fi
-    done
-    # Remove orphan commands on disk that no longer exist in the repo
-    # (e.g. a skill was added to the skip-list and its command should
-    # disappear from the user's deployed set).
-    for dst in "$OPENCODE_CMDS_DST"/*.md; do
-        [ -f "$dst" ] || continue
-        if [ ! -f "$OPENCODE_CMDS_SRC/$(basename "$dst")" ]; then
-            rm -f "$dst"
-            cmds_removed=$((cmds_removed + 1))
-        fi
-    done
-    log_success "opencode commands: $cmds_added added, $cmds_skipped already in sync, $cmds_removed orphans removed"
-else
-    log_info "opencode commands source missing: $OPENCODE_CMDS_SRC (skipping; run scripts/skills-to-opencode.sh to generate)"
-fi
+# opencode commands are deployed from the vault skill records by
+# `compile-harness.sh --deploy` (SDD-008): each committed record under
+# harness/skills/ whose targets[] includes opencode is rendered to a
+# ~/.config/opencode/commands/<n>.md command file (name: dropped — opencode
+# keys commands off the filename). This replaces the former
+# ai/opencode/commands/ + skills-to-opencode.sh path; the per-skill targets[]
+# now expresses what was the hard-coded Claude-only skip-list.
 
 # Post-deploy assertion — binary reachable + version reports
 if [ -x "$OPENCODE_BINARY" ] || command -v opencode >/dev/null 2>&1; then
@@ -1084,39 +1015,20 @@ if [ -d "$VAULT_ROOT" ]; then
     done
 fi
 
-# Deploy vault-hosted skill symlinks (vault → Claude Code)
-# Vault skills live in $VAULT_ROOT/00_meta/skills/<name>/SKILL.md per pattern-spec-driven-development.
-# Symlink each into ~/.claude/skills/ for Claude Code discovery. Idempotent.
-VAULT_SKILLS_DIR="$VAULT_ROOT/00_meta/skills"
-if [ -d "$VAULT_SKILLS_DIR" ]; then
-    log_info "Linking vault-hosted skills to Claude Code..."
-    for skill_dir in "$VAULT_SKILLS_DIR"/*/; do
-        [ -d "$skill_dir" ] || continue
-        skill_source="${skill_dir%/}"
-        skill_name=$(basename "$skill_source")
-        target="$HOME/.claude/skills/$skill_name"
-
-        if [ -L "$target" ]; then
-            current_target=$(readlink "$target")
-            if [ "$current_target" != "$skill_source" ]; then
-                rm "$target"
-                ln -s "$skill_source" "$target"
-                log_success "Re-linked vault skill: $skill_name"
-            fi
-        elif [ -d "$target" ] && [ -n "$(ls -A "$target" 2>/dev/null)" ]; then
-            log_warning "$skill_name exists at $target — backing up"
-            mv "$target" "${target}.bak.$(date +%s)"
-            ln -s "$skill_source" "$target"
-            log_success "Linked vault skill: $skill_name"
-        elif [ -d "$target" ]; then
-            rmdir "$target" 2>/dev/null || true
-            ln -s "$skill_source" "$target"
-            log_success "Linked vault skill: $skill_name"
-        else
-            ln -s "$skill_source" "$target"
-            log_success "Linked vault skill: $skill_name"
-        fi
-    done
+# Deploy all skills from the committed records to their per-agent $HOME paths
+# (SDD-008, option A). Renders each harness/skills/<n> record to ~/.claude/skills,
+# ~/.config/opencode/commands, ~/.gemini/skills + ~/.gemini/prompts, and injects
+# the copilot catalog into ~/.copilot/copilot-instructions.md, honoring each
+# skill's targets[]. Deploy is a regular copy — never a symlink — and replaces
+# any pre-existing vault symlink with a copy first, ending the BUG-100 fragility
+# class. Records are committed, so this runs offline (no vault required); the
+# earlier --refresh re-renders the records from the vault SSOT when present.
+# Runs last so the per-agent base files (e.g. ~/.copilot/copilot-instructions.md)
+# are already in place for catalog injection.
+if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --deploy ) >/dev/null; then
+    log_success "Skills deployed from records (claude / opencode / agy / copilot)"
+else
+    log_warning "compile-harness --deploy reported issues; check skill records"
 fi
 
 # Weekly vault maintenance cron (Sundays 10:00 AM)

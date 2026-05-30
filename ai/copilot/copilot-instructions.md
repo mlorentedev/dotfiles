@@ -37,3 +37,15 @@ Full vault hierarchy and frontmatter law live in `AGENTS.md` § Vault Structure 
 - **Top / Mid / Low:** TBD — concrete model identifiers pending AI-017 (skills port) and AI-018 (MCP deploy) audits on a Windows admin machine where `copilot` v2 is installed. Until then, follow AGENTS.md tier semantics and use whatever default the v2 CLI provides.
 
 When AI-017/AI-018 close, replace this block with the literal model IDs.
+
+## Skills
+
+Copilot has no per-skill discovery mechanism, so the cross-agent skill pipeline
+(SDD-008) injects a catalog of the available skills below. The list is generated
+from the vault skill records (`harness/skills/`) at deploy time and honors each
+skill's `targets[]`; edit the skill in the vault and re-run setup — do NOT edit
+between the markers.
+
+<!-- BEGIN HARNESS GENERATED -->
+<!-- END HARNESS GENERATED -->
+

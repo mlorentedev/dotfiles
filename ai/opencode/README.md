@@ -7,7 +7,12 @@
 | File | Role |
 |---|---|
 | `opencode.jsonc` | SSOT for opencode config. Deploys to `~/.config/opencode/opencode.jsonc` via `setup-linux.sh` / `setup-windows.ps1`. |
-| `commands/` | OpenCode slash-command catalog (mirror of Claude Code skills via AI-012). |
+
+OpenCode slash-commands are no longer stored here. They are rendered from the
+vault skill records (`harness/skills/`) to `~/.config/opencode/commands/<name>.md`
+at deploy time by `scripts/compile-harness.sh --deploy` (SDD-008), honoring each
+skill's `targets[]`. The former `commands/` mirror + `skills-to-opencode.sh` were
+removed.
 
 ## Providers wired here
 

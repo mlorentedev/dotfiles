@@ -1,5 +1,6 @@
 ---
 name: creating-skills
+targets: [claude]
 description: Use when creating a new skill, updating an existing skill, or verifying a skill works before deployment. Covers skill anatomy, TDD testing methodology, and Claude Search Optimization for trigger descriptions.
 ---
 
@@ -250,8 +251,14 @@ The context window is a public good. Only add context Claude doesn't already hav
 
 ## Deployment
 
-Skills auto-deploy via `setup-linux.sh` / `setup-windows.ps1`:
-- Claude: `~/.claude/skills/<skill-name>/` (full directory)
-- Gemini: `~/.gemini/prompts/<skill-name>.md` (YAML frontmatter stripped)
+The vault is the single source of truth (SDD-008). Author the skill here
+(`00_meta/skills/<skill-name>/SKILL.md`); `setup-linux.sh` / `setup-windows.ps1`
+compile it into a committed record and render it to each agent:
+- Claude: `~/.claude/skills/<skill-name>/` (full directory, regular copy)
+- OpenCode: `~/.config/opencode/commands/<skill-name>.md`
+- Antigravity: `~/.gemini/skills/<skill-name>/` + `~/.gemini/prompts/<skill-name>.md` (frontmatter stripped)
+- Copilot: a catalog entry in `~/.copilot/copilot-instructions.md`
 
-Commit to `ai/skills/` in the dotfiles repo. No manual deployment needed.
+Add `targets: [claude]` (or any subset) to the frontmatter to limit which agents
+receive the skill; absent = all agents. Edit the skill here and re-run setup —
+no manual per-agent deployment.

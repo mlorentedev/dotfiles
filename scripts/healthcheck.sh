@@ -416,14 +416,35 @@ fi
 
 # Harness override drift (ENGINE-001): generated blocks vs their source-of-record.
 # Offline (no vault); run from the repo so git resolves regardless of CWD.
+# --check also validates that every committed skill record (SDD-008) renders
+# cleanly, so this one gate covers both the override blocks and the skill records.
 if [ -x "$SCRIPT_DIR/compile-harness.sh" ]; then
     if ( cd "$DOTFILES_DIR" && "$SCRIPT_DIR/compile-harness.sh" --check ) >/dev/null 2>&1; then
-        pass "harness override blocks match their source-of-record (no drift)"
+        pass "harness blocks + skill records match their source-of-record (no drift)"
     else
-        fail "harness override drift (run: $SCRIPT_DIR/compile-harness.sh --refresh, then re-deploy)"
+        fail "harness/skill drift (run: $SCRIPT_DIR/compile-harness.sh --refresh, then re-deploy)"
     fi
 else
     skip "compile-harness.sh not found at $SCRIPT_DIR/compile-harness.sh"
+fi
+
+# Skill deployment integrity (SDD-008, AC1): deployed skills MUST be regular
+# copies, never symlinks/junctions (the BUG-100 fragility class). --check above
+# verifies the records render; this asserts the on-machine deploy is symlink-free.
+_skill_dirs=""
+for _d in "$HOME/.claude/skills" "$HOME/.config/opencode/commands" "$HOME/.gemini/skills" "$HOME/.gemini/prompts"; do
+    [ -d "$_d" ] && _skill_dirs="$_skill_dirs $_d"
+done
+if [ -n "$_skill_dirs" ]; then
+    # shellcheck disable=SC2086
+    _skill_link="$(find $_skill_dirs -type l 2>/dev/null | head -1)"
+    if [ -n "$_skill_link" ]; then
+        fail "deployed skill path is a symlink (run: $SCRIPT_DIR/compile-harness.sh --deploy): $_skill_link"
+    else
+        pass "deployed skills are regular copies (no symlinks in skill paths)"
+    fi
+else
+    skip "no deployed skill paths found (run ./setup-linux.sh to deploy skills)"
 fi
 
 # ==================================================

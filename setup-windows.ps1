@@ -327,34 +327,12 @@ if (Test-Path $claudeMdSource) {
     Write-Warn "CLAUDE.md not found at $claudeMdSource"
 }
 
-# Sync skills: remove stale skill directories not in source, then copy current
-$skillsSource = "$DotfilesDir\ai\skills"
-if (Test-Path $skillsSource) {
-    # Remove stale skills from target that no longer exist in source.
-    # CRITICAL: Junction directories (vault-hosted skills, see vault-skills loop
-    # later in this script) must be detected via the ReparsePoint attribute and
-    # removed with .Delete() only. Remove-Item -Recurse -Force on a junction in
-    # Windows PowerShell 5.1 historically follows the link and deletes the target
-    # contents. The vault-skills loop below re-creates the junction if still valid.
-    $existingSkills = Get-ChildItem "$ClaudeHome\skills" -Directory -ErrorAction SilentlyContinue
-    foreach ($existing in $existingSkills) {
-        if (-not (Test-Path "$skillsSource\$($existing.Name)")) {
-            if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                $existing.Delete()
-            } else {
-                Remove-Item $existing.FullName -Recurse -Force
-            }
-        }
-    }
-    # Copy current skills
-    $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
-    foreach ($skillDir in $skillDirs) {
-        $targetDir = "$ClaudeHome\skills\$($skillDir.Name)"
-        Ensure-Directory $targetDir
-        Copy-Item "$($skillDir.FullName)\*" $targetDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Write-Success "Synced skills to $ClaudeHome\skills\"
-}
+# Skills (claude, opencode, agy) are deployed from the committed vault skill
+# records by Deploy-SkillRecord near the end of this script (SDD-008, option A),
+# replacing the former ai\skills copy loops. Deploy is a regular copy that
+# de-junctions any pre-existing vault junction first (BUG-100), honoring each
+# skill's targets[].
+Ensure-Directory "$ClaudeHome\skills"
 
 # Register MCP servers (requires Claude Code CLI, Node.js)
 # Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
@@ -591,34 +569,10 @@ if (Test-Path $VaultRoot) {
     }
 }
 
-# Deploy vault-hosted skill junctions (vault -> Claude Code)
-# Vault skills live in $VaultRoot\00_meta\skills\<name>\SKILL.md per pattern-spec-driven-development.
-# Junction each into $env:USERPROFILE\.claude\skills\ for Claude Code discovery. Idempotent.
-$VaultSkillsDir = Join-Path $VaultRoot "00_meta\skills"
-if (Test-Path $VaultSkillsDir) {
-    Write-Info "Linking vault-hosted skills to Claude Code..."
-    Get-ChildItem -Path $VaultSkillsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        $skillSource = $_.FullName
-        $skillName = $_.Name
-        $target = Join-Path $ClaudeHome "skills\$skillName"
-
-        if (Test-Path $target) {
-            $item = Get-Item $target -Force
-            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                cmd /c rmdir $target 2>&1 | Out-Null
-            } elseif ((Get-ChildItem $target -ErrorAction SilentlyContinue).Count -gt 0) {
-                $backup = "$target.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
-                Write-Warn "$skillName exists at $target - backing up to $backup"
-                Rename-Item $target $backup
-            } else {
-                Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        New-Item -ItemType Junction -Path $target -Target $skillSource -Force | Out-Null
-        Write-Success "Linked vault skill: $skillName"
-    }
-}
+# Vault-hosted skills are no longer junctioned into ~/.claude/skills (that was
+# the BUG-100 fragility source). They are migrated into the vault SSOT, compiled
+# into committed records, and rendered to a regular copy by Deploy-SkillRecord
+# near the end of this script (SDD-008, option A).
 
 # ============================================================================
 # 2b. PYTHON TOOLING (uv + poetry)
@@ -758,42 +712,12 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     Write-Warn "AGENTS.md source missing at $agentsSrc"
 }
 
-# Commands sync: add new, leave unchanged, remove orphans. Mirror of the bash
-# loop in setup-linux.sh: cmds_added/cmds_skipped/cmds_removed counters.
-$opencodeCmdsSrc = "$DotfilesDir\ai\opencode\commands"
-$opencodeCmdsDst = Join-Path $env:USERPROFILE '.config\opencode\commands'
-if (Test-Path -LiteralPath $opencodeCmdsSrc -PathType Container) {
-    Ensure-Directory $opencodeCmdsDst
-    $cmdsAdded   = 0
-    $cmdsSkipped = 0
-    $cmdsRemoved = 0
-    foreach ($src in Get-ChildItem -LiteralPath $opencodeCmdsSrc -Filter '*.md' -File -ErrorAction SilentlyContinue) {
-        $dst = Join-Path $opencodeCmdsDst $src.Name
-        $sameContent = $false
-        if (Test-Path -LiteralPath $dst -PathType Leaf) {
-            $sH = (Get-FileHash -LiteralPath $src.FullName -Algorithm SHA256).Hash
-            $dH = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
-            if ($sH -eq $dH) { $sameContent = $true }
-        }
-        if ($sameContent) {
-            $cmdsSkipped++
-        } else {
-            Copy-Item -LiteralPath $src.FullName -Destination $dst -Force
-            $cmdsAdded++
-        }
-    }
-    # Orphan removal: any *.md in destination not present in source.
-    foreach ($dst in Get-ChildItem -LiteralPath $opencodeCmdsDst -Filter '*.md' -File -ErrorAction SilentlyContinue) {
-        $srcPath = Join-Path $opencodeCmdsSrc $dst.Name
-        if (-not (Test-Path -LiteralPath $srcPath -PathType Leaf)) {
-            Remove-Item -LiteralPath $dst.FullName -Force
-            $cmdsRemoved++
-        }
-    }
-    Write-Success "opencode commands: $cmdsAdded added, $cmdsSkipped already in sync, $cmdsRemoved orphans removed"
-} else {
-    Write-Info "opencode commands source missing: $opencodeCmdsSrc (skipping)"
-}
+# OpenCode commands are deployed from the committed vault skill records by
+# Deploy-SkillRecord near the end of this script (SDD-008, option A): each
+# record whose targets[] includes opencode is rendered to a
+# .config\opencode\commands\<n>.md command file (name: dropped), with stale
+# commands pruned. This replaces the former ai\opencode\commands copy loop; the
+# per-skill targets[] now expresses what was the hard-coded Claude-only skip-list.
 
 # ============================================================================
 # 3. DEPLOY GEMINI & ANTIGRAVITY CONFIGURATION (config deploy is always safe)
@@ -925,61 +849,13 @@ if (Test-Path $agyMdSource) {
     }
 }
 
-# Sync Gemini prompts: remove stale, then extract from current skills
-if (Test-Path $skillsSource) {
-    # Remove stale skill-derived prompts not in source
-    $existingPrompts = Get-ChildItem "$GeminiHome\prompts\*.md" -ErrorAction SilentlyContinue
-    foreach ($prompt in $existingPrompts) {
-        if (-not (Test-Path "$skillsSource\$($prompt.BaseName)")) {
-            Remove-Item $prompt.FullName -Force
-        }
-    }
-    # Extract SKILL.md content as flat prompts (strip YAML frontmatter)
-    $skillDirs = Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue
-    foreach ($skillDir in $skillDirs) {
-        $skillMd = "$($skillDir.FullName)\SKILL.md"
-        if (Test-Path $skillMd) {
-            $content = Get-Content $skillMd -Raw
-
-            # Strip YAML frontmatter (content between --- markers)
-            if ($content -match '^---\r?\n[\s\S]*?\r?\n---\r?\n(.*)$') {
-                $strippedContent = $Matches[1]
-            } else {
-                $strippedContent = $content
-            }
-
-            $targetFile = "$GeminiHome\prompts\$($skillDir.Name).md"
-            Set-Content -Path $targetFile -Value $strippedContent.Trim() -Encoding UTF8
-        }
-    }
-    Write-Success "Synced Gemini prompts to $GeminiHome\prompts\"
-}
-
-# Sync native Shared Skills for Antigravity (recognized as 'Shared' in agy).
-# Cross-OS parity with setup-linux.sh:398-419. Without this block, agy shows
-# "0 skills" on Windows even though the Linux side ships the full skill set.
-# Target: $GeminiHome\skills\<name>\SKILL.md (Shared path).
-if (Test-Path $skillsSource) {
-    $sharedSkillsDir = Join-Path $GeminiHome 'skills'
-    Ensure-Directory $sharedSkillsDir
-
-    # Remove stale shared skills (source dir no longer exists)
-    foreach ($target in Get-ChildItem $sharedSkillsDir -Directory -ErrorAction SilentlyContinue) {
-        if (-not (Test-Path (Join-Path $skillsSource $target.Name))) {
-            Remove-Item -Recurse -Force $target.FullName -ErrorAction SilentlyContinue
-        }
-    }
-
-    # Copy each skill directory (recursive, idempotent)
-    foreach ($skillDir in Get-ChildItem $skillsSource -Directory -ErrorAction SilentlyContinue) {
-        $skillMd = Join-Path $skillDir.FullName 'SKILL.md'
-        if (-not (Test-Path $skillMd)) { continue }
-        $dst = Join-Path $sharedSkillsDir $skillDir.Name
-        Ensure-Directory $dst
-        Copy-Item -Path (Join-Path $skillDir.FullName '*') -Destination $dst -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Write-Success "Synced Shared Skills to $sharedSkillsDir\"
-}
+# Agy skills (native Shared skills under $GeminiHome\skills and frontmatter-
+# stripped flat prompts under $GeminiHome\prompts) are deployed from the
+# committed vault skill records by Deploy-SkillRecord near the end of this
+# script (SDD-008, option A), honoring each skill's targets[]. The former
+# ai\skills extraction loops are gone.
+Ensure-Directory (Join-Path $GeminiHome 'skills')
+Ensure-Directory (Join-Path $GeminiHome 'prompts')
 
 # ============================================================================
 # 4. DEPLOY POWERSHELL PROFILE
@@ -1366,6 +1242,169 @@ if ($copilotCmd) {
 } else {
     Write-Info "GitHub Copilot CLI not installed; the dev tools block above attempts auto-install via winget GitHub.Copilot. Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
 }
+
+# ============================================================================
+# SDD-008: deploy skills from committed records (option A, render-at-deploy)
+# Windows port of `compile-harness.sh --deploy`. ENGINE-001's --refresh/--check
+# stay Linux-only; Windows consumes the committed records under harness/skills/,
+# the same way it consumes the committed harness override blocks. Each record is
+# rendered to its per-agent path under the user profile as a regular copy (never
+# a junction -- ends the BUG-100 class), honoring each skill's targets[]. Runs
+# after the per-agent base files are deployed so copilot catalog injection sees
+# the instructions file already in place.
+# ============================================================================
+
+function Test-SkillTargetsAgent {
+    param([string]$SkillMd, [string]$Agent)
+    if (-not (Test-Path -LiteralPath $SkillMd)) { return $false }
+    $fm = 0
+    foreach ($line in Get-Content -LiteralPath $SkillMd) {
+        if ($line -match '^---\s*$') { $fm++; if ($fm -ge 2) { break }; continue }
+        if ($fm -eq 1 -and $line -match '^targets:\s*(.+)$') {
+            return [bool]($Matches[1] -match ('\b' + [regex]::Escape($Agent) + '\b'))
+        }
+    }
+    return $true   # no targets: -> all agents
+}
+
+function Get-SkillField {
+    param([string]$SkillMd, [string]$Key)
+    $fm = 0
+    foreach ($line in Get-Content -LiteralPath $SkillMd) {
+        if ($line -match '^---\s*$') { $fm++; if ($fm -ge 2) { break }; continue }
+        if ($fm -eq 1 -and $line -match ('^' + [regex]::Escape($Key) + ':\s*(.+)$')) { return $Matches[1].Trim() }
+    }
+    return ''
+}
+
+function Convert-SkillRecord {
+    param([string]$Kind, [string]$RecordMd, [string]$SrcPath)
+    $sha = (Get-FileHash -LiteralPath $RecordMd -Algorithm SHA256).Hash.Substring(0, 16).ToLower()
+    if ($Kind -eq 'prompt') {
+        $raw = Get-Content -LiteralPath $RecordMd -Raw
+        if ($raw -match '^---\r?\n[\s\S]*?\r?\n---\r?\n([\s\S]*)$') { $body = $Matches[1] } else { $body = $raw }
+        return "<!-- generated: true; from: $SrcPath; sha256:$sha; edit the vault source + re-run setup -->`n`n" + $body.Trim()
+    }
+    $fm = 0
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($line in Get-Content -LiteralPath $RecordMd) {
+        if ($line -match '^---\s*$') {
+            $fm++
+            $out.Add($line)
+            if ($fm -eq 1) {
+                $out.Add('generated: true')
+                $out.Add("generated_from: $SrcPath")
+                $out.Add("generated_sha: $sha")
+            }
+            continue
+        }
+        if ($fm -eq 1 -and $Kind -eq 'command' -and $line -match '^name:') { continue }
+        $out.Add($line)
+    }
+    return ($out -join "`n")
+}
+
+function Deploy-SkillRecord {
+    param([string]$DotfilesDir)
+    $manifestPath = Join-Path $DotfilesDir 'harness\manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath)) { Write-Warn "harness manifest not found: $manifestPath"; return }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (-not $manifest.skills) { Write-Info "no skills block in manifest; skipping skill deploy"; return }
+    $recordDir = Join-Path $DotfilesDir ($manifest.skills.record_dir -replace '/', '\')
+    $vsub = $manifest.skills.vault_subpath
+    if (-not (Test-Path -LiteralPath $recordDir)) { Write-Warn "no skill records at $recordDir; skipping skill deploy"; return }
+    $records = @(Get-ChildItem -LiteralPath $recordDir -Directory -ErrorAction SilentlyContinue)
+
+    foreach ($d in $manifest.skills.deploy) {
+        $destBase = Join-Path $env:USERPROFILE ($d.dir -replace '/', '\')
+        Ensure-Directory $destBase
+        foreach ($rec in $records) {
+            $recMd = Join-Path $rec.FullName 'SKILL.md'
+            if (-not (Test-Path -LiteralPath $recMd)) { continue }
+            if (-not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $d.agent)) { continue }
+            $src = "$vsub/$($rec.Name)/SKILL.md"
+            if ($d.render -eq 'command' -or $d.render -eq 'prompt') {
+                $target = Join-Path $destBase ("{0}.md" -f $rec.Name)
+                if ((Test-Path -LiteralPath $target) -and ((Get-Item -LiteralPath $target -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                    Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+                }
+                Set-Content -LiteralPath $target -Value (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src) -Encoding UTF8
+            } else {
+                $destDir = Join-Path $destBase $rec.Name
+                if (Test-Path -LiteralPath $destDir) {
+                    $item = Get-Item -LiteralPath $destDir -Force
+                    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { cmd /c rmdir "$destDir" 2>&1 | Out-Null }
+                }
+                Ensure-Directory $destDir
+                Copy-Item -Path (Join-Path $rec.FullName '*') -Destination $destDir -Recurse -Force -ErrorAction SilentlyContinue
+                Set-Content -LiteralPath (Join-Path $destDir 'SKILL.md') -Value (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src) -Encoding UTF8
+            }
+        }
+        # Prune our own stale outputs (skill removed, or targets[] dropped this agent).
+        if ($d.render -eq 'command' -or $d.render -eq 'prompt') {
+            foreach ($f in Get-ChildItem -LiteralPath $destBase -Filter '*.md' -File -ErrorAction SilentlyContinue) {
+                if (-not (Select-String -LiteralPath $f.FullName -Pattern 'generated: true' -SimpleMatch -Quiet)) { continue }
+                $recMd = Join-Path (Join-Path $recordDir $f.BaseName) 'SKILL.md'
+                if (-not (Test-Path -LiteralPath $recMd) -or -not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $d.agent)) {
+                    Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue
+                }
+            }
+        } else {
+            foreach ($sd in Get-ChildItem -LiteralPath $destBase -Directory -ErrorAction SilentlyContinue) {
+                $deployedMd = Join-Path $sd.FullName 'SKILL.md'
+                if (-not (Test-Path -LiteralPath $deployedMd)) { continue }
+                if (-not (Select-String -LiteralPath $deployedMd -Pattern 'generated: true' -SimpleMatch -Quiet)) { continue }
+                $recMd = Join-Path (Join-Path $recordDir $sd.Name) 'SKILL.md'
+                if (-not (Test-Path -LiteralPath $recMd) -or -not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $d.agent)) {
+                    Remove-Item -LiteralPath $sd.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+    }
+
+    # Copilot catalog: inject a bullet list into the deployed instructions file.
+    if ($manifest.skills.catalog) {
+        $catFile = Join-Path $env:USERPROFILE ($manifest.skills.catalog.file -replace '/', '\')
+        $catAgent = $manifest.skills.catalog.agent
+        $beginPrefix = '<!-- BEGIN HARNESS GENERATED'
+        $endMarker = '<!-- END HARNESS GENERATED -->'
+        if ((Test-Path -LiteralPath $catFile) -and (Select-String -LiteralPath $catFile -Pattern $beginPrefix -SimpleMatch -Quiet)) {
+            $bullets = New-Object System.Collections.Generic.List[string]
+            foreach ($rec in ($records | Sort-Object Name)) {
+                $recMd = Join-Path $rec.FullName 'SKILL.md'
+                if (-not (Test-Path -LiteralPath $recMd)) { continue }
+                if (-not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $catAgent)) { continue }
+                $desc = Get-SkillField -SkillMd $recMd -Key 'description'
+                $bullets.Add(("- **{0}** -- {1}" -f $rec.Name, $desc))
+            }
+            $catBody = ($bullets -join "`n")
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($catBody + "`n")
+            $sha = (([System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 16)
+            $beginLine = "$beginPrefix (sha256:$sha) -- skill catalog from vault $vsub; edit there + re-run setup, do NOT edit between markers -->"
+            $result = New-Object System.Collections.Generic.List[string]
+            $state = 'before'
+            foreach ($line in Get-Content -LiteralPath $catFile) {
+                if ($state -eq 'before' -and $line.StartsWith($beginPrefix)) {
+                    $result.Add($beginLine)
+                    foreach ($b in $bullets) { $result.Add($b) }
+                    $state = 'inside'
+                    continue
+                }
+                if ($state -eq 'inside') {
+                    if ($line -eq $endMarker) { $result.Add($line); $state = 'after' }
+                    continue
+                }
+                $result.Add($line)
+            }
+            Set-Content -LiteralPath $catFile -Value $result -Encoding UTF8
+            Write-Success "Injected skill catalog into $catFile"
+        }
+    }
+
+    Write-Success "Skills deployed from records (claude / opencode / agy / copilot)"
+}
+
+Deploy-SkillRecord -DotfilesDir $DotfilesDir
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
 # Self-healing: compare existing action arguments against expected and rewrite

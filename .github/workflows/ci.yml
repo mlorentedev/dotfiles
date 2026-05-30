@@ -29,9 +29,9 @@ jobs:
         run: |
           shellcheck --severity=error setup-linux.sh
 
-      - name: Verify opencode commands in sync with Claude skills (AI-012)
+      - name: Verify skill records render cleanly, offline (SDD-008)
         run: |
-          ./scripts/skills-to-opencode.sh --check
+          ./scripts/compile-harness.sh --check
 
   lint-powershell:
     runs-on: ubuntu-latest

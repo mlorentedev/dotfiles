@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mlorentedev.dev/schemas/skill-frontmatter.schema.json",
+  "title": "SKILL.md frontmatter",
+  "description": "Contract for skill frontmatter validated by compile-harness.sh before render (SDD-008). Required fields are the universal subset present in every skill (Claude Code convention: name + description); vault skills additionally carry id/type/status/allowed-tools. Lives in the repo (not the vault) so validation runs offline, consistent with ENGINE-001's committed source-of-record.",
+  "type": "object",
+  "required": ["name", "description"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "description": "Skill identifier; also the deployed directory/command name." },
+    "description": { "type": "string", "minLength": 1, "description": "Trigger/when-to-use text agents match against." },
+    "allowed-tools": { "description": "Optional tool allowlist (Claude Code)." },
+    "targets": { "description": "Optional per-skill agent allowlist (e.g. [claude, opencode]); absent = all agents." },
+    "id": { "type": "string" },
+    "type": { "type": "string" },
+    "status": { "type": "string" },
+    "created": {}
+  },
+  "additionalProperties": true
+}

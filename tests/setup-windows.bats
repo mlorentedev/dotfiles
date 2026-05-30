@@ -334,11 +334,21 @@ setup() {
     grep -qE 'Substitute-EnvPlaceholders.*opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 syncs OpenCode commands with orphan removal (AI-014)" {
-    # The commands sync writes to .config\opencode\commands and removes any
-    # .md file present in the destination that does not exist in the source.
-    grep -qF '.config\opencode\commands' "$PS1_SCRIPT"
-    grep -qF 'cmds_removed' "$PS1_SCRIPT" || grep -qF '$cmdsRemoved' "$PS1_SCRIPT"
+@test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {
+    # opencode commands (and claude/agy skills) are now rendered from the committed
+    # vault skill records by Deploy-SkillRecord, honoring per-skill targets[], with
+    # stale outputs pruned -- replacing the former ai\opencode\commands copy loop.
+    grep -qF 'function Deploy-SkillRecord' "$PS1_SCRIPT"
+    grep -qF 'Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT"
+    grep -qF 'Test-SkillTargetsAgent' "$PS1_SCRIPT"
+    grep -qF 'harness\manifest.json' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 no longer deploys skills from the removed ai\\skills tree (SDD-008)" {
+    # the ai\skills / ai\opencode\commands references that remain are historical
+    # comments in the Deploy-SkillRecord block, never active Test-Path sources.
+    ! grep -qE '\$skillsSource\s*=\s*"\$DotfilesDir\\ai\\skills"' "$PS1_SCRIPT"
+    ! grep -qE '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---

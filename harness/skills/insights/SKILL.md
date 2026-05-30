@@ -1,5 +1,6 @@
 ---
 name: insights
+targets: [claude]
 description: Use when checking AI workflow health, vault structural integrity, or knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale MEMORY.md, unvaulted observations, vault structural issues, or before starting a major sprint.
 ---
 

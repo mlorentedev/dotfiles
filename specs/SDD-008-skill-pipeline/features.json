@@ -1,0 +1,58 @@
+[
+  {
+    "id": "SDD-008-f1-zero-symlinks",
+    "behavior": "AC1 — no deployed skill path is a symlink. --deploy de-symlinks any pre-existing vault symlink and writes a regular copy; healthcheck.sh asserts it on-machine.",
+    "verification": "bats tests/skills-pipeline.bats -f 'no deployed skill path is a symlink' && bats tests/compile-harness.bats -f 'replaces a pre-existing vault symlink'",
+    "state": "verifying",
+    "evidence": "Phase 5: --deploy de-symlink + AC1 smoke tests green; healthcheck.sh check added (compile-harness.bats 'symlink-free' assert). Full setup-linux.sh end-to-end exercised by the integration container."
+  },
+  {
+    "id": "SDD-008-f2-single-ssot",
+    "behavior": "AC2 — vault 00_meta/skills is the single SSOT; the migrated skills are gone from the repo (ai/skills holds only a README stub) and skills-to-opencode.sh + ai/opencode/commands are removed.",
+    "verification": "test ! -d ai/skills || [ \"$(ls -1 ai/skills | grep -vc '^README')\" -eq 0 ]; test ! -e scripts/skills-to-opencode.sh; test ! -d ai/opencode/commands",
+    "state": "verifying",
+    "evidence": "Phase 4 migrated 17 skills to the vault (22 total there); Phase 5 removed ai/skills/* (README stub remains), scripts/skills-to-opencode.sh, and ai/opencode/commands/."
+  },
+  {
+    "id": "SDD-008-f3-drift-check",
+    "behavior": "AC3 — compile-harness.sh --check detects skill-record drift offline (no vault): each committed record must render cleanly; invalid frontmatter fails.",
+    "verification": "bats tests/compile-harness.bats -f 'AC3'",
+    "state": "verifying",
+    "evidence": "Phase 5: --check validates every record renders (offline); 2 tests green (offline pass on a clean tree; fail on an invalid record). Wired into CI lint + healthcheck.sh."
+  },
+  {
+    "id": "SDD-008-f4-provenance",
+    "behavior": "AC4 (reconciled) — rendered outputs carry provenance: skill/command get `generated:`/`generated_from:`/`generated_sha:` frontmatter fields; prompt gets a leading `<!-- generated: ... sha256:... -->` comment. Provenance is added at --deploy, not committed (a leading comment would break the YAML frontmatter agents parse).",
+    "verification": "bats tests/compile-harness.bats -f 'renders records to .HOME with provenance'",
+    "state": "verifying",
+    "evidence": "Phase 5: provenance asserted in claude/opencode/agy deployed outputs (sha256 + source path); records themselves stay verbatim (provenance is deploy-time)."
+  },
+  {
+    "id": "SDD-008-f5-schema",
+    "behavior": "AC5 (reconciled) — malformed / missing-required frontmatter fails --refresh with file context. Required = name + description (the universal subset), not the proposal's id/type/allowed-tools (which would reject valid skills).",
+    "verification": "bats tests/compile-harness.bats -f 'schema:'",
+    "state": "verifying",
+    "evidence": "Phase 2: harness/skill-frontmatter.schema.json + validator; tests for missing name and unterminated frontmatter green; also enforced by --check on committed records."
+  },
+  {
+    "id": "SDD-008-f6-targets",
+    "behavior": "AC6 — per-skill targets[] limits which agents receive output; agy gets a native skill + a flat prompt; copilot gets a marker-injected catalog that also honors targets[]. Five Claude-only skills carry targets:[claude].",
+    "verification": "bats tests/compile-harness.bats -f 'targets|catalog|agy' && bats tests/skills-pipeline.bats -f 'Claude-only'",
+    "state": "verifying",
+    "evidence": "Phases 3+5: targets opt-out at deploy, agy native+prompt renderers, copilot catalog injection (into $HOME). Real records: opencode/agy deploy 17 skills, claude 22; creating-skills excluded from opencode/agy."
+  },
+  {
+    "id": "SDD-008-f7-pattern-doc",
+    "behavior": "AC7 — vault 00_meta/patterns/pattern-cross-agent-skill-pipeline.md exists and cross-links pattern-spec-driven-development.md bidirectionally.",
+    "verification": "test -f \"$HOME/Projects/knowledge/00_meta/patterns/pattern-cross-agent-skill-pipeline.md\" && grep -q pattern-spec-driven-development \"$HOME/Projects/knowledge/00_meta/patterns/pattern-cross-agent-skill-pipeline.md\" && grep -q pattern-cross-agent-skill-pipeline \"$HOME/Projects/knowledge/00_meta/patterns/pattern-spec-driven-development.md\"",
+    "state": "verifying",
+    "evidence": "Phase 6: pattern doc created in the vault; bidirectional [[wikilink]] cross-link verified on the authoring machine. Vault-dependent (private repo), so not run in dotfiles CI."
+  },
+  {
+    "id": "SDD-008-f8-smoke",
+    "behavior": "AC8 — after deploy, /spec is discoverable for claude + opencode (and agy); the vault -> record -> render -> deploy -> discovery round-trip lands files at each agent's discovery path.",
+    "verification": "bats tests/skills-pipeline.bats -f 'smoke'",
+    "state": "verifying",
+    "evidence": "Phase 6: skills-pipeline.bats renders the committed records to a throwaway HOME and asserts /spec at the claude/opencode/agy discovery paths (5/5 green). The integration container runs the full setup-linux.sh."
+  }
+]

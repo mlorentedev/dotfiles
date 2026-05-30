@@ -1,5 +1,6 @@
 ---
 name: executing-plans
+targets: [claude]
 description: Use when you have a written implementation plan to execute, typically after /writing-plans produces a plan file.
 ---
 
