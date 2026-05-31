@@ -27,6 +27,48 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
 - Strategic planning across milestones -> use `/writing-plans`.
 - If you cannot point to ANY vault entry justifying this spec (backlog, ADR, roadmap) — don't run the skill yet; first crystallize the work in the vault.
 
+---
+
+## Agent-Side Activation Rule
+
+> **Proactive mode.** The subcommands below are *reactive* — they run when a human types `/spec …`. This rule makes the agent *proactive*: when work is being scoped in conversation and a Discipline Gate trigger is met, the agent applies the Skip-SDD heuristic itself and PROPOSES `/spec init <id>` — it does not wait to be asked. The always-on trigger that primes this behavior lives in `AGENTS.md` ("Discipline Gate"); this section is the SSOT for *how* the agent decides and *how* it phrases the proposal.
+
+### Checks the agent runs
+
+When a change is being planned or has just been described, silently evaluate it against the Discipline Gate triggers (authoritative list: `AGENTS.md` → "Discipline Gate (NON-NEGOTIABLE)" / `pattern-spec-driven-development.md` → "Trigger Criteria"):
+
+1. **Size** — does the change look like ~50–300+ LOC of production diff (excluding tests, generated files, lockfiles)?
+2. **Public contract** — does it touch an API, CLI flag, exported type, alias name, file path, deployed config schema, or *agent behavior*?
+3. **Dependency** — does it add or remove a dependency?
+4. **Multi-PR** — is it the first step of a multi-PR sequence?
+5. **Socratic** — does it warrant a Socratic Guardrail pause (architecture, schema design, concurrency, breaking change)?
+
+If ANY trigger fires AND none of the "When NOT to propose" conditions hold → propose a spec.
+
+### How to phrase the proposal
+
+Surface a short, skippable proposal that states the evidence — don't just assert. Template:
+
+> This looks like a Discipline-Gate trigger: **<which trigger(s) fired>** (e.g. "~120 LOC + touches a deployed config schema"). I ran the Skip-SDD checks — it does **not** qualify for skip. Propose `/spec init <feature-id>` before writing code? (id from the vault backlog, or a new `11-tasks.md` entry.)
+
+- **List the checks you ran**, not just the verdict — the evidence is the value (mirrors the Model-Tier "the proposal IS the value" rule in `AGENTS.md`).
+- **Offer, don't impose.** The human decides. If they decline, proceed without the spec and do not re-propose for the same change.
+- **Suggest the id.** Derive `<feature-id>` from an existing vault entry if one matches; otherwise propose creating the 1-line `11-tasks.md` entry first (the vault gate).
+
+### When NOT to propose
+
+Silence is correct when ANY of these hold — proposing here is noise:
+
+- **Trivial change** per the Skip-SDD list: typo, comment-only, mechanical rename, doc-only, or an obvious bugfix <20 LOC.
+- **Already inside an active spec** — `specs/<id>/` exists for this work; just keep implementing and ticking `tasks.md`.
+- **User already declined** a spec for this change in the current thread (once-per-change debounce — do not nag).
+- **Pure exploration / question** — no change is being committed yet.
+- **Emergency / hotfix** the user has explicitly fast-tracked.
+
+When unsure whether a change crosses the threshold, ASK rather than assume (`AGENTS.md`: "When in doubt, ASK the user") — a one-line "want a spec for this?" is cheaper than either a missed spec or an unwanted one.
+
+---
+
 ## Environment (resolve once per invocation)
 
 - `$VAULT_PATH` — env var. Cross-OS default `$HOME/Projects/knowledge` (Linux/macOS) or `%USERPROFILE%\Projects\knowledge` (Windows).
