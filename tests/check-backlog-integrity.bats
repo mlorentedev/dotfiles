@@ -35,6 +35,17 @@ EOF
     echo "$output" | grep -q 'ENGINE-001'
 }
 
+@test "full-id: same NUMBER, different slug -> exit 0 + advisory NOTE (not drift)" {
+    cat > "$TMP/collide.md" <<'EOF'
+- [x] **BUG-020-pwsh-profile-corruption-heal**: fixed via #122
+- [x] **BUG-020-splitpath-literalpath-parent**: a DIFFERENT bug, fixed via #124
+EOF
+    run "$SCRIPT" "$TMP/collide.md"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qi 'NOTE'
+    echo "$output" | grep -q 'BUG-020'
+}
+
 @test "AC2 contradiction: same ID both [ ] and [x] -> exit 1, flagged as contradiction" {
     cat > "$TMP/contra.md" <<'EOF'
 - [ ] **POLISH-004-bundle**: still open in the sprint overview
