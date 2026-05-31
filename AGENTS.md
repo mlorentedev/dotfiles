@@ -227,7 +227,7 @@ Stop generation and warn if you detect:
 
 **CORE PRINCIPLE:** Code lives in Git. **Knowledge placement depends on the project model** (Standing Order #2): a repo's build/operate docs — ADRs (`docs/adr/`), runbooks, troubleshooting — live in that repo's `docs/`; the vault (`~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows) holds the cross-project brain, AI memory, and personal/methodology lessons. Patterns: `pattern-knowledge-placement`, `pattern-platform-governance`.
 **LANGUAGE:** All Vault content MUST be in English.
-**COMMIT POLICY:** Default to staging changes only; **commit / push / open PRs only when the user asks** (this preserves the guardrail while fitting workflows — like this repo's PR-per-feature flow — that routinely commit on request).
+**COMMIT POLICY:** **Autonomous agents** (no human in the loop) may commit autonomously **only within their vault workspace `80_agents/`** — that sandbox is theirs; everywhere else (code repos + the rest of the vault) they stage only and leave commits for human approval. **Interactive / in-session agents** stage by default and commit / push / open PRs **when the user asks** (e.g. this repo's PR-per-feature flow).
 **REPO DOCS:** Repos on the knowledge-placement model keep `docs/` (with `docs/adr/`) in-repo and may keep a root `CHANGELOG.md`. This **supersedes the older blanket "never create `docs/`" stance** (closes CHORE-002). Still avoid ad-hoc `TODO.md` — tasks live in `specs/` + the backlog.
 
 ### Phase 1: Context Sync (Read First)
