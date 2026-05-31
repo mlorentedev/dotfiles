@@ -1,0 +1,23 @@
+[
+  {
+    "id": "SDD-012-tasks-integrity-guard-f1",
+    "behavior": "AC1/AC2/AC3 — the guard flags duplicate ticket IDs and status contradictions, passes a clean file, and keeps WIN-002 vs WIN-002a distinct",
+    "verification": "~/.local/bin/bats tests/check-backlog-integrity.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-012-tasks-integrity-guard-f2",
+    "behavior": "AC4 — wired + discoverable: vault.sh dispatches check-tasks and vault-health.sh carries a GUI-independent Backlog Integrity section",
+    "verification": "grep -q 'check-backlog-integrity.sh' scripts/vault.sh && grep -q 'Backlog Integrity' scripts/vault-health.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-012-tasks-integrity-guard-f3",
+    "behavior": "Scripts are lint-clean (shellcheck + bash -n) across the guard, dispatcher, and vault-health",
+    "verification": "~/.local/bin/shellcheck scripts/check-backlog-integrity.sh scripts/vault.sh scripts/vault-health.sh",
+    "state": "pending",
+    "evidence": ""
+  }
+]
