@@ -30,12 +30,17 @@ Subcommands:
       Scan markdown files for literal '\n' corruption (Hive vault_patch bug).
       Path may be a file or directory; directories scanned recursively.
 
+  check-tasks <tasks-file>...
+      Scan task files for backlog drift: duplicate ticket IDs and status
+      contradictions (same ID marked both [ ] and [x]). One ticket = one entry.
+
   help, -h, --help
       Show this message.
 
 Each subcommand is also runnable standalone (vault-health.sh,
-vault-maintenance-weekly.sh, check-md-escapes.sh) — this dispatcher provides
-a single discoverable entry point without changing the underlying scripts.
+vault-maintenance-weekly.sh, check-md-escapes.sh, check-backlog-integrity.sh) —
+this dispatcher provides a single discoverable entry point without changing the
+underlying scripts.
 EOF
 }
 
@@ -56,6 +61,9 @@ case "$sub" in
         ;;
     check-escapes|check)
         exec "$SCRIPT_DIR/check-md-escapes.sh" "$@"
+        ;;
+    check-tasks|tasks)
+        exec "$SCRIPT_DIR/check-backlog-integrity.sh" "$@"
         ;;
     help|-h|--help)
         usage

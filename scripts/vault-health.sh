@@ -81,7 +81,7 @@ echo "========================================"
 echo "Vault: $VAULT_NAME ($VAULT_DIR)"
 
 # ==================================================
-section "1/6" "Working Tree Integrity"
+section "1/7" "Working Tree Integrity"
 
 # GUI-independent check: detect files deleted from working tree but still in HEAD.
 # Triggered by 2026-05-13 incident — SKILL.md vanished from disk, git status showed `D`.
@@ -103,7 +103,7 @@ else
 fi
 
 # ==================================================
-section "2/6" "Vault Connectivity"
+section "2/7" "Vault Connectivity"
 
 if ! command_exists obsidian; then
     log_error "Obsidian CLI not found in PATH"
@@ -123,7 +123,7 @@ else
 fi
 
 # ==================================================
-section "3/6" "Orphans & Dead-Ends"
+section "3/7" "Orphans & Dead-Ends"
 
 ORPHAN_OUTPUT=$(obsidian_cmd orphans --vault "$VAULT_NAME" 2>/dev/null || true)
 ORPHAN_COUNT=$(echo "$ORPHAN_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
@@ -166,7 +166,7 @@ if [ "$VERBOSE" = true ]; then
 fi
 
 # ==================================================
-section "4/6" "Unresolved Links"
+section "4/7" "Unresolved Links"
 
 UNRESOLVED_OUTPUT=$(obsidian_cmd unresolved --vault "$VAULT_NAME" 2>/dev/null || true)
 UNRESOLVED_COUNT=$(echo "$UNRESOLVED_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
@@ -186,7 +186,7 @@ if [ "$VERBOSE" = true ] && [ "$UNRESOLVED_COUNT" -gt 0 ]; then
 fi
 
 # ==================================================
-section "5/6" "Frontmatter Coverage"
+section "5/7" "Frontmatter Coverage"
 
 check_frontmatter_field() {
     local field="$1"
@@ -216,7 +216,7 @@ else
 fi
 
 # ==================================================
-section "6/6" "Tag Hygiene"
+section "6/7" "Tag Hygiene"
 
 TAG_OUTPUT=$(obsidian_cmd tags --vault "$VAULT_NAME" 2>/dev/null || true)
 TAG_COUNT=$(echo "$TAG_OUTPUT" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
@@ -226,6 +226,33 @@ if [ "$VERBOSE" = true ] && [ "$TAG_COUNT" -gt 0 ]; then
     echo "  --- Tags ---"
     echo "$TAG_OUTPUT" | head -30
     [ "$TAG_COUNT" -gt 30 ] && echo "  ... and $((TAG_COUNT - 30)) more"
+fi
+
+# ==================================================
+section "7/7" "Backlog Integrity"
+
+# GUI-independent: detect backlog drift in project task files — duplicate ticket
+# IDs and status contradictions — via check-backlog-integrity.sh (SDD-012).
+# Incident->guard sibling of the working-tree (sec 1) and \n-escape checks.
+if [ ! -d "$VAULT_DIR" ]; then
+    skip "Backlog integrity" "vault dir not found"
+else
+    BACKLOG_FILES=0
+    BACKLOG_BAD=0
+    for tasks in "$VAULT_DIR"/10_projects/*/11-tasks.md; do
+        [ -f "$tasks" ] || continue
+        BACKLOG_FILES=$((BACKLOG_FILES + 1))
+        if ! "$SCRIPT_DIR/check-backlog-integrity.sh" "$tasks" >/dev/null 2>&1; then
+            BACKLOG_BAD=$((BACKLOG_BAD + 1))
+            fail "Backlog drift in $(basename "$(dirname "$tasks")")/11-tasks.md (duplicate IDs / status contradictions)"
+            "$SCRIPT_DIR/check-backlog-integrity.sh" "$tasks" 2>/dev/null | sed 's|^|        |'
+        fi
+    done
+    if [ "$BACKLOG_FILES" -eq 0 ]; then
+        skip "Backlog integrity" "no 10_projects/*/11-tasks.md found"
+    elif [ "$BACKLOG_BAD" -eq 0 ]; then
+        pass "Backlog integrity: $BACKLOG_FILES task file(s) clean (one ticket = one entry)"
+    fi
 fi
 
 # ==================================================
