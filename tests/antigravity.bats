@@ -54,12 +54,16 @@ setup() {
     grep -qF 'Obsidian vault not found at' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup-windows.ps1 syncs Shared Skills to ~/.gemini/skills (closes 0-skills-on-Windows bug)" {
-    # setup-linux.sh:398-419 deploys to ~/.gemini/skills (Shared path); parity
-    # was missing on Windows -> agy displayed "0 skills". This test locks the
-    # cross-OS parity.
-    grep -qF 'Synced Shared Skills to' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'sharedSkillsDir' "$DOTFILES_DIR/setup-windows.ps1"
+@test "setup-windows.ps1 deploys agy skills via the SDD-008 engine (closes 0-skills-on-Windows bug, cross-OS parity)" {
+    # SDD-008 (#179) replaced the per-agent sharedSkillsDir sync with the unified
+    # render-at-deploy engine (Deploy-SkillRecord on Windows, compile-harness
+    # --deploy on Linux). The old 'Synced Shared Skills to' / 'sharedSkillsDir'
+    # literals are gone from both setups. From a Linux box we cannot run the
+    # Windows setup, so we static-check that the Windows script still wires up
+    # agy skill deployment: it invokes Deploy-SkillRecord and provisions the
+    # gemini skills dir. This locks the cross-OS parity at the live mechanism.
+    grep -qF 'Deploy-SkillRecord' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF "GeminiHome 'skills'" "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "ai/agy/AGY.md H1 is '# AGY.md' (regression: GEMINI.md->AGY.md rename completeness)" {
