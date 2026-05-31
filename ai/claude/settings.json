@@ -47,6 +47,18 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__SESSION_END_COMMAND__",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {

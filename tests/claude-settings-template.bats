@@ -40,6 +40,20 @@ setup() {
     [[ "$(jq -r '.hooks.SessionStart[0].hooks[0].type' "$SETTINGS_TEMPLATE")" == "command" ]]
 }
 
+# --- hooks.SessionEnd with placeholder (MEMORY-001 session bridge) ---
+
+@test "template hooks.SessionEnd contains __SESSION_END_COMMAND__ placeholder" {
+    [[ "$(jq -r '.hooks.SessionEnd[0].hooks[0].command' "$SETTINGS_TEMPLATE")" == "__SESSION_END_COMMAND__" ]]
+}
+
+@test "setup-linux merge wires hooks.SessionEnd from template" {
+    grep -qF '.hooks.SessionEnd = $tmpl.hooks.SessionEnd' setup-linux.sh
+}
+
+@test "setup-windows merge wires hooks.SessionEnd from template" {
+    grep -qF "\$existing['hooks']['SessionEnd'] = \$template['hooks']['SessionEnd']" setup-windows.ps1
+}
+
 # --- permissions.allow: MCP entries required, Bash/WebSearch/WebFetch/Skill allowed ---
 
 @test "template permissions.allow has at least 3 entries" {

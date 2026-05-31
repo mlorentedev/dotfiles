@@ -154,7 +154,8 @@ function Merge-ClaudeSettings {
     param(
         [Parameter(Mandatory)][string]$TemplatePath,
         [Parameter(Mandatory)][string]$TargetPath,
-        [Parameter(Mandatory)][string]$HookCommand
+        [Parameter(Mandatory)][string]$HookCommand,
+        [Parameter(Mandatory)][string]$SessionEndCommand
     )
 
     if (-not (Test-Path $TemplatePath)) {
@@ -164,7 +165,8 @@ function Merge-ClaudeSettings {
 
     # Read template, JSON-escape the hook command, substitute __HOOK_COMMAND__
     $escapedCommand = ($HookCommand -replace '\\', '\\') -replace '"', '\"'
-    $templateRaw = (Get-Content $TemplatePath -Raw) -replace '__HOOK_COMMAND__', $escapedCommand
+    $escapedEndCommand = ($SessionEndCommand -replace '\\', '\\') -replace '"', '\"'
+    $templateRaw = (Get-Content $TemplatePath -Raw) -replace '__HOOK_COMMAND__', $escapedCommand -replace '__SESSION_END_COMMAND__', $escapedEndCommand
     try {
         $template = $templateRaw | ConvertFrom-Json -AsHashtable
     } catch {
@@ -207,6 +209,10 @@ function Merge-ClaudeSettings {
     if ($template.ContainsKey('hooks') -and $template['hooks'].ContainsKey('SessionStart')) {
         if (-not $existing.ContainsKey('hooks')) { $existing['hooks'] = @{} }
         $existing['hooks']['SessionStart'] = $template['hooks']['SessionStart']
+    }
+    if ($template.ContainsKey('hooks') -and $template['hooks'].ContainsKey('SessionEnd')) {
+        if (-not $existing.ContainsKey('hooks')) { $existing['hooks'] = @{} }
+        $existing['hooks']['SessionEnd'] = $template['hooks']['SessionEnd']
     }
 
     # enabledPlugins: object merge (template wins on conflict). User-added
@@ -1049,6 +1055,14 @@ if (Test-Path $sessionStartSource) {
     Write-Warn "claude-session-start.ps1 not found at $sessionStartSource"
 }
 
+$sessionHandoffSource = "$DotfilesDir\scripts\session-handoff.ps1"
+if (Test-Path $sessionHandoffSource) {
+    Copy-Item $sessionHandoffSource "$ScriptsDir\" -Force
+    Write-Success "Deployed session-handoff.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "session-handoff.ps1 not found at $sessionHandoffSource"
+}
+
 $memHealSource = "$DotfilesDir\scripts\claude-mem-heal.ps1"
 if (Test-Path $memHealSource) {
     Copy-Item $memHealSource "$ScriptsDir\" -Force
@@ -1205,8 +1219,10 @@ $ClaudeSettings = "$ClaudeHome\settings.json"
 $ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
 $sessionStartCmd = "$ScriptsDir\claude-session-start.ps1"
 $expectedHookCommand = "pwsh -NoProfile -File `"$sessionStartCmd`""
+$sessionEndCmd = "$ScriptsDir\session-handoff.ps1"
+$expectedSessionEndCommand = "pwsh -NoProfile -File `"$sessionEndCmd`""
 
-Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings -HookCommand $expectedHookCommand
+Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings -HookCommand $expectedHookCommand -SessionEndCommand $expectedSessionEndCommand
 
 # ============================================================================
 # 8. GITHUB COPILOT CLI

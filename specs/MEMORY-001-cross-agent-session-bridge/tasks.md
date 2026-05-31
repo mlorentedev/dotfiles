@@ -18,8 +18,8 @@ created: "2026-05-13"
 - [x] Failing bats `tests/session-handoff.bats` (fixture `SessionEnd` payload) → RED (AC1)
 - [x] `scripts/session-handoff.sh`: parse stdin JSON (`jq`), locate the project MEMORY.md, **archive its `## Session Handoff` block** to `00_meta/sessions/<date>-<project>-claude.md`; resilient no-op on trivial/missing/malformed input → GREEN (AC1). *(Design: the agent authors via /handoff; the hook persists — see ADR-014.)*
 - [x] bats: no handoff block / no MEMORY.md / empty stdin → no record, clean exit (AC2)
-- [ ] **(next increment — deploy plumbing)** Wire the Claude `SessionEnd` hook in `ai/claude/settings.json` + the setup merge policy (placeholder substitution + `.hooks.SessionEnd` merge, cross-OS `setup-{linux,windows}`) + settings-template assert (AC3)
-- [ ] **(next increment)** `scripts/session-handoff.ps1` Windows port + Pester parity (AC4)
+- [x] Wire the Claude `SessionEnd` hook in `ai/claude/settings.json` (`__SESSION_END_COMMAND__`) + the setup merge policy (substitution + `.hooks.SessionEnd` merge, cross-OS `setup-{linux,windows}`) + `claude-settings-template.bats` asserts (AC3)
+- [x] `scripts/session-handoff.ps1` Windows port (ASCII-only functional mirror) + deployed by `setup-windows.ps1` (AC4 — Windows runtime validation remains empirical)
 
 ## Closing
 
