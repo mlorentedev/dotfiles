@@ -1,7 +1,7 @@
 ---
 id: "SDD-012-tasks-integrity-guard"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-31"
 tags: [spec, proposal, vault-health, incident-to-guard, backlog-hygiene, sdd-006-sibling]
 template_version: "1.0"
@@ -50,3 +50,5 @@ Concrete, observable behavior after this PR:
 - Dispatcher: `scripts/vault.sh` (REFACTOR-005), `scripts/vault-health.sh`
 - Vault: `10_projects/dotfiles/11-tasks.md` (the drifted file); backlog entry SDD-012 to be added when the vault checkout is free
 - AGENTS.md Standing Order #4 (clean as you go) + the "incident → guard" feedback guardrail
+
+<!-- archived 2026-05-31 — PR: https://github.com/mlorentedev/dotfiles/pull/183 -->
