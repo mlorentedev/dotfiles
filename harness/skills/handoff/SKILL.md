@@ -36,11 +36,15 @@ OVERWRITE the `## Session Handoff` section (the first section after the H1) of t
 
 Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handoff, not journal); convert relative dates to absolute. **Path:** the project's auto-memory `MEMORY.md`, which is junctioned into `vault/10_projects/<repo>/memory/` — so any agent can write it. This is the only place strategic continuity prose lives (the rest of `MEMORY.md` stays index-only).
 
-### 2. Vault hygiene (Standing Order #3 — in-session, never "later")
+### 2. Knowledge & documentation sync (Standing Order #3 — in-session, never "later")
 
+**Vault knowledge:**
 - Tick completed tasks in `vault/10_projects/<repo>/11-tasks.md` (`[ ]` -> `[x]` + ✓ date + PR link). Keep the file guard-green (one ticket = one entry — see SDD-012 `check-backlog-integrity.sh`).
-- Capture any non-obvious lesson in `90-lessons.md` (Context / Problem / Solution / Tags).
-- New architectural decision -> `30-architecture/adr-XXX.md`. Recurring pattern -> `00_meta/patterns/`.
+- Capture any non-obvious lesson in `90-lessons.md` (Context / Problem / Solution / Tags). New architectural decision -> an ADR; recurring pattern -> `00_meta/patterns/`.
+
+**Repo documentation (keep it reflecting the latest state):**
+- If the session changed behavior, structure, commands, public contracts, or setup, update the repo docs that describe them: `README.md` and the repo's `docs/` (ADRs, runbooks, troubleshooting) for repos on the knowledge-placement model. ADRs in this repo live in `docs/adr/`.
+- **Scope = this session's deltas, NOT a full audit.** A complete README/docs reconciliation is a dedicated task (e.g. an `AUDIT-*` ticket), not something every handoff redoes — the goal here is simply that docs do not drift behind the code the session just changed.
 
 ### 3. Repo / worktree / branch state
 
