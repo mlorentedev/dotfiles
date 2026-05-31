@@ -317,11 +317,11 @@ setup() {
     # Post-SDD-008: setup-linux.sh runs compile-harness.sh --deploy, which renders
     # each committed vault skill record whose targets[] includes opencode to a
     # command .md. The container has no vault, so --refresh is skipped and --deploy
-    # uses the committed records (22 skills, 5 Claude-only opt out -> 17 commands).
+    # uses the committed records (23 skills, 5 Claude-only opt out -> 18 commands).
     [ -d "$HOME/.config/opencode/commands" ]
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
-    [ "$count" -eq 17 ]
+    [ "$count" -eq 18 ]  # 17 -> 18: HANDOFF-001 added the /handoff skill (targets all agents)
     # Spot check: audit.md present (portable), creating-skills.md absent (targets:[claude]).
     [ -f "$HOME/.config/opencode/commands/audit.md" ]
     [ ! -f "$HOME/.config/opencode/commands/creating-skills.md" ]
