@@ -13,13 +13,13 @@ created: "2026-05-13"
 - [x] **ADR-014** written + ratified (`docs/adr/adr-014-cross-agent-session-memory-bridge.md`)
 - [x] `proposal.md` complete; acceptance criteria testable
 
-## Implementation (follow-up — TDD)
+## Implementation (TDD)
 
-- [ ] Write failing bats: `session-handoff.sh` fed a fixture `SessionEnd` payload writes `00_meta/sessions/<date>-<project>-claude.md` (AC1)
-- [ ] Implement `scripts/session-handoff.sh`: parse stdin JSON (`jq`), gate on non-trivial, render the session record from the `/handoff` schema → green (AC1)
-- [ ] bats: trivial-session payload → no record written (AC2)
-- [ ] Wire the Claude `SessionEnd` hook in `ai/claude/settings.json` → `session-handoff.sh`; extend the settings merge policy assert (AC3)
-- [ ] `scripts/session-handoff.ps1` parity stub + cross-OS fixture parity assert (AC4)
+- [x] Failing bats `tests/session-handoff.bats` (fixture `SessionEnd` payload) → RED (AC1)
+- [x] `scripts/session-handoff.sh`: parse stdin JSON (`jq`), locate the project MEMORY.md, **archive its `## Session Handoff` block** to `00_meta/sessions/<date>-<project>-claude.md`; resilient no-op on trivial/missing/malformed input → GREEN (AC1). *(Design: the agent authors via /handoff; the hook persists — see ADR-014.)*
+- [x] bats: no handoff block / no MEMORY.md / empty stdin → no record, clean exit (AC2)
+- [ ] **(next increment — deploy plumbing)** Wire the Claude `SessionEnd` hook in `ai/claude/settings.json` + the setup merge policy (placeholder substitution + `.hooks.SessionEnd` merge, cross-OS `setup-{linux,windows}`) + settings-template assert (AC3)
+- [ ] **(next increment)** `scripts/session-handoff.ps1` Windows port + Pester parity (AC4)
 
 ## Closing
 

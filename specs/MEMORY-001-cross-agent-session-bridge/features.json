@@ -1,0 +1,16 @@
+[
+  {
+    "id": "MEMORY-001-cross-agent-session-bridge-f1",
+    "behavior": "AC1/AC2 — session-handoff.sh archives the MEMORY.md handoff block into 00_meta/sessions/ from a SessionEnd payload, and is a resilient no-op on trivial/missing/empty input",
+    "verification": "~/.local/bin/bats tests/session-handoff.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-001-cross-agent-session-bridge-f2",
+    "behavior": "session-handoff.sh is lint-clean",
+    "verification": "~/.local/bin/shellcheck scripts/session-handoff.sh",
+    "state": "pending",
+    "evidence": ""
+  }
+]
