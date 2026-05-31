@@ -50,16 +50,22 @@ EOF
 }
 
 # --- locate repo + inputs ---
-if ! REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    printf '[ERROR] not in a git repo\n' >&2
-    exit 1
-fi
+# Resolve the repo/deploy root from the script's own location: CWD-independent
+# and deploy-model-independent. Correct in a git checkout, a linked worktree, and
+# the non-git deploy copy (~/.dotfiles, ADR-012 copy-deploy) alike — and the copy
+# is exactly where setup + healthcheck invoke --check / --deploy. (The previous
+# `git rev-parse --show-toplevel` was CWD-dependent and errored on the non-git
+# copy, which was the root cause of the section-12 drift false-fail.)
+# HARNESS_REPO_ROOT overrides this — the test harness points the real script at a
+# throwaway fixture tree, the same explicit-override idiom as VAULT_PATH below.
+REPO_ROOT="${HARNESS_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 MANIFEST="$REPO_ROOT/harness/manifest.json"
 RECORD_DIR="$REPO_ROOT/harness/enforced"
 VAULT_PATH="${VAULT_PATH:-$HOME/Projects/knowledge}"
 
 require_tools() {
     command -v jq >/dev/null 2>&1 || { printf '[ERROR] jq is required\n' >&2; exit 2; }
+    [ -f "$MANIFEST" ] || { printf '[ERROR] manifest not found: %s (run from the repo or a complete deploy)\n' "$MANIFEST" >&2; exit 2; }
 }
 
 # --- helpers ---

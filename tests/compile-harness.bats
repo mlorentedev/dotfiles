@@ -29,6 +29,11 @@ EOF
     git init -q -b main
     git config user.email t@t; git config user.name t; git config commit.gpgsign false
 
+    # Point the real script at this fixture tree (the script defaults to its own
+    # SCRIPT_DIR — the live repo — so without this every mode would operate on the
+    # real harness/ instead of the fixture). Inherited by every `run` below.
+    export HARNESS_REPO_ROOT="$REPO"
+
     cat > "$REPO/harness/manifest.json" <<'EOF'
 { "version": 1, "vault_subpath": "00_meta/patterns",
   "enforced": [ { "id": "demo", "source": "test-pattern.md#1-demo-rule" } ],
@@ -110,7 +115,7 @@ run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
 }
 
 @test "AC1: healthcheck.sh asserts deployed skills are symlink-free (SDD-008)" {
-    grep -q 'deployed skill path is a symlink' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
+    grep -qF 'deployed skill path(s) are symlinks' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
     grep -qF '.claude/skills' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
     grep -qF '.config/opencode/commands' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
 }

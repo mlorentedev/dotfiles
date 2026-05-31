@@ -415,11 +415,12 @@ else
 fi
 
 # Harness override drift (ENGINE-001): generated blocks vs their source-of-record.
-# Offline (no vault); run from the repo so git resolves regardless of CWD.
-# --check also validates that every committed skill record (SDD-008) renders
-# cleanly, so this one gate covers both the override blocks and the skill records.
+# Offline (no vault). compile-harness resolves its own root from the script's
+# location, so this works from the non-git deploy copy too — no CWD juggling.
+# --check also validates every committed skill record (SDD-008) renders cleanly,
+# so this one gate covers both the override blocks and the skill records.
 if [ -x "$SCRIPT_DIR/compile-harness.sh" ]; then
-    if ( cd "$DOTFILES_DIR" && "$SCRIPT_DIR/compile-harness.sh" --check ) >/dev/null 2>&1; then
+    if "$SCRIPT_DIR/compile-harness.sh" --check >/dev/null 2>&1; then
         pass "harness blocks + skill records match their source-of-record (no drift)"
     else
         fail "harness/skill drift (run: $SCRIPT_DIR/compile-harness.sh --refresh, then re-deploy)"
@@ -431,15 +432,21 @@ fi
 # Skill deployment integrity (SDD-008, AC1): deployed skills MUST be regular
 # copies, never symlinks/junctions (the BUG-100 fragility class). --check above
 # verifies the records render; this asserts the on-machine deploy is symlink-free.
+# Deployed skill paths MUST be regular hard copies, never symlinks (BUG-100 /
+# ADR-012). The invariant is intentionally strict — ANY symlink here is fragile
+# (a dangling/foreign link breaks discovery), so we surface all of them. Report
+# every offending path (not just the first) so cleanup is one pass.
 _skill_dirs=""
 for _d in "$HOME/.claude/skills" "$HOME/.config/opencode/commands" "$HOME/.gemini/skills" "$HOME/.gemini/prompts"; do
     [ -d "$_d" ] && _skill_dirs="$_skill_dirs $_d"
 done
 if [ -n "$_skill_dirs" ]; then
-    # shellcheck disable=SC2086
-    _skill_link="$(find $_skill_dirs -type l 2>/dev/null | head -1)"
-    if [ -n "$_skill_link" ]; then
-        fail "deployed skill path is a symlink (run: $SCRIPT_DIR/compile-harness.sh --deploy): $_skill_link"
+    # shellcheck disable=SC2086  # _skill_dirs is an intentional space-separated list
+    _skill_links="$(find $_skill_dirs -type l 2>/dev/null)"
+    if [ -n "$_skill_links" ]; then
+        fail "deployed skill path(s) are symlinks (must be hard copies — BUG-100):"
+        printf '%s\n' "$_skill_links" | sed 's|^|        |'
+        printf '        Fix: ours -> %s/compile-harness.sh --deploy; foreign/dangling -> remove the link.\n' "$SCRIPT_DIR"
     else
         pass "deployed skills are regular copies (no symlinks in skill paths)"
     fi
