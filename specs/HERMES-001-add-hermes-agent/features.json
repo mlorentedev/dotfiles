@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HERMES-001-add-hermes-agent-f1",
+    "behavior": "ai/hermes/setup.sh passes shellcheck and parses clean under bash -n and zsh -n",
+    "verification": "shellcheck ai/hermes/setup.sh && bash -n ai/hermes/setup.sh && zsh -n ai/hermes/setup.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f2",
+    "behavior": "setup.sh is idempotent: run twice under the dry-run/stub seam, both exit 0, second run is a no-op",
+    "verification": "bats tests/hermes-setup.bats -f idempotent",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f3",
+    "behavior": "setup.sh fails fast with non-zero exit and a clear message when uv or GITHUB_TOKEN_KNOWLEDGE is missing",
+    "verification": "bats tests/hermes-setup.bats -f 'fail fast'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f4",
+    "behavior": "ai/hermes/AGENTS.md is a thin pointer to root AGENTS.md and the vault constitution",
+    "verification": "grep -qi 'AGENTS.md' ai/hermes/AGENTS.md && grep -qi 'hermes-nan' ai/hermes/AGENTS.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f5",
+    "behavior": "setup.sh modifies none of setup-linux.sh, setup-windows.ps1, mcp-servers.json",
+    "verification": "! grep -qE 'setup-linux\\.sh|setup-windows\\.ps1|mcp-servers\\.json' ai/hermes/setup.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f6",
+    "behavior": "vault SSOT is consistent: 80_agents/hermes-nan/scripts/validate.sh passes against the real folder (vault-side)",
+    "verification": "bash \"$HOME/Projects/knowledge/80_agents/hermes-nan/scripts/validate.sh\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f7",
+    "behavior": "safety net: preflight aborts on unreachable vault remote; auto-pull wrapper aborts a conflicted rebase",
+    "verification": "bats tests/hermes-setup.bats -f 'preflight|sync wrapper'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERMES-001-add-hermes-agent-f8",
+    "behavior": "mechanical write-zone: pre-commit rejects paths outside 80_agents/hermes-nan and token-like content; pre-push forbids force-push (pending commit-path confirmation)",
+    "verification": "bats tests/hermes-setup.bats -f guardrail",
+    "state": "pending",
+    "evidence": ""
+  }
+]
