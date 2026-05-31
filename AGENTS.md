@@ -379,6 +379,8 @@ Before creating ANY branch for code changes in this repo, evaluate against `patt
 6. Fill `verification.md` with evidence (commit hashes, test outputs, smoke results)
 7. On merge: move folder to `specs/archive/<feature-id>/` and tick the vault entry with the PR link
 
+**Proactive proposal (agent-side).** Do not wait to be asked. While scoping work in conversation, if you detect any trigger above, apply the Skip-SDD heuristic yourself and **propose `/spec init <feature-id>`** — stating which trigger fired and the checks you ran, then let the user decide. The full activation rule (the checks, the proposal wording, when NOT to propose, and the once-per-change debounce) is the SSOT in the `/spec` skill's **"Agent-Side Activation Rule"** section (`00_meta/skills/spec/SKILL.md`); do not duplicate it here.
+
 **Banned phrases when planning work in this session:**
 
 - "I'll do vault hygiene later"

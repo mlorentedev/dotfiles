@@ -32,6 +32,16 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
     [ ! -L "$FAKEHOME/.config/opencode/commands/spec.md" ]
 }
 
+@test "SDD-011: deployed /spec carries the Agent-Side Activation Rule (claude + opencode)" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    # The agent-side proactive trigger must survive the vault -> record -> render
+    # chain; if the record is regenerated from a SKILL.md missing the section, the
+    # proactive /spec proposal behavior silently regresses. Guard both renders.
+    grep -q '^## Agent-Side Activation Rule' "$FAKEHOME/.claude/skills/spec/SKILL.md"
+    grep -q '^## Agent-Side Activation Rule' "$FAKEHOME/.config/opencode/commands/spec.md"
+}
+
 @test "AC8 smoke: agy gets /spec as a native skill + a flat prompt" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]

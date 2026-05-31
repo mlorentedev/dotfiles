@@ -1,0 +1,30 @@
+[
+  {
+    "id": "SDD-011-agent-side-spec-trigger-f1",
+    "behavior": "AC2 — AGENTS.md Discipline Gate carries an always-on proactive-proposal trigger that points to the skill's Agent-Side Activation Rule without duplicating the checklist",
+    "verification": "grep -q 'Proactive proposal (agent-side)' AGENTS.md && grep -q 'Agent-Side Activation Rule' AGENTS.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-011-agent-side-spec-trigger-f2",
+    "behavior": "AC3 — the committed record harness/skills/spec/SKILL.md reflects the new section and compile-harness.sh --check reports no drift",
+    "verification": "grep -q '^## Agent-Side Activation Rule' harness/skills/spec/SKILL.md && ./scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-011-agent-side-spec-trigger-f3",
+    "behavior": "AC4 — after --deploy to a throwaway HOME, the rendered Claude skill and OpenCode command for /spec both carry the Agent-Side Activation Rule heading",
+    "verification": "~/.local/bin/bats tests/skills-pipeline.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-011-agent-side-spec-trigger-f4",
+    "behavior": "AC1 — the vault SSOT 00_meta/skills/spec/SKILL.md defines the Agent-Side Activation Rule (checks, proposal format, when-not-to-propose)",
+    "verification": "grep -q '^## Agent-Side Activation Rule' \"${VAULT_PATH:-$HOME/Projects/knowledge}/00_meta/skills/spec/SKILL.md\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
