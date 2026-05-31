@@ -91,6 +91,7 @@ chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/load-secrets.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 chmod +x "$DOTFILES_DIR/scripts/claude-session-start.sh"
+chmod +x "$DOTFILES_DIR/scripts/session-handoff.sh"
 chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
 chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
 chmod +x "$DOTFILES_DIR/scripts/doctor.sh"
@@ -877,6 +878,7 @@ merge_claude_settings() {
     local template_path="$1"
     local target_path="$2"
     local hook_command="$3"
+    local session_end_command="$4"
 
     if [ ! -f "$template_path" ]; then
         log_warning "Claude settings template not found at $template_path, skipping merge"
@@ -889,8 +891,9 @@ merge_claude_settings() {
     fi
 
     local template_substituted
-    template_substituted=$(jq --arg cmd "$hook_command" \
-        '(.hooks.SessionStart[0].hooks[0].command) = $cmd' \
+    template_substituted=$(jq --arg cmd "$hook_command" --arg endcmd "$session_end_command" \
+        '(.hooks.SessionStart[0].hooks[0].command) = $cmd
+         | (.hooks.SessionEnd[0].hooks[0].command) = $endcmd' \
         "$template_path" 2>/dev/null)
     if [ -z "$template_substituted" ]; then
         log_warning "Claude settings template substitution failed, skipping merge"
@@ -916,6 +919,7 @@ merge_claude_settings() {
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
         | .hooks = (.hooks // {})
         | .hooks.SessionStart = $tmpl.hooks.SessionStart
+        | .hooks.SessionEnd = $tmpl.hooks.SessionEnd
         | .enabledPlugins = ((.enabledPlugins // {}) + $tmpl.enabledPlugins)
     ' "$target_path" 2>/dev/null)
     if [ -z "$merged" ]; then
@@ -931,11 +935,12 @@ merge_claude_settings() {
 # settings.json lives at ai/claude/settings.json. Previous inline `HOOK_ENTRY`
 # heredoc + `jq --argjson` is gone -- merge_claude_settings reads the template,
 # substitutes __HOOK_COMMAND__, applies per-key policy, bootstraps if missing.
-log_info "Applying Claude settings.json template + registering SessionStart hook..."
+log_info "Applying Claude settings.json template + registering SessionStart/SessionEnd hooks..."
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
 EXPECTED_HOOK_COMMAND="$HOME/.dotfiles/scripts/claude-session-start.sh"
-merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_HOOK_COMMAND"
+EXPECTED_SESSION_END_COMMAND="$HOME/.dotfiles/scripts/session-handoff.sh"
+merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_HOOK_COMMAND" "$EXPECTED_SESSION_END_COMMAND"
 
 # Deploy auto-memory symlinks (vault → Claude Code)
 # Memory lives in the knowledge vault, not in this repo (see ADR-007)
