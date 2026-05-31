@@ -1,7 +1,7 @@
 ---
 id: "SDD-011-agent-side-spec-trigger"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-31"
 tags: [spec, proposal, sdd-008-followup, agent-behavior, skill-content, harness-001]
 template_version: "1.0"
@@ -55,3 +55,5 @@ Observable outcomes. Each must be testable.
 - Parent (archived): `specs/archive/SDD-008-skill-pipeline/proposal.md` §What #5 (original trigger wording) + §Out-of-scope (empirical-validation carve-out)
 - Related patterns: `00_meta/patterns/pattern-cross-agent-skill-pipeline.md` (the deploy pipeline), `00_meta/patterns/pattern-spec-driven-development.md` (the Discipline Gate this extends)
 - Epic: HARNESS-001 unified cross-agent harness ([#162](https://github.com/mlorentedev/dotfiles/issues/162))
+
+<!-- archived 2026-05-31 — PR: https://github.com/mlorentedev/dotfiles/pull/181 -->
