@@ -8,24 +8,9 @@
 
 Self-maintaining knowledge across sessions. Zero manual intervention required.
 
-### Session Handoff (MANDATORY at session end)
+### Session Handoff
 
-At the END of every session where meaningful work was done, OVERWRITE the `## Session Handoff` section in `MEMORY.md`. This MUST be the first section after the H1 heading.
-
-**Fields (in this exact order, overwrite the entire section):**
-
-- `> Updated: YYYY-MM-DD`
-- `**Last task:** [1-line what was worked on]`
-- `**Decisions:** [key decisions, or "None"]`
-- `**Open threads:** [unfinished work, or "None"]`
-- `**Next action:** [concrete first step for next session]`
-
-Rules:
-
-- OVERWRITE entirely each session. Never append.
-- Max 8 lines. Handoff, not journal.
-- Skip if session was trivial (quick question, no state change).
-- Exception to MEMORY.md "index-only" rule: this section holds ephemeral continuity data.
+Session handoff is a **cross-agent `/handoff` skill** — SSOT at `00_meta/skills/handoff/SKILL.md`, with an always-on trigger in `AGENTS.md`. At the END of any non-trivial session, run it. For Claude, the continuity block it overwrites (`## Session Handoff`, the first section after the H1) lives in this project's auto-memory `MEMORY.md`. The skill is the source of truth for the full checklist (continuity block + vault hygiene + repo/worktree state + artifact summary + next action) — don't duplicate it here.
 
 ### Auto-Crystallize
 

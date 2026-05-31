@@ -50,6 +50,17 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
     ! grep -q '^name:' "$FAKEHOME/.gemini/prompts/spec.md"   # frontmatter stripped
 }
 
+@test "HANDOFF-001: /handoff deploys cross-agent (claude + opencode + agy) with its checklist" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ -f "$FAKEHOME/.claude/skills/handoff/SKILL.md" ]
+    grep -q '^name: handoff' "$FAKEHOME/.claude/skills/handoff/SKILL.md"
+    [ -f "$FAKEHOME/.config/opencode/commands/handoff.md" ]
+    [ -f "$FAKEHOME/.gemini/skills/handoff/SKILL.md" ]
+    # the continuity-block checklist survives the vault -> record -> render chain
+    grep -q '## Session Handoff' "$FAKEHOME/.claude/skills/handoff/SKILL.md"
+}
+
 @test "AC8 smoke: a Claude-only skill is NOT exposed to opencode/agy" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]

@@ -256,6 +256,7 @@ Stop generation and warn if you detect:
 * **Strategy (`10-roadmap.md`):** ONLY if a major milestone is completed.
 * **Lessons:** Append to `90-lessons.md` using the Lesson Template.
 * **Promotion:** If the solution is generic, create `00_meta/patterns/pattern-<topic>.md`.
+* **Session handoff (at session end):** run the **`/handoff`** skill — the complete, cross-agent checklist (continuity block in `MEMORY.md` + the vault hygiene above + repo/worktree/branch state + artifact/PR summary + a concrete next action). SSOT: `00_meta/skills/handoff/SKILL.md`. Skip only for trivial sessions.
 
 For the full session taxonomy and document placement table, query `00_meta/patterns/workflow-protocol.md`.
 

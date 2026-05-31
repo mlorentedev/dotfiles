@@ -1,0 +1,23 @@
+[
+  {
+    "id": "HANDOFF-001-cross-agent-handoff-skill-f1",
+    "behavior": "AC2 — AGENTS.md carries the always-on /handoff trigger and ai/claude/CLAUDE.md is reduced to a pointer (no duplicated 5-field detail)",
+    "verification": "grep -q '`/handoff`' AGENTS.md && grep -q 'skills/handoff' ai/claude/CLAUDE.md && ! grep -q '\\*\\*Last task:\\*\\* \\[1-line' ai/claude/CLAUDE.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HANDOFF-001-cross-agent-handoff-skill-f2",
+    "behavior": "AC3 — the committed record renders and compile-harness --check reports no drift",
+    "verification": "grep -q '^name: handoff' harness/skills/handoff/SKILL.md && ./scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HANDOFF-001-cross-agent-handoff-skill-f3",
+    "behavior": "AC3 — /handoff deploys cross-agent (claude + opencode + agy) carrying its checklist",
+    "verification": "~/.local/bin/bats tests/skills-pipeline.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
