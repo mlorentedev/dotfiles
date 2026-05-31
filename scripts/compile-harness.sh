@@ -56,7 +56,9 @@ EOF
 # is exactly where setup + healthcheck invoke --check / --deploy. (The previous
 # `git rev-parse --show-toplevel` was CWD-dependent and errored on the non-git
 # copy, which was the root cause of the section-12 drift false-fail.)
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
+# HARNESS_REPO_ROOT overrides this — the test harness points the real script at a
+# throwaway fixture tree, the same explicit-override idiom as VAULT_PATH below.
+REPO_ROOT="${HARNESS_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 MANIFEST="$REPO_ROOT/harness/manifest.json"
 RECORD_DIR="$REPO_ROOT/harness/enforced"
 VAULT_PATH="${VAULT_PATH:-$HOME/Projects/knowledge}"
