@@ -225,10 +225,10 @@ Stop generation and warn if you detect:
 
 ## "Neural Hive" Protocol (The Loop)
 
-**CORE PRINCIPLE:** Code lives in Git. Knowledge lives in the vault — `~/Projects/knowledge/` (Linux/macOS) or `%USERPROFILE%\Projects\knowledge\` (Windows).
+**CORE PRINCIPLE:** Code lives in Git. **Knowledge placement depends on the project model** (Standing Order #2): a repo's build/operate docs — ADRs (`docs/adr/`), runbooks, troubleshooting — live in that repo's `docs/`; the vault (`~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows) holds the cross-project brain, AI memory, and personal/methodology lessons. Patterns: `pattern-knowledge-placement`, `pattern-platform-governance`.
 **LANGUAGE:** All Vault content MUST be in English.
-**COMMIT POLICY:** Agents NEVER commit. Stage changes only.
-**NEVER** create `docs/`, `TODO.md` or `CHANGELOG.md` inside the repo.
+**COMMIT POLICY:** Default to staging changes only; **commit / push / open PRs only when the user asks** (this preserves the guardrail while fitting workflows — like this repo's PR-per-feature flow — that routinely commit on request).
+**REPO DOCS:** Repos on the knowledge-placement model keep `docs/` (with `docs/adr/`) in-repo and may keep a root `CHANGELOG.md`. This **supersedes the older blanket "never create `docs/`" stance** (closes CHORE-002). Still avoid ad-hoc `TODO.md` — tasks live in `specs/` + the backlog.
 
 ### Phase 1: Context Sync (Read First)
 
