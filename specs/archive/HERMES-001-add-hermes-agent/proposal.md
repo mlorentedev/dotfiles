@@ -1,6 +1,6 @@
 ---
 id: "HERMES-001-add-hermes-agent"
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-31"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -76,14 +76,14 @@ The design questions are resolved (see table above). Residual risks to keep visi
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `ai/hermes/setup.sh` passes `shellcheck` and parses clean under both `bash -n` and `zsh -n` (repo shell-compat standard).
-- [ ] **AC2** — `ai/hermes/setup.sh` is idempotent: a bats test runs it twice under the dry-run/stub seam; both runs exit 0 and the second run produces no changes (no duplicate cron entry, no clobbered `config.yaml`, `.env` untouched).
-- [ ] **AC3** — `ai/hermes/setup.sh` fails fast (non-zero exit + clear message) when `uv` is absent or `GITHUB_TOKEN_KNOWLEDGE` is unavailable (neither env nor `~/.hermes/.env`).
-- [ ] **AC4** — `ai/hermes/AGENTS.md` exists and is a thin pointer to root `AGENTS.md` and the vault constitution, consistent with the `ai/agy/AGY.md` parity pattern (ADR-009).
-- [ ] **AC5** — `setup.sh` modifies none of `setup-linux.sh`, `setup-windows.ps1`, `mcp-servers.json` (asserted by a guard in the test).
-- [ ] **AC6** (vault track) — `80_agents/hermes-nan/scripts/validate.sh` passes against the real folder (filename checks match the numbered files); the canonical name `hermes-nan` and the vault constitution `AGENTS.md` are present and consistent. Verified vault-side, recorded in `verification.md`.
-- [ ] **AC7** — `setup.sh` preflight aborts (non-zero) when the token cannot reach the vault remote; the cron auto-pull wrapper aborts a conflicted rebase rather than wedging the clone. Both covered by `tests/hermes-setup.bats`.
-- [ ] **AC8** — mechanical write-zone enforcement in Hermes's clone (confirmed: Hermes commits via git CLI, so local hooks fire): a `pre-commit` hook rejects staged paths outside `80_agents/hermes-nan/` and token-like content; a `pre-push` hook forbids non-fast-forward (force) pushes. Covered by four functional tests in `tests/hermes-setup.bats`.
+- [x] **AC1** — `ai/hermes/setup.sh` passes `shellcheck` and parses clean under both `bash -n` and `zsh -n` (repo shell-compat standard).
+- [x] **AC2** — `ai/hermes/setup.sh` is idempotent: a bats test runs it twice under the dry-run/stub seam; both runs exit 0 and the second run produces no changes (no duplicate cron entry, no clobbered `config.yaml`, `.env` untouched).
+- [x] **AC3** — `ai/hermes/setup.sh` fails fast (non-zero exit + clear message) when `uv` is absent or `GITHUB_TOKEN_KNOWLEDGE` is unavailable (neither env nor `~/.hermes/.env`).
+- [x] **AC4** — `ai/hermes/AGENTS.md` exists and is a thin pointer to root `AGENTS.md` and the vault constitution, consistent with the `ai/agy/AGY.md` parity pattern (ADR-009).
+- [x] **AC5** — `setup.sh` modifies none of `setup-linux.sh`, `setup-windows.ps1`, `mcp-servers.json` (asserted by a guard in the test).
+- [x] **AC6** (vault track) — `80_agents/hermes-nan/scripts/validate.sh` passes against the real folder (filename checks match the numbered files); the canonical name `hermes-nan` and the vault constitution `AGENTS.md` are present and consistent. Verified vault-side, recorded in `verification.md`.
+- [x] **AC7** — `setup.sh` preflight aborts (non-zero) when the token cannot reach the vault remote; the cron auto-pull wrapper aborts a conflicted rebase rather than wedging the clone. Both covered by `tests/hermes-setup.bats`.
+- [x] **AC8** — mechanical write-zone enforcement in Hermes's clone (confirmed: Hermes commits via git CLI, so local hooks fire): a `pre-commit` hook rejects staged paths outside `80_agents/hermes-nan/` and token-like content; a `pre-push` hook forbids non-fast-forward (force) pushes. Covered by four functional tests in `tests/hermes-setup.bats`.
 
 ## References
 
