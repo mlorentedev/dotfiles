@@ -2,7 +2,7 @@
 
 > **Single Source of Truth for AI coding agents in this repo.**
 >
-> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. See [`docs/adr/adr-009-multi-agent-runtime.md`](docs/adr/adr-009-multi-agent-runtime.md) for the rationale.
+> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. **Hermes** is the exception: a remote ops agent that does not clone this repo, so it reads a self-contained subset from the vault constitution `80_agents/hermes-nan/AGENTS.md`, which defers back here as the canonical authority. See [`docs/adr/adr-009-multi-agent-runtime.md`](docs/adr/adr-009-multi-agent-runtime.md) for the rationale.
 
 ## Identity
 
@@ -30,6 +30,7 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 4. **Clean as you go.** Dead code, stale comments, orphan files -- fix them when you see them. Don't defer trivial fixes.
 5. **Consult patterns before architectural decisions.** 37 universal patterns in `00_meta/patterns/`. Query via Hive MCP (when available) or read from `~/Projects/knowledge/00_meta/patterns/<name>.md` (Linux/macOS) / `%USERPROFILE%\Projects\knowledge\00_meta\patterns\<name>.md` (Windows).
 6. **Enterprise-grade or nothing.** Before proposing any code, evaluate: Is this a proven enterprise pattern? Is it scalable? Would a senior engineer approve this in code review? No hacks, no quick-and-dirty, no "it works for now" shortcuts. If the straightforward approach is sloppy, find the elegant one.
+7. **Noted = recorded, never verbal-only.** When you say something is "noted"/"apuntado", or the user tells you to note or track something, persist it to its canonical home **in the same session** — never leave it as conversation-only prose. Placement follows #2 + #3: personal projects → the vault (`11-tasks.md` backlog, `90-lessons.md`, or an ADR); work/team projects → the repo (`specs/`, `docs/`, a GitHub issue / Project item); a decision affecting how agents work → an ADR or this file. If it genuinely cannot be filed now, create an explicit tracked task for the debt. "I'll note it" with no durable artifact is a broken promise. See `pattern-decision-persistence`.
 
 ### Pattern Catalog (00_meta/patterns/)
 
@@ -76,6 +77,7 @@ Concrete model identifiers per tier live in the agent-specific overlay files:
 - `ai/opencode/opencode.jsonc` — OpenCode (TUI `/models` picker; `qq` / `qf` wrappers for quick-questions)
 - `ai/agy/AGY.md` — Antigravity CLI (agy) (per-prompt `--model` flag)
 - `ai/copilot/copilot-instructions.md` — GitHub Copilot CLI v2 (TBD; concrete schema pending AI-017/AI-018 audit)
+- `ai/hermes/AGENTS.md` — Hermes (Nous Research) remote ops agent (NaN catalog: `deepseek-v4-flash` interactive, `qwen3.6` async; provisioned by `ai/hermes/setup.sh`, reads the vault not this repo)
 
 Model names rotate; tier semantics are stable. When a provider releases a new flagship or sunsets a tier, edit ONLY the relevant overlay — `AGENTS.md` does not need a corresponding patch.
 
