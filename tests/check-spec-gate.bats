@@ -124,6 +124,23 @@ _commit() {
     [ "$status" -eq 0 ]
 }
 
+@test "excludes docs/**/*.md from LOC count (doc-only ADR/lesson/runbook)" {
+    mkdir -p docs/adr
+    printf 'line %d\n' {1..200} > docs/adr/adr-999-example.md
+    _commit "doc-only ADR"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 0 ]
+}
+
+@test "does NOT exclude non-markdown under docs/ (a script still counts)" {
+    mkdir -p docs
+    printf 'line %d\n' {1..60} > docs/example.sh
+    _commit "script under docs counts as production"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
+}
+
 @test "excludes lockfiles from LOC count" {
     printf 'line %d\n' {1..200} > package-lock.json
     _commit "lockfile bump"
