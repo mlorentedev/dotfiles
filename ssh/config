@@ -43,6 +43,12 @@ Host vps
   User deployer
   IdentityFile ~/.ssh/id_ed25519
 
+# --- Fleet agents (Headscale tag:hermes, ADR-041; userspace pod, root) ---
+Host hermes-nan
+  Hostname 100.64.0.9
+  User root
+  IdentityFile ~/.ssh/id_ed25519
+
 # --- LAN fallback (no VPN needed, local network only) ---
 Host rpi4-lan
   Hostname 10.0.0.131
