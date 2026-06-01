@@ -2,7 +2,7 @@
 
 > **Single Source of Truth for AI coding agents in this repo.**
 >
-> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. See [`docs/adr/adr-009-multi-agent-runtime.md`](docs/adr/adr-009-multi-agent-runtime.md) for the rationale.
+> Claude Code, OpenCode, Copilot, Cursor, Codex, and Antigravity all read this file as their canonical system prompt. Per-agent files in `ai/<agent>/` and `.github/` are thin pointers that delegate here, retaining only agent-specific extensions. **Hermes** is the exception: a remote ops agent that does not clone this repo, so it reads a self-contained subset from the vault constitution `80_agents/hermes-nan/AGENTS.md`, which defers back here as the canonical authority. See [`docs/adr/adr-009-multi-agent-runtime.md`](docs/adr/adr-009-multi-agent-runtime.md) for the rationale.
 
 ## Identity
 
@@ -76,6 +76,7 @@ Concrete model identifiers per tier live in the agent-specific overlay files:
 - `ai/opencode/opencode.jsonc` — OpenCode (TUI `/models` picker; `qq` / `qf` wrappers for quick-questions)
 - `ai/agy/AGY.md` — Antigravity CLI (agy) (per-prompt `--model` flag)
 - `ai/copilot/copilot-instructions.md` — GitHub Copilot CLI v2 (TBD; concrete schema pending AI-017/AI-018 audit)
+- `ai/hermes/AGENTS.md` — Hermes (Nous Research) remote ops agent (NaN catalog: `deepseek-v4-flash` interactive, `qwen3.6` async; provisioned by `ai/hermes/setup.sh`, reads the vault not this repo)
 
 Model names rotate; tier semantics are stable. When a provider releases a new flagship or sunsets a tier, edit ONLY the relevant overlay — `AGENTS.md` does not need a corresponding patch.
 

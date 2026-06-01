@@ -9,19 +9,20 @@ created: "2026-05-31"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior). Filled during implementation.
 
-- [ ] AC1 (shellcheck + bash -n + zsh -n clean) -> commit `<hash>` / `features.json` f1
-- [ ] AC2 (idempotent, second run no-op) -> commit `<hash>` / test `hermes-setup.bats: idempotent`
-- [ ] AC3 (fail fast on missing uv / token) -> commit `<hash>` / test `hermes-setup.bats: fail fast`
-- [ ] AC4 (AGENTS.md thin pointer) -> commit `<hash>` / `features.json` f4
-- [ ] AC5 (local-deploy surface untouched) -> commit `<hash>` / `features.json` f5
-- [ ] AC6 (vault SSOT consistent, validate.sh green) -> vault-side run of `validate.sh`
+- [x] AC1 (shellcheck + bash -n + zsh -n clean) -> Track A, PR #195 / `tests/hermes-setup.bats`
+- [x] AC2 (idempotent, second run no-op) -> Track A, PR #195 / test `hermes-setup.bats: idempotent`
+- [x] AC3 (fail fast on missing uv / token) -> Track A, PR #195 / test `hermes-setup.bats: fail fast`
+- [x] AC4 (AGENTS.md thin pointer) -> Track A, PR #195 / `ai/hermes/AGENTS.md`
+- [x] AC5 (local-deploy surface untouched) -> Track A, PR #195 (setup.sh never wired into setup-linux)
+- [x] AC6 (vault SSOT consistent, validate.sh green) -> Track B, vault master `8b3c299`: `validate.sh` exits 0 ("Vault SSOT consistent"). Curated `80_agents/hermes-nan/` against the reconciled provisioning reality.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test (remote): `setup.sh` run twice on the NaN box — what was exercised, what was observed
-- Vault-side: `bash 80_agents/hermes-nan/scripts/validate.sh -> <output>`
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: `tests/hermes-setup.bats` -> 11 green (Track A, PR #195).
+- Manual smoke test (remote): `setup.sh` run twice on the NaN box (Track A) — idempotent, second run a no-op.
+- Vault-side: `HERMES_VAULT_PATH=<checkout> bash 80_agents/hermes-nan/scripts/validate.sh` -> exit 0, "Vault SSOT consistent"; 10 SSOT files pass with frontmatter, constitution names its write zone, 3 warnings are box-runtime advisories (expected off-box).
+- Follow-ups (this PR, #196): registered `ai/hermes/AGENTS.md` in the root overlay matrix; re-homed the `pattern-loader` skill off the `/tmp/hermes-vault` hardcode (vault source fixed on knowledge master; harness record regenerated). Opencode command-count test bumped 18 -> 19 for the new skill.
+- No regressions in existing test suite: yes (after the count bump).
 
 ## Decisions made during implementation
 
