@@ -36,13 +36,13 @@ Brief log of non-obvious trade-offs or course corrections. Routine choices belon
 
 Before archiving, flag what (if anything) should be promoted to the vault.
 
-- [ ] Lesson for `dotfiles/90-lessons.md`? Likely yes — "a remote agent's self-authored bootstrap docs drift; curate them against reality as part of onboarding it as code" (and the `/tmp`-as-durable-bridge anti-pattern).
-- [ ] ADR-worthy decision? Likely yes — remote self-provisioning agent: full-clone read + instruction-enforced write boundary + secrets divergence from the age model. Candidate `docs/adr/` or `30-architecture/adr-XXX`.
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if it recurs — "remote agent provisioning via curl + vault SSOT" could generalize beyond Hermes.
+- [x] Lesson for `dotfiles/90-lessons.md`? Likely yes — "a remote agent's self-authored bootstrap docs drift; curate them against reality as part of onboarding it as code" (and the `/tmp`-as-durable-bridge anti-pattern).
+- [x] ADR-worthy decision? Likely yes — remote self-provisioning agent: full-clone read + instruction-enforced write boundary + secrets divergence from the age model. Candidate `docs/adr/` or `30-architecture/adr-XXX`.
+- [x] New pattern candidate for `00_meta/patterns/`? Only if it recurs — "remote agent provisioning via curl + vault SSOT" could generalize beyond Hermes.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HERMES-001-add-hermes-agent/` -> `specs/archive/HERMES-001-add-hermes-agent/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HERMES-001-add-hermes-agent/` -> `specs/archive/HERMES-001-add-hermes-agent/`
+- [x] Backlog entry in vault `11-tasks.md` ticked with PR link
+- [x] Promotions above executed (if any)
