@@ -93,6 +93,7 @@ _excluded() {
     local path="$1"
     local base="${path##*/}"
     case "$path" in
+        docs/*.md) return 0 ;;   # doc-only (ADRs, lessons, runbooks): prose, not production
         tests/*|specs/archive/*) return 0 ;;
         *generated*) return 0 ;;
     esac
