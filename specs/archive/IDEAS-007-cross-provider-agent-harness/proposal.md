@@ -1,7 +1,7 @@
 ---
 id: "IDEAS-007-cross-provider-agent-harness"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -73,3 +73,5 @@ Phase 1 audit (per public-review feedback) adopts a **three-bucket classificatio
   - @m13v (2026-05-27): "splitting by provider just moves the rot" — calls for per-line attribution audit before refactor. Folded into R2.
 - Dependencies: SDD-008 (skill pipeline foundation), vault ADR-010 (multi-agent runtime), vault PATTERN-001 (lifecycle formalization).
 - Sister specs: AGENTS-001 (subagent SSOT), MEMORY-001 (cross-agent memory bridge).
+
+<!-- archived 2026-06-02 — PR: https://github.com/mlorentedev/dotfiles/pull/208 -->
