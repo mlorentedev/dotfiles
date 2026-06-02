@@ -1,7 +1,7 @@
 ---
 id: "IDEAS-007-cross-provider-agent-harness"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -9,6 +9,8 @@ template_version: "1.0"
 
 # IDEAS-007-cross-provider-agent-harness
 
+> **Outcome (2026-06-01): reconciled, not implemented.** The 4-layer design below was already realised by ADR-009/010 + the `ai/<provider>/` overlay structure that shipped after this proposal was written. The registry + runtime-discovery layers are rejected as YAGNI (no consumer). See [`reconciliation.md`](./reconciliation.md) and [`audit.json`](./audit.json) — the proposal text is retained verbatim as the historical record.
+>
 > **Naming**: file lives at `<repo>/specs/IDEAS-007-cross-provider-agent-harness/proposal.md`. `IDEAS-007-cross-provider-agent-harness` is `YYYY-MM-DD-<slug>` or `<TICKET-NN>`.
 
 ## Why
@@ -71,3 +73,5 @@ Phase 1 audit (per public-review feedback) adopts a **three-bucket classificatio
   - @m13v (2026-05-27): "splitting by provider just moves the rot" — calls for per-line attribution audit before refactor. Folded into R2.
 - Dependencies: SDD-008 (skill pipeline foundation), vault ADR-010 (multi-agent runtime), vault PATTERN-001 (lifecycle formalization).
 - Sister specs: AGENTS-001 (subagent SSOT), MEMORY-001 (cross-agent memory bridge).
+
+<!-- archived 2026-06-02 — PR: https://github.com/mlorentedev/dotfiles/pull/208 -->
