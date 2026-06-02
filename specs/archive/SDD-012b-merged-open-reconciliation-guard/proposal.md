@@ -1,7 +1,7 @@
 ---
 id: "SDD-012b-merged-open-reconciliation-guard"
 type: spec
-status: active
+status: archived
 created: "2026-06-01"
 tags: [spec, proposal, vault-health, incident-to-guard, backlog-hygiene, sdd-012-followup]
 template_version: "1.0"
@@ -55,3 +55,5 @@ Concrete, observable behavior after this PR:
 - Canonized in: `pattern-verify-against-source-of-truth.md` §"Automating the Reconciliation"; merge-time step of `pattern-three-layer-proposal-lifecycle`
 - Dispatcher: `scripts/vault.sh` (REFACTOR-005), `scripts/vault-health.sh` section 7
 - Incident: the 2026-06-01 sweep (BUG-022/023/024 + SDD-009 stale-merged); AGENTS.md "incident → guard"
+
+<!-- archived 2026-06-02 — PR: https://github.com/mlorentedev/dotfiles/pull/203 -->
