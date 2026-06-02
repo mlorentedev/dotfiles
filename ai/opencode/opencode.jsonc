@@ -79,6 +79,14 @@
             "input": ["text", "image"],
             "output": ["text"]
           }
+        },
+        "mimo-v2.5": {
+          "name": "Xiaomi MiMo V2.5",
+          "contextWindow": 500000,
+          "modalities": {
+            "input": ["text", "image", "audio"],
+            "output": ["text"]
+          }
         }
         // Non-chat NaN models (qwen3-embedding, kokoro TTS, whisper STT) are
         // intentionally NOT listed here: opencode's modality schema only allows
