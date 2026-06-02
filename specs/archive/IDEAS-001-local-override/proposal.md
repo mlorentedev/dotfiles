@@ -1,7 +1,7 @@
 ---
 id: "IDEAS-001-local-override"
 type: spec
-status: active
+status: archived
 created: "2026-05-25"
 tags: [spec, proposal, ideas-001, shell, dotfiles-survey, tier-1]
 template_version: "1.0"
@@ -85,3 +85,5 @@ Adding (not in template, load-bearing here):
 ## LOC estimate
 
 ~10 LOC source lines + 2 lines `.gitignore` + ~30 LOC example files + ~40 LOC bats = **~80 LOC total**. Borderline `skip-sdd` candidate, but specced for traceability to the survey research.
+
+<!-- archived 2026-06-02 — PR: https://github.com/mlorentedev/dotfiles/pull/205 -->
