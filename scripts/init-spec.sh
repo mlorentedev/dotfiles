@@ -48,9 +48,13 @@ if [[ -z "$FEATURE_ID" ]]; then
 fi
 
 # --- Validate id ---
-if [[ ! "$FEATURE_ID" =~ ^([A-Z]+-[0-9]+(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
+# The optional single letter after the number ([a-z]?) admits the sub-id
+# convention (SDD-012b, WIN-002a) that check-backlog-integrity.sh already treats
+# as a distinct ticket. Without it, init-spec rejected ids the rest of the system
+# accepts — sibling defect to BUG-024 in the same vault-gate.
+if [[ ! "$FEATURE_ID" =~ ^([A-Z]+-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
     printf '[ERROR] Invalid feature-id: %s\n' "$FEATURE_ID" >&2
-    printf '        Expected: TICKET-NNN[-slug] (e.g. AI-001-ollama-public) or YYYY-MM-DD-slug\n' >&2
+    printf '        Expected: TICKET-NNN[letter][-slug] (e.g. AI-001-ollama-public, SDD-012b-guard) or YYYY-MM-DD-slug\n' >&2
     exit 1
 fi
 
