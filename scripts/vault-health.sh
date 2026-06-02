@@ -253,6 +253,17 @@ else
     elif [ "$BACKLOG_BAD" -eq 0 ]; then
         pass "Backlog integrity: $BACKLOG_FILES task file(s) clean (one ticket = one entry)"
     fi
+
+    # Semantic drift (advisory): open [ ] entries whose work already shipped
+    # (full id has an archived spec) via check-backlog-merged.sh (SDD-012b).
+    # WARN, not fail — the signal is strong but the tick is a human/agent action.
+    for tasks in "$VAULT_DIR"/10_projects/*/11-tasks.md; do
+        [ -f "$tasks" ] || continue
+        if ! merged_out="$("$SCRIPT_DIR/check-backlog-merged.sh" "$tasks" 2>/dev/null)"; then
+            warn "Stale-merged ticks in $(basename "$(dirname "$tasks")")/11-tasks.md — work shipped, tick still [ ]:"
+            printf '%s\n' "$merged_out" | sed 's|^|        |'
+        fi
+    done
 fi
 
 # ==================================================
