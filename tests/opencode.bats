@@ -125,8 +125,8 @@ setup() {
     grep -qE '"model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc exposes 3 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
-    for m in deepseek-v4-flash qwen3.6 gemma4; do
+@test "opencode.jsonc exposes 4 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
+    for m in deepseek-v4-flash qwen3.6 gemma4 mimo-v2.5; do
         grep -qE "\"$m\":" "$OPENCODE_CFG" || { echo "missing chat model $m" >&2; false; }
     done
     # Non-chat models must NOT appear (would break config load)
