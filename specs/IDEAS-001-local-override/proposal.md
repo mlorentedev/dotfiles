@@ -1,7 +1,7 @@
 ---
 id: "IDEAS-001-local-override"
 type: spec
-status: draft
+status: active
 created: "2026-05-25"
 tags: [spec, proposal, ideas-001, shell, dotfiles-survey, tier-1]
 template_version: "1.0"

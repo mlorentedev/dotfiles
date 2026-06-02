@@ -77,6 +77,12 @@ secrets_list                        # List all secrets and status
 secrets_check                       # Validate mapping integrity
 ```
 
+### Machine-local overrides
+
+Non-sensitive, per-machine shell config (a host-only `PATH` prepend, a VM-only alias) goes in `~/.zshrc.local` / `~/.bashrc.local` — gitignored, sourced **last** so it can override anything above. Copy from the committed `.zshrc.local.example` / `.bashrc.local.example`.
+
+> **`.local` is not for secrets.** API keys, tokens and credentials always go through the age system above (`sensitive/*.secret.age` + `env-mapping.conf`), never a `.local` file.
+
 ### AI Tools
 
 ```bash

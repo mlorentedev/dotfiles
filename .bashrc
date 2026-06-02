@@ -178,3 +178,9 @@ alias project-init="$HOME/.claude/init-project.sh"
 
 # Dotfiles scripts on PATH
 export PATH="$HOME/.dotfiles/scripts:$PATH"
+
+# ==========================
+# Machine-local overrides (IDEAS-001) — sourced LAST so a machine-specific tweak
+# can override anything above. NON-SENSITIVE config only; secrets use the age
+# system (sensitive/*.secret.age). See .bashrc.local.example. (gitignored)
+[ -r "$HOME/.bashrc.local" ] && [ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"
