@@ -9,6 +9,8 @@ template_version: "1.0"
 
 # IDEAS-007-cross-provider-agent-harness
 
+> **Outcome (2026-06-01): reconciled, not implemented.** The 4-layer design below was already realised by ADR-009/010 + the `ai/<provider>/` overlay structure that shipped after this proposal was written. The registry + runtime-discovery layers are rejected as YAGNI (no consumer). See [`reconciliation.md`](./reconciliation.md) and [`audit.json`](./audit.json) — the proposal text is retained verbatim as the historical record.
+>
 > **Naming**: file lives at `<repo>/specs/IDEAS-007-cross-provider-agent-harness/proposal.md`. `IDEAS-007-cross-provider-agent-harness` is `YYYY-MM-DD-<slug>` or `<TICKET-NN>`.
 
 ## Why

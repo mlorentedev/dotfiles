@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "spec": "IDEAS-007-cross-provider-agent-harness",
+    "artifact": "Phase-1 instruction audit (acceptance criterion: rule -> bucket -> target_layer -> fires_observed)",
+    "generated": "2026-06-01",
+    "method": "manual classification of AGENTS.md (450 LOC) + ai/claude/CLAUDE.md (75 LOC) against the cross-provider / per-provider boundary; fires_observed is a qualitative judgement from recent-session review (R2 path (c)), NOT telemetry",
+    "naming_note": "IDEAS-007 proposed Layer 2 as '.agent/<id>/INSTRUCT.md'. The repo shipped the identical architecture earlier as 'ai/<provider>/<FILE>' (ADR-009/010). target_layer values below use the SHIPPED names: 'AGENTS.md' (cross-provider SSOT) and 'ai/<provider>/' (per-provider extension). The two are functionally equivalent; see reconciliation.md.",
+    "bucket_legend": {
+      "direct": "maps_directly - rule is provider-agnostic, fires identically for every agent",
+      "weak": "maps_weakly - applies to all providers but only in a sub-context (a language, a vault write, an MCP-capable agent)",
+      "manual": "requires_manual_validation - provider-specific mechanism with no clean cross-provider equivalent"
+    },
+    "fires_observed_legend": "yes = referenced/applied in recent sessions | no = present but no observed fire | unknown = context-gated, not exercised recently"
+  },
+
+  "rules": [
+    { "source": "AGENTS.md", "rule": "Identity / Operating Mode (Adaptive: low vs high cognitive load)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider behavioural contract. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Decision Hierarchy (Correctness > Performance > Elegance; Stdlib > libs > new deps)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Used this session to reject the no-caller discovery mechanism. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Standing Orders #1-7 (Automate / SSOT / Vault hygiene / Clean-as-you-go / Patterns / Enterprise-grade / Noted=recorded)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Core cross-provider law. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Pattern Catalog table (vault 00_meta/patterns pointers)", "bucket": "weak", "target_layer": "AGENTS.md", "fires_observed": "unknown", "note": "Cross-provider but vault-dependent; fires only when a pattern lookup is triggered. Correctly placed; no move." },
+    { "source": "AGENTS.md", "rule": "Model Selection - tier mapping + trigger heuristics (provider-agnostic principle)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Principle stays in SSOT; concrete model ids correctly delegated to per-provider overlays (see Per-Provider Overlays row)." },
+    { "source": "AGENTS.md", "rule": "Model Selection - Per-Provider Overlays pointer (ai/claude, ai/opencode, ai/agy, ai/copilot, ai/hermes)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "This is IDEAS-007's Layer-2 boundary ALREADY DRAWN: AGENTS.md explicitly defers concrete model ids to ai/<provider>/. Proof the split exists." },
+    { "source": "AGENTS.md", "rule": "Competence Retention Protocol (Fast Lane / Socratic Guardrail / Debugging Mode)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider. Socratic Guardrail fired this session on IDEAS-007 scoping. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Technical Standards (Python / Go / TS / Java / Astro / Matlab tables)", "bucket": "weak", "target_layer": "AGENTS.md", "fires_observed": "unknown", "note": "Cross-provider but language-gated; fires only when that stack is in play. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Architecture Patterns (microservices / monolith layouts)", "bucket": "weak", "target_layer": "AGENTS.md", "fires_observed": "unknown", "note": "Cross-provider, scaffold-gated. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Security (Immediate HALT table: injection / secrets / auth / async / concurrency / memory)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider safety contract. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Code Quality Rules (function < 40 LOC, class < 250, complexity < 10, nesting < 4)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider thresholds. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Neural Hive Protocol (knowledge placement; commit policy; repo docs)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider knowledge-placement law. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Vault Structure & Standards / Frontmatter Law", "bucket": "weak", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider but fires only on vault writes. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "MCP Server Usage - Context7 / Sequential Thinking / Hive / Obsidian CLI (declared 'Portable')", "bucket": "weak", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "BOUNDARY CASE (R1 / @unitedideas): MCP refs. Verdict: KEEP in AGENTS.md as reference-only - they are capability-gated, not Claude-only (any MCP-capable agent honours them), and contain NO secret values. Secrets resolve at runtime via load-secrets.sh. No move." },
+    { "source": "AGENTS.md", "rule": "Spec-Driven Development + Discipline Gate (NON-NEGOTIABLE)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider; enforced by spec-gate CI. Fired this session. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Response Protocol (classify load -> mentor/execute; tests; no fluff)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider. Correctly placed." },
+    { "source": "AGENTS.md", "rule": "Operational Rules - Overrides of Harness Defaults (HARNESS-generated block, sha256:82589eb0)", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "BOUNDARY CASE: generator-injected into BOTH AGENTS.md AND every ai/<id>/ file from a single vault SSOT (compile-harness.sh). Duplication is BY DESIGN (each agent must see the no-attribution override regardless of entry file), NOT drift. No move; do not hand-edit between markers." },
+    { "source": "AGENTS.md", "rule": "Interaction Discipline / Change Management / Engineering Discipline / Shell & Cross-Platform / Domain-Specific", "bucket": "direct", "target_layer": "AGENTS.md", "fires_observed": "yes", "note": "Cross-provider corrections-derived rules. Correctly placed." },
+
+    { "source": "ai/claude/CLAUDE.md", "rule": "Header pointer ('First, read AGENTS.md ... contains only Claude-specific extensions')", "bucket": "direct", "target_layer": "ai/<provider>/", "fires_observed": "yes", "note": "This IS acceptance-criterion 'CLAUDE.md slims to a pointer' - already satisfied. Deploy verifies the pointer string (setup-linux.sh:498)." },
+    { "source": "ai/claude/CLAUDE.md", "rule": "Auto-Maintenance (Session Handoff / Auto-Crystallize / Auto-Archive)", "bucket": "weak", "target_layer": "ai/<provider>/", "fires_observed": "yes", "note": "Handoff is a CROSS-agent skill (SSOT in vault, trigger in AGENTS.md); the MEMORY.md continuity-block mechanism is Claude-specific. Correctly placed in the Claude overlay." },
+    { "source": "ai/claude/CLAUDE.md", "rule": "Claude-Only MCP: claude-mem (conversation memory, hooks, CLAUDE_MEM_RUNTIME)", "bucket": "manual", "target_layer": "ai/<provider>/", "fires_observed": "yes", "note": "No cross-provider equivalent. Correctly Claude-only." },
+    { "source": "ai/claude/CLAUDE.md", "rule": "Tooling Notes - Skills auto-load / TaskCreate-Update-List / AskUserQuestion / MEMORY.md", "bucket": "manual", "target_layer": "ai/<provider>/", "fires_observed": "yes", "note": "Claude-specific tool names + behaviours. Skill CONTENT is portable (AI-012 -> opencode commands), but auto-load is Claude-only. Correctly placed." },
+    { "source": "ai/claude/CLAUDE.md", "rule": "Project Memory Hierarchy (4-level read order at session start)", "bucket": "manual", "target_layer": "ai/<provider>/", "fires_observed": "yes", "note": "Describes Claude's memory load order. Claude-only. Correctly placed." },
+    { "source": "ai/claude/CLAUDE.md", "rule": "Model Tier (concrete: claude-opus-4-7 / sonnet-4-6 / haiku-4-5)", "bucket": "direct", "target_layer": "ai/<provider>/", "fires_observed": "yes", "note": "FLAG (drift, not misplacement): 'claude-opus-4-7' is stale - active sessions now run opus-4-8. Placement is correct (per-provider overlay); the ID needs a bump in a separate model-overlay chore (out of scope here). Candidate for the data-driven model-tier registry kernel (see reconciliation.md follow-up)." }
+  ],
+
+  "sensitive_categories": [
+    { "category": "MCP env + secret refs", "verdict": "reference-only; stay in AGENTS.md", "rationale": "Capability-gated, not Claude-only; no secret VALUES present; secrets resolve at runtime via load-secrets.sh." },
+    { "category": "Claude Code hooks + lifecycle (claude-mem, session-start, crystallize, auto-archive)", "verdict": "Claude-only; ai/claude/ (== .agent/claude-code/INSTRUCT.md)", "rationale": "No cross-provider analogue. Already correctly isolated in the Claude overlay." },
+    { "category": "Per-agent restrictions (allowed-tools whitelists, runtime caps)", "verdict": "registry-level metadata - REJECTED for now (no registry, no consumer)", "rationale": "IDEAS-007 Layer-3 registry has no runtime consumer in this repo; deferred as YAGNI. Today these live per-provider in ai/<id>/ where needed." },
+    { "category": "Session / memory artifacts (handoffs, MEMORY.md content)", "verdict": "context, NOT instructions - load-as-context-only", "rationale": "MEMORY.md continuity is data, never quoted as a rule. Boundary already respected: AGENTS.md is the rule SSOT, MEMORY.md is per-Claude state." }
+  ],
+
+  "decisions": {
+    "q1_discovery_mechanism": "RESOLVED-by-reality: no runtime discovery needed. Each provider self-discovers its OWN deployed file natively (Claude -> ~/.claude/CLAUDE.md, OpenCode -> ~/.config/opencode/AGENTS.md, Copilot -> ~/.copilot/copilot-instructions.md, AGY -> $GEMINI_HOME/AGY.md). A binary-name->provider detector would have ZERO callers. REJECTED (YAGNI).",
+    "q2_backwards_compat": "RESOLVED: never at risk - the slim-pointer CLAUDE.md already ships and is deploy-verified. No cutover required.",
+    "q3_colocation_vs_global": "RESOLVED: per-repo overlays = ai/<provider>/ (co-located, git-synced); a global registry was the Layer-3 proposal, REJECTED below.",
+    "q4_state_md_format": "OUT OF SCOPE: STATE.md cross-session handoff is MEMORY-001 territory, not the instruction boundary IDEAS-007 fixes.",
+    "q5_minimal_viable_subset": "RESOLVED: the MVS already lives in AGENTS.md (identity, decision hierarchy, security halts, response protocol + the rest). Audit confirms no provider-specific rule leaked into it.",
+    "r2_telemetry": "Path (c) qualitative audit adopted (this artifact). fires_observed annotated from session review, no instrumentation cost. Path (a) telemetry NOT triggered - the split is already validated as correct, so there is nothing to instrument-then-refactor."
+  },
+
+  "rejected_yagni": {
+    "layer_3_registry": "~/.config/agent-harness/providers/*.yaml - no runtime consumer; each provider's native config discovery already does the job.",
+    "discovery_mechanism": "runtime binary-name->provider detector + bats - no caller. Building it would be dead code (Decision Hierarchy: Explicit > Implicit; boring tech).",
+    "rename_ai_to_dotagent": "renaming ai/<provider>/ -> .agent/<id>/INSTRUCT.md - pure churn on a deployed convention wired into setup-linux.sh (~6 sites) + healthcheck; zero functional gain."
+  },
+
+  "deferred_followup": {
+    "id": "candidate-data-driven-provider-deploy",
+    "summary": "setup-linux.sh has ~5 near-identical per-provider deploy blocks (copy file -> grep-verify pointer). A data-driven manifest (provider|src|dst|verify-string) looped once would collapse ~80-100 LOC to ~30 + a manifest, making 'add a provider' a one-line change. This is the ONE genuine scalability win in IDEAS-007, but it is a setup-linux.sh refactor (different logical change), so it must be its own spec - NOT bundled here (Atomic PRs).",
+    "trigger": "do it when the 6th provider is added OR when the per-provider deploy blocks drift out of sync; YAGNI until then (5 providers, stable).",
+    "also_subsumes": "the stale claude-opus-4-7 model id could be fixed under the same manifest if model tiers move into it."
+  }
+}
