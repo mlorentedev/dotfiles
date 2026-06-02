@@ -45,6 +45,24 @@ teardown() {
     [ -f "$MAINREPO/specs/TEST-001-foo/proposal.md" ]
 }
 
+@test "accepts a sub-id feature-id (SDD-012b / WIN-002a convention)" {
+    # Sibling of BUG-024: the regex rejected sub-ids that check-backlog-integrity.sh
+    # treats as distinct tickets. A trailing single letter on the number is valid.
+    printf -- '- [ ] **TEST-002a-subid** sub-id backlog entry\n' \
+        >> "$VAULT/10_projects/canonrepo/11-tasks.md"
+    cd "$MAINREPO"
+    run env VAULT_PATH="$VAULT" "$SCRIPTS_DIR/init-spec.sh" TEST-002a-subid
+    [ "$status" -eq 0 ]
+    [ -f "$MAINREPO/specs/TEST-002a-subid/proposal.md" ]
+}
+
+@test "still rejects a malformed feature-id (no ticket number)" {
+    cd "$MAINREPO"
+    run env VAULT_PATH="$VAULT" "$SCRIPTS_DIR/init-spec.sh" notaticket
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid feature-id"* ]]
+}
+
 @test "BUG-024: scaffolds from a linked worktree (vault-gate resolves canonical name)" {
     git -C "$MAINREPO" worktree add -q "$TMP/canonrepo-feature" -b feature
     cd "$TMP/canonrepo-feature"
