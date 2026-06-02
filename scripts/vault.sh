@@ -34,11 +34,17 @@ Subcommands:
       Scan task files for backlog drift: duplicate ticket IDs and status
       contradictions (same ID marked both [ ] and [x]). One ticket = one entry.
 
+  check-merged <tasks-file> [--repo <dir>]
+      Flag open [ ] entries whose work already shipped: full ticket id has an
+      archived spec under <repo>/specs/archive/. Advisory ("verify + tick"), not
+      a failure. --repo defaults to $HOME/Projects/<proj> from the tasks path.
+
   help, -h, --help
       Show this message.
 
 Each subcommand is also runnable standalone (vault-health.sh,
-vault-maintenance-weekly.sh, check-md-escapes.sh, check-backlog-integrity.sh) —
+vault-maintenance-weekly.sh, check-md-escapes.sh, check-backlog-integrity.sh,
+check-backlog-merged.sh) —
 this dispatcher provides a single discoverable entry point without changing the
 underlying scripts.
 EOF
@@ -64,6 +70,9 @@ case "$sub" in
         ;;
     check-tasks|tasks)
         exec "$SCRIPT_DIR/check-backlog-integrity.sh" "$@"
+        ;;
+    check-merged|merged)
+        exec "$SCRIPT_DIR/check-backlog-merged.sh" "$@"
         ;;
     help|-h|--help)
         usage
