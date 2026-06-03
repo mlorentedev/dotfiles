@@ -1,7 +1,7 @@
 ---
 id: "HANDOFF-001-cross-agent-handoff-skill"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-31"
 tags: [spec, proposal, cross-agent, handoff, skill, harness-001, sdd-011-sibling]
 template_version: "1.0"
