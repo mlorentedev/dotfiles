@@ -28,12 +28,7 @@
   "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
   // Explicit fast model for title generation — avoids fallback delay.
   "small_model": "nan/qwen3.6",
-  // Default model — NaN community (subscription, OpenAI-compatible @ api.nan.builders/v1).
-  // Rate limits: 100 rpm, max 5 concurrent. See ai/nan/README.md.
-  // qwen3.6 chosen empirically (scripts/nan-bench.sh): 4× faster than deepseek-v4-flash
-  // because deepseek has mandatory reasoning chain (~30-180 reason_tokens per call).
-  // For long-context (>256K) or async tasks, switch to nan/deepseek-v4-flash via /models.
-  "model": "nan/qwen3.6",
+  "model": "nan/deepseek-v4-flash",
 
   "provider": {
     // NaN community — primary daily provider.
@@ -52,7 +47,7 @@
       },
       "models": {
         "deepseek-v4-flash": {
-          "name": "DeepSeek V4 Flash (1M context, reasoning ON server-side)",
+          "name": "DeepSeek V4 Flash (NaN - 1M)",
           "contextWindow": 1000000,
           // Note: NaN returns reasoning chain in non-OpenAI fields
           // (`reasoning_content`, `provider_specific_fields.reasoning`).
@@ -65,7 +60,7 @@
           }
         },
         "qwen3.6": {
-          "name": "Qwen 3.6 (daily — multimodal, 256K)",
+          "name": "Qwen 3.6 (Alibaba - 256K)",
           "contextWindow": 262144,
           "modalities": {
             "input": ["text", "image"],
@@ -73,7 +68,7 @@
           }
         },
         "gemma4": {
-          "name": "Gemma 4 (multimodal A/B, 256K)",
+          "name": "Gemma 4 (Google - 256K)",
           "contextWindow": 262144,
           "modalities": {
             "input": ["text", "image"],
@@ -81,8 +76,8 @@
           }
         },
         "mimo-v2.5": {
-          "name": "Xiaomi MiMo V2.5",
-          "contextWindow": 500000,
+          "name": "MiMo V2.5 (Xiaomi - 1M)",
+          "contextWindow": 1000000,
           "modalities": {
             "input": ["text", "image", "audio"],
             "output": ["text"]
