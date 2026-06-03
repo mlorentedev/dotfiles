@@ -25,12 +25,12 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 ## Standing Orders (Non-Negotiable)
 
 1. **Automate, don't instruct.** If a task is repeatable, encode it: shell script, Makefile, Python CLI, IaC (Terraform/Ansible), CI pipeline, or whatever fits the project stack. Never give manual steps for repeatable work.
-2. **SSOT.** One source of truth per datum; never duplicate. Code lives in git. Knowledge depends on project type: **personal projects → the vault**; **work/team projects → the repo + a GitHub Project** (ADRs in `docs/adr/`, specs in `specs/`, tasks/roadmap in the Project), with the vault demoted to a personal upstream (AI memory, drafts, and personal/methodology lessons only). Full model: `00_meta/patterns/pattern-platform-governance.md`.
-3. **Vault hygiene** (personal projects). After fixing a bug -> `50-troubleshooting/`. After architecture decision -> `30-architecture/adr-XXX.md`. After useful trick -> `90-lessons.md`. Do it in-session, not "later". **Work/team projects:** ADRs -> repo `docs/adr/`; codebase-technical lessons -> repo (ADR/issue/docs); only personal/methodology lessons stay in `90-lessons.md`. Tools that default to vault output (e.g. the architecture-session workflow, lesson capture) must target the repo for work projects.
+2. **SSOT.** One source of truth per datum; never duplicate. Code lives in git. **Knowledge placement is by layer, not project type** (`pattern-knowledge-placement`): **decide/position → the store** (vault `00_meta/`) — patterns, AI memory, cross-project lessons, strategic backlog; **build/operate → the repo** — ADRs (`docs/adr/`), runbooks, troubleshooting, project lessons (`docs/lessons.md`), specs (`specs/`); **collaborate → the forge** — tasks/roadmap as GitHub issues/Project. The store links *out* to repos; repos never depend on the store. The only personal-vs-work residual is *where the cross-project brain lives* (personal vault vs a team store) and *whether tasks sit on a shared board* — declared per repo in the **Knowledge Placement** block below (defaults: personal vault + this repo's issues). Full model: `pattern-knowledge-placement`; team governance: `pattern-platform-governance`.
+3. **Knowledge hygiene — in-session, not "later".** Route by decide-vs-operate (#2): bug fix -> repo `docs/troubleshooting/`; architecture decision -> repo `docs/adr/`; project lesson/trick -> repo `docs/lessons.md`. Only **cross-project** (pattern-worthy) insight -> vault (`00_meta/` patterns, or `90-lessons.md` for methodology); AI memory/handoffs -> always vault. Do it in-session, not "later". Tools that default to vault output (e.g. the `architecture-session` workflow, `capture_lesson`) must target the repo for **any repo on the knowledge-placement model** (any repo with `docs/`), not just "work" repos.
 4. **Clean as you go.** Dead code, stale comments, orphan files -- fix them when you see them. Don't defer trivial fixes.
 5. **Consult patterns before architectural decisions.** 37 universal patterns in `00_meta/patterns/`. Query via Hive MCP (when available) or read from `~/Projects/knowledge/00_meta/patterns/<name>.md` (Linux/macOS) / `%USERPROFILE%\Projects\knowledge\00_meta\patterns\<name>.md` (Windows).
 6. **Enterprise-grade or nothing.** Before proposing any code, evaluate: Is this a proven enterprise pattern? Is it scalable? Would a senior engineer approve this in code review? No hacks, no quick-and-dirty, no "it works for now" shortcuts. If the straightforward approach is sloppy, find the elegant one.
-7. **Noted = recorded, never verbal-only.** When you say something is "noted"/"apuntado", or the user tells you to note or track something, persist it to its canonical home **in the same session** — never leave it as conversation-only prose. Placement follows #2 + #3: personal projects → the vault (`11-tasks.md` backlog, `90-lessons.md`, or an ADR); work/team projects → the repo (`specs/`, `docs/`, a GitHub issue / Project item); a decision affecting how agents work → an ADR or this file. If it genuinely cannot be filed now, create an explicit tracked task for the debt. "I'll note it" with no durable artifact is a broken promise. See `pattern-decision-persistence`.
+7. **Noted = recorded, never verbal-only.** When you say something is "noted"/"apuntado", or the user tells you to note or track something, persist it to its canonical home **in the same session** — never leave it as conversation-only prose. Placement follows #2 + #3 (decide-vs-operate): build/operate artifacts → the repo (`specs/`, `docs/`, a GitHub issue / Project item); cross-project knowledge → the vault (`00_meta/`, `90-lessons.md`); a decision affecting how agents work → an ADR or this file. If it genuinely cannot be filed now, create an explicit tracked task for the debt. "I'll note it" with no durable artifact is a broken promise. See `pattern-decision-persistence`.
 
 ### Pattern Catalog (00_meta/patterns/)
 
@@ -225,9 +225,18 @@ Stop generation and warn if you detect:
 | Cyclomatic complexity | < 10 |
 | Nesting depth | < 4 levels |
 
+## Knowledge Placement (this repo)
+
+Placement follows `pattern-knowledge-placement` (decide-vs-operate, Standing Order #2). Two values vary per repo; everything else is fixed by layer:
+
+- **brain:** `vault:00_meta/` — the cross-project store (default: personal vault). A team repo overrides to its shared store.
+- **tasks:** `repo:issues` — tactical work tracking (default: this repo's GitHub issues). A team repo may use a shared Project board.
+
+Defaults = personal solo project (this repo). Build/operate docs always live in this repo's `docs/`; only the two values above are context-dependent.
+
 ## "Neural Hive" Protocol (The Loop)
 
-**CORE PRINCIPLE:** Code lives in Git. **Knowledge placement depends on the project model** (Standing Order #2): a repo's build/operate docs — ADRs (`docs/adr/`), runbooks, troubleshooting — live in that repo's `docs/`; the vault (`~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows) holds the cross-project brain, AI memory, and personal/methodology lessons. Patterns: `pattern-knowledge-placement`, `pattern-platform-governance`.
+**CORE PRINCIPLE:** Code lives in Git. **Knowledge placement is by layer — decide-vs-operate** (Standing Order #2): a repo's build/operate docs — ADRs (`docs/adr/`), runbooks, troubleshooting — live in that repo's `docs/`; the vault (`~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows) holds the cross-project brain, AI memory, and personal/methodology lessons. Patterns: `pattern-knowledge-placement`, `pattern-platform-governance`.
 **LANGUAGE:** All Vault content MUST be in English.
 **COMMIT POLICY:** **Autonomous agents** (no human in the loop) may commit autonomously **only within their vault workspace `80_agents/`** — that sandbox is theirs; everywhere else (code repos + the rest of the vault) they stage only and leave commits for human approval. **Interactive / in-session agents** stage by default and commit / push / open PRs **when the user asks** (e.g. this repo's PR-per-feature flow).
 **REPO DOCS:** Repos on the knowledge-placement model keep `docs/` (with `docs/adr/`) in-repo and may keep a root `CHANGELOG.md`. This **supersedes the older blanket "never create `docs/`" stance** (closes CHORE-002). Still avoid ad-hoc `TODO.md` — tasks live in `specs/` + the backlog.
@@ -245,20 +254,20 @@ Stop generation and warn if you detect:
 * **Plan:** Create a sub-task checklist in memory (or scratchpad).
 * **Act:** Implement code/tests in the repo.
 * **Verify:** Run tests.
-* **Document Dynamic:**
-  * New architectural decision → `30-architecture/adr-XXX.md`.
-  * New operational procedure → `40-runbooks/guide-XXX.md`.
-  * Fixing a bug → `50-troubleshooting/error-name.md`.
-  * Useful trick → `90-lessons.md` or `60-resources/`.
-  * New repeated pattern → `00_meta/patterns/`.
+* **Document Dynamic** (decide-vs-operate — build/operate → repo, cross-project → vault):
+  * New architectural decision → repo `docs/adr/adr-XXX.md`.
+  * New operational procedure → repo `docs/runbooks/guide-XXX.md`.
+  * Fixing a bug → repo `docs/troubleshooting/error-name.md`.
+  * Project-specific trick/lesson → repo `docs/lessons.md`.
+  * New cross-project pattern → vault `00_meta/patterns/`.
 
 ### Phase 3: Knowledge Crystallization (Write Back)
 
 * **Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar.
 * **Strategy (`10-roadmap.md`):** ONLY if a major milestone is completed.
-* **Lessons:** Append to `90-lessons.md` using the Lesson Template.
+* **Lessons:** project-specific → repo `docs/lessons.md`; cross-project / methodology → vault `90-lessons.md` (Lesson Template).
 * **Promotion:** If the solution is generic, create `00_meta/patterns/pattern-<topic>.md`.
-* **Session handoff (at session end):** run the **`/handoff`** skill — the complete, cross-agent checklist (continuity block in `MEMORY.md` + the vault hygiene above + repo/worktree/branch state + artifact/PR summary + a concrete next action). SSOT: `00_meta/skills/handoff/SKILL.md`. Skip only for trivial sessions.
+* **Session handoff (at session end):** run the **`/handoff`** skill — the complete, cross-agent checklist (continuity block in `MEMORY.md` + the knowledge hygiene above + repo/worktree/branch state + artifact/PR summary + a concrete next action). SSOT: `00_meta/skills/handoff/SKILL.md`. Skip only for trivial sessions.
 
 For the full session taxonomy and document placement table, query `00_meta/patterns/workflow-protocol.md`.
 
@@ -315,7 +324,7 @@ For reasoning structure, query `00_meta/patterns/pattern-mcp-sequential-thinking
 
 * `vault_search` over `grep`+`Read`; `vault_query` over `Read` of whole files.
 * `vault_patch` / `vault_write` over `Edit`/`Write` — do NOT also create a manual git commit (Hive already committed).
-* `capture_lesson` over manual `90-lessons.md` writes.
+* `capture_lesson` over manual `90-lessons.md` writes **for cross-project / methodology lessons**; project-specific lessons go to repo `docs/lessons.md`.
 * `vault_health` over Bash + `vault-validate.py`.
 * `delegate_task` for bulk summaries — keeps the main context lean.
 * `vault_list` before `ls`/`find` to browse vault structure.
@@ -386,11 +395,11 @@ Before creating ANY branch for code changes in this repo, evaluate against `patt
 
 **Banned phrases when planning work in this session:**
 
-- "I'll do vault hygiene later"
+- "I'll do knowledge hygiene later"
 - "Will add the spec entry after merge"
 - "Let me commit first and document later"
 
-Standing Order #3 (vault hygiene) is **in-session, not 'later'**. Every "later" is debt that compounds and historically gets forgotten between sessions. If a vault hygiene action genuinely cannot fit in the current turn, create an explicit tracked task for the debt — never leave it as a verbal promise.
+Standing Order #3 (knowledge hygiene) is **in-session, not 'later'**. Every "later" is debt that compounds and historically gets forgotten between sessions. If a knowledge hygiene action genuinely cannot fit in the current turn, create an explicit tracked task for the debt — never leave it as a verbal promise.
 
 ## Response Protocol
 
