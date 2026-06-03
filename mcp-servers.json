@@ -1,6 +1,6 @@
 {
   "_comment": "Single source of truth for Claude Code MCP servers registered by setup-linux.sh and setup-windows.ps1. Add new servers here; both setup scripts pick them up automatically. Args is a space-separated string of arguments passed after `--` to `claude mcp add`.",
-  "_history": "2026-05-25 SDD-007: removed `drawio` (rarely used for diagram gen, spawned subprocess even with --pure) and `socket` (mcp.socket.dev remote endpoint hung 30s+ on tool discovery). User decision: keep only hive + context7 + sequential-thinking across all environments (Claude Code, opencode, agy).",
+  "_history": "2026-05-25 SDD-007: removed `drawio` (rarely used for diagram gen, spawned subprocess even with --pure) and `socket` (mcp.socket.dev remote endpoint hung 30s+ on tool discovery). User decision: keep only hive + context7 + sequential-thinking across all environments (Claude Code, opencode, agy). 2026-06-02 HIVE-118: hive args flipped `uvx hive-vault` (per-session stdio) -> `hive client` (Phase C daemon proxy). setup-linux.sh/setup-windows.ps1 migrate an existing stale entry by REMOVING it before the registration loop so the loop re-adds `hive client` from this SSOT (no hardcoded `claude mcp add`), then install the supervised `hive serve` service gated on hive-vault >= 1.32.0.",
   "servers": [
     {
       "name": "sequential-thinking",
@@ -15,7 +15,7 @@
     {
       "name": "hive",
       "transport": "stdio",
-      "args": "uvx hive-vault",
+      "args": "hive client",
       "prerequisite_binary": "uv",
       "prerequisite_command": "uv tool install --upgrade hive-vault"
     }

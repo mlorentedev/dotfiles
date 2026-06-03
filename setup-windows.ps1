@@ -361,6 +361,15 @@ if (-not ($claudeCmd -and $npxCmd)) {
     $mcpFailed = 0
     try {
         $servers = (Get-Content $mcpConfig -Raw | ConvertFrom-Json).servers
+        # HIVE-118: migrate a stale `uvx hive-vault` entry by REMOVING it here so
+        # the skip-if-present loop below re-adds the current definition
+        # (`hive client`) from mcp-servers.json. Remove-only -- the loop owns every
+        # `claude mcp add` so this stays SSOT-driven (no hardcoded server add).
+        $hiveEntry = Backup-AndRestoreClaudeJson -Action { & claude mcp get hive 2>&1 }
+        if ($hiveEntry -match 'uvx|hive-vault') {
+            Backup-AndRestoreClaudeJson -Action { & claude mcp remove hive --scope user 2>&1 } | Out-Null
+            Write-Info "Migrating hive MCP entry: uvx hive-vault -> hive client (via mcp-servers.json)"
+        }
         foreach ($srv in $servers) {
             # mcp-servers.json only declares prerequisite_binary/_command for
             # MCPs that need a runtime install (e.g. hive needs uv). Under
@@ -412,6 +421,23 @@ if (-not ($claudeCmd -and $npxCmd)) {
     } catch {
         Write-Warn "Failed to register MCP servers: $_"
     }
+}
+
+# Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
+# `hive serve` Scheduled Task now that the MCP loop's prerequisite installed/upgraded
+# the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing
+# `hive service`, which an older hive routes to the blocking stdio server). The MCP
+# entry itself is already `hive client` (re-added from mcp-servers.json above).
+# Non-fatal: any failure leaves the in-process `hive client` fallback.
+$hiveVerMatch = (& uv tool list 2>$null | Select-String -Pattern '^hive-vault\s+v?([\d.]+)')
+$hiveVer = if ($hiveVerMatch) { $hiveVerMatch.Matches[0].Groups[1].Value } else { $null }
+if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
+    & hive service install *> $null
+    if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
+    else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
+} elseif (Get-Command hive -ErrorAction SilentlyContinue) {
+    $shownVer = if ($hiveVer) { $hiveVer } else { '<unknown>' }
+    Write-Warn "hive $shownVer predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 }
 
 # Claude Code plugins (requires claude CLI).
