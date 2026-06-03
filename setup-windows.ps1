@@ -361,6 +361,15 @@ if (-not ($claudeCmd -and $npxCmd)) {
     $mcpFailed = 0
     try {
         $servers = (Get-Content $mcpConfig -Raw | ConvertFrom-Json).servers
+        # HIVE-118: migrate a stale `uvx hive-vault` entry by REMOVING it here so
+        # the skip-if-present loop below re-adds the current definition
+        # (`hive client`) from mcp-servers.json. Remove-only -- the loop owns every
+        # `claude mcp add` so this stays SSOT-driven (no hardcoded server add).
+        $hiveEntry = Backup-AndRestoreClaudeJson -Action { & claude mcp get hive 2>&1 }
+        if ($hiveEntry -match 'uvx|hive-vault') {
+            Backup-AndRestoreClaudeJson -Action { & claude mcp remove hive --scope user 2>&1 } | Out-Null
+            Write-Info "Migrating hive MCP entry: uvx hive-vault -> hive client (via mcp-servers.json)"
+        }
         foreach ($srv in $servers) {
             # mcp-servers.json only declares prerequisite_binary/_command for
             # MCPs that need a runtime install (e.g. hive needs uv). Under
@@ -414,34 +423,21 @@ if (-not ($claudeCmd -and $npxCmd)) {
     }
 }
 
-# Phase C daemon activation (HIVE-118 / hive#176). Mirror of the Linux block:
-# converge a stale `uvx hive-vault` entry to `hive client` (the skip-if-present
-# loop leaves it untouched) and register the supervised Scheduled Task. Gated on
-# hive-vault >= 1.32.0 via the package version (NOT by probing `hive service`,
-# which an older hive would route to the blocking stdio server). A missing/older
-# hive stays on stdio (the in-process fallback degrades, never breaks).
+# Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
+# `hive serve` Scheduled Task now that the MCP loop's prerequisite installed/upgraded
+# the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing
+# `hive service`, which an older hive routes to the blocking stdio server). The MCP
+# entry itself is already `hive client` (re-added from mcp-servers.json above).
+# Non-fatal: any failure leaves the in-process `hive client` fallback.
 $hiveVerMatch = (& uv tool list 2>$null | Select-String -Pattern '^hive-vault\s+v?([\d.]+)')
 $hiveVer = if ($hiveVerMatch) { $hiveVerMatch.Matches[0].Groups[1].Value } else { $null }
-if ((Get-Command hive -ErrorAction SilentlyContinue) -and (Get-Command claude -ErrorAction SilentlyContinue) `
-        -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
-    Write-Info "Activating hive daemon (v$hiveVer, HIVE-118)..."
-    # Migrate a stale `uvx hive-vault` entry -> `hive client` (BUG-011 wrapped).
-    $hiveEntry = Backup-AndRestoreClaudeJson -Action { & claude mcp get hive 2>&1 }
-    if ($hiveEntry -match 'uvx|hive-vault') {
-        Backup-AndRestoreClaudeJson -Action { & claude mcp remove hive --scope user 2>&1 } | Out-Null
-        $addErr = Backup-AndRestoreClaudeJson -Action {
-            & claude mcp add --transport stdio hive --scope user -- hive client 2>&1
-        }
-        if ($LASTEXITCODE -eq 0) { Write-Success "Migrated hive MCP entry -> hive client" }
-        else { Write-Warn "Could not migrate hive MCP entry: $addErr" }
-    }
-    # Register the supervised daemon (Scheduled Task). Non-fatal.
+if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
     & hive service install *> $null
-    if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task)" }
-    else { Write-Warn "hive service install failed (non-fatal; client still works via fallback)" }
+    if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
+    else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
 } elseif (Get-Command hive -ErrorAction SilentlyContinue) {
     $shownVer = if ($hiveVer) { $hiveVer } else { '<unknown>' }
-    Write-Warn "hive $shownVer predates 'hive service' (need >= 1.32.0); leaving stdio entry"
+    Write-Warn "hive $shownVer predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 }
 
 # Claude Code plugins (requires claude CLI).

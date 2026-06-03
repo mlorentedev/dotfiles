@@ -29,11 +29,14 @@ created: "2026-06-03"
   to the blocking stdio server (it reads stdin and hangs setup). So the block gates on
   the installed package version (`uv tool list` parse + `sort -V` / `[version]`), never by
   running `hive service --help`.
-- **Dedicated post-loop block, not a change to the shared MCP loop.** The generic loop's
-  skip-if-present idempotence can't update a changed server definition; rather than make the
-  shared loop converge-on-mismatch (higher blast radius for all servers), a hive-specific
-  block migrates the stale `uvx hive-vault` entry. `mcp-servers.json` still carries hive
-  (now `hive client`) so fresh machines register it via the loop and the SSOT stays complete.
+- **Migrate by remove-before-loop, not a hardcoded re-add.** The repo enforces "no hardcoded
+  `claude mcp add <known-server>`" (tests/setup-*.bats: all MCP servers come from
+  mcp-servers.json) -- the first cut hardcoded `claude mcp add … hive client` and tripped it.
+  Fixed by REMOVING a stale `uvx hive-vault` entry *before* the registration loop, so the loop
+  re-adds the current definition (`hive client`) from the SSOT. The loop still owns every add;
+  the migration is remove-only. This also generalises (any server whose definition changes can
+  be force-removed pre-loop to get re-added). The service install stays a separate post-loop
+  step that touches no MCP state.
 - **Non-fatal everywhere.** Missing systemd `--user` / Task Scheduler, an upgrade lag, or any
   failure downgrades to a warning and leaves the stdio entry — the in-process `hive client`
   fallback means a missing daemon degrades, never breaks a session.

@@ -8,15 +8,15 @@
   },
   {
     "id": "AI-022-hive-daemon-activation-f2",
-    "behavior": "setup-linux.sh has a hive activation block that migrates a stale entry and installs the service",
-    "verification": "grep -q 'Activating hive daemon' setup-linux.sh && grep -q 'claude mcp add --transport stdio hive --scope user -- hive client' setup-linux.sh && grep -q 'hive service install' setup-linux.sh",
+    "behavior": "setup-linux.sh migrates a stale hive entry by remove-only (loop re-adds from SSOT) and installs the service; no hardcoded `claude mcp add` for a known server",
+    "verification": "grep -q 'claude mcp remove hive --scope user' setup-linux.sh && grep -q 'hive service install' setup-linux.sh && ! grep -qE 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' setup-linux.sh",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-022-hive-daemon-activation-f3",
-    "behavior": "setup-windows.ps1 mirrors the activation block (migration + Scheduled Task install)",
-    "verification": "grep -q 'Activating hive daemon' setup-windows.ps1 && grep -q 'hive service install' setup-windows.ps1",
+    "behavior": "setup-windows.ps1 mirrors the migration (remove-only) + Scheduled Task install; no hardcoded `claude mcp add` for a known server",
+    "verification": "grep -q 'claude mcp remove hive --scope user' setup-windows.ps1 && grep -q 'hive service install' setup-windows.ps1 && ! grep -qE 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' setup-windows.ps1",
     "state": "pending",
     "evidence": ""
   },
@@ -30,7 +30,7 @@
   {
     "id": "AI-022-hive-daemon-activation-f5",
     "behavior": "setup-linux.sh stays syntactically valid and shellcheck-clean in the added block",
-    "verification": "bash -n setup-linux.sh && [ -z \"$(shellcheck -f gcc setup-linux.sh 2>/dev/null | awk -F: '$2>=815 && $2<=850')\" ]",
+    "verification": "bash -n setup-linux.sh && [ -z \"$(shellcheck -f gcc setup-linux.sh 2>/dev/null | awk -F: '$2>=771 && $2<=842')\" ]",
     "state": "pending",
     "evidence": ""
   }
