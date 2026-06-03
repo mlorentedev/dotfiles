@@ -1,7 +1,7 @@
 ---
 id: "SKILLS-001-vendor-devops-skills"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-06-03"
 tags: [spec, proposal, harness-001, skills, skills-sh, vendoring, cross-agent]
 template_version: "1.0"

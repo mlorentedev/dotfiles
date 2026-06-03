@@ -1,7 +1,7 @@
 ---
 id: "WORKMODE-001-knowledge-placement-mode"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-06-02"
 tags: [spec, proposal, harness-001, knowledge-placement, ssot, agents-md, cross-agent]
 template_version: "1.0"

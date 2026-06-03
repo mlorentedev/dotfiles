@@ -1,7 +1,7 @@
 ---
 id: "CHORE-002-changelog-policy-reconcile"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
