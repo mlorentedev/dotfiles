@@ -37,9 +37,9 @@ setup() {
     grep -qF 'verification.md' "$AGENTS_MD"
 }
 
-@test "AGENTS.md Discipline Gate has banned-phrases list for vault hygiene" {
+@test "AGENTS.md Discipline Gate has banned-phrases list for knowledge hygiene" {
     grep -qF 'Banned phrases' "$AGENTS_MD"
-    grep -qF "vault hygiene later" "$AGENTS_MD"
+    grep -qF "knowledge hygiene later" "$AGENTS_MD"
     grep -qF "spec entry after merge" "$AGENTS_MD"
     grep -qF "commit first and document later" "$AGENTS_MD"
 }
@@ -47,4 +47,31 @@ setup() {
 @test "AGENTS.md Discipline Gate references Standing Order 3 (in-session, not later)" {
     grep -qF "in-session, not 'later'" "$AGENTS_MD"
     grep -qF 'Standing Order' "$AGENTS_MD"
+}
+
+# --- WORKMODE-001: decide-vs-operate knowledge placement (incident->guard, #197/#159) ---
+# The kubelab regression (a personal+placement repo whose lesson got routed back to
+# the vault by the retired work/personal axis) is the incident; these are its guards.
+
+@test "AGENTS.md SO#2 states decide-vs-operate as the placement discriminator" {
+    grep -qF 'Knowledge placement is by layer' "$AGENTS_MD"
+}
+
+@test "AGENTS.md has the per-repo Knowledge Placement declaration (brain/tasks)" {
+    grep -qE '^## Knowledge Placement' "$AGENTS_MD"
+    grep -qF 'brain:' "$AGENTS_MD"
+    grep -qF 'tasks:' "$AGENTS_MD"
+}
+
+@test "AGENTS.md routes build/operate artifacts to the repo, not the vault" {
+    grep -qF 'docs/troubleshooting/' "$AGENTS_MD"
+    grep -qF 'docs/adr/' "$AGENTS_MD"
+    grep -qF 'docs/lessons.md' "$AGENTS_MD"
+}
+
+@test "AGENTS.md does NOT reintroduce the retired work/personal routing axis" {
+    # Negative guard: these markers encode the old axis that mis-routed build/operate
+    # artifacts to the vault. Their presence is a regression.
+    ! grep -qF 'for work projects' "$AGENTS_MD"
+    ! grep -qF '30-architecture/adr' "$AGENTS_MD"
 }
