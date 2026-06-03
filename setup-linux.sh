@@ -812,6 +812,39 @@ else
     log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
 fi
 
+# Phase C daemon activation (HIVE-118 / hive#176). The skip-if-present MCP loop
+# above leaves an existing `uvx hive-vault` entry untouched, so converge it to
+# `hive client` here and install the supervised per-user service. Gated on
+# hive-vault >= 1.32.0 (the version that ships `hive service`) -- checked via the
+# package version, NOT by probing `hive service`, because an older hive routes an
+# unknown subcommand to the blocking stdio server. The prerequisite
+# `uv tool install --upgrade` above normally satisfies the gate; a missing/older
+# hive stays on stdio (the in-process `hive client` fallback degrades, never breaks).
+hive_ver=$(uv tool list 2>/dev/null | sed -n 's/^hive-vault v\?\([0-9][0-9.]*\).*/\1/p' | head -1)
+if command -v hive >/dev/null 2>&1 && command -v claude >/dev/null 2>&1 && [ -n "$hive_ver" ] \
+    && [ "$(printf '1.32.0\n%s\n' "$hive_ver" | sort -V | head -1)" = "1.32.0" ]; then
+    log_info "Activating hive daemon (v$hive_ver, HIVE-118)..."
+    # Migrate a stale `uvx hive-vault` entry -> `hive client` (BUG-011 wrapped).
+    _snap=$(snapshot_claude_json)
+    if claude mcp get hive 2>/dev/null | grep -qE 'uvx|hive-vault'; then
+        claude mcp remove hive --scope user >/dev/null 2>&1 || true
+        if claude mcp add --transport stdio hive --scope user -- hive client >/dev/null 2>&1; then
+            log_success "Migrated hive MCP entry -> hive client"
+        else
+            log_warning "Could not migrate hive MCP entry to hive client"
+        fi
+    fi
+    restore_claude_json_if_truncated "$_snap"
+    # Install + enable the supervised daemon (systemd --user). Non-fatal.
+    if hive service install >/dev/null 2>&1; then
+        log_success "Installed hive daemon service (systemd --user)"
+    else
+        log_warning "hive service install failed (non-fatal; client still works via fallback)"
+    fi
+elif command -v hive >/dev/null 2>&1; then
+    log_warning "hive ${hive_ver:-<unknown>} predates 'hive service' (need >= 1.32.0); leaving stdio entry"
+fi
+
 # Claude Code plugins (requires claude CLI).
 # Idempotent: cache the installed-plugins list ONCE before the loop and skip
 # entries already present. The wrapper above (BUG-004/011) catches the
