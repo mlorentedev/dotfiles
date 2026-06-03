@@ -1,10 +1,16 @@
 # Dotfiles
 
-Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Works across Linux, macOS, and Windows.
+Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Supported today on **Linux** and **Windows**. **macOS is planned** (roadmap) — there is no `setup-macos.sh` yet, so the Linux bootstrap is unverified on macOS.
+
+| Platform | Status | Bootstrap |
+|---|---|---|
+| Linux | Supported | `setup-linux.sh` |
+| Windows | Supported | `setup-windows.ps1` |
+| macOS | Planned (not yet implemented) | — |
 
 ## Quick Start
 
-### Linux / macOS
+### Linux
 
 ```bash
 git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
@@ -27,14 +33,14 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
 - **Encrypted secrets** — Age-encrypted tokens and file secrets, auto-loaded at login
 - **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 21 custom skills, unified by `AGENTS.md` SSOT
-- **Cross-platform** — Symlinks on Linux/macOS, copies on Windows (no admin required)
+- **Cross-platform** — Symlinks on Linux, copies on Windows (no admin required); macOS planned
 - **Editor & shell ergonomics** — `.editorconfig` for cross-IDE consistency + `.inputrc` for case-insensitive tab-completion and arrow-key history search
 - **Tested** — 316 BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
 
 ```text
-├── setup-linux.sh              # Linux/macOS setup (symlinks)
+├── setup-linux.sh              # Linux setup (symlinks); macOS planned
 ├── setup-windows.ps1           # Windows setup (copies)
 ├── scripts/                    # Shell utilities (added to PATH)
 │   ├── utils.sh                # Shared function library
@@ -149,9 +155,11 @@ Full reference and pane-layout recipes: [`docs/runbooks/guide-tmux.md`](docs/run
 
 ## Requirements
 
-**Linux/macOS:** git, bash/zsh, tmux (`sudo apt install tmux`)
+**Linux:** git, bash/zsh, tmux (`sudo apt install tmux`)
 
 **Windows:** git, PowerShell
+
+**macOS:** planned — not yet supported (no `setup-macos.sh`)
 
 **Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
 
