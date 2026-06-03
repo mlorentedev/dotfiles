@@ -11,15 +11,13 @@
 #     COPY of the script placed next to stub siblings, with HOME redirected to
 #     a temp dir (no vault, no network, no notify-send dependency).
 #
-# COVERAGE GAP (documented, not papered over): the end-to-end run is exercised
-# under zsh only. Under bash (the script's declared shebang) the section-header
-# lines `printf '--- ... ---'` abort with "printf: --: invalid option" because
-# the format string begins with `--`; combined with `set -e` this aborts the
-# whole log block. That is a PRE-EXISTING portability defect in the script
-# (it violates the repo's bash+zsh rule), out of scope for TEST-001 which only
-# adds coverage. See the test report for the finding. The structural guards
-# below run shell-independently; the behavioral run uses zsh where the script
-# currently works.
+# The end-to-end run is exercised under BOTH zsh and bash. A pre-existing
+# portability defect surfaced while writing this coverage: the section-header
+# lines `printf '--- ... ---'` aborted under bash with "printf: --: invalid
+# option" (the format string begins with `--`), and with `set -e` killed the
+# whole log block — so the script only worked under zsh. Fixed in the same PR
+# (incident->guard) to `printf '%s\n' '--- ... ---'`; the bash behavioral test
+# below is the regression guard (it fails on the old script, passes on the fix).
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -112,6 +110,21 @@ EOF
     _prep_sandbox "all clean"
     run env HOME="$FAKE_HOME" PATH="$TMP:$PATH" zsh "$TMP/vault-maintenance-weekly.sh"
     [ "$status" -eq 0 ]
+    log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
+    grep -qF 'knowledge-crystallize --all' "$log"
+    grep -qF 'vault-health' "$log"
+    grep -qF '=== Done:' "$log"
+}
+
+@test "vault-maintenance-weekly.sh runs cleanly under bash — guards the printf '--' regression" {
+    # Regression guard: section headers used `printf '--- ... ---'`, which under
+    # bash abort with "printf: --: invalid option" and (set -e) kill the run before
+    # the sections write. Fixed to `printf '%s\n' '--- ... ---'`. This FAILS on the
+    # old script (sections + Done missing) and PASSES on the fix.
+    _prep_sandbox "all clean"
+    run env HOME="$FAKE_HOME" PATH="$TMP:$PATH" bash "$TMP/vault-maintenance-weekly.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"invalid option"* ]]
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
     grep -qF 'knowledge-crystallize --all' "$log"
     grep -qF 'vault-health' "$log"

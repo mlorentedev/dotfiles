@@ -18,11 +18,11 @@ mkdir -p "$LOG_DIR"
 {
     printf '=== Vault Maintenance: %s ===\n\n' "$(date)"
 
-    printf '--- knowledge-crystallize --all ---\n'
+    printf '%s\n' '--- knowledge-crystallize --all ---'
     "$SCRIPT_DIR/knowledge-crystallize.sh" --all 2>&1 || true
     printf '\n'
 
-    printf '--- vault-health ---\n'
+    printf '%s\n' '--- vault-health ---'
     "$SCRIPT_DIR/vault-health.sh" 2>&1 || true
     printf '\n'
 
