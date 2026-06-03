@@ -1,0 +1,37 @@
+[
+  {
+    "id": "AI-022-hive-daemon-activation-f1",
+    "behavior": "mcp-servers.json hive args is `hive client` (fresh installs register the daemon proxy)",
+    "verification": "jq -e '.servers[]|select(.name==\"hive\").args==\"hive client\"' mcp-servers.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-hive-daemon-activation-f2",
+    "behavior": "setup-linux.sh migrates a stale hive entry by remove-only (loop re-adds from SSOT) and installs the service; no hardcoded `claude mcp add` for a known server",
+    "verification": "grep -q 'claude mcp remove hive --scope user' setup-linux.sh && grep -q 'hive service install' setup-linux.sh && ! grep -qE 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-hive-daemon-activation-f3",
+    "behavior": "setup-windows.ps1 mirrors the migration (remove-only) + Scheduled Task install; no hardcoded `claude mcp add` for a known server",
+    "verification": "grep -q 'claude mcp remove hive --scope user' setup-windows.ps1 && grep -q 'hive service install' setup-windows.ps1 && ! grep -qE 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-hive-daemon-activation-f4",
+    "behavior": "activation gates on hive-vault >= 1.32.0 via package version, never by probing the subcommand (which would hang an old hive)",
+    "verification": "grep -q 'sort -V' setup-linux.sh && grep -q '\\[version\\]' setup-windows.ps1 && ! grep -q 'hive service --help' setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-hive-daemon-activation-f5",
+    "behavior": "setup-linux.sh stays syntactically valid and shellcheck-clean in the added block",
+    "verification": "bash -n setup-linux.sh && [ -z \"$(shellcheck -f gcc setup-linux.sh 2>/dev/null | awk -F: '$2>=771 && $2<=842')\" ]",
+    "state": "pending",
+    "evidence": ""
+  }
+]

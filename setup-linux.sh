@@ -768,6 +768,17 @@ if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 && comman
         mcp_added=0
         mcp_skipped=0
         mcp_failed=0
+        # HIVE-118: migrate a stale `uvx hive-vault` entry by REMOVING it here so
+        # the skip-if-present loop below re-adds the current definition
+        # (`hive client`) from mcp-servers.json. Remove-only -- the loop owns every
+        # `claude mcp add` so this stays SSOT-driven (no hardcoded server add).
+        if claude mcp get hive 2>/dev/null | grep -qE 'uvx|hive-vault'; then
+            _snap=$(snapshot_claude_json)
+            if claude mcp remove hive --scope user >/dev/null 2>&1; then
+                log_info "Migrating hive MCP entry: uvx hive-vault -> hive client (via mcp-servers.json)"
+            fi
+            restore_claude_json_if_truncated "$_snap"
+        fi
         while IFS=$'\t' read -r mcp_name mcp_transport mcp_args mcp_prereq_bin mcp_prereq_cmd; do
             # Check prerequisite binary, run prerequisite command if specified
             if [ -n "$mcp_prereq_bin" ]; then
@@ -810,6 +821,24 @@ if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 && comman
     fi
 else
     log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
+fi
+
+# Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
+# `hive serve` service now that the MCP loop's prerequisite has installed/upgraded
+# the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing
+# `hive service`, which an older hive routes to the blocking stdio server). The MCP
+# entry itself is already `hive client` (re-added from mcp-servers.json above).
+# Non-fatal: a missing systemd --user or any failure leaves the in-process fallback.
+hive_ver=$(uv tool list 2>/dev/null | sed -n 's/^hive-vault v\?\([0-9][0-9.]*\).*/\1/p' | head -1)
+if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
+    && [ "$(printf '1.32.0\n%s\n' "$hive_ver" | sort -V | head -1)" = "1.32.0" ]; then
+    if hive service install >/dev/null 2>&1; then
+        log_success "Installed hive daemon service (systemd --user, v$hive_ver)"
+    else
+        log_warning "hive service install failed (non-fatal; client works via fallback)"
+    fi
+elif command -v hive >/dev/null 2>&1; then
+    log_warning "hive ${hive_ver:-<unknown>} predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 fi
 
 # Claude Code plugins (requires claude CLI).
