@@ -157,4 +157,4 @@ OpenCode no expone estos como provider-level config; los inyecta por agente. Par
 
 - Provider docs: https://nan.builders/docs (intro), https://nan.builders/docs/api (API reference), https://nan.builders/docs/examples (per-language examples)
 - Spec: `specs/SDD-007-ai-tooling-consolidation/proposal.md`
-- Vault decision record (post-merge): `10_projects/dotfiles/30-architecture/adr-013-nan-default-provider.md` (planned)
+- Decision record (planned, not yet written): repo `docs/adr/` — NaN as default provider. (The old `adr-013` slot is taken by `adr-013-agent-artifact-deploy-engine.md`.)
