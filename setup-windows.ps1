@@ -435,6 +435,35 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     & hive service install *> $null
     if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
     else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
+
+    # AI-023 / hive#176: the upgrade policy that FEEDS the daemon's
+    # restart-on-upgrade. Daily Scheduled Task running `uv tool upgrade hive-vault`.
+    # Self-healing: re-register when the action arguments drift (parity with the
+    # weekly vault maintenance task). Same version gate as the service above.
+    $hiveUvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
+    $hiveUpgradeTask = "DotfilesHiveUpgrade"
+    $hiveUpgradeArg = "tool upgrade hive-vault"
+    $existingHiveTask = Get-ScheduledTask -TaskName $hiveUpgradeTask -ErrorAction SilentlyContinue
+    $existingHiveArg = $null
+    if ($existingHiveTask -and $existingHiveTask.Actions -and $existingHiveTask.Actions[0]) {
+        $existingHiveArg = $existingHiveTask.Actions[0].Arguments
+    }
+    if ($existingHiveTask -and ($existingHiveArg -eq $hiveUpgradeArg)) {
+        Write-Info "hive-upgrade task already correctly configured, skipping"
+    } else {
+        try {
+            $hiveAction = New-ScheduledTaskAction -Execute $hiveUvExe -Argument $hiveUpgradeArg
+            $hiveTrigger = New-ScheduledTaskTrigger -Daily -At "9:00AM"
+            Register-ScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
+                -Description "Daily hive-vault upgrade (feeds hive serve restart-on-upgrade)" -Force | Out-Null
+            Write-Success "Installed hive-upgrade task (daily 9:00, v$hiveVer)"
+            if (-not (Test-Path $hiveUvExe)) {
+                Write-Warn "hive-upgrade task registered but uv not found at $hiveUvExe"
+            }
+        } catch {
+            Write-Warn "Could not register hive-upgrade task (non-fatal; setup still upgrades hive each run): $_"
+        }
+    }
 } elseif (Get-Command hive -ErrorAction SilentlyContinue) {
     $shownVer = if ($hiveVer) { $hiveVer } else { '<unknown>' }
     Write-Warn "hive $shownVer predates 'hive service' (need >= 1.32.0); skipping daemon supervision"

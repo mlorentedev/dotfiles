@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodically upgrade hive-vault (feeds hive serve restart-on-upgrade)
+Documentation=https://github.com/mlorentedev/hive/issues/176
+
+[Timer]
+# Wall-clock slots at :00/:15/:30/:45. Persistent runs a missed slot once on the
+# next boot/resume, so a suspended laptop still converges to the latest hive-vault.
+# RandomizedDelaySec spreads the fleet so machines do not all hit PyPI on the minute.
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

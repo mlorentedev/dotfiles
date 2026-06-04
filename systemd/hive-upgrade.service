@@ -1,0 +1,10 @@
+[Unit]
+Description=Upgrade hive-vault to the latest PyPI release
+Documentation=https://github.com/mlorentedev/hive/issues/176
+
+[Service]
+Type=oneshot
+# uv is installed to ~/.local/bin by setup-linux.sh; %h resolves to the user home.
+# Absolute path because a --user oneshot gets a minimal PATH that may omit it.
+# uv tool upgrade exits 0 when already current, so the oneshot is not marked failed.
+ExecStart=%h/.local/bin/uv tool upgrade hive-vault

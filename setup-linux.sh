@@ -853,6 +853,34 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
     else
         log_warning "hive service install failed (non-fatal; client works via fallback)"
     fi
+    # AI-023 / hive#176: the upgrade policy that FEEDS the daemon's
+    # restart-on-upgrade. Deploy the --user timer + oneshot from the repo's
+    # systemd/ SSOT and enable the timer (every 15 min). Same version gate as the
+    # service above -- daemon + its feeder install together or not at all.
+    if command -v systemctl >/dev/null 2>&1; then
+        SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+        ensure_directory "$SYSTEMD_USER_DIR"
+        if cp -f "$CURRENT_DIR/systemd/hive-upgrade.service" "$SYSTEMD_USER_DIR/" \
+            && cp -f "$CURRENT_DIR/systemd/hive-upgrade.timer" "$SYSTEMD_USER_DIR/"; then
+            systemctl --user daemon-reload >/dev/null 2>&1 || true
+            if systemctl --user enable --now hive-upgrade.timer >/dev/null 2>&1; then
+                log_success "Enabled hive-upgrade.timer (every 15 min, systemd --user)"
+                # Single owner: retire the legacy manual cron now the timer owns
+                # the upgrade policy (only after a successful enable).
+                if crontab -l 2>/dev/null | grep -q 'uv tool upgrade hive-vault'; then
+                    if crontab -l 2>/dev/null | grep -v 'uv tool upgrade hive-vault' | crontab -; then
+                        log_info "Removed legacy 'uv tool upgrade hive-vault' cron (timer is now the single owner)"
+                    fi
+                fi
+            else
+                log_warning "hive-upgrade.timer enable failed (non-fatal; setup still upgrades hive each run)"
+            fi
+        else
+            log_warning "Could not deploy hive-upgrade units to $SYSTEMD_USER_DIR (non-fatal)"
+        fi
+    else
+        log_warning "systemctl not found; skipping hive-upgrade.timer (setup still upgrades hive each run)"
+    fi
 elif command -v hive >/dev/null 2>&1; then
     log_warning "hive ${hive_ver:-<unknown>} predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 fi
