@@ -1,12 +1,12 @@
 ---
-id: "AI-023-antigravity-oauth-verification"
+id: "AI-024-antigravity-oauth-verification"
 status: draft # draft | implementing | verifying | archived
 created: "2026-06-04"
 tags: [spec, proposal]
 template_version: "1.0"
 ---
 
-# AI-023-antigravity-oauth-verification
+# AI-024-antigravity-oauth-verification
 
 > Follow-up to AI-020 (Gemini CLI → Antigravity migration decision). AI-020
 > chose **branch #1** (`agy` OAuth via the Code Assist backend preserves the
@@ -65,7 +65,7 @@ discovered mid-task.
 
 ## References
 
-- Predecessor: `specs/AI-020-gemini-empirical-validation/` (decision + matrix).
-- Vault: `10_projects/dotfiles/11-tasks.md` → AI-020 / AI-023.
-- Runbook: `40-runbooks/guide-antigravity-cli-migration.md`.
+- Predecessor: `specs/archive/AI-020-gemini-empirical-validation/` (decision + matrix).
+- Vault: `10_projects/dotfiles/11-tasks.md` → AI-020 / AI-024.
+- Runbook: `docs/runbooks/guide-antigravity-cli-migration.md`.
 - Upstream: <https://goo.gle/gemini-cli-migration>.

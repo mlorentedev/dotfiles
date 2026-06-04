@@ -3,13 +3,13 @@ tags: [spec, tasks, templates]
 created: "2026-05-13"
 ---
 
-# Tasks - AI-023-antigravity-oauth-verification
+# Tasks - AI-024-antigravity-oauth-verification
 
 > TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
 
 ## Setup
 
-- [ ] Branch created from main: `feat/AI-023-antigravity-oauth-verification`
+- [ ] Branch created from main: `feat/AI-024-antigravity-oauth-verification`
 - [ ] `proposal.md` is complete and acceptance criteria are testable
 - [ ] No open questions left in `proposal.md` "Risks / open questions"
 
@@ -40,12 +40,12 @@ This spec emits a sibling `features.json` (alongside this file) following [[patt
 
 **Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
 
-Minimal `features.json` skeleton (drop into `<repo>/specs/AI-023-antigravity-oauth-verification/features.json`):
+Minimal `features.json` skeleton (drop into `<repo>/specs/AI-024-antigravity-oauth-verification/features.json`):
 
 ```json
 [
   {
-    "id": "AI-023-antigravity-oauth-verification-f1",
+    "id": "AI-024-antigravity-oauth-verification-f1",
     "behavior": "<one-line copy of an acceptance criterion>",
     "verification": "<single shell command; exit 0 means pass>",
     "state": "pending",
