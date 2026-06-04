@@ -1,0 +1,44 @@
+[
+  {
+    "id": "AI-023-hive-auto-upgrade-timer-f1",
+    "behavior": "hive-upgrade.timer fires every 15 min wall-clock with catch-up and installs to timers.target",
+    "verification": "grep -q 'OnCalendar=\\*:0/15' systemd/hive-upgrade.timer && grep -q 'Persistent=true' systemd/hive-upgrade.timer && grep -q 'WantedBy=timers.target' systemd/hive-upgrade.timer",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-023-hive-auto-upgrade-timer-f2",
+    "behavior": "hive-upgrade.service is a oneshot that runs `uv tool upgrade hive-vault` via the absolute %h/.local/bin/uv",
+    "verification": "grep -q 'Type=oneshot' systemd/hive-upgrade.service && grep -q 'ExecStart=%h/.local/bin/uv tool upgrade hive-vault' systemd/hive-upgrade.service",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-023-hive-auto-upgrade-timer-f3",
+    "behavior": "setup-linux.sh deploys the units and enables the timer inside the hive >= 1.32.0 gate (non-fatal); enable line comes after the sort -V gate",
+    "verification": "grep -q 'enable --now hive-upgrade.timer' setup-linux.sh && [ \"$(grep -n 'sort -V' setup-linux.sh | head -1 | cut -d: -f1)\" -lt \"$(grep -n 'enable --now hive-upgrade.timer' setup-linux.sh | head -1 | cut -d: -f1)\" ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-023-hive-auto-upgrade-timer-f4",
+    "behavior": "setup-linux.sh removes the legacy `uv tool upgrade hive-vault` crontab line once the timer is enabled (single owner)",
+    "verification": "grep -q \"grep -v 'uv tool upgrade hive-vault' | crontab -\" setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-023-hive-auto-upgrade-timer-f5",
+    "behavior": "setup-windows.ps1 registers a daily DotfilesHiveUpgrade task running `uv tool upgrade hive-vault`, gated >= 1.32.0",
+    "verification": "grep -q 'DotfilesHiveUpgrade' setup-windows.ps1 && grep -q 'tool upgrade hive-vault' setup-windows.ps1 && grep -q 'New-ScheduledTaskTrigger -Daily' setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-023-hive-auto-upgrade-timer-f6",
+    "behavior": "setup-linux.sh stays valid + shellcheck-clean in the added block and the units are valid systemd",
+    "verification": "bash -n setup-linux.sh && bats tests/hive-upgrade-timer.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
