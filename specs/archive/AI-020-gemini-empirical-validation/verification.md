@@ -77,7 +77,7 @@ Two findings that reshaped scope versus the proposal:
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived` (after AC5/AC6 land)
-- [ ] Folder moved: `specs/AI-020-gemini-empirical-validation/` → `specs/archive/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
-- [ ] Promotions above executed (lesson)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/AI-020-gemini-empirical-validation/` → `specs/archive/`
+- [x] Backlog entry in vault `11-tasks.md` ticked with decision link (master `6000362`)
+- [x] Promotions executed — lesson captured in `90-lessons.md` (vault master `65077cc`)
