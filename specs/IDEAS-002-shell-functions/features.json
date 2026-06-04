@@ -1,0 +1,44 @@
+[
+  {
+    "id": "IDEAS-002-shell-functions-f1",
+    "behavior": "mkd creates and cd's into a nested path",
+    "verification": "bats tests/shell-functions.bats --filter 'mkd'",
+    "state": "implemented",
+    "evidence": "ok 7 mkd creates a nested path and cd's into it; ok 8 mkd with no argument prints usage and fails"
+  },
+  {
+    "id": "IDEAS-002-shell-functions-f2",
+    "behavior": "dataurl emits a valid data: URL with detected MIME and round-trips",
+    "verification": "bats tests/shell-functions.bats --filter 'dataurl'",
+    "state": "implemented",
+    "evidence": "ok 11 dataurl emits a data: URL that round-trips to the original; ok 12 dataurl on a missing file fails with usage"
+  },
+  {
+    "id": "IDEAS-002-shell-functions-f3",
+    "behavior": "targz produces a gzip-decompressible tarball (gzip-compatible path)",
+    "verification": "bats tests/shell-functions.bats --filter 'targz'",
+    "state": "implemented",
+    "evidence": "ok 13 targz produces a gzip-decompressible tarball; ok 14 targz on a missing path fails with usage"
+  },
+  {
+    "id": "IDEAS-002-shell-functions-f4",
+    "behavior": "gz reports original and gzipped sizes",
+    "verification": "bats tests/shell-functions.bats --filter 'gz '",
+    "state": "implemented",
+    "evidence": "ok 9 gz reports both original and gzipped sizes; ok 10 gz on a missing file fails with usage"
+  },
+  {
+    "id": "IDEAS-002-shell-functions-f5",
+    "behavior": "shellcheck passes on the portable functions file with no warnings",
+    "verification": "shellcheck .zsh/functions.sh",
+    "state": "implemented",
+    "evidence": "shellcheck exits 0, no warnings (functions.sh carries `# shellcheck shell=bash`)"
+  },
+  {
+    "id": "IDEAS-002-shell-functions-f6",
+    "behavior": "file sources cleanly under both bash and zsh; both rc files load it",
+    "verification": "bats tests/shell-functions.bats --filter 'cross-shell|sources'",
+    "state": "implemented",
+    "evidence": "ok 6 sources cleanly under bash and zsh; ok 17 .zshrc sources it; ok 18 .bashrc sources it"
+  }
+]

@@ -113,6 +113,8 @@ function gp() {
 # ==========================
 # Load custom functions and scripts
 [[ -f ~/.zsh/functions.zsh ]] && source ~/.zsh/functions.zsh
+# Portable swiss-army functions (IDEAS-002) — shared with bash (.zsh/functions.sh)
+[[ -f ~/.zsh/functions.sh ]] && source ~/.zsh/functions.sh
 [[ -f ~/.zsh/nvm.zsh ]] && source ~/.zsh/nvm.zsh
 
 # Initialize tools

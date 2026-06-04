@@ -1,7 +1,7 @@
 ---
 id: "IDEAS-002-shell-functions"
 type: spec
-status: draft
+status: implementing
 created: "2026-05-25"
 tags: [spec, proposal, ideas-002, shell, dotfiles-survey, tier-1]
 template_version: "1.0"
