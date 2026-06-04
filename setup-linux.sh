@@ -80,6 +80,8 @@ log_info "Setting up .zsh directory and utils.sh..."
 ensure_directory "$HOME/.zsh"
 deploy_file "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
 deploy_file "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
+# Portable swiss-army functions (IDEAS-002) — shared by bash + zsh.
+deploy_file "$DOTFILES_DIR/.zsh/functions.sh" "$HOME/.zsh/functions.sh"
 deploy_file "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
 deploy_file "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
 # readline config (POLISH-004): case-insensitive completion + smart history.
@@ -1128,6 +1130,7 @@ log_success "Installation completed! Verifying file links..."
 
 check_deployed "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh" "aliases.zsh"
 check_deployed "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh" "functions.zsh"
+check_deployed "$DOTFILES_DIR/.zsh/functions.sh" "$HOME/.zsh/functions.sh" "functions.sh"
 # NOTE: .zshrc intentionally NOT under strict check_deployed -- setup-linux.sh
 # may legitimately modify it (e.g. stripping stale gh-copilot eval lines via
 # sed -i). Same rationale as .bashrc: tool installers append PATH/init lines,

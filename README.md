@@ -118,6 +118,24 @@ profile-shell --shell bash --detail # Per-function breakdown via zprof/xtrace
 vault help                          # Vault tooling dispatcher (health / maintenance / check-escapes)
 ```
 
+### Shell helpers
+
+Portable swiss-army functions in `.zsh/functions.sh`, sourced by **both** bash and
+zsh (curated from [mathiasbynens/dotfiles](https://github.com/mathiasbynens/dotfiles)):
+
+```bash
+mkd <dir>            # mkdir -p <dir> && cd into it
+gz <file>            # show original vs gzipped size + ratio (read-only)
+dataurl <file>       # print a base64 data: URI (MIME auto-detected)
+targz <file|dir>     # create <input>.tar.gz (zopfli > pigz > gzip by availability)
+server [port]        # serve the current dir over HTTP (default 8000) + open browser
+getcertnames host[:port]  # print a TLS cert's Common Name + Subject Alt Names
+```
+
+The names `mkd`, `gz`, `server` are short and may shadow a binary on `$PATH`. If one
+conflicts, re-alias it in `~/.zshrc.local` / `~/.bashrc.local` (see *Machine-local
+overrides*).
+
 ### tmux
 
 Two use cases this setup is tuned for: **(1) split-pane multiplexing** (editor + AI agent + tests side by side) and **(2) session persistence** (close the laptop / drop SSH and come back to the same state).

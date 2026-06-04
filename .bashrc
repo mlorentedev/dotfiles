@@ -153,6 +153,9 @@ dbg() { /home/manu/Projects/dotfiles/scripts/nan-debug.sh "$@"; }
 # ==========================
 #    SHELL ENHANCEMENTS
 # ==========================
+# Portable swiss-army functions (IDEAS-002) — shared with zsh (.zsh/functions.sh)
+[ -f ~/.zsh/functions.sh ] && . ~/.zsh/functions.sh
+
 # Enable direnv and zoxide
 command -v direnv >/dev/null && eval "$(direnv hook bash)"
 command -v zoxide >/dev/null && eval "$(zoxide init bash)"
