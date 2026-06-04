@@ -47,8 +47,11 @@
       },
       "models": {
         "deepseek-v4-flash": {
-          "name": "DeepSeek V4 Flash (NaN - 1M)",
-          "contextWindow": 1000000,
+          "name": "DeepSeek V4 Flash (DeepSeek - 1M)",
+          "limit": {
+            "context": 1000000,
+            "output": 8192
+          },
           // Note: NaN returns reasoning chain in non-OpenAI fields
           // (`reasoning_content`, `provider_specific_fields.reasoning`).
           // Opencode (1.15.10) renders neither — the chain is invisible in TUI.
@@ -57,30 +60,107 @@
           "modalities": {
             "input": ["text"],
             "output": ["text"]
+          },
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
           }
         },
         "qwen3.6": {
           "name": "Qwen 3.6 (Alibaba - 256K)",
-          "contextWindow": 262144,
+          "limit": {
+            "context": 256000,
+            "output": 8192
+          },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
+          },
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
           }
         },
         "gemma4": {
           "name": "Gemma 4 (Google - 256K)",
-          "contextWindow": 262144,
+          "limit": {
+            "context": 256000,
+            "output": 8192
+          },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
+          },
+                    "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
           }
         },
         "mimo-v2.5": {
           "name": "MiMo V2.5 (Xiaomi - 1M)",
-          "contextWindow": 1000000,
+          "limit": {
+            "context": 1000000,
+            "output": 8192
+          },
           "modalities": {
             "input": ["text", "image", "audio"],
             "output": ["text"]
+          },
+                  "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
           }
         }
         // Non-chat NaN models (qwen3-embedding, kokoro TTS, whisper STT) are

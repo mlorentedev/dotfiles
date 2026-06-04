@@ -568,3 +568,33 @@ setup() {
     grep -q '\$env:DOTFILES_DIR' "$DOTFILES_DIR/powershell/profile.ps1"
     grep -q '\$env:CLAUDE_CONFIG_DIR' "$DOTFILES_DIR/powershell/profile.ps1"
 }
+
+# --- Harness deploy-dir mirror (drift false-FAIL fix) ---
+# healthcheck section 12 runs `compile-harness.sh --check` from the deploy copy
+# (~/.dotfiles), and the engine resolves its root from its own location. That
+# offline check needs the harness inputs mirrored into the deploy dir -- exactly
+# the complete non-git copy the rootresolve regression test models: scripts/
+# (compile-harness.sh, already copied) + AGENTS.md + ai/claude/CLAUDE.md +
+# harness/. setup copied none of the latter three, so --check exited 2 (manifest
+# not found) and section 12 reported a false drift FAIL. These guards lock the
+# mirror in, AND assert it runs AFTER --refresh so the snapshot matches the
+# refreshed repo state (else the repo<->deploy drift sub-check would see drift).
+
+@test "setup-linux.sh mirrors harness/ into the deploy dir (drift fix)" {
+    grep -qF 'cp -rf "$CURRENT_DIR/harness/." "$DOTFILES_DIR/harness/"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh mirrors AGENTS.md into the deploy dir (drift fix)" {
+    grep -qF 'safe_copy "$CURRENT_DIR/AGENTS.md" "$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh mirrors ai/claude/CLAUDE.md into the deploy dir (drift fix)" {
+    grep -qF 'safe_copy "$CURRENT_DIR/ai/claude/CLAUDE.md" "$DOTFILES_DIR/ai/claude/"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh harness mirror runs AFTER compile-harness --refresh (ordering guard)" {
+    refresh_line=$(grep -n 'compile-harness.sh" --refresh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    mirror_line=$(grep -n 'cp -rf "\$CURRENT_DIR/harness/\.' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$refresh_line" ] && [ -n "$mirror_line" ]
+    [ "$mirror_line" -gt "$refresh_line" ]
+}

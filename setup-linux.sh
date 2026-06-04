@@ -475,6 +475,22 @@ else
     log_info "Vault absent; deploying committed harness override blocks"
 fi
 
+# Mirror the harness inputs into the deploy dir so `compile-harness.sh --check`
+# (healthcheck section 12) can verify drift offline from ~/.dotfiles. The engine
+# resolves its root from its own location, and the rootresolve regression test
+# models exactly this complete non-git copy: scripts/ (compile-harness.sh) +
+# AGENTS.md + ai/claude/CLAUDE.md + harness/. setup copied none of the latter
+# three, so --check exited 2 (manifest not found) and section 12 reported a false
+# drift FAIL. This runs AFTER --refresh so the snapshot matches the refreshed
+# repo state (else the repo<->deploy drift sub-check would then see drift).
+if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
+    ensure_directory "$DOTFILES_DIR/harness"
+    cp -rf "$CURRENT_DIR/harness/." "$DOTFILES_DIR/harness/" 2>/dev/null || true
+    safe_copy "$CURRENT_DIR/AGENTS.md" "$DOTFILES_DIR/" 2>/dev/null || true
+    ensure_directory "$DOTFILES_DIR/ai/claude"
+    safe_copy "$CURRENT_DIR/ai/claude/CLAUDE.md" "$DOTFILES_DIR/ai/claude/" 2>/dev/null || true
+fi
+
 # Claude Code
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
