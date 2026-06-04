@@ -3,7 +3,7 @@ tags: [spec, verification, templates]
 created: "2026-05-13"
 ---
 
-# Verification - AI-023-antigravity-oauth-verification
+# Verification - AI-024-antigravity-oauth-verification
 
 ## Evidence
 
@@ -37,6 +37,6 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-023-antigravity-oauth-verification/` -> `specs/archive/AI-023-antigravity-oauth-verification/`
+- [ ] Folder moved: `specs/AI-024-antigravity-oauth-verification/` -> `specs/archive/AI-024-antigravity-oauth-verification/`
 - [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
 - [ ] Promotions above executed (if any)

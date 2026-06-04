@@ -10,7 +10,7 @@ owner: manu
 # Antigravity CLI Migration
 
 Decision record + operating procedure for the `gemini-cli` → Antigravity CLI
-(`agy`) migration. Resolves AI-020 (decision) and feeds AI-023 (verification).
+(`agy`) migration. Resolves AI-020 (decision) and feeds AI-024 (verification).
 
 ## Why this exists
 
@@ -97,7 +97,7 @@ echo "$ANTIGRAVITY_ENDPOINT"   # expect https://cloudcode-pa.googleapis.com
 
 ## References
 
-- Decision spec: `specs/AI-020-gemini-empirical-validation/` (matrix + evidence).
-- Follow-up: `specs/AI-023-antigravity-oauth-verification/` (OAuth/quota guard).
+- Decision spec: `specs/archive/AI-020-gemini-empirical-validation/` (matrix + evidence).
+- Follow-up: `specs/AI-024-antigravity-oauth-verification/` (OAuth/quota guard).
 - Upstream: <https://goo.gle/gemini-cli-migration>.
 - Related: [AI Tools Setup](ai-tools-setup.md), [Gemini CLI Recovery](guide-gemini-cli-recovery.md).

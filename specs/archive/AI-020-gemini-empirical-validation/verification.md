@@ -34,7 +34,8 @@ Two findings that reshaped scope versus the proposal:
    migration, and consolidate MCP to `~/.gemini/config/mcp_config.json`;
    healthcheck §13 already guards it. So the downstream follow-up shrinks from
    "port the install" to "verify the OAuth/quota path" → scaffolded as
-   **AI-023** (the proposal's "AI-022" id was already taken by #161/#211).
+   **AI-024** (the proposal's "AI-022" id was already taken by #161/#211, and
+   AI-023 was claimed concurrently by the parallel hive-timer session).
 
 ## Evidence
 
@@ -44,7 +45,7 @@ Two findings that reshaped scope versus the proposal:
 - [x] AC2 Decision matrix completed, explicit branch chosen → **branch #1**
       (this file).
 - [x] AC3 User tier identified → **Google AI Plus** (low Gemini reliance).
-- [x] AC4 Follow-up spec scaffolded → `specs/AI-023-antigravity-oauth-verification/`
+- [x] AC4 Follow-up spec scaffolded → `specs/AI-024-antigravity-oauth-verification/`
       (id corrected from AI-022, which is consumed by #161/#211).
 - [x] AC5 Vault `11-tasks.md` AI-020 entry ticked with decision link → vault
       master commit `6000362`.
@@ -64,8 +65,9 @@ Two findings that reshaped scope versus the proposal:
 
 - Rejected the proposal's "evaluate AI Pro upgrade" path: low Gemini reliance
   makes any paid upgrade non-justified; drop-or-free-allotment is the fallback.
-- Renamed the follow-up AI-022 → AI-023 after verifying AI-022 is already in use
-  (verify-before-act).
+- Renamed the follow-up AI-022 → AI-024: AI-022 was already in use (#161/#211),
+  and AI-023 was claimed concurrently by the parallel hive-timer session
+  (verify-before-act, twice over).
 
 ## Promotion candidates
 
