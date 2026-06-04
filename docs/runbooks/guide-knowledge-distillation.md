@@ -24,9 +24,11 @@ Claude Code sessions are stateless. Without active maintenance, valuable decisio
 
 **The target state:**
 - MEMORY.md: < 23 lines (user preferences + dynamic state only)
-- 90-lessons.md: all significant bugs and decisions documented
+- Lessons: project-specific → repo `docs/lessons.md`; cross-project/methodology → vault `00_meta/` patterns
 - 00_meta/patterns/: reusable patterns promoted from repeated lessons
 - Baseline session tokens: ~7k (65% reduction from 20k)
+
+> **Placement note:** the `10_projects/<repo>/90-lessons.md` (vault) references later in this guide are the **legacy** location. Per the knowledge-placement model, project lessons live in the repo `docs/lessons.md`; only cross-project/methodology lessons stay in the vault `00_meta/`. Realigning the distillation tooling (`crystallize`/`insights` skills, which are vault-SSOT) is tracked in `RFD-001-vault-placement-cleanup`.
 
 ---
 

@@ -34,4 +34,4 @@ veracrypt -d /media/veracrypt1
 
 ## Full Documentation
 
-Full secrets management runbook is in the private knowledge vault (`10_projects/dotfiles/02-runbooks/secrets-management.md`).
+Full secrets management runbook: [`docs/runbooks/secrets-management.md`](../docs/runbooks/secrets-management.md).
