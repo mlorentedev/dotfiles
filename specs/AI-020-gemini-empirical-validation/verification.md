@@ -46,17 +46,19 @@ Two findings that reshaped scope versus the proposal:
 - [x] AC3 User tier identified → **Google AI Plus** (low Gemini reliance).
 - [x] AC4 Follow-up spec scaffolded → `specs/AI-023-antigravity-oauth-verification/`
       (id corrected from AI-022, which is consumed by #161/#211).
-- [ ] AC5 Vault `11-tasks.md` AI-020 entry ticked with decision link → vault
-      master commit (this session).
-- [ ] AC6 Runbook `40-runbooks/guide-antigravity-cli-migration.md` written →
-      vault master commit (this session).
+- [x] AC5 Vault `11-tasks.md` AI-020 entry ticked with decision link → vault
+      master commit `6000362`.
+- [x] AC6 Runbook written → `docs/runbooks/guide-antigravity-cli-migration.md`
+      in repo `docs/` (operate-doc per the placement model; vault holds only the
+      index pointer). Re-landed via the runbook follow-up PR after it missed the
+      #216 squash.
 
 ## Test status
 
 - No code change in this ticket (decision + docs + scaffold). No test impact.
-- Manual verification (user-run, optional de-risk): `agy -p "reply pong"` under
-  AI Plus OAuth, `$ANTIGRAVITY_ENDPOINT == https://cloudcode-pa.googleapis.com`,
-  no API-key prompt. Result folded into the runbook when available.
+- Manual verification (user-run, 2026-06-03): `agy -p "reply with exactly: pong"`
+  returned `pong` under AI Plus OAuth with no API-key prompt → **branch #1
+  confirmed empirically.**
 
 ## Decisions made during implementation
 
