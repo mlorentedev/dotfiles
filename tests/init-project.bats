@@ -31,8 +31,15 @@ teardown() {
     
     local kb_dir="$MOCK_HOME/Projects/knowledge/10_projects/$(basename "$TEST_DIR")"
     [[ -d "$kb_dir" ]]
+    [[ -f "$kb_dir/00-context.md" ]]
     [[ -f "$kb_dir/11-tasks.md" ]]
-    [[ -f "$kb_dir/90-lessons.md" ]]
+    [[ -d "$kb_dir/memory" ]]
+    # knowledge-placement (slim store): operate-layer folders + 90-lessons.md
+    # live in the repo docs/, NOT the vault. Regression guard.
+    [[ ! -d "$kb_dir/30-architecture" ]]
+    [[ ! -d "$kb_dir/40-runbooks" ]]
+    [[ ! -d "$kb_dir/50-troubleshooting" ]]
+    [[ ! -f "$kb_dir/90-lessons.md" ]]
 }
 
 @test "init-project.sh creates structure under zsh" {
