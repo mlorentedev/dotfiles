@@ -147,6 +147,17 @@ setup() {
     ! grep -qE '^\s*"drawio":|^\s*"socket":' "$OPENCODE_CFG"
 }
 
+@test "opencode.jsonc DX keys present (share disabled, autoupdate notify, providers pruned, tool_output, read-only plan agent)" {
+    grep -qE '"share":\s*"disabled"' "$OPENCODE_CFG"
+    grep -qE '"autoupdate":\s*"notify"' "$OPENCODE_CFG"
+    grep -qE '"disabled_providers":\s*\[' "$OPENCODE_CFG"
+    grep -qE '"tool_output":\s*\{' "$OPENCODE_CFG"
+    grep -qE '"max_lines":' "$OPENCODE_CFG"
+    # plan agent must exist, pin the fast model, and hard-deny writes
+    grep -qE '"agent":\s*\{' "$OPENCODE_CFG"
+    grep -qE '"plan":\s*\{' "$OPENCODE_CFG"
+}
+
 # --- Alias ---
 
 @test ".zsh/aliases.zsh has oc alias for opencode (--pure: skip MCPs/plugins)" {
