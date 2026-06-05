@@ -20,7 +20,7 @@ if [ "${1:-}" = "--work-sdk" ]; then
     SDK_DIR="$KNOWLEDGE_HOME/50_work/45-development/$FAMILY/$COMPONENT"
 
     printf '[INFO] Creating work SDK vault entry: 50_work/45-development/%s/%s\n' "$FAMILY" "$COMPONENT"
-    mkdir -p "$SDK_DIR/30-architecture" "$SDK_DIR/40-runbooks" "$SDK_DIR/50-troubleshooting" "$SDK_DIR/memory"
+    mkdir -p "$SDK_DIR/memory"
 
     cat > "$SDK_DIR/00-context.md" << EOF
 ---
@@ -51,11 +51,8 @@ See [[../00-context|$FAMILY family context]] for all repos.
 - **Real repo path:** Fill in source_path above with actual \${PROJECTS_PATH}/... path
 
 ## Knowledge Structure
-- [[30-architecture]]: ADRs & Technical Decisions
-- [[40-runbooks]]: Operational Guides
-- [[50-troubleshooting]]: Known Issues
+Per [[pattern-knowledge-placement]]: build/operate docs (ADRs, runbooks, troubleshooting, lessons) live in the repo \`docs/\`; this entry keeps only decide/personal layers.
 - [[memory/MEMORY]]: Session memory
-- [[90-lessons]]: Lessons Learned
 
 ## Development Flow
 1. Open Claude in the real repo (see source_path)
@@ -76,19 +73,6 @@ EOF
 - Follow global CLAUDE.md + workflow-protocol.md rules
 
 ## Last Crystallized: $TODAY
-EOF
-
-    cat > "$SDK_DIR/90-lessons.md" << EOF
----
-id: "${FAMILY}-${COMPONENT}-lessons"
-type: lesson
-status: active
-owner: manu
-tags: [work, sdk, $FAMILY]
----
-# Lessons Learned — ${COMPONENT}
-
-*Record non-trivial bugs and decisions here. Promoted to 00_meta/patterns/ if recurring.*
 EOF
 
     # Create parent family context if it doesn't exist
@@ -212,7 +196,7 @@ PROJECT_KB_DIR="${KNOWLEDGE_HOME}/10_projects/${ACTUAL_PROJECT_NAME}"
 
 log_info "Initializing Knowledge Vault structure..."
 TODAY=$(date +%Y-%m-%d)
-mkdir -p "$PROJECT_KB_DIR/30-architecture" "$PROJECT_KB_DIR/40-runbooks" "$PROJECT_KB_DIR/50-troubleshooting" "$PROJECT_KB_DIR/memory"
+mkdir -p "$PROJECT_KB_DIR/memory"
 
 # 00-context.md (full project context — fill in after init)
 if [ ! -f "$PROJECT_KB_DIR/00-context.md" ]; then
@@ -243,12 +227,11 @@ created: "$TODAY"
 - **Production:**
 
 ## Knowledge Structure
-- [[10-roadmap]]: Planning & Strategy
-- [[11-tasks]]: Active Backlog
-- [[30-architecture]]: ADRs & Technical Decisions
-- [[40-runbooks]]: Operational Guides
-- [[50-troubleshooting]]: Known Issues
-- [[90-lessons]]: Lessons Learned
+Per [[pattern-knowledge-placement]]: build/operate docs live in the **repo**; this store keeps only decide/personal layers. Do NOT seed vault-local \`30-architecture/\`, \`40-runbooks/\`, \`50-troubleshooting/\`, \`90-lessons.md\`.
+
+**In the repo** (\`~/Projects/${ACTUAL_PROJECT_NAME}/\`): \`docs/adr/\`, \`docs/runbooks/\`, \`docs/troubleshooting/\`, \`docs/lessons.md\`, \`specs/<id>/\`.
+
+**In this store:** [[10-roadmap]] (strategy) · [[11-tasks]] (strategic backlog) · [[memory/MEMORY]] (AI memory).
 
 ## Development Flow
 1. Feature branch from \`main\`
@@ -302,22 +285,6 @@ Progress: [..........] 0%
 ## In Progress
 
 ## Done
-EOF
-fi
-
-# 90-lessons.md
-if [ ! -f "$PROJECT_KB_DIR/90-lessons.md" ]; then
-cat > "$PROJECT_KB_DIR/90-lessons.md" << EOF
----
-id: "${ACTUAL_PROJECT_NAME}-lessons"
-type: lesson
-status: active
-owner: manu
-tags: []
----
-# Lessons Learned — ${ACTUAL_PROJECT_NAME}
-
-*Non-trivial bugs and decisions. Promoted to 00_meta/patterns/ if recurring across projects.*
 EOF
 fi
 
@@ -501,4 +468,4 @@ log_success "Project initialized with Dual AI Configuration"
 log_info "Structure:"
 echo "  CLAUDE.md / AGY.md         - AI Memory files (Dual-Core)"
 echo "  .claude/skills/            - Custom skills"
-echo "  Knowledge Vault updated    - 11-tasks.md & 90-lessons.md in knowledge/10_projects/"
+echo "  Knowledge Vault updated    - 00-context.md & 11-tasks.md in knowledge/10_projects/"
