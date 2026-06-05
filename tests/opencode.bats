@@ -226,3 +226,32 @@ setup() {
     awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
     awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q '\$schema'
 }
+
+# --- DX-004: reasoning visibility (interleaved) + TUI config (tui.json) ---
+
+@test "opencode.jsonc maps NaN reasoning_content via interleaved on all 4 chat models (DX-004 AC1)" {
+    # opencode only renders NaN's reasoning chain if reasoning_content is mapped
+    # to a reasoning part. All four chat models must carry the mapping.
+    count=$(grep -cE '"interleaved":[[:space:]]*\{[[:space:]]*"field":[[:space:]]*"reasoning_content"[[:space:]]*\}' "$OPENCODE_CFG")
+    [ "$count" -eq 4 ] || { echo "expected 4 interleaved blocks, got $count" >&2; false; }
+}
+
+@test "opencode.jsonc reasoning comment updated off the stale 1.15.10 'renders neither' note (DX-004 AC5)" {
+    ! grep -q 'Opencode (1.15.10) renders neither' "$OPENCODE_CFG"
+    grep -q 'interleaved' "$OPENCODE_CFG"
+}
+
+@test "ai/opencode/tui.json exists with schema, theme=opencode, display_thinking=ctrl+o (DX-004 AC2)" {
+    TUI_CFG="$DOTFILES_DIR/ai/opencode/tui.json"
+    [ -f "$TUI_CFG" ]
+    grep -qE '"\$schema":[[:space:]]*"https://opencode.ai/tui.json"' "$TUI_CFG"
+    grep -qE '"theme":[[:space:]]*"opencode"' "$TUI_CFG"
+    grep -qE '"display_thinking":[[:space:]]*"ctrl\+o"' "$TUI_CFG"
+}
+
+@test "setup-linux.sh deploys tui.json as a plain copy, no secret substitution (DX-004 AC3)" {
+    grep -q 'TUI_SRC="\$CURRENT_DIR/ai/opencode/tui.json"' "$SETUP_SCRIPT"
+    grep -q 'cmp -s "\$TUI_SRC" "\$TUI_DST"' "$SETUP_SCRIPT"
+    # tui.json carries no secrets: it must NOT go through substitute_env_placeholders
+    ! grep -qE 'substitute_env_placeholders "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
+}

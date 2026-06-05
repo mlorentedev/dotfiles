@@ -698,3 +698,10 @@ setup() {
     "
     [[ "$status" -eq 0 ]]
 }
+
+# --- DX-004: opencode tui.json deploy (Linux parity) ---
+
+@test "setup-windows.ps1 deploys opencode tui.json (DX-004 AC4)" {
+    grep -qF 'ai\opencode\tui.json' "$PS1_SCRIPT"
+    grep -qF '.config\opencode\tui.json' "$PS1_SCRIPT"
+}

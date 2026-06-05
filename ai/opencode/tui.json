@@ -1,0 +1,20 @@
+// OpenCode TUI configuration — managed by dotfiles.
+//
+// SSOT: ai/opencode/tui.json (this file).
+// Deploy target: ~/.config/opencode/tui.json (via setup-linux.sh / setup-windows.ps1).
+// Plain copy — no secret substitution (unlike opencode.jsonc); contains no secrets.
+// Schema: https://opencode.ai/tui.json  (NOTE: a different schema from config.json).
+// Spec: specs/DX-004-opencode-tui-config/.
+{
+  "$schema": "https://opencode.ai/tui.json",
+  // Follow opencode's default palette (tracks the terminal). Swap for tokyonight,
+  // catppuccin, gruvbox, etc. via /themes in the TUI.
+  "theme": "opencode",
+  "keybinds": {
+    // Toggle visibility of the model's reasoning/thinking blocks. NaN's chain is
+    // ingested via per-model `interleaved` in opencode.jsonc; this binds the
+    // show/hide toggle (also available as the /thinking command). Default is
+    // unbound ("none"), which is why the reasoning felt invisible.
+    "display_thinking": "ctrl+o"
+  }
+}

@@ -48,15 +48,19 @@
       "models": {
         "deepseek-v4-flash": {
           "name": "DeepSeek V4 Flash (DeepSeek - 1M)",
+          // Surface NaN's reasoning chain in the TUI. NaN streams it in the
+          // non-standard `reasoning_content` field (a DeepSeek/Qwen alias), which
+          // @ai-sdk/openai-compatible drops by default. `interleaved` maps it to a
+          // reasoning part opencode can render (schema-verified on opencode 1.15.13).
+          // Toggle visibility with ctrl+o or `/thinking` (see ai/opencode/tui.json).
+          // NaN's other field, `provider_specific_fields.reasoning`, is NOT in the
+          // enum, so we map reasoning_content. Out-of-TUI fallback: the `dbg` alias
+          // (scripts/nan-debug.sh) curls NaN directly and prints reasoning + answer.
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
             "output": 8192
           },
-          // Note: NaN returns reasoning chain in non-OpenAI fields
-          // (`reasoning_content`, `provider_specific_fields.reasoning`).
-          // Opencode (1.15.10) renders neither — the chain is invisible in TUI.
-          // For visibility use `dbg` alias (scripts/nan-debug.sh) which curls
-          // directly and prints reasoning + answer side-by-side.
           "modalities": {
             "input": ["text"],
             "output": ["text"]
@@ -81,6 +85,8 @@
         },
         "qwen3.6": {
           "name": "Qwen 3.6 (Alibaba - 256K)",
+          // Surface reasoning in the TUI (see deepseek-v4-flash note).
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 256000,
             "output": 8192
@@ -109,6 +115,8 @@
         },
         "gemma4": {
           "name": "Gemma 4 (Google - 256K)",
+          // Surface reasoning in the TUI (see deepseek-v4-flash note).
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 256000,
             "output": 8192
@@ -137,6 +145,8 @@
         },
         "mimo-v2.5": {
           "name": "MiMo V2.5 (Xiaomi - 1M)",
+          // Surface reasoning in the TUI (see deepseek-v4-flash note).
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
             "output": 8192
