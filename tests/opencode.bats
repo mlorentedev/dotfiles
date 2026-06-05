@@ -118,11 +118,13 @@ setup() {
     grep -q 'ollama.kubelab.live' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc default model is nan/deepseek-v4-flash (NaN, 1M context default)" {
-    # deepseek-v4-flash is the default (1M context, reasoning ON server-side);
-    # small_model stays nan/qwen3.6 for fast title generation. Switch the active
-    # model via /models per task.
-    grep -qE '"model":\s*"nan/deepseek-v4-flash"' "$OPENCODE_CFG"
+@test "opencode.jsonc default model is nan/qwen3.6 (fast default; deepseek-v4-flash on-demand)" {
+    # qwen3.6 is the default (256K, ~0.8s, fast) — matches the model-tier header
+    # comment. deepseek-v4-flash (1M context, reasoning-heavy ~3s) is reached
+    # on-demand via the `qf` wrapper, not as the always-on default; the tight
+    # SSE chunkTimeout made it abort with "SSE timeout" as the default. Switch
+    # the active model via /models per task.
+    grep -qE '"model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc exposes 4 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
