@@ -29,6 +29,29 @@ created: "2026-06-03"
 - [ ] PR opened referencing this spec folder
 - [ ] (post-merge) Multi-machine validation by the maintainer, then tick hive #176
 
+## Follow-on: Windows-safe upgrade orchestration (ADR-015 / hive#176)
+
+The first real Windows rollout validation (2026-06-04) found the daemon's
+restart-on-upgrade broken on Windows three ways: `uv tool upgrade` cannot replace
+a running exe (os error 32), Task Scheduler `RestartOnFailure` ignores the exit-75
+drift stop, and the task showed a console window every logon. Fixed across hive
+(PR #207 — S4U principal + supervisor loop) and this repo:
+
+- [x] `windows/hive-upgrade.ps1`: orchestrated stop-before-upgrade — only-if-newer
+      -> defer-if-locked -> stop daemon -> `uv tool upgrade` (never `--reinstall`)
+      -> start daemon. Runs from PowerShell, so it holds no lock on the install.
+- [x] `setup-windows.ps1`: `DotfilesHiveUpgrade` runs the orchestration script on a
+      15-min cadence (Linux `OnCalendar=*:0/15` parity, replacing the daily-9:00
+      trigger whose ~24h lag was observed live). Idempotent on Execute/Args drift.
+- [x] `tests/hive-upgrade-timer.bats`: orchestration contract + 15-min wiring (24/24).
+- [x] Validated on real hardware: a genuine `1.32.4 -> 1.33.0` release ran clean.
+- [ ] (post-merge) activate the Windows daemon, then tick hive #176.
+
+Decision: ADR-015 (hive) — A1 orchestrated stop-before-upgrade, NOT A3 junction-swap
+(over-engineering for a low-ROI Windows daemon). The residual OS limit (replacing a
+loaded native module while a session holds it) is tracked upstream in uv
+(astral-sh/uv#8528, #11930, #11134).
+
 ## Machine-readable features
 
 See sibling `features.json`. Structural/static checks (JSON shape, syntax, lint,
