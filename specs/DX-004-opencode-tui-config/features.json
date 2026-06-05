@@ -1,0 +1,44 @@
+[
+  {
+    "id": "DX-004-opencode-tui-config-f1",
+    "behavior": "AC1: all 4 NaN chat models map reasoning_content via interleaved in opencode.jsonc",
+    "verification": "bats tests/opencode.bats -f 'DX-004 AC1'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DX-004-opencode-tui-config-f2",
+    "behavior": "AC2: ai/opencode/tui.json exists with schema, theme=opencode, display_thinking=ctrl+o",
+    "verification": "bats tests/opencode.bats -f 'DX-004 AC2'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DX-004-opencode-tui-config-f3",
+    "behavior": "AC3: setup-linux.sh deploys tui.json as a plain copy with no secret substitution",
+    "verification": "bats tests/opencode.bats -f 'DX-004 AC3'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DX-004-opencode-tui-config-f4",
+    "behavior": "AC4: setup-windows.ps1 deploys tui.json (cross-OS parity)",
+    "verification": "bats tests/setup-windows.bats -f 'DX-004 AC4'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DX-004-opencode-tui-config-f5",
+    "behavior": "AC5: the stale 1.15.10 'renders neither' reasoning comment is updated",
+    "verification": "bats tests/opencode.bats -f 'DX-004 AC5'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DX-004-opencode-tui-config-f6",
+    "behavior": "AC6: in the TUI, NaN reasoning becomes visible after ctrl+o / /thinking (empirical)",
+    "verification": "manual: launch opencode, send a prompt to a NaN thinking model, press ctrl+o and confirm the reasoning block appears",
+    "state": "pending",
+    "evidence": ""
+  }
+]
