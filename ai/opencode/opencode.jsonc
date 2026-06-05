@@ -28,7 +28,10 @@
   "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
   // Explicit fast model for title generation — avoids fallback delay.
   "small_model": "nan/qwen3.6",
-  "model": "nan/deepseek-v4-flash",
+  // Default = fast model (matches the tier comment above). deepseek-v4-flash
+  // is reasoning-heavy (~3s + mandatory reasoning chain) — reach for it
+  // on-demand via the `qf` wrapper, not as the always-on default.
+  "model": "nan/qwen3.6",
 
   "provider": {
     // NaN community — primary daily provider.
@@ -40,23 +43,32 @@
         "baseURL": "https://api.nan.builders/v1",
         "apiKey": "{env:NAN_API_KEY}",
         "model": "qwen3.6",
-        // Reduced from 300s default — NaN is fast, fail fast on network issues.
-        "timeout": 60000,
-        // Reduced from 30s default — qwen3.6 streams quickly.
-        "chunkTimeout": 10000
+        // Overall request timeout (opencode default = 300000). Generous on
+        // purpose: reasoning models (deepseek-v4-flash via `qf`) and thinking-
+        // enabled chats produce long generations; 60s here cut them off with
+        // "operation timed out".
+        "timeout": 300000,
+        // Max ms between streamed SSE chunks before opencode aborts. NaN's
+        // reasoning models go silent for several seconds mid-chain; 10s was too
+        // tight and surfaced as "SSE timeout". 60s tolerates the pause.
+        "chunkTimeout": 60000
       },
       "models": {
         "deepseek-v4-flash": {
           "name": "DeepSeek V4 Flash (DeepSeek - 1M)",
+          // Surface NaN's reasoning chain in the TUI. NaN streams it in the
+          // non-standard `reasoning_content` field (a DeepSeek/Qwen alias), which
+          // @ai-sdk/openai-compatible drops by default. `interleaved` maps it to a
+          // reasoning part opencode can render (schema-verified on opencode 1.15.13).
+          // Toggle visibility with ctrl+o or `/thinking` (see ai/opencode/tui.json).
+          // NaN's other field, `provider_specific_fields.reasoning`, is NOT in the
+          // enum, so we map reasoning_content. Out-of-TUI fallback: the `dbg` alias
+          // (scripts/nan-debug.sh) curls NaN directly and prints reasoning + answer.
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
             "output": 8192
           },
-          // Note: NaN returns reasoning chain in non-OpenAI fields
-          // (`reasoning_content`, `provider_specific_fields.reasoning`).
-          // Opencode (1.15.10) renders neither — the chain is invisible in TUI.
-          // For visibility use `dbg` alias (scripts/nan-debug.sh) which curls
-          // directly and prints reasoning + answer side-by-side.
           "modalities": {
             "input": ["text"],
             "output": ["text"]
@@ -81,6 +93,8 @@
         },
         "qwen3.6": {
           "name": "Qwen 3.6 (Alibaba - 256K)",
+          // Surface reasoning in the TUI (see deepseek-v4-flash note).
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 256000,
             "output": 8192
@@ -109,6 +123,8 @@
         },
         "gemma4": {
           "name": "Gemma 4 (Google - 256K)",
+          // Surface reasoning in the TUI (see deepseek-v4-flash note).
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 256000,
             "output": 8192
@@ -137,6 +153,8 @@
         },
         "mimo-v2.5": {
           "name": "MiMo V2.5 (Xiaomi - 1M)",
+          // Surface reasoning in the TUI (see deepseek-v4-flash note).
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
             "output": 8192
@@ -203,6 +221,37 @@
     "auto": true,
     "prune": true,
     "reserved": 50000
+  },
+
+  // Behaviour / DX (keys verified against https://opencode.ai/config.json, 2026-06).
+  // Privacy: never upload a session to a share URL. Default "manual" still
+  // exposes the /share command; "disabled" turns it off entirely — correct for
+  // a secrets-heavy dotfiles workflow.
+  "share": "disabled",
+  // Surface new releases instead of silently self-updating the binary mid-
+  // session (opencode moves fast; install is unpinned via opencode.ai/install).
+  "autoupdate": "notify",
+  // Keep the /models picker clean: don't auto-load providers detected from
+  // ambient env vars (OPENAI_API_KEY etc.). Only nan/openrouter/ollama remain.
+  "disabled_providers": ["openai", "anthropic", "google"],
+  // Trim noisy tool output before it burns context (defaults are 2000/51200).
+  // Pairs with the token-thrift compaction block above.
+  "tool_output": {
+    "max_lines": 500,
+    "max_bytes": 20480
+  },
+  // Agent overrides. `plan` is the built-in read-only planning mode (toggle in
+  // the TUI) — pin it to the fast model and hard-deny writes so planning never
+  // edits files or runs commands. deepseek-v4-flash stays the depth option via
+  // /models.
+  "agent": {
+    "plan": {
+      "model": "nan/qwen3.6",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny"
+      }
+    }
   },
 
   // MCP servers — mirror of mcp-servers.json (Claude Code SSOT).

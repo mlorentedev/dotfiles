@@ -118,11 +118,13 @@ setup() {
     grep -q 'ollama.kubelab.live' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc default model is nan/deepseek-v4-flash (NaN, 1M context default)" {
-    # deepseek-v4-flash is the default (1M context, reasoning ON server-side);
-    # small_model stays nan/qwen3.6 for fast title generation. Switch the active
-    # model via /models per task.
-    grep -qE '"model":\s*"nan/deepseek-v4-flash"' "$OPENCODE_CFG"
+@test "opencode.jsonc default model is nan/qwen3.6 (fast default; deepseek-v4-flash on-demand)" {
+    # qwen3.6 is the default (256K, ~0.8s, fast) — matches the model-tier header
+    # comment. deepseek-v4-flash (1M context, reasoning-heavy ~3s) is reached
+    # on-demand via the `qf` wrapper, not as the always-on default; the tight
+    # SSE chunkTimeout made it abort with "SSE timeout" as the default. Switch
+    # the active model via /models per task.
+    grep -qE '"model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc exposes 4 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
@@ -143,6 +145,17 @@ setup() {
     done
     # drawio + socket intentionally removed (see opencode.jsonc comment)
     ! grep -qE '^\s*"drawio":|^\s*"socket":' "$OPENCODE_CFG"
+}
+
+@test "opencode.jsonc DX keys present (share disabled, autoupdate notify, providers pruned, tool_output, read-only plan agent)" {
+    grep -qE '"share":\s*"disabled"' "$OPENCODE_CFG"
+    grep -qE '"autoupdate":\s*"notify"' "$OPENCODE_CFG"
+    grep -qE '"disabled_providers":\s*\[' "$OPENCODE_CFG"
+    grep -qE '"tool_output":\s*\{' "$OPENCODE_CFG"
+    grep -qE '"max_lines":' "$OPENCODE_CFG"
+    # plan agent must exist, pin the fast model, and hard-deny writes
+    grep -qE '"agent":\s*\{' "$OPENCODE_CFG"
+    grep -qE '"plan":\s*\{' "$OPENCODE_CFG"
 }
 
 # --- Alias ---
@@ -225,4 +238,33 @@ setup() {
     awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'opencode --version'
     awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
     awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q '\$schema'
+}
+
+# --- DX-004: reasoning visibility (interleaved) + TUI config (tui.json) ---
+
+@test "opencode.jsonc maps NaN reasoning_content via interleaved on all 4 chat models (DX-004 AC1)" {
+    # opencode only renders NaN's reasoning chain if reasoning_content is mapped
+    # to a reasoning part. All four chat models must carry the mapping.
+    count=$(grep -cE '"interleaved":[[:space:]]*\{[[:space:]]*"field":[[:space:]]*"reasoning_content"[[:space:]]*\}' "$OPENCODE_CFG")
+    [ "$count" -eq 4 ] || { echo "expected 4 interleaved blocks, got $count" >&2; false; }
+}
+
+@test "opencode.jsonc reasoning comment updated off the stale 1.15.10 'renders neither' note (DX-004 AC5)" {
+    ! grep -q 'Opencode (1.15.10) renders neither' "$OPENCODE_CFG"
+    grep -q 'interleaved' "$OPENCODE_CFG"
+}
+
+@test "ai/opencode/tui.json exists with schema, theme=opencode, display_thinking=ctrl+o (DX-004 AC2)" {
+    TUI_CFG="$DOTFILES_DIR/ai/opencode/tui.json"
+    [ -f "$TUI_CFG" ]
+    grep -qE '"\$schema":[[:space:]]*"https://opencode.ai/tui.json"' "$TUI_CFG"
+    grep -qE '"theme":[[:space:]]*"opencode"' "$TUI_CFG"
+    grep -qE '"display_thinking":[[:space:]]*"ctrl\+o"' "$TUI_CFG"
+}
+
+@test "setup-linux.sh deploys tui.json as a plain copy, no secret substitution (DX-004 AC3)" {
+    grep -q 'TUI_SRC="\$CURRENT_DIR/ai/opencode/tui.json"' "$SETUP_SCRIPT"
+    grep -q 'cmp -s "\$TUI_SRC" "\$TUI_DST"' "$SETUP_SCRIPT"
+    # tui.json carries no secrets: it must NOT go through substitute_env_placeholders
+    ! grep -qE 'substitute_env_placeholders "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
 }

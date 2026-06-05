@@ -61,8 +61,10 @@ setup() {
     grep -q '11-tasks.md' "$PS1_SCRIPT"
 }
 
-@test "init-project.ps1 creates 90-lessons.md" {
-    grep -q '90-lessons.md' "$PS1_SCRIPT"
+@test "init-project.ps1 does not seed 90-lessons.md (knowledge-placement)" {
+    # Lessons live in the repo docs/lessons.md, not the vault — the script must
+    # not Set-Content a vault 90-lessons.md (the guidance text mentioning it is fine).
+    ! grep -qE 'Set-Content.*90-lessons\.md' "$PS1_SCRIPT"
 }
 
 @test "init-project.ps1 injects CLAUDE.md" {

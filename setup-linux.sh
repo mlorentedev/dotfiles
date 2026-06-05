@@ -646,6 +646,22 @@ else
     log_warning "AGENTS.md source missing at $AGENTS_SRC"
 fi
 
+# Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
+# Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
+# carries no secrets, so it deploys verbatim. opencode reads tui.json natively.
+TUI_SRC="$CURRENT_DIR/ai/opencode/tui.json"
+TUI_DST="$HOME/.config/opencode/tui.json"
+if [ -f "$TUI_SRC" ]; then
+    if [ -f "$TUI_DST" ] && cmp -s "$TUI_SRC" "$TUI_DST"; then
+        log_info "opencode tui.json already in sync"
+    else
+        cp "$TUI_SRC" "$TUI_DST"
+        log_success "Deployed tui.json to $TUI_DST"
+    fi
+else
+    log_warning "tui.json source missing at $TUI_SRC"
+fi
+
 # opencode commands are deployed from the vault skill records by
 # `compile-harness.sh --deploy` (SDD-008): each committed record under
 # harness/skills/ whose targets[] includes opencode is rendered to a
