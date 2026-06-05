@@ -436,27 +436,42 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
     else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
 
-    # AI-023 / hive#176: the upgrade policy that FEEDS the daemon's
-    # restart-on-upgrade. Daily Scheduled Task running `uv tool upgrade hive-vault`.
-    # Self-healing: re-register when the action arguments drift (parity with the
-    # weekly vault maintenance task). Same version gate as the service above.
+    # AI-023 / hive#176 / ADR-015: the upgrade policy that FEEDS the daemon's
+    # restart-on-upgrade. Windows cannot replace a running executable, so the task
+    # does NOT call `uv tool upgrade` directly -- it runs the orchestration script
+    # (only-if-newer -> defer-if-locked -> stop daemon -> upgrade -> start),
+    # deployed from the dotfiles SSOT. Cadence matches Linux: every 15 min.
+    # Self-healing: re-register when the action Execute/Arguments drift.
     $hiveUvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
     $hiveUpgradeTask = "DotfilesHiveUpgrade"
-    $hiveUpgradeArg = "tool upgrade hive-vault"
+    $hiveUpgradeSrc = Join-Path $DotfilesDir "windows\hive-upgrade.ps1"
+    $hiveUpgradeDst = Join-Path $ClaudeHome "scripts\hive-upgrade.ps1"
+    $hiveUpgradeArg = "-NoProfile -ExecutionPolicy Bypass -File `"$hiveUpgradeDst`""
+    if (Test-Path $hiveUpgradeSrc) {
+        Ensure-Directory (Split-Path $hiveUpgradeDst -Parent)
+        Copy-Item $hiveUpgradeSrc $hiveUpgradeDst -Force
+    } else {
+        Write-Warn "hive-upgrade orchestration script not found at $hiveUpgradeSrc"
+    }
     $existingHiveTask = Get-ScheduledTask -TaskName $hiveUpgradeTask -ErrorAction SilentlyContinue
     $existingHiveArg = $null
+    $existingHiveExe = $null
     if ($existingHiveTask -and $existingHiveTask.Actions -and $existingHiveTask.Actions[0]) {
         $existingHiveArg = $existingHiveTask.Actions[0].Arguments
+        $existingHiveExe = $existingHiveTask.Actions[0].Execute
     }
-    if ($existingHiveTask -and ($existingHiveArg -eq $hiveUpgradeArg)) {
+    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg)) {
         Write-Info "hive-upgrade task already correctly configured, skipping"
     } else {
         try {
-            $hiveAction = New-ScheduledTaskAction -Execute $hiveUvExe -Argument $hiveUpgradeArg
-            $hiveTrigger = New-ScheduledTaskTrigger -Daily -At "9:00AM"
+            $hiveAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $hiveUpgradeArg
+            $hiveTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+                -RepetitionInterval (New-TimeSpan -Minutes 15)
+            $hiveSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
             Register-ScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
-                -Description "Daily hive-vault upgrade (feeds hive serve restart-on-upgrade)" -Force | Out-Null
-            Write-Success "Installed hive-upgrade task (daily 9:00, v$hiveVer)"
+                -Settings $hiveSettings `
+                -Description "hive-vault auto-upgrade every 15 min (ADR-015 orchestrated stop-before-upgrade; feeds hive serve restart-on-upgrade)" -Force | Out-Null
+            Write-Success "Installed hive-upgrade task (15-min, v$hiveVer)"
             if (-not (Test-Path $hiveUvExe)) {
                 Write-Warn "hive-upgrade task registered but uv not found at $hiveUvExe"
             }
