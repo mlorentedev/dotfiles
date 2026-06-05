@@ -205,6 +205,37 @@
     "reserved": 50000
   },
 
+  // Behaviour / DX (keys verified against https://opencode.ai/config.json, 2026-06).
+  // Privacy: never upload a session to a share URL. Default "manual" still
+  // exposes the /share command; "disabled" turns it off entirely — correct for
+  // a secrets-heavy dotfiles workflow.
+  "share": "disabled",
+  // Surface new releases instead of silently self-updating the binary mid-
+  // session (opencode moves fast; install is unpinned via opencode.ai/install).
+  "autoupdate": "notify",
+  // Keep the /models picker clean: don't auto-load providers detected from
+  // ambient env vars (OPENAI_API_KEY etc.). Only nan/openrouter/ollama remain.
+  "disabled_providers": ["openai", "anthropic", "google"],
+  // Trim noisy tool output before it burns context (defaults are 2000/51200).
+  // Pairs with the token-thrift compaction block above.
+  "tool_output": {
+    "max_lines": 500,
+    "max_bytes": 20480
+  },
+  // Agent overrides. `plan` is the built-in read-only planning mode (toggle in
+  // the TUI) — pin it to the fast model and hard-deny writes so planning never
+  // edits files or runs commands. deepseek-v4-flash stays the depth option via
+  // /models.
+  "agent": {
+    "plan": {
+      "model": "nan/qwen3.6",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny"
+      }
+    }
+  },
+
   // MCP servers — mirror of mcp-servers.json (Claude Code SSOT).
   // 2026-05-25 cleanup: removed `drawio` (rarely used, spawned subprocess
   // even with --pure) and `socket` (mcp.socket.dev hung 30s+ on tool
