@@ -28,7 +28,10 @@
   "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
   // Explicit fast model for title generation — avoids fallback delay.
   "small_model": "nan/qwen3.6",
-  "model": "nan/deepseek-v4-flash",
+  // Default = fast model (matches the tier comment above). deepseek-v4-flash
+  // is reasoning-heavy (~3s + mandatory reasoning chain) — reach for it
+  // on-demand via the `qf` wrapper, not as the always-on default.
+  "model": "nan/qwen3.6",
 
   "provider": {
     // NaN community — primary daily provider.
@@ -40,10 +43,15 @@
         "baseURL": "https://api.nan.builders/v1",
         "apiKey": "{env:NAN_API_KEY}",
         "model": "qwen3.6",
-        // Reduced from 300s default — NaN is fast, fail fast on network issues.
-        "timeout": 60000,
-        // Reduced from 30s default — qwen3.6 streams quickly.
-        "chunkTimeout": 10000
+        // Overall request timeout (opencode default = 300000). Generous on
+        // purpose: reasoning models (deepseek-v4-flash via `qf`) and thinking-
+        // enabled chats produce long generations; 60s here cut them off with
+        // "operation timed out".
+        "timeout": 300000,
+        // Max ms between streamed SSE chunks before opencode aborts. NaN's
+        // reasoning models go silent for several seconds mid-chain; 10s was too
+        // tight and surfaced as "SSE timeout". 60s tolerates the pause.
+        "chunkTimeout": 60000
       },
       "models": {
         "deepseek-v4-flash": {
