@@ -187,12 +187,55 @@ heal_hooks_json() {
     log "patched hooks.json (BUG-017 head-n1 + BUG-018 continue-directive on all 5 hooks): $target"
 }
 
+# BUG-019 (2026-06-05): the claude-mem SessionStart "context" hook injects a
+# "recent context" block whose legend uses astral (non-BMP) emoji
+# (e.g. U+1F3AF, U+1F534). These render as UTF-16 surrogate pairs; Claude Code
+# truncates the assembled request context at a code-unit boundary and splits a
+# pair, emitting a lone high surrogate -> the API rejects the whole request with
+# "400 ... no low surrogate in string" and the session is bricked (survives
+# /clear, because the block is re-injected every turn from session start, not
+# from the conversation). It only bites repos whose total context is large
+# enough to push an emoji onto the truncation boundary (e.g. a ~28KB AGENTS.md).
+# The plugin's own CLAUDE_MEM_EXCLUDED_PROJECTS does NOT reliably stop it. We
+# neuter the context-injection command (replace the `node ... hook claude-code
+# context` invocation with `true`) so nothing is injected; observation capture
+# and mem-search are unaffected. Upstream fix request (use BMP markers):
+# thedotmack/claude-mem#2787.
+#
+# Runs AFTER heal_hooks_json (whose BUG-018 sed keeps the context command alive
+# with a continue directive). Idempotent: once neutered the `hook claude-code
+# context` token is gone, so re-runs are no-ops. Re-applies after a /plugin
+# update restores the pristine hooks.json.
+neuter_context_hook() {
+    target="$1"
+    [ -f "$target" ] || return 0
+    grep -qF 'hook claude-code context' "$target" 2>/dev/null || {
+        verbose "context hook already neutered: $target"
+        return 0
+    }
+    # `#` sed delimiter: the command contains `/` but no `#`. Replace the whole
+    # node-context invocation (from `node` up to the next `;`) with `true`, so
+    # the context generator never runs and no astral-emoji block is injected.
+    # `file-context` (PreToolUse) does NOT match: it has no `claude-code context`
+    # substring (it is `claude-code file-context`).
+    tmp="$target.tmp.$$"
+    if sed 's#node [^;]*hook claude-code context[^;]*#true#g' "$target" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$target"
+        log "neutered claude-mem context-injection hook (astral-emoji 400 surrogate bug): $target"
+    else
+        rm -f "$tmp"
+        log "ERROR: failed to neuter context hook: $target"
+    fi
+}
+
 heal_dir() {
     dir="$1"
     [ -d "$dir" ] || return 0
     heal_mcp_json "$dir/.mcp.json"
     heal_hooks_json "$dir/hooks/hooks.json"
     heal_hooks_json "$dir/plugin/hooks/hooks.json"
+    neuter_context_hook "$dir/hooks/hooks.json"
+    neuter_context_hook "$dir/plugin/hooks/hooks.json"
     heal_zod "$dir"
 }
 
