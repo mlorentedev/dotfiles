@@ -97,10 +97,13 @@ function Repair-MarketplaceCompatJunction {
 # on Windows Git Bash).
 #
 # The healthy form mirrors the v13.x cascade structure (so it works whether
-# or not Claude Code sets CLAUDE_PLUGIN_ROOT) but pipes the consumer's
-# matches through `head -n1` instead of breaking the inner `while` loop --
-# this drains the entire producer pipe, eliminating the EPIPE writes that
-# trigger the upstream bug.
+# or not Claude Code sets CLAUDE_PLUGIN_ROOT) but drains the consumer pipe
+# with `sed -n 1p` instead of breaking the inner `while` loop or using
+# `head -n1`. `head -n1` closes stdin after line 1, so with >=2 matching
+# candidates the still-writing loop hits a closed pipe -> EPIPE (the same
+# consumer-EPIPE race fixed for hooks.json in Repair-HooksJson; mirrored here
+# under task 2026-06-06-mcp-json-consumer-epipe-drain). `sed -n 1p` prints
+# only line 1 but reads to EOF, so it never closes under the writer.
 #
 # Idempotent: skips when neither v12.7.4 nor v13.x signature present.
 function Repair-McpJson {
@@ -131,7 +134,7 @@ function Repair-McpJson {
       "command": "sh",
       "args": [
         "-c",
-        "_C=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"; _E=\"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}\"; _P=$({ [ -n \"$_E\" ] && printf '%s\\n' \"$_E\"; ls -dt \"$_C/plugins/cache/thedotmack/claude-mem\"/[0-9]*/ 2>/dev/null; printf '%s\\n' \"$_C/plugins/marketplaces/thedotmack-claude-mem/plugin\" \"$_C/plugins/marketplaces/thedotmack/plugin\"; } | while IFS= read -r _R; do _R=\"${_R%/}\"; [ -d \"$_R/plugin/scripts\" ] && _Q=\"$_R/plugin\" || _Q=\"$_R\"; [ -f \"$_Q/scripts/mcp-server.cjs\" ] && printf '%s\\n' \"$_Q\"; done | head -n1); [ -n \"$_P\" ] || { echo 'claude-mem: mcp server not found' >&2; exit 1; }; exec node \"$_P/scripts/mcp-server.cjs\""
+        "_C=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"; _E=\"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}\"; _P=$({ [ -n \"$_E\" ] && printf '%s\\n' \"$_E\"; ls -dt \"$_C/plugins/cache/thedotmack/claude-mem\"/[0-9]*/ 2>/dev/null; printf '%s\\n' \"$_C/plugins/marketplaces/thedotmack-claude-mem/plugin\" \"$_C/plugins/marketplaces/thedotmack/plugin\"; } | while IFS= read -r _R; do _R=\"${_R%/}\"; [ -d \"$_R/plugin/scripts\" ] && _Q=\"$_R/plugin\" || _Q=\"$_R\"; [ -f \"$_Q/scripts/mcp-server.cjs\" ] && printf '%s\\n' \"$_Q\"; done | sed -n 1p); [ -n \"$_P\" ] || { echo 'claude-mem: mcp server not found' >&2; exit 1; }; exec node \"$_P/scripts/mcp-server.cjs\""
       ]
     }
   }
@@ -139,9 +142,9 @@ function Repair-McpJson {
 '@
     Set-Content -Path $Target -Value $healthy -Encoding UTF8 -NoNewline
     if ($hasV13) {
-        Write-HealLog "patched .mcp.json (v13.x cascade -> head -n1 race-free form): $Target"
+        Write-HealLog "patched .mcp.json (v13.x cascade -> sed -n 1p race-free form): $Target"
     } else {
-        Write-HealLog "patched .mcp.json (v12.7.4 -> head -n1 race-free form): $Target"
+        Write-HealLog "patched .mcp.json (v12.7.4 -> sed -n 1p race-free form): $Target"
     }
 }
 
