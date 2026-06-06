@@ -57,8 +57,8 @@ If failures detected -> recommend `/vault-doctor`.
 
 ### Step 5 -- Vault Gap Analysis (full mode)
 
-- Read `~/Projects/knowledge/10_projects/<repo>/90-lessons.md`
-- Identify bugfix and decision observations NOT documented in vault lessons
+- Read the repo's `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `~/Projects/knowledge/00_meta/` for cross-project
+- Identify bugfix and decision observations NOT documented in the repo's lessons
 - List each gap: ID, type, title
 
 ### Step 6 -- Decision Persistence Check (full mode)
@@ -76,7 +76,7 @@ Decision persistence:
 
 ### Step 7 -- Pattern Opportunities (full mode)
 
-- For lessons in `90-lessons.md` that appear relevant to multiple projects:
+- For lessons in the repo's `docs/lessons.md` that appear relevant to multiple projects:
   - Check `~/Projects/knowledge/00_meta/patterns/` for existing patterns
   - Identify lessons that warrant a new global pattern
 - For existing patterns: check if recent lessons should be added to them
@@ -101,7 +101,7 @@ Backlog: X active items (Progress: [====......] 40%)
 Observation inventory (last 14 days):
   Discoveries: N | Changes: N | Bugfixes: N (X unvaulted) | Decisions: N (X unvaulted) | Features: N
 
-Vault gaps (not in 90-lessons.md):
+Project-lesson gaps (not in the repo's docs/lessons.md):
   - #ID: <title>
 
 Decision persistence:

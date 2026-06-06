@@ -13,19 +13,19 @@ Full maintenance ritual for the Neural Hive knowledge loop. Run when `/insights`
 ### Step 1 — Audit State
 - Read `~/.claude/projects/<encoded-cwd>/memory/MEMORY.md`
 - Note: line count, Last Crystallized date, days elapsed since last run
-- Read `~/Projects/knowledge/10_projects/<repo>/90-lessons.md` for current vault state
+- Read the repo's `docs/lessons.md` for current **project** lesson state (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `~/Projects/knowledge/00_meta/patterns/` for cross-project state
 
 ### Step 2 — Mine Observations
 - Run `/mem-search` filtering for 🔴 (bugfix) and ⚖️ (decision) type observations from the past 14 days
 - List each unvaulted observation with its ID and title
 
 ### Step 3 — Gap Detection
-- Compare mined observations against `90-lessons.md`
+- Compare mined observations against the repo's `docs/lessons.md` (project lessons) and `00_meta/` (cross-project)
 - Identify which bugs/decisions are NOT yet documented in the vault
 - These become new lesson candidates
 
 ### Step 4 — Vault Update
-- For each gap, create a lesson entry in `90-lessons.md` using the **Lesson Template**:
+- For each gap, append a **project** lesson to the repo's `docs/lessons.md` using the **Lesson Template** (a genuinely **cross-project** lesson goes to `00_meta/`, promoted to a pattern — never a vault per-project `90-lessons.md`):
 
 ```markdown
 ### [YYYY-MM-DD] <Title>
@@ -54,7 +54,7 @@ Full maintenance ritual for the Neural Hive knowledge loop. Run when `/insights`
 Print a summary:
 ```
 Crystallization complete:
-  - X lessons added to 90-lessons.md
+  - X project lessons added to the repo's docs/lessons.md (cross-project -> 00_meta/)
   - Y pattern proposals (list titles)
   - MEMORY.md: N lines before → M lines after
   - Last Crystallized: <today>
