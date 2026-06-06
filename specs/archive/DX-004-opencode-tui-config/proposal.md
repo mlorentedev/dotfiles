@@ -1,7 +1,7 @@
 ---
 id: "DX-004-opencode-tui-config"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-05"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -57,12 +57,12 @@ After this PR:
 
 ## Acceptance criteria
 
-- [ ] AC1: `ai/opencode/opencode.jsonc` has `interleaved: { field: "reasoning_content" }` on all 4 NaN chat models (deepseek-v4-flash, qwen3.6, gemma4, mimo-v2.5).
-- [ ] AC2: `ai/opencode/tui.json` exists, is valid JSON, with `theme: "opencode"` and `keybinds.display_thinking: "ctrl+o"`.
-- [ ] AC3: `setup-linux.sh` deploys `tui.json` to `~/.config/opencode/tui.json` as a plain copy (no `substitute_env_placeholders`).
-- [ ] AC4: `setup-windows.ps1` deploys `tui.json` (cross-OS parity) and is ASCII-only.
-- [ ] AC5: the stale `opencode.jsonc` reasoning comment is updated to reflect the `interleaved` fix and version 1.15.13.
-- [ ] AC6 (empirical, user-run): in the TUI, the NaN reasoning chain becomes visible after pressing `ctrl+o` (or `/thinking`). Evidence recorded in `verification.md`.
+- [x] AC1: `ai/opencode/opencode.jsonc` has `interleaved: { field: "reasoning_content" }` on all 4 NaN chat models (deepseek-v4-flash, qwen3.6, gemma4, mimo-v2.5).
+- [x] AC2: `ai/opencode/tui.json` exists, is valid JSON, with `theme: "opencode"` and `keybinds.display_thinking: "ctrl+o"`.
+- [x] AC3: `setup-linux.sh` deploys `tui.json` to `~/.config/opencode/tui.json` as a plain copy (no `substitute_env_placeholders`).
+- [x] AC4: `setup-windows.ps1` deploys `tui.json` (cross-OS parity) and is ASCII-only.
+- [x] AC5: the stale `opencode.jsonc` reasoning comment is updated to reflect the `interleaved` fix and version 1.15.13.
+- [x] AC6 (empirical, user-run): in the TUI, the NaN reasoning chain becomes visible after pressing `ctrl+o` (or `/thinking`). Evidence recorded in `verification.md`.
 
 ## References
 
