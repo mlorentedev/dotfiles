@@ -1,13 +1,28 @@
 ---
 id: "IDEAS-003-sourcing-loop"
 type: spec
-status: draft
+status: abandoned
 created: "2026-05-25"
 tags: [spec, proposal, ideas-003, shell, refactor, dotfiles-survey, tier-1]
 template_version: "1.0"
 ---
 
 # IDEAS-003: Sourcing loop refactor
+
+> **ABANDONED 2026-06-05 — premise invalid against current code; superseded by REFACTOR-010.**
+> The spec assumed `.zshrc` and `.bashrc` carried parallel contiguous `source` blocks
+> over a shared file set, so a single brace-expanded loop would deduplicate them. Verified
+> reality before implementing: (1) `.zshrc` sourcing is intentionally scattered across two
+> semantic sections (`aliases.zsh` in ALIASES at L86, the rest in SHELL ENHANCEMENTS at
+> L115-118), so a single loop would reorder `aliases.zsh` relative to the inline AI aliases —
+> a behavioral change the spec itself forbids; (2) `.bashrc` sources exactly ONE `.zsh/` file
+> (`functions.sh`, L157) — bash and zsh deliberately diverge (bash uses `~/.bash_aliases` +
+> inline wrappers), so there is no parallel duplication to remove; (3) the graceful-missing
+> tolerance the loop would add already exists (every line has its own `[[ -f ]]` guard).
+> Net effect of implementing as specced: reorder risk for zero/negative benefit (cf. POLISH-001
+> WONTFIX; lesson "verify-before-act on agent audits"). The genuine duplication is elsewhere —
+> the `_qq_call`/`oc`/`ocfull` wrappers shared bash↔zsh — captured in REFACTOR-010. See
+> `verification.md` for the full finding.
 
 > **Naming**: file lives at `<repo>/specs/IDEAS-003-sourcing-loop/proposal.md`.
 > Origin: dotfiles-survey research, Tier-1 idea (#3) from mathiasbynens (`.bash_profile` source loop).
