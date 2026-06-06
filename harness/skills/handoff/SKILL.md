@@ -40,7 +40,7 @@ Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handof
 
 **Vault knowledge:**
 - Tick completed tasks in `vault/10_projects/<repo>/11-tasks.md` (`[ ]` -> `[x]` + ✓ date + PR link). Keep the file guard-green (one ticket = one entry — see SDD-012 `check-backlog-integrity.sh`).
-- Capture any non-obvious lesson in `90-lessons.md` (Context / Problem / Solution / Tags). New architectural decision -> an ADR; recurring pattern -> `00_meta/patterns/`.
+- Capture any non-obvious **project** lesson in the **repo's `docs/lessons.md`** (Context / Problem / Solution / Tags) — NOT a vault `90-lessons.md` (see [[pattern-knowledge-placement]]: build/operate knowledge lives in the repo). A genuinely **cross-project / methodology** lesson goes to `00_meta/` (promote to a pattern). New architectural decision -> repo `docs/adr/`; recurring cross-project pattern -> `00_meta/patterns/`.
 
 **Repo documentation (keep it reflecting the latest state):**
 - If the session changed behavior, structure, commands, public contracts, or setup, update the repo docs that describe them: `README.md` and the repo's `docs/` (ADRs, runbooks, troubleshooting) for repos on the knowledge-placement model. ADRs in this repo live in `docs/adr/`.

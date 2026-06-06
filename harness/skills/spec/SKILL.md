@@ -222,9 +222,9 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 2. **Promotion candidates (always interactive — never autoparse):**
    For each of the three promotion types, ASK the user regardless of `verification.md` marker (the marker is a hint, not authoritative):
    - **Lesson?** "Any non-obvious lesson worth recording? 2-sentence summary, or `no`."
-     - If non-`no`: compose lesson entry -> append to `$VAULT_PATH/10_projects/$REPO_NAME/90-lessons.md` via Hive `vault_write` (append mode, lessons section).
+     - If non-`no`: compose lesson entry -> append to the **repo's** `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]; never a vault `90-lessons.md`). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
    - **ADR-worthy?** "Any architectural decision that future-you needs to remember? ADR title, or `no`."
-     - If non-`no`: ask for ADR number (query existing ADRs first to suggest next sequential) and 1-line decision summary. Create skeleton at `$VAULT_PATH/10_projects/$REPO_NAME/30-architecture/adr-XXX-<slug>.md` via Hive (using ADR template).
+     - If non-`no`: ask for ADR number (query existing ADRs in the **repo's** `docs/adr/` first to suggest next sequential) and 1-line decision summary. Create skeleton at the **repo's** `docs/adr/adr-XXX-<slug>.md` (ADRs live in the repo — see [[pattern-knowledge-placement]]; the vault keeps only cross-project decisions in `00_meta/`).
    - **Pattern candidate?** "Does this approach recur in >1 project? Pattern name, or `no`."
      - If non-`no`: create skeleton at `$VAULT_PATH/00_meta/patterns/pattern-<name>.md` via Hive.
 
@@ -266,11 +266,11 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 | Subcommand | Reads | Writes |
 |---|---|---|
-| `init` (pre-flight) | `11-tasks.md`, `30-architecture/`, `10-roadmap.md` (search for context) | `11-tasks.md` (if user chose option a — new entry) |
+| `init` (pre-flight) | `11-tasks.md`, the repo's `docs/adr/` (search for context) | `11-tasks.md` (if user chose option a — new entry) |
 | `init` (substitution) | `00_meta/templates/spec-*.md` | (filesystem only — repo specs/) |
 | `bootstrap` (template) | `00_meta/templates/bootstrap-contract.md`, sister contracts in `specs/archive/` | (filesystem only — repo specs/<id>/bootstrap-contract.md) |
 | `fill` (grounding) | `11-tasks.md`, `10-roadmap.md`, referenced ADRs, sister specs | nothing |
-| `archive` (promotion) | `verification.md` flags | `90-lessons.md`, `30-architecture/adr-XXX.md`, `00_meta/patterns/` (selective) |
+| `archive` (promotion) | `verification.md` flags | repo `docs/lessons.md`, repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
 | `archive` (backlog tick) | `11-tasks.md` | `11-tasks.md` (tick + PR link) |
 
 ## References

@@ -84,7 +84,7 @@ For files missing required frontmatter fields (`id`, `type`, `status`):
 
 1. **Infer values** from file location and content:
    - `id`: derive from filename slug (e.g., `my-note.md` → `my-note`)
-   - `type`: derive from directory (e.g., `30-architecture/` → `adr`, `90-lessons.md` → `lesson`)
+   - `type`: derive from directory (e.g., `30-architecture/` → `adr`, `90-lessons.md` → `lesson`). Note: per [[pattern-knowledge-placement]], project ADRs/lessons now live in the repo's `docs/`; these vault types apply only to residual or meta-project files, not new project knowledge.
    - `status`: default to `active` unless content suggests otherwise
 2. **Apply in bulk** using `vault_patch` — inject frontmatter at file top
 3. **Preserve existing fields** — only add missing ones, never overwrite
