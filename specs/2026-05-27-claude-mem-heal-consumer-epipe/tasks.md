@@ -34,4 +34,4 @@ created: "2026-06-06"
 - [x] `bats tests/claude-mem-heal.bats tests/claude-mem-heal-ps1.bats` green (25/26; the 1 failure is a pre-existing Windows-only symlink env issue)
 - [x] No unrelated changes in the diff (no `.mcp.json` / no `init-spec` changes)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder ([#242](https://github.com/mlorentedev/dotfiles/pull/242))
