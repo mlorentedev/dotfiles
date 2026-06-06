@@ -68,9 +68,7 @@ if ($WorkSdk) {
 
     Write-Info "Creating work SDK vault entry: 50_work/45-development/$Family/$Component"
 
-    foreach ($subDir in @('30-architecture', '40-runbooks', '50-troubleshooting', 'memory')) {
-        New-Item -ItemType Directory -Path "$SdkDir\$subDir" -Force | Out-Null
-    }
+    New-Item -ItemType Directory -Path "$SdkDir\memory" -Force | Out-Null
 
     Set-Content -Path "$SdkDir\00-context.md" -Encoding UTF8 -Value @"
 ---
@@ -101,11 +99,8 @@ See [[../00-context|$Family family context]] for all repos.
 - **Real repo path:** Fill in source_path above with actual `$env:USERPROFILE\Projects\...` path
 
 ## Knowledge Structure
-- [[30-architecture]]: ADRs and Technical Decisions
-- [[40-runbooks]]: Operational Guides
-- [[50-troubleshooting]]: Known Issues
+Per [[pattern-knowledge-placement]]: build/operate docs (ADRs, runbooks, troubleshooting, lessons) live in the repo docs/; this entry keeps only decide/personal layers.
 - [[memory/MEMORY]]: Session memory
-- [[90-lessons]]: Lessons Learned
 "@
 
     Set-Content -Path "$SdkDir\memory\MEMORY.md" -Encoding UTF8 -Value @"
@@ -122,19 +117,6 @@ See [[../00-context|$Family family context]] for all repos.
 - Follow global CLAUDE.md + workflow-protocol.md rules
 
 ## Last Crystallized: $Today
-"@
-
-    Set-Content -Path "$SdkDir\90-lessons.md" -Encoding UTF8 -Value @"
----
-id: "$Family-$Component-lessons"
-type: lesson
-status: active
-owner: manu
-tags: [work, sdk, $Family]
----
-# Lessons Learned - $Component
-
-*Record non-trivial bugs and decisions here. Promoted to 00_meta/patterns/ if recurring.*
 "@
 
     # Create parent family context if it doesn't exist
@@ -253,9 +235,7 @@ $ProjectKbDir = "$KnowledgeHome\10_projects\$ProjectBaseName"
 
 Write-Info "Initializing Knowledge Vault structure..."
 
-foreach ($subDir in @('30-architecture', '40-runbooks', '50-troubleshooting', 'memory')) {
-    New-Item -ItemType Directory -Path "$ProjectKbDir\$subDir" -Force | Out-Null
-}
+New-Item -ItemType Directory -Path "$ProjectKbDir\memory" -Force | Out-Null
 
 # 00-context.md
 if (-not (Test-Path "$ProjectKbDir\00-context.md")) {
@@ -286,12 +266,11 @@ created: "$Today"
 - **Production:**
 
 ## Knowledge Structure
-- [[10-roadmap]]: Planning & Strategy
-- [[11-tasks]]: Active Backlog
-- [[30-architecture]]: ADRs and Technical Decisions
-- [[40-runbooks]]: Operational Guides
-- [[50-troubleshooting]]: Known Issues
-- [[90-lessons]]: Lessons Learned
+Per [[pattern-knowledge-placement]]: build/operate docs live in the **repo**; this store keeps only decide/personal layers. Do NOT seed vault-local 30-architecture/, 40-runbooks/, 50-troubleshooting/, 90-lessons.md.
+
+**In the repo** (~/Projects/$ProjectBaseName/): docs/adr/, docs/runbooks/, docs/troubleshooting/, docs/lessons.md, specs/<id>/.
+
+**In this store:** [[10-roadmap]] (strategy), [[11-tasks]] (strategic backlog), [[memory/MEMORY]] (AI memory).
 
 ## Development Flow
 1. Feature branch from ``main``
@@ -345,22 +324,6 @@ Progress: [..........] 0%
 ## In Progress
 
 ## Done
-"@
-}
-
-# 90-lessons.md
-if (-not (Test-Path "$ProjectKbDir\90-lessons.md")) {
-    Set-Content -Path "$ProjectKbDir\90-lessons.md" -Encoding UTF8 -Value @"
----
-id: "$ProjectBaseName-lessons"
-type: lesson
-status: active
-owner: manu
-tags: []
----
-# Lessons Learned - $ProjectBaseName
-
-*Non-trivial bugs and decisions. Promoted to 00_meta/patterns/ if recurring across projects.*
 "@
 }
 
@@ -620,4 +583,4 @@ Write-Host ""
 Write-Host "Structure:" -ForegroundColor Cyan
 Write-Host "  CLAUDE.md / AGY.md         - AI Memory files (Dual-Core)"
 Write-Host "  .claude\skills\            - Custom skills"
-Write-Host "  Knowledge Vault updated    - 11-tasks.md & 90-lessons.md in knowledge/10_projects/"
+Write-Host "  Knowledge Vault updated    - 00-context.md & 11-tasks.md in knowledge/10_projects/"

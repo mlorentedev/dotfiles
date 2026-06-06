@@ -80,14 +80,14 @@ setup() {
 
 # --- setup-windows.ps1 wiring ---
 
-@test "setup-windows.ps1 registers a daily DotfilesHiveUpgrade task" {
+@test "setup-windows.ps1 registers a 15-min DotfilesHiveUpgrade task (Linux parity)" {
     grep -qF 'DotfilesHiveUpgrade' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'New-ScheduledTaskTrigger -Daily' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'RepetitionInterval (New-TimeSpan -Minutes 15)' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup-windows.ps1 hive-upgrade task runs uv tool upgrade hive-vault" {
-    grep -qF 'tool upgrade hive-vault' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'uv.exe' "$DOTFILES_DIR/setup-windows.ps1"
+@test "setup-windows.ps1 hive-upgrade task runs the orchestration script (not uv directly)" {
+    grep -qF 'windows\hive-upgrade.ps1' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'New-ScheduledTaskAction -Execute "powershell.exe"' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # Same version gate as Linux: the task must register inside the
@@ -104,6 +104,45 @@ setup() {
     block=$(sed -n '/DotfilesHiveUpgrade/,/Could not register hive-upgrade/p' "$DOTFILES_DIR/setup-windows.ps1")
     [ -n "$block" ]
     printf '%s' "$block" | LC_ALL=C grep -nP '[^\x00-\x7F]' && return 1
+    return 0
+}
+
+# --- Windows daemon upgrade orchestration (ADR-015 / hive#176) ---
+# Windows cannot replace a running executable, so the upgrade cannot be a bare
+# `uv tool upgrade`: it must stop the daemon first and defer if a client session
+# holds the install. This logic lives in windows/hive-upgrade.ps1 (SSOT).
+
+@test "windows/hive-upgrade.ps1 orchestration script exists" {
+    [ -f "$DOTFILES_DIR/windows/hive-upgrade.ps1" ]
+}
+
+@test "hive-upgrade.ps1 defers when a client session holds the install" {
+    grep -qF 'deferring' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    grep -qF 'holders' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+}
+
+@test "hive-upgrade.ps1 stops the daemon, upgrades, then restarts" {
+    grep -qF 'Stop-ScheduledTask' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    grep -qF 'tool upgrade hive-vault' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    grep -qF 'Start-ScheduledTask' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+}
+
+# At a 15-min cadence the daemon must not be restarted every tick: only act when
+# a newer version is actually published (compare installed vs latest first).
+@test "hive-upgrade.ps1 only acts when a newer version is published" {
+    grep -qF 'pypi.org/pypi/hive-vault' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    grep -qF '[version]$installed -ge [version]$latest' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+}
+
+# A `uv tool ... --reinstall` removes the locked venv dir (os error 5) and
+# corrupts the install -- the script documents the hazard in a comment but must
+# never actually run it (so the check is on a real uv command, not the word).
+@test "hive-upgrade.ps1 never runs uv tool ... --reinstall" {
+    ! grep -qE '\$uv tool.*--reinstall' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+}
+
+@test "hive-upgrade.ps1 is ASCII-only (PSScriptAnalyzer CI)" {
+    LC_ALL=C grep -nP '[^\x00-\x7F]' "$DOTFILES_DIR/windows/hive-upgrade.ps1" && return 1
     return 0
 }
 
