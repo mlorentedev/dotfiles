@@ -203,3 +203,79 @@ _source_heal() {
     [ -z "$output" ]
     [ "$(cat "$healthy")" = "$before" ]
 }
+
+# --- Consumer-EPIPE fix (spec 2026-05-27-claude-mem-heal-consumer-epipe) ---
+#
+# Root cause: the path-resolution pipe `... }; done | head -n1` makes the inner
+# while loop the WRITER into head. head -n1 closes its stdin after line 1; if
+# the loop is still writing (>=2 matching candidates, slow FS), the next printf
+# hits a closed pipe -> EPIPE. Node ignores SIGPIPE and Claude Code spawns hooks
+# with that disposition, so the write error is REPORTED (printf: write error)
+# instead of dying silently, and surfaces as a hook-error banner on every tool
+# call. Fix: `head -n1` -> `sed -n 1p`. sed prints only line 1 but reads to EOF
+# (no early `q`), so it never closes the pipe while the writer runs.
+
+@test "consumer pipe: head -n1 races but sed -n 1p drains under SIGPIPE-ignore (AC1)" {
+    # Mimic the production parent: SIGPIPE ignored (as Node does) + a slow writer
+    # so the consumer closes stdin mid-write. This is the deterministic form of
+    # the otherwise-flaky timing race; it reproduces on Linux and Windows alike.
+    run bash -c 'trap "" PIPE; { { printf "a\n"; sleep 0.05; printf "b\n"; } | head -n1; } 2>&1 1>/dev/null'
+    # head -n1 closes early -> the second printf reports a write error.
+    [ -n "$output" ]
+
+    run bash -c 'trap "" PIPE; { { printf "a\n"; sleep 0.05; printf "b\n"; } | sed -n 1p; } 2>&1 1>/dev/null'
+    # sed -n 1p drains to EOF -> no closed pipe -> clean.
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# Fixture helpers: a hooks.json command in the pristine upstream form
+# (`break; }; done`) and in the BUG-017-healed form (`}; done | head -n1`).
+_write_break_form() {
+    # Terminator is a bare `"` after the verb -- the JSON string-closing quote,
+    # which is what the real (pre-BUG-018) hooks.json carries and what the
+    # directive substitution keys on.
+    printf '%s\n' \
+'{ "command": "_P=$({ ls -dt X 2>/dev/null; printf Y; } | while IFS= read -r _R; do [ -f Z ] && { printf '"'"'%s\n'"'"' \"$_R\"; break; }; done); node B hook claude-code session-init" }' \
+        > "$1"
+}
+_write_headn1_form() {
+    # Already BUG-017-healed AND BUG-018-directive applied (current deployed shape).
+    printf '%s\n' \
+'{ "command": "_P=$({ ls -dt X 2>/dev/null; printf Y; } | while IFS= read -r _R; do [ -f Z ] && { printf '"'"'%s\n'"'"' \"$_R\"; }; done | head -n1); node B hook claude-code observation 2>/dev/null; echo '"'"'{\"continue\":true}'"'"'" }' \
+        > "$1"
+}
+
+@test "heal_hooks_json converts the pristine break;}done form to sed -n 1p (AC2)" {
+    _source_heal
+    f="$TMP/break.hooks.json"
+    _write_break_form "$f"
+    run heal_hooks_json "$f"
+    [ "$status" -eq 0 ]
+    grep -qF 'sed -n 1p' "$f"
+    ! grep -qF 'head -n1' "$f"
+    # BUG-018 continue-directive applied to the session-init terminator.
+    grep -qF 'session-init 2>/dev/null' "$f"
+}
+
+@test "heal_hooks_json converts the already-head-n1 form to sed -n 1p (AC2)" {
+    _source_heal
+    f="$TMP/headn1.hooks.json"
+    _write_headn1_form "$f"
+    run heal_hooks_json "$f"
+    [ "$status" -eq 0 ]
+    grep -qF 'sed -n 1p' "$f"
+    ! grep -qF 'head -n1' "$f"
+}
+
+@test "heal_hooks_json is idempotent: re-healing the fixed form is a silent no-op (AC4)" {
+    _source_heal
+    f="$TMP/idem.hooks.json"
+    _write_break_form "$f"
+    heal_hooks_json "$f" >/dev/null
+    first="$(cat "$f")"
+    run heal_hooks_json "$f"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(cat "$f")" = "$first" ]
+}

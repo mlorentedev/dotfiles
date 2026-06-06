@@ -141,50 +141,48 @@ heal_zod() {
     log "installed missing zod dep in $plugin_dir"
 }
 
-# BUG-017 (2026-05-21): patch hooks.json against the same EPIPE race that
-# BUG-016 closed for .mcp.json. The 6 upstream hooks (Setup, SessionStart x2,
-# UserPromptSubmit, PostToolUse, PreToolUse, Stop) all use the
-# `{ printf; ls; printf; } | while ... break` pipe cascade. When the consumer
-# breaks early, unconsumed producer writes EPIPE on Git Bash Windows.
-# Minimal substitution: `break; }; done` -> `}; done | head -n1` keeps the
-# loop running to completion, then head takes the first printed match.
+# BUG-017 (2026-05-21) + 2026-05-27-claude-mem-heal-consumer-epipe (2026-06-06):
+# rewrite the path-resolution pipe so the consumer never closes early while the
+# inner `while` is still writing. BUG-017 used `... }; done | head -n1`, but
+# `head -n1` IS an early-closing consumer: with >=2 matching candidates (a cache
+# version dir AND the marketplace junction) the loop writes a 2nd line after head
+# has closed its stdin -> consumer-side EPIPE. Node ignores SIGPIPE and Claude
+# Code spawns hooks with that disposition, so the failed write is REPORTED
+# (`printf: write error`) instead of dying silently, surfacing as a hook-error
+# banner on every tool call. Fix: `sed -n 1p` prints only line 1 but reads to
+# EOF (no early `q`), draining the writer so it never closes under it. We
+# normalise BOTH the pristine upstream form (`break; }; done`) and any
+# already-deployed `}; done | head -n1` form, so existing installs converge on
+# the next session with no `/plugin update`.
 #
-# BUG-018 (2026-05-21): after BUG-017 closed the EPIPE race, the
-# UserPromptSubmit hook STILL blocked because its command terminates with
-# `node ... hook claude-code session-init` and does NOT emit Claude Code's
-# `{"continue":true,"suppressOutput":true}` directive. bun-runner.js's
-# empty-stdin diagnostic (upstream claude-mem#2188) goes to stdout, Claude
-# Code reads it as non-continue, blocks the prompt. Heal appends the
-# directive in the same pass.
+# BUG-018 (2026-05-21): hooks terminating with `hook claude-code <X>"` lack
+# Claude Code's `{"continue":true,"suppressOutput":true}` directive; bun-runner's
+# empty-stdin diagnostic (upstream claude-mem#2188) then blocks the operation.
+# Append the directive in the same pass, generic across all 5 hot-path hooks
+# (session-init / context / observation / file-context / summarize). The Setup
+# hook (`version-check.js`) is left untouched -- not on the user hot path.
 heal_hooks_json() {
     target="$1"
     [ -f "$target" ] || { verbose "no hooks.json at $target"; return 0; }
-    # Detect either BUG-017 signature (break; }; done) or BUG-018 signature
-    # (UserPromptSubmit terminator without the continue directive).
-    has_017=$(grep -cF 'break; }; done' "$target" 2>/dev/null || echo 0)
-    has_018=$(grep -cE 'session-init"$|session-init"[^}]*$' "$target" 2>/dev/null | head -1)
-    has_018=${has_018:-0}
-    # Simpler: also check explicitly for the un-patched session-init terminator.
+    # Heal when any signature is present: the pristine EPIPE pipe
+    # (`break; }; done`), the BUG-017-era `head -n1` consumer, or a missing
+    # BUG-018 directive (un-patched `session-init"` terminator).
     if ! grep -qF 'break; }; done' "$target" && \
+       ! grep -qF 'head -n1' "$target" && \
        ! grep -qF 'session-init"' "$target"; then
         verbose "hooks.json already healthy: $target"
         return 0
     fi
-    # Use `#` as sed delimiter -- `|` appears literally in the replacement
-    # (`done | head -n1`) and would confuse `s|...|...|g`.
-    #
-    # BUG-018 substitution is GENERIC across all 5 `hook claude-code <X>"`
-    # terminators (UserPromptSubmit/session-init, SessionStart/context,
-    # PostToolUse/observation, PreToolUse/file-context, Stop/summarize).
-    # The user empirically hit UserPromptSubmit first (BUG-018 narrow scope)
-    # then Stop minutes later (originally deferred as BUG-018b -- now folded
-    # in via regex capture). Setup hook (`version-check.js`) is left untouched:
-    # it only fires on plugin install/update, not user hot path.
+    # `#` sed delimiter -- `|` appears literally in the replacements. `sed -n 1p`
+    # carries no quotes/backslashes/newlines, so it is safe both inside this
+    # single-quoted sed script and inside the hook's JSON string. The two EPIPE
+    # substitutions converge the pristine and head-n1 forms onto the same drain.
     tmp="$target.tmp.$$"
-    sed -e 's#break; }; done#}; done | head -n1#g' \
+    sed -e 's#break; }; done#}; done | sed -n 1p#g' \
+        -e 's#}; done | head -n1#}; done | sed -n 1p#g' \
         -e 's#hook claude-code \([a-z][a-z-]*\)"#hook claude-code \1 2>/dev/null; echo '\''{\\"continue\\":true,\\"suppressOutput\\":true}'\''"#g' \
         "$target" > "$tmp" && mv "$tmp" "$target"
-    log "patched hooks.json (BUG-017 head-n1 + BUG-018 continue-directive on all 5 hooks): $target"
+    log "patched hooks.json (EPIPE drain sed -n 1p + BUG-018 continue-directive): $target"
 }
 
 # BUG-019 (2026-06-05): the claude-mem SessionStart "context" hook injects a
