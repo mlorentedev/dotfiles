@@ -42,33 +42,45 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```text
 ├── setup-linux.sh              # Linux setup (symlinks); macOS planned
 ├── setup-windows.ps1           # Windows setup (copies)
-├── scripts/                    # Shell utilities (added to PATH)
-│   ├── utils.sh                # Shared function library
-│   ├── load-secrets.sh         # Secrets → env vars (Linux, sourced at login)
-│   ├── load-secrets.ps1        # Secrets → env vars (Windows)
-│   ├── dotfiles-sync.sh        # Bidirectional sync (Linux)
-│   ├── dotfiles-sync.ps1       # Bidirectional sync (Windows)
-│   ├── claude-session-start.sh # Claude SessionStart hook (Linux)
-│   ├── claude-session-start.ps1# Claude SessionStart hook (Windows)
-│   ├── init-project.sh         # Project bootstrapper (bash)
-│   ├── init-project.ps1        # Project bootstrapper (PowerShell)
-│   ├── github-secrets-manager.sh
-│   └── age-encrypt-decrypt.sh
+├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
+│   ├── utils.sh                # Shared function library (sourced by other scripts)
+│   ├── load-secrets.sh / .ps1  # Secrets → env vars (sourced at login)
+│   ├── init-project.sh / .ps1  # Project bootstrapper
+│   ├── healthcheck.sh / .ps1   # Post-setup verification
+│   ├── vault.sh                # Vault tooling dispatcher
+│   └── …                       # 31 more scripts (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets
 │   ├── env-mapping.conf        # ENV_VAR=filename mapping
 │   └── *.secret.age            # Encrypted files (tracked)
 ├── AGENTS.md                   # Cross-agent SSOT (canonical system prompt)
 ├── ai/
 │   ├── claude/CLAUDE.md        # Claude Code extensions (pointer to AGENTS.md)
-│   ├── gemini/GEMINI.md        # Gemini extensions (pointer to AGENTS.md)
+│   ├── agy/AGY.md              # Gemini/AGY extensions (pointer to AGENTS.md)
 │   ├── copilot/                # Copilot extensions (pointer to AGENTS.md)
 │   ├── opencode/opencode.jsonc # OpenCode config (Go + OpenRouter providers + MCP)
-│   └── skills/                 # 21 shared AI skills
+│   └── harness/skills/         # 31 shared AI skills (deployed by compile-harness)
 ├── ssh/                        # SSH config + public key
 ├── powershell/profile.ps1      # Windows PowerShell profile
 ├── tests/*.bats                # BATS test suite
 └── .zsh/                       # Zsh modules
 ```
+
+## Human entrypoints
+
+Scripts in `scripts/` are **not on PATH**. They are invoked via shell aliases (defined in
+`.zsh/aliases.zsh` and `.bashrc`) or sourced at login. The table below lists the ~8
+scripts that a human ever runs directly — everything else is a library, hook, or CI helper.
+
+| Alias / command | Script | What it does |
+|---|---|---|
+| `./setup-linux.sh` | `setup-linux.sh` | Bootstrap Linux: install tools, deploy configs, register MCPs |
+| `.\setup-windows.ps1` | `setup-windows.ps1` | Bootstrap Windows: same, via PowerShell |
+| `hc` | `scripts/healthcheck.sh` | Post-setup verification (versions, paths, symlinks, env vars) |
+| `project-init <name> <stack>` | `scripts/init-project.sh` | Bootstrap a new project with dual AI config |
+| `vault <subcommand>` | `scripts/vault.sh` | Vault tooling: `vault health`, `vault maintenance`, `vault check-escapes` |
+| `profile-shell` | `scripts/shell-profile.sh` | Measure shell startup time (zsh/bash, --detail for per-function) |
+| `obs` | `scripts/obs-cli.sh` | Open Obsidian vault (Linux, --no-sandbox, GUI check) |
+| `. scripts/load-secrets.sh` | `scripts/load-secrets.sh` | Decrypt age secrets → env vars (auto-sourced at login; manual when adding a new secret) |
 
 ## Key Commands
 
