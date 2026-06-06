@@ -191,13 +191,19 @@ function Repair-ZodDep {
     }
 }
 
-# BUG-017 (2026-05-21): patch hooks.json against the same EPIPE race that
-# BUG-016 closed for .mcp.json. The 6 upstream hooks (Setup, SessionStart x2,
-# UserPromptSubmit, PostToolUse, PreToolUse, Stop) all use the
-# `{ printf; ls; printf; } | while ... break` pipe cascade. When the consumer
-# breaks early, unconsumed producer writes EPIPE on Git Bash Windows.
-# Minimal substitution: `break; }; done` -> `}; done | head -n1` keeps the
-# loop running to completion, then head takes the first printed match.
+# BUG-017 (2026-05-21) + 2026-05-27-claude-mem-heal-consumer-epipe (2026-06-06):
+# rewrite the path-resolution pipe so the consumer never closes early while the
+# inner `while` is still writing. BUG-017 used `}; done | head -n1`, but
+# `head -n1` IS an early-closing consumer: with >=2 matching candidates the loop
+# writes a 2nd line after head has closed its stdin -> consumer-side EPIPE. Node
+# ignores SIGPIPE and Claude Code spawns hooks with that disposition, so the
+# failed write is REPORTED (`printf: write error`) instead of dying silently,
+# surfacing as a hook-error banner on every tool call. Fix: `sed -n 1p` prints
+# only line 1 but reads to EOF (no early `q`), draining the writer so it never
+# closes under it. Normalise BOTH the pristine upstream form (`break; }; done`)
+# and any already-deployed `}; done | head -n1` form, so existing installs
+# converge on the next session with no `/plugin update`. Mirrors
+# scripts/claude-mem-heal.sh::heal_hooks_json.
 function Repair-HooksJson {
     param([string]$Target)
 
@@ -208,31 +214,41 @@ function Repair-HooksJson {
     $content = Get-Content $Target -Raw -ErrorAction SilentlyContinue
     if (-not $content) { return }
 
-    $broken017 = 'break; }; done'
-    $fixed017  = '}; done | head -n1'
+    # EPIPE drain: converge both the pristine pipe and the BUG-017-era head -n1
+    # consumer onto `sed -n 1p` (prints line 1 but reads to EOF -> no early close).
+    $brokenBreak  = 'break; }; done'
+    $brokenHeadN1 = '}; done | head -n1'
+    $drainForm    = '}; done | sed -n 1p'
     # BUG-018: ALL hooks that terminate with `hook claude-code <X>"` lack
     # Claude Code's {"continue":true,"suppressOutput":true} directive. The
     # bun-runner empty-stdin diagnostic (upstream claude-mem#2188) goes to
-    # stdout and Claude Code blocks the operation. User empirically hit
-    # UserPromptSubmit first and Stop minutes later -- regex captures all
-    # 5 (session-init / context / observation / file-context / summarize).
-    # Setup hook's version-check.js terminator is left untouched -- not on
-    # the user hot path (fires only on plugin install/update).
+    # stdout and Claude Code blocks the operation. Regex captures all 5
+    # (session-init / context / observation / file-context / summarize). The
+    # Setup hook's version-check.js terminator is left untouched -- not on the
+    # user hot path (fires only on plugin install/update).
     $pattern018     = 'hook claude-code ([a-z][a-z-]*)"'
     $replacement018 = 'hook claude-code $1 2>/dev/null; echo ''{\"continue\":true,\"suppressOutput\":true}''"'
 
-    $has017 = $content.Contains($broken017)
-    $has018 = $content -match $pattern018
-    if (-not $has017 -and -not $has018) {
+    $hasBreak  = $content.Contains($brokenBreak)
+    $hasHeadN1 = $content.Contains($brokenHeadN1)
+    $has018    = $content -match $pattern018
+    if (-not $hasBreak -and -not $hasHeadN1 -and -not $has018) {
         Write-HealVerbose "hooks.json already healthy: $Target"
         return
     }
 
     $patched = $content
-    if ($has017) {
-        $count017 = ([regex]::Matches($patched, [regex]::Escape($broken017))).Count
-        $patched = $patched.Replace($broken017, $fixed017)
-        Write-HealLog "patched hooks.json (BUG-017, $count017 hook(s) -> head -n1 race-free form): $Target"
+    $epipeFixed = 0
+    if ($hasBreak) {
+        $epipeFixed += ([regex]::Matches($patched, [regex]::Escape($brokenBreak))).Count
+        $patched = $patched.Replace($brokenBreak, $drainForm)
+    }
+    if ($hasHeadN1) {
+        $epipeFixed += ([regex]::Matches($patched, [regex]::Escape($brokenHeadN1))).Count
+        $patched = $patched.Replace($brokenHeadN1, $drainForm)
+    }
+    if ($epipeFixed -gt 0) {
+        Write-HealLog "patched hooks.json (EPIPE drain, $epipeFixed hook(s) -> sed -n 1p): $Target"
     }
     if ($has018) {
         $count018 = ([regex]::Matches($patched, $pattern018)).Count
