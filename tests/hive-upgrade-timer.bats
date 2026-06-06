@@ -94,7 +94,7 @@ setup() {
 # `[version]$hiveVer -ge [version]'1.32.0'` branch (after that check).
 @test "setup-windows.ps1 hive-upgrade task is inside the version gate" {
     gate_line=$(grep -n "ge \[version\]'1.32.0'" "$DOTFILES_DIR/setup-windows.ps1" | head -1 | cut -d: -f1)
-    task_line=$(grep -n 'Register-ScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1" | head -1 | cut -d: -f1)
+    task_line=$(grep -n 'Register-HiveScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1" | head -1 | cut -d: -f1)
     [ -n "$gate_line" ] && [ -n "$task_line" ]
     [ "$task_line" -gt "$gate_line" ]
 }
@@ -105,6 +105,33 @@ setup() {
     [ -n "$block" ]
     printf '%s' "$block" | LC_ALL=C grep -nP '[^\x00-\x7F]' && return 1
     return 0
+}
+
+# dotfiles#230: hive Scheduled Tasks must run windowless. A task registered with
+# no explicit principal defaults to the Interactive logon type, runs in the
+# desktop session, and pops a console window every 15-min tick. An S4U principal
+# runs the task in session 0 (no desktop -> no window), with no admin rights.
+@test "setup-windows.ps1 registers hive tasks windowless via an S4U helper" {
+    grep -qF 'function Register-HiveScheduledTask' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF -- '-LogonType S4U' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+# The upgrade task must go through the helper (S4U guaranteed), never the bare
+# Register-ScheduledTask (which would default to the windowed Interactive logon).
+@test "setup-windows.ps1 routes the hive-upgrade task through the S4U helper" {
+    grep -qF 'Register-HiveScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1"
+    ! grep -qF 'Register-ScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+@test "setup-windows.ps1 hive-upgrade action is windowless (-WindowStyle Hidden)" {
+    grep -qF -- '-WindowStyle Hidden' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+# Re-running setup on a box that still has the old Interactive task must repair
+# the principal -- the idempotence check has to inspect the logon type, not just
+# the action's Execute/Arguments.
+@test "setup-windows.ps1 self-heals a drifted (non-S4U) hive-upgrade principal" {
+    grep -qF '$existingHiveLogon -eq "S4U"' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- Windows daemon upgrade orchestration (ADR-015 / hive#176) ---
