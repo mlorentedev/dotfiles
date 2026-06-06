@@ -25,7 +25,7 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 ## Standing Orders (Non-Negotiable)
 
 1. **Automate, don't instruct.** If a task is repeatable, encode it: shell script, Makefile, Python CLI, IaC (Terraform/Ansible), CI pipeline, or whatever fits the project stack. Never give manual steps for repeatable work.
-2. **SSOT.** One source of truth per datum; never duplicate. Code lives in git. **Knowledge placement is by layer, not project type** (`pattern-knowledge-placement`): **decide/position → the store** (vault `00_meta/`) — patterns, AI memory, cross-project lessons, strategic backlog; **build/operate → the repo** — ADRs (`docs/adr/`), runbooks, troubleshooting, project lessons (`docs/lessons.md`), specs (`specs/`); **collaborate → the forge** — tasks/roadmap as GitHub issues/Project. The store links *out* to repos; repos never depend on the store. The only personal-vs-work residual is *where the cross-project brain lives* (personal vault vs a team store) and *whether tasks sit on a shared board* — declared per repo in the **Knowledge Placement** block below (defaults: personal vault + this repo's issues). Full model: `pattern-knowledge-placement`; team governance: `pattern-platform-governance`.
+2. **SSOT.** One source of truth per datum; never duplicate. Code lives in git. **Knowledge placement is by layer, not project type** (`pattern-knowledge-placement`): **decide/position → the store** (vault `00_meta/`) — patterns, AI memory, cross-project lessons; **build/operate → the repo** — ADRs (`docs/adr/`), runbooks, troubleshooting, project lessons (`docs/lessons.md`), specs (`specs/`); **collaborate → the forge** — tasks/roadmap as GitHub issues/Project (user-level cross-repo "bitácora"). The store links *out* to repos; repos never depend on the store. Task state does NOT live in the vault (see [ADR-018](docs/adr/adr-018-de-vault-task-placement.md)). The only personal-vs-work residual is *where the cross-project brain lives* (personal vault vs a team store) and *which cross-repo Project board aggregates tasks* — declared per repo in the **Knowledge Placement** block below. Full model: `pattern-knowledge-placement`; team governance: `pattern-platform-governance`.
 3. **Knowledge hygiene — in-session, not "later".** Route by decide-vs-operate (#2): bug fix -> repo `docs/troubleshooting/`; architecture decision -> repo `docs/adr/`; project lesson/trick -> repo `docs/lessons.md`. Only **cross-project** (pattern-worthy) insight -> vault (`00_meta/` patterns, or `90-lessons.md` for methodology); AI memory/handoffs -> always vault. Do it in-session, not "later". Tools that default to vault output (e.g. the `architecture-session` workflow, `capture_lesson`) must target the repo for **any repo on the knowledge-placement model** (any repo with `docs/`), not just "work" repos.
 4. **Clean as you go.** Dead code, stale comments, orphan files -- fix them when you see them. Don't defer trivial fixes.
 5. **Consult patterns before architectural decisions.** 37 universal patterns in `00_meta/patterns/`. Query via Hive MCP (when available) or read from `~/Projects/knowledge/00_meta/patterns/<name>.md` (Linux/macOS) / `%USERPROFILE%\Projects\knowledge\00_meta\patterns\<name>.md` (Windows).
@@ -230,9 +230,9 @@ Stop generation and warn if you detect:
 Placement follows `pattern-knowledge-placement` (decide-vs-operate, Standing Order #2). Two values vary per repo; everything else is fixed by layer:
 
 - **brain:** `vault:00_meta/` — the cross-project store (default: personal vault). A team repo overrides to its shared store.
-- **tasks:** `repo:issues` — tactical work tracking (default: this repo's GitHub issues). A team repo may use a shared Project board.
+- **tasks:** `project:bitácora` — user-level private cross-repo GitHub Project. Issue-closed→Done is automatic (built-in workflow). Per-repo auto-add wired via `.github/workflows/add-to-project.yml` (requires PAT with `project` scope in the age-secrets store). See [ADR-018](docs/adr/adr-018-de-vault-task-placement.md).
 
-Defaults = personal solo project (this repo). Build/operate docs always live in this repo's `docs/`; only the two values above are context-dependent.
+Defaults = personal solo project (this repo). Build/operate docs always live in this repo's `docs/`; only the two values above are context-dependent. **The vault no longer holds task state** (no `11-tasks.md`); the cross-project brain and AI memory remain in the vault.
 
 ## "Neural Hive" Protocol (The Loop)
 
@@ -247,7 +247,7 @@ Defaults = personal solo project (this repo). Build/operate docs always live in 
 2. **Master Map:** If unsure about structure, read `knowledge/README.md`.
 3. **Project Context:** Read `10_projects/<repo>/00-context.md`.
 4. **Global Rules:** Read relevant `00_meta/patterns/*.md`.
-5. **Tactical Plan:** Read `10_projects/<repo>/11-tasks.md` (Active Backlog).
+5. **Tactical Plan:** Check the **bitácora** GitHub Project (user-level, cross-repo) for active backlog items. Filter by `Repo` field to see this repo's items. If offline, fall back to open GitHub issues.
 
 ### Phase 2: Execution (The Work)
 
@@ -263,7 +263,7 @@ Defaults = personal solo project (this repo). Build/operate docs always live in 
 
 ### Phase 3: Knowledge Crystallization (Write Back)
 
-* **Backlog (`11-tasks.md`):** Mark items `[x]` and update the Progress Bar.
+* **Backlog (bitácora):** Close the GitHub issue — the built-in workflow moves it to Done automatically. No manual vault update needed.
 * **Strategy (`10-roadmap.md`):** ONLY if a major milestone is completed.
 * **Lessons:** project-specific → repo `docs/lessons.md`; cross-project / methodology → vault `90-lessons.md` (Lesson Template).
 * **Promotion:** If the solution is generic, create `00_meta/patterns/pattern-<topic>.md`.
@@ -383,8 +383,8 @@ Before creating ANY branch for code changes in this repo, evaluate against `patt
 
 **If trigger met, follow this order — no shortcuts:**
 
-1. Add vault entry to `10_projects/<repo>/11-tasks.md` (the "vault gate")
-2. Run `init-spec.{sh,ps1} <feature-id>` to scaffold `specs/<feature-id>/` (the script enforces the vault-gate check; bypass only with `-ForceNoVault` + explicit user-facing justification)
+1. Open a GitHub issue (or reuse an existing one) and add it to the **bitácora** Project — this is the "work gate" replacing the former vault `11-tasks.md` entry
+2. Run `init-spec.{sh,ps1} <feature-id>` to scaffold `specs/<feature-id>/` (the script enforces the work-gate check; bypass only with `-ForceNoVault` + explicit user-facing justification)
 3. Fill `proposal.md` (why + what + acceptance criteria) **before** writing implementation code
 4. Fill `tasks.md` in TDD order
 5. Implement; tick boxes as you go
@@ -425,7 +425,7 @@ These rules **counter agent harness defaults** that would otherwise silently win
 - **No internal phase/milestone references** in branch names, commit messages, or PR titles.
   - Bad: `feat/phase-3.1-scaffold`, `chore: scaffold repo (Phase 3.1)`
   - Good: `feat/scaffold-pyhydra3d`, `chore: scaffold PyHydra3D repository`
-- Phase tracking belongs in the vault backlog (`11-tasks.md`), not in git history.
+- Phase tracking belongs in the **bitácora** GitHub Project (open issues / Project items), not in git history.
 <!-- END HARNESS GENERATED -->
 
 ### Interaction Discipline
