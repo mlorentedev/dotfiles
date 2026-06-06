@@ -27,5 +27,5 @@ created: "2026-06-05"
 
 - [x] Every AC (1-5) covered by at least one test; AC6 is user-empirical
 - [x] JSONC/JSON validated; shellcheck on setup-linux.sh
-- [ ] `verification.md` filled with evidence (test output + AC6 left for user)
-- [ ] PR opened referencing this spec folder
+- [x] `verification.md` filled with evidence (test output + AC6 user-confirmed 2026-06-05)
+- [x] PR opened referencing this spec folder (PR #226, commit `9e31ae3`)
