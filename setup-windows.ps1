@@ -138,6 +138,29 @@ function Backup-AndRestoreClaudeJson {
     }
 }
 
+# ADR-015 / dotfiles#230: single registration point for hive Scheduled Tasks so
+# they ALWAYS run windowless. A task registered without an explicit principal
+# defaults to the Interactive logon type, which runs in the user's desktop
+# session and pops a console window every tick for a powershell.exe action. An
+# S4U principal ("run whether the user is logged on or not", no stored password,
+# no admin) runs the task in session 0 -- the non-interactive session with no
+# desktop -- so no window can appear. This matches the daemon task, which hive's
+# own render_windows_task_xml already registers as S4U. Route every hive task
+# through here so the windowless guarantee cannot be forgotten on a future task.
+function Register-HiveScheduledTask {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$TaskName,
+        [Parameter(Mandatory)]$Action,
+        [Parameter(Mandatory)]$Trigger,
+        [Parameter(Mandatory)]$Settings,
+        [Parameter(Mandatory)][string]$Description
+    )
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Limited
+    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
+        -Settings $Settings -Principal $principal -Description $Description -Force | Out-Null
+}
+
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,
@@ -441,12 +464,15 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     # does NOT call `uv tool upgrade` directly -- it runs the orchestration script
     # (only-if-newer -> defer-if-locked -> stop daemon -> upgrade -> start),
     # deployed from the dotfiles SSOT. Cadence matches Linux: every 15 min.
-    # Self-healing: re-register when the action Execute/Arguments drift.
+    # Self-healing: re-register when the action OR the S4U principal drift, so a
+    # box that still has the old Interactive (windowed) task gets repaired.
     $hiveUvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
     $hiveUpgradeTask = "DotfilesHiveUpgrade"
     $hiveUpgradeSrc = Join-Path $DotfilesDir "windows\hive-upgrade.ps1"
     $hiveUpgradeDst = Join-Path $ClaudeHome "scripts\hive-upgrade.ps1"
-    $hiveUpgradeArg = "-NoProfile -ExecutionPolicy Bypass -File `"$hiveUpgradeDst`""
+    # -WindowStyle Hidden is belt-and-suspenders; the S4U principal applied by
+    # Register-HiveScheduledTask (session 0) is what actually guarantees no window.
+    $hiveUpgradeArg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$hiveUpgradeDst`""
     if (Test-Path $hiveUpgradeSrc) {
         Ensure-Directory (Split-Path $hiveUpgradeDst -Parent)
         Copy-Item $hiveUpgradeSrc $hiveUpgradeDst -Force
@@ -456,11 +482,13 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     $existingHiveTask = Get-ScheduledTask -TaskName $hiveUpgradeTask -ErrorAction SilentlyContinue
     $existingHiveArg = $null
     $existingHiveExe = $null
+    $existingHiveLogon = $null
     if ($existingHiveTask -and $existingHiveTask.Actions -and $existingHiveTask.Actions[0]) {
         $existingHiveArg = $existingHiveTask.Actions[0].Arguments
         $existingHiveExe = $existingHiveTask.Actions[0].Execute
+        if ($existingHiveTask.Principal) { $existingHiveLogon = "$($existingHiveTask.Principal.LogonType)" }
     }
-    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg)) {
+    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg) -and ($existingHiveLogon -eq "S4U")) {
         Write-Info "hive-upgrade task already correctly configured, skipping"
     } else {
         try {
@@ -468,10 +496,10 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
             $hiveTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
                 -RepetitionInterval (New-TimeSpan -Minutes 15)
             $hiveSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
-            Register-ScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
+            Register-HiveScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
                 -Settings $hiveSettings `
-                -Description "hive-vault auto-upgrade every 15 min (ADR-015 orchestrated stop-before-upgrade; feeds hive serve restart-on-upgrade)" -Force | Out-Null
-            Write-Success "Installed hive-upgrade task (15-min, v$hiveVer)"
+                -Description "hive-vault auto-upgrade every 15 min (ADR-015 orchestrated stop-before-upgrade; feeds hive serve restart-on-upgrade)"
+            Write-Success "Installed hive-upgrade task (15-min, windowless S4U, v$hiveVer)"
             if (-not (Test-Path $hiveUvExe)) {
                 Write-Warn "hive-upgrade task registered but uv not found at $hiveUvExe"
             }
