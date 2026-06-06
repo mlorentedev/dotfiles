@@ -123,27 +123,19 @@ function gp() {
     agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
 }
 
-# qq / qf: one-shot opencode wrappers. Mirrors .zsh/aliases.zsh for bash users.
-# Bash leaves `foo?` literal when no match exists (no zsh-style nomatch error),
-# so no `noglob` wrapper is needed here.
+# qq / qf: bash quick-question wrappers. `_qq_call` lives in .zsh/functions.sh
+# (REFACTOR-010, shared with zsh). Bash leaves `foo?` literal when no match
+# exists (no zsh-style nomatch error), so no `noglob` wrapper is needed here.
 #   qq -> nan/qwen3.6           (default daily, multilingual, 262K ctx)
 #   qf -> nan/deepseek-v4-flash (long-context 500K)
-_qq_call() {
-    local model="$1" name="$2"; shift 2
-    [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
-    opencode run -m "$model" "$*"
-}
 qq() { _qq_call nan/qwen3.6 qq "$@"; }
 qf() { _qq_call nan/deepseek-v4-flash qf "$@"; }
 
-# oc / ocfull: opencode TUI dispatch. --pure bypasses MCPs+skills+plugins,
-# avoiding the tool-resolution hang on complex queries (empirical 2026-05-25).
-alias oc='opencode --pure'
-alias ocfull='opencode'
+# oc / ocfull moved to .zsh/functions.sh (REFACTOR-010, shared bash/zsh core).
 
 # dbg: deepseek con reasoning chain VISIBLE (opencode TUI oculta reasoning_content).
-# Mirror de .zsh/aliases.zsh. Mismo script subyacente.
-dbg() { /home/manu/Projects/dotfiles/scripts/nan-debug.sh "$@"; }
+# Mirror de .zsh/aliases.zsh. Mismo script subyacente (nan-debug.sh on PATH).
+dbg() { nan-debug.sh "$@"; }
 
 # Claude Code - use slash commands inside session:
 #   claude
