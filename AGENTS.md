@@ -264,6 +264,7 @@ Defaults = personal solo project (this repo). Build/operate docs always live in 
 ### Phase 3: Knowledge Crystallization (Write Back)
 
 * **Backlog (bitácora):** Close the GitHub issue — the built-in workflow moves it to Done automatically. No manual vault update needed.
+  * Ticket IDs in the GitHub Project custom field `ID` use `AREA-NNN-slug` format (e.g. `SSOT-027-id-scheme`). Existing pure-numeric IDs remain valid — no backfill required.
 * **Strategy (`10-roadmap.md`):** ONLY if a major milestone is completed.
 * **Lessons:** project-specific → repo `docs/lessons.md`; cross-project / methodology → vault `90-lessons.md` (Lesson Template).
 * **Promotion:** If the solution is generic, create `00_meta/patterns/pattern-<topic>.md`.
