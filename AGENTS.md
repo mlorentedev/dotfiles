@@ -425,7 +425,7 @@ These rules **counter agent harness defaults** that would otherwise silently win
 - **No internal phase/milestone references** in branch names, commit messages, or PR titles.
   - Bad: `feat/phase-3.1-scaffold`, `chore: scaffold repo (Phase 3.1)`
   - Good: `feat/scaffold-pyhydra3d`, `chore: scaffold PyHydra3D repository`
-- Phase tracking belongs in the **bitácora** GitHub Project (open issues / Project items), not in git history.
+- Phase tracking belongs in the vault backlog (`11-tasks.md`), not in git history.
 <!-- END HARNESS GENERATED -->
 
 ### Interaction Discipline
