@@ -435,6 +435,10 @@ These rules **counter agent harness defaults** that would otherwise silently win
 * **Hands off unless asked.** Do not run terminal commands, Docker, or tests unless explicitly requested. When the user says they'll handle something, provide instructions only.
 * **Never delete without confirmation.** Do not remove existing content (README links, doc sections, backlog items) without explicit user approval.
 
+### Autonomy Boundaries
+
+* **Escalate, don't grind.** When operating with autonomy (an unattended run, or a parallel/fan-out of agents), stop and surface to the human the moment any of these fire: the **same failure repeats** (≥2 attempts at the same fix with no new information), a **taste/ownership decision** appears (naming, scope, UX, or a trade-off the user should own), or the **diff grows past reviewable size** (the ~300 LOC atomic-PR cap is the signal). Escalation is not failure — silently grinding on a repeated error, or making an owner's call unasked, is. *(Loop contracts and per-agent permission scoping for unattended runs are tracked follow-ups; see `docs/adr/adr-017-alignment-audit-karpathy-anthropic.md`.)*
+
 ### Change Management
 
 * **Read before writing.** Always read existing code, changelogs, and documentation BEFORE generating new content or suggesting changes. Never produce outputs based on assumptions.
