@@ -34,8 +34,10 @@ setup() {
 
 # --- OpenCode alias (replaces aider tiers, sunset) ---
 
-@test "aliases.zsh defines oc alias for opencode (SDD-007: --pure default)" {
-    grep -qE '^alias oc="opencode( --pure)?"' "$ALIASES_FILE"
+@test "aliases.zsh no longer defines oc/ocfull (moved to .zsh/functions.sh, REFACTOR-010)" {
+    # oc/ocfull are now shared bash/zsh functions in .zsh/functions.sh.
+    # Positive coverage lives in tests/shell-wrapper-dedup.bats.
+    ! grep -qE '^alias (oc|ocfull)=' "$ALIASES_FILE"
 }
 
 @test "aliases.zsh defines oclog alias for live opencode log tailing" {
@@ -69,14 +71,6 @@ setup() {
 # the null-coalescing operator; this is the cross-platform compromise.
 # zsh aliases use `noglob` so `qq por que tardas tanto?` works without quotes.
 
-@test "aliases.zsh defines oc as opencode --pure (avoid MCP tool-resolution hang)" {
-    grep -qE '^alias oc="opencode --pure"' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh defines ocfull for explicit MCP/skills mode" {
-    grep -qE '^alias ocfull="opencode"' "$ALIASES_FILE"
-}
-
 @test "aliases.zsh defines qq alias pinning nan/qwen3.6 via noglob" {
     grep -qE "^alias qq='noglob _qq_call nan/qwen3.6" "$ALIASES_FILE"
 }
@@ -85,14 +79,10 @@ setup() {
     grep -qE "^alias qf='noglob _qq_call nan/deepseek-v4-flash" "$ALIASES_FILE"
 }
 
-@test "aliases.zsh _qq_call helper invokes opencode run" {
-    grep -qE '^_qq_call\(\)' "$ALIASES_FILE"
-    grep -qF 'opencode run' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh _qq_call prints usage when called with no args" {
-    # Single usage string parameterized by the alias name ($name).
-    grep -qF 'usage: %s' "$ALIASES_FILE"
+@test "aliases.zsh no longer defines _qq_call body (moved to .zsh/functions.sh, REFACTOR-010)" {
+    # The qq/qf noglob aliases stay here but reference the shared _qq_call,
+    # which now lives once in .zsh/functions.sh (sourced by both shells).
+    ! grep -qE '^_qq_call\(\)' "$ALIASES_FILE"
 }
 
 @test "aliases.zsh no longer defines ghcs/ghce (renamed in BUG-003)" {

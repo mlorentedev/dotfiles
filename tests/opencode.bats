@@ -160,11 +160,12 @@ setup() {
 
 # --- Alias ---
 
-@test ".zsh/aliases.zsh has oc alias for opencode (--pure: skip MCPs/plugins)" {
+@test ".zsh/functions.sh defines oc for opencode (--pure: skip MCPs/plugins) [REFACTOR-010]" {
     # --pure bypasses MCP+plugins to avoid the tool-resolution hang on complex
-    # queries (empirical 2026-05-25). Mirror in .bashrc and powershell/profile.ps1.
-    # Hypothesis still under investigation: hang may be Ghostty-on-Linux specific.
-    grep -q '^alias oc="opencode --pure"' "$ALIASES_FILE"
+    # queries (empirical 2026-05-25). Shared bash/zsh core in functions.sh;
+    # Windows keeps plain opencode (see powershell-profile.bats). Moved out of
+    # aliases.zsh per REFACTOR-010 to dedup the bash/zsh wrappers.
+    grep -qE '^oc\(\) \{ opencode --pure' "$DOTFILES_DIR/.zsh/functions.sh"
 }
 
 # --- AGENTS.md (SSOT cross-agent per ADR-009) ---

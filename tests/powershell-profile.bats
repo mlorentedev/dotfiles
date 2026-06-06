@@ -60,11 +60,12 @@ setup() {
 
 @test "oc is defined on both POSIX and PowerShell (intentional asymmetry on --pure)" {
     # Same finger pattern, different underlying invocation:
-    #   Linux/.zsh : alias oc="opencode --pure"   (Ghostty hang workaround)
-    #   Windows    : Set-Alias -Name oc -Value opencode  (no hang observed)
-    # Tracked as Phase 2.4: once the Linux hang root cause is found (Ghostty
-    # hypothesis), the --pure workaround drops everywhere and parity restores.
-    grep -qE '^alias oc="opencode --pure"' "$DOTFILES_DIR/.zsh/aliases.zsh"
+    #   Linux : oc() { opencode --pure ...} in .zsh/functions.sh (Ghostty hang workaround)
+    #   Windows: Set-Alias -Name oc -Value opencode  (no hang observed)
+    # Linux oc moved to functions.sh (shared bash/zsh) per REFACTOR-010; the
+    # intentional --pure asymmetry is preserved. Once the Linux hang root cause is
+    # found (Ghostty hypothesis), the --pure workaround drops everywhere.
+    grep -qE '^oc\(\) \{ opencode --pure' "$DOTFILES_DIR/.zsh/functions.sh"
     grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
 }
 

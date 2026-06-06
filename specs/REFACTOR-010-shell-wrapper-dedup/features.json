@@ -1,0 +1,44 @@
+[
+  {
+    "id": "REFACTOR-010-shell-wrapper-dedup-f1",
+    "behavior": "_qq_call is defined exactly once, in .zsh/functions.sh",
+    "verification": "[ \"$(grep -lE '^_qq_call\\(\\)' .zsh/functions.sh .zsh/aliases.zsh .bashrc 2>/dev/null)\" = '.zsh/functions.sh' ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-010-shell-wrapper-dedup-f2",
+    "behavior": "oc/ocfull are portable functions in functions.sh; duplicate aliases removed from aliases.zsh and .bashrc",
+    "verification": "grep -qE '^oc\\(\\)' .zsh/functions.sh && grep -qE '^ocfull\\(\\)' .zsh/functions.sh && ! grep -qE \"alias oc=\" .zsh/aliases.zsh .bashrc",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-010-shell-wrapper-dedup-f3",
+    "behavior": "zsh keeps noglob qq/qf aliases; bash keeps qq/qf functions; both call the shared core",
+    "verification": "grep -qE \"alias qq='noglob _qq_call\" .zsh/aliases.zsh && grep -qE '^qq\\(\\) \\{ _qq_call' .bashrc",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-010-shell-wrapper-dedup-f4",
+    "behavior": "dbg invokes PATH-resolved nan-debug.sh, not a hardcoded absolute path",
+    "verification": "! grep -q '/home/manu/Projects/dotfiles/scripts/nan-debug.sh' .zsh/aliases.zsh .bashrc",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-010-shell-wrapper-dedup-f5",
+    "behavior": "After sourcing functions.sh, _qq_call/oc/ocfull are defined in both bash and zsh",
+    "verification": "bats tests/shell-wrapper-dedup.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-010-shell-wrapper-dedup-f6",
+    "behavior": "shellcheck clean on .zsh/functions.sh",
+    "verification": "shellcheck .zsh/functions.sh",
+    "state": "pending",
+    "evidence": ""
+  }
+]

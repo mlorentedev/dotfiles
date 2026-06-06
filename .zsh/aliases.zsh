@@ -32,35 +32,22 @@ alias dch="diff-check.sh"                         # Detect drift between repo an
 alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from git log
 alias profile-shell="shell-profile.sh"            # Measure shell startup (use --detail for per-function breakdown via zprof/xtrace)
 
-# OpenCode (primary AI coding agent — see specs/SDD-007-ai-tooling-consolidation/)
-# Empirical 2026-05-25: opencode TUI/run with MCPs+skills (38 tool defs) hangs on
-# complex queries that trigger tool-use; queries that don't need tools work fine.
-# `oc` = --pure (no MCPs, no plugins, no skills) for fast interactive sessions.
-# `ocfull` = full mode when you explicitly want MCP tool-use (Hive vault writes, etc.)
-# Diagnostic: scripts/nan-bench.sh confirms NaN itself responds in 0.5-1.5s; the
-# bottleneck is opencode's tool-resolution loop, not the LLM provider.
-alias oc="opencode --pure"                                                                # default: no MCP/plugin overhead
-alias ocfull="opencode"                                                                   # opt-in: MCPs + skills (slower for complex queries)
+# OpenCode (primary AI coding agent). `oc`/`ocfull` moved to .zsh/functions.sh
+# (REFACTOR-010, shared bash/zsh core). `oclog` is zsh-only (not duplicated in bash).
 alias oclog='tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)" | grep --line-buffered -vE "file\.watcher\.updated|bus type=message\.part\.delta"'  # live tail of newest opencode log, filtered
 
-# qq / qf: cross-platform one-shot quick-question wrappers. Each invocation is
-# a fresh session; for follow-ups use `opencode run -c` directly or the TUI.
+# qq / qf: zsh quick-question wrappers. `_qq_call` lives in .zsh/functions.sh
+# (REFACTOR-010, shared with bash). Wrapped in `noglob` so `qq por que tardas?`
+# works without quotes -- zsh would otherwise glob-expand the trailing `?`.
 #   qq -> nan/qwen3.6           (default daily, multilingual, ES-friendly, 262K ctx)
 #   qf -> nan/deepseek-v4-flash (long-context 500K, autocomplete / large transforms)
-# Aliases are wrapped in `noglob` so `qq por que tardas tanto?` works without
-# quotes -- zsh would otherwise try to glob-expand the trailing `?`.
-_qq_call() {
-  local model="$1" name="$2"; shift 2
-  [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
-  opencode run -m "$model" "$*"
-}
 alias qq='noglob _qq_call nan/qwen3.6 qq'
 alias qf='noglob _qq_call nan/deepseek-v4-flash qf'
 
 # dbg: deepseek-v4-flash con reasoning chain VISIBLE (opencode TUI lo oculta
 # porque NaN devuelve el campo en `reasoning_content` non-OpenAI). Usa
 # scripts/nan-debug.sh que parsea + colorea reasoning aparte del answer.
-alias dbg='noglob /home/manu/Projects/dotfiles/scripts/nan-debug.sh'
+alias dbg='noglob nan-debug.sh'
 
 # GitHub Copilot CLI v2 (BUG-003: standalone agentic CLI, replaces ghcs/ghce wrappers)
 # cop  -> interactive agent (tool use requires confirmation, safe default)

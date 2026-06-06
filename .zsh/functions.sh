@@ -132,3 +132,27 @@ getcertnames() {
     printf '%s\n' "$cert" | grep -A1 'Subject Alternative Name' | tail -n1 \
         | tr ',' '\n' | sed 's/^[[:space:]]*/  /'
 }
+
+# ---------------------------------------------------------------------------
+# opencode wrappers - shared bash/zsh core (REFACTOR-010)
+# ---------------------------------------------------------------------------
+# The portable pieces of the opencode quick-question + TUI wrappers live here,
+# once, instead of being duplicated in .zsh/aliases.zsh and .bashrc. Each shell
+# adds its own thin qq/qf/dbg on top: zsh needs `noglob` aliases (it errors on
+# the unmatched `?` glob in `qq por que tardas?`); bash uses plain functions.
+
+# _qq_call <model> <name> <prompt...>: one-shot opencode quick question. Each
+# invocation is a fresh session; for follow-ups use `opencode run -c` or the TUI.
+#   qq -> nan/qwen3.6           (default daily, multilingual, 262K ctx)
+#   qf -> nan/deepseek-v4-flash (long-context 500K, large transforms)
+_qq_call() {
+    local model="$1" name="$2"; shift 2
+    [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
+    opencode run -m "$model" "$*"
+}
+
+# oc / ocfull: opencode TUI dispatch. `--pure` bypasses MCPs + skills + plugins,
+# avoiding the tool-resolution hang on complex queries (empirical 2026-05-25);
+# `ocfull` is the opt-in full mode (MCP tool-use: Hive vault writes, etc.).
+oc() { opencode --pure "$@"; }
+ocfull() { opencode "$@"; }
