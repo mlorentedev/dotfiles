@@ -188,11 +188,17 @@ setup() {
     grep -q 'while IFS=' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
 
-@test "claude-mem-heal scripts write the race-free head -n1 form (BUG-016)" {
-    # The replacement .mcp.json template must contain `head -n1` to
-    # consume the entire producer pipe and avoid the EPIPE race.
-    grep -q 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -q 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+@test "claude-mem-heal scripts write the race-free sed -n 1p .mcp.json template (BUG-016 + mcp consumer-EPIPE)" {
+    # The .mcp.json template's path-resolution pipe must drain via `sed -n 1p`
+    # (reads to EOF), NOT the early-closing `head -n1` (consumer-EPIPE race --
+    # task 2026-06-06-mcp-json-consumer-epipe-drain). Anchor on the template's
+    # unique `); [ -n` tail so this targets the .mcp.json emitter specifically,
+    # not heal_hooks_json's `head -n1` sed match pattern (which stays, to
+    # converge already-deployed installs).
+    grep -qF 'sed -n 1p); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    ! grep -qF 'head -n1); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
+    grep -qF 'sed -n 1p); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
+    ! grep -qF 'head -n1); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
 }
 
 @test "parity: both heal scripts reference BUG-016 + thedotmack/claude-mem#2607 (BUG-016)" {

@@ -92,7 +92,10 @@ _source_heal() {
     heal_mcp_json "$f"
     second="$(cat "$f")"
     [ "$first" = "$second" ]
-    grep -qF 'head -n1' "$f"
+    # The convergent template drains the path-resolution pipe via `sed -n 1p`
+    # (reads to EOF), not the early-closing `head -n1` (consumer-EPIPE race).
+    grep -qF 'sed -n 1p' "$f"
+    ! grep -qF 'head -n1' "$f"
 }
 
 @test "heal_mcp_json rewrites a v12.7.4 \${_R%/} broken file and logs the patch" {
@@ -106,9 +109,11 @@ _source_heal() {
     [[ "$output" == *"patched .mcp.json"* ]]
     [[ "$output" == *"v12.7.4"* ]]
     # The file was rewritten to the canonical race-free form: it changed, it
-    # carries the head -n1 discovery, and it is now a full mcpServers block.
+    # drains the path-resolution pipe via `sed -n 1p` (not the early-closing
+    # `head -n1`), and it is now a full mcpServers block.
     [ "$(cat "$broken")" != "$before" ]
-    grep -qF 'head -n1' "$broken"
+    grep -qF 'sed -n 1p' "$broken"
+    ! grep -qF 'head -n1' "$broken"
     grep -qF '"mcpServers"' "$broken"
 }
 
@@ -120,7 +125,8 @@ _source_heal() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"patched .mcp.json"* ]]
     [[ "$output" == *"v13.x"* ]]
-    grep -qF 'head -n1' "$broken"
+    grep -qF 'sed -n 1p' "$broken"
+    ! grep -qF 'head -n1' "$broken"
 }
 
 # --- heal_zod: guards before any npm side effect (4) ---

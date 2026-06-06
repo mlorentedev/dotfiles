@@ -41,6 +41,11 @@ _repair() {
     pwsh -NoProfile -Command ". '$(_winpath "$FUNCS")'; Repair-HooksJson -Target '$(_winpath "$1")'" 2>&1
 }
 
+# Drive Repair-McpJson against a fixture path via pwsh.
+_repair_mcp() {
+    pwsh -NoProfile -Command ". '$(_winpath "$FUNCS")'; Repair-McpJson -Target '$(_winpath "$1")'" 2>&1
+}
+
 @test "Repair-HooksJson converts the pristine break;}done form to sed -n 1p (AC3)" {
     f="$TMP/break.hooks.json"
     printf '%s\n' '{ "command": "X | while IFS= read -r _R; do [ -f Z ] && { printf Y; break; }; done); node B hook claude-code session-init" }' > "$f"
@@ -79,4 +84,20 @@ _repair() {
 @test "Repair-HooksJson no-ops on a missing target" {
     out="$(_repair "$TMP/does-not-exist.json")"
     [ -z "$out" ]
+}
+
+# --- Repair-McpJson: .mcp.json consumer-EPIPE drain parity ---
+# (task 2026-06-06-mcp-json-consumer-epipe-drain). The emitted template's
+# path-resolution pipe must drain via `sed -n 1p` (reads to EOF), not the
+# early-closing `head -n1` that races under SIGPIPE-ignore -- the same root
+# cause Repair-HooksJson fixes for hooks.json, mirrored for .mcp.json.
+
+@test "Repair-McpJson emits the sed -n 1p drain, not head -n1 (mcp consumer-EPIPE)" {
+    f="$TMP/v13.mcp.json"
+    printf '%s\n' '{ "command": "sh", "args": ["-c", "X | while IFS= read -r _R; do printf Y; done | head -n1"] }' > "$f"
+    out="$(_repair_mcp "$f")"
+    [[ "$out" == *"patched .mcp.json"* ]]
+    grep -qF 'sed -n 1p' "$f"
+    ! grep -qF 'head -n1' "$f"
+    grep -qF '"mcpServers"' "$f"
 }
