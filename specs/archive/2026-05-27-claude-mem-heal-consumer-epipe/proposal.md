@@ -1,7 +1,7 @@
 ---
 id: "2026-05-27-claude-mem-heal-consumer-epipe"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-06"
 tags: [spec, proposal, claude-mem, windows, epipe]
 template_version: "1.0"
@@ -116,3 +116,5 @@ Observable outcomes. Each must be testable.
   `specs/archive/BUG-017-claude-mem-heal-hooks-json-race/`
 - Upstream: thedotmack/claude-mem#2607 (EPIPE race) — heal becomes a no-op if/when upstream fixes it
 - Related: TEST-001 (#128) wants bats coverage for `claude-mem-heal.{sh,ps1}`
+
+<!-- archived 2026-06-06 — PR: https://github.com/mlorentedev/dotfiles/pull/242 -->
