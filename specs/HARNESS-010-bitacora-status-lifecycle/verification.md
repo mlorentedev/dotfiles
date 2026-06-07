@@ -20,8 +20,8 @@ created: "2026-06-07"
 - **Manual smoke (mechanism, pre-deploy):** the Action's exact command pair was exercised live against the real board —
   - `gh project item-edit ... --single-select-option-id 6c133cc8` moved #270 → In Progress (confirmed on the board).
   - `gh project item-add` idempotency confirmed: re-adding #270 returned the existing item id `PVTI_lAHOAM7xJs4BZ6GYzgu7wCI`, no duplicate, status preserved.
-- **Live end-to-end** (`assign → In Progress` via the deployed workflow) is verifiable only after this lands on `main` (workflows run from the default branch). Post-merge check: assign a throwaway/open issue and confirm the run is green and the field flips. Recorded as a closing step, not claimed done here.
-- No regressions: dotfiles CI (`lint`, `test`, `integration`, `spec-gate`) expected green — spec folder present satisfies the Discipline Gate regardless of LOC.
+- **Live end-to-end (#286, first deploy): FAILED → fixed in #289.** The first real assignment ran the workflow and it errored with `unknown owner type`: `gh project --owner` cannot resolve the owner under the fine-grained `BITACORA_PAT`. Rewritten with `actions/github-script` calling the Projects v2 GraphQL directly; the two mutations were re-validated against the live board before re-shipping. A fresh assign-a-throwaway test confirms the deployed workflow once #289 is on `main`.
+- No regressions: dotfiles CI (`lint`, `test`, `integration`, `spec-gate`) green.
 
 ## Decisions made during implementation
 
@@ -29,10 +29,11 @@ created: "2026-06-07"
 - **`Blocked` left manual.** No reliable machine signal for "stuck"; naming the blocker is human judgement. Automating it would add label-management surface for little gain.
 - **Rollout deferred to OPS-002 (#258).** This PR ships + validates the workflow on `dotfiles` and registers it in the runbook's per-repo bundle (§4/§7); copying it to all repos + secret is OPS-002's job — keeps HARNESS-010 acotado and avoids a half-deployed automation.
 - **No helper script.** A `.sh`/`.ps1` wrapper would incur Windows-parity + test surface; the `gh project item-edit` one-liner in runbook §5 is enough for the only remaining manual transition (Blocked).
+- **`gh project` → `actions/github-script` (#289).** The runtime `unknown owner type` failure forced the Projects v2 calls onto raw GraphQL. Chose `github-script` over `gh api graphql` in bash because the latter trips `SC2016` on GraphQL `$vars` in single quotes — suppressing that with `# shellcheck disable` is a kludge; `github-script` carries the query in a JS template literal with no linter false-positive.
 
 ## Promotion candidates
 
-- [ ] Lesson for `docs/lessons.md`? **yes (separate, not this PR)** — "re-running a failed GitHub Actions run replays the *original commit's* workflow file, so a workflow-file fix must be verified by firing a *fresh* event, not a re-run." Surfaced while fixing the `add-to-project@v1` failures this session. File in dotfiles `docs/lessons.md` next session.
+- [x] Lesson for `docs/lessons.md`? **done in #289** — two entries filed: (1) re-running a failed Actions run replays the *original commit's* workflow file (verify fixes with a fresh event); (2) `gh project --owner` → "unknown owner type" under a fine-grained PAT, and a green CI is not a green workflow (validate secret-dependent workflows end-to-end with the real secret).
 - [ ] ADR-worthy? **no** — doctrine fits AGENTS.md Standing Order #8; no architectural fork.
 - [ ] New `00_meta/patterns/` candidate? **not yet** — revisit if a second project needs the same assign→status automation (OPS-002 may surface it).
 

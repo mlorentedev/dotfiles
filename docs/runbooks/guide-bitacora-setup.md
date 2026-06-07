@@ -135,30 +135,43 @@ jobs:
 ### 7b. `bitacora-status.yml` — moves an **assigned** issue to *In Progress* (HARNESS-010)
 
 Fires on `issues: [assigned]`, so self-assigning at pickup flips `Status` automatically (§5). It is
-idempotent (`item-add` returns the existing item) and guarded to skip closed issues. The IDs are the
-canonical ones from §2 — re-list with `gh project field-list 1 --owner mlorentedev --format json`.
+idempotent (`addProjectV2ItemById` returns the existing item) and guarded to skip closed issues. Uses
+`actions/github-script` for the Projects v2 GraphQL — **not `gh project`**, which fails with
+`unknown owner type` under a fine-grained PAT. IDs are the canonical ones from §2.
 
 ```yaml
 name: Bitácora status — In Progress on assign
 on:
   issues:
     types: [assigned]
-permissions: {}   # authenticates with BITACORA_PAT, not the default GITHUB_TOKEN
+permissions: {}
 jobs:
   in-progress:
     if: github.event.issue.state == 'open'
     runs-on: ubuntu-latest
     steps:
-      - name: Set bitácora Status = In Progress
-        env:
-          GH_TOKEN: ${{ secrets.BITACORA_PAT }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
-        run: |
-          set -euo pipefail
-          ITEM_ID=$(gh project item-add 1 --owner mlorentedev --url "$ISSUE_URL" --format json --jq '.id')
-          gh project item-edit --project-id PVT_kwHOAM7xJs4BZ6GY --id "$ITEM_ID" \
-            --field-id PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI --single-select-option-id 6c133cc8
+      - uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BITACORA_PAT }}   # project + repo scope
+          script: |
+            const projectId = 'PVT_kwHOAM7xJs4BZ6GY';
+            const fieldId = 'PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI';
+            const optionId = '6c133cc8';                 // "In Progress"
+            const contentId = context.payload.issue.node_id;
+            const added = await github.graphql(
+              `mutation($projectId: ID!, $contentId: ID!) {
+                 addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) { item { id } }
+               }`, { projectId, contentId });
+            await github.graphql(
+              `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                 updateProjectV2ItemFieldValue(input: {
+                   projectId: $projectId, itemId: $itemId, fieldId: $fieldId,
+                   value: { singleSelectOptionId: $optionId } }) { projectV2Item { id } }
+               }`, { projectId, itemId: added.addProjectV2ItemById.item.id, fieldId, optionId });
 ```
+
+> **Gotcha (2026-06-07):** `gh project ... --owner` → `unknown owner type` under a fine-grained PAT.
+> Drive Projects v2 from `actions/github-script` (or raw `gh api graphql`) instead.
 
 ## 8. Troubleshooting
 
