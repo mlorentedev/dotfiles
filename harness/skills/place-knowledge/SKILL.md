@@ -48,4 +48,4 @@ Tool-agnostic: store = vault/Confluence/Notion/private-docs-repo; forge = GitHub
 - [[onboard-project-to-placement-model]] — the full runbook
 - [[pattern-three-layer-proposal-lifecycle]] — process view
 - [[feedback_pr_no_attribution]], [[feedback_agent_git_hygiene]] — hard rules learned during KPM-001
-- Epic: `10_projects/knowledge/specs/KPM-001-knowledge-placement-migration/`
+- Epic: `specs/archive/KPM-001-knowledge-placement-migration/` (archived)

@@ -50,7 +50,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
    - `$PROJECT_AREA/00-context.md` (technical stack, repo map, hotspots)
    - `$PROJECT_AREA/10-roadmap.md` (active phase, what is done vs pending)
    - `$PROJECT_AREA/11-tasks.md` (progress bar + last "Updated" frontmatter date)
-   - `$PROJECT_AREA/30-architecture/adr-index.md` (latest ADR number, accepted/deferred status)
+   - the repo's `docs/adr/` directory (latest ADR number, accepted/deferred status — GitHub self-indexes; legacy vault-only projects still use `$PROJECT_AREA/30-architecture/`)
    - `$PROJECT_AREA/30-architecture/plan-*.md` -- newest mtime first
    - `$PROJECT_AREA/memory/MEMORY.md` -- Session Handoff section
 2. If a `$PROJECT_AREA/30-architecture/session-protocol.md` exists, read it -- it is the project-specific overlay (constraints, rejection list, pending ADRs).
@@ -152,15 +152,16 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 - Write the ADR to the **repo** `docs/adr/adr-NNN-<slug>.md` (cross-cutting in the platform repo; repo-specific in the owning repo) via a PR — **NOT** the vault `30-architecture/`.
 - Track tasks/roadmap in the **GitHub Project + Issues** — NOT the vault `11-tasks`.
 - The vault keeps only personal/methodology lessons + AI memory + drafts.
-For **personal** projects, use the vault paths below.
+For **personal** projects on the placement model, ADRs ALSO go to the repo `docs/adr/` (per [[pattern-knowledge-placement]]); only the `11-tasks.md` / `memory/` steps below stay in the vault. The work-vs-personal split is now only about *tracking* (GitHub Project vs issues), not ADR placement.
 
 **Steps:**
 
-1. **Author the ADR draft.** Use `$VAULT_PATH/00_meta/templates/adr.md`. Path: `$PROJECT_AREA/30-architecture/adr-NNN-<slug>.md` where NNN = (highest existing ADR + 1).
+1. **Author the ADR draft.** Use `$VAULT_PATH/00_meta/templates/adr.md`. Path: the repo's `docs/adr/adr-NNN-<slug>.md` where NNN = (highest existing ADR + 1). (Legacy pre-migration project still vault-only: `$PROJECT_AREA/30-architecture/`.)
    - Required sections: Status, Date, Context, Options Considered, Decision, Rationale, Consequences (positive/negative/neutral), References.
    - If decision is deferred: status `deferred`, plus explicit "Triggers to Reopen Decision" section (per ADR-016 model).
+   - **GitHub issue link:** if a GitHub Project issue or task tracks this architectural decision, populate `issue: <repo>#NNN` in the ADR frontmatter before writing.
 2. **Update the plan** of record. If a `plan-*.md` motivated this session, patch it: append a "Decision recorded" line linking the new ADR, and update the "Next steps" section if the decision changes it.
-3. **Patch `adr-index.md`** to include the new ADR row.
+3. **Index:** the repo `docs/adr/` self-indexes (GitHub renders the directory) — no separate index file to patch. (Legacy vault-only project: patch the project `_index.md`.)
 4. **Update `11-tasks.md`** if the decision creates, closes, or reshapes tasks. Apply backlog ticks `- [x]` and add new tasks with the ADR-NNN reference inline.
 5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive.
 
@@ -168,7 +169,7 @@ For **personal** projects, use the vault paths below.
 
 **Override.** If the user genuinely cannot author an ADR this turn (interruption, missing data), Phase E creates a tracked task in `11-tasks.md` named `**ADR-NNN-draft**: write ADR for <topic>` with `(spec: ADR-NNN-...)` placeholder. Verbal deferral never counts.
 
-**Output of Phase E:** new ADR file + patched plan + patched adr-index + patched 11-tasks.
+**Output of Phase E:** new ADR file (repo `docs/adr/`, self-indexing) + patched plan + patched 11-tasks.
 
 ---
 
@@ -211,11 +212,11 @@ For **personal** projects, use the vault paths below.
 
 | Phase | Reads | Writes |
 |---|---|---|
-| A | `00-context.md`, `10-roadmap.md`, `11-tasks.md`, `adr-index.md`, `plan-*.md`, `memory/MEMORY.md`, `session-protocol.md` | nothing (read-only verification) |
+| A | `00-context.md`, `10-roadmap.md`, `11-tasks.md`, repo `docs/adr/`, `plan-*.md`, `memory/MEMORY.md`, `session-protocol.md` | nothing (read-only verification) |
 | B | `sensor-reference-audit-matrix.md` (or analog) | patches matrix + divergence-log |
 | C | `session-protocol.md` (constraints section) | patches constraint table |
 | D | `session-protocol.md` (rejection list), `00_meta/patterns/_index.md` | nothing (or patches rejection list if new alternatives discarded) |
-| E | `templates/adr.md` | new `adr-NNN-*.md`, patches `adr-index.md`, patches `plan-*.md`, patches `11-tasks.md` |
+| E | `templates/adr.md` | new repo `docs/adr/adr-NNN-*.md` (self-indexing), patches `plan-*.md`, patches `11-tasks.md` |
 | F | (nothing) | patches `memory/MEMORY.md` handoff; OPTIONAL delta proposal for `CURRENT-STATE.md` |
 
 ## Anti-patterns this skill blocks

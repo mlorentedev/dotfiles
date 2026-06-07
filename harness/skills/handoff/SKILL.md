@@ -52,6 +52,18 @@ Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handof
 - Worktrees for MERGED PRs removed; their branches deleted; `git fetch --prune` gone refs.
 - Every PR opened this session linked (number + merged/open state) in the handoff.
 
+### 3b. Housekeeping (active cleanup — run for every repo touched this session)
+
+Remove transient clutter before closing:
+
+- **Merged branches (local):** `git branch --merged main | grep -vE '^\*|main|master' | xargs -r git branch -d`. Inspect output — do not force-delete (`-D`) without reading why a branch is unmerged.
+- **Remote gone refs:** `git fetch --prune` on every repo touched. Removes stale remote-tracking refs for branches deleted upstream.
+- **Done worktrees:** any worktree whose PR is merged must be removed (`git worktree remove <path>`). If not yet merged, name it in **Open threads** with PR number.
+- **Temp / scratch files:** inspect `git status` for untracked `.bak`, `*.tmp`, scratch notes. Delete only files with no commit intent — never blindly `git clean -f`.
+- **Empty vault stubs:** if any vault file (e.g. `90-lessons.md`) is frontmatter-only with no real content, delete it and remove its inbound links. Scope: only paths touched this session.
+
+Scope: only repos and vault paths actually touched in this session — not a global cleanup pass.
+
 ### 4. Artifact summary
 
 List what the session produced: PRs (number + state), key commit hashes, files created/changed, vault entries added/ticked.
