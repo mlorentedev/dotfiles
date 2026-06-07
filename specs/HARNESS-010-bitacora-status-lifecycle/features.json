@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-010-bitacora-status-lifecycle-f1",
+    "behavior": "AC1 — AGENTS.md codifies the status-lifecycle rule (In Progress / Blocked / Done) as a Standing Order and Neural Hive Loop touchpoints",
+    "verification": "grep -qi 'status.*lifecycle' AGENTS.md && grep -q 'In Progress' AGENTS.md && grep -q 'Blocked' AGENTS.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-010-bitacora-status-lifecycle-f2",
+    "behavior": "AC2 — bitacora-status.yml triggers on issues:[assigned], guards open state, sets Status=In Progress via the canonical In Progress option id",
+    "verification": "grep -q 'assigned' .github/workflows/bitacora-status.yml && grep -q \"state == 'open'\" .github/workflows/bitacora-status.yml && grep -q '6c133cc8' .github/workflows/bitacora-status.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-010-bitacora-status-lifecycle-f3",
+    "behavior": "AC3 — the workflow file is valid YAML",
+    "verification": "python3 -c \"import yaml,sys; yaml.safe_load(open('.github/workflows/bitacora-status.yml'))\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-010-bitacora-status-lifecycle-f4",
+    "behavior": "AC4 — the bitácora runbook registers bitacora-status.yml in the per-repo deployment bundle",
+    "verification": "grep -q 'bitacora-status.yml' docs/runbooks/guide-bitacora-setup.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-010-bitacora-status-lifecycle-f5",
+    "behavior": "AC5 — /handoff SKILL.md (vault) has a board-status reconciliation step. Verified by observation; vault is a separate repo, not in dotfiles CI.",
+    "verification": "test -f \"$HOME/Projects/knowledge/00_meta/skills/handoff/SKILL.md\" && grep -qi 'reconcil' \"$HOME/Projects/knowledge/00_meta/skills/handoff/SKILL.md\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

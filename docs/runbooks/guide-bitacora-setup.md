@@ -55,8 +55,8 @@ The single source for field/option IDs — copy from here, do not re-discover.
 # 1. Link the repo to the project
 gh project link 1 --owner mlorentedev --repo mlorentedev/<repo>
 
-# 2. Deploy the workflow (§7) + upload the secret it needs
-#    copy .github/workflows/add-to-project.yml into the repo, then:
+# 2. Deploy BOTH workflows (§7) + upload the secret they need
+#    copy .github/workflows/add-to-project.yml AND bitacora-status.yml into the repo, then:
 age --decrypt -i ~/.config/age/key.txt sensitive/github.bitacora.secret.age \
   | gh secret set BITACORA_PAT --repo mlorentedev/<repo>
 
@@ -73,28 +73,30 @@ gh issue list --repo mlorentedev/<repo> --state open --limit 200 --json number \
 
 ## 5. Operating discipline — the status lifecycle (HARNESS-010)
 
-The board is only worth anything if Status reflects reality. On every issue you act on:
+The board is only worth anything if `Status` reflects reality. The cross-agent rule is canonical in
+`AGENTS.md` Standing Order #8; this section is the mechanical reference. On every issue you act on:
 
-| When | Action |
-|------|--------|
-| New issue opened | the *Item added* workflow sets **Backlog** automatically |
-| **You start working it** | set Status → **In Progress** (do this BEFORE the first edit) |
-| You hit a blocker | set Status → **Blocked** + name the blocker in a comment |
-| You finish / close it | close the issue → the *issue closed* workflow sets **Done** |
+| When | Status | How |
+|------|--------|-----|
+| New issue opened | **Backlog** | automatic — *Item added* built-in workflow |
+| **You start working it** | **In Progress** | automatic — **self-assign** (`gh issue edit <n> --add-assignee @me`); the `bitacora-status.yml` workflow (§7) flips the field |
+| You hit a blocker | **Blocked** | manual — set the field (helper below) + name the blocker in a comment |
+| You finish / close it | **Done** | automatic — *issue closed* built-in workflow |
 
-**Automated today** (built-in workflows): **Backlog** (item added) and **Done** (issue closed).
-**Manual today:** **In Progress** and **Blocked** — there is no clean built-in for "work started".
-Automating *In Progress* (trigger on a linked PR opening, or on issue-assignment) is tracked in
-**HARNESS-010**; until then it is a manual step, with the discipline above as the contract.
+**Automated (HARNESS-010):** *Backlog* (item added), *In Progress* (issue assigned → `bitacora-status.yml`),
+and *Done* (issue closed). In normal flow you therefore touch the field **only for `Blocked`** —
+self-assign starts it, closing finishes it. `Blocked` stays manual on purpose: there is no reliable
+machine signal for "stuck", and naming the blocker is a human judgement.
 
-Set **Priority** (default P2) and **Type** manually; set the **ID** field forward-only. Helper to move issue `#N`:
+Set **Priority** (default P2) and **Type** manually; set the **ID** field forward-only. Manual helper
+to move issue `#N` (Status options: In Progress `6c133cc8` · Blocked `7705a647` · Done `bb482da4`):
 
 ```bash
 ITEM=$(gh project item-list 1 --owner mlorentedev --format json --limit 300 \
   | python3 -c "import json,sys;[print(i['id']) for i in json.load(sys.stdin)['items'] \
        if i.get('content',{}).get('number')==N]")
 gh project item-edit --id "$ITEM" --project-id PVT_kwHOAM7xJs4BZ6GY \
-  --field-id PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI --single-select-option-id 6c133cc8   # -> In Progress
+  --field-id PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI --single-select-option-id 7705a647   # -> Blocked
 ```
 
 ## 6. Views
@@ -103,9 +105,12 @@ gh project item-edit --id "$ITEM" --project-id PVT_kwHOAM7xJs4BZ6GY \
 - **By repo** — group by Repository (tasks span all repos).
 - **PRs pending review** (OPS-003) — filter `is:pr is:open`, group by repo.
 
-## 7. `add-to-project.yml` (workflow template)
+## 7. Workflows (deploy BOTH to every linked repo)
 
-Deploy verbatim to every linked repo. Adds opened **issues and PRs** to the bitácora.
+Each linked repo carries two workflows. **OPS-002 (#258) rolls both out** to every repo in one pass;
+the canonical copies live in `mlorentedev/dotfiles/.github/workflows/`.
+
+### 7a. `add-to-project.yml` — puts opened **issues and PRs** on the board
 
 ```yaml
 name: Add to bitácora
@@ -127,15 +132,45 @@ jobs:
 > **Gotcha (2026-06-06):** `actions/add-to-project@v1` is unresolvable — there is no floating
 > `v1` tag. Pin `@v1.0.2` (latest v1) or `@v2.0.0`. `BITACORA_PAT` needs `project` + `repo` scope.
 
+### 7b. `bitacora-status.yml` — moves an **assigned** issue to *In Progress* (HARNESS-010)
+
+Fires on `issues: [assigned]`, so self-assigning at pickup flips `Status` automatically (§5). It is
+idempotent (`item-add` returns the existing item) and guarded to skip closed issues. The IDs are the
+canonical ones from §2 — re-list with `gh project field-list 1 --owner mlorentedev --format json`.
+
+```yaml
+name: Bitácora status — In Progress on assign
+on:
+  issues:
+    types: [assigned]
+permissions: {}   # authenticates with BITACORA_PAT, not the default GITHUB_TOKEN
+jobs:
+  in-progress:
+    if: github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set bitácora Status = In Progress
+        env:
+          GH_TOKEN: ${{ secrets.BITACORA_PAT }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          set -euo pipefail
+          ITEM_ID=$(gh project item-add 1 --owner mlorentedev --url "$ISSUE_URL" --format json --jq '.id')
+          gh project item-edit --project-id PVT_kwHOAM7xJs4BZ6GY --id "$ITEM_ID" \
+            --field-id PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI --single-select-option-id 6c133cc8
+```
+
 ## 8. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| "Add to bitácora" fails in ~4s, `unable to resolve action … v1` | invalid version pin | §7 — pin `@v1.0.2` |
+| "Add to bitácora" fails in ~4s, `unable to resolve action … v1` | invalid version pin | §7a — pin `@v1.0.2` |
 | Issue/PR never lands on the board | workflow missing, secret absent, or PAT expired | redo §4 step 2 |
+| Assigning an issue does **not** move it to *In Progress* | `bitacora-status.yml` missing in that repo, or PAT lacks `project` scope | §7b — deploy it (OPS-002 rollout) / check `BITACORA_PAT` |
 | `item-edit`: *could not resolve to ProjectV2 node* | wrong project-id / field-id | §2 reference |
 | `gh pr edit` errors with `projectCards` deprecation | classic-projects GraphQL path | use `gh api` instead |
 
 ## References
 
-- ADR-018 (de-vault task placement), epic #244 (Flow v2), OPS-002/003, CUR-008 (ID scheme), HARNESS-010 (status lifecycle).
+- ADR-018 (de-vault task placement), epic #244 (Flow v2), OPS-002/003, CUR-008 (ID scheme).
+- HARNESS-010 (status lifecycle): `AGENTS.md` Standing Order #8 (doctrine) + `bitacora-status.yml` (§7b automation).
