@@ -1,13 +1,16 @@
 name: Bitácora status — In Progress on assign
 
-# Flip the bitácora (GitHub Project #1) Status to "In Progress" when an issue is
-# assigned. The self-assign-on-pickup habit (AGENTS.md "Neural Hive" Phase 1) now
+# When an issue is assigned, move its bitácora (GitHub Project #1) Status to
+# "In Progress". Self-assigning at pickup (AGENTS.md "Neural Hive" Phase 1) now
 # moves the board automatically — closing the manual-transition gap (HARNESS-010,
 # observed 2026-06-06 when #261 was worked while still in Backlog).
 #
 # The other transitions are already covered: built-in Project workflows set
 # "Backlog" on add and "Done" on close; "Blocked" stays a deliberate manual
 # transition (no reliable machine signal) — see runbook §5.
+#
+# Uses actions/github-script for the Projects v2 GraphQL (the `gh project` CLI
+# fails with "unknown owner type" under a fine-grained PAT).
 #
 # Canonical IDs (re-list: gh project field-list 1 --owner mlorentedev --format json):
 #   Project  PVT_kwHOAM7xJs4BZ6GY
@@ -18,7 +21,7 @@ on:
   issues:
     types: [assigned]
 
-permissions: {}   # the job authenticates with BITACORA_PAT, not the default GITHUB_TOKEN
+permissions: {}   # authenticates via the github-script token input (BITACORA_PAT), not the default GITHUB_TOKEN
 
 jobs:
   in-progress:
@@ -26,25 +29,36 @@ jobs:
     if: github.event.issue.state == 'open'
     runs-on: ubuntu-latest
     steps:
-      - name: Set bitácora Status = In Progress
-        env:
-          GH_TOKEN: ${{ secrets.BITACORA_PAT }}   # needs project + repo scope
-          ISSUE_URL: ${{ github.event.issue.html_url }}
-        run: |
-          set -euo pipefail
-          PROJECT_ID=PVT_kwHOAM7xJs4BZ6GY
-          STATUS_FIELD=PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI
-          IN_PROGRESS=6c133cc8
+      - name: Move assigned issue to In Progress
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BITACORA_PAT }}   # needs project + repo scope
+          script: |
+            const projectId = 'PVT_kwHOAM7xJs4BZ6GY';
+            const statusFieldId = 'PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI';
+            const inProgressId = '6c133cc8';
+            const contentId = context.payload.issue.node_id;
 
-          # item-add is idempotent: if the issue is already on the board it
-          # returns the existing item id (verified — no duplicate is created),
-          # so add-then-edit is safe even if the auto-add workflow has not run.
-          ITEM_ID=$(gh project item-add 1 --owner mlorentedev --url "$ISSUE_URL" --format json --jq '.id')
+            // addProjectV2ItemById is idempotent: returns the existing item id
+            // if the issue is already on the board.
+            const added = await github.graphql(
+              `mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                  item { id }
+                }
+              }`,
+              { projectId, contentId },
+            );
+            const itemId = added.addProjectV2ItemById.item.id;
 
-          gh project item-edit \
-            --project-id "$PROJECT_ID" \
-            --id "$ITEM_ID" \
-            --field-id "$STATUS_FIELD" \
-            --single-select-option-id "$IN_PROGRESS"
+            await github.graphql(
+              `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId, itemId: $itemId, fieldId: $fieldId,
+                  value: { singleSelectOptionId: $optionId },
+                }) { projectV2Item { id } }
+              }`,
+              { projectId, itemId, fieldId: statusFieldId, optionId: inProgressId },
+            );
 
-          echo "Moved $ISSUE_URL → In Progress (item $ITEM_ID)"
+            core.info(`Moved issue #${context.payload.issue.number} → In Progress (item ${itemId})`);
