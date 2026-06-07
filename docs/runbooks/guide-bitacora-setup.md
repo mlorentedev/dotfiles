@@ -18,6 +18,18 @@ Task state lives in **one** place — the bitácora — never in vault `11-tasks
 - **Board:** https://github.com/users/mlorentedev/projects/1 — owner `mlorentedev`, number `1`
 - **Project ID:** `PVT_kwHOAM7xJs4BZ6GY`
 
+## 1b. Which repo does an issue belong to? (home repo)
+
+An issue is filed in the repo it **primarily modifies**, then auto-added to this board (the `Repository` field makes the home explicit). Rule of thumb:
+
+| Work is mostly about… | Home repo | Prefix |
+|---|---|---|
+| Harness / methodology / skills / agents / `AGENTS.md` / SDD | `dotfiles` | HARNESS-* , most OPS-* |
+| Vault **content or structure** (patterns, `00_meta/` layout, links) | `knowledge` | CUR-* |
+| A specific project's code or infra (e.g. the homelab CI runner) | that project's repo | per-project |
+
+**Tie-breaker** when work spans repos (e.g. a skill whose SSOT is the vault but deploys via dotfiles): file it where the **deploy/runtime contract** lives — dotfiles for harness skills — and reference the rest. When genuinely cross-cutting, default to `dotfiles`. Per-project *infrastructure* (a runner, a cluster service) is the exception: it belongs to that project's repo even if a methodology rule consumes it.
+
 ## 2. Fields & IDs (canonical reference)
 
 The single source for field/option IDs — copy from here, do not re-discover.
@@ -69,6 +81,11 @@ The board is only worth anything if Status reflects reality. On every issue you 
 | **You start working it** | set Status → **In Progress** (do this BEFORE the first edit) |
 | You hit a blocker | set Status → **Blocked** + name the blocker in a comment |
 | You finish / close it | close the issue → the *issue closed* workflow sets **Done** |
+
+**Automated today** (built-in workflows): **Backlog** (item added) and **Done** (issue closed).
+**Manual today:** **In Progress** and **Blocked** — there is no clean built-in for "work started".
+Automating *In Progress* (trigger on a linked PR opening, or on issue-assignment) is tracked in
+**HARNESS-010**; until then it is a manual step, with the discipline above as the contract.
 
 Set **Priority** (default P2) and **Type** manually; set the **ID** field forward-only. Helper to move issue `#N`:
 
