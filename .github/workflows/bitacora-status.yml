@@ -1,0 +1,50 @@
+name: Bitácora status — In Progress on assign
+
+# Flip the bitácora (GitHub Project #1) Status to "In Progress" when an issue is
+# assigned. The self-assign-on-pickup habit (AGENTS.md "Neural Hive" Phase 1) now
+# moves the board automatically — closing the manual-transition gap (HARNESS-010,
+# observed 2026-06-06 when #261 was worked while still in Backlog).
+#
+# The other transitions are already covered: built-in Project workflows set
+# "Backlog" on add and "Done" on close; "Blocked" stays a deliberate manual
+# transition (no reliable machine signal) — see runbook §5.
+#
+# Canonical IDs (re-list: gh project field-list 1 --owner mlorentedev --format json):
+#   Project  PVT_kwHOAM7xJs4BZ6GY
+#   Status   PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI   (option "In Progress" = 6c133cc8)
+# Full reference: docs/runbooks/guide-bitacora-setup.md §2 / §5 / §7.
+
+on:
+  issues:
+    types: [assigned]
+
+permissions: {}   # the job authenticates with BITACORA_PAT, not the default GITHUB_TOKEN
+
+jobs:
+  in-progress:
+    # Never resurrect a closed issue's status when it is (re)assigned.
+    if: github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set bitácora Status = In Progress
+        env:
+          GH_TOKEN: ${{ secrets.BITACORA_PAT }}   # needs project + repo scope
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          set -euo pipefail
+          PROJECT_ID=PVT_kwHOAM7xJs4BZ6GY
+          STATUS_FIELD=PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI
+          IN_PROGRESS=6c133cc8
+
+          # item-add is idempotent: if the issue is already on the board it
+          # returns the existing item id (verified — no duplicate is created),
+          # so add-then-edit is safe even if the auto-add workflow has not run.
+          ITEM_ID=$(gh project item-add 1 --owner mlorentedev --url "$ISSUE_URL" --format json --jq '.id')
+
+          gh project item-edit \
+            --project-id "$PROJECT_ID" \
+            --id "$ITEM_ID" \
+            --field-id "$STATUS_FIELD" \
+            --single-select-option-id "$IN_PROGRESS"
+
+          echo "Moved $ISSUE_URL → In Progress (item $ITEM_ID)"

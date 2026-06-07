@@ -31,6 +31,7 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 5. **Consult patterns before architectural decisions.** 37 universal patterns in `00_meta/patterns/`. Query via Hive MCP (when available) or read from `~/Projects/knowledge/00_meta/patterns/<name>.md` (Linux/macOS) / `%USERPROFILE%\Projects\knowledge\00_meta\patterns\<name>.md` (Windows).
 6. **Enterprise-grade or nothing.** Before proposing any code, evaluate: Is this a proven enterprise pattern? Is it scalable? Would a senior engineer approve this in code review? No hacks, no quick-and-dirty, no "it works for now" shortcuts. If the straightforward approach is sloppy, find the elegant one.
 7. **Noted = recorded, never verbal-only.** When you say something is "noted"/"apuntado", or the user tells you to note or track something, persist it to its canonical home **in the same session** — never leave it as conversation-only prose. Placement follows #2 + #3 (decide-vs-operate): build/operate artifacts → the repo (`specs/`, `docs/` — project lessons in `docs/lessons.md`, ADRs in `docs/adr/`, a GitHub issue / Project item); **only** cross-project / methodology knowledge → the vault (`00_meta/` patterns); a decision affecting how agents work → an ADR or this file. Project lessons are NOT a vault `90-lessons.md` (that path is a migration artifact — see `RFD-001`). If it genuinely cannot be filed now, create an explicit tracked task for the debt. "I'll note it" with no durable artifact is a broken promise. See `pattern-decision-persistence`.
+8. **Bitácora status reflects reality.** The board ([GitHub Project #1](https://github.com/users/mlorentedev/projects/1)) is only worth keeping if `Status` tracks what is actually happening. Cross-agent status-lifecycle discipline: **pick up an issue → self-assign it** (`gh issue edit <n> --add-assignee @me`) — the `bitacora-status` Action flips its `Status` to **In Progress**; **hit a hard blocker → set `Status` = Blocked** and name the blocker in an issue comment; **close the issue → the built-in workflow sets Done**. Never leave an issue you are actively working in `Backlog`. Mechanics, IDs, and the manual fallback live in `docs/runbooks/guide-bitacora-setup.md` §5.
 
 ### Pattern Catalog (00_meta/patterns/)
 
@@ -248,12 +249,14 @@ Defaults = personal solo project (this repo). Build/operate docs always live in 
 3. **Project Context:** Read `10_projects/<repo>/00-context.md`.
 4. **Global Rules:** Read relevant `00_meta/patterns/*.md`.
 5. **Tactical Plan:** Check the **bitácora** GitHub Project (user-level, cross-repo) for active backlog items. Filter by `Repo` field to see this repo's items. If offline, fall back to open GitHub issues.
+6. **Claim it:** When you pick an item to work, **self-assign it** (`gh issue edit <n> --add-assignee @me`) — the `bitacora-status` Action moves it to `In Progress` (Standing Order #8). Don't start editing while it still sits in `Backlog`.
 
 ### Phase 2: Execution (The Work)
 
 * **Plan:** Create a sub-task checklist in memory (or scratchpad).
 * **Act:** Implement code/tests in the repo.
 * **Verify:** Run tests.
+* **Blocked?** If a hard blocker stops progress, set the issue's bitácora `Status` = `Blocked` and name the blocker in an issue comment (Standing Order #8) — don't leave it silently stalled in `In Progress`.
 * **Document Dynamic** (decide-vs-operate — build/operate → repo, cross-project → vault):
   * New architectural decision → repo `docs/adr/adr-XXX.md`.
   * New operational procedure → repo `docs/runbooks/guide-XXX.md`.
@@ -263,7 +266,7 @@ Defaults = personal solo project (this repo). Build/operate docs always live in 
 
 ### Phase 3: Knowledge Crystallization (Write Back)
 
-* **Backlog (bitácora):** Close the GitHub issue — the built-in workflow moves it to Done automatically. No manual vault update needed.
+* **Backlog (bitácora):** Close the GitHub issue — the built-in workflow moves it to `Done` automatically (the close end of the Standing Order #8 lifecycle). No manual vault update needed.
   * Ticket IDs in the GitHub Project custom field `ID` use `AREA-NNN-slug` format (e.g. `SSOT-027-id-scheme`). Existing pure-numeric IDs remain valid — no backfill required.
 * **Strategy (`10-roadmap.md`):** ONLY if a major milestone is completed.
 * **Lessons:** project-specific → repo `docs/lessons.md`; cross-project / methodology → vault `90-lessons.md` (Lesson Template).
