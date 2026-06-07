@@ -91,7 +91,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 3. **Vault context pre-flight (mandatory):**
    - Via Hive `vault_search`, look for `<feature-id>` (or `--task <id>` if provided) in:
      - `$VAULT_PATH/10_projects/$REPO_NAME/11-tasks.md`
-     - `$VAULT_PATH/10_projects/$REPO_NAME/30-architecture/` (any ADR)
+     - the repo's `docs/adr/` (any ADR)
      - `$VAULT_PATH/10_projects/$REPO_NAME/10-roadmap.md`
    - If found in any -> note source for step 7.
    - If NOT found -> present three options to user:
@@ -174,6 +174,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
    - `$VAULT_PATH/10_projects/$REPO_NAME/10-roadmap.md` (strategic frame).
    - Referenced ADRs (frontmatter only via Hive).
    - Up to 3 sister specs in `$REPO_ROOT/specs/archive/` (for tone consistency).
+4. **GitHub issue link:** if the `issue:` frontmatter field is empty and a GitHub Project issue exists for this spec, ask: "What is the GitHub issue for this spec? (e.g. `kubelab#123` or `skip`)" and populate the field before proceeding.
 
 **The 5 questions (one at a time, wait for each answer):**
 
