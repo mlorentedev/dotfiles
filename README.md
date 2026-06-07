@@ -113,6 +113,11 @@ qq por que tardas tanto?             # one-shot question (no quotes needed in zs
 qf explain the C10k problem         # one-shot question -> deepseek-v4-flash (faster, technical)
 ```
 
+**AI skills** are edited in the vault (`00_meta/skills/<name>/`), compiled to committed
+records under `harness/skills/`, and deployed per-agent by `scripts/compile-harness.sh`
+(Claude, OpenCode, Gemini/AGY, Copilot). Do not add skill directories to the repo — edit
+in the vault and re-run setup. Pipeline details: the vault's `pattern-cross-agent-skill-pipeline.md`.
+
 ### Sync
 
 ```bash
