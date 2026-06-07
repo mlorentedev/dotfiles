@@ -317,11 +317,11 @@ setup() {
     # Post-SDD-008: setup-linux.sh runs compile-harness.sh --deploy, which renders
     # each committed vault skill record whose targets[] includes opencode to a
     # command .md. The container has no vault, so --refresh is skipped and --deploy
-    # uses the committed records (30 skills, 5 Claude-only opt out -> 25 commands).
+    # uses the committed records (29 skills, 5 Claude-only opt out -> 24 commands).
     [ -d "$HOME/.config/opencode/commands" ]
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
-    [ "$count" -eq 25 ]  # 19 -> 25: SKILLS-001 vendored terraform/helm/mcp-builder/golang-pro/async-python-patterns + vault-sync drift-fix (all no targets: -> all agents)
+    [ "$count" -eq 24 ]  # 25 -> 24: dropped generic vault-sync (Hermes-only; now lives in vault 80_agents/hermes-nan/skills only)
     # Spot check: audit.md present (portable), creating-skills.md absent (targets:[claude]).
     [ -f "$HOME/.config/opencode/commands/audit.md" ]
     [ ! -f "$HOME/.config/opencode/commands/creating-skills.md" ]
