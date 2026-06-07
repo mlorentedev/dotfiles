@@ -39,7 +39,7 @@ For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.m
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:82589eb0b0204879) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:e1984fb77ea4562d) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -48,7 +48,7 @@ For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.m
 - **No internal phase/milestone references** in branch names, commit messages, or PR titles.
   - Bad: `feat/phase-3.1-scaffold`, `chore: scaffold repo (Phase 3.1)`
   - Good: `feat/scaffold-pyhydra3d`, `chore: scaffold PyHydra3D repository`
-- Phase tracking belongs in the vault backlog (`11-tasks.md`), not in git history.
+- Phase/milestone tracking belongs in the bitácora GitHub Project (issues + board), not in git history or the vault (per ADR-018).
 <!-- END HARNESS GENERATED -->
 * **Skills.** `~/.claude/skills/<skill>/SKILL.md` auto-load via slash commands. Skill auto-loading is a Claude Code feature, not portable. Skill **content** is portable: `AI-012-opencode-commands-port` mechanically transforms each skill into an OpenCode command in `ai/opencode/commands/*.md`.
 * **TaskCreate / TaskUpdate / TaskList.** Use for non-trivial multi-step work (≥3 distinct steps). Mark `in_progress` BEFORE starting; mark `completed` immediately on finish. Don't batch updates.
