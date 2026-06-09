@@ -1,6 +1,6 @@
 ---
 id: "REFACTOR-011-version-manifest"
-status: verifying # draft | implementing | verifying | archived
+status: archived
 created: "2026-06-07"
 issue: "mlorentedev/dotfiles#282"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, versions, ssot]
@@ -66,3 +66,5 @@ a guard so no version literal can re-appear outside the manifest.
 - Vault backlog: REFACTOR-011
 - Related: `docs/adr/dotfiles-architecture-map.md` ("where does X live" → `versions.conf`)
 - Patterns: `00_meta/patterns/pattern-spec-driven-development.md`; incident→guard (`90-lessons`)
+
+<!-- archived 2026-06-09 — PR: https://github.com/mlorentedev/dotfiles/pull/293 -->
