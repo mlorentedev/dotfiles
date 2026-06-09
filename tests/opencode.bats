@@ -113,6 +113,16 @@ setup() {
     grep -q '"openrouter":' "$OPENCODE_CFG"
 }
 
+@test "opencode.jsonc openrouter picker is curated to the shared free+NaN set (#300, no big-3)" {
+    # An explicit models map (not an empty {}) restricts the /models picker, and
+    # must match pi's ai/pi/settings.json so the two agents are interchangeable.
+    grep -q '"qwen/qwen3-coder:free":' "$OPENCODE_CFG"
+    grep -q '"deepseek/deepseek-v4-pro":' "$OPENCODE_CFG"
+    grep -q '"minimax/minimax-m3":' "$OPENCODE_CFG"
+    # No OpenAI/Google/Anthropic OpenRouter model entries.
+    ! grep -qE '"(openai|google|anthropic)/[^"]+":[[:space:]]*\{[[:space:]]*"name"' "$OPENCODE_CFG"
+}
+
 @test "opencode.jsonc has ollama provider (homelab via VPN)" {
     grep -q '"ollama":' "$OPENCODE_CFG"
     grep -q 'ollama.kubelab.live' "$OPENCODE_CFG"
