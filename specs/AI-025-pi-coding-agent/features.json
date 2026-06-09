@@ -1,0 +1,58 @@
+[
+  {
+    "id": "AI-025-pi-coding-agent-f1",
+    "behavior": "ai/pi/models.json carries no literal key and uses the {env:NAN_API_KEY} placeholder",
+    "verification": "! grep -qE '\"apiKey\"[[:space:]]*:[[:space:]]*\"sk-' ai/pi/models.json && grep -qF '{env:NAN_API_KEY}' ai/pi/models.json",
+    "state": "passed",
+    "evidence": "pi-config.bats tests 2-3 green; secret-substitution smoke resolves it to a real value"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f2",
+    "behavior": "versions.conf defines PI_VERSION as semver",
+    "verification": "grep -qE '^PI_VERSION=[0-9]+\\.[0-9]+\\.[0-9]+$' versions.conf",
+    "state": "passed",
+    "evidence": "PI_VERSION=0.78.1; versions-conf.bats 'sets PI_VERSION' green"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f3",
+    "behavior": "setup-linux.sh installs pi pinned via npm and deploys models.json (subst) + AGENTS.md + seeds settings.json",
+    "verification": "grep -qF 'npm install -g --ignore-scripts \"$PI_PKG\"' setup-linux.sh && grep -qF 'substitute_env_placeholders \"$PI_MODELS_TMP\"' setup-linux.sh && grep -qF 'Seeded pi settings.json' setup-linux.sh",
+    "state": "passed",
+    "evidence": "pi deploy block mirrors the opencode block; shellcheck clean"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f4",
+    "behavior": "settings.json enabledModels are NaN + free + non-big-3 paid, and omit lastChangelogVersion",
+    "verification": "! grep -qE 'openrouter/(openai|google|anthropic)/' ai/pi/settings.json && ! grep -qF 'lastChangelogVersion' ai/pi/settings.json",
+    "state": "passed",
+    "evidence": "10 curated models; pi-config.bats tests 6-7 green"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f5",
+    "behavior": "healthcheck.sh reports pi presence, version match, and no leftover {env:} placeholder",
+    "verification": "grep -qF 'pi version drift' scripts/healthcheck.sh && grep -qF 'PI_PINNED' scripts/healthcheck.sh",
+    "state": "passed",
+    "evidence": "folded into the OpenCode + pi section"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f6",
+    "behavior": "AGENTS.md registers pi under Per-Provider Overlays",
+    "verification": "grep -qF 'ai/pi/models.json' AGENTS.md",
+    "state": "passed",
+    "evidence": "pi entry added next to opencode"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f7",
+    "behavior": "setup-windows.ps1 installs pi via npm and deploys models.json (subst) + AGENTS.md + seeds settings.json",
+    "verification": "grep -qF 'pi-coding-agent' setup-windows.ps1 && grep -qF 'Substitute-EnvPlaceholders -Path $piModelsTmp' setup-windows.ps1",
+    "state": "pending",
+    "evidence": "authored + static grep PASS; winget/npm + pi auth runtime pending a Windows box (#297)"
+  },
+  {
+    "id": "AI-025-pi-coding-agent-f8",
+    "behavior": "healthcheck.ps1 reports pi presence + PI_VERSION match",
+    "verification": "grep -qF 'pi version drift' scripts/healthcheck.ps1 && grep -qF \"Versions['PI_VERSION']\" scripts/healthcheck.ps1",
+    "state": "pending",
+    "evidence": "authored + static grep PASS; pwsh not available on Linux to run (#297)"
+  }
+]

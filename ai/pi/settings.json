@@ -1,0 +1,17 @@
+{
+  "defaultProvider": "nan",
+  "defaultModel": "qwen3.6",
+  "defaultThinkingLevel": "high",
+  "enabledModels": [
+    "nan/qwen3.6",
+    "nan/gemma4",
+    "nan/deepseek-v4-flash",
+    "nan/mimo-v2.5",
+    "openrouter/qwen/qwen3-coder:free",
+    "openrouter/moonshotai/kimi-k2.6:free",
+    "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter/deepseek/deepseek-v4-pro",
+    "openrouter/qwen/qwen3-coder-plus",
+    "openrouter/minimax/minimax-m3"
+  ]
+}

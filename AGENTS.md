@@ -76,6 +76,7 @@ Concrete model identifiers per tier live in the agent-specific overlay files:
 
 - `ai/claude/CLAUDE.md` — Claude Code (subagent frontmatter `model: opus|sonnet|haiku`; main session `/model` slash)
 - `ai/opencode/opencode.jsonc` — OpenCode (TUI `/models` picker; `qq` / `qf` wrappers for quick-questions)
+- `ai/pi/models.json` + `ai/pi/settings.json` — pi coding agent (`@earendil-works/pi-coding-agent`; TUI model picker; NaN primary, shared free+NaN catalog with opencode; reads `~/.pi/agent/AGENTS.md`)
 - `ai/agy/AGY.md` — Antigravity CLI (agy) (per-prompt `--model` flag)
 - `ai/copilot/copilot-instructions.md` — GitHub Copilot CLI v2 (TBD; concrete schema pending AI-017/AI-018 audit)
 - `ai/hermes/AGENTS.md` — Hermes (Nous Research) remote ops agent (NaN catalog: `deepseek-v4-flash` interactive, `qwen3.6` async; provisioned by `ai/hermes/setup.sh`, reads the vault not this repo)
