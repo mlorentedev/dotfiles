@@ -979,6 +979,42 @@ elif command -v hive >/dev/null 2>&1; then
     log_warning "hive ${hive_ver:-<unknown>} predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 fi
 
+# OPS-001: opt-in self-deploy timer (git pull --ff-only + idempotent setup).
+# Tri-state, gated on DOTFILES_AUTODEPLOY so a normal setup never touches it:
+#   1     -> deploy units + enable --now the daily --user timer
+#   0     -> disable + remove the timer (clean opt-out / teardown)
+#   unset -> no-op (opt-in, default OFF)
+# Non-fatal: any failure leaves setup succeeding; the timer is a convenience, and
+# `dotfiles-selfupdate.sh` itself no-ops on a dirty/diverged repo (OPS-001).
+if command -v systemctl >/dev/null 2>&1; then
+    SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    case "${DOTFILES_AUTODEPLOY:-}" in
+        1)
+            ensure_directory "$SYSTEMD_USER_DIR"
+            if cp -f "$CURRENT_DIR/systemd/dotfiles-selfupdate.service" "$SYSTEMD_USER_DIR/" \
+                && cp -f "$CURRENT_DIR/systemd/dotfiles-selfupdate.timer" "$SYSTEMD_USER_DIR/"; then
+                systemctl --user daemon-reload >/dev/null 2>&1 || true
+                if systemctl --user enable --now dotfiles-selfupdate.timer >/dev/null 2>&1; then
+                    log_success "Enabled dotfiles-selfupdate.timer (daily self-deploy, systemd --user)"
+                else
+                    log_warning "dotfiles-selfupdate.timer enable failed (non-fatal; re-run setup manually to update)"
+                fi
+            else
+                log_warning "Could not deploy dotfiles-selfupdate units to $SYSTEMD_USER_DIR (non-fatal)"
+            fi
+            ;;
+        0)
+            systemctl --user disable --now dotfiles-selfupdate.timer >/dev/null 2>&1 || true
+            rm -f "$SYSTEMD_USER_DIR/dotfiles-selfupdate.timer" "$SYSTEMD_USER_DIR/dotfiles-selfupdate.service"
+            systemctl --user daemon-reload >/dev/null 2>&1 || true
+            log_info "Disabled + removed dotfiles-selfupdate.timer (DOTFILES_AUTODEPLOY=0)"
+            ;;
+        *)
+            : # unset -> no-op (opt-in, default OFF)
+            ;;
+    esac
+fi
+
 # Claude Code plugins (requires claude CLI).
 # Idempotent: cache the installed-plugins list ONCE before the loop and skip
 # entries already present. The wrapper above (BUG-004/011) catches the

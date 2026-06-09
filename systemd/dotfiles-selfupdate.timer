@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily dotfiles self-deploy (git pull --ff-only + idempotent setup)
+Documentation=https://github.com/mlorentedev/dotfiles/issues/295
+
+[Timer]
+# Daily wall-clock. Persistent runs a missed slot once on the next boot/resume,
+# so a laptop that was off still converges to origin/main. RandomizedDelaySec
+# spreads multiple machines so they do not all hit the remote on the same second.
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

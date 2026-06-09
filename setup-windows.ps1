@@ -1724,6 +1724,44 @@ if (Test-Path $healthcheckScript) {
 # 9. SUMMARY
 # ============================================================================
 
+# OPS-001: opt-in self-deploy Scheduled Task (Windows parity of the systemd timer).
+# Tri-state, gated on DOTFILES_AUTODEPLOY so a normal setup never touches it:
+#   1     -> deploy the selfupdate script + register a daily windowless S4U task
+#   0     -> unregister the task (clean opt-out)
+#   unset -> no-op (opt-in, default OFF)
+# Routes through Register-HiveScheduledTask (the generic S4U/windowless registrar)
+# so the task runs in session 0 with no console window, same as the hive tasks.
+$selfUpdateTask = "DotfilesSelfUpdate"
+switch ("$env:DOTFILES_AUTODEPLOY") {
+    "1" {
+        $selfUpdateSrc = Join-Path $DotfilesDir "scripts\dotfiles-selfupdate.ps1"
+        $selfUpdateDst = Join-Path $ClaudeHome "scripts\dotfiles-selfupdate.ps1"
+        if (Test-Path $selfUpdateSrc) {
+            Ensure-Directory (Split-Path $selfUpdateDst -Parent)
+            Copy-Item $selfUpdateSrc $selfUpdateDst -Force
+            $selfUpdateArg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$selfUpdateDst`""
+            try {
+                $suAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $selfUpdateArg
+                $suTrigger = New-ScheduledTaskTrigger -Daily -At 3am
+                $suSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
+                Register-HiveScheduledTask -TaskName $selfUpdateTask -Action $suAction -Trigger $suTrigger `
+                    -Settings $suSettings `
+                    -Description "dotfiles self-deploy: daily git pull --ff-only + idempotent setup (OPS-001)"
+                Write-Success "Enabled DotfilesSelfUpdate task (daily, windowless S4U)"
+            } catch {
+                Write-Warn "Could not register DotfilesSelfUpdate task (non-fatal): $_"
+            }
+        } else {
+            Write-Warn "self-update script not found at $selfUpdateSrc"
+        }
+    }
+    "0" {
+        Unregister-ScheduledTask -TaskName $selfUpdateTask -Confirm:$false -ErrorAction SilentlyContinue
+        Write-Info "Disabled DotfilesSelfUpdate task (DOTFILES_AUTODEPLOY=0)"
+    }
+    default { }
+}
+
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
 Write-Host "  Setup Complete!                          " -ForegroundColor Green

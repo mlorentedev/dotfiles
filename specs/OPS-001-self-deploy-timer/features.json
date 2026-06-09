@@ -1,0 +1,44 @@
+[
+  {
+    "id": "OPS-001-self-deploy-timer-f1",
+    "behavior": "AC1 dirty worktree: skip + exit 0, no fetch, no setup",
+    "verification": "bats tests/dotfiles-selfupdate.bats -f 'dirty'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-001-self-deploy-timer-f2",
+    "behavior": "AC2 diverged/non-ff: skip + exit 0, no setup",
+    "verification": "bats tests/dotfiles-selfupdate.bats -f 'diverged'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-001-self-deploy-timer-f3",
+    "behavior": "AC3 already current: exit 0, no setup",
+    "verification": "bats tests/dotfiles-selfupdate.bats -f 'current'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-001-self-deploy-timer-f4",
+    "behavior": "AC4 clean fast-forward: ff + run setup once",
+    "verification": "bats tests/dotfiles-selfupdate.bats -f 'fast-forward'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-001-self-deploy-timer-f5",
+    "behavior": "AC5 setup failure propagates non-zero exit",
+    "verification": "bats tests/dotfiles-selfupdate.bats -f 'setup failure'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-001-self-deploy-timer-f6",
+    "behavior": "AC6/AC7 opt-in gate + units structure",
+    "verification": "bats tests/dotfiles-selfupdate-install.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
