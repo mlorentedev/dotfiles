@@ -4,7 +4,7 @@ type: skill
 status: active
 created: "2026-05-31"
 name: handoff
-description: Run a complete, standardized session handoff at session end (or on demand). Triggers on /handoff, "do handoff", "haz handoff", "wrap up the session", "session handoff", "close out the session". Updates the MEMORY.md continuity block, then vault hygiene (tick tasks, capture lessons), repo/worktree/branch state verification, an artifact/PR summary, and a concrete next action. Cross-agent via AGENTS.md indirection.
+description: Run a complete, standardized session handoff at session end (or on demand). Triggers on /handoff, "do handoff", "haz handoff", "wrap up the session", "session handoff", "close out the session". Updates the MEMORY.md continuity block, then vault hygiene (tick tasks, capture lessons), bitácora board-status reconciliation, repo/worktree/branch state verification, an artifact/PR summary, and a concrete next action. Cross-agent via AGENTS.md indirection.
 allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch]
 ---
 
@@ -46,6 +46,23 @@ Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handof
 - If the session changed behavior, structure, commands, public contracts, or setup, update the repo docs that describe them: `README.md` and the repo's `docs/` (ADRs, runbooks, troubleshooting) for repos on the knowledge-placement model. ADRs in this repo live in `docs/adr/`.
 - **Scope = this session's deltas, NOT a full audit.** A complete README/docs reconciliation is a dedicated task (e.g. an `AUDIT-*` ticket), not something every handoff redoes — the goal here is simply that docs do not drift behind the code the session just changed.
 
+### 2b. Bitácora status reconciliation (Standing Order #8 — HARNESS-010)
+
+Every issue you touched this session must reflect reality on the board ([Project #1](https://github.com/users/mlorentedev/projects/1)) — **none left in `Backlog` while actively worked**:
+
+- **Worked, still open →** `In Progress` (self-assigning fires `bitacora-status.yml`; if you never assigned it, self-assign now or set the field by hand) — or `Blocked` with the blocker named in an issue comment.
+- **Finished, closed →** the built-in workflow sets `Done` on close; confirm it landed.
+
+Quick audit of this session's issue numbers (`N1,N2,…`):
+
+```bash
+gh project item-list 1 --owner mlorentedev --format json --limit 300 \
+  | python3 -c "import json,sys; W={N1,N2}; [print(i.get('status'),'·',i.get('content',{}).get('title','')) \
+       for i in json.load(sys.stdin)['items'] if i.get('content',{}).get('number') in W]"
+```
+
+Leaving an actively-worked issue in `Backlog` is the exact gap HARNESS-010 closes. Mechanics: `dotfiles/docs/runbooks/guide-bitacora-setup.md` §5.
+
 ### 3. Repo / worktree / branch state
 
 - No uncommitted work left dangling — or explicitly named in **Open threads** (never silently).
@@ -63,6 +80,10 @@ Remove transient clutter before closing:
 - **Empty vault stubs:** if any vault file (e.g. `90-lessons.md`) is frontmatter-only with no real content, delete it and remove its inbound links. Scope: only paths touched this session.
 
 Scope: only repos and vault paths actually touched in this session — not a global cleanup pass.
+
+### 3c. Context refresh (conditional — `/context-refresh`)
+
+If this session **wrote an ADR, closed a phase milestone, pivoted direction, or changed the active focus**, run `/context-refresh <project>` for each affected project. It patches only the `00-context.md` frontmatter (`phase`, `focus`, `blocked_by`, `recent_adrs`, `last_updated`) so the next session orients in <400 tokens, and never touches the stable body. **Skip** when the session only changed task state — that lives in the bitácora, not `00-context.md`. See [[context-refresh]] (HARNESS-006).
 
 ### 4. Artifact summary
 
