@@ -294,6 +294,19 @@ if (Test-Path $versionsSource) {
 
 Write-Info "Installing developer tools..."
 
+# Pin OpenCode to OPENCODE_VERSION from versions.conf (REFACTOR-011), mirroring
+# the Linux installer. winget honors --version. If the manifest is missing or
+# the key is absent, $opencodeVersion stays $null and OpenCode installs latest.
+$opencodeVersion = $null
+if (Test-Path -LiteralPath $versionsSource) {
+    foreach ($line in Get-Content -LiteralPath $versionsSource) {
+        if ($line -match '^\s*OPENCODE_VERSION\s*=\s*(.+?)\s*$') {
+            $opencodeVersion = $Matches[1].Trim().Trim('"').Trim("'")
+            break
+        }
+    }
+}
+
 $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
 if ($wingetCmd) {
     $tools = @(
@@ -305,13 +318,15 @@ if ($wingetCmd) {
         @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" },
         # AI-014: OpenCode (secondary AI agent, ADR-009). User-scope winget
         # package, no admin. Cleaner than the Linux curl-bash equivalent.
-        @{ Name = "OpenCode"; Cmd = "opencode"; Id = "SST.opencode" }
+        @{ Name = "OpenCode"; Cmd = "opencode"; Id = "SST.opencode"; Version = $opencodeVersion }
     )
     foreach ($tool in $tools) {
         if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
             Write-Info "Installing $($tool.Name)..."
             try {
-                & winget install $tool.Id --accept-package-agreements --accept-source-agreements 2>$null | Out-Null
+                $wingetArgs = @($tool.Id, '--accept-package-agreements', '--accept-source-agreements')
+                if ($tool.Version) { $wingetArgs += @('--version', $tool.Version) }
+                & winget install @wingetArgs 2>$null | Out-Null
                 Write-Success "$($tool.Name) installed"
             } catch {
                 Write-Warn "Failed to install $($tool.Name): $_"

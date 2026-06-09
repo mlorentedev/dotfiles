@@ -471,6 +471,17 @@ $opencodeCfg = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
 if (Test-Command 'opencode') {
     $ocVersion = (& opencode --version 2>&1 | Select-Object -First 1)
     Write-Pass "opencode in PATH: $ocVersion"
+    $ocPinned = $script:Versions['OPENCODE_VERSION']
+    if ($ocPinned) {
+        $ocInstalled = ($ocVersion -split '\s+')[-1]
+        if ($ocInstalled -eq $ocPinned) {
+            Write-Pass "opencode version matches versions.conf ($ocPinned)"
+        } else {
+            Write-Fail "opencode version drift: installed=$ocInstalled pinned=$ocPinned"
+        }
+    } else {
+        Write-Skip 'opencode version' 'OPENCODE_VERSION not set in versions.conf'
+    }
 } else {
     Write-Skip 'opencode binary' 'not installed (winget install SST.opencode, or re-run setup-windows.ps1)'
 }

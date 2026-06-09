@@ -353,8 +353,17 @@ section "10/13" "OpenCode"
 
 OPENCODE_BIN="$HOME/.opencode/bin/opencode"
 OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
+OPENCODE_PINNED="$(grep -E '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf" 2>/dev/null | cut -d= -f2)"
 if command -v opencode >/dev/null 2>&1; then
     pass "opencode in PATH: $(opencode --version 2>&1 | head -1)"
+    INSTALLED_OPENCODE=$(opencode --version 2>&1 | head -1 | awk '{print $NF}')
+    if [ -n "$OPENCODE_PINNED" ] && [ "$INSTALLED_OPENCODE" = "$OPENCODE_PINNED" ]; then
+        pass "opencode version matches versions.conf ($OPENCODE_PINNED)"
+    elif [ -n "$OPENCODE_PINNED" ]; then
+        fail "opencode version drift: installed=$INSTALLED_OPENCODE pinned=$OPENCODE_PINNED"
+    else
+        skip "OPENCODE_VERSION not set in versions.conf — version match not verified"
+    fi
 elif [ -x "$OPENCODE_BIN" ]; then
     fail "opencode binary exists at $OPENCODE_BIN but not in PATH (reload shell or check .zshrc/.bashrc)"
 else

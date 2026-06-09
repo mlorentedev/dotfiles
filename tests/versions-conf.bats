@@ -52,6 +52,11 @@ setup() {
     [[ -n "$BATS_VERSION" ]]
 }
 
+@test "versions.conf sets OPENCODE_VERSION" {
+    . "$VERSIONS_CONF"
+    [[ -n "$OPENCODE_VERSION" ]]
+}
+
 @test "versions.conf all values match semver pattern" {
     while IFS= read -r line; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue

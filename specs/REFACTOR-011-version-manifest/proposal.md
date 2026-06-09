@@ -1,6 +1,6 @@
 ---
 id: "REFACTOR-011-version-manifest"
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-06-07"
 issue: "mlorentedev/dotfiles#282"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, versions, ssot]

@@ -23,6 +23,13 @@ CURRENT_DIR=$(pwd)
 
 # Create necessary directories
 export DOTFILES_DIR="$HOME/.dotfiles"
+
+# Single source of truth for tool versions (REFACTOR-011): source the manifest
+# from the checkout so $OPENCODE_VERSION / $GHOSTTY_VERSION / etc. are reliable
+# regardless of the parent shell. Read from $CURRENT_DIR: the copy under
+# $DOTFILES_DIR does not exist yet on a first run (it is created below).
+[ -f "$CURRENT_DIR/versions.conf" ] && . "$CURRENT_DIR/versions.conf"
+
 log_info "Creating necessary directories..."
 ensure_directory "$HOME/.zsh"
 ensure_directory "$HOME/.bash"
@@ -592,8 +599,19 @@ OPENCODE_BIN_DIR="$HOME/.opencode/bin"
 OPENCODE_BINARY="$OPENCODE_BIN_DIR/opencode"
 
 if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$OPENCODE_BINARY" ]; then
-    log_info "Installing opencode via official install script..."
-    if curl -fsSL https://opencode.ai/install | bash; then
+    # Pin to $OPENCODE_VERSION from versions.conf (REFACTOR-011). The official
+    # installer honors `--version`. If the manifest is missing (broken checkout)
+    # OPENCODE_VERSION is empty -- fall back to latest rather than passing an
+    # empty --version, and let healthcheck surface the drift.
+    opencode_install_status=0
+    if [ -n "$OPENCODE_VERSION" ]; then
+        log_info "Installing opencode v$OPENCODE_VERSION via official install script..."
+        curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION" || opencode_install_status=$?
+    else
+        log_info "Installing opencode (latest; OPENCODE_VERSION unset) via official install script..."
+        curl -fsSL https://opencode.ai/install | bash || opencode_install_status=$?
+    fi
+    if [ "$opencode_install_status" -eq 0 ]; then
         log_success "opencode installed to $OPENCODE_BIN_DIR"
     else
         log_warning "opencode install failed — re-run setup or install manually (https://opencode.ai/docs/)"
@@ -685,7 +703,7 @@ fi
 # one-liner once per machine. Config is deployed unconditionally though, so
 # the moment the user runs `sudo apt install -y ghostty` the canonical config
 # is already in place.
-GHOSTTY_VERSION_PINNED="${GHOSTTY_VERSION:-1.3.0}"
+GHOSTTY_VERSION_PINNED="${GHOSTTY_VERSION}"
 if ! command -v ghostty >/dev/null 2>&1; then
     log_warning "ghostty not installed. Run: sudo apt install -y ghostty  (Ubuntu 26.04+ universe; needed for the recommended opencode TUI host)"
 else
