@@ -381,6 +381,33 @@ else
     fail "opencode.jsonc missing: $OPENCODE_CFG (run setup-linux.sh)"
 fi
 
+# pi coding agent (AI-025) — same NaN-first, free+NaN catalog as opencode.
+PI_PINNED="$(grep -E '^PI_VERSION=' "$DOTFILES_DIR/versions.conf" 2>/dev/null | cut -d= -f2)"
+PI_MODELS_CFG="$HOME/.pi/agent/models.json"
+if command -v pi >/dev/null 2>&1; then
+    pass "pi in PATH: $(pi --version 2>&1 | head -1)"
+    INSTALLED_PI=$(pi --version 2>&1 | head -1 | awk '{print $NF}')
+    if [ -n "$PI_PINNED" ] && [ "$INSTALLED_PI" = "$PI_PINNED" ]; then
+        pass "pi version matches versions.conf ($PI_PINNED)"
+    elif [ -n "$PI_PINNED" ]; then
+        fail "pi version drift: installed=$INSTALLED_PI pinned=$PI_PINNED"
+    else
+        skip "PI_VERSION not set in versions.conf — version match not verified"
+    fi
+else
+    skip "pi not installed (npm i -g --ignore-scripts @earendil-works/pi-coding-agent, or re-run setup-linux.sh)"
+fi
+if [ -f "$PI_MODELS_CFG" ]; then
+    pass "pi models.json deployed: $PI_MODELS_CFG"
+    if grep -qF '{env:' "$PI_MODELS_CFG"; then
+        fail "pi models.json has an unresolved {env:...} placeholder (secret not substituted — re-run setup-linux.sh)"
+    else
+        pass "pi models.json secret substituted (no {env:} placeholder left)"
+    fi
+else
+    skip "pi models.json not deployed at $PI_MODELS_CFG (run setup-linux.sh)"
+fi
+
 # ==================================================
 section "11/13" "Ghostty"
 

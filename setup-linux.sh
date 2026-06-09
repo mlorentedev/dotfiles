@@ -664,6 +664,64 @@ else
     log_warning "AGENTS.md source missing at $AGENTS_SRC"
 fi
 
+# Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
+# agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
+# Install pinned via npm (guarded); models.json gets the same deploy-time secret
+# substitution as opencode (SDD-009, self-contained cross-OS); AGENTS.md is the
+# same canonical SSOT; settings.json is seeded only when absent (pi mutates it).
+PI_AGENT_DIR="$HOME/.pi/agent"
+if command -v npm >/dev/null 2>&1; then
+    if ! command -v pi >/dev/null 2>&1; then
+        PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"
+        log_info "Installing pi ($PI_PKG) via npm..."
+        if npm install -g --ignore-scripts "$PI_PKG" >/dev/null 2>&1; then
+            log_success "pi installed"
+        else
+            log_warning "pi install failed — run: npm install -g --ignore-scripts $PI_PKG"
+        fi
+    else
+        log_info "pi already installed"
+    fi
+else
+    log_warning "npm not found — skipping pi install (install Node.js, then re-run setup)"
+fi
+
+ensure_directory "$PI_AGENT_DIR"
+
+PI_MODELS_SRC="$CURRENT_DIR/ai/pi/models.json"
+PI_MODELS_DST="$PI_AGENT_DIR/models.json"
+if [ -f "$PI_MODELS_SRC" ]; then
+    PI_MODELS_TMP=$(mktemp)
+    cp "$PI_MODELS_SRC" "$PI_MODELS_TMP"
+    substitute_env_placeholders "$PI_MODELS_TMP"
+    if [ -f "$PI_MODELS_DST" ] && cmp -s "$PI_MODELS_TMP" "$PI_MODELS_DST"; then
+        log_info "pi models.json already in sync"
+        rm -f "$PI_MODELS_TMP"
+    else
+        mv "$PI_MODELS_TMP" "$PI_MODELS_DST"
+        log_success "Deployed pi models.json (deploy-time secrets) to $PI_MODELS_DST"
+    fi
+else
+    log_warning "pi models.json source missing: $PI_MODELS_SRC"
+fi
+
+PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"
+if [ -f "$AGENTS_SRC" ]; then
+    if [ -f "$PI_AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$PI_AGENTS_DST"; then
+        log_info "AGENTS.md (pi) already in sync"
+    else
+        cp "$AGENTS_SRC" "$PI_AGENTS_DST"
+        log_success "Deployed AGENTS.md to $PI_AGENTS_DST"
+    fi
+fi
+
+PI_SETTINGS_SRC="$CURRENT_DIR/ai/pi/settings.json"
+PI_SETTINGS_DST="$PI_AGENT_DIR/settings.json"
+if [ -f "$PI_SETTINGS_SRC" ] && [ ! -f "$PI_SETTINGS_DST" ]; then
+    cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
+    log_success "Seeded pi settings.json to $PI_SETTINGS_DST"
+fi
+
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
 # Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
 # carries no secrets, so it deploys verbatim. opencode reads tui.json natively.

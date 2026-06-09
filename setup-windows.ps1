@@ -831,6 +831,81 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     Write-Warn "AGENTS.md source missing at $agentsSrc"
 }
 
+# ============================================================================
+# 2e. PI CODING AGENT CONFIG (AI-025)
+# ============================================================================
+# Mirror of the opencode block + setup-linux.sh pi deploy so the two agents are
+# interchangeable across Linux/Windows. pi reads %USERPROFILE%\.pi\agent\.
+# npm-pinned install (guarded); models.json gets the same {env:VAR} deploy-time
+# substitution (SDD-009); AGENTS.md is the same SSOT; settings.json seeds only
+# when absent (pi mutates it at runtime).
+$piVersion = $null
+if (Test-Path -LiteralPath $versionsSource) {
+    foreach ($line in Get-Content -LiteralPath $versionsSource) {
+        if ($line -match '^\s*PI_VERSION\s*=\s*(.+?)\s*$') {
+            $piVersion = $Matches[1].Trim().Trim('"').Trim("'")
+            break
+        }
+    }
+}
+$piAgentDir = Join-Path $env:USERPROFILE '.pi\agent'
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
+        $piPkg = if ($piVersion) { "@earendil-works/pi-coding-agent@$piVersion" } else { "@earendil-works/pi-coding-agent" }
+        Write-Info "Installing pi ($piPkg) via npm..."
+        & npm install -g --ignore-scripts $piPkg 2>$null | Out-Null
+        if (Get-Command pi -ErrorAction SilentlyContinue) {
+            Write-Success "pi installed"
+        } else {
+            Write-Warn "pi install failed - run: npm install -g --ignore-scripts $piPkg"
+        }
+    } else {
+        Write-Info "pi already installed"
+    }
+} else {
+    Write-Warn "npm not available, skipping pi install (install Node.js then re-run)"
+}
+Ensure-Directory $piAgentDir
+
+$piModelsSrc = Join-Path $DotfilesDir 'ai\pi\models.json'
+$piModelsDst = Join-Path $piAgentDir 'models.json'
+if (Test-Path -LiteralPath $piModelsSrc -PathType Leaf) {
+    $piModelsTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "pi-models-$PID.json")
+    Copy-Item -LiteralPath $piModelsSrc -Destination $piModelsTmp -Force
+    if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
+        [void](Substitute-EnvPlaceholders -Path $piModelsTmp)
+    } else {
+        Write-Warn "Substitute-EnvPlaceholders missing; deploying pi models.json with literal {env:VAR} placeholders intact"
+    }
+    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
+        [void](Deploy-File -Source $piModelsTmp -Destination $piModelsDst)
+    } else {
+        Ensure-Directory (Split-Path $piModelsDst -Parent)
+        Copy-Item -LiteralPath $piModelsTmp -Destination $piModelsDst -Force
+        Write-Success "Deployed pi models.json to $piModelsDst (fallback)"
+    }
+    Remove-Item -LiteralPath $piModelsTmp -Force -ErrorAction SilentlyContinue
+} else {
+    Write-Warn "pi models.json source missing: $piModelsSrc"
+}
+
+$piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'
+if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
+    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
+        [void](Deploy-File -Source $agentsSrc -Destination $piAgentsDst)
+    } else {
+        Copy-Item -LiteralPath $agentsSrc -Destination $piAgentsDst -Force
+        Write-Success "Deployed AGENTS.md to $piAgentsDst (fallback)"
+    }
+}
+
+$piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
+$piSettingsDst = Join-Path $piAgentDir 'settings.json'
+if ((Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) -and -not (Test-Path -LiteralPath $piSettingsDst)) {
+    Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst -Force
+    Write-Success "Seeded pi settings.json to $piSettingsDst"
+}
+
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
 # Plain copy: unlike opencode.jsonc this file carries no secrets, so no env-var
 # substitution (DX-004). opencode reads .config\opencode\tui.json natively.

@@ -497,6 +497,37 @@ if (Test-Path -LiteralPath $opencodeCfg -PathType Leaf) {
     Write-Skip 'opencode.jsonc' "not deployed at $opencodeCfg (run setup-windows.ps1)"
 }
 
+# pi coding agent (AI-025) - same NaN-first, free+NaN catalog as opencode.
+$piModelsCfg = Join-Path $env:USERPROFILE '.pi\agent\models.json'
+if (Test-Command 'pi') {
+    $piVer = (& pi --version 2>&1 | Select-Object -First 1)
+    Write-Pass "pi in PATH: $piVer"
+    $piPinned = $script:Versions['PI_VERSION']
+    if ($piPinned) {
+        $piInstalled = ($piVer -split '\s+')[-1]
+        if ($piInstalled -eq $piPinned) {
+            Write-Pass "pi version matches versions.conf ($piPinned)"
+        } else {
+            Write-Fail "pi version drift: installed=$piInstalled pinned=$piPinned"
+        }
+    } else {
+        Write-Skip 'pi version' 'PI_VERSION not set in versions.conf'
+    }
+} else {
+    Write-Skip 'pi binary' 'not installed (npm i -g --ignore-scripts @earendil-works/pi-coding-agent, or re-run setup-windows.ps1)'
+}
+
+if (Test-Path -LiteralPath $piModelsCfg -PathType Leaf) {
+    Write-Pass "pi models.json deployed: $piModelsCfg"
+    if (Select-String -LiteralPath $piModelsCfg -Pattern '\{env:' -Quiet) {
+        Write-Fail 'pi models.json has an unresolved {env:...} placeholder (re-run setup-windows.ps1)'
+    } else {
+        Write-Pass 'pi models.json secret substituted (no {env:} placeholder left)'
+    }
+} else {
+    Write-Skip 'pi models.json' "not deployed at $piModelsCfg (run setup-windows.ps1)"
+}
+
 # ==================================================
 # 11/13 Ghostty
 # ==================================================

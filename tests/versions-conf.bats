@@ -57,6 +57,11 @@ setup() {
     [[ -n "$OPENCODE_VERSION" ]]
 }
 
+@test "versions.conf sets PI_VERSION" {
+    . "$VERSIONS_CONF"
+    [[ -n "$PI_VERSION" ]]
+}
+
 @test "versions.conf all values match semver pattern" {
     while IFS= read -r line; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue

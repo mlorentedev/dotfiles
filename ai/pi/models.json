@@ -1,0 +1,88 @@
+{
+  "providers": {
+    "nan": {
+      "baseUrl": "https://api.nan.builders/v1",
+      "api": "openai-completions",
+      "apiKey": "{env:NAN_API_KEY}",
+      "compat": {
+        "supportsDeveloperRole": true
+      },
+      "timeoutSeconds": 300,
+      "models": [
+        {
+          "id": "qwen3.6",
+          "name": "qwen3.6 (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 262144,
+          "maxTokens": 65536
+        },
+        {
+          "id": "gemma4",
+          "name": "Gemma4 (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 262144,
+          "maxTokens": 65536
+        },
+        {
+          "id": "deepseek-v4-flash",
+          "name": "deepseek (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 1048576,
+          "maxTokens": 65536
+        },
+        {
+          "id": "mimo-v2.5",
+          "name": "mimo (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 1048576,
+          "maxTokens": 65536
+        }
+      ],
+      "authHeader": false
+    }
+  }
+}
