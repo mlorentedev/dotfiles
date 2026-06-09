@@ -1,7 +1,7 @@
 ---
 id: "AI-025-pi-coding-agent"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived
 created: "2026-06-09"
 issue: "mlorentedev/dotfiles#296"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ai, pi, agent]
@@ -66,3 +66,5 @@ model set.
 - Related: `specs/archive/SDD-009-opencode-deploy-time-secrets/` (deploy-time secret pattern reused here)
 - Related: `specs/AI-011-opencode-bootstrap/`, `ai/opencode/opencode.jsonc` (the mirrored agent pattern)
 - Stacked on: #293 (REFACTOR-011 — makes `setup-linux.sh` source the manifest)
+
+<!-- archived 2026-06-09 — PR: https://github.com/mlorentedev/dotfiles/pull/298 -->

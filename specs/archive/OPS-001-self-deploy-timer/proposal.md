@@ -1,7 +1,7 @@
 ---
 id: "OPS-001-self-deploy-timer"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived
 created: "2026-06-09"
 issue: "dotfiles#295"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -62,3 +62,5 @@ Observable outcomes. Each must be testable.
 - Reference pattern in-repo: `systemd/hive-upgrade.{service,timer}` + its install block in `setup-linux.sh` (AI-023 / hive#176)
 - ADR: `docs/adr/adr-005-*` (`~/.dotfiles` is a deployed copy, not a git repo — why self-update targets `~/Projects/dotfiles`)
 - Related patterns: `00_meta/patterns/pattern-config-defaults.md` (opt-in defaults), `pattern-shell-standards.md`
+
+<!-- archived 2026-06-09 — PR: https://github.com/mlorentedev/dotfiles/pull/303 -->
