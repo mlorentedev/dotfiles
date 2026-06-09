@@ -189,9 +189,21 @@
       }
     },
 
-    // OpenRouter — frontier on-demand fallback (PAYG, existing $5 credit).
-    // No models override → uses OpenRouter's preloaded catalog; interactive picker.
-    "openrouter": {},
+    // OpenRouter — curated to the shared free+NaN set (#300; matches pi's
+    // ai/pi/settings.json enabledModels) so opencode and pi are interchangeable.
+    // An explicit models map restricts the /models picker to exactly these,
+    // whereas an empty {} loads OpenRouter's entire catalog. 3 most-powerful
+    // free + 3 paid non-OpenAI/Google/Anthropic.
+    "openrouter": {
+      "models": {
+        "qwen/qwen3-coder:free": { "name": "Qwen3 Coder (free)" },
+        "moonshotai/kimi-k2.6:free": { "name": "Kimi K2.6 (free)" },
+        "nvidia/nemotron-3-ultra-550b-a55b:free": { "name": "Nemotron 3 Ultra (free)" },
+        "deepseek/deepseek-v4-pro": { "name": "DeepSeek V4 Pro" },
+        "qwen/qwen3-coder-plus": { "name": "Qwen3 Coder Plus" },
+        "minimax/minimax-m3": { "name": "MiniMax M3" }
+      }
+    },
 
     // (compaction block sits at top level — see below the provider block)
 
