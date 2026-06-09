@@ -27,16 +27,17 @@ created: "2026-06-07"
    - fail if `.zshrc`/`.bashrc` match `\$\{[A-Z_]+_VERSION:-[0-9]` (a re-introduced hardcoded fallback);
    - assert every `${*_VERSION}` referenced in the RC tool-home exports is a key defined in `versions.conf`.
 8. **healthcheck opencode assert (Linux)** — `scripts/healthcheck.sh` opencode block (~353-357): add a version-match mirroring the ghostty pattern (379-388): `OPENCODE_PINNED="$(grep -E '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf" | cut -d= -f2)"`, compare to `opencode --version`.
-9. **Windows (⚠️ Windows-empirical — defer to a Windows session per the batch-windows rule):**
-   - `setup-windows.ps1` installs opencode via **winget** (`SST.opencode`, generic loop :310-322). Pinning needs `winget install --version $OPENCODE_VERSION SST.opencode` (special-case out of the loop) **and** the script must parse `OPENCODE_VERSION` from `versions.conf`. Verify winget honors `--version` for this package + that the version is available.
-   - `scripts/healthcheck.ps1` (~472): mirror the opencode version assert.
+9. **Windows (authored now — Linux-authorable; only the winget runtime check is Windows-empirical):**
+   - [x] `setup-windows.ps1` parses `OPENCODE_VERSION` from `versions.conf` and pins via winget by adding a `Version` field to the `SST.opencode` tool entry + array-splat `--version` in the install loop (no orphan flag when unset).
+   - [x] `scripts/healthcheck.ps1`: opencode version assert against `$script:Versions['OPENCODE_VERSION']` (mirrors the Linux block).
+   - [ ] Windows runtime check ONLY: run `setup-windows.ps1` + `healthcheck.ps1` on a Windows box to confirm `winget install --version 1.16.2 SST.opencode` succeeds (version published) and `opencode --version` parses.
 
 ## Closing
 
-- [ ] Every AC covered by a test; add sibling `features.json` (harness contract) at implementation time.
-- [ ] `bats tests/*.bats` green; `shellcheck` clean on changed scripts.
-- [ ] `verification.md` filled with evidence (commit hashes / test names).
-- [ ] Windows items either landed (if at a Windows box) or split into a follow-up ticket.
+- [x] Every AC covered by a test; sibling `features.json` (harness contract) added — 6 passed, 2 pending (Windows runtime).
+- [x] `bats tests/*.bats` green (version + deploy tests); `shellcheck --severity=error` clean on changed scripts. 9 pre-existing env failures (pwsh absent + shell-profile sandbox), reproduced on pristine main, 0 introduced.
+- [x] `verification.md` filled with evidence (test names + per-AC checks).
+- [x] Windows items landed (authored); the single winget runtime check is flagged for the next Windows session.
 - [ ] PR opened referencing this spec folder.
 
 ## Notes / discovered debt (capture, don't fix here)

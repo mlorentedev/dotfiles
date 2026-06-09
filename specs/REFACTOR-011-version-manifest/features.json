@@ -1,0 +1,58 @@
+[
+  {
+    "id": "REFACTOR-011-version-manifest-f1",
+    "behavior": "versions.conf defines OPENCODE_VERSION as semver",
+    "verification": "grep -qE '^OPENCODE_VERSION=[0-9]+\\.[0-9]+\\.[0-9]+$' versions.conf",
+    "state": "passed",
+    "evidence": "OPENCODE_VERSION=1.16.2; bats 'versions.conf sets OPENCODE_VERSION' green"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f2",
+    "behavior": "setup-linux.sh sources the manifest and pins opencode to $OPENCODE_VERSION (latest only when unset)",
+    "verification": "grep -qF '. \"$CURRENT_DIR/versions.conf\"' setup-linux.sh && grep -qF 'bash -s -- --version \"$OPENCODE_VERSION\"' setup-linux.sh",
+    "state": "passed",
+    "evidence": "manifest sourced near top (line ~27); pinned install with empty-var latest-fallback"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f3",
+    "behavior": ".zshrc and .bashrc contain no hardcoded version fallback literal",
+    "verification": "! grep -qE '\\$\\{[A-Z_]+_VERSION:-[0-9]' .zshrc .bashrc",
+    "state": "passed",
+    "evidence": "10 ${VAR:-X.Y.Z} fallbacks stripped to ${VAR}"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f4",
+    "behavior": "guard test fails on a reintroduced fallback OR an undefined *_VERSION reference",
+    "verification": "bats tests/versions-no-hardcode.bats",
+    "state": "passed",
+    "evidence": "4/4 tests green (2 no-fallback + 2 defined-in-manifest)"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f5",
+    "behavior": "healthcheck.sh asserts installed opencode version against OPENCODE_VERSION",
+    "verification": "grep -qF 'OPENCODE_PINNED' scripts/healthcheck.sh && grep -qF 'opencode version drift' scripts/healthcheck.sh",
+    "state": "passed",
+    "evidence": "pass/fail/skip block mirroring the ghostty version-match"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f6",
+    "behavior": "ghostty version uses the manifest with no hardcoded fallback",
+    "verification": "grep -qF 'GHOSTTY_VERSION_PINNED=\"${GHOSTTY_VERSION}\"' setup-linux.sh",
+    "state": "passed",
+    "evidence": "${GHOSTTY_VERSION:-1.3.0} -> ${GHOSTTY_VERSION}"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f7",
+    "behavior": "setup-windows.ps1 parses OPENCODE_VERSION and pins opencode via winget --version",
+    "verification": "grep -qF 'OPENCODE_VERSION' setup-windows.ps1 && grep -qF '$wingetArgs += @(' setup-windows.ps1",
+    "state": "pending",
+    "evidence": "authored (array splatting, no orphan flag when unset); static grep PASS; winget --version runtime pending a Windows box"
+  },
+  {
+    "id": "REFACTOR-011-version-manifest-f8",
+    "behavior": "healthcheck.ps1 asserts opencode version against OPENCODE_VERSION",
+    "verification": "grep -qF \"Versions['OPENCODE_VERSION']\" scripts/healthcheck.ps1 && grep -qF 'opencode version drift' scripts/healthcheck.ps1",
+    "state": "pending",
+    "evidence": "authored (mirrors Linux); static grep PASS; pwsh not available on Linux to run"
+  }
+]
