@@ -1,0 +1,11 @@
+[Unit]
+Description=Self-deploy dotfiles (git pull --ff-only + idempotent setup)
+Documentation=https://github.com/mlorentedev/dotfiles/issues/295
+
+[Service]
+Type=oneshot
+# %h resolves to the user home. Absolute path because a --user oneshot gets a
+# minimal PATH. The script fast-forwards the repo and re-runs setup only when
+# HEAD actually moved; a dirty/diverged/unreachable repo is a no-op (exit 0),
+# so this oneshot is safe to run unattended and is never marked failed for a skip.
+ExecStart=%h/Projects/dotfiles/scripts/dotfiles-selfupdate.sh
