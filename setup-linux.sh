@@ -477,6 +477,21 @@ log_success "Antigravity CLI configuration complete"
 if [ -d "${VAULT_PATH:-$HOME/Projects/knowledge}/00_meta/patterns" ]; then
     if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --refresh ) >/dev/null 2>&1; then
         log_success "Harness override blocks refreshed from vault SSOT"
+        # OPS-003: --refresh regenerates the committed harness records (and the
+        # generated blocks in AGENTS.md / ai/claude/CLAUDE.md) from the vault SSOT
+        # -- generate-and-commit (ADR-013). When the vault is ahead, that leaves
+        # UNCOMMITTED changes in the working tree. Announce them LOUDLY so they read
+        # as an actionable commit, not a parallel session's WIP (the silent drift
+        # misled a session, #295). Only meaningful inside the git repo -- the
+        # ~/.dotfiles deploy mirror is not a repo (ADR-005).
+        if git -C "$CURRENT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+            harness_drift="$(git -C "$CURRENT_DIR" status --porcelain -- harness/ AGENTS.md ai/claude/CLAUDE.md 2>/dev/null)"
+            if [ -n "$harness_drift" ]; then
+                log_warning "Harness records changed by --refresh from the vault -- commit them:"
+                printf '%s\n' "$harness_drift" | sed 's/^/      /'
+                log_warning "  git add harness/ AGENTS.md ai/claude/CLAUDE.md && git commit -m 'chore(harness): refresh records from vault'"
+            fi
+        fi
     else
         log_warning "compile-harness --refresh failed; deploying committed blocks"
     fi
