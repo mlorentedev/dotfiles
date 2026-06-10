@@ -1,7 +1,7 @@
 ---
 id: "WIN-005-windows-defaults-script"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -58,3 +58,5 @@ Invoked at the end of `setup-windows.ps1` behind a new `-WithDefaults` flag (off
 - Vault: `10_projects/dotfiles/11-tasks.md` § "Session 2026-05-27 — fresh-eyes audit" → WIN-005.
 - Inspiration: mathiasbynens/dotfiles `.macos` (~1200 LOC of `defaults write`).
 - Prior research note: `research/dotfiles-survey.md` § "Validación: cosas que el usuario YA hace mejor" — this proposal contests the survey's "doesn't port" framing.
+
+<!-- archived 2026-06-10 — PR: https://github.com/mlorentedev/dotfiles/pull/331 -->
