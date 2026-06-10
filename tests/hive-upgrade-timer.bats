@@ -110,10 +110,22 @@ setup() {
 # dotfiles#230: hive Scheduled Tasks must run windowless. A task registered with
 # no explicit principal defaults to the Interactive logon type, runs in the
 # desktop session, and pops a console window every 15-min tick. An S4U principal
-# runs the task in session 0 (no desktop -> no window), with no admin rights.
-@test "setup-windows.ps1 registers hive tasks windowless via an S4U helper" {
+# runs the task in session 0 (no desktop -> no window) -- but REGISTERING an S4U
+# task requires an elevated caller, so the helper picks the strongest achievable
+# logon type: S4U when elevated, Interactive (with -WindowStyle Hidden) otherwise.
+@test "setup-windows.ps1 registers hive tasks via the strongest-principal helper" {
     grep -qF 'function Register-HiveScheduledTask' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF -- '-LogonType S4U' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF -- '-LogonType $script:HiveTaskLogonType' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF "WindowsBuiltInRole]::Administrator" "$DOTFILES_DIR/setup-windows.ps1"
+}
+
+# Register-ScheduledTask raises "Access is denied" as a NON-terminating error;
+# without -ErrorAction Stop it slips past the call sites' try/catch and setup
+# prints a false SUCCESS for a task that was never (re)registered.
+@test "setup-windows.ps1 hive task registration failures are terminating" {
+    helper=$(sed -n '/function Register-HiveScheduledTask/,/^}/p' "$DOTFILES_DIR/setup-windows.ps1")
+    [ -n "$helper" ]
+    printf '%s' "$helper" | grep -qF -- '-ErrorAction Stop'
 }
 
 # The upgrade task must go through the helper (S4U guaranteed), never the bare
@@ -127,11 +139,13 @@ setup() {
     grep -qF -- '-WindowStyle Hidden' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# Re-running setup on a box that still has the old Interactive task must repair
-# the principal -- the idempotence check has to inspect the logon type, not just
-# the action's Execute/Arguments.
-@test "setup-windows.ps1 self-heals a drifted (non-S4U) hive-upgrade principal" {
-    grep -qF '$existingHiveLogon -eq "S4U"' "$DOTFILES_DIR/setup-windows.ps1"
+# Re-running setup on a box that still has a drifted principal must repair it --
+# the idempotence check has to inspect the logon type, not just the action's
+# Execute/Arguments. The expected type is the strongest achievable one (S4U
+# elevated / Interactive non-admin), so non-admin boxes stay idempotent instead
+# of failing the S4U re-registration on every run.
+@test "setup-windows.ps1 self-heals a drifted hive-upgrade principal" {
+    grep -qF '$existingHiveLogon -eq $script:HiveTaskLogonType' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- Windows daemon upgrade orchestration (ADR-015 / hive#176) ---

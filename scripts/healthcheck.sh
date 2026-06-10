@@ -416,7 +416,15 @@ fi
 if [ -f "$PI_MODELS_CFG" ]; then
     pass "pi models.json deployed: $PI_MODELS_CFG"
     if grep -qF '{env:' "$PI_MODELS_CFG"; then
-        fail "pi models.json has an unresolved {env:...} placeholder (secret not substituted — re-run setup-linux.sh)"
+        # The age identity is optional per box: without it the deploy-time
+        # substitution cannot run, so a leftover {env:} token is the expected
+        # state (pi's runtime env resolver is the fallback), not an error.
+        _age_key="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
+        if [ -f "$_age_key" ]; then
+            fail "pi models.json has an unresolved {env:...} placeholder (secret not substituted — re-run setup-linux.sh)"
+        else
+            skip "pi models.json substitution -- age identity absent (optional on this box; {env:} placeholder resolves at runtime)"
+        fi
     else
         pass "pi models.json secret substituted (no {env:} placeholder left)"
     fi

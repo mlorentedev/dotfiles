@@ -321,6 +321,14 @@ setup() {
     grep -qF 'SST.opencode' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 converges a drifted opencode to the versions.conf pin (REFACTOR-011)" {
+    # Presence is not convergence: an opencode older than OPENCODE_VERSION was
+    # previously skipped as "already installed", leaving healthcheck FAILing on
+    # version drift on every run.
+    grep -qF '$installedVer -ne $tool.Version' "$PS1_SCRIPT"
+    grep -qE 'winget install \$tool\.Id --version \$tool\.Version' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
     # Post-SDD-007: the inline Copy-Item + Get-FileHash block was extracted
     # into Deploy-File in scripts/utils.ps1 (atomic + idempotent by SHA256).
