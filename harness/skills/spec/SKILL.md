@@ -4,14 +4,14 @@ type: skill
 status: active
 created: "2026-05-13"
 name: spec
-description: Manage Spec-Driven Development per-feature artifacts. Triggers on /spec, "create a spec for", "scaffold spec X", "bootstrap substrate for X", "fill proposal for X", "archive spec X". Four subcommands: init (scaffold, vault-rooted), bootstrap (optional 4-section substrate contract), fill (Socratic 5-question proposal), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent Claude/Copilot via AGENTS.md indirection.
+description: Manage Spec-Driven Development per-feature artifacts. Triggers on /spec, "create a spec for", "scaffold spec X", "bootstrap substrate for X", "fill proposal for X", "archive spec X". Four subcommands: init (scaffold, gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate contract), fill (Socratic 5-question proposal), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent Claude/Copilot via AGENTS.md indirection.
 allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch]
 ---
 
 # Spec Workflow
 
 > Implements `pattern-spec-driven-development`. Four subcommands: `init`, `bootstrap` (optional), `fill`, `archive`.
-> **Core principle:** every spec is downstream of a vault entry (`11-tasks.md`, ADR, or roadmap). Vault is SSOT.
+> **Core principle:** every spec is downstream of an OPEN GitHub issue on the bitácora Project — the work-gate per ADR-018. The vault keeps templates and patterns; task state lives in GitHub.
 
 ## When to use
 
@@ -25,7 +25,7 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
 
 - Trivial change (typo, comment-only, mechanical rename) — per pattern's "Skip SDD" rules.
 - Strategic planning across milestones -> use `/writing-plans`.
-- If you cannot point to ANY vault entry justifying this spec (backlog, ADR, roadmap) — don't run the skill yet; first crystallize the work in the vault.
+- If you cannot point to ANY work-gate justifying this spec (open GitHub issue, ADR, roadmap) — don't run the skill yet; open the bitácora issue first.
 
 ---
 
@@ -49,11 +49,11 @@ If ANY trigger fires AND none of the "When NOT to propose" conditions hold → p
 
 Surface a short, skippable proposal that states the evidence — don't just assert. Template:
 
-> This looks like a Discipline-Gate trigger: **<which trigger(s) fired>** (e.g. "~120 LOC + touches a deployed config schema"). I ran the Skip-SDD checks — it does **not** qualify for skip. Propose `/spec init <feature-id>` before writing code? (id from the vault backlog, or a new `11-tasks.md` entry.)
+> This looks like a Discipline-Gate trigger: **<which trigger(s) fired>** (e.g. "~120 LOC + touches a deployed config schema"). I ran the Skip-SDD checks — it does **not** qualify for skip. Propose `/spec init <feature-id>` before writing code? (work-gate = an open GitHub issue — reuse one or open it now.)
 
 - **List the checks you ran**, not just the verdict — the evidence is the value (mirrors the Model-Tier "the proposal IS the value" rule in `AGENTS.md`).
 - **Offer, don't impose.** The human decides. If they decline, proceed without the spec and do not re-propose for the same change.
-- **Suggest the id.** Derive `<feature-id>` from an existing vault entry if one matches; otherwise propose creating the 1-line `11-tasks.md` entry first (the vault gate).
+- **Suggest the id.** Derive `<feature-id>` from the gating GitHub issue if one matches; otherwise propose opening the issue first (the work-gate).
 
 ### When NOT to propose
 
@@ -80,25 +80,22 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 ## Subcommand: init
 
-**Purpose:** Scaffold `$REPO_ROOT/specs/<feature-id>/` from vault templates. Vault-rooted: requires (or offers to create) a vault entry before scaffolding.
+**Purpose:** Scaffold `$REPO_ROOT/specs/<feature-id>/` from vault templates. Work-gated per ADR-018: requires an OPEN GitHub issue (bitácora) before scaffolding.
 
-**Signature:** `/spec init <feature-id> [--task <task-id>] [--force-no-vault]`
+**Signature:** `/spec init <feature-id> [--issue <number>] [--force-no-gate]` (`--force-no-vault` is a deprecated alias of `--force-no-gate`)
 
 **Steps:**
 
-1. **Validate id** matches `^[A-Z]+-\d+(-[a-z0-9-]+)?$` OR `^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$`. Reject otherwise.
+1. **Validate id** matches `^[A-Z]+-\d+[a-z]?(-[a-z0-9-]+)?$` OR `^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$`. Reject otherwise.
 2. **No clobber:** fail if `$REPO_ROOT/specs/<feature-id>/` exists. Warn if `specs/archive/<feature-id>/` exists.
-3. **Vault context pre-flight (mandatory):**
-   - Via Hive `vault_search`, look for `<feature-id>` (or `--task <id>` if provided) in:
-     - `$VAULT_PATH/10_projects/$REPO_NAME/11-tasks.md`
-     - the repo's `docs/adr/` (any ADR)
-     - `$VAULT_PATH/10_projects/$REPO_NAME/10-roadmap.md`
-   - If found in any -> note source for step 7.
-   - If NOT found -> present three options to user:
-     - **(a)** Create a 1-line backlog entry in `11-tasks.md` now. Ask for description. Append via Hive `vault_patch` (under appropriate stream/section).
-     - **(b)** Cancel. User creates vault entry manually, then re-runs `/spec init`.
-     - **(c)** Force-proceed via `--force-no-vault` flag (NOT RECOMMENDED — violates SSOT discipline; emit warning).
-   - Wait for choice. If (a) executed, treat the new entry as the source.
+3. **Work-gate pre-flight (mandatory):**
+   - The gate is an OPEN GitHub issue on the repo (tracked in the bitácora Project). Verify via `gh issue view <number> --json state,title`: the issue must exist and be `OPEN`.
+   - If `--issue` was not given, ask the user which issue gates this work (suggest candidates via `gh issue list --state open` if helpful).
+   - If the issue is missing or closed -> present three options to user:
+     - **(a)** Open (or reopen) the gating issue now, add it to the bitácora Project, then proceed with its number.
+     - **(b)** Cancel. User sorts out the issue manually, then re-runs `/spec init`.
+     - **(c)** Force-proceed via `--force-no-gate` flag (NOT RECOMMENDED — violates the work-gate discipline; emit warning).
+   - Wait for choice. Note the gating issue for step 7.
 4. `mkdir -p $REPO_ROOT/specs/<feature-id>/`.
 5. Read 3 templates from `$VAULT_PATH/00_meta/templates/spec-{proposal,tasks,verification}.md`.
 6. Substitute placeholders in memory:
@@ -106,17 +103,18 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
    - `{TITLE}` -> derived from id (drop ticket prefix, title-case the slug). E.g. `AI-001-ollama-public` -> `AI-001: Ollama public`.
    - `{{date:YYYY-MM-DD}}` -> today (UTC).
    - `template_version: "1.0"` -> hardcoded v1.
-7. **Inject vault context** in proposal `## Why` as HTML comment: `<!-- from <source-path>: <one-line-extract> -->`. Always injected when vault source exists.
+7. **Inject issue context** in proposal `## Why` as HTML comment: `<!-- from issue #<number>: <issue-title> -->`, and set the `issue:` frontmatter field to `<repo>#<number>`. Always injected when the gate was verified.
 8. Write the 3 substituted files.
 9. **Output:**
    - Paths created.
-   - Vault source used (or `none — force-proceeded`).
+   - Gating issue used (or `none — force-proceeded`).
    - Next step: `/spec fill <feature-id>`.
 
 **Edge cases:**
-- Vault unreachable: cannot do step 3 -> emit error and instructions to set `$VAULT_PATH` or vendored-template fallback (v2).
+- `gh` unavailable or unauthenticated: gate cannot be verified -> fail with instructions (install/auth `gh`) or `--force-no-gate`.
 - Templates missing in vault -> fail with path hint.
 - Id collides with archived spec -> warn but allow (user may be reviving).
+- Mechanical fallback: `init-spec.sh <id> --issue <N>` / `init-spec.ps1 <id> -Issue <N>` implement this same gate for non-interactive use.
 
 ---
 
@@ -267,7 +265,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 | Subcommand | Reads | Writes |
 |---|---|---|
-| `init` (pre-flight) | `11-tasks.md`, the repo's `docs/adr/` (search for context) | `11-tasks.md` (if user chose option a — new entry) |
+| `init` (pre-flight) | GitHub issue via `gh` (work-gate, not a vault read) | nothing |
 | `init` (substitution) | `00_meta/templates/spec-*.md` | (filesystem only — repo specs/) |
 | `bootstrap` (template) | `00_meta/templates/bootstrap-contract.md`, sister contracts in `specs/archive/` | (filesystem only — repo specs/<id>/bootstrap-contract.md) |
 | `fill` (grounding) | `11-tasks.md`, `10-roadmap.md`, referenced ADRs, sister specs | nothing |

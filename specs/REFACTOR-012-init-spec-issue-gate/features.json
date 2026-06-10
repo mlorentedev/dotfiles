@@ -1,0 +1,30 @@
+[
+  {
+    "id": "REFACTOR-012-f1",
+    "behavior": "init-spec.sh ID --issue N with an open issue scaffolds the spec and injects the issue context into ## Why (exit 0)",
+    "verification": "bats tests/init-spec.bats -f 'injects issue context'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-f2",
+    "behavior": "Missing --issue, nonexistent issue, or closed issue exits 3 and creates no spec dir",
+    "verification": "bats tests/init-spec.bats -f 'gate fails'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-f3",
+    "behavior": "--force-no-gate and legacy --force-no-vault bypass the gate without invoking gh",
+    "verification": "bats tests/init-spec.bats -f 'bypass'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-f4",
+    "behavior": "No 11-tasks.md reference remains in init-spec.{sh,ps1}",
+    "verification": "bats tests/init-spec.bats -f 'ADR-018'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
