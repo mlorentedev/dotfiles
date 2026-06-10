@@ -22,4 +22,4 @@ created: "2026-06-09"
 
 - [x] shellcheck clean
 - [x] `--check` dry-run against knowledge + pollex (detects drifted workflow copies, pending link)
-- [ ] Post-merge: full live rollout; re-run → 0 changes (AC5)
+- [x] Post-merge: full live rollout; re-run → 0 changes (AC5)
