@@ -9,6 +9,8 @@
 # the BUG-018 continue directive. Driven via pwsh against fixtures; no real
 # ~/.claude mutation.
 
+load 'winpath'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export HEAL_PS1="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
@@ -28,12 +30,6 @@ setup() {
 
 teardown() {
     [ -n "${TMP:-}" ] && rm -rf "$TMP"
-}
-
-# Convert an MSYS path to a Windows path for the native pwsh process. On Linux
-# (no cygpath) pwsh understands the path as-is.
-_winpath() {
-    if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi
 }
 
 # Drive Repair-HooksJson against a fixture path via pwsh.

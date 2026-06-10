@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for scripts/knowledge-crystallize.ps1 (structural + PSScriptAnalyzer)
 
+load 'winpath'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
@@ -71,7 +73,7 @@ setup() {
         \$ErrorActionPreference = 'Stop'
         try {
             Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            \$results = Invoke-ScriptAnalyzer -Path '\$PS1_SCRIPT' -Settings '\$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1' -Severity Error,Warning
+            \$results = Invoke-ScriptAnalyzer -Path '$(_winpath "$PS1_SCRIPT")' -Settings '$(_winpath "$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1")' -Severity Error,Warning
             if (\$results) {
                 \$results | Format-Table -AutoSize
                 exit 1
@@ -92,7 +94,7 @@ setup() {
     run pwsh -NonInteractive -Command "
         \$errors = \$null
         [System.Management.Automation.Language.Parser]::ParseFile(
-            '$PS1_SCRIPT', [ref]\$null, [ref]\$errors
+            '$(_winpath "$PS1_SCRIPT")', [ref]\$null, [ref]\$errors
         ) | Out-Null
         if (\$errors) {
             \$errors | ForEach-Object { Write-Error \$_.Message }

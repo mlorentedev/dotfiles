@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for powershell/profile.ps1 (structural)
 
+load 'winpath'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PROFILE_SCRIPT="$DOTFILES_DIR/powershell/profile.ps1"
@@ -98,5 +100,5 @@ setup() {
     if ! command -v pwsh >/dev/null 2>&1; then
         skip "pwsh not available"
     fi
-    pwsh -NoProfile -Command "Get-Content '$PROFILE_SCRIPT' | Out-Null; \$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content '$PROFILE_SCRIPT' -Raw), [ref]\$null)"
+    pwsh -NoProfile -Command "Get-Content '$(_winpath "$PROFILE_SCRIPT")' | Out-Null; \$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content '$(_winpath "$PROFILE_SCRIPT")' -Raw), [ref]\$null)"
 }
