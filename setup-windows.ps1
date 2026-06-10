@@ -139,14 +139,21 @@ function Backup-AndRestoreClaudeJson {
 }
 
 # ADR-015 / dotfiles#230: single registration point for hive Scheduled Tasks so
-# they ALWAYS run windowless. A task registered without an explicit principal
-# defaults to the Interactive logon type, which runs in the user's desktop
-# session and pops a console window every tick for a powershell.exe action. An
-# S4U principal ("run whether the user is logged on or not", no stored password,
-# no admin) runs the task in session 0 -- the non-interactive session with no
-# desktop -- so no window can appear. This matches the daemon task, which hive's
-# own render_windows_task_xml already registers as S4U. Route every hive task
-# through here so the windowless guarantee cannot be forgotten on a future task.
+# they ALWAYS run with the strongest achievable principal. A task registered
+# without an explicit principal defaults to the Interactive logon type, which
+# runs in the user's desktop session and pops a console window every tick for a
+# powershell.exe action. An S4U principal ("run whether the user is logged on
+# or not", no stored password) runs the task in session 0 -- the non-interactive
+# session with no desktop -- so no window can appear. BUT registering an S4U
+# task requires an elevated caller: on a non-admin box Register-ScheduledTask
+# raises "Access is denied" as a NON-terminating error, which used to slip past
+# every call site's try/catch and print a false SUCCESS while a stale task
+# survived. So: compute the strongest achievable logon type once (elevated ->
+# S4U windowless; non-admin -> Interactive, where -WindowStyle Hidden on the
+# action softens the console flash), and register with -ErrorAction Stop so any
+# residual failure is terminating and the call-site catch reports the truth.
+$script:HiveTaskLogonType =
+    if (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { 'S4U' } else { 'Interactive' }
 function Register-HiveScheduledTask {
     [CmdletBinding()]
     param(
@@ -156,9 +163,9 @@ function Register-HiveScheduledTask {
         [Parameter(Mandatory)]$Settings,
         [Parameter(Mandatory)][string]$Description
     )
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Limited
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $script:HiveTaskLogonType -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
-        -Settings $Settings -Principal $principal -Description $Description -Force | Out-Null
+        -Settings $Settings -Principal $principal -Description $Description -Force -ErrorAction Stop | Out-Null
 }
 
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
@@ -331,6 +338,23 @@ if ($wingetCmd) {
             } catch {
                 Write-Warn "Failed to install $($tool.Name): $_"
             }
+        } elseif ($tool.Version) {
+            # REFACTOR-011: presence is not convergence. A pinned tool whose
+            # installed version drifted from versions.conf was previously
+            # skipped as "already installed", leaving healthcheck FAILing on
+            # version drift on every run. Converge it to the pin.
+            $installedVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
+            if ($installedVer -ne $tool.Version) {
+                Write-Info "$($tool.Name) $installedVer drifted from pinned $($tool.Version), converging..."
+                & winget install $tool.Id --version $tool.Version --accept-package-agreements --accept-source-agreements --force 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Success "$($tool.Name) converged to $($tool.Version)"
+                } else {
+                    Write-Warn "winget exit ${LASTEXITCODE}: could not converge $($tool.Name) to $($tool.Version); healthcheck will flag the drift"
+                }
+            } else {
+                Write-Info "$($tool.Name) already installed (pinned $($tool.Version))"
+            }
         } else {
             Write-Info "$($tool.Name) already installed"
         }
@@ -486,7 +510,9 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     $hiveUpgradeSrc = Join-Path $DotfilesDir "windows\hive-upgrade.ps1"
     $hiveUpgradeDst = Join-Path $ClaudeHome "scripts\hive-upgrade.ps1"
     # -WindowStyle Hidden is belt-and-suspenders; the S4U principal applied by
-    # Register-HiveScheduledTask (session 0) is what actually guarantees no window.
+    # Register-HiveScheduledTask (session 0) is what actually guarantees no
+    # window when elevated. Non-admin boxes fall back to Interactive, where
+    # Hidden is the only mitigation (brief console flash possible).
     $hiveUpgradeArg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$hiveUpgradeDst`""
     if (Test-Path $hiveUpgradeSrc) {
         Ensure-Directory (Split-Path $hiveUpgradeDst -Parent)
@@ -503,7 +529,7 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
         $existingHiveExe = $existingHiveTask.Actions[0].Execute
         if ($existingHiveTask.Principal) { $existingHiveLogon = "$($existingHiveTask.Principal.LogonType)" }
     }
-    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg) -and ($existingHiveLogon -eq "S4U")) {
+    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg) -and ($existingHiveLogon -eq $script:HiveTaskLogonType)) {
         Write-Info "hive-upgrade task already correctly configured, skipping"
     } else {
         try {
@@ -514,7 +540,10 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
             Register-HiveScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
                 -Settings $hiveSettings `
                 -Description "hive-vault auto-upgrade every 15 min (ADR-015 orchestrated stop-before-upgrade; feeds hive serve restart-on-upgrade)"
-            Write-Success "Installed hive-upgrade task (15-min, windowless S4U, v$hiveVer)"
+            Write-Success "Installed hive-upgrade task (15-min, $($script:HiveTaskLogonType) principal, v$hiveVer)"
+            if ($script:HiveTaskLogonType -ne 'S4U') {
+                Write-Info "not elevated: windowless S4U registration unavailable; using Interactive logon with -WindowStyle Hidden"
+            }
             if (-not (Test-Path $hiveUvExe)) {
                 Write-Warn "hive-upgrade task registered but uv not found at $hiveUvExe"
             }
@@ -1763,11 +1792,12 @@ if (Test-Path $healthcheckScript) {
 
 # OPS-001: opt-in self-deploy Scheduled Task (Windows parity of the systemd timer).
 # Tri-state, gated on DOTFILES_AUTODEPLOY so a normal setup never touches it:
-#   1     -> deploy the selfupdate script + register a daily windowless S4U task
+#   1     -> deploy the selfupdate script + register a daily scheduled task
 #   0     -> unregister the task (clean opt-out)
 #   unset -> no-op (opt-in, default OFF)
-# Routes through Register-HiveScheduledTask (the generic S4U/windowless registrar)
-# so the task runs in session 0 with no console window, same as the hive tasks.
+# Routes through Register-HiveScheduledTask (the strongest-principal registrar:
+# windowless S4U when elevated, Interactive fallback when not), same as the
+# hive tasks.
 $selfUpdateTask = "DotfilesSelfUpdate"
 switch ("$env:DOTFILES_AUTODEPLOY") {
     "1" {
@@ -1784,7 +1814,7 @@ switch ("$env:DOTFILES_AUTODEPLOY") {
                 Register-HiveScheduledTask -TaskName $selfUpdateTask -Action $suAction -Trigger $suTrigger `
                     -Settings $suSettings `
                     -Description "dotfiles self-deploy: daily git pull --ff-only + idempotent setup (OPS-001)"
-                Write-Success "Enabled DotfilesSelfUpdate task (daily, windowless S4U)"
+                Write-Success "Enabled DotfilesSelfUpdate task (daily, $($script:HiveTaskLogonType) principal)"
             } catch {
                 Write-Warn "Could not register DotfilesSelfUpdate task (non-fatal): $_"
             }

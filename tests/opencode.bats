@@ -43,6 +43,13 @@ setup() {
     ! grep -q 'ensure_line_in_file.*OPENCODE_PATH_LINE' "$SETUP_SCRIPT"
 }
 
+@test "setup-linux.sh converges a drifted opencode to the versions.conf pin (REFACTOR-011)" {
+    # Presence is not convergence: an opencode older than OPENCODE_VERSION was
+    # previously skipped as "already installed", leaving healthcheck FAILing on
+    # version drift on every run.
+    grep -q 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
+}
+
 @test "setup-linux.sh opencode install URL uses opencode.ai (not anomalyco fork)" {
     grep -q 'curl -fsSL https://opencode.ai/install' "$SETUP_SCRIPT"
     ! grep -q 'curl.*anomalyco' "$SETUP_SCRIPT"

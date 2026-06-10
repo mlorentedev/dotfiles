@@ -631,6 +631,23 @@ if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$OPENCODE_BINARY" ]; then
     else
         log_warning "opencode install failed — re-run setup or install manually (https://opencode.ai/docs/)"
     fi
+elif [ -n "$OPENCODE_VERSION" ]; then
+    # REFACTOR-011: presence is not convergence. An installed opencode whose
+    # version drifted from the versions.conf pin was previously skipped as
+    # "already installed", leaving healthcheck FAILing on drift on every run.
+    opencode_cmd="opencode"
+    command -v opencode >/dev/null 2>&1 || opencode_cmd="$OPENCODE_BINARY"
+    installed_opencode=$("$opencode_cmd" --version 2>/dev/null | head -1 | awk '{print $NF}')
+    if [ "$installed_opencode" != "$OPENCODE_VERSION" ]; then
+        log_info "opencode ${installed_opencode:-unknown} drifted from pinned $OPENCODE_VERSION, converging..."
+        if curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION"; then
+            log_success "opencode converged to $OPENCODE_VERSION"
+        else
+            log_warning "opencode upgrade to $OPENCODE_VERSION failed — healthcheck will flag the drift"
+        fi
+    else
+        log_info "opencode already installed (pinned $OPENCODE_VERSION)"
+    fi
 else
     log_info "opencode already installed"
 fi

@@ -38,3 +38,11 @@ setup() {
 @test "ai/pi/settings.json enabledModels exclude OpenAI/Google/Anthropic OpenRouter providers" {
     ! grep -qE 'openrouter/(openai|google|anthropic)/' "$PI_SETTINGS"
 }
+
+# The age identity is optional per box: a leftover {env:} token in the
+# deployed models.json without a local age key is the expected state (runtime
+# env resolver is the fallback), so both healthchecks must SKIP, not FAIL.
+@test "parity: healthchecks treat a missing age identity as optional for pi models.json" {
+    grep -qF 'age identity absent' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    grep -qF 'age identity absent' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+}
