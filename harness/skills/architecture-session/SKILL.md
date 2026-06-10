@@ -4,7 +4,7 @@ type: skill
 status: active
 created: "2026-05-28"
 name: architecture-session
-description: Run a pure-architecture / definition session on a project. Triggers on /architecture-session, /arch, "sesion de arquitectura", "arch session for X", "definir arquitectura de X", "revisar arquitectura de X", "evaluar opciones para X". Six phases A-F: state verification, multi-reference audit (Regla del 3 gate), constraint formalization, options + rejection list, decision (ADR + plan + vault patch in-session), recap. Refuses to advance past Phase B without N>=2 references audited for any decision affecting cross-instance reuse. Pairs with /spec init (downstream implementation) and /adversarial-review (post-implementation gate).
+description: "Run a pure-architecture / definition session on a project. Triggers on /architecture-session, /arch, \"sesion de arquitectura\", \"arch session for X\", \"definir arquitectura de X\", \"revisar arquitectura de X\", \"evaluar opciones para X\". Six phases A-F: state verification, multi-reference audit (Regla del 3 gate), constraint formalization, options + rejection list, decision (ADR + plan + vault patch in-session), recap. Refuses to advance past Phase B without N>=2 references audited for any decision affecting cross-instance reuse. Pairs with /spec init (downstream implementation) and /adversarial-review (post-implementation gate)."
 allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch, mcp__hive__capture_lesson]
 ---
 
