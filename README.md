@@ -28,6 +28,12 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 # Restart PowerShell after setup
 ```
 
+Optional: add `-WithDefaults` to also apply ~15 HKCU engineering defaults
+(show file extensions/hidden files, disable advertising ID and Bing-in-Start,
+dark mode — the [mathiasbynens `.macos`](https://github.com/mathiasbynens/dotfiles/blob/main/.macos)
+analog, see `scripts/windows-defaults.ps1`). Off by default; HKCU only, no
+admin needed; some changes show after an Explorer restart.
+
 ## Features
 
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)

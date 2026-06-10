@@ -9,26 +9,25 @@ created: "2026-05-13"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/WIN-005-windows-defaults-script`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/win-005-windows-defaults`
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions" (R1-R5 all carry their resolution inline)
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+- [x] Write failing structural bats tests (`tests/windows-defaults.bats`): script exists, doc block, StrictMode, HKCU-only invariant (no `HKLM` token anywhere), no `explorer.exe` restart, named-constants table (R2), PSScriptAnalyzer + ParseFile via `tests/winpath.bash` (red: 18/19 fail before implementation)
+- [x] Write failing setup-integration bats tests (same file): `setup-windows.ps1` declares `-WithDefaults` switch, invocation gated on the flag (default OFF), script deployed to ScriptsDir, README documents the flag
+- [x] Write failing Pester behavior tests (`tests/windows-defaults.Tests.ps1`, Windows-only via discovery-time `-Skip`): sandboxed `-Root HKCU:\Software\dotfiles-win005-test` run applies all defaults; second run reports 0 changes (idempotency, R4); non-HKCU root is rejected
+- [x] Implement `scripts/windows-defaults.ps1`: defaults table as named constants (15 entries), injectable `-Root` (HKCU-validated), read-before-write logging, Win10/Win11 branch on build 22000 (R3), explorer-restart note in output (R1)
+- [x] Wire `setup-windows.ps1`: `-WithDefaults` switch + gated invocation + deploy to ScriptsDir + explicit flag forwarding through the BUG-005 re-exec
+- [x] Document the opt-in flag in README
+- [x] Run full local suite (bats subset + Pester) green (bats 20/20, Pester 4/4)
 
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
 - [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
+- [ ] Type checks pass (n/a -- PowerShell/bats only)
 - [ ] Lint passes
 - [ ] No unrelated changes in the diff (no scope creep)
 - [ ] `verification.md` filled in

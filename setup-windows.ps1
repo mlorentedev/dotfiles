@@ -26,7 +26,12 @@
 #>
 
 [CmdletBinding()]
-param()
+param(
+    # WIN-005: opt-in HKCU engineering defaults (scripts/windows-defaults.ps1).
+    # OFF by default -- mass-setting user preferences without explicit consent
+    # violates user autonomy (proposal R5).
+    [switch]$WithDefaults
+)
 
 # ============================================================================
 # BUG-005: AUTO-REEXEC UNDER PWSH IF RUNNING ON WINDOWS POWERSHELL 5.1
@@ -41,15 +46,17 @@ param()
 # settings.json merge is silently skipped.
 #
 # Defense: detect the host version up front; if pwsh (7+) is on PATH,
-# re-exec under it; otherwise fail loud with an install hint. The current
-# script has an empty param() block, so forwarding @args is sufficient; if
-# named parameters are added later, forward $PSBoundParameters explicitly.
+# re-exec under it; otherwise fail loud with an install hint. Named parameters
+# bound by param() are NOT in @args, so each one must be forwarded explicitly
+# (WIN-005 added the first one).
 
 if ($PSVersionTable.PSVersion.Major -lt 7) {
     $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
     if ($pwshCmd) {
         Write-Host "[INFO] Windows PowerShell $($PSVersionTable.PSVersion) detected; re-executing under pwsh ($($pwshCmd.Source)) for full feature compatibility (BUG-005)" -ForegroundColor Yellow
-        & $pwshCmd.Source -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
+        $forward = @()
+        if ($WithDefaults) { $forward += '-WithDefaults' }
+        & $pwshCmd.Source -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @forward @args
         exit $LASTEXITCODE
     } else {
         Write-Host "[ERROR] Windows PowerShell $($PSVersionTable.PSVersion) detected and pwsh (PowerShell 7+) is not installed." -ForegroundColor Red
@@ -1391,6 +1398,15 @@ if (Test-Path $healthcheckSource) {
     Write-Warn "healthcheck.ps1 not found at $healthcheckSource"
 }
 
+# WIN-005: deploy the HKCU engineering-defaults script (invoked opt-in below).
+$winDefaultsSource = "$DotfilesDir\scripts\windows-defaults.ps1"
+if (Test-Path $winDefaultsSource) {
+    Copy-Item $winDefaultsSource "$ScriptsDir\" -Force
+    Write-Success "Deployed windows-defaults.ps1 to $ScriptsDir\"
+} else {
+    Write-Warn "windows-defaults.ps1 not found at $winDefaultsSource"
+}
+
 $contractSource = "$DotfilesDir\env-contract.json"
 if (Test-Path $contractSource) {
     Copy-Item $contractSource "$DotfilesDest\" -Force
@@ -1836,6 +1852,24 @@ switch ("$env:DOTFILES_AUTODEPLOY") {
         Write-Info "Disabled DotfilesSelfUpdate task (DOTFILES_AUTODEPLOY=0)"
     }
     default { }
+}
+
+# ============================================================================
+# WIN-005: OPT-IN WINDOWS ENGINEERING DEFAULTS (HKCU)
+# ============================================================================
+# OFF by default (proposal R5): a setup run must never mass-edit user
+# preferences without explicit consent. Runs the deployed copy so what
+# executes is exactly what landed in $ScriptsDir.
+if ($WithDefaults) {
+    $winDefaultsDeployed = "$ScriptsDir\windows-defaults.ps1"
+    if (Test-Path $winDefaultsDeployed) {
+        Write-Info "Applying Windows engineering defaults (-WithDefaults)..."
+        & $winDefaultsDeployed
+    } else {
+        Write-Warn "windows-defaults.ps1 not deployed; skipping -WithDefaults"
+    }
+} else {
+    Write-Info "Windows defaults not applied (opt-in: re-run with -WithDefaults)"
 }
 
 Write-Host ""
