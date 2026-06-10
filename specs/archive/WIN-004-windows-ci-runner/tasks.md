@@ -9,7 +9,7 @@ created: "2026-05-13"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/WIN-004-windows-ci-runner`
+- [x] Branch created from main: `feat/win-004-windows-ci`
 - [x] `proposal.md` is complete and acceptance criteria are testable
 - [x] No open questions left in `proposal.md` "Risks / open questions"
 
@@ -19,22 +19,22 @@ created: "2026-05-13"
 - [x] Gate the BUG-015 probe on `installed_plugins.json` in `scripts/healthcheck.ps1` (CI-clean-machine FAIL eliminated)
 - [x] Mirror the gate in `scripts/healthcheck.sh` (cross-OS parity)
 - [x] Add `test-windows` job to `.github/workflows/ci.yml`: choco age -> secrets/vault sandbox -> `setup-windows.ps1` under PS 5.1 (BUG-005 re-exec) -> core-tools fallback -> `healthcheck.ps1` -> Pester (`tests/*.Tests.ps1`) -> bats subset under Git Bash (pinned `BATS_VERSION`)
-- [ ] Open PR; iterate on the live `windows-latest` run until green (cannot be executed locally — the PR run IS the execution verification)
-- [ ] Measure wall-time on the green run; record in `verification.md` (AC6: <= 7 min increase)
+- [x] Open PR; iterate on the live `windows-latest` run until green (PR #325, 4 runs, each failure a real latent bug -- see verification.md)
+- [x] Measure wall-time on the green run; record in `verification.md` (AC6: 6.5 min job, ~+3.9 min wall-time increase, PASS)
 
 ## Post-merge
 
-- [ ] Add `test-windows` to branch protection required checks for `main` (repo admin): `gh api -X PATCH repos/mlorentedev/dotfiles/branches/main/protection/required_status_checks -f 'contexts[]=test-windows'` (or via Settings UI)
+- [x] Add `test-windows` to branch protection required checks for `main` (done 2026-06-10; NOTE: the PATCH replaces the contexts array, so the full list must be sent -- the one-liner above with only the new context would have dropped the existing three)
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass (n/a -- shell/YAML only)
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder (PR #325)
 
 ## Machine-readable features
 
