@@ -341,16 +341,21 @@ if ($wingetCmd) {
         } elseif ($tool.Version) {
             # REFACTOR-011: presence is not convergence. A pinned tool whose
             # installed version drifted from versions.conf was previously
-            # skipped as "already installed", leaving healthcheck FAILing on
+            # skipped as "already installed", leaving healthcheck flagging
             # version drift on every run. Converge it to the pin.
             $installedVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
             if ($installedVer -ne $tool.Version) {
                 Write-Info "$($tool.Name) $installedVer drifted from pinned $($tool.Version), converging..."
                 & winget install $tool.Id --version $tool.Version --accept-package-agreements --accept-source-agreements --force 2>$null | Out-Null
-                if ($LASTEXITCODE -eq 0) {
+                # Re-query instead of trusting winget's exit code: when the
+                # PATH-resolved binary comes from another package manager (npm
+                # global, scoop), winget converges its own copy but the
+                # shadowing install keeps winning -- that is not convergence.
+                $postVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
+                if ($postVer -eq $tool.Version) {
                     Write-Success "$($tool.Name) converged to $($tool.Version)"
                 } else {
-                    Write-Warn "winget exit ${LASTEXITCODE}: could not converge $($tool.Name) to $($tool.Version); healthcheck will flag the drift"
+                    Write-Warn "$($tool.Name) still $postVer after winget install $($tool.Version): another install shadows it in PATH (e.g. npm global, scoop); converge that install instead"
                 }
             } else {
                 Write-Info "$($tool.Name) already installed (pinned $($tool.Version))"
