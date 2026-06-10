@@ -28,7 +28,8 @@
       { "agent": "claude",   "render": "skill",   "dir": ".claude/skills" },
       { "agent": "opencode", "render": "command", "dir": ".config/opencode/commands" },
       { "agent": "agy",      "render": "skill",   "dir": ".gemini/skills" },
-      { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" }
+      { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" },
+      { "agent": "pi",       "render": "skill",   "dir": ".pi/agent/skills" }
     ],
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   }
