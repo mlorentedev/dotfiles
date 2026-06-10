@@ -107,8 +107,18 @@ gh project item-edit --id "$ITEM" --project-id PVT_kwHOAM7xJs4BZ6GY \
 
 ## 7. Workflows (deploy BOTH to every linked repo)
 
-Each linked repo carries two workflows. **OPS-002 (#258) rolls both out** to every repo in one pass;
-the canonical copies live in `mlorentedev/dotfiles/.github/workflows/`.
+Each linked repo carries two workflows; the canonical copies live in
+`mlorentedev/dotfiles/.github/workflows/`.
+
+**Multi-repo rollout (OPS-002, #258):** run `./scripts/bitacora-rollout.sh` — idempotent, one
+pass over every non-archived, non-fork repo: project link + `BITACORA_PAT` secret + both
+workflows (diff-aware) + open issue/PR backfill. `--check` = dry-run. The sections below
+remain the manual path for a single repo.
+
+> **Decision (2026-06-09, #258):** board-add mechanism = this per-repo Action, NOT the
+> built-in project "Auto-add" workflow — git-native (IaC, no UI-only config), uniform and
+> portable via `init-project`, covers PRs (OPS-003), and avoids the plan-dependent
+> auto-add workflow limit.
 
 ### 7a. `add-to-project.yml` — puts opened **issues and PRs** on the board
 

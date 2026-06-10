@@ -1,0 +1,37 @@
+[
+  {
+    "id": "OPS-002-bitacora-rollout-f1",
+    "behavior": "AC1 — scripts/bitacora-rollout.sh exists, executable, shellcheck-clean, supports --check and repo args",
+    "verification": "test -x scripts/bitacora-rollout.sh && shellcheck scripts/bitacora-rollout.sh && grep -q -- '--check' scripts/bitacora-rollout.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-002-bitacora-rollout-f2",
+    "behavior": "AC2 — converges link + secret + both canonical workflows + backfill per repo, reading .github/workflows/ as the single source",
+    "verification": "grep -q 'project link' scripts/bitacora-rollout.sh && grep -q 'BITACORA_PAT' scripts/bitacora-rollout.sh && grep -q 'add-to-project.yml' scripts/bitacora-rollout.sh && grep -q 'bitacora-status.yml' scripts/bitacora-rollout.sh && grep -q 'item-add' scripts/bitacora-rollout.sh && ! grep -q 'actions/add-to-project' scripts/bitacora-rollout.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-002-bitacora-rollout-f3",
+    "behavior": "AC3 — no-args discovery selects non-archived, non-fork repos",
+    "verification": "grep -q 'isArchived == false and .isFork == false' scripts/bitacora-rollout.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-002-bitacora-rollout-f4",
+    "behavior": "AC4 — runbook registers the rollout script and the per-repo-Action decision",
+    "verification": "grep -q 'bitacora-rollout.sh' docs/runbooks/guide-bitacora-setup.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-002-bitacora-rollout-f5",
+    "behavior": "AC5 — live rollout executed across all repos; immediate re-run reports 0 changes. Verified by observation (CI cannot run the live rollout).",
+    "verification": "manual: run twice post-merge; second run prints 'all repos already rolled out (0 changes)'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
