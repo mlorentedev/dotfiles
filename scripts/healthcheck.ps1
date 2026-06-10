@@ -59,6 +59,7 @@ foreach ($cand in $versionsCandidates) {
 # --- Counters and output helpers ---
 $script:Passed = 0
 $script:Failed = 0
+$script:Warned = 0
 $script:Skipped = 0
 
 function Write-Pass {
@@ -71,6 +72,14 @@ function Write-Fail {
     param([string]$Msg)
     $script:Failed++
     Write-Host "  FAIL: $Msg" -ForegroundColor Red
+}
+
+# Advisory finding: worth surfacing, but the install still works (e.g. a
+# pinned tool drifted from versions.conf). Does NOT affect the exit code.
+function Write-Warn {
+    param([string]$Msg)
+    $script:Warned++
+    Write-Host "  WARN: $Msg" -ForegroundColor Yellow
 }
 
 function Write-Skip {
@@ -207,7 +216,7 @@ if (-not $env:APPS_HOME) {
         if ($yarnPinned -and $yarnInstalled -eq $yarnPinned) {
             Write-Pass "yarn version matches versions.conf ($yarnPinned)"
         } elseif ($yarnPinned) {
-            Write-Fail "yarn version drift: installed=$yarnInstalled pinned=$yarnPinned"
+            Write-Warn "yarn version drift: installed=$yarnInstalled pinned=$yarnPinned"
         } else {
             Write-Skip 'yarn version' 'YARN_VERSION not set in versions.conf'
         }
@@ -498,7 +507,7 @@ if (Test-Command 'opencode') {
         if ($ocInstalled -eq $ocPinned) {
             Write-Pass "opencode version matches versions.conf ($ocPinned)"
         } else {
-            Write-Fail "opencode version drift: installed=$ocInstalled pinned=$ocPinned"
+            Write-Warn "opencode version drift: installed=$ocInstalled pinned=$ocPinned"
         }
     } else {
         Write-Skip 'opencode version' 'OPENCODE_VERSION not set in versions.conf'
@@ -529,7 +538,7 @@ if (Test-Command 'pi') {
         if ($piInstalled -eq $piPinned) {
             Write-Pass "pi version matches versions.conf ($piPinned)"
         } else {
-            Write-Fail "pi version drift: installed=$piInstalled pinned=$piPinned"
+            Write-Warn "pi version drift: installed=$piInstalled pinned=$piPinned"
         }
     } else {
         Write-Skip 'pi version' 'PI_VERSION not set in versions.conf'
@@ -642,7 +651,7 @@ if (Test-Command 'agy') {
 # ==================================================
 Write-Host ''
 Write-Host '========================================'
-Write-Host ("Results: {0} passed, {1} failed, {2} skipped" -f $script:Passed, $script:Failed, $script:Skipped)
+Write-Host ("Results: {0} passed, {1} failed, {2} warned, {3} skipped" -f $script:Passed, $script:Failed, $script:Warned, $script:Skipped)
 Write-Host '========================================'
 
 if ($script:Failed -gt 0) {

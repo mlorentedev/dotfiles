@@ -36,6 +36,7 @@ fi
 # Test counters
 CHECKS_PASSED=0
 CHECKS_FAILED=0
+CHECKS_WARNED=0
 CHECKS_SKIPPED=0
 
 pass() {
@@ -46,6 +47,13 @@ pass() {
 fail() {
     printf '  %bFAIL%b: %s\n' "$RED" "$NC" "$1"
     CHECKS_FAILED=$((CHECKS_FAILED + 1))
+}
+
+# Advisory finding: worth surfacing, but the install still works (e.g. a
+# pinned tool drifted from versions.conf). Does NOT affect the exit code.
+warn() {
+    printf '  %bWARN%b: %s\n' "$YELLOW" "$NC" "$1"
+    CHECKS_WARNED=$((CHECKS_WARNED + 1))
 }
 
 skip() {
@@ -154,7 +162,7 @@ if command -v yarn >/dev/null 2>&1; then
     if [ -n "$YARN_PINNED" ] && [ "$INSTALLED_YARN" = "$YARN_PINNED" ]; then
         pass "yarn version matches versions.conf ($YARN_PINNED)"
     elif [ -n "$YARN_PINNED" ]; then
-        fail "yarn version drift: installed=$INSTALLED_YARN pinned=$YARN_PINNED"
+        warn "yarn version drift: installed=$INSTALLED_YARN pinned=$YARN_PINNED"
     else
         skip "YARN_VERSION not set in versions.conf — version match not verified"
     fi
@@ -383,7 +391,7 @@ if command -v opencode >/dev/null 2>&1; then
     if [ -n "$OPENCODE_PINNED" ] && [ "$INSTALLED_OPENCODE" = "$OPENCODE_PINNED" ]; then
         pass "opencode version matches versions.conf ($OPENCODE_PINNED)"
     elif [ -n "$OPENCODE_PINNED" ]; then
-        fail "opencode version drift: installed=$INSTALLED_OPENCODE pinned=$OPENCODE_PINNED"
+        warn "opencode version drift: installed=$INSTALLED_OPENCODE pinned=$OPENCODE_PINNED"
     else
         skip "OPENCODE_VERSION not set in versions.conf — version match not verified"
     fi
@@ -413,7 +421,7 @@ if command -v pi >/dev/null 2>&1; then
     if [ -n "$PI_PINNED" ] && [ "$INSTALLED_PI" = "$PI_PINNED" ]; then
         pass "pi version matches versions.conf ($PI_PINNED)"
     elif [ -n "$PI_PINNED" ]; then
-        fail "pi version drift: installed=$INSTALLED_PI pinned=$PI_PINNED"
+        warn "pi version drift: installed=$INSTALLED_PI pinned=$PI_PINNED"
     else
         skip "PI_VERSION not set in versions.conf — version match not verified"
     fi
@@ -547,9 +555,10 @@ fi
 # ============================================================
 echo ""
 echo "========================================"
-printf 'Results: %b%d passed%b, %b%d failed%b, %b%d skipped%b\n' \
+printf 'Results: %b%d passed%b, %b%d failed%b, %b%d warned%b, %b%d skipped%b\n' \
     "$GREEN" "$CHECKS_PASSED" "$NC" \
     "$RED" "$CHECKS_FAILED" "$NC" \
+    "$YELLOW" "$CHECKS_WARNED" "$NC" \
     "$YELLOW" "$CHECKS_SKIPPED" "$NC"
 echo "========================================"
 
