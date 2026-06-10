@@ -1,9 +1,9 @@
 # init-spec.ps1
 # Purpose: Mechanical scaffold of a per-feature spec folder per pattern-spec-driven-development.
-#          Vault-rooted: requires vault entry before scaffolding (SSOT discipline).
+#          Work-gated: requires an OPEN GitHub issue (bitacora) before scaffolding (ADR-018).
 #
 # Usage:
-#   .\init-spec.ps1 <feature-id> [-Task <task-id>] [-ForceNoVault]
+#   .\init-spec.ps1 <feature-id> -Issue <number> [-ForceNoGate]
 #
 # Mechanical only. For Socratic proposal filling (Q1-Q6), use /spec fill in an agent.
 # See: $env:VAULT_PATH\00_meta\skills\spec\SKILL.md for the full workflow.
@@ -13,8 +13,11 @@ param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string]$FeatureId,
 
-    [string]$Task,
+    [int]$Issue,
 
+    [switch]$ForceNoGate,
+
+    # Deprecated alias of -ForceNoGate (pre-ADR-018 name).
     [switch]$ForceNoVault,
 
     [switch]$Help
@@ -24,19 +27,27 @@ $ErrorActionPreference = 'Stop'
 
 if ($Help) {
     @"
-Usage: init-spec.ps1 <feature-id> [-Task <task-id>] [-ForceNoVault]
+Usage: init-spec.ps1 <feature-id> -Issue <number> [-ForceNoGate]
 
   <feature-id>      e.g. AI-001-ollama-public or 2026-05-13-foo
-  -Task <task-id>   override which task ID to look up in vault 11-tasks.md
-  -ForceNoVault     skip vault context check (NOT RECOMMENDED — violates SSOT)
+  -Issue <number>   GitHub issue that gates this work (must exist and be OPEN)
+  -ForceNoGate      skip the work-gate check (NOT RECOMMENDED -- gate is the SSOT)
+  -ForceNoVault     deprecated alias of -ForceNoGate
 "@ | Write-Host
     exit 0
 }
 
+if ($ForceNoVault) {
+    Write-Warning '-ForceNoVault is deprecated; use -ForceNoGate (ADR-018).'
+    $ForceNoGate = $true
+}
+
 # --- Validate id ---
-$Pattern = '^([A-Z]+-[0-9]+(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$'
+# The optional single letter after the number admits the sub-id convention
+# (SDD-012b, WIN-002a) that check-backlog-integrity treats as a distinct ticket.
+$Pattern = '^([A-Z]+-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$'
 if ($FeatureId -notmatch $Pattern) {
-    Write-Error "Invalid feature-id: $FeatureId. Expected: TICKET-NNN[-slug] or YYYY-MM-DD-slug."
+    Write-Error "Invalid feature-id: $FeatureId. Expected: TICKET-NNN[letter][-slug] or YYYY-MM-DD-slug."
     exit 1
 }
 
@@ -58,7 +69,6 @@ if (-not $RepoRoot) {
     exit 1
 }
 
-$RepoName = Split-Path $RepoRoot -Leaf
 $SpecDir = Join-Path $RepoRoot "specs\$FeatureId"
 
 # --- No clobber ---
@@ -71,30 +81,44 @@ if (Test-Path $ArchivedPath) {
     Write-Warning "$FeatureId exists in specs\archive\. Possibly reviving."
 }
 
-# --- Vault context check ---
-$VaultLine = $null
-$TasksFile = Join-Path $VaultPath "10_projects\$RepoName\11-tasks.md"
+# --- Work-gate check (ADR-018: an OPEN GitHub issue, not a vault entry) ---
+$IssueTitle = $null
 
-if (-not $ForceNoVault) {
-    $SearchId = if ($Task) { $Task } else { $FeatureId }
-    if (Test-Path $TasksFile) {
-        $Escaped = [regex]::Escape($SearchId)
-        $VaultLine = Select-String -Path $TasksFile -Pattern "^- \[[ x-]\] \*\*$Escaped\*\*" |
-            Select-Object -First 1
-    }
-    if (-not $VaultLine) {
+if (-not $ForceNoGate) {
+    if (-not $Issue) {
         @"
-[ERROR] No vault entry found for "$SearchId" in $TasksFile.
+[ERROR] No work-gate given. Pass -Issue <number>.
 
-Spec must be downstream of a vault entry (backlog/ADR/roadmap) per SSOT discipline.
+Per ADR-018 every spec is downstream of an OPEN GitHub issue on the bitacora
+Project -- that issue is the work-gate (the vault no longer holds task state).
 
 Options:
-  (a) Cancel. Add an entry to 11-tasks.md, then re-run.
-  (b) Re-run with -ForceNoVault (NOT RECOMMENDED).
+  (a) Open (or find) the issue, then re-run with -Issue <number>.
+  (b) Re-run with -ForceNoGate (NOT RECOMMENDED).
 "@ | Write-Error
         exit 3
     }
-    Write-Host "[INFO] Vault context found in $TasksFile"
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Write-Error "gh CLI not found -- cannot verify the work-gate issue #$Issue. Install gh, or re-run with -ForceNoGate (NOT RECOMMENDED)."
+        exit 3
+    }
+    $GateInfo = $null
+    try {
+        $GateInfo = gh issue view "$Issue" --json state,title --jq '.state + "\t" + .title' 2>&1
+        if ($LASTEXITCODE -ne 0) { $GateInfo = $null }
+    } catch { $GateInfo = $null }
+    if (-not $GateInfo) {
+        Write-Error "Work-gate issue #$Issue not found (or gh failed)."
+        exit 3
+    }
+    $Parts = ($GateInfo | Out-String).Trim() -split "`t", 2
+    $IssueState = $Parts[0]
+    $IssueTitle = if ($Parts.Count -gt 1) { $Parts[1] } else { '' }
+    if ($IssueState -ne 'OPEN') {
+        Write-Error "Work-gate issue #$Issue is not open (state: $IssueState). The work-gate is an OPEN issue."
+        exit 3
+    }
+    Write-Host "[INFO] Work-gate OK: issue #$Issue is open -- $IssueTitle"
 }
 
 # --- Scaffold ---
@@ -116,11 +140,10 @@ foreach ($tpl in @('proposal', 'tasks', 'verification')) {
     Set-Content -Path $dst -Value $content -NoNewline
 }
 
-# --- Inject vault context comment in proposal Why ---
-if ($VaultLine) {
+# --- Inject issue context comment in proposal Why ---
+if ($IssueTitle) {
     $proposal = Join-Path $SpecDir 'proposal.md'
-    $contextText = $VaultLine.Line -replace '^- \[[^]]+\] \*\*[^*]+\*\*:? *', ''
-    $contextLine = "<!-- from 11-tasks.md: $contextText -->"
+    $contextLine = "<!-- from issue #${Issue}: $IssueTitle -->"
     $content = Get-Content $proposal -Raw
     $content = $content -replace '(?m)^(## Why)\s*$', "`$1`n`n$contextLine"
     Set-Content -Path $proposal -Value $content -NoNewline
@@ -130,8 +153,8 @@ if ($VaultLine) {
 Write-Host ''
 Write-Host "[OK] Created: $SpecDir"
 Write-Host '     proposal.md, tasks.md, verification.md'
-if ($VaultLine) {
-    Write-Host "     Vault context linked from $TasksFile"
+if ($IssueTitle) {
+    Write-Host "     Work-gate linked: issue #$Issue"
 }
 Write-Host ''
 Write-Host "Next: fill proposal.md interactively (`"/spec fill $FeatureId`" in an agent)"

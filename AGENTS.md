@@ -389,7 +389,7 @@ Before creating ANY branch for code changes in this repo, evaluate against `patt
 **If trigger met, follow this order — no shortcuts:**
 
 1. Open a GitHub issue (or reuse an existing one) and add it to the **bitácora** Project — this is the "work gate" replacing the former vault `11-tasks.md` entry
-2. Run `init-spec.{sh,ps1} <feature-id>` to scaffold `specs/<feature-id>/` (the script enforces the work-gate check; bypass only with `-ForceNoVault` + explicit user-facing justification)
+2. Run `init-spec.{sh,ps1} <feature-id> --issue <N>` to scaffold `specs/<feature-id>/` (the script verifies via `gh` that issue N exists and is OPEN; bypass only with `--force-no-gate` / `-ForceNoGate` + explicit user-facing justification)
 3. Fill `proposal.md` (why + what + acceptance criteria) **before** writing implementation code
 4. Fill `tasks.md` in TDD order
 5. Implement; tick boxes as you go
