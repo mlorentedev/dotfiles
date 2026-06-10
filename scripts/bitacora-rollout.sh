@@ -63,6 +63,8 @@ fi
 LINKED="$(gh api graphql -f query="query { user(login: \"$OWNER\") { projectV2(number: $PROJECT_NUMBER) { repositories(first: 100) { nodes { name } } } } }" \
     -q '.data.user.projectV2.repositories.nodes[].name' 2>/dev/null || true)"
 
+PR_FILES=()   # workflows that hit branch protection on the current repo (reset per repo)
+
 deploy_workflow() {  # $1 = repo, $2 = workflow filename
     local repo="$1" wf="$2" path=".github/workflows/$2" src remote sha
     src="$REPO_ROOT/.github/workflows/$wf"
@@ -79,7 +81,41 @@ deploy_workflow() {  # $1 = repo, $2 = workflow filename
             -f message="ci: deploy bitácora workflow $wf (OPS-002)"
             -f content="$(base64 -w0 < "$src")")
         [ -n "$sha" ] && put_args+=(-f sha="$sha")
-        gh api "${put_args[@]}" >/dev/null || err "$repo: PUT $wf failed"
+        if ! gh api "${put_args[@]}" >/dev/null 2>&1; then
+            # HTTP 409 on protected branches ("changes must be made through a pull request")
+            # — queue the file for the per-repo PR fallback below.
+            PR_FILES+=("$wf")
+        fi
+    fi
+}
+
+deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens an auto-merge PR
+    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf path src sha
+    base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
+    base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
+    gh api -X POST "repos/$OWNER/$repo/git/refs" \
+        -f ref="refs/heads/$branch" -f sha="$base_sha" >/dev/null 2>&1 || true   # exists → reuse
+    for wf in "${PR_FILES[@]}"; do
+        path=".github/workflows/$wf"
+        src="$REPO_ROOT/.github/workflows/$wf"
+        sha="$(gh api "repos/$OWNER/$repo/contents/$path?ref=$branch" -q '.sha' 2>/dev/null || true)"
+        local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$path"
+            -f message="ci: deploy bitácora workflow $wf (OPS-002)"
+            -f content="$(base64 -w0 < "$src")" -f branch="$branch")
+        [ -n "$sha" ] && put_args+=(-f sha="$sha")
+        gh api "${put_args[@]}" >/dev/null || { err "$repo: PUT $wf to $branch failed"; return; }
+    done
+    if ! gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number' | grep -q .; then
+        gh pr create --repo "$OWNER/$repo" --base "$base" --head "$branch" \
+            --title "ci: deploy bitácora workflows (OPS-002)" \
+            --body "Canonical \`add-to-project.yml\` + \`bitacora-status.yml\` from \`mlorentedev/dotfiles\` (runbook §7). Deployed via \`scripts/bitacora-rollout.sh\` — this repo's default branch is protected, so the rollout lands through a PR." >/dev/null \
+            || { err "$repo: pr create failed"; return; }
+    fi
+    # Auto-merge needs the repo setting enabled; if not, leave the PR open for review.
+    if gh pr merge --repo "$OWNER/$repo" "$branch" --squash --auto >/dev/null 2>&1; then
+        ok "$repo: protected branch — PR opened with auto-merge (${PR_FILES[*]})"
+    else
+        ok "$repo: protected branch — PR opened, merge manually (${PR_FILES[*]})"
     fi
 }
 
@@ -107,10 +143,14 @@ for repo in "${REPOS[@]}"; do
         fi
     fi
 
-    # 3. Workflows
+    # 3. Workflows (direct push; PR fallback when the default branch is protected)
+    PR_FILES=()
     for wf in "${WORKFLOWS[@]}"; do
         deploy_workflow "$repo" "$wf"
     done
+    if [ "${#PR_FILES[@]}" -gt 0 ]; then
+        deploy_via_pr "$repo"
+    fi
 
     # 4. Backfill open issues + PRs (item-add returns the existing item when already on board)
     backfilled=0
