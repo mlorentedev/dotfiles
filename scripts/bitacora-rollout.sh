@@ -93,8 +93,17 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens an au
     local repo="$1" branch="ci/bitacora-workflows" base base_sha wf path src sha
     base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
     base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
-    gh api -X POST "repos/$OWNER/$repo/git/refs" \
-        -f ref="refs/heads/$branch" -f sha="$base_sha" >/dev/null 2>&1 || true   # exists → reuse
+    # Create the branch at base HEAD; if it already exists, FORCE-reset it to base.
+    # Blind reuse caused merge conflicts: after the previous PR was squash-merged the
+    # leftover branch held stale commits that textually conflicted with the new base
+    # (observed on pollex/yt-metrics-cli/pdf-modifier-mcp, 2026-06-10). Re-PUTting the
+    # canonical files on a base-fresh branch is the convergent form.
+    if ! gh api -X POST "repos/$OWNER/$repo/git/refs" \
+        -f ref="refs/heads/$branch" -f sha="$base_sha" >/dev/null 2>&1; then
+        gh api -X PATCH "repos/$OWNER/$repo/git/refs/heads/$branch" \
+            -f sha="$base_sha" -F force=true >/dev/null \
+            || { err "$repo: cannot reset $branch to $base HEAD"; return; }
+    fi
     for wf in "${PR_FILES[@]}"; do
         path=".github/workflows/$wf"
         src="$REPO_ROOT/.github/workflows/$wf"
