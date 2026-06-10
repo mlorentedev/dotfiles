@@ -6,7 +6,7 @@
 # Philosophy: opportunistic configuration. The script attempts to set up
 # every supported tool and warns when something is not available, rather
 # than requiring opt-in flags. Heavy / disk-intensive installs (e.g.
-# future Ollama, Ghostty) may add explicit flags case by case.
+# future Ollama) may add explicit flags case by case.
 
 set -euo pipefail
 
@@ -25,7 +25,7 @@ CURRENT_DIR=$(pwd)
 export DOTFILES_DIR="$HOME/.dotfiles"
 
 # Single source of truth for tool versions (REFACTOR-011): source the manifest
-# from the checkout so $OPENCODE_VERSION / $GHOSTTY_VERSION / etc. are reliable
+# from the checkout so $OPENCODE_VERSION / etc. are reliable
 # regardless of the parent shell. Read from $CURRENT_DIR: the copy under
 # $DOTFILES_DIR does not exist yet on a first run (it is created below).
 [ -f "$CURRENT_DIR/versions.conf" ] && . "$CURRENT_DIR/versions.conf"
@@ -679,6 +679,35 @@ else
     log_warning "AGENTS.md source missing at $AGENTS_SRC"
 fi
 
+# Yarn (classic) — npm-pinned global install (TERM-002 companion).
+# Guarded on npm (same convention as pi). Reconcile-not-skip: a version drift
+# is corrected by reinstalling the pin, since npm -g yarn upgrades are safe.
+if command -v npm >/dev/null 2>&1; then
+    YARN_PINNED="${YARN_VERSION:-}"
+    if ! command -v yarn >/dev/null 2>&1; then
+        log_info "Installing yarn (yarn@${YARN_PINNED:-latest}) via npm..."
+        if npm install -g "yarn${YARN_PINNED:+@$YARN_PINNED}" >/dev/null 2>&1; then
+            log_success "yarn installed: $(yarn --version 2>/dev/null)"
+        else
+            log_warning "yarn install failed — run: npm install -g yarn${YARN_PINNED:+@$YARN_PINNED}"
+        fi
+    else
+        INSTALLED_YARN=$(yarn --version 2>/dev/null | head -1)
+        if [ -n "$YARN_PINNED" ] && [ "$INSTALLED_YARN" != "$YARN_PINNED" ]; then
+            log_info "yarn version drift (installed=$INSTALLED_YARN pinned=$YARN_PINNED) — reconciling..."
+            if npm install -g "yarn@$YARN_PINNED" >/dev/null 2>&1; then
+                log_success "yarn reconciled to $YARN_PINNED"
+            else
+                log_warning "yarn reconcile failed — run: npm install -g yarn@$YARN_PINNED"
+            fi
+        else
+            log_info "yarn already installed: $INSTALLED_YARN"
+        fi
+    fi
+else
+    log_warning "npm not found — skipping yarn install (install Node.js, then re-run setup)"
+fi
+
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
 # agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
 # Install pinned via npm (guarded); models.json gets the same deploy-time secret
@@ -768,41 +797,6 @@ if [ -x "$OPENCODE_BINARY" ] || command -v opencode >/dev/null 2>&1; then
     log_info "First-time use: launch \`opencode\` and run /connect to authenticate (Go subscription)"
 else
     log_warning "opencode binary not reachable at $OPENCODE_BINARY after install — agent unavailable"
-fi
-
-# Ghostty terminal emulator (TERM-001 — Linux only, Ubuntu universe).
-# Detect-and-act with warn-not-fail: this script avoids sudo (same convention
-# as tmux / xclip), so apt install is NOT attempted here -- the user runs the
-# one-liner once per machine. Config is deployed unconditionally though, so
-# the moment the user runs `sudo apt install -y ghostty` the canonical config
-# is already in place.
-GHOSTTY_VERSION_PINNED="${GHOSTTY_VERSION}"
-if ! command -v ghostty >/dev/null 2>&1; then
-    log_warning "ghostty not installed. Run: sudo apt install -y ghostty  (Ubuntu 26.04+ universe; needed for the recommended opencode TUI host)"
-else
-    INSTALLED_GHOSTTY=$(ghostty --version 2>&1 | head -1 | awk '{print $2}' | sed 's/-.*//')
-    if [ "$INSTALLED_GHOSTTY" = "$GHOSTTY_VERSION_PINNED" ]; then
-        log_info "ghostty installed: $(ghostty --version 2>&1 | head -1)"
-    else
-        log_warning "ghostty version drift: installed=$INSTALLED_GHOSTTY pinned=$GHOSTTY_VERSION_PINNED (sudo apt install --only-upgrade ghostty if you want to track the pin)"
-    fi
-fi
-
-# Deploy ghostty config — reconcile-not-skip pattern (same as opencode.jsonc).
-# Inert if ghostty is not installed: the file lives at ~/.config/ghostty/
-# regardless and gets read the moment the binary is.
-ensure_directory "$HOME/.config/ghostty"
-GHOSTTY_CONFIG_SRC="$CURRENT_DIR/terminals/ghostty/config"
-GHOSTTY_CONFIG_DST="$HOME/.config/ghostty/config"
-if [ -f "$GHOSTTY_CONFIG_SRC" ]; then
-    if [ -f "$GHOSTTY_CONFIG_DST" ] && cmp -s "$GHOSTTY_CONFIG_SRC" "$GHOSTTY_CONFIG_DST"; then
-        log_info "ghostty config already in sync"
-    else
-        cp "$GHOSTTY_CONFIG_SRC" "$GHOSTTY_CONFIG_DST"
-        log_success "Deployed ghostty config to $GHOSTTY_CONFIG_DST"
-    fi
-else
-    log_warning "ghostty config source missing: $GHOSTTY_CONFIG_SRC"
 fi
 
 # GitHub Copilot CLI (BUG-003: standalone agentic CLI, drops legacy gh-copilot

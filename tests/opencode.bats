@@ -241,14 +241,14 @@ setup() {
 
 # --- healthcheck.sh integration ---
 
-@test "healthcheck.sh has OpenCode section (10/13)" {
-    grep -q 'section "10/13" "OpenCode"' "$HEALTHCHECK"
+@test "healthcheck.sh has OpenCode section (10/12)" {
+    grep -q 'section "10/12" "OpenCode"' "$HEALTHCHECK"
 }
 
 @test "healthcheck.sh OpenCode section checks binary + config + schema" {
-    awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'opencode --version'
-    awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
-    awk '/section "10\/13" "OpenCode"/,/section "11\/13"/' "$HEALTHCHECK" | grep -q '\$schema'
+    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'opencode --version'
+    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
+    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q '\$schema'
 }
 
 # --- DX-004: reasoning visibility (interleaved) + TUI config (tui.json) ---

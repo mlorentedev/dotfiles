@@ -50,7 +50,6 @@ opencode run -m nan/gemma4 "..."   # explicit model override
 ## Known gotchas (cross-OS)
 
 - **`socket` MCP disabled** in opencode.jsonc — `mcp.socket.dev` remote endpoint hangs 30s+ on tool discovery, blocking all chat responses. Re-enable only when upstream confirms latency fix.
-- **TUI rendering issues on Ghostty** (both opencode and agy): use `opencode run` CLI mode or `opencode web` browser UI as workaround until upstream patches. Claude Code TUI is unaffected.
 - **Non-chat NaN models** (`qwen3-embedding`, `kokoro` TTS, `whisper` STT) are NOT in the `/models` picker — opencode rejects `"embedding"` / `"audio"` as output modalities. Access via curl / OpenAI SDK directly.
 
 ## See also

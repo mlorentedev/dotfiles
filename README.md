@@ -207,7 +207,7 @@ PRs ≥50 LOC of production diff must include an active `specs/<feature-id>/` fo
 Project-bound knowledge lives in [`docs/`](docs/) (docs-as-code):
 
 - [`docs/adr/`](docs/adr/) — Architecture Decision Records (age encryption, dual-shell, BATS testing, two-directory sync, symlinks vs copies, multi-agent runtime, model-tier policy, …) plus the repo audits and architecture map
-- [`docs/runbooks/`](docs/runbooks/) — operational procedures (secrets management, AI tools setup, tool installation, tmux, Ghostty, OpenCode, self-deploy timer)
+- [`docs/runbooks/`](docs/runbooks/) — operational procedures (secrets management, AI tools setup, tool installation, tmux, OpenCode, self-deploy timer)
 - [`docs/troubleshooting/`](docs/troubleshooting/) — known issues and their fixes (secrets, AI tools, Hive MCP, claude-mem)
 - [`docs/lessons.md`](docs/lessons.md) — accumulated gotchas and post-mortems
 
