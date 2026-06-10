@@ -1,7 +1,7 @@
 ---
 id: "WIN-004-windows-ci-runner"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -56,3 +56,5 @@ All resolved at implementation time:
 - Vault: `10_projects/dotfiles/11-tasks.md` § "Session 2026-05-27 — fresh-eyes audit" → WIN-004.
 - Existing Linux CI: `.github/workflows/ci.yml` lines 69-102 (`test` job).
 - Related: Phase 2.6 (Linux idempotence CI) — Windows mirror tracked here. POLISH-003 (PSScriptAnalyzer breadth) is the static-analysis counterpart.
+
+<!-- archived 2026-06-10 — PR: https://github.com/mlorentedev/dotfiles/pull/325 -->
