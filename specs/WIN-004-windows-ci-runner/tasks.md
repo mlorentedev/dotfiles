@@ -10,19 +10,21 @@ created: "2026-05-13"
 ## Setup
 
 - [ ] Branch created from main: `feat/WIN-004-windows-ci-runner`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
+- [x] Write failing bats test: BUG-015 probe must SKIP (not FAIL) when Claude Code never ran (`tests/setup-linux.bats` "claude-mem hook probe n/a" parity assertion)
+- [x] Gate the BUG-015 probe on `installed_plugins.json` in `scripts/healthcheck.ps1` (CI-clean-machine FAIL eliminated)
+- [x] Mirror the gate in `scripts/healthcheck.sh` (cross-OS parity)
+- [x] Add `test-windows` job to `.github/workflows/ci.yml`: choco age -> secrets/vault sandbox -> `setup-windows.ps1` under PS 5.1 (BUG-005 re-exec) -> core-tools fallback -> `healthcheck.ps1` -> Pester (`tests/*.Tests.ps1`) -> bats subset under Git Bash (pinned `BATS_VERSION`)
+- [ ] Open PR; iterate on the live `windows-latest` run until green (cannot be executed locally — the PR run IS the execution verification)
+- [ ] Measure wall-time on the green run; record in `verification.md` (AC6: <= 7 min increase)
 
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+## Post-merge
+
+- [ ] Add `test-windows` to branch protection required checks for `main` (repo admin): `gh api -X PATCH repos/mlorentedev/dotfiles/branches/main/protection/required_status_checks -f 'contexts[]=test-windows'` (or via Settings UI)
 
 ## Closing
 

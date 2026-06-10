@@ -1,0 +1,51 @@
+[
+  {
+    "id": "WIN-004-windows-ci-runner-f1",
+    "behavior": ".github/workflows/ci.yml includes a test-windows job on windows-latest",
+    "verification": "grep -q 'test-windows:' .github/workflows/ci.yml && grep -q 'runs-on: windows-latest' .github/workflows/ci.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-004-windows-ci-runner-f2",
+    "behavior": "Job runs setup-windows.ps1 end-to-end under PS 5.1 (BUG-005 re-exec path) and exits 0",
+    "verification": "grep -q 'shell: powershell' .github/workflows/ci.yml && grep -q 'setup-windows.ps1' .github/workflows/ci.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-004-windows-ci-runner-f3",
+    "behavior": "Job runs healthcheck.ps1 and exits 0 (BUG-015 probe SKIPs on a never-ran-Claude machine)",
+    "verification": "grep -q 'healthcheck.ps1' .github/workflows/ci.yml && grep -q 'claude-mem hook probe n/a' scripts/healthcheck.ps1 && grep -q 'claude-mem hook probe n/a' scripts/healthcheck.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-004-windows-ci-runner-f4",
+    "behavior": "Job runs the named PowerShell bats subset (7 files) pinned to versions.conf BATS_VERSION",
+    "verification": "for f in powershell-profile profile-heal-ps1 setup-windows init-project-ps1 knowledge-crystallize-ps1 obs-cli-ps1 healthcheck-ps1; do grep -q \"tests/$f.bats\" .github/workflows/ci.yml || exit 1; done",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-004-windows-ci-runner-f5",
+    "behavior": "Job runs the Pester suites (tests/*.Tests.ps1) on windows-latest",
+    "verification": "grep -q 'Invoke-Pester' .github/workflows/ci.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-004-windows-ci-runner-f6",
+    "behavior": "test-windows is a required status check in branch protection for main (post-merge, repo admin)",
+    "verification": "gh api repos/mlorentedev/dotfiles/branches/main/protection/required_status_checks --jq '.contexts[]' | grep -q 'test-windows'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-004-windows-ci-runner-f7",
+    "behavior": "Total CI wall-time increase <= 7 minutes (measured on the first green PR run)",
+    "verification": "gh run list --repo mlorentedev/dotfiles --workflow CI --limit 1 --json databaseId --jq '.[0].databaseId' | xargs -I{} gh run view {} --repo mlorentedev/dotfiles --json jobs --jq '[.jobs[] | select(.name==\"test-windows\")][0].startedAt'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -101,6 +101,88 @@ jobs:
         run: |
           bats tests/*.bats
 
+  # WIN-004 (#125): execute the Windows deployment end-to-end. Every
+  # Windows-only bug since SDD-002 (BUG-005/020/021/022) escaped the
+  # ubuntu-only CI because PSScriptAnalyzer is static analysis, not execution.
+  # PR-only: windows-latest minutes bill 2x Linux (proposal R4).
+  # Sandbox strategy: re-encrypt the one secret consumed by {env:} tokens with
+  # a throwaway age key so the SDD-009 substitution path runs for real, and
+  # mock only the vault surface healthcheck section 7 asserts.
+  test-windows:
+    runs-on: windows-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install age (needed before setup for the secrets sandbox)
+        run: choco install age.portable -y --no-progress
+
+      - name: Sandbox secrets + minimal vault
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\age" | Out-Null
+          age-keygen -o "$env:USERPROFILE\.config\age\key.txt"
+          $pub = (Select-String "$env:USERPROFILE\.config\age\key.txt" -Pattern 'age1[0-9a-z]+').Matches.Value | Select-Object -First 1
+          'ci-dummy-nan-key' | age -r $pub -o sensitive\nan.api-key.secret.age
+          # Minimal vault tree for healthcheck section 7.
+          $vault = "$env:USERPROFILE\Projects\knowledge"
+          foreach ($d in '00_meta', '10_projects', '40_resources', '.obsidian') {
+            New-Item -ItemType Directory -Force (Join-Path $vault $d) | Out-Null
+          }
+          '{}' | Set-Content (Join-Path $vault '.obsidian\types.json') -Encoding UTF8
+          # Stub obsidian CLI: healthcheck asserts PATH presence only.
+          $stub = "$env:USERPROFILE\ci-stub-bin"
+          New-Item -ItemType Directory -Force $stub | Out-Null
+          Set-Content (Join-Path $stub 'obsidian.cmd') '@echo off'
+          Add-Content $env:GITHUB_PATH $stub
+
+      # Deliberately Windows PowerShell 5.1 so the BUG-005 pwsh re-exec path
+      # is exercised in CI, not just direct-pwsh invocation (proposal R2).
+      - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
+        shell: powershell
+        run: .\setup-windows.ps1
+
+      - name: Ensure core tools (winget-less runner fallback)
+        shell: pwsh
+        run: |
+          $missing = @('jq', 'eza', 'zoxide') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
+          if ($missing) { choco install @missing -y --no-progress }
+
+      - name: Run healthcheck.ps1
+        shell: pwsh
+        env:
+          ANTIGRAVITY_ENDPOINT: https://cloudcode-pa.googleapis.com
+          CLOUDCODE_URL: https://cloudcode-pa.googleapis.com
+        run: |
+          $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
+          $env:GEMINI_DIR = "$env:USERPROFILE\.gemini"
+          pwsh -NoProfile -File scripts\healthcheck.ps1
+          exit $LASTEXITCODE
+
+      - name: Run Pester suites
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
+          Import-Module Pester -MinimumVersion 5.5.0
+          Invoke-Pester -Path tests -CI
+
+      - name: Run PowerShell bats subset (Git Bash, pinned bats)
+        shell: bash
+        run: |
+          source versions.conf
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          tar -xzf bats.tar.gz
+          bash "bats-core-${BATS_VERSION}/install.sh" "$HOME/.local"
+          "$HOME/.local/bin/bats" \
+            tests/powershell-profile.bats \
+            tests/profile-heal-ps1.bats \
+            tests/setup-windows.bats \
+            tests/init-project-ps1.bats \
+            tests/knowledge-crystallize-ps1.bats \
+            tests/obs-cli-ps1.bats \
+            tests/healthcheck-ps1.bats
+
   integration:
     runs-on: ubuntu-latest
     needs: [lint]
