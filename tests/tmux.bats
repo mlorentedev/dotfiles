@@ -42,6 +42,3 @@ setup() {
     grep -qE "^bind -T copy-mode-vi MouseDragEnd1Pane .*copy-pipe-and-cancel .*xclip" "$CONFIG_FILE"
 }
 
-@test "tmux.conf enables truecolor passthrough for ghostty" {
-    grep -qE 'xterm-ghostty:Tc' "$CONFIG_FILE"
-}

@@ -1,7 +1,7 @@
 ---
 id: "DX-003-ghostty-opencode-hang"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"

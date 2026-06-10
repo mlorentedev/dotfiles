@@ -28,7 +28,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof.
 - Design Option A (chosen over B): only the genuinely-portable core (`_qq_call`, `oc`, `ocfull`) moves to `.zsh/functions.sh`; each rc keeps its irreducible shell-specific `qq`/`qf`/`dbg` wrapper. `noglob` is a zsh-only precommand modifier and cannot live in the shared "portable" file, so a shell-detection branch there (Option B) was rejected as violating the file's contract.
 - `oc`/`ocfull` added as functions (not aliases) to preserve functions.sh's "functions only" contract.
 - Lazy-eval ordering verified safe: `qq`/`qf` (in aliases.zsh / .bashrc, defined before functions.sh is sourced) reference `_qq_call` whose body is evaluated only at call time, by which point functions.sh has loaded.
-- Cross-OS asymmetry preserved: Linux `oc` = `opencode --pure` (Ghostty hang workaround), Windows `oc` = plain `opencode`. The parity test was repointed to functions.sh, not broken.
+- Cross-OS asymmetry preserved: Linux `oc` = `opencode --pure` (DX-003 hang workaround, abandoned), Windows `oc` = plain `opencode`. The parity test was repointed to functions.sh, not broken.
 - Test maintenance: 7 existing tests asserting the old location were updated (5 in aliases.bats consolidated into 2 negative guards; 1 in opencode.bats and 1 in powershell-profile.bats repointed to functions.sh). Positive coverage now lives in `tests/shell-wrapper-dedup.bats`.
 
 ## Promotion candidates

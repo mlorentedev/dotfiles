@@ -832,6 +832,43 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
 }
 
 # ============================================================================
+# 2d-bis. YARN (npm-pinned global install, TERM-002 companion)
+# ============================================================================
+# Guarded on npm (same convention as pi). Reconcile-not-skip on version drift.
+$yarnVersion = $null
+if (Test-Path -LiteralPath $versionsSource) {
+    foreach ($line in Get-Content -LiteralPath $versionsSource) {
+        if ($line -match '^\s*YARN_VERSION\s*=\s*(.+?)\s*$') {
+            $yarnVersion = $Matches[1].Trim().Trim('"').Trim("'")
+            break
+        }
+    }
+}
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    $yarnPkg = if ($yarnVersion) { "yarn@$yarnVersion" } else { "yarn" }
+    if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
+        Write-Info "Installing yarn ($yarnPkg) via npm..."
+        & npm install -g $yarnPkg 2>$null | Out-Null
+        if (Get-Command yarn -ErrorAction SilentlyContinue) {
+            Write-Success "yarn installed: $(& yarn --version 2>$null)"
+        } else {
+            Write-Warn "yarn install failed - run: npm install -g $yarnPkg"
+        }
+    } else {
+        $yarnInstalled = (& yarn --version 2>$null | Select-Object -First 1)
+        if ($yarnVersion -and $yarnInstalled -ne $yarnVersion) {
+            Write-Info "yarn version drift (installed=$yarnInstalled pinned=$yarnVersion) - reconciling..."
+            & npm install -g $yarnPkg 2>$null | Out-Null
+            Write-Success "yarn reconciled to $yarnVersion"
+        } else {
+            Write-Info "yarn already installed: $yarnInstalled"
+        }
+    }
+} else {
+    Write-Warn "npm not available, skipping yarn install (install Node.js then re-run)"
+}
+
+# ============================================================================
 # 2e. PI CODING AGENT CONFIG (AI-025)
 # ============================================================================
 # Mirror of the opencode block + setup-linux.sh pi deploy so the two agents are

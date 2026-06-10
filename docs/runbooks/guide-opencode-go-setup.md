@@ -147,7 +147,7 @@ OpenCode is pre-1.0 and the config schema can shift. If the TUI logs a schema er
 
 ### TUI feels noticeably slower than Claude Code, especially under tmux
 
-Empirically confirmed during AI-011-validation (2026-05-17): opencode 1.15.4 TUI does aggressive full-screen refreshes on each streamed token chunk. When stacked under tmux, every refresh has to be parsed and re-emitted through tmux's ANSI layer, adding visible latency. `opencode run "..."` (non-interactive CLI) is **unaffected**. **Recommended workflow:** use Ghostty native splits/tabs (`Ctrl+Shift+T` for new tab, `Ctrl+Shift+E` for split) for opencode TUI sessions; keep tmux for shell sessions and persistent SSH (`sshmux`). Claude Code TUI is unaffected -- its render is more conservative.
+Empirically confirmed during AI-011-validation (2026-05-17): opencode 1.15.4 TUI does aggressive full-screen refreshes on each streamed token chunk. When stacked under tmux, every refresh has to be parsed and re-emitted through tmux's ANSI layer, adding visible latency. `opencode run "..."` (non-interactive CLI) is **unaffected**. **Recommended workflow:** run opencode TUI sessions in your terminal's native tabs/splits (outside tmux); keep tmux for shell sessions and persistent SSH (`sshmux`). Claude Code TUI is unaffected -- its render is more conservative.
 
 ### Where to launch opencode (cwd matters a lot)
 
@@ -212,7 +212,7 @@ The first turn completes normally; opencode runs the tool the model requested (b
 
 ### Live log tailing (when "thinking..." takes forever and you want to see what's happening)
 
-The TUI hides backend events. Open a second Ghostty tab/split and tail the most recent log:
+The TUI hides backend events. Open a second terminal tab/split and tail the most recent log:
 
 ```bash
 # Quick one-liner
@@ -238,10 +238,6 @@ The number shown at the bottom of the TUI (e.g., `$0.12`) is a **theoretical PAY
 ### First DeepSeek V4 Pro response time vs Claude Sonnet
 
 DeepSeek V4 Pro on Go infrastructure: ~1–3s first-token latency from Europe, 40–80 tokens/sec sustained. Claude Sonnet 4.6/4.7: ~0.3–0.8s first-token, 80–150 tokens/sec. This is provider geography + inference stack differences, **not a bug**. For latency-sensitive tasks (interactive refactor, line-by-line code review), prefer Claude Code; for cheap bulk iteration (summarisation, scripted edits, mechanical refactors), opencode + DeepSeek wins on $/token.
-
-### Ghostty `theme "<name>" not found` on config validation
-
-Ghostty 1.3.0 theme names use literal capitalization with spaces, not kebab-case. List available: `ghostty +list-themes | grep -i <fragment>`. For Catppuccin family: `Catppuccin Mocha`, `Catppuccin Latte`, `Catppuccin Frappe`, `Catppuccin Macchiato` (each with the literal space). Use `ghostty +validate-config` after editing `~/.config/ghostty/config` to catch typos before reopening the TUI.
 
 ## References
 

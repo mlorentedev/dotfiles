@@ -3,11 +3,10 @@
     Post-setup tool and version verification for Windows. Cross-OS sibling of healthcheck.sh.
 
 .DESCRIPTION
-    Runs 13 sections of structural assertions against a deployed dotfiles install
-    on Windows. Sections 9 (tmux), 11 (ghostty) emit SKIP with explanation
-    because those tools are Linux-only by design or pending follow-up specs
-    (WIN-001b, REFACTOR-003, TERM-002). Section 13 (Antigravity CLI Health)
-    added in SDD-007.
+    Runs 12 sections of structural assertions against a deployed dotfiles install
+    on Windows. Section 9 (tmux) emits SKIP with explanation because tmux is
+    Linux-only by design (WIN-001b, REFACTOR-003). Section 12 (Antigravity CLI
+    Health) added in SDD-007.
 
     Numbered identically to healthcheck.sh so bats parity asserts work cross-OS.
 
@@ -119,13 +118,13 @@ Write-Host '========================================'
 Write-Host "Checking from: $script:DotfilesDir"
 
 # ==================================================
-# 1/13 Core Tools in PATH
+# 1/12 Core Tools in PATH
 # ==================================================
 # Required = installed by setup-windows.ps1 (winget array) + the bootstrap
 # prerequisites git/pwsh. Workflow-dependent tools (node/npm/docker/kubectl/
 # terraform/direnv) moved to section 6 (Optional) because dotfiles does not
 # deploy them on Windows -- they're user choice per task.
-Write-Section '1/13' 'Core Tools in PATH'
+Write-Section '1/12' 'Core Tools in PATH'
 
 $coreTools = @('git', 'pwsh', 'curl', 'jq', 'eza', 'gh', 'zoxide')
 foreach ($tool in $coreTools) {
@@ -137,9 +136,9 @@ foreach ($tool in $coreTools) {
 }
 
 # ==================================================
-# 2/13 Versioned Tool Paths
+# 2/12 Versioned Tool Paths
 # ==================================================
-Write-Section '2/13' 'Versioned Tool Paths'
+Write-Section '2/12' 'Versioned Tool Paths'
 
 Test-BinaryInDir -Name 'JAVA_HOME'   -Dir $env:JAVA_HOME   -Binary 'java'
 Test-BinaryInDir -Name 'MAVEN_HOME'  -Dir $env:MAVEN_HOME  -Binary 'mvn'
@@ -168,14 +167,14 @@ if ($env:MINIKUBE_HOME -and (Test-Path -LiteralPath $env:MINIKUBE_HOME -PathType
 }
 
 # ==================================================
-# 3/13 Version Match (versions.conf)
+# 3/12 Version Match (versions.conf)
 # ==================================================
 # Linux deploys language toolchains under $APPS_HOME/{jdk-VERSION,go-VERSION,...}
 # and pins versions via versions.conf. Windows installs language toolchains via
 # winget into user-chosen paths and does NOT use $APPS_HOME. So this section is
 # only meaningful when $env:APPS_HOME is explicitly set; otherwise SKIP the
 # whole block (a single line, not 5 individual SKIPs).
-Write-Section '3/13' 'Version Match (versions.conf)'
+Write-Section '3/12' 'Version Match (versions.conf)'
 
 if (-not $env:APPS_HOME) {
     Write-Skip 'version match' '$env:APPS_HOME not set (Windows uses winget, not $APPS_HOME -- skip section)'
@@ -200,14 +199,29 @@ if (-not $env:APPS_HOME) {
     Test-VersionMatch 'Python'   $script:Versions['PYTHON_VERSION']   (Join-Path $appsHome "python-$($script:Versions['PYTHON_VERSION'])")
     Test-VersionMatch 'Minikube' $script:Versions['MINIKUBE_VERSION'] (Join-Path $appsHome "minikube-$($script:Versions['MINIKUBE_VERSION'])")
     Test-VersionMatch 'Go'       $script:Versions['GO_VERSION']       (Join-Path $appsHome "go-$($script:Versions['GO_VERSION'])")
+
+    # Yarn: npm-global pinned (no versioned dir) - compare binary version to pin.
+    if (Test-Command 'yarn') {
+        $yarnPinned = $script:Versions['YARN_VERSION']
+        $yarnInstalled = (& yarn --version 2>&1 | Select-Object -First 1)
+        if ($yarnPinned -and $yarnInstalled -eq $yarnPinned) {
+            Write-Pass "yarn version matches versions.conf ($yarnPinned)"
+        } elseif ($yarnPinned) {
+            Write-Fail "yarn version drift: installed=$yarnInstalled pinned=$yarnPinned"
+        } else {
+            Write-Skip 'yarn version' 'YARN_VERSION not set in versions.conf'
+        }
+    } else {
+        Write-Skip 'yarn binary' 'not installed (npm install -g yarn@<pin>, or re-run setup-windows.ps1)'
+    }
 }
 
 # ==================================================
-# 4/13 Key Files / Junctions
+# 4/12 Key Files / Junctions
 # ==================================================
 # Windows uses file copies + the .dotfiles junction (BUG-012) instead of POSIX
 # symlinks. We check existence rather than symlink-ness.
-Write-Section '4/13' 'Key Files / Junctions'
+Write-Section '4/12' 'Key Files / Junctions'
 
 function Test-DeployedFile {
     param([string]$Path, [string]$Name)
@@ -295,12 +309,12 @@ if ($resolved) {
 }
 
 # ==================================================
-# 5/13 Environment Variables
+# 5/12 Environment Variables
 # ==================================================
 # DOTFILES_DIR is the only Windows-required env var (set by powershell/profile.ps1).
 # APPS_HOME + language _HOME vars are Linux-deploy-pattern vars; on Windows they
 # are optional (user may set them per workflow) -- SKIP if unset, not FAIL.
-Write-Section '5/13' 'Environment Variables'
+Write-Section '5/12' 'Environment Variables'
 
 $requiredVars = @('DOTFILES_DIR', 'ANTIGRAVITY_ENDPOINT', 'CLOUDCODE_URL', 'GEMINI_DIR')
 $optionalVars = @('APPS_HOME', 'JAVA_HOME', 'MAVEN_HOME', 'PYTHON_HOME', 'GO_HOME', 'MINIKUBE_HOME')
@@ -324,9 +338,9 @@ foreach ($v in $optionalVars) {
 }
 
 # ==================================================
-# 6/13 Optional Tools
+# 6/12 Optional Tools
 # ==================================================
-Write-Section '6/13' 'Optional Tools'
+Write-Section '6/12' 'Optional Tools'
 
 $optionalTools = @(
     'age', 'claude', 'gemini', 'bats', 'helm', 'ansible', 'pip', 'copilot', 'opencode', 'uv',
@@ -344,9 +358,9 @@ foreach ($tool in $optionalTools) {
 }
 
 # ==================================================
-# 7/13 Knowledge Vault
+# 7/12 Knowledge Vault
 # ==================================================
-Write-Section '7/13' 'Knowledge Vault'
+Write-Section '7/12' 'Knowledge Vault'
 
 $vaultDir = if ($env:VAULT_DIR) { $env:VAULT_DIR } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
 
@@ -403,9 +417,9 @@ foreach ($subdir in @('00_meta', '10_projects', '40_resources')) {
 }
 
 # ==================================================
-# 8/13 Secrets Integrity
+# 8/12 Secrets Integrity
 # ==================================================
-Write-Section '8/13' 'Secrets Integrity'
+Write-Section '8/12' 'Secrets Integrity'
 
 $secretsDir = Join-Path $script:DotfilesDir 'sensitive'
 $mappingFile = Join-Path $secretsDir 'env-mapping.conf'
@@ -456,15 +470,15 @@ if (Test-Path -LiteralPath $mappingFile -PathType Leaf) {
 }
 
 # ==================================================
-# 9/13 tmux
+# 9/12 tmux
 # ==================================================
-Write-Section '9/13' 'tmux'
+Write-Section '9/12' 'tmux'
 Write-Skip 'tmux' 'Linux-only by design (no Windows port planned; use WSL if needed)'
 
 # ==================================================
-# 10/13 OpenCode
+# 10/12 OpenCode
 # ==================================================
-Write-Section '10/13' 'OpenCode'
+Write-Section '10/12' 'OpenCode'
 
 $opencodeCfg = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
 
@@ -529,15 +543,9 @@ if (Test-Path -LiteralPath $piModelsCfg -PathType Leaf) {
 }
 
 # ==================================================
-# 11/13 Ghostty
+# 11/12 Repo - Deploy-Dir Drift
 # ==================================================
-Write-Section '11/13' 'Ghostty'
-Write-Skip 'ghostty' 'Windows port not yet scheduled (TERM-001 is Linux-only; open TERM-002 to enable this section)'
-
-# ==================================================
-# 12/13 Repo - Deploy-Dir Drift
-# ==================================================
-Write-Section '12/13' 'Repo - Deploy-Dir Drift'
+Write-Section '11/12' 'Repo - Deploy-Dir Drift'
 
 # REFACTOR-003: invoke diff-check.ps1 (port of diff-check.sh). Non-fatal:
 # surfaces drift as FAIL line but does NOT alter healthcheck's overall
@@ -558,9 +566,9 @@ if (Test-Path -LiteralPath $diffCheckScript -PathType Leaf) {
 }
 
 # ==================================================
-# 13/13 Antigravity CLI Health
+# 12/12 Antigravity CLI Health
 # ==================================================
-Write-Section '13/13' 'Antigravity CLI Health'
+Write-Section '12/12' 'Antigravity CLI Health'
 
 if (Test-Command 'agy') {
     # Verify production endpoint

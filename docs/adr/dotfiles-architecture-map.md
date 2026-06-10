@@ -167,7 +167,6 @@ The "I want to change X — where do I look?" reference.
 | Aliases (bash + zsh) | `.zsh/aliases.zsh` (noglob `qq`), `.bashrc` (function `qq`) | Cross-shell parity: same alias name, OS-appropriate mechanism. |
 | Aliases (PowerShell) | `powershell/profile.ps1` | Functions inside `Get-Command opencode` guards. |
 | tmux config | `tmux.conf` (root) | Symlinked to `~/.tmux.conf`. Linux-only. |
-| Ghostty config | `terminal/ghostty/config` | Linux-only (Windows uses native terminal). |
 | Bats tests | `tests/<area>.bats` | Mirror script names (`utils.bats`, `healthcheck.bats`, etc.). |
 | Integration test | `tests/Dockerfile.integration` + `tests/verify-setup.bats` | Clean Ubuntu 24.04 container runs full `setup-linux.sh`. |
 | Knowledge crystallisation | `scripts/knowledge-crystallize.{sh,ps1}` + `/crystallize` skill | Auto-discovers from `~/.claude/projects/`. |
@@ -179,7 +178,6 @@ These are not decisions, just signals. AUDIT-001/002/003 will turn them into pro
 
 - **`scripts/` is the dominant surface** (43 files, 7663 LOC of `.sh` + 4060 LOC of `.ps1`). Four files account for ~40% of the LOC: `load-secrets.sh` (1058), `utils.sh` (726), `init-project.sh` (460), `healthcheck.sh` (398). These are REFACTOR-001's primary subjects.
 - **Cross-OS duplication is uneven.** Some pairs are tight (`obs-cli.{sh,ps1}`, `archive-spec.{sh,ps1}`, `claude-mem-heal.{sh,ps1}`); others diverge meaningfully (`setup-linux.sh` 912 vs `setup-windows.ps1` 1043, but with different feature sets). AUDIT-002 will classify per-pair.
-- **`terminal/` has only one file** (`ghostty/config`). Could live under `ai/` or stay as sibling depending on whether Ghostty is treated as "AI workspace" or "general terminal". AUDIT-001 question.
 - **`powershell/` and `.zsh/` both hold shell-specific snippets** but with different naming conventions (one camelCase visible dir, one dotfile). AUDIT-001 candidate for `shells/` umbrella.
 - **`sensitive/` mixes encrypted blobs (`*.secret.age`) and the `env-mapping.conf` plaintext index.** Stable as-is, but worth verifying the index never accidentally leaks paths.
 - **6 cross-agent docs files** (`AGENTS.md`, `ai/claude/CLAUDE.md`, `ai/copilot/copilot-instructions.md`, `ai/gemini/GEMINI.md`, `.github/copilot-instructions.md`, `.claude/CLAUDE.md`). Pointer-style post AI-013; AUDIT-003 verifies no drift.

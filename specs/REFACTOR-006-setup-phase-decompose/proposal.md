@@ -26,7 +26,7 @@ Refactor both setup scripts so they become thin entrypoints (~50 LOC) that call 
 - `03-deploy-shellrc.{sh,ps1}` — `.zshrc`, `.bashrc`, `profile.ps1`, ssh config.
 - `04-ai-configs.{sh,ps1}` — Claude settings merge, opencode.jsonc, agy, gemini.
 - `05-secrets.{sh,ps1}` — age install hint, secrets directory, `load-secrets` wiring.
-- `06-tools.{sh,ps1}` — opportunistic installs (Ollama, Antigravity, Ghostty, mise).
+- `06-tools.{sh,ps1}` — opportunistic installs (Ollama, Antigravity, mise).
 - `07-post-install.{sh,ps1}` — healthcheck, drift baseline, log summary.
 
 Each phase is a separate file under `scripts/setup/`. The entrypoints `setup-linux.sh` and `setup-windows.ps1` keep their names (public contract) and become orchestrators (~50 LOC each). Behavior must be byte-identical to current (verified by healthcheck + drift baseline against `main`).

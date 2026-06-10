@@ -26,7 +26,6 @@ Empirical validation pass on Windows: re-run setup, launch OpenCode TUI, walk th
 - **Modifying `setup-windows.ps1`** — code fixes discovered open atomic follow-up PRs (AI-022+).
 - **Modifying `ai/opencode/opencode.jsonc`** — if Gemini-via-OpenCode is viable, the config change ships in a separate atomic PR.
 - **Performance benchmarking** (token/sec, time-to-first-token) — qualitative impressions only.
-- **Ghostty integration on Windows** — no port exists yet; out of scope.
 
 ## Risks / open questions
 

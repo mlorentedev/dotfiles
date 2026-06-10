@@ -29,7 +29,7 @@ setup() {
     # skip the alias rather than producing broken references. Plain Set-Alias
     # (no --pure) because empirically opencode launched bare from a Windows
     # terminal works correctly with MCPs+plugins (2026-05-26). Linux keeps
-    # --pure pending Ghostty hypothesis investigation (Phase 2.4 backlog).
+    # --pure kept from the abandoned DX-003 terminal-hang investigation.
     grep -qE 'if \(Get-Command opencode' "$PROFILE_SCRIPT"
     grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
     # Regression guard: ensure --pure isn't quietly reintroduced for Windows.
@@ -60,11 +60,11 @@ setup() {
 
 @test "oc is defined on both POSIX and PowerShell (intentional asymmetry on --pure)" {
     # Same finger pattern, different underlying invocation:
-    #   Linux : oc() { opencode --pure ...} in .zsh/functions.sh (Ghostty hang workaround)
+    #   Linux : oc() { opencode --pure ...} in .zsh/functions.sh (DX-003 hang workaround)
     #   Windows: Set-Alias -Name oc -Value opencode  (no hang observed)
     # Linux oc moved to functions.sh (shared bash/zsh) per REFACTOR-010; the
     # intentional --pure asymmetry is preserved. Once the Linux hang root cause is
-    # found (Ghostty hypothesis), the --pure workaround drops everywhere.
+    # found (DX-003, abandoned), the --pure workaround drops everywhere.
     grep -qE '^oc\(\) \{ opencode --pure' "$DOTFILES_DIR/.zsh/functions.sh"
     grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
 }

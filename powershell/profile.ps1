@@ -23,7 +23,7 @@ if (Get-Command opencode -ErrorAction SilentlyContinue) {
     # does NOT exhibit the Linux tool-resolution hang. Empirical 2026-05-26:
     # opencode launched bare from a Windows terminal works correctly with
     # MCPs+plugins enabled. The Linux side keeps `opencode --pure` pending
-    # the Ghostty hypothesis investigation (Phase 2.4 backlog) -- documented
+    # the abandoned DX-003 terminal-hang investigation -- documented
     # cross-OS asymmetry, not parity drift.
     Set-Alias -Name oc -Value opencode
 

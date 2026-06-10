@@ -26,8 +26,9 @@ setup() {
     grep -q 'versions.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh has all 13 sections" {
-    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 13 ]]
+@test "healthcheck.sh has all 12 sections" {
+    # 13 -> 12: Ghostty section removed in TERM-002.
+    [[ $(grep -c 'section "' "$SCRIPTS_DIR/healthcheck.sh") -eq 12 ]]
 }
 
 @test "healthcheck.sh uses set -euo pipefail" {
@@ -61,7 +62,7 @@ setup() {
 # --- tmux section 9/12 ---
 
 @test "healthcheck.sh has section 9/12 for tmux" {
-    grep -qE 'section "9/13" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'section "9/12" "tmux"' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh verifies tmux binary" {
@@ -74,28 +75,17 @@ setup() {
     grep -qE 'check_deployed.*tmux\.conf' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-# --- ghostty section 11/12 (TERM-001) ---
+# --- yarn (TERM-002 companion: npm-global pinned install) ---
 
-@test "healthcheck.sh has section 11/12 for ghostty" {
-    grep -qE 'section "11/13" "Ghostty"' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh verifies yarn version match against versions.conf" {
+    grep -qE 'YARN_VERSION=' "$SCRIPTS_DIR/healthcheck.sh"
+    grep -qE 'command -v yarn' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
-@test "healthcheck.sh verifies ghostty binary presence" {
-    grep -qE 'command -v ghostty' "$SCRIPTS_DIR/healthcheck.sh"
-}
+# --- drift section 11/12 ---
 
-@test "healthcheck.sh verifies ghostty config deployed" {
-    grep -qE 'HOME/\.config/ghostty/config' "$SCRIPTS_DIR/healthcheck.sh"
-}
-
-@test "healthcheck.sh verifies ghostty version match against versions.conf" {
-    grep -qE 'GHOSTTY_VERSION=' "$SCRIPTS_DIR/healthcheck.sh"
-}
-
-# --- drift section 12/12 ---
-
-@test "healthcheck.sh has section 12/12 for drift" {
-    grep -qE 'section "12/13" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
+@test "healthcheck.sh has section 11/12 for drift" {
+    grep -qE 'section "11/12" "Repo' "$SCRIPTS_DIR/healthcheck.sh"
 }
 
 @test "healthcheck.sh invokes diff-check.sh" {
