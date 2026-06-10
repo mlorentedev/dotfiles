@@ -4,8 +4,9 @@
 # Helper under test: substitute_env_placeholders <file> (in scripts/utils.sh).
 # Reads {env:NAME} tokens from <file>, looks up NAME in
 # sensitive/env-mapping.conf, decrypts sensitive/<value>.secret.age with age,
-# and rewrites <file> in place. Unresolved placeholders are left intact with
-# a log_warning, allowing opencode's runtime env resolver to act as fallback.
+# and rewrites <file> in place. Placeholders left intact split in two classes:
+# unmapped (no active mapping line -- runtime-resolved by design, log_info) and
+# unresolved (mapped but secret missing/undecryptable -- actionable, log_warning).
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -80,7 +81,24 @@ teardown() {
     grep -q '"apiKey": "{env:OLLAMA_API_KEY}"' "$TARGET_FILE"
 }
 
-@test "emits log_warning for unresolved placeholders" {
+@test "no log_warning for unmapped placeholders (runtime-resolved by design)" {
+    # OLLAMA_API_KEY has no active mapping line: leaving it for the runtime
+    # env resolver is the designed behavior, not a problem to warn about.
+    run bash -c '
+        source "$1/utils.sh"
+        substitute_env_placeholders "$2" 2>&1
+    ' -- "$SCRIPTS_DIR" "$TARGET_FILE"
+    [[ "$output" != *"[WARNING]"* ]]
+    [[ "$output" == *"OLLAMA_API_KEY"* ]]
+}
+
+@test "emits log_warning for mapped placeholders whose secret cannot be resolved" {
+    # Map OLLAMA_API_KEY but provide no secret file: mapped-but-unresolvable
+    # is the actionable case (missing/undecryptable secret, e.g. no age key).
+    cat > "$SECRETS_MAPPING_FILE" <<EOF
+NAN_API_KEY=nan.api-key
+OLLAMA_API_KEY=ollama.api-key
+EOF
     run bash -c '
         source "$1/utils.sh"
         substitute_env_placeholders "$2" 2>&1
