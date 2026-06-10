@@ -70,6 +70,34 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
     [ ! -d "$FAKEHOME/.gemini/skills/creating-skills" ]
 }
 
+@test "AI-022: pi gets /spec as a native skill (regular copy, not a symlink)" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ -f "$FAKEHOME/.pi/agent/skills/spec/SKILL.md" ]
+    grep -q '^name: spec' "$FAKEHOME/.pi/agent/skills/spec/SKILL.md"
+    [ ! -L "$FAKEHOME/.pi/agent/skills/spec" ]
+}
+
+@test "AI-022: a Claude-only skill is NOT exposed to pi" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    # creating-skills is targets:[claude]
+    [ ! -d "$FAKEHOME/.pi/agent/skills/creating-skills" ]
+}
+
+@test "AI-022: deploy leaves pi-installed sibling symlinks alone" {
+    # pi's own installer manages skills as symlinks into ~/.agents/skills; our
+    # deploy must only de-symlink destinations it owns, never prune foreign links.
+    mkdir -p "$FAKEHOME/.agents/skills/userskill" "$FAKEHOME/.pi/agent/skills"
+    printf -- '---\nname: userskill\n---\nuser-installed\n' \
+        > "$FAKEHOME/.agents/skills/userskill/SKILL.md"
+    ln -s "$FAKEHOME/.agents/skills/userskill" "$FAKEHOME/.pi/agent/skills/userskill"
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ -L "$FAKEHOME/.pi/agent/skills/userskill" ]
+    [ -f "$FAKEHOME/.pi/agent/skills/userskill/SKILL.md" ]
+}
+
 @test "AC1 smoke: no deployed skill path is a symlink" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]

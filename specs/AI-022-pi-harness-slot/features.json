@@ -1,0 +1,30 @@
+[
+  {
+    "id": "AI-022-f1",
+    "behavior": "harness/manifest.json lists pi under skills.deploy[] with render skill and dir .pi/agent/skills",
+    "verification": "jq -e '.skills.deploy[] | select(.agent==\"pi\" and .render==\"skill\" and .dir==\".pi/agent/skills\")' harness/manifest.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-f2",
+    "behavior": "compile-harness --deploy renders /spec to .pi/agent/skills/spec/SKILL.md as a regular file",
+    "verification": "bats tests/skills-pipeline.bats -f 'pi gets /spec'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-f3",
+    "behavior": "A targets:-restricted skill that excludes pi is not deployed to pi",
+    "verification": "bats tests/skills-pipeline.bats -f 'NOT exposed to pi'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-022-f4",
+    "behavior": "Deploy leaves pi-installed sibling symlinks untouched",
+    "verification": "bats tests/skills-pipeline.bats -f 'sibling symlinks'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

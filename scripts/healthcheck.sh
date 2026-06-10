@@ -472,6 +472,10 @@ fi
 # ADR-012). The invariant is intentionally strict — ANY symlink here is fragile
 # (a dangling/foreign link breaks discovery), so we surface all of them. Report
 # every offending path (not just the first) so cleanup is one pass.
+# ~/.pi/agent/skills is deliberately NOT swept (AI-022): pi's own installer
+# manages sibling skills as symlinks into ~/.agents/skills, so links there are
+# expected agent-owned state, not deploy fragility. Harness-deployed pi skills
+# are still regular copies (asserted in tests/skills-pipeline.bats).
 _skill_dirs=""
 for _d in "$HOME/.claude/skills" "$HOME/.config/opencode/commands" "$HOME/.gemini/skills" "$HOME/.gemini/prompts"; do
     [ -d "$_d" ] && _skill_dirs="$_skill_dirs $_d"
