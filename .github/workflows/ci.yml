@@ -139,8 +139,15 @@ jobs:
 
       # Deliberately Windows PowerShell 5.1 so the BUG-005 pwsh re-exec path
       # is exercised in CI, not just direct-pwsh invocation (proposal R2).
+      # Both vars point at the checkout: Substitute-EnvPlaceholders derives
+      # the secrets dir from DOTFILES_DIR, and the BUG-021 pre-export plus
+      # diff-check derive the repo root from DOTFILES_REPO_DIR -- their
+      # defaults assume ~\Projects\dotfiles, which does not exist on a runner.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
         shell: powershell
+        env:
+          DOTFILES_DIR: ${{ github.workspace }}
+          DOTFILES_REPO_DIR: ${{ github.workspace }}
         run: .\setup-windows.ps1
 
       - name: Ensure core tools (winget-less runner fallback)
@@ -156,6 +163,10 @@ jobs:
           CLOUDCODE_URL: https://cloudcode-pa.googleapis.com
         run: |
           $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
+          # The deployed profile (loaded by the Actions pwsh shell, which runs
+          # without -NoProfile) points DOTFILES_REPO_DIR at ~\Projects\dotfiles;
+          # override to the checkout so diff-check compares the real repo.
+          $env:DOTFILES_REPO_DIR = $env:GITHUB_WORKSPACE
           $env:GEMINI_DIR = "$env:USERPROFILE\.gemini"
           pwsh -NoProfile -File scripts\healthcheck.ps1
           exit $LASTEXITCODE

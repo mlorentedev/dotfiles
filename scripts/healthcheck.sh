@@ -443,9 +443,12 @@ fi
 section "11/12" "Repo ↔ Deploy-Dir Drift"
 
 if [ -x "$SCRIPT_DIR/diff-check.sh" ]; then
-    if "$SCRIPT_DIR/diff-check.sh" >/dev/null 2>&1; then
+    # Capture output: on failure it IS the diagnosis -- swallowing it made
+    # setup errors undiagnosable (WIN-004 CI lesson, kept in parity here).
+    if _diff_out=$("$SCRIPT_DIR/diff-check.sh" 2>&1); then
         pass "no drift between repo and $DOTFILES_DIR"
     else
+        printf '%s\n' "$_diff_out" | sed 's/^/    /'
         fail "drift detected (run: $SCRIPT_DIR/diff-check.sh to inspect, then ./setup-linux.sh)"
     fi
 else

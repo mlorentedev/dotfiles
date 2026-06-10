@@ -567,14 +567,22 @@ Write-Section '11/12' 'Repo - Deploy-Dir Drift'
 # exit code beyond the existing FAIL-count semantics.
 $diffCheckScript = Join-Path $script:ScriptDir 'diff-check.ps1'
 if (Test-Path -LiteralPath $diffCheckScript -PathType Leaf) {
-    # Capture output; suppress the script's own colored echoes since we want
-    # the healthcheck pass/fail framing only.
-    $null = & pwsh -NoProfile -File $diffCheckScript 2>&1
+    # Capture output; on success suppress the script's own colored echoes
+    # since we want the healthcheck pass/fail framing only. On failure the
+    # captured output IS the diagnosis -- swallowing it made exit-2 setup
+    # errors undiagnosable (WIN-004 CI lesson).
+    $diffOutput = & pwsh -NoProfile -File $diffCheckScript 2>&1
     $diffExit = $LASTEXITCODE
     switch ($diffExit) {
         0 { Write-Pass 'No drift between repo and deploy-dir' }
-        1 { Write-Fail 'Drift detected -- run setup-windows.ps1 or `dch -VerboseOutput` to see details' }
-        default { Write-Fail "diff-check.ps1 exited with code $diffExit (setup error)" }
+        1 {
+            $diffOutput | Where-Object { $_ -match 'DRIFT' } | ForEach-Object { Write-Host "    $_" }
+            Write-Fail 'Drift detected -- run setup-windows.ps1 or `dch -VerboseOutput` to see details'
+        }
+        default {
+            $diffOutput | ForEach-Object { Write-Host "    $_" }
+            Write-Fail "diff-check.ps1 exited with code $diffExit (setup error)"
+        }
     }
 } else {
     Write-Skip 'diff-check' "diff-check.ps1 not deployed at $diffCheckScript (run setup-windows.ps1)"

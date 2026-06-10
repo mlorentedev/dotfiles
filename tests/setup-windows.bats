@@ -329,6 +329,13 @@ setup() {
     grep -qE 'winget install \$tool\.Id --version \$tool\.Version' "$PS1_SCRIPT"
 }
 
+# utils.ps1 sets Set-StrictMode Latest, so accessing a missing hashtable key
+# as a property throws. Latent until a box actually needs the install branch
+# (all tools present locally) -- first caught by the WIN-004 CI runner.
+@test "setup-windows.ps1 guards the optional Version key under StrictMode (WIN-004)" {
+    grep -qF "ContainsKey('Version')" "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
     # Post-SDD-007: the inline Copy-Item + Get-FileHash block was extracted
     # into Deploy-File in scripts/utils.ps1 (atomic + idempotent by SHA256).
