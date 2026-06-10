@@ -1,7 +1,7 @@
 ---
 id: "OPS-002-bitacora-rollout"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-09"
 issue: "mlorentedev/dotfiles#258"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -37,11 +37,11 @@ After this PR:
 
 ## Acceptance criteria
 
-- [ ] AC1 — `scripts/bitacora-rollout.sh` exists, is executable, passes shellcheck, and supports `--check` (read-only dry-run) plus explicit repo args.
-- [ ] AC2 — per repo it converges: project link, `BITACORA_PAT` secret, `add-to-project.yml` + `bitacora-status.yml` (deployed from the canonical `.github/workflows/` copies — no embedded duplicates), and open issue/PR backfill.
-- [ ] AC3 — repo discovery covers every non-archived, non-fork repo of the owner when no args are given.
-- [ ] AC4 — runbook §7 registers the script as the multi-repo rollout mechanism and records the board-add decision.
-- [ ] AC5 — live validation: full rollout executed; a re-run reports 0 changes (idempotence).
+- [x] AC1 — `scripts/bitacora-rollout.sh` exists, is executable, passes shellcheck, and supports `--check` (read-only dry-run) plus explicit repo args.
+- [x] AC2 — per repo it converges: project link, `BITACORA_PAT` secret, `add-to-project.yml` + `bitacora-status.yml` (deployed from the canonical `.github/workflows/` copies — no embedded duplicates), and open issue/PR backfill.
+- [x] AC3 — repo discovery covers every non-archived, non-fork repo of the owner when no args are given.
+- [x] AC4 — runbook §7 registers the script as the multi-repo rollout mechanism and records the board-add decision.
+- [x] AC5 — live validation: full rollout executed; a re-run reports 0 changes (idempotence). Evidence in `verification.md`.
 
 ## References
 
