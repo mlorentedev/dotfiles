@@ -1,0 +1,44 @@
+[
+  {
+    "id": "WIN-005-windows-defaults-script-f1",
+    "behavior": "scripts/windows-defaults.ps1 exists, idempotent, no admin required",
+    "verification": "bash -c '~/.local/bin/bats tests/windows-defaults.bats && pwsh -NoProfile -Command \"Import-Module Pester -MinimumVersion 5.0; (Invoke-Pester -Path tests/windows-defaults.Tests.ps1 -PassThru).FailedCount -eq 0 ? (exit 0) : (exit 1)\"'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-005-windows-defaults-script-f2",
+    "behavior": "setup-windows.ps1 accepts -WithDefaults switch and invokes the deployed script when present",
+    "verification": "grep -q '\\[switch\\]\\$WithDefaults' setup-windows.ps1 && grep -q 'if (\\$WithDefaults)' setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-005-windows-defaults-script-f3",
+    "behavior": "Flag is OFF by default -- users opt in explicitly",
+    "verification": "grep -q '\\[switch\\]\\$WithDefaults' setup-windows.ps1 && ! grep -q 'WithDefaults = \\$true' setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-005-windows-defaults-script-f4",
+    "behavior": "All registry writes target HKCU: only (structural + runtime invariant)",
+    "verification": "! grep -qi HKLM scripts/windows-defaults.ps1 && grep -q 'Root -notmatch' scripts/windows-defaults.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-005-windows-defaults-script-f5",
+    "behavior": "tests/windows-defaults.bats verifies HKCU-only invariant; Pester suite verifies idempotency in a sandboxed root",
+    "verification": "grep -q 'HKCU-only invariant' tests/windows-defaults.bats && grep -q 'is idempotent' tests/windows-defaults.Tests.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-005-windows-defaults-script-f6",
+    "behavior": "README documents the opt-in flag",
+    "verification": "grep -q 'WithDefaults' README.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]

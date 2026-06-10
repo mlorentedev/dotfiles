@@ -1,7 +1,7 @@
 ---
 id: "WIN-005-windows-defaults-script"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
