@@ -21,7 +21,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - `bats tests/windows-defaults.bats` -> 20/20 (includes PSScriptAnalyzer strict-catch variant + ParseFile via `tests/winpath.bash`)
 - `Invoke-Pester tests/windows-defaults.Tests.ps1` -> 4/4 on this box (Windows 11, non-admin); all writes sandboxed, real HKCU untouched
 - Full Windows bats subset (the 7 CI files + this one) re-run locally: no regressions
-- Live `windows-latest` confirmation deferred to the PR run (test-windows job runs Pester + bats subsets)
+- Live `windows-latest` confirmation: PR #331 fully green on the FIRST run (run 27312926683; `test-windows` 5m56s) -- the Pester suite applied all defaults via real registry writes in the runner sandbox and confirmed `Applied 0` on the second pass. Zero CI iterations needed (WIN-004 lessons applied at authoring time)
 
 ## Decisions made during implementation
 
@@ -40,7 +40,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/WIN-005-windows-defaults-script/` -> `specs/archive/WIN-005-windows-defaults-script/`
-- [ ] GitHub issue #129 closed (built-in workflow moves it to Done on the bitácora board)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/WIN-005-windows-defaults-script/` -> `specs/archive/WIN-005-windows-defaults-script/`
+- [x] GitHub issue #129 closed (built-in workflow moves it to Done on the bitácora board)
+- [x] Promotions above executed (none flagged)
