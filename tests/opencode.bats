@@ -45,9 +45,21 @@ setup() {
 
 @test "setup-linux.sh converges a drifted opencode to the versions.conf pin (REFACTOR-011)" {
     # Presence is not convergence: an opencode older than OPENCODE_VERSION was
-    # previously skipped as "already installed", leaving healthcheck FAILing on
+    # previously skipped as "already installed", leaving healthcheck flagging
     # version drift on every run.
     grep -q 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
+    # Convergence is verified by re-query, not by installer exit code: a
+    # shadowing install (npm global) would otherwise produce a false SUCCESS.
+    grep -q 'shadows it in PATH' "$SETUP_SCRIPT"
+}
+
+# Version drift is advisory: the pinned tool still works, just outdated.
+# Drift must WARN (exit-neutral), never FAIL the healthcheck run.
+@test "parity: version drift reports WARN not FAIL in both healthchecks" {
+    grep -qE 'warn "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    ! grep -qE 'fail "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    grep -qE 'Write-Warn "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+    ! grep -qE 'Write-Fail "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
 @test "setup-linux.sh opencode install URL uses opencode.ai (not anomalyco fork)" {
