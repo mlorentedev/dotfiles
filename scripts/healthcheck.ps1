@@ -290,31 +290,38 @@ if (Test-Path -LiteralPath $marketplaceReal -PathType Container) {
 # Windows, and path separators differ). Both paths check the same
 # candidate directories for the same files (bun-runner.js +
 # worker-service.cjs).
-$cmDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
-$candidates = @()
-if ($env:PLUGIN_ROOT) { $candidates += $env:PLUGIN_ROOT }
-$cacheDirs = Get-ChildItem (Join-Path $cmDir 'plugins/cache/thedotmack/claude-mem') -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
-foreach ($d in $cacheDirs) { $candidates += $d.FullName }
-$candidates += Join-Path $cmDir 'plugins/marketplaces/thedotmack-claude-mem/plugin'
-
-$resolved = $null
-foreach ($c in $candidates) {
-    $base = $c.TrimEnd('/')
-    $pluginDir = if (Test-Path (Join-Path $base 'plugin/scripts')) { Join-Path $base 'plugin' } else { $base }
-    $runner = Join-Path $pluginDir 'scripts/bun-runner.js'
-    $worker = Join-Path $pluginDir 'scripts/worker-service.cjs'
-    $runnerExists = Test-Path $runner -PathType Leaf -ErrorAction SilentlyContinue
-    $workerExists = Test-Path $worker -PathType Leaf -ErrorAction SilentlyContinue
-    if ($runnerExists -and $workerExists) {
-        $resolved = $base
-        break
-    }
-}
-
-if ($resolved) {
-    Write-Pass "claude-mem hook path resolves to: $resolved (BUG-015)"
+# WIN-004: gate the probe on the same install record as the BUG-014 check.
+# On a machine where Claude Code never ran (clean box, CI runner) there is
+# nothing to resolve -- that is a SKIP, not a FAIL.
+if (-not (Test-Path -LiteralPath $installedPluginsJson)) {
+    Write-Skip 'claude-mem hook path' 'installed_plugins.json missing (claude-mem hook probe n/a; Claude Code never ran)'
 } else {
-    Write-Fail 'claude-mem hook path resolution FAILED -- run claude-mem-heal.ps1 (BUG-015)'
+    $cmDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+    $candidates = @()
+    if ($env:PLUGIN_ROOT) { $candidates += $env:PLUGIN_ROOT }
+    $cacheDirs = Get-ChildItem (Join-Path $cmDir 'plugins/cache/thedotmack/claude-mem') -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+    foreach ($d in $cacheDirs) { $candidates += $d.FullName }
+    $candidates += Join-Path $cmDir 'plugins/marketplaces/thedotmack-claude-mem/plugin'
+
+    $resolved = $null
+    foreach ($c in $candidates) {
+        $base = $c.TrimEnd('/')
+        $pluginDir = if (Test-Path (Join-Path $base 'plugin/scripts')) { Join-Path $base 'plugin' } else { $base }
+        $runner = Join-Path $pluginDir 'scripts/bun-runner.js'
+        $worker = Join-Path $pluginDir 'scripts/worker-service.cjs'
+        $runnerExists = Test-Path $runner -PathType Leaf -ErrorAction SilentlyContinue
+        $workerExists = Test-Path $worker -PathType Leaf -ErrorAction SilentlyContinue
+        if ($runnerExists -and $workerExists) {
+            $resolved = $base
+            break
+        }
+    }
+
+    if ($resolved) {
+        Write-Pass "claude-mem hook path resolves to: $resolved (BUG-015)"
+    } else {
+        Write-Fail 'claude-mem hook path resolution FAILED -- run claude-mem-heal.ps1 (BUG-015)'
+    }
 }
 
 # ==================================================
@@ -569,14 +576,22 @@ Write-Section '11/12' 'Repo - Deploy-Dir Drift'
 # exit code beyond the existing FAIL-count semantics.
 $diffCheckScript = Join-Path $script:ScriptDir 'diff-check.ps1'
 if (Test-Path -LiteralPath $diffCheckScript -PathType Leaf) {
-    # Capture output; suppress the script's own colored echoes since we want
-    # the healthcheck pass/fail framing only.
-    $null = & pwsh -NoProfile -File $diffCheckScript 2>&1
+    # Capture output; on success suppress the script's own colored echoes
+    # since we want the healthcheck pass/fail framing only. On failure the
+    # captured output IS the diagnosis -- swallowing it made exit-2 setup
+    # errors undiagnosable (WIN-004 CI lesson).
+    $diffOutput = & pwsh -NoProfile -File $diffCheckScript 2>&1
     $diffExit = $LASTEXITCODE
     switch ($diffExit) {
         0 { Write-Pass 'No drift between repo and deploy-dir' }
-        1 { Write-Fail 'Drift detected -- run setup-windows.ps1 or `dch -VerboseOutput` to see details' }
-        default { Write-Fail "diff-check.ps1 exited with code $diffExit (setup error)" }
+        1 {
+            $diffOutput | Where-Object { $_ -match 'DRIFT' } | ForEach-Object { Write-Host "    $_" }
+            Write-Fail 'Drift detected -- run setup-windows.ps1 or `dch -VerboseOutput` to see details'
+        }
+        default {
+            $diffOutput | ForEach-Object { Write-Host "    $_" }
+            Write-Fail "diff-check.ps1 exited with code $diffExit (setup error)"
+        }
     }
 } else {
     Write-Skip 'diff-check' "diff-check.ps1 not deployed at $diffCheckScript (run setup-windows.ps1)"

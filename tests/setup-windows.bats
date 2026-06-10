@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for setup-windows.ps1 (structural + PSScriptAnalyzer)
 
+load 'winpath'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PS1_SCRIPT="$DOTFILES_DIR/setup-windows.ps1"
@@ -331,6 +333,13 @@ setup() {
     # shadowing install (npm global, scoop) would otherwise produce a false
     # SUCCESS -- the same lie class this branch eliminates for S4U tasks.
     grep -qF 'shadows it in PATH' "$PS1_SCRIPT"
+}
+
+# utils.ps1 sets Set-StrictMode Latest, so accessing a missing hashtable key
+# as a property throws. Latent until a box actually needs the install branch
+# (all tools present locally) -- first caught by the WIN-004 CI runner.
+@test "setup-windows.ps1 guards the optional Version key under StrictMode (WIN-004)" {
+    grep -qF "ContainsKey('Version')" "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
@@ -679,7 +688,7 @@ setup() {
         \$ErrorActionPreference = 'Stop'
         try {
             Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            \$results = Invoke-ScriptAnalyzer -Path '$PS1_SCRIPT' -Settings '$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1' -Severity Error,Warning
+            \$results = Invoke-ScriptAnalyzer -Path '$(_winpath "$PS1_SCRIPT")' -Settings '$(_winpath "$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1")' -Severity Error,Warning
             if (\$results) {
                 \$results | Format-Table -AutoSize
                 exit 1
@@ -700,7 +709,7 @@ setup() {
     run pwsh -NonInteractive -Command "
         \$errors = \$null
         [System.Management.Automation.Language.Parser]::ParseFile(
-            '$PS1_SCRIPT', [ref]\$null, [ref]\$errors
+            '$(_winpath "$PS1_SCRIPT")', [ref]\$null, [ref]\$errors
         ) | Out-Null
         if (\$errors) {
             \$errors | ForEach-Object { Write-Error \$_.Message }

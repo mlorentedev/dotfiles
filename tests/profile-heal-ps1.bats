@@ -11,6 +11,8 @@
 # deploy_file (clean-copy under set -e), so no equivalent heal script is
 # needed. Asymmetry is intentional and documented here.
 
+load 'winpath'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
@@ -89,7 +91,7 @@ setup() {
     run pwsh -NonInteractive -Command "
         \$errors = \$null
         [System.Management.Automation.Language.Parser]::ParseFile(
-            '$PS1_SCRIPT', [ref]\$null, [ref]\$errors
+            '$(_winpath "$PS1_SCRIPT")', [ref]\$null, [ref]\$errors
         ) | Out-Null
         if (\$errors) {
             \$errors | ForEach-Object { Write-Error \$_.Message }

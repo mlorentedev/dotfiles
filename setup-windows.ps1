@@ -332,13 +332,17 @@ if ($wingetCmd) {
             Write-Info "Installing $($tool.Name)..."
             try {
                 $wingetArgs = @($tool.Id, '--accept-package-agreements', '--accept-source-agreements')
-                if ($tool.Version) { $wingetArgs += @('--version', $tool.Version) }
+                # ContainsKey guard: utils.ps1 sets Set-StrictMode Latest, so
+                # $tool.Version on a hashtable WITHOUT that key throws instead
+                # of returning $null -- latent until a box actually needs the
+                # install branch (first caught by the WIN-004 CI runner).
+                if ($tool.ContainsKey('Version') -and $tool.Version) { $wingetArgs += @('--version', $tool.Version) }
                 & winget install @wingetArgs 2>$null | Out-Null
                 Write-Success "$($tool.Name) installed"
             } catch {
                 Write-Warn "Failed to install $($tool.Name): $_"
             }
-        } elseif ($tool.Version) {
+        } elseif ($tool.ContainsKey('Version') -and $tool.Version) {
             # REFACTOR-011: presence is not convergence. A pinned tool whose
             # installed version drifted from versions.conf was previously
             # skipped as "already installed", leaving healthcheck flagging

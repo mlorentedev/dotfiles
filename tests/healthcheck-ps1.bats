@@ -2,6 +2,8 @@
 # Tests for scripts/healthcheck.ps1 (structural + PSScriptAnalyzer)
 # Cross-OS parity sibling of tests/healthcheck.bats (the .sh tests).
 
+load 'winpath'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
@@ -221,7 +223,7 @@ setup() {
             if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
                 Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
             }
-            \$results = Invoke-ScriptAnalyzer -Path '$PS1_SCRIPT' -Settings '$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1' -Severity Error,Warning
+            \$results = Invoke-ScriptAnalyzer -Path '$(_winpath "$PS1_SCRIPT")' -Settings '$(_winpath "$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1")' -Severity Error,Warning
             if (\$results) {
                 \$results | Format-Table -AutoSize
                 exit 1
@@ -244,7 +246,7 @@ setup() {
     fi
     run pwsh -NonInteractive -NoProfile -Command "
         try {
-            [scriptblock]::Create((Get-Content -Raw '$PS1_SCRIPT')) | Out-Null
+            [scriptblock]::Create((Get-Content -Raw '$(_winpath "$PS1_SCRIPT")')) | Out-Null
             Write-Host 'PARSE OK'
         } catch {
             Write-Host \"PARSE FAIL: \$_\"

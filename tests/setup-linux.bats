@@ -484,6 +484,14 @@ setup() {
     grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
+# WIN-004: on a machine where Claude Code never ran (clean box, CI runner),
+# the BUG-015 hook probe must SKIP like the BUG-014 check above it, not FAIL.
+# Gate: installed_plugins.json missing -> skip the probe.
+@test "parity: BUG-015 hook probe skips when claude-mem was never installed (WIN-004)" {
+    grep -qF 'claude-mem hook probe n/a' "$DOTFILES_DIR/scripts/healthcheck.sh"
+    grep -qF 'claude-mem hook probe n/a' "$DOTFILES_DIR/scripts/healthcheck.ps1"
+}
+
 # BUG-023: the BUG-015 probe must use the race-free materialize+break form,
 # NOT the BUG-022 `done | head -n1` pipe (which races under `set -euo
 # pipefail` when 2+ candidates match -> EPIPE on leftover printfs -> exit

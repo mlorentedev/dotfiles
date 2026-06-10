@@ -1,7 +1,7 @@
 ---
 id: "WIN-004-windows-ci-runner"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
@@ -19,7 +19,11 @@ template_version: "1.0"
 
 ## What
 
-New CI job `test-windows` on `windows-latest` that (1) checks out the repo, (2) executes `setup-windows.ps1` end-to-end, (3) runs `healthcheck.ps1` to verify deployment integrity, (4) executes the PowerShell-flavored bats subset (`powershell-profile.bats`, `profile-heal-ps1.bats`, `setup-windows.bats`, `init-project-ps1.bats`, `knowledge-crystallize-ps1.bats`, `obs-cli-ps1.bats`, `healthcheck-ps1.bats`). Job becomes required-to-merge in branch protection for `main`.
+New CI job `test-windows` on `windows-latest` that (1) checks out the repo, (2) executes `setup-windows.ps1` end-to-end, (3) runs `healthcheck.ps1` to verify deployment integrity, (4) runs the Pester suites (`tests/*.Tests.ps1` — `sdd-009-deploy-time-secrets.Tests.ps1` was written for this runner and never executed before), (5) executes the PowerShell-flavored bats subset (`powershell-profile.bats`, `profile-heal-ps1.bats`, `setup-windows.bats`, `init-project-ps1.bats`, `knowledge-crystallize-ps1.bats`, `obs-cli-ps1.bats`, `healthcheck-ps1.bats`). Job becomes required-to-merge in branch protection for `main`.
+
+**CI sandbox** (so both scripts exit 0 on a clean runner): a throwaway age identity is generated and `sensitive/nan.api-key.secret.age` re-encrypted with it in the checkout, so the SDD-009 `{env:NAN_API_KEY}` substitution path executes for real; a minimal vault tree (`00_meta/ 10_projects/ 40_resources/ .obsidian/types.json`) plus an `obsidian` CLI stub satisfy healthcheck section 7; `ANTIGRAVITY_ENDPOINT`/`CLOUDCODE_URL`/`GEMINI_DIR`/`DOTFILES_DIR` are set explicitly (profile not loaded in CI).
+
+**Enabling fix**: both healthchecks' BUG-015 claude-mem hook probe FAILed unconditionally when Claude Code never ran; it is now gated on `installed_plugins.json` (same record as the BUG-014 check) and SKIPs on a clean machine — semantically correct beyond CI.
 
 ## Out of scope
 
@@ -30,10 +34,13 @@ New CI job `test-windows` on `windows-latest` that (1) checks out the repo, (2) 
 
 ## Risks / open questions
 
-- **R1**: bats on Windows. Use git-bash bats via `choco install bats` or curl-tarball install. Pin the bats version to `versions.conf` `BATS_VERSION` (already used by Linux CI) for parity.
-- **R2**: `setup-windows.ps1` line 48 auto-re-execs under pwsh when invoked from PS 5.1. `windows-latest` ships both — verify the re-exec path runs and exits 0 in CI, not just direct-pwsh invocation.
-- **R3**: Some Windows-only scripts require `git config --global user.{name,email}` and `gh auth status`. CI runner lacks both. Either set them in a setup step or guard with `if (gh auth status -e SilentlyContinue)` in the scripts.
-- **R4**: Runner cost. `windows-latest` minutes are 2x Linux. Mitigate by running only on `pull_request` events targeting `main`, not on every push.
+All resolved at implementation time:
+
+- **R1 (bats on Windows)** → RESOLVED: curl-tarball + `bash install.sh "$HOME/.local"` under Git Bash, pinned to `versions.conf` `BATS_VERSION` (same source as the Linux `test` job; no choco/npm version dependency).
+- **R2 (PS 5.1 re-exec)** → RESOLVED: the setup step deliberately uses `shell: powershell` (5.1) so the BUG-005 re-exec path is what CI executes.
+- **R3 (git/gh prereqs)** → RESOLVED: setup deploys the repo `.gitconfig` when `~/.gitconfig` is absent (runner case); no step in the job's path calls `gh` against the API; healthcheck env vars are set explicitly in the workflow.
+- **R4 (runner cost)** → RESOLVED: `if: github.event_name == 'pull_request'` + `timeout-minutes: 30`. Wall-time measured on the first PR run (AC6).
+- **NEW — winget availability on windows-latest** is historically flaky: setup tolerates its absence (skips tool installs with a warning), and a post-setup fallback step installs `jq`/`eza`/`zoxide` via choco only if missing, so healthcheck section 1 stays deterministic either way.
 
 ## Acceptance criteria
 

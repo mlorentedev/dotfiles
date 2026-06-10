@@ -8,13 +8,19 @@
 #
 # ASCII-only by repo convention (pattern-powershell-ascii-only).
 
+# Discovery-time computation: -Skip is evaluated during Pester 5 DISCOVERY,
+# before any BeforeAll runs. Computing this inside BeforeAll left the variable
+# unset at discovery -- silently $null without StrictMode, but a terminating
+# "variable cannot be retrieved" error when the session runs under StrictMode
+# (utils.ps1 sets it globally when the dotfiles profile chain is loaded, as on
+# the WIN-004 CI runner, where this first surfaced).
+$script:AgeMissing = (-not (Get-Command age -ErrorAction SilentlyContinue)) -or
+                    (-not (Get-Command age-keygen -ErrorAction SilentlyContinue))
+
 BeforeAll {
     $script:DotfilesDir = Split-Path -Parent $PSScriptRoot
     $script:ScriptsDir = Join-Path $script:DotfilesDir 'scripts'
     . (Join-Path $script:ScriptsDir 'utils.ps1')
-
-    $script:AgeMissing = (-not (Get-Command age -ErrorAction SilentlyContinue)) -or
-                        (-not (Get-Command age-keygen -ErrorAction SilentlyContinue))
 }
 
 Describe 'Substitute-EnvPlaceholders' -Skip:$script:AgeMissing {
