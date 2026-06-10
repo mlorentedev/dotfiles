@@ -272,9 +272,11 @@ age_get_pubkey() {
 #     -> <value-after-=> -> "$SECRETS_DIR/<value>.secret.age"
 #     -> age_decrypt -> inject literal value (newlines stripped).
 # Placeholders whose mapping is commented OR whose .secret.age is missing OR
-# whose decrypt fails are left intact; the function then emits one log_warning
-# listing every unresolved NAME. opencode's runtime env resolver remains a
-# fallback for those.
+# whose decrypt fails are left intact. Intact placeholders split in two
+# classes: unmapped (no active mapping line -- runtime-resolved by design, one
+# log_info) and unresolved (mapped but secret missing/undecryptable -- the
+# actionable case, one log_warning). opencode's runtime env resolver remains a
+# fallback for both.
 # Side effect: the resulting file has owner-only permissions (mode 600).
 # Idempotent: re-running with rotated secrets re-substitutes (the function
 # rewrites every invocation, not just when tokens are present).
@@ -307,16 +309,17 @@ substitute_env_placeholders() {
     fi
 
     content=$(cat "$file")
+    unmapped=""
     unresolved=""
     for token in $tokens; do
         name=${token#\{env:}
         name=${name%\}}
         # Mapping line: NAME=<filename-without-.secret.age>. Skip comments.
         # `|| true` for the same set-e reason: commented / missing mapping
-        # lines must drop into the unresolved branch, not abort setup.
+        # lines must drop into the unmapped branch, not abort setup.
         secret_name=$(grep -E "^${name}=" "$mapping_file" 2>/dev/null | head -1 | cut -d= -f2- || true)
         if [ -z "$secret_name" ]; then
-            unresolved="$unresolved $name"
+            unmapped="$unmapped $name"
             continue
         fi
         secret_file="$secrets_dir/${secret_name}.secret.age"
@@ -344,8 +347,11 @@ substitute_env_placeholders() {
     chmod 600 "$tmp" 2>/dev/null || true
     mv "$tmp" "$file"
 
+    if [ -n "$unmapped" ]; then
+        log_info "substitute_env_placeholders: unmapped placeholders left for runtime resolution:${unmapped}"
+    fi
     if [ -n "$unresolved" ]; then
-        log_warning "substitute_env_placeholders: unresolved placeholders left intact:${unresolved}"
+        log_warning "substitute_env_placeholders: unresolved placeholders left intact (mapped but secret missing/undecryptable -- check age key):${unresolved}"
     fi
     return 0
 }

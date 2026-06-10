@@ -541,7 +541,15 @@ if (Test-Command 'pi') {
 if (Test-Path -LiteralPath $piModelsCfg -PathType Leaf) {
     Write-Pass "pi models.json deployed: $piModelsCfg"
     if (Select-String -LiteralPath $piModelsCfg -Pattern '\{env:' -Quiet) {
-        Write-Fail 'pi models.json has an unresolved {env:...} placeholder (re-run setup-windows.ps1)'
+        # The age identity is optional per box: without it the deploy-time
+        # substitution cannot run, so a leftover {env:} token is the expected
+        # state (pi's runtime env resolver is the fallback), not an error.
+        $ageKey = if ($env:AGE_KEY_PATH) { $env:AGE_KEY_PATH } else { Join-Path $env:USERPROFILE '.config\age\key.txt' }
+        if (Test-Path -LiteralPath $ageKey -PathType Leaf) {
+            Write-Fail 'pi models.json has an unresolved {env:...} placeholder (re-run setup-windows.ps1)'
+        } else {
+            Write-Skip 'pi models.json substitution' 'age identity absent (optional on this box; {env:} placeholder resolves at runtime)'
+        }
     } else {
         Write-Pass 'pi models.json secret substituted (no {env:} placeholder left)'
     }

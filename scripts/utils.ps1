@@ -113,9 +113,10 @@ function Test-FileDrift {
 #     -> grep ^NAN_API_KEY= in env-mapping.conf (skip comments)
 #     -> <value-after-=> -> "$SecretsDir\<value>.secret.age"
 #     -> age --decrypt -> inject literal value (newlines stripped).
-# Unresolvable placeholders (mapping commented OR secret missing OR decrypt
-# fails) are left intact; emits one Write-Warning listing every unresolved
-# NAME. opencode's runtime env resolver acts as fallback.
+# Placeholders left intact split in two classes: unmapped (no active mapping
+# line -- runtime-resolved by design, one [INFO] line) and unresolved (mapped
+# but secret missing/undecryptable -- the actionable case, one Write-Warning).
+# opencode's runtime env resolver acts as fallback for both.
 # Side effect: deployed file ACL is restricted to the current user (Windows
 # equivalent of chmod 600).
 # Idempotent: re-running with rotated secrets re-substitutes.
@@ -164,12 +165,13 @@ function Substitute-EnvPlaceholders {
     }
 
     $mappingLines = Get-Content -LiteralPath $MappingFile -Encoding UTF8
+    $unmapped = @()
     $unresolved = @()
 
     foreach ($name in $tokenSet.Keys) {
         # Skip-comments match: line must start with NAME= (no leading #).
         $line = $mappingLines | Where-Object { $_ -match "^${name}=" } | Select-Object -First 1
-        if (-not $line) { $unresolved += $name; continue }
+        if (-not $line) { $unmapped += $name; continue }
 
         $secretName = ($line -split '=', 2)[1]
         if (-not $secretName) { $unresolved += $name; continue }
@@ -227,8 +229,11 @@ function Substitute-EnvPlaceholders {
         return $false
     }
 
+    if ($unmapped.Count -gt 0) {
+        Write-Host "[INFO] Substitute-EnvPlaceholders: unmapped placeholders left for runtime resolution: $($unmapped -join ' ')" -ForegroundColor Cyan
+    }
     if ($unresolved.Count -gt 0) {
-        Write-Warning "Substitute-EnvPlaceholders: unresolved placeholders left intact: $($unresolved -join ' ')"
+        Write-Warning "Substitute-EnvPlaceholders: unresolved placeholders left intact (mapped but secret missing/undecryptable -- check age key): $($unresolved -join ' ')"
     }
     return $true
 }

@@ -79,7 +79,23 @@ Describe 'Substitute-EnvPlaceholders' -Skip:$script:AgeMissing {
         $content | Should -Match '\{env:OLLAMA_API_KEY\}'
     }
 
-    It 'emits a warning naming the unresolved placeholder' {
+    It 'does not warn for unmapped placeholders (runtime-resolved by design)' {
+        # OLLAMA_API_KEY has no active mapping line: leaving it for the
+        # runtime env resolver is designed behavior, not a problem.
+        $warn = Substitute-EnvPlaceholders -Path $script:TargetFile `
+            -SecretsDir $script:SecretsDir `
+            -MappingFile $script:MappingFile `
+            -KeyPath $script:KeyPath 3>&1
+        ($warn | Out-String) | Should -Not -Match 'OLLAMA_API_KEY'
+    }
+
+    It 'warns for mapped placeholders whose secret cannot be resolved' {
+        # Map OLLAMA_API_KEY but provide no secret file: mapped-but-unresolvable
+        # is the actionable case (missing/undecryptable secret, e.g. no age key).
+        @(
+            'NAN_API_KEY=nan.api-key'
+            'OLLAMA_API_KEY=ollama.api-key'
+        ) | Set-Content -LiteralPath $script:MappingFile -Encoding UTF8
         $warn = Substitute-EnvPlaceholders -Path $script:TargetFile `
             -SecretsDir $script:SecretsDir `
             -MappingFile $script:MappingFile `

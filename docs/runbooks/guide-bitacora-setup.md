@@ -103,7 +103,13 @@ gh project item-edit --id "$ITEM" --project-id PVT_kwHOAM7xJs4BZ6GY \
 
 - **Board** grouped by Status (Backlog / In Progress / Blocked / Done).
 - **By repo** — group by Repository (tasks span all repos).
-- **PRs pending review** (OPS-003) — filter `is:pr is:open`, group by repo.
+- **PRs pending review** (OPS-003, created 2026-06-09) — the cross-repo PR dashboard:
+  - Type: **Table** (scannable columns beat a one-field Board for PR triage).
+  - Filter: `is:pr is:open`. Group by: **Repository**.
+  - Columns: Title, Assignees, Status, Repository (hide Priority/Type/ID — issue fields, noise on PRs).
+  - PRs land on the board automatically (`add-to-project.yml` `pull_request` trigger, deployed to every repo by `scripts/bitacora-rollout.sh`, which also backfills open ones).
+  - Views are UI-only (no API) — pressing **Save** on the tab is what persists the filter.
+  - Optional second view for review-blocked PRs: `is:pr is:open review:required`.
 
 ## 7. Workflows (deploy BOTH to every linked repo)
 
