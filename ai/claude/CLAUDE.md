@@ -39,7 +39,7 @@ For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.m
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:e1984fb77ea4562d) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:e9c8d9d67d9ce58f) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -49,6 +49,8 @@ For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.m
   - Bad: `feat/phase-3.1-scaffold`, `chore: scaffold repo (Phase 3.1)`
   - Good: `feat/scaffold-pyhydra3d`, `chore: scaffold PyHydra3D repository`
 - Phase/milestone tracking belongs in the bitácora GitHub Project (issues + board), not in git history or the vault (per ADR-018).
+- **Auto-merge is forbidden in every repository.** Never run `gh pr merge --auto`, never enable "Auto-merge" in the GitHub UI, and keep the repo setting `allow_auto_merge=false`. Auto-merge lands a PR the instant CI goes green — bypassing the human review gate in §1.
+- Every PR merges deliberately, after a human has reviewed it and CI is green (squash or rebase per §4, diff verified per §5). Merge is a supervised action, never a queued automatic one. An agent merges only when the user has authorized merging that specific PR.
 <!-- END HARNESS GENERATED -->
 * **Skills.** `~/.claude/skills/<skill>/SKILL.md` auto-load via slash commands. Skill auto-loading is a Claude Code feature, not portable. Skill **content** is portable: `AI-012-opencode-commands-port` mechanically transforms each skill into an OpenCode command in `ai/opencode/commands/*.md`.
 * **TaskCreate / TaskUpdate / TaskList.** Use for non-trivial multi-step work (≥3 distinct steps). Mark `in_progress` BEFORE starting; mark `completed` immediately on finish. Don't batch updates.
