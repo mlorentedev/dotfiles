@@ -72,14 +72,22 @@ require_tools() {
 
 # Extract a markdown section body by GitHub-style heading slug.
 # Args: <pattern_file> <slug>. Prints the section body (heading excluded).
+# The section ends at the next heading of the SAME-OR-HIGHER level, so deeper
+# sub-headings (e.g. a ### under a ## rule) stay inside the body instead of
+# silently truncating it (the #156 regression class — ENGINE-002).
 extract_section() {
     local file="$1" want="$2" out
     out="$(awk -v want="$want" '
         function slug(s){ s=tolower(s); gsub(/[^a-z0-9 -]/,"",s); gsub(/ +/,"-",s); gsub(/-+/,"-",s); return s }
         /^#{1,6} / {
-            if (cap) { exit }
-            hdr=$0; sub(/^#{1,6} +/,"",hdr)
-            if (slug(hdr)==want) { cap=1; next }
+            match($0, /^#+/); lvl=RLENGTH
+            if (cap) {
+                if (lvl <= caplvl) { exit }   # same/higher level == section boundary
+                # deeper sub-heading: fall through, it is part of the body
+            } else {
+                hdr=$0; sub(/^#{1,6} +/,"",hdr)
+                if (slug(hdr)==want) { cap=1; caplvl=lvl; next }
+            }
         }
         cap { print }
     ' "$file")"

@@ -343,3 +343,63 @@ EOF
     [ "$status" -ne 0 ]
     [[ "$output" == *"frontmatter"* ]]
 }
+
+# --- ENGINE-002: follow-up hardening from the ENGINE-001 adversarial review ---
+
+@test "ENGINE-002: extract_section keeps deeper sub-headings inside an enforced section" {
+    # Regression guard for the #156 truncation class: a future deeper sub-heading
+    # (###) under an enforced section must NOT cut the rule short. The extractor
+    # stops only at a same-or-higher-level heading, so the next ## section is the
+    # real boundary; the nested ### and its content stay in the record.
+    cat > "$VAULT/00_meta/patterns/test-pattern.md" <<'EOF'
+# Test Pattern
+
+## 1. Demo Rule
+- rule line one
+### 1.1 Nested detail
+- nested rule line
+- rule line two
+
+## 2. Next Section
+- unrelated
+EOF
+    run_refresh
+    [ "$status" -eq 0 ]
+    grep -qF '### 1.1 Nested detail' "$REPO/harness/enforced/demo.md"
+    grep -qF 'nested rule line'      "$REPO/harness/enforced/demo.md"
+    grep -qF 'rule line two'         "$REPO/harness/enforced/demo.md"
+    # the next same-level section is the boundary and must not leak in
+    ! grep -qF 'unrelated'        "$REPO/harness/enforced/demo.md"
+    ! grep -qF 'Next Section'     "$REPO/harness/enforced/demo.md"
+}
+
+@test "ENGINE-002: --refresh aborts loudly when the manifest anchor is missing (FM D3)" {
+    # Anchor typo / renamed section: the extractor must abort with a clear error
+    # rather than silently writing an empty record.
+    cat > "$REPO/harness/manifest.json" <<'EOF'
+{ "version": 1, "vault_subpath": "00_meta/patterns",
+  "enforced": [ { "id": "demo", "source": "test-pattern.md#9-does-not-exist" } ],
+  "targets":  [ { "agent": "t", "kind": "native", "file": "TARGET.md", "inject": ["demo"] } ] }
+EOF
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"section"* ]]
+    [[ "$output" == *"not found"* ]]
+    # no broken record left behind
+    [ ! -f "$REPO/harness/enforced/demo.md" ]
+}
+
+@test "ENGINE-002: AC6 behavioral — the drift gate healthcheck wires passes clean, fails tampered" {
+    # healthcheck.sh gates on `if compile-harness.sh --check; then pass; else fail`.
+    # Running the full healthcheck here can't isolate that gate (unrelated tool/vault
+    # checks would dominate its exit code), so we exercise the exact command it wires
+    # and assert BOTH branches: clean tree -> exit 0 (pass), tampered block -> exit !=0
+    # (fail). Complements the structural test that healthcheck calls --check.
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -eq 0 ]
+    sed -i 's/rule line one/TAMPERED/' "$REPO/TARGET.md"
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"DRIFT"* ]]
+}
