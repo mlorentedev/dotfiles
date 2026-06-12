@@ -292,7 +292,7 @@ ALL Markdown files created in the vault MUST have this YAML header:
 ```yaml
 ---
 id: "unique-slug"          # e.g., T-2024-ACME-001 or project-name
-type: [project, ticket, adr, lesson, pattern, runbook, troubleshooting]
+type: [project, ticket, adr, lesson, pattern, runbook, troubleshooting, research]
 status: [active, done, archived]
 tags: [tag1, tag2]
 ---
