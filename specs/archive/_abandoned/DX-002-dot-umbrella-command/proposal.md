@@ -1,7 +1,7 @@
 ---
 id: "DX-002-dot-umbrella-command"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # superseded by ADR-020 (Go CLI convergence); subcommand map + GraphViz risk harvested into specs/CLI-001-dot-scaffold/
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
