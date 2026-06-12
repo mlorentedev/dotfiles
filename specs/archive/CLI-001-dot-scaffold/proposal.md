@@ -1,7 +1,7 @@
 ---
 id: "CLI-001-dot-scaffold"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-12"
 issue: "dotfiles#335"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

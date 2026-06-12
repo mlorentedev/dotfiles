@@ -924,3 +924,13 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Problem:** Four consecutive live runs each surfaced a real latent bug that no installed box could reproduce: (1) `$tool.Version` under StrictMode killed installs on clean machines; (2) `DOTFILES_DIR`/`DOTFILES_REPO_DIR` defaults pointed at paths that don't exist on runners; (3) Pester `-Skip` conditions evaluate at discovery, before `BeforeAll` runs; (4) MSYS paths inside quoted pwsh `-Command` strings bypass Git Bash auto-conversion and resolve against the drive root (`D:\d\a\...`). Worse, the knowledge-crystallize analyzer test had escaped its variables (`'\$PS1_SCRIPT'`) and was analyzing an empty path — its catch-block `exit 0` made it pass everywhere, forever, without analyzing anything.
 **Solution:** Land the runner with the first test that targets it, not after a backlog of "will be picked up later" suites — every deferred suite is unverified code wearing a green badge. Audit `catch { exit 0 }` / "if available" guards: a test that can't fail is documentation, not verification (the healthcheck variant that exits 1 in its catch is what exposed the path bug). For Git Bash → native pwsh boundaries, convert paths explicitly (`tests/winpath.bash`, `cygpath -w`) — auto-conversion only applies to plain arguments, never inside quoted command strings.
 **Tags:** `#ci` `#windows` `#pester` `#bats` `#msys` `#silent-failure` `#dead-tests` `#verify-before-completion`
+
+### [2026-06-12] goreleaser monorepo.tag_prefix is Pro-only — verify paywalled features empirically
+
+**Context**: CLI-001 scaffold (ADR-020): configuring goreleaser for the nested `cli/` Go module with `cli/vX.Y.Z` release tags.
+
+**Problem**: Trained memory and most blog posts present `monorepo.tag_prefix` as a goreleaser feature; it is GoReleaser **Pro**-only. OSS silently treats a prefixed tag as the literal version (`cli/v0.0.1`), and the slash corrupts artifact paths (`dist/dot_cli/v0.0.1_...`).
+
+**Solution**: Exercised the release pipeline locally with a throwaway tag + the OSS binary BEFORE the first real release; switched to plain `v*` tags (the CLI is the repo's only released artifact) and documented the revisit condition in the spec (CLI-001 R2).
+
+**Rule**: Before designing around any third-party tool feature, check the OSS/paid feature split in current docs (Context7) AND exercise the pipeline empirically with a throwaway run. Feature paywalls invalidate trained memory silently.
