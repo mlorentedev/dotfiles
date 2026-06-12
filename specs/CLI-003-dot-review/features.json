@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-003-dot-review-f1",
+    "behavior": "Piped git diff to dot review returns a markdown review (live on Linux; same path mocked on Windows CI)",
+    "verification": "sh -c 'cd cli && git -C .. diff HEAD~1 | go run ./cmd/dot review --provider nan'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-003-dot-review-f2",
+    "behavior": "Unit tests cover provider selection, env validation, stdin parsing and the full error contract on both OSes",
+    "verification": "sh -c 'cd cli && go test ./... -run TestReview -v'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-003-dot-review-f3",
+    "behavior": "dot review --help documents providers, default models, required env vars and exit codes",
+    "verification": "sh -c 'cd cli && go run ./cmd/dot review --help | grep -q NAN_API_KEY'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-003-dot-review-f4",
+    "behavior": "HTTP client enforces default timeout and bounded max_tokens, both tested",
+    "verification": "sh -c 'cd cli && go test ./... -run \"TestReview.*(timeout|MaxTokens)\" -v'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-003-dot-review-f5",
+    "behavior": "Scaffold checks (lint, goreleaser snapshot) stay green",
+    "verification": "sh -c 'cd cli && gofmt -l . && go vet ./...'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-003-dot-review-f6",
+    "behavior": "Manual QA pass on both OSes recorded in verification.md",
+    "verification": "grep -qi 'QA' specs/CLI-003-dot-review/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
