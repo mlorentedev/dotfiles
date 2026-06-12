@@ -9,14 +9,14 @@ created: "2026-05-13"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [x] `go build` + `go test` green (Linux local) -> `ok github.com/mlorentedev/dotfiles/cli/cmd/dot 0.003s` (`TestRootCmd` table-driven, 4 cases + `TestVersionDefault`); Windows leg -> CI `test (windows-latest)` job (pending first CI run)
-- [x] `dot --help` exit 0 + usage; `dot version` prints version -> local smoke: help prints "Usage:/Available Commands:", `dot version dev`; unknown subcommand `bogus` exits 1 with usage hint
-- [ ] `golangci-lint` passes in CI -> local binary (v1.64.8, built with go1.24) cannot analyze a go 1.26 module; `gofmt -l` clean + `go vet` OK locally; full lint delegated to CI `lint` job (golangci-lint-action@v8)
-- [x] goreleaser snapshot + release pipeline -> exercised locally with goreleaser OSS binary: throwaway tag `v0.0.1` produced 6 clean artifacts (`dot_0.0.1_{linux,darwin,windows}_{amd64,arm64}`), checksums.txt, and ldflags version injection verified (`./dist/dot_linux_amd64_v1/dot version` -> `dot version 0.0.1`); tag deleted, dist/ removed
+- [x] `go build` + `go test` green (Linux local) -> `ok github.com/mlorentedev/dotfiles/cli/cmd/dot 0.003s` (`TestRootCmd` table-driven, 4 cases + `TestVersionDefault`); Windows leg -> CI `test (windows-latest)` PASS on PR #345 (56s)
+- [x] `dot --help` exit 0 + usage; `dot version` prints version -> local smoke + Windows CI smoke (PR #345 run: `Usage:` shown, `dot version dev` printed on windows-latest); unknown subcommand `bogus` exits 1 with usage hint
+- [x] `golangci-lint` passes in CI -> `lint` job PASS on PR #345 (golangci-lint v2.12.2); it caught a real errcheck issue (unchecked `fmt.Fprintf`) that the stale local binary (v1.64.8/go1.24) could not — fixed with `cmd.Printf`
+- [x] goreleaser snapshot + release pipeline -> exercised locally with goreleaser OSS binary: throwaway tag `v0.0.1` produced 6 clean artifacts (`dot_0.0.1_{linux,darwin,windows}_{amd64,arm64}`), checksums.txt, and ldflags version injection verified (`./dist/dot_linux_amd64_v1/dot version` -> `dot version 0.0.1`); tag deleted, dist/ removed. CI `goreleaser snapshot` job PASS on PR #345 (44s); `goreleaser release` correctly skipped (no tag)
 - [ ] Path filter verified on an unrelated change -> verify after PR opens (cli jobs must NOT run on a docs-only PR)
 - [x] DX-002 archived -> `git mv` to `specs/archive/_abandoned/DX-002-dot-umbrella-command/`, frontmatter `status: abandoned`, supersession note pointing to ADR-020 + this spec
 - [x] `cli/README.md` -> build/test/lint/release one-liners present
-- [ ] Manual QA pass -> Linux: binary exercised locally (help/version/bogus/release binary). Windows: review CI `test (windows-latest)` smoke output on the PR; file issues for findings
+- [x] Manual QA pass -> Linux: binary exercised locally (help/version/bogus/release binary). Windows: CI `test (windows-latest)` smoke output inspected on PR #345 (`Usage:` + `dot version dev`). No findings — no issues to file. Standing task: repeat per CLI PR (proposal R5)
 
 ## Test status
 
