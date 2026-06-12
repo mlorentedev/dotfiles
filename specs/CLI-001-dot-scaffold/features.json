@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-001-dot-scaffold-f1",
+    "behavior": "go build ./... and go test ./... green for the cli/ module",
+    "verification": "sh -c 'cd cli && go build ./... && go test ./...'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f2",
+    "behavior": "dot --help exits 0 and prints usage; dot version prints the version",
+    "verification": "sh -c 'cd cli && go run ./cmd/dot --help >/dev/null && go run ./cmd/dot version'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f3",
+    "behavior": "golangci-lint passes for cli/",
+    "verification": "sh -c 'cd cli && golangci-lint run ./...'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f4",
+    "behavior": "goreleaser snapshot build produces linux/macOS/windows amd64+arm64 static binaries",
+    "verification": "sh -c 'cd cli && goreleaser build --snapshot --clean && ls dist/'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f5",
+    "behavior": "CLI CI jobs are path-filtered to cli/** (plus the workflow and spec folder themselves)",
+    "verification": "grep -q 'cli/\\*\\*' .github/workflows/cli.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f6",
+    "behavior": "DX-002-dot-umbrella-command archived as abandoned (superseded by ADR-020)",
+    "verification": "sh -c 'test -d specs/archive/_abandoned/DX-002-dot-umbrella-command && test ! -d specs/DX-002-dot-umbrella-command && grep -q \"status: abandoned\" specs/archive/_abandoned/DX-002-dot-umbrella-command/proposal.md'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f7",
+    "behavior": "cli/README.md documents build / test / release one-liners",
+    "verification": "sh -c 'test -f cli/README.md && grep -q \"go test\" cli/README.md'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-001-dot-scaffold-f8",
+    "behavior": "Manual QA pass on Linux and Windows recorded in verification.md with issues filed for findings",
+    "verification": "grep -qi 'QA' specs/CLI-001-dot-scaffold/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
