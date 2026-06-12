@@ -1,0 +1,37 @@
+# goreleaser config for the dot CLI (nested Go module, run from cli/).
+# Release: push a plain tag vX.Y.Z — the CLI is the repo's only released
+# artifact. monorepo.tag_prefix (cli/v*) is GoReleaser Pro-only; revisit the
+# tag scheme if the repo ever needs releases of its own.
+# Snapshot (every PR touching cli/**): goreleaser build --snapshot --clean
+version: 2
+
+project_name: dot
+
+builds:
+  - id: dot
+    main: ./cmd/dot
+    binary: dot
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: dot
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
