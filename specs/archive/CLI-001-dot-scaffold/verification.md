@@ -35,13 +35,13 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? yes — "OSS/Pro feature splits invalidate trained memory: goreleaser monorepo.tag_prefix is Pro-only; verify paywalled features empirically before designing around them"
+- [x] Lesson for the repo's `docs/lessons.md`? yes — "OSS/Pro feature splits invalidate trained memory: goreleaser monorepo.tag_prefix is Pro-only; verify paywalled features empirically before designing around them"
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no — tag-scheme decision recorded here + in proposal R2; ADR-020 already covers the architecture
 - [ ] New pattern candidate for `00_meta/patterns/`? no — single-repo concern so far
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-001-dot-scaffold/` -> `specs/archive/CLI-001-dot-scaffold/`
-- [ ] Backlog entry: close issue #335 (bitácora auto-moves to Done)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-001-dot-scaffold/` -> `specs/archive/CLI-001-dot-scaffold/`
+- [x] Backlog entry: issue #335 closed by PR #345 merge (bitácora auto-moved to Done)
+- [x] Promotions above executed: lesson appended to docs/lessons.md (2026-06-12 entry); ADR/pattern: no
