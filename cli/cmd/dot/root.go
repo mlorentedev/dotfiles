@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +29,7 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print the dot version",
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "dot version %s\n", version)
+			cmd.Printf("dot version %s\n", version)
 		},
 	}
 }
