@@ -34,7 +34,7 @@ OVERWRITE the `## Session Handoff` section (the first section after the H1) of t
 - `**Open threads:** [unfinished work + who owns each, or "None"]`
 - `**Next action:** [concrete first step for the next session]`
 
-Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handoff, not journal); convert relative dates to absolute. **Path:** the project's auto-memory `MEMORY.md`, which is junctioned into `vault/10_projects/<repo>/memory/` — so any agent can write it. This is the only place strategic continuity prose lives (the rest of `MEMORY.md` stays index-only).
+Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handoff, not journal); convert relative dates to absolute. **End each handoff field line with two trailing spaces** (markdown hard break) so the fields render as separate lines in Obsidian, not one crammed paragraph — vault-only convention (do NOT carry trailing spaces into code repos; pre-commit strips them). **Path:** the project's auto-memory `MEMORY.md`, which is junctioned into `vault/10_projects/<repo>/memory/` — so any agent can write it. This is the only place strategic continuity prose lives (the rest of `MEMORY.md` stays index-only).
 
 ### 2. Knowledge & documentation sync (Standing Order #3 — in-session, never "later")
 

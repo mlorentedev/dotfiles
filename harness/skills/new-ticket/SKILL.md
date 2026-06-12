@@ -45,6 +45,7 @@ Take the title and any description/body the user gave. A title alone is enough; 
 | **Type** | Infer from the AREA prefix via the table below. |
 | **Priority** | `P2` (default). |
 | **Status** | `Backlog`. |
+| **Labels** | GitHub labels by nature, from the mapping in "Labels by nature" below (primary from Type + optional secondary from AREA). |
 | **NNN** | Next free number for that AREA in the home repo — scan existing issue titles (snippet below). |
 | **slug** | Short kebab-case of the title (≤5 words), AREA prefix stripped. |
 
@@ -52,7 +53,7 @@ Take the title and any description/body the user gave. A title alone is enough; 
 
 ### 3. Confirm with the user — `AskUserQuestion`
 
-State the proposal in one line first (repo · `AREA-NNN-slug` · title), then ask. Put the recommended option **first** and label it "(Recommended)". Ask the fields most likely to need a decision:
+State the proposal in one line first (repo · `AREA-NNN-slug` · title · proposed labels), then ask. Put the recommended option **first** and label it "(Recommended)". Ask the fields most likely to need a decision:
 
 1. **Type** — `spec` · `bug` · `chore` · `ideas` (pre-selected = inferred).
 2. **Priority** — `P2 (Recommended)` · `P0` · `P1` · `P3`.
@@ -68,8 +69,14 @@ REPO="$OWNER/<home-repo>"; AREA=HARNESS; NNN=017; SLUG=ticket-templates
 TITLE="<human title>"; BODY="<description, or a short stub>"
 FULL_ID="$AREA-$NNN-$SLUG"
 
-# 1. Open the issue — AREA-NNN in the title (§3)
-URL=$(gh issue create --repo "$REPO" --title "$AREA-$NNN: $TITLE" --body "$BODY")
+# 1. Ensure nature labels exist (idempotent; colors from the "Labels by nature" table),
+#    then open the issue — AREA-NNN in the title (§3)
+LABELS="feature"          # comma-separated, from the "Labels by nature" mapping
+for L in $(printf '%s' "$LABELS" | tr ',' ' '); do
+  gh label list --repo "$REPO" --json name -q '.[].name' | grep -qx "$L" \
+    || gh label create "$L" --repo "$REPO" --color "<color-from-table>" --description "<desc-from-table>"
+done
+URL=$(gh issue create --repo "$REPO" --title "$AREA-$NNN: $TITLE" --body "$BODY" --label "$LABELS")
 
 # 2. Put it on the board (idempotent — returns the existing item if already added)
 ITEM=$(gh project item-add "$PROJECT_NUM" --owner "$OWNER" --url "$URL" --format json \
@@ -114,7 +121,7 @@ for i in json.load(sys.stdin)['items']:
 
 ## Non-interactive / autonomous mode
 
-For agents acting under **detect→ticket** (no human in the loop), skip step 3's `AskUserQuestion`: accept the computed defaults (or explicit args), create the issue, set the fields, and report the URL. Defaults stay **Backlog / P2 / unassigned** so a human triages priority and start later — an autonomous agent files the work, it does not self-prioritize it.
+For agents acting under **detect→ticket** (no human in the loop), skip step 3's `AskUserQuestion`: accept the computed defaults (or explicit args), create the issue, set the fields, and report the URL. Defaults stay **Backlog / P2 / unassigned + nature labels** so a human triages priority and start later — an autonomous agent files the work, it does not self-prioritize it.
 
 ## Type inference from the AREA prefix
 
@@ -129,6 +136,31 @@ The `Type` field has four options; map the prefix to the closest, then let the h
 | anything else | `chore` (safe default) |
 
 The mapping is a *suggestion*, not a rule — the human confirms it in step 3.
+
+## Labels by nature
+
+Every ticket gets GitHub **labels** at creation (in addition to the board fields) so the bitácora can be filtered by nature cross-repo. One **primary** label inferred from Type + optional **secondary** labels from the AREA/content. Canonical set (create-if-missing with these exact colors; do NOT use `gh label create --force` — it overwrites color/description of existing labels):
+
+| Label | Color | When |
+|-------|-------|------|
+| `bug` | `d73a4a` | Type=bug |
+| `feature` | `a2eeef` | Type=spec (new capability) |
+| `chore` | `ededed` | Type=chore (maintenance, refactor, cleanup) |
+| `idea` | `fbca04` | Type=ideas |
+| `docs` | `0075ca` | DOC*/README/runbook/ADR work |
+| `security` | `b60205` | SEC*/auth/secrets/CVE work |
+| `debt` | `5319e7` | DEBT*/known tech-debt paydown |
+| `infra` | `0e8a16` | ANSIBLE/TF/K8s/VPN/CERT/HELM-class work |
+| `ci` | `bfd4f2` | CI*/workflows/runners |
+
+Idempotent ensure (per label, deterministic color):
+
+```bash
+gh label list --repo "$REPO" --json name -q '.[].name' | grep -qx "$L" \
+  || gh label create "$L" --repo "$REPO" --color "<color>" --description "<short desc>"
+```
+
+The mapping is a suggestion like Type — the human can override in step 3. Labels live at repo level, so they survive board re-organizations and work for repos outside the bitácora too.
 
 ## Compute the next free NNN
 
