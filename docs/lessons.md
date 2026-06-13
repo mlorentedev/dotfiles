@@ -964,3 +964,13 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Invert the guard so both branches exit 0: `[ -z "${TMP:-}" ] || rm -rf "$TMP"` (empty → `[ -z ]` true, short-circuits at exit 0; set → runs `rm`, exit 0). Applied across the affected teardowns; the six heal-ps1 entries flip from `not ok # skip` to `ok # skip`.
 
 **Rule**: A teardown's final command determines the test's exit classification — for passing, failing, *and* skipped tests alike. Never end a teardown with a bare `[ cond ] && cmd`; invert to `[ ! cond ] || cmd` or append an explicit `return 0`. A `skip` that fires before `setup()` finishes leaves cleanup vars unset, so the cleanup guard must not itself be able to fail.
+
+### [2026-06-13] Sourced-vs-executed guard: use `(return 0 2>/dev/null)`, not a `BASH_SOURCE`-vs-`$0` compare
+
+**Context**: CLI-009 `scripts/install-dot.sh` is both *sourced* (by `setup-linux.sh` and by its bats test) and *executed* directly (standalone `./install-dot.sh` upgrade). It needs a guard so `install_dot "$@"` runs only on direct execution, not on source.
+
+**Problem**: The first guard was the common `if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]`. It fired on *source* in the Bash-tool / harness context — `install_dot` ran at source time with empty `$@`, printing a spurious `no version given` error (and would side-effect under setup). The `${BASH_SOURCE[0]:-$0}` fallback also makes it wrong under zsh: `BASH_SOURCE` is unset there, so the expansion becomes `$0` and the comparison is trivially true whether sourced or executed. A standalone diagnostic with `bash -c '. probe.sh'` showed "not equal" (correct) while the actual harness invocation showed it firing — i.e. the idiom's correctness is context-dependent, which is itself disqualifying for a guard.
+
+**Solution**: `if ! (return 0 2>/dev/null); then install_dot "$@"; fi`. `return` is only valid in a sourced script (or function), so the subshell exits 0 when sourced and non-zero when executed — a context-independent signal. Verified across `bash -c` source, script-source (the setup path), and direct execution.
+
+**Rule**: To gate a script's "run only when executed directly" block, use `(return 0 2>/dev/null)` (sourced → succeeds, executed → fails), not a `BASH_SOURCE`-vs-`$0` string compare. The string compare aligns the two values in some shells (zsh, where `BASH_SOURCE` is unset) and some harnesses, so it fires on `source` and auto-runs the script's main path as a side effect.
