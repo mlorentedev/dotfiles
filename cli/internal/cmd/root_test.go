@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 
 func execute(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := newRootCmd()
+	cmd := New("dev")
 	var out, errBuf bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errBuf)
@@ -60,11 +60,5 @@ func TestRootCmd(t *testing.T) {
 				t.Errorf("output %q does not contain %q", combined, tt.wantOutSub)
 			}
 		})
-	}
-}
-
-func TestVersionDefault(t *testing.T) {
-	if version == "" {
-		t.Fatal("version must never be empty; default to \"dev\"")
 	}
 }
