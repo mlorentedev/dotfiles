@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-009-setup-install-dot-f1",
+    "behavior": "DOT_VERSION lives in versions.conf; install-dot.sh reads it, no hard-coded version elsewhere",
+    "verification": "grep -qE '^DOT_VERSION=' versions.conf && ! grep -RnE 'dot_0\\.[0-9]' scripts/install-dot.sh setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f2",
+    "behavior": "_dot_arch maps host machine to goreleaser arch (x86_64->amd64, aarch64/arm64->arm64) and errors on unmapped arch",
+    "verification": "~/.local/bin/bats tests/install-dot.bats -f arch",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f3",
+    "behavior": "install_dot downloads the right artifact, verifies sha256 against checksums.txt, and extracts dot to dest",
+    "verification": "~/.local/bin/bats tests/install-dot.bats -f 'happy|installs'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f4",
+    "behavior": "A checksum mismatch aborts the install and leaves no binary in dest",
+    "verification": "~/.local/bin/bats tests/install-dot.bats -f checksum",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f5",
+    "behavior": "Idempotent: install_dot is a no-op when the pinned version is already present",
+    "verification": "~/.local/bin/bats tests/install-dot.bats -f idempotent",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f6",
+    "behavior": "healthcheck.sh reports dot presence and flags version drift vs DOT_VERSION",
+    "verification": "grep -q 'dot' scripts/healthcheck.sh && ~/.local/bin/bats tests/healthcheck.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f7",
+    "behavior": "cli.yml release job is gated on test + lint (no publish from red code)",
+    "verification": "awk '/^  release:/{f=1} f&&/^    needs:/{print;exit}' .github/workflows/cli.yml | grep -qE 'test.*lint|lint.*test'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-009-setup-install-dot-f8",
+    "behavior": "Changed shell scripts are shellcheck-clean and the full bats suite stays green",
+    "verification": "~/.local/bin/shellcheck scripts/install-dot.sh && ~/.local/bin/bats tests/*.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
