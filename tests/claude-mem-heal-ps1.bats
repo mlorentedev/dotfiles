@@ -29,7 +29,7 @@ setup() {
 }
 
 teardown() {
-    [ -n "${TMP:-}" ] && rm -rf "$TMP"
+    [ -z "${TMP:-}" ] || rm -rf "$TMP"
 }
 
 # Drive Repair-HooksJson against a fixture path via pwsh.

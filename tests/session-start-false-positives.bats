@@ -33,7 +33,7 @@ setup() {
 }
 
 teardown() {
-    [ -n "$TEST_HOME" ] && rm -rf "$TEST_HOME"
+    [ -z "${TEST_HOME:-}" ] || rm -rf "$TEST_HOME"
 }
 
 # Run the hook hermetically: isolated HOME, no sibling scripts, given CWD.

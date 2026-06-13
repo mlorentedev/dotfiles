@@ -23,7 +23,7 @@ setup() {
 }
 
 teardown() {
-    [ -n "${STUB_BIN:-}" ] && rm -rf "$STUB_BIN"
+    [ -z "${STUB_BIN:-}" ] || rm -rf "$STUB_BIN"
 }
 
 # --- Schema: session-start-config.json shape ---
