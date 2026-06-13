@@ -150,6 +150,20 @@ and native shape.
   updated — a non-trivial audit pass.
 - At ~300–500 open items the single board will need a split strategy (Priority field
   buys time; a per-stream sub-view is the natural first split).
+- **Issue homing is constrained by repo visibility (added 2026-06-13).** `gh issue
+  transfer` refuses private→public moves (`Old issue cannot be transferred from private
+  repository to public repository`). The vault repo (`knowledge`) is private; the existing
+  home repos (`kubelab`, `hive`, `dotfiles`) are all public — so the "the bitácora
+  aggregates repo issues; it owns no data of its own" target state **cannot** be reached by
+  lazy-migrating issues into them without making the private backlog public. Recreating the
+  issue in the public repo is the only workaround and it both exposes the ticket and loses
+  comment history / the stable number. Net: while home repos are public and the backlog is
+  private, **centralizing issues in the private `knowledge` repo is the correct state**, and
+  the board's `Repo` field provides the per-repo focus view. Lazy migration (decision §
+  "Migration path" step 6) applies only to private→private, or where a ticket's public
+  exposure is acceptable (e.g. a genuinely open-source repo's own bug). Repos that do not
+  yet exist (`iris`, `hermes`, the KPM-W targets) keep their tickets in `knowledge` as a
+  holding pen until created.
 
 ## Reopen Triggers
 
@@ -158,6 +172,10 @@ and native shape.
   reconsider native vs Action-based auto-add at that point.
 - **Vault backfill:** if the vault `11-tasks.md` pattern is needed for offline-only
   work (air-gapped machine, no GitHub), re-evaluate the fallback model.
+- **Repo homing unblocked:** a private per-stream repo is created (e.g. `iris` / `hermes`
+  born private), or a stream's tickets become acceptable to expose publicly — at which point
+  that stream's issues move to their home repo and the `add-to-project` workflow re-aggregates
+  them onto the board (see the visibility-constraint note under Consequences › Negative/debt).
 
 ## References
 
