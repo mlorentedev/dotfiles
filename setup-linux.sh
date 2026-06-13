@@ -266,6 +266,16 @@ else
     log_info "gh already installed"
 fi
 
+# dot (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
+# checksum-verified, into ~/.local/bin. Idempotent; converges on drift.
+if [ -f ./scripts/install-dot.sh ]; then
+    # shellcheck source=/dev/null
+    . ./scripts/install-dot.sh
+    install_dot || log_warning "dot installation failed (continuing; see healthcheck)"
+else
+    log_warning "scripts/install-dot.sh not found; skipping dot install"
+fi
+
 # zoxide (smarter cd)
 if ! command -v zoxide >/dev/null 2>&1; then
     log_info "Installing zoxide..."
