@@ -236,6 +236,20 @@ Placement follows `pattern-knowledge-placement` (decide-vs-operate, Standing Ord
 
 Defaults = personal solo project (this repo). Build/operate docs always live in this repo's `docs/`; only the two values above are context-dependent. **The vault no longer holds task state** (no `11-tasks.md`); the cross-project brain and AI memory remain in the vault.
 
+## Language Boundary (this repo)
+
+Two layers, declared by [ADR-020](docs/adr/adr-020-tooling-cli-go-convergence.md). All agents follow it:
+
+| Layer | Owns | Lives at |
+|---|---|---|
+| **Go** (`dot` CLI) | User-facing tooling — the logic of every `.sh`/`.ps1` twin | `cli/` (own `go.mod`; table-driven `go test`) |
+| **Shell** (POSIX + PowerShell) | Thin bootstrap (detect OS/arch, fetch binary, PATH) + profile/env wiring | `setup-*.{sh,ps1}`, RC files; `scripts/` until ported |
+
+- **Python is not a layer here.** Introducing it reopens ADR-020 — and the default answer is still Go.
+- **New tooling goes in Go.** A new user-facing tool or subcommand is a `dot` subcommand under `cli/`; never a new `.sh`/`.ps1` twin.
+- **Strangler-fig on contact.** When a `.sh`/`.ps1` twin is next touched, port it to `dot` in that same PR and delete the pair + its bats/Pester tests — never leave the three coexisting (ADR-020 §5).
+- **Bootstrap stays shell** — it provisions the tooling itself (chicken-and-egg, ADR-020 C7).
+
 ## "Neural Hive" Protocol (The Loop)
 
 **CORE PRINCIPLE:** Code lives in Git. **Knowledge placement is by layer — decide-vs-operate** (Standing Order #2): a repo's build/operate docs — ADRs (`docs/adr/`), runbooks, troubleshooting — live in that repo's `docs/`; the vault (`~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows) holds the cross-project brain, AI memory, and personal/methodology lessons. Patterns: `pattern-knowledge-placement`, `pattern-platform-governance`.
