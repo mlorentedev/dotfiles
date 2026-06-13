@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"encoding/json"
@@ -56,7 +56,7 @@ type capturedRequest struct {
 
 func executeReview(t *testing.T, stdin string, args ...string) (string, error) {
 	t.Helper()
-	cmd := newRootCmd()
+	cmd := New("dev")
 	var out strings.Builder
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)

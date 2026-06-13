@@ -1,7 +1,7 @@
 ---
 id: "CLI-002-repo-structure"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-06-13"
 issue: "dotfiles#336"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

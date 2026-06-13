@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-002-repo-structure-f1",
+    "behavior": "cli/cmd/dot contains only the entrypoint (main.go + its test); wiring lives in internal/cmd, domain logic in internal/review",
+    "verification": "sh -c '! command ls cli/cmd/dot | grep -qvE \"^main(_test)?\\.go$\" && test -d cli/internal/cmd && test -d cli/internal/review'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-002-repo-structure-f2",
+    "behavior": "Full Go suite green after the move with asserts untouched (no behavior change)",
+    "verification": "sh -c 'cd cli && go test ./...'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-002-repo-structure-f3",
+    "behavior": "goreleaser entrypoint and ldflags untouched: version stays in package main",
+    "verification": "sh -c 'grep -q \"main: ./cmd/dot\" cli/.goreleaser.yaml && grep -q \"X main.version\" cli/.goreleaser.yaml && grep -q \"var version\" cli/cmd/dot/main.go'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-002-repo-structure-f4",
+    "behavior": "docs/architecture.md exists, README links it, and the dir table tracks the real tree (drift guard)",
+    "verification": "sh -c '\"$HOME\"/.local/bin/bats tests/architecture-md.bats'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-002-repo-structure-f5",
+    "behavior": "Blast radius confined to cli/, docs/, README.md, tests/ and specs/",
+    "verification": "sh -c 'git diff --name-only origin/main...HEAD | grep -vE \"^(cli/|docs/|README\\.md|tests/|specs/)\" | wc -l | grep -qx 0'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

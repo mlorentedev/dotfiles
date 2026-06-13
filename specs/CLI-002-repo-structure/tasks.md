@@ -15,9 +15,9 @@ created: "2026-05-13"
 
 ## Implementation
 
-- [ ] Write failing `tests/architecture-md.bats`: doc exists, README links it, every real top-level dir appears in the doc's table, boundary section points to AGENTS.md (no duplication)
-- [ ] Author `docs/architecture.md` (dir table, target tree, boundary + epic pointers) + README link — bats guard goes green
-- [ ] Restructure `cli/`: domain logic to `internal/review/` (package `review`: `Resolve`, `ReadDiff`, `Request`), Cobra wiring to `internal/cmd/` (`New(version)`), `cmd/dot/main.go` entrypoint-only keeping `var version` (ldflags `-X main.version` untouched, R2); move tests with asserts unchanged; `go test ./...` + `gofmt -l` + `go vet` green
+- [x] Write failing `tests/architecture-md.bats`: doc exists, README links it, every real top-level dir appears in the doc's table, boundary section points to AGENTS.md (no duplication) — red confirmed (5/5 fail before the doc exists)
+- [x] Author `docs/architecture.md` (dir table, target tree, boundary + epic pointers) + README link — bats guard green (5/5)
+- [x] Restructure `cli/`: domain logic to `internal/review/` (package `review`: `Resolve`, `ReadDiff`, `Request`), Cobra wiring to `internal/cmd/` (`New(version)`), `cmd/dot/main.go` entrypoint-only keeping `var version` (ldflags `-X main.version` untouched, R2); tests moved with asserts unchanged (only package decl + `newRootCmd()` -> `New(\"dev\")` call sites); `go test ./...` + `gofmt -l` + `go vet` + `go build` green
 
 ## Closing
 

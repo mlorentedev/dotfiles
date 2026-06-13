@@ -1,14 +1,14 @@
-package main
+// Package cmd wires the dot CLI (Cobra). One <verb>.go per subcommand;
+// domain logic lives in sibling internal packages, never here.
+package cmd
 
 import (
 	"github.com/spf13/cobra"
 )
 
-// version is overridden at release time by goreleaser via
-// -ldflags "-X main.version=<tag>".
-var version = "dev"
-
-func newRootCmd() *cobra.Command {
+// New builds the root command. The version is injected by cmd/dot/main.go,
+// where goreleaser's -X main.version ldflags lands.
+func New(version string) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "dot",
 		Short: "Single entry point for the dotfiles tooling",
@@ -20,12 +20,12 @@ func newRootCmd() *cobra.Command {
 		},
 	}
 
-	root.AddCommand(newVersionCmd())
+	root.AddCommand(newVersionCmd(version))
 	root.AddCommand(newReviewCmd())
 	return root
 }
 
-func newVersionCmd() *cobra.Command {
+func newVersionCmd(version string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print the dot version",
