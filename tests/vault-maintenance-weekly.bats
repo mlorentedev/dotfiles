@@ -27,7 +27,7 @@ setup() {
 }
 
 teardown() {
-    [ -n "${TMP:-}" ] && rm -rf "$TMP"
+    [ -z "${TMP:-}" ] || rm -rf "$TMP"
 }
 
 # --- Syntax (1 & 2) ---

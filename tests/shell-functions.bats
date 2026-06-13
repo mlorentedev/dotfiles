@@ -11,7 +11,7 @@ setup() {
 }
 
 teardown() {
-    [ -n "${WORK:-}" ] && rm -rf "$WORK"
+    [ -z "${WORK:-}" ] || rm -rf "$WORK"
 }
 
 # --- File + static checks ---

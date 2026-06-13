@@ -38,7 +38,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-002-repo-structure/` -> `specs/archive/CLI-002-repo-structure/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-002-repo-structure/` -> `specs/archive/CLI-002-repo-structure/`
 - [ ] Backlog entry: close issue #336 (bitácora auto-moves to Done)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any) — all three "no" (see Promotion candidates above)
