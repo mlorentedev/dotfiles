@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -19,10 +20,11 @@ func newSpecCmd() *cobra.Command {
 		Use:   "spec",
 		Short: "Spec-driven development scaffolding (ADR-020)",
 		Long: "spec scaffolds and manages per-feature SDD spec folders.\n" +
-			"The Go twin of scripts/init-spec.sh; templates are embedded, so it\n" +
-			"works without the vault checked out.",
+			"The Go twin of scripts/init-spec.sh + scripts/archive-spec.sh; templates\n" +
+			"are embedded, so init works without the vault checked out.",
 	}
 	cmd.AddCommand(newSpecInitCmd())
+	cmd.AddCommand(newSpecArchiveCmd())
 	return cmd
 }
 
@@ -100,5 +102,72 @@ agent) or by hand. Do not skip the Why.`,
 
 	cmd.Flags().IntVar(&issueNum, "issue", 0, "GitHub issue number that gates this work (must exist and be OPEN)")
 	cmd.Flags().BoolVar(&forceNoGate, "force-no-gate", false, "skip the open-issue work-gate (NOT RECOMMENDED — the gate is the SSOT)")
+	return cmd
+}
+
+func newSpecArchiveCmd() *cobra.Command {
+	var (
+		prURL       string
+		abandoned   bool
+		forceDrafts bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "archive <feature-id>",
+		Short: "Archive (or abandon) a per-feature spec folder",
+		Long: `Move specs/<feature-id>/ into specs/archive/ (or specs/archive/_abandoned/
+under --abandoned) and rewrite the proposal status to archived/abandoned.
+
+Mechanical only — the Go twin of scripts/archive-spec.sh. A pre-flight refuses to
+archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain (override
+with --force-with-drafts). Vault promotion (lessons/ADR/pattern) and any backlog
+tick stay interactive via "/spec archive" in an agent.`,
+		Example:      "  dot spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id := args[0]
+
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := spec.RepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+
+			target, err := spec.Archive(repoRoot, id, spec.ArchiveOptions{
+				Abandoned:       abandoned,
+				ForceWithDrafts: forceDrafts,
+				PRURL:           prURL,
+				Date:            now().Format("2006-01-02"),
+			})
+			if err != nil {
+				return err
+			}
+
+			rel, relErr := filepath.Rel(repoRoot, target)
+			if relErr != nil {
+				rel = target
+			}
+			status := "archived"
+			if abandoned {
+				status = "abandoned"
+			}
+			cmd.Printf("\n[OK] Archived: specs/%s -> %s\n", id, rel)
+			cmd.Printf("     status: %s\n", status)
+			if prURL != "" {
+				cmd.Printf("     PR: %s\n", prURL)
+			}
+			cmd.Printf("\nVault promotion (lessons/ADR/pattern) and backlog tick must be done\n")
+			cmd.Printf("separately (via \"/spec archive\" in an agent, or by hand).\n")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&prURL, "pr", "", "record this PR URL in proposal.md (informational)")
+	cmd.Flags().BoolVar(&abandoned, "abandoned", false, "route to specs/archive/_abandoned/ and set status abandoned")
+	cmd.Flags().BoolVar(&forceDrafts, "force-with-drafts", false, "archive even with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags")
 	return cmd
 }

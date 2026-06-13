@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-008-dot-spec-archive-f1",
+    "behavior": "dot spec archive ID moves specs/ID -> specs/archive/ID and sets status: archived in proposal.md",
+    "verification": "cd cli && go test ./internal/spec/ -run TestArchiveMovesAndSetsStatus && go test ./internal/cmd/ -run TestSpecArchiveHappyPath",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-008-dot-spec-archive-f2",
+    "behavior": "--abandoned routes to specs/archive/_abandoned/ID and sets status: abandoned",
+    "verification": "cd cli && go test ./internal/spec/ -run TestArchiveAbandonedRoute",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-008-dot-spec-archive-f3",
+    "behavior": "Unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags block the archive (non-zero exit, no move, lists file:line); --force-with-drafts overrides",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestFindUnresolvedTags|TestArchiveBlocksOnDrafts|TestArchiveForceWithDrafts' && go test ./internal/cmd/ -run TestSpecArchiveBlocksOnDrafts",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-008-dot-spec-archive-f4",
+    "behavior": "Missing specs/ID -> non-zero exit, no move; target already in archive -> non-zero exit, no clobber",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveMissingSpecFails|TestArchiveNoClobber'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-008-dot-spec-archive-f5",
+    "behavior": "--pr <url> appends the archived/PR provenance comment to proposal.md",
+    "verification": "cd cli && go test ./internal/spec/ -run TestArchiveRecordsPRURL",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-008-dot-spec-archive-f6",
+    "behavior": "status: rewrite touches only the first frontmatter block; a status: token in the body is left untouched",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestSetStatus|TestSetStatusOnlyFirstBlock'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-008-dot-spec-archive-f7",
+    "behavior": "Go suite is clean: gofmt, vet, test, build all green",
+    "verification": "cd cli && test -z \"$(gofmt -l .)\" && go vet ./... && go test ./... && go build ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
