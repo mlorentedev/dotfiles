@@ -69,6 +69,22 @@ setup() {
     grep -qF 'docs/lessons.md' "$AGENTS_MD"
 }
 
+# --- CLI-004: Go/shell language boundary (ADR-020, #338) ---
+
+@test "AGENTS.md declares the Language Boundary section" {
+    grep -qE '^## Language Boundary \(this repo\)$' "$AGENTS_MD"
+}
+
+@test "AGENTS.md language boundary names the two layers and excludes Python" {
+    grep -qF 'Python is not a layer here' "$AGENTS_MD"
+    grep -qF 'adr-020-tooling-cli-go-convergence' "$AGENTS_MD"
+}
+
+@test "AGENTS.md language boundary mandates strangler-fig porting on contact" {
+    grep -qF 'Strangler-fig on contact' "$AGENTS_MD"
+    grep -qF 'never a new `.sh`/`.ps1` twin' "$AGENTS_MD"
+}
+
 @test "AGENTS.md does NOT reintroduce the retired work/personal routing axis" {
     # Negative guard: these markers encode the old axis that mis-routed build/operate
     # artifacts to the vault. Their presence is a regression.
