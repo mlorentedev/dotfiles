@@ -11,7 +11,7 @@ created: "2026-05-13"
 - [x] Unit tests -> `TestReviewErrorContract` (empty stdin, missing NAN_API_KEY/NAN_BASE_URL/OPENROUTER_API_KEY naming the variable, unknown provider, max-bytes exceeded), `TestReviewHappyPath` (auth header + default model asserted), `TestReviewModelOverride`, `TestReviewNoChoices`, `TestReviewHTTPError` (5xx), `TestReviewTimeout` — green on Linux local; both OSes in CI.
 - [x] `dot review --help` documents providers, default models, required env vars, exit codes and the privacy note.
 - [x] Timeout default (120s, `--timeout`) + bounded `max_tokens` (4096 const `reviewMaxTokens`) -> `TestReviewTimeout`, `TestReviewMaxTokensBounded`.
-- [ ] Lint + goreleaser snapshot stay green -> CI on the PR (pending first run; gofmt/vet clean locally).
+- [x] Lint + goreleaser snapshot stay green -> CI green on PR #349 (lint, test matrix, snapshot); merged 2026-06-12.
 - [x] Manual QA pass -> see QA findings below; no product issues to file (one provider-side limitation documented in README).
 
 ## Test status
@@ -31,13 +31,13 @@ created: "2026-05-13"
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons.md`? yes — "Non-streaming chat endpoints behind CDN gateways drop long generations: timeout flags cannot fix a server-side cut; test providers with realistic payload sizes during QA, not hello-world ones"
+- [x] Lesson for the repo's `docs/lessons.md`? yes — "Non-streaming chat endpoints behind CDN gateways drop long generations: timeout flags cannot fix a server-side cut; test providers with realistic payload sizes during QA, not hello-world ones"
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no — provider/default decisions recorded here and in proposal
 - [ ] New pattern candidate for `00_meta/patterns/`? no — single-tool concern so far
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-003-dot-review/` -> `specs/archive/CLI-003-dot-review/`
-- [ ] Backlog entry: close issue #337 (bitácora auto-moves to Done)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-003-dot-review/` -> `specs/archive/CLI-003-dot-review/`
+- [x] Backlog entry: close issue #337 (bitácora auto-moves to Done)
+- [x] Promotions above executed (lesson -> `docs/lessons.md`; ADR/pattern: no, rationale above)
