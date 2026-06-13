@@ -44,7 +44,7 @@
   {
     "id": "CLI-009-setup-install-dot-f7",
     "behavior": "cli.yml release job is gated on test + lint (no publish from red code)",
-    "verification": "python3 -c \"import yaml,sys; j=yaml.safe_load(open('.github/workflows/cli.yml'))['jobs']['release']; sys.exit(0 if set(['test','lint']).issubset(set(j.get('needs',[]))) else 1)\"",
+    "verification": "awk '/^  release:/{f=1} f&&/^    needs:/{print;exit}' .github/workflows/cli.yml | grep -qE 'test.*lint|lint.*test'",
     "state": "pending",
     "evidence": ""
   },
