@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-007-dot-spec-init-f1",
+    "behavior": "dot spec init ID --issue N (open issue) scaffolds the 3 files, injects the Why comment, and sets frontmatter issue: dotfiles#N",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSpecInitWithOpenIssueSetsFrontmatter",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f2",
+    "behavior": "Missing --issue, nonexistent issue, or closed issue -> non-zero exit, no specs/ID dir, message names the gate",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSpecInitMissingGateFails|TestSpecInitClosedIssueFails' && go test ./internal/spec/ -run 'TestGateMissingIssueFails|TestGateClosedIssueFails'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f3",
+    "behavior": "--force-no-gate scaffolds without invoking gh and leaves frontmatter issue empty",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSpecInitForceNoGateScaffolds",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f4",
+    "behavior": "Feature-id grammar accepts AREA-NNN[letter][-slug] + date forms, rejects junk (parity with init-spec.sh)",
+    "verification": "cd cli && go test ./internal/spec/ -run TestValidateID",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f5",
+    "behavior": "Existing specs/ID refuses to clobber; id under specs/archive warns but still scaffolds",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestScaffoldWritesFilesAndGuardsClobber|TestScaffoldWarnsOnArchivedID'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f6",
+    "behavior": "Templates are embedded; rendering needs no vault present (Render reads the go:embed FS, not $VAULT_PATH)",
+    "verification": "cd cli && env -u VAULT_PATH go test ./internal/spec/ -run 'TestRenderSubstitutesAndFixesIssueFrontmatter|TestRenderWithoutIssueLeavesFrontmatterEmpty'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f7",
+    "behavior": "Drift guard fails if an embedded template diverges from the vault SSOT, and skips (not fails) when the vault is absent",
+    "verification": "cd cli && go test ./internal/spec/ -run TestEmbeddedTemplatesMatchVault -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-007-dot-spec-init-f8",
+    "behavior": "Go suite is clean: gofmt, vet, test, build all green",
+    "verification": "cd cli && test -z \"$(gofmt -l .)\" && go vet ./... && go test ./... && go build ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
