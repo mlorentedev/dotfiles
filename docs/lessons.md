@@ -934,3 +934,13 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Exercised the release pipeline locally with a throwaway tag + the OSS binary BEFORE the first real release; switched to plain `v*` tags (the CLI is the repo's only released artifact) and documented the revisit condition in the spec (CLI-001 R2).
 
 **Rule**: Before designing around any third-party tool feature, check the OSS/paid feature split in current docs (Context7) AND exercise the pipeline empirically with a throwaway run. Feature paywalls invalidate trained memory silently.
+
+### [2026-06-12] Non-streaming chat endpoints behind a gateway drop long generations — a client timeout cannot fix a server-side cut
+
+**Context**: CLI-003 `dot review` QA: live review of a real 12KB staged diff through the NaN gateway (`deepseek-v4-flash`, non-streaming chat completions).
+
+**Problem**: The gateway closes long non-streaming responses mid-generation. Reproduced at the 120s client timeout and again at 300s (TCP read died at ~168s) — the cut is provider-side, so no client-side `--timeout` value can help. Hello-world smoke tests never trigger it; the failure only appears at realistic payload sizes.
+
+**Solution**: Kept the 120s default instead of chasing the timeout; documented `--provider openrouter` as the escape hatch for large diffs (same 12KB diff reviewed in ~10s) and recorded the limitation in `cli/README.md`.
+
+**Rule**: QA API integrations with realistic payload sizes, not hello-world ones. When a remote endpoint drops long responses, change the route (streaming, different provider) — not the client timeout.
