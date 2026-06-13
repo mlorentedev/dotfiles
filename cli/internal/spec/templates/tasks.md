@@ -1,6 +1,6 @@
 ---
 tags: [spec, tasks, templates]
-created: "2026-05-13"
+created: "{{date:YYYY-MM-DD}}"
 ---
 
 # Tasks - <feature-id>
