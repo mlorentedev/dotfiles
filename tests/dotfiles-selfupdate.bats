@@ -38,7 +38,7 @@ setup() {
 }
 
 teardown() {
-    [ -n "${TMP:-}" ] && rm -rf "$TMP"
+    [ -z "${TMP:-}" ] || rm -rf "$TMP"
 }
 
 # Advance the remote by one commit (a second clone commits + pushes).
