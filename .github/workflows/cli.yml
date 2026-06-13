@@ -40,8 +40,8 @@ jobs:
         run: go test ./...
       - name: Smoke (help + version)
         run: |
-          go run ./cmd/dot --help
-          go run ./cmd/dot version
+          go run ./cmd/dotf --help
+          go run ./cmd/dotf version
 
   lint:
     name: lint

@@ -11,6 +11,8 @@ created: "2026-06-10"
 
 # ADR-020: Converge cross-platform tooling into a single Go CLI (strangler-fig)
 
+> **Amendment 2026-06-13 (CLI-010, [#367](https://github.com/mlorentedev/dotfiles/issues/367)):** the CLI binary was renamed `dot` → `dotf` to avoid colliding with Graphviz's `/usr/bin/dot`. Read every `dot <subcommand>` below as `dotf <subcommand>`; the installed binary is `dotf`. Rationale in the [Amendment](#amendment) section. The decision text is left as originally written (historical record).
+
 > The ~18 logic scripts that exist as `.sh` + `.ps1` twins (each fix applied twice, tested twice
 > in bats *and* Pester) converge into one statically-linked Go CLI binary (`dot`). Migration is
 > strangler-fig (port on contact, delete the shell pair in the same PR), not a big-bang rewrite.
@@ -21,6 +23,16 @@ created: "2026-06-10"
 ## Status
 
 Accepted. Architectural direction; implementation follows via per-feature specs and PRs.
+
+## Amendment
+
+**2026-06-13 — binary renamed `dot` → `dotf` (CLI-010, [#367](https://github.com/mlorentedev/dotfiles/issues/367)).**
+
+This ADR named the CLI `dot`, modelled on `gh` / `kubectl` / `chezmoi`, but did not weigh a name collision: **Graphviz** (`graphviz` 14.x) ships `/usr/bin/dot`. Because `install-dotf.sh` deploys the binary to `~/.local/bin`, which precedes `/usr/bin` on `PATH`, our CLI would **shadow** Graphviz once `setup` ran — any tool that shells out to a bare `dot` (plantuml, doxygen `HAVE_DOT`, render scripts) would silently hit our CLI and fail. The collision was latent (the binary was not yet deployed on any box) and surfaced before it activated.
+
+**Decision:** the newcomer yields. The binary, its goreleaser artifacts, the `versions.conf` pin (`DOTF_VERSION`), `install-dotf.sh`, and every doc are `dotf`. No behaviour changed — only the name.
+
+**Release sequencing:** the published `v0.1.0` release carries `dot` artifacts; `dotf` artifacts first appear in `v0.2.0`. `install-dotf.sh` pins `DOTF_VERSION=0.2.0`, so the CLI is installable once that tag is cut (merge → tag `v0.2.0` → CI builds `dotf` → install works). The `v0.1.0` `dot` artifacts remain published as immutable history.
 
 ## Context
 

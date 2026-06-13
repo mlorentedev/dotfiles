@@ -28,7 +28,7 @@ setup() {
 }
 
 @test "architecture.md declares the cli/ standard layout (cmd + internal)" {
-    grep -qF 'cmd/dot' "$ARCH_MD"
+    grep -qF 'cmd/dotf' "$ARCH_MD"
     grep -qF 'internal/' "$ARCH_MD"
 }
 

@@ -1,4 +1,4 @@
-# dot — dotfiles tooling CLI
+# dotf — dotfiles tooling CLI
 
 Single cross-platform entry point for the repo tooling ([ADR-020](../docs/adr/adr-020-tooling-cli-go-convergence.md)).
 Shell script twins under `scripts/` converge here one subcommand at a time (strangler-fig).
@@ -10,14 +10,14 @@ not `go install`.
 
 ## Commands
 
-### `dot review` — cross-model code review
+### `dotf review` — cross-model code review
 
 Reads a unified diff from stdin and asks a non-Claude model for a decorrelated
 second-opinion review (markdown on stdout):
 
 ```sh
-git diff main...HEAD | dot review                        # NaN, deepseek-v4-flash
-git diff main...HEAD | dot review --provider openrouter  # OpenRouter, deepseek/deepseek-chat
+git diff main...HEAD | dotf review                        # NaN, deepseek-v4-flash
+git diff main...HEAD | dotf review --provider openrouter  # OpenRouter, deepseek/deepseek-chat
 ```
 
 | Provider | Required env | Default model |

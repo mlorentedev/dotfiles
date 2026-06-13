@@ -261,21 +261,21 @@ for tool in $OPTIONAL_TOOLS; do
     fi
 done
 
-# dot (the dotfiles Go CLI — ADR-020). Installed from its release into
-# ~/.local/bin by install-dot.sh; verify presence + pinned-version match.
-DOT_PINNED="$(grep -E '^DOT_VERSION=' "$DOTFILES_DIR/versions.conf" 2>/dev/null | cut -d= -f2)"
-if command -v dot >/dev/null 2>&1; then
-    INSTALLED_DOT=$(dot version 2>/dev/null | awk '{print $NF}')
-    pass "dot in PATH: ${INSTALLED_DOT:-unknown}"
-    if [ -n "$DOT_PINNED" ] && [ "$INSTALLED_DOT" = "$DOT_PINNED" ]; then
-        pass "dot version matches versions.conf ($DOT_PINNED)"
-    elif [ -n "$DOT_PINNED" ]; then
-        warn "dot version drift: installed=$INSTALLED_DOT pinned=$DOT_PINNED (run ./scripts/install-dot.sh)"
+# dotf (the dotfiles Go CLI — ADR-020). Installed from its release into
+# ~/.local/bin by install-dotf.sh; verify presence + pinned-version match.
+DOTF_PINNED="$(grep -E '^DOTF_VERSION=' "$DOTFILES_DIR/versions.conf" 2>/dev/null | cut -d= -f2)"
+if command -v dotf >/dev/null 2>&1; then
+    INSTALLED_DOTF=$(dotf version 2>/dev/null | awk '{print $NF}')
+    pass "dotf in PATH: ${INSTALLED_DOTF:-unknown}"
+    if [ -n "$DOTF_PINNED" ] && [ "$INSTALLED_DOTF" = "$DOTF_PINNED" ]; then
+        pass "dotf version matches versions.conf ($DOTF_PINNED)"
+    elif [ -n "$DOTF_PINNED" ]; then
+        warn "dotf version drift: installed=$INSTALLED_DOTF pinned=$DOTF_PINNED (run ./scripts/install-dotf.sh)"
     else
-        skip "DOT_VERSION" "not set in versions.conf — version match not verified"
+        skip "DOTF_VERSION" "not set in versions.conf — version match not verified"
     fi
 else
-    skip "dot" "not in PATH (run ./scripts/install-dot.sh or setup-linux.sh)"
+    skip "dotf" "not in PATH (run ./scripts/install-dotf.sh or setup-linux.sh)"
 fi
 
 # ==================================================

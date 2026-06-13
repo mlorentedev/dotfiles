@@ -40,7 +40,7 @@ func TestRootCmd(t *testing.T) {
 			name:       "version prints the version",
 			args:       []string{"version"},
 			wantErr:    false,
-			wantOutSub: "dot version",
+			wantOutSub: "dotf version",
 		},
 		{
 			name:    "unknown subcommand fails",

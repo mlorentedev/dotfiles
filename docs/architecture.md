@@ -11,11 +11,11 @@
 | Directory | Purpose |
 |---|---|
 | `ai/` | Per-agent configuration sources (claude, opencode, copilot, pi, agy, hermes, aider, nan) deployed by setup; thin overlays over the `AGENTS.md` SSOT |
-| `cli/` | The `dot` Go CLI — own module (`go.mod`), own release pipeline (goreleaser). See layout below |
+| `cli/` | The `dotf` Go CLI — own module (`go.mod`), own release pipeline (goreleaser). See layout below |
 | `docs/` | Build/operate knowledge: `adr/`, `runbooks/`, `troubleshooting/`, `lessons.md`, this file |
 | `harness/` | Compiled harness records (skills, enforced overrides) — generated cache from the vault SSOT via `compile-harness.sh`; do not hand-edit |
 | `powershell/` | PowerShell profile (Windows counterpart of `.zsh/`) |
-| `scripts/` | Shell tooling as `.sh`/`.ps1` twins — **shrinking**: each twin is deleted when its logic ports to a `dot` subcommand (ADR-020, epic #131); end state is thin bootstrap helpers only |
+| `scripts/` | Shell tooling as `.sh`/`.ps1` twins — **shrinking**: each twin is deleted when its logic ports to a `dotf` subcommand (ADR-020, epic #131); end state is thin bootstrap helpers only |
 | `sensitive/` | age-encrypted secrets (`*.secret.age`) + `env-mapping.conf` |
 | `specs/` | Active per-feature SDD specs; closed ones move to `specs/archive/` |
 | `ssh/` | SSH client config + public key (deployed by setup) |
@@ -44,7 +44,7 @@ Community-standard shape (go.dev module layout; same pattern as `gh` and `chezmo
 
 ```text
 cli/
-├── cmd/dot/
+├── cmd/dotf/
 │   └── main.go          # entrypoint ONLY: version var (goreleaser ldflags) + cmd.New(version)
 ├── internal/
 │   ├── cmd/             # Cobra wiring: one <verb>.go per subcommand (+ tests)
@@ -56,7 +56,7 @@ cli/
 
 Rules:
 
-- `cmd/dot/` never grows beyond `main.go` — the anti-flat-`scripts/` guard. `var version`
+- `cmd/dotf/` never grows beyond `main.go` — the anti-flat-`scripts/` guard. `var version`
   stays there because goreleaser injects `-X main.version`; moving it breaks releases silently.
 - Every future twin port lands as `internal/cmd/<verb>.go` + `internal/<domain>/`.
 - The per-script migration map (which twin becomes which subcommand) lives in epic

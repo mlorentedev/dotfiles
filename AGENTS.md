@@ -242,12 +242,12 @@ Two layers, declared by [ADR-020](docs/adr/adr-020-tooling-cli-go-convergence.md
 
 | Layer | Owns | Lives at |
 |---|---|---|
-| **Go** (`dot` CLI) | User-facing tooling — the logic of every `.sh`/`.ps1` twin | `cli/` (own `go.mod`; table-driven `go test`) |
+| **Go** (`dotf` CLI) | User-facing tooling — the logic of every `.sh`/`.ps1` twin | `cli/` (own `go.mod`; table-driven `go test`) |
 | **Shell** (POSIX + PowerShell) | Thin bootstrap (detect OS/arch, fetch binary, PATH) + profile/env wiring | `setup-*.{sh,ps1}`, RC files; `scripts/` until ported |
 
 - **Python is not a layer here.** Introducing it reopens ADR-020 — and the default answer is still Go.
-- **New tooling goes in Go.** A new user-facing tool or subcommand is a `dot` subcommand under `cli/`; never a new `.sh`/`.ps1` twin.
-- **Strangler-fig on contact.** When a `.sh`/`.ps1` twin is next touched, port it to `dot` in that same PR and delete the pair + its bats/Pester tests — never leave the three coexisting (ADR-020 §5).
+- **New tooling goes in Go.** A new user-facing tool or subcommand is a `dotf` subcommand under `cli/`; never a new `.sh`/`.ps1` twin.
+- **Strangler-fig on contact.** When a `.sh`/`.ps1` twin is next touched, port it to `dotf` in that same PR and delete the pair + its bats/Pester tests — never leave the three coexisting (ADR-020 §5).
 - **Bootstrap stays shell** — it provisions the tooling itself (chicken-and-egg, ADR-020 C7).
 
 ## "Neural Hive" Protocol (The Loop)

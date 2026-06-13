@@ -1,4 +1,4 @@
-// Package spec implements the `dot spec` scaffold domain: feature-id
+// Package spec implements the `dotf spec` scaffold domain: feature-id
 // validation, the GitHub work-gate, and rendering the per-feature spec folder
 // from templates embedded in the binary. It mirrors scripts/init-spec.sh, but
 // the templates are vendored via //go:embed so the binary is self-contained and

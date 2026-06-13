@@ -31,7 +31,7 @@ HTTP error or timeout.
 
 Privacy: the diff is sent to the selected third-party API. Think before piping
 diffs from repositories you do not own.`,
-		Example:      "  git diff main...HEAD | dot review --provider nan",
+		Example:      "  git diff main...HEAD | dotf review --provider nan",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			diff, err := review.ReadDiff(cmd.InOrStdin(), maxBytes)
