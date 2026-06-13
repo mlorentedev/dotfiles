@@ -91,7 +91,7 @@ func ReadDiff(in io.Reader, maxBytes int64) (string, error) {
 	}
 	diff := strings.TrimSpace(string(raw))
 	if diff == "" {
-		return "", fmt.Errorf("no diff on stdin; usage: git diff main...HEAD | dot review")
+		return "", fmt.Errorf("no diff on stdin; usage: git diff main...HEAD | dotf review")
 	}
 	return diff, nil
 }

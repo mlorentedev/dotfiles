@@ -266,14 +266,14 @@ else
     log_info "gh already installed"
 fi
 
-# dot (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
+# dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
 # checksum-verified, into ~/.local/bin. Idempotent; converges on drift.
-if [ -f ./scripts/install-dot.sh ]; then
+if [ -f ./scripts/install-dotf.sh ]; then
     # shellcheck source=/dev/null
-    . ./scripts/install-dot.sh
-    install_dot || log_warning "dot installation failed (continuing; see healthcheck)"
+    . ./scripts/install-dotf.sh
+    install_dotf || log_warning "dotf installation failed (continuing; see healthcheck)"
 else
-    log_warning "scripts/install-dot.sh not found; skipping dot install"
+    log_warning "scripts/install-dotf.sh not found; skipping dotf install"
 fi
 
 # zoxide (smarter cd)

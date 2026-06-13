@@ -47,7 +47,7 @@ Use --force-no-gate to scaffold without an issue (NOT RECOMMENDED).
 
 Mechanical only: fill the proposal interactively afterwards ("/spec fill" in an
 agent) or by hand. Do not skip the Why.`,
-		Example:      "  dot spec init AI-001-ollama-public --issue 42",
+		Example:      "  dotf spec init AI-001-ollama-public --issue 42",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -122,7 +122,7 @@ Mechanical only — the Go twin of scripts/archive-spec.sh. A pre-flight refuses
 archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain (override
 with --force-with-drafts). Vault promotion (lessons/ADR/pattern) and any backlog
 tick stay interactive via "/spec archive" in an agent.`,
-		Example:      "  dot spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
+		Example:      "  dotf spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

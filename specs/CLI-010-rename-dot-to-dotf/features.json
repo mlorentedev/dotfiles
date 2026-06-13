@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-010-rename-dot-to-dotf-f1",
+    "behavior": "Binary package renamed: cli/cmd/dotf exists, cli/cmd/dot does not, go test green",
+    "verification": "test -d cli/cmd/dotf && ! test -d cli/cmd/dot && cd cli && go build -o /tmp/dotf ./cmd/dotf && go test ./...",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-010-rename-dot-to-dotf-f2",
+    "behavior": "Release pipeline names the binary dotf (goreleaser project_name/id/binary + cli.yml)",
+    "verification": "grep -q 'project_name: dotf' cli/.goreleaser.yaml && grep -q 'binary: dotf' cli/.goreleaser.yaml && ! grep -qE '^(project_name|    binary): dot$' cli/.goreleaser.yaml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-010-rename-dot-to-dotf-f3",
+    "behavior": "Bootstrap installs/checks dotf: install-dot fetches dotf, healthcheck checks dotf, versions.conf has DOTF_VERSION",
+    "verification": "grep -q 'DOTF_VERSION' versions.conf && ! grep -q 'DOT_VERSION' versions.conf && grep -q 'dotf' scripts/install-dot.sh && grep -q 'dotf' scripts/healthcheck.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-010-rename-dot-to-dotf-f4",
+    "behavior": "No live dot-as-CLI reference remains in AGENTS.md / README.md / docs/architecture.md (drift-guarded); all point to dotf",
+    "verification": "grep -q 'dotf' AGENTS.md && grep -q 'dotf' README.md && grep -q 'cmd/dotf' docs/architecture.md && ! grep -qE '`dot`|cmd/dot/|dot subcommand' docs/architecture.md && ~/.local/bin/bats tests/architecture-md.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-010-rename-dot-to-dotf-f5",
+    "behavior": "ADR-020 carries an amendment documenting the Graphviz collision and the dot->dotf rename",
+    "verification": "grep -qiE 'graphviz' docs/adr/adr-020-tooling-cli-go-convergence.md && grep -q 'dotf' docs/adr/adr-020-tooling-cli-go-convergence.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-010-rename-dot-to-dotf-f6",
+    "behavior": "Changed scripts are shellcheck-clean and bootstrap bats are green",
+    "verification": "~/.local/bin/shellcheck scripts/install-dot.sh scripts/healthcheck.sh setup-linux.sh && ~/.local/bin/bats tests/install-dot.bats tests/healthcheck.bats tests/agents-md.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
