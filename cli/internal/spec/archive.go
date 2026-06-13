@@ -90,11 +90,18 @@ func setStatus(content, newStatus string) string {
 }
 
 // Archive performs the mechanical spec archive, the Go twin of archive-spec.sh:
-// a tag pre-flight, a no-clobber move into the archive (or _abandoned) tree, a
-// proposal status rewrite, and an optional PR provenance comment. It returns the
-// absolute target directory on success. Vault promotion and backlog ticks are
-// out of scope — do those via "/spec archive" in an agent.
+// id validation, a tag pre-flight, a no-clobber move into the archive (or
+// _abandoned) tree, a proposal status rewrite, and an optional PR provenance
+// comment. It returns the absolute target directory on success. Vault promotion
+// and backlog ticks are out of scope — do those via "/spec archive" in an agent.
+//
+// id is validated first: ValidateID's grammar admits no path separators or "..",
+// so it doubles as the guard that keeps a crafted id (e.g. "../../etc") from
+// escaping specs/ through the filepath.Join calls below.
 func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error) {
+	if err := ValidateID(id); err != nil {
+		return "", err
+	}
 	specDir := filepath.Join(repoRoot, "specs", id)
 	if info, statErr := os.Stat(specDir); statErr != nil || !info.IsDir() {
 		return "", fmt.Errorf("spec not found: %s", specDir)

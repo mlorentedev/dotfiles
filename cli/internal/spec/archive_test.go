@@ -231,6 +231,25 @@ func TestArchiveForceWithDrafts(t *testing.T) {
 	}
 }
 
+// TestArchiveRejectsTraversalID guards the path-traversal class CodeRabbit
+// flagged on #362: a crafted id must be rejected by ValidateID before it can
+// reach the filepath.Join calls and move something outside specs/.
+func TestArchiveRejectsTraversalID(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(root, "outside")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"../outside", "../../etc", "foo/bar", ".", ".."} {
+		if _, err := Archive(root, id, ArchiveOptions{ForceWithDrafts: true}); err == nil {
+			t.Errorf("Archive(%q) = nil error, want rejection", id)
+		}
+	}
+	if _, err := os.Stat(outside); err != nil {
+		t.Errorf("a rejected traversal id must move nothing: %v", err)
+	}
+}
+
 func TestArchiveRecordsPRURL(t *testing.T) {
 	root := t.TempDir()
 	writeSpec(t, root, "AI-001-x", map[string]string{"proposal.md": "---\nstatus: draft\n---\nbody\n"})

@@ -37,7 +37,7 @@
   {
     "id": "CLI-008-dot-spec-archive-f6",
     "behavior": "status: rewrite touches only the first frontmatter block; a status: token in the body is left untouched",
-    "verification": "cd cli && go test ./internal/spec/ -run TestSetStatus",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestSetStatus|TestSetStatusOnlyFirstBlock'",
     "state": "pending",
     "evidence": ""
   },
