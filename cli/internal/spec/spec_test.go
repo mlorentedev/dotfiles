@@ -73,6 +73,22 @@ func TestRenderSubstitutesAndFixesIssueFrontmatter(t *testing.T) {
 	}
 }
 
+// TestRenderStampsCreatedInAllFiles guards the CodeRabbit-found bug (dotfiles#359):
+// tasks.md and verification.md once hard-coded the template authoring date in
+// created:, so scaffolded specs inherited it. All three templates must now carry
+// the {{date}} placeholder and have it substituted with the generation date.
+func TestRenderStampsCreatedInAllFiles(t *testing.T) {
+	files, err := Render("BUG-007-x", "2026-06-13", 0, "")
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, name := range []string{"proposal.md", "tasks.md", "verification.md"} {
+		if !strings.Contains(files[name], `created: "2026-06-13"`) {
+			t.Errorf("%s did not stamp created: with the generation date:\n%s", name, files[name])
+		}
+	}
+}
+
 func TestRenderWithoutIssueLeavesFrontmatterEmpty(t *testing.T) {
 	files, err := Render("BUG-007", "2026-06-13", 0, "")
 	if err != nil {

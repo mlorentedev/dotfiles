@@ -1,6 +1,6 @@
 ---
 tags: [spec, verification, templates]
-created: "2026-05-13"
+created: "{{date:YYYY-MM-DD}}"
 ---
 
 # Verification - <feature-id>

@@ -44,7 +44,7 @@
   {
     "id": "CLI-007-dot-spec-init-f7",
     "behavior": "Drift guard fails if an embedded template diverges from the vault SSOT, and skips (not fails) when the vault is absent",
-    "verification": "cd cli && go test ./internal/spec/ -run TestEmbeddedTemplatesMatchVault -v",
+    "verification": "cd cli && go test ./internal/spec/ -run TestEmbeddedTemplatesMatchVault -v && VAULT_PATH=/nonexistent go test ./internal/spec/ -run TestEmbeddedTemplatesMatchVault -v 2>&1 | grep -q SKIP",
     "state": "pending",
     "evidence": ""
   },
