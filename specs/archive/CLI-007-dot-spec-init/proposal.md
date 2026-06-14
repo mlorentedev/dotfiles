@@ -1,7 +1,7 @@
 ---
 id: "CLI-007-dot-spec-init"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-13"
 issue: "dotfiles#358"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -66,3 +66,5 @@ Observable outcomes. Each must be testable.
 - Related ADRs: `docs/adr/adr-018-de-vault-task-placement.md` (work-gate), ADR-013 (CI has no vault)
 - Related patterns: `00_meta/patterns/pattern-spec-driven-development.md`
 - Related tickets: CLI-005 #339, CLI-006 #340, SELF-002 #249
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/359 -->

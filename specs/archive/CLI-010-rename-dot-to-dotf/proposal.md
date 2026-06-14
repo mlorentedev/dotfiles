@@ -1,7 +1,7 @@
 ---
 id: "CLI-010-rename-dot-to-dotf"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-13"
 issue: "dotfiles#367"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -55,3 +55,5 @@ Observable outcomes. Each must be testable.
 - Epic: `dotfiles#131` ([epic] CLI convergence) — `docs/adr/adr-020-tooling-cli-go-convergence.md`
 - Reorders: CLI-005 #339 (retire spec shell twins → repoints to `dotf spec`)
 - Predecessors: CLI-007 (`dot spec init`), CLI-008 (`dot spec archive`), CLI-009 #365 (setup installs the CLI)
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/368 -->
