@@ -37,6 +37,25 @@ piping diffs from repositories you do not own.
 for large ones. Streaming is a deliberate non-goal until this hurts enough
 (spec CLI-003, out of scope).
 
+### `dotf doctor` — post-setup diagnostics
+
+The Go consolidation of `scripts/healthcheck.sh` (the 12-section sweep) and
+`scripts/doctor.sh` (the `env-contract.json` verifier), read natively — no `jq`
+(CLI-012, the first port of [ADR-021](../docs/adr/adr-021-cli-orchestration-roadmap.md)).
+Run after `setup-linux.sh` and on demand:
+
+```sh
+dotf doctor              # full sweep; exit 0 if all checks pass, 1 on any FAIL
+dotf doctor --fix        # also print profile lines for missing env defaults + run known heals (claude-mem)
+dotf doctor --verbose    # list passing checks too (default summarises them per section)
+```
+
+Checks: core tools on PATH, versioned tool dirs, version-pin match (`versions.conf`),
+key symlinks, environment variables + PATH (`env-contract.json`), optional tools,
+vault presence, secrets integrity, tmux, opencode/pi, harness drift, Antigravity.
+Advisory `WARN`/`SKIP`/`INFO` never fail the run. It resolves `DOTFILES_DIR`
+(default `$HOME/.dotfiles`), falling back to the git repo root.
+
 ## Build
 
 ```sh

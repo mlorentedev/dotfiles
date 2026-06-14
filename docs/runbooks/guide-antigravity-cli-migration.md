@@ -60,7 +60,7 @@ The install/config migration is **done** cross-OS — no porting work remains:
   `~/.gemini/config/mcp_config.json`.
 - `ANTIGRAVITY_ENDPOINT=https://cloudcode-pa.googleapis.com` (production Code
   Assist endpoint = the subscription path).
-- `healthcheck.sh` section 13 ("Antigravity CLI Health") already guards endpoint,
+- `dotf doctor` ("Antigravity CLI health" section) already guards endpoint,
   app-data path, and MCP config integrity.
 
 ## Verify branch #1 (do this once)

@@ -577,7 +577,7 @@ deploy_file() {
     return 1
 }
 
-# Asserts a deployed file matches its repo source (drift detection for healthcheck.sh).
+# Asserts a deployed file matches its repo source (copy-deploy drift detection).
 # Pair of deploy_file: if the user edited ~/.zshrc directly instead of in the repo,
 # this surfaces it loudly instead of silently losing the edit on next setup-linux.sh run.
 # Input: $1 - repo source path, $2 - deployed target path, $3 - display name (optional)

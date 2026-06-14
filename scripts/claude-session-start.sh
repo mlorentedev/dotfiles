@@ -82,23 +82,12 @@ $HEAL_OUTPUT"
     fi
 fi
 
-# --- Silent doctor: surface env-contract drift to Claude only when detected ---
-# Runs check-only; suppresses [ok]/[info] lines and only forwards [warn]/[fail].
-DOCTOR_SCRIPT="$SCRIPT_DIR/doctor.sh"
-if [ -x "$DOCTOR_SCRIPT" ] && command -v jq >/dev/null 2>&1; then
-    DOCTOR_DRIFT=$(bash "$DOCTOR_SCRIPT" 2>&1 | grep -E '^  \[(warn|fail)\]' || true)
-    if [ -n "$DOCTOR_DRIFT" ]; then
-        if [ -n "$CONTEXT_LINES" ]; then
-            CONTEXT_LINES="$CONTEXT_LINES
-
-[doctor] env-contract drift detected (run scripts/doctor.sh --fix):
-$DOCTOR_DRIFT"
-        else
-            CONTEXT_LINES="[doctor] env-contract drift detected (run scripts/doctor.sh --fix):
-$DOCTOR_DRIFT"
-        fi
-    fi
-fi
+# NOTE: the per-session env-contract drift check was retired with the doctor.sh
+# twin (CLI-012 / ADR-021). Its replacement, `dotf doctor`, runs the full
+# 12-section sweep (~2.8s, dominated by the compile-harness drift gate) — too
+# heavy to fork on every session start. Drift is now surfaced post-setup
+# (setup-linux.sh runs `dotf doctor`) and on demand. A focused `dotf doctor
+# --quick` for the hook is tracked with the SessionStart hook port (roadmap step 6).
 
 # Walk up from CWD to find an Obsidian vault (.obsidian/ directory)
 find_vault_root() {

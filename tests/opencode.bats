@@ -9,7 +9,6 @@ setup() {
     export OPENCODE_CFG="$DOTFILES_DIR/ai/opencode/opencode.jsonc"
     export AGENTS_MD="$DOTFILES_DIR/AGENTS.md"
     export ALIASES_FILE="$DOTFILES_DIR/.zsh/aliases.zsh"
-    export HEALTHCHECK="$DOTFILES_DIR/scripts/healthcheck.sh"
 }
 
 # --- setup-linux.sh: opencode install block ---
@@ -53,11 +52,11 @@ setup() {
     grep -q 'shadows it in PATH' "$SETUP_SCRIPT"
 }
 
-# Version drift is advisory: the pinned tool still works, just outdated.
-# Drift must WARN (exit-neutral), never FAIL the healthcheck run.
-@test "parity: version drift reports WARN not FAIL in both healthchecks" {
-    grep -qE 'warn "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.sh"
-    ! grep -qE 'fail "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.sh"
+# Version drift is advisory: the pinned tool still works, just outdated. Drift
+# must WARN (exit-neutral), never FAIL. The .sh side is now go test
+# (TestCheckOptionalTools_DotfDrift, TestCheckVersionMatch); healthcheck.ps1
+# keeps the assertion until the Windows port.
+@test "healthcheck.ps1: version drift reports WARN not FAIL" {
     grep -qE 'Write-Warn "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.ps1"
     ! grep -qE 'Write-Fail "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
@@ -258,17 +257,10 @@ setup() {
     ! grep -q "Apps\\\\knowledge" "$DOTFILES_DIR/.github/copilot-instructions.md"
 }
 
-# --- healthcheck.sh integration ---
-
-@test "healthcheck.sh has OpenCode section (10/12)" {
-    grep -q 'section "10/12" "OpenCode"' "$HEALTHCHECK"
-}
-
-@test "healthcheck.sh OpenCode section checks binary + config + schema" {
-    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'opencode --version'
-    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q 'OPENCODE_CFG'
-    awk '/section "10\/12" "OpenCode"/,/section "11\/12"/' "$HEALTHCHECK" | grep -q '\$schema'
-}
+# --- OpenCode diagnostics integration ---
+# The healthcheck.sh OpenCode section (binary + config + $schema) was ported to
+# cli/internal/doctor (checkOpenCode), covered by go test. The structural .sh
+# greps that lived here are retired with the script.
 
 # --- DX-004: reasoning visibility (interleaved) + TUI config (tui.json) ---
 

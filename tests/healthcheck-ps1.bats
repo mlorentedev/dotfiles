@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
-# Tests for scripts/healthcheck.ps1 (structural + PSScriptAnalyzer)
-# Cross-OS parity sibling of tests/healthcheck.bats (the .sh tests).
+# Tests for scripts/healthcheck.ps1 (structural + PSScriptAnalyzer).
+# The Linux .sh twin was ported to `dotf doctor` (CLI-012) and deleted; its
+# behavioural intent now lives in cli/internal/doctor (go test). healthcheck.ps1
+# is kept until the Windows port lands dotf on PATH there.
 
 load 'winpath'
 
@@ -8,7 +10,6 @@ setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
     export PS1_SCRIPT="$SCRIPTS_DIR/healthcheck.ps1"
-    export SH_SCRIPT="$SCRIPTS_DIR/healthcheck.sh"
 }
 
 # --- File presence + doc comment block ---
@@ -43,7 +44,7 @@ setup() {
     grep -q "ErrorActionPreference = 'Continue'" "$PS1_SCRIPT"
 }
 
-# --- Output helpers (parity with healthcheck.sh pass/fail/skip/section) ---
+# --- Output helpers (pass/fail/skip/section) ---
 
 @test "healthcheck.ps1 defines Write-Pass" {
     grep -q '^function Write-Pass' "$PS1_SCRIPT"
@@ -61,7 +62,7 @@ setup() {
     grep -q '^function Write-Section' "$PS1_SCRIPT"
 }
 
-# --- 12 sections present (parity with healthcheck.sh; 13 -> 12 after TERM-002) ---
+# --- 12 sections present (13 -> 12 after TERM-002) ---
 
 @test "healthcheck.ps1 has all 12 sections numbered 1/12..12/12" {
     for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
@@ -187,28 +188,6 @@ setup() {
 
 @test "healthcheck.ps1 gates exit 1 on \$script:Failed counter" {
     grep -qF 'if ($script:Failed -gt 0)' "$PS1_SCRIPT"
-}
-
-# --- Cross-OS parity with healthcheck.sh ---
-
-@test "healthcheck.sh exists (parity sibling)" {
-    [[ -f "$SH_SCRIPT" ]]
-}
-
-@test "healthcheck.ps1 and .sh both have 12 sections" {
-    # 12 sections post-TERM-002 (section 11 removed; Antigravity now closes at 12).
-    local sh_sections
-    sh_sections=$(grep -cE 'section "[0-9]+/12"' "$SH_SCRIPT")
-    [[ "$sh_sections" -eq 12 ]] || {
-        echo "healthcheck.sh has $sh_sections sections, expected 12"
-        return 1
-    }
-    local ps1_sections
-    ps1_sections=$(grep -cE "Write-Section '[0-9]+/12'" "$PS1_SCRIPT")
-    [[ "$ps1_sections" -eq 12 ]] || {
-        echo "healthcheck.ps1 has $ps1_sections sections, expected 12"
-        return 1
-    }
 }
 
 # --- PSScriptAnalyzer ---

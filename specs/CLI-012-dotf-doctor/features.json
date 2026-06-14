@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-012-dotf-doctor-f1",
+    "behavior": "dotf doctor reproduces the consolidated post-setup checks and exits 0 on all-pass, non-zero on any failure",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestRun_ExitContract|TestCheckCoreTools|TestCheckRequiredBinaries|TestCheckVersionedPaths|TestCheckSymlinks'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-012-dotf-doctor-f2",
+    "behavior": "dotf doctor --fix reports the env-default profile line and runs the claude-mem heal (no heal-path regression)",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckContractEnvVars",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-012-dotf-doctor-f3",
+    "behavior": "scripts/healthcheck.sh, scripts/doctor.sh and tests/healthcheck.bats no longer exist",
+    "verification": "! test -e scripts/healthcheck.sh && ! test -e scripts/doctor.sh && ! test -e tests/healthcheck.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-012-dotf-doctor-f4",
+    "behavior": "no live source/exec reference to the retired .sh scripts remains (provenance + absence-assertions only)",
+    "verification": "! grep -rEn '(bash|\\.) +[^ ]*(healthcheck|doctor)\\.sh' --include='*.sh' --include='*.bats' .",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-012-dotf-doctor-f5",
+    "behavior": "setup-linux.sh runs dotf doctor post-setup, non-fatally",
+    "verification": "grep -q 'dotf doctor || log_warning' setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-012-dotf-doctor-f6",
+    "behavior": "the full Go test suite passes and builds",
+    "verification": "cd cli && go build ./... && go test ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]

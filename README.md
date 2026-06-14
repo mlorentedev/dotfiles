@@ -52,7 +52,7 @@ admin needed; some changes show after an Explorer restart.
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
 │   ├── load-secrets.sh / .ps1  # Secrets → env vars (sourced at login)
 │   ├── init-project.sh / .ps1  # Project bootstrapper
-│   ├── healthcheck.sh / .ps1   # Post-setup verification
+│   ├── healthcheck.ps1         # Windows post-setup verification (Linux: `dotf doctor`)
 │   ├── vault.sh                # Vault tooling dispatcher
 │   └── …                       # 31 more scripts (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets
@@ -81,7 +81,7 @@ scripts that a human ever runs directly — everything else is a library, hook, 
 |---|---|---|
 | `./setup-linux.sh` | `setup-linux.sh` | Bootstrap Linux: install tools, deploy configs, register MCPs |
 | `.\setup-windows.ps1` | `setup-windows.ps1` | Bootstrap Windows: same, via PowerShell |
-| `hc` | `scripts/healthcheck.sh` | Post-setup verification (versions, paths, symlinks, env vars) |
+| `dotf doctor` | `dotf` CLI | Post-setup verification (versions, paths, symlinks, env vars, env-contract) |
 | `project-init <name> <stack>` | `scripts/init-project.sh` | Bootstrap a new project with dual AI config |
 | `vault <subcommand>` | `scripts/vault.sh` | Vault tooling: `vault health`, `vault maintenance`, `vault check-escapes` |
 | `profile-shell` | `scripts/shell-profile.sh` | Measure shell startup time (zsh/bash, --detail for per-function) |

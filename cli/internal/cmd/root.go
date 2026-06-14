@@ -23,6 +23,7 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newVersionCmd(version))
 	root.AddCommand(newReviewCmd())
 	root.AddCommand(newSpecCmd())
+	root.AddCommand(newDoctorCmd())
 	return root
 }
 
