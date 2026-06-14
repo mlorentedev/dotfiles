@@ -19,7 +19,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 Run before merge (kept for the user per hands-off-testing preference):
 
-```
+```bash
 bats tests/*.bats                              # init-spec.bats deleted; expect all green
 ~/.local/bin/shellcheck scripts/check-spec-gate.sh scripts/check-md-escapes.sh
 (cd cli && go test ./...)                       # unchanged Go path, smoke
