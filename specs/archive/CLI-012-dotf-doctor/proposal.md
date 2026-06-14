@@ -1,7 +1,7 @@
 ---
 id: "CLI-012-dotf-doctor"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-14"
 issue: "dotfiles#376"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -62,3 +62,5 @@ Observable outcomes. Each must be testable.
 - Roadmap: `docs/adr/adr-021-cli-orchestration-roadmap.md` (this is its first port)
 - Pattern: ADR-020 §5 strangler-fig + the CLI-005 port playbook (delete twins on contact, guard-grep as completeness oracle)
 - Twin sources: `scripts/healthcheck.sh` (12-section), `scripts/doctor.sh` (env-contract); `.ps1` siblings as parity reference
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/379 -->
