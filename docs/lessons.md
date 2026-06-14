@@ -994,3 +994,23 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Sync the vault sources in lockstep with the render. On the interactive machine, vault edits land on `origin/master` via obsidian-git's periodic auto-commit — just edit the files, no manual git. Verify the vault sources no longer carry the old reference before declaring the migration done.
 
 **Rule**: For any file that is a generated/committed render, a migration is only complete when its *source-of-truth* changes too. Identify the generator (here `compile-harness.sh`) and edit upstream, or the render's change is transient. Sibling of the GEMINI→AGY incomplete-migration lesson: a repoint that leaves a caller — or a generator's source — stale is a half-migration.
+
+### [2026-06-14] Deleting one OS twin while keeping its sibling forces asymmetric parity tests — rewrite them to the migration reality, don't fake symmetry
+
+**Context**: CLI-012 ported the Linux diagnostics twins (`healthcheck.sh`, `doctor.sh`) to a cross-compiled `dotf doctor` and deleted them, but kept the `.ps1` siblings because `dotf` is not yet installed on Windows (no Windows `install-dotf`).
+
+**Problem**: A pile of cross-OS bats encoded `.sh`↔`.ps1` symmetry ("parity: both healthchecks include BUG-015", "parity: both doctors check min_version"). Deleting only the `.sh` breaks the `.sh` half of every one, and the pure `.sh`-structural greps (`healthcheck.sh has 12 sections`, the BUG-023 probe shape) become dangling. Keeping them green by quietly dropping the `.sh` line leaves a test still *named* "parity: both…" that now checks only one OS — a lie in the suite.
+
+**Solution**: Rewrite each parity test to the actual migration state — the Linux side asserts the `dotf doctor` wiring (or its intent moves to `go test`), the Windows side keeps its `.ps1` assertion, and the test name says which ("healthcheck.ps1 includes BUG-015…", "(Windows port pending)"). Pure `.sh`-structural tests are deleted outright; their behavioural intent lives in the Go table tests.
+
+**Rule**: When a strangler-fig port deletes one OS's twin but can't yet delete the other, the cross-OS parity tests are no longer true — don't paper over them by dropping a grep line under an unchanged "both…" name. Rewrite them to the asymmetric reality so a reader sees the migration window, and migrate the deleted side's intent to the new test home. One-OS-per-PR is the cleaner unit, and the tests should announce which OS is done.
+
+### [2026-06-14] A consolidated diagnostic that shells out to a generator is on-demand-cheap but per-event-expensive
+
+**Context**: `dotf doctor` (CLI-012) consolidates the 12-section healthcheck. One section gates on `compile-harness.sh --check`, which re-renders every skill record offline. The retired `claude-session-start.sh` used to run a light, env-contract-only `doctor.sh` on every Claude session start.
+
+**Problem**: Repointing the per-session hook to the full `dotf doctor` would fork a ~2.8s sweep on **every** session start (the `compile-harness --check` re-render dominates the time), and a PATH-command call would also break the hermetic isolation the session-start test relies on — that test copies only the hook into a temp dir so sibling scripts are *absent* and skipped, an assumption a PATH binary violates. The faithful "just repoint it" would have shipped a silent latency + context-noise regression.
+
+**Solution**: Retire the per-session drift block rather than repoint it; surface env-contract drift post-setup (`setup-linux.sh` runs `dotf doctor`) and on demand instead. A focused `dotf doctor --quick` (env-contract only, no harness gate) is tracked for the hook with the SessionStart hook port. Time the tool against the hot path before wiring it in.
+
+**Rule**: A diagnostic that's fine to run by hand can be far too heavy for a per-event hook once it shells out to a generator or probes N tools. Before wiring a "do everything" command into a hot path (session start, pre-commit, prompt-submit), measure it and split a `--quick` subset — "it's the same checks" ignores that frequency, not check count, sets the cost budget.
