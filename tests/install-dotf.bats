@@ -85,3 +85,15 @@ EOF
     [[ "$output" == *"already installed"* ]]
     [ ! -e "$DEST/dotf" ]
 }
+
+@test "standalone (executed, no arg, no DOTF_VERSION env) resolves the pinned version from versions.conf" {
+    # Regression guard: the standalone run-guard called install_dotf with no version
+    # because the script read DOTF_VERSION only from the env and never sourced
+    # versions.conf. Execute it directly (NOT sourced) with DOTF_VERSION unset and no
+    # arg, pointed at a non-existent file:// base so it never touches the network. It
+    # must get PAST the "no version given" check and name the pinned versions.conf value.
+    pinned="$(grep -m1 '^DOTF_VERSION=' "$SCRIPTS_DIR/../versions.conf" | cut -d= -f2)"
+    run env -u DOTF_VERSION DOTF_RELEASE_BASE="file://$TMP/nope" "$SCRIPTS_DIR/install-dotf.sh"
+    [[ "$output" != *"no version given"* ]]
+    [[ "$output" == *"$pinned"* ]]
+}

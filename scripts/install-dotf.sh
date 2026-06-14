@@ -12,9 +12,12 @@
 # the version/dest/base_url as args so bats can drive them against a file://
 # fixture with no network. Cross-shell: bash + zsh safe.
 
+# Resolve this script's directory once — used to find utils.sh and, when run
+# standalone, versions.conf (the DOTF_VERSION SSOT).
+_DOTF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
 # Load logging + helpers if the caller (setup) has not already sourced utils.sh.
 if ! command -v log_info >/dev/null 2>&1; then
-    _DOTF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
     # shellcheck source=/dev/null
     . "$_DOTF_SCRIPT_DIR/utils.sh"
 fi
@@ -117,5 +120,12 @@ install_dotf() {
 # `(return)` succeeds only in a sourced context, so this is robust where the
 # BASH_SOURCE-vs-$0 comparison is not (some shells/harnesses align them).
 if ! (return 0 2>/dev/null); then
+    # Standalone: with no version arg and none exported, load the pinned
+    # DOTF_VERSION from versions.conf (the SSOT). setup-linux.sh sources
+    # versions.conf before us, so this only fires on a direct ./install-dotf.sh run.
+    if [ -z "${1:-}" ] && [ -z "${DOTF_VERSION:-}" ] && [ -f "$_DOTF_SCRIPT_DIR/../versions.conf" ]; then
+        # shellcheck source=/dev/null
+        . "$_DOTF_SCRIPT_DIR/../versions.conf"
+    fi
     install_dotf "$@"
 fi
