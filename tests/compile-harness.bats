@@ -110,15 +110,11 @@ run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
     [[ "$output" == *"marker"* ]]
 }
 
-@test "AC6: healthcheck.sh wires the offline harness drift check" {
-    grep -q 'compile-harness.sh" --check' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
-}
-
-@test "AC1: healthcheck.sh asserts deployed skills are symlink-free (SDD-008)" {
-    grep -qF 'deployed skill path(s) are symlinks' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
-    grep -qF '.claude/skills' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
-    grep -qF '.config/opencode/commands' "$BATS_TEST_DIRNAME/../scripts/healthcheck.sh"
-}
+# AC6 (offline harness drift gate) + AC1 (deployed skills are symlink-free)
+# moved from healthcheck.sh to cli/internal/doctor (checkHarnessDrift), covered
+# by go test (TestCheckHarnessDrift). The structural .sh greps are retired with
+# the script; the behavioral `compile-harness.sh --check` gate is still
+# exercised end-to-end below.
 
 @test "setup-linux.sh runs compile-harness --refresh during deploy" {
     grep -q 'compile-harness.sh" --refresh' "$BATS_TEST_DIRNAME/../setup-linux.sh"
@@ -389,12 +385,12 @@ EOF
     [ ! -f "$REPO/harness/enforced/demo.md" ]
 }
 
-@test "ENGINE-002: AC6 behavioral — the drift gate healthcheck wires passes clean, fails tampered" {
-    # healthcheck.sh gates on `if compile-harness.sh --check; then pass; else fail`.
-    # Running the full healthcheck here can't isolate that gate (unrelated tool/vault
-    # checks would dominate its exit code), so we exercise the exact command it wires
-    # and assert BOTH branches: clean tree -> exit 0 (pass), tampered block -> exit !=0
-    # (fail). Complements the structural test that healthcheck calls --check.
+@test "ENGINE-002: AC6 behavioral — the drift gate dotf doctor wires passes clean, fails tampered" {
+    # `dotf doctor` gates on `if compile-harness.sh --check; then pass; else fail`
+    # (checkHarnessDrift). Running the full doctor here can't isolate that gate
+    # (unrelated tool/vault checks would dominate its exit code), so we exercise the
+    # exact command it wires and assert BOTH branches: clean tree -> exit 0 (pass),
+    # tampered block -> exit !=0 (fail). Complements TestCheckHarnessDrift (go test).
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -eq 0 ]

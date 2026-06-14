@@ -15,7 +15,7 @@
 # Hermetic design: the hook runs everything top-to-bottom on exec with no main()
 # guard, and its sibling vault-health.sh launches Obsidian (which hangs headless,
 # see session-start-config.bats). We copy ONLY the script into an isolated temp
-# dir so every sibling lookup (vault-health.sh, doctor.sh, claude-mem-heal.sh)
+# dir so every sibling lookup (vault-health.sh, claude-mem-heal.sh)
 # and the config file MISS and get skipped, while the real check_knowledge_health
 # / check_vault_baseline logic still runs against a controlled HOME and CWD.
 

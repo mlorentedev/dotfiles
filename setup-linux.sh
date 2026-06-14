@@ -103,7 +103,6 @@ chmod +x "$DOTFILES_DIR/scripts/claude-session-start.sh"
 chmod +x "$DOTFILES_DIR/scripts/session-handoff.sh"
 chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
 chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
-chmod +x "$DOTFILES_DIR/scripts/doctor.sh"
 
 # Copy sensitive directory (env-mapping.conf and encrypted files)
 log_info "Setting up sensitive directory..."
@@ -1314,7 +1313,7 @@ file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || 
 # Check dependencies
 check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible" "pip"
 
-# Deploy env-contract.json so doctor.sh can find it under $DOTFILES_DIR.
+# Deploy env-contract.json so `dotf doctor` can find it under $DOTFILES_DIR.
 if [ -f "$CURRENT_DIR/env-contract.json" ]; then
     cp -f "$CURRENT_DIR/env-contract.json" "$DOTFILES_DIR/env-contract.json"
     log_success "Deployed env-contract.json to $DOTFILES_DIR/"
@@ -1323,9 +1322,9 @@ fi
 # Final assertion against env-contract.json -- catches drift between what
 # setup just deployed and what's actually in place / on PATH / in env vars.
 #
-# Pre-export the REFACTOR-002 path vars so doctor sees what the deployed RC
-# files WILL set on the next shell. Without this, every fresh setup run reports
-# 4 false warnings because the running shell hasn't re-sourced .zshrc/.bashrc.
+# Pre-export the REFACTOR-002 path vars so `dotf doctor` sees what the deployed
+# RC files WILL set on the next shell. Without this, every fresh setup run
+# reports false warnings because the running shell hasn't re-sourced .zshrc/.bashrc.
 # Values must match the corresponding `export` lines in .zshrc + .bashrc.
 export SCRIPTS_DIR="${SCRIPTS_DIR:-$DOTFILES_DIR/scripts}"
 export GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
@@ -1339,28 +1338,18 @@ export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
 # hasn't been re-evaluated post-deploy. Mirror of the setup-windows.ps1 fix.
 export DOTFILES_REPO_DIR="${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"
 
-DOCTOR_SCRIPT="$DOTFILES_DIR/scripts/doctor.sh"
-if [ -x "$DOCTOR_SCRIPT" ] && command -v jq >/dev/null 2>&1; then
-    log_info "Running post-setup doctor check..."
+# Final consolidated diagnostics: `dotf doctor` (ADR-021, CLI-012) replaces the
+# retired doctor.sh + healthcheck.sh twins in one cross-compiled sweep. Non-fatal:
+# surfaces deploy gaps (env-contract drift, version/symlink/vault mismatches) but
+# does NOT alter setup's exit code. Needs dotf on PATH (installed above by
+# install_dotf); a clean box where that step failed skips gracefully.
+if command -v dotf >/dev/null 2>&1; then
+    log_info "Running post-setup diagnostics (dotf doctor)..."
     echo
-    bash "$DOCTOR_SCRIPT" || log_warning "doctor reported one or more required items missing -- review output above"
+    dotf doctor || log_warning "dotf doctor reported one or more FAIL items -- review output above; re-run with 'dotf doctor'"
     echo
-elif [ -f "$DOCTOR_SCRIPT" ]; then
-    log_warning "doctor.sh present but not executable or jq missing, skipping post-setup check"
-fi
-
-# WIN-001b: mirror PR #71 setup-windows.ps1 section 8d on the Linux side.
-# Full structural health check after doctor. Non-fatal: surfaces deploy gaps
-# but does NOT alter setup's exit code. Matches the Windows auto-wire so the
-# cross-OS contract stays symmetric.
-HEALTHCHECK_SCRIPT="$DOTFILES_DIR/scripts/healthcheck.sh"
-if [ -x "$HEALTHCHECK_SCRIPT" ]; then
-    log_info "Running post-setup healthcheck..."
-    echo
-    bash "$HEALTHCHECK_SCRIPT" || log_warning "healthcheck reported one or more FAIL items -- review output above; use 'hc' alias to re-run"
-    echo
-elif [ -f "$HEALTHCHECK_SCRIPT" ]; then
-    log_warning "healthcheck.sh present but not executable, skipping post-setup check"
+else
+    log_warning "dotf not on PATH -- skipping post-setup diagnostics (run ./scripts/install-dotf.sh, then 'dotf doctor')"
 fi
 
 log_info "To apply changes immediately, run:"

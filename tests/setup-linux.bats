@@ -432,27 +432,23 @@ setup() {
     fi
 }
 
-@test "doctor.sh and doctor.ps1 both exist (cross-OS parity)" {
-    [ -f "$DOTFILES_DIR/scripts/doctor.sh" ]
+# CLI-012/ADR-021: doctor.sh was ported to `dotf doctor` (Go) and deleted; its
+# check logic + --fix path now live in cli/internal/doctor (go test). doctor.ps1
+# is kept until the Windows port lands dotf on PATH there.
+@test "doctor.sh is retired (ported to dotf doctor); doctor.ps1 kept" {
+    [ ! -f "$DOTFILES_DIR/scripts/doctor.sh" ]
     [ -f "$DOTFILES_DIR/scripts/doctor.ps1" ]
-}
-
-@test "doctor.sh has valid bash syntax" {
-    bash -n "$DOTFILES_DIR/scripts/doctor.sh"
-}
-
-@test "doctor.sh supports --check and --fix modes" {
-    grep -q -- '--check' "$DOTFILES_DIR/scripts/doctor.sh"
-    grep -q -- '--fix' "$DOTFILES_DIR/scripts/doctor.sh"
 }
 
 @test "doctor.ps1 supports -Fix switch" {
     grep -q '\[switch\]\$Fix' "$DOTFILES_DIR/scripts/doctor.ps1"
 }
 
-# Setup scripts must invoke the doctor before printing 'Setup Complete'.
-@test "parity: both setup scripts invoke doctor post-setup" {
-    grep -q 'doctor\.sh' "$DOTFILES_DIR/setup-linux.sh"
+# Setup scripts run post-setup diagnostics before 'Setup Complete'. Linux folds
+# doctor + healthcheck into one `dotf doctor` call (CLI-012); Windows still runs
+# doctor.ps1 until the Windows port.
+@test "post-setup diagnostics: linux runs dotf doctor, windows runs doctor.ps1" {
+    grep -q 'dotf doctor' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
@@ -479,31 +475,23 @@ setup() {
 # The root cause is unfixable from outside (upstream hook pattern issue).
 # We keep ONLY the detection assertion: both healthchecks actually run
 # the hook resolution and report.
-@test "parity: both healthchecks include BUG-015 hook resolution assertion" {
-    grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.sh"
+@test "healthcheck.ps1 includes BUG-015 hook resolution assertion" {
+    # The .sh side moved to cli/internal/doctor (resolveClaudeMemHook, go test);
+    # healthcheck.ps1 keeps the probe until the Windows port.
     grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
 # WIN-004: on a machine where Claude Code never ran (clean box, CI runner),
 # the BUG-015 hook probe must SKIP like the BUG-014 check above it, not FAIL.
 # Gate: installed_plugins.json missing -> skip the probe.
-@test "parity: BUG-015 hook probe skips when claude-mem was never installed (WIN-004)" {
-    grep -qF 'claude-mem hook probe n/a' "$DOTFILES_DIR/scripts/healthcheck.sh"
+@test "healthcheck.ps1: BUG-015 hook probe skips when claude-mem never installed (WIN-004)" {
     grep -qF 'claude-mem hook probe n/a' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
-# BUG-023: the BUG-015 probe must use the race-free materialize+break form,
-# NOT the BUG-022 `done | head -n1` pipe (which races under `set -euo
-# pipefail` when 2+ candidates match -> EPIPE on leftover printfs -> exit
-# 141 mid-section). Locks the new pattern present AND the old pattern
-# absent so a future "simplification" can't regress us back.
-@test "BUG-023: healthcheck.sh probe uses materialize+break (no pipe-to-head race)" {
-    # Positive: the materialized candidates variable + heredoc loop is there.
-    grep -qF '_cmhook_cands=$(' "$DOTFILES_DIR/scripts/healthcheck.sh"
-    grep -qF 'done <<<"$_cmhook_cands"' "$DOTFILES_DIR/scripts/healthcheck.sh"
-    # Negative: the broken pipe-to-head form must not reappear in the probe.
-    ! grep -qF 'done | head -n1' "$DOTFILES_DIR/scripts/healthcheck.sh"
-}
+# BUG-022/023 (the .sh probe's pipe-to-head EPIPE race) is structurally moot in
+# the Go port: resolveClaudeMemHook iterates a materialized slice and breaks on
+# the first hit — no pipe, no race. Covered by go test (resolveClaudeMemHook).
+# The .ps1 native probe is asserted below.
 
 @test "BUG-023: healthcheck.ps1 uses native PowerShell probe (not bash)" {
     # The bash one-liner was removed (BUG-015): CLAUDE_CONFIG_DIR not
@@ -518,30 +506,24 @@ setup() {
     grep -qF 'Test-Path' "$DOTFILES_DIR/scripts/healthcheck.ps1"
 }
 
-# WIN-001b: cross-OS parity for the post-setup healthcheck auto-invoke.
-# setup-windows.ps1 has wired healthcheck.ps1 after doctor since PR #71 (WIN-001).
-# setup-linux.sh now mirrors that wiring with bash healthcheck.sh so the
-# cross-OS contract stays symmetric.
-@test "parity: both setup scripts invoke healthcheck post-setup (WIN-001b)" {
-    grep -qF 'healthcheck.sh' "$DOTFILES_DIR/setup-linux.sh"
+# CLI-012: setup-linux folds the old doctor + healthcheck blocks into ONE
+# `dotf doctor` call (the consolidated sweep). setup-windows keeps its
+# healthcheck.ps1 auto-invoke (WIN-001) until the Windows port.
+@test "setup-linux.sh runs dotf doctor non-fatally post-setup" {
+    grep -q 'dotf doctor' "$DOTFILES_DIR/setup-linux.sh"
+    # non-fatal: the failure path warns, never hard-exits.
+    grep -q 'dotf doctor || log_warning' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-windows.ps1 still invokes healthcheck.ps1 post-setup (Windows port pending)" {
     grep -qF 'healthcheck.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "WIN-001b: setup-linux.sh healthcheck block runs after doctor block" {
-    doctor_line=$(grep -n 'Running post-setup doctor check' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    health_line=$(grep -n 'Running post-setup healthcheck' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    [ -n "$doctor_line" ] && [ -n "$health_line" ]
-    [ "$health_line" -gt "$doctor_line" ]
-}
-
-@test "WIN-001b: setup-linux.sh healthcheck block is non-fatal (log_warning, no hard exit)" {
-    # The healthcheck failure path must emit a warning, not call exit non-zero.
-    grep -B1 -A1 'healthcheck reported one or more FAIL' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'log_warning'
-}
-
-# SessionStart hooks must run a silent doctor and surface only drift.
-@test "parity: both SessionStart hooks invoke silent doctor" {
-    grep -q 'doctor\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
+# CLI-012: the Linux per-session env-contract drift check was retired with
+# doctor.sh — `dotf doctor` (~2.8s, dominated by the harness drift gate) is too
+# heavy to fork on every session start. claude-session-start.ps1 keeps its
+# silent doctor until the Windows hook port (roadmap step 6).
+@test "claude-session-start.ps1 still invokes silent doctor (Windows port pending)" {
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 
@@ -553,16 +535,15 @@ setup() {
     fi
 }
 
-# Both doctors must implement the binary version-check logic.
-@test "parity: both doctors check binary versions against min_version" {
-    grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.sh"
+# The binary version-check logic (min_version) moved to cli/internal/doctor
+# (checkRequiredBinaries, go test); doctor.ps1 keeps it until the Windows port.
+@test "doctor.ps1 checks binary versions against min_version (Windows port pending)" {
     grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.ps1"
 }
 
-# Doctor sections must emit a one-line summary so non-verbose runs never
-# show an empty header (regression guard for the post-#24 UX bug).
-@test "parity: both doctors emit per-section summaries" {
-    grep -q 'section_summary' "$DOTFILES_DIR/scripts/doctor.sh"
+# Per-section summaries (no empty headers) are the Report's job in Go
+# (report.go, go test); doctor.ps1 keeps Write-SectionSummary until the port.
+@test "doctor.ps1 emits per-section summaries (Windows port pending)" {
     grep -q 'Write-SectionSummary' "$DOTFILES_DIR/scripts/doctor.ps1"
 }
 

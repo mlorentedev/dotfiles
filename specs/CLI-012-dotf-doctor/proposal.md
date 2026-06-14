@@ -1,7 +1,7 @@
 ---
 id: "CLI-012-dotf-doctor"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-06-14"
 issue: "dotfiles#376"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

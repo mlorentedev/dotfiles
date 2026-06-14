@@ -18,7 +18,7 @@ sudo apt install -y tmux
 tmux -V   # expect: tmux 3.4 or newer
 ```
 
-After install, run `./setup-linux.sh` from the dotfiles repo to deploy `~/.tmux.conf` (symlink to repo's `tmux.conf`), then verify with `./scripts/healthcheck.sh` (section 9/9).
+After install, run `./setup-linux.sh` from the dotfiles repo to deploy `~/.tmux.conf` (copy of the repo's `tmux.conf`), then verify with `dotf doctor` (tmux section).
 
 ## How the config gets deployed
 
@@ -81,8 +81,8 @@ Requires tmux installed on the remote host. For kubelab-managed hosts (ace1, ace
 
 | Check | How |
 |---|---|
-| Binary installed | `./scripts/healthcheck.sh` section 9/9 (or `tmux -V`) |
-| Symlink correct | `./scripts/healthcheck.sh` (verifies `~/.tmux.conf` is a symlink with existing target) |
+| Binary installed | `dotf doctor` (tmux section, or `tmux -V`) |
+| Config deployed | `dotf doctor` (verifies `~/.tmux.conf` matches the repo source) |
 | Config parses | `tmux -f tmux.conf -L test new-session -d -s s 'sleep 0.5' && tmux -L test kill-server` |
 | Integration test | `tests/Dockerfile.integration` builds and verifies in clean Ubuntu 24.04 |
 
@@ -154,4 +154,4 @@ The config keeps a comment marker on the binding line. If both servers matter (e
 - `.zsh/aliases.zsh` — `tx`/`txl`/`txa`/`txk` aliases
 - `.zsh/functions.zsh` — `sshmux` function
 - `tests/tmux.bats` — config parse + content assertions
-- `scripts/healthcheck.sh` section 9/9 — runtime verification
+- `dotf doctor` (tmux section) — runtime verification
