@@ -1,7 +1,7 @@
 ---
 id: "CLI-005-retire-spec-shell-twins"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-13"
 issue: "dotfiles#339"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -63,3 +63,5 @@ Observable outcomes. Each must be testable.
 - Epic: ADR-020 §5 (strangler-fig: delete the pair on contact) — `docs/adr/adr-020-tooling-cli-go-convergence.md`
 - Predecessors: CLI-007 (`dotf spec init`), CLI-008 (`dotf spec archive`), CLI-009 #365 (setup installs `dotf` — the unblocker)
 - Testing strategy: `docs/adr/adr-004-bats-testing.md` (bats stays for bootstrap/profile, not migrated logic)
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/371 -->

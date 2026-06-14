@@ -1,7 +1,7 @@
 ---
 id: "CLI-009-setup-install-dot"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-13"
 issue: "dotfiles#364"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -64,3 +64,5 @@ Observable outcomes. Each must be testable.
 - Release: `v0.1.0` (first CI-published `dot` release; `cli/.goreleaser.yaml`)
 - Pattern precedents in-repo: the `opencode` version-pin + drift-convergence block in `setup-linux.sh`; the `gh` download-extract block
 - Unblocks: CLI-005 #339 (retire shells); related CLI-006 #340 (adapters)
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/365 -->

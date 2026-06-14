@@ -1,7 +1,7 @@
 ---
 id: "CLI-008-dot-spec-archive"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-13"
 issue: "dotfiles#361"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -66,3 +66,5 @@ Observable outcomes. Each must be testable.
 - Predecessor: `specs/CLI-007-dot-spec-init/` (established the cmd/domain split + coexistence stance)
 - Related tickets: CLI-005 #339 (retire shells), CLI-006 #340 (per-agent adapters)
 - Related patterns: `00_meta/patterns/pattern-spec-driven-development.md`
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/362 -->
