@@ -82,12 +82,27 @@ $HEAL_OUTPUT"
     fi
 fi
 
-# NOTE: the per-session env-contract drift check was retired with the doctor.sh
-# twin (CLI-012 / ADR-021). Its replacement, `dotf doctor`, runs the full
-# 12-section sweep (~2.8s, dominated by the compile-harness drift gate) — too
-# heavy to fork on every session start. Drift is now surfaced post-setup
-# (setup-linux.sh runs `dotf doctor`) and on demand. A focused `dotf doctor
-# --quick` for the hook is tracked with the SessionStart hook port (roadmap step 6).
+# --- Silent doctor: surface env-contract drift to Claude only when detected ---
+# Uses `dotf doctor --quick` (CLI-013): the env-contract sweep only, no
+# compile-harness gate, so it stays sub-100ms — unlike the full `dotf doctor`
+# sweep (~2.8s) which is too heavy to fork per session. Forwards only [WARN]/
+# [FAIL] lines. Gated on dotf being on PATH AND a deployed env-contract.json so
+# the hermetic test (isolated HOME, no deployed contract) skips it.
+DOTF_CONTRACT="${DOTFILES_DIR:-$HOME/.dotfiles}/env-contract.json"
+if command -v dotf >/dev/null 2>&1 && [ -f "$DOTF_CONTRACT" ]; then
+    DOCTOR_DRIFT=$(dotf doctor --quick 2>&1 | grep -E '^  \[(WARN|FAIL)\]' || true)
+    if [ -n "$DOCTOR_DRIFT" ]; then
+        if [ -n "$CONTEXT_LINES" ]; then
+            CONTEXT_LINES="$CONTEXT_LINES
+
+[doctor] env-contract drift detected (run 'dotf doctor --fix'):
+$DOCTOR_DRIFT"
+        else
+            CONTEXT_LINES="[doctor] env-contract drift detected (run 'dotf doctor --fix'):
+$DOCTOR_DRIFT"
+        fi
+    fi
+fi
 
 # Walk up from CWD to find an Obsidian vault (.obsidian/ directory)
 find_vault_root() {

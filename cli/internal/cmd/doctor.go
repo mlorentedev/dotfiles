@@ -18,6 +18,7 @@ func newDoctorCmd() *cobra.Command {
 	var (
 		fix     bool
 		verbose bool
+		quick   bool
 	)
 
 	cmd := &cobra.Command{
@@ -35,8 +36,13 @@ fails; advisory WARN/SKIP/INFO never fail the run.
 
 With --fix it reports the exact shell-profile lines for any missing env default
 (a subprocess cannot export into your shell) and invokes the known heal scripts
-(claude-mem).`,
-		Example:       "  dotf doctor\n  dotf doctor --fix\n  dotf doctor --verbose",
+(claude-mem).
+
+With --quick it runs ONLY the env-contract sweep (env vars, PATH, required
+binaries) and skips the heavy sections — chiefly the ~2.8s compile-harness drift
+gate. This is the fast subset the SessionStart hook wires in; --quick is
+report-only (it ignores --fix).`,
+		Example:       "  dotf doctor\n  dotf doctor --fix\n  dotf doctor --quick\n  dotf doctor --verbose",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -45,6 +51,7 @@ With --fix it reports the exact shell-profile lines for any missing env default
 				Out:     cmd.OutOrStdout(),
 				Fix:     fix,
 				Verbose: verbose,
+				Quick:   quick,
 			})
 			if err != nil {
 				cmd.PrintErrln("doctor:", err)
@@ -59,5 +66,6 @@ With --fix it reports the exact shell-profile lines for any missing env default
 
 	cmd.Flags().BoolVar(&fix, "fix", false, "report safe env defaults to persist and run known heals (claude-mem)")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "list passing checks too (default summarises them per section)")
+	cmd.Flags().BoolVar(&quick, "quick", false, "env-contract sweep only — fast, no compile-harness gate (for the SessionStart hook)")
 	return cmd
 }

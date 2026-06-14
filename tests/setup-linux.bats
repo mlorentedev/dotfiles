@@ -519,11 +519,11 @@ setup() {
     grep -qF 'healthcheck.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# CLI-012: the Linux per-session env-contract drift check was retired with
-# doctor.sh — `dotf doctor` (~2.8s, dominated by the harness drift gate) is too
-# heavy to fork on every session start. claude-session-start.ps1 keeps its
-# silent doctor until the Windows hook port (roadmap step 6).
-@test "claude-session-start.ps1 still invokes silent doctor (Windows port pending)" {
+# CLI-013: the Linux SessionStart hook surfaces env-contract drift via the light
+# `dotf doctor --quick` (the full sweep was too heavy to fork per session —
+# CLI-012). Windows still uses doctor.ps1 until the Windows hook port.
+@test "SessionStart hooks surface drift: linux via dotf doctor --quick, windows via doctor.ps1" {
+    grep -q 'dotf doctor --quick' "$DOTFILES_DIR/scripts/claude-session-start.sh"
     grep -q 'doctor\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 

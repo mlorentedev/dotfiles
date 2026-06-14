@@ -12,6 +12,7 @@ type Options struct {
 	Out      io.Writer
 	Fix      bool
 	Verbose  bool
+	Quick    bool    // env-contract sweep only — fast, for the SessionStart hook (CLI-013)
 	System   *System // nil → realSystem()
 	StartDir string  // "" → os.Getwd()
 }
@@ -49,36 +50,44 @@ func Run(opts Options) (int, error) {
 
 	rep := NewReport(out, opts.Verbose)
 	mode := "check"
-	if opts.Fix {
+	switch {
+	case opts.Quick:
+		mode = "quick"
+	case opts.Fix:
 		mode = "fix"
 	}
 	_, _ = fmt.Fprintf(out, "dotf doctor [%s] — diagnostics for %s\n", mode, cfg.DotfilesDir)
 
 	contract := loadContractSection(sys, cfg, rep)
 
-	// Folded env-contract sweep (the doctor.sh surface).
+	// Folded env-contract sweep (the doctor.sh surface). In --quick mode this is
+	// the ONLY work: it is the fast, fork-free subset wired into the SessionStart
+	// hook (CLI-013), so it must skip the heavy healthcheck sweep below — chiefly
+	// the ~2.8s compile-harness drift gate.
 	if contract != nil {
 		checkContractEnvVars(sys, contract, rep, opts.Fix)
 		checkContractPath(sys, contract, rep)
 		checkRequiredBinaries(sys, contract, rep)
 	}
 
-	// healthcheck.sh 12-section sweep (minus diff-check + deep vault-health).
-	checkCoreTools(sys, contract, rep)
-	checkVersionedPaths(sys, rep)
-	checkVersionMatch(sys, cfg, rep)
-	checkSymlinks(sys, rep)
-	checkToolHomeEnvVars(sys, rep)
-	checkOptionalTools(sys, cfg, contract, rep)
-	checkVault(sys, rep)
-	checkSecrets(sys, cfg, rep)
-	checkTmux(sys, cfg, rep)
-	checkOpenCode(sys, cfg, rep)
-	checkHarnessDrift(sys, cfg, rep)
-	checkAntigravity(sys, rep)
+	if !opts.Quick {
+		// healthcheck.sh 12-section sweep (minus diff-check + deep vault-health).
+		checkCoreTools(sys, contract, rep)
+		checkVersionedPaths(sys, rep)
+		checkVersionMatch(sys, cfg, rep)
+		checkSymlinks(sys, rep)
+		checkToolHomeEnvVars(sys, rep)
+		checkOptionalTools(sys, cfg, contract, rep)
+		checkVault(sys, rep)
+		checkSecrets(sys, cfg, rep)
+		checkTmux(sys, cfg, rep)
+		checkOpenCode(sys, cfg, rep)
+		checkHarnessDrift(sys, cfg, rep)
+		checkAntigravity(sys, rep)
 
-	if opts.Fix {
-		runHeals(sys, cfg, rep)
+		if opts.Fix {
+			runHeals(sys, cfg, rep)
+		}
 	}
 
 	rep.Summary()
