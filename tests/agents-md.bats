@@ -31,7 +31,7 @@ setup() {
 
 @test "AGENTS.md Discipline Gate documents the mandatory ordered process" {
     grep -qF '11-tasks.md' "$AGENTS_MD"
-    grep -qF 'init-spec' "$AGENTS_MD"
+    grep -qF 'dotf spec init' "$AGENTS_MD"
     grep -qF 'proposal.md' "$AGENTS_MD"
     grep -qF 'tasks.md' "$AGENTS_MD"
     grep -qF 'verification.md' "$AGENTS_MD"

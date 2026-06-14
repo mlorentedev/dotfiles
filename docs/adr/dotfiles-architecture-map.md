@@ -134,7 +134,7 @@ Five distinct runtime triggers fan into specific hook scripts. Each writes to a 
 | **Health & drift** | `healthcheck.sh` (398), `doctor.sh` (218), `diff-check.sh`, `vault-health.sh` | Post-setup verification, env-contract conformance, repo↔deploy drift, vault structural checks. |
 | **Hooks** | `claude-session-start.{sh,ps1}`, `claude-mem-heal.{sh,ps1}`, `check-spec-gate.sh`, `vault-maintenance-weekly.{sh,ps1}` | Fire on session start, push, PR, or schedule. Inject context, patch upstream bugs, enforce discipline. |
 | **Knowledge** | `knowledge-crystallize.{sh,ps1}`, `vault-health.sh`, `obs-cli.{sh,ps1}` | Vault maintenance: stale-memory detection, broken-link scan, Obsidian CLI wrapper. |
-| **Specs (SDD)** | `init-spec.{sh,ps1}`, `archive-spec.{sh,ps1}`, `check-spec-gate.sh` | Scaffold, archive, and enforce per-feature spec folders. |
+| **Specs (SDD)** | `dotf spec init`, `dotf spec archive`, `check-spec-gate.sh` | Scaffold, archive, and enforce per-feature spec folders. |
 | **Secrets** | `load-secrets.{sh,ps1}`, `age-*.sh`, `github-secrets-manager.sh`, `backup-secrets-to-usb.sh` | age encryption/decryption, env-mapping, GitHub Actions secrets manager, USB backup. |
 | **Project init** | `init-project.{sh,ps1}`, `init-repo-*.{sh,ps1}` | Bootstrap new repos with AGENTS.md/CLAUDE.md, GitHub defaults, standards. |
 | **Skills pipeline** | `compile-harness.sh` | Compiles vault `00_meta/skills/*` → committed records in `harness/skills/`, then deploys per-agent (claude/opencode/agy/copilot). SDD-008. |
@@ -162,7 +162,7 @@ The "I want to change X — where do I look?" reference.
 | Cross-OS shared logic | `env-contract.json`, `mcp-servers.json` (proven), `versions.conf` (KEY=VALUE) | Pattern: JSON SSOT + thin per-OS reader. AUDIT-002 candidates for more. |
 | Add/edit a skill | vault `00_meta/skills/<name>/SKILL.md` | Edit in the vault (SSOT). `compile-harness.sh --refresh` writes the committed record under `harness/skills/`; setup `--deploy` renders it to `~/.claude/skills/` etc. Do not add skill dirs to the repo. |
 | Skill (per-agent render) | `harness/skills/<name>/` → `~/.config/opencode/commands/<name>.md`, `~/.gemini/…`, etc. | Rendered by `compile-harness.sh --deploy` (offline copy, never symlink); `--check` is the CI gate. |
-| Active spec folder | `specs/<feature-id>/{proposal,tasks,verification}.md` | Lifecycle: `init-spec.sh` → fill → implement → `archive-spec.sh` → `specs/archive/`. |
+| Active spec folder | `specs/<feature-id>/{proposal,tasks,verification}.md` | Lifecycle: `dotf spec init` → fill → implement → `dotf spec archive` → `specs/archive/`. |
 | Spec-gate logic | `scripts/check-spec-gate.sh` (SDD-003) | Called by `.github/workflows/spec-gate.yml` and (opt-in) `.pre-commit-config.yaml` pre-push. |
 | Aliases (bash + zsh) | `.zsh/aliases.zsh` (noglob `qq`), `.bashrc` (function `qq`) | Cross-shell parity: same alias name, OS-appropriate mechanism. |
 | Aliases (PowerShell) | `powershell/profile.ps1` | Functions inside `Get-Command opencode` guards. |
@@ -177,7 +177,7 @@ The "I want to change X — where do I look?" reference.
 These are not decisions, just signals. AUDIT-001/002/003 will turn them into proposals.
 
 - **`scripts/` is the dominant surface** (43 files, 7663 LOC of `.sh` + 4060 LOC of `.ps1`). Four files account for ~40% of the LOC: `load-secrets.sh` (1058), `utils.sh` (726), `init-project.sh` (460), `healthcheck.sh` (398). These are REFACTOR-001's primary subjects.
-- **Cross-OS duplication is uneven.** Some pairs are tight (`obs-cli.{sh,ps1}`, `archive-spec.{sh,ps1}`, `claude-mem-heal.{sh,ps1}`); others diverge meaningfully (`setup-linux.sh` 912 vs `setup-windows.ps1` 1043, but with different feature sets). AUDIT-002 will classify per-pair.
+- **Cross-OS duplication is uneven.** Some pairs are tight (`obs-cli.{sh,ps1}`, `claude-mem-heal.{sh,ps1}`); others diverge meaningfully (`setup-linux.sh` 912 vs `setup-windows.ps1` 1043, but with different feature sets). AUDIT-002 will classify per-pair.
 - **`powershell/` and `.zsh/` both hold shell-specific snippets** but with different naming conventions (one camelCase visible dir, one dotfile). AUDIT-001 candidate for `shells/` umbrella.
 - **`sensitive/` mixes encrypted blobs (`*.secret.age`) and the `env-mapping.conf` plaintext index.** Stable as-is, but worth verifying the index never accidentally leaks paths.
 - **6 cross-agent docs files** (`AGENTS.md`, `ai/claude/CLAUDE.md`, `ai/copilot/copilot-instructions.md`, `ai/gemini/GEMINI.md`, `.github/copilot-instructions.md`, `.claude/CLAUDE.md`). Pointer-style post AI-013; AUDIT-003 verifies no drift.

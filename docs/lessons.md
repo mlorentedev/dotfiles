@@ -964,3 +964,33 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Invert the guard so both branches exit 0: `[ -z "${TMP:-}" ] || rm -rf "$TMP"` (empty → `[ -z ]` true, short-circuits at exit 0; set → runs `rm`, exit 0). Applied across the affected teardowns; the six heal-ps1 entries flip from `not ok # skip` to `ok # skip`.
 
 **Rule**: A teardown's final command determines the test's exit classification — for passing, failing, *and* skipped tests alike. Never end a teardown with a bare `[ cond ] && cmd`; invert to `[ ! cond ] || cmd` or append an explicit `return 0`. A `skip` that fires before `setup()` finishes leaves cleanup vars unset, so the cleanup guard must not itself be able to fail.
+
+### [2026-06-13] Sourced-vs-executed guard: use `(return 0 2>/dev/null)`, not a `BASH_SOURCE`-vs-`$0` compare
+
+**Context**: CLI-009 `scripts/install-dotf.sh` (named `install-dot.sh` until the CLI-010 rename) is both *sourced* (by `setup-linux.sh` and by its bats test) and *executed* directly (standalone `./install-dotf.sh` upgrade). It needs a guard so `install_dotf "$@"` runs only on direct execution, not on source.
+
+**Problem**: The first guard was the common `if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]`. It fired on *source* in the Bash-tool / harness context — `install_dotf` ran at source time with empty `$@`, printing a spurious `no version given` error (and would side-effect under setup). The `${BASH_SOURCE[0]:-$0}` fallback also makes it wrong under zsh: `BASH_SOURCE` is unset there, so the expansion becomes `$0` and the comparison is trivially true whether sourced or executed. A standalone diagnostic with `bash -c '. probe.sh'` showed "not equal" (correct) while the actual harness invocation showed it firing — i.e. the idiom's correctness is context-dependent, which is itself disqualifying for a guard.
+
+**Solution**: `if ! (return 0 2>/dev/null); then install_dotf "$@"; fi`. `return` is only valid in a sourced script (or function), so the subshell exits 0 when sourced and non-zero when executed — a context-independent signal. Verified across `bash -c` source, script-source (the setup path), and direct execution.
+
+**Rule**: To gate a script's "run only when executed directly" block, use `(return 0 2>/dev/null)` (sourced → succeeds, executed → fails), not a `BASH_SOURCE`-vs-`$0` string compare. The string compare aligns the two values in some shells (zsh, where `BASH_SOURCE` is unset) and some harnesses, so it fires on `source` and auto-runs the script's main path as a side effect.
+
+### [2026-06-13] A migration's acceptance guard-grep is the completeness oracle, not the spec's hand-listed targets
+
+**Context**: CLI-005 retired the `init-spec`/`archive-spec` shell twins and repointed every reference to `dotf spec`. The proposal enumerated five repoint targets by hand (AGENTS.md, `agents-md.bats`, `check-spec-gate.sh`, the spec `SKILL.md`, the architecture-map).
+
+**Problem**: The hand-list was incomplete. The acceptance criterion's own guard — `grep -rE 'init-spec|archive-spec'` must return only historical artifacts — surfaced **two more live references the list missed**: a comment in `scripts/check-md-escapes.sh` and two lines in `harness/skills/adversarial-review/SKILL.md` that named `archive-spec.sh` as a command to run. Shipping the spec's list verbatim would have left broken references that no test named.
+
+**Solution**: Treat the acceptance guard-grep as the authority and run it *before* claiming done, then repoint whatever it returns until only provenance (CHANGELOG, ADRs, lessons, `specs/`) remains. The hand-list is a starting hypothesis; the grep is the proof.
+
+**Rule**: When a change's acceptance criterion is "no live reference to X remains except historical," the grep that expresses it is the completeness oracle — not the enumerated edit list in the proposal. Run it as a gate, not an afterthought; it finds the surfaces a human inventory forgets.
+
+### [2026-06-13] Editing a committed render without its source-of-truth is a half-migration that `--refresh` reverts
+
+**Context**: CLI-005 repointed `harness/skills/spec/SKILL.md` and `harness/skills/adversarial-review/SKILL.md` to `dotf spec`. Those files are committed *renders*: `compile-harness.sh` (SDD-008) treats the vault `00_meta/skills/<name>/SKILL.md` as the edit-SSOT and regenerates `harness/skills/` from it via `--refresh`.
+
+**Problem**: Editing only the committed render leaves the vault sources stale. The render is correct for CI `--check`/`--deploy`, but the next `compile-harness.sh --refresh` pulls the unchanged vault source and silently reverts the repoint — a green PR that re-introduces the dead references on the next harness refresh.
+
+**Solution**: Sync the vault sources in lockstep with the render. On the interactive machine, vault edits land on `origin/master` via obsidian-git's periodic auto-commit — just edit the files, no manual git. Verify the vault sources no longer carry the old reference before declaring the migration done.
+
+**Rule**: For any file that is a generated/committed render, a migration is only complete when its *source-of-truth* changes too. Identify the generator (here `compile-harness.sh`) and edit upstream, or the render's change is transient. Sibling of the GEMINI→AGY incomplete-migration lesson: a repoint that leaves a caller — or a generator's source — stale is a half-migration.

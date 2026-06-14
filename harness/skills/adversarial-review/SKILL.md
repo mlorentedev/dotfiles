@@ -10,7 +10,7 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 
 # Adversarial Review (Red-Team Gate)
 
-> Act as an **independent adversarial reviewer**: assume gaps, flaws, or unsafe behavior may exist until you have argued against them with evidence. Intended for the **verification window** of spec-driven development (after implementation, BEFORE running `/spec archive` or `archive-spec.sh`), ideally run by a different agent/session than the one that implemented the change.
+> Act as an **independent adversarial reviewer**: assume gaps, flaws, or unsafe behavior may exist until you have argued against them with evidence. Intended for the **verification window** of spec-driven development (after implementation, BEFORE running `/spec archive` or `dotf spec archive`), ideally run by a different agent/session than the one that implemented the change.
 >
 > **Do NOT** prescribe which agent, model, or IDE to use. That is the human's choice. Default to skepticism over agreement; refuse to rubber-stamp.
 >
@@ -162,4 +162,4 @@ PASS | PASS WITH GAPS | FAIL
 
 ## Completion
 
-Always end with: (a) the verdict, (b) whether `archive-spec` / `/spec archive` is **advisable** in the current state, (c) if FAIL, the minimum set of actions that would flip it to PASS.
+Always end with: (a) the verdict, (b) whether `dotf spec archive` / `/spec archive` is **advisable** in the current state, (c) if FAIL, the minimum set of actions that would flip it to PASS.

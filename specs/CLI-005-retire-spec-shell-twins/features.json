@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-005-retire-spec-shell-twins-f1",
+    "behavior": "The 4 migrated shell files and tests/init-spec.bats no longer exist",
+    "verification": "! ls scripts/init-spec.sh scripts/init-spec.ps1 scripts/archive-spec.sh scripts/archive-spec.ps1 tests/init-spec.bats >/dev/null 2>&1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-005-retire-spec-shell-twins-f2",
+    "behavior": "No live reference to init-spec/archive-spec remains in the executable/skill surface (AGENTS.md, harness/, scripts/, tests/, architecture-map); only CHANGELOG/ADR/lessons/spec provenance is allowed",
+    "verification": "! grep -rnE 'init-spec|archive-spec' AGENTS.md harness/ scripts/ tests/ docs/adr/dotfiles-architecture-map.md | grep .",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-005-retire-spec-shell-twins-f3",
+    "behavior": "AGENTS.md, check-spec-gate.sh, and the spec SKILL.md direct users to dotf spec init/archive",
+    "verification": "grep -q 'dotf spec init' AGENTS.md && grep -q 'dotf spec' scripts/check-spec-gate.sh && grep -q 'dotf spec' harness/skills/spec/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-005-retire-spec-shell-twins-f4",
+    "behavior": "agents-md.bats asserts the dotf spec guidance and the full bats suite is green (minus deleted init-spec.bats); shellcheck clean on changed scripts",
+    "verification": "~/.local/bin/bats tests/*.bats && ~/.local/bin/shellcheck scripts/check-spec-gate.sh scripts/check-md-escapes.sh",
+    "state": "pending",
+    "evidence": ""
+  }
+]

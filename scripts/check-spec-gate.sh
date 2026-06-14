@@ -190,7 +190,7 @@ cat >&2 <<EOF
        No specs/<feature-id>/ folder touched in this PR.
 
        Options:
-         (a) Create a spec folder: ./scripts/init-spec.sh <feature-id>
+         (a) Create a spec folder: dotf spec init <feature-id>
          (b) Add the "skip-sdd" label to the PR AND a non-empty
              "## SDD skip rationale" section in the PR body.
 
