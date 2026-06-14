@@ -318,3 +318,41 @@ func TestRun_ExitContract(t *testing.T) {
 		t.Error("contract should load from DOTFILES_DIR")
 	}
 }
+
+func TestRun_QuickSkipsHeavySections(t *testing.T) {
+	home := t.TempDir()
+	dotfiles := filepath.Join(home, ".dotfiles")
+	// Contract that passes trivially (no required vars/paths/binaries).
+	writeFile(t, filepath.Join(dotfiles, "env-contract.json"),
+		`{"env_vars":[],"required_path_entries":{"linux":[]},"required_binaries":[],"optional_binaries":[]}`)
+	writeFile(t, filepath.Join(dotfiles, "versions.conf"), "GO_VERSION=1.26.0\n")
+	env := map[string]string{"HOME": home, "DOTFILES_DIR": dotfiles}
+	// Nothing on PATH, no vault/secrets/tmux — the full sweep's healthcheck
+	// sections all FAIL; the contract sweep (empty) passes.
+	sys := newSys(env, nil, nil)
+
+	// Full mode: heavy sections run and fail → exit 1.
+	var full bytes.Buffer
+	fullCode, _ := Run(Options{Out: &full, System: sys, StartDir: home, Verbose: true})
+	if fullCode != 1 {
+		t.Fatalf("full mode should fail (missing tools/vault/...), got %d", fullCode)
+	}
+	if !strings.Contains(full.String(), "Core tools in PATH") {
+		t.Error("full mode must run the core-tools section")
+	}
+
+	// Quick mode: contract-only → exit 0, heavy section headers absent.
+	var quick bytes.Buffer
+	quickCode, _ := Run(Options{Out: &quick, System: sys, StartDir: home, Verbose: true, Quick: true})
+	if quickCode != 0 {
+		t.Fatalf("quick mode should pass (contract-only), got %d\n%s", quickCode, quick.String())
+	}
+	for _, heavy := range []string{"Core tools in PATH", "Harness + skill drift", "Antigravity CLI health", "Knowledge vault"} {
+		if strings.Contains(quick.String(), heavy) {
+			t.Errorf("quick mode must skip the %q section", heavy)
+		}
+	}
+	if !strings.Contains(quick.String(), "[quick]") {
+		t.Error("quick mode header should announce [quick]")
+	}
+}
