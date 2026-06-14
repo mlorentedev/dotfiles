@@ -386,7 +386,7 @@ Per-feature specs live at `specs/<feature-id>/` in this repo; archived at `specs
 
 **Pattern reference**: `00_meta/patterns/pattern-spec-driven-development.md`.
 
-**Shell fallback for non-interactive use** (CI, batch): `init-spec` / `archive-spec` (POSIX) or `init-spec.ps1` / `archive-spec.ps1` (Windows), available on PATH via dotfiles install.
+**Non-interactive use** (CI, batch, Windows): `dotf spec init` / `dotf spec archive` — the Go CLI, on PATH via dotfiles install (one cross-platform entry; re-run `setup` after pulling to install it).
 
 `<feature-id>` format: `^[A-Z]+-\d+(-[a-z0-9-]+)?$` (e.g., `AI-001-ollama-public`) or `^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$` (e.g., `2026-05-13-cleanup`).
 
@@ -403,7 +403,7 @@ Before creating ANY branch for code changes in this repo, evaluate against `patt
 **If trigger met, follow this order — no shortcuts:**
 
 1. Open a GitHub issue (or reuse an existing one) and add it to the **bitácora** Project — this is the "work gate" replacing the former vault `11-tasks.md` entry
-2. Run `init-spec.{sh,ps1} <feature-id> --issue <N>` to scaffold `specs/<feature-id>/` (the script verifies via `gh` that issue N exists and is OPEN; bypass only with `--force-no-gate` / `-ForceNoGate` + explicit user-facing justification)
+2. Run `dotf spec init <feature-id> --issue <N>` to scaffold `specs/<feature-id>/` (verifies via `gh` that issue N exists and is OPEN; bypass only with `--force-no-gate` + explicit user-facing justification)
 3. Fill `proposal.md` (why + what + acceptance criteria) **before** writing implementation code
 4. Fill `tasks.md` in TDD order
 5. Implement; tick boxes as you go

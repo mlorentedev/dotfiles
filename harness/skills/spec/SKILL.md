@@ -114,7 +114,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 - `gh` unavailable or unauthenticated: gate cannot be verified -> fail with instructions (install/auth `gh`) or `--force-no-gate`.
 - Templates missing in vault -> fail with path hint.
 - Id collides with archived spec -> warn but allow (user may be reviving).
-- Mechanical fallback: `init-spec.sh <id> --issue <N>` / `init-spec.ps1 <id> -Issue <N>` implement this same gate for non-interactive use.
+- Mechanical fallback: `dotf spec init <id> --issue <N>` implements this same gate for non-interactive use (cross-platform Go CLI on PATH).
 
 ---
 
@@ -258,7 +258,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 ## Cross-OS notes
 
 - Linux/macOS: agent uses POSIX commands via `Bash` tool.
-- Windows native (Copilot): agent reads this SKILL via `AGENTS.md` indirection at `$VAULT_PATH/00_meta/skills/spec/SKILL.md` and invokes PowerShell scripts from dotfiles (`init-spec.ps1`, `archive-spec.ps1`) where mechanical ops are needed.
+- Windows native (Copilot): agent reads this SKILL via `AGENTS.md` indirection at `$VAULT_PATH/00_meta/skills/spec/SKILL.md` and invokes the `dotf spec` CLI from dotfiles (`dotf spec init` / `dotf spec archive`) where mechanical ops are needed.
 - Path joining: never hardcode `/` or `\`; agent uses platform-appropriate joining.
 
 ## Vault connections (5 touchpoints)

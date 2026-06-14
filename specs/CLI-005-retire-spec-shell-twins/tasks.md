@@ -12,22 +12,25 @@ created: "2026-06-13"
 - [x] Branch created from main: `chore/retire-spec-shell-twins` (worktree)
 - [x] `proposal.md` is complete and acceptance criteria are testable
 - [x] No open questions left in `proposal.md` "Risks / open questions"
-- [ ] **GATE: CLI-009 #365 merged** (dot installs on PATH) — do not start deletions until green
+- [x] **GATE: CLI-009 #365 merged** (dot installs on PATH); post-rename `dotf` shipped via **v0.2.0 release** — deletions cleared
 
 ## Implementation
 
 > Mostly deletions + reference repointing. Update the test (`agents-md.bats`) in lockstep with the AGENTS.md edit. After #365 merges, rebase this branch onto fresh main first.
 
-- [ ] Rebase `chore/retire-spec-shell-twins` onto post-#365 main
-- [ ] Update `tests/agents-md.bats:34` to assert `dot spec init` (red until AGENTS.md edited)
-- [ ] Edit `AGENTS.md` §389 + §406 to point to `dot spec init` / `dot spec archive` (greens agents-md.bats)
-- [ ] `git rm` the 4 shells: `scripts/{init-spec,archive-spec}.{sh,ps1}`
-- [ ] `git rm tests/init-spec.bats`
-- [ ] Update `harness/skills/spec/SKILL.md` invocations → `dot spec`
-- [ ] Update `scripts/check-spec-gate.sh:193` hint string → `dot spec init`
-- [ ] Update `docs/adr/dotfiles-architecture-map.md` rows naming the scripts
-- [ ] Guard: `grep -rE 'init-spec|archive-spec'` returns only CHANGELOG / audits / spec-provenance docs
-- [ ] Run full `bats tests/*.bats` (minus init-spec.bats) + `shellcheck`; smoke `dot spec init/archive`
+- [x] Rebase `chore/retire-spec-shell-twins` onto post-#365 main (clean, no conflicts)
+- [x] Update `tests/agents-md.bats:34` to assert `dotf spec init`
+- [x] Edit `AGENTS.md` §389 (reframed "shell fallback" → single cross-platform entry) + §406 → `dotf spec init`
+- [x] `git rm` the 4 shells: `scripts/{init-spec,archive-spec}.{sh,ps1}`
+- [x] `git rm tests/init-spec.bats`
+- [x] Update `harness/skills/spec/SKILL.md` invocations → `dotf spec`
+- [x] Update `scripts/check-spec-gate.sh:193` hint string → `dotf spec init`
+- [x] Update `docs/adr/dotfiles-architecture-map.md` rows naming the scripts
+- [x] **(extra — surfaced by guard-grep, not in original list)** repoint `scripts/check-md-escapes.sh` comment + `harness/skills/adversarial-review/SKILL.md` L13/L165
+- [x] **(companion)** sync vault edit-SSOT (`spec` + `adversarial-review` SKILL.md) → on vault `origin/master`; obsidian-git persists, no manual push needed
+- [x] **(companion)** file `11-tasks.md` residual-drift ticket → REFACTOR-013 #370
+- [x] Guard: `grep -rE 'init-spec|archive-spec'` returns only CHANGELOG / ADRs / lessons / spec-provenance
+- [ ] Run full `bats tests/*.bats` (minus init-spec.bats) + `shellcheck`; smoke `dotf spec init/archive` — **user runs**
 
 ## Closing
 
