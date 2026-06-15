@@ -35,6 +35,6 @@ created: "2026-06-14"
 
 ## Archive checklist
 
-- [ ] `proposal.md` → `status: archived` (on merge)
-- [ ] Folder → `specs/archive/CLI-013-dotf-doctor-quick/` (on merge)
-- [ ] #380 item 2 ticked (the Windows item 1 remains open)
+- [x] `proposal.md` → `status: archived` (on merge)
+- [x] Folder → `specs/archive/CLI-013-dotf-doctor-quick/` (on merge)
+- [x] #380 item 2 ticked (the Windows item 1 remains open)
