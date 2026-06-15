@@ -1,7 +1,7 @@
 ---
 id: "CLI-013-dotf-doctor-quick"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-14"
 issue: "dotfiles#380"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -50,3 +50,6 @@ Observable outcomes. Each must be testable.
 - GitHub issue: `dotfiles#380` (work-gate)
 - Predecessor: CLI-012 (`specs/archive/CLI-012-dotf-doctor/`), which removed the per-session check
 - Roadmap: `docs/adr/adr-021-cli-orchestration-roadmap.md` (SessionStart hook port = step 6)
+
+<!-- archived 2026-06-14 — PR: https://github.com/mlorentedev/dotfiles/pull/382 -->
+
