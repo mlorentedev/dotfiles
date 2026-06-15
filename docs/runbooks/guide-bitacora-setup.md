@@ -69,7 +69,7 @@ gh issue list --repo mlorentedev/<repo> --state open --limit 200 --json number \
     done
 ```
 
-> Once SELF-001 lands, `init-project` runs steps 1–2 automatically for new repos.
+> `dotf init` runs steps 1–2 automatically for new repos.
 
 ## 5. Operating discipline — the status lifecycle (HARNESS-010)
 
@@ -123,7 +123,7 @@ remain the manual path for a single repo.
 
 > **Decision (2026-06-09, #258):** board-add mechanism = this per-repo Action, NOT the
 > built-in project "Auto-add" workflow — git-native (IaC, no UI-only config), uniform and
-> portable via `init-project`, covers PRs (OPS-003), and avoids the plan-dependent
+> portable via `dotf init`, covers PRs (OPS-003), and avoids the plan-dependent
 > auto-add workflow limit.
 
 ### 7a. `add-to-project.yml` — puts opened **issues and PRs** on the board

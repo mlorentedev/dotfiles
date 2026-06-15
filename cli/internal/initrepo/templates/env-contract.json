@@ -1,0 +1,7 @@
+{
+  "_comment": "Structural environment contract consumed by `dotf doctor`. Declare the env vars, PATH entries, and binaries this repo's tooling expects; doctor verifies (and with --fix, reports) drift. Empty arrays are valid — fill in as the project grows. See the dotfiles env-contract.json for a worked example.",
+  "env_vars": [],
+  "required_path_entries": {},
+  "required_binaries": [],
+  "optional_binaries": []
+}

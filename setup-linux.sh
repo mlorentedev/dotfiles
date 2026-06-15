@@ -535,7 +535,9 @@ for _claude_src in "$CURRENT_DIR/ai/claude/"*; do
     cp -rf "$_claude_src" "$HOME/.claude/" 2>/dev/null || true
 done
 unset _claude_src
-cp -f "$CURRENT_DIR/scripts/init-project.sh" "$HOME/.claude/" 2>/dev/null || true
+# CLI-014: init-project.sh was retired (repo scaffolding is now `dotf init`).
+# Remove any copy a prior setup left in ~/.claude so it doesn't linger as an orphan.
+rm -f "$HOME/.claude/init-project.sh"
 # Claude skills are deployed from the vault skill records by
 # `compile-harness.sh --deploy` (SDD-008): each committed record under
 # harness/skills/ is rendered (with provenance) to ~/.claude/skills/<n>/,
@@ -549,7 +551,6 @@ if grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"; then
 else
     echo "❌ Error: CLAUDE.md deployment failed verification"
 fi
-chmod +x "$HOME/.claude/init-project.sh" 2>/dev/null || true
 log_success "Claude Code configured with skills"
 
 # Python tooling (uv + poetry) — used by hive MCP server (uvx hive-vault) and general Python workflows

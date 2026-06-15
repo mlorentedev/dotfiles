@@ -16,7 +16,6 @@ Guide for setting up and using Claude Code and Gemini CLI with the dotfiles repo
 ```
 ~/.claude/                      # Claude Code home
 ├── CLAUDE.md                   # Master instructions
-├── init-project.sh             # Project initialization script
 └── skills/                     # Custom skills (21 total)
     ├── audit/SKILL.md
     ├── refactor/SKILL.md
@@ -55,13 +54,12 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 This automatically:
 - Copies `ai/claude/*` to `~/.claude/` (or `~\.claude\` on Windows)
 - Copies `ai/gemini/*` to `~/.gemini/` (or `~\.gemini\` on Windows)
-- Copies `scripts/init-project.sh` to `~/.claude/` (Linux/macOS)
-- Copies `scripts/init-project.ps1` to `~/scripts/` (Windows)
+- Copies `scripts/init-project.ps1` to `~/scripts/` (Windows project scaffolder)
 - Copies `ai/skills/*` to `~/.claude/skills/` (full SKILL.md with YAML frontmatter)
 - Converts skills to `~/.gemini/prompts/` (YAML frontmatter stripped, flat markdown)
 - Registers MCP servers (user scope, available in all projects)
 - Installs Claude Code plugins
-- Creates the `project-init` alias/function
+- On Linux/macOS, repo scaffolding is `dotf init` (on PATH); Windows keeps the `project-init` function → `init-project.ps1` until #380
 
 ### 2. Install AI Tools
 
@@ -85,14 +83,14 @@ export GEMINI_API_KEY="your-api-key"
 
 ## Project Setup
 
-### Option A: Use project-init (Recommended)
+### Option A: Use `dotf init` (Recommended)
 
 ```bash
-project-init my-project python
-project-init . go              # Initialize current directory
+dotf init my-project --stack python
+dotf init . --stack go         # Initialize current directory
 ```
 
-On Windows (PowerShell):
+On Windows (PowerShell), until a Windows `dotf` install path exists (#380):
 ```powershell
 project-init my-project python
 ```
@@ -241,7 +239,8 @@ The `claude-mem` plugin provides persistent memory across sessions.
 |-------|---------|----------|
 | `c` | `claude` | All |
 | `g` | `gemini` | All |
-| `project-init` | Init project with dual AI config | All |
+| `dotf init` | Scaffold a new fully-practiced repo | Linux/macOS |
+| `project-init` | Windows scaffolder (-> init-project.ps1) | Windows |
 | `gp <skill> <args>` | Gemini prompt function | Linux/macOS |
 
 ## Daily Development Workflow

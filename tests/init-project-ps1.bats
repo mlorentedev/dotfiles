@@ -6,7 +6,6 @@ load 'winpath'
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PS1_SCRIPT="$DOTFILES_DIR/scripts/init-project.ps1"
-    export SH_SCRIPT="$DOTFILES_DIR/scripts/init-project.sh"
 }
 
 @test "init-project.ps1 exists" {
@@ -101,13 +100,33 @@ setup() {
     grep 'poetry add' "$PS1_SCRIPT" | grep -q 'pydantic'
 }
 
-@test "parity: init-project.sh and .ps1 both install typer rich pydantic" {
-    grep 'poetry add' "$SH_SCRIPT" | grep -q 'typer'
-    grep 'poetry add' "$SH_SCRIPT" | grep -q 'rich'
-    grep 'poetry add' "$SH_SCRIPT" | grep -q 'pydantic'
-    grep 'poetry add' "$PS1_SCRIPT" | grep -q 'typer'
-    grep 'poetry add' "$PS1_SCRIPT" | grep -q 'rich'
-    grep 'poetry add' "$PS1_SCRIPT" | grep -q 'pydantic'
+# --- REFACTOR-004 wiring. init-project.ps1 is the Windows fallback for `dotf
+# init` until a Windows dotf install path exists (#380). The .sh twins were
+# deleted in CLI-014; these asserts lock the surviving .ps1 wiring and guard the
+# two features removed from the repo-init path: standards (dropped, 0/6
+# adoption) and --work-sdk (vault work, moved to dotf vault, #388). ---
+
+@test "init-project.ps1 declares -SkipAgents/-SkipGithub switches" {
+    grep -qF '[switch]$SkipAgents' "$PS1_SCRIPT"
+    grep -qF '[switch]$SkipGithub' "$PS1_SCRIPT"
+}
+
+@test "init-project.ps1 invokes the 2 kept init-repo-* helpers" {
+    grep -qF 'init-repo-agents.ps1' "$PS1_SCRIPT"
+    grep -qF 'init-repo-github-defaults.ps1' "$PS1_SCRIPT"
+}
+
+@test "init-project.ps1 github invocation guarded by origin remote check" {
+    grep -qF 'remote.origin.url' "$PS1_SCRIPT"
+}
+
+@test "regression: init-project.ps1 no longer wires init-repo-standards (dropped)" {
+    ! grep -qF 'init-repo-standards.ps1' "$PS1_SCRIPT"
+    ! grep -qF 'SkipStandards' "$PS1_SCRIPT"
+}
+
+@test "regression: init-project.ps1 no longer carries -WorkSdk (moved to dotf vault #388)" {
+    ! grep -qiF 'WorkSdk' "$PS1_SCRIPT"
 }
 
 # --- PSScriptAnalyzer ---

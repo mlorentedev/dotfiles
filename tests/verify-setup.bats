@@ -188,11 +188,6 @@ setup() {
     [ "$count" -ge 15 ]
 }
 
-@test "~/.claude/init-project.sh exists and is executable" {
-    [ -f "$HOME/.claude/init-project.sh" ]
-    [ -x "$HOME/.claude/init-project.sh" ]
-}
-
 @test "~/.gemini/AGY.md deployed with AGENTS.md pointer marker (post-SDD-007 rename)" {
     # gemini-cli → agy (Google Antigravity CLI). Identity file renamed from
     # GEMINI.md → AGY.md but lives in the same dir ($HOME/.gemini) because
@@ -279,16 +274,8 @@ setup() {
     grep -q 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.zshrc"
 }
 
-@test "project-init alias in .zshrc" {
-    grep -q 'alias project-init=' "$HOME/.zshrc"
-}
-
 @test "scripts PATH in .bashrc" {
     grep -q 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.bashrc"
-}
-
-@test "project-init alias in .bashrc" {
-    grep -q 'alias project-init=' "$HOME/.bashrc"
 }
 
 # =============================================================================

@@ -31,16 +31,8 @@ param(
     [ValidateSet("python", "go", "node", "ts", "none")]
     [string]$Stack = "python",
 
-    [switch]$WorkSdk,
-
-    [string]$Family = "",
-
-    [string]$Component = "",
-
     # REFACTOR-004: opt-out switches for the wired init-repo-* helpers.
     [switch]$SkipAgents,
-
-    [switch]$SkipStandards,
 
     [switch]$SkipGithub
 )
@@ -52,109 +44,6 @@ param(
 $ClaudeHome = "$env:USERPROFILE\.claude"
 $GeminiHome = "$env:USERPROFILE\.gemini"
 $Today = Get-Date -Format 'yyyy-MM-dd'
-
-# ============================================================================
-# --WorkSdk MODE: vault-only entry for nested work SDK repos
-# ============================================================================
-
-if ($WorkSdk) {
-    if (-not $Family -or -not $Component) {
-        Write-Err "Usage: init-project.ps1 -WorkSdk -Family <family-slug> -Component <component>"
-        exit 1
-    }
-
-    $KnowledgeHome = "$env:USERPROFILE\Projects\knowledge"
-    $SdkDir = "$KnowledgeHome\50_work\45-development\$Family\$Component"
-
-    Write-Info "Creating work SDK vault entry: 50_work/45-development/$Family/$Component"
-
-    New-Item -ItemType Directory -Path "$SdkDir\memory" -Force | Out-Null
-
-    Set-Content -Path "$SdkDir\00-context.md" -Encoding UTF8 -Value @"
----
-id: "$Family-$Component"
-type: project
-status: active
-owner: manu
-source_path:
-  code: "`${PROJECTS_PATH}/<ProductFamily>/<component>"
-  onedrive: "`${ONEDRIVE_PATH}/Products/<ProductFamily>"
-stack: []
-tags: [work, sdk, $Family]
-created: "$Today"
----
-
-# ${Component}: Work SDK Context
-
-> **Goal:** [Describe this repo's purpose within the $Family product family]
-
-## Technical Stack
-- **Language:**
-- **Key Tools:**
-
-## Repos in this Family
-See [[../00-context|$Family family context]] for all repos.
-
-## Critical Links
-- **Real repo path:** Fill in source_path above with actual `$env:USERPROFILE\Projects\...` path
-
-## Knowledge Structure
-Per [[pattern-knowledge-placement]]: build/operate docs (ADRs, runbooks, troubleshooting, lessons) live in the repo docs/; this entry keeps only decide/personal layers.
-- [[memory/MEMORY]]: Session memory
-"@
-
-    Set-Content -Path "$SdkDir\memory\MEMORY.md" -Encoding UTF8 -Value @"
-# $Component - Work SDK Session Memory
-
-## Session Handoff
-> Updated: $Today
-**Last task:** Vault entry initialized
-**Decisions:** None
-**Open threads:** Fill source_path in 00-context.md with real repo path
-**Next action:** Open Claude in real repo -- session hook creates junction automatically
-
-## User Preferences
-- Follow global CLAUDE.md + workflow-protocol.md rules
-
-## Last Crystallized: $Today
-"@
-
-    # Create parent family context if it doesn't exist
-    $FamilyContext = "$KnowledgeHome\50_work\45-development\$Family\00-context.md"
-    if (-not (Test-Path $FamilyContext)) {
-        Set-Content -Path $FamilyContext -Encoding UTF8 -Value @"
----
-id: "$Family"
-type: project
-status: active
-owner: manu
-tags: [work, sdk, product-family]
-created: "$Today"
----
-
-# ${Family}: Product Family Context
-
-> Umbrella context for all repos in the $Family product family.
-
-## Repos
-
-| Component | Vault Path | Real Path |
-|-----------|-----------|-----------|
-| $Component | [[$Component/00-context]] | Fill in source_path |
-
-## Work Context
-- Product knowledge: [[../../20-products/$Family/00-overview|product overview]] (if exists)
-"@
-        Write-Success "Created family context: $FamilyContext"
-    }
-
-    Write-Success "Work SDK vault entry created: $SdkDir"
-    Write-Host ""
-    Write-Host "Next steps:" -ForegroundColor Cyan
-    Write-Host "  1. Fill in source_path in $SdkDir\00-context.md"
-    Write-Host "  2. Open Claude in the real repo - session hook creates junction automatically"
-    exit 0
-}
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -204,7 +93,7 @@ if (Test-Path "$ClaudeHome\CLAUDE.md") {
     Write-Warn "CLAUDE.md not found in global config ($ClaudeHome)"
 }
 
-# Copy AGY.md (post-SDD-007: agy replaces gemini-cli; Linux parity at init-project.sh:186-191)
+# Copy AGY.md (post-SDD-007: agy replaces gemini-cli; Linux parity: dotf init)
 if (Test-Path "$GeminiHome\AGY.md") {
     Copy-Item "$GeminiHome\AGY.md" "." -Force
     Write-Success "Injected AGY.md"
@@ -548,14 +437,6 @@ if (-not $SkipAgents) {
     if (Test-Path $agentsScript) {
         Write-Info "Bootstrapping AGENTS.md (init-repo-agents)..."
         try { & $agentsScript -Repo (Get-Location).Path } catch { Write-Warn "init-repo-agents failed (non-fatal); continuing" }
-    }
-}
-
-if (-not $SkipStandards) {
-    $standardsScript = Join-Path $ScriptDir 'init-repo-standards.ps1'
-    if (Test-Path $standardsScript) {
-        Write-Info "Bootstrapping docs/standards.md (init-repo-standards)..."
-        try { & $standardsScript -Repo (Get-Location).Path } catch { Write-Warn "init-repo-standards failed (non-fatal); continuing" }
     }
 }
 
