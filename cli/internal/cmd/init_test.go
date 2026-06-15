@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -42,5 +44,35 @@ func TestInitListedInRootHelp(t *testing.T) {
 	}
 	if !strings.Contains(avail, "init") {
 		t.Errorf("`dotf --help` does not list init under Available Commands:\n%s", stdout)
+	}
+}
+
+// TestInitAgentsCreatesAgentsMd exercises `dotf init agents --repo <dir>` end to
+// end: it writes a self-contained AGENTS.md (no $VAULT_PATH) and is idempotent.
+func TestInitAgentsCreatesAgentsMd(t *testing.T) {
+	dir := t.TempDir()
+
+	stdout, stderr, err := execute(t, "init", "agents", "--repo", dir)
+	if err != nil {
+		t.Fatalf("`dotf init agents` errored: %v\n%s", err, stdout+stderr)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("AGENTS.md not written: %v", err)
+	}
+	if !strings.Contains(string(got), "## Spec-Driven Development") {
+		t.Errorf("AGENTS.md missing the SDD section:\n%s", got)
+	}
+	if strings.Contains(string(got), "$VAULT_PATH") {
+		t.Errorf("AGENTS.md leaks $VAULT_PATH:\n%s", got)
+	}
+
+	// Re-run is a safe no-op and says so.
+	stdout2, stderr2, err := execute(t, "init", "agents", "--repo", dir)
+	if err != nil {
+		t.Fatalf("re-run errored: %v\n%s", err, stdout2+stderr2)
+	}
+	if !strings.Contains(stdout2+stderr2, "already present") {
+		t.Errorf("re-run should report the section already present, got:\n%s", stdout2+stderr2)
 	}
 }

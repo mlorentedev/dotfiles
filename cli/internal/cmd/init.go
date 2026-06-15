@@ -1,7 +1,13 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // newInitCmd builds `dotf init`, the repo-scaffolder (ADR-022) — the Go flagship
@@ -35,5 +41,66 @@ orchestrator are being built out under CLI-014.`,
 			return cmd.Help()
 		},
 	}
+	cmd.AddCommand(newInitAgentsCmd())
+	return cmd
+}
+
+// newInitAgentsCmd builds `dotf init agents`: seed or refresh the target repo's
+// AGENTS.md + Spec-Driven Development section from the embedded, self-contained
+// template. The Go twin of scripts/init-repo-agents.sh, and the standalone
+// target for the fleet-wide AGENTS.md backfill (HARNESS-013).
+func newInitAgentsCmd() *cobra.Command {
+	var (
+		repo  string
+		force bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "agents",
+		Short: "Bootstrap or refresh AGENTS.md + the Spec-Driven Development section",
+		Long: `agents seeds (or refreshes) the target repo's AGENTS.md with the self-contained
+Spec-Driven Development section, from the template embedded in the binary — no
+vault required and no $VAULT_PATH leak (#248).
+
+Idempotent: a re-run is a safe no-op when the section is already present. Pass
+--force to replace an existing section in place. Without --repo it operates on
+the current git repo.`,
+		Example:      "  dotf init agents\n  dotf init agents --repo ../other-repo --force",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root := repo
+			if root == "" {
+				cwd, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				if root, err = spec.RepoRoot(cwd); err != nil {
+					return err
+				}
+			} else if info, err := os.Stat(root); err != nil || !info.IsDir() {
+				return fmt.Errorf("--repo is not a directory: %s", root)
+			}
+
+			res, err := initrepo.BootstrapAgents(root, force)
+			if err != nil {
+				return err
+			}
+			switch res.Action {
+			case "unchanged":
+				cmd.Printf("[OK] SDD section already present in %s (use --force to refresh)\n", res.Path)
+			case "created":
+				cmd.Printf("[OK] Created %s with the Spec-Driven Development section\n", res.Path)
+			case "appended":
+				cmd.Printf("[OK] Appended the Spec-Driven Development section to %s\n", res.Path)
+			case "replaced":
+				cmd.Printf("[OK] Replaced the Spec-Driven Development section in %s\n", res.Path)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&repo, "repo", "", "target repo root (default: the current git repo)")
+	cmd.Flags().BoolVar(&force, "force", false, "replace an existing SDD section in place")
 	return cmd
 }

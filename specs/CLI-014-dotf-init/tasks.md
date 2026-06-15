@@ -23,9 +23,9 @@ created: "2026-06-14"
 - [x] Implement template loading to make the drift-test pass
 
 ### Step 2 — `dotf init agents` (port init-repo-agents)
-- [ ] Failing test: bootstrap `AGENTS.md`+SDD, idempotent re-run, **no `$VAULT_PATH` leak**
-- [ ] Implement; idempotent regenerate-between-markers + `--force`
-- [ ] Migrate the bats cases to `go test`; `git rm scripts/init-repo-agents.sh` (+ `.ps1` if Windows-gated; else leave orphan per #380)
+- [x] Failing test: bootstrap `AGENTS.md`+SDD, idempotent re-run, **no `$VAULT_PATH` leak**
+- [x] Implement; idempotent regenerate-between-markers + `--force` (+ self-contained vault SSOT fix + render guard, per ADR decision)
+- [ ] Migrate the bats cases to `go test`; `git rm scripts/init-repo-agents.sh` (+ `.ps1` if Windows-gated; else leave orphan per #380) — *deletion sequencing under decision (Step 2d); the `.sh` caller is init-project.sh, ported in Step 4*
 
 ### Step 3 — `dotf init github` (port init-repo-github-defaults)
 - [ ] Failing test: derive owner/name from `origin`, `--dry-run`, auto-skip without remote/`gh`
