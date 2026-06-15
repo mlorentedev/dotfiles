@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -20,27 +21,81 @@ import (
 // default orchestrator land in the following steps; until then `dotf init`
 // prints its help.
 func newInitCmd() *cobra.Command {
+	var (
+		stack      string
+		skipVault  bool
+		skipGithub bool
+		skipAgents bool
+	)
+
 	cmd := &cobra.Command{
 		Use:   "init [path]",
 		Short: "Scaffold a fully-practiced repo from embedded templates (ADR-022)",
-		Long: `init scaffolds a new repo with the cross-project practice stack baked in:
-AGENTS.md + the Spec-Driven Development section, a CLAUDE.md pointer, guardrail
-CI, pre-commit (gitleaks), .gitignore, stack init, git init, the env-contract,
-and (when present) the vault entry and GitHub repo defaults.
+		Long: `init scaffolds a repo (the current dir, or [path]) with the cross-project
+practice stack baked in: the placement-model structure, AGENTS.md + the
+Spec-Driven Development section, a CLAUDE.md pointer, stack-appropriate CI,
+pre-commit (gitleaks), .gitignore, an env-contract skeleton, stack init, git
+init, and — when present — the vault project entry and GitHub repo defaults.
 
-Templates are embedded in the binary and drift-tested against the vault SSOT, so
-init is self-contained: it works on a machine with no vault and no ~/.claude, and
-the generated AGENTS.md never leaks an unexpanded $VAULT_PATH.
+Templates are embedded in the binary, so init is self-contained: it works on a
+machine with no vault and no ~/.claude, and the generated AGENTS.md never leaks
+an unexpanded $VAULT_PATH. Files are skip-if-present (a re-run never clobbers),
+and host-coupled steps (vault, GitHub, pre-commit) degrade to a [skip] when
+their dependency is absent — never fatal.
 
-Re-runnable subcommands ('init agents', 'init github') and the default
-orchestrator are being built out under CLI-014.`,
-		// Until the orchestrator lands (Step 4), bare `dotf init` prints its
-		// help — the same idiom the root command uses. This also keeps init a
-		// first-class entry under "Available Commands" rather than a help topic.
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return cmd.Help()
+Use the subcommands to run one piece on an existing repo: 'dotf init agents'
+(AGENTS.md + SDD) and 'dotf init github' (repo defaults).`,
+		Example:      "  dotf init\n  dotf init my-new-repo --stack go\n  dotf init . --skip-vault --skip-github",
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := "."
+			if len(args) == 1 {
+				target = args[0]
+			}
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+			root, err := filepath.Abs(target)
+			if err != nil {
+				return err
+			}
+
+			vault := ""
+			if !skipVault {
+				vault = initrepo.ResolveVault()
+			}
+			claudeDir := ""
+			if home, herr := os.UserHomeDir(); herr == nil {
+				claudeDir = filepath.Join(home, ".claude", "projects")
+			}
+
+			report, err := initrepo.Init(initrepo.InitOptions{
+				Root:              root,
+				Stack:             stack,
+				Date:              now().Format("2006-01-02"),
+				SkipAgents:        skipAgents,
+				SkipGithub:        skipGithub,
+				VaultPath:         vault,
+				ClaudeProjectsDir: claudeDir,
+			})
+			if err != nil {
+				return err
+			}
+
+			cmd.Printf("\n[OK] Initialized %s\n", report.Root)
+			for _, s := range report.Steps {
+				cmd.Printf("  %-10s [%s] %s\n", s.Name, s.Status, s.Detail)
+			}
+			return nil
 		},
 	}
+
+	cmd.Flags().StringVar(&stack, "stack", "none", "project stack to initialize: go|python|node|none")
+	cmd.Flags().BoolVar(&skipVault, "skip-vault", false, "skip the vault project entry")
+	cmd.Flags().BoolVar(&skipGithub, "skip-github", false, "skip applying GitHub repo defaults")
+	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "skip writing AGENTS.md + the SDD section")
+
 	cmd.AddCommand(newInitAgentsCmd())
 	cmd.AddCommand(newInitGithubCmd())
 	return cmd
