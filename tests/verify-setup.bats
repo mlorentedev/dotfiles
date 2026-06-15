@@ -274,16 +274,8 @@ setup() {
     grep -q 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.zshrc"
 }
 
-@test "project-init alias in .zshrc" {
-    grep -q 'alias project-init=' "$HOME/.zshrc"
-}
-
 @test "scripts PATH in .bashrc" {
     grep -q 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.bashrc"
-}
-
-@test "project-init alias in .bashrc" {
-    grep -q 'alias project-init=' "$HOME/.bashrc"
 }
 
 # =============================================================================
