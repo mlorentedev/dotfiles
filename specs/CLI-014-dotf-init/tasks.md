@@ -9,8 +9,8 @@ created: "2026-06-14"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/CLI-014-dotf-init`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
+- [x] Branch created from main: `feat/dotf-init`
+- [x] `proposal.md` is complete and acceptance criteria are testable
 - [ ] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
@@ -18,9 +18,9 @@ created: "2026-06-14"
 > TDD order, mirroring the ADR-022 build sequence. Each twin is deleted on contact (strangler-fig). Stage as 1-4 PRs (the package + each subcommand + the orchestrator) or one large PR.
 
 ### Step 1 — package + embed + drift guard
-- [ ] `cli/internal/initrepo/` package + `cli/internal/cmd/init.go`; wire `newInitCmd()` into `root.go`
-- [ ] Embed templates under `cli/internal/initrepo/templates/`; failing drift-test mirroring `spec/drift_test.go` (embedded == vault SSOT)
-- [ ] Implement template loading to make the drift-test pass
+- [x] `cli/internal/initrepo/` package + `cli/internal/cmd/init.go`; wire `newInitCmd()` into `root.go`
+- [x] Embed templates under `cli/internal/initrepo/templates/`; failing drift-test mirroring `spec/drift_test.go` (embedded == vault SSOT)
+- [x] Implement template loading to make the drift-test pass
 
 ### Step 2 — `dotf init agents` (port init-repo-agents)
 - [ ] Failing test: bootstrap `AGENTS.md`+SDD, idempotent re-run, **no `$VAULT_PATH` leak**
