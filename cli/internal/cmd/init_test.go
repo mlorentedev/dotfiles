@@ -76,3 +76,17 @@ func TestInitAgentsCreatesAgentsMd(t *testing.T) {
 		t.Errorf("re-run should report the section already present, got:\n%s", stdout2+stderr2)
 	}
 }
+
+// TestInitGithubSkipsGracefullyWithoutGh asserts `dotf init github` degrades to a
+// [WARN] + exit 0 when gh is absent (ADR-022 C7), so the orchestrator never
+// aborts. PATH is pointed at an empty dir to guarantee gh is not found.
+func TestInitGithubSkipsGracefullyWithoutGh(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	stdout, stderr, err := execute(t, "init", "github", "--repo", "owner/name")
+	if err != nil {
+		t.Fatalf("`dotf init github` should not error when gh is absent: %v", err)
+	}
+	if !strings.Contains(stdout+stderr, "[WARN]") {
+		t.Errorf("expected a [WARN] skip, got:\n%s", stdout+stderr)
+	}
+}

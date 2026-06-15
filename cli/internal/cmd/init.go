@@ -42,6 +42,7 @@ orchestrator are being built out under CLI-014.`,
 		},
 	}
 	cmd.AddCommand(newInitAgentsCmd())
+	cmd.AddCommand(newInitGithubCmd())
 	return cmd
 }
 
@@ -102,5 +103,70 @@ the current git repo.`,
 
 	cmd.Flags().StringVar(&repo, "repo", "", "target repo root (default: the current git repo)")
 	cmd.Flags().BoolVar(&force, "force", false, "replace an existing SDD section in place")
+	return cmd
+}
+
+// newInitGithubCmd builds `dotf init github`: apply opinionated GitHub repo
+// defaults via gh. The Go twin of scripts/init-repo-github-defaults.sh.
+func newInitGithubCmd() *cobra.Command {
+	var (
+		repo   string
+		dryRun bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "github",
+		Short: "Apply GitHub repo defaults (delete_branch_on_merge)",
+		Long: `github applies opinionated GitHub repo-level defaults via the gh CLI —
+currently delete_branch_on_merge=true, which auto-deletes a PR's head branch on
+merge (the orphan-branch hygiene fix). Idempotent: a no-op when already enabled.
+
+Without --repo it derives owner/name from the current repo's origin remote.
+Host-coupling degrades gracefully (ADR-022): a missing gh, missing remote, or an
+unreadable repo is a [WARN] skip with exit 0, never fatal.`,
+		Example:      "  dotf init github\n  dotf init github --repo owner/name --dry-run",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			target := repo
+			switch {
+			case target == "":
+				cwd, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				root, err := spec.RepoRoot(cwd)
+				if err != nil {
+					cmd.PrintErrln("[WARN] not in a git repo and no --repo given; skipping GitHub defaults")
+					return nil
+				}
+				if target, err = initrepo.OriginRepo(root); err != nil {
+					cmd.PrintErrln("[WARN] no origin remote; skipping GitHub defaults (add a remote, then re-run)")
+					return nil
+				}
+			case !initrepo.ValidRepoSlug(target):
+				return fmt.Errorf("--repo must be owner/name, got %q", target)
+			}
+
+			res, err := initrepo.ApplyDeleteBranchOnMerge(target, dryRun)
+			if err != nil {
+				return err
+			}
+			switch res.Action {
+			case "skipped":
+				cmd.PrintErrf("[WARN] %s — skipping GitHub defaults for %s\n", res.Reason, res.Repo)
+			case "already-enabled":
+				cmd.Printf("[OK] delete_branch_on_merge already enabled on %s\n", res.Repo)
+			case "dry-run":
+				cmd.Printf("[DRY-RUN] would enable delete_branch_on_merge on %s\n", res.Repo)
+			case "enabled":
+				cmd.Printf("[OK] enabled delete_branch_on_merge on %s\n", res.Repo)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&repo, "repo", "", "target repo owner/name (default: derived from origin)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without applying")
 	return cmd
 }
