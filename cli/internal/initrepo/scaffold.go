@@ -18,13 +18,16 @@ var scaffoldDirs = []string{
 	".claude",
 }
 
-// staticFiles maps an embedded template to its repo-relative destination. The
-// template names carry no leading dot (go:embed skips dot/underscore files), so
-// gitignore -> .gitignore happens here. Each write is skip-if-present.
+// staticFiles maps an embedded template to its repo-relative destination. Source
+// template names are chosen so the file is actually committed AND embedded: they
+// carry no leading dot (go:embed skips dot/underscore files, so gitignore ->
+// .gitignore), and they dodge the repo's own .gitignore (claude-md -> CLAUDE.md,
+// else the root `CLAUDE.md` ignore rule drops the template from a fresh checkout
+// and embed open fails at runtime). Each write is skip-if-present.
 var staticFiles = []struct{ template, dest string }{
 	{"gitignore", ".gitignore"},
 	{"pre-commit-config.yaml", ".pre-commit-config.yaml"},
-	{"CLAUDE.md", "CLAUDE.md"},
+	{"claude-md", "CLAUDE.md"},
 	{"env-contract.json", "env-contract.json"},
 	{"lessons.md", filepath.Join("docs", "lessons.md")},
 }
