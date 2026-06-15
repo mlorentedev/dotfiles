@@ -11,7 +11,7 @@ created: "2026-06-14"
 
 - [x] Branch created from main: `feat/dotf-init`
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
@@ -32,17 +32,17 @@ created: "2026-06-14"
 - [x] Implement `gh api` PATCH `delete_branch_on_merge`. **Twin + bats deletion DEFERRED to Step 4** (same as agents: `init-project.sh` calls it; the whole init-twin set dies with the orchestrator). `.ps1` stays orphan (#380).
 
 ### Step 4 — `dotf init` orchestrator (port init-project)
-- [ ] Failing tests: structure + `.gitignore` + pre-commit + stack init + `git init` + CI scaffold + env-contract + AGENTS/github steps + vault entry (auto-skip / `--skip-vault`)
-- [ ] Implement; CLAUDE.md thin pointer; host-coupled steps degrade to `[WARN]`
-- [ ] Delete `scripts/init-project.sh` + **`scripts/init-repo-agents.sh` (deferred from Step 2)** + **`scripts/init-repo-github-defaults.sh` (deferred from Step 3)** + `scripts/init-repo-standards.{sh,ps1}` (dropped) + their bats (the whole init-twin set dies together with its orchestrator caller; `.ps1` twins stay orphan per #380)
+- [x] Failing tests: structure + `.gitignore` + pre-commit + stack init + `git init` + CI scaffold + env-contract + AGENTS/github steps + vault entry (auto-skip / `--skip-vault`)
+- [x] Implement; CLAUDE.md thin pointer; host-coupled steps degrade to `[WARN]`
+- [x] Delete `scripts/init-project.sh` + **`scripts/init-repo-agents.sh` (deferred from Step 2)** + **`scripts/init-repo-github-defaults.sh` (deferred from Step 3)** + `scripts/init-repo-standards.{sh,ps1}` (dropped) + their bats (the whole init-twin set dies together with its orchestrator caller; `.ps1` twins stay orphan per #380). **`--work-sdk` removed both OSes (not extracted) — restore in `dotf vault`, #388.**
 
 ### Step 5 — repoint + guard
-- [ ] Guard-grep `init-(project|repo)` returns only provenance (CHANGELOG / ADRs / `specs/`)
-- [ ] Repoint `setup-linux.sh`, docs, `AGENTS.md` to `dotf init`
+- [x] Guard-grep `init-(project|repo)` returns only provenance (CHANGELOG / ADRs / `specs/`) + the kept Windows `.ps1` (#380) + Go port-provenance comments
+- [x] Repoint `setup-linux.sh`, docs, `AGENTS.md` to `dotf init` (also dropped the dead `project-init` alias from `.bashrc`/`.zshrc`)
 
 ### Step 6 — close out
 - [ ] Close #248, #299; tick #275 (HARNESS-013) standalone-AGENTS half
-- [ ] Smoke `dotf init` on a throwaway checkout with no vault present
+- [x] Smoke `dotf init` on a throwaway checkout with no vault present
 
 ## Closing
 

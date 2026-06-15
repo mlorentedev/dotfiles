@@ -51,7 +51,7 @@ admin needed; some changes show after an Explorer restart.
 ├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
 │   ├── load-secrets.sh / .ps1  # Secrets → env vars (sourced at login)
-│   ├── init-project.sh / .ps1  # Project bootstrapper
+│   ├── init-project.ps1        # Windows project scaffolder (Linux: `dotf init`)
 │   ├── healthcheck.ps1         # Windows post-setup verification (Linux: `dotf doctor`)
 │   ├── vault.sh                # Vault tooling dispatcher
 │   └── …                       # 31 more scripts (hooks, CI helpers, secret tools)
@@ -82,7 +82,7 @@ scripts that a human ever runs directly — everything else is a library, hook, 
 | `./setup-linux.sh` | `setup-linux.sh` | Bootstrap Linux: install tools, deploy configs, register MCPs |
 | `.\setup-windows.ps1` | `setup-windows.ps1` | Bootstrap Windows: same, via PowerShell |
 | `dotf doctor` | `dotf` CLI | Post-setup verification (versions, paths, symlinks, env vars, env-contract) |
-| `project-init <name> <stack>` | `scripts/init-project.sh` | Bootstrap a new project with dual AI config |
+| `dotf init [path] --stack <s>` | `dotf` CLI | Scaffold a new fully-practiced repo (AGENTS.md + SDD, CI, pre-commit, git) |
 | `vault <subcommand>` | `scripts/vault.sh` | Vault tooling: `vault health`, `vault maintenance`, `vault check-escapes` |
 | `profile-shell` | `scripts/shell-profile.sh` | Measure shell startup time (zsh/bash, --detail for per-function) |
 | `obs` | `scripts/obs-cli.sh` | Open Obsidian vault (Linux, --no-sandbox, GUI check) |
@@ -110,7 +110,7 @@ Non-sensitive, per-machine shell config (a host-only `PATH` prepend, a VM-only a
 ### AI Tools
 
 ```bash
-project-init my-project python      # Bootstrap project with dual AI config
+dotf init my-project --stack python  # Scaffold a new fully-practiced repo
 claude                               # Start Claude Code session
 > /audit src/auth.py                 # Use skills via slash commands
 gp audit "$(cat src/main.py)"       # Gemini prompt function

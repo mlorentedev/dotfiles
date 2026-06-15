@@ -168,9 +168,6 @@ fi
 # opencode CLI
 export PATH="$HOME/.opencode/bin:$PATH"
 
-# AI-agnostic project init alias
-alias project-init="$HOME/.claude/init-project.sh"
-
 # Dotfiles scripts on PATH
 export PATH="$HOME/.dotfiles/scripts:$PATH"
 

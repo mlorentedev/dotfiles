@@ -40,21 +40,21 @@ Host-coupled steps (vault entry, GitHub defaults, `pre-commit install`) auto-ski
 
 - **Behavioural-parity surface is the largest of any noun so far** (orchestrator + 2 subcommands). Mitigation: enumerate each baked artefact as a `tasks.md` checklist; golden-test stable outputs.
 - **Embedded-template drift.** The drift-test must stay green as the vault evolves. Mitigation: reuse the exact `spec/drift_test.go` mechanism (already proven).
-- **`--work-sdk` (vault-only) placement.** Retained for parity but really a `dotf vault` concern — kept here this port, flagged to migrate. (Resolved: keep + flag, not block.)
+- **`--work-sdk` (vault-only) placement.** A `dotf vault` concern, not repo-init. (Resolved: **removed** on both OSes — not ported, not extracted to a transitional script; restore in `dotf vault`, tracked by #388.)
 - **Idempotency across re-runs** (regenerate-between-markers for AGENTS.md, skip-if-present elsewhere) must match the current scripts' guarantees.
 
 ## Acceptance criteria
 
 Observable outcomes. Each must be testable.
 
-- [ ] `dotf init` scaffolds a fully-practiced repo on a machine with **no vault and no `~/.claude`**; the generated `AGENTS.md` contains zero unexpanded `$VAULT_PATH` literals (closes #248).
-- [ ] `dotf init agents` and `dotf init github` are independently re-runnable and idempotent (re-run is a safe no-op / clean regeneration).
-- [ ] `AGENTS.md` is the agent-instruction SSOT; `CLAUDE.md` is written as a thin pointer (closes #299).
-- [ ] Embedded templates are drift-tested against the vault SSOT (`go test` fails on divergence).
-- [ ] Vault entry + GitHub defaults auto-skip with a `[WARN]` when their dependency is absent; exit code stays 0.
-- [ ] `scripts/init-{project,repo-agents,repo-standards,repo-github-defaults}.sh` + their bats are removed; guard-grep `init-(project|repo)` returns only provenance (CHANGELOG / ADRs / `specs/`).
-- [ ] `setup-linux.sh` + docs + `AGENTS.md` repoint to `dotf init`.
-- [ ] `go test ./...` covers the scaffold + drift; `dotf init` smoke-tested end-to-end on a throwaway checkout.
+- [x] `dotf init` scaffolds a fully-practiced repo on a machine with **no vault and no `~/.claude`**; the generated `AGENTS.md` contains zero unexpanded `$VAULT_PATH` literals (closes #248).
+- [x] `dotf init agents` and `dotf init github` are independently re-runnable and idempotent (re-run is a safe no-op / clean regeneration).
+- [x] `AGENTS.md` is the agent-instruction SSOT; `CLAUDE.md` is written as a thin pointer (closes #299).
+- [x] Embedded templates are drift-tested against the vault SSOT (`go test` fails on divergence).
+- [x] Vault entry + GitHub defaults auto-skip with a `[WARN]` when their dependency is absent; exit code stays 0.
+- [x] `scripts/init-{project,repo-agents,repo-standards,repo-github-defaults}.sh` + their bats are removed; guard-grep `init-(project|repo)` returns only provenance (CHANGELOG / ADRs / `specs/`).
+- [x] `setup-linux.sh` + docs + `AGENTS.md` repoint to `dotf init`.
+- [x] `go test ./...` covers the scaffold + drift; `dotf init` smoke-tested end-to-end on a throwaway checkout.
 
 ## References
 

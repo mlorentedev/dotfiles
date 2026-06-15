@@ -4,7 +4,7 @@
 #
 # Decision (2026-06-09): per-repo Action, NOT the built-in project Auto-add — git-native
 # (IaC: the workflow lives in each repo, no UI snowflake config), uniform across N repos,
-# portable via init-project, and the add-to-project trigger covers PRs (OPS-003, #266).
+# portable via dotf init, and the add-to-project trigger covers PRs (OPS-003, #266).
 #
 # Per repo (idempotent — mutates only on diff, 2nd run reports 0 changes):
 #   1. link the repo to GitHub Project #1 (the bitácora)

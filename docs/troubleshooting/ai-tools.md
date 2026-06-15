@@ -100,23 +100,29 @@ cat ~/.claude/settings.json | jq '.enabledPlugins'
 - `claude` CLI not in PATH when setup ran
 - Network issue during plugin download
 
-## project-init not found
+## `dotf init` not found (Linux/macOS)
 
 ```bash
-# Check if alias/function exists
-type project-init
-
-# Linux: verify init-project.sh was copied
-ls -la ~/.claude/init-project.sh
-
-# Windows: verify init-project.ps1 was copied
-# Get-ChildItem "$env:USERPROFILE\scripts\init-project.ps1"
+# dotf must be on PATH (installed by setup + install-dotf)
+command -v dotf
+dotf init --help
 ```
 
 **Common causes:**
-- Shell config not sourced after setup
-- Script not copied by setup (re-run setup)
-- On Windows: PowerShell profile not loaded (restart PowerShell)
+- Shell config not sourced after setup (open a new shell or `source ~/.zshrc`)
+- `dotf` not installed / not on PATH — re-run `./setup-linux.sh`
+
+## `project-init` not found (Windows)
+
+```powershell
+# Verify init-project.ps1 was copied + the profile loaded
+Get-ChildItem "$env:USERPROFILE\scripts\init-project.ps1"
+type project-init
+```
+
+**Common causes:**
+- PowerShell profile not loaded (restart PowerShell)
+- Script not copied by setup (re-run setup-windows.ps1)
 
 ## Related
 
