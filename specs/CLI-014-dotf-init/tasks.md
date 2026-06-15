@@ -25,7 +25,7 @@ created: "2026-06-14"
 ### Step 2 — `dotf init agents` (port init-repo-agents)
 - [x] Failing test: bootstrap `AGENTS.md`+SDD, idempotent re-run, **no `$VAULT_PATH` leak**
 - [x] Implement; idempotent regenerate-between-markers + `--force` (+ self-contained vault SSOT fix + render guard, per ADR decision)
-- [ ] Migrate the bats cases to `go test`; `git rm scripts/init-repo-agents.sh` (+ `.ps1` if Windows-gated; else leave orphan per #380) — *deletion sequencing under decision (Step 2d); the `.sh` caller is init-project.sh, ported in Step 4*
+- [x] Migrate the bats cases to `go test` (no dedicated init-repo-agents bats existed; coverage was via init-project.bats — moved to `agents_test.go` + `init_test.go`). **`git rm scripts/init-repo-agents.sh` DEFERRED to Step 4** (decided): its caller `init-project.sh` is ported there, so the whole init-twin set + bats die together — avoids a regressed/churned intermediate. `.ps1` stays orphan (#380).
 
 ### Step 3 — `dotf init github` (port init-repo-github-defaults)
 - [ ] Failing test: derive owner/name from `origin`, `--dry-run`, auto-skip without remote/`gh`
@@ -34,7 +34,7 @@ created: "2026-06-14"
 ### Step 4 — `dotf init` orchestrator (port init-project)
 - [ ] Failing tests: structure + `.gitignore` + pre-commit + stack init + `git init` + CI scaffold + env-contract + AGENTS/github steps + vault entry (auto-skip / `--skip-vault`)
 - [ ] Implement; CLAUDE.md thin pointer; host-coupled steps degrade to `[WARN]`
-- [ ] Delete `scripts/init-project.sh` + `scripts/init-repo-standards.{sh,ps1}` (dropped) + their bats
+- [ ] Delete `scripts/init-project.sh` + **`scripts/init-repo-agents.sh` (deferred from Step 2)** + `scripts/init-repo-standards.{sh,ps1}` (dropped) + their bats (the whole init-twin set dies together with its orchestrator caller)
 
 ### Step 5 — repoint + guard
 - [ ] Guard-grep `init-(project|repo)` returns only provenance (CHANGELOG / ADRs / `specs/`)
