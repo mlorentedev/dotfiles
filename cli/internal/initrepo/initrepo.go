@@ -18,7 +18,12 @@ import (
 	"fmt"
 )
 
-//go:embed templates/agents-spec-section.md
+// templatesFS holds the whole practice-stack template set. The directory is the
+// embed contract: every file under templates/ is vendored into the binary.
+// agents-spec-section.md has a vault SSOT and is drift-tested (drift_test.go);
+// the rest are self-contained static scaffolding with no vault counterpart.
+//
+//go:embed templates
 var templatesFS embed.FS
 
 // ReadTemplate returns the raw bytes of the embedded template named by its path
