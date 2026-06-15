@@ -1,0 +1,20 @@
+# CI scaffolded by `dotf init`. The Spec-Driven Development convention is
+# documented in AGENTS.md; wire an enforced spec-gate when your project wants one.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
