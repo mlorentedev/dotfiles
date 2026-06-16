@@ -37,7 +37,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-023-spec-init-bitacora-repo/` -> `specs/archive/HARNESS-023-spec-init-bitacora-repo/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-023-spec-init-bitacora-repo/` -> `specs/archive/HARNESS-023-spec-init-bitacora-repo/`
+- [x] Bitácora #392 closed -> `Done` (built-in workflow); fix shipped in PR #393. (Task state lives in the bitácora, not vault `11-tasks.md`, per ADR-018.)
+- [x] Promotions above executed (if any) -> lesson promoted to `docs/lessons.md` (this PR).
