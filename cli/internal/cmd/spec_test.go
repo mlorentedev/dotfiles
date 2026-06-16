@@ -78,16 +78,17 @@ func TestSpecInitWithOpenIssueSetsFrontmatter(t *testing.T) {
 	root := makeRepo(t)
 	pinClock(t)
 	stubGhCmd(t, "OPEN\tPort init-spec")
+	t.Setenv("DOTF_BITACORA_REPO", "mlorentedev/dotfiles")
 
 	stdout, _, err := execute(t, "spec", "init", "CLI-007-dot-spec-init", "--issue", "358")
 	if err != nil {
 		t.Fatalf("spec init --issue: %v", err)
 	}
-	if !strings.Contains(stdout, "Work-gate OK: issue #358 is open") {
+	if !strings.Contains(stdout, "Work-gate OK: mlorentedev/dotfiles#358 is open") {
 		t.Errorf("missing work-gate confirmation:\n%s", stdout)
 	}
 	proposal := readFile(t, filepath.Join(root, "specs", "CLI-007-dot-spec-init", "proposal.md"))
-	if !strings.Contains(proposal, `issue: "dotfiles#358"`) {
+	if !strings.Contains(proposal, `issue: "mlorentedev/dotfiles#358"`) {
 		t.Errorf("frontmatter issue not populated (the fix):\n%s", proposal)
 	}
 	if !strings.Contains(proposal, "<!-- from issue #358: Port init-spec -->") {
@@ -109,6 +110,7 @@ func TestSpecInitMissingGateFails(t *testing.T) {
 func TestSpecInitClosedIssueFails(t *testing.T) {
 	root := makeRepo(t)
 	stubGhCmd(t, "CLOSED\tAlready done")
+	t.Setenv("DOTF_BITACORA_REPO", "mlorentedev/dotfiles")
 	_, _, err := execute(t, "spec", "init", "CLI-007-dot-spec-init", "--issue", "358")
 	if err == nil {
 		t.Fatalf("expected error for a closed work-gate issue")
@@ -127,6 +129,43 @@ func TestSpecInitInvalidIDFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid feature-id") {
 		t.Errorf("error should name the invalid id, got: %v", err)
+	}
+}
+
+// TestSpecInitBitacoraRepoFlagOverrides guards HARNESS-023: --bitacora-repo
+// sets BOTH the gate repo and the frontmatter issue: prefix, so a cross-repo
+// work-gate (e.g. a kubelab spec gated by a knowledge issue) resolves to the
+// right repo instead of the current one.
+func TestSpecInitBitacoraRepoFlagOverrides(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	stubGhCmd(t, "OPEN\tCross-repo gate")
+
+	_, _, err := execute(t, "spec", "init", "CLI-007-dot-spec-init",
+		"--issue", "358", "--bitacora-repo", "mlorentedev/knowledge")
+	if err != nil {
+		t.Fatalf("spec init --bitacora-repo: %v", err)
+	}
+	proposal := readFile(t, filepath.Join(root, "specs", "CLI-007-dot-spec-init", "proposal.md"))
+	if !strings.Contains(proposal, `issue: "mlorentedev/knowledge#358"`) {
+		t.Errorf("frontmatter should record the overridden repo:\n%s", proposal)
+	}
+}
+
+// TestSpecInitUnresolvableRepoFails guards that a gated init refuses to fabricate
+// an issue prefix when the repo can't be resolved (no flag, no env, no origin) —
+// it errors pointing at --bitacora-repo rather than scaffolding a bogus "#N".
+// stubGhCmd points PATH at a dir with only `gh`, so the origin-slug fallback
+// (which shells out to `git`) finds no git and yields an empty slug.
+func TestSpecInitUnresolvableRepoFails(t *testing.T) {
+	makeRepo(t)
+	stubGhCmd(t, "OPEN\tWhatever")
+	_, _, err := execute(t, "spec", "init", "CLI-007-dot-spec-init", "--issue", "358")
+	if err == nil {
+		t.Fatalf("expected error when the bitácora repo is unresolvable")
+	}
+	if !strings.Contains(err.Error(), "bitacora-repo") {
+		t.Errorf("error should point at --bitacora-repo, got: %v", err)
 	}
 }
 

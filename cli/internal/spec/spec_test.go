@@ -38,7 +38,7 @@ func TestValidateID(t *testing.T) {
 }
 
 func TestRenderSubstitutesAndFixesIssueFrontmatter(t *testing.T) {
-	files, err := Render("CLI-007-dot-spec-init", "2026-06-13", 358, "Port init-spec")
+	files, err := Render("CLI-007-dot-spec-init", "2026-06-13", "mlorentedev/knowledge", 358, "Port init-spec")
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -47,7 +47,9 @@ func TestRenderSubstitutesAndFixesIssueFrontmatter(t *testing.T) {
 	wantContains := []string{
 		`id: "CLI-007-dot-spec-init"`,
 		`created: "2026-06-13"`,
-		`issue: "dotfiles#358"`, // the fix: frontmatter populated, not left empty
+		// HARNESS-023: records the issue's real owner/repo, not a hardcoded
+		// "dotfiles" — and the full owner/name form, not the bare repo.
+		`issue: "mlorentedev/knowledge#358"`,
 		"# CLI-007-dot-spec-init",
 		"<!-- from issue #358: Port init-spec -->",
 	}
@@ -78,7 +80,7 @@ func TestRenderSubstitutesAndFixesIssueFrontmatter(t *testing.T) {
 // created:, so scaffolded specs inherited it. All three templates must now carry
 // the {{date}} placeholder and have it substituted with the generation date.
 func TestRenderStampsCreatedInAllFiles(t *testing.T) {
-	files, err := Render("BUG-007-x", "2026-06-13", 0, "")
+	files, err := Render("BUG-007-x", "2026-06-13", "", 0, "")
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -90,7 +92,7 @@ func TestRenderStampsCreatedInAllFiles(t *testing.T) {
 }
 
 func TestRenderWithoutIssueLeavesFrontmatterEmpty(t *testing.T) {
-	files, err := Render("BUG-007", "2026-06-13", 0, "")
+	files, err := Render("BUG-007", "2026-06-13", "", 0, "")
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -106,7 +108,7 @@ func TestRenderWithoutIssueLeavesFrontmatterEmpty(t *testing.T) {
 func TestScaffoldWritesFilesAndGuardsClobber(t *testing.T) {
 	root := t.TempDir()
 
-	warn, err := Scaffold(root, "CLI-007-dot-spec-init", "2026-06-13", 358, "Port init-spec")
+	warn, err := Scaffold(root, "CLI-007-dot-spec-init", "2026-06-13", "mlorentedev/dotfiles", 358, "Port init-spec")
 	if err != nil {
 		t.Fatalf("Scaffold: %v", err)
 	}
@@ -121,7 +123,7 @@ func TestScaffoldWritesFilesAndGuardsClobber(t *testing.T) {
 	}
 
 	// Re-scaffolding the same id must refuse to clobber.
-	if _, err := Scaffold(root, "CLI-007-dot-spec-init", "2026-06-13", 358, "Port init-spec"); err == nil {
+	if _, err := Scaffold(root, "CLI-007-dot-spec-init", "2026-06-13", "mlorentedev/dotfiles", 358, "Port init-spec"); err == nil {
 		t.Errorf("expected clobber guard error on second scaffold")
 	}
 }
@@ -131,7 +133,7 @@ func TestScaffoldWarnsOnArchivedID(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "specs", "archive", "AI-001-x"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	warn, err := Scaffold(root, "AI-001-x", "2026-06-13", 0, "")
+	warn, err := Scaffold(root, "AI-001-x", "2026-06-13", "", 0, "")
 	if err != nil {
 		t.Fatalf("Scaffold: %v", err)
 	}
@@ -174,7 +176,7 @@ func shellQuote(s string) string {
 
 func TestGateOpenIssueReturnsTitle(t *testing.T) {
 	stubGh(t, "OPEN\tMy open issue", "", false)
-	title, err := Gate(42)
+	title, err := Gate(42, "")
 	if err != nil {
 		t.Fatalf("Gate: %v", err)
 	}
@@ -185,7 +187,7 @@ func TestGateOpenIssueReturnsTitle(t *testing.T) {
 
 func TestGateClosedIssueFails(t *testing.T) {
 	stubGh(t, "CLOSED\tDone already", "", false)
-	if _, err := Gate(42); err == nil {
+	if _, err := Gate(42, ""); err == nil {
 		t.Errorf("expected error for a closed work-gate issue")
 	} else if !strings.Contains(err.Error(), "not open") {
 		t.Errorf("error should mention not-open, got: %v", err)
@@ -194,7 +196,7 @@ func TestGateClosedIssueFails(t *testing.T) {
 
 func TestGateMissingIssueFails(t *testing.T) {
 	stubGh(t, "", "gh: could not resolve issue", true)
-	if _, err := Gate(99999); err == nil {
+	if _, err := Gate(99999, ""); err == nil {
 		t.Errorf("expected error when gh fails to find the issue")
 	}
 }
