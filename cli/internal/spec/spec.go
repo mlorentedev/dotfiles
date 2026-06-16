@@ -17,12 +17,6 @@ import (
 	"strings"
 )
 
-// repoSlug is the GitHub repo the work-gate issue belongs to. It is written
-// into the proposal frontmatter `issue:` field as "<repoSlug>#<num>" — the fix
-// for init-spec.sh, which injected the Why provenance comment but left the
-// frontmatter field empty.
-const repoSlug = "dotfiles"
-
 // templateNames are the spec files rendered into specs/<id>/, in a stable
 // order. proposal.md is special-cased (it carries the issue: frontmatter and
 // the ## Why provenance comment); the others are pure placeholder substitution.
@@ -65,14 +59,20 @@ func RepoRoot(start string) (string, error) {
 // Gate verifies that issue #num exists and is OPEN, returning its title. It
 // shells out to `gh issue view` — a faithful twin of init-spec.sh, and the same
 // path the bitácora workflow uses — rather than reimplementing the GitHub API.
-// Callers skip Gate entirely under --force-no-gate.
-func Gate(num int) (title string, err error) {
+// When repo ("owner/name") is non-empty it is passed as --repo so the gate is
+// checked against the issue's actual home, not the current git repo's default
+// (HARNESS-023). Callers skip Gate entirely under --force-no-gate.
+func Gate(num int, repo string) (title string, err error) {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return "", fmt.Errorf("gh CLI not found — cannot verify work-gate issue #%d "+
 			"(install gh, or use --force-no-gate)", num)
 	}
-	out, err := exec.Command("gh", "issue", "view", strconv.Itoa(num),
-		"--json", "state,title", "--jq", `.state + "\t" + .title`).Output()
+	args := []string{"issue", "view", strconv.Itoa(num),
+		"--json", "state,title", "--jq", `.state + "\t" + .title`}
+	if repo != "" {
+		args = append(args, "--repo", repo)
+	}
+	out, err := exec.Command("gh", args...).Output()
 	if err != nil {
 		return "", fmt.Errorf("work-gate issue #%d not found (or gh failed): %s",
 			num, strings.TrimSpace(stderrOf(err)))
@@ -100,9 +100,10 @@ func stderrOf(err error) string {
 
 // Render returns each spec file's content keyed by filename, with placeholders
 // substituted. When issueNum > 0 the proposal frontmatter `issue:` field is set
-// to "<repo>#<num>"; when a non-empty issueTitle is also given, the ## Why
-// provenance comment is injected. date is the value for created: (YYYY-MM-DD).
-func Render(id, date string, issueNum int, issueTitle string) (map[string]string, error) {
+// to "<repoSlug>#<num>" (repoSlug is the issue's "owner/name" home, not a
+// hardcoded repo — HARNESS-023); when a non-empty issueTitle is also given, the
+// ## Why provenance comment is injected. date is the value for created:.
+func Render(id, date, repoSlug string, issueNum int, issueTitle string) (map[string]string, error) {
 	files := make(map[string]string, len(templateNames))
 	for _, name := range templateNames {
 		raw, err := templatesFS.ReadFile("templates/" + name)
@@ -131,8 +132,8 @@ func Render(id, date string, issueNum int, issueTitle string) (map[string]string
 // Scaffold renders the spec for id and writes it under repoRoot/specs/<id>. It
 // refuses to overwrite an existing specs/<id> (returns an error). If <id>
 // already exists under specs/archive/, it returns a non-empty warning but still
-// scaffolds. issueNum/issueTitle are passed through to Render.
-func Scaffold(repoRoot, id, date string, issueNum int, issueTitle string) (warning string, err error) {
+// scaffolds. repoSlug/issueNum/issueTitle are passed through to Render.
+func Scaffold(repoRoot, id, date, repoSlug string, issueNum int, issueTitle string) (warning string, err error) {
 	specDir := filepath.Join(repoRoot, "specs", id)
 	if _, err := os.Stat(specDir); err == nil {
 		return "", fmt.Errorf("already exists: %s", specDir)
@@ -140,7 +141,7 @@ func Scaffold(repoRoot, id, date string, issueNum int, issueTitle string) (warni
 	if _, err := os.Stat(filepath.Join(repoRoot, "specs", "archive", id)); err == nil {
 		warning = fmt.Sprintf("%s exists in specs/archive/. Possibly reviving.", id)
 	}
-	files, err := Render(id, date, issueNum, issueTitle)
+	files, err := Render(id, date, repoSlug, issueNum, issueTitle)
 	if err != nil {
 		return warning, err
 	}

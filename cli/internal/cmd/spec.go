@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
@@ -30,8 +31,9 @@ func newSpecCmd() *cobra.Command {
 
 func newSpecInitCmd() *cobra.Command {
 	var (
-		issueNum    int
-		forceNoGate bool
+		issueNum     int
+		forceNoGate  bool
+		bitacoraRepo string
 	)
 
 	cmd := &cobra.Command{
@@ -42,7 +44,9 @@ embedded SDD templates.
 
 Work-gate (ADR-018): the spec must be downstream of an OPEN GitHub issue.
 Pass --issue <N>; the issue is verified via 'gh issue view' and its title is
-recorded in the proposal's frontmatter (issue: dotfiles#N) and ## Why comment.
+recorded in the proposal's frontmatter (issue: owner/repo#N) and ## Why comment.
+The issue's repo defaults to the current repo's origin; override with
+--bitacora-repo owner/repo or $DOTF_BITACORA_REPO for a cross-repo work-gate.
 Use --force-no-gate to scaffold without an issue (NOT RECOMMENDED).
 
 Mechanical only: fill the proposal interactively afterwards ("/spec fill" in an
@@ -65,7 +69,7 @@ agent) or by hand. Do not skip the Why.`,
 				return err
 			}
 
-			var issueTitle string
+			var issueTitle, repoSlug string
 			if !forceNoGate {
 				if issueNum == 0 {
 					return fmt.Errorf("no work-gate given: pass --issue <number>.\n" +
@@ -73,15 +77,39 @@ agent) or by hand. Do not skip the Why.`,
 						"bitácora Project. Options: (a) open/find the issue, re-run with --issue;\n" +
 						"(b) re-run with --force-no-gate (NOT RECOMMENDED)")
 				}
-				issueTitle, err = spec.Gate(issueNum)
+				// Resolve the repo that hosts the work-gate issue (HARNESS-023):
+				// explicit --bitacora-repo, then DOTF_BITACORA_REPO, else the
+				// current repo's origin slug. Used for BOTH the gate check and the
+				// proposal's issue: frontmatter, so a cross-repo gate (e.g. a
+				// kubelab spec gated by a knowledge issue) resolves correctly
+				// instead of silently checking the current repo.
+				repoSlug = bitacoraRepo
+				if repoSlug == "" {
+					repoSlug = os.Getenv("DOTF_BITACORA_REPO")
+				}
+				if repoSlug == "" {
+					if s, e := initrepo.OriginRepo(repoRoot); e == nil {
+						repoSlug = s
+					}
+				}
+				if repoSlug == "" {
+					return fmt.Errorf("cannot determine the repo hosting issue #%d: no "+
+						"--bitacora-repo, no DOTF_BITACORA_REPO, and no origin remote in %s.\n"+
+						"Pass --bitacora-repo owner/repo (e.g. mlorentedev/knowledge) or set "+
+						"DOTF_BITACORA_REPO", issueNum, repoRoot)
+				}
+				if !initrepo.ValidRepoSlug(repoSlug) {
+					return fmt.Errorf("invalid bitácora repo %q: want owner/name", repoSlug)
+				}
+				issueTitle, err = spec.Gate(issueNum, repoSlug)
 				if err != nil {
 					return err
 				}
-				cmd.Printf("[INFO] Work-gate OK: issue #%d is open — %s\n", issueNum, issueTitle)
+				cmd.Printf("[INFO] Work-gate OK: %s#%d is open — %s\n", repoSlug, issueNum, issueTitle)
 			}
 
 			date := now().Format("2006-01-02")
-			warning, err := spec.Scaffold(repoRoot, id, date, issueNum, issueTitle)
+			warning, err := spec.Scaffold(repoRoot, id, date, repoSlug, issueNum, issueTitle)
 			if warning != "" {
 				cmd.PrintErrf("[WARN] %s\n", warning)
 			}
@@ -101,6 +129,7 @@ agent) or by hand. Do not skip the Why.`,
 	}
 
 	cmd.Flags().IntVar(&issueNum, "issue", 0, "GitHub issue number that gates this work (must exist and be OPEN)")
+	cmd.Flags().StringVar(&bitacoraRepo, "bitacora-repo", "", "owner/repo hosting the work-gate issue (default: current repo's origin, or $DOTF_BITACORA_REPO)")
 	cmd.Flags().BoolVar(&forceNoGate, "force-no-gate", false, "skip the open-issue work-gate (NOT RECOMMENDED — the gate is the SSOT)")
 	return cmd
 }
