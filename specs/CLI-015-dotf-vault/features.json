@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-015-dotf-vault-f1",
+    "behavior": "dotf vault work <family> <component> scaffolds 50_work/45-development/<family>/<component>/{00-context.md,memory/MEMORY.md} with tokens substituted, plus the parent <family>/00-context.md create-if-absent",
+    "verification": "cd cli && go test ./internal/vault -run 'TestWriteWorkEntryCreatesFilesWithTokensSubstituted|TestWriteWorkEntryFamilyContextNotClobberedBySecondComponent'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-015-dotf-vault-f2",
+    "behavior": "Component files skip-if-present and regenerate under --force; a missing vault is an error naming $VAULT_PATH (not a silent skip)",
+    "verification": "cd cli && go test ./internal/vault -run 'TestWriteWorkEntrySkipsExistingThenForceRegenerates|TestResolveVaultStrictErrorsWhenAbsent' && go test ./internal/cmd -run 'TestVaultWorkErrorsWhenVaultAbsent|TestVaultWorkForceFlagPlumbed'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-015-dotf-vault-f3",
+    "behavior": "Embedded work-sdk-*.md templates are byte-identical to the vault SSOT (drift guard runs real where the vault is present, skips where absent)",
+    "verification": "cd cli && go test ./internal/vault -run TestEmbeddedTemplatesMatchVault",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-015-dotf-vault-f4",
+    "behavior": "dotf vault parent is a first-class Available Command (runnable via cmd.Help), listed by dotf --help, with the work subcommand under it",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestVaultListedInRoot|TestVaultParentPrintsHelp|TestVaultWorkArgValidation'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-015-dotf-vault-f5",
+    "behavior": "family/component path arguments are validated against traversal/injection (../, .., path separators rejected before any write)",
+    "verification": "cd cli && go test ./internal/vault -run TestWriteWorkEntryRejectsPathTraversal",
+    "state": "pending",
+    "evidence": ""
+  }
+]
