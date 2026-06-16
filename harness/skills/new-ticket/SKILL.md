@@ -43,7 +43,7 @@ Take the title and any description/body the user gave. A title alone is enough; 
 | **Home repo** | Infer from §1b: harness / methodology / skills / agents / `AGENTS.md` / SDD → `dotfiles`; vault content or structure → `knowledge`; a specific project's code/infra → that repo. Tie-breaker: where the deploy/runtime contract lives, else `dotfiles`. Fallback: the current repo (`git rev-parse --show-toplevel`). |
 | **AREA prefix** | Pick the area the work belongs to (e.g. `HARNESS`, `OPS`, `CUR`, `AI`, `BUG`, `REFACTOR`, `IDEAS`). If the user typed one in the title, reuse it. |
 | **Type** | Infer from the AREA prefix via the table below. |
-| **Priority** | `P2` (default). |
+| **Priority** | Propose from "Priority by signal" below (calibrated to the board's real distribution); `P2` when no signal fires. |
 | **Status** | `Backlog`. |
 | **Labels** | GitHub labels by nature, from the mapping in "Labels by nature" below (primary from Type + optional secondary from AREA). |
 | **NNN** | Next free number for that AREA in the home repo — scan existing issue titles (snippet below). |
@@ -56,7 +56,7 @@ Take the title and any description/body the user gave. A title alone is enough; 
 State the proposal in one line first (repo · `AREA-NNN-slug` · title · proposed labels), then ask. Put the recommended option **first** and label it "(Recommended)". Ask the fields most likely to need a decision:
 
 1. **Type** — `spec` · `bug` · `chore` · `ideas` (pre-selected = inferred).
-2. **Priority** — `P2 (Recommended)` · `P0` · `P1` · `P3`.
+2. **Priority** — the "Priority by signal" pick is pre-selected and marked `(Recommended)`; offer the other three of `P0` · `P1` · `P2` · `P3`.
 3. **Assignment** — `Leave in Backlog (Recommended, unassigned)` · `Self-assign → In Progress` (self-assigning fires `bitacora-status.yml`, HARNESS-010).
 
 If the user needs a different **repo**, **AREA**, or **slug**, they say so (or pick "Other") — re-propose and re-confirm. Do not proceed until the ID and repo are agreed.
@@ -136,6 +136,28 @@ The `Type` field has four options; map the prefix to the closest, then let the h
 | anything else | `chore` (safe default) |
 
 The mapping is a *suggestion*, not a rule — the human confirms it in step 3.
+
+## Priority by signal
+
+Propose `Priority` the same way Type and Labels are proposed — derived from the ticket's nature, not a flat default — then the human confirms in step 3. Match the **highest** signal that fires:
+
+| Signal in the title/body | Priority |
+|--------------------------|----------|
+| Broken or blocking **now** — CI red, a shipped command/tool erroring, secret/data-loss risk, or it blocks other in-flight work | `P0` (rare — reserve for true "stop and fix"; ~never on this board) |
+| A real **defect** in shipped code (`BUG-*`, "fails/errors/wrong"), OR work that **unblocks the active arc** / is the named next step, OR a **security/secrets** gap | `P1` |
+| Normal backlog — a capability, refactor, doc, or chore with **no urgency signal** | `P2` (default) |
+| Nice-to-have, speculative, **parked/undecided**, cosmetic/polish, or an `IDEAS`/`RFD` research item | `P3` |
+
+**Calibrate, don't inflate.** Resolve the live distribution before proposing, so the proposal tracks how the board actually uses the scale (today: `P2` ~90%, `P1` selective ~5%, `P0` ~never, `P3` the long tail):
+
+```bash
+gh project item-list 1 --owner mlorentedev --format json --limit 1000 | python3 -c "
+import json,sys; from collections import Counter
+c=Counter(i.get('priority') for i in json.load(sys.stdin)['items'] if i.get('priority'))
+print(dict(c))"
+```
+
+When two signals tie, take the higher only if there is a concrete urgency cue (a date, a blocked dependency, a red CI); absent that, prefer `P2`. The pick is a *suggestion* like Type — the human confirms it in step 3. **Autonomous mode does NOT apply this rubric's upgrade**: an unattended `detect→ticket` run still files at `P2` and leaves prioritization to a human triage (see "Non-interactive / autonomous mode").
 
 ## Labels by nature
 
