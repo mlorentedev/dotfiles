@@ -40,13 +40,13 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons.md`? yes - (1) gitignored //go:embed template builds locally but is absent in a fresh CI checkout; (2) extract-to-a-new-script fights a reduce-the-surface north star, prefer remove + ticket-restore.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no - ADR-022 already records the `dotf init` flagship; no further architectural decision surfaced.
+- [x] New pattern candidate for `00_meta/patterns/`? no - both lessons are repo-local (embed/gitignore mechanics, strangler surface trade); neither recurs cross-project yet.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-014-dotf-init/` -> `specs/archive/CLI-014-dotf-init/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-014-dotf-init/` -> `specs/archive/CLI-014-dotf-init/`
+- [x] Backlog entry in vault `11-tasks.md` ticked with PR link
+- [x] Promotions above executed (if any)
