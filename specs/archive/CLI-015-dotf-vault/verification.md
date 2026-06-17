@@ -35,7 +35,7 @@ created: "2026-06-16"
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons.md`? maybe at archive — two candidates: (a) "broaden a port's scope when it exposes a latent duplication (init's inlined vault entry) rather than restoring the narrow capability in isolation"; (b) **"a byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename"** — going to reconcile the embedded `vault-context.md` against the SSOT `project-context.md` revealed they were never the same artifact (different token schemes), only similarly named → reframed PR2 as embed-only + ticket #400 (verify-before-act, lesson #7 applied). Decide at archive.
+- [x] Lesson promoted to `docs/lessons.md` (2026-06-17): **"a byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename"** (the PR2 reconciliation → #400). Candidate (a) "broaden a port's scope…" NOT promoted — already covered by the 2026-06-16 entry on scope-broadening migrations.
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no — ADR-021 step 3 already names `dotf vault`; this executes it.
 - [ ] New pattern candidate for `00_meta/patterns/`? no — repo-local (embed/drift + cobra noun-verb, already established).
 
@@ -43,7 +43,7 @@ created: "2026-06-16"
 
 > Archive only after **both** PR1 (#388) and PR2 (#395) merge — the spec spans the sequence.
 
-- [ ] `proposal.md` frontmatter set to `status: archived` (after PR2)
-- [ ] Folder moved: `specs/CLI-015-dotf-vault/` -> `specs/archive/CLI-015-dotf-vault/` (after PR2)
-- [ ] Bitácora #388 + #395 closed -> `Done` (task state lives in the bitácora, ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived` (via `dotf spec archive`)
+- [x] Folder moved: `specs/CLI-015-dotf-vault/` -> `specs/archive/CLI-015-dotf-vault/` (via `dotf spec archive`)
+- [x] Bitácora #388 + #395 closed -> `Done` (both CLOSED; task state lives in the bitácora, ADR-018)
+- [x] Promotions above executed: lesson promoted to `docs/lessons.md`
