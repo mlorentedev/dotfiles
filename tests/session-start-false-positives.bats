@@ -14,10 +14,12 @@
 #
 # Hermetic design: the hook runs everything top-to-bottom on exec with no main()
 # guard, and its sibling vault-health.sh launches Obsidian (which hangs headless,
-# see session-start-config.bats). We copy ONLY the script into an isolated temp
-# dir so every sibling lookup (vault-health.sh, claude-mem-heal.sh)
-# and the config file MISS and get skipped, while the real check_knowledge_health
-# / check_vault_baseline logic still runs against a controlled HOME and CWD.
+# see session-start-config.bats). We copy the hook AND its required session-brief
+# core (ADR-023 — vault detection / spec / baseline signals live there now) into
+# an isolated temp dir, but deliberately NOT the other siblings (vault-health.sh,
+# claude-mem-heal.sh) nor the config file, so those lookups MISS and get skipped
+# while the real check_knowledge_health / vault-baseline logic runs against a
+# controlled HOME and CWD.
 
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -30,6 +32,10 @@ setup() {
     mkdir -p "$TEST_HOME/bin"
     TMP_SCRIPT="$TEST_HOME/bin/claude-session-start.sh"
     cp "$SRC_SCRIPT" "$TMP_SCRIPT"
+    # session-brief.sh is a REQUIRED dependency: the hook sources it for the
+    # vault-detection / spec / baseline signals. Copy it alongside so those run;
+    # vault-health.sh stays absent so sb_vault_health takes its "not found" path.
+    cp "$DOTFILES_DIR/scripts/session-brief.sh" "$TEST_HOME/bin/session-brief.sh"
 }
 
 teardown() {
