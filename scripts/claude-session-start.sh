@@ -15,24 +15,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-# --- session-brief core (ADR-023, HARNESS-026) ---
-# The agent-independent vault signals (vault detection, vault-health, spec
-# counts, baseline integrity) live in the agnostic session-brief core. This hook
-# is the Claude adapter: it sources the core as a library and calls the sb_*
-# emitters at their legacy positions below, so the emitted additionalContext
-# stays byte-identical. No-op fallbacks first so a partial install (core script
-# not yet deployed) still runs and degrades to "no vault signals".
-find_vault_root() { return 1; }
-sb_vault_detect() { :; }
-sb_vault_health() { :; }
-sb_specs() { :; }
-sb_vault_baseline() { :; }
-SESSION_BRIEF_CORE="$SCRIPT_DIR/session-brief.sh"
-if [ -f "$SESSION_BRIEF_CORE" ]; then
-    # shellcheck source=session-brief.sh
-    SESSION_BRIEF_LIB=1 . "$SESSION_BRIEF_CORE"
-fi
-
 # --- SDD-004: session-start-config.json reader ---
 # Single source of truth for thresholds + injector flags. Lives at repo root
 # (one level above scripts/). Override via SESSION_START_CONFIG env var.
@@ -85,6 +67,27 @@ fi
 # subsequent diagnostic blocks (claude-mem, doctor, hive, specs, vault, memory)
 # APPEND to CONTEXT_LINES defensively so they cannot wipe this reminder.
 CONTEXT_LINES='[sdd] Before your first tool call, read `AGENTS.md` at the repo root (or `~/Projects/dotfiles/AGENTS.md` as fallback) and apply its "Spec-Driven Development" (including the Discipline Gate) and "Standing Orders" sections. SDD applies by default for PR-sized changes (~50-300 LOC, public contract, new dep, multi-PR sequence). Skip ONLY for: typos, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, documentation-only changes. When in doubt, ASK the user.'
+
+# --- session-brief core (ADR-023, HARNESS-026) ---
+# The agent-independent vault signals (vault detection, vault-health, spec
+# counts, baseline integrity) live in the agnostic session-brief core. This hook
+# is the Claude adapter: it sources the core as a library and calls the sb_*
+# emitters at their legacy positions below, so the emitted additionalContext
+# stays byte-identical. No-op fallbacks first so a partial install (core script
+# not yet deployed) still runs and degrades to "no vault signals".
+# NOTE: sourced AFTER the [sdd] reminder above — the fallback find_vault_root()
+# stub must stay below the [sdd] line (tests/hooks.bats anchors the SDD-first
+# invariant on the first find_vault_root definition).
+find_vault_root() { return 1; }
+sb_vault_detect() { :; }
+sb_vault_health() { :; }
+sb_specs() { :; }
+sb_vault_baseline() { :; }
+SESSION_BRIEF_CORE="$SCRIPT_DIR/session-brief.sh"
+if [ -f "$SESSION_BRIEF_CORE" ]; then
+    # shellcheck source=session-brief.sh
+    SESSION_BRIEF_LIB=1 . "$SESSION_BRIEF_CORE"
+fi
 
 # --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
 # Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
