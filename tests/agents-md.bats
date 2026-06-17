@@ -10,6 +10,14 @@ setup() {
     [[ -f "$AGENTS_MD" ]]
 }
 
+@test "AGENTS.md states the memory single-sink rule (GUARD-001, AC6)" {
+    grep -qF 'MEMORY SINGLE-SINK' "$AGENTS_MD"
+    grep -qF 'only' "$AGENTS_MD"
+    grep -qF 'Hive is the memory API' "$AGENTS_MD"
+    grep -qF 'core.hooksPath' "$AGENTS_MD"
+    grep -qF 'MEMORY.md' "$AGENTS_MD"
+}
+
 @test "AGENTS.md has Spec-Driven Development H2 section (pre-existing, regression guard)" {
     grep -qE '^## Spec-Driven Development$' "$AGENTS_MD"
 }
