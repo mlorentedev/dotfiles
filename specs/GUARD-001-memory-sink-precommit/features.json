@@ -23,21 +23,21 @@
   {
     "id": "GUARD-001-f4",
     "behavior": "dotf init scaffolds a .gitignore block ignoring MEMORY.md and memory/",
-    "verification": "go test ./cli/internal/initrepo/ -run TestScaffoldGitignoreMemoryBlock",
+    "verification": "cd cli && go test ./internal/initrepo/ -run TestScaffoldGitignoreHasMemorySinkBlock",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "GUARD-001-f5",
-    "behavior": "Global core.hooksPath install is idempotent and preserves an unrelated existing hooksPath",
-    "verification": "bats tests/guard-install.bats -f 'idempotent'",
+    "behavior": "dotf doctor wires core.hooksPath at the dispatcher idempotently, preserves an unrelated existing hooksPath (no clobber), and only writes under --fix",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckGuardHooks",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "GUARD-001-f6",
-    "behavior": "AGENTS.md states the single-sink rule once (no Hive-note duplication)",
-    "verification": "grep -q 'single sink' AGENTS.md",
+    "behavior": "AGENTS.md states the memory single-sink rule once (vault = only sink; Hive = the memory API)",
+    "verification": "bats tests/agents-md.bats -f 'memory single-sink rule'",
     "state": "pending",
     "evidence": ""
   }

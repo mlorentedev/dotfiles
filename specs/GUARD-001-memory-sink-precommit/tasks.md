@@ -22,12 +22,12 @@ created: "2026-06-16"
 - [x] Failing bats: same artifact inside a vault fixture (sentinel present) → expect exit 0 (AC2) — **RED** → **GREEN**
 - [x] Failing bats: chaining — fixture repo with a pre-existing local `pre-commit` hook; assert both the GUARD and the local hook execute, local hook not clobbered (AC3) — **RED**
 - [x] Implement chaining: dispatcher execs the repo-local hook after the guard passes (R1 decision) → **GREEN** (AC3)
-- [ ] Failing Go test: `initrepo` scaffold output `.gitignore` contains the `MEMORY.md` / `memory/` block (AC4) — **RED**
-- [ ] Implement the gitignore block in `cli/internal/initrepo/scaffold.go` → **GREEN** (AC4)
-- [ ] Failing bats: idempotent install (setup / `dotf doctor`) — first run wires `core.hooksPath` + places the dispatcher; re-run is a no-op; an unrelated pre-existing `core.hooksPath` is preserved, not clobbered (AC5) — **RED**
-- [ ] Implement the install/repair function (wire `git config --global core.hooksPath`, place the dispatcher, idempotent) → **GREEN** (AC5)
-- [ ] AGENTS.md: add the single-sink rule once (vault = only memory sink; Hive = the memory API over it) + grep assertion (AC6)
-- [ ] Refactor for clarity; cross-OS parity assert (R5 — POSIX hook runs under Git-for-Windows `sh`); no `.ps1` hook mirror needed
+- [x] Failing Go test: `initrepo` scaffold `.gitignore` contains the `MEMORY.md` / `memory/` block (AC4) — `TestScaffoldGitignoreHasMemorySinkBlock`
+- [x] Implement the gitignore block — added to the embedded `cli/internal/initrepo/templates/gitignore` (the scaffold copies it verbatim) → **GREEN** (AC4)
+- [x] Failing Go test: `dotf doctor` install is idempotent — wires `core.hooksPath` only when unset (under `--fix`); re-run on an already-correct value is a no-op; an unrelated pre-existing `core.hooksPath` is preserved, not clobbered (AC5) — `TestCheckGuardHooks_*` (5 cases)
+- [x] Implement the install/repair check `checkGuardHooks` in `cli/internal/doctor/checks_guard.go` (wire `git config --global core.hooksPath` at the deployed `git-hooks/`, fail-fast if the dispatcher is undeployed) → **GREEN** (AC5). *Chosen over a bats end-to-end so CI never mutates a real `~/.gitconfig`; the `System` injection covers the full contract.*
+- [x] AGENTS.md: added the **MEMORY SINGLE-SINK (GUARD-001)** rule once (vault = only memory sink; Hive = the memory API over it) + `tests/agents-md.bats` grep assertion (AC6)
+- [x] Cross-OS parity: AC4/5/6 add no new shell — AC4 is a template, AC5 is Go (`dotf doctor`, cross-compiled), AC6 is docs; the POSIX dispatcher from #409 is unchanged (R5 holds, no `.ps1` mirror needed)
 
 ## Closing
 
