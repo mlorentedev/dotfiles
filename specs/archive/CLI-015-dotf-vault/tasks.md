@@ -59,7 +59,7 @@ created: "2026-06-16"
 - [x] Rewire `dotf init` orchestrator to call `vault.WriteProjectEntry`; delete the `initrepo` copy (strangler — guard-grep clean).
 - [x] Parity: `dotf init` produces a byte-identical `10_projects/<repo>/` before/after (templates moved via `git mv` — byte-equal vs `main`; smoke: project-vs-init `00-context.md` identical modulo repo name; orchestrator/vault tests green).
 - [x] Templates stay embed-only (no drift guard yet): they diverge from the vault SSOT `project-context.md`/`agent-memory.md` — reconciliation tracked in #400 (kept out of #395 to preserve byte-identical output).
-- [ ] PR2 opened referencing this spec folder; closes #395. Archive CLI-015 after PR2 merges.
+- [x] PR2 opened referencing this spec folder; closes #395. (PR #403, merged @ `cd03921` → #395 closed; spec archived here.)
 
 ## Machine-readable features
 
