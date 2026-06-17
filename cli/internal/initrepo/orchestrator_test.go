@@ -67,6 +67,40 @@ func TestInitSkipAgents(t *testing.T) {
 	}
 }
 
+// TestInitWritesVaultEntryWhenVaultPresent is the parity oracle for #395: with a
+// vault present, the orchestrator must drive vault.WriteProjectEntry and produce
+// the full 10_projects/<repo>/ entry — the same output the inlined
+// initrepo.WriteVaultEntry produced before the extraction.
+func TestInitWritesVaultEntryWhenVaultPresent(t *testing.T) {
+	vaultDir := t.TempDir()
+	root := filepath.Join(t.TempDir(), "myproj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Init(InitOptions{
+		Root:       root,
+		Stack:      "go",
+		Date:       "2026-06-14",
+		SkipGithub: true,
+		VaultPath:  vaultDir,
+		// ClaudeProjectsDir "" => no symlink attempt (keeps HOME untouched).
+	})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if s := stepStatus(report, "vault"); s != "ok" {
+		t.Errorf("vault step status = %q, want ok", s)
+	}
+
+	entry := filepath.Join(vaultDir, "10_projects", "myproj")
+	for _, f := range []string{"00-context.md", "10-roadmap.md", filepath.Join("memory", "MEMORY.md")} {
+		if _, err := os.Stat(filepath.Join(entry, f)); err != nil {
+			t.Errorf("expected vault entry file %s after Init: %v", f, err)
+		}
+	}
+}
+
 func stepStatus(r InitReport, name string) string {
 	for _, s := range r.Steps {
 		if s.Name == name {
