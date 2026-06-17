@@ -13,6 +13,7 @@
 | `ai/` | Per-agent configuration sources (claude, opencode, copilot, pi, agy, hermes, aider, nan) deployed by setup; thin overlays over the `AGENTS.md` SSOT |
 | `cli/` | The `dotf` Go CLI — own module (`go.mod`), own release pipeline (goreleaser). See layout below |
 | `docs/` | Build/operate knowledge: `adr/`, `runbooks/`, `troubleshooting/`, `lessons.md`, this file |
+| `git-hooks/` | Global git hooks deployed via `core.hooksPath` (GUARD-001) — the memory-sink guard (`pre-commit`) plus per-type chain dispatchers that re-exec the repo-local `.git/hooks/<type>` so local guards (gitleaks) survive |
 | `harness/` | Compiled harness records (skills, enforced overrides) — generated cache from the vault SSOT via `compile-harness.sh`; do not hand-edit |
 | `powershell/` | PowerShell profile (Windows counterpart of `.zsh/`) |
 | `scripts/` | Shell tooling as `.sh`/`.ps1` twins — **shrinking**: each twin is deleted when its logic ports to a `dotf` subcommand (ADR-020, epic #131); end state is thin bootstrap helpers only |
