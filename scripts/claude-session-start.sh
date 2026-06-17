@@ -299,65 +299,22 @@ encode_project_path() {
 
 # --- Auto-create memory symlink if vault has memory/ for this project ---
 # Runs before health check so the symlink exists when health check reads it.
+# The vault-source resolution lives in the agent-agnostic ensure-memory-symlink.sh
+# (MEMORY-002); this hook only computes Claude's encoded target and delegates.
 ensure_memory_symlink() {
-    local encoded target_dir project_name vault_memory parent_dir
+    local encoded target_dir msg helper
+    helper="$SCRIPT_DIR/ensure-memory-symlink.sh"
+    [ -x "$helper" ] || return 0   # degrade cleanly if the sibling isn't deployed
     encoded=$(encode_project_path "$CWD")
     target_dir="$HOME/.claude/projects/$encoded/memory"
 
-    # Already linked? Skip.
-    if [ -L "$target_dir" ]; then return 0; fi
-    if [ -d "$target_dir" ] && [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then return 0; fi
-
-    # Try 10_projects/<name>/memory/ (personal projects convention)
-    project_name=$(basename "$CWD")
-    vault_memory="$KNOWLEDGE_VAULT/10_projects/$project_name/memory"
-
-    if [ ! -d "$vault_memory" ]; then
-        # Try CWD/memory/ (knowledge sessions where CWD is inside the vault)
-        case "$CWD" in
-            "$KNOWLEDGE_VAULT"*) vault_memory="$CWD/memory" ;;
-            *) vault_memory="" ;;
-        esac
-    fi
-
-    # Try 50_work/45-development/<family>/<component>/memory/ for nested work SDK repos
-    if [ -z "$vault_memory" ] || [ ! -d "$vault_memory" ]; then
-        local dev_dir="$KNOWLEDGE_VAULT/50_work/45-development"
-        if [ -d "$dev_dir" ]; then
-            local cwd_path_slug sdk_family_dir sdk_family_slug sdk_comp_dir sdk_comp_slug
-            cwd_path_slug=$(printf '%s' "$CWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9/')
-            for sdk_family_dir in "$dev_dir"/*/; do
-                [ -d "$sdk_family_dir" ] || continue
-                sdk_family_slug=$(basename "$sdk_family_dir" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
-                if printf '%s' "$cwd_path_slug" | grep -q "$sdk_family_slug"; then
-                    for sdk_comp_dir in "$sdk_family_dir"*/; do
-                        [ -d "$sdk_comp_dir" ] || continue
-                        sdk_comp_slug=$(basename "$sdk_comp_dir" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
-                        if printf '%s' "$cwd_path_slug" | grep -q "$sdk_comp_slug"; then
-                            vault_memory="$sdk_comp_dir/memory"
-                            break 2
-                        fi
-                    done
-                fi
-            done
-        fi
-    fi
-
-    [ -d "$vault_memory" ] || return 0
-
-    # Create parent dir and symlink
-    parent_dir="$HOME/.claude/projects/$encoded"
-    mkdir -p "$parent_dir"
-
-    # Remove empty target dir if it exists (no files, not a symlink)
-    if [ -d "$target_dir" ] && [ -z "$(ls -A "$target_dir" 2>/dev/null)" ]; then
-        rmdir "$target_dir" 2>/dev/null || true
-    fi
-
-    if ln -s "$vault_memory" "$target_dir" 2>/dev/null; then
+    msg=$(VAULT_PATH="$KNOWLEDGE_VAULT" "$helper" \
+        --cwd "$CWD" --target "$target_dir" 2>/dev/null) || true
+    if [ -n "$msg" ]; then
         CONTEXT_LINES="$CONTEXT_LINES
-[auto-memory] Created symlink for $project_name"
+$msg"
     fi
+    return 0   # never let an empty-msg short-circuit fail the hook under set -e
 }
 
 ensure_memory_symlink
