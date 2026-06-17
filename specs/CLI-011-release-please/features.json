@@ -22,8 +22,8 @@
   },
   {
     "id": "CLI-011-release-please-f4",
-    "behavior": "AC4: the release workflow uses a PAT (RELEASE_PLEASE_TOKEN) so the created tag triggers goreleaser",
-    "verification": "grep -q 'secrets.RELEASE_PLEASE_TOKEN' .github/workflows/release-please.yml",
+    "behavior": "AC4: the release workflow uses a PAT (RELEASE_TOKEN) so the created tag triggers goreleaser",
+    "verification": "grep -q 'secrets.RELEASE_TOKEN' .github/workflows/release-please.yml",
     "state": "pending",
     "evidence": ""
   },
