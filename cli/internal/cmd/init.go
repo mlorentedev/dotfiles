@@ -9,6 +9,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
 // newInitCmd builds `dotf init`, the repo-scaffolder (ADR-022) — the Go flagship
@@ -61,9 +62,9 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 				return err
 			}
 
-			vault := ""
+			vaultPath := ""
 			if !skipVault {
-				vault = initrepo.ResolveVault()
+				vaultPath = vault.ResolveVault()
 			}
 			claudeDir := ""
 			if home, herr := os.UserHomeDir(); herr == nil {
@@ -76,7 +77,7 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 				Date:              now().Format("2006-01-02"),
 				SkipAgents:        skipAgents,
 				SkipGithub:        skipGithub,
-				VaultPath:         vault,
+				VaultPath:         vaultPath,
 				ClaudeProjectsDir: claudeDir,
 			})
 			if err != nil {
