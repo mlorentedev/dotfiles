@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-026-session-brief-core-f1",
+    "behavior": "scripts/session-brief.sh exists, is executable, and is ShellCheck-clean",
+    "verification": "test -x scripts/session-brief.sh && shellcheck scripts/session-brief.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-026-session-brief-core-f2",
+    "behavior": "session-brief.sh --format=stdout emits the agent-independent vault brief as raw lines",
+    "verification": "bats tests/session-brief.bats -f 'format=stdout'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-026-session-brief-core-f3",
+    "behavior": "session-brief.sh --format=markdown wraps the same brief in one fenced markdown block",
+    "verification": "bats tests/session-brief.bats -f 'format=markdown'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-026-session-brief-core-f4",
+    "behavior": "session-brief.sh with an unknown/empty --format exits non-zero and prints usage to stderr",
+    "verification": "bats tests/session-brief.bats -f 'unknown format'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-026-session-brief-core-f5",
+    "behavior": "claude-session-start.sh sources the core and emits byte-identical additionalContext vs origin/main across 3 CWDs",
+    "verification": "bats tests/session-start-config.bats -f 'byte-equivalence'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
