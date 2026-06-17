@@ -3,6 +3,8 @@ package initrepo
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
 // InitOptions configures the full `dotf init` scaffold. Root must be an existing
@@ -87,7 +89,7 @@ func Init(opts InitOptions) (InitReport, error) {
 	}
 
 	// 7. Vault entry (auto-skip when no vault).
-	vres, err := WriteVaultEntry(VaultEntryOptions{
+	vres, err := vault.WriteProjectEntry(vault.ProjectEntryOptions{
 		VaultPath:         opts.VaultPath,
 		RepoRoot:          opts.Root,
 		Stack:             opts.Stack,
