@@ -583,6 +583,11 @@ setup() {
     grep -qF 'safe_copy "$CURRENT_DIR/AGENTS.md" "$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-linux.sh installs the GUARD memory-sink git-hooks (#418 deploy + wire)" {
+    grep -qF '. ./scripts/install-git-hooks.sh' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'install_git_hooks' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-linux.sh mirrors ai/claude/CLAUDE.md into the deploy dir (drift fix)" {
     grep -qF 'safe_copy "$CURRENT_DIR/ai/claude/CLAUDE.md" "$DOTFILES_DIR/ai/claude/"' "$DOTFILES_DIR/setup-linux.sh"
 }
