@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Global commit-msg dispatcher (GUARD-001): no global concern here — just chain
+# to the repo-local hook, which a global core.hooksPath would otherwise shadow.
+set -u
+DISPATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+exec "$DISPATCH_DIR/lib/chain-local-hook.sh" commit-msg "$@"

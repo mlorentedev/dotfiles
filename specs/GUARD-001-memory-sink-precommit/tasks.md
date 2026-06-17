@@ -17,11 +17,11 @@ created: "2026-06-16"
 
 > The guard is a single POSIX `pre-commit` dispatcher under a tracked `git-hooks/` dir; setup/`dotf doctor` point `core.hooksPath` at it. Keep each step one commit.
 
-- [ ] Failing bats: in a non-vault fixture repo, `git commit` staging `MEMORY.md` → expect non-zero exit + vault message (AC1) — **RED**
-- [ ] Implement the dispatcher core: vault detection (sentinel `.obsidian/` + `$VAULT_PATH` fallback, R2) + staged-path scan (`MEMORY.md`, `memory/`, session-record shape, R4) + reject → **GREEN** (AC1)
-- [ ] Failing bats: same artifact inside a vault fixture (sentinel present) → expect exit 0 (AC2) — **RED** → **GREEN**
-- [ ] Failing bats: chaining — fixture repo with a pre-existing local `pre-commit` hook; assert both the GUARD and the local hook execute, local hook not clobbered (AC3) — **RED**
-- [ ] Implement chaining: dispatcher execs the repo-local hook after the guard passes (R1 decision) → **GREEN** (AC3)
+- [x] Failing bats: in a non-vault fixture repo, `git commit` staging `MEMORY.md` → expect non-zero exit + vault message (AC1) — **RED**
+- [x] Implement the dispatcher core: vault detection (sentinel `.obsidian/` + `$VAULT_PATH` fallback, R2) + staged-path scan (`MEMORY.md`, `memory/`, session-record shape, R4) + reject → **GREEN** (AC1)
+- [x] Failing bats: same artifact inside a vault fixture (sentinel present) → expect exit 0 (AC2) — **RED** → **GREEN**
+- [x] Failing bats: chaining — fixture repo with a pre-existing local `pre-commit` hook; assert both the GUARD and the local hook execute, local hook not clobbered (AC3) — **RED**
+- [x] Implement chaining: dispatcher execs the repo-local hook after the guard passes (R1 decision) → **GREEN** (AC3)
 - [ ] Failing Go test: `initrepo` scaffold output `.gitignore` contains the `MEMORY.md` / `memory/` block (AC4) — **RED**
 - [ ] Implement the gitignore block in `cli/internal/initrepo/scaffold.go` → **GREEN** (AC4)
 - [ ] Failing bats: idempotent install (setup / `dotf doctor`) — first run wires `core.hooksPath` + places the dispatcher; re-run is a no-op; an unrelated pre-existing `core.hooksPath` is preserved, not clobbered (AC5) — **RED**

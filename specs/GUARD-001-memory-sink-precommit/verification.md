@@ -5,24 +5,24 @@ created: "2026-06-16"
 
 # Verification - GUARD-001-memory-sink-precommit
 
-> Status: **draft** — this PR ships the spec (design). Evidence is filled during the implementation PR.
+> Status: **implementing** — this PR ships the AC1/AC2/AC3 mechanism + tests; AC4/AC5/AC6 are follow-up (same #398).
 
 ## Evidence
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] AC1 (reject in non-vault repo) -> bats `guard-memory.bats::rejects MEMORY.md in non-vault repo`
-- [ ] AC2 (allow in vault) -> bats `guard-memory.bats::allows MEMORY.md in vault (sentinel)`
-- [ ] AC3 (chaining preserves local hook) -> bats `guard-memory.bats::runs guard and local pre-commit`
-- [ ] AC4 (dotf init gitignore block) -> Go `initrepo.TestScaffoldGitignoreMemoryBlock`
-- [ ] AC5 (idempotent install) -> bats `guard-install.bats::idempotent + preserves existing hooksPath`
-- [ ] AC6 (AGENTS.md single-sink) -> grep assertion in CI / bats
+- [x] AC1 (reject in non-vault repo) -> bats `tests/guard-memory-sink.bats::"AC1: rejects MEMORY.md committed to a non-vault repo"` (+ `memory/` path + normal-file-allowed variants)
+- [x] AC2 (allow in vault) -> bats `tests/guard-memory-sink.bats::"AC2: allows MEMORY.md inside the vault (sentinel .obsidian/)"` + `"AC2: allows MEMORY.md when repo root == VAULT_PATH"`
+- [x] AC3 (chaining preserves local hook) -> bats `tests/guard-memory-sink.bats::"AC3: chains to repo-local .git/hooks/pre-commit (both run)"` (+ failure-propagation + no-local-hook variants)
+- [ ] AC4 (dotf init gitignore block) -> Go `initrepo.TestScaffoldGitignoreMemoryBlock` — **follow-up**
+- [ ] AC5 (idempotent install) -> bats `guard-install.bats::idempotent + preserves existing hooksPath` — **follow-up**
+- [ ] AC6 (AGENTS.md single-sink) -> grep assertion in CI / bats — **follow-up**
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>` (filled at implementation)
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no
+- Test suite: `bats tests/guard-memory-sink.bats` -> 8/8 ok (AC1 reject ×2 + allow; AC2 vault sentinel + VAULT_PATH; AC3 chain runs + propagates failure + runs without local hook)
+- Drift guard: `bats tests/architecture-md.bats` -> 5/5 ok (`git-hooks/` declared in `docs/architecture.md`)
+- No regressions in existing test suite: yes (only the two affected guards run here; full suite runs in CI `test` job)
 
 ## Decisions made during implementation
 

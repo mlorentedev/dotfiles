@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Global pre-push dispatcher (GUARD-001): chain to the repo-local hook (e.g. the
+# opt-in SDD spec-gate), shadowed by a global core.hooksPath. stdin (the ref
+# list) is inherited through exec.
+set -u
+DISPATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+exec "$DISPATCH_DIR/lib/chain-local-hook.sh" pre-push "$@"
