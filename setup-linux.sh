@@ -275,6 +275,19 @@ else
     log_warning "scripts/install-dotf.sh not found; skipping dotf install"
 fi
 
+# GUARD-001 memory-sink dispatcher (#398/#418): deploy git-hooks/ into the
+# ~/.dotfiles mirror and wire core.hooksPath machine-wide so the guard is active
+# in every repo. Idempotent; preserves an unrelated pre-existing hooksPath. The
+# deployed dotf release can't self-deploy these (no source tree), so the
+# bootstrap places them (ADR-020 C7); `dotf doctor` verifies the wiring after.
+if [ -f ./scripts/install-git-hooks.sh ]; then
+    # shellcheck source=/dev/null
+    . ./scripts/install-git-hooks.sh
+    install_git_hooks || log_warning "git-hooks install failed (continuing; see 'dotf doctor')"
+else
+    log_warning "scripts/install-git-hooks.sh not found; skipping memory-sink guard install"
+fi
+
 # zoxide (smarter cd)
 if ! command -v zoxide >/dev/null 2>&1; then
     log_info "Installing zoxide..."
