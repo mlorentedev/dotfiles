@@ -29,10 +29,10 @@ func checkGuardHooks(sys *System, cfg *Config, rep *Report, fix bool) {
 	}
 
 	current := gitGlobalHooksPath(sys)
-	switch {
-	case current == target:
+	switch current {
+	case target:
 		rep.Pass("core.hooksPath wired to the GUARD dispatcher")
-	case current == "":
+	case "":
 		if !fix {
 			rep.Fail("core.hooksPath unset — GUARD memory-sink guard inactive; run `dotf doctor --fix`")
 			return
