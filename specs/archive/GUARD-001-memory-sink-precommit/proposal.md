@@ -1,7 +1,7 @@
 ---
 id: "GUARD-001-memory-sink-precommit"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-16"
 issue: "dotfiles#398"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, memory, single-sink, git-hooks, cross-agent]
