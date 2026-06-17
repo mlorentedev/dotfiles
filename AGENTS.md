@@ -256,6 +256,7 @@ Two layers, declared by [ADR-020](docs/adr/adr-020-tooling-cli-go-convergence.md
 **LANGUAGE:** All Vault content MUST be in English.
 **COMMIT POLICY:** **Autonomous agents** (no human in the loop) may commit autonomously **only within their vault workspace `80_agents/`** — that sandbox is theirs; everywhere else (code repos + the rest of the vault) they stage only and leave commits for human approval. **Interactive / in-session agents** stage by default and commit / push / open PRs **when the user asks** (e.g. this repo's PR-per-feature flow).
 **REPO DOCS:** Repos on the knowledge-placement model keep `docs/` (with `docs/adr/`) in-repo and may keep a root `CHANGELOG.md`. This **supersedes the older blanket "never create `docs/`" stance** (closes CHORE-002). Still avoid ad-hoc `TODO.md` — tasks live in `specs/` + the backlog.
+**MEMORY SINGLE-SINK (GUARD-001):** The vault is the **only** sink for agent memory — `MEMORY.md`, `memory/`, and session handoffs/journals live there and nowhere else. **Hive is the memory API over the vault**: read and write memory through Hive, never by committing memory files into a code repo. A global `core.hooksPath` pre-commit guard rejects `MEMORY.md` / `memory/` in any non-vault repo, and `dotf init` bakes the matching `.gitignore`; never bypass it with `--no-verify` to sink memory into a repo.
 
 ### Phase 1: Context Sync (Read First)
 
