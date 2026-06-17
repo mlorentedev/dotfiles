@@ -1,6 +1,6 @@
 # Changelog
 
-Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit by hand.
+Maintained by [release-please](https://github.com/googleapis/release-please) from Conventional Commits. Do not edit by hand.
 
 ## Features
 
