@@ -29,3 +29,9 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 coverage.out
+
+# Memory sink (single-sink convention, GUARD-001): agent memory lives only in
+# the vault, never committed to a code repo. The global core.hooksPath pre-commit
+# guard blocks these too; this born-correct ignore is the belt-and-suspenders.
+MEMORY.md
+memory/
