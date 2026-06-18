@@ -80,6 +80,7 @@ func Run(opts Options) (int, error) {
 		checkOptionalTools(sys, cfg, contract, rep)
 		checkVault(sys, rep)
 		checkSecrets(sys, cfg, rep)
+		checkPATExpiry(sys, cfg, rep)
 		checkGuardHooks(sys, cfg, rep, opts.Fix)
 		checkTmux(sys, cfg, rep)
 		checkOpenCode(sys, cfg, rep)
