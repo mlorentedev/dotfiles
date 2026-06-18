@@ -1,7 +1,7 @@
 ---
 id: "OPS-009-pat-expiry-preflight"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-17"
 issue: "dotfiles#422"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ops, secrets, ci, pat, doctor]
@@ -50,13 +50,13 @@ Both surfaces lean on two new `System` seam members — `HTTPGet` (the network i
 
 Observable outcomes. Each must be testable.
 
-- [ ] **AC1** — A full `dotf doctor` run prints a "PAT expiry" section that enumerates each *unique* `github.*` PAT-backed secret once (so `github.token`, mapped by both `GITHUB_PERSONAL_ACCESS_TOKEN` and `RELEASE_TOKEN`, is probed a single time). *Verify:* table test asserting one probe per filename + manual run.
-- [ ] **AC2** — Classification is correct on every branch: HTTP 401 → FAIL (exit 1); expiry ≤ threshold → WARN; valid + runway → PASS; token env-unset → SKIP; network error → WARN. *Verify:* `checks_pat_test.go` table tests, one row per branch, using a fake `System`.
-- [ ] **AC3** — The threshold defaults to 14 days and is overridable via `DOTF_PAT_EXPIRY_WARN_DAYS`. *Verify:* tests with the env set to a value that flips a fixed-clock case from PASS to WARN.
-- [ ] **AC4** — The check is **not** invoked under `--quick`. *Verify:* a test runs `Options{Quick:true}` with a fake `HTTPGet` that records calls and asserts zero calls.
+- [x] **AC1** — A full `dotf doctor` run prints a "PAT expiry" section that enumerates each *unique* `github.*` PAT-backed secret once (so `github.token`, mapped by both `GITHUB_PERSONAL_ACCESS_TOKEN` and `RELEASE_TOKEN`, is probed a single time). *Verify:* table test asserting one probe per filename + manual run.
+- [x] **AC2** — Classification is correct on every branch: HTTP 401 → FAIL (exit 1); expiry ≤ threshold → WARN; valid + runway → PASS; token env-unset → SKIP; network error → WARN. *Verify:* `checks_pat_test.go` table tests, one row per branch, using a fake `System`.
+- [x] **AC3** — The threshold defaults to 14 days and is overridable via `DOTF_PAT_EXPIRY_WARN_DAYS`. *Verify:* tests with the env set to a value that flips a fixed-clock case from PASS to WARN.
+- [x] **AC4** — The check is **not** invoked under `--quick`. *Verify:* a test runs `Options{Quick:true}` with a fake `HTTPGet` that records calls and asserts zero calls.
 - [ ] **AC5** — `.github/workflows/pat-expiry.yml` exists, triggers on `schedule` + `workflow_dispatch`, probes `RELEASE_TOKEN` and `BITACORA_PAT`, and opens/updates a `pat-expiry`-labelled issue when a token is invalid or within the threshold. *Verify:* `actionlint`/yaml parse + a recorded `workflow_dispatch` dry-run in verification.md.
-- [ ] **AC6** — `System` gains `HTTPGet` + `Now`; `realSystem()` wires `net/http` (with timeout) + `time.Now`; unit tests make **no real network call**. *Verify:* `grep` for the seam members + `go test ./...` passes with networking unavailable.
-- [ ] **AC7** — The existing doctor sections and the full `bats` + `go test` suites stay green; no behavioural change outside the new section. *Verify:* `go test ./...` + `bats tests/`.
+- [x] **AC6** — `System` gains `HTTPGet` + `Now`; `realSystem()` wires `net/http` (with timeout) + `time.Now`; unit tests make **no real network call**. *Verify:* `grep` for the seam members + `go test ./...` passes with networking unavailable.
+- [x] **AC7** — The existing doctor sections and the full `bats` + `go test` suites stay green; no behavioural change outside the new section. *Verify:* `go test ./...` + `bats tests/`.
 
 ## References
 
