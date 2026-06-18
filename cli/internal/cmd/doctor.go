@@ -26,8 +26,8 @@ func newDoctorCmd() *cobra.Command {
 		Short: "Post-setup diagnostics — the consolidated healthcheck + doctor twins (ADR-021)",
 		Long: `doctor runs the post-setup diagnostic sweep: core tools, versioned tool
 paths, version-pin match, key symlinks, environment variables + PATH, optional
-tools, the env-contract, vault presence, secrets integrity, tmux, opencode/pi,
-harness drift, and the Antigravity CLI.
+tools, the env-contract, vault presence, secrets integrity, PAT expiry, tmux,
+opencode/pi, harness drift, and the Antigravity CLI.
 
 It is the Go consolidation of scripts/healthcheck.sh (the 12-section sweep) and
 scripts/doctor.sh (the env-contract verifier), reading versions.conf and
