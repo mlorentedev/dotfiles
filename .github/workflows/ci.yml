@@ -115,8 +115,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install age (needed before setup for the secrets sandbox)
-        run: choco install age.portable -y --no-progress
+      # Deterministic age install. `choco install age.portable` reported success
+      # but intermittently left age-keygen unresolvable on PATH in the next step
+      # (chocolatey shim/PATH propagation flake), false-reddening unrelated PRs
+      # (BUG-025; sibling of the eza flake BUG-024/#414). Fetch the pinned
+      # official release instead, wire it onto PATH explicitly, and verify both
+      # binaries resolve here so a layout change fails loudly at install time —
+      # not as a cryptic "age-keygen not recognized" downstream.
+      - name: Install age (deterministic release — choco-shim flake guard, BUG-025)
+        shell: pwsh
+        run: |
+          $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
+          if (-not $ver) { throw "AGE_VERSION missing from versions.conf" }
+          $ver = $ver.Trim()
+          $url = "https://github.com/FiloSottile/age/releases/download/v$ver/age-v$ver-windows-amd64.zip"
+          $dest = "$env:USERPROFILE\age-dist"
+          Invoke-WebRequest -Uri $url -OutFile age.zip
+          Expand-Archive -Path age.zip -DestinationPath $dest -Force
+          $ageDir = Join-Path $dest 'age'
+          Add-Content $env:GITHUB_PATH $ageDir
+          # Guard the guard: fail here if the binaries are not where we expect.
+          & (Join-Path $ageDir 'age.exe') --version
+          & (Join-Path $ageDir 'age-keygen.exe') --version
 
       - name: Sandbox secrets + minimal vault
         shell: pwsh
