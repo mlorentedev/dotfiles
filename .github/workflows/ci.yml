@@ -115,8 +115,38 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install age (needed before setup for the secrets sandbox)
-        run: choco install age.portable -y --no-progress
+      # Deterministic age install. `choco install age.portable` reported success
+      # but intermittently left age-keygen unresolvable on PATH in the next step
+      # (chocolatey shim/PATH propagation flake), false-reddening unrelated PRs
+      # (BUG-025; sibling of the eza flake BUG-024/#414). Fetch the pinned
+      # official release instead, wire it onto PATH explicitly, and verify both
+      # binaries resolve here so a layout change fails loudly at install time —
+      # not as a cryptic "age-keygen not recognized" downstream.
+      - name: Install age (deterministic release + registry PATH — BUG-025)
+        shell: pwsh
+        run: |
+          $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
+          if (-not $ver) { throw "AGE_VERSION missing from versions.conf" }
+          $ver = $ver.Trim()
+          $url = "https://github.com/FiloSottile/age/releases/download/v$ver/age-v$ver-windows-amd64.zip"
+          $dest = "$env:USERPROFILE\age-dist"
+          Invoke-WebRequest -Uri $url -OutFile age.zip
+          Expand-Archive -Path age.zip -DestinationPath $dest -Force
+          $ageDir = Join-Path $dest 'age'
+          Add-Content $env:GITHUB_PATH $ageDir
+          # setup-windows.ps1 rebuilds $env:PATH from the Machine+User registry
+          # (dropping process-level $GITHUB_PATH additions), so age must ALSO live
+          # on the registry PATH or load-secrets.ps1 silently returns without
+          # exporting NAN_API_KEY — leaving pi's models.json {env:...} placeholder
+          # unresolved at deploy time. choco's age went onto the Machine PATH and
+          # survived that rebuild; this restores the property via the User PATH.
+          $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+          if ($userPath -notlike "*$ageDir*") {
+            [Environment]::SetEnvironmentVariable('PATH', "$userPath;$ageDir", 'User')
+          }
+          # Guard the guard: fail here if the binaries are not where we expect.
+          & (Join-Path $ageDir 'age.exe') --version
+          & (Join-Path $ageDir 'age-keygen.exe') --version
 
       - name: Sandbox secrets + minimal vault
         shell: pwsh
@@ -150,11 +180,38 @@ jobs:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
         run: .\setup-windows.ps1
 
-      - name: Ensure core tools (winget-less runner fallback)
+      # Deterministic eza + zoxide install. `choco install` left them
+      # unresolvable on PATH for the healthcheck step (BUG-024/#414, the same
+      # chocolatey shim/PATH flake as age). Fetch the pinned official releases,
+      # extract onto a single dir wired into $GITHUB_PATH, and verify both
+      # resolve here. jq is preinstalled on the runner, so it keeps a choco
+      # fallback only if genuinely absent.
+      - name: Ensure core tools (deterministic eza/zoxide — flake guard, BUG-024)
         shell: pwsh
         run: |
-          $missing = @('jq', 'eza', 'zoxide') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
-          if ($missing) { choco install @missing -y --no-progress }
+          function Read-Pin($key) {
+            $line = (Get-Content versions.conf | Select-String "^$key=").Line
+            if (-not $line) { throw "$key missing from versions.conf" }
+            return ($line -split '=', 2)[1].Trim()
+          }
+          $bin = "$env:USERPROFILE\ci-tools"
+          New-Item -ItemType Directory -Force $bin | Out-Null
+
+          $ezaVer = Read-Pin 'EZA_VERSION'
+          Invoke-WebRequest "https://github.com/eza-community/eza/releases/download/v$ezaVer/eza.exe_x86_64-pc-windows-gnu.zip" -OutFile eza.zip
+          Expand-Archive eza.zip -DestinationPath $bin -Force
+
+          $zoxVer = Read-Pin 'ZOXIDE_VERSION'
+          Invoke-WebRequest "https://github.com/ajeetdsouza/zoxide/releases/download/v$zoxVer/zoxide-$zoxVer-x86_64-pc-windows-msvc.zip" -OutFile zoxide.zip
+          Expand-Archive zoxide.zip -DestinationPath $bin -Force
+
+          Add-Content $env:GITHUB_PATH $bin
+
+          if (-not (Get-Command jq -ErrorAction SilentlyContinue)) { choco install jq -y --no-progress }
+
+          # Guard the guard: fail here if the extracted binaries are not present.
+          & "$bin\eza.exe" --version
+          & "$bin\zoxide.exe" --version
 
       - name: Run healthcheck.ps1
         shell: pwsh
