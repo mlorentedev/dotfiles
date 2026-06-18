@@ -356,3 +356,55 @@ func TestRun_QuickSkipsHeavySections(t *testing.T) {
 		t.Error("quick mode header should announce [quick]")
 	}
 }
+
+// TestCheckOpenCode_piPathResilience guards the Orca / GUI per-node-version PATH
+// trap: pi installed under an nvm node version not on the current PATH. The
+// doctor must FAIL loudly (not SKIP "pi not installed") when pi is configured
+// or present at the ~/.local launcher yet unreachable, and PASS/SKIP correctly
+// otherwise. Pairs with the setup-linux.sh `--prefix ~/.local` install (#426).
+func TestCheckOpenCode_piPathResilience(t *testing.T) {
+	cfg := &Config{Versions: map[string]string{"PI_VERSION": "0.79.1", "OPENCODE_VERSION": "1.0.0"}}
+
+	t.Run("configured but not on PATH fails loud", func(t *testing.T) {
+		home := t.TempDir()
+		writeFile(t, filepath.Join(home, ".pi", "agent", "models.json"), `{"models":{}}`)
+		var buf bytes.Buffer
+		checkOpenCode(newSys(map[string]string{"HOME": home}, nil, nil), cfg, capture(&buf))
+		out := buf.String()
+		if !strings.Contains(out, "pi configured (~/.pi present) but not on PATH") {
+			t.Errorf("configured-but-unreachable pi must FAIL with the root cause\n%s", out)
+		}
+		if strings.Contains(out, "pi not installed") {
+			t.Errorf("must not emit the misleading 'pi not installed' SKIP when pi is configured\n%s", out)
+		}
+	})
+
+	t.Run("present at ~/.local launcher but not on PATH", func(t *testing.T) {
+		home := t.TempDir()
+		writeExec(t, filepath.Join(home, ".local", "bin", "pi"))
+		var buf bytes.Buffer
+		checkOpenCode(newSys(map[string]string{"HOME": home}, nil, nil), cfg, capture(&buf))
+		if out := buf.String(); !strings.Contains(out, "pi exists at") || !strings.Contains(out, "but not in PATH") {
+			t.Errorf("pi at ~/.local but off PATH must FAIL (reload shell)\n%s", out)
+		}
+	})
+
+	t.Run("on PATH passes", func(t *testing.T) {
+		home := t.TempDir()
+		var buf bytes.Buffer
+		checkOpenCode(newSys(map[string]string{"HOME": home}, []string{"pi"},
+			map[string]string{"pi --version": "pi 0.79.1"}), cfg, capture(&buf))
+		if out := buf.String(); !strings.Contains(out, "pi in PATH:") {
+			t.Errorf("pi on PATH should PASS\n%s", out)
+		}
+	})
+
+	t.Run("truly absent skips", func(t *testing.T) {
+		home := t.TempDir()
+		var buf bytes.Buffer
+		checkOpenCode(newSys(map[string]string{"HOME": home}, nil, nil), cfg, capture(&buf))
+		if out := buf.String(); !strings.Contains(out, "pi not installed") {
+			t.Errorf("truly-absent pi should SKIP with install hint\n%s", out)
+		}
+	})
+}

@@ -253,13 +253,24 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 		rep.Fail("opencode.jsonc missing $schema declaration (re-run setup to redeploy)")
 	}
 
-	// pi binary + version (pi is optional → SKIP when absent).
-	if sys.has("pi") {
+	// pi binary + version. pi is optional → SKIP when truly absent, but FAIL when
+	// it is configured (~/.pi present) yet unreachable on PATH — the Orca / GUI
+	// per-node-version PATH trap: pi installed under an nvm node version not on
+	// the current PATH. The ~/.local launcher (see setup-linux.sh) is the
+	// durable fix; this guard makes the trap loud instead of a misleading SKIP.
+	piLocalBin := filepath.Join(home, ".local", "bin", "pi")
+	piConfigured := pathExists(filepath.Join(home, ".pi", "agent", "models.json"))
+	switch {
+	case sys.has("pi"):
 		ver := trailingVersion(sys, "pi", "--version")
 		rep.Pass("pi in PATH: " + ver)
 		matchPin(rep, "pi", ver, cfg.Versions["PI_VERSION"])
-	} else {
-		rep.Skip("pi not installed (npm i -g --ignore-scripts @earendil-works/pi-coding-agent)")
+	case isExecFile(piLocalBin):
+		rep.Fail("pi exists at " + piLocalBin + " but not in PATH (reload shell)")
+	case piConfigured:
+		rep.Fail("pi configured (~/.pi present) but not on PATH — installed under a node version not on this PATH; re-run setup to install into ~/.local")
+	default:
+		rep.Skip("pi not installed (run setup, or npm i -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent)")
 	}
 
 	// pi models.json + secret substitution state.
