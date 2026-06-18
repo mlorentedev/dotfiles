@@ -134,6 +134,34 @@ func TestCheckPATExpiry_ProbesEachFilenameOnce(t *testing.T) {
 	}
 }
 
+// TestCheckPATExpiry_FallsBackToSecondAlias guards the alias-resolution fix:
+// github.token is mapped by both GITHUB_PERSONAL_ACCESS_TOKEN and RELEASE_TOKEN.
+// When only the SECOND alias is exported, the token must still be probed — a
+// single unset alias must not yield a false SKIP.
+func TestCheckPATExpiry_FallsBackToSecondAlias(t *testing.T) {
+	mapping := "GITHUB_PERSONAL_ACCESS_TOKEN=github.token\n" +
+		"RELEASE_TOKEN=github.token\n"
+
+	sys := newSys(map[string]string{"RELEASE_TOKEN": "tok"}, nil, nil) // first alias unset
+	sys.Now = func() time.Time { return fixedTestNow }
+	var calls int
+	sys.HTTPGet = func(string, map[string]string) (int, http.Header, error) {
+		calls++
+		return http.StatusOK, http.Header{}, nil
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkPATExpiry(sys, patCfg(t, mapping), rep)
+
+	if calls != 1 {
+		t.Fatalf("a set fallback alias must be probed, not SKIPped; got %d probe(s)\n%s", calls, buf.String())
+	}
+	if strings.Contains(buf.String(), "not in environment") {
+		t.Fatalf("must not report SKIP when a fallback alias is set\n%s", buf.String())
+	}
+}
+
 // TestCheckPATExpiry_QuickSkipsProbe covers AC4: the SessionStart hot path
 // (--quick) must stay fork-free and offline, so a full Run with Quick:true makes
 // zero HTTP probes even with a token in the environment.
