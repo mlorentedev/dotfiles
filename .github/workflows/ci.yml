@@ -170,11 +170,38 @@ jobs:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
         run: .\setup-windows.ps1
 
-      - name: Ensure core tools (winget-less runner fallback)
+      # Deterministic eza + zoxide install. `choco install` left them
+      # unresolvable on PATH for the healthcheck step (BUG-024/#414, the same
+      # chocolatey shim/PATH flake as age). Fetch the pinned official releases,
+      # extract onto a single dir wired into $GITHUB_PATH, and verify both
+      # resolve here. jq is preinstalled on the runner, so it keeps a choco
+      # fallback only if genuinely absent.
+      - name: Ensure core tools (deterministic eza/zoxide — flake guard, BUG-024)
         shell: pwsh
         run: |
-          $missing = @('jq', 'eza', 'zoxide') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
-          if ($missing) { choco install @missing -y --no-progress }
+          function Read-Pin($key) {
+            $line = (Get-Content versions.conf | Select-String "^$key=").Line
+            if (-not $line) { throw "$key missing from versions.conf" }
+            return ($line -split '=', 2)[1].Trim()
+          }
+          $bin = "$env:USERPROFILE\ci-tools"
+          New-Item -ItemType Directory -Force $bin | Out-Null
+
+          $ezaVer = Read-Pin 'EZA_VERSION'
+          Invoke-WebRequest "https://github.com/eza-community/eza/releases/download/v$ezaVer/eza.exe_x86_64-pc-windows-gnu.zip" -OutFile eza.zip
+          Expand-Archive eza.zip -DestinationPath $bin -Force
+
+          $zoxVer = Read-Pin 'ZOXIDE_VERSION'
+          Invoke-WebRequest "https://github.com/ajeetdsouza/zoxide/releases/download/v$zoxVer/zoxide-$zoxVer-x86_64-pc-windows-msvc.zip" -OutFile zoxide.zip
+          Expand-Archive zoxide.zip -DestinationPath $bin -Force
+
+          Add-Content $env:GITHUB_PATH $bin
+
+          if (-not (Get-Command jq -ErrorAction SilentlyContinue)) { choco install jq -y --no-progress }
+
+          # Guard the guard: fail here if the extracted binaries are not present.
+          & "$bin\eza.exe" --version
+          & "$bin\zoxide.exe" --version
 
       - name: Run healthcheck.ps1
         shell: pwsh
