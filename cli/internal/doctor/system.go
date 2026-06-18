@@ -10,6 +10,7 @@
 package doctor
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -55,7 +56,7 @@ func realSystem() *System {
 		HTTPGet: func(url string, headers map[string]string) (int, http.Header, error) {
 			req, err := http.NewRequest(http.MethodGet, url, nil)
 			if err != nil {
-				return 0, nil, err
+				return 0, nil, fmt.Errorf("build request %q: %w", url, err)
 			}
 			for k, v := range headers {
 				req.Header.Set(k, v)
@@ -63,7 +64,7 @@ func realSystem() *System {
 			client := &http.Client{Timeout: 5 * time.Second}
 			resp, err := client.Do(req)
 			if err != nil {
-				return 0, nil, err
+				return 0, nil, fmt.Errorf("GET %q: %w", url, err)
 			}
 			defer func() { _ = resp.Body.Close() }()
 			return resp.StatusCode, resp.Header, nil

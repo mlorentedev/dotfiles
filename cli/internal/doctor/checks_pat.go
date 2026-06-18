@@ -23,11 +23,12 @@ const (
 )
 
 // patSecret is a GitHub PAT-backed mapping: the age-blob filename (the dedupe
-// key — github.token is mapped by two env vars) and a representative env var to
-// read the live token value from.
+// key) plus every env var that maps to it. github.token is mapped by BOTH
+// GITHUB_PERSONAL_ACCESS_TOKEN and RELEASE_TOKEN, so all aliases are kept — any
+// one being exported is enough to probe the token (the first non-empty wins).
 type patSecret struct {
-	filename string // e.g. "github.token"
-	envVar   string // e.g. "GITHUB_PERSONAL_ACCESS_TOKEN"
+	filename string   // e.g. "github.token"
+	envVars  []string // e.g. ["GITHUB_PERSONAL_ACCESS_TOKEN", "RELEASE_TOKEN"]
 }
 
 // checkPATExpiry probes each GitHub PAT-backed secret for liveness + days to
@@ -48,62 +49,87 @@ func checkPATExpiry(sys *System, cfg *Config, rep *Report) {
 	}
 
 	warnDays := patWarnDays(sys, rep)
-
 	for _, s := range secrets {
-		token := sys.Getenv(s.envVar)
-		if token == "" {
-			rep.Skip(fmt.Sprintf("%s (%s) not in environment — run secrets_refresh", s.filename, s.envVar))
-			continue
-		}
+		probePATSecret(sys, s, warnDays, rep)
+	}
+}
 
-		status, hdr, err := sys.HTTPGet(githubAPIUser, map[string]string{
-			"Authorization": "Bearer " + token,
-			"Accept":        "application/vnd.github+json",
-			"User-Agent":    "dotf-doctor",
-		})
-		switch {
-		case err != nil:
-			rep.Warn(fmt.Sprintf("%s: could not reach api.github.com (%v) — liveness check skipped", s.filename, err))
-			continue
-		case status == http.StatusUnauthorized:
-			rep.Fail(fmt.Sprintf("%s: token invalid or expired (HTTP 401) — rotate it", s.filename))
-			continue
-		case status != http.StatusOK:
-			rep.Warn(fmt.Sprintf("%s: unexpected HTTP %d from api.github.com — liveness inconclusive", s.filename, status))
-			continue
+// resolvePATToken returns the first non-empty value among the secret's env
+// aliases. github.token is mapped by both GITHUB_PERSONAL_ACCESS_TOKEN and
+// RELEASE_TOKEN; either being exported is enough to probe it, so a single unset
+// alias never produces a false SKIP.
+func resolvePATToken(sys *System, s patSecret) string {
+	for _, v := range s.envVars {
+		if val := sys.Getenv(v); val != "" {
+			return val
 		}
+	}
+	return ""
+}
 
+// probePATSecret runs the liveness probe for one secret and reports its outcome.
+// Split out of checkPATExpiry to keep both within the < 40-line / < 10-complexity
+// budget (AGENTS.md). HTTP 401 → FAIL (the only non-zero-exit branch); transport
+// error or non-200 → WARN; 200 hands off to reportPATExpiry for the expiry math.
+func probePATSecret(sys *System, s patSecret, warnDays int, rep *Report) {
+	token := resolvePATToken(sys, s)
+	if token == "" {
+		rep.Skip(fmt.Sprintf("%s (%s) not in environment — run secrets_refresh", s.filename, strings.Join(s.envVars, ", ")))
+		return
+	}
+
+	status, hdr, err := sys.HTTPGet(githubAPIUser, map[string]string{
+		"Authorization": "Bearer " + token,
+		"Accept":        "application/vnd.github+json",
+		"User-Agent":    "dotf-doctor",
+	})
+	switch {
+	case err != nil:
+		rep.Warn(fmt.Sprintf("%s: could not reach api.github.com (%v) — liveness check skipped", s.filename, err))
+	case status == http.StatusUnauthorized:
+		rep.Fail(fmt.Sprintf("%s: token invalid or expired (HTTP 401) — rotate it", s.filename))
+	case status != http.StatusOK:
+		rep.Warn(fmt.Sprintf("%s: unexpected HTTP %d from api.github.com — liveness inconclusive", s.filename, status))
+	default:
 		// 200 OK: the token authenticates. Worst case from here is "rotate soon"
 		// (WARN), never FAIL — a token that just succeeded is not dead.
-		raw := strings.TrimSpace(hdr.Get(patExpiryHeader))
-		if raw == "" {
-			rep.Pass(fmt.Sprintf("%s: valid, no expiry set", s.filename))
-			continue
-		}
-		exp, perr := parsePATExpiry(raw)
-		if perr != nil {
-			rep.Warn(fmt.Sprintf("%s: valid, but could not parse expiry %q — %v", s.filename, raw, perr))
-			continue
-		}
+		reportPATExpiry(s.filename, hdr, sys.Now(), warnDays, rep)
+	}
+}
 
-		day := exp.Format("2006-01-02")
-		days := int(exp.Sub(sys.Now()).Hours() / 24)
-		switch {
-		case days <= 0:
-			rep.Warn(fmt.Sprintf("%s: at/just past its stated expiry (%s) but still accepted — rotate now", s.filename, day))
-		case days <= warnDays:
-			rep.Warn(fmt.Sprintf("%s: expires in %d day(s) (%s) — rotate soon", s.filename, days, day))
-		default:
-			rep.Pass(fmt.Sprintf("%s: valid, expires in %d day(s) (%s)", s.filename, days, day))
-		}
+// reportPATExpiry classifies the expiry header on a 200 response: absent header
+// (non-expiring token) → PASS; at/past expiry → WARN; within warnDays → WARN;
+// otherwise PASS with the runway.
+func reportPATExpiry(filename string, hdr http.Header, now time.Time, warnDays int, rep *Report) {
+	raw := strings.TrimSpace(hdr.Get(patExpiryHeader))
+	if raw == "" {
+		rep.Pass(fmt.Sprintf("%s: valid, no expiry set", filename))
+		return
+	}
+	exp, err := parsePATExpiry(raw)
+	if err != nil {
+		rep.Warn(fmt.Sprintf("%s: valid, but could not parse expiry %q — %v", filename, raw, err))
+		return
+	}
+
+	day := exp.Format("2006-01-02")
+	days := int(exp.Sub(now).Hours() / 24)
+	switch {
+	case days <= 0:
+		rep.Warn(fmt.Sprintf("%s: at/just past its stated expiry (%s) but still accepted — rotate now", filename, day))
+	case days <= warnDays:
+		rep.Warn(fmt.Sprintf("%s: expires in %d day(s) (%s) — rotate soon", filename, days, day))
+	default:
+		rep.Pass(fmt.Sprintf("%s: valid, expires in %d day(s) (%s)", filename, days, day))
 	}
 }
 
 // githubPATSecrets parses env-mapping.conf and returns the unique github.*
-// PAT-backed secrets, one per .age filename (github.token is mapped by both
-// GITHUB_PERSONAL_ACCESS_TOKEN and RELEASE_TOKEN — probed once). The first env
-// var seen for a filename is the representative value source. A missing or
-// unreadable mapping yields nil (checkSecrets owns the "mapping exists" assertion).
+// PAT-backed secrets, one per .age filename, each carrying ALL of its env
+// aliases (github.token is mapped by both GITHUB_PERSONAL_ACCESS_TOKEN and
+// RELEASE_TOKEN — kept together so it is probed once but resolvable from either).
+// A missing or unreadable mapping yields nil (checkSecrets owns the "mapping
+// exists" assertion).
 func githubPATSecrets(cfg *Config) []patSecret {
 	mapping := filepath.Join(cfg.DotfilesDir, "sensitive", "env-mapping.conf")
 	raw, err := os.ReadFile(mapping)
@@ -111,7 +137,7 @@ func githubPATSecrets(cfg *Config) []patSecret {
 		return nil
 	}
 
-	seen := map[string]bool{}
+	idx := map[string]int{} // filename → index into out
 	var out []patSecret
 	for _, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
@@ -129,11 +155,15 @@ func githubPATSecrets(cfg *Config) []patSecret {
 			fname = strings.TrimSpace(fname)
 			varName = strings.TrimPrefix(varName, "@")
 		}
-		if !strings.HasPrefix(fname, "github.") || seen[fname] {
+		if !strings.HasPrefix(fname, "github.") {
 			continue
 		}
-		seen[fname] = true
-		out = append(out, patSecret{filename: fname, envVar: varName})
+		if i, ok := idx[fname]; ok {
+			out[i].envVars = append(out[i].envVars, varName)
+			continue
+		}
+		idx[fname] = len(out)
+		out = append(out, patSecret{filename: fname, envVars: []string{varName}})
 	}
 	return out
 }
