@@ -122,7 +122,7 @@ jobs:
       # official release instead, wire it onto PATH explicitly, and verify both
       # binaries resolve here so a layout change fails loudly at install time —
       # not as a cryptic "age-keygen not recognized" downstream.
-      - name: Install age (deterministic release — choco-shim flake guard, BUG-025)
+      - name: Install age (deterministic release + registry PATH — BUG-025)
         shell: pwsh
         run: |
           $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
@@ -134,6 +134,16 @@ jobs:
           Expand-Archive -Path age.zip -DestinationPath $dest -Force
           $ageDir = Join-Path $dest 'age'
           Add-Content $env:GITHUB_PATH $ageDir
+          # setup-windows.ps1 rebuilds $env:PATH from the Machine+User registry
+          # (dropping process-level $GITHUB_PATH additions), so age must ALSO live
+          # on the registry PATH or load-secrets.ps1 silently returns without
+          # exporting NAN_API_KEY — leaving pi's models.json {env:...} placeholder
+          # unresolved at deploy time. choco's age went onto the Machine PATH and
+          # survived that rebuild; this restores the property via the User PATH.
+          $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+          if ($userPath -notlike "*$ageDir*") {
+            [Environment]::SetEnvironmentVariable('PATH', "$userPath;$ageDir", 'User')
+          }
           # Guard the guard: fail here if the binaries are not where we expect.
           & (Join-Path $ageDir 'age.exe') --version
           & (Join-Path $ageDir 'age-keygen.exe') --version
