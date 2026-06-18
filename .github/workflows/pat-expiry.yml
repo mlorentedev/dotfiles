@@ -1,0 +1,131 @@
+name: PAT expiry preflight
+
+# Weekly liveness + expiry preflight for the PAT-backed Actions secrets that drive
+# automation: RELEASE_TOKEN (release-please tag push → goreleaser) and BITACORA_PAT
+# (Projects v2 board moves). A classic PAT expired silently and broke release-please's
+# first run with "Bad credentials" (CLI-011/#369) — nothing warned beforehand.
+#
+# This job probes GET /user with each secret, reads the
+# github-authentication-token-expiration response header, and opens or UPDATES a
+# deduplicated `pat-expiry`-labelled issue (one per secret, stable title) when a
+# token is invalid/expired or within WARN_DAYS of expiry — so a rotation reminder
+# lands in the backlog BEFORE the next release run goes red. Detection only;
+# automatic rotation is HARNESS-022/#378. See specs/OPS-009-pat-expiry-preflight/.
+#
+# The issue calls use the default GITHUB_TOKEN (issues: write); each secret under
+# test is used ONLY as the probe's Authorization bearer, never to write.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1' # Mondays 06:17 UTC — well clear of the release cron
+  workflow_dispatch:
+    inputs:
+      warn_days:
+        description: 'Days before expiry at which to alert'
+        required: false
+        default: '14'
+
+permissions:
+  issues: write
+
+concurrency:
+  group: pat-expiry
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      WARN_DAYS: ${{ github.event.inputs.warn_days || '14' }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      BITACORA_PAT: ${{ secrets.BITACORA_PAT }}
+    steps:
+      - name: Probe PAT-backed secrets and alert on expiry
+        run: |
+          set -euo pipefail
+
+          # The dedupe label must exist before `gh issue create --label` can use it.
+          gh label create pat-expiry \
+            --description "PAT-backed Actions secret expiring or invalid (OPS-009)" \
+            --color D93F0B --force >/dev/null
+
+          # alert NAME REASON — open a `pat-expiry` issue for NAME, or comment on the
+          # existing open one (dedupe by stable title), so a weekly cron never spams.
+          alert() {
+            local name="$1" reason="$2"
+            local title="PAT expiry: ${name}"
+            local existing
+            existing=$(gh issue list --state open --label pat-expiry \
+              --json number,title \
+              --jq "[.[] | select(.title==\"${title}\") | .number] | first // empty")
+            if [ -n "${existing}" ]; then
+              gh issue comment "${existing}" --body "Still flagged on $(date -u +%F): ${name} ${reason}."
+              echo "::notice::updated existing issue #${existing} for ${name}"
+            else
+              gh issue create --title "${title}" --label pat-expiry --body \
+          "The Actions secret \`${name}\` ${reason}.
+
+          **Rotate it**: re-encrypt the age-secret, run \`secrets_refresh\`, then sync the
+          value to the repository Actions secret (\`github-secrets-manager.sh --select ${name}\`).
+
+          Filed automatically by \`.github/workflows/pat-expiry.yml\` (OPS-009)."
+              echo "::warning::opened a pat-expiry issue for ${name}"
+            fi
+          }
+
+          # check_token NAME VALUE — probe one secret and classify it. Mirrors the
+          # checks_pat.go decision tree: empty/offline → warn-and-skip (not a failure);
+          # non-200 → invalid; expiry within threshold → alert; else healthy.
+          check_token() {
+            local name="$1" value="$2"
+            if [ -z "${value}" ]; then
+              echo "::warning::${name} secret is empty/unset — skipping"
+              return 0
+            fi
+
+            local headers status expiry
+            if ! headers=$(curl -fsS -m 10 -D - -o /dev/null \
+                  -H "Authorization: Bearer ${value}" \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "User-Agent: pat-expiry-preflight" \
+                  https://api.github.com/user 2>/dev/null); then
+              # curl -f makes 4xx/5xx a non-zero exit; re-probe without -f to read the
+              # status (a 401 here is a real finding, not a transport error).
+              status=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' \
+                -H "Authorization: Bearer ${value}" \
+                -H "Accept: application/vnd.github+json" \
+                -H "User-Agent: pat-expiry-preflight" \
+                https://api.github.com/user 2>/dev/null || echo "000")
+              if [ "${status}" = "000" ]; then
+                echo "::warning::${name}: api.github.com unreachable — liveness check skipped"
+                return 0
+              fi
+              alert "${name}" "is invalid or expired (api.github.com returned HTTP ${status})"
+              return 0
+            fi
+
+            expiry=$(printf '%s' "${headers}" | tr -d '\r' \
+              | awk -F': ' 'tolower($1)=="github-authentication-token-expiration"{print $2}')
+            if [ -z "${expiry}" ]; then
+              echo "::notice::${name}: valid, no expiry set"
+              return 0
+            fi
+
+            local exp_epoch now_epoch days_left
+            exp_epoch=$(date -u -d "${expiry}" +%s 2>/dev/null || echo 0)
+            if [ "${exp_epoch}" -eq 0 ]; then
+              echo "::warning::${name}: valid, but could not parse expiry '${expiry}'"
+              return 0
+            fi
+            now_epoch=$(date -u +%s)
+            days_left=$(( (exp_epoch - now_epoch) / 86400 ))
+            if [ "${days_left}" -le "${WARN_DAYS}" ]; then
+              alert "${name}" "expires in ${days_left} day(s) (${expiry}) — within the ${WARN_DAYS}-day threshold"
+            else
+              echo "::notice::${name}: valid, expires in ${days_left} day(s) (${expiry})"
+            fi
+          }
+
+          check_token "RELEASE_TOKEN" "${RELEASE_TOKEN}"
+          check_token "BITACORA_PAT" "${BITACORA_PAT}"

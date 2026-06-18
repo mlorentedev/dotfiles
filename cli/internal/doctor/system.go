@@ -10,9 +10,11 @@
 package doctor
 
 import (
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // System abstracts the non-deterministic, process-global surfaces a check
@@ -29,6 +31,16 @@ type System struct {
 	// CommandOutput runs name with args and returns combined stdout+stderr.
 	// Used for the `<tool> --version` probes; faked in tests.
 	CommandOutput func(name string, args ...string) (string, error)
+	// HTTPGet issues a GET with the given request headers and returns the status
+	// code + response headers (the body is never needed — the PAT-expiry check
+	// reads only the status and the github-authentication-token-expiration
+	// header). The network is the canonical "non-deterministic external surface"
+	// this seam exists to isolate; tests inject canned responses. err != nil for
+	// transport failures (offline, DNS, timeout).
+	HTTPGet func(url string, headers map[string]string) (int, http.Header, error)
+	// Now returns the current time (time.Now in production). A clock seam keeps
+	// "days until expiry" deterministic under test.
+	Now func() time.Time
 }
 
 // realSystem wires System to the live OS.
@@ -40,6 +52,23 @@ func realSystem() *System {
 			out, err := exec.Command(name, args...).CombinedOutput()
 			return string(out), err
 		},
+		HTTPGet: func(url string, headers map[string]string) (int, http.Header, error) {
+			req, err := http.NewRequest(http.MethodGet, url, nil)
+			if err != nil {
+				return 0, nil, err
+			}
+			for k, v := range headers {
+				req.Header.Set(k, v)
+			}
+			client := &http.Client{Timeout: 5 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				return 0, nil, err
+			}
+			defer func() { _ = resp.Body.Close() }()
+			return resp.StatusCode, resp.Header, nil
+		},
+		Now: time.Now,
 	}
 }
 
