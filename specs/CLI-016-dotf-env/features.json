@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-016-dotf-env-f1",
+    "behavior": "The resolver applies the cascade env -> machine.json -> contract default[GOOS]: a machine.json override beats the default, vars without a default (HOME/USERPROFILE) are not emitted, darwin falls back to the linux default, and home placeholders expand.",
+    "verification": "cd cli && go test ./internal/env -run 'TestResolveOverrideBeatsDefaultAndSkipsNoDefault|TestResolveDarwinFallsBackToLinuxDefault|TestResolveWindowsExpandsUserprofile'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-016-dotf-env-f2",
+    "behavior": "dotf env generate writes the OS-appropriate paths file, skips rewriting identical content (idempotent), and --check detects drift.",
+    "verification": "cd cli && go test ./internal/env -run TestGenerateWriteIdempotentAndCheck",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-016-dotf-env-f3",
+    "behavior": "Generated lines preserve an already-set env var: sh emits ${VAR:-default}, ps1 emits if (-not $env:VAR) { ... }.",
+    "verification": "cd cli && go test ./internal/env -run 'TestRenderShKeepsAlreadySetValue|TestRenderPs1OnlyAssignsWhenUnset'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-016-dotf-env-f4",
+    "behavior": "vault.ResolveVault resolves VAULT_PATH through the env cascade (no hardcoded ~/Projects/knowledge), and the whole CLI builds, vets, and tests clean.",
+    "verification": "cd cli && go vet ./... && go test ./internal/vault/... ./internal/doctor/... ./internal/cmd/...",
+    "state": "pending",
+    "evidence": ""
+  }
+]

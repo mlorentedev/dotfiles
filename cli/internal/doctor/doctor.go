@@ -79,6 +79,7 @@ func Run(opts Options) (int, error) {
 		checkToolHomeEnvVars(sys, rep)
 		checkOptionalTools(sys, cfg, contract, rep)
 		checkVault(sys, rep)
+		checkPathFiles(sys, cfg, rep)
 		checkSecrets(sys, cfg, rep)
 		checkPATExpiry(sys, cfg, rep)
 		checkGuardHooks(sys, cfg, rep, opts.Fix)

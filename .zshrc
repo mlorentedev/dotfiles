@@ -16,21 +16,30 @@ source $ZSH/oh-my-zsh.sh
 #       ENVIRONMENT
 # ==========================
 export EDITOR=nano
-# Base Directories (must be set before loading secrets)
-export DOTFILES_DIR="$HOME/.dotfiles"
-export DOTFILES_REPO_DIR="$HOME/Projects/dotfiles"
-export CLAUDE_CONFIG_DIR="$HOME/.claude"
-# Per-agent install dirs + scripts deploy target (REFACTOR-002).
-# Declared in env-contract.json; doctor.{sh,ps1} validates on every run.
-export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-export AGY_HOME="$HOME/.gemini/antigravity-cli"
+# Base Directories (ADR-025): sourced from the generated paths.sh — source of
+# truth is env-contract.json (defaults) + ~/.config/dotfiles/machine.json
+# (per-machine overrides), rendered by `dotf env generate`. DOTFILES_DIR is
+# bootstrapped first because it locates the file. Must be set before secrets.
+export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+if [ -f "$DOTFILES_DIR/paths.sh" ]; then
+    . "$DOTFILES_DIR/paths.sh"
+else
+    # Bootstrap fallback (paths.sh not generated yet): contract defaults inline.
+    export DOTFILES_REPO_DIR="${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"
+    export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+    export SCRIPTS_DIR="${SCRIPTS_DIR:-$DOTFILES_DIR/scripts}"
+    export AGY_HOME="${AGY_HOME:-$HOME/.gemini/antigravity-cli}"
+    export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
+    export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
+fi
 export AGY_APP_DATA="$AGY_HOME"
 export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
 export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
 export GEMINI_DIR="$HOME/.gemini"
 export GEMINI_HOME="$HOME/.gemini"
-export COPILOT_HOME="$HOME/.copilot"
-export OPENCODE_HOME="$HOME/.config/opencode"
+# COPILOT_HOME / OPENCODE_HOME now come from the ADR-025 cascade above
+# (sourced paths.sh, or the bootstrap fallback) — the old unconditional
+# exports here clobbered that, so they were removed.
 
 # AI provider endpoints — NaN community (primary, OpenAI-compatible).
 # API key in $NAN_API_KEY (loaded by load-secrets.sh from sensitive/nan.api-key.secret.age).

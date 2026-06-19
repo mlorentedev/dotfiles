@@ -127,7 +127,9 @@ fi
 
 # find_vault_root is provided by the sourced session-brief core.
 VAULT_ROOT=$(find_vault_root "$CWD") || true
-KNOWLEDGE_VAULT="$HOME/Projects/knowledge"
+# VAULT_PATH is the cross-machine seam (ADR-025), set by the sourced paths.sh;
+# fall back to the legacy default only when it is unset.
+KNOWLEDGE_VAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
 VAULT_NAME=""
 
 # --- Hive: detect project and suggest vault queries ---

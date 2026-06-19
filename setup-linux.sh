@@ -1341,6 +1341,20 @@ if [ -f "$CURRENT_DIR/env-contract.json" ]; then
     log_success "Deployed env-contract.json to $DOTFILES_DIR/"
 fi
 
+# Render the per-machine path file (ADR-025) from the contract + the
+# ~/.config/dotfiles/machine.json overrides, so the profiles source it and the
+# `dotf doctor` run below sees no path drift. Sourcing it here makes this setup
+# shell match what the next login shell will see.
+if command -v dotf >/dev/null 2>&1; then
+    if dotf env generate; then
+        log_success "Generated $DOTFILES_DIR/paths.sh (dotf env generate)"
+        # shellcheck disable=SC1091
+        [ -f "$DOTFILES_DIR/paths.sh" ] && . "$DOTFILES_DIR/paths.sh"
+    else
+        log_warning "dotf env generate failed (profiles fall back to inline defaults)"
+    fi
+fi
+
 # Final assertion against env-contract.json -- catches drift between what
 # setup just deployed and what's actually in place / on PATH / in env vars.
 #
