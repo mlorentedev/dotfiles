@@ -4,7 +4,7 @@ type: skill
 status: active
 created: "2026-05-31"
 name: handoff
-description: Run a complete, standardized session handoff at session end (or on demand). Triggers on /handoff, "do handoff", "haz handoff", "wrap up the session", "session handoff", "close out the session". Updates the MEMORY.md continuity block, then vault hygiene (tick tasks, capture lessons), bitácora board-status reconciliation, repo/worktree/branch state verification, an artifact/PR summary, and a concrete next action. Cross-agent via AGENTS.md indirection.
+description: Run a complete, standardized session handoff at session end (or on demand). Triggers on /handoff, "do handoff", "haz handoff", "wrap up the session", "session handoff", "close out the session". Updates the MEMORY.md continuity block, then vault hygiene (capture lessons), bitácora board-status reconciliation, repo/worktree/branch state verification, an artifact/PR summary, and a concrete next action. Cross-agent via AGENTS.md indirection.
 allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch]
 ---
 
@@ -20,7 +20,12 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
 
 ## When to SKIP
 
-- Trivial session: a quick question, no state change, nothing committed. A handoff would be noise. (Mirrors the `MEMORY.md` "skip if trivial" rule.)
+Skip when the session left no durable state worth carrying forward — any of:
+- A quick question or explanation; no files changed.
+- A syntax / docs lookup, or a single-line / trivial edit with nothing committed.
+- No new decision, no open thread, no PR or issue touched.
+
+If in doubt, run it — a thin handoff is cheaper than a lost thread. (Mirrors the `MEMORY.md` "skip if trivial" rule.)
 
 ## The handoff checklist (run in order)
 
@@ -36,10 +41,12 @@ OVERWRITE the `## Session Handoff` section (the first section after the H1) of t
 
 Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handoff, not journal); convert relative dates to absolute. **End each handoff field line with two trailing spaces** (markdown hard break) so the fields render as separate lines in Obsidian, not one crammed paragraph — vault-only convention (do NOT carry trailing spaces into code repos; pre-commit strips them). **Path:** the project's auto-memory `MEMORY.md`, which is junctioned into `vault/10_projects/<repo>/memory/` — so any agent can write it. This is the only place strategic continuity prose lives (the rest of `MEMORY.md` stays index-only).
 
+**Lifecycle (prune, don't accumulate):** there is exactly ONE `## Session Handoff` block — the first section after the H1. Overwrite it in place every time; never add a second handoff block and never stack per-session blocks. Durable context that must outlive a single session goes in its OWN named section *below* the handoff (e.g. `## Older context`), not in the handoff block.
+
 ### 2. Knowledge & documentation sync (Standing Order #3 — in-session, never "later")
 
 **Vault knowledge:**
-- Tick completed tasks in `vault/10_projects/<repo>/11-tasks.md` (`[ ]` -> `[x]` + ✓ date + PR link). Keep the file guard-green (one ticket = one entry — see SDD-012 `check-backlog-integrity.sh`).
+- **Task state lives on the bitácora board, not in the vault** (ADR-018) — reconcile it in step 2b, not here. (Legacy `11-tasks.md` files are retired; the few that survive are not the source of truth, so don't tick them as if they were.)
 - Capture any non-obvious **project** lesson in the **repo's `docs/lessons.md`** (Context / Problem / Solution / Tags) — NOT a vault `90-lessons.md` (see [[pattern-knowledge-placement]]: build/operate knowledge lives in the repo). A genuinely **cross-project / methodology** lesson goes to `00_meta/` (promote to a pattern). New architectural decision -> repo `docs/adr/`; recurring cross-project pattern -> `00_meta/patterns/`.
 
 **Repo documentation (keep it reflecting the latest state):**
@@ -63,6 +70,8 @@ gh project item-list 1 --owner mlorentedev --format json --limit 300 \
 
 Leaving an actively-worked issue in `Backlog` is the exact gap HARNESS-010 closes. Mechanics: `dotfiles/docs/runbooks/guide-bitacora-setup.md` §5.
 
+**Best-effort, never a blocker:** if the `gh project` query is unavailable (auth, permissions, or a sandbox denial), do NOT stall the handoff. Instead make sure each touched issue is at least self-assigned or carries a status comment, and record the board change you couldn't apply in **Open threads** so the next session (or Manu) finishes it.
+
 ### 3. Repo / worktree / branch state
 
 - No uncommitted work left dangling — or explicitly named in **Open threads** (never silently).
@@ -76,8 +85,8 @@ Remove transient clutter before closing:
 - **Merged branches (local):** `git branch --merged main | grep -vE '^\*|main|master' | xargs -r git branch -d`. Inspect output — do not force-delete (`-D`) without reading why a branch is unmerged.
 - **Remote gone refs:** `git fetch --prune` on every repo touched. Removes stale remote-tracking refs for branches deleted upstream.
 - **Done worktrees:** any worktree whose PR is merged must be removed (`git worktree remove <path>`). If not yet merged, name it in **Open threads** with PR number.
-- **Temp / scratch files:** inspect `git status` for untracked `.bak`, `*.tmp`, scratch notes. Delete only files with no commit intent — never blindly `git clean -f`.
-- **Empty vault stubs:** if any vault file (e.g. `90-lessons.md`) is frontmatter-only with no real content, delete it and remove its inbound links. Scope: only paths touched this session.
+- **Temp / scratch files:** inspect `git status` for untracked `.bak`, `*.tmp`, scratch notes. **Never delete a file without explicit user confirmation** — list the candidates and ask; never `git clean -f`.
+- **Empty vault stubs:** if any vault file (e.g. `90-lessons.md`) is frontmatter-only with no real content, flag it (with its inbound links) and confirm before removing. Scope: only paths touched this session.
 
 Scope: only repos and vault paths actually touched in this session — not a global cleanup pass.
 
@@ -102,6 +111,7 @@ Tests/lints green; nothing claimed done-when-not. If something is incomplete, it
 - Step 1 targets the vault-junctioned `MEMORY.md` path, writable by every agent — so the handoff is portable today, before MEMORY-001 (the cross-agent session bridge) lands. Non-Claude agents write the same path directly.
 - Steps 2-6 are agent-agnostic (vault + git).
 - Path joining: never hardcode `/` or `\`; use platform-appropriate joining.
+- **If the junction/symlink is missing** (fresh machine, or Windows where the link is a junction, not a symlink): write the continuity block at the auto-memory's REAL location directly — `~/.claude/projects/<project-hash>/memory/MEMORY.md` (POSIX) or `%USERPROFILE%\.claude\projects\<project-hash>\memory\MEMORY.md` (Windows) — then (re)create the junction afterward. The continuity write must never be skipped just because the link is absent.
 
 ## References
 
