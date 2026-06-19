@@ -91,7 +91,11 @@ function Install-Dotf {
 
         # Idempotence: skip when the pinned version is already on PATH.
         if (Get-Command dotf -ErrorAction SilentlyContinue) {
-            $current = ((& dotf version 2>$null) -split '\s+')[-1]
+            # `dotf version` may print to stderr, so capture both streams (2>&1)
+            # and pull the semver out with a regex — robust to the stream and to
+            # empty output (StrictMode makes `@()[-1]` throw, so never index blind).
+            $verRaw = (& dotf version 2>&1 | Out-String)
+            $current = if ($verRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
             if ($current -eq $Version) {
                 Write-Host "dotf $Version already installed; skipping"
                 return $true

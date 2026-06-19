@@ -12,14 +12,23 @@ var coreTools = []string{
 	"direnv", "node", "npm", "zoxide", "docker", "kubectl", "terraform",
 }
 
+// posixOnlyTools are absent on Windows by design — skip them there instead of
+// reporting a false failure (Windows uses pwsh, not zsh; direnv is POSIX-shell).
+var posixOnlyTools = map[string]bool{"zsh": true, "direnv": true}
+
 // checkCoreTools reproduces healthcheck section 1: the core toolchain is on
 // PATH. Names already version-checked by the contract (git, jq) are skipped here
 // to avoid double-reporting — the consolidation the two twins never did.
 func checkCoreTools(sys *System, c *Contract, rep *Report) {
 	rep.Section("Core tools in PATH")
 	covered := contractBinaryNames(c)
+	win := sys.GOOS == "windows"
 	for _, tool := range coreTools {
 		if covered[tool] {
+			continue
+		}
+		if win && posixOnlyTools[tool] {
+			rep.Skip(tool + " (POSIX-only; not expected on Windows)")
 			continue
 		}
 		if sys.has(tool) {
@@ -98,22 +107,29 @@ var versionMatches = []versionedDir{
 // version to the pin: a drift is a WARN, not a FAIL.
 func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Version match (versions.conf)")
-	appsHome := sys.env("APPS_HOME", filepath.Join(sys.home(), "Applications"))
-
-	for _, v := range versionMatches {
-		want := cfg.Versions[v.key]
-		if want == "" {
-			rep.Skip(v.name + " version (not set in versions.conf)")
-			continue
-		}
-		dir := filepath.Join(appsHome, v.dirPrefix+want)
-		if isDir(dir) {
-			rep.Pass(fmt.Sprintf("%s version %s (directory exists)", v.name, want))
-		} else {
-			rep.Fail(fmt.Sprintf("%s expected version %s but directory missing: %s", v.name, want, dir))
+	if sys.GOOS == "windows" {
+		// Windows installs these via winget, not ~/Applications/<tool>-<version>,
+		// so the versioned-dir check does not apply (parity with healthcheck.ps1
+		// section 3, which skips when APPS_HOME is unset).
+		rep.Skip("versioned tool dirs (Windows uses winget, not APPS_HOME)")
+	} else {
+		appsHome := sys.env("APPS_HOME", filepath.Join(sys.home(), "Applications"))
+		for _, v := range versionMatches {
+			want := cfg.Versions[v.key]
+			if want == "" {
+				rep.Skip(v.name + " version (not set in versions.conf)")
+				continue
+			}
+			dir := filepath.Join(appsHome, v.dirPrefix+want)
+			if isDir(dir) {
+				rep.Pass(fmt.Sprintf("%s version %s (directory exists)", v.name, want))
+			} else {
+				rep.Fail(fmt.Sprintf("%s expected version %s but directory missing: %s", v.name, want, dir))
+			}
 		}
 	}
 
+	// yarn is npm-global (cross-platform) — always checked.
 	pin := cfg.Versions["YARN_VERSION"]
 	switch {
 	case !sys.has("yarn"):
@@ -141,10 +157,15 @@ var toolHomeVars = []string{
 // set. Unset is a FAIL (the RC files are expected to export them).
 func checkToolHomeEnvVars(sys *System, rep *Report) {
 	rep.Section("Tool-home environment variables")
+	win := sys.GOOS == "windows"
 	for _, v := range toolHomeVars {
-		if sys.Getenv(v) != "" {
+		switch {
+		case sys.Getenv(v) != "":
 			rep.Pass(v + " is set")
-		} else {
+		case win:
+			// Linux-deploy vars; optional on Windows (winget-managed toolchains).
+			rep.Skip(v + " (optional on Windows — Linux-deploy var)")
+		default:
 			rep.Fail(v + " is not set")
 		}
 	}

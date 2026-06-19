@@ -120,3 +120,34 @@ func TestGenerateWriteIdempotentAndCheck(t *testing.T) {
 		t.Error("expected drift after manual edit")
 	}
 }
+
+func TestResolveContractPathPrefersRepoCheckout(t *testing.T) {
+	// A valid DOTFILES_REPO_DIR checkout wins over the deployed copy, so a dev
+	// machine never generates from a stale ~/.dotfiles/env-contract.json.
+	repo := t.TempDir()
+	want := filepath.Join(repo, "env-contract.json")
+	if err := os.WriteFile(want, []byte(`{"env_vars":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+
+	if got := ResolveContractPath(); got != want {
+		t.Errorf("ResolveContractPath() = %q, want repo copy %q", got, want)
+	}
+}
+
+func TestResolveContractPathRepoMissingFallsThrough(t *testing.T) {
+	// DOTFILES_REPO_DIR set but carrying no contract (or a stale/non-existent path)
+	// must NOT short-circuit — resolution falls through to the deployed copy.
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir()) // empty dir: no env-contract.json
+	deployed := t.TempDir()
+	want := filepath.Join(deployed, "env-contract.json")
+	if err := os.WriteFile(want, []byte(`{"env_vars":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_DIR", deployed)
+
+	if got := ResolveContractPath(); got != want {
+		t.Errorf("ResolveContractPath() = %q, want deployed copy %q", got, want)
+	}
+}

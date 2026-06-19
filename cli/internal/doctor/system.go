@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -42,6 +43,10 @@ type System struct {
 	// Now returns the current time (time.Now in production). A clock seam keeps
 	// "days until expiry" deterministic under test.
 	Now func() time.Time
+	// GOOS is the target OS (runtime.GOOS in production). A seam so OS-gated
+	// checks (skip POSIX-only tools / tmux / shell-rc symlinks on Windows) are
+	// table-testable; the zero value "" behaves like a POSIX host.
+	GOOS string
 }
 
 // realSystem wires System to the live OS.
@@ -69,7 +74,8 @@ func realSystem() *System {
 			defer func() { _ = resp.Body.Close() }()
 			return resp.StatusCode, resp.Header, nil
 		},
-		Now: time.Now,
+		Now:  time.Now,
+		GOOS: runtime.GOOS,
 	}
 }
 
