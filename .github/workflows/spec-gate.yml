@@ -8,6 +8,10 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled, edited]
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   spec-gate:
     runs-on: ubuntu-latest
