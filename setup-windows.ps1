@@ -1431,6 +1431,24 @@ if (Test-Path $healthcheckSource) {
     Write-Warn "healthcheck.ps1 not found at $healthcheckSource"
 }
 
+# DX-006: deploy + re-apply the Orca/Copilot PreToolUse hook fix. Orca regenerates
+# ~/.copilot/hooks/orca.json and ~/.orca/agent-hooks/copilot-hook.ps1 on every
+# install/upgrade, reverting the fix (timeoutSec 5 + slow Invoke-WebRequest) and
+# making every Copilot tool call fail with "hook errored". The script is idempotent
+# and skips cleanly when Orca is not installed, so it is always safe to run.
+$orcaHookTuneSource = "$DotfilesDir\scripts\orca-hook-tune.ps1"
+if (Test-Path $orcaHookTuneSource) {
+    Copy-Item $orcaHookTuneSource "$ScriptsDir\" -Force
+    Write-Success "Deployed orca-hook-tune.ps1 to $ScriptsDir\"
+    try {
+        & "$ScriptsDir\orca-hook-tune.ps1"
+    } catch {
+        Write-Warn "orca-hook-tune.ps1 failed: $($_.Exception.Message)"
+    }
+} else {
+    Write-Warn "orca-hook-tune.ps1 not found at $orcaHookTuneSource"
+}
+
 # WIN-005: deploy the HKCU engineering-defaults script (invoked opt-in below).
 $winDefaultsSource = "$DotfilesDir\scripts\windows-defaults.ps1"
 if (Test-Path $winDefaultsSource) {
