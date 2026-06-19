@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/mlorentedev/dotfiles/compare/v0.5.1...v0.6.0) (2026-06-19)
+
+
+### Features
+
+* **cli:** cross-machine path resolution via dotf env generate (CLI-016, [#445](https://github.com/mlorentedev/dotfiles/issues/445)) ([#447](https://github.com/mlorentedev/dotfiles/issues/447)) ([60d120b](https://github.com/mlorentedev/dotfiles/commit/60d120bdd4d10eb75368b4fb6abcf560df57af48))
+* **setup:** wire resolved vault path into setup + hive daemon (HARNESS-024, [#446](https://github.com/mlorentedev/dotfiles/issues/446)) ([#448](https://github.com/mlorentedev/dotfiles/issues/448)) ([4d8ce18](https://github.com/mlorentedev/dotfiles/commit/4d8ce184af2fe7bf1d4f3307e32b649be7ef0119))
+
 ## [0.5.1](https://github.com/mlorentedev/dotfiles/compare/v0.5.0...v0.5.1) (2026-06-18)
 
 
