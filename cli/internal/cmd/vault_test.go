@@ -24,8 +24,9 @@ func TestVaultParentPrintsHelp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("vault: %v", err)
 	}
-	if !strings.Contains(stdout+stderr, "work") {
-		t.Errorf("`dotf vault` should print help listing the work subcommand:\n%s", stdout+stderr)
+	out := stdout + stderr
+	if !strings.Contains(out, "work") || !strings.Contains(out, "project") {
+		t.Errorf("`dotf vault` should print help listing the work and project subcommands:\n%s", out)
 	}
 }
 
@@ -89,6 +90,66 @@ func TestVaultWorkForceFlagPlumbed(t *testing.T) {
 		t.Errorf("re-run without --force should skip:\n%s", stdout)
 	}
 	stdout, _, err = execute(t, "vault", "work", "acme", "edge", "--force")
+	if err != nil {
+		t.Fatalf("force run: %v", err)
+	}
+	if strings.Contains(stdout, "skipped  00-context.md") {
+		t.Errorf("--force should regenerate, not skip:\n%s", stdout)
+	}
+}
+
+func TestVaultProjectScaffolds(t *testing.T) {
+	vaultDir := t.TempDir()
+	t.Setenv("VAULT_PATH", vaultDir)
+	t.Setenv("HOME", t.TempDir()) // isolate the linkMemory symlink off the real ~/.claude
+	pinClock(t)
+	repo := filepath.Join(t.TempDir(), "myrepo")
+
+	stdout, _, err := execute(t, "vault", "project", repo, "--stack", "go")
+	if err != nil {
+		t.Fatalf("vault project: %v", err)
+	}
+	if !strings.Contains(stdout, "[OK] Project vault entry") {
+		t.Errorf("missing success line:\n%s", stdout)
+	}
+
+	ctx := filepath.Join(vaultDir, "10_projects", "myrepo", "00-context.md")
+	if _, err := os.Stat(ctx); err != nil {
+		t.Errorf("00-context.md not written: %v", err)
+	}
+	b, _ := os.ReadFile(ctx)
+	if !strings.Contains(string(b), "myrepo") || !strings.Contains(string(b), `created: "2026-06-13"`) {
+		t.Errorf("tokens not substituted (repo/date):\n%s", string(b))
+	}
+}
+
+func TestVaultProjectErrorsWhenVaultAbsent(t *testing.T) {
+	t.Setenv("VAULT_PATH", filepath.Join(t.TempDir(), "nope"))
+	_, _, err := execute(t, "vault", "project", t.TempDir())
+	if err == nil {
+		t.Fatal("expected error when the vault is absent (vault-only command)")
+	}
+}
+
+func TestVaultProjectForceFlagPlumbed(t *testing.T) {
+	vaultDir := t.TempDir()
+	t.Setenv("VAULT_PATH", vaultDir)
+	t.Setenv("HOME", t.TempDir())
+	pinClock(t)
+	repo := filepath.Join(t.TempDir(), "myrepo")
+
+	if _, _, err := execute(t, "vault", "project", repo); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	// Second run without --force skips; with --force regenerates.
+	stdout, _, err := execute(t, "vault", "project", repo)
+	if err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if !strings.Contains(stdout, "skipped") {
+		t.Errorf("re-run without --force should skip:\n%s", stdout)
+	}
+	stdout, _, err = execute(t, "vault", "project", repo, "--force")
 	if err != nil {
 		t.Fatalf("force run: %v", err)
 	}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#
+# Global pre-commit dispatcher (GUARD-001). Installed machine-wide via
+# core.hooksPath, so it runs in EVERY repo. It (1) runs the memory-sink guard,
+# then (2) chains to the repo-local hook — because a global core.hooksPath makes
+# git ignore .git/hooks/, this exec is what keeps per-repo guards (gitleaks)
+# alive. See ADR / spec GUARD-001 (R1: multi-hook chaining dispatcher).
+
+set -u
+
+DISPATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# 1. Global concern: block memory artifacts outside the vault.
+"$DISPATCH_DIR/lib/memory-sink-guard.sh" || exit $?
+
+# 2. Chain to the repo-local hook (shadowed by the global core.hooksPath).
+exec "$DISPATCH_DIR/lib/chain-local-hook.sh" pre-commit "$@"

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-011-release-please-f1",
+    "behavior": "AC1: release-please config + manifest exist and are valid JSON; manifest seeded at 0.3.0",
+    "verification": "jq -e '.packages[\".\"]' release-please-config.json >/dev/null && jq -e '.\".\" == \"0.3.0\"' .release-please-manifest.json >/dev/null",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-011-release-please-f2",
+    "behavior": "AC2: single-root config emits v<version> tags (no component prefix)",
+    "verification": "jq -e '.\"include-component-in-tag\" == false' release-please-config.json >/dev/null",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-011-release-please-f3",
+    "behavior": "AC3: release PR bumps versions.conf via extra-files + the DOTF_VERSION block marker is present",
+    "verification": "jq -e '.packages[\".\"][\"extra-files\"] | index(\"versions.conf\")' release-please-config.json >/dev/null && grep -q 'x-release-please-start-version' versions.conf",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-011-release-please-f4",
+    "behavior": "AC4: the release workflow uses a PAT (RELEASE_TOKEN) so the created tag triggers goreleaser",
+    "verification": "grep -q 'secrets.RELEASE_TOKEN' .github/workflows/release-please.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-011-release-please-f5",
+    "behavior": "AC5: changelog-gen.sh + its bats are removed and no references remain",
+    "verification": "! test -e scripts/changelog-gen.sh && ! test -e tests/changelog-gen.bats && ! grep -rqI 'changelog-gen' --include='*.sh' --include='*.yml' --include='*.yaml' --include='*.bats' .",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-011-release-please-f6",
+    "behavior": "AC6: versions.conf stays the single DOTF_VERSION source and still parses (semver test green)",
+    "verification": "bash -n versions.conf && zsh -n versions.conf && ~/.local/bin/bats tests/versions-conf.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

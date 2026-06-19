@@ -1,0 +1,44 @@
+[
+  {
+    "id": "GUARD-001-f1",
+    "behavior": "Committing MEMORY.md (or a memory/ path) to a non-vault repo is rejected with a vault-pointing message",
+    "verification": "bats tests/guard-memory.bats -f 'rejects MEMORY.md in non-vault repo'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-001-f2",
+    "behavior": "Committing the same memory artifact inside the vault is allowed",
+    "verification": "bats tests/guard-memory.bats -f 'allows MEMORY.md in vault'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-001-f3",
+    "behavior": "A pre-existing local pre-commit hook still runs after the guard (chaining, no clobber)",
+    "verification": "bats tests/guard-memory.bats -f 'runs guard and local pre-commit'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-001-f4",
+    "behavior": "dotf init scaffolds a .gitignore block ignoring MEMORY.md and memory/",
+    "verification": "cd cli && go test ./internal/initrepo/ -run TestScaffoldGitignoreHasMemorySinkBlock",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-001-f5",
+    "behavior": "dotf doctor wires core.hooksPath at the dispatcher idempotently, preserves an unrelated existing hooksPath (no clobber), and only writes under --fix",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckGuardHooks",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-001-f6",
+    "behavior": "AGENTS.md states the memory single-sink rule once (vault = only sink; Hive = the memory API)",
+    "verification": "bats tests/agents-md.bats -f 'memory single-sink rule'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -174,3 +174,48 @@ _commit() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]]
 }
+
+# Regression for #397: git compresses a spec-archive rename into
+# "specs/{ => archive}/<id>/proposal.md". The raw compressed path starts with
+# "specs/{", dodging the specs/archive/* exclusion and falsely reading as an
+# active-spec touch. A PR bundling that archive move with >=50 LOC of production
+# code and NO genuine active spec must still FAIL the gate.
+@test "spec-archive rename bundled with production code does not evade the gate (#397)" {
+    # Put the spec on main so the move is a real rename across main...feature.
+    git checkout -q main
+    mkdir -p specs/HARNESS-026-foo
+    printf 'proposal line %d\n' {1..30} > specs/HARNESS-026-foo/proposal.md
+    git add -A && git commit -q -m "add spec on main"
+    git checkout -q feature
+    git merge -q main
+
+    mkdir -p specs/archive/HARNESS-026-foo
+    git mv specs/HARNESS-026-foo/proposal.md specs/archive/HARNESS-026-foo/proposal.md
+    printf 'code line %d\n' {1..60} > feature.go
+    _commit "archive move bundled with unrelated production code"
+
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
+}
+
+# The compressed rename must normalize so a PURE archive move still passes — but
+# because it is below threshold (archived files excluded), NOT because of a
+# phantom active-spec touch. --explain proves "Spec folder touched: no".
+@test "pure spec-archive rename passes for the right reason: no false active-spec touch (#397)" {
+    git checkout -q main
+    mkdir -p specs/HARNESS-026-bar
+    printf 'proposal line %d\n' {1..30} > specs/HARNESS-026-bar/proposal.md
+    git add -A && git commit -q -m "add spec on main"
+    git checkout -q feature
+    git merge -q main
+
+    mkdir -p specs/archive/HARNESS-026-bar
+    git mv specs/HARNESS-026-bar/proposal.md specs/archive/HARNESS-026-bar/proposal.md
+    _commit "pure archive move"
+
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Spec folder touched: no"* ]]
+    [[ "$output" == *"Production LOC (added+removed): 0"* ]]
+}

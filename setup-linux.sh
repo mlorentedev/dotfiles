@@ -275,6 +275,19 @@ else
     log_warning "scripts/install-dotf.sh not found; skipping dotf install"
 fi
 
+# GUARD-001 memory-sink dispatcher (#398/#418): deploy git-hooks/ into the
+# ~/.dotfiles mirror and wire core.hooksPath machine-wide so the guard is active
+# in every repo. Idempotent; preserves an unrelated pre-existing hooksPath. The
+# deployed dotf release can't self-deploy these (no source tree), so the
+# bootstrap places them (ADR-020 C7); `dotf doctor` verifies the wiring after.
+if [ -f ./scripts/install-git-hooks.sh ]; then
+    # shellcheck source=/dev/null
+    . ./scripts/install-git-hooks.sh
+    install_git_hooks || log_warning "git-hooks install failed (continuing; see 'dotf doctor')"
+else
+    log_warning "scripts/install-git-hooks.sh not found; skipping memory-sink guard install"
+fi
+
 # zoxide (smarter cd)
 if ! command -v zoxide >/dev/null 2>&1; then
     log_info "Installing zoxide..."
@@ -747,17 +760,25 @@ fi
 # substitution as opencode (SDD-009, self-contained cross-OS); AGENTS.md is the
 # same canonical SSOT; settings.json is seeded only when absent (pi mutates it).
 PI_AGENT_DIR="$HOME/.pi/agent"
+PI_BIN="$HOME/.local/bin/pi"
 if command -v npm >/dev/null 2>&1; then
-    if ! command -v pi >/dev/null 2>&1; then
+    # Install into the manager-independent ~/.local prefix — the same dir that
+    # already carries `claude`/`dotf` and is on PATH for login shells AND
+    # GUI/ADE processes (e.g. Orca). A bare `npm i -g` lands in nvm's
+    # per-node-version tree (~/.nvm/versions/node/<v>/bin), invisible to any
+    # environment running a different node. Guard on the stable location, not
+    # bare `command -v pi`, so a stale nvm-version copy cannot mask a missing
+    # ~/.local launcher.
+    if [ ! -x "$PI_BIN" ]; then
         PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"
-        log_info "Installing pi ($PI_PKG) via npm..."
-        if npm install -g --ignore-scripts "$PI_PKG" >/dev/null 2>&1; then
-            log_success "pi installed"
+        log_info "Installing pi ($PI_PKG) into ~/.local ..."
+        if npm install -g --ignore-scripts --prefix "$HOME/.local" "$PI_PKG" >/dev/null 2>&1; then
+            log_success "pi installed -> $PI_BIN"
         else
-            log_warning "pi install failed — run: npm install -g --ignore-scripts $PI_PKG"
+            log_warning "pi install failed — run: npm install -g --ignore-scripts --prefix \"\$HOME/.local\" $PI_PKG"
         fi
     else
-        log_info "pi already installed"
+        log_info "pi already installed ($PI_BIN)"
     fi
 else
     log_warning "npm not found — skipping pi install (install Node.js, then re-run setup)"

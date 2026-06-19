@@ -49,16 +49,17 @@ created: "2026-06-16"
 - [x] `go test ./...` green; `gofmt -l` + `go vet` clean.
 - [x] Smoke: built binary scaffolds a throwaway `<family>/<component>` under a temp `$VAULT_PATH`; re-run skips; `--force` regenerates.
 - [x] `verification.md` filled (evidence: test names, smoke, drift-real proof).
-- [ ] PR1 opened referencing this spec folder; closes #388.
+- [x] PR1 opened referencing this spec folder; closes #388. (PR #396, merged)
 
-## PR2 — `dotf vault project` + rewire `dotf init` (#395) — DEFERRED
+## PR2 — `dotf vault project` + rewire `dotf init` (#395)
 
-> Separate PR (atomic-PR). Behavior-preserving refactor. Not started until PR1 merges.
+> Separate PR (atomic-PR). Behavior-preserving refactor.
 
-- [ ] Move `initrepo.WriteVaultEntry` (+ `linkMemory`, `vaultEntryFiles`, the 3 `vault-*` templates) into `cli/internal/vault` as `WriteProjectEntry` / `vault project <repo>`.
-- [ ] Rewire `dotf init` orchestrator to call `vault.WriteProjectEntry`; delete the `initrepo` copy (strangler).
-- [ ] Parity: `dotf init` produces a byte-identical `10_projects/<repo>/` before/after (golden compare; existing orchestrator/vault tests green).
-- [ ] PR2 opened referencing this spec folder; closes #395. Archive CLI-015 after PR2 merges.
+- [x] Move `initrepo.WriteVaultEntry` (+ `linkMemory`, `vaultEntryFiles`, the 3 `vault-*` templates) into `cli/internal/vault` as `WriteProjectEntry` / `vault project [path]`.
+- [x] Rewire `dotf init` orchestrator to call `vault.WriteProjectEntry`; delete the `initrepo` copy (strangler — guard-grep clean).
+- [x] Parity: `dotf init` produces a byte-identical `10_projects/<repo>/` before/after (templates moved via `git mv` — byte-equal vs `main`; smoke: project-vs-init `00-context.md` identical modulo repo name; orchestrator/vault tests green).
+- [x] Templates stay embed-only (no drift guard yet): they diverge from the vault SSOT `project-context.md`/`agent-memory.md` — reconciliation tracked in #400 (kept out of #395 to preserve byte-identical output).
+- [x] PR2 opened referencing this spec folder; closes #395. (PR #403, merged @ `cd03921` → #395 closed; spec archived here.)
 
 ## Machine-readable features
 

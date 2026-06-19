@@ -1,0 +1,30 @@
+[
+  {
+    "id": "MEMORY-002-f1",
+    "behavior": "ensure-memory-symlink.sh creates the symlink when a vault source exists under any of the 3 conventions",
+    "verification": "bats tests/ensure-memory-symlink.bats -f 'creates symlink'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-002-f2",
+    "behavior": "Idempotent and safe: already-linked / non-empty real dir / no-source all no-op with exit 0 and never clobber data",
+    "verification": "bats tests/ensure-memory-symlink.bats -f 'idempotent'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-002-f3",
+    "behavior": "claude-session-start.sh delegates to the script and produces the same symlink the inline function did (parity)",
+    "verification": "bats tests/ensure-memory-symlink.bats -f 'claude parity'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-002-f5",
+    "behavior": "The inline ensure_memory_symlink body is removed from claude-session-start.sh (no duplicated logic)",
+    "verification": "bash -c '! grep -q \"vault_memory=\\\"$KNOWLEDGE_VAULT/10_projects\" scripts/claude-session-start.sh'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
