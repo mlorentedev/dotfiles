@@ -1,6 +1,43 @@
 # Changelog
 
-Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit by hand.
+## [0.5.1](https://github.com/mlorentedev/dotfiles/compare/v0.5.0...v0.5.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* **setup:** install pi into ~/.local so GUI/ADE launchers resolve it ([#440](https://github.com/mlorentedev/dotfiles/issues/440)) ([f22e425](https://github.com/mlorentedev/dotfiles/commit/f22e425e47e6da45dcbfda9da3b4434ab3f693aa)), closes [#426](https://github.com/mlorentedev/dotfiles/issues/426)
+
+## [0.5.0](https://github.com/mlorentedev/dotfiles/compare/v0.4.0...v0.5.0) (2026-06-18)
+
+
+### Features
+
+* **doctor:** detect expiring or invalid GitHub PATs before they break CI ([#427](https://github.com/mlorentedev/dotfiles/issues/427)) ([52695f3](https://github.com/mlorentedev/dotfiles/commit/52695f32e1de33b46f1e24a3f90322fb6b95d7db)), closes [#422](https://github.com/mlorentedev/dotfiles/issues/422)
+
+
+### Bug Fixes
+
+* **ci:** deterministic Windows tool install — age, eza, zoxide (BUG-025/024) ([#425](https://github.com/mlorentedev/dotfiles/issues/425)) ([fdb27f8](https://github.com/mlorentedev/dotfiles/commit/fdb27f854ed2dfb16d937975c5ff21d0f978d0aa))
+* **doctor:** resolve PAT from any mapped env alias, not just the first ([#429](https://github.com/mlorentedev/dotfiles/issues/429)) ([add7d1d](https://github.com/mlorentedev/dotfiles/commit/add7d1de3104fd61bafd15fb523fc6d586ae5b63))
+
+## [0.4.0](https://github.com/mlorentedev/dotfiles/compare/v0.3.0...v0.4.0) (2026-06-17)
+
+
+### Features
+
+* **ci:** adopt release-please (version + changelog + tag automation) ([#416](https://github.com/mlorentedev/dotfiles/issues/416)) ([a17c917](https://github.com/mlorentedev/dotfiles/commit/a17c917ba66d08b9d75932c1ff7291b963430590)), closes [#369](https://github.com/mlorentedev/dotfiles/issues/369)
+* **guard:** complete GUARD-001 single-sink (gitignore, global install, AGENTS.md) ([#415](https://github.com/mlorentedev/dotfiles/issues/415)) ([a4cd005](https://github.com/mlorentedev/dotfiles/commit/a4cd005964480c87de36f0f12c2dfd76f6399068))
+* **session-start:** extract agent-agnostic session-brief core (ADR-023) ([#413](https://github.com/mlorentedev/dotfiles/issues/413)) ([5f34eee](https://github.com/mlorentedev/dotfiles/commit/5f34eeeef18e28d81f3cd15baa82a1d5f1c6221c))
+
+
+### Bug Fixes
+
+* **ci:** point release-please at the existing RELEASE_TOKEN secret ([#419](https://github.com/mlorentedev/dotfiles/issues/419)) ([242f6d1](https://github.com/mlorentedev/dotfiles/commit/242f6d1ff1a61ca65ad72041f4b6ad634e8fdd2c)), closes [#369](https://github.com/mlorentedev/dotfiles/issues/369)
+* **guard:** deploy the memory-sink dispatcher + wire core.hooksPath ([#418](https://github.com/mlorentedev/dotfiles/issues/418)) ([#420](https://github.com/mlorentedev/dotfiles/issues/420)) ([3d551a6](https://github.com/mlorentedev/dotfiles/commit/3d551a690b5fc0a941953276c6246ebbce9ce493))
+
+## Changelog
+
+Maintained by [release-please](https://github.com/googleapis/release-please) from Conventional Commits. Do not edit by hand.
 
 ## Features
 
@@ -166,4 +203,3 @@ Generated from conventional commits via `scripts/changelog-gen.sh`. Do not edit 
 - 2025-03-23: bug: fix issue in nvm alias inizialiation (fc73945)
 - 2024-11-01: First commit (c40614f)
 - 2024-11-01: Initial commit (3cb97d3)
-

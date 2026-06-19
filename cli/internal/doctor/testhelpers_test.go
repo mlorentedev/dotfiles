@@ -3,11 +3,17 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
+
+// fixedTestNow is the deterministic clock the default test System reports, so
+// any check reading sys.Now() in a full-sweep test is reproducible.
+var fixedTestNow = time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
 
 // newSys builds a System with deterministic env, PATH membership and command
 // output — the three process-global surfaces a check touches. The filesystem is
@@ -41,6 +47,14 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 			}
 			return "", errors.New("no such command: " + key)
 		},
+		// Safe defaults so full-sweep tests never nil-panic on the network/clock
+		// seams: the clock is fixed, and HTTPGet reports "offline" (which the
+		// PAT check degrades to a WARN, not a panic). Tests exercising the PAT
+		// check inject their own HTTPGet/Now.
+		HTTPGet: func(string, map[string]string) (int, http.Header, error) {
+			return 0, nil, errors.New("no network in tests")
+		},
+		Now: func() time.Time { return fixedTestNow },
 	}
 }
 

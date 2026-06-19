@@ -52,6 +52,26 @@ func TestScaffoldCreatesStructureAndFiles(t *testing.T) {
 	}
 }
 
+func TestScaffoldGitignoreHasMemorySinkBlock(t *testing.T) {
+	// GUARD-001 AC4: a fresh repo is born convention-correct — its .gitignore
+	// excludes the memory-sink artifacts so MEMORY.md / memory/ can never be
+	// committed to a code repo (memory lives only in the vault).
+	root := filepath.Join(t.TempDir(), "myproj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Scaffold(root); err != nil {
+		t.Fatalf("Scaffold: %v", err)
+	}
+
+	gitignore := readFile(t, filepath.Join(root, ".gitignore"))
+	for _, want := range []string{"MEMORY.md", "memory/"} {
+		if !strings.Contains(gitignore, want) {
+			t.Errorf(".gitignore must ignore %q (single-sink convention):\n%s", want, gitignore)
+		}
+	}
+}
+
 func TestScaffoldEnvContractIsValidJSON(t *testing.T) {
 	root := t.TempDir()
 	if _, err := Scaffold(root); err != nil {

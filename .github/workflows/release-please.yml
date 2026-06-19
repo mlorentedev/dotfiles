@@ -1,0 +1,30 @@
+name: release-please
+
+# Conventional-Commit-driven release automation (CLI-011, #369).
+# On every push to main, release-please maintains a standing "release PR" that
+# computes the next semver from commit types, regenerates CHANGELOG.md, and
+# bumps DOTF_VERSION in versions.conf (extra-files). Merging that PR creates the
+# v* tag — which cli.yml's `release` job consumes to build + publish binaries.
+#
+# IMPORTANT: a tag pushed with the default GITHUB_TOKEN does NOT trigger other
+# workflows (GitHub recursion guard), so goreleaser would never fire. We use a
+# PAT (RELEASE_TOKEN) so the tag push triggers cli.yml. See spec
+# specs/CLI-011-release-please/proposal.md R1.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

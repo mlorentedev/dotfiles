@@ -113,6 +113,28 @@ _is_active_spec_path() {
     esac
 }
 
+# git diff --numstat compresses a rename into one path with the common
+# prefix/suffix factored out: "specs/{ => archive}/<id>/proposal.md" (brace
+# form) or "old/path => new/path" (full form). Both must collapse to the
+# DESTINATION path before the matchers run, or an archived move reads as an
+# active-spec touch and dodges the gate (#397).
+_normalize_rename_path() {
+    local p="$1"
+    case "$p" in
+        *'{'*' => '*'}'*)
+            # Brace form: prefix{old => new}suffix -> prefix + new + suffix
+            p=$(printf '%s' "$p" | sed 's/{[^}]* => \([^}]*\)}/\1/')
+            ;;
+    esac
+    case "$p" in
+        *' => '*) p="${p##* => }" ;;   # Full form: old => new -> new
+    esac
+    case "$p" in
+        *//*) p=$(printf '%s' "$p" | sed 's#//*#/#g') ;;  # collapse moves OUT of a dir
+    esac
+    printf '%s' "$p"
+}
+
 if _has_label "dependencies"; then
     printf '[OK] spec-gate skipped: PR carries "dependencies" label (dependabot/renovate)\n'
     exit 0
@@ -138,6 +160,8 @@ EXCLUDED=()
 
 while IFS=$'\t' read -r added removed path; do
     [[ -z "${path:-}" ]] && continue
+    # Resolve git's rename-compression to the destination path (#397).
+    case "$path" in *' => '*) path=$(_normalize_rename_path "$path") ;; esac
     [[ "$added" == "-" ]] && added=0
     [[ "$removed" == "-" ]] && removed=0
 

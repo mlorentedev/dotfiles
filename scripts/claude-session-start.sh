@@ -68,6 +68,27 @@ fi
 # APPEND to CONTEXT_LINES defensively so they cannot wipe this reminder.
 CONTEXT_LINES='[sdd] Before your first tool call, read `AGENTS.md` at the repo root (or `~/Projects/dotfiles/AGENTS.md` as fallback) and apply its "Spec-Driven Development" (including the Discipline Gate) and "Standing Orders" sections. SDD applies by default for PR-sized changes (~50-300 LOC, public contract, new dep, multi-PR sequence). Skip ONLY for: typos, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, documentation-only changes. When in doubt, ASK the user.'
 
+# --- session-brief core (ADR-023, HARNESS-026) ---
+# The agent-independent vault signals (vault detection, vault-health, spec
+# counts, baseline integrity) live in the agnostic session-brief core. This hook
+# is the Claude adapter: it sources the core as a library and calls the sb_*
+# emitters at their legacy positions below, so the emitted additionalContext
+# stays byte-identical. No-op fallbacks first so a partial install (core script
+# not yet deployed) still runs and degrades to "no vault signals".
+# NOTE: sourced AFTER the [sdd] reminder above — the fallback find_vault_root()
+# stub must stay below the [sdd] line (tests/hooks.bats anchors the SDD-first
+# invariant on the first find_vault_root definition).
+find_vault_root() { return 1; }
+sb_vault_detect() { :; }
+sb_vault_health() { :; }
+sb_specs() { :; }
+sb_vault_baseline() { :; }
+SESSION_BRIEF_CORE="$SCRIPT_DIR/session-brief.sh"
+if [ -f "$SESSION_BRIEF_CORE" ]; then
+    # shellcheck source=session-brief.sh
+    SESSION_BRIEF_LIB=1 . "$SESSION_BRIEF_CORE"
+fi
+
 # --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
 # Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
 # missing zod runtime dep. Silent on healthy installs.
@@ -104,19 +125,7 @@ $DOCTOR_DRIFT"
     fi
 fi
 
-# Walk up from CWD to find an Obsidian vault (.obsidian/ directory)
-find_vault_root() {
-    local dir="$1"
-    while [ "$dir" != "/" ]; do
-        if [ -d "$dir/.obsidian" ]; then
-            echo "$dir"
-            return 0
-        fi
-        dir="$(dirname "$dir")"
-    done
-    return 1
-}
-
+# find_vault_root is provided by the sourced session-brief core.
 VAULT_ROOT=$(find_vault_root "$CWD") || true
 # VAULT_PATH is the cross-machine seam (ADR-023), set by the sourced paths.sh;
 # fall back to the legacy default only when it is unset.
@@ -185,58 +194,11 @@ find_work_sdk_project() {
     done
 }
 
-# --- Spec-Driven Development: detect repo specs/ and surface in-flight work ---
-# Counts active vs archived specs under $CWD/specs/ and flags any spec
-# containing unresolved [AGENT-DRAFT] or [AGENT-SUGGESTION] tags.
-# Discovery without proactive nag — silent if no specs/.
-detect_repo_specs() {
-    local specs_dir d name active_count archive_count drafts_specs draft_count msg
-    specs_dir="$CWD/specs"
-    [ -d "$specs_dir" ] || return 0
-
-    active_count=0
-    drafts_specs=""
-    for d in "$specs_dir"/*/; do
-        [ -d "$d" ] || continue
-        name=$(basename "$d")
-        [ "$name" = "archive" ] && continue
-        active_count=$((active_count + 1))
-        if grep -rlE '\[AGENT-DRAFT\]|\[AGENT-SUGGESTION\]' "$d" >/dev/null 2>&1; then
-            drafts_specs="$drafts_specs $name"
-        fi
-    done
-
-    archive_count=0
-    if [ -d "$specs_dir/archive" ]; then
-        for d in "$specs_dir/archive"/*/; do
-            [ -d "$d" ] || continue
-            archive_count=$((archive_count + 1))
-        done
-    fi
-
-    # Silent if entirely empty
-    if [ "$active_count" -eq 0 ] && [ "$archive_count" -eq 0 ]; then
-        return 0
-    fi
-
-    msg="[specs] $active_count active, $archive_count archived"
-    if [ -n "$drafts_specs" ]; then
-        drafts_specs="${drafts_specs# }"
-        draft_count=$(printf '%s' "$drafts_specs" | wc -w | tr -d ' ')
-        msg="$msg — $draft_count with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags:"
-        for name in $drafts_specs; do
-            msg="$msg
-  - $name"
-        done
-    fi
-
-    CONTEXT_LINES="$CONTEXT_LINES
-$msg"
-}
-
+# Spec counts (sb_specs) come from the session-brief core; detect_hive_project
+# stays in the adapter (deferred to a later slice).
 if [ -d "$CWD/.git" ]; then
     detect_hive_project
-    detect_repo_specs
+    CONTEXT_LINES="$CONTEXT_LINES$(sb_specs "$CWD")"
 fi
 
 # Note: previous versions exited silently here when both VAULT_ROOT and
@@ -246,50 +208,13 @@ fi
 
 if [ -n "$VAULT_ROOT" ]; then
     VAULT_NAME=$(basename "$VAULT_ROOT")
-    CONTEXT_LINES="Obsidian vault detected: $VAULT_NAME ($VAULT_ROOT)
+    CONTEXT_LINES="$(sb_vault_detect "$VAULT_ROOT")
 
 $CONTEXT_LINES"
 fi
 
-# Try running vault-health.sh if available
-VAULT_HEALTH="$SCRIPT_DIR/vault-health.sh"
-if [ -x "$VAULT_HEALTH" ]; then
-    # Run with vault env vars, capture output, tolerate failures
-    HEALTH_OUTPUT=$(
-        VAULT_DIR="$VAULT_ROOT" VAULT_NAME="$VAULT_NAME" \
-        bash "$VAULT_HEALTH" 2>&1
-    ) || HEALTH_EXIT=$?
-    HEALTH_EXIT=${HEALTH_EXIT:-0}
-
-    if [ "$HEALTH_EXIT" -eq 2 ]; then
-        # GUI down: GUI-dependent checks skipped, but integrity check (git-based) ran anyway.
-        # Scan HEALTH_OUTPUT for any FAIL lines so integrity alerts still surface.
-        INTEGRITY_FAILS=$(echo "$HEALTH_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep 'FAIL' || echo "")
-        if [ -n "$INTEGRITY_FAILS" ]; then
-            CONTEXT_LINES="$CONTEXT_LINES
-Obsidian GUI not running — GUI-dependent checks skipped. Integrity issues found:
-$INTEGRITY_FAILS"
-        else
-            CONTEXT_LINES="$CONTEXT_LINES
-Obsidian GUI not running — vault health skipped. Run 'vault-health.sh' manually when GUI is up."
-        fi
-    elif [ "$HEALTH_EXIT" -eq 0 ]; then
-        CONTEXT_LINES="$CONTEXT_LINES
-Vault health: ALL CHECKS PASSED"
-    else
-        # Extract summary line (Results: X passed, Y failed, Z skipped)
-        SUMMARY=$(echo "$HEALTH_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep '^Results:' || echo "")
-        # Extract FAIL lines
-        FAILURES=$(echo "$HEALTH_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep 'FAIL' || echo "")
-        CONTEXT_LINES="$CONTEXT_LINES
-Vault health: $SUMMARY
-Issues found:
-$FAILURES"
-    fi
-else
-    CONTEXT_LINES="$CONTEXT_LINES
-vault-health.sh not found at $VAULT_HEALTH — run dotfiles setup to install."
-fi
+# Vault-health block (agent-independent) comes from the session-brief core.
+CONTEXT_LINES="$CONTEXT_LINES$(sb_vault_health "$VAULT_ROOT" "$VAULT_NAME" "$SCRIPT_DIR")"
 
 # --- Knowledge maintenance health check ---
 # Derives MEMORY.md path from CWD using Claude Code's path encoding convention.
@@ -301,65 +226,22 @@ encode_project_path() {
 
 # --- Auto-create memory symlink if vault has memory/ for this project ---
 # Runs before health check so the symlink exists when health check reads it.
+# The vault-source resolution lives in the agent-agnostic ensure-memory-symlink.sh
+# (MEMORY-002); this hook only computes Claude's encoded target and delegates.
 ensure_memory_symlink() {
-    local encoded target_dir project_name vault_memory parent_dir
+    local encoded target_dir msg helper
+    helper="$SCRIPT_DIR/ensure-memory-symlink.sh"
+    [ -x "$helper" ] || return 0   # degrade cleanly if the sibling isn't deployed
     encoded=$(encode_project_path "$CWD")
     target_dir="$HOME/.claude/projects/$encoded/memory"
 
-    # Already linked? Skip.
-    if [ -L "$target_dir" ]; then return 0; fi
-    if [ -d "$target_dir" ] && [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then return 0; fi
-
-    # Try 10_projects/<name>/memory/ (personal projects convention)
-    project_name=$(basename "$CWD")
-    vault_memory="$KNOWLEDGE_VAULT/10_projects/$project_name/memory"
-
-    if [ ! -d "$vault_memory" ]; then
-        # Try CWD/memory/ (knowledge sessions where CWD is inside the vault)
-        case "$CWD" in
-            "$KNOWLEDGE_VAULT"*) vault_memory="$CWD/memory" ;;
-            *) vault_memory="" ;;
-        esac
-    fi
-
-    # Try 50_work/45-development/<family>/<component>/memory/ for nested work SDK repos
-    if [ -z "$vault_memory" ] || [ ! -d "$vault_memory" ]; then
-        local dev_dir="$KNOWLEDGE_VAULT/50_work/45-development"
-        if [ -d "$dev_dir" ]; then
-            local cwd_path_slug sdk_family_dir sdk_family_slug sdk_comp_dir sdk_comp_slug
-            cwd_path_slug=$(printf '%s' "$CWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9/')
-            for sdk_family_dir in "$dev_dir"/*/; do
-                [ -d "$sdk_family_dir" ] || continue
-                sdk_family_slug=$(basename "$sdk_family_dir" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
-                if printf '%s' "$cwd_path_slug" | grep -q "$sdk_family_slug"; then
-                    for sdk_comp_dir in "$sdk_family_dir"*/; do
-                        [ -d "$sdk_comp_dir" ] || continue
-                        sdk_comp_slug=$(basename "$sdk_comp_dir" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
-                        if printf '%s' "$cwd_path_slug" | grep -q "$sdk_comp_slug"; then
-                            vault_memory="$sdk_comp_dir/memory"
-                            break 2
-                        fi
-                    done
-                fi
-            done
-        fi
-    fi
-
-    [ -d "$vault_memory" ] || return 0
-
-    # Create parent dir and symlink
-    parent_dir="$HOME/.claude/projects/$encoded"
-    mkdir -p "$parent_dir"
-
-    # Remove empty target dir if it exists (no files, not a symlink)
-    if [ -d "$target_dir" ] && [ -z "$(ls -A "$target_dir" 2>/dev/null)" ]; then
-        rmdir "$target_dir" 2>/dev/null || true
-    fi
-
-    if ln -s "$vault_memory" "$target_dir" 2>/dev/null; then
+    msg=$(VAULT_PATH="$KNOWLEDGE_VAULT" "$helper" \
+        --cwd "$CWD" --target "$target_dir" 2>/dev/null) || true
+    if [ -n "$msg" ]; then
         CONTEXT_LINES="$CONTEXT_LINES
-[auto-memory] Created symlink for $project_name"
+$msg"
     fi
+    return 0   # never let an empty-msg short-circuit fail the hook under set -e
 }
 
 ensure_memory_symlink
@@ -405,61 +287,8 @@ CRYSTALLIZE NEEDED (${days_since} days stale)"
 
 check_knowledge_health
 
-# --- Vault baseline integrity (SDD-017b) ---
-# SDD-017 catches working-tree D entries (unstaged deletes). This catches
-# already-auto-committed deletes: when Obsidian-git plugin commits a deletion
-# before the next session-start, `git status` is clean but a canonical file
-# is gone. Checks:
-#   (a) Every 00_meta/skills/<name>/ directory must contain a non-empty SKILL.md
-#   (b) Static list of always-required canonical files must exist
-# Trigger incident: 2026-05-13 + 2026-05-15 setup-linux.sh skill-sync deleted
-# vault SKILL.md content via rm -rf <symlink-trailing-slash> bug (fixed in
-# dotfiles#32). This is the defensive layer if a different trigger regresses.
-check_vault_baseline() {
-    [ -n "$VAULT_ROOT" ] || return 0
-    [ -d "$VAULT_ROOT/00_meta" ] || return 0
-
-    local issues=""
-
-    if [ -d "$VAULT_ROOT/00_meta/skills" ]; then
-        for skill_dir in "$VAULT_ROOT/00_meta/skills"/*/; do
-            [ -d "$skill_dir" ] || continue
-            local skill_md="${skill_dir}SKILL.md"
-            local skill_name
-            skill_name=$(basename "$skill_dir")
-            if [ ! -f "$skill_md" ]; then
-                issues="${issues}
-        MISSING: 00_meta/skills/${skill_name}/SKILL.md (skill dir exists but SKILL.md gone)"
-            elif [ ! -s "$skill_md" ]; then
-                issues="${issues}
-        EMPTY: 00_meta/skills/${skill_name}/SKILL.md (0 bytes — likely truncated)"
-            fi
-        done
-    fi
-
-    # AGENTS.md is intentionally NOT listed: per ADR-010 it is single-SSOT in
-    # dotfiles and deployed (not duplicated) to runtime targets — the vault never
-    # carries its own copy, so requiring it here is a false positive (BUG-023).
-    local critical_files=(
-        "00_meta/patterns/_index.md"
-        "00_meta/skills/README.md"
-        "README.md"
-    )
-    for cf in "${critical_files[@]}"; do
-        if [ ! -f "$VAULT_ROOT/$cf" ]; then
-            issues="${issues}
-        MISSING: $cf (canonical file)"
-        fi
-    done
-
-    if [ -n "$issues" ]; then
-        CONTEXT_LINES="$CONTEXT_LINES
-Vault baseline FAIL — canonical artifacts missing (likely auto-committed delete):$issues
-        Recovery: cd $VAULT_ROOT; git log --diff-filter=D --name-only --pretty=format: -5 | sort -u; git show <commit>:<path> > <path>"
-    fi
-}
-
-check_vault_baseline
+# Vault baseline integrity (SDD-017b) comes from the session-brief core.
+CONTEXT_LINES="$CONTEXT_LINES$(sb_vault_baseline "$VAULT_ROOT")"
 
 # --- Memory temperature scan ---
 # Reads file modification times to classify memory files as HOT/WARM/COLD.
