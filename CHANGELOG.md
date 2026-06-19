@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/mlorentedev/dotfiles/compare/v0.6.0...v0.7.0) (2026-06-19)
+
+
+### Features
+
+* **setup:** install dotf from the published release binary on Windows (WIN-006, [#451](https://github.com/mlorentedev/dotfiles/issues/451)) ([#453](https://github.com/mlorentedev/dotfiles/issues/453)) ([1f22769](https://github.com/mlorentedev/dotfiles/commit/1f227693e67501a5b0a6f6ae8f5a6873a6aa943a))
+
 ## [0.6.0](https://github.com/mlorentedev/dotfiles/compare/v0.5.1...v0.6.0) (2026-06-19)
 
 
