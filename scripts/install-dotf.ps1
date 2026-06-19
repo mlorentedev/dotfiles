@@ -1,0 +1,137 @@
+<#
+.SYNOPSIS
+    Fetch, verify, and install the `dotf` CLI release binary on Windows.
+
+.DESCRIPTION
+    The ADR-020 bootstrap step for Windows (WIN-006): download the pinned `dotf`
+    release zip from GitHub, verify its sha256 against the release checksums.txt,
+    and install dotf.exe to ~/.local/bin — user-space, no admin. The PowerShell
+    twin of scripts/install-dotf.sh.
+
+    Dot-sourced by setup-windows.ps1 (which then calls Install-Dotf); also runnable
+    standalone to (re)install or upgrade. DOTF_VERSION is the pinned version
+    (versions.conf SSOT); the function takes version/dest/base as parameters so
+    bats can drive it against a file:// fixture with no network.
+
+.PARAMETER Version
+    dotf version to install. Defaults to $env:DOTF_VERSION, then the DOTF_VERSION
+    line in versions.conf.
+
+.EXAMPLE
+    # One-line bootstrap — no clone, no admin:
+    irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.ps1 | iex
+
+.EXAMPLE
+    # From a checkout:
+    . .\scripts\install-dotf.ps1 ; Install-Dotf
+#>
+[CmdletBinding()]
+param(
+    [string]$Version,
+    [string]$Dest = (Join-Path $env:USERPROFILE '.local\bin'),
+    [string]$BaseUrl = 'https://github.com/mlorentedev/dotfiles/releases/download'
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# Map the host architecture to the goreleaser arch token, or $null when
+# unsupported (the analogue of install-dotf.sh's `return 1`).
+function Get-DotfArch {
+    [CmdletBinding()]
+    param([string]$Arch = $env:PROCESSOR_ARCHITECTURE)
+    switch ($Arch) {
+        'AMD64' { 'amd64'; break }
+        'ARM64' { 'arm64'; break }
+        default { $null }
+    }
+}
+
+# Resolve the pinned version: explicit arg, then $env:DOTF_VERSION, then the
+# DOTF_VERSION line in versions.conf (the SSOT). Mirrors install-dotf.sh.
+function Get-DotfVersion {
+    [CmdletBinding()]
+    param([string]$Version)
+    if ($Version) { return $Version }
+    if ($env:DOTF_VERSION) { return $env:DOTF_VERSION }
+    $versionsConf = Join-Path $PSScriptRoot '..\versions.conf'
+    if (Test-Path $versionsConf) {
+        $match = Select-String -Path $versionsConf -Pattern '^DOTF_VERSION=(.+)$' | Select-Object -First 1
+        if ($match) { return $match.Matches[0].Groups[1].Value.Trim() }
+    }
+    return $null
+}
+
+# Idempotently install the pinned dotf release. No-op when the pinned version is
+# already on PATH; converges on drift. Returns $true on success, $false on any
+# download/verify error (no binary left in Dest). Never throws — setup wires it
+# `if (-not (Install-Dotf)) { Write-Warn ... }`, the analogue of `|| log_warning`.
+function Install-Dotf {
+    [CmdletBinding()]
+    param(
+        [string]$Version,
+        [string]$Dest = (Join-Path $env:USERPROFILE '.local\bin'),
+        [string]$BaseUrl = 'https://github.com/mlorentedev/dotfiles/releases/download'
+    )
+
+    $work = $null
+    try {
+        $Version = Get-DotfVersion -Version $Version
+        if (-not $Version) {
+            throw 'no version given (set DOTF_VERSION in versions.conf)'
+        }
+        $arch = Get-DotfArch
+        if (-not $arch) {
+            throw "unsupported arch: $env:PROCESSOR_ARCHITECTURE"
+        }
+
+        # Idempotence: skip when the pinned version is already on PATH.
+        if (Get-Command dotf -ErrorAction SilentlyContinue) {
+            $current = ((& dotf version 2>$null) -split '\s+')[-1]
+            if ($current -eq $Version) {
+                Write-Host "dotf $Version already installed; skipping"
+                return $true
+            }
+            if ($current) { Write-Host "dotf $current drifted from pinned $Version; converging" }
+        }
+
+        $artifact = "dotf_${Version}_windows_${arch}.zip"
+        $work = Join-Path ([System.IO.Path]::GetTempPath()) ('dotf-' + [System.IO.Path]::GetRandomFileName())
+        New-Item -ItemType Directory -Force -Path $work | Out-Null
+
+        Invoke-WebRequest -Uri "$BaseUrl/v$Version/$artifact" -OutFile (Join-Path $work $artifact) -UseBasicParsing
+        Invoke-WebRequest -Uri "$BaseUrl/v$Version/checksums.txt" -OutFile (Join-Path $work 'checksums.txt') -UseBasicParsing
+
+        $entry = Select-String -Path (Join-Path $work 'checksums.txt') -Pattern ([regex]::Escape($artifact)) | Select-Object -First 1
+        if (-not $entry) {
+            throw "$artifact not listed in checksums.txt"
+        }
+        $expected = (($entry.Line -split '\s+') | Where-Object { $_ })[0].ToLower()
+        $actual = (Get-FileHash -Path (Join-Path $work $artifact) -Algorithm SHA256).Hash.ToLower()
+        if ($expected -ne $actual) {
+            throw "checksum mismatch for $artifact (want $expected, got $actual)"
+        }
+
+        Expand-Archive -Path (Join-Path $work $artifact) -DestinationPath $work -Force
+        $exe = Join-Path $work 'dotf.exe'
+        if (-not (Test-Path $exe)) {
+            throw "dotf.exe not found in $artifact"
+        }
+        New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+        Copy-Item -Path $exe -Destination (Join-Path $Dest 'dotf.exe') -Force
+        Write-Host "dotf $Version installed to $Dest\dotf.exe"
+        return $true
+    } catch {
+        Write-Warning "install-dotf: $($_.Exception.Message)"
+        return $false
+    } finally {
+        if ($work) { Remove-Item -Recurse -Force -Path $work -ErrorAction SilentlyContinue }
+    }
+}
+
+# Standalone run-guard: install when EXECUTED, not when dot-sourced.
+# $MyInvocation.InvocationName is '.' under dot-sourcing (setup-windows.ps1 does
+# `. install-dotf.ps1`, which must only define the functions).
+if ($MyInvocation.InvocationName -ne '.') {
+    $null = Install-Dotf -Version $Version -Dest $Dest -BaseUrl $BaseUrl
+}
