@@ -16,11 +16,11 @@ template_version: "1.0"
 
 <!-- from issue #445: cross-machine path resolution — dotf env generate + per-machine machine.json -->
 
-The same repos (`dotfiles`, the `knowledge` vault) live on multiple machines with different OSes and different absolute roots. The env-var seams (`VAULT_PATH`, `DOTFILES_REPO_DIR`, `HIVE_VAULT_PATH`) already existed but were **never activated**: the shell profiles hardcoded `DOTFILES_REPO_DIR`, `VAULT_PATH` was never exported, and the session hooks hardcoded `~/Projects/knowledge` instead of reading the seam. The system only "worked" because the hardcoded fallback happened to match reality — relocating the workspace to `~/Projects/Workspace/` broke vault/hive/selfupdate silently. The codebase also carried **three names for one concept** (`VAULT_PATH` in Go/skills, `VAULT_DIR` in doctor, hardcoded `~/Projects/knowledge` in hooks). ADR-023 is the decision; this spec is its implementation.
+The same repos (`dotfiles`, the `knowledge` vault) live on multiple machines with different OSes and different absolute roots. The env-var seams (`VAULT_PATH`, `DOTFILES_REPO_DIR`, `HIVE_VAULT_PATH`) already existed but were **never activated**: the shell profiles hardcoded `DOTFILES_REPO_DIR`, `VAULT_PATH` was never exported, and the session hooks hardcoded `~/Projects/knowledge` instead of reading the seam. The system only "worked" because the hardcoded fallback happened to match reality — relocating the workspace to `~/Projects/Workspace/` broke vault/hive/selfupdate silently. The codebase also carried **three names for one concept** (`VAULT_PATH` in Go/skills, `VAULT_DIR` in doctor, hardcoded `~/Projects/knowledge` in hooks). ADR-025 is the decision; this spec is its implementation.
 
 ## What
 
-A single per-machine path-resolution mechanism — the **render-at-setup hybrid** (ADR-023 Option C), consumed identically by shells, PowerShell, and the `dotf` CLI:
+A single per-machine path-resolution mechanism — the **render-at-setup hybrid** (ADR-025 Option C), consumed identically by shells, PowerShell, and the `dotf` CLI:
 
 - **`cli/internal/env`** — a self-contained package: loads `env-contract.json` (defaults) + `~/.config/dotfiles/machine.json` (per-machine overrides), resolves the cascade `env → machine.json → contract default[GOOS]`, and renders `paths.sh` / `paths.ps1`. Deliberately does **not** import `doctor` (the dependency runs doctor→env), so there is no import cycle.
 - **`dotf env generate`** (`+ --check`, `--stdout`) — renders the OS-appropriate path file into `<DOTFILES_DIR>/paths.{sh,ps1}`; idempotent; `--check` reports drift without writing.
@@ -35,7 +35,7 @@ The cascade's rule #1 (an explicit env var wins) is enforced by the generated fi
 
 - **Making `dotf doctor` fully cross-OS.** `checkContractEnvVars` / `checkContractPath` are Linux-first (they read `Default["linux"]`); on Windows `doctor.ps1` is still the path (ADR-022 defers the Windows `dotf doctor`). Running `dotf doctor` on Windows surfaces mixed-separator defaults for unset vars — pre-existing, tracked in the WIN queue, not this spec.
 - **Migrating `env-contract.json` to YAML** (#227) — unrelated format migration.
-- **Adopting chezmoi wholesale / direnv** — evaluated and rejected in ADR-023's rejection list.
+- **Adopting chezmoi wholesale / direnv** — evaluated and rejected in ADR-025's rejection list.
 - **Removing the per-machine User-level stopgap env vars** set during the incident — a one-time cleanup after deploy, not a code change.
 
 ## Risks / open questions
@@ -59,7 +59,7 @@ Observable outcomes. Each must be testable.
 
 ## References
 
-- ADR: `docs/adr/adr-023-cross-machine-path-resolution.md` (the decision + industry audit)
+- ADR: `docs/adr/adr-025-cross-machine-path-resolution.md` (the decision + industry audit)
 - Pattern reuse: `docs/adr/adr-012-deploy-strategy-copy-with-drift-assertion.md` (drift assertion) · `docs/adr/adr-020-tooling-cli-go-convergence.md` (Go owns logic) · `docs/adr/adr-022-dotf-init-flagship.md` (`env-contract.json` is the format dotf consumes)
 - Work-gate: `mlorentedev/dotfiles#445`
 - Precedent: `cli/internal/spec/drift_test.go` / `cli/internal/vault/vault.go` (embed + resolver idioms)

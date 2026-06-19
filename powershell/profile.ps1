@@ -201,7 +201,7 @@ function prompt {
 # ENVIRONMENT VARIABLES
 # ============================================================================
 
-# Structural paths (ADR-023). Source of truth: env-contract.json (defaults) +
+# Structural paths (ADR-025). Source of truth: env-contract.json (defaults) +
 # ~/.config/dotfiles/machine.json (per-machine overrides), rendered into
 # paths.ps1 by `dotf env generate`. Edit those, not this block. DOTFILES_DIR is
 # bootstrapped first because it locates the generated file itself.

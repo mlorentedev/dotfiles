@@ -16,7 +16,7 @@ source $ZSH/oh-my-zsh.sh
 #       ENVIRONMENT
 # ==========================
 export EDITOR=nano
-# Base Directories (ADR-023): sourced from the generated paths.sh — source of
+# Base Directories (ADR-025): sourced from the generated paths.sh — source of
 # truth is env-contract.json (defaults) + ~/.config/dotfiles/machine.json
 # (per-machine overrides), rendered by `dotf env generate`. DOTFILES_DIR is
 # bootstrapped first because it locates the file. Must be set before secrets.
@@ -37,7 +37,7 @@ export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
 export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
 export GEMINI_DIR="$HOME/.gemini"
 export GEMINI_HOME="$HOME/.gemini"
-# COPILOT_HOME / OPENCODE_HOME now come from the ADR-023 cascade above
+# COPILOT_HOME / OPENCODE_HOME now come from the ADR-025 cascade above
 # (sourced paths.sh, or the bootstrap fallback) — the old unconditional
 # exports here clobbered that, so they were removed.
 

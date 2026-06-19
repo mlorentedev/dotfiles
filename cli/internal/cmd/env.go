@@ -9,14 +9,14 @@ import (
 )
 
 // newEnvCmd is the `dotf env` noun: per-machine path resolution and the
-// generated path files shells source (ADR-023).
+// generated path files shells source (ADR-025).
 func newEnvCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "env",
 		Short: "Per-machine path resolution (paths.sh / paths.ps1)",
 		Long: "env renders the per-machine path file from env-contract.json (defaults)\n" +
 			"+ ~/.config/dotfiles/machine.json (overrides). Shells source the result, so a\n" +
-			"machine that relocates a repo edits machine.json and re-runs generate (ADR-023).",
+			"machine that relocates a repo edits machine.json and re-runs generate (ADR-025).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()

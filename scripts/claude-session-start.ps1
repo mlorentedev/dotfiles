@@ -33,7 +33,7 @@ if (-not $CWD) {
     $CWD = (Get-Location).Path
 }
 
-# VAULT_PATH is the cross-machine seam (ADR-023), set by the sourced paths.ps1;
+# VAULT_PATH is the cross-machine seam (ADR-025), set by the sourced paths.ps1;
 # fall back to the legacy default only when it is unset.
 $KnowledgeVault = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
 # SDD discipline reminder -- unconditional, first in additionalContext (SDD-001).

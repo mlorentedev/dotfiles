@@ -44,7 +44,7 @@ func readTemplate(name string) ([]byte, error) {
 // init is rewired to call vault (#395).
 func ResolveVault() string {
 	// env.ResolvePath runs the full cascade: $VAULT_PATH, then the per-machine
-	// machine.json override, then the env-contract default for this OS (ADR-023).
+	// machine.json override, then the env-contract default for this OS (ADR-025).
 	// This replaces the old hardcoded ~/Projects/knowledge fallback, so a vault
 	// relocated on one machine is found without touching code.
 	v := env.ResolvePath("VAULT_PATH")

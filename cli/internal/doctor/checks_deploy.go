@@ -123,7 +123,7 @@ func newestVersionDirs(parent string) []string {
 // future `dotf vault` (ADR-021), per the proposal's scope.
 func checkVault(sys *System, rep *Report) {
 	rep.Section("Knowledge vault (presence)")
-	// VAULT_PATH is the canonical seam (ADR-023); the old VAULT_DIR name is gone.
+	// VAULT_PATH is the canonical seam (ADR-025); the old VAULT_DIR name is gone.
 	// The generated paths file sets VAULT_PATH, so the hardcoded default below is
 	// only a last resort for a machine that never ran `dotf env generate`.
 	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
@@ -144,12 +144,12 @@ func checkVault(sys *System, rep *Report) {
 	}
 }
 
-// checkPathFiles verifies the deployed paths.sh/paths.ps1 (ADR-023) match a
+// checkPathFiles verifies the deployed paths.sh/paths.ps1 (ADR-025) match a
 // fresh resolution of env-contract.json + machine.json. Drift means a path was
 // changed in the contract or the per-machine override but `dotf env generate`
 // was never re-run — the same copy-with-drift-assertion discipline as ADR-012.
 func checkPathFiles(sys *System, cfg *Config, rep *Report) {
-	rep.Section("Generated path files (ADR-023)")
+	rep.Section("Generated path files (ADR-025)")
 	if cfg.ContractPath == "" {
 		rep.Skip("env-contract.json not found — path-file drift check skipped")
 		return

@@ -1,5 +1,5 @@
 ---
-id: adr-023-cross-machine-path-resolution
+id: adr-025-cross-machine-path-resolution
 type: adr
 status: accepted
 date: 2026-06-18
@@ -7,11 +7,13 @@ related: [adr-022-dotf-init-flagship, adr-020-tooling-cli-go-convergence, adr-01
 tags: [paths, env-contract, cross-os, cross-machine, dotf, resolver, render-at-setup, knowledge-placement]
 ---
 
-# ADR-023 — Cross-machine path resolution: per-machine overrides + render-at-setup
+# ADR-025 — Cross-machine path resolution: per-machine overrides + render-at-setup
 
 ## Status
 
-Accepted 2026-06-18. Implemented the same day in one pass: `cli/internal/env`
+Accepted 2026-06-18. Renumbered from ADR-023 → ADR-025 on integration (the
+original number collided with the shipped ADR-023 agnostic-session-start +
+ADR-024 PAT-expiry on `main`). Implemented the same day in one pass: `cli/internal/env`
 (resolver + generator + tests), `dotf env generate` (+ `--check`), the
 `dotf doctor` drift check, the `vault.ResolveVault` rewrite, the shell/PS/hook
 consumers, the setup-script wiring, and `~/.config/dotfiles/machine.json`.

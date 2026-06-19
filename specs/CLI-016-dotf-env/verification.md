@@ -37,7 +37,7 @@ created: "2026-06-18"
 ## Promotion candidates
 
 - [ ] Lesson for `docs/lessons.md`? **yes (at archive)** — "an env-var seam is inert until something actually sets it; a hardcoded fallback that happens to match reality masks the broken seam until the assumption shifts."
-- [ ] ADR-worthy? **already** — ADR-023 is the decision; this spec implements it.
+- [ ] ADR-worthy? **already** — ADR-025 is the decision; this spec implements it.
 - [ ] New pattern for the vault `00_meta/patterns/`? **maybe** — "contract-defaults + per-machine-override + render-at-setup" as a reusable cross-machine config pattern.
 
 ## Archive checklist

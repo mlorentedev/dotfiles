@@ -19,7 +19,7 @@ Thumbs.db
 .zshrc.local
 .bashrc.local
 
-# Cross-machine path resolution (ADR-023). The per-machine override lives at
+# Cross-machine path resolution (ADR-025). The per-machine override lives at
 # ~/.config/dotfiles/machine.json (outside the repo); the generated path files
 # are rendered into ~/.dotfiles. Both are ignored here defensively so a stray
 # `dotf env generate --output .` or a copied machine.json never gets committed.

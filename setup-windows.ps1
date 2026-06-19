@@ -1415,7 +1415,7 @@ if (Test-Path $contractSource) {
     Write-Warn "env-contract.json not found at $contractSource"
 }
 
-# Render the per-machine path file (ADR-023) from the contract + the
+# Render the per-machine path file (ADR-025) from the contract + the
 # %USERPROFILE%\.config\dotfiles\machine.json overrides, so profile.ps1 sources
 # it. Guarded on dotf being installed (the Windows dotf install path is still on
 # the WIN queue); until then profile.ps1 uses its bootstrap fallback.

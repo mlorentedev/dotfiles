@@ -127,7 +127,7 @@ fi
 
 # find_vault_root is provided by the sourced session-brief core.
 VAULT_ROOT=$(find_vault_root "$CWD") || true
-# VAULT_PATH is the cross-machine seam (ADR-023), set by the sourced paths.sh;
+# VAULT_PATH is the cross-machine seam (ADR-025), set by the sourced paths.sh;
 # fall back to the legacy default only when it is unset.
 KNOWLEDGE_VAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
 VAULT_NAME=""

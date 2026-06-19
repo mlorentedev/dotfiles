@@ -1341,7 +1341,7 @@ if [ -f "$CURRENT_DIR/env-contract.json" ]; then
     log_success "Deployed env-contract.json to $DOTFILES_DIR/"
 fi
 
-# Render the per-machine path file (ADR-023) from the contract + the
+# Render the per-machine path file (ADR-025) from the contract + the
 # ~/.config/dotfiles/machine.json overrides, so the profiles source it and the
 # `dotf doctor` run below sees no path drift. Sourcing it here makes this setup
 # shell match what the next login shell will see.

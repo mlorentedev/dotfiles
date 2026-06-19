@@ -55,7 +55,7 @@ setup() {
 # ---- RC parity: .zshrc + .bashrc + powershell/profile.ps1 -----------------
 
 @test ".zshrc sources the generated path file and declares the 4 path vars" {
-    # ADR-023: paths.sh (rendered by `dotf env generate`) is the primary source;
+    # ADR-025: paths.sh (rendered by `dotf env generate`) is the primary source;
     # the 4 vars also appear in the bootstrap fallback (indented in the else
     # branch), so match the export anywhere on the line, not only at column 0.
     grep -qE 'paths\.sh' "$ZSHRC"
@@ -66,7 +66,7 @@ setup() {
 }
 
 @test ".bashrc sources the generated path file and declares the 4 path vars" {
-    # ADR-023: see the .zshrc test above — primary source is paths.sh, the
+    # ADR-025: see the .zshrc test above — primary source is paths.sh, the
     # inline exports are the indented bootstrap fallback.
     grep -qE 'paths\.sh' "$BASHRC"
     grep -qE 'export SCRIPTS_DIR=' "$BASHRC"
@@ -85,7 +85,7 @@ setup() {
 
 @test ".zshrc and .bashrc agree on the 4 new exports (parity)" {
     for var in SCRIPTS_DIR AGY_HOME COPILOT_HOME OPENCODE_HOME; do
-        # ADR-023: the exports live in the indented bootstrap fallback, so allow
+        # ADR-025: the exports live in the indented bootstrap fallback, so allow
         # leading whitespace when matching and stripping the `export VAR=` prefix.
         zsh_val=$(grep -E "export ${var}=" "$ZSHRC" | head -1 | sed -E "s|^[[:space:]]*export ${var}=||" | tr -d '"')
         bash_val=$(grep -E "export ${var}=" "$BASHRC" | head -1 | sed -E "s|^[[:space:]]*export ${var}=||" | tr -d '"')

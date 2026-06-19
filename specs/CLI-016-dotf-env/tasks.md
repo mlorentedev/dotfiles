@@ -10,7 +10,7 @@ created: "2026-06-18"
 ## Setup
 
 - [x] Branch created from main: `feat/cross-machine-path-resolution`
-- [x] ADR-023 accepted (architecture session: state verify → industry audit → constraints → options → decision)
+- [x] ADR-025 accepted (architecture session: state verify → industry audit → constraints → options → decision)
 - [x] `proposal.md` complete; acceptance criteria testable
 
 ## Contract (SSOT first)

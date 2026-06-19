@@ -44,7 +44,7 @@ fi
 #       ENVIRONMENT
 # ==========================
 export EDITOR=nano
-# Base Directories (ADR-023): sourced from the generated paths.sh — source of
+# Base Directories (ADR-025): sourced from the generated paths.sh — source of
 # truth is env-contract.json (defaults) + ~/.config/dotfiles/machine.json
 # (per-machine overrides), rendered by `dotf env generate`. DOTFILES_DIR is
 # bootstrapped first because it locates the file. Must be set before secrets.

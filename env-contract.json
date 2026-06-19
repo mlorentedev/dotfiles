@@ -1,5 +1,5 @@
 {
-  "_comment": "Declarative contract for structural environment expectations — the DEFAULTS layer of cross-machine path resolution (ADR-023). Read by `dotf doctor`/`dotf env generate` and the legacy doctor.{sh,ps1}. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` resolves env -> machine.json -> these defaults (per OS) and renders paths.sh/paths.ps1 that the shell profiles source. v1 covers structural paths only; tooling-required vars and version pins live in versions.conf and sensitive/env-mapping.conf.",
+  "_comment": "Declarative contract for structural environment expectations — the DEFAULTS layer of cross-machine path resolution (ADR-025). Read by `dotf doctor`/`dotf env generate` and the legacy doctor.{sh,ps1}. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` resolves env -> machine.json -> these defaults (per OS) and renders paths.sh/paths.ps1 that the shell profiles source. v1 covers structural paths only; tooling-required vars and version pins live in versions.conf and sensitive/env-mapping.conf.",
   "env_vars": [
     {
       "name": "DOTFILES_DIR",
@@ -74,7 +74,7 @@
     {
       "name": "VAULT_PATH",
       "required": false,
-      "description": "Obsidian knowledge vault root — the cross-machine path seam (ADR-023). Honored by `dotf vault`/`dotf init`, the session-start hooks, and the Go vault resolver. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` renders it into paths.{sh,ps1}.",
+      "description": "Obsidian knowledge vault root — the cross-machine path seam (ADR-025). Honored by `dotf vault`/`dotf init`, the session-start hooks, and the Go vault resolver. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` renders it into paths.{sh,ps1}.",
       "default": {
         "linux": "$HOME/Projects/knowledge",
         "windows": "$env:USERPROFILE\\Projects\\knowledge"
@@ -83,7 +83,7 @@
     {
       "name": "HIVE_VAULT_PATH",
       "required": false,
-      "description": "Vault path the Hive MCP daemon (`hive serve`) reads at start. Mirrors VAULT_PATH by default (same vault); declared separately because the daemon reads its own env (ADR-023).",
+      "description": "Vault path the Hive MCP daemon (`hive serve`) reads at start. Mirrors VAULT_PATH by default (same vault); declared separately because the daemon reads its own env (ADR-025).",
       "default": {
         "linux": "$HOME/Projects/knowledge",
         "windows": "$env:USERPROFILE\\Projects\\knowledge"

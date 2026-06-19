@@ -1,6 +1,6 @@
 // Package env owns cross-machine path resolution and the generation of the
 // per-machine path files (paths.sh / paths.ps1) that shells source and the
-// session hooks read (ADR-023).
+// session hooks read (ADR-025).
 //
 // The resolution cascade, per path key, is:
 //
