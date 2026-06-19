@@ -32,9 +32,6 @@ param(
     [string]$BaseUrl = 'https://github.com/mlorentedev/dotfiles/releases/download'
 )
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
 # Map the host architecture to the goreleaser arch token, or $null when
 # unsupported (the analogue of install-dotf.sh's `return 1`).
 function Get-DotfArch {
@@ -73,6 +70,13 @@ function Install-Dotf {
         [string]$Dest = (Join-Path $env:USERPROFILE '.local\bin'),
         [string]$BaseUrl = 'https://github.com/mlorentedev/dotfiles/releases/download'
     )
+
+    # Function-scoped, so dot-sourcing this script (setup-windows.ps1 does
+    # `. install-dotf.ps1`) never leaks Stop/StrictMode into the caller's scope —
+    # only this function's body runs strict. Also required for the try/catch below
+    # to catch non-terminating errors regardless of the caller's preference.
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
 
     $work = $null
     try {
