@@ -19,10 +19,21 @@ import (
 func checkSymlinks(sys *System, rep *Report) {
 	rep.Section("Key symlinks")
 	home := sys.home()
+	win := sys.GOOS == "windows"
+	// POSIX shell rc files have no Windows equivalent (pwsh uses $PROFILE) — skip
+	// them there instead of reporting a false "missing".
+	posixOnly := map[string]bool{
+		".zshrc": true, ".bashrc": true,
+		".zsh/aliases.zsh": true, ".zsh/functions.zsh": true,
+	}
 	for _, rel := range []string{
 		".dotfiles", ".zshrc", ".bashrc",
 		".zsh/aliases.zsh", ".zsh/functions.zsh", ".ssh/config",
 	} {
+		if win && posixOnly[rel] {
+			rep.Skip(rel + " (POSIX-only; Windows uses $PROFILE)")
+			continue
+		}
 		p := filepath.Join(home, rel)
 		switch {
 		case isSymlink(p) && pathExists(p):
@@ -233,6 +244,10 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 // matches the repo source (copy-deploy drift check, ADR-012).
 func checkTmux(sys *System, cfg *Config, rep *Report) {
 	rep.Section("tmux")
+	if sys.GOOS == "windows" {
+		rep.Skip("tmux (Linux-only by design; use WSL if needed)")
+		return
+	}
 	if !sys.has("tmux") {
 		rep.Fail("tmux not installed (run: sudo apt install -y tmux)")
 		return

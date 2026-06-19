@@ -85,7 +85,10 @@ install_dotf() {
     _dotf_archname="$(_dotf_arch "$(uname -m)")" || return 1
 
     if command_exists dotf; then
-        _dotf_current="$(dotf version 2>/dev/null | awk '{print $NF}')"
+        # `dotf version` may print to stderr, so capture both streams (2>&1) and
+        # extract the semver — robust to the stream and to empty output (parity
+        # with install-dotf.ps1; root cause: dotf writes version to stderr).
+        _dotf_current="$(dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
         if [ "$_dotf_current" = "$version" ]; then
             log_info "dotf $version already installed; skipping"
             return 0

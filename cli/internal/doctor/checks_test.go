@@ -126,6 +126,52 @@ func TestCheckVersionMatch(t *testing.T) {
 	}
 }
 
+// TestOSGatingSkipsLinuxOnlyChecksOnWindows exercises the GOOS seam: on Windows
+// the POSIX-only checks SKIP instead of emitting false failures.
+func TestOSGatingSkipsLinuxOnlyChecksOnWindows(t *testing.T) {
+	winSys := func() *System {
+		s := newSys(map[string]string{}, []string{"git"}, nil)
+		s.GOOS = "windows"
+		return s
+	}
+
+	t.Run("tmux skips", func(t *testing.T) {
+		var b bytes.Buffer
+		rep := capture(&b)
+		checkTmux(winSys(), &Config{}, rep)
+		if rep.Failures() != 0 || !strings.Contains(b.String(), "Linux-only") {
+			t.Errorf("tmux must SKIP on Windows\n%s", b.String())
+		}
+	})
+
+	t.Run("version match skips versioned dirs", func(t *testing.T) {
+		var b bytes.Buffer
+		rep := capture(&b)
+		checkVersionMatch(winSys(), &Config{Versions: map[string]string{"JAVA_VERSION": "21.0.4"}}, rep)
+		if rep.Failures() != 0 {
+			t.Errorf("versioned-dir checks must SKIP on Windows\n%s", b.String())
+		}
+	})
+
+	t.Run("core tools skip posix-only", func(t *testing.T) {
+		var b bytes.Buffer
+		rep := capture(&b)
+		checkCoreTools(winSys(), &Contract{}, rep)
+		if !strings.Contains(b.String(), "zsh (POSIX-only") || !strings.Contains(b.String(), "direnv (POSIX-only") {
+			t.Errorf("zsh/direnv must SKIP as POSIX-only on Windows\n%s", b.String())
+		}
+	})
+
+	t.Run("tool-home vars skip when unset", func(t *testing.T) {
+		var b bytes.Buffer
+		rep := capture(&b)
+		checkToolHomeEnvVars(winSys(), rep)
+		if rep.Failures() != 0 {
+			t.Errorf("tool-home vars must SKIP when unset on Windows\n%s", b.String())
+		}
+	})
+}
+
 func TestCheckSymlinks(t *testing.T) {
 	home := t.TempDir()
 	// Valid symlink: ~/.zshrc -> a real target.

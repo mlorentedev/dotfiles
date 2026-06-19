@@ -207,6 +207,12 @@ function prompt {
 # bootstrapped first because it locates the generated file itself.
 if (-not $env:DOTFILES_DIR) { $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles" }
 $DotfPathsFile = Join-Path $env:DOTFILES_DIR 'paths.ps1'
+# Zero-touch: auto-render paths.ps1 on first run when it is missing and dotf is on
+# PATH (a fresh machine self-configures without a manual `dotf env generate`).
+# Best-effort + silent; the bootstrap fallback below covers any failure.
+if (-not (Test-Path $DotfPathsFile) -and (Get-Command dotf -ErrorAction SilentlyContinue)) {
+    & dotf env generate 2>$null | Out-Null
+}
 if (Test-Path $DotfPathsFile) {
     . $DotfPathsFile
 } else {

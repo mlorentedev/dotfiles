@@ -118,7 +118,11 @@ if (Test-Path "$ClaudeHome\skills") {
 # KNOWLEDGE VAULT INTEGRATION
 # ============================================================================
 
-$KnowledgeHome = "$env:USERPROFILE\Projects\knowledge"
+# ADR-025: VAULT_PATH is the contract seam (set by paths.ps1 from machine.json +
+# env-contract.json). Fall back to the contract's Windows DEFAULT only — never this
+# machine's relocated path; "Workspace" is an override owned by VAULT_PATH, not a
+# baked-in default for every machine.
+$KnowledgeHome = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
 $ProjectBaseName = Split-Path -Leaf $ProjectRoot
 $ProjectKbDir = "$KnowledgeHome\10_projects\$ProjectBaseName"
 
@@ -151,13 +155,13 @@ created: "$Today"
 - **Key Tools:**
 
 ## Critical Links
-- **Repository:** ~/Projects/$ProjectBaseName
+- **Repository:** $ProjectRoot
 - **Production:**
 
 ## Knowledge Structure
 Per [[pattern-knowledge-placement]]: build/operate docs live in the **repo**; this store keeps only decide/personal layers. Do NOT seed vault-local 30-architecture/, 40-runbooks/, 50-troubleshooting/, 90-lessons.md.
 
-**In the repo** (~/Projects/$ProjectBaseName/): docs/adr/, docs/runbooks/, docs/troubleshooting/, docs/lessons.md, specs/<id>/.
+**In the repo** ($ProjectRoot/): docs/adr/, docs/runbooks/, docs/troubleshooting/, docs/lessons.md, specs/<id>/.
 
 **In this store:** [[10-roadmap]] (strategy), [[11-tasks]] (strategic backlog), [[memory/MEMORY]] (AI memory).
 
