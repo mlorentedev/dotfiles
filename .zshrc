@@ -37,8 +37,9 @@ export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
 export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
 export GEMINI_DIR="$HOME/.gemini"
 export GEMINI_HOME="$HOME/.gemini"
-export COPILOT_HOME="$HOME/.copilot"
-export OPENCODE_HOME="$HOME/.config/opencode"
+# COPILOT_HOME / OPENCODE_HOME now come from the ADR-023 cascade above
+# (sourced paths.sh, or the bootstrap fallback) — the old unconditional
+# exports here clobbered that, so they were removed.
 
 # AI provider endpoints — NaN community (primary, OpenAI-compatible).
 # API key in $NAN_API_KEY (loaded by load-secrets.sh from sensitive/nan.api-key.secret.age).
