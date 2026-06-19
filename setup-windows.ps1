@@ -1415,6 +1415,21 @@ if (Test-Path $contractSource) {
     Write-Warn "env-contract.json not found at $contractSource"
 }
 
+# Render the per-machine path file (ADR-023) from the contract + the
+# %USERPROFILE%\.config\dotfiles\machine.json overrides, so profile.ps1 sources
+# it. Guarded on dotf being installed (the Windows dotf install path is still on
+# the WIN queue); until then profile.ps1 uses its bootstrap fallback.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    dotf env generate | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Generated $DotfilesDest\paths.ps1 (dotf env generate)"
+        $pathsFile = Join-Path $DotfilesDest 'paths.ps1'
+        if (Test-Path $pathsFile) { . $pathsFile }
+    } else {
+        Write-Warn "dotf env generate failed (profile.ps1 falls back to inline defaults)"
+    }
+}
+
 $syncSource = "$DotfilesDir\scripts\dotfiles-sync.ps1"
 if (Test-Path $syncSource) {
     Copy-Item $syncSource "$ScriptsDir\" -Force

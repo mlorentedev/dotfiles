@@ -201,23 +201,26 @@ function prompt {
 # ENVIRONMENT VARIABLES
 # ============================================================================
 
-# Structural paths declared in env-contract.json. Setting them explicitly
-# silences `doctor.ps1` warnings and makes the install location unambiguous
-# to every subshell.
-$env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
-# BUG-020: cross-OS parity with .bashrc/.zshrc which both export
-# DOTFILES_REPO_DIR. diff-check.ps1 (REFACTOR-003) needs it to locate the
-# repo root; without it, the script falls back to parent of $PSScriptRoot
-# which is $env:USERPROFILE\scripts (the deploy location, NOT a git repo)
-# and exits 2 -- which is what healthcheck.ps1 sec 12 was reporting after
-# REFACTOR-003 wired in the drift check.
-$env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles"
-$env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
-# Per-agent install dirs + scripts deploy target (REFACTOR-002).
-$env:SCRIPTS_DIR = "$env:DOTFILES_DIR\scripts"
-$env:AGY_HOME = "$env:USERPROFILE\.gemini\antigravity-cli"
-$env:COPILOT_HOME = "$env:USERPROFILE\.copilot"
-$env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode"
+# Structural paths (ADR-023). Source of truth: env-contract.json (defaults) +
+# ~/.config/dotfiles/machine.json (per-machine overrides), rendered into
+# paths.ps1 by `dotf env generate`. Edit those, not this block. DOTFILES_DIR is
+# bootstrapped first because it locates the generated file itself.
+if (-not $env:DOTFILES_DIR) { $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles" }
+$DotfPathsFile = Join-Path $env:DOTFILES_DIR 'paths.ps1'
+if (Test-Path $DotfPathsFile) {
+    . $DotfPathsFile
+} else {
+    # Bootstrap fallback: paths.ps1 not generated yet (fresh machine before the
+    # first `dotf env generate`). Contract defaults inline, conditional so a
+    # later source wins. DOTFILES_REPO_DIR keeps the legacy default; a relocated
+    # repo is picked up once generate renders machine.json (BUG-020 / REFACTOR-003).
+    if (-not $env:DOTFILES_REPO_DIR) { $env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles" }
+    if (-not $env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude" }
+    if (-not $env:SCRIPTS_DIR) { $env:SCRIPTS_DIR = "$env:DOTFILES_DIR\scripts" }
+    if (-not $env:AGY_HOME) { $env:AGY_HOME = "$env:USERPROFILE\.gemini\antigravity-cli" }
+    if (-not $env:COPILOT_HOME) { $env:COPILOT_HOME = "$env:USERPROFILE\.copilot" }
+    if (-not $env:OPENCODE_HOME) { $env:OPENCODE_HOME = "$env:USERPROFILE\.config\opencode" }
+}
 
 # AI provider endpoint -- NaN community (primary, OpenAI-compatible).
 # Mirrors NAN_BASE_URL set in .bashrc/.zshrc. API key comes from the

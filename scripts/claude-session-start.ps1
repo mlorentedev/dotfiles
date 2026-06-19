@@ -33,7 +33,9 @@ if (-not $CWD) {
     $CWD = (Get-Location).Path
 }
 
-$KnowledgeVault = Join-Path $env:USERPROFILE 'Projects\knowledge'
+# VAULT_PATH is the cross-machine seam (ADR-023), set by the sourced paths.ps1;
+# fall back to the legacy default only when it is unset.
+$KnowledgeVault = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
 # SDD discipline reminder -- unconditional, first in additionalContext (SDD-001).
 # Surfaces the Discipline Gate to every Claude Code session regardless of CWD,
 # repo, or vault state. Cross-OS parity with claude-session-start.sh. All

@@ -5,8 +5,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // checkSymlinks reproduces healthcheck section 4: the dotfiles symlinks resolve,
@@ -120,7 +123,10 @@ func newestVersionDirs(parent string) []string {
 // future `dotf vault` (ADR-021), per the proposal's scope.
 func checkVault(sys *System, rep *Report) {
 	rep.Section("Knowledge vault (presence)")
-	vault := sys.env("VAULT_DIR", filepath.Join(sys.home(), "Projects", "knowledge"))
+	// VAULT_PATH is the canonical seam (ADR-023); the old VAULT_DIR name is gone.
+	// The generated paths file sets VAULT_PATH, so the hardcoded default below is
+	// only a last resort for a machine that never ran `dotf env generate`.
+	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
 
 	presence := func(ok bool, okMsg, failMsg string) {
 		if ok {
@@ -135,6 +141,41 @@ func checkVault(sys *System, rep *Report) {
 	presence(sys.has("obsidian"), "Obsidian CLI in PATH", "Obsidian CLI not in PATH")
 	for _, d := range []string{"00_meta", "10_projects", "40_resources"} {
 		presence(isDir(filepath.Join(vault, d)), "vault directory: "+d+"/", "vault directory missing: "+d+"/")
+	}
+}
+
+// checkPathFiles verifies the deployed paths.sh/paths.ps1 (ADR-023) match a
+// fresh resolution of env-contract.json + machine.json. Drift means a path was
+// changed in the contract or the per-machine override but `dotf env generate`
+// was never re-run — the same copy-with-drift-assertion discipline as ADR-012.
+func checkPathFiles(sys *System, cfg *Config, rep *Report) {
+	rep.Section("Generated path files (ADR-023)")
+	if cfg.ContractPath == "" {
+		rep.Skip("env-contract.json not found — path-file drift check skipped")
+		return
+	}
+	home := sys.home()
+	out := envpkg.DefaultOutput(runtime.GOOS, sys.env("DOTFILES_DIR", filepath.Join(home, ".dotfiles")))
+	if !pathExists(out) {
+		rep.Warn(filepath.Base(out) + " not generated — run `dotf env generate`")
+		return
+	}
+	res, err := envpkg.Generate(envpkg.Options{
+		ContractPath: cfg.ContractPath,
+		MachinePath:  envpkg.MachinePath(home),
+		GOOS:         runtime.GOOS,
+		Home:         home,
+		Output:       out,
+		Check:        true,
+	})
+	if err != nil {
+		rep.Warn("path-file drift check failed: " + err.Error())
+		return
+	}
+	if res.Drifted {
+		rep.Fail(filepath.Base(out) + " is stale — run `dotf env generate` (" + out + ")")
+	} else {
+		rep.Pass(filepath.Base(out) + " up to date (" + out + ")")
 	}
 }
 

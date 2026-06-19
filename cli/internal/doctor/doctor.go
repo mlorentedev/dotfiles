@@ -79,6 +79,7 @@ func Run(opts Options) (int, error) {
 		checkToolHomeEnvVars(sys, rep)
 		checkOptionalTools(sys, cfg, contract, rep)
 		checkVault(sys, rep)
+		checkPathFiles(sys, cfg, rep)
 		checkSecrets(sys, cfg, rep)
 		checkTmux(sys, cfg, rep)
 		checkOpenCode(sys, cfg, rep)

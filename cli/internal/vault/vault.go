@@ -15,9 +15,10 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // templatesFS holds the vault-entry template set. Every file under templates/ is
@@ -42,12 +43,11 @@ func readTemplate(name string) ([]byte, error) {
 // canonical home going forward — initrepo.ResolveVault folds in here when dotf
 // init is rewired to call vault (#395).
 func ResolveVault() string {
-	v := os.Getenv("VAULT_PATH")
-	if v == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			v = filepath.Join(home, "Projects", "knowledge")
-		}
-	}
+	// env.ResolvePath runs the full cascade: $VAULT_PATH, then the per-machine
+	// machine.json override, then the env-contract default for this OS (ADR-023).
+	// This replaces the old hardcoded ~/Projects/knowledge fallback, so a vault
+	// relocated on one machine is found without touching code.
+	v := env.ResolvePath("VAULT_PATH")
 	if v == "" {
 		return ""
 	}

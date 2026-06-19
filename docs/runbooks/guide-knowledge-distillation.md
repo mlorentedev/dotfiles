@@ -134,12 +134,12 @@ The entire sync system depends on two path conventions. If these don't hold, jun
 
 | Assumption | Expected Value | Used By |
 |------------|---------------|---------|
-| **Vault location** | `~/Projects/knowledge` | Setup scripts, session hooks, crystallize scripts |
+| **Vault location** | `$VAULT_PATH` (default `~/Projects/knowledge`; per-machine override in `~/.config/dotfiles/machine.json`, ADR-023) | Setup scripts, session hooks, crystallize scripts |
 | **Personal project repos** | `~/Projects/<name>` where `<name>` matches `10_projects/<name>/` | Setup scripts, session hooks |
 | **Work projects CWD** | The vault path itself (`~/Projects/knowledge/50_work/.../<name>`) | Session hook fallback |
 | **Obsidian running** | Git plugin active with auto-commit/pull | Cross-machine sync |
 
-If the vault moves to a different path or projects don't follow the naming convention, update both setup scripts and both session hooks.
+If the vault moves to a different path, set its override in `~/.config/dotfiles/machine.json` and run `dotf env generate` (ADR-023) — no hand-editing of setup scripts or hooks. Projects must still follow the `~/Projects/<name>` naming convention.
 
 ### What Happens Automatically
 
@@ -157,7 +157,7 @@ If the vault moves to a different path or projects don't follow the naming conve
 |-----------|--------|
 | New machine | Clone vault + run setup script (once) |
 | Username change (e.g. `Manu` to `mlorente`) | Re-run setup script (re-creates all junctions with new encoded paths) |
-| Vault path moved | Update hardcoded `~/Projects/knowledge` in setup scripts and hooks, re-run setup |
+| Vault path moved | Set `VAULT_PATH` (and `HIVE_VAULT_PATH`) in `~/.config/dotfiles/machine.json`, run `dotf env generate` (ADR-023) |
 | Obsidian not running | Open Obsidian (changes accumulate locally until sync resumes) |
 | Want all junctions pre-created (not just current project) | Run `setup-windows.ps1` / `setup-linux.sh` |
 

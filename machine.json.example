@@ -1,0 +1,8 @@
+{
+  "_comment": "EXAMPLE per-machine path overrides (ADR-023). Copy to ~/.config/dotfiles/machine.json (Windows: %USERPROFILE%\\.config\\dotfiles\\machine.json) and edit. List ONLY the keys this machine relocates vs env-contract.json defaults; omit the rest. After editing, run `dotf env generate`. The real machine.json lives OUTSIDE any repo and is never committed — this example is the only path file that belongs in git.",
+  "paths": {
+    "DOTFILES_REPO_DIR": "/home/you/Projects/dotfiles",
+    "VAULT_PATH": "/home/you/Projects/knowledge",
+    "HIVE_VAULT_PATH": "/home/you/Projects/knowledge"
+  }
+}
