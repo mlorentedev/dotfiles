@@ -23,7 +23,7 @@
 
 ## Quick Reference (paths)
 
-* **Vault root:** `~/Projects/knowledge/` (Linux/macOS) or `%USERPROFILE%\Projects\knowledge\` (Windows).
+* **Vault root:** `$VAULT_PATH` (default `~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows; per-machine override in `~/.config/dotfiles/machine.json` — ADR-025).
 * **Project context:** `10_projects/<repo>/00-context.md`.
 * **Active backlog:** `10_projects/<repo>/11-tasks.md` — NEVER look for `TODO.md` in the repo.
 * **Global patterns:** `00_meta/patterns/*.md`.

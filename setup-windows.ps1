@@ -514,6 +514,20 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
     else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
 
+    # ADR-025 + HARNESS-024 (#446): the hive serve daemon runs as a Scheduled Task
+    # and inherits the User-scope environment (not the shell paths.ps1). Persist
+    # the resolved vault path at User scope so the daemon follows the cascade.
+    # hive#246 hardens the daemon's own resolution.
+    $hiveVaultResolved = $null
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        $hiveVaultResolved = (& dotf env path HIVE_VAULT_PATH 2>$null | Select-Object -First 1)
+    }
+    if (-not $hiveVaultResolved) {
+        $hiveVaultResolved = if ($env:HIVE_VAULT_PATH) { $env:HIVE_VAULT_PATH } elseif ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
+    }
+    [Environment]::SetEnvironmentVariable('HIVE_VAULT_PATH', $hiveVaultResolved, 'User')
+    Write-Success "Provisioned hive daemon vault path at User scope ($hiveVaultResolved)"
+
     # AI-023 / hive#176 / ADR-015: the upgrade policy that FEEDS the daemon's
     # restart-on-upgrade. Windows cannot replace a running executable, so the task
     # does NOT call `uv tool upgrade` directly -- it runs the orchestration script
@@ -647,7 +661,9 @@ if ($claudeCmd) {
 # Deploy auto-memory junctions from vault (see ADR-007)
 # Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
 # Scans both 10_projects/ and 50_work/ for memory directories.
-$VaultRoot = Join-Path $env:USERPROFILE "Projects\knowledge"
+# VaultRoot honors the ADR-025 seam ($env:VAULT_PATH, set by the sourced
+# paths.ps1) with the legacy default as fallback — parity with setup-linux.sh.
+$VaultRoot = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE "Projects\knowledge" }
 $VaultProjects = Join-Path $VaultRoot "10_projects"
 if (Test-Path $VaultRoot) {
     Write-Info "Deploying auto-memory junctions from vault..."
@@ -1071,7 +1087,9 @@ if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq
     # The committed JSON uses ${VAULT_PATH} so it's OS-portable; agy does NOT
     # expand env vars inside JSON values, so substitution must happen here
     # before write. The path itself is by convention: $USERPROFILE\Projects\knowledge.
-    $vaultPath = Join-Path $env:USERPROFILE 'Projects\knowledge'
+    # ADR-025: honor $env:VAULT_PATH (the cross-machine seam) before the legacy
+    # default — parity with setup-linux.sh:402 ${VAULT_PATH:-...}.
+    $vaultPath = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
     $hiveEntry = $mcpConfigJson.mcpServers."hive-vault"
     if ($hiveEntry -and $hiveEntry.env.PSObject.Properties['VAULT_PATH']) {
         $hiveEntry.env.VAULT_PATH = $vaultPath

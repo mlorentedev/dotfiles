@@ -1010,6 +1010,22 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
     else
         log_warning "hive service install failed (non-fatal; client works via fallback)"
     fi
+
+    # ADR-025 + HARNESS-024 (#446): the hive serve daemon is a systemd --user
+    # service and does NOT source the shell paths.sh, so provision its vault path
+    # via environment.d (read by the user manager for all --user services). The
+    # value follows the ADR-025 cascade ($VAULT_PATH -> machine.json -> contract).
+    # hive#246 hardens the daemon's own resolution; this guarantees the env is set.
+    HIVE_VAULT_RESOLVED="$(dotf env path HIVE_VAULT_PATH 2>/dev/null || true)"
+    HIVE_VAULT_RESOLVED="${HIVE_VAULT_RESOLVED:-${HIVE_VAULT_PATH:-${VAULT_PATH:-$HOME/Projects/knowledge}}}"
+    ENV_D_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
+    if mkdir -p "$ENV_D_DIR" 2>/dev/null; then
+        printf 'HIVE_VAULT_PATH=%s\nVAULT_PATH=%s\n' "$HIVE_VAULT_RESOLVED" "$HIVE_VAULT_RESOLVED" > "$ENV_D_DIR/10-hive-vault.conf"
+        export HIVE_VAULT_PATH="$HIVE_VAULT_RESOLVED"
+        systemctl --user import-environment HIVE_VAULT_PATH VAULT_PATH >/dev/null 2>&1 || true
+        log_success "Provisioned hive daemon vault path via environment.d ($HIVE_VAULT_RESOLVED)"
+    fi
+
     # AI-023 / hive#176: the upgrade policy that FEEDS the daemon's
     # restart-on-upgrade. Deploy the --user timer + oneshot from the repo's
     # systemd/ SSOT and enable the timer (every 15 min). Same version gate as the
@@ -1211,7 +1227,9 @@ merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_
 # Deploy auto-memory symlinks (vault → Claude Code)
 # Memory lives in the knowledge vault, not in this repo (see ADR-007)
 # Scans both 10_projects/ and 50_work/ for memory directories.
-VAULT_ROOT="$HOME/Projects/knowledge"
+# VAULT_ROOT honors the ADR-025 seam ($VAULT_PATH, set by the sourced paths.sh)
+# with the legacy default as fallback — parity with the agy hive-vault block above.
+VAULT_ROOT="${VAULT_PATH:-$HOME/Projects/knowledge}"
 VAULT_PROJECTS="$VAULT_ROOT/10_projects"
 VAULT_WORK="$VAULT_ROOT/50_work"
 if [ -d "$VAULT_ROOT" ]; then

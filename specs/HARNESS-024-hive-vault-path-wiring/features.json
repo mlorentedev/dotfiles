@@ -1,0 +1,23 @@
+[
+  {
+    "id": "HARNESS-024-hive-vault-path-wiring-f1",
+    "behavior": "dotf env path <KEY> prints the cascade-resolved value of one structural path key (env -> machine.json -> contract default[GOOS]).",
+    "verification": "cd cli && go build ./... && go vet ./...",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-hive-vault-path-wiring-f2",
+    "behavior": "No hardcoded Projects/knowledge literal remains for vault-path RESOLUTION in setup scripts; the three sites read $VAULT_PATH first (sh/ps1 parity).",
+    "verification": "bash -n setup-linux.sh && ! grep -nE \"(VAULT_ROOT|vaultPath|VaultRoot)\\s*=\\s*[\\\"']?(\\$HOME|\\$env:USERPROFILE|Join-Path)\" setup-linux.sh setup-windows.ps1 | grep -v 'VAULT_PATH'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-hive-vault-path-wiring-f3",
+    "behavior": "The canonical AI vault-root references point at $VAULT_PATH + machine.json, not a hardcoded path.",
+    "verification": "grep -q 'VAULT_PATH' AGENTS.md && grep -q 'VAULT_PATH' .github/copilot-instructions.md && grep -q 'VAULT_PATH' ai/copilot/copilot-instructions.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
