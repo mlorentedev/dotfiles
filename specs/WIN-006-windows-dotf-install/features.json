@@ -1,0 +1,16 @@
+[
+  {
+    "id": "WIN-006-windows-dotf-install-f1",
+    "behavior": "install-dotf.ps1 exists, defines Install-Dotf/Get-DotfArch/Get-DotfVersion, fetches the windows zip + verifies sha256, installs user-space to ~/.local/bin, is idempotent, and has a standalone run-guard.",
+    "verification": "bats tests/install-dotf-ps1.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-006-windows-dotf-install-f2",
+    "behavior": "setup-windows.ps1 dot-sources install-dotf.ps1 and calls Install-Dotf before the dotf env steps; both files parse clean.",
+    "verification": "pwsh -NoProfile -Command \"$null=[System.Management.Automation.Language.Parser]::ParseFile('setup-windows.ps1',[ref]$null,[ref]$null); $null=[System.Management.Automation.Language.Parser]::ParseFile('scripts/install-dotf.ps1',[ref]$null,[ref]$null); if($?){exit 0}else{exit 1}\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

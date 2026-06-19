@@ -501,6 +501,21 @@ if (-not ($claudeCmd -and $npxCmd)) {
     }
 }
 
+# dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
+# (user-space, no admin) — the PowerShell twin of setup-linux.sh sourcing
+# install-dotf.sh. goreleaser already publishes the Windows zip, so nothing is
+# compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
+# automatically; non-fatal, like the Linux side (`install_dotf || log_warning`).
+$installDotfScript = Join-Path $PSScriptRoot 'scripts\install-dotf.ps1'
+if (Test-Path $installDotfScript) {
+    . $installDotfScript
+    if (-not (Install-Dotf)) {
+        Write-Warn "dotf installation failed (continuing; the env steps below auto-skip)"
+    }
+} else {
+    Write-Warn "scripts\install-dotf.ps1 not found; skipping dotf install"
+}
+
 # Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
 # `hive serve` Scheduled Task now that the MCP loop's prerequisite installed/upgraded
 # the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing
