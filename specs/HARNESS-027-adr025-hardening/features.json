@@ -1,0 +1,23 @@
+[
+  {
+    "id": "HARNESS-027-adr025-hardening-f1",
+    "behavior": "install-dotf.ps1/.sh read `dotf version` from both streams and regex-extract the semver, so the idempotence check is robust to stderr output and StrictMode-safe.",
+    "verification": "bats tests/install-dotf-ps1.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-adr025-hardening-f2",
+    "behavior": "ResolveContractPath prefers the repo's env-contract.json when DOTFILES_REPO_DIR is a valid checkout, and falls through when it is absent.",
+    "verification": "cd cli && go test ./internal/env/...",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-adr025-hardening-f3",
+    "behavior": "dotf doctor OS-gates POSIX-only checks behind a mockable System.GOOS seam: they SKIP on Windows, Linux behavior unchanged.",
+    "verification": "cd cli && go test ./internal/doctor/...",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -114,6 +114,18 @@ func MachinePath(home string) string {
 // deployed copy), then by walking up from the current directory (so the CLI
 // works from inside a checkout). Returns "" when none is found.
 func ResolveContractPath() string {
+	// Prefer the repo's contract when DOTFILES_REPO_DIR points at a real checkout.
+	// On a dev machine the checkout is fresher than the deployed copy under
+	// ~/.dotfiles, so this prevents the stale-deployed-copy drift where a relocated
+	// repo keeps generating from an out-of-date ~/.dotfiles/env-contract.json. Read
+	// with os.Getenv (not ResolvePath): ResolvePath calls back into here, so going
+	// through the cascade would recurse. A non-existent path (stale value) just
+	// falls through to the deployed copy below.
+	if repo := os.Getenv("DOTFILES_REPO_DIR"); repo != "" {
+		if p := filepath.Join(repo, "env-contract.json"); fileExists(p) {
+			return p
+		}
+	}
 	home := Home()
 	if p := filepath.Join(DotfilesDir(home), "env-contract.json"); fileExists(p) {
 		return p

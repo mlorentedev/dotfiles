@@ -21,6 +21,12 @@ export EDITOR=nano
 # (per-machine overrides), rendered by `dotf env generate`. DOTFILES_DIR is
 # bootstrapped first because it locates the file. Must be set before secrets.
 export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+# Zero-touch: auto-render paths.sh on first run when missing and dotf is on PATH
+# (a fresh machine self-configures without a manual `dotf env generate`). Silent +
+# best-effort; the bootstrap fallback below covers any failure.
+if [ ! -f "$DOTFILES_DIR/paths.sh" ] && command -v dotf >/dev/null 2>&1; then
+    dotf env generate >/dev/null 2>&1 || true
+fi
 if [ -f "$DOTFILES_DIR/paths.sh" ]; then
     . "$DOTFILES_DIR/paths.sh"
 else

@@ -107,6 +107,23 @@ Non-sensitive, per-machine shell config (a host-only `PATH` prepend, a VM-only a
 
 > **`.local` is not for secrets.** API keys, tokens and credentials always go through the age system above (`sensitive/*.secret.age` + `env-mapping.conf`), never a `.local` file.
 
+### Cross-machine paths (ADR-025)
+
+Structural paths (vault, repo, agent homes) resolve through a cascade, so the **same repo works on every machine** without editing tracked files:
+
+```
+env var  →  ~/.config/dotfiles/machine.json (per-machine override)  →  env-contract.json default[OS]
+```
+
+**To change where a path points:**
+
+| You want to… | Edit | Then |
+|---|---|---|
+| Relocate something on **this machine** (e.g. the vault moved) | `~/.config/dotfiles/machine.json` | `dotf env generate` → open a new shell |
+| Change the **default for all machines** | `env-contract.json` (the `default` block) | commit → on each machine `dotf env generate` (or re-run setup) |
+
+`dotf env generate` renders `~/.dotfiles/paths.{sh,ps1}` (sourced by your shell profile); **never edit those — they carry a `DO NOT EDIT` header.** Verify with `dotf doctor` (asserts no drift) or `dotf env path VAULT_PATH` (prints the resolved value). `machine.json` is gitignored and holds **only** the keys this machine overrides — copy `machine.json.example` to start. Full rationale: [`docs/adr/adr-025-cross-machine-path-resolution.md`](docs/adr/adr-025-cross-machine-path-resolution.md).
+
 ### AI Tools
 
 ```bash

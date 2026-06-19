@@ -378,7 +378,11 @@ foreach ($tool in $optionalTools) {
 # ==================================================
 Write-Section '7/13' 'Knowledge Vault'
 
-$vaultDir = if ($env:VAULT_DIR) { $env:VAULT_DIR } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
+# ADR-025: VAULT_PATH is the contract var (set by paths.ps1 from env-contract.json
+# + machine.json). The old code read $env:VAULT_DIR — a name that never existed in
+# the contract — so it always fell through to the hardcoded default and FAILed once
+# the vault was relocated. Fall back to the contract's Windows default only.
+$vaultDir = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
 
 if (Test-Path -LiteralPath $vaultDir -PathType Container) {
     Write-Pass "Vault directory exists ($vaultDir)"
