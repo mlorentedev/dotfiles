@@ -1114,3 +1114,43 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Install pi into the manager-independent `~/.local` prefix — `npm install -g --ignore-scripts --prefix "$HOME/.local"` puts the launcher at `~/.local/bin/pi`, the same dir `claude`/`dotf` use, which is on PATH for login shells AND GUI/ADE processes. Its `#!/usr/bin/env node` shebang then runs under whatever node each environment provides. Guard the install on `~/.local/bin/pi` (the stable location), not bare `command -v pi`, so a stale nvm-version copy can't mask a missing launcher. Add the incident→guard branch to `dotf doctor`: configured-but-off-PATH → FAIL with the root cause, not a SKIP.
 
 **Rule**: Any CLI a GUI app / ADE (or a cron job, or a different-node shell) must spawn has to live on a version-manager-independent PATH dir like `~/.local/bin` — never only in nvm/asdf/volta's per-version global, which is invisible outside the shell that activated that version. When a tool is "found in my terminal but not in <other launcher>", first compare the *active node/runtime version* in each environment before assuming it's uninstalled. And a health check must distinguish "absent" from "present-but-unreachable" — the second is the actionable failure, not a skip.
+
+### [2026-06-18] An env-var seam is inert until something sets it — a hardcoded fallback that matches reality hides the broken seam
+
+**Context**: The vault and dotfiles repo were relocated from `~/Projects/` to `~/Projects/Workspace/`. Vault MCP, hive, selfupdate and the session hooks all broke silently.
+
+**Problem**: The code already had the seams (`VAULT_PATH`, `DOTFILES_REPO_DIR`, `HIVE_VAULT_PATH`) and a Go resolver that honored them — but nothing on the deploy path ever *set* them: the shell profiles hardcoded the value, `VAULT_PATH` was never exported, and the session hooks read a literal `~/Projects/knowledge` instead of the seam. It "worked" only because each hardcoded fallback coincided with the real path. The seam was decorative. The day the assumption (path == default) shifted, every consumer broke at once, and silently — the resolver degraded to "not found" instead of erroring. The same concept even carried three names across the code (`VAULT_PATH` / `VAULT_DIR` / the literal).
+
+**Solution**: ADR-025 — a real cascade (`env → ~/.config/dotfiles/machine.json → env-contract default[OS]`) rendered into `paths.{sh,ps1}` that shells source and that `dotf env generate` writes for every consumer; `dotf doctor` asserts drift. Collapse the three names onto `VAULT_PATH`.
+
+**Rule**: A seam (env var, config key, DI point) is only real if something on the deploy path *sets* it AND every consumer reads it through one resolver. A fallback equal to today's reality is a latent bug, not a safety net — it postpones the failure to the first time the assumption moves and makes it silent. Audit seams by grepping who *sets* them, not just who reads them; collapse synonyms to one name.
+
+### [2026-06-18] "Wire all consumers" must enumerate the non-shell ones — services and daemons never source a shell profile
+
+**Context**: After ADR-025 wired the vault-path cascade into shells, hooks and the Go CLI, the Claude Code Hive still pointed at the old path.
+
+**Problem**: `paths.{sh,ps1}` only reach interactive shells. The hive `serve` daemon (systemd `--user` on Linux, Scheduled Task on Windows) and the agy MCP registration never source a shell profile, so a shell-only mechanism silently missed them. `hive client` is a stateless proxy; the daemon reads `HIVE_VAULT_PATH` from its OWN process env at start — and `claude mcp add` has no `--env`, so the path can't flow through the MCP registration either.
+
+**Solution**: Provision the *service* environment directly — `~/.config/environment.d/10-hive-vault.conf` (read by the systemd `--user` manager for all user services) on Linux, and a User-scope env var (Scheduled Tasks inherit it) on Windows — both from the same cascade via a new `dotf env path <KEY>`.
+
+**Rule**: When a change claims to "wire all consumers" of a value, list them by *execution context*, not convenience: interactive shells, login shells, services (systemd/launchd/Scheduled Task), cron, MCP daemons, GUI/ADE processes. Each has its own env-provisioning mechanism; a shell-profile mechanism reaches none of the non-shell ones. A proxy daemon (client→server) holds its state in the *server* — set the server's env, not the client's.
+
+### [2026-06-18] Number an ADR off the latest origin/main, not your branch base — a stale base collides with ADRs shipped in parallel
+
+**Context**: I wrote ADR-023 for cross-machine path resolution, taking the next number from my branch base (highest was ADR-022). While I worked, `main` advanced: ADR-023 (agnostic session-start) and ADR-024 (PAT-expiry) shipped. On merge, my ADR-023 collided.
+
+**Problem**: ADR numbers are a shared append-only namespace, but I picked the next one from a *stale local base* instead of current `main`. A parallel session had already claimed 023 and 024. The collision surfaced only at integration; renumbering to 025 then meant chasing ~20 files + 3 GitHub issue/PR bodies — and surgically *not* touching the other ADR-023's references in files that carried both (the session hooks).
+
+**Solution**: Renumber to ADR-025 (next free on merged main), case-sensitive + slug-aware; in files referencing both ADR-023s, edit only the cross-machine line.
+
+**Rule**: Before assigning any number in a shared append-only namespace (ADRs, migrations, ticket IDs), resolve it against the *latest* `origin/main`, not your branch base — `git fetch && git ls-tree origin/main docs/adr/`. When parallel work is likely, reserve the number up front rather than guessing.
+
+### [2026-06-18] `gh issue/pr create` use GraphQL — when that bucket is rate-limited, `gh api -X POST` (REST) still works
+
+**Context**: Mid-session, `gh repo view --json` and `gh label list` failed with "GraphQL: API rate limit already exceeded", blocking issue/PR creation.
+
+**Problem**: GitHub keeps *separate* rate-limit buckets for REST (5000/h) and GraphQL (5000/h). `gh issue create`, `gh pr create`, `gh label list` and `gh project` go through GraphQL; when that bucket is exhausted they all fail — while the REST bucket can be completely fresh.
+
+**Solution**: Create the issue/PR via REST — `gh api -X POST /repos/<owner>/<repo>/issues --input -` (and `/pulls`), feeding a JSON body; check both buckets with `gh api /rate_limit --jq '.resources'`. PowerShell gotchas: capture a fetched body as a single string (`-join "\n"`, since the tool splits multiline output into an array) and use case-sensitive `-creplace` — plain `-replace` is case-insensitive and corrupts e.g. `adr-023` → `ADR-025`; build the payload with a single-quoted here-string `@'...'@` so `$`-vars stay literal.
+
+**Rule**: On a `gh` "GraphQL rate limit" error, don't wait — fall back to `gh api` REST endpoints (separate bucket), verified via `gh api /rate_limit`. For scripted body edits: single-string + case-sensitive replace + literal here-string.

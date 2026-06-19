@@ -23,7 +23,26 @@ func newEnvCmd() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(newEnvGenerateCmd())
+	cmd.AddCommand(newEnvPathCmd())
 	return cmd
+}
+
+func newEnvPathCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "path <KEY>",
+		Short: "Print the cascade-resolved value of one path key",
+		Long: "path resolves a single structural path through the ADR-025 cascade\n" +
+			"(env -> machine.json -> contract default[GOOS]) and prints it. Used by\n" +
+			"setup scripts to provision service environments (e.g. the hive daemon)\n" +
+			"that do not source the shell path file. Prints an empty line + exits 0\n" +
+			"when the key has no resolved value, so callers can fall back with ${X:-default}.",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.Println(env.ResolvePath(args[0]))
+			return nil
+		},
+	}
 }
 
 func newEnvGenerateCmd() *cobra.Command {

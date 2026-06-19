@@ -8,7 +8,7 @@
 
 <!-- Enforced by .github/workflows/spec-gate.yml. See AGENTS.md "Discipline Gate". -->
 
-- [ ] Vault backlog entry exists in `~/Projects/knowledge/10_projects/dotfiles/11-tasks.md`
+- [ ] Vault backlog entry exists in `$VAULT_PATH/10_projects/dotfiles/11-tasks.md` (default `~/Projects/knowledge`)
 - [ ] Spec folder `specs/<feature-id>/` is included in this PR (or `skip-sdd` label below)
 - [ ] `proposal.md` has filled Why / What / Acceptance criteria
 - [ ] `tasks.md` is in TDD order
