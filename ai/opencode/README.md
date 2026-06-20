@@ -54,6 +54,6 @@ opencode run -m nan/gemma4 "..."   # explicit model override
 
 ## See also
 
-- Spec: [`specs/SDD-007-ai-tooling-consolidation/`](../../specs/SDD-007-iac-deploy-strategy/) — full design rationale + acceptance criteria.
+- Spec: [`specs/archive/SDD-007-iac-deploy-strategy/`](../../specs/archive/SDD-007-iac-deploy-strategy/) — full design rationale + acceptance criteria (archived).
 - NaN provider: [`ai/nan/README.md`](../nan/README.md) — model catalog, API key, rate limits, troubleshooting.
 - Coexistence with Claude Code: do NOT run `oc` and `claude` in parallel on the same repo until hive MCP adds an auto-commit lockfile (tracked in `hive` repo).

@@ -1062,9 +1062,13 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
 
 $piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
 $piSettingsDst = Join-Path $piAgentDir 'settings.json'
-if ((Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) -and -not (Test-Path -LiteralPath $piSettingsDst)) {
-    Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst -Force
-    Write-Success "Seeded pi settings.json to $piSettingsDst"
+if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
+    if ((Test-Path -LiteralPath $piSettingsDst) -and (Compare-Object (Get-Content $piSettingsSrc) (Get-Content $piSettingsDst) -SyncId)) {
+        Write-Info "pi settings.json already in sync"
+    } else {
+        Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst -Force
+        Write-Success "Deployed pi settings.json to $piSettingsDst"
+    }
 }
 
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
@@ -1667,6 +1671,20 @@ if ($copilotCmd) {
     Write-Success "GitHub Copilot CLI configured (aliases cop/cops in profile.ps1)"
 } else {
     Write-Info "GitHub Copilot CLI not installed; the dev tools block above attempts auto-install via winget GitHub.Copilot. Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
+}
+
+# Sync .github/copilot-instructions.md from ai/copilot/ (SDD-005 parity rule).
+# The .github/ copy is what GitHub's web Copilot Chat reads; ai/copilot/ is the
+# SSOT. Setup keeps them in sync so the docs-drift test never fails.
+$ghCopilotDst = Join-Path $DotfilesDir '.github\copilot-instructions.md'
+$aiCopilotSrc = Join-Path $DotfilesDir 'ai\copilot\copilot-instructions.md'
+if (Test-Path -LiteralPath $aiCopilotSrc -PathType Leaf) {
+    if ((Test-Path -LiteralPath $ghCopilotDst) -and (Compare-Object (Get-Content $aiCopilotSrc) (Get-Content $ghCopilotDst) -SyncId)) {
+        Write-Info ".github/copilot-instructions.md already in sync"
+    } else {
+        Copy-Item -LiteralPath $aiCopilotSrc -Destination $ghCopilotDst -Force
+        Write-Success "Synced .github/copilot-instructions.md from ai/copilot/"
+    }
 }
 
 # ============================================================================

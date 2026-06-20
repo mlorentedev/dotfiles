@@ -8,8 +8,8 @@
 > MCP usage, Operational Rules). This file holds only Hermes-specific notes on top.
 >
 > If `AGENTS.md` is missing from the current context, default to the canonical
-> version at `~/Projects/dotfiles/AGENTS.md` (Linux/macOS) or
-> `%USERPROFILE%\Projects\dotfiles\AGENTS.md` (Windows).
+> version at `$DOTFILES_REPO_DIR/AGENTS.md` (resolved via `machine.json` per
+> ADR-025; falls back to `~/Projects/Workspace/dotfiles/AGENTS.md`).
 
 ## Runtime brain lives in the vault, not in this checkout
 

@@ -2,7 +2,7 @@
 
 > **First, read [`AGENTS.md`](../AGENTS.md) at the repo root** — canonical SSOT for behaviour rules across all agents (Standing Orders, Decision Hierarchy, Neural Hive Loop, MCP usage, Operational Rules). This file contains only Copilot-specific extensions on top.
 >
-> If `AGENTS.md` is missing from the current repo, default to the canonical version at `~/Projects/dotfiles/AGENTS.md` (Linux/macOS) or `%USERPROFILE%\Projects\dotfiles\AGENTS.md` (Windows).
+> If `AGENTS.md` is missing from the current repo, default to the canonical version at `$DOTFILES_REPO_DIR/AGENTS.md` (resolved via `machine.json` per ADR-025; falls back to `~/Projects/Workspace/dotfiles/AGENTS.md`).
 
 ## Role & Goal (Copilot framing)
 
@@ -13,7 +13,7 @@
 
 * Suggest POSIX-compliant shell commands (`bash` / `zsh`) — see `AGENTS.md` § Operational Rules → Shell & Cross-Platform.
 * Prefer modern tools: `ripgrep` (`rg`), `fd`, `eza`, `bat`.
-* **Dynamic Documentation:** If explaining a complex fix, suggest creating a runbook in `40-runbooks/`.
+* **Dynamic Documentation:** If explaining a complex fix, suggest creating a runbook in the repo's `docs/runbooks/` (per knowledge-placement model).
 
 ## Interaction Style (Copilot)
 
@@ -23,9 +23,9 @@
 
 ## Quick Reference (paths)
 
-* **Vault root:** `$VAULT_PATH` (default `~/Projects/knowledge/` Linux/macOS, `%USERPROFILE%\Projects\knowledge\` Windows; per-machine override in `~/.config/dotfiles/machine.json` — ADR-025).
+* **Vault root:** `$VAULT_PATH` (resolved via `machine.json` per ADR-025; default `~/Projects/Workspace/knowledge/`).
 * **Project context:** `10_projects/<repo>/00-context.md`.
-* **Active backlog:** `10_projects/<repo>/11-tasks.md` — NEVER look for `TODO.md` in the repo.
+* **Active backlog:** bitácora GitHub Project (per ADR-018).
 * **Global patterns:** `00_meta/patterns/*.md`.
 * **Templates:** `00_meta/templates/*.md`.
 * **FAE tickets:** `50_work/tickets/`.
