@@ -44,11 +44,13 @@ setup() {
     ! grep -q 'ensure_line_in_file.*OPENCODE_PATH_LINE' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh converges a drifted opencode to the versions.conf pin (REFACTOR-011)" {
-    # Presence is not convergence: an opencode older than OPENCODE_VERSION was
-    # previously skipped as "already installed", leaving healthcheck flagging
-    # version drift on every run.
-    grep -q 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
+@test "setup-linux.sh upgrades a below-minimum opencode to the versions.conf pin (REFACTOR-011/013)" {
+    # Presence is not convergence, and the pin is a MINIMUM: an opencode older
+    # than OPENCODE_VERSION was skipped as "already installed", while an exact
+    # != reconcile would downgrade a newer install. Gate on version_gte so only
+    # an older opencode triggers an upgrade.
+    grep -q 'version_gte "$installed_opencode" "$OPENCODE_VERSION"' "$SETUP_SCRIPT"
+    ! grep -q 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
     # Convergence is verified by re-query, not by installer exit code: a
     # shadowing install (npm global) would otherwise produce a false SUCCESS.
     grep -q 'shadows it in PATH' "$SETUP_SCRIPT"

@@ -323,11 +323,13 @@ setup() {
     grep -qF 'SST.opencode' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 converges a drifted opencode to the versions.conf pin (REFACTOR-011)" {
-    # Presence is not convergence: an opencode older than OPENCODE_VERSION was
-    # previously skipped as "already installed", leaving healthcheck flagging
-    # version drift on every run.
-    grep -qF '$installedVer -ne $tool.Version' "$PS1_SCRIPT"
+@test "setup-windows.ps1 upgrades a below-minimum opencode to the versions.conf pin (REFACTOR-011/013)" {
+    # Presence is not convergence, and the pin is a MINIMUM: an opencode older
+    # than OPENCODE_VERSION was skipped as "already installed", while an exact
+    # -ne reconcile would downgrade a newer install. Gate on Test-VersionAtLeast
+    # so only a below-minimum opencode triggers an upgrade.
+    grep -qF 'Test-VersionAtLeast $installedVer $tool.Version' "$PS1_SCRIPT"
+    ! grep -qF '$installedVer -ne $tool.Version' "$PS1_SCRIPT"
     grep -qE 'winget install \$tool\.Id --version \$tool\.Version' "$PS1_SCRIPT"
     # Convergence is verified by re-query, not by winget's exit code: a
     # shadowing install (npm global, scoop) would otherwise produce a false

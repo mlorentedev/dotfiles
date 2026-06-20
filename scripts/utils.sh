@@ -52,9 +52,29 @@ log_error() {
 exit_error() {
     message=$1
     code=${2:-1} # Default exit code is 1
-    
+
     log_error "$message"
     exit $code
+}
+
+# version_gte: is an installed version at least the pinned minimum?
+# versions.conf pins are MINIMUMS, not exact pins (REFACTOR-013): an install
+# gate must upgrade when installed < pin, and leave a NEWER install untouched
+# (an exact-match `!=` reconcile would downgrade it). Pure semver compare via
+# `sort -V`; no external deps.
+# Input:  $1 - installed version (e.g. "1.16.2"), $2 - pinned minimum
+# Returns: 0 if installed >= minimum (satisfied), 1 if installed < minimum
+#          (needs install/upgrade). Empty minimum -> 0 (no pin = anything OK);
+#          empty installed -> 1 (nothing there = needs install).
+# Usage:   version_gte "$installed" "$PIN" || install_or_upgrade
+version_gte() {
+    installed="$1"
+    minimum="$2"
+    [ -z "$minimum" ] && return 0
+    [ -z "$installed" ] && return 1
+    [ "$installed" = "$minimum" ] && return 0
+    # installed >= minimum iff the minimum sorts as the lower of the two.
+    [ "$(printf '%s\n%s\n' "$installed" "$minimum" | sort -V | head -n1)" = "$minimum" ]
 }
 
 # Silent check functions (for conditionals and shell startup)

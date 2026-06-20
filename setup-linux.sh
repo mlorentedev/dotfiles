@@ -655,27 +655,28 @@ if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$OPENCODE_BINARY" ]; then
         log_warning "opencode install failed — re-run setup or install manually (https://opencode.ai/docs/)"
     fi
 elif [ -n "$OPENCODE_VERSION" ]; then
-    # REFACTOR-011: presence is not convergence. An installed opencode whose
-    # version drifted from the versions.conf pin was previously skipped as
-    # "already installed", leaving healthcheck flagging drift on every run.
+    # REFACTOR-011/013: presence is not convergence, and the pin is a MINIMUM.
+    # An opencode OLDER than the pin was previously skipped as "already
+    # installed"; an exact-match reconcile would conversely DOWNGRADE a newer
+    # install. Upgrade only when installed < pin (version_gte), never downgrade.
     opencode_cmd="opencode"
     command -v opencode >/dev/null 2>&1 || opencode_cmd="$OPENCODE_BINARY"
     installed_opencode=$("$opencode_cmd" --version 2>/dev/null | head -1 | awk '{print $NF}')
-    if [ "$installed_opencode" != "$OPENCODE_VERSION" ]; then
-        log_info "opencode ${installed_opencode:-unknown} drifted from pinned $OPENCODE_VERSION, converging..."
+    if ! version_gte "$installed_opencode" "$OPENCODE_VERSION"; then
+        log_info "opencode ${installed_opencode:-unknown} below pinned minimum $OPENCODE_VERSION, upgrading..."
         curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION" || true
         # Re-query instead of trusting the installer exit code: when the
         # PATH-resolved binary comes from another package manager (npm
         # global), the installer converges its own copy but the shadowing
         # install keeps winning -- that is not convergence.
         converged_opencode=$("$opencode_cmd" --version 2>/dev/null | head -1 | awk '{print $NF}')
-        if [ "$converged_opencode" = "$OPENCODE_VERSION" ]; then
-            log_success "opencode converged to $OPENCODE_VERSION"
+        if version_gte "$converged_opencode" "$OPENCODE_VERSION"; then
+            log_success "opencode upgraded to ${converged_opencode:-$OPENCODE_VERSION} (>= $OPENCODE_VERSION)"
         else
             log_warning "opencode still ${converged_opencode:-unknown} after install of $OPENCODE_VERSION: another install shadows it in PATH (e.g. npm global); converge that install instead"
         fi
     else
-        log_info "opencode already installed (pinned $OPENCODE_VERSION)"
+        log_info "opencode already installed (${installed_opencode:-unknown} >= $OPENCODE_VERSION)"
     fi
 else
     log_info "opencode already installed"
@@ -731,12 +732,12 @@ if command -v npm >/dev/null 2>&1; then
         fi
     else
         INSTALLED_YARN=$(yarn --version 2>/dev/null | head -1)
-        if [ -n "$YARN_PINNED" ] && [ "$INSTALLED_YARN" != "$YARN_PINNED" ]; then
-            log_info "yarn version drift (installed=$INSTALLED_YARN pinned=$YARN_PINNED) — reconciling..."
+        if [ -n "$YARN_PINNED" ] && ! version_gte "$INSTALLED_YARN" "$YARN_PINNED"; then
+            log_info "yarn $INSTALLED_YARN below pinned minimum $YARN_PINNED — upgrading..."
             if npm install -g "yarn@$YARN_PINNED" >/dev/null 2>&1; then
-                log_success "yarn reconciled to $YARN_PINNED"
+                log_success "yarn upgraded to $YARN_PINNED"
             else
-                log_warning "yarn reconcile failed — run: npm install -g yarn@$YARN_PINNED"
+                log_warning "yarn upgrade failed — run: npm install -g yarn@$YARN_PINNED"
             fi
         else
             log_info "yarn already installed: $INSTALLED_YARN"
@@ -770,7 +771,20 @@ if command -v npm >/dev/null 2>&1; then
             log_warning "pi install failed — run: npm install -g --ignore-scripts --prefix \"\$HOME/.local\" $PI_PKG"
         fi
     else
-        log_info "pi already installed ($PI_BIN)"
+        # REFACTOR-013: the pin is a MINIMUM. Presence alone left an outdated pi
+        # in place forever (it was only ever WARNed by healthcheck, #474, never
+        # converged here). Upgrade when installed < pin; leave a newer pi alone.
+        installed_pi=$("$PI_BIN" --version 2>/dev/null | head -1 | awk '{print $NF}')
+        if [ -n "$PI_VERSION" ] && ! version_gte "$installed_pi" "$PI_VERSION"; then
+            log_info "pi ${installed_pi:-unknown} below pinned minimum $PI_VERSION — upgrading..."
+            if npm install -g --ignore-scripts --prefix "$HOME/.local" "@earendil-works/pi-coding-agent@$PI_VERSION" >/dev/null 2>&1; then
+                log_success "pi upgraded to $PI_VERSION"
+            else
+                log_warning "pi upgrade failed — run: npm install -g --ignore-scripts --prefix \"\$HOME/.local\" @earendil-works/pi-coding-agent@$PI_VERSION"
+            fi
+        else
+            log_info "pi already installed ($PI_BIN, ${installed_pi:-unknown} >= ${PI_VERSION:-any})"
+        fi
     fi
 else
     log_warning "npm not found — skipping pi install (install Node.js, then re-run setup)"
