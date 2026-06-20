@@ -1021,7 +1021,20 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
             Write-Warn "pi install failed - run: npm install -g --ignore-scripts $piPkg"
         }
     } else {
-        Write-Info "pi already installed"
+        # Check for version drift and reinstall if pinned version differs.
+        $piVerRaw = (& pi --version 2>&1 | Out-String)
+        $piCurrent = if ($piVerRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
+        if ($piVersion -and $piCurrent -and ($piCurrent -ne $piVersion)) {
+            Write-Info "pi $piCurrent drifted from pinned $piVersion; reinstalling"
+            & npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@$piVersion" 2>$null | Out-Null
+            if (Get-Command pi -ErrorAction SilentlyContinue) {
+                Write-Success "pi reinstalled at pinned $piVersion"
+            } else {
+                Write-Warn "pi reinstall failed - run: npm install -g --ignore-scripts @earendil-works/pi-coding-agent@$piVersion"
+            }
+        } else {
+            Write-Info "pi already installed"
+        }
     }
 } else {
     Write-Warn "npm not available, skipping pi install (install Node.js then re-run)"
@@ -1063,7 +1076,7 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
 $piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
 $piSettingsDst = Join-Path $piAgentDir 'settings.json'
 if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
-    if ((Test-Path -LiteralPath $piSettingsDst) -and (Compare-Object (Get-Content $piSettingsSrc) (Get-Content $piSettingsDst) -SyncId)) {
+    if ((Test-Path -LiteralPath $piSettingsDst) -and (-not (Compare-Object (Get-Content $piSettingsSrc) (Get-Content $piSettingsDst)))) {
         Write-Info "pi settings.json already in sync"
     } else {
         Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst -Force
@@ -1679,7 +1692,7 @@ if ($copilotCmd) {
 $ghCopilotDst = Join-Path $DotfilesDir '.github\copilot-instructions.md'
 $aiCopilotSrc = Join-Path $DotfilesDir 'ai\copilot\copilot-instructions.md'
 if (Test-Path -LiteralPath $aiCopilotSrc -PathType Leaf) {
-    if ((Test-Path -LiteralPath $ghCopilotDst) -and (Compare-Object (Get-Content $aiCopilotSrc) (Get-Content $ghCopilotDst) -SyncId)) {
+    if ((Test-Path -LiteralPath $ghCopilotDst) -and (-not (Compare-Object (Get-Content $aiCopilotSrc) (Get-Content $ghCopilotDst)))) {
         Write-Info ".github/copilot-instructions.md already in sync"
     } else {
         Copy-Item -LiteralPath $aiCopilotSrc -Destination $ghCopilotDst -Force
