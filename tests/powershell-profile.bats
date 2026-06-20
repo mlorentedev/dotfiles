@@ -42,6 +42,16 @@ setup() {
     ! grep -qE '^function (ai|aic|aia) ' "$PROFILE_SCRIPT"
 }
 
+# --- Cross-machine path resolution (ADR-025): no hardcoded repo literal ---
+
+@test "profile.ps1 dbg resolves nan-debug.sh via DOTFILES_REPO_DIR, not a hardcoded Projects\\dotfiles literal" {
+    # Mirror of the Linux AC4 (shell-wrapper-dedup.bats): a relocated clone must
+    # still find the repo script. The old literal 'Projects\dotfiles\scripts'
+    # broke on any machine whose repo is not under ~/Projects/dotfiles.
+    grep -qF '$env:DOTFILES_REPO_DIR' "$PROFILE_SCRIPT"
+    ! grep -qF "'Projects\\dotfiles\\scripts\\nan-debug.sh'" "$PROFILE_SCRIPT"
+}
+
 # --- Secrets sourcing (cross-OS parity: .bashrc sources load-secrets.sh) ---
 
 @test "profile.ps1 sources load-secrets.ps1 (cross-OS parity with .bashrc)" {
