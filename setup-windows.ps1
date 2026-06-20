@@ -526,7 +526,8 @@ $hiveVerMatch = (& uv tool list 2>$null | Select-String -Pattern '^hive-vault\s+
 $hiveVer = if ($hiveVerMatch) { $hiveVerMatch.Matches[0].Groups[1].Value } else { $null }
 if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
     & hive service install *> $null
-    if ($LASTEXITCODE -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
+    $hiveSvcRc = $LASTEXITCODE
+    if ($hiveSvcRc -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
     else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
 
     # ADR-025 + HARNESS-024 (#446): the hive serve daemon runs as a Scheduled Task
@@ -542,6 +543,29 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     }
     [Environment]::SetEnvironmentVariable('HIVE_VAULT_PATH', $hiveVaultResolved, 'User')
     Write-Success "Provisioned hive daemon vault path at User scope ($hiveVaultResolved)"
+
+    # hive#252: on a policy-locked / non-admin box, `hive service install` cannot
+    # register the Scheduled Task ("Access is denied" -- even a trivial schtasks
+    # /Create fails on a domain machine that blocks non-admin task creation). Fall
+    # back to a Startup-folder launcher that runs the daemon supervisor hidden at
+    # logon -- no Task Scheduler, no admin. The daemon reads HIVE_VAULT_PATH from
+    # the User-scope env provisioned above; the in-process `hive client` fallback
+    # still covers correctness if even this is unavailable.
+    if ($hiveSvcRc -ne 0) {
+        $hiveSupSrc = Join-Path $DotfilesDir "windows\hive-serve-supervisor.ps1"
+        $hiveSupDst = Join-Path $ClaudeHome "scripts\hive-serve-supervisor.ps1"
+        if (Test-Path $hiveSupSrc) {
+            Ensure-Directory (Split-Path $hiveSupDst -Parent)
+            Copy-Item $hiveSupSrc $hiveSupDst -Force
+            $hiveStartupVbs = Join-Path ([Environment]::GetFolderPath('Startup')) "hive-serve.vbs"
+            # .vbs runs the supervisor with a hidden window (0) -> no console flash
+            $hiveVbsBody = 'CreateObject("WScript.Shell").Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""' + $hiveSupDst + '""", 0, False'
+            Set-Content -Path $hiveStartupVbs -Value $hiveVbsBody -Encoding ASCII
+            Write-Success "Provisioned hive daemon autostart via Startup folder (no-admin fallback)"
+        } else {
+            Write-Warn "hive-serve supervisor script not found at $hiveSupSrc"
+        }
+    }
 
     # AI-023 / hive#176 / ADR-015: the upgrade policy that FEEDS the daemon's
     # restart-on-upgrade. Windows cannot replace a running executable, so the task
