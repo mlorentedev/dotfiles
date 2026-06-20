@@ -16,7 +16,6 @@ sshmux() {
     ssh -t "$1" "tmux new-session -A -s ${2:-main}"
 }
 
-# Source utility functions from dotfiles
-if [ -f "$HOME/.dotfiles/scripts/utils.sh" ]; then
-    source "$HOME/.dotfiles/scripts/utils.sh"
-fi
+# utils.sh is sourced from the shared .zsh/functions.sh (loaded by both .zshrc
+# and .bashrc), so it is intentionally NOT sourced here — keeping it in one place
+# avoids double-sourcing in zsh and gives bash the same library declaratively.

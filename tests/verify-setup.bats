@@ -262,8 +262,8 @@ setup() {
     zsh -c ". '$DOTFILES_DIR/scripts/utils.sh'"
 }
 
-@test "functions.zsh references utils.sh" {
-    grep -q 'utils.sh' "$DOTFILES_DIR/.zsh/functions.zsh"
+@test "functions.sh sources utils.sh (shared bash/zsh entrypoint)" {
+    grep -q 'utils\.sh' "$DOTFILES_DIR/.zsh/functions.sh"
 }
 
 # =============================================================================

@@ -127,15 +127,9 @@ alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
-function gp() {
-    local prompt_file="$HOME/.gemini/prompts/$1.md"
-    shift
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt not found at $prompt_file"
-        return 1
-    fi
-    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
-}
+# Gemini saved-prompt helper `gpr` lives in .zsh/functions.sh (shared bash/zsh,
+# sourced below). It was renamed from `gp` to stop colliding with the
+# `gp=git pull` git alias.
 
 # qq / qf: bash quick-question wrappers. `_qq_call` lives in .zsh/functions.sh
 # (REFACTOR-010, shared with zsh). Bash leaves `foo?` literal when no match

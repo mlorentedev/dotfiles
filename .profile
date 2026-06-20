@@ -26,15 +26,10 @@ if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
 
-# set Utils file
-UTILS_FILE="$HOME/.dotfiles/scripts/utils.sh"
-if [ -f "$UTILS_FILE" ]; then
-    # Add the sourcing of utils.sh to the .bashrc or .zshrc file
-    if ! grep -q "source $UTILS_FILE" "$HOME/.bashrc" && ! grep -q "source $UTILS_FILE" "$HOME/.zshrc"; then
-        echo "source $UTILS_FILE" >> "$HOME/.bashrc"
-        echo "source $UTILS_FILE" >> "$HOME/.zshrc"
-    fi
-fi
+# utils.sh is sourced declaratively from .zsh/functions.sh (loaded by both
+# .bashrc and .zshrc). This file no longer appends a `source utils.sh` line to
+# the user's rc files at login — that runtime mutation of deployed files was
+# non-idempotent and fought the copy-deploy strategy (ADR-012).
 
 # set PATH and EDITOR
 export PATH="$HOME/bin:$PATH"
