@@ -156,3 +156,29 @@ _qq_call() {
 # `ocfull` is the opt-in full mode (MCP tool-use: Hive vault writes, etc.).
 oc() { opencode --pure "$@"; }
 ocfull() { opencode "$@"; }
+
+# ---------------------------------------------------------------------------
+# gpr: run a saved Gemini/AGY prompt. Shared bash/zsh (REFACTOR-010 style).
+# Was duplicated as `gp` in both .bashrc and .zshrc, where it COLLIDED with the
+# `gp=git pull` alias (in zsh the alias won at call time, so the helper was
+# unreachable). Renamed to `gpr` and centralized here: one definition, no
+# collision.
+#   gpr <prompt-name> [extra args]   -> ~/.gemini/prompts/<prompt-name>.md
+gpr() {
+    [ -z "${1:-}" ] && { printf 'usage: gpr <prompt-name> [args]\n' >&2; return 1; }
+    local prompt_file="$HOME/.gemini/prompts/$1.md"
+    shift
+    if [ ! -f "$prompt_file" ]; then
+        printf 'gpr: prompt not found at %s\n' "$prompt_file" >&2
+        return 1
+    fi
+    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
+}
+
+# Shared utility library (log_*, version_gte, deploy_file, …). Sourced from this
+# single shared entrypoint so BOTH bash and zsh get it — replaces the old
+# ~/.profile runtime mutation that appended `source utils.sh` to the user's rc
+# files on every login (non-declarative; mutated deployed files).
+if [ -f "$HOME/.dotfiles/scripts/utils.sh" ]; then
+    . "$HOME/.dotfiles/scripts/utils.sh"
+fi

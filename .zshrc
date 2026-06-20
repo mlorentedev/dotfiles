@@ -107,16 +107,9 @@ alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
-# Gemini Helper Function
-function gp() {
-    local prompt_file="$HOME/.gemini/prompts/$1.md"
-    shift
-    if [ ! -f "$prompt_file" ]; then
-        echo "❌ Error: Prompt not found at $prompt_file"
-        return 1
-    fi
-    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
-}
+# Gemini saved-prompt helper `gpr` lives in .zsh/functions.sh (shared bash/zsh,
+# sourced below). Renamed from `gp` so it no longer collides with the
+# `gp=git pull` alias from aliases.zsh (the alias won, leaving the helper dead).
 
 # Claude Code - use slash commands inside session:
 #   claude

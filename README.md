@@ -138,7 +138,7 @@ env var  →  ~/.config/dotfiles/machine.json (per-machine override)  →  env-c
 dotf init my-project --stack python  # Scaffold a new fully-practiced repo
 claude                               # Start Claude Code session
 > /audit src/auth.py                 # Use skills via slash commands
-gp audit "$(cat src/main.py)"       # Gemini prompt function
+gpr audit "$(cat src/main.py)"      # Gemini saved-prompt helper (~/.gemini/prompts/audit.md)
 oc                                   # OpenCode TUI (Go subscription, DeepSeek V4 Pro default)
 qq por que tardas tanto?             # one-shot question (no quotes needed in zsh) -> qwen3.6-plus (ES-friendly)
 qf explain the C10k problem         # one-shot question -> deepseek-v4-flash (faster, technical)

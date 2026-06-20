@@ -60,3 +60,33 @@ setup() {
     run zsh -c ". '$REPO_ROOT/.zsh/functions.sh'; type _qq_call >/dev/null && type oc >/dev/null && type ocfull >/dev/null"
     [ "$status" -eq 0 ]
 }
+
+# --- AC6: Gemini helper renamed gp -> gpr (no collision with `gp=git pull`) ---
+
+@test "AC6: gpr is the Gemini helper, defined once in functions.sh" {
+    run grep -lE '^gpr\(\)' "$REPO_ROOT/.zsh/functions.sh" "$REPO_ROOT/.zsh/aliases.zsh" "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc"
+    [ "$output" = "$REPO_ROOT/.zsh/functions.sh" ]
+}
+
+@test "AC6: the colliding gemini 'function gp()' no longer exists in any rc file" {
+    ! grep -qE '^(function )?gp\(\)' "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc" "$REPO_ROOT/.zsh/functions.sh"
+}
+
+# --- AC7: utils.sh sourced declaratively; .profile no longer mutates rc files ---
+
+@test "AC7: functions.sh sources utils.sh (shared bash/zsh entrypoint)" {
+    grep -qE 'scripts/utils\.sh' "$REPO_ROOT/.zsh/functions.sh"
+}
+
+@test "AC7: .profile no longer appends 'source utils.sh' to ~/.bashrc or ~/.zshrc" {
+    ! grep -qE '>>[[:space:]]*"\$HOME/\.(bashrc|zshrc)"' "$REPO_ROOT/.profile"
+}
+
+@test "AC7: version_gte resolves after sourcing functions.sh (bash, via utils.sh)" {
+    tmph="$(mktemp -d)"
+    mkdir -p "$tmph/.dotfiles/scripts"
+    cp "$REPO_ROOT/scripts/utils.sh" "$tmph/.dotfiles/scripts/"
+    run env HOME="$tmph" bash -c ". '$REPO_ROOT/.zsh/functions.sh'; type version_gte >/dev/null && type gpr >/dev/null"
+    rm -rf "$tmph"
+    [ "$status" -eq 0 ]
+}
