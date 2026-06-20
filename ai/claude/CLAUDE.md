@@ -2,7 +2,7 @@
 
 > **First, read `AGENTS.md` at the repo root** — it is the canonical SSOT for behaviour rules across all agents (Standing Orders, Decision Hierarchy, Neural Hive, MCP usage, Operational Rules). This file (`~/.claude/CLAUDE.md` after deploy) contains only Claude Code-specific extensions on top of `AGENTS.md`.
 >
-> If `AGENTS.md` is missing from the current repo, default to the canonical version at `~/Projects/dotfiles/AGENTS.md` (Linux/macOS) or `%USERPROFILE%\Projects\dotfiles\AGENTS.md` (Windows).
+> If `AGENTS.md` is missing from the current repo, default to the canonical version at `$DOTFILES_REPO_DIR/AGENTS.md` (resolved via `machine.json` per ADR-025; falls back to `~/Projects/Workspace/dotfiles/AGENTS.md`).
 
 ## Auto-Maintenance Rules
 

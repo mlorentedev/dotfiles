@@ -815,9 +815,13 @@ fi
 
 PI_SETTINGS_SRC="$CURRENT_DIR/ai/pi/settings.json"
 PI_SETTINGS_DST="$PI_AGENT_DIR/settings.json"
-if [ -f "$PI_SETTINGS_SRC" ] && [ ! -f "$PI_SETTINGS_DST" ]; then
-    cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
-    log_success "Seeded pi settings.json to $PI_SETTINGS_DST"
+if [ -f "$PI_SETTINGS_SRC" ]; then
+    if [ -f "$PI_SETTINGS_DST" ] && cmp -s "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"; then
+        log_info "pi settings.json already in sync"
+    else
+        cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
+        log_success "Deployed pi settings.json to $PI_SETTINGS_DST"
+    fi
 fi
 
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
@@ -880,6 +884,27 @@ if command -v copilot >/dev/null 2>&1; then
     log_success "GitHub Copilot CLI configured (aliases cop/cops in .zsh/aliases.zsh)"
 else
     log_info "GitHub Copilot CLI not installed, skipping Copilot config (install via snap/apt/curl: https://docs.github.com/copilot/how-tos/copilot-cli)"
+fi
+
+# Sync .github/copilot-instructions.md from ai/copilot/ (SDD-005 parity rule).
+# The .github/ copy is what GitHub's web Copilot Chat reads; ai/copilot/ is the
+# SSOT. Setup keeps them in sync so the docs-drift test never fails.
+# The pointer banner differs: .github/ uses a markdown link [\`AGENTS.md\`](../AGENTS.md)
+# while ai/copilot/ uses a plain backticked reference. Everything else must match.
+GH_COPILOT_DST="$CURRENT_DIR/.github/copilot-instructions.md"
+AI_COPILOT_SRC="$CURRENT_DIR/ai/copilot/copilot-instructions.md"
+if [ -f "$AI_COPILOT_SRC" ]; then
+    # Strip the pointer banner (lines starting with '> ') from ai/copilot/
+    BODY=$(sed -E '/^> /d' "$AI_COPILOT_SRC")
+    # Prepend the .github/-specific pointer banner
+    GH_BANNER="> **First, read [\`AGENTS.md\`](../AGENTS.md) at the repo root** — canonical SSOT for behaviour rules across all agents (Standing Orders, Decision Hierarchy, Neural Hive Loop, MCP usage, Operational Rules). This file contains only Copilot-specific extensions on top.\n>\n> If \`AGENTS.md\` is missing from the current repo, default to the canonical version at \`\$DOTFILES_REPO_DIR/AGENTS.md\` (resolved via \`machine.json\` per ADR-025; falls back to \`~/Projects/Workspace/dotfiles/AGENTS.md\`)."
+    NEW_CONTENT="$GH_BANNER\n\n$BODY"
+    if [ -f "$GH_COPILOT_DST" ] && printf '%s' "$NEW_CONTENT" | cmp -s - "$GH_COPILOT_DST"; then
+        log_info ".github/copilot-instructions.md already in sync"
+    else
+        printf '%s' "$NEW_CONTENT" > "$GH_COPILOT_DST"
+        log_success "Synced .github/copilot-instructions.md from ai/copilot/ (with .github/ pointer banner)"
+    fi
 fi
 
 # BUG-004 + BUG-011: defense-in-depth wrapper around EVERY `claude <subcommand>`
