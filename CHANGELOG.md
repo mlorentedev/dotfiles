@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/mlorentedev/dotfiles/compare/v0.8.1...v0.9.0) (2026-06-20)
+
+
+### Features
+
+* **setup:** autostart the hive daemon via Startup folder when Task Scheduler is blocked ([#467](https://github.com/mlorentedev/dotfiles/issues/467)) ([12c8d50](https://github.com/mlorentedev/dotfiles/commit/12c8d502350d15d6262d11c5ca47f5034b7469fc))
+
 ## [0.8.1](https://github.com/mlorentedev/dotfiles/compare/v0.8.0...v0.8.1) (2026-06-20)
 
 
