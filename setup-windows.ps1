@@ -87,6 +87,23 @@ function Write-Success { param([string]$Message) Write-Host "[SUCCESS] $Message"
 function Write-Warn { param([string]$Message) Write-Host "[WARNING] $Message" -ForegroundColor Yellow }
 function Write-Err { param([string]$Message) Write-Host "[ERROR] $Message" -ForegroundColor Red }
 
+function Test-VersionAtLeast {
+    # versions.conf pins are MINIMUMS (REFACTOR-013): an install gate must
+    # upgrade when installed < pin and leave a NEWER install untouched (an
+    # exact-match `-ne` reconcile would downgrade it). Returns $true when
+    # $Installed >= $Minimum. Empty minimum -> $true (no pin); empty installed
+    # -> $false (needs install). Non-semver strings fall back to string equality
+    # so a tag that does not parse as [version] never throws.
+    param([string]$Installed, [string]$Minimum)
+    if ([string]::IsNullOrWhiteSpace($Minimum)) { return $true }
+    if ([string]::IsNullOrWhiteSpace($Installed)) { return $false }
+    try {
+        return ([version]$Installed -ge [version]$Minimum)
+    } catch {
+        return ($Installed -eq $Minimum)
+    }
+}
+
 function Ensure-Directory {
     param([string]$Path)
     if (-not (Test-Path $Path)) {
@@ -350,26 +367,26 @@ if ($wingetCmd) {
                 Write-Warn "Failed to install $($tool.Name): $_"
             }
         } elseif ($tool.ContainsKey('Version') -and $tool.Version) {
-            # REFACTOR-011: presence is not convergence. A pinned tool whose
-            # installed version drifted from versions.conf was previously
-            # skipped as "already installed", leaving healthcheck flagging
-            # version drift on every run. Converge it to the pin.
+            # REFACTOR-011/013: presence is not convergence, and the pin is a
+            # MINIMUM. A tool OLDER than the pin was skipped as "already
+            # installed"; an exact-match `-ne` reconcile would conversely
+            # DOWNGRADE a newer install. Upgrade only when installed < pin.
             $installedVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
-            if ($installedVer -ne $tool.Version) {
-                Write-Info "$($tool.Name) $installedVer drifted from pinned $($tool.Version), converging..."
+            if (-not (Test-VersionAtLeast $installedVer $tool.Version)) {
+                Write-Info "$($tool.Name) $installedVer below pinned minimum $($tool.Version), upgrading..."
                 & winget install $tool.Id --version $tool.Version --accept-package-agreements --accept-source-agreements --force 2>$null | Out-Null
                 # Re-query instead of trusting winget's exit code: when the
                 # PATH-resolved binary comes from another package manager (npm
                 # global, scoop), winget converges its own copy but the
                 # shadowing install keeps winning -- that is not convergence.
                 $postVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
-                if ($postVer -eq $tool.Version) {
-                    Write-Success "$($tool.Name) converged to $($tool.Version)"
+                if (Test-VersionAtLeast $postVer $tool.Version) {
+                    Write-Success "$($tool.Name) upgraded to $postVer (>= $($tool.Version))"
                 } else {
                     Write-Warn "$($tool.Name) still $postVer after winget install $($tool.Version): another install shadows it in PATH (e.g. npm global, scoop); converge that install instead"
                 }
             } else {
-                Write-Info "$($tool.Name) already installed (pinned $($tool.Version))"
+                Write-Info "$($tool.Name) already installed ($installedVer >= $($tool.Version))"
             }
         } else {
             Write-Info "$($tool.Name) already installed"
@@ -980,10 +997,10 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
         }
     } else {
         $yarnInstalled = (& yarn --version 2>$null | Select-Object -First 1)
-        if ($yarnVersion -and $yarnInstalled -ne $yarnVersion) {
-            Write-Info "yarn version drift (installed=$yarnInstalled pinned=$yarnVersion) - reconciling..."
+        if ($yarnVersion -and -not (Test-VersionAtLeast $yarnInstalled $yarnVersion)) {
+            Write-Info "yarn $yarnInstalled below pinned minimum $yarnVersion - upgrading..."
             & npm install -g $yarnPkg 2>$null | Out-Null
-            Write-Success "yarn reconciled to $yarnVersion"
+            Write-Success "yarn upgraded to $yarnVersion"
         } else {
             Write-Info "yarn already installed: $yarnInstalled"
         }
@@ -1021,16 +1038,17 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
             Write-Warn "pi install failed - run: npm install -g --ignore-scripts $piPkg"
         }
     } else {
-        # Check for version drift and reinstall if pinned version differs.
+        # REFACTOR-013: pin is a MINIMUM — upgrade only when installed < pin so
+        # a newer pi is never downgraded by an exact-match reconcile.
         $piVerRaw = (& pi --version 2>&1 | Out-String)
         $piCurrent = if ($piVerRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
-        if ($piVersion -and $piCurrent -and ($piCurrent -ne $piVersion)) {
-            Write-Info "pi $piCurrent drifted from pinned $piVersion; reinstalling"
+        if ($piVersion -and $piCurrent -and -not (Test-VersionAtLeast $piCurrent $piVersion)) {
+            Write-Info "pi $piCurrent below pinned minimum $piVersion; upgrading"
             & npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@$piVersion" 2>$null | Out-Null
             if (Get-Command pi -ErrorAction SilentlyContinue) {
-                Write-Success "pi reinstalled at pinned $piVersion"
+                Write-Success "pi upgraded to pinned $piVersion"
             } else {
-                Write-Warn "pi reinstall failed - run: npm install -g --ignore-scripts @earendil-works/pi-coding-agent@$piVersion"
+                Write-Warn "pi upgrade failed - run: npm install -g --ignore-scripts @earendil-works/pi-coding-agent@$piVersion"
             }
         } else {
             Write-Info "pi already installed"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/mlorentedev/dotfiles/compare/v0.9.2...v0.9.3) (2026-06-20)
+
+
+### Bug Fixes
+
+* **setup:** enforce versions.conf pins as minimums, not presence or exact match ([#480](https://github.com/mlorentedev/dotfiles/issues/480)) ([a9fdd60](https://github.com/mlorentedev/dotfiles/commit/a9fdd60f8872e6e60642806ff23577d083536913))
+
 ## [0.9.2](https://github.com/mlorentedev/dotfiles/compare/v0.9.1...v0.9.2) (2026-06-20)
 
 
