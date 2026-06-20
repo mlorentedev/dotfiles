@@ -28,12 +28,17 @@ teardown() {
     cmp -s "$SRC" "$DST"
 }
 
-@test "deploy_file: second run on unchanged source is a no-op (no log output)" {
+@test "deploy_file: second run re-deploys unconditionally (declarative always-overwrite)" {
     deploy_file "$SRC" "$DST"
     run deploy_file "$SRC" "$DST"
     [ "$status" -eq 0 ]
-    # Second run: nothing about "Deployed" in output (silent idempotency)
-    [[ "$output" != *"Deployed"* ]]
+    # Aligned with the Windows always-overwrite strategy: every run guarantees
+    # convergence and logs the deploy — there is no silent "already in sync"
+    # skip path that could mask drift. Idempotency is of *outcome*, not output.
+    [[ "$output" == *"Deployed"* ]]
+    [ -f "$DST" ]
+    [ ! -L "$DST" ]
+    cmp -s "$SRC" "$DST"
 }
 
 @test "deploy_file: source change triggers re-deploy" {
