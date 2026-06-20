@@ -172,7 +172,7 @@ gpr() {
         printf 'gpr: prompt not found at %s\n' "$prompt_file" >&2
         return 1
     fi
-    agy -i "$(cat "$prompt_file")"$'\n\n'"$*"
+    agy -i "$(< "$prompt_file")"$'\n\n'"$*"
 }
 
 # Shared utility library (log_*, version_gte, deploy_file, …). Sourced from this
@@ -180,5 +180,6 @@ gpr() {
 # ~/.profile runtime mutation that appended `source utils.sh` to the user's rc
 # files on every login (non-declarative; mutated deployed files).
 if [ -f "$HOME/.dotfiles/scripts/utils.sh" ]; then
+    # shellcheck source=/dev/null
     . "$HOME/.dotfiles/scripts/utils.sh"
 fi

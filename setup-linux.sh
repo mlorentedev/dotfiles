@@ -139,23 +139,12 @@ if [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
 fi
 
 
-# Update functions.zsh to source utils.sh if not already done
-if [ -f "$DOTFILES_DIR/.zsh/functions.zsh" ]; then
-    if ! grep -q "source.*utils.sh" "$DOTFILES_DIR/.zsh/functions.zsh"; then
-        log_info "Appending utils.sh source to existing functions.zsh..."
-        printf '\n# Source utility functions\n. %s/scripts/utils.sh\n' "$DOTFILES_DIR" >> "$DOTFILES_DIR/.zsh/functions.zsh"
-    else
-        log_info "functions.zsh already sources utils.sh, skipping"
-    fi
-else
-    log_info "Creating functions.zsh file..."
-    cat > "$DOTFILES_DIR/.zsh/functions.zsh" << EOF
-
-# Source the utils.sh script
-. "$DOTFILES_DIR/scripts/utils.sh"
-
-EOF
-fi
+# utils.sh is sourced declaratively from .zsh/functions.sh (loaded by both
+# ~/.bashrc and ~/.zshrc), so setup no longer mutates the deployed functions.zsh
+# to append a `. utils.sh` line. That deploy-time mutation made the deployed copy
+# drift from the repo source, so the check_deployed assertion below failed. One
+# shared entrypoint gives bash AND zsh the library without ever editing a
+# deployed file (REFACTOR-010 / "presence is not convergence").
 
 # Create a bash_aliases file for bash
 log_info "Creating bash_aliases file..."
