@@ -55,11 +55,14 @@ if (Get-Command opencode -ErrorAction SilentlyContinue) {
             Write-Error 'usage: dbg <consulta libre>'
             return
         }
-        $script = Join-Path $env:USERPROFILE 'Projects\dotfiles\scripts\nan-debug.sh'
+        # Resolve the repo via the ADR-025 var (rendered into paths.ps1 by
+        # `dotf env generate`, overridable in machine.json), not a hardcoded
+        # ~/Projects/dotfiles literal that breaks on a relocated clone.
+        $script = Join-Path $env:DOTFILES_REPO_DIR 'scripts\nan-debug.sh'
         if (Test-Path -LiteralPath $script) {
             bash $script ($args -join ' ')
         } else {
-            Write-Error "nan-debug.sh not found at $script"
+            Write-Error "nan-debug.sh not found at $script (check DOTFILES_REPO_DIR / run dotf env generate)"
         }
     }
 }
