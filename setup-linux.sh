@@ -694,16 +694,8 @@ if [ -f "$OPENCODE_CONFIG_SRC" ]; then
     OPENCODE_CONFIG_TMP=$(mktemp)
     cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
     substitute_env_placeholders "$OPENCODE_CONFIG_TMP"
-    if [ -f "$OPENCODE_CONFIG_DST" ] && cmp -s "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"; then
-        log_info "opencode.jsonc already in sync"
-        rm -f "$OPENCODE_CONFIG_TMP"
-    else
-        # mktemp creates the staged file at mode 600 and mv preserves it, so
-        # the deployed config inherits owner-only perms without an explicit
-        # chmod (which would also need a defensive `|| true` under set -e).
-        mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
-        log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
-    fi
+    mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
+    log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
 else
     log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
 fi

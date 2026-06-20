@@ -532,14 +532,13 @@ ensure_directory() {
     fi
 }
 
-# Deploys a file from repo source to home target with atomic + idempotent semantics.
+# Deploys a file from repo source to home target unconditionally.
 # Replaces `ln -sf` for config-deploy paths (SDD-007 IaC strategy).
 # Input: $1 - source path (must exist), $2 - target path
 # Behavior:
-#   - skips silently if cmp -s matches (idempotent: 2nd setup run is a no-op)
+#   - declarative overwrite: every run guarantees DST matches SRC
 #   - removes any existing symlink at target (drift recovery from old strategy)
 #   - writes via tempfile + mv (atomic; no partial state)
-#   - logs "Deployed" only on actual change
 # Output: returns 0 on success, 1 on error
 # Usage: deploy_file "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
 deploy_file() {
@@ -549,11 +548,6 @@ deploy_file() {
     if [[ ! -f "$src" ]]; then
         log_error "deploy_file: source missing: $src"
         return 1
-    fi
-
-    # Idempotency: regular file already matches source
-    if [[ -f "$dst" ]] && [[ ! -L "$dst" ]] && cmp -s "$src" "$dst"; then
-        return 0
     fi
 
     # Drift recovery: old strategy left a symlink here. Remove before write.
