@@ -21,11 +21,13 @@ setup() {
     grep -q 'if ! command -v opencode' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode config deploy uses reconcile-not-skip (cmp -s)" {
-    # Post-SDD-009: cmp compares the staged-substituted tmp file (not the raw
-    # source) against the deployed file, so substitution-driven content changes
-    # still trigger a redeploy without breaking idempotence.
-    grep -q 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
+@test "setup-linux.sh opencode config deploy is declarative always-overwrite (no cmp -s skip)" {
+    # fix/linux-deploy-always-overwrite: the opencode block aligns with the
+    # Windows always-overwrite strategy. The staged-substituted tmp file is
+    # moved into place on every run (substitution may have changed content);
+    # there is no "already in sync" skip path that could mask drift.
+    ! grep -q 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
+    grep -q 'mv "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh opencode deploy calls substitute_env_placeholders (SDD-009)" {
