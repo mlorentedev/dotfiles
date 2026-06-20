@@ -151,7 +151,7 @@ else
     log_info "Creating functions.zsh file..."
     cat > "$DOTFILES_DIR/.zsh/functions.zsh" << EOF
 
-# Source the utils.sh and setup-gh-secrets.sh scripts
+# Source the utils.sh script
 . "$DOTFILES_DIR/scripts/utils.sh"
 
 EOF
