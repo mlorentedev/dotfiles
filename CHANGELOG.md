@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.4](https://github.com/mlorentedev/dotfiles/compare/v0.9.3...v0.9.4) (2026-06-20)
+
+
+### Bug Fixes
+
+* **profile:** resolve nan-debug.sh via DOTFILES_REPO_DIR, not a hardcoded literal ([#482](https://github.com/mlorentedev/dotfiles/issues/482)) ([2a23355](https://github.com/mlorentedev/dotfiles/commit/2a2335562cf5a292f59a4794b911c4c596a056fc))
+* **shell:** rename gp-&gt;gpr (collision) and source utils.sh declaratively ([#484](https://github.com/mlorentedev/dotfiles/issues/484)) ([e1c0090](https://github.com/mlorentedev/dotfiles/commit/e1c00900a1dd93988020962042f51f09e98bdc35))
+
 ## [0.9.3](https://github.com/mlorentedev/dotfiles/compare/v0.9.2...v0.9.3) (2026-06-20)
 
 
