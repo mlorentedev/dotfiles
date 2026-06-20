@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2](https://github.com/mlorentedev/dotfiles/compare/v0.9.1...v0.9.2) (2026-06-20)
+
+
+### Bug Fixes
+
+* **setup:** align Linux deploy strategy with Windows always-overwrite ([#476](https://github.com/mlorentedev/dotfiles/issues/476)) ([d653db3](https://github.com/mlorentedev/dotfiles/commit/d653db30608695ada867e36803022d57aafa919b))
+* **setup:** correct Compare-Object -SyncId errors and add pi version drift check ([#474](https://github.com/mlorentedev/dotfiles/issues/474)) ([58cd9e3](https://github.com/mlorentedev/dotfiles/commit/58cd9e3389b3c735754c8dd571ee0c5a479ff3db))
+
 ## [0.9.1](https://github.com/mlorentedev/dotfiles/compare/v0.9.0...v0.9.1) (2026-06-20)
 
 
