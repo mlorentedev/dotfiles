@@ -10,7 +10,7 @@
 
 | Directory | Purpose |
 |---|---|
-| `ai/` | Per-agent configuration sources (claude, opencode, copilot, pi, agy, hermes, aider, nan) deployed by setup; thin overlays over the `AGENTS.md` SSOT |
+| `ai/` | Per-agent configuration sources (claude, opencode, copilot, pi, agy, hermes, nan) deployed by setup; thin overlays over the `AGENTS.md` SSOT |
 | `cli/` | The `dotf` Go CLI — own module (`go.mod`), own release pipeline (goreleaser). See layout below |
 | `docs/` | Build/operate knowledge: `adr/`, `runbooks/`, `troubleshooting/`, `lessons.md`, this file |
 | `git-hooks/` | Global git hooks deployed via `core.hooksPath` (GUARD-001) — the memory-sink guard (`pre-commit`) plus per-type chain dispatchers that re-exec the repo-local `.git/hooks/<type>` so local guards (gitleaks) survive |

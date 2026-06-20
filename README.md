@@ -48,27 +48,35 @@ admin needed; some changes show after an Explorer restart.
 ```text
 ├── setup-linux.sh              # Linux setup (symlinks); macOS planned
 ├── setup-windows.ps1           # Windows setup (copies)
+├── cli/                        # `dotf` Go CLI (doctor, init, env, spec) — primary user-facing tool
 ├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
 │   ├── load-secrets.sh / .ps1  # Secrets → env vars (sourced at login)
 │   ├── init-project.ps1        # Windows project scaffolder (Linux: `dotf init`)
 │   ├── healthcheck.ps1         # Windows post-setup verification (Linux: `dotf doctor`)
 │   ├── vault.sh                # Vault tooling dispatcher
-│   └── …                       # 31 more scripts (hooks, CI helpers, secret tools)
+│   └── …                       # ~50 scripts total (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets
 │   ├── env-mapping.conf        # ENV_VAR=filename mapping
 │   └── *.secret.age            # Encrypted files (tracked)
 ├── AGENTS.md                   # Cross-agent SSOT (canonical system prompt)
-├── ai/
+├── ai/                         # Per-agent config overlays (thin pointers to AGENTS.md)
 │   ├── claude/CLAUDE.md        # Claude Code extensions (pointer to AGENTS.md)
 │   ├── agy/AGY.md              # Gemini/AGY extensions (pointer to AGENTS.md)
 │   ├── copilot/                # Copilot extensions (pointer to AGENTS.md)
-│   ├── opencode/opencode.jsonc # OpenCode config (Go + OpenRouter providers + MCP)
-│   └── harness/skills/         # 31 shared AI skills (deployed by compile-harness)
+│   ├── opencode/opencode.jsonc # OpenCode config (providers + MCP)
+│   └── …                       # pi, hermes, nan
+├── harness/                    # Compiled AI-skill records (generated from the vault by compile-harness.sh)
+├── docs/                       # Docs-as-code: architecture.md, adr/, runbooks/, troubleshooting/, lessons.md
+├── specs/                      # Spec-Driven Development feature folders (+ archive/)
+├── git-hooks/                  # Global pre-commit/pre-push dispatcher (GUARD-001)
+├── systemd/                    # Linux self-update + hive timers/services
+├── windows/                    # Windows-specific assets (hive supervisor, upgrade)
+├── .github/                    # CI workflows (lint, test, spec-gate)
 ├── ssh/                        # SSH config + public key
 ├── powershell/profile.ps1      # Windows PowerShell profile
-├── tests/*.bats                # BATS test suite
-└── .zsh/                       # Zsh modules
+├── tests/                      # BATS + Pester test suite
+└── .zsh/                       # Zsh modules (aliases, functions)
 ```
 
 ## Human entrypoints
@@ -151,7 +159,7 @@ dotfiles-sync --secrets-only        # Only sync sensitive/ files
 ### Diagnostics
 
 ```bash
-hc                                  # Run healthcheck (versions, paths, symlinks, env vars)
+dotf doctor                         # Healthcheck: versions, paths, symlinks, env vars (`hc` on Windows)
 dch                                 # Drift check: repo vs ~/.dotfiles deploy dir
 profile-shell                       # Measure shell startup time (zsh default)
 profile-shell --shell bash --detail # Per-function breakdown via zprof/xtrace
