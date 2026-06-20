@@ -32,7 +32,26 @@ jobs:
       # PRs: use gh CLI directly (the action doesn't support PRs)
       - name: Add PR to project
         if: github.event_name == 'pull_request'
-        run: |
-          gh project item-add 1 --owner mlorentedev --url "${{ github.event.pull_request.html_url }}"
         env:
           GH_TOKEN: ${{ secrets.BITACORA_PAT }}
+        run: |
+          # Get the project ID
+          PROJECT_ID=$(gh api graphql -f query='
+            query { user(login: "mlorentedev") { projectV2(number: 1) { id } } }
+          ' --jq '.data.user.projectV2.id')
+          # Get the PR node ID
+          PR_NODE_ID=$(gh pr view ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} --json id --jq '.id')
+          if [ -z "$PROJECT_ID" ] || [ -z "$PR_NODE_ID" ]; then
+            echo "Failed to resolve project ID or PR node ID"
+            echo "PROJECT_ID=$PROJECT_ID PR_NODE_ID=$PR_NODE_ID"
+            exit 1
+          fi
+          # Add the PR to the project
+          gh api graphql -f query='
+            mutation($project: ID!, $contentId: ID!) {
+              addProjectV2ItemById(input: {projectId: $project, contentId: $contentId}) {
+                item { id }
+              }
+            }
+          ' -f project="$PROJECT_ID" -f contentId="$PR_NODE_ID"
