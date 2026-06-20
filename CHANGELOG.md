@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/mlorentedev/dotfiles/compare/v0.9.0...v0.9.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* **ci:** add PRs to bitácora board via gh CLI ([#470](https://github.com/mlorentedev/dotfiles/issues/470)) ([01d7bb5](https://github.com/mlorentedev/dotfiles/commit/01d7bb5e9c7c17724a3aec33f0aebb5b483262f4))
+* **ci:** rewrite add-to-project PR step with GraphQL API ([#473](https://github.com/mlorentedev/dotfiles/issues/473)) ([f2312a5](https://github.com/mlorentedev/dotfiles/commit/f2312a525a7055f7a5dcc90a6d3cf5cf6068387f))
+
 ## [0.9.0](https://github.com/mlorentedev/dotfiles/compare/v0.8.1...v0.9.0) (2026-06-20)
 
 
