@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.1](https://github.com/mlorentedev/dotfiles/compare/v0.8.0...v0.8.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* **session-start:** match Claude Code's path encoding for the memory junction ([#466](https://github.com/mlorentedev/dotfiles/issues/466)) ([298fb60](https://github.com/mlorentedev/dotfiles/commit/298fb602fe90fd1647b7f573efb88923973a59eb))
+* **setup:** install Bun on Windows so the claude-mem worker can start ([#464](https://github.com/mlorentedev/dotfiles/issues/464)) ([2785235](https://github.com/mlorentedev/dotfiles/commit/27852355ca610ff400aefb904faec5adcd82b1e2))
+
+## [0.8.0](https://github.com/mlorentedev/dotfiles/compare/v0.7.0...v0.8.0) (2026-06-19)
+
+
+### Features
+
+* **harness:** harden ADR-025 cross-machine path resolution end-to-end (HARNESS-027, [#457](https://github.com/mlorentedev/dotfiles/issues/457)) ([#458](https://github.com/mlorentedev/dotfiles/issues/458)) ([6594288](https://github.com/mlorentedev/dotfiles/commit/6594288720d4724ec33ff79c3d7ca831f31554d4))
+
+
+### Bug Fixes
+
+* **windows:** re-apply Orca Copilot hook fix idempotently (DX-006) ([#456](https://github.com/mlorentedev/dotfiles/issues/456)) ([6f045a4](https://github.com/mlorentedev/dotfiles/commit/6f045a43da42bd90d95263ec5ddd4b574bc3f6d1))
+
 ## [0.7.0](https://github.com/mlorentedev/dotfiles/compare/v0.6.0...v0.7.0) (2026-06-19)
 
 

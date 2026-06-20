@@ -844,6 +844,30 @@ if (-not $poetryCmd) {
     Write-Info "poetry already installed"
 }
 
+# Install Bun (JS runtime -- the claude-mem worker daemon requires it for bun:sqlite)
+$bunCmd = Get-Command bun -ErrorAction SilentlyContinue
+if (-not $bunCmd) {
+    Write-Info "Installing Bun..."
+    try {
+        $bunInstaller = Join-Path $env:TEMP "bun-install.ps1"
+        Invoke-RestMethod https://bun.sh/install.ps1 -OutFile $bunInstaller
+        & $bunInstaller 2>$null
+        Remove-Item -Path $bunInstaller -Force -ErrorAction SilentlyContinue
+        # Refresh PATH for current session
+        $env:PATH = "$env:USERPROFILE\.bun\bin;$env:PATH"
+        $bunCmd = Get-Command bun -ErrorAction SilentlyContinue
+        if ($bunCmd) {
+            Write-Success "Bun installed"
+        } else {
+            Write-Warn "Bun installation failed"
+        }
+    } catch {
+        Write-Warn "Failed to install Bun: $_"
+    }
+} else {
+    Write-Info "Bun already installed"
+}
+
 # ============================================================================
 # 2c. OBSIDIAN CLI (BUG-013)
 # ============================================================================

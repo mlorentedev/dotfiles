@@ -224,7 +224,11 @@ if ($VaultRoot) {
 # --- Knowledge maintenance health check ---
 function Get-EncodedProjectPath {
     param([string]$Path)
-    return $Path.Replace('\', '-').Replace(':', '').Replace('/', '-')
+    # Match Claude Code's own encoding: it replaces ':' with '-' (NOT strips it),
+    # so 'C:\...' -> 'C--...'. Stripping the colon yielded a single-dash path that
+    # never matched Claude's project dir, orphaning the junction (the auto-memory
+    # then lived in an un-linked plain dir, unbacked by vault git).
+    return $Path.Replace('\', '-').Replace(':', '-').Replace('/', '-')
 }
 
 # --- Auto-create memory junction if vault has memory/ for this project ---
