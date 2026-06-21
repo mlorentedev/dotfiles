@@ -25,11 +25,11 @@ created: "2026-06-21"
 
 ## PR-B — installer (separate PR, closes #506)
 
-- [ ] Verify the exact sops release asset + checksum filenames against the live getsops/sops v3.13.1 release (asset names confirmed in PR-A; checksum file is `sops-v{version}.checksums.txt`)
-- [ ] `dotf tools install [name]`: download asset + checksums, verify sha256, place in `~/.local/bin`, chmod; install-if-missing + upgrade-if-below-pin; offline/404 → non-fatal
-- [ ] Testable download seam (no network in tests); table-driven tests for resolve/verify/reconcile
-- [ ] Wire `dotf tools install` into setup (best-effort, non-fatal) so sops lands on machines
-- [ ] `dotf doctor` optionally reports catalog tools present/at-pin (nice-to-have)
+- [x] Verify the exact sops release asset + checksum filenames against the live getsops/sops v3.13.1 release (assets are raw binaries; checksum manifest `sops-v{version}.checksums.txt`, GNU-coreutils format). Added `Source.Checksums` to the catalog schema.
+- [x] `dotf tools install [name]`: download asset + checksums, verify sha256, place in `~/.local/bin`, chmod; install-if-missing + upgrade-if-below-pin (`decideAction`); offline/404 → command errors (setup wraps best-effort)
+- [x] Testable download seam (`Fetcher`, no network in tests); table-driven tests for resolve/verify/reconcile + live end-to-end smoke
+- [x] Wire `dotf tools install` into setup (best-effort, non-fatal) so sops lands on machines; deploy `packages.json` to `$DOTFILES_DIR` (both OSes)
+- [ ] ~~`dotf doctor` reports catalog tools present/at-pin~~ — dropped: touches `cli/internal/doctor` (parallel doctor lane's territory); not blocking #506
 
 ## Closing
 

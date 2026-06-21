@@ -11,7 +11,8 @@
           "linux": "sops-v{version}.linux.{goarch}",
           "darwin": "sops-v{version}.darwin.{goarch}",
           "windows": "sops-v{version}.{goarch}.exe"
-        }
+        },
+        "checksums": "sops-v{version}.checksums.txt"
       }
     }
   ]
