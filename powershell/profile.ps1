@@ -106,13 +106,10 @@ function project-init {
         [string]$Stack = "python"
     )
 
-    $ScriptsDir = "$env:USERPROFILE\scripts"
-    $InitScript = "$ScriptsDir\init-project.ps1"
-
-    if (Test-Path $InitScript) {
-        & $InitScript -ProjectName $ProjectName -Stack $Stack
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        dotf init $ProjectName --stack $Stack
     } else {
-        Write-Host "[ERROR] init-project.ps1 not found at $InitScript" -ForegroundColor Red
+        Write-Host "[ERROR] dotf not found on PATH." -ForegroundColor Red
         Write-Host "Run setup-windows.ps1 from your dotfiles repository first." -ForegroundColor Yellow
     }
 }
@@ -176,7 +173,7 @@ if (Get-Command eza -ErrorAction SilentlyContinue) {
 # PATH AUGMENTATION (informational - actual PATH is set by setup script)
 # ============================================================================
 # The setup-windows.ps1 script adds ~/scripts to PATH at User level.
-# This ensures init-project.ps1 and other scripts are available globally.
+# This ensures user scripts (hooks, helpers) are available globally.
 
 # ============================================================================
 # PROMPT CUSTOMIZATION (optional)

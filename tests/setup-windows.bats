@@ -124,8 +124,11 @@ setup() {
     grep -qE 'Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys init-project.ps1" {
-    grep -q 'init-project.ps1' "$PS1_SCRIPT"
+@test "setup-windows.ps1 removes retired init .ps1 orphans, does not deploy them (CLI-020)" {
+    # init-project.ps1 et al. were retired -> dotf init. setup must clean up old
+    # copies, never Copy-Item them.
+    grep -q 'init-repo-github-defaults.ps1' "$PS1_SCRIPT"
+    ! grep -qE 'Copy-Item .*init-project\.ps1' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys knowledge-crystallize.ps1" {
