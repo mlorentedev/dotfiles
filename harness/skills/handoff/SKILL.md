@@ -31,7 +31,7 @@ If in doubt, run it — a thin handoff is cheaper than a lost thread. (Mirrors t
 
 ### 1. Continuity block — `## Session Handoff` in `MEMORY.md`
 
-OVERWRITE the `## Session Handoff` section (the first section after the H1) of the project's `MEMORY.md` with these fields, in this exact order:
+Maintain exactly ONE `## Session Handoff` block with these fields, in this exact order:
 
 - `> Updated: YYYY-MM-DD`
 - `**Last task:** [what was worked on, with PR/commit refs]`
@@ -39,15 +39,36 @@ OVERWRITE the `## Session Handoff` section (the first section after the H1) of t
 - `**Open threads:** [unfinished work + who owns each, or "None"]`
 - `**Next action:** [concrete first step for the next session]`
 
-Rules: OVERWRITE entirely (never append); dense but bounded (~8 lines — handoff, not journal); convert relative dates to absolute. **End each handoff field line with two trailing spaces** (markdown hard break) so the fields render as separate lines in Obsidian, not one crammed paragraph — vault-only convention (do NOT carry trailing spaces into code repos; pre-commit strips them). **Path:** the project's auto-memory `MEMORY.md`, which is junctioned into `vault/10_projects/<repo>/memory/` — so any agent can write it. This is the only place strategic continuity prose lives (the rest of `MEMORY.md` stays index-only).
+Rules: dense but bounded (~8 lines — handoff, not journal); convert relative dates to absolute. **End each handoff field line with two trailing spaces** (markdown hard break) so the fields render as separate lines in Obsidian, not one crammed paragraph — vault-only convention (do NOT carry trailing spaces into code repos; pre-commit strips them). **Path resolution (MUST DO before writing):** The write target is `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md`. Resolve `$VAULT_PATH` via: (1) env var if set, (2) `dotf env path VAULT_PATH` if dotf is on PATH, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) **FAIL** with instructions to set it. Never hardcode a literal path. If the target directory doesn't exist, create it (`mkdir -p`).
 
-**Lifecycle (prune, don't accumulate):** there is exactly ONE `## Session Handoff` block — the first section after the H1. Overwrite it in place every time; never add a second handoff block and never stack per-session blocks. Durable context that must outlive a single session goes in its OWN named section *below* the handoff (e.g. `## Older context`), not in the handoff block.
+**Placement — cache-stable (HARNESS-029):** the block is the **LAST** section of `MEMORY.md`, *after* the stable index content. It changes every session; keeping it out of the auto-loaded KV-cache *prefix* stops it from busting the provider prompt cache on every new session. If you find it in a legacy position (e.g. the first section after the H1), relocate it to the end on this write.
+
+**Write mechanics — concurrency-safe (HARNESS-028):** `MEMORY.md` is shared and unlocked — any session, any agent, can write it. To avoid a silent last-writer-wins clobber:
+1. **Re-read `MEMORY.md` immediately before writing** — not the copy you read at session start.
+2. **Replace only the block** — match-and-replace the existing `## Session Handoff` section using your tool's scoped/string-replace edit, never a full-file overwrite. A stale match then **fails loudly** instead of silently reverting the whole file.
+3. **If the on-disk `> Updated:` marker changed** since that pre-write re-read, a concurrent session wrote the block — **merge** both sessions' threads into one block (or loud-fail then re-read), never overwrite blind.
+
+This rule generalizes to **every** process that writes `MEMORY.md` (crystallize, auto-archive, any memory dispatcher), not only the handoff.
+
+**Lifecycle (prune the block, accumulate the log):** there is exactly ONE `## Session Handoff` block — replace it in place (per the mechanics above); never add a second block or stack per-session blocks. The permanent, greppable per-session history lives in `sessions/` (step 1b), so the block stays a single latest-snapshot. Durable context that must outlive one session goes in its OWN named section *above* the handoff block (e.g. `## Older context`), keeping the volatile block last.
+
+**Memory bridge (the vault path is the SSOT):** the write target above is the **vault** path — identical for every agent. If your agent keeps a local auto-memory mirror bridged onto the vault `…/memory/` dir and that bridge is missing or broken, write the **vault** path anyway AND repair the bridge per your agent's own setup — never write only to the agent-local copy. Agents with no such mirror write the vault path directly. (The bridge's concrete mechanics are an agent-specific detail; they live in that agent's overlay, not in this SSOT.)
+
+### 1b. Session record — append-only history (`sessions/<date>-<project>-<agent>.md`)
+
+In ADDITION to the replaced-in-place continuity block (step 1), write the **full session** as a new timestamped file so nothing is lost: `MEMORY.md` keeps only the *latest* handoff; this folder is the permanent, greppable history (ADR-014 + **MEMORY-003**).
+
+- **Path:** `<project-area>/sessions/<YYYY-MM-DD>-<project>-<agent>.md` — the project's OWN vault folder (e.g. `10_projects/knowledge/sessions/`, `50_work/45-development/<sdk>/sessions/`), **never `00_meta/sessions/`** (per `feedback_sessions_in_project_folder.md`; already the convention in `ts-bridge`, `nan-video-pipeline`, `kubelab`, `iris`). Resolve the vault root via `$VAULT_PATH` — never a hardcoded literal.
+- **Content:** frontmatter (`date`, `agent`, `project`, `session_id` if the runtime exposes one, `type: session`) + the same four handoff fields as step 1, but here you MAY be fuller than the ~8-line cap — this is the journal, not the snapshot.
+- **Append-only:** one file per session. Never overwrite a prior session file; if a same-day file already exists, suffix `-2`, `-3`. (The `MEMORY.md` block is the only single-slot snapshot — replaced in place per step 1, never appended; this `sessions/` log is what accumulates. Satisfies the HARNESS-029 append-only-log requirement.)
+
+**Mechanism (never skip): Hive-first, filesystem-fallback.** Prefer Hive `vault_write`; if Hive is unavailable/slow (the failure-mode protocol in `pattern-hive-first-vault-access`), fall back to a native filesystem write to the resolved `$VAULT_PATH/.../sessions/` path + a manual `vault:` commit. The session record is **never skipped** — not for a wedged Hive, a missing junction, or a sandbox denial.
 
 ### 2. Knowledge & documentation sync (Standing Order #3 — in-session, never "later")
 
 **Vault knowledge:**
-- **Task state lives on the bitácora board, not in the vault** (ADR-018) — reconcile it in step 2b, not here. (Legacy `11-tasks.md` files are retired; the few that survive are not the source of truth, so don't tick them as if they were.)
-- Capture any non-obvious **project** lesson in the **repo's `docs/lessons.md`** (Context / Problem / Solution / Tags) — NOT a vault `90-lessons.md` (see [[pattern-knowledge-placement]]: build/operate knowledge lives in the repo). A genuinely **cross-project / methodology** lesson goes to `00_meta/` (promote to a pattern). New architectural decision -> repo `docs/adr/`; recurring cross-project pattern -> `00_meta/patterns/`.
+- **Task state lives on the bitácora board, not in the vault** (ADR-018) — reconcile it in step 2b, not here.
+- Capture any non-obvious **project** lesson in the **repo's `docs/lessons.md`** (Context / Problem / Solution / Tags). A genuinely **cross-project / methodology** lesson goes to `00_meta/` (promote to a pattern). New architectural decision -> repo `docs/adr/`; recurring cross-project pattern -> `00_meta/patterns/`.
 
 **Repo documentation (keep it reflecting the latest state):**
 - If the session changed behavior, structure, commands, public contracts, or setup, update the repo docs that describe them: `README.md` and the repo's `docs/` (ADRs, runbooks, troubleshooting) for repos on the knowledge-placement model. ADRs in this repo live in `docs/adr/`.
@@ -63,10 +84,10 @@ Every issue you touched this session must reflect reality on the board ([Project
 Quick audit of this session's issue numbers (`N1,N2,…`):
 
 ```bash
-gh project item-list 1 --owner mlorentedev --format json --limit 300 \
-  | python3 -c "import json,sys; W={N1,N2}; [print(i.get('status'),'·',i.get('content',{}).get('title','')) \
-       for i in json.load(sys.stdin)['items'] if i.get('content',{}).get('number') in W]"
+gh issue list --repo mlorentedev/dotfiles --state open --json number,title,assignees --jq '.[] | select(.number == N1 or .number == N2) | "\(.number) \(.title) assigned:\(.assignees | length)"'
 ```
+
+Or manually check each issue: `gh issue view <N> --json state,assignees,title`.
 
 Leaving an actively-worked issue in `Backlog` is the exact gap HARNESS-010 closes. Mechanics: `dotfiles/docs/runbooks/guide-bitacora-setup.md` §5.
 
@@ -86,7 +107,7 @@ Remove transient clutter before closing:
 - **Remote gone refs:** `git fetch --prune` on every repo touched. Removes stale remote-tracking refs for branches deleted upstream.
 - **Done worktrees:** any worktree whose PR is merged must be removed (`git worktree remove <path>`). If not yet merged, name it in **Open threads** with PR number.
 - **Temp / scratch files:** inspect `git status` for untracked `.bak`, `*.tmp`, scratch notes. **Never delete a file without explicit user confirmation** — list the candidates and ask; never `git clean -f`.
-- **Empty vault stubs:** if any vault file (e.g. `90-lessons.md`) is frontmatter-only with no real content, flag it (with its inbound links) and confirm before removing. Scope: only paths touched this session.
+- **Empty vault stubs:** if any vault file is frontmatter-only with no real content, flag it (with its inbound links) and confirm before removing. Scope: only paths touched this session.
 
 Scope: only repos and vault paths actually touched in this session — not a global cleanup pass.
 
@@ -98,23 +119,29 @@ If this session **wrote an ADR, closed a phase milestone, pivoted direction, or 
 
 List what the session produced: PRs (number + state), key commit hashes, files created/changed, vault entries added/ticked.
 
+**Verify before you assert (HARNESS-011):** every commit hash and PR you list must resolve — `git cat-file -e <hash>^{commit}` for each hash, `gh pr view <n>` for each PR. An artifact that does not resolve is reported as **uncommitted WIP** under Open threads, never stated as done. (A 2026-06-06 handoff claimed a commit `83c9609` that was never committed; this gate closes that false-positive.)
+
 ### 5. Next action
 
 One concrete first step for the next session — actionable, not vague ("merge #185 then build X", not "continue").
 
-### 6. Verification (preferred)
+### 6. Completion gates (verification-before-completion)
 
-Tests/lints green; nothing claimed done-when-not. If something is incomplete, it belongs in **Open threads** with its owner — report outcomes faithfully.
+- **Outcomes:** tests/lints green; nothing claimed done-when-not. Anything incomplete belongs in **Open threads** with its owner — report faithfully. (Artifact existence is gated in step 4.)
+- **Lessons delta (HARNESS-024):** if this session produced a fix, correction, or post-mortem, confirm a matching `docs/lessons.md` entry was written *this session*. If it is missing, capture it now (Standing Order #3) or name the omission in **Open threads** before completing — never let a real lesson go uncaptured. (Session-start surfaces `docs/lessons.md` staleness per touched repo; that signal lives in the session-start hook, not this skill.)
+- **Behavioral-rule → `AGENTS.md` (HARNESS-009):** if this session established a new cross-agent behavioral rule — the user corrected how the agent should work, or you recorded a new agent-memory rule (e.g. a `feedback_*.md` entry) — surface a proposed `AGENTS.md` addition (target section + bullet) as a **code block for human review**. `AGENTS.md` is the cross-agent SSOT, so never auto-apply; point to the worktree PR that would carry it. Skip entirely when no new rule was established (zero noise in clean sessions).
 
 ## Cross-OS / cross-agent notes
 
-- Step 1 targets the vault-junctioned `MEMORY.md` path, writable by every agent — so the handoff is portable today, before MEMORY-001 (the cross-agent session bridge) lands. Non-Claude agents write the same path directly.
+- Step 1 targets the vault path (`$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md`), writable by every agent. Resolve `$VAULT_PATH` per the cascade in step 1 — never assume.
 - Steps 2-6 are agent-agnostic (vault + git).
 - Path joining: never hardcode `/` or `\`; use platform-appropriate joining.
-- **If the junction/symlink is missing** (fresh machine, or Windows where the link is a junction, not a symlink): write the continuity block at the auto-memory's REAL location directly — `~/.claude/projects/<project-hash>/memory/MEMORY.md` (POSIX) or `%USERPROFILE%\.claude\projects\<project-hash>\memory\MEMORY.md` (Windows) — then (re)create the junction afterward. The continuity write must never be skipped just because the link is absent.
+- **If the target directory doesn't exist:** create it (`mkdir -p`). Do not skip the continuity write.
+- **Memory bridge (OS wrinkle):** the vault path is the SSOT (step 1). Where an agent bridges a local auto-memory mirror onto it, that bridge can be OS-specific (a Windows reparse point vs a POSIX symlink); its concrete mechanics belong to the agent's own overlay. Missing bridge → write the vault path AND repair it, per step 1.
 
 ## References
 
 - Trigger (always-on): `AGENTS.md` — "at session end, run the handoff".
-- Continuity-schema origin: the former Claude-only "Session Handoff (MANDATORY)" rule, now a pointer in `ai/claude/CLAUDE.md` (no duplication).
+- Continuity-schema origin: a former agent-specific "Session Handoff" rule, consolidated here as the cross-agent SSOT; per-agent overlays only point to it (no duplication).
 - Related: `MEMORY-001` (cross-agent session bridge), `00_meta/patterns/pattern-decision-persistence.md`, SDD-011 (the two-surface skill+trigger pattern this mirrors).
+- Hardening folded in (2026-06-20): HARNESS-011 (#271, artifact verify · step 4), HARNESS-009 (#265, rule→AGENTS.md · step 6), HARNESS-024 (#387, lessons gate · step 6), HARNESS-028 (#432, concurrency-safe write · step 1), HARNESS-029 (#452, append-log + cache-stable order · steps 1/1b), HARNESS-025 (#390, noise/signal · skip-criteria + housekeeping scope). **Coordinated edit:** any per-agent overlay that hardcodes the block position ("the first section after the H1") must change to "the last section" in the same release (HARNESS-029).
