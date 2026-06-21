@@ -14,3 +14,9 @@
 
 # Work-only, non-secret environment variable:
 # export HTTP_PROXY="http://proxy.corp.local:8080"
+
+# Unlock a passphrase-protected SSH key once per boot via a userspace ssh-agent
+# (for boxes where the OS ssh-agent service isn't available, e.g. non-admin
+# Windows). The key is reused across Git Bash sessions, so you type the
+# passphrase once. Serves Git Bash's ssh, not the Windows ssh.exe in PowerShell.
+# export DOTFILES_SSH_AGENT_KEY="$HOME/.ssh/id_ed25519"
