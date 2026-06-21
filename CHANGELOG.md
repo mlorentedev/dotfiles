@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/mlorentedev/dotfiles/compare/v0.12.0...v0.13.0) (2026-06-21)
+
+
+### Features
+
+* **doctor:** port healthcheck section 4 deployed-config checks ([#522](https://github.com/mlorentedev/dotfiles/issues/522)) ([7f9f3b6](https://github.com/mlorentedev/dotfiles/commit/7f9f3b66ad8caf47283e36c025811d5293afc484)), closes [#509](https://github.com/mlorentedev/dotfiles/issues/509)
+
 ## [0.12.0](https://github.com/mlorentedev/dotfiles/compare/v0.11.0...v0.12.0) (2026-06-21)
 
 
