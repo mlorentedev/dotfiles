@@ -25,12 +25,28 @@ created: "2026-06-21"
 
 ## PR-B — repoint callers + delete diff-check (separate PR, closes #488)
 
-- [ ] Repoint `ci.yml` (the `diff-check` invocation) → `dotf doctor`
-- [ ] Repoint `setup-linux.sh` + `setup-windows.ps1` (the `diff-check` deploy/invoke blocks) → `dotf doctor`
-- [ ] Repoint `powershell/profile.ps1` `dch` alias → `dotf doctor`
-- [ ] `git rm scripts/diff-check.sh scripts/diff-check.ps1` + their bats/Pester
-- [ ] Guard-grep clean for `diff-check`; CI green
-- [ ] (hardening) grep-guard test pinning the Go allowlist to `setup-linux.sh`'s copy block
+- [x] Repoint `ci.yml` — only stale comments referenced `diff-check` (no direct
+      invocation); generalized them. The Windows CI step still runs
+      `healthcheck.ps1`, whose §11 now SKIPs; the dotf-doctor switch is #509.
+- [x] Repoint `setup-linux.sh` + `setup-windows.ps1` — removed the
+      `setup-windows.ps1` diff-check deploy block; `setup-linux.sh` had only a
+      BUG-021 comment (cleaned). Both already invoke `dotf doctor` post-setup
+      (Linux today; Windows via #509).
+- [x] Repoint `powershell/profile.ps1` `dch` function **and** the Linux
+      `.zsh/aliases.zsh` `dch` alias → `dotf doctor` (the task list omitted the
+      Linux alias; both are now repointed). Also fixed `env-contract.json`'s
+      `DOTFILES_REPO_DIR` description.
+- [x] `git rm scripts/diff-check.sh scripts/diff-check.ps1 tests/diff-check.bats`
+      (no Pester existed for the twin).
+- [x] Guard-grep clean for `diff-check` — new `tests/setup-windows.bats`
+      "production callers no longer reference diff-check" test, scoped to the 5
+      caller files; `scripts/healthcheck.ps1` + `tests/healthcheck-ps1.bats` are
+      the lone residual, excluded and owned by #509. bats suites green
+      (setup-windows 109, setup-linux, healthcheck-ps1 36); `go test
+      ./internal/doctor/...` green.
+- [ ] (hardening, deferred) grep-guard test pinning the Go allowlist to
+      `setup-linux.sh`'s copy block — kept out of PR-B to stay atomic; tracked as
+      a follow-up on #488.
 
 ## Closing
 
