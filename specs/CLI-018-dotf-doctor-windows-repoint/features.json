@@ -1,0 +1,16 @@
+[
+  {
+    "id": "CLI-018-dotf-doctor-windows-repoint-f1",
+    "behavior": "dotf doctor runs an Orca Copilot hook (DX-006) check with all branches (skip/pass/fail) covered",
+    "verification": "go -C cli test ./internal/doctor/ -run TestCheckOrcaHook",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-018-dotf-doctor-windows-repoint-f2",
+    "behavior": "the doctor package stays green with the new check registered in the full sweep",
+    "verification": "go -C cli test ./internal/doctor/...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
