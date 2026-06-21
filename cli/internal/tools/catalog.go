@@ -34,8 +34,9 @@ type Source struct {
 	Repo string `json:"repo"`
 	// Asset maps GOOS -> a release-asset filename template. A per-OS map (not a
 	// single template) is required because release naming is irregular across OSes
-	// — e.g. sops is "sops-v{version}.linux.{goarch}" but just "sops-v{version}.exe"
-	// on Windows. Templates expand {version} and {goarch}.
+	// — e.g. sops is "sops-v{version}.linux.{goarch}" but "sops-v{version}.{goarch}.exe"
+	// on Windows (no OS token, arch before .exe). Templates expand {version} and
+	// {goarch}.
 	Asset map[string]string `json:"asset"`
 }
 

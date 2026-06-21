@@ -8,11 +8,11 @@ created: "2026-06-21"
 ## Evidence (PR-A)
 
 - [x] **Catalog parses** → `packages.json` + `tools.Load`; `TestLoad` asserts the sops entry, `TestLoad_Errors` covers missing + invalid JSON.
-- [x] **Per-OS asset resolution** → `Tool.AssetName`; `TestAssetName` covers linux/darwin (amd64+arm64), the irregular Windows `sops-v3.9.0.exe`, and an unsupported OS → "".
+- [x] **Per-OS asset resolution** → `Tool.AssetName`; `TestAssetName` covers linux/darwin (amd64+arm64), the irregular Windows `sops-v3.13.1.amd64.exe` (arch before `.exe`, no OS token), and an unsupported OS → "".
 - [x] **`dotf tools list` works** → smoke output on this Windows box:
   ```
   NAME  VERSION  PROFILE  ASSET (windows/amd64)
-  sops  3.9.0    full     sops-v3.9.0.exe
+  sops  3.13.1   full     sops-v3.13.1.amd64.exe
   ```
 - [x] **Absent-catalog error** → `dotf tools list` errors clearly when `DOTFILES_DIR/packages.json` is missing.
 

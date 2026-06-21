@@ -25,7 +25,7 @@ created: "2026-06-21"
 
 ## PR-B — installer (separate PR, closes #506)
 
-- [ ] Verify the exact sops release asset + checksum filenames against the live getsops/sops v3.9.0 release
+- [ ] Verify the exact sops release asset + checksum filenames against the live getsops/sops v3.13.1 release (asset names confirmed in PR-A; checksum file is `sops-v{version}.checksums.txt`)
 - [ ] `dotf tools install [name]`: download asset + checksums, verify sha256, place in `~/.local/bin`, chmod; install-if-missing + upgrade-if-below-pin; offline/404 → non-fatal
 - [ ] Testable download seam (no network in tests); table-driven tests for resolve/verify/reconcile
 - [ ] Wire `dotf tools install` into setup (best-effort, non-fatal) so sops lands on machines

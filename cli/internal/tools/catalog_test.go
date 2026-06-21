@@ -10,7 +10,7 @@ const sampleCatalog = `{
   "tools": [
     {
       "name": "sops",
-      "version": "3.9.0",
+      "version": "3.13.1",
       "profile": "full",
       "source": {
         "type": "github-release",
@@ -18,7 +18,7 @@ const sampleCatalog = `{
         "asset": {
           "linux": "sops-v{version}.linux.{goarch}",
           "darwin": "sops-v{version}.darwin.{goarch}",
-          "windows": "sops-v{version}.exe"
+          "windows": "sops-v{version}.{goarch}.exe"
         }
       }
     }
@@ -43,7 +43,7 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("tools = %d, want 1", len(cat.Tools))
 	}
 	got := cat.Tools[0]
-	if got.Name != "sops" || got.Version != "3.9.0" || got.Profile != "full" {
+	if got.Name != "sops" || got.Version != "3.13.1" || got.Profile != "full" {
 		t.Fatalf("unexpected tool: %+v", got)
 	}
 	if got.Source.Type != "github-release" || got.Source.Repo != "getsops/sops" {
@@ -62,21 +62,21 @@ func TestLoad_Errors(t *testing.T) {
 
 func TestAssetName(t *testing.T) {
 	tool := Tool{
-		Version: "3.9.0",
+		Version: "3.13.1",
 		Source: Source{Asset: map[string]string{
 			"linux":   "sops-v{version}.linux.{goarch}",
 			"darwin":  "sops-v{version}.darwin.{goarch}",
-			"windows": "sops-v{version}.exe",
+			"windows": "sops-v{version}.{goarch}.exe",
 		}},
 	}
 	cases := []struct {
 		goos, goarch, want string
 	}{
-		{"linux", "amd64", "sops-v3.9.0.linux.amd64"},
-		{"linux", "arm64", "sops-v3.9.0.linux.arm64"},
-		{"darwin", "arm64", "sops-v3.9.0.darwin.arm64"},
-		{"windows", "amd64", "sops-v3.9.0.exe"}, // irregular: no goos/goarch in the name
-		{"plan9", "amd64", ""},                  // unsupported OS → empty
+		{"linux", "amd64", "sops-v3.13.1.linux.amd64"},
+		{"linux", "arm64", "sops-v3.13.1.linux.arm64"},
+		{"darwin", "arm64", "sops-v3.13.1.darwin.arm64"},
+		{"windows", "amd64", "sops-v3.13.1.amd64.exe"}, // irregular: goarch before .exe, no OS token
+		{"plan9", "amd64", ""},                         // unsupported OS → empty
 	}
 	for _, tc := range cases {
 		if got := tool.AssetName(tc.goos, tc.goarch); got != tc.want {
