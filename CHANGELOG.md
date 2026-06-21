@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/mlorentedev/dotfiles/compare/v0.10.0...v0.11.0) (2026-06-21)
+
+
+### Features
+
+* **bash:** opt-in userspace ssh-agent autoload ([#507](https://github.com/mlorentedev/dotfiles/issues/507)) ([cbe1c78](https://github.com/mlorentedev/dotfiles/commit/cbe1c787d9cb735e8deba2a0c24d0485f53ac72d))
+* **tools:** declarative package catalog + dotf tools list (CLI-029 pilot) ([#508](https://github.com/mlorentedev/dotfiles/issues/508)) ([8332630](https://github.com/mlorentedev/dotfiles/commit/8332630260d9c4c8cb671f77bc09a33b985c4163))
+
+
+### Bug Fixes
+
+* **harness:** CRLF-robust refresh + reconcile skill records with vault SSOT ([#511](https://github.com/mlorentedev/dotfiles/issues/511)) ([7328965](https://github.com/mlorentedev/dotfiles/commit/7328965e6981a5a1db8c6f4b063c620367ceed30))
+
 ## [0.10.0](https://github.com/mlorentedev/dotfiles/compare/v0.9.4...v0.10.0) (2026-06-21)
 
 
