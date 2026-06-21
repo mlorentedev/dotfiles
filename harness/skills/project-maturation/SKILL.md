@@ -118,7 +118,6 @@ Use `executing-plans` skill to implement phase by phase with checkpoints.
 ### Step 6 — Crystallize
 
 After completing all phases:
-- Update vault `11-tasks.md` with completion status
 - Log lessons learned to the repo's `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]])
 - If new patterns emerged, propose for `00_meta/patterns/`
 

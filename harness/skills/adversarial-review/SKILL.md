@@ -82,6 +82,24 @@ Classify each finding:
 
 For each finding, state whether the fix belongs in **code**, **tests**, **spec artifacts** (proposal/tasks/verification), or **vault** (new ADR / pattern promotion candidate).
 
+### Reality classification — REAL / THEORETICAL / SPECULATIVE (HARNESS-004)
+
+Orthogonal to severity, tag every finding by how much *evidence* says it can actually happen — so a reviewer cannot inflate the verdict with hypotheticals, and a real past-incident risk cannot be waved off as "just theoretical":
+
+- **REAL** — a past incident, a reproduction, or a failing test demonstrates this can occur (**cite it**). The strongest class; a REAL Blocker is non-negotiable.
+- **THEORETICAL** — a concrete, plausible failure path argued from the code/spec, but never observed and not yet reproduced. Legitimate, but must be labelled as such.
+- **SPECULATIVE** — a hypothesis with weak evidence ("could maybe happen if…"). Allowed, but **never escalate a verdict on a SPECULATIVE finding alone** — surface it, or convert it into a "Question / assumption" to confirm.
+
+Rule: weight each finding by `severity × reality`. A **REAL** Blocker/Major forces FAIL / PASS-WITH-GAPS; a **SPECULATIVE** finding cannot, by itself, move the verdict below PASS. State the reality tag **and its evidence** for every finding.
+
+### Test traceability gate — named coverage or UNTESTED (HARNESS-004)
+
+For each finding, name the test that *proves* it (or proves its fix). A finding with no named test is **UNTESTED**, and that gap is itself first-class:
+
+- Cite the **named test** that exercises the finding's path — a `bats` case (`test/*.bats` → `@test "…"`), a pytest id, or a Go test func — **by name**, not "the test suite".
+- A finding with **no named covering test → mark it `UNTESTED`**. An UNTESTED Blocker/Major is **not** resolved by the implementer's claim alone; it needs a named regression test before PASS.
+- This closes the gap where `verification.md` asserts "tested" but no *named* test maps to the specific risk.
+
 ## Evaluator Rubric (quantitative — SDD-028c)
 
 Orthogonal to the Blocker/Major/Minor severity of individual findings, grade the change across **six dimensions on an A-D scale**. The severity axis answers "how bad is this specific issue"; the rubric axis answers "how solid is the change overall by dimension". Both are required.
@@ -131,9 +149,9 @@ End with a clear verdict:
 
 ### Findings
 
-| Severity | Area | Finding | Evidence | Fix location (code / tests / spec / vault) |
-|----------|------|---------|----------|---------------------------------------------|
-| Blocker  |      |         |          |                                             |
+| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
+|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
+| Blocker  | REAL    |      |         |          |                           |                                             |
 
 ### Evaluator rubric
 
@@ -152,6 +170,16 @@ PASS | PASS WITH GAPS | FAIL
 ### Recommended next steps (before archive)
 - ...
 ```
+
+### Worked example (severity × reality × test coverage)
+
+| Severity | Reality | Area | Finding | Evidence | Test | Fix location |
+|---|---|---|---|---|---|---|
+| Blocker | REAL | concurrency | Two back-to-back `/handoff` runs clobber the `## Session Handoff` block (last-writer-wins) | observed; HARNESS-028 | UNTESTED | code + tests (add `test/handoff-concurrency.bats`) |
+| Major | THEORETICAL | path-resolution | `$VAULT_PATH` unset on a fresh machine falls back to a hardcoded literal | code read of session-start; no repro | `@test "resolves VAULT_PATH via machine.json"` | tests |
+| Minor | SPECULATIVE | perf | `rglob` over a very large vault *could* be slow | none | UNTESTED | — (surface only; do not gate) |
+
+**Verdict: FAIL** — one **REAL** Blocker (concurrency) that is **UNTESTED** → needs a named regression test before it can flip to PASS. The SPECULATIVE perf finding is surfaced but does not move the verdict.
 
 ## Guardrails
 
