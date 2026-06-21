@@ -1,5 +1,5 @@
 ---
-tags: [spec, verification, templates]
+tags: [spec, verification]
 created: "2026-06-21"
 ---
 
@@ -7,36 +7,33 @@ created: "2026-06-21"
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
-
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] **profile `project-init` calls `dotf init`** → `powershell/profile.ps1` body is `dotf init $ProjectName --stack $Stack`; bats `profile.ps1 has project-init function` (powershell-profile.bats) + `profile.ps1 valid PowerShell syntax` pass.
+- [x] **setup-windows.ps1 cleans up orphans, does not deploy** → new bats `setup-windows.ps1 removes retired init .ps1 orphans, does not deploy them (CLI-020)` passes; `setup-windows.ps1 passes PSScriptAnalyzer` + `valid PowerShell syntax` pass.
+- [x] **3 `.ps1` + 2 bats deleted; ci.yml updated** → `git rm` of all five; `ci.yml` PSScriptAnalyzer list (`:55`) + bats run (`:253`) no longer reference them.
+- [x] **Parity verified (the pre-deletion gate)** → isolated `VAULT_PATH=$tmp dotf init <tmp> --stack go --skip-github` created `<VAULT>/10_projects/<repo>/{00-context.md,10-roadmap.md,memory/MEMORY.md}` and ran structure/agents/ci/stack/git/pre-commit/vault; `--skip-github` honored. Superset of the retired `.ps1` (which seeded a stale `11-tasks.md`).
+- [x] **Guard-grep clean** → no live ref to `init-(project|repo-agents|repo-github-defaults).ps1` outside the intentional cleanup list, the updated bats, and historical records.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: `bats tests/setup-windows.bats tests/powershell-profile.bats` → **all pass, exit 0** (incl. PSScriptAnalyzer + PowerShell-syntax checks for both edited scripts).
+- Manual smoke test: isolated `dotf init` run on Windows with a throwaway `VAULT_PATH` (then cleaned up) — vault entry + full scaffold produced; confirmed the Windows memory junction is (re)created by `claude-session-start.ps1` `Ensure-MemoryJunction`, so delegating it is safe.
+- No regressions: yes — full Windows bats suite green; only the deploy→cleanup assertion intentionally changed.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- **No Go change.** Parity gate came back green; `dotf init` is at/above parity on Windows, so CLI-020 stayed a pure repoint+delete.
+- **Junction delegated, not ported.** `dotf init`'s Go `linkMemory` is non-Windows by design; the eager junction the `.ps1` created is recreated every session by `Ensure-MemoryJunction`. The transient gap (no junction until the first Claude session) is harmless — a junction's only consumer is a session.
+- **`agents-spec-section.md` left untouched** despite a stale `init-repo-agents.ps1`/#380 mention: it is a vault-SSOT, drift-tested template (`cli/internal/initrepo/drift_test.go:32`). Editing only the embedded copy would trip the drift guard → fold into **#461** (template re-vendor).
 
 ## Promotion candidates
 
-Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
-
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for `docs/lessons.md`? **yes** — "first real strangler-fig deletion: a parity gate must cover *every* behavior (vault-path resolution, seeded files, OS-specific side effects like the Windows junction); a deliberately-different Go design still counts as parity when a downstream consumer reconstructs the omitted effect." (capture at archive)
+- [ ] ADR-worthy? no — executes ADR-020/021, no new decision.
+- [ ] New cross-project pattern? no — repo-specific.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-020-dotf-init-windows-repoint/` -> `specs/archive/CLI-020-dotf-init-windows-repoint/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
-- [ ] Promotions above executed (if any)
+- [ ] `proposal.md` frontmatter `status: archived`
+- [ ] Folder moved to `specs/archive/CLI-020-dotf-init-windows-repoint/`
+- [ ] Backlog: close #489 (PR link) — bitácora auto-moves to Done
+- [ ] Promotions above executed (the `docs/lessons.md` entry)

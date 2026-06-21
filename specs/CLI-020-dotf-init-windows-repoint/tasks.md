@@ -1,55 +1,40 @@
 ---
-tags: [spec, tasks, templates]
+tags: [spec, tasks]
 created: "2026-06-21"
 ---
 
 # Tasks - CLI-020-dotf-init-windows-repoint
 
-> TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
+> Repoint + delete (strangler-fig contact), not new-feature TDD. The "red" is the
+> pre-deletion parity gate; the "green" is the guard-grep oracle + CI. One task ≈
+> one focused change.
 
 ## Setup
 
-- [ ] Branch created from main: `feat/CLI-020-dotf-init-windows-repoint`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/dotf-init-windows-repoint`
+- [x] `proposal.md` complete; acceptance criteria testable
+- [x] No open questions in `proposal.md` — the parity gate is **resolved green** (empirical isolated `dotf init` run)
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+- [x] **Parity gate (pre-deletion):** isolated `VAULT_PATH=$tmp dotf init <tmp> --stack go --skip-github` — confirmed VaultPath resolves on Windows, entry at `10_projects/<repo>` with `00-context.md` + `10-roadmap.md` + `memory/MEMORY.md` (superset of, and more correct than, the `.ps1`; junction delegated to `Ensure-MemoryJunction`)
+- [x] Repoint `powershell/profile.ps1` `project-init` → `dotf init $ProjectName --stack $Stack` (was `& init-project.ps1`)
+- [x] `setup-windows.ps1`: replace the `init-project.ps1` deploy block with orphan cleanup of all 3 init `.ps1` from `$ScriptsDir`/`$ClaudeHome` (mirrors `setup-linux.sh` CLI-014)
+- [x] `tests/setup-windows.bats`: flip the deploy assertion to a cleanup assertion (no `Copy-Item init-project.ps1`)
+- [x] Delete `scripts/init-project.ps1`, `scripts/init-repo-agents.ps1`, `scripts/init-repo-github-defaults.ps1`
+- [x] Delete `tests/init-project-ps1.bats`, `tests/init-repo-github-defaults.bats`
+- [x] Remove `ci.yml` references: PSScriptAnalyzer list (`:55`) + bats run list (`:253`)
+- [x] Honesty pass on docs: `README.md` tree, `docs/runbooks/ai-tools-setup.md`, `docs/troubleshooting/ai-tools.md`, `powershell/profile.ps1` PATH comment
+- [x] Guard-grep clean for `init-(project|repo-agents|repo-github-defaults)\.ps1` (only the intentional cleanup list + updated bats + historical records remain)
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [ ] `test-windows` CI green (bats + PSScriptAnalyzer)
+- [x] No scope creep — `cli/internal/initrepo/templates/agents-spec-section.md:18` (stale `init-repo-agents.ps1`/#380 mention) **deliberately left**: it is a vault-SSOT, drift-tested template (`drift_test.go:32`); fixing it belongs to **#461** (re-vendor templates), not here
+- [ ] `verification.md` filled with evidence
+- [ ] PR opened referencing this spec folder + closing #489
 
-## Machine-readable features
+## Known residual (tracked, not this PR)
 
-This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
-
-**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
-
-Minimal `features.json` skeleton (drop into `<repo>/specs/CLI-020-dotf-init-windows-repoint/features.json`):
-
-```json
-[
-  {
-    "id": "CLI-020-dotf-init-windows-repoint-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+- `cli/internal/initrepo/templates/agents-spec-section.md:18` → fold into #461.
+- `docs/adr/adr-009-multi-agent-runtime.md:73` → historical ADR narrative (past AI-011 bootstrap event); left as audit-trail.

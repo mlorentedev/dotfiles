@@ -115,14 +115,14 @@ dotf init --help
 ## `project-init` not found (Windows)
 
 ```powershell
-# Verify init-project.ps1 was copied + the profile loaded
-Get-ChildItem "$env:USERPROFILE\scripts\init-project.ps1"
+# project-init is a profile function that calls `dotf init`; verify both
+Get-Command dotf
 type project-init
 ```
 
 **Common causes:**
 - PowerShell profile not loaded (restart PowerShell)
-- Script not copied by setup (re-run setup-windows.ps1)
+- `dotf` not installed / not on PATH (re-run setup-windows.ps1)
 
 ## Related
 

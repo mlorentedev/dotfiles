@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-020-dotf-init-windows-repoint-f1",
+    "behavior": "powershell/profile.ps1 project-init invokes dotf init (path + --stack) instead of init-project.ps1",
+    "verification": "grep -qF 'dotf init $ProjectName --stack $Stack' powershell/profile.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-020-dotf-init-windows-repoint-f2",
+    "behavior": "setup-windows.ps1 removes retired init .ps1 orphans instead of deploying init-project.ps1",
+    "verification": "sh -c \"grep -qF 'Remove-Item $initOrphan' setup-windows.ps1 && ! grep -Eq 'Copy-Item .*init-project' setup-windows.ps1\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-020-dotf-init-windows-repoint-f3",
+    "behavior": "the 3 init .ps1 and their 2 bats are deleted",
+    "verification": "sh -c 'for f in scripts/init-project.ps1 scripts/init-repo-agents.ps1 scripts/init-repo-github-defaults.ps1 tests/init-project-ps1.bats tests/init-repo-github-defaults.bats; do test ! -e \"$f\" || exit 1; done'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-020-dotf-init-windows-repoint-f4",
+    "behavior": "ci.yml no longer references the deleted init scripts/tests",
+    "verification": "sh -c '! grep -q init-project .github/workflows/ci.yml'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-020-dotf-init-windows-repoint-f5",
+    "behavior": "Windows profile + setup bats suites pass (incl. PSScriptAnalyzer + PS-syntax)",
+    "verification": "bats tests/setup-windows.bats tests/powershell-profile.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

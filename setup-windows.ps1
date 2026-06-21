@@ -1433,13 +1433,14 @@ if ($currentPath -notlike "*$ScriptsDir*") {
 
 Write-Info "Deploying scripts..."
 
-$initProjectSource = "$DotfilesDir\scripts\init-project.ps1"
-if (Test-Path $initProjectSource) {
-    Copy-Item $initProjectSource "$ScriptsDir\" -Force
-    Copy-Item $initProjectSource "$ClaudeHome\" -Force
-    Write-Success "Deployed init-project.ps1 to $ScriptsDir\ and $ClaudeHome\"
-} else {
-    Write-Warn "init-project.ps1 not found at $initProjectSource"
+# CLI-020: the init .ps1 were retired (repo scaffolding is now `dotf init`).
+# Remove any copy a prior setup left in ~/scripts or ~/.claude so they don't
+# linger as orphans (mirrors setup-linux.sh's init-project.sh cleanup, CLI-014).
+foreach ($initOrphan in @(
+        "$ScriptsDir\init-project.ps1", "$ClaudeHome\init-project.ps1",
+        "$ScriptsDir\init-repo-agents.ps1", "$ClaudeHome\init-repo-agents.ps1",
+        "$ScriptsDir\init-repo-github-defaults.ps1", "$ClaudeHome\init-repo-github-defaults.ps1")) {
+    if (Test-Path $initOrphan) { Remove-Item $initOrphan -Force -ErrorAction SilentlyContinue }
 }
 
 $crystallizeSource = "$DotfilesDir\scripts\knowledge-crystallize.ps1"

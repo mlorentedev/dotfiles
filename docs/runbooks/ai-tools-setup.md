@@ -54,12 +54,11 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 This automatically:
 - Copies `ai/claude/*` to `~/.claude/` (or `~\.claude\` on Windows)
 - Copies `ai/gemini/*` to `~/.gemini/` (or `~\.gemini\` on Windows)
-- Copies `scripts/init-project.ps1` to `~/scripts/` (Windows project scaffolder)
 - Copies `ai/skills/*` to `~/.claude/skills/` (full SKILL.md with YAML frontmatter)
 - Converts skills to `~/.gemini/prompts/` (YAML frontmatter stripped, flat markdown)
 - Registers MCP servers (user scope, available in all projects)
 - Installs Claude Code plugins
-- On Linux/macOS, repo scaffolding is `dotf init` (on PATH); Windows keeps the `project-init` function → `init-project.ps1` until #380
+- Repo scaffolding is `dotf init` (on PATH, both OSes); the Windows `project-init` function now calls `dotf init` (CLI-020)
 
 ### 2. Install AI Tools
 
@@ -239,8 +238,8 @@ The `claude-mem` plugin provides persistent memory across sessions.
 |-------|---------|----------|
 | `c` | `claude` | All |
 | `g` | `gemini` | All |
-| `dotf init` | Scaffold a new fully-practiced repo | Linux/macOS |
-| `project-init` | Windows scaffolder (-> init-project.ps1) | Windows |
+| `dotf init` | Scaffold a new fully-practiced repo | All |
+| `project-init` | Windows wrapper → `dotf init` | Windows |
 | `gp <skill> <args>` | Gemini prompt function | Linux/macOS |
 
 ## Daily Development Workflow
