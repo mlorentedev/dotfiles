@@ -46,6 +46,14 @@ setup() {
     grep -q 'Deploying versions.conf' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 deploys packages.json (CLI-029 tool catalog)" {
+    grep -q 'packages.json deployed to' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 installs catalog tools via dotf (best-effort)" {
+    grep -q 'dotf tools install' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 no longer deploys Aider configuration (sunset)" {
     ! grep -q 'Deploying Aider configuration' "$PS1_SCRIPT"
     ! grep -q 'Installing aider-chat via uv' "$PS1_SCRIPT"

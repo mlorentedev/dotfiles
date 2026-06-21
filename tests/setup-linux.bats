@@ -92,6 +92,14 @@ setup() {
     grep -qE 'safe_copy "\$CURRENT_DIR/tmux\.conf" "\$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-linux.sh copies packages.json into deploy dir (CLI-029 tool catalog)" {
+    grep -qE 'safe_copy "\$CURRENT_DIR/packages\.json" "\$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh installs catalog tools via dotf (best-effort)" {
+    grep -q 'dotf tools install' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-linux.sh deploys tmux.conf to ~/.tmux.conf via deploy_file (SDD-007)" {
     grep -qE 'deploy_file "\$DOTFILES_DIR/tmux\.conf" "\$HOME/\.tmux\.conf"' "$DOTFILES_DIR/setup-linux.sh"
 }
