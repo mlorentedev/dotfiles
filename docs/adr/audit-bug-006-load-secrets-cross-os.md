@@ -7,6 +7,15 @@ created: "2026-05-19"
 
 # BUG-006 — load-secrets cross-OS completeness audit
 
+> **SUPERSEDED (2026-06-20) by [ADR-021](adr-021-cli-orchestration-roadmap.md) §"Supersedes".**
+> The recommended remediation below — porting the missing functions to
+> `load-secrets.ps1` (the "BUG-008/009/010" parity PRs) — is **moot**. ADR-021's
+> strangler-fig converges secrets into a single cross-platform `dotf secrets`
+> noun, which **deletes** `load-secrets.ps1` rather than growing it. Adding `.ps1`
+> parity now is dual-maintenance debt the convergence will throw away. The
+> cross-OS *gap analysis* in this audit stays valid as the contract `dotf secrets`
+> must reconstruct (the Linux superset). See [AUDIT-007](audit-007-cli-convergence-state.md) PR 8.
+
 > Surfaced by [AUDIT-002](audit-002-cross-os-duplication.md) as a ratio anomaly: `load-secrets.sh` 1058 LOC vs `load-secrets.ps1` 254 LOC (0.24 ratio). Audit answers the question: is the Windows side missing features (DEFECT), or is the Linux side bloated (REFACTOR)? Generated 2026-05-19.
 
 ## TL;DR

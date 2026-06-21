@@ -124,7 +124,7 @@ Atomic PRs, ordered by ratio of (value / blast radius):
 
 ## Closing
 
-- [ ] PR-1: delete `run_pssa.ps1` (queued).
+- [x] PR-1: delete `run_pssa.ps1` — **DONE** (the orphan dev script no longer exists in the tree).
 - [ ] PR-2: rename `terminal/` → `terminals/` (deferred — triggered by adding a second emulator).
 - [ ] Tick AUDIT-001 in the project task backlog with this report's path.
 
