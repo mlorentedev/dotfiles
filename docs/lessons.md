@@ -1194,3 +1194,43 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Treat the irregularities as **catalog data**: per-OS `asset` map (already in PR-A) plus a `Source.Checksums` template, both expanded from `packages.json`. Drop the extraction step (place the raw binary, rename to the command name, chmod). Reconcile is **pin-as-minimum** (`decideAction`: install/upgrade/skip, never downgrade — REFACTOR-011/013). Verified the real chain with one live `gh release view` + an end-to-end smoke (`dotf tools install` → `sops --version` → idempotent skip), not just the hermetic `Fetcher`-seam tests.
 
 **Rule**: Before wiring a downloader for a new release source, verify the **exact** asset names, archive-vs-raw shape, and checksum-manifest filename against the **live** release (`gh release view <tag> --repo <r>`) — release naming is per-project data, never a safe convention. Keep those facts in the catalog (templates), not in installer code, so the next tool (CLI-028) is a data edit, not a code change. Hermetic seam tests prove the *logic*; only a live smoke proves the *facts*.
+
+### [2026-06-21] release-please can close a multi-PR issue from a build-only sub-PR's `Refs` — keep the parent issue out of sub-PR footers
+
+**Context**: CLI-018 was split into PR-B0 (§4 coverage port, build-only, #522) and PR-B (the deletion, tracked by #509). #522's footer deliberately said `Refs #509`, *not* `Closes`, because the deletion was not done.
+
+**Problem**: When #522 merged, release-please rolled it into the 0.13.0 release PR (#523), whose generated changelog rendered the reference as `closes #509`. Merging the release PR auto-closed #509 — the work-gate for the still-unstarted deletion vanished while `healthcheck.ps1`/`doctor.ps1` were verifiably still in `main`. Same premature-close class as #488 earlier in the convergence.
+
+**Solution**: Verified the deletion was genuinely undone (both `.ps1` present), reopened #509 with the remaining scope and a note on the cause.
+
+**Rule**: A build-only sub-PR of a multi-PR issue must not reference the parent issue in its footer *at all* — release-please aggregates any issue mention into the release's `closes` list regardless of the `Refs` vs `Closes` keyword. Reference the sub-task or nothing; reserve the issue reference for the final PR that completes it. After any release that swept a multi-PR issue, re-check that issue is still open.
+
+### [2026-06-21] `git branch --merged` answers "is the tip an ancestor?", not "is the content backed up" — verify before deleting
+
+**Context**: Housekeeping a 5-week-old orphan branch (`fix/win-sessionstart-hook-path`). `git branch --merged origin/main` would have green-lit deleting it — its single commit does not conflict with `main`.
+
+**Problem**: "Doesn't conflict" ≠ "redundant". The commit only *adds* files — 7 spec scaffolds — and 3 of them (AI-012, AI-013, WIN-003) exist nowhere in `main` (neither active `specs/` nor `specs/archive/`). `--merged` merely tests whether the branch tip is reachable from `main`, which is trivially true for a branch whose unique commit adds new files. Deleting on that signal silently loses unmerged work.
+
+**Solution**: Per-artifact verification — for each path the branch adds, confirm it is implemented (in `main`), ticketed (an issue), or specified (a spec dir, active or archived). Three scaffolds failed all three → kept the branch.
+
+**Rule**: "Safe to delete" means "all its content is backed up elsewhere", not "git says merged". Diff the branch's added content against `main` (`git log origin/main..branch`, then confirm each added path exists in main/archive/an issue) — never trust `--merged` for a delete decision.
+
+### [2026-06-21] Resolving Windows `$PROFILE` from Go must include the OneDrive-redirected Documents root
+
+**Context**: Porting healthcheck §4 (`$PROFILE` existence) into `dotf doctor`. Go has no `$PROFILE` intrinsic, so the check enumerates candidate paths.
+
+**Problem**: A naive `~\Documents\{PowerShell,WindowsPowerShell}\Microsoft.PowerShell_profile.ps1` check false-FAILs on corporate Windows, where Documents is frequently redirected to `~\OneDrive\Documents` by Known Folder Move. The profile is present; the check reports "missing".
+
+**Solution**: Enumerate `{Documents, OneDrive\Documents} × {PowerShell (pwsh 7), WindowsPowerShell (5.1)}` and PASS on any hit. Chosen over shelling out to `pwsh -Command '$PROFILE'` — pure-Go + deterministic fits the doctor's temp-tree test model and avoids a SKIP-when-pwsh-absent branch.
+
+**Rule**: Any Go (or non-PowerShell) check that reconstructs a Windows user-profile path must account for OneDrive Known Folder redirection of Documents — `%USERPROFILE%\Documents` alone is wrong on managed/corporate boxes. Enumerate both roots, or ask PowerShell for the real path.
+
+### [2026-06-21] In bats, a `! grep -q` guard is exempt from errexit — it won't fail the test when the pattern is found
+
+**Context**: A guard test asserting a retired token (`diff-check`) no longer appears in the production caller files.
+
+**Problem**: Written as `! grep -qF 'diff-check' "$file"`, the line does NOT fail the test when the token IS present. POSIX `set -e` (which bats applies inside a test body) explicitly ignores the failure of a command/pipeline negated with `!`, so the negated grep's status never trips errexit and the test passes regardless — a guard that silently never guards.
+
+**Solution**: Write the negative assertion explicitly: `if grep -qF 'diff-check' "$file"; then echo "still referenced in $file" >&2; return 1; fi`.
+
+**Rule**: Never rely on a bare `! cmd` line as a failing assertion under errexit (bats, or any `set -e` script) — `!`-negated commands are exempt from errexit. Use an explicit `if cmd; then return 1; fi`, or `run cmd` + an `$status` check.
