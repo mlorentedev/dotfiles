@@ -87,6 +87,7 @@ func Run(opts Options) (int, error) {
 		checkOpenCode(sys, cfg, rep)
 		checkHarnessDrift(sys, cfg, rep)
 		checkAntigravity(sys, rep)
+		checkOrcaHook(sys, rep)
 
 		if opts.Fix {
 			runHeals(sys, cfg, rep)
