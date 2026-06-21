@@ -44,7 +44,7 @@ AUDIT-005 (2026-05-21) classified `scripts/` (the 9-category inventory this road
 | `secrets` *(hybrid)* | Secrets: load-secrets (decrypt/map), github-secrets-manager, age-* | 1 (worst) | github-secrets-manager, age-* |
 | `sync` / `update` | Lifecycle: dotfiles-sync, dotfiles-selfupdate | 2 | — |
 | `mem` | Claude: claude-mem-heal, claude-session-start (hook → shim) | 2 | — |
-| `changelog` / `harness` | changelog-gen, compile-harness, skills-to-opencode | — | all three |
+| `harness` | compile-harness (changelog-gen retired → release-please/CLI-011; skills-to-opencode retired → `harness/skills` `targets[]` render) | — | compile-harness |
 
 ## Prioritised sequence (highest leverage first)
 
@@ -53,7 +53,7 @@ AUDIT-005 (2026-05-21) classified `scripts/` (the 9-category inventory this road
 3. **`dotf vault`** — knowledge-crystallize, obs-cli (DRIFT), vault-maintenance-weekly + vault-health. Replaces the *shell* vault-cli AUDIT-005 §5 proposed.
 4. **`dotf secrets`** — load-secrets (1058/405, the worst pair, 0.24). Hybrid: decrypt/map in Go + `eval "$(dotf secrets env)"` shim. Kills the BUG-006 critical divergence.
 5. **`dotf spec` gates** — fold check-spec-gate, check-backlog-*, check-md-escapes (sh-only) into Go; cross-platform for free.
-6. **`dotf sync` / `mem` / `changelog` / `harness`** — remaining pairs + singletons; hooks become thin shims.
+6. **`dotf sync` / `mem` / `harness`** — remaining pairs + singletons; hooks become thin shims (changelog retired to release-please, CLI-011).
 7. **`dotf setup`** *(last)* — the bootstrap orchestrator moves to Go, leaving only the curl bootstrap + install-dotf in shell.
 
 Each step is its own spec/PR (SDD), guard-grep-verified, with its twins deleted on contact, tracked in the bitácora.
