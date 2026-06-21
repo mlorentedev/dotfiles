@@ -82,6 +82,7 @@ find_vault_root() { return 1; }
 sb_vault_detect() { :; }
 sb_vault_health() { :; }
 sb_specs() { :; }
+sb_lessons_staleness() { :; }
 sb_vault_baseline() { :; }
 SESSION_BRIEF_CORE="$SCRIPT_DIR/session-brief.sh"
 if [ -f "$SESSION_BRIEF_CORE" ]; then
@@ -199,6 +200,7 @@ find_work_sdk_project() {
 if [ -d "$CWD/.git" ]; then
     detect_hive_project
     CONTEXT_LINES="$CONTEXT_LINES$(sb_specs "$CWD")"
+    CONTEXT_LINES="$CONTEXT_LINES$(sb_lessons_staleness "$CWD")"
 fi
 
 # Note: previous versions exited silently here when both VAULT_ROOT and
