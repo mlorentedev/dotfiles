@@ -14,7 +14,7 @@
     {
       "name": "DOTFILES_REPO_DIR",
       "required": false,
-      "description": "Repo source-of-truth for dotfiles (BUG-020). Distinct from DOTFILES_DIR which is the deployed copy. Used by diff-check.{sh,ps1} (REFACTOR-003) to locate the git repo; without it the script falls back to the script's parent dir (deploy location, not a repo) and exits 2.",
+      "description": "Repo source-of-truth for dotfiles (BUG-020). Distinct from DOTFILES_DIR which is the deployed copy. Used by dotf doctor (CLI-019 repo/deploy drift check) to locate the git repo; without it the drift check cannot resolve the repo root and SKIPs.",
       "default": {
         "linux": "$HOME/Projects/dotfiles",
         "windows": "$env:USERPROFILE\\Projects\\dotfiles"

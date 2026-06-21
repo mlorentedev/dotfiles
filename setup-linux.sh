@@ -1407,9 +1407,10 @@ export GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
 export AGY_HOME="${AGY_HOME:-$GEMINI_HOME/antigravity-cli}"
 export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
 export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
-# BUG-021 (2026-05-21): pre-export DOTFILES_REPO_DIR so doctor + diff-check.sh
-# (REFACTOR-003 sec 12) see it set even when the running shell's profile
-# hasn't been re-evaluated post-deploy. Mirror of the setup-windows.ps1 fix.
+# BUG-021 (2026-05-21): pre-export DOTFILES_REPO_DIR so `dotf doctor` (which
+# byte-compares the repo against the deployed copy, CLI-019) sees it set even
+# when the running shell's profile hasn't been re-evaluated post-deploy.
+# Mirror of the setup-windows.ps1 fix.
 export DOTFILES_REPO_DIR="${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"
 
 # Final consolidated diagnostics: `dotf doctor` (ADR-021, CLI-012) replaces the
