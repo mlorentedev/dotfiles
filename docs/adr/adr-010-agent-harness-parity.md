@@ -54,7 +54,7 @@ For each primitive, the matrix has one of four states per agent: ✅ portable, �
 
 **Gap 1 -- Commands / skills (Claude <-> OpenCode <-> Gemini)**
 
-- Claude -> OpenCode: closed by AI-012 (PR #43). `scripts/skills-to-opencode.sh` is the deterministic transform, CI-gated.
+- Claude -> OpenCode: closed by AI-012 (PR #43) with the `scripts/skills-to-opencode.sh` transform (since retired — the deterministic transform now lives in the `harness/skills` `targets[]` render path in setup; ADR-021).
 - Claude -> Gemini: open. Gemini prompts already exist at `~/.gemini/prompts/` (audited as 15+ files in healthcheck). A follow-up spec `AI-016-skills-to-gemini-prompts` would write the analogous `scripts/skills-to-gemini.sh` transform. Lower priority than #2 and #3 because Gemini CLI usage is sporadic in the user's workflow.
 - Claude / OpenCode -> Copilot: not pursuing. Copilot CLI is meant for shell command suggestions, not multi-step agent work. The pointer file (`copilot-instructions.md`) already covers the system-prompt side; commands have no target.
 
