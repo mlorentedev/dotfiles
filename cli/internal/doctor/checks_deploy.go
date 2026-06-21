@@ -346,10 +346,10 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	}
 }
 
-// checkHarnessDrift reproduces healthcheck section 11 MINUS the diff-check
-// (repo↔deploy drift), which the proposal defers to a future `dotf doctor`
-// mode. The harness/skill-record drift gate and the symlink-free-skills
-// invariant remain.
+// checkHarnessDrift reproduces healthcheck section 11's harness/skill-record
+// drift gate and the symlink-free-skills invariant. The repo↔deploy-dir drift
+// half of §11 (the standalone diff-check twin) is a separate section,
+// checkDeployDrift (CLI-019).
 func checkHarnessDrift(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Harness + skill drift")
 	scriptsDir := filepath.Join(cfg.DotfilesDir, "scripts")
@@ -489,4 +489,92 @@ func matchPin(rep *Report, tool, installed, pin string) {
 	default:
 		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s", tool, installed, pin))
 	}
+}
+
+// checkDeployDrift ports the standalone diff-check twin (healthcheck §11): for
+// every git-tracked file under the managed allowlist, byte-compare the repo copy
+// against the deployed ~/.dotfiles copy. Drift means the repo was edited without
+// re-running setup, so every shell still reads the stale deploy-dir copy. A
+// missing repo / deploy-dir / non-git repo is a SKIP (the shell twin's exit 2),
+// because `dotf doctor` legitimately runs where one side is absent (CI, fresh box).
+func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
+	rep.Section("Repo↔deploy-dir drift")
+
+	repo := resolveRepoDir(sys)
+	if repo == "" {
+		rep.Skip("repo not found — set DOTFILES_REPO_DIR or run from a checkout")
+		return
+	}
+	deploy := cfg.DotfilesDir
+	if !isDir(deploy) {
+		rep.Skip("deploy-dir absent: " + deploy + " (run setup)")
+		return
+	}
+	if !isDir(filepath.Join(repo, ".git")) {
+		rep.Skip("not a git repo: " + repo)
+		return
+	}
+
+	out, err := sys.CommandOutput("git", "-C", repo, "ls-files")
+	if err != nil {
+		rep.Warn("git ls-files failed in " + repo + ": " + err.Error())
+		return
+	}
+
+	drift, checked := 0, 0
+	for _, rel := range strings.Split(out, "\n") {
+		rel = strings.TrimSpace(rel)
+		if rel == "" || !isManagedDeployPath(rel) {
+			continue
+		}
+		repoFile := filepath.Join(repo, filepath.FromSlash(rel))
+		deployFile := filepath.Join(deploy, filepath.FromSlash(rel))
+		// Compare only files present on BOTH sides — a repo file not yet deployed
+		// (or a deploy-only leftover) is not "drift", matching diff-check's
+		// existence guards.
+		if !pathExists(repoFile) || !pathExists(deployFile) {
+			continue
+		}
+		checked++
+		if !filesEqual(repoFile, deployFile) {
+			rep.Fail("drift: " + rel + " — repo differs from deploy-dir (run setup to refresh ~/.dotfiles)")
+			drift++
+		}
+	}
+	if drift == 0 {
+		rep.Pass(fmt.Sprintf("repo and deploy-dir agree (%d managed files checked)", checked))
+	}
+}
+
+// resolveRepoDir locates the dotfiles checkout: DOTFILES_REPO_DIR when it points
+// at a real directory, else the git root walked up from the current directory.
+// "" means neither resolved (caller SKIPs). The shell twin used
+// DOTFILES_REPO_DIR → parent-of-script; Go has no script dir, so it walks up.
+func resolveRepoDir(sys *System) string {
+	if r := sys.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
+		return r
+	}
+	if wd, err := os.Getwd(); err == nil {
+		if root, err := findRepoRoot(wd); err == nil {
+			return root
+		}
+	}
+	return ""
+}
+
+// isManagedDeployPath reports whether a git-tracked repo path is one setup copies
+// into the deploy-dir. It MUST mirror the copy block in setup-linux.sh (and the
+// Windows guards in setup-windows.ps1); diff-check kept them in sync by comment,
+// and this port inherits that coupling (CLI-019 follow-up: a grep-guard test).
+func isManagedDeployPath(rel string) bool {
+	switch rel {
+	case "versions.conf", ".zshrc", ".bashrc", ".profile", ".gitconfig", "tmux.conf":
+		return true
+	}
+	for _, prefix := range []string{".zsh/", "ssh/", "scripts/", "sensitive/"} {
+		if strings.HasPrefix(rel, prefix) {
+			return true
+		}
+	}
+	return false
 }
