@@ -319,6 +319,18 @@ if (Test-Path $versionsSource) {
     Write-Warn "versions.conf not found at $versionsSource"
 }
 
+# packages.json (CLI-029): the declarative tool catalog `dotf tools` consumes.
+# Deploy it beside versions.conf so `dotf tools list` / `install` resolve it from
+# $DOTFILES_DIR on this machine, not just from a repo checkout.
+$packagesSource = "$DotfilesDir\packages.json"
+if (Test-Path $packagesSource) {
+    Ensure-Directory $DotfilesDest
+    Copy-Item $packagesSource "$DotfilesDest\" -Force
+    Write-Success "packages.json deployed to $DotfilesDest\"
+} else {
+    Write-Warn "packages.json not found at $packagesSource"
+}
+
 # ============================================================================
 # 1c. DEVELOPER TOOLS (via winget)
 # ============================================================================
@@ -531,6 +543,19 @@ if (Test-Path $installDotfScript) {
     }
 } else {
     Write-Warn "scripts\install-dotf.ps1 not found; skipping dotf install"
+}
+
+# Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
+# tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
+# as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
+# offline box or a single failed download must not abort setup (parity with the
+# Install-Dotf warning above). Guarded on dotf being on PATH, mirroring the env
+# blocks below.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    dotf tools install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf tools install failed (continuing; re-run 'dotf tools install')"
+    }
 }
 
 # Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised

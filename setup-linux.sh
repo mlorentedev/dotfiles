@@ -43,6 +43,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     # Copy files to the dotfiles directory
     log_info "Copying files from $CURRENT_DIR to $DOTFILES_DIR..."
     safe_copy "$CURRENT_DIR/versions.conf" "$DOTFILES_DIR/" 2>/dev/null || true
+    safe_copy "$CURRENT_DIR/packages.json" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/mcp-servers.json" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.zshrc" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.profile" "$DOTFILES_DIR/" 2>/dev/null || true
@@ -262,6 +263,16 @@ if [ -f ./scripts/install-dotf.sh ]; then
     install_dotf || log_warning "dotf installation failed (continuing; see healthcheck)"
 else
     log_warning "scripts/install-dotf.sh not found; skipping dotf install"
+fi
+
+# Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
+# tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
+# as install_dotf, driven by data instead of a per-OS install block. Best-effort:
+# an offline box or a single failed download must never abort setup (parity with the
+# `install_dotf || log_warning` line above). Needs dotf on PATH (installed just
+# above; ~/.local/bin was exported into PATH earlier in this script).
+if command -v dotf >/dev/null 2>&1; then
+    dotf tools install || log_warning "dotf tools install failed (continuing; re-run 'dotf tools install')"
 fi
 
 # GUARD-001 memory-sink dispatcher (#398/#418): deploy git-hooks/ into the

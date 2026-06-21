@@ -1184,3 +1184,13 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Shadow `jq` with a CR-stripping wrapper that preserves the real exit status (`return ${PIPESTATUS[0]}`, so `jq -e` truthiness still works); verify the binary with `type -P jq`, not the function. (PR #511; to be superseded by the Go port CLI-026.)
 
 **Rule**: Shell engines that read tool output into loops via process substitution must strip `\r` — the `$(...)` CRLF-strip is a Git-Bash illusion that does NOT extend to `< <(...)`+read. And: a `vault → records → deploy` pipeline has two drift axes — cover BOTH (records↔deploy = CLI-019/#488; vault↔records = CLI-026 `check --against-vault`), or one half drifts silently.
+
+### [2026-06-21] Catalog installer: release naming is per-repo data, not a convention (CLI-029)
+
+**Context**: `dotf tools install` (the declarative `packages.json` catalog's installer) reuses the `install-dotf` download→checksum→place pattern, generalised from one CLI to any github-release tool. First tool: sops.
+
+**Problem**: Two assumptions baked into `install-dotf` do NOT generalise. (1) **Archive shape**: `install-dotf` extracts `dotf` from a `.tar.gz`/`.zip`; sops ships **raw binaries** (`sops-v3.13.1.linux.amd64` is the executable itself), so an extraction step would fail. (2) **Checksum filename**: `dotf` ships `checksums.txt`; sops ships `sops-v3.13.1.checksums.txt`. A hardcoded name (or a single asset template) silently 404s or mis-resolves. Both only surface against the *live* release — a unit test over a fixture happily passes a wrong assumption.
+
+**Solution**: Treat the irregularities as **catalog data**: per-OS `asset` map (already in PR-A) plus a `Source.Checksums` template, both expanded from `packages.json`. Drop the extraction step (place the raw binary, rename to the command name, chmod). Reconcile is **pin-as-minimum** (`decideAction`: install/upgrade/skip, never downgrade — REFACTOR-011/013). Verified the real chain with one live `gh release view` + an end-to-end smoke (`dotf tools install` → `sops --version` → idempotent skip), not just the hermetic `Fetcher`-seam tests.
+
+**Rule**: Before wiring a downloader for a new release source, verify the **exact** asset names, archive-vs-raw shape, and checksum-manifest filename against the **live** release (`gh release view <tag> --repo <r>`) — release naming is per-project data, never a safe convention. Keep those facts in the catalog (templates), not in installer code, so the next tool (CLI-028) is a data edit, not a code change. Hermetic seam tests prove the *logic*; only a live smoke proves the *facts*.

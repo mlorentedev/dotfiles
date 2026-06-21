@@ -3,14 +3,28 @@
     "id": "CLI-029-dotf-tools-catalog-f1",
     "behavior": "packages.json parses and Tool.AssetName resolves per-OS assets (incl. sops's irregular Windows name) with errors on missing/invalid catalog",
     "verification": "go -C cli test ./internal/tools/...",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestLoad, TestLoad_Errors, TestAssetName (PR-A #508 merged)"
   },
   {
     "id": "CLI-029-dotf-tools-catalog-f2",
     "behavior": "dotf tools list prints the catalog with the current-OS asset",
     "verification": "go -C cli test ./internal/cmd/ -run TestTools",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestToolsList, TestToolsList_MissingCatalog (PR-A #508 merged)"
+  },
+  {
+    "id": "CLI-029-dotf-tools-catalog-f3",
+    "behavior": "dotf tools install downloads the pinned release asset, verifies its sha256 against the release checksums, and places it in ~/.local/bin; reconcile is pin-as-minimum (install/upgrade/skip, never downgrade); a checksum mismatch or download failure leaves Dest untouched",
+    "verification": "go -C cli test ./internal/tools/... -run TestInstall; go -C cli test ./internal/tools/... -run TestDecideAction",
+    "state": "passing",
+    "evidence": "TestInstall_{Fresh,ChecksumMismatch,MissingChecksumEntry,DownloadFailure,UnsupportedOS,SkipWhenAtOrAbovePin,UpgradeWhenBelowPin,WindowsBinaryName}, TestDecideAction; live smoke: sops 3.13.1 installed + skip on re-run"
+  },
+  {
+    "id": "CLI-029-dotf-tools-catalog-f4",
+    "behavior": "dotf tools install [name] selects all/one catalog tool, installs best-effort (aggregate failures, exit non-zero if any failed), and errors clearly on an unknown tool or absent packages.json; setup deploys packages.json and invokes the installer non-fatally",
+    "verification": "go -C cli test ./internal/cmd/ -run 'TestRunToolsInstall|TestToolsInstall'",
+    "state": "passing",
+    "evidence": "TestRunToolsInstall_{All,UnknownTool,AggregatesFailure}, TestToolsInstall_MissingCatalog; setup-linux.sh + setup-windows.ps1 wired (shellcheck/PS-parse clean)"
   }
 ]

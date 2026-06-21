@@ -19,7 +19,8 @@ const sampleCatalog = `{
           "linux": "sops-v{version}.linux.{goarch}",
           "darwin": "sops-v{version}.darwin.{goarch}",
           "windows": "sops-v{version}.{goarch}.exe"
-        }
+        },
+        "checksums": "sops-v{version}.checksums.txt"
       }
     }
   ]
@@ -48,6 +49,19 @@ func TestLoad(t *testing.T) {
 	}
 	if got.Source.Type != "github-release" || got.Source.Repo != "getsops/sops" {
 		t.Fatalf("unexpected source: %+v", got.Source)
+	}
+	if got.Source.Checksums != "sops-v{version}.checksums.txt" {
+		t.Fatalf("unexpected checksums template: %q", got.Source.Checksums)
+	}
+}
+
+func TestChecksumsName(t *testing.T) {
+	tool := Tool{Version: "3.13.1", Source: Source{Checksums: "sops-v{version}.checksums.txt"}}
+	if got, want := tool.ChecksumsName("amd64"), "sops-v3.13.1.checksums.txt"; got != want {
+		t.Errorf("ChecksumsName = %q, want %q", got, want)
+	}
+	if got := (Tool{Version: "1.0.0"}).ChecksumsName("amd64"); got != "" {
+		t.Errorf("ChecksumsName with no template = %q, want empty", got)
 	}
 }
 

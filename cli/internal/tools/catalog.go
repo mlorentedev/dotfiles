@@ -38,6 +38,12 @@ type Source struct {
 	// on Windows (no OS token, arch before .exe). Templates expand {version} and
 	// {goarch}.
 	Asset map[string]string `json:"asset"`
+	// Checksums is the release's sha256 manifest filename — a SINGLE file covering
+	// every OS asset (so no per-OS map). The name is per-repo: dotf ships
+	// "checksums.txt" but sops ships "sops-v{version}.checksums.txt". Templates
+	// expand {version}. The installer (CLI-029 PR-B) downloads it and verifies the
+	// fetched asset against its entry.
+	Checksums string `json:"checksums"`
 }
 
 // Load reads and parses the catalog at path.
@@ -60,5 +66,21 @@ func (t Tool) AssetName(goos, goarch string) string {
 	if !ok {
 		return ""
 	}
+	return t.expand(tmpl, goarch)
+}
+
+// ChecksumsName resolves the sha256-manifest filename, or "" when the catalog
+// declares none. {goarch} is accepted for symmetry but checksum manifests are
+// arch-agnostic, so it is rarely present.
+func (t Tool) ChecksumsName(goarch string) string {
+	if t.Source.Checksums == "" {
+		return ""
+	}
+	return t.expand(t.Source.Checksums, goarch)
+}
+
+// expand fills the {version}/{goarch} placeholders shared by the asset and
+// checksum templates.
+func (t Tool) expand(tmpl, goarch string) string {
 	return strings.NewReplacer("{version}", t.Version, "{goarch}", goarch).Replace(tmpl)
 }
