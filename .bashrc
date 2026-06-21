@@ -184,24 +184,3 @@ export PATH="$HOME/.dotfiles/scripts:$PATH"
 # can override anything above. NON-SENSITIVE config only; secrets use the age
 # system (sensitive/*.secret.age). See .bashrc.local.example. (gitignored)
 [ -r "$HOME/.bashrc.local" ] && [ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"
-
-# ==========================
-#    SSH AGENT (userspace, opt-in)
-# ==========================
-# Unlock a passphrase-protected key once per boot via a userspace ssh-agent,
-# reused across interactive Git Bash sessions. For boxes where the OS ssh-agent
-# isn't usable (e.g. non-admin Windows: the ssh-agent service is admin-gated).
-# Opt-in: set DOTFILES_SSH_AGENT_KEY in ~/.bashrc.local (sourced just above).
-# Serves Git Bash's ssh, NOT the Windows ssh.exe used by PowerShell.
-if [ -n "${DOTFILES_SSH_AGENT_KEY:-}" ] && [ -f "${DOTFILES_SSH_AGENT_KEY}" ]; then
-    _agent_env="$HOME/.ssh/agent.env"
-    [ -f "$_agent_env" ] && . "$_agent_env" >/dev/null
-    ssh-add -l >/dev/null 2>&1; _agent_state=$?   # 0=has keys 1=no keys 2=no agent
-    if [ "$_agent_state" -eq 2 ]; then
-        (umask 077; ssh-agent -s >"$_agent_env"); . "$_agent_env" >/dev/null
-        ssh-add "${DOTFILES_SSH_AGENT_KEY}"
-    elif [ "$_agent_state" -eq 1 ]; then
-        ssh-add "${DOTFILES_SSH_AGENT_KEY}"
-    fi
-    unset _agent_env _agent_state
-fi

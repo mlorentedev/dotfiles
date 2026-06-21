@@ -17,6 +17,20 @@
 
 # Unlock a passphrase-protected SSH key once per boot via a userspace ssh-agent
 # (for boxes where the OS ssh-agent service isn't available, e.g. non-admin
-# Windows). The key is reused across Git Bash sessions, so you type the
-# passphrase once. Serves Git Bash's ssh, not the Windows ssh.exe in PowerShell.
-# export DOTFILES_SSH_AGENT_KEY="$HOME/.ssh/id_ed25519"
+# Windows where the ssh-agent service is admin-gated). The key is reused across
+# Git Bash sessions, so you type the passphrase once per boot. Serves Git Bash's
+# ssh, not the Windows ssh.exe in PowerShell. Uncomment to enable on this box:
+# _ssh_key="$HOME/.ssh/id_ed25519"
+# if [ -f "$_ssh_key" ]; then
+#     _agent_env="$HOME/.ssh/agent.env"
+#     [ -f "$_agent_env" ] && . "$_agent_env" >/dev/null
+#     ssh-add -l >/dev/null 2>&1; _state=$?      # 0=has keys 1=no keys 2=no agent
+#     if [ "$_state" -eq 2 ]; then
+#         (umask 077; ssh-agent -s >"$_agent_env"); . "$_agent_env" >/dev/null
+#         ssh-add "$_ssh_key"
+#     elif [ "$_state" -eq 1 ]; then
+#         ssh-add "$_ssh_key"
+#     fi
+#     unset _agent_env _state
+# fi
+# unset _ssh_key
