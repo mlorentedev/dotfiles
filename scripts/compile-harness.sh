@@ -64,9 +64,20 @@ RECORD_DIR="$REPO_ROOT/harness/enforced"
 VAULT_PATH="${VAULT_PATH:-$HOME/Projects/knowledge}"
 
 require_tools() {
-    command -v jq >/dev/null 2>&1 || { printf '[ERROR] jq is required\n' >&2; exit 2; }
+    type -P jq >/dev/null 2>&1 || { printf '[ERROR] jq is required\n' >&2; exit 2; }
     [ -f "$MANIFEST" ] || { printf '[ERROR] manifest not found: %s (run from the repo or a complete deploy)\n' "$MANIFEST" >&2; exit 2; }
 }
+
+# The winget Windows build of jq emits CRLF line terminators (even for a single
+# value). MSYS command-substitution `$(jq …)` silently strips the trailing CRLF,
+# but `read`/`mapfile`/`for` fed via `< <(jq …)` keep the bare `\r` in the last
+# field — which broke slug/path matching on Windows (the "section not found"
+# refresh failure). Shadow `jq` with a CR-stripping wrapper so every call yields
+# LF output regardless of platform, while preserving jq's own exit status
+# (PIPESTATUS[0]) so `jq -e` truthiness checks keep working. `require_tools` uses
+# `type -P` above to verify the real binary, not this function. (Superseded once
+# CLI-026 ports the engine to Go.)
+jq() { command jq "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
 
 # --- helpers ---
 

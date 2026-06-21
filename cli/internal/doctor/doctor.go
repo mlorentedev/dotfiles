@@ -86,6 +86,7 @@ func Run(opts Options) (int, error) {
 		checkTmux(sys, cfg, rep)
 		checkOpenCode(sys, cfg, rep)
 		checkHarnessDrift(sys, cfg, rep)
+		checkDeployDrift(sys, cfg, rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep)
 

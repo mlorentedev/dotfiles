@@ -72,6 +72,8 @@ digraph tdd_cycle {
 
 Write one minimal test showing what should happen.
 
+> For the per-language mechanics of writing that test (pytest/Go testing/vitest/Rust — parametrization, fixtures, mocks, edge-case checklist), see the `test` skill. TDD owns the *discipline* (test-first); `test` owns the *generation mechanics*.
+
 <Good>
 ```typescript
 test('retries failed operations 3 times', async () => {

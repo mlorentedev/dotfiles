@@ -1,6 +1,6 @@
 ---
 name: agent-lifecycle
-description: "Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery, vault integration, config optimization, cronjob scheduling, and container deployment. Absorbs agent-bootstrap, hermes-config-optimization, cronjob-management, and hermes-vault-integration."
+description: "Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery, vault integration, config optimization, cronjob scheduling, and container deployment. Absorbs agent-bootstrap, agent-config-optimization, cronjob-management, and vault-integration (the standalone agent-config-optimization skill is retired into this skill's Section 3)."
 version: 1.0.0
 platforms: [linux]
 metadata:
@@ -47,7 +47,7 @@ Every agent should maintain these files under `80_agents/<agent-name>/`:
 3. **Restore skills** — Read `skills.md`, re-create each custom skill via skill_manage(create)
 4. **Restore cron jobs** — Read `cronjobs.md`, re-create each job via cronjob(action='create')
 5. **Restore config** — Read `config.md`, apply model/provider/toolsets/gateway config
-6. **Context recovery** — Browse `sessions/`, read `11-tasks.md`, resume operations
+6. **Context recovery** — Browse `sessions/`, check bitácora GitHub Project for active issues, resume operations
 
 ### Validation Script
 
@@ -165,17 +165,23 @@ When the user wants to tune or optimize Hermes Agent configuration.
 - `sessions.retention_days` — increase from 90 to 180
 - `checkpoints.enabled` — enable for rollback capability
 
+Additional tunables worth knowing: `compression.hygiene_hard_message_limit` (raise to ~800), `tool_output.max_lines` (2000 → 4000+), and the resilience guardrail `tool_loop_guardrails.hard_stop_after.same_tool_failure` (8 → 12).
+
 ### Important Notes
 - **Changes require session restart** — `/restart` (gateway) or exit/re-enter (CLI). Changes do NOT apply mid-conversation.
+- **The `hermes` binary is not on PATH** — it lives at `/opt/hermes/.venv/bin/hermes`. Use the full path or activate the venv.
 - **Don't set context_length above model's max** — the model will silently truncate.
 - **Higher tool_output limits = more tokens consumed** — balance with context_length.
-- **Always configure a fallback_model.** Set `fallback_model.provider` and `fallback_model.model` so the agent has a backup.
-- **MCP server env vars need explicit PATH.** When configuring MCP servers, add `env: { PATH: /root/.local/bin:/usr/local/bin:/usr/bin:/bin }` and any required config vars.
-- **SSOT sync rule is non-negotiable.** Every runtime change must be synced to the vault in the same session.
-- **Prefer consolidating in existing files.** Don't create separate config files — put optimization values in `13-config.md` under a section.
+- **Always configure a fallback_model.** Set `fallback_model.provider` and `fallback_model.model` so the agent has a backup if the primary provider goes down.
+- **MCP server env vars need explicit PATH.** When configuring MCP servers, add `env: { PATH: /root/.local/bin:/usr/local/bin:/usr/bin:/bin }` and any required config vars (e.g. `HIVE_VAULT_PATH`).
+- **SSOT sync rule is non-negotiable.** Every runtime change must be synced to the vault in the same session — the `agent-vault-sync` skill lists all update triggers; the 4h auto-sync cron only catches misses, it is not the rule.
+- **Prefer consolidating in existing files.** Put optimization values in `13-config.md` under a section. **Do NOT create a separate `config-backup.yaml`** — it drifts from the live config. Use `13-config.md` with a "Restore from This File" section holding the exact `hermes config set` commands for each changed parameter; keep a raw YAML copy only if the user explicitly asks for a fast-restore artifact.
+- **Report bugs, don't work around them.** If a tool has an API issue (wrong params, missing feature), file a GitHub issue with the exact test + error instead of patching around it.
+- **Verify with BOTH `hermes config show` AND a Python `yaml` script** that prints every changed param at once — the CLI output is a summary; the full dump catches edge cases.
 
 ### See also
 - `references/reasoning-effort-per-provider.md` — Per-provider reasoning effort value mappings
+- `agent-vault-sync` skill — the full table of runtime→vault update triggers
 
 ---
 

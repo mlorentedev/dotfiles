@@ -7,6 +7,8 @@ description: Use when creating tests for functions, classes, or modules. Covers 
 
 Generate complete test file ready to run.
 
+> **Boundary vs `test-driven-development`:** this skill *generates* tests for code that already exists (coverage after the fact). If you are *implementing* a feature or fixing a bug, use `test-driven-development` instead — it writes the failing test FIRST and drives the code. Same multi-language mechanics (below); different moment in the loop.
+
 ## Coverage Requirements
 
 - **Edge cases:** Empty inputs, nil/null, boundary values, zero, negative

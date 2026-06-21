@@ -35,12 +35,13 @@ vault_search(project="_meta", query="<keyword>", scope="patterns")
 ```
 
 If Hive is unavailable, fall back to a file search against your local vault
-clone. The clone path is environment-specific, so resolve it from your
-environment instead of hardcoding it (`$VAULT_PATH` on Manu's workstations,
-defaulting to `~/Projects/knowledge`; `$HERMES_VAULT_PATH` on the Hermes box):
+clone. Resolve the path via: (1) `$VAULT_PATH` env var, (2) `dotf env path VAULT_PATH`,
+(3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`. **Never hardcode a literal path.**
+If none resolve, ask the user for the vault path:
 
 ```bash
-grep -rli "<keyword>" "${VAULT_PATH:-$HOME/Projects/knowledge}/00_meta/patterns/" 2>/dev/null
+VAULT_PATH="${VAULT_PATH:-$(dotf env path VAULT_PATH 2>/dev/null || grep -o '"VAULT_PATH": *"[^"]*"' ~/.config/dotfiles/machine.json 2>/dev/null | cut -d'"' -f4)}"
+grep -rli "<keyword>" "${VAULT_PATH}/00_meta/patterns/" 2>/dev/null
 ```
 
 ### Step 2 — Match and load

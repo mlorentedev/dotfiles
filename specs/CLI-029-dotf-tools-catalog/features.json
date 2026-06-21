@@ -1,0 +1,16 @@
+[
+  {
+    "id": "CLI-029-dotf-tools-catalog-f1",
+    "behavior": "packages.json parses and Tool.AssetName resolves per-OS assets (incl. sops's irregular Windows name) with errors on missing/invalid catalog",
+    "verification": "go -C cli test ./internal/tools/...",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-029-dotf-tools-catalog-f2",
+    "behavior": "dotf tools list prints the catalog with the current-OS asset",
+    "verification": "go -C cli test ./internal/cmd/ -run TestTools",
+    "state": "pending",
+    "evidence": ""
+  }
+]
