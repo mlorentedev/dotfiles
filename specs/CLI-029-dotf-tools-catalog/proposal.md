@@ -37,11 +37,11 @@ Two PRs under #506:
 
 ```json
 { "tools": [ {
-  "name": "sops", "version": "3.9.0", "profile": "full",
+  "name": "sops", "version": "3.13.1", "profile": "full",
   "source": { "type": "github-release", "repo": "getsops/sops",
     "asset": { "linux": "sops-v{version}.linux.{goarch}",
                "darwin": "sops-v{version}.darwin.{goarch}",
-               "windows": "sops-v{version}.exe" } } } ] }
+               "windows": "sops-v{version}.{goarch}.exe" } } } ] }
 ```
 
 **Design refinement (pre-flight materialized):** the approved single-template `asset` was changed to a **per-OS map**. Release naming is irregular — sops is `sops-v{version}.linux.{goarch}` but just `sops-v{version}.exe` on Windows (no OS/arch in the name). A single template cannot express both; the map can. Same concept, correct detail.

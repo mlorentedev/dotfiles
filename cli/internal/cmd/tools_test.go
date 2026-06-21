@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-const testCatalog = `{"tools":[{"name":"sops","version":"3.9.0","profile":"full",` +
+const testCatalog = `{"tools":[{"name":"sops","version":"3.13.1","profile":"full",` +
 	`"source":{"type":"github-release","repo":"getsops/sops","asset":{` +
 	`"linux":"sops-v{version}.linux.{goarch}","darwin":"sops-v{version}.darwin.{goarch}",` +
-	`"windows":"sops-v{version}.exe"}}}]}`
+	`"windows":"sops-v{version}.{goarch}.exe"}}}]}`
 
 func TestToolsList(t *testing.T) {
 	dir := t.TempDir()
@@ -23,7 +23,7 @@ func TestToolsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tools list: %v", err)
 	}
-	for _, want := range []string{"sops", "3.9.0", "full"} {
+	for _, want := range []string{"sops", "3.13.1", "full"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("output missing %q\n%s", want, stdout)
 		}

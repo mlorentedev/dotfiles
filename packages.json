@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "sops",
-      "version": "3.9.0",
+      "version": "3.13.1",
       "profile": "full",
       "source": {
         "type": "github-release",
@@ -10,7 +10,7 @@
         "asset": {
           "linux": "sops-v{version}.linux.{goarch}",
           "darwin": "sops-v{version}.darwin.{goarch}",
-          "windows": "sops-v{version}.exe"
+          "windows": "sops-v{version}.{goarch}.exe"
         }
       }
     }
