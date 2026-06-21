@@ -27,6 +27,7 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newInitCmd())
 	root.AddCommand(newVaultCmd())
 	root.AddCommand(newEnvCmd())
+	root.AddCommand(newToolsCmd())
 	return root
 }
 
