@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/mlorentedev/dotfiles/compare/v0.11.0...v0.12.0) (2026-06-21)
+
+
+### Features
+
+* **doctor:** port repo↔deploy-dir drift check (CLI-019 PR-A) ([#513](https://github.com/mlorentedev/dotfiles/issues/513)) ([699e34c](https://github.com/mlorentedev/dotfiles/commit/699e34c17e1694c0ccbc02ab9a998aa142014cac))
+
 ## [0.11.0](https://github.com/mlorentedev/dotfiles/compare/v0.10.0...v0.11.0) (2026-06-21)
 
 
