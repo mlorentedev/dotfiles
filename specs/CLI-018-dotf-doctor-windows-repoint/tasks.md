@@ -21,9 +21,26 @@ created: "2026-06-21"
 - [x] `go test ./internal/doctor/...` green; `go vet` clean; gofmt clean
 - [ ] PR-A opened (references #380, does NOT close it)
 
-## PR-B — repoint + delete (separate PR, closes #380)
+## PR-B0 — port the §4 residual (build-only, this PR)
 
-- [ ] Settle the §4 residual: add `$PROFILE` / `.claude/CLAUDE.md` / `.gemini/AGY.md` existence (+ optionally BUG-012 junction) to `dotf doctor`, or consciously accept the drop
+> Strangler-fig: like PR-A, port the missing coverage to `dotf doctor` and prove
+> it on CI BEFORE the deletion PR removes `healthcheck.ps1`. Split decided this
+> session (CLI-019 PR-A→PR-B precedent): build-only, no deletion, no repoint.
+
+- [x] `checkProfileFiles` (`checks_profile.go`): existence of `.claude/CLAUDE.md`
+      + `.gemini/AGY.md` (cross-OS) and the Windows `$PROFILE` (pwsh 7 / WinPS 5.1
+      under Documents, incl. OneDrive-redirected). FAIL on missing; SKIP `$PROFILE`
+      off-Windows (POSIX uses `.zshrc`/`.bashrc`, already in `checkSymlinks`).
+      BUG-012 junction dropped (secondary, superseded by BUG-014 which `dotf
+      doctor` already has).
+- [x] Table test `checks_profile_test.go` (7 rows: posix pass + 2 fails, win pwsh
+      / WinPS / OneDrive / missing); registered after `checkSymlinks` (not `--quick`).
+- [x] `go test ./internal/doctor/...` green; gofmt + vet clean.
+- [ ] PR-B0 opened (references #509, does NOT close it)
+
+## PR-B — repoint + delete (separate PR, closes #380/#509)
+
+- [x] §4 residual settled → ported in PR-B0 (above); no coverage lost on deletion.
 - [ ] Repoint `setup-windows.ps1` post-setup (deploy + invoke blocks) → `dotf doctor`
 - [ ] Repoint `ci.yml` `test-windows` + the profile `hc` alias → `dotf doctor`
 - [ ] `git rm scripts/healthcheck.ps1 scripts/doctor.ps1` + their Pester
