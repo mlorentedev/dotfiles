@@ -10,7 +10,7 @@ Self-maintaining knowledge across sessions. Zero manual intervention required.
 
 ### Session Handoff
 
-Session handoff is a **cross-agent `/handoff` skill** — SSOT at `00_meta/skills/handoff/SKILL.md`, with an always-on trigger in `AGENTS.md`. At the END of any non-trivial session, run it. For Claude, the continuity block it overwrites (`## Session Handoff`, the first section after the H1) lives in this project's auto-memory `MEMORY.md`. The skill is the source of truth for the full checklist (continuity block + vault hygiene + repo/worktree state + artifact summary + next action) — don't duplicate it here.
+Session handoff is a **cross-agent `/handoff` skill** — SSOT at `00_meta/skills/handoff/SKILL.md`, with an always-on trigger in `AGENTS.md`. At the END of any non-trivial session, run it. For Claude, the continuity block it replaces in place (`## Session Handoff`, the **last** section — after the stable index, for KV-cache prefix stability) lives in this project's auto-memory `MEMORY.md`. The skill is the source of truth for the full checklist (continuity block + vault hygiene + repo/worktree state + artifact summary + next action) — don't duplicate it here.
 
 ### Auto-Crystallize
 

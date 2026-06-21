@@ -1,6 +1,8 @@
 # --- KUBELAB-SSH-START ---
-# Primary: Headscale VPN (works from anywhere)
+# Primary: Headscale VPN (works from anywhere — requires a native Tailscale node)
 # Fallback: LAN aliases (*-lan) for when VPN is down and on local network
+# Bastion: *-ext aliases jump via VPS public IP — for non-admin boxes that can't
+#          run native Tailscale, so mesh IPs (100.64.0.x) aren't locally routable
 
 # --- VPN access (Headscale mesh) ---
 Host rpi4
@@ -90,6 +92,51 @@ Host vps-pub
   Hostname 162.55.57.175
   User deployer
   IdentityFile ~/.ssh/id_ed25519
+
+# --- Bastion access (*-ext): jump via VPS public IP. Use from outside the LAN on
+#     a box without native Tailscale (mesh IPs not locally routable there). The VPS
+#     (vps-pub) is always reachable by public IP and is itself on the mesh. ---
+Host rpi4-ext
+  Hostname 100.64.0.10
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
+
+Host rpi3-ext
+  Hostname 100.64.0.6
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
+
+Host ace1-ext
+  Hostname 100.64.0.11
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
+
+Host ace2-ext
+  Hostname 100.64.0.5
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
+
+Host bee-ext
+  Hostname 100.64.0.3
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
+
+Host jet1-ext
+  Hostname 100.64.0.8
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
+
+Host aws1-ext
+  Hostname 100.64.0.7
+  User deployer
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyJump vps-pub
 # --- KUBELAB-SSH-END ---
 
 # --- OFFICE-JETSON-START ---
