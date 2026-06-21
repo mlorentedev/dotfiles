@@ -238,10 +238,8 @@ setup() {
 
 # --- BUG-020: DOTFILES_REPO_DIR cross-OS export parity ---
 # .bashrc + .zshrc export it; powershell/profile.ps1 was missing it.
-# Required by diff-check.{sh,ps1} (REFACTOR-003) to locate the repo root.
-# Without it, diff-check falls back to script's parent dir (deploy location,
-# not a git repo) and exits 2 -- healthcheck sec 12 then reports a setup
-# error rather than drift / no-drift.
+# Required by `dotf doctor` (CLI-019 repo/deploy drift check) to locate the
+# repo root. Without it, the drift check cannot resolve the repo and SKIPs.
 
 @test "parity: all 3 profiles export DOTFILES_REPO_DIR (BUG-020)" {
     grep -qF 'export DOTFILES_REPO_DIR=' "$DOTFILES_DIR/.bashrc"

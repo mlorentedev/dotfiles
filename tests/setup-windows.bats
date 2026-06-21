@@ -588,18 +588,39 @@ setup() {
     grep -qF 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-# --- REFACTOR-003: diff-check.ps1 deploy + dch alias + sec 12 wiring ---
-# Windows port of diff-check.sh closes the permanent SKIP in healthcheck.ps1
-# section 12/12. Mirrors PR #10 (Linux side, 2026-05-12).
+# --- CLI-019: diff-check retired; `dotf doctor` owns repo/deploy drift ---
+# The diff-check.{sh,ps1} twins were deleted once `dotf doctor` (PR-A, #513)
+# absorbed the byte-compare. setup must no longer deploy diff-check.ps1, the
+# `dch` convenience now wraps `dotf doctor`, and no production caller may
+# reference diff-check. (healthcheck.ps1 sec 11 keeps the lone residual until #509.)
 
-@test "REFACTOR-003: setup-windows.ps1 deploys diff-check.ps1 to ScriptsDir" {
-    grep -qF 'diff-check.ps1' "$PS1_SCRIPT"
-    grep -B5 'Deployed diff-check.ps1' "$PS1_SCRIPT" | grep -q 'Copy-Item'
+@test "CLI-019: setup-windows.ps1 no longer deploys diff-check.ps1" {
+    if grep -qF 'diff-check' "$PS1_SCRIPT"; then
+        echo "diff-check still referenced in setup-windows.ps1" >&2
+        return 1
+    fi
 }
 
-@test "REFACTOR-003: powershell/profile.ps1 declares dch function" {
+@test "CLI-019: powershell/profile.ps1 dch wraps dotf doctor" {
     grep -qF 'function dch' "$DOTFILES_DIR/powershell/profile.ps1"
-    grep -B2 -A6 'function dch' "$DOTFILES_DIR/powershell/profile.ps1" | grep -qF 'diff-check.ps1'
+    grep -A6 'function dch' "$DOTFILES_DIR/powershell/profile.ps1" | grep -qF 'dotf doctor'
+    if grep -A6 'function dch' "$DOTFILES_DIR/powershell/profile.ps1" | grep -qF 'diff-check'; then
+        echo "dch still references diff-check" >&2
+        return 1
+    fi
+}
+
+@test "CLI-019: production callers no longer reference diff-check" {
+    [ ! -f "$DOTFILES_DIR/scripts/diff-check.sh" ]
+    [ ! -f "$DOTFILES_DIR/scripts/diff-check.ps1" ]
+    # healthcheck.ps1 sec 11 is the lone residual until #509 deletes the file.
+    for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
+             .zsh/aliases.zsh .github/workflows/ci.yml; do
+        if grep -qF 'diff-check' "$DOTFILES_DIR/$f"; then
+            echo "diff-check still referenced in $f" >&2
+            return 1
+        fi
+    done
 }
 
 # --- WIN-001: healthcheck.ps1 wiring as final step ---
