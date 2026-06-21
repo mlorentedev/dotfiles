@@ -9,20 +9,33 @@ created: "2026-06-21"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/CLI-026-dotf-harness-engine`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions" (line-endings, cutover, sequencing resolved 2026-06-21)
+- [ ] Branch created from main for PR-A: `feat/CLI-026-dotf-harness-engine`
+
+> **Status:** spec resolved, held for roadmap order (PR10) per the sequencing decision. Implementation begins when the slot arrives; the steps below are the planned breakdown, not a frozen list.
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
+> Phased cutover (resolved): PR-A adds the Go engine alongside bash; PR-B removes bash and rewires callers. TDD order, one commit each.
 
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+### PR-A — add `dotf harness` alongside bash (no deletion, no caller rewiring)
+
+- [ ] Golden-file fixture: capture current `compile-harness.sh` output over the live vault + records as the parity oracle
+- [ ] Write failing test: `harness refresh` output diffs empty vs the golden fixture (marker sha, slugify, section extraction, line caps)
+- [ ] Implement `cli/internal/harness/` refresh, modeled on `cli/internal/spec/` (embedded-asset + cobra wiring)
+- [ ] Write failing test: CRLF input → LF output, byte-identical on Windows and Linux
+- [ ] Implement CRLF→LF normalization on read; emit LF unconditionally
+- [ ] Implement `harness deploy` (offline render to per-agent `$HOME`) + `harness check` (offline drift)
+- [ ] Write failing test: `check --against-vault` mutates a vault skill → non-zero exit
+- [ ] Implement `check --against-vault` (sha(vault skill) != committed record)
+- [ ] Refactor for clarity; wire `dotf harness` noun in `cli/internal/cmd/`
+
+### PR-B — strangle bash (gated on PR-A parity proven)
+
+- [ ] Rewire `setup-windows.ps1` to call `dotf harness deploy`; delete the `Deploy-SkillRecord` block
+- [ ] `git rm scripts/compile-harness.sh`; repoint `setup-*.sh` / `ci.yml` / profile
+- [ ] Guard-grep: no remaining references to the old block or script
 
 ## Closing
 
