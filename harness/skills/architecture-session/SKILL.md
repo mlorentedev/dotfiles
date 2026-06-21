@@ -10,7 +10,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 
 # Architecture Session
 
-> Pure architecture / definition session: no implementation, no code. The output is **decisions persisted in the vault** (ADR + plan revision + 11-tasks update), not commits. Implements the discipline crystallized in `pattern-decision-persistence` + `pattern-workflow-protocol` (Exit Phase 2) + ADR-015 "Regla del 3 en abstraccion".
+> Pure architecture / definition session: no implementation, no code. The output is **decisions persisted in the vault** (ADR + plan revision + task tracking update), not commits. Implements the discipline crystallized in `pattern-decision-persistence` + `pattern-workflow-protocol` (Exit Phase 2) + ADR-015 "Regla del 3 en abstraccion".
 >
 > **Companion to** `/spec init|fill|archive` (per-feature SDD): architecture sessions produce ADRs and roadmap shifts; specs produce code. Different granularity, different cadence.
 
@@ -30,7 +30,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 
 ## Environment (resolve once per invocation)
 
-- `$VAULT_PATH` -- env var. Linux/macOS: `$HOME/Projects/knowledge`. Windows: `%USERPROFILE%\Projects\knowledge`.
+- `$VAULT_PATH` -- resolve via: (1) env var if set, (2) `dotf env path VAULT_PATH` if dotf is on PATH, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) **FAIL** with instructions to set it. Never hardcode a literal path.
 - `$PROJECT_AREA` -- vault path of the project area in scope. Examples:
   - `10_projects/<repo>/`
   - `50_work/45-development/<family>/<component>/`
@@ -49,7 +49,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 1. Read these vault files in order (Hive `vault_query`):
    - `$PROJECT_AREA/00-context.md` (technical stack, repo map, hotspots)
    - `$PROJECT_AREA/10-roadmap.md` (active phase, what is done vs pending)
-   - `$PROJECT_AREA/11-tasks.md` (progress bar + last "Updated" frontmatter date)
+   - GitHub Project board status via `gh project item-list` (task progress — bitácora is the SSOT per ADR-018)
    - the repo's `docs/adr/` directory (latest ADR number, accepted/deferred status — GitHub self-indexes; legacy vault-only projects still use `$PROJECT_AREA/30-architecture/`)
    - `$PROJECT_AREA/30-architecture/plan-*.md` -- newest mtime first
    - `$PROJECT_AREA/memory/MEMORY.md` -- Session Handoff section
@@ -63,7 +63,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
    |---|---|---|---|
    | Repo X version | v0.7.0 (per 00-context) | v0.7.4 (per pyproject) | YES (stale 4 patches) |
    | Repo Y branches | clean | 3 zombie local branches | YES |
-   | Vault 11-tasks "Updated" | 2026-03-18 | (today minus N days) | YES if N > 30 |
+   | Bitácora board status | In Progress | (current state) | YES if stale >7d |
 
 5. **If drift detected**, ask the user: "First action: patch the stale items in vault, or note drift and continue?" Do not advance to Phase B until the user picks.
 
@@ -150,9 +150,9 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 
 **Work-project mode (IMPORTANT).** If the project is a **work / team** project under the docs-as-code model (repo + GitHub Project as SSOT — see `pattern-platform-governance`; detect via the project's `AGENTS.md` / CLAUDE overlay), then:
 - Write the ADR to the **repo** `docs/adr/adr-NNN-<slug>.md` (cross-cutting in the platform repo; repo-specific in the owning repo) via a PR — **NOT** the vault `30-architecture/`.
-- Track tasks/roadmap in the **GitHub Project + Issues** — NOT the vault `11-tasks`.
+- Track tasks/roadmap in the **GitHub Project + Issues** (per ADR-018).
 - The vault keeps only personal/methodology lessons + AI memory + drafts.
-For **personal** projects on the placement model, ADRs ALSO go to the repo `docs/adr/` (per [[pattern-knowledge-placement]]); only the `11-tasks.md` / `memory/` steps below stay in the vault. The work-vs-personal split is now only about *tracking* (GitHub Project vs issues), not ADR placement.
+For **personal** projects on the placement model, ADRs ALSO go to the repo `docs/adr/` (per [[pattern-knowledge-placement]]); only the `memory/` step below stays in the vault. The work-vs-personal split is now only about *tracking* (GitHub Project vs issues), not ADR placement.
 
 **Steps:**
 
@@ -162,37 +162,29 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
    - **GitHub issue link:** if a GitHub Project issue or task tracks this architectural decision, populate `issue: <repo>#NNN` in the ADR frontmatter before writing.
 2. **Update the plan** of record. If a `plan-*.md` motivated this session, patch it: append a "Decision recorded" line linking the new ADR, and update the "Next steps" section if the decision changes it.
 3. **Index:** the repo `docs/adr/` self-indexes (GitHub renders the directory) — no separate index file to patch. (Legacy vault-only project: patch the project `_index.md`.)
-4. **Update `11-tasks.md`** if the decision creates, closes, or reshapes tasks. Apply backlog ticks `- [x]` and add new tasks with the ADR-NNN reference inline.
-5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive.
+4. **Update task tracking** if the decision creates, closes, or reshapes tasks. Open or update GitHub issues via `gh`.
+5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons.md`**. Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
 
 **Blocking rule.** Phase E does not exit until at least the ADR file is written. The user CANNOT defer the write to "later" -- per `pattern-decision-persistence` "Anti-Patterns", `I'll update the vault later` = the decision is lost.
 
-**Override.** If the user genuinely cannot author an ADR this turn (interruption, missing data), Phase E creates a tracked task in `11-tasks.md` named `**ADR-NNN-draft**: write ADR for <topic>` with `(spec: ADR-NNN-...)` placeholder. Verbal deferral never counts.
+**Override.** If the user genuinely cannot author an ADR this turn (interruption, missing data), Phase E creates a tracked GitHub issue named `**ADR-NNN-draft**: write ADR for <topic>` with `(spec: ADR-NNN-...)` placeholder. Verbal deferral never counts.
 
-**Output of Phase E:** new ADR file (repo `docs/adr/`, self-indexing) + patched plan + patched 11-tasks.
+**Output of Phase E:** new ADR file (repo `docs/adr/`, self-indexing) + patched plan + task tracking updated.
 
 ---
 
 ## Phase F -- Recap
 
-**Goal:** persist session continuity (handoff) and propagate cross-cutting deltas to the working guide if a trigger fired.
+**Goal:** persist session continuity by **delegating to the canonical persistence skills**, not by restating their mechanics. This skill owns the *decision* (the ADR, Phase E); the recap fires the skills that own continuity.
 
 **Steps:**
 
-1. **MEMORY.md Session Handoff.** OVERWRITE the `## Session Handoff` section in `$PROJECT_AREA/memory/MEMORY.md` (max 8 lines, format per `~/.claude/CLAUDE.md` Auto-Maintenance Rules).
-2. **CURRENT-STATE.md delta** (Exit Phase 2, conditional). Check `pattern-workflow-protocol` trigger dimensions:
-   - Skill added / removed / renamed -> propose delta to CURRENT-STATE.md section 1
-   - Automation changed -> section 2
-   - Lifecycle diagram changed -> section 3
-   - Path topology shifted -> section 4
-   - Mental model branch / new anti-pattern -> section 5 / 7
-   - Date close marker (sprint boundary) -> section 6
+1. **Patch `00-context.md` -- delegate to `context-refresh`.** An ADR + phase shift is exactly its trigger. Run `context-refresh` to patch the frontmatter (`phase`, `focus`, `recent_adrs` <- new ADR slug, `last_updated`). Do NOT hand-patch those fields here -- `context-refresh` owns them (HARNESS-021 D4 — avoids duplicating the context-patch logic).
+2. **MEMORY.md Session Handoff -- owned by the `handoff` skill.** The `## Session Handoff` overwrite (continuity block, format per `~/.claude/CLAUDE.md` Auto-Maintenance Rules) is `handoff`'s job; trigger it (or `/handoff`) rather than restating the format. This skill records the *decision*; `handoff` records the *session*.
+3. **CURRENT-STATE.md delta** (Exit Phase 2, conditional) -- the one arch-specific recap step. If this session changed a skill / automation / path / mental-model, emit a `vault_patch` proposal for ONLY the affected CURRENT-STATE.md section (never a full rewrite). Trigger map (`pattern-workflow-protocol`): skill -> §1, automation -> §2, lifecycle -> §3, paths -> §4, mental-model/anti-pattern -> §5/§7, sprint-close -> §6.
+4. **claude-mem observation.** Captured automatically by the session hook; no manual `observation_add`. Reopen triggers for a deferred decision live in the ADR itself, not in `/schedule`.
 
-   Emit a `vault_patch` proposal for ONLY the affected sections; do not full-rewrite CURRENT-STATE.md.
-3. **claude-mem observation.** The session hook captures conversation automatically; no manual `observation_add` needed (per `~/.claude/CLAUDE.md` claude-mem section).
-4. **Schedule follow-ups (no `/schedule`).** Architecture sessions rarely produce timer-based follow-ups. If the decision has an explicit reopen trigger (per Phase D deferral), the trigger lives in the ADR itself -- not in `/schedule`.
-
-**Output of Phase F:** patched MEMORY.md handoff + (conditional) CURRENT-STATE.md delta proposal.
+**Output of Phase F:** `context-refresh` run (00-context patched) + `handoff` triggered (MEMORY.md) + (conditional) CURRENT-STATE.md delta proposal.
 
 ---
 
@@ -206,18 +198,18 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 ## Cross-OS notes
 
 - Linux / macOS: agent uses POSIX commands via `Bash`. Path joining uses `/`.
-- Windows: agent uses PowerShell tool. Path joining uses `\`. Hard-copy deployment (not symlinks) per dotfiles `setup-windows.ps1` -- the skill in `~/.claude/skills/architecture-session/` is a COPY of vault SSOT, NOT a symlink. After editing the vault SSOT, the user re-runs `setup-windows.ps1` to refresh.
+- Windows: agent uses PowerShell tool. Path joining uses `\`. Hard-copy deployment (not symlinks): the skill in `~/.claude/skills/architecture-session/` is a COPY of the vault SSOT rendered by `compile-harness.sh`. After editing the vault SSOT, run `compile-harness.sh --deploy` (or re-run setup) to refresh the copy — never edit the deployed copy directly.
 
 ## Vault connections
 
 | Phase | Reads | Writes |
 |---|---|---|
-| A | `00-context.md`, `10-roadmap.md`, `11-tasks.md`, repo `docs/adr/`, `plan-*.md`, `memory/MEMORY.md`, `session-protocol.md` | nothing (read-only verification) |
+| A | `00-context.md`, `10-roadmap.md`, GitHub Project board, repo `docs/adr/`, `plan-*.md`, `memory/MEMORY.md`, `session-protocol.md` | nothing (read-only verification) |
 | B | `sensor-reference-audit-matrix.md` (or analog) | patches matrix + divergence-log |
 | C | `session-protocol.md` (constraints section) | patches constraint table |
 | D | `session-protocol.md` (rejection list), `00_meta/patterns/_index.md` | nothing (or patches rejection list if new alternatives discarded) |
-| E | `templates/adr.md` | new repo `docs/adr/adr-NNN-*.md` (self-indexing), patches `plan-*.md`, patches `11-tasks.md` |
-| F | (nothing) | patches `memory/MEMORY.md` handoff; OPTIONAL delta proposal for `CURRENT-STATE.md` |
+| E | `templates/adr.md` | new repo `docs/adr/adr-NNN-*.md` (self-indexing), patches `plan-*.md`, GitHub issues updated |
+| F | (nothing) | delegates to `context-refresh` (00-context.md) + `handoff` (memory/MEMORY.md); OPTIONAL delta proposal for `CURRENT-STATE.md` |
 
 ## Anti-patterns this skill blocks
 
@@ -232,7 +224,7 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 - Pattern: `$VAULT_PATH/00_meta/patterns/pattern-decision-persistence.md`
 - Pattern: `$VAULT_PATH/00_meta/patterns/pattern-workflow-protocol.md` (Exit Phase 2)
 - Pattern: `$VAULT_PATH/00_meta/patterns/pattern-spec-driven-development.md` (downstream after Phase E)
-- Pattern: `$VAULT_PATH/00_meta/patterns/pattern-architecture.md` (project structure conventions)
+- Pattern: `$VAULT_PATH/00_meta/patterns/pattern-architecture.md` (code-repo source layouts) + `pattern-project-structure.md` (vault store-side project layout)
 - Template: `$VAULT_PATH/00_meta/templates/adr.md`
 - Template: `$VAULT_PATH/00_meta/templates/system-design.md`
 - Sibling skill: `$VAULT_PATH/00_meta/skills/spec/SKILL.md`

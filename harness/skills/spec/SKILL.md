@@ -71,7 +71,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 ## Environment (resolve once per invocation)
 
-- `$VAULT_PATH` — env var. Cross-OS default `$HOME/Projects/knowledge` (Linux/macOS) or `%USERPROFILE%\Projects\knowledge` (Windows).
+- `$VAULT_PATH` — resolve via: (1) env var if set, (2) `dotf env path VAULT_PATH` if dotf is on PATH, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) **FAIL** with instructions to set it. Never hardcode a literal path.
 - `$REPO_ROOT` = `git rev-parse --show-toplevel`.
 - `$REPO_NAME` = basename of `$REPO_ROOT`.
 - Fail fast if `$VAULT_PATH` unresolvable AND a vault operation is required.
@@ -168,7 +168,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 1. Verify `$REPO_ROOT/specs/<feature-id>/proposal.md` exists. If not -> suggest `/spec init` first.
 2. For each section: if non-placeholder content present, ask: "Section `<X>` is already filled. Overwrite, append, or skip?"
 3. Read context for grounding (silent, not shown to user):
-   - `$VAULT_PATH/10_projects/$REPO_NAME/11-tasks.md` (find feature entry).
+   - GitHub issue for this spec (via `gh issue view` — bitácora is the SSOT per ADR-018).
    - `$VAULT_PATH/10_projects/$REPO_NAME/10-roadmap.md` (strategic frame).
    - Referenced ADRs (frontmatter only via Hive).
    - Up to 3 sister specs in `$REPO_ROOT/specs/archive/` (for tone consistency).
@@ -221,7 +221,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 2. **Promotion candidates (always interactive — never autoparse):**
    For each of the three promotion types, ASK the user regardless of `verification.md` marker (the marker is a hint, not authoritative):
    - **Lesson?** "Any non-obvious lesson worth recording? 2-sentence summary, or `no`."
-     - If non-`no`: compose lesson entry -> append to the **repo's** `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]; never a vault `90-lessons.md`). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
+     - If non-`no`: compose lesson entry -> append to the **repo's** `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
    - **ADR-worthy?** "Any architectural decision that future-you needs to remember? ADR title, or `no`."
      - If non-`no`: ask for ADR number (query existing ADRs in the **repo's** `docs/adr/` first to suggest next sequential) and 1-line decision summary. Create skeleton at the **repo's** `docs/adr/adr-XXX-<slug>.md` (ADRs live in the repo — see [[pattern-knowledge-placement]]; the vault keeps only cross-project decisions in `00_meta/`).
    - **Pattern candidate?** "Does this approach recur in >1 project? Pattern name, or `no`."
@@ -233,10 +233,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
    - `mv $REPO_ROOT/specs/<feature-id>/ <target>/<feature-id>/`.
    - In archived `proposal.md`: `Edit` `status: <whatever>` -> `status: archived` (or `abandoned`).
 
-4. **Update vault backlog:**
-   - Via Hive `vault_patch` on `$VAULT_PATH/10_projects/$REPO_NAME/11-tasks.md`:
-     - Replace `- [ ] **<feature-id>**:` -> `- [x] **<feature-id>**:` and append ` ✓ <today>` plus ` (PR: <url>)` if `--pr` provided.
-     - If `--abandoned`: replace `- [ ] **<feature-id>**:` -> `- [-] **<feature-id>**:` (or strikethrough convention) and append ` ✗ <today> (abandoned)`.
+4. **Close the GitHub issue** via `gh issue close` — the bitácora workflow sets Done automatically (per ADR-018).
 
 5. **Output:**
    - List of artifacts created/moved (paths).
@@ -268,9 +265,9 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 | `init` (pre-flight) | GitHub issue via `gh` (work-gate, not a vault read) | nothing |
 | `init` (substitution) | `00_meta/templates/spec-*.md` | (filesystem only — repo specs/) |
 | `bootstrap` (template) | `00_meta/templates/bootstrap-contract.md`, sister contracts in `specs/archive/` | (filesystem only — repo specs/<id>/bootstrap-contract.md) |
-| `fill` (grounding) | `11-tasks.md`, `10-roadmap.md`, referenced ADRs, sister specs | nothing |
+| `fill` (grounding) | GitHub issue, `10-roadmap.md`, referenced ADRs, sister specs | nothing |
 | `archive` (promotion) | `verification.md` flags | repo `docs/lessons.md`, repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
-| `archive` (backlog tick) | `11-tasks.md` | `11-tasks.md` (tick + PR link) |
+| `archive` (backlog tick) | GitHub issue | GitHub issue closed |
 
 ## References
 

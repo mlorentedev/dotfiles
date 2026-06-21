@@ -5,31 +5,17 @@ description: Use when troubleshooting hardware or firmware issues -- device comm
 
 # Hardware Debugging
 
-Systematic approach for hardware/firmware issues. Evidence before hypotheses.
+The evidence-first debugging **method** lives in one skill: `systematic-debugging` (the Iron Rule — no guessing, a single hypothesis formed from evidence, the minimal fix, verify after every change). This skill is the **hardware/firmware specialization** of it: same method, plus the domain-specific evidence sources and pitfalls below. Reach for `systematic-debugging` for the process; reach for this for what "evidence" means in hardware.
 
-## The Iron Rule
+## Hardware-specific evidence sources
 
-```
-NO GUESSING. NO CYCLING THROUGH HYPOTHESES WITHOUT EVIDENCE.
-```
+Before forming a hypothesis (the "gather evidence" step of `systematic-debugging`), read the hardware truth — never assume it:
 
-## Process
+- **Reference implementation** — vendor examples, GUI code, known-good configurations. Always compare against known-working code.
+- **Datasheets / register maps / timing diagrams / protocol specs** — register *reset* values, setup/hold times, clock domains, byte order.
+- **Concrete observations** — register values, signal traces, error codes. Observed vs expected, with numbers.
 
-1. **Read reference code** — Find ALL related source files and working implementations (GUI code, vendor examples, known-good configurations)
-2. **Read documentation** — Check firmware/hardware datasheets, register maps, timing diagrams, protocol specs
-3. **Gather observations** — Ask user to describe observed vs expected behavior. Get concrete data: register values, signal traces, error codes
-4. **Form single hypothesis** — Only AFTER steps 1-3. State clearly: "I think X because evidence Y shows Z"
-5. **Propose minimal fix** — Smallest possible change to test the hypothesis. One variable at a time
-6. **Verify** — Run tests after every change
-
-## When Fix Fails
-
-- Do NOT guess another cause
-- Ask user for more observations
-- Re-read documentation with new context
-- Repeat from step 3
-
-## Common Pitfalls
+## Common Pitfalls (the hardware delta)
 
 | Pitfall | Correct Approach |
 |---------|-----------------|
@@ -38,3 +24,5 @@ NO GUESSING. NO CYCLING THROUGH HYPOTHESES WITHOUT EVIDENCE.
 | Ignoring timing requirements | Check setup/hold times, clock domains |
 | Guessing endianness | Verify byte order from documentation |
 | Skipping reference implementation | Always compare against known-working code |
+
+> Method owner: `systematic-debugging`. This skill adds only the hardware evidence sources + pitfalls; it does not restate the Iron Rule or the generic process (that would be triplication — see HARNESS-021 D3).

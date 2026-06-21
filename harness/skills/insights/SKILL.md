@@ -44,8 +44,8 @@ If failures detected -> recommend `/vault-doctor`.
 
 ### Step 3 -- Backlog Snapshot
 
-- Read `~/Projects/knowledge/10_projects/<repo>/11-tasks.md` via Hive MCP
-- Report: active items count, progress bar, any overdue P0/P1 items
+- Query open issues on the bitácora GitHub Project via `gh project item-list` or `gh issue list --state open`
+- Report: active items count, status distribution, any blocked items
 
 ### -- Quick mode stops here --
 
@@ -57,7 +57,7 @@ If failures detected -> recommend `/vault-doctor`.
 
 ### Step 5 -- Vault Gap Analysis (full mode)
 
-- Read the repo's `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `~/Projects/knowledge/00_meta/` for cross-project
+- Read the repo's `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
 - Identify bugfix and decision observations NOT documented in the repo's lessons
 - List each gap: ID, type, title
 
@@ -77,7 +77,7 @@ Decision persistence:
 ### Step 7 -- Pattern Opportunities (full mode)
 
 - For lessons in the repo's `docs/lessons.md` that appear relevant to multiple projects:
-  - Check `~/Projects/knowledge/00_meta/patterns/` for existing patterns
+  - Check `$VAULT_PATH/00_meta/patterns/` for existing patterns
   - Identify lessons that warrant a new global pattern
 - For existing patterns: check if recent lessons should be added to them
 
