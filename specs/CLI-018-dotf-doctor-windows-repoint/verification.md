@@ -11,6 +11,24 @@ created: "2026-06-21"
 - [x] **Registered in the full sweep, not `--quick`** → `doctor.go` calls `checkOrcaHook` inside the `!opts.Quick` block after `checkAntigravity`.
 - [x] **Cross-OS** → no `GOOS` gate; SKIPs when neither Orca file is present (the off-Windows / no-Orca state).
 
+## Evidence (PR-B0 — §4 residual port, build-only)
+
+- [x] **§4 residual ported** → `checkProfileFiles` (`checks_profile.go`): `.claude/CLAUDE.md`
+  + `.gemini/AGY.md` existence (cross-OS, recovers Linux coverage the CLI-012
+  consolidation dropped) and the Windows-only `$PROFILE`. Registered after
+  `checkSymlinks` in the `!opts.Quick` sweep.
+- [x] **`$PROFILE` resolved by candidate paths, not a pwsh shell-out** →
+  `{Documents, OneDrive\Documents} × {PowerShell, WindowsPowerShell}` /
+  `Microsoft.PowerShell_profile.ps1`. Pure-Go + deterministic (fits the framework's
+  temp-tree test model) and covers the OneDrive-redirected Documents common on
+  corporate boxes, which a naïve `~\Documents` check would false-FAIL.
+- [x] **Table test green** → `TestCheckProfileFiles` (7 rows): posix both-present
+  (profile SKIP) + CLAUDE.md/AGY.md missing fails; windows pwsh / WinPS / OneDrive
+  pass + profile-missing fail. `go test ./internal/doctor/...` ok; gofmt + vet +
+  golangci-lint clean.
+- [x] **No coverage lost on PR-B's deletion** → `healthcheck.ps1` §4's three
+  deployed-file checks now live in `dotf doctor`; PR-B can delete the `.ps1`.
+
 ## Test status
 
 - `go -C cli test ./internal/doctor/...` → **ok** (4.9s), incl. `TestCheckOrcaHook`.

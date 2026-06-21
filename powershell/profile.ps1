@@ -67,15 +67,14 @@ if (Get-Command opencode -ErrorAction SilentlyContinue) {
     }
 }
 
-# REFACTOR-003: dch alias for diff-check.ps1 (drift detection). Function
-# form (not Set-Alias) so -VerboseOutput and -Help pass through. Mirrors
-# the Linux `dch` bash function shipped in PR #10.
+# CLI-019: `dch` now wraps `dotf doctor`. The repo/deploy drift check moved
+# into the Go sweep (PR-A, #513) and the standalone drift-check twins were
+# retired; mirrors the Linux `dch` alias. Thin pass-through so flags reach dotf.
 function dch {
-    $script = Join-Path $env:USERPROFILE 'scripts\diff-check.ps1'
-    if (Test-Path -LiteralPath $script) {
-        & pwsh -NoProfile -File $script @args
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        dotf doctor @args
     } else {
-        Write-Error "diff-check.ps1 not deployed at $script -- run setup-windows.ps1"
+        Write-Error "dotf not on PATH -- run setup-windows.ps1"
     }
 }
 

@@ -56,6 +56,35 @@ created: "2026-06-21"
 - **Allowlist ported verbatim** with the mirror-setup warning comment. A
   grep-guard pinning it to `setup-linux.sh`'s copy block is a PR-B follow-up.
 
+## Evidence (PR-B — delete + repoint)
+
+- [x] **Twins deleted** → `git rm scripts/diff-check.sh scripts/diff-check.ps1
+  tests/diff-check.bats` (no Pester existed).
+- [x] **Production callers repointed/cleaned** → `setup-windows.ps1` diff-check
+  deploy block removed + BUG-021 comment generalized; `setup-linux.sh` BUG-021
+  comment cleaned; `powershell/profile.ps1` `dch` now wraps `dotf doctor`;
+  `.zsh/aliases.zsh` `dch` alias → `dotf doctor`; `ci.yml` comments generalized;
+  `env-contract.json` `DOTFILES_REPO_DIR` description updated.
+- [x] **Guard test green** → `tests/setup-windows.bats` gains 3 CLI-019 checks
+  (no-deploy / `dch`-wraps-`dotf doctor` / production-callers-clean). The guard
+  is scoped to the 5 caller files; written with explicit `if grep …; then
+  return 1; fi` (a bare `! grep` is exempt from bats errexit).
+- [x] **Suites green** → `bats tests/setup-windows.bats` (109), `bats
+  tests/setup-linux.bats`, `bats tests/healthcheck-ps1.bats` (36, §11 residual
+  still asserts the un-touched `healthcheck.ps1`). `go test
+  ./internal/doctor/...` ok. (`go test ./...` shows the pre-existing #461
+  vault-template drift FAILs only — unrelated; no Go touched here.)
+
+### Sequencing decision (PR-B before #509)
+
+Kept the spec order at the user's call. Because Windows does not yet invoke
+`dotf doctor` (that switch is #509), deleting `diff-check.ps1` opens a
+**transient Windows repo↔deploy drift gap** — `healthcheck.ps1` §11 degrades to
+SKIP — until #509 lands right after. Linux is unaffected (`setup-linux.sh`
+already runs `dotf doctor` with PR-A's `checkDeployDrift`). The lone residual
+(`healthcheck.ps1` + `tests/healthcheck-ps1.bats`) is excluded from the guard and
+owned by #509, which tightens it on deletion.
+
 ## Promotion candidates
 
 - [ ] Lesson for `docs/lessons.md`? no (faithful port; the build-then-delete +

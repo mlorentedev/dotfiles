@@ -1519,16 +1519,6 @@ if (Test-Path $doctorSource) {
     Write-Warn "doctor.ps1 not found at $doctorSource"
 }
 
-# REFACTOR-003: deploy diff-check.ps1 (Windows port of diff-check.sh).
-# Closes the section 12/12 SKIP in healthcheck.ps1.
-$diffCheckSource = "$DotfilesDir\scripts\diff-check.ps1"
-if (Test-Path $diffCheckSource) {
-    Copy-Item $diffCheckSource "$ScriptsDir\" -Force
-    Write-Success "Deployed diff-check.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "diff-check.ps1 not found at $diffCheckSource"
-}
-
 # WIN-001 follow-up: PR #71 added the post-setup invocation in section 8d but
 # omitted the deploy. Without this Copy-Item, $ScriptsDir\healthcheck.ps1 never
 # exists and section 8d silently warns "not deployed, skipping" on every run.
@@ -1960,8 +1950,8 @@ if (-not $env:COPILOT_HOME)      { $env:COPILOT_HOME      = "$env:USERPROFILE\.c
 if (-not $env:OPENCODE_HOME)     { $env:OPENCODE_HOME     = "$env:USERPROFILE\.config\opencode" }
 # BUG-021 (2026-05-21): added DOTFILES_REPO_DIR pre-export -- BUG-020 (PR #86)
 # added the export to profile.ps1 but the running shell doesn't reload profile,
-# so doctor + diff-check.ps1 (via healthcheck sec 12) still see the var unset
-# until next shell restart. Mirror the same pre-export pattern as the other
+# so `dotf doctor` (the repo/deploy drift check, CLI-019) still sees the var
+# unset until next shell restart. Mirror the same pre-export pattern as the other
 # 4 vars to surface PASS immediately in the post-setup checks.
 if (-not $env:DOTFILES_REPO_DIR) { $env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles" }
 

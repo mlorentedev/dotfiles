@@ -28,7 +28,7 @@ alias kc="knowledge-crystallize.sh"               # Stamp current project MEMORY
 alias kca="knowledge-crystallize.sh --all"        # Stamp all projects at once
 
 # Repo maintenance
-alias dch="diff-check.sh"                         # Detect drift between repo and ~/.dotfiles
+alias dch="dotf doctor"                           # Repo/deploy drift check now lives in dotf doctor (CLI-019)
 alias cl="changelog-gen.sh"                       # Regenerate CHANGELOG.md from git log
 alias profile-shell="shell-profile.sh"            # Measure shell startup (use --detail for per-function breakdown via zprof/xtrace)
 
