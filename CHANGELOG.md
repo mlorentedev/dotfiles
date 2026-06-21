@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.0](https://github.com/mlorentedev/dotfiles/compare/v0.9.4...v0.10.0) (2026-06-21)
+
+
+### Features
+
+* **doctor:** port the Orca Copilot hook (DX-006) check into dotf doctor ([#505](https://github.com/mlorentedev/dotfiles/issues/505)) ([3701936](https://github.com/mlorentedev/dotfiles/commit/3701936bedf68df6d3ddf4c86119d3999620ed30))
+* **handoff:** cache-stable block placement + agnostic lessons-staleness signal ([#502](https://github.com/mlorentedev/dotfiles/issues/502)) ([9de802b](https://github.com/mlorentedev/dotfiles/commit/9de802b6a760019bccf90bd51ec28d13adf748c5))
+* **ssh:** add *-ext bastion aliases for off-LAN fleet access ([#503](https://github.com/mlorentedev/dotfiles/issues/503)) ([260008f](https://github.com/mlorentedev/dotfiles/commit/260008f1fe4de6003e625056ac2c4cd3b3f6d4c4))
+
 ## [0.9.4](https://github.com/mlorentedev/dotfiles/compare/v0.9.3...v0.9.4) (2026-06-20)
 
 
