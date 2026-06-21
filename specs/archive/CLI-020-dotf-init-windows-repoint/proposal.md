@@ -1,7 +1,7 @@
 ---
 id: "CLI-020-dotf-init-windows-repoint"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-21"
 issue: "mlorentedev/dotfiles#489"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -61,3 +61,5 @@ After this PR, on Windows:
 - ADR-020 (convergence boundary), ADR-021 (roadmap), ADR-022 / CLI-014 (`dotf init` parity), ADR-025 (cross-machine path resolution)
 - Linux precedent: `setup-linux.sh` init-project.sh orphan cleanup (CLI-014)
 - Parity target: `cli/internal/vault/project.go`
+
+<!-- archived 2026-06-21 — PR: https://github.com/mlorentedev/dotfiles/pull/500 -->
