@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-019-f1",
+    "behavior": "Managed file differing between repo and deploy-dir is reported as drift (FAIL) naming the path",
+    "verification": "go -C cli test -run 'TestCheckDeployDrift/managed_drift' ./internal/doctor/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-019-f2",
+    "behavior": "All managed files equal between repo and deploy-dir yields PASS",
+    "verification": "go -C cli test -run 'TestCheckDeployDrift/all_managed_equal' ./internal/doctor/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-019-f3",
+    "behavior": "An unmanaged tracked file that differs is ignored (no FAIL)",
+    "verification": "go -C cli test -run 'TestCheckDeployDrift/unmanaged' ./internal/doctor/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-019-f4",
+    "behavior": "Missing deploy-dir or non-git repo yields SKIP, not FAIL",
+    "verification": "go -C cli test -run 'TestCheckDeployDrift/(no_deploy-dir|not_a_git_repo)' ./internal/doctor/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-019-f5",
+    "behavior": "git ls-files failure degrades to WARN without crashing",
+    "verification": "go -C cli test -run 'TestCheckDeployDrift/git_ls-files_fails' ./internal/doctor/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-019-f6",
+    "behavior": "The managed allowlist matches the files setup copies into the deploy-dir",
+    "verification": "go -C cli test -run 'TestIsManagedDeployPath' ./internal/doctor/",
+    "state": "pending",
+    "evidence": ""
+  }
+]
