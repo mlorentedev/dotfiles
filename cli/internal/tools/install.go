@@ -125,7 +125,7 @@ func (in *Installer) Install(t Tool) (Result, error) {
 
 	switch decideAction(in.CurrentVersion(t.Name), t.Version) {
 	case actionSkip:
-		fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
+		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
 		return Skipped, nil
 	case actionUpgrade:
 		return in.fetchVerifyPlace(t, asset, sumsName, Upgraded)
@@ -161,7 +161,7 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 	if err := placeBinary(assetPath, dst); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
-	fmt.Fprintf(in.Out, "%s %s %s to %s\n", t.Name, t.Version, res, dst)
+	_, _ = fmt.Fprintf(in.Out, "%s %s %s to %s\n", t.Name, t.Version, res, dst)
 	return res, nil
 }
 

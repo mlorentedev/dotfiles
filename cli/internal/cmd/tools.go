@@ -102,7 +102,7 @@ func installAll(in *tools.Installer, selected []tools.Tool, errOut io.Writer) er
 	var failed []string
 	for _, t := range selected {
 		if _, err := in.Install(t); err != nil {
-			fmt.Fprintf(errOut, "warning: %v\n", err)
+			_, _ = fmt.Fprintf(errOut, "warning: %v\n", err)
 			failed = append(failed, t.Name)
 		}
 	}
