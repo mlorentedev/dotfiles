@@ -129,6 +129,22 @@ sb_specs() (
     printf '\n%s' "$msg"
 )
 
+# sb_lessons_staleness <cwd>: flag a stale docs/lessons.md in the current repo, so
+# corrections/discoveries do not rot uncaptured (HARNESS-024). Leading newline when
+# stale, nothing when the file is absent or fresh. Threshold days: LESSONS_STALE_DAYS
+# (default 14), matching the crystallize-staleness window.
+sb_lessons_staleness() (
+    cwd="$1"
+    lessons="$cwd/docs/lessons.md"
+    [ -f "$lessons" ] || return 0
+    days="${LESSONS_STALE_DAYS:-14}"
+    # POSIX find: -mtime +N flags files modified more than ~N*24h ago. A soft nudge,
+    # so the ~1-day rounding is immaterial.
+    if [ -n "$(find "$lessons" -mtime +"$days" 2>/dev/null)" ]; then
+        printf '\n[lessons] docs/lessons.md not updated in >%s days — capture fixes/discoveries from this session (handoff Step 2) or note the gap (HARNESS-024).' "$days"
+    fi
+)
+
 # sb_vault_baseline <vault_root>: defensive check that every 00_meta/skills/<n>/
 # has a non-empty SKILL.md and the static critical files exist (SDD-017b).
 # Leading newline when issues found, otherwise nothing.
@@ -198,10 +214,11 @@ sb_main() {
     vault_name=""
     [ -n "$vault_root" ] && vault_name=$(basename "$vault_root")
 
-    # Canonical agnostic order: headline, vault-health, specs, baseline.
+    # Canonical agnostic order: headline, vault-health, specs, lessons, baseline.
     brief="$(sb_vault_detect "$vault_root")"
     brief="$brief$(sb_vault_health "$vault_root" "$vault_name" "$script_dir")"
     brief="$brief$(sb_specs "$cwd")"
+    brief="$brief$(sb_lessons_staleness "$cwd")"
     brief="$brief$(sb_vault_baseline "$vault_root")"
     # Drop a leading blank line when there was no headline (no-vault CWD).
     brief=$(printf '%s' "$brief" | sed '1{/^$/d;}')
