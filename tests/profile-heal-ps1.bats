@@ -108,10 +108,12 @@ setup() {
     grep -q 'profile-heal.ps1' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "doctor.ps1 -Fix invokes profile-heal.ps1" {
-    # Pattern mirrors claude-mem-heal invocation at doctor.ps1:215.
-    grep -qF 'profile-heal.ps1' "$DOTFILES_DIR/scripts/doctor.ps1"
-}
+# CLI-018: doctor.ps1 was retired and its -Fix auto-invocation of
+# profile-heal.ps1 (BUG-020) is NOT yet ported to `dotf doctor --fix`
+# (runHeals only invokes claude-mem-heal.sh). Recovery still works manually:
+# profile-heal.ps1 stays deployed and the BUG-021 setup preflight points at it.
+# The doctor auto-heal port is tracked in #531; once landed, assert it in the Go
+# doctor fix tests (cli/internal/doctor), not here.
 
 # --- Cross-OS asymmetry documented (Linux uses clean-copy, no heal needed) ---
 

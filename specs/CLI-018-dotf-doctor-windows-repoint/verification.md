@@ -29,6 +29,38 @@ created: "2026-06-21"
 - [x] **No coverage lost on PR-B's deletion** → `healthcheck.ps1` §4's three
   deployed-file checks now live in `dotf doctor`; PR-B can delete the `.ps1`.
 
+## Evidence (PR-B — delete the `.ps1` twins + repoint all callers)
+
+- [x] **Retired scripts deleted** → `git rm scripts/healthcheck.ps1 scripts/doctor.ps1
+  tests/healthcheck-ps1.bats`. `dotf doctor` is now the only Windows diagnostic.
+- [x] **All production callers repointed** →
+  - `setup-windows.ps1`: dropped both deploy blocks (no longer copies the `.ps1`
+    to `ScriptsDir`) and replaced the 8c/8d invoke blocks with a single non-fatal
+    `dotf doctor` post-setup block (does NOT alter `$LASTEXITCODE`).
+  - `.github/workflows/ci.yml`: `test-windows` runs `dotf doctor` (PATH prepended
+    with `~/.local/bin`) instead of `healthcheck.ps1`.
+  - `powershell/profile.ps1`: `hc` wraps `dotf doctor @args`.
+  - `scripts/claude-session-start.ps1`: SessionStart drift surfaces via
+    `dotf doctor --quick` (mirrors the Linux hook).
+  - `README.md`: dropped the `healthcheck.ps1` tree line.
+- [x] **Guard tests added** (`tests/setup-windows.bats`) →
+  - `CLI-018: healthcheck.ps1 and doctor.ps1 are deleted` (file-absence).
+  - `CLI-018: no production caller references healthcheck.ps1 or doctor.ps1`
+    (greps the 6 production files for the `(healthcheck|doctor)\.ps1` token).
+    Retired-script *mentions* in comments were reworded to "doctor + healthcheck
+    shell scripts" so the guard catches live references, not documentation.
+- [x] **Parity + structural bats updated** → `setup-linux.bats` (both OSes run
+  `dotf doctor`; SessionStart drift via `--quick`), `powershell-profile.bats`
+  (`hc` wraps `dotf doctor`, no `healthcheck.ps1`), `opencode.bats` + `pi-config.bats`
+  (the old `healthcheck.ps1` assertions are now comments — behaviour lives in
+  `go test`).
+- [x] **No-silent-drop flagged** → `doctor.ps1 -Fix` auto-invoked `profile-heal.ps1`
+  (BUG-020). `dotf doctor --fix` (`runHeals`) does NOT — it only runs
+  `claude-mem-heal.sh`. `profile-heal.ps1` stays deployed and the BUG-021 setup
+  preflight still points at it (manual recovery intact); the doctor auto-heal port
+  is tracked in **#531**. `tests/profile-heal-ps1.bats` swaps the `doctor.ps1 -Fix`
+  assertion for an explanatory comment referencing #531.
+
 ## Test status
 
 - `go -C cli test ./internal/doctor/...` → **ok** (4.9s), incl. `TestCheckOrcaHook`.

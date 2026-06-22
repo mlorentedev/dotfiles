@@ -216,7 +216,7 @@ jobs:
           & "$bin\eza.exe" --version
           & "$bin\zoxide.exe" --version
 
-      - name: Run healthcheck.ps1
+      - name: Run dotf doctor
         shell: pwsh
         env:
           ANTIGRAVITY_ENDPOINT: https://cloudcode-pa.googleapis.com
@@ -229,7 +229,9 @@ jobs:
           # the real repo.
           $env:DOTFILES_REPO_DIR = $env:GITHUB_WORKSPACE
           $env:GEMINI_DIR = "$env:USERPROFILE\.gemini"
-          pwsh -NoProfile -File scripts\healthcheck.ps1
+          # dotf is installed to ~/.local/bin by setup-windows.ps1 (WIN-006).
+          $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+          dotf doctor
           exit $LASTEXITCODE
 
       - name: Run Pester suites

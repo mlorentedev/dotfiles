@@ -60,15 +60,19 @@ if (Test-Path $ClaudeMemHeal) {
     }
 }
 
-# --- Silent doctor: surface env-contract drift only when detected ---
-# Runs check-only; keeps only [warn]/[fail] lines.
-$DoctorScript = Join-Path $PSScriptRoot 'doctor.ps1'
-if (Test-Path $DoctorScript) {
+# --- Silent doctor: surface env-contract drift to Claude only when detected ---
+# Uses `dotf doctor --quick` (CLI-013/CLI-018): the env-contract sweep only, no
+# compile-harness gate, so it stays fast. Forwards only [WARN]/[FAIL] lines.
+# Gated on dotf being on PATH AND a deployed env-contract.json. Mirrors the
+# Linux claude-session-start.sh block.
+$DotfilesRoot = if ($env:DOTFILES_DIR) { $env:DOTFILES_DIR } else { Join-Path $env:USERPROFILE '.dotfiles' }
+$DotfContract = Join-Path $DotfilesRoot 'env-contract.json'
+if ((Get-Command dotf -ErrorAction SilentlyContinue) -and (Test-Path $DotfContract)) {
     try {
-        $doctorOut = & pwsh -NoProfile -File $DoctorScript 2>&1 | Out-String
-        $drift = ($doctorOut -split "`n" | Where-Object { $_ -match '^\s+\[(warn|fail)\]' }) -join "`n"
+        $doctorOut = & dotf doctor --quick 2>&1 | Out-String
+        $drift = ($doctorOut -split "`n" | Where-Object { $_ -match '^\s+\[(WARN|FAIL)\]' }) -join "`n"
         if ($drift) {
-            $driftBlock = "[doctor] env-contract drift detected (run scripts/doctor.ps1 -Fix):`n$drift"
+            $driftBlock = "[doctor] env-contract drift detected (run 'dotf doctor --fix'):`n$drift"
             if ($ContextLines) {
                 $ContextLines = "$ContextLines`n`n$driftBlock"
             } else {
