@@ -39,10 +39,6 @@ setup() {
     ! grep -qE 'openrouter/(openai|google|anthropic)/' "$PI_SETTINGS"
 }
 
-# The age identity is optional per box: a leftover {env:} token in the deployed
-# models.json without a local age key is the expected state (runtime env resolver
-# is the fallback), so it must SKIP, not FAIL. The .sh side is now go test
-# (TestCheckOpenCode pi models.json branch); healthcheck.ps1 keeps the assertion.
-@test "healthcheck.ps1 treats a missing age identity as optional for pi models.json" {
-    grep -qF 'age identity absent' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-}
+# CLI-018: the "missing age identity is optional for pi models.json" assertion
+# lived in healthcheck.ps1; it now lives in go test (TestCheckOpenCode pi
+# models.json branch) after the .ps1 was retired.

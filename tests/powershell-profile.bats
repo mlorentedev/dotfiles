@@ -93,17 +93,14 @@ setup() {
 
 # --- WIN-001: hc function (healthcheck alias mirror of Linux `hc`) ---
 
-@test "profile.ps1 defines hc function (WIN-001 healthcheck alias)" {
+@test "profile.ps1 defines hc function (CLI-018: dotf doctor alias)" {
     grep -qE '^function hc' "$PROFILE_SCRIPT"
 }
 
-@test "profile.ps1 hc function probes both deploy locations (Phase 2.7 contract drift workaround)" {
-    # Until env-contract drift is resolved, hc must look at the actual deploy
-    # location ($USERPROFILE\scripts -- where setup-windows.ps1 puts it AND
-    # the dir added to PATH) BEFORE the env-contract path. Without this fix
-    # hc was permanently FAIL-on-not-found on Windows.
-    grep -qF 'scripts\healthcheck.ps1' "$PROFILE_SCRIPT"
-    grep -qF '$env:USERPROFILE' "$PROFILE_SCRIPT"
+@test "profile.ps1 hc function wraps dotf doctor (CLI-018)" {
+    # hc was a healthcheck.ps1 launcher; after CLI-018 it runs dotf doctor.
+    grep -A6 '^function hc' "$PROFILE_SCRIPT" | grep -qF 'dotf doctor'
+    ! grep -qF 'healthcheck.ps1' "$PROFILE_SCRIPT"
 }
 
 @test "profile.ps1 valid PowerShell syntax (if pwsh available)" {

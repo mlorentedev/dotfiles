@@ -1501,33 +1501,13 @@ if (Test-Path $memHealSource) {
 }
 
 # BUG-020: profile-heal.ps1 reconstructs a corrupted PowerShell profile from
-# the SSOT. Invoked by doctor.ps1 -Fix and pointed at by setup-windows.ps1's
-# preflight error message (BUG-021).
+# the SSOT. Pointed at by setup-windows.ps1's preflight error message (BUG-021).
 $profileHealSource = "$DotfilesDir\scripts\profile-heal.ps1"
 if (Test-Path $profileHealSource) {
     Copy-Item $profileHealSource "$ScriptsDir\" -Force
     Write-Success "Deployed profile-heal.ps1 to $ScriptsDir\"
 } else {
     Write-Warn "profile-heal.ps1 not found at $profileHealSource"
-}
-
-$doctorSource = "$DotfilesDir\scripts\doctor.ps1"
-if (Test-Path $doctorSource) {
-    Copy-Item $doctorSource "$ScriptsDir\" -Force
-    Write-Success "Deployed doctor.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "doctor.ps1 not found at $doctorSource"
-}
-
-# WIN-001 follow-up: PR #71 added the post-setup invocation in section 8d but
-# omitted the deploy. Without this Copy-Item, $ScriptsDir\healthcheck.ps1 never
-# exists and section 8d silently warns "not deployed, skipping" on every run.
-$healthcheckSource = "$DotfilesDir\scripts\healthcheck.ps1"
-if (Test-Path $healthcheckSource) {
-    Copy-Item $healthcheckSource "$ScriptsDir\" -Force
-    Write-Success "Deployed healthcheck.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "healthcheck.ps1 not found at $healthcheckSource"
 }
 
 # DX-006: deploy + re-apply the Orca/Copilot PreToolUse hook fix. Orca regenerates
@@ -1955,39 +1935,20 @@ if (-not $env:OPENCODE_HOME)     { $env:OPENCODE_HOME     = "$env:USERPROFILE\.c
 # 4 vars to surface PASS immediately in the post-setup checks.
 if (-not $env:DOTFILES_REPO_DIR) { $env:DOTFILES_REPO_DIR = "$env:USERPROFILE\Projects\dotfiles" }
 
-$doctorScript = "$ScriptsDir\doctor.ps1"
-if (Test-Path $doctorScript) {
-    Write-Info "Running post-setup doctor check..."
+# CLI-018: dotf doctor is the single post-setup diagnostic on Windows, replacing
+# the retired doctor + healthcheck shell scripts. Non-fatal -- surfaces gaps but
+# does NOT alter setup's $LASTEXITCODE.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    Write-Info "Running post-setup dotf doctor..."
     Write-Host ""
-    & pwsh -NoProfile -File $doctorScript
+    & dotf doctor
     $doctorExit = $LASTEXITCODE
     Write-Host ""
     if ($doctorExit -ne 0) {
-        Write-Warn "doctor reported one or more required items missing (exit $doctorExit) -- review output above"
+        Write-Warn "dotf doctor reported one or more issues (exit $doctorExit) -- review output above; re-run with the 'hc' alias"
     }
 } else {
-    Write-Warn "doctor.ps1 not deployed at $doctorScript, skipping post-setup check"
-}
-
-# ============================================================================
-# 8d. POST-SETUP HEALTHCHECK (WIN-001)
-# ============================================================================
-# Full structural health check after doctor. Non-fatal: surfaces deploy gaps
-# but does NOT alter setup's $LASTEXITCODE. Linux setup-linux.sh does not
-# auto-invoke healthcheck.sh today; that parity is tracked by WIN-001b.
-
-$healthcheckScript = "$ScriptsDir\healthcheck.ps1"
-if (Test-Path $healthcheckScript) {
-    Write-Info "Running post-setup healthcheck..."
-    Write-Host ""
-    & pwsh -NoProfile -File $healthcheckScript
-    $healthcheckExit = $LASTEXITCODE
-    Write-Host ""
-    if ($healthcheckExit -ne 0) {
-        Write-Warn "healthcheck reported one or more FAIL items (exit $healthcheckExit) -- review output above; use 'hc' alias to re-run"
-    }
-} else {
-    Write-Warn "healthcheck.ps1 not deployed at $healthcheckScript, skipping post-setup check"
+    Write-Warn "dotf not found on PATH, skipping post-setup diagnostics"
 }
 
 # ============================================================================

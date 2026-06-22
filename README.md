@@ -52,7 +52,6 @@ admin needed; some changes show after an Explorer restart.
 ├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
 │   ├── load-secrets.sh / .ps1  # Secrets → env vars (sourced at login)
-│   ├── healthcheck.ps1         # Windows post-setup verification (Linux: `dotf doctor`)
 │   ├── vault.sh                # Vault tooling dispatcher
 │   └── …                       # ~50 scripts total (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets

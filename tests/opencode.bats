@@ -56,14 +56,9 @@ setup() {
     grep -q 'shadows it in PATH' "$SETUP_SCRIPT"
 }
 
-# Version drift is advisory: the pinned tool still works, just outdated. Drift
-# must WARN (exit-neutral), never FAIL. The .sh side is now go test
-# (TestCheckOptionalTools_DotfDrift, TestCheckVersionMatch); healthcheck.ps1
-# keeps the assertion until the Windows port.
-@test "healthcheck.ps1: version drift reports WARN not FAIL" {
-    grep -qE 'Write-Warn "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-    ! grep -qE 'Write-Fail "(yarn|opencode|pi) version drift' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-}
+# CLI-018: version-drift-is-WARN (yarn/opencode/pi) was asserted against
+# healthcheck.ps1; it now lives in go test (TestCheckOptionalTools_DotfDrift,
+# TestCheckVersionMatch) after the .ps1 was retired.
 
 @test "setup-linux.sh opencode install URL uses opencode.ai (not anomalyco fork)" {
     grep -q 'curl -fsSL https://opencode.ai/install' "$SETUP_SCRIPT"

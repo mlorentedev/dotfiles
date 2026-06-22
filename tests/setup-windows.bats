@@ -600,7 +600,7 @@ setup() {
 # The diff-check.{sh,ps1} twins were deleted once `dotf doctor` (PR-A, #513)
 # absorbed the byte-compare. setup must no longer deploy diff-check.ps1, the
 # `dch` convenience now wraps `dotf doctor`, and no production caller may
-# reference diff-check. (healthcheck.ps1 sec 11 keeps the lone residual until #509.)
+# reference diff-check.
 
 @test "CLI-019: setup-windows.ps1 no longer deploys diff-check.ps1" {
     if grep -qF 'diff-check' "$PS1_SCRIPT"; then
@@ -621,7 +621,6 @@ setup() {
 @test "CLI-019: production callers no longer reference diff-check" {
     [ ! -f "$DOTFILES_DIR/scripts/diff-check.sh" ]
     [ ! -f "$DOTFILES_DIR/scripts/diff-check.ps1" ]
-    # healthcheck.ps1 sec 11 is the lone residual until #509 deletes the file.
     for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
              .zsh/aliases.zsh .github/workflows/ci.yml; do
         if grep -qF 'diff-check' "$DOTFILES_DIR/$f"; then
@@ -631,24 +630,35 @@ setup() {
     done
 }
 
-# --- WIN-001: healthcheck.ps1 wiring as final step ---
+# --- CLI-018 (#509): healthcheck.ps1 + doctor.ps1 retired; dotf doctor owns it ---
+# Both Windows .ps1 diagnostics were deleted once dotf doctor reached parity
+# (the §4 residual was ported by #522). The files must be gone and no production
+# caller may reference them -- setup, CI, the profile hc alias, and the
+# SessionStart hook all repoint to dotf doctor.
 
-@test "WIN-001: setup-windows.ps1 invokes healthcheck.ps1 after doctor" {
-    grep -qF 'healthcheck.ps1' "$PS1_SCRIPT"
-    grep -qF 'Running post-setup healthcheck' "$PS1_SCRIPT"
+@test "CLI-018: healthcheck.ps1 and doctor.ps1 are deleted" {
+    [ ! -f "$DOTFILES_DIR/scripts/healthcheck.ps1" ]
+    [ ! -f "$DOTFILES_DIR/scripts/doctor.ps1" ]
 }
 
-@test "WIN-001: setup-windows.ps1 healthcheck block is non-fatal (Write-Warn, no exit)" {
-    # Capture the healthcheck block (between 8d header and section 9 SUMMARY)
-    # and assert it warns instead of exiting.
-    sed -n '/8d\. POST-SETUP HEALTHCHECK/,/9\. SUMMARY/p' "$PS1_SCRIPT" | grep -qF 'Write-Warn'
-    ! sed -n '/8d\. POST-SETUP HEALTHCHECK/,/9\. SUMMARY/p' "$PS1_SCRIPT" | grep -qE '^\s*exit\s+[0-9]'
+@test "CLI-018: no production caller references healthcheck.ps1 or doctor.ps1" {
+    for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
+             scripts/claude-session-start.ps1 scripts/claude-session-start.sh \
+             .github/workflows/ci.yml; do
+        if grep -qE '(healthcheck|doctor)\.ps1' "$DOTFILES_DIR/$f"; then
+            echo "(healthcheck|doctor).ps1 still referenced in $f" >&2
+            return 1
+        fi
+    done
 }
 
-@test "WIN-001: setup-windows.ps1 healthcheck block runs after doctor block" {
-    doctor_line=$(grep -n '8c\. POST-SETUP DOCTOR' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    health_line=$(grep -n '8d\. POST-SETUP HEALTHCHECK' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [[ -n "$doctor_line" ]] && [[ -n "$health_line" ]] && [[ "$health_line" -gt "$doctor_line" ]]
+# --- CLI-018: dotf doctor as the post-setup diagnostic (replaced WIN-001) ---
+
+@test "CLI-018: setup-windows.ps1 runs dotf doctor post-setup, non-fatal" {
+    grep -qF 'dotf doctor' "$PS1_SCRIPT"
+    grep -qF 'Running post-setup dotf doctor' "$PS1_SCRIPT"
+    # non-fatal: the failure path warns, never hard-exits.
+    grep -qF 'dotf doctor reported one or more issues' "$PS1_SCRIPT"
 }
 
 # --- BUG-021: profile-section fail-fast (root cause of BUG-020 accumulation) ---

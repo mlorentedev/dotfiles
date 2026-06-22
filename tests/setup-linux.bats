@@ -438,24 +438,20 @@ setup() {
     fi
 }
 
-# CLI-012/ADR-021: doctor.sh was ported to `dotf doctor` (Go) and deleted; its
-# check logic + --fix path now live in cli/internal/doctor (go test). doctor.ps1
-# is kept until the Windows port lands dotf on PATH there.
-@test "doctor.sh is retired (ported to dotf doctor); doctor.ps1 kept" {
+# CLI-012/CLI-018/ADR-021: doctor.sh and doctor.ps1 were both ported to
+# `dotf doctor` (Go) and deleted; the check logic + --fix path live in
+# cli/internal/doctor (go test).
+@test "doctor.sh and doctor.ps1 are both retired (ported to dotf doctor)" {
     [ ! -f "$DOTFILES_DIR/scripts/doctor.sh" ]
-    [ -f "$DOTFILES_DIR/scripts/doctor.ps1" ]
+    [ ! -f "$DOTFILES_DIR/scripts/doctor.ps1" ]
 }
 
-@test "doctor.ps1 supports -Fix switch" {
-    grep -q '\[switch\]\$Fix' "$DOTFILES_DIR/scripts/doctor.ps1"
-}
-
-# Setup scripts run post-setup diagnostics before 'Setup Complete'. Linux folds
-# doctor + healthcheck into one `dotf doctor` call (CLI-012); Windows still runs
-# doctor.ps1 until the Windows port.
-@test "post-setup diagnostics: linux runs dotf doctor, windows runs doctor.ps1" {
+# Setup scripts run post-setup diagnostics before 'Setup Complete'. Both OSes
+# now fold the old doctor + healthcheck blocks into one `dotf doctor` call
+# (CLI-012 Linux, CLI-018 Windows).
+@test "post-setup diagnostics: both linux and windows run dotf doctor" {
     grep -q 'dotf doctor' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'doctor\.ps1' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -q 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # BUG-013b: cross-OS parity for the Obsidian CLI install.
@@ -473,64 +469,29 @@ setup() {
     grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
 }
 
-# --- BUG-015: detection layer for claude-mem hook intermittent fails ---
-# The originally proposed prevention via PLUGIN_ROOT export was empirically
-# invalidated: setting PLUGIN_ROOT adds a third producer to the upstream
-# hooks' `{ printf; ls; printf; } | while ... break` pipe, tightening the
-# race that causes `printf: write error: Permission denied` on Git Bash.
-# The root cause is unfixable from outside (upstream hook pattern issue).
-# We keep ONLY the detection assertion: both healthchecks actually run
-# the hook resolution and report.
-@test "healthcheck.ps1 includes BUG-015 hook resolution assertion" {
-    # The .sh side moved to cli/internal/doctor (resolveClaudeMemHook, go test);
-    # healthcheck.ps1 keeps the probe until the Windows port.
-    grep -qF 'BUG-015' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-}
+# CLI-018: the claude-mem hook detection (BUG-015/WIN-004) + the EPIPE-race
+# guard (BUG-022/023) lived in healthcheck.ps1; both are now covered by
+# cli/internal/doctor (resolveClaudeMemHook / checkClaudeMem, go test) after
+# the .ps1 was retired.
 
-# WIN-004: on a machine where Claude Code never ran (clean box, CI runner),
-# the BUG-015 hook probe must SKIP like the BUG-014 check above it, not FAIL.
-# Gate: installed_plugins.json missing -> skip the probe.
-@test "healthcheck.ps1: BUG-015 hook probe skips when claude-mem never installed (WIN-004)" {
-    grep -qF 'claude-mem hook probe n/a' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-}
-
-# BUG-022/023 (the .sh probe's pipe-to-head EPIPE race) is structurally moot in
-# the Go port: resolveClaudeMemHook iterates a materialized slice and breaks on
-# the first hit — no pipe, no race. Covered by go test (resolveClaudeMemHook).
-# The .ps1 native probe is asserted below.
-
-@test "BUG-023: healthcheck.ps1 uses native PowerShell probe (not bash)" {
-    # The bash one-liner was removed (BUG-015): CLAUDE_CONFIG_DIR not
-    # inherited into bash subshell on Windows. Native PS probe checks the
-    # same candidate directories for bun-runner.js + worker-service.cjs.
-    ! grep -qF '_CANDS=$(' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-    ! grep -qF 'done <<<"$_CANDS"' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-    # Negative: lock out the broken pipe-to-head form so PS1 stays in parity.
-    ! grep -qF 'done | head -n1' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-    # Positive: native PS probe uses Get-ChildItem and Test-Path.
-    grep -qF 'Get-ChildItem' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-    grep -qF 'Test-Path' "$DOTFILES_DIR/scripts/healthcheck.ps1"
-}
-
-# CLI-012: setup-linux folds the old doctor + healthcheck blocks into ONE
-# `dotf doctor` call (the consolidated sweep). setup-windows keeps its
-# healthcheck.ps1 auto-invoke (WIN-001) until the Windows port.
+# CLI-012/CLI-018: both setups fold the old doctor + healthcheck blocks into ONE
+# `dotf doctor` call (the consolidated sweep).
 @test "setup-linux.sh runs dotf doctor non-fatally post-setup" {
     grep -q 'dotf doctor' "$DOTFILES_DIR/setup-linux.sh"
     # non-fatal: the failure path warns, never hard-exits.
     grep -q 'dotf doctor || log_warning' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-windows.ps1 still invokes healthcheck.ps1 post-setup (Windows port pending)" {
-    grep -qF 'healthcheck.ps1' "$DOTFILES_DIR/setup-windows.ps1"
+@test "setup-windows.ps1 runs dotf doctor post-setup (CLI-018)" {
+    grep -qF 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'Running post-setup dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# CLI-013: the Linux SessionStart hook surfaces env-contract drift via the light
-# `dotf doctor --quick` (the full sweep was too heavy to fork per session —
-# CLI-012). Windows still uses doctor.ps1 until the Windows hook port.
-@test "SessionStart hooks surface drift: linux via dotf doctor --quick, windows via doctor.ps1" {
+# CLI-013/CLI-018: both SessionStart hooks surface env-contract drift via the
+# light `dotf doctor --quick` (the full sweep is too heavy to fork per session).
+@test "SessionStart hooks surface drift via dotf doctor --quick (both OSes)" {
     grep -q 'dotf doctor --quick' "$DOTFILES_DIR/scripts/claude-session-start.sh"
-    grep -q 'doctor\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
+    grep -q 'dotf doctor --quick' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 
 # Required binaries in the contract must include min_version pins.
@@ -541,17 +502,9 @@ setup() {
     fi
 }
 
-# The binary version-check logic (min_version) moved to cli/internal/doctor
-# (checkRequiredBinaries, go test); doctor.ps1 keeps it until the Windows port.
-@test "doctor.ps1 checks binary versions against min_version (Windows port pending)" {
-    grep -q 'min_version' "$DOTFILES_DIR/scripts/doctor.ps1"
-}
-
-# Per-section summaries (no empty headers) are the Report's job in Go
-# (report.go, go test); doctor.ps1 keeps Write-SectionSummary until the port.
-@test "doctor.ps1 emits per-section summaries (Windows port pending)" {
-    grep -q 'Write-SectionSummary' "$DOTFILES_DIR/scripts/doctor.ps1"
-}
+# CLI-018: doctor.ps1's min_version check + per-section summaries are covered by
+# cli/internal/doctor (checkRequiredBinaries / report.go, go test) after the
+# .ps1 was retired.
 
 # Profiles must export the structural env vars declared in env-contract.json,
 # so a fresh shell silences doctor without needing --fix every session.

@@ -137,27 +137,13 @@ if (Get-Command copilot -ErrorAction SilentlyContinue) {
 # Healthcheck (WIN-001): mirrors the Linux `hc` alias. Runs the full 13-section
 # structural verification of the deployed dotfiles install.
 #
-# Path-resolution note: env-contract.json declares SCRIPTS_DIR =
-# $USERPROFILE\.dotfiles\scripts, but setup-windows.ps1 actually deploys
-# scripts to $USERPROFILE\scripts (and adds THAT to User PATH). Until that
-# contract drift is fixed (tracked as Phase 2.7), try both locations -- the
-# deployed path first (where setup actually puts it), the env-contract path
-# as a future-proof fallback.
+# CLI-018: `hc` runs `dotf doctor`, the single diagnostic that replaced the
+# retired healthcheck + doctor shell scripts.
 function hc {
-    # First match wins. Explicit foreach (not Where-Object) so a single-hit
-    # result stays a [string] and not the indexed-as-char trap.
-    $found = $null
-    foreach ($p in @(
-        (Join-Path $env:USERPROFILE 'scripts\healthcheck.ps1'),
-        $(if ($env:SCRIPTS_DIR) { Join-Path $env:SCRIPTS_DIR 'healthcheck.ps1' } else { $null })
-    )) {
-        if ($p -and (Test-Path -LiteralPath $p)) { $found = $p; break }
-    }
-
-    if ($found) {
-        & pwsh -NoProfile -File $found
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        & dotf doctor @args
     } else {
-        Write-Host "[ERROR] healthcheck.ps1 not found at `$USERPROFILE\scripts\ or `$env:SCRIPTS_DIR" -ForegroundColor Red
+        Write-Host "[ERROR] dotf not found on PATH." -ForegroundColor Red
         Write-Host "Run setup-windows.ps1 from your dotfiles repository first." -ForegroundColor Yellow
     }
 }
