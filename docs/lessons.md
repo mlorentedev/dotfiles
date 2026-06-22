@@ -1234,3 +1234,23 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Write the negative assertion explicitly: `if grep -qF 'diff-check' "$file"; then echo "still referenced in $file" >&2; return 1; fi`.
 
 **Rule**: Never rely on a bare `! cmd` line as a failing assertion under errexit (bats, or any `set -e` script) — `!`-negated commands are exempt from errexit. Use an explicit `if cmd; then return 1; fi`, or `run cmd` + an `$status` check.
+
+### [2026-06-21] A strict cross-OS `dotf doctor` is not a drop-in CI gate for a lenient platform-specific healthcheck
+
+**Context**: CLI-018 retired Windows `healthcheck.ps1`. The `test-windows` CI job's "Run healthcheck.ps1" step was repointed to `dotf doctor` followed by `exit $LASTEXITCODE`.
+
+**Problem**: The step false-red'd. `dotf doctor` (the cross-OS Go diagnostic) FAILs on a partial CI runner — `HOME` unset, `wget`/`terraform`/`java` are env-contract *required* binaries, and opencode/pi/git-hooks-dispatcher are absent — so it exit-codes 1. The retired `healthcheck.ps1` had been Windows-aware and lenient about exactly those checks, so it exited 0 in the same environment. Renaming the step silently swapped a lenient checker for a strict one against an environment that never satisfied the strict one — same intent, different exit semantics.
+
+**Solution**: Removed the live gate from `test-windows` rather than tuning the Go diagnostic's Windows-awareness (a behaviour change, out of scope for a delete+repoint PR). This mirrors Linux, which runs **no** live diagnostic gate — `dotf doctor` is covered by `go test` + structural bats, and `setup-windows.ps1` still runs end-to-end (its own *non-fatal* post-setup `dotf doctor` prints health without gating).
+
+**Rule**: When a CI gate's underlying tool changes from a lenient platform-specific script to a strict cross-OS one, re-derive what the gate can actually assert in the CI environment — a partial runner will not satisfy a full-install diagnostic, so gating on its exit code false-reds every PR. Check what the *other* OS's CI does (parity) before inventing a gate; a diagnostic built for humans post-setup is normally validated in CI by unit + structural tests, not by gating on its live exit code.
+
+### [2026-06-21] A delete ripples past the direct caller — token guard-greps miss transitive refs, and "orphaned" fixtures can have hidden consumers
+
+**Context**: Deleting `healthcheck.ps1`/`doctor.ps1` + `tests/healthcheck-ps1.bats` (CLI-018 PR-B). A guard test greps the production files for the `(healthcheck|doctor)\.ps1` token.
+
+**Problem**: Two blind spots the guard did not cover. (1) The grep matches the token `healthcheck.ps1` but NOT `tests/healthcheck-ps1.bats` (hyphen, different extension) — so a stale invocation of the deleted bats file survived in `ci.yml`'s bats subset and would have errored the step once the gating step ahead of it was removed. (2) A CI fixture commented "minimal vault tree for healthcheck section 7" looked orphaned by the deletion, but `setup-windows.ps1` itself consumes it: the auto-memory junction deploy is gated on `Test-Path $VaultRoot`, and a stub `obsidian.cmd` on PATH makes setup take its skip-install branch. Deleting on the comment's word would have silently cut end-to-end coverage.
+
+**Solution**: Read the whole CI job, not just the grep hits. Removed the stale `healthcheck-ps1.bats` entry and the genuinely-orphaned eza/zoxide flake-guard step (it only fed the removed diagnostic), but KEPT the vault/obsidian fixtures and corrected their stale comments to name the real consumer (`setup-windows.ps1`).
+
+**Rule**: A token guard-grep covers layer 1 (direct references in the exact filename form). It does not catch transitive references (CI test lists, glob runners) or setup steps that only fed the deleted thing. Before deleting "orphaned" setup, grep its consumers by *capability* (the dir/binary/PATH entry it provides), not just by the comment — a comment documents one original reason, not every later consumer.

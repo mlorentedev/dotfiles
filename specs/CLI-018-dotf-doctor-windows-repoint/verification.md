@@ -83,7 +83,7 @@ created: "2026-06-21"
 
 ## Promotion candidates
 
-- [ ] Lesson for `docs/lessons.md`? no — the cross-OS-parity lesson is already captured (CLI-020).
+- [x] Lesson for `docs/lessons.md`? **yes, 2 captured** — (1) a strict cross-OS `dotf doctor` is not a drop-in CI gate for a lenient platform-specific healthcheck; (2) a delete ripples past the direct caller (token guard-greps miss transitive refs; "orphaned" fixtures can have hidden consumers). The cross-OS-parity lesson itself was already captured (CLI-020).
 - [ ] ADR-worthy? no — executes ADR-020/021.
 - [ ] New pattern? no.
 
