@@ -198,6 +198,32 @@ jobs:
 | Assigning an issue does **not** move it to *In Progress* | `bitacora-status.yml` missing in that repo, or PAT lacks `project` scope | §7b — deploy it (OPS-002 rollout) / check `BITACORA_PAT` |
 | `item-edit`: *could not resolve to ProjectV2 node* | wrong project-id / field-id | §2 reference |
 | `gh pr edit` errors with `projectCards` deprecation | classic-projects GraphQL path | use `gh api` instead |
+| `gh project item-list` / `gh issue list --json` returns empty or `API rate limit exceeded` | GraphQL pool exhausted (Projects v2 + `--json` are GraphQL; bulk `item-list` burns it fast) | §8a — REST for issue data; board fields have no REST path |
+
+### 8a. GraphQL rate-limit fallback
+
+The GraphQL pool is **separate** from the REST core pool, and Projects v2 queries cost
+many GraphQL points each — a couple of full `gh project item-list` sweeps can drain it.
+When drained, `gh project item-list` and `gh issue list --json` fail or return empty while
+REST is usually still fresh. Check both pools first (the `rate_limit` endpoint is free):
+
+```bash
+gh api rate_limit --jq '{core:.resources.core.remaining, graphql:.resources.graphql.remaining, reset:(.resources.graphql.reset|todate)}'
+```
+
+- **Issue data** (number, title, labels, state, body) → fall back to the **REST** issues
+  endpoint (separate pool). `gh issue list --json` does **not** help — it is GraphQL.
+
+  ```bash
+  gh api "repos/OWNER/REPO/issues?state=open&per_page=100" --paginate \
+    --jq '.[] | select(.pull_request==null) | "#\(.number) [\(.labels|map(.name)|join(","))] \(.title)"'
+  ```
+
+- **Board fields** (Status / Priority / Type / the custom `ID`) → **GraphQL-only; there is
+  no REST fallback.** Degrade gracefully: use repo **labels as a proxy** for nature/priority,
+  read local state, or **wait for `graphql.reset`**. Do not spin-retry — it only burns more.
+- **Prevention:** fetch the board JSON **once** with a high `--limit` into a file and parse it
+  locally (repeated `python`), instead of looping `gh project item-list` or calling it per item.
 
 ## References
 
