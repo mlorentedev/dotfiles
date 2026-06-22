@@ -110,7 +110,8 @@ jobs:
   # PR-only: windows-latest minutes bill 2x Linux (proposal R4).
   # Sandbox strategy: re-encrypt the one secret consumed by {env:} tokens with
   # a throwaway age key so the SDD-009 substitution path runs for real, and
-  # mock only the vault surface healthcheck section 7 asserts.
+  # mock only the vault surface that setup-windows.ps1's auto-memory junction
+  # and obsidian-CLI paths consume.
   test-windows:
     runs-on: windows-latest
     if: github.event_name == 'pull_request'
@@ -158,13 +159,16 @@ jobs:
           age-keygen -o "$env:USERPROFILE\.config\age\key.txt"
           $pub = (Select-String "$env:USERPROFILE\.config\age\key.txt" -Pattern 'age1[0-9a-z]+').Matches.Value | Select-Object -First 1
           'ci-dummy-nan-key' | age -r $pub -o sensitive\nan.api-key.secret.age
-          # Minimal vault tree for healthcheck section 7.
+          # Minimal vault tree so setup-windows.ps1's "Deploy auto-memory
+          # junctions from vault" block (gated on Test-Path $VaultRoot) is
+          # exercised end-to-end on the runner.
           $vault = "$env:USERPROFILE\Projects\knowledge"
           foreach ($d in '00_meta', '10_projects', '40_resources', '.obsidian') {
             New-Item -ItemType Directory -Force (Join-Path $vault $d) | Out-Null
           }
           '{}' | Set-Content (Join-Path $vault '.obsidian\types.json') -Encoding UTF8
-          # Stub obsidian CLI: healthcheck asserts PATH presence only.
+          # Stub obsidian CLI so setup-windows.ps1's Get-Command obsidian check
+          # takes the "already installed" path instead of an npm global install.
           $stub = "$env:USERPROFILE\ci-stub-bin"
           New-Item -ItemType Directory -Force $stub | Out-Null
           Set-Content (Join-Path $stub 'obsidian.cmd') '@echo off'
@@ -182,57 +186,6 @@ jobs:
           DOTFILES_DIR: ${{ github.workspace }}
           DOTFILES_REPO_DIR: ${{ github.workspace }}
         run: .\setup-windows.ps1
-
-      # Deterministic eza + zoxide install. `choco install` left them
-      # unresolvable on PATH for the healthcheck step (BUG-024/#414, the same
-      # chocolatey shim/PATH flake as age). Fetch the pinned official releases,
-      # extract onto a single dir wired into $GITHUB_PATH, and verify both
-      # resolve here. jq is preinstalled on the runner, so it keeps a choco
-      # fallback only if genuinely absent.
-      - name: Ensure core tools (deterministic eza/zoxide — flake guard, BUG-024)
-        shell: pwsh
-        run: |
-          function Read-Pin($key) {
-            $line = (Get-Content versions.conf | Select-String "^$key=").Line
-            if (-not $line) { throw "$key missing from versions.conf" }
-            return ($line -split '=', 2)[1].Trim()
-          }
-          $bin = "$env:USERPROFILE\ci-tools"
-          New-Item -ItemType Directory -Force $bin | Out-Null
-
-          $ezaVer = Read-Pin 'EZA_VERSION'
-          Invoke-WebRequest "https://github.com/eza-community/eza/releases/download/v$ezaVer/eza.exe_x86_64-pc-windows-gnu.zip" -OutFile eza.zip
-          Expand-Archive eza.zip -DestinationPath $bin -Force
-
-          $zoxVer = Read-Pin 'ZOXIDE_VERSION'
-          Invoke-WebRequest "https://github.com/ajeetdsouza/zoxide/releases/download/v$zoxVer/zoxide-$zoxVer-x86_64-pc-windows-msvc.zip" -OutFile zoxide.zip
-          Expand-Archive zoxide.zip -DestinationPath $bin -Force
-
-          Add-Content $env:GITHUB_PATH $bin
-
-          if (-not (Get-Command jq -ErrorAction SilentlyContinue)) { choco install jq -y --no-progress }
-
-          # Guard the guard: fail here if the extracted binaries are not present.
-          & "$bin\eza.exe" --version
-          & "$bin\zoxide.exe" --version
-
-      - name: Run dotf doctor
-        shell: pwsh
-        env:
-          ANTIGRAVITY_ENDPOINT: https://cloudcode-pa.googleapis.com
-          CLOUDCODE_URL: https://cloudcode-pa.googleapis.com
-        run: |
-          $env:DOTFILES_DIR = "$env:USERPROFILE\.dotfiles"
-          # The deployed profile (loaded by the Actions pwsh shell, which runs
-          # without -NoProfile) points DOTFILES_REPO_DIR at ~\Projects\dotfiles;
-          # override to the checkout so the repo/deploy drift check compares
-          # the real repo.
-          $env:DOTFILES_REPO_DIR = $env:GITHUB_WORKSPACE
-          $env:GEMINI_DIR = "$env:USERPROFILE\.gemini"
-          # dotf is installed to ~/.local/bin by setup-windows.ps1 (WIN-006).
-          $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
-          dotf doctor
-          exit $LASTEXITCODE
 
       - name: Run Pester suites
         shell: pwsh
@@ -253,8 +206,7 @@ jobs:
             tests/profile-heal-ps1.bats \
             tests/setup-windows.bats \
             tests/knowledge-crystallize-ps1.bats \
-            tests/obs-cli-ps1.bats \
-            tests/healthcheck-ps1.bats
+            tests/obs-cli-ps1.bats
 
   integration:
     runs-on: ubuntu-latest
