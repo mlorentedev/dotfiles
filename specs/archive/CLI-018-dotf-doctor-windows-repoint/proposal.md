@@ -1,7 +1,7 @@
 ---
 id: "CLI-018-dotf-doctor-windows-repoint"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-21"
 issue: "mlorentedev/dotfiles#380"
 tags: [spec, proposal]
