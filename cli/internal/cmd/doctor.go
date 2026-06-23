@@ -35,8 +35,8 @@ env-contract.json natively (no jq). Exit 0 when every check passes, 1 when any
 fails; advisory WARN/SKIP/INFO never fail the run.
 
 With --fix it reports the exact shell-profile lines for any missing env default
-(a subprocess cannot export into your shell) and invokes the known heal scripts
-(claude-mem).
+(a subprocess cannot export into your shell) and wires any safe repaired state
+(e.g. core.hooksPath).
 
 With --quick it runs ONLY the env-contract sweep (env vars, PATH, required
 binaries) and skips the heavy sections — chiefly the ~2.8s compile-harness drift
@@ -64,7 +64,7 @@ report-only (it ignores --fix).`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&fix, "fix", false, "report safe env defaults to persist and run known heals (claude-mem)")
+	cmd.Flags().BoolVar(&fix, "fix", false, "report safe env defaults to persist and wire safe repaired state (e.g. core.hooksPath)")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "list passing checks too (default summarises them per section)")
 	cmd.Flags().BoolVar(&quick, "quick", false, "env-contract sweep only — fast, no compile-harness gate (for the SessionStart hook)")
 	return cmd

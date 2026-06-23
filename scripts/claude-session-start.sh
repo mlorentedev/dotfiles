@@ -64,8 +64,8 @@ fi
 # SDD discipline reminder -- unconditional, first in additionalContext (SDD-001).
 # Surfaces the Discipline Gate to every Claude Code session regardless of CWD,
 # repo, or vault state. Cross-OS parity with claude-session-start.ps1. All
-# subsequent diagnostic blocks (claude-mem, doctor, hive, specs, vault, memory)
-# APPEND to CONTEXT_LINES defensively so they cannot wipe this reminder.
+# subsequent diagnostic blocks (doctor, hive, specs, vault, memory) APPEND to
+# CONTEXT_LINES defensively so they cannot wipe this reminder.
 CONTEXT_LINES='[sdd] Before your first tool call, read `AGENTS.md` at the repo root (or `~/Projects/dotfiles/AGENTS.md` as fallback) and apply its "Spec-Driven Development" (including the Discipline Gate) and "Standing Orders" sections. SDD applies by default for PR-sized changes (~50-300 LOC, public contract, new dep, multi-PR sequence). Skip ONLY for: typos, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, documentation-only changes. When in doubt, ASK the user.'
 
 # --- session-brief core (ADR-023, HARNESS-026) ---
@@ -88,20 +88,6 @@ SESSION_BRIEF_CORE="$SCRIPT_DIR/session-brief.sh"
 if [ -f "$SESSION_BRIEF_CORE" ]; then
     # shellcheck source=session-brief.sh
     SESSION_BRIEF_LIB=1 . "$SESSION_BRIEF_CORE"
-fi
-
-# --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
-# Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
-# missing zod runtime dep. Silent on healthy installs.
-CLAUDE_MEM_HEAL="$SCRIPT_DIR/claude-mem-heal.sh"
-if [ -x "$CLAUDE_MEM_HEAL" ]; then
-    HEAL_OUTPUT=$(bash "$CLAUDE_MEM_HEAL" 2>&1) || true
-    if [ -n "$HEAL_OUTPUT" ]; then
-        CONTEXT_LINES="$CONTEXT_LINES
-
-[claude-mem] self-healed plugin install:
-$HEAL_OUTPUT"
-    fi
 fi
 
 # --- Silent doctor: surface env-contract drift to Claude only when detected ---

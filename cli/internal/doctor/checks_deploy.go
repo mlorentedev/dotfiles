@@ -6,16 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
-// checkSymlinks reproduces healthcheck section 4: the dotfiles symlinks resolve,
-// plus the two claude-mem install-state assertions (BUG-014 membership, BUG-015
-// hook-path resolution). A real-file-where-a-symlink-was-expected still PASSes
-// (the deploy strategy moved to copy for some paths, ADR-012).
+// checkSymlinks reproduces healthcheck section 4: the dotfiles symlinks resolve.
+// A real-file-where-a-symlink-was-expected still PASSes (the deploy strategy
+// moved to copy for some paths, ADR-012).
 func checkSymlinks(sys *System, rep *Report) {
 	rep.Section("Key symlinks")
 	home := sys.home()
@@ -46,86 +44,6 @@ func checkSymlinks(sys *System, rep *Report) {
 			rep.Fail(rel + " missing: " + p)
 		}
 	}
-	checkClaudeMem(sys, rep)
-}
-
-// checkClaudeMem ports the BUG-014 + BUG-015 assertions: claude-mem is a
-// registered plugin and its hook path resolves to a runnable plugin dir. Both
-// SKIP when Claude Code never ran (no installed_plugins.json), which is the
-// expected state on a clean box or CI runner (WIN-004).
-func checkClaudeMem(sys *System, rep *Report) {
-	installedJSON := filepath.Join(sys.home(), ".claude", "plugins", "installed_plugins.json")
-
-	if !pathExists(installedJSON) {
-		rep.Skip("claude-mem install state — installed_plugins.json missing (Claude Code never ran)")
-		rep.Skip("claude-mem hook path — installed_plugins.json missing (probe n/a)")
-		return
-	}
-
-	if fileContains(installedJSON, "claude-mem@thedotmack") {
-		rep.Pass("claude-mem@thedotmack installed (BUG-014)")
-	} else {
-		rep.Fail("claude-mem@thedotmack NOT in installed_plugins.json — re-run setup (BUG-014)")
-	}
-
-	if p := resolveClaudeMemHook(sys); p != "" {
-		rep.Pass("claude-mem hook path resolves to: " + p + " (BUG-015)")
-	} else {
-		rep.Fail("claude-mem hook path resolution FAILED — run claude-mem-heal.sh (BUG-015)")
-	}
-}
-
-// resolveClaudeMemHook reproduces the healthcheck.sh path-resolution cascade:
-// PLUGIN_ROOT override, then the newest versioned cache dir, then the
-// marketplace plugin dir. The first candidate carrying both runner scripts
-// wins; "" means none did.
-func resolveClaudeMemHook(sys *System) string {
-	c := sys.env("CLAUDE_CONFIG_DIR", filepath.Join(sys.home(), ".claude"))
-
-	var candidates []string
-	if pr := sys.Getenv("PLUGIN_ROOT"); pr != "" {
-		candidates = append(candidates, pr)
-	}
-	candidates = append(candidates, newestVersionDirs(filepath.Join(c, "plugins", "cache", "thedotmack", "claude-mem"))...)
-	candidates = append(candidates, filepath.Join(c, "plugins", "marketplaces", "thedotmack-claude-mem", "plugin"))
-
-	for _, r := range candidates {
-		r = strings.TrimRight(r, "/")
-		q := r
-		if isDir(filepath.Join(r, "plugin", "scripts")) {
-			q = filepath.Join(r, "plugin")
-		}
-		if pathExists(filepath.Join(q, "scripts", "bun-runner.js")) &&
-			pathExists(filepath.Join(q, "scripts", "worker-service.cjs")) {
-			return q
-		}
-	}
-	return ""
-}
-
-// newestVersionDirs returns the numeric-prefixed subdirectories of parent,
-// newest (by mtime) first — the `ls -dt .../[0-9]*/` the twin used to prefer
-// the most recently installed plugin version.
-func newestVersionDirs(parent string) []string {
-	matches, _ := filepath.Glob(filepath.Join(parent, "[0-9]*"))
-	type dirMod struct {
-		path string
-		mod  int64
-	}
-	var dirs []dirMod
-	for _, m := range matches {
-		fi, err := os.Stat(m)
-		if err != nil || !fi.IsDir() {
-			continue
-		}
-		dirs = append(dirs, dirMod{m, fi.ModTime().UnixNano()})
-	}
-	sort.Slice(dirs, func(i, j int) bool { return dirs[i].mod > dirs[j].mod })
-	out := make([]string, len(dirs))
-	for i, d := range dirs {
-		out[i] = d.path
-	}
-	return out
 }
 
 // checkVault reproduces healthcheck section 7's read-only PRESENCE checks only.

@@ -1128,23 +1128,12 @@ fi
 # Claude Code plugins (requires claude CLI).
 # Idempotent: cache the installed-plugins list ONCE before the loop and skip
 # entries already present. The wrapper above (BUG-004/011) catches the
-# false-negative case where the idempotence guard misses a plugin (e.g.
-# claude-mem@thedotmack) and the resulting `claude plugin install` call
-# truncates .claude.json. BUG-011: the pre-loop `claude plugin list` is now
-# also wrapped because it goes through the same #59870 path.
+# false-negative case where the idempotence guard misses a plugin and the
+# resulting `claude plugin install` call truncates .claude.json. BUG-011: the
+# pre-loop `claude plugin list` is now also wrapped because it goes through the
+# same #59870 path.
 if command -v claude >/dev/null 2>&1; then
     log_info "Installing Claude Code plugins..."
-    # BUG-014: register the `thedotmack` marketplace BEFORE the plugin install
-    # loop. Without this, `claude plugin install claude-mem@thedotmack` cannot
-    # resolve `@thedotmack` (only `claude-plugins-official` is registered by
-    # default) and fails silently inside the loop's `|| true`. The CLI is
-    # idempotent ("Marketplace 'thedotmack' already on disk" + exit 0 on
-    # re-run), so we call it unconditionally. Wrapped per BUG-011 — every
-    # `claude` CLI invocation in setup must be snapshot-guarded.
-    _snap=$(snapshot_claude_json)
-    claude plugin marketplace add thedotmack/claude-mem >/dev/null 2>&1 || true
-    restore_claude_json_if_truncated "$_snap"
-
     # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
     # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
     _snap=$(snapshot_claude_json)
@@ -1153,7 +1142,6 @@ if command -v claude >/dev/null 2>&1; then
     plugins_added=0
     plugins_skipped=0
     for plugin in \
-        "claude-mem@thedotmack" \
         "code-simplifier@claude-plugins-official" \
         "gopls-lsp@claude-plugins-official" \
         "security-guidance@claude-plugins-official" \
@@ -1181,10 +1169,28 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
+# MEM-002: retire claude-mem — one-cycle cleanup, prune after rollout.
+# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
+# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
+# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
+# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
+# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
+# idempotent — a no-op on a clean machine.
+log_info "Removing retired claude-mem plugin (MEM-002, if present)..."
+if command -v claude >/dev/null 2>&1; then
+    _snap=$(snapshot_claude_json)
+    claude plugin uninstall claude-mem@thedotmack >/dev/null 2>&1 || true
+    restore_claude_json_if_truncated "$_snap"
+fi
+_claude_cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+rm -rf "$_claude_cfg/plugins/cache/thedotmack/claude-mem" \
+       "$_claude_cfg/plugins/marketplaces/thedotmack-claude-mem" \
+       "$_claude_cfg/plugins/marketplaces/thedotmack" 2>/dev/null || true
+
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,
-# additionalDirectories, third-party hooks like claude-mem / GitGuardian) by only
+# additionalDirectories, third-party hooks like GitGuardian) by only
 # touching the keys declared as "ours" in the template. The template's
 # __HOOK_COMMAND__ placeholder is replaced via jq --arg before any merge / write.
 merge_claude_settings() {

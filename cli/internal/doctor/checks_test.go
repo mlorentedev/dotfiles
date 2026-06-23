@@ -198,8 +198,7 @@ func TestCheckSymlinks(t *testing.T) {
 	if !strings.Contains(buf.String(), ".dotfiles exists (not a symlink)") {
 		t.Error("real file should PASS as exists")
 	}
-	// 3 missing (aliases, functions, ssh/config) + 1 broken (.bashrc) = 4 fails,
-	// plus the two claude-mem SKIPs (no installed_plugins.json).
+	// 3 missing (aliases, functions, ssh/config) + 1 broken (.bashrc) = 4 fails.
 	if rep.Failures() != 4 {
 		t.Errorf("failures = %d, want 4\n%s", rep.Failures(), buf.String())
 	}

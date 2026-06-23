@@ -10,33 +10,35 @@ template_version: "1.0"
 
 # CLI-025-dotf-mem-heal-and-session-start
 
-> AUDIT-007 Phase B / PR9 — build the `dotf mem` noun so the claude-mem heal +
+> AUDIT-007 Phase B / PR9 — build the `dotf mem` noun so the
 > session-start/end hook cluster collapses from twin shell scripts into one Go
 > implementation. Parent: `docs/adr/audit-007-cli-convergence-state.md`.
+
+> **Scope change (2026-06-22):** `dotf mem heal` is **removed from this spec**. The
+> 2026-06-22 architecture session ratified ADR-016 Q2 (hive) → **claude-mem is being
+> retired** (#541), so porting its self-heal is throwaway (ADR-016 "continuous
+> simplification"). PR1/PR2 below are **dropped**; the WIP on `origin/feat/dotf-mem-heal`
+> is abandoned. This noun is now **`session-start` + `session-end`** (folding
+> `session-brief` + `ensure-memory-symlink`).
 
 ## Why
 
 <!-- from issue #494: CLI-025: dotf mem — heal + session-start/end, thin the hooks, delete 4+ scripts -->
 
-`mem` is the largest unmigrated shell cluster in the CLI convergence: **8 scripts,
-~1615 lines** — `claude-mem-heal.{sh,ps1}` (the claude-mem plugin self-heal),
+`mem` is a large unmigrated shell cluster in the CLI convergence:
 `claude-session-start.{sh,ps1}` (the SessionStart aggregator), `session-handoff.{sh,ps1}`
 (the SessionEnd twin), plus `session-brief.sh` and `ensure-memory-symlink.sh`
-(sourced/overlapping singletons). They are cross-OS twins that **drift**: the
-Windows `.ps1` lacks the BUG-019 context-hook neuter, so a live Windows gap exists
-today. Per ADR-020/021, every twin pair must converge to one Go noun; building
-`dotf mem` kills the drift, closes the Windows gap, and lets the hooks shrink to
-thin shims.
+(sourced/overlapping singletons). They are cross-OS twins that **drift**. Per
+ADR-020/021, every twin pair must converge to one Go noun; building `dotf mem`
+session-start/end kills the drift and lets the hooks shrink to thin shims. (The
+`claude-mem-heal.{sh,ps1}` pair, formerly the largest piece of this cluster, is
+**deleted** by the claude-mem retirement #541 — not ported.)
 
 ## What
 
-A new `dotf mem` noun with three subcommands, faithful ports of the existing
+A new `dotf mem` noun with two subcommands, faithful ports of the existing
 behaviour (cross-OS, single implementation):
 
-- **`dotf mem heal`** — ports `claude-mem-heal`: `ensure_marketplace_compat_symlink`,
-  `heal_mcp_json`, `heal_zod`, `heal_hooks_json` (preserving the `sed -n 1p` drain
-  from the EPIPE fix #242, **not** `head -n1`), `neuter_context_hook` (BUG-019), and
-  the v13 cascade over both the cache-version dir and the marketplace junction.
 - **`dotf mem session-start`** — ports the SessionStart aggregator and folds in
   `session-brief.sh` + `ensure-memory-symlink.sh`: SDD-004 config gate, session-brief
   core (vault detect/health/specs/lessons-staleness), silent `dotf doctor --quick`
@@ -47,8 +49,8 @@ behaviour (cross-OS, single implementation):
 
 After this work the SessionStart/SessionEnd hooks (`claude-session-start.{sh,ps1}`
 and the SessionEnd registration) are **thin shims** that `exec dotf mem …`, and the
-8-script cluster is deleted. Building the heal in Go closes the BUG-019 Windows gap
-for free (one implementation, both OSes).
+session-start/end script cluster is deleted. (The `claude-mem-heal.{sh,ps1}` pair is
+deleted separately by #541, not here.)
 
 ## Out of scope
 
@@ -63,20 +65,14 @@ for free (one implementation, both OSes).
 
 ## Decomposition (strangler-fig — this is NOT one atomic PR)
 
-~1615 LOC across 8 scripts and a per-session hot path → multiple atomic PRs, each
-build-then-cutover-then-delete:
+The session-start/end cluster + a per-session hot path → multiple atomic PRs, each
+build-then-cutover-then-delete (heal PRs removed — see Scope change above):
 
-1. **`dotf mem heal` (build + test, no deletes).** Port the heal cluster to
-   `cli/internal/mem`. Cross-OS table tests over hooks.json/mcp.json/zod fixtures
-   incl. the EPIPE `sed -n 1p` guard and the BUG-019 neuter. Closes the Windows gap
-   on build.
-2. **Heal cutover + delete.** Repoint the self-heal call site + `setup-{linux,windows}`
-   to `dotf mem heal`; `git rm claude-mem-heal.{sh,ps1}`; guard-grep.
-3. **`dotf mem session-end` + shim + delete `session-handoff.{sh,ps1}`.** Small and
+1. **`dotf mem session-end` + shim + delete `session-handoff.{sh,ps1}`.** Small and
    independent; can land early.
-4. **`dotf mem session-start` (build).** Port the aggregator, folding `session-brief.sh`
+2. **`dotf mem session-start` (build).** Port the aggregator, folding `session-brief.sh`
    + `ensure-memory-symlink.sh`. Golden-output test for the `additionalContext` JSON.
-5. **Session-start cutover + delete.** Thin `claude-session-start.{sh,ps1}` to shims;
+3. **Session-start cutover + delete.** Thin `claude-session-start.{sh,ps1}` to shims;
    `git rm` session-start + session-brief + ensure-memory-symlink; guard-grep.
 
 ## Risks / open questions
@@ -95,24 +91,21 @@ build-then-cutover-then-delete:
 - **Output equivalence.** The SessionStart `additionalContext` must be byte-equivalent
   to the shell version (Claude consumes it). Capture a golden fixture from the live
   shell hook before porting; diff in the test.
-- **EPIPE regression.** Go does not inherit Node's `SIGPIPE→SIG_IGN`, but the
-  *deployed* `hooks.json` still needs the `sed -n 1p` drain — `dotf mem heal` must keep
-  emitting it (and normalising any `head -n1` left on older machines), per #242.
-- **`.mcp.json` race follow-up.** #242 left the `.mcp.json` `head -n1` unfixed (lower
-  blast radius). Fold the same drain into the Go `heal_mcp_json` port, or keep deferred?
+- **Sequencing vs #541.** The claude-mem retirement (#541) edits the same SessionStart
+  hook (removing the heal call). Land #541 first, then port the slimmed aggregator —
+  avoids porting a hook that #541 is about to change.
 
 ## Acceptance criteria
 
 Spec-level (each sub-PR carries its own testable ACs in `tasks.md`):
 
-- [ ] `dotf mem {heal, session-start, session-end}` implemented in `cli/internal/mem`,
+- [ ] `dotf mem {session-start, session-end}` implemented in `cli/internal/mem`,
   cross-OS, table-tested.
 - [ ] The SessionStart/SessionEnd hooks are thin shims (`exec dotf mem …`), no business
   logic.
-- [ ] The 8-script cluster is deleted and a guard-grep pins that no production caller
-  references any of them.
-- [ ] BUG-019 context-hook neuter is present on Windows (the current gap is closed),
-  proven by a Windows-path test.
+- [ ] The session-start/end script cluster (`claude-session-start.{sh,ps1}`,
+  `session-handoff.{sh,ps1}`, `session-brief.sh`, `ensure-memory-symlink.sh`) is deleted
+  and a guard-grep pins that no production caller references any of them.
 - [ ] The SessionStart `additionalContext` output is byte-equivalent to the retired
   shell hook (golden-fixture diff).
 

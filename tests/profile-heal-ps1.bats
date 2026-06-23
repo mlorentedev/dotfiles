@@ -79,8 +79,8 @@ setup() {
 }
 
 @test "profile-heal.ps1 exits 0 when profile is healthy (idempotent no-op)" {
-    # Same shape as claude-mem-heal.ps1: silent on healthy installs, prints
-    # one line per heal action. Always exit 0 (never block session start).
+    # Self-heal shape: silent on healthy installs, prints one line per heal
+    # action. Always exit 0 (never block session start).
     grep -qE 'exit 0|return$' "$PS1_SCRIPT"
 }
 
@@ -109,11 +109,12 @@ setup() {
 }
 
 # CLI-018: doctor.ps1 was retired and its -Fix auto-invocation of
-# profile-heal.ps1 (BUG-020) is NOT yet ported to `dotf doctor --fix`
-# (runHeals only invokes claude-mem-heal.sh). Recovery still works manually:
-# profile-heal.ps1 stays deployed and the BUG-021 setup preflight points at it.
-# The doctor auto-heal port is tracked in #531; once landed, assert it in the Go
-# doctor fix tests (cli/internal/doctor), not here.
+# profile-heal.ps1 (BUG-020) is NOT yet ported to `dotf doctor --fix` (the
+# previous --fix heal path, which only invoked the now-retired claude-mem-heal,
+# was removed in MEM-002). Recovery still works manually: profile-heal.ps1 stays
+# deployed and the BUG-021 setup preflight points at it. The doctor auto-heal
+# port is tracked in #531; once landed, assert it in the Go doctor fix tests
+# (cli/internal/doctor), not here.
 
 # --- Cross-OS asymmetry documented (Linux uses clean-copy, no heal needed) ---
 
