@@ -43,8 +43,8 @@ teardown() {
     done
 }
 
-@test "session-start-config.json has the 12 injector entries with enabled flags" {
-    for key in sdd_reminder claude_mem_heal doctor_drift hive_project specs_summary vault_root_detection vault_health auto_memory_symlink knowledge_health vault_baseline memory_temperature claude_json_size; do
+@test "session-start-config.json has the 11 injector entries with enabled flags" {
+    for key in sdd_reminder doctor_drift hive_project specs_summary vault_root_detection vault_health auto_memory_symlink knowledge_health vault_baseline memory_temperature claude_json_size; do
         val=$(jq -r ".injectors.$key.enabled // \"MISSING\"" "$CONFIG_JSON")
         [ "$val" != "MISSING" ] || { echo "missing key: injectors.$key.enabled"; return 1; }
     done
@@ -103,7 +103,7 @@ teardown() {
 # representative CWDs (dotfiles repo / outside-vault tmp / inside-vault).
 # IMPORTANT: PRE script must run from same dir as POST so SCRIPT_DIR resolves
 # to the same scripts/ folder for both (otherwise sibling-script lookups —
-# claude-mem-heal.sh, vault-health.sh — diverge artificially).
+# vault-health.sh — diverge artificially).
 
 @test "byte-equivalence: refactor preserves output (3 CWD scenarios)" {
     if ! command -v jq >/dev/null 2>&1; then skip "jq required"; fi

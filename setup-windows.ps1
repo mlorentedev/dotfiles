@@ -127,9 +127,9 @@ if (Test-Path -LiteralPath $utilsPs1Path -PathType Leaf) {
 # organizationRateLimitTier, projects map, onboarding flags), shrinking the file
 # from ~75 KB to ~1.5 KB and forcing re-authentication in every project. The
 # existing `installedPlugins -match` idempotence guard against `claude plugin list`
-# yields a false negative for claude-mem@thedotmack (not present in that listing),
-# so every setup run triggers a real install of claude-mem and hits #59870 --
-# this wrapper is the second layer that catches the false-negative case.
+# can yield a false negative for a plugin not present in that listing, so a setup
+# run can trigger a real install and hit #59870 -- this wrapper is the second
+# layer that catches the false-negative case.
 # Complementary to SDD-021 session-start canary in claude-session-start.ps1
 # (same 10240-byte threshold, same upstream issue, different detection moment).
 # See dotfiles#33 for the original incomplete trigger fix.
@@ -195,7 +195,7 @@ function Register-HiveScheduledTask {
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,
-# additionalDirectories, third-party hooks like claude-mem / GitGuardian) by only
+# additionalDirectories, third-party hooks like GitGuardian) by only
 # touching the keys declared as "ours" in the template. The template's
 # __HOOK_COMMAND__ placeholder is replaced with the OS-specific hook command
 # before any merge / write.
@@ -681,7 +681,6 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
 if ($claudeCmd) {
     Write-Info "Installing Claude Code plugins..."
     $plugins = @(
-        "claude-mem@thedotmack",
         "code-simplifier@claude-plugins-official",
         "gopls-lsp@claude-plugins-official",
         "security-guidance@claude-plugins-official",
@@ -693,22 +692,6 @@ if ($claudeCmd) {
         "commit-commands@claude-plugins-official",
         "pr-review-toolkit@claude-plugins-official"
     )
-    # BUG-014: register the `thedotmack` marketplace BEFORE the install loop.
-    # Without this, `claude plugin install claude-mem@thedotmack` cannot resolve
-    # `@thedotmack` (only `claude-plugins-official` is registered by default)
-    # and fails silently inside the loop's try/catch. The CLI is idempotent
-    # ("Marketplace 'thedotmack' already on disk" + exit 0 on re-run), so we
-    # call it unconditionally. Wrapped per BUG-011 -- every `claude` CLI
-    # invocation in setup must be snapshot-guarded.
-    Backup-AndRestoreClaudeJson -Action {
-        try {
-            & claude plugin marketplace add thedotmack/claude-mem 2>$null | Out-Null
-        } catch {
-            # Network failure or transient CLI issue -- let the install loop fail
-            # loud-but-recoverable rather than blocking the rest of setup.
-        }
-    }
-
     # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
     # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
     $installedPlugins = Backup-AndRestoreClaudeJson -Action {
@@ -722,9 +705,7 @@ if ($claudeCmd) {
             continue
         }
         # BUG-004: wrap the install with the snapshot/restore guard so the upstream
-        # truncation bug (#59870) cannot drop subscription state. The existing
-        # `installedPlugins -match` idempotence above does NOT catch claude-mem
-        # (it does not appear in `claude plugin list` output).
+        # truncation bug (#59870) cannot drop subscription state.
         Backup-AndRestoreClaudeJson -Action {
             try {
                 & claude plugin install $plugin 2>$null | Out-Null
@@ -737,6 +718,31 @@ if ($claudeCmd) {
     Write-Success "Claude Code plugins ready ($pluginsAdded added, $pluginsSkipped already present)"
 } else {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
+}
+
+# MEM-002: retire claude-mem -- one-cycle cleanup, prune after rollout.
+# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
+# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
+# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
+# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
+# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
+# idempotent -- a no-op on a clean machine.
+Write-Info "Removing retired claude-mem plugin (MEM-002, if present)..."
+if ($claudeCmd) {
+    Backup-AndRestoreClaudeJson -Action {
+        try {
+            & claude plugin uninstall claude-mem@thedotmack 2>$null | Out-Null
+        } catch {
+            # Non-fatal -- already absent or transient CLI issue.
+        }
+    }
+}
+$claudeCfg = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+foreach ($stale in @(
+        (Join-Path $claudeCfg 'plugins\cache\thedotmack\claude-mem'),
+        (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack-claude-mem'),
+        (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack'))) {
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $stale
 }
 
 # Deploy auto-memory junctions from vault (see ADR-007)
@@ -886,7 +892,7 @@ if (-not $poetryCmd) {
     Write-Info "poetry already installed"
 }
 
-# Install Bun (JS runtime -- the claude-mem worker daemon requires it for bun:sqlite)
+# Install Bun (JS runtime used by some Claude Code plugin workers for bun:sqlite)
 $bunCmd = Get-Command bun -ErrorAction SilentlyContinue
 if (-not $bunCmd) {
     Write-Info "Installing Bun..."
@@ -1490,14 +1496,6 @@ if (Test-Path $sessionHandoffSource) {
     Write-Success "Deployed session-handoff.ps1 to $ScriptsDir\"
 } else {
     Write-Warn "session-handoff.ps1 not found at $sessionHandoffSource"
-}
-
-$memHealSource = "$DotfilesDir\scripts\claude-mem-heal.ps1"
-if (Test-Path $memHealSource) {
-    Copy-Item $memHealSource "$ScriptsDir\" -Force
-    Write-Success "Deployed claude-mem-heal.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "claude-mem-heal.ps1 not found at $memHealSource"
 }
 
 # BUG-020: profile-heal.ps1 reconstructs a corrupted PowerShell profile from

@@ -46,7 +46,7 @@ Run after `setup-linux.sh` and on demand:
 
 ```sh
 dotf doctor              # full sweep; exit 0 if all checks pass, 1 on any FAIL
-dotf doctor --fix        # also print profile lines for missing env defaults + run known heals (claude-mem)
+dotf doctor --fix        # also print profile lines for missing env defaults + wire safe repaired state
 dotf doctor --quick      # env-contract sweep only — fast, no compile-harness gate (SessionStart hook)
 dotf doctor --verbose    # list passing checks too (default summarises them per section)
 ```

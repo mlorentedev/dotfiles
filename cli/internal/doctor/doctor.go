@@ -90,10 +90,6 @@ func Run(opts Options) (int, error) {
 		checkDeployDrift(sys, cfg, rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep)
-
-		if opts.Fix {
-			runHeals(sys, cfg, rep)
-		}
 	}
 
 	rep.Summary()

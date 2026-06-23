@@ -161,89 +161,6 @@ setup() {
     grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# --- claude-mem-heal cross-OS parity ---
-
-@test "claude-mem-heal.ps1 exists alongside the bash version" {
-    [ -f "$DOTFILES_DIR/scripts/claude-mem-heal.sh" ]
-    [ -f "$DOTFILES_DIR/scripts/claude-mem-heal.ps1" ]
-}
-
-# Both heal scripts must use --ignore-scripts to avoid triggering native
-# postinstalls (tree-sitter -> node-gyp -> MSBuild on Windows, build-essential
-# on Linux). Only zod's pure-JS files are needed.
-@test "claude-mem-heal scripts both use --ignore-scripts on npm install" {
-    grep -q -- '--ignore-scripts' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -q -- '--ignore-scripts' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-# Both SessionStart hooks must invoke the heal at session start.
-@test "parity: both SessionStart hooks invoke claude-mem-heal" {
-    grep -q 'claude-mem-heal\.sh' "$DOTFILES_DIR/scripts/claude-session-start.sh"
-    grep -q 'claude-mem-heal\.ps1' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
-}
-
-# --- BUG-016: claude-mem-heal Repair-McpJson refresh for v13.x cascade pattern ---
-# Original heal (PR #57) only detected v12.7.4's ${_R%/} pattern. v13.0.0+
-# ships a different broken pattern (cascading-printf via `sh -c` -- root cause
-# of the EPIPE race in thedotmack/claude-mem#2607). Heal silently no-ops on
-# v13.x installs. BUG-016 extends detection AND replaces with a race-free
-# form using `done | head -n1` (Option A from upstream issue, applied locally).
-
-@test "claude-mem-heal scripts detect v13.x cascade pattern (BUG-016)" {
-    # Both heal scripts must look for `while IFS=` (the v13.x signature)
-    # in addition to the v12.7.4 ${_R%/} literal.
-    grep -q 'while IFS=' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -q 'while IFS=' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-@test "claude-mem-heal scripts write the race-free sed -n 1p .mcp.json template (BUG-016 + mcp consumer-EPIPE)" {
-    # The .mcp.json template's path-resolution pipe must drain via `sed -n 1p`
-    # (reads to EOF), NOT the early-closing `head -n1` (consumer-EPIPE race --
-    # task 2026-06-06-mcp-json-consumer-epipe-drain). Anchor on the template's
-    # unique `); [ -n` tail so this targets the .mcp.json emitter specifically,
-    # not heal_hooks_json's `head -n1` sed match pattern (which stays, to
-    # converge already-deployed installs).
-    grep -qF 'sed -n 1p); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    ! grep -qF 'head -n1); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'sed -n 1p); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    ! grep -qF 'head -n1); [ -n' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-@test "parity: both heal scripts reference BUG-016 + thedotmack/claude-mem#2607 (BUG-016)" {
-    grep -qF 'BUG-016' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'BUG-016' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF 'claude-mem#2607' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'claude-mem#2607' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-# --- BUG-017: hooks.json EPIPE race patch (mirror of BUG-016 for hooks) ---
-# claude-mem v13.x ships plugin/hooks/hooks.json with 6 hooks all using the
-# same `break; }; done` cascade-pipe pattern as the .mcp.json that BUG-016
-# fixed. heal_hooks_json / Repair-HooksJson applies the minimal `head -n1`
-# substitution to all hook commands in one pass.
-
-@test "parity: both heal scripts define a hooks.json repair function (BUG-017)" {
-    grep -q 'heal_hooks_json' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -q 'Repair-HooksJson' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-@test "parity: both heal scripts substitute break; }; done -> head -n1 (BUG-017)" {
-    # The substitution literal must appear in both heal scripts' source.
-    grep -qF 'break; }; done' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'break; }; done' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'head -n1' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-@test "parity: both heal scripts walk hooks.json AND plugin/hooks/hooks.json (BUG-017)" {
-    grep -q 'hooks/hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    # PowerShell uses single-backslash path separator inside single-quoted strings.
-    # In bash single-quote -> grep BRE, two backslashes match one literal backslash.
-    grep -q 'hooks\\hooks\.json' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'BUG-017' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
 # --- BUG-020: DOTFILES_REPO_DIR cross-OS export parity ---
 # .bashrc + .zshrc export it; powershell/profile.ps1 was missing it.
 # Required by `dotf doctor` (CLI-019 repo/deploy drift check) to locate the
@@ -262,66 +179,14 @@ setup() {
     fi
 }
 
-# --- BUG-018: ALL 5 `hook claude-code <X>` hooks missing continue directive ---
-# After BUG-017 closed the EPIPE race, every claude-mem hook that terminates
-# with `node ... hook claude-code <event>"` blocks Claude Code because the
-# stdout output is not a {"continue":true} directive (upstream bun-runner
-# stdout vs Claude Code hook protocol mismatch, claude-mem#2188).
-# The regex-based substitution catches all 5 in one pass: session-init
-# (UserPromptSubmit), context (SessionStart), observation (PostToolUse),
-# file-context (PreToolUse), summarize (Stop).
-
-@test "parity: both heal scripts append continue directive to ALL hook claude-code <X> terminators (BUG-018)" {
-    # The substitution must use a regex capture so all 5 event terminators get
-    # the same treatment in one pass.
-    grep -q 'hook claude-code' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -q 'hook claude-code' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    # The replacement must contain the {"continue":true} directive (literal in
-    # both heal scripts, with JSON-escaped quotes \").
-    grep -qF 'continue' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'continue' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF 'BUG-018' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'BUG-018' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-# --- BUG-012: legacy marketplace junction/symlink for plugin discovery ---
-# Claude Code clones the claude-mem marketplace under the GitHub repo name
-# `thedotmack-claude-mem/`, but the plugin's bundled hooks.json hardcodes
-# the legacy fallback `marketplaces/thedotmack/plugin/scripts/...`. Without
-# a compatibility junction/symlink, UserPromptSubmit hooks fail to find
-# bun-runner.js. Both heal scripts create the link defensively at session
-# start, gated on `thedotmack/` missing AND `thedotmack-claude-mem/` present.
-
-@test "claude-mem-heal.sh creates legacy marketplace symlink (BUG-012)" {
-    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -Eq 'ln -s' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-}
-
-@test "claude-mem-heal.sh symlink creation is guarded on both source+target (BUG-012)" {
-    # Source dir (thedotmack-claude-mem) must be checked; target (thedotmack)
-    # must be checked too -- both guards required for idempotence.
-    grep -Eq '\[ ! -d "\$actual" \]' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -Eq '\[ -e "\$legacy" \]' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-}
-
-@test "claude-mem-heal.ps1 creates legacy marketplace junction (BUG-012)" {
-    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF -- '-ItemType Junction' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
-@test "parity: both heal scripts implement legacy marketplace link (BUG-012)" {
-    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.sh"
-    grep -qF 'thedotmack-claude-mem' "$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-}
-
 # --- BUG-004: defense-in-depth around claude plugin install (truncate guard) ---
 # Linux mirror of the Windows guard. Every `claude plugin install` call triggers
 # upstream anthropics/claude-code#59870, dropping subscription fields out of
 # ~/.claude/.claude.json. The bash idempotence guard (`grep -qF` against
-# `claude plugin list` output) yields a false negative for claude-mem@thedotmack
-# because it does not appear in that listing -- so every run installs it again,
-# truncating .claude.json from ~75 KB to ~1.5 KB. Defense in depth: snapshot
-# before the call, restore if shrinks >50% from a baseline of >=10 KB.
+# `claude plugin list` output) can yield a false negative for a plugin not in
+# that listing -- so a run reinstalls it, truncating .claude.json from ~75 KB to
+# ~1.5 KB. Defense in depth: snapshot before the call, restore if it shrinks
+# >50% from a baseline of >=10 KB.
 
 @test "setup-linux.sh defines snapshot_claude_json + restore_claude_json_if_truncated (BUG-004)" {
     grep -q 'snapshot_claude_json()' "$DOTFILES_DIR/setup-linux.sh"
@@ -396,30 +261,23 @@ setup() {
     grep -B5 'claude plugin list' "$DOTFILES_DIR/setup-windows.ps1" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
-# --- BUG-014: register thedotmack marketplace before plugin install ---
-# setup-{linux,windows} list `claude-mem@thedotmack` in the plugin install loop,
-# but neither script ever registers the `thedotmack` marketplace first. On a
-# fresh machine `claude plugin marketplace list` shows only `claude-plugins-official`
-# (bundled default), so `claude plugin install claude-mem@thedotmack` cannot
-# resolve `@thedotmack` and fails silently inside the existing try/catch.
-# The fix is to invoke `claude plugin marketplace add thedotmack/claude-mem`
-# BEFORE the install loop, wrapped with the existing BUG-011 snapshot guard.
+# --- MEM-002: retire claude-mem — no longer installed; one-cycle cleanup runs ---
+# claude-mem is no longer in the plugin install loop (ADR-016 Q2). Both setups
+# instead ship an idempotent cleanup that uninstalls the plugin + prunes its
+# leftover cache/marketplace dirs on the next run. These lock in BOTH the
+# removal (no marketplace registration, plugin absent from the loop) and the
+# presence of the cleanup block.
 
-@test "setup-linux.sh registers thedotmack marketplace before plugin install (BUG-014)" {
-    add_line=$(grep -n 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    install_line=$(grep -n 'claude plugin install "\$plugin"' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    [ -n "$add_line" ] && [ -n "$install_line" ]
-    [ "$add_line" -lt "$install_line" ]
+@test "setup scripts no longer register the thedotmack marketplace (MEM-002)" {
+    ! grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh"
+    ! grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup-linux.sh wraps claude plugin marketplace add with snapshot+restore (BUG-014)" {
-    grep -B5 'claude plugin marketplace add thedotmack' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
-    grep -A5 'claude plugin marketplace add thedotmack' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
-}
-
-@test "parity: both setup scripts register thedotmack marketplace before plugin install (BUG-014)" {
-    grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-windows.ps1"
+@test "setup scripts ship the idempotent claude-mem cleanup block (MEM-002)" {
+    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'MEM-002' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'MEM-002' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- doctor + env-contract.json (cross-OS parity) ---
@@ -469,10 +327,10 @@ setup() {
     grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
 }
 
-# CLI-018: the claude-mem hook detection (BUG-015/WIN-004) + the EPIPE-race
-# guard (BUG-022/023) lived in healthcheck.ps1; both are now covered by
-# cli/internal/doctor (resolveClaudeMemHook / checkClaudeMem, go test) after
-# the .ps1 was retired.
+# MEM-002: the claude-mem install-state assertions that lived in
+# cli/internal/doctor (checkClaudeMem / resolveClaudeMemHook) were removed with
+# the rest of the claude-mem wiring (ADR-016 Q2). `dotf doctor` no longer probes
+# for the plugin.
 
 # CLI-012/CLI-018: both setups fold the old doctor + healthcheck blocks into ONE
 # `dotf doctor` call (the consolidated sweep).

@@ -11,7 +11,6 @@
   },
   "injectors": {
     "sdd_reminder": { "enabled": true, "comment": "Unconditional Discipline Gate reminder (SDD-001), first in additionalContext" },
-    "claude_mem_heal": { "enabled": true, "comment": "Self-heal claude-mem plugin upstream regressions (.mcp.json, missing zod)" },
     "doctor_drift": { "enabled": true, "comment": "Surface env-contract drift via scripts/doctor.{sh,ps1}" },
     "hive_project": { "enabled": true, "comment": "Detect vault project match for CWD (10_projects + 50_work/45-development)" },
     "specs_summary": { "enabled": true, "comment": "Count active vs archived specs and flag [AGENT-DRAFT]/[AGENT-SUGGESTION] tags" },

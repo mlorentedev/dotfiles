@@ -147,25 +147,11 @@ setup() {
     grep -q 'claude-session-start.ps1' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys claude-mem-heal.ps1" {
-    grep -q 'claude-mem-heal.ps1' "$PS1_SCRIPT"
-}
-
-# BUG-012: claude-mem-heal.ps1 creates a Junction `marketplaces\thedotmack`
-# pointing at `marketplaces\thedotmack-claude-mem` so the plugin's hardcoded
-# `marketplaces/thedotmack/plugin/scripts/...` fallback paths resolve when
-# CLAUDE_PLUGIN_ROOT is unset/stale (the UserPromptSubmit hook failure mode).
-@test "claude-mem-heal.ps1 creates legacy marketplace junction (BUG-012)" {
-    local heal="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -qF 'thedotmack-claude-mem' "$heal"
-    grep -qF -- '-ItemType Junction' "$heal"
-}
-
-# Junction creation must be guarded: only create when target dir missing AND
-# source dir present. Mirrors the heal script's idempotence pattern.
-@test "claude-mem-heal.ps1 junction creation is idempotent-guarded (BUG-012)" {
-    local heal="$DOTFILES_DIR/scripts/claude-mem-heal.ps1"
-    grep -B5 -A5 -- '-ItemType Junction' "$heal" | grep -qE 'Test-Path|-not'
+# MEM-002: claude-mem-heal.ps1 is retired (ADR-016 Q2). setup-windows.ps1 must
+# NOT deploy it any more.
+@test "setup-windows.ps1 no longer deploys claude-mem-heal.ps1 (MEM-002)" {
+    ! grep -q 'claude-mem-heal.ps1' "$PS1_SCRIPT"
+    [ ! -f "$DOTFILES_DIR/scripts/claude-mem-heal.ps1" ]
 }
 
 @test "setup-windows.ps1 deploys dotfiles-sync.ps1" {
@@ -237,9 +223,9 @@ setup() {
 # struct (organizationType, organizationRateLimitTier, projects map, onboarding
 # flags), shrinking ~/.claude/.claude.json from ~75 KB to ~1.5 KB and forcing
 # re-authentication. The existing idempotence guard (`-match [regex]::Escape`
-# against `claude plugin list` output) yields a false negative for
-# claude-mem@thedotmack because it does not appear in that listing -- so every
-# run installs it again, triggering the truncation. The fix is defense in depth:
+# against `claude plugin list` output) can yield a false negative for a plugin
+# not in that listing -- so a run reinstalls it, triggering the truncation. The
+# fix is defense in depth:
 # snapshot .claude.json before the call, restore if it shrinks >50% from a
 # baseline of >=10 KB. Complementary to SDD-021's session-start canary at
 # claude-session-start.ps1 (same 10240 threshold, same upstream issue).
@@ -288,22 +274,18 @@ setup() {
     grep -B5 'claude plugin list' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
-# --- BUG-014: register thedotmack marketplace before plugin install ---
-# Windows side of the BUG-014 cross-OS fix. setup-windows.ps1 lists
-# claude-mem@thedotmack in the plugin install loop but never registers the
-# thedotmack marketplace first. The install fails silently (try/catch).
-# Fix: invoke `claude plugin marketplace add thedotmack/claude-mem` BEFORE the
-# install loop, wrapped with Backup-AndRestoreClaudeJson.
+# --- MEM-002: retire claude-mem — plugin no longer installed on Windows ---
+# claude-mem is no longer in the $plugins array and the thedotmack marketplace is
+# no longer registered (ADR-016 Q2). setup-windows.ps1 instead ships an
+# idempotent cleanup that uninstalls the plugin + prunes leftover dirs.
 
-@test "setup-windows.ps1 registers thedotmack marketplace before plugin install (BUG-014)" {
-    add_line=$(grep -n 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    install_line=$(grep -n 'claude plugin install \$plugin' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$add_line" ] && [ -n "$install_line" ]
-    [ "$add_line" -lt "$install_line" ]
+@test "setup-windows.ps1 no longer registers the thedotmack marketplace (MEM-002)" {
+    ! grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 wraps claude plugin marketplace add with Backup-AndRestoreClaudeJson (BUG-014)" {
-    grep -B5 'claude plugin marketplace add thedotmack' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
+@test "setup-windows.ps1 ships the idempotent claude-mem cleanup block (MEM-002)" {
+    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$PS1_SCRIPT"
+    grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
 # --- BUG-013: install Obsidian CLI on Windows ---

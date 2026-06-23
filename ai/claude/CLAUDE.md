@@ -25,17 +25,6 @@ If session start context reports memory files needing archive (>60 days cold):
 3. Remove their entries from `MEMORY.md`.
 4. Inform briefly: "Archived N cold memory files."
 
-## Claude-Only MCP: claude-mem (Conversation Memory)
-
-**Active by default in every session.** Captures observations automatically via session hooks — conversation flow → claude-mem, crystallized knowledge → vault. Never duplicate across both.
-
-* `/mem-search "query"` — find solutions from past sessions.
-* `/timeline-report`, `/knowledge-agent`, `/how-it-works` — narrative history, topic brains, self-explanation.
-* **Do NOT** write strategic decisions, lessons, or ADRs to claude-mem — those go to vault via `capture_lesson` / `vault_write`.
-* Default `worker` runtime blocks manual writes (`observation_add`, `memory_add`); hook capture works regardless. Set `CLAUDE_MEM_RUNTIME=server-beta` in `~/.claude/settings.json` to enable manual writes.
-
-For the full dual-memory protocol, query `00_meta/patterns/pattern-dual-memory.md`.
-
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:

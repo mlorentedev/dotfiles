@@ -39,26 +39,9 @@ $KnowledgeVault = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env
 # SDD discipline reminder -- unconditional, first in additionalContext (SDD-001).
 # Surfaces the Discipline Gate to every Claude Code session regardless of CWD,
 # repo, or vault state. Cross-OS parity with claude-session-start.sh. All
-# subsequent diagnostic blocks (claude-mem, doctor, hive, specs, vault, memory)
-# APPEND to $ContextLines defensively so they cannot wipe this reminder.
+# subsequent diagnostic blocks (doctor, hive, specs, vault, memory) APPEND to
+# $ContextLines defensively so they cannot wipe this reminder.
 $ContextLines = '[sdd] Before your first tool call, read `AGENTS.md` at the repo root (or `~/Projects/dotfiles/AGENTS.md` as fallback) and apply its "Spec-Driven Development" (including the Discipline Gate) and "Standing Orders" sections. SDD applies by default for PR-sized changes (~50-300 LOC, public contract, new dep, multi-PR sequence). Skip ONLY for: typos, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, documentation-only changes. When in doubt, ASK the user.'
-
-# --- Self-heal claude-mem plugin if marketplace shipped broken artifacts ---
-# Patches .mcp.json (${_R%/} regression, upstream #2385) and installs the
-# missing zod runtime dep. Silent on healthy installs. Mirrors the bash side.
-$ClaudeMemHeal = Join-Path $PSScriptRoot 'claude-mem-heal.ps1'
-if (Test-Path $ClaudeMemHeal) {
-    try {
-        $healOutput = & pwsh -NoProfile -File $ClaudeMemHeal 2>&1 | Out-String
-        $healOutput = $healOutput.Trim()
-        if ($healOutput) {
-            $healBlock = "[claude-mem] self-healed plugin install:`n$healOutput"
-            $ContextLines = "$ContextLines`n`n$healBlock"
-        }
-    } catch {
-        # Non-fatal -- session continues even if heal fails
-    }
-}
 
 # --- Silent doctor: surface env-contract drift to Claude only when detected ---
 # Uses `dotf doctor --quick` (CLI-013/CLI-018): the env-contract sweep only, no

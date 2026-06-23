@@ -16,10 +16,10 @@
 # guard, and its sibling vault-health.sh launches Obsidian (which hangs headless,
 # see session-start-config.bats). We copy the hook AND its required session-brief
 # core (ADR-023 — vault detection / spec / baseline signals live there now) into
-# an isolated temp dir, but deliberately NOT the other siblings (vault-health.sh,
-# claude-mem-heal.sh) nor the config file, so those lookups MISS and get skipped
-# while the real check_knowledge_health / vault-baseline logic runs against a
-# controlled HOME and CWD.
+# an isolated temp dir, but deliberately NOT the other siblings (vault-health.sh)
+# nor the config file, so those lookups MISS and get skipped while the real
+# check_knowledge_health / vault-baseline logic runs against a controlled HOME
+# and CWD.
 
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
