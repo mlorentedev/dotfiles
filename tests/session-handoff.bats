@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # MEMORY-001: session-handoff.sh — the Claude SessionEnd bridge (ADR-014).
 # It ARCHIVES the `## Session Handoff` block that /handoff wrote into a project's
-# MEMORY.md into an append-only record under 00_meta/sessions/. The agent reasons
+# MEMORY.md into an append-only record under 10_projects/<project>/sessions/. The agent reasons
 # (via /handoff); the hook persists. Fixture-driven — no real vault, CI-safe.
 
 setup() {
@@ -10,7 +10,7 @@ setup() {
     VAULT="$(mktemp -d)"
     PROJ_PARENT="$(mktemp -d)"
     PROJ="$PROJ_PARENT/myproj"
-    mkdir -p "$PROJ" "$VAULT/00_meta/sessions" "$VAULT/10_projects/myproj/memory"
+    mkdir -p "$PROJ" "$VAULT/10_projects/myproj/memory"
     export VAULT_PATH="$VAULT"
     PAYLOAD="$VAULT/payload.json"
 }
@@ -34,7 +34,7 @@ EOF
     write_payload sess-123
     run bash -c "'$SCRIPT' < '$PAYLOAD'"
     [ "$status" -eq 0 ]
-    rec="$(find "$VAULT/00_meta/sessions" -name '*-myproj-claude.md')"
+    rec="$(find "$VAULT/10_projects/myproj/sessions" -name '*-myproj-claude.md')"
     [ -n "$rec" ]
     grep -q 'session_id: sess-123' "$rec"
     grep -q 'built the thing' "$rec"
@@ -47,14 +47,14 @@ EOF
     write_payload sess-1
     run bash -c "'$SCRIPT' < '$PAYLOAD'"
     [ "$status" -eq 0 ]
-    [ -z "$(find "$VAULT/00_meta/sessions" -name '*.md')" ]
+    [ -z "$(find "$VAULT/10_projects/myproj/sessions" -name '*.md' 2>/dev/null)" ]
 }
 
 @test "AC2b: no MEMORY.md at all -> clean exit, no record" {
     write_payload sess-1
     run bash -c "'$SCRIPT' < '$PAYLOAD'"
     [ "$status" -eq 0 ]
-    [ -z "$(find "$VAULT/00_meta/sessions" -name '*.md' 2>/dev/null)" ]
+    [ -z "$(find "$VAULT/10_projects/myproj/sessions" -name '*.md' 2>/dev/null)" ]
 }
 
 @test "usage: no stdin payload / empty -> clean no-op (never crashes a session)" {

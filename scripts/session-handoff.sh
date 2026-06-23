@@ -4,7 +4,7 @@
 # Wired to Claude Code's `SessionEnd` hook. Reads the hook JSON on stdin and
 # ARCHIVES the `## Session Handoff` block that the /handoff skill wrote into the
 # project's MEMORY.md into an append-only record:
-#     $VAULT_PATH/00_meta/sessions/<date>-<project>-claude.md
+#     $VAULT_PATH/10_projects/<project>/sessions/<date>-<project>-claude.md
 # The agent authors the handoff (via /handoff, with reasoning); this hook only
 # persists it as durable cross-session history.
 #
@@ -41,7 +41,7 @@ block="$(awk '
 
 # 5. Append a durable, timestamped session record.
 date="$(date -u +%Y-%m-%d)"
-out_dir="$VAULT_PATH/00_meta/sessions"
+out_dir="$VAULT_PATH/10_projects/$project/sessions"
 mkdir -p "$out_dir" 2>/dev/null || exit 0
 out="$out_dir/$date-$project-claude.md"
 
