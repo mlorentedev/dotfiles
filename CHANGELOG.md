@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.1](https://github.com/mlorentedev/dotfiles/compare/v0.14.0...v0.14.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* **session-handoff:** write records to the project folder, not 00_meta/sessions ([#542](https://github.com/mlorentedev/dotfiles/issues/542)) ([1a185b1](https://github.com/mlorentedev/dotfiles/commit/1a185b1e8a46cbeff39a027b28f920d0efa22227))
+
+## [0.14.0](https://github.com/mlorentedev/dotfiles/compare/v0.13.0...v0.14.0) (2026-06-22)
+
+
+### Features
+
+* **tools:** dotf tools install — download + checksum-verify catalog tools (CLI-029) ([#526](https://github.com/mlorentedev/dotfiles/issues/526)) ([9d6f2ed](https://github.com/mlorentedev/dotfiles/commit/9d6f2ed28b7c7e55779c6b5450120e938d4b6a08))
+
 ## [0.13.0](https://github.com/mlorentedev/dotfiles/compare/v0.12.0...v0.13.0) (2026-06-21)
 
 
