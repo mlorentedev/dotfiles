@@ -13,6 +13,13 @@ created: "2026-05-31"
 
 > Drives `MEMORY-001` (GH [#117](https://github.com/mlorentedev/dotfiles/issues/117)); builds on `HANDOFF-001` (the `/handoff` skill) and the SDD-008 deploy engine (ADR-013).
 
+> **Update (2026-06-22):** the session-record **location** specified below (`00_meta/sessions/`) was
+> superseded by **HARNESS-031** (`feedback_sessions_in_project_folder`): records now live in
+> `10_projects/<project>/sessions/`, enforced by `vault-validate.py` §9 and written there by the
+> `/handoff` skill. The `session-handoff.{sh,ps1}` bridge was updated to match (it already resolves
+> the project at `10_projects/<project>/`). The rest of this ADR — the bridge mechanism, the
+> trigger model, and the record schema — stands unchanged.
+
 ## Status
 
 Accepted

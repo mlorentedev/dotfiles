@@ -4,7 +4,7 @@
 # Mirror of session-handoff.sh. Wired to Claude Code's SessionEnd hook: reads the
 # hook JSON on stdin, locates the project's MEMORY.md, and archives the /handoff
 # '## Session Handoff' block into an append-only record:
-#     $VAULT_PATH/00_meta/sessions/<date>-<project>-claude.md
+#     $VAULT_PATH/10_projects/<project>/sessions/<date>-<project>-claude.md
 # The agent authors (via /handoff); this hook only persists.
 #
 # Resilience contract: a session-end hook must NEVER crash a session. Every
@@ -44,7 +44,7 @@ if ([string]::IsNullOrWhiteSpace($blockText)) { exit 0 }
 # 5. Append a durable, timestamped session record.
 $date = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
 if ([string]::IsNullOrEmpty($sid)) { $sid = 'unknown' }
-$outDir = Join-Path $vault '00_meta\sessions'
+$outDir = Join-Path $vault "10_projects\$project\sessions"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $out = Join-Path $outDir "$date-$project-claude.md"
 
