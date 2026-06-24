@@ -66,8 +66,8 @@ func newMemSessionStartCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(cmd.OutOrStdout(), out)
-			return nil
+			_, err = fmt.Fprint(cmd.OutOrStdout(), out)
+			return err
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "", "output format: stdout|markdown")
