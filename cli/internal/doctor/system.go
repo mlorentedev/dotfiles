@@ -33,6 +33,11 @@ type System struct {
 	// CommandOutput runs name with args and returns combined stdout+stderr.
 	// Used for the `<tool> --version` probes; faked in tests.
 	CommandOutput func(name string, args ...string) (string, error)
+	// CommandOutputDir is CommandOutput with a working directory — for tools that
+	// resolve their target from the process cwd rather than an argument (e.g.
+	// `pre-commit install`, which locates the git repo relative to where it runs).
+	// Faked in tests.
+	CommandOutputDir func(dir, name string, args ...string) (string, error)
 	// HTTPGet issues a GET with the given request headers and returns the status
 	// code + response headers (the body is never needed — the PAT-expiry check
 	// reads only the status and the github-authentication-token-expiration
@@ -56,6 +61,12 @@ func realSystem() *System {
 		LookPath: exec.LookPath,
 		CommandOutput: func(name string, args ...string) (string, error) {
 			out, err := exec.Command(name, args...).CombinedOutput()
+			return string(out), err
+		},
+		CommandOutputDir: func(dir, name string, args ...string) (string, error) {
+			cmd := exec.Command(name, args...)
+			cmd.Dir = dir
+			out, err := cmd.CombinedOutput()
 			return string(out), err
 		},
 		HTTPGet: func(url string, headers map[string]string) (int, http.Header, error) {
