@@ -34,17 +34,51 @@ created: "2026-06-22"
       `dotf mem session-end`; `git rm scripts/session-handoff.{sh,ps1}`
 - [ ] Guard test (bats): no production caller references `session-handoff`
 
-### PR2/PR3 — `dotf mem session-start` (UNBLOCKED — ports HARNESS-026's shipped shell core)
+### `dotf mem session-start` — decomposed PR2a / PR2b / PR3 (architecture decision 2026-06-23)
 
-> HARNESS-026 is DONE on main (`session-brief.sh` + 16 bats + 3-CWD byte-equivalence harness).
-> PR2 ports it to Go; the binary absorbs the agnostic `--format` role; PR3 deletes the shell core.
+> **Architecture (ratified in-session 2026-06-23):** the session-start hook splits into an
+> **agnostic core** + a **thin Claude adapter**, with OS-variance localized in a shared Go
+> primitive. This maximizes the north star (everything in `dotf`, max OS/agent agnosticism):
+>
+> - **Agnostic core** — the `sb_*` brief signals (vault detect/health/specs/lessons/baseline),
+>   rendered via `--format=stdout|markdown`. Serves opencode/agy/copilot (HARNESS-001 compiler)
+>   AND feeds the Claude adapter. This is the port of `session-brief.sh`.
+> - **Claude adapter (thin)** — wraps the core in the `additionalContext` JSON envelope and runs
+>   the Claude-only injectors (SDD-004 config gate, doctor-drift, hive/work-sdk detect, knowledge
+>   health, memory-temperature, `.claude.json` monitor) + the junction ensure.
+> - **`memlink` primitive** — junction(Windows)/symlink(POSIX) ensure, one OS-agnostic Go helper,
+>   shared by the adapter (per-session ensure, surfaces a notice if it repaired — kills #551's
+>   "silent hook" complaint) AND by `dotf doctor --fix` (#551, on-demand repair). One impl, two
+>   consumers — no Go-level duplication.
+>
+> The ~720 LOC port exceeds the ~300 LOC atomic cap, so it splits along the architecture seam:
 
-- [ ] (PR2) Port `session-brief.sh`'s `sb_*` emitters + `--format=stdout|markdown` contract into
-      `cli/internal/mem` (Go), folding `ensure-memory-symlink.sh`; reuse HARNESS-026's 3-CWD
-      byte-equivalence harness + a golden `additionalContext` fixture as the regression gate
-- [ ] (PR3) Repoint the SessionStart hook to `dotf mem session-start` directly (no shim);
+#### PR2a — agnostic core (this branch, `feat/CLI-025-mem-session-start-core`)
+
+- [ ] Failing tests (table-driven, mirror `tests/session-brief.bats`): `vaultDetect`, `specs`
+      (active/archived counts + AGENT-DRAFT flagging), `lessonsStaleness`, `vaultBaseline`,
+      `vaultHealth` (against a stub script), brief assembly + leading-blank drop, `--format` render
+- [ ] Implement `cli/internal/mem/session_start.go` — port `session-brief.sh`'s `find_vault_root`
+      + `sb_*` emitters + the assemble/render runner; `vaultHealth` shells out to the same
+      `vault-health.sh` (scriptsDir injected for tests, resolved from the env-contract in prod)
+- [ ] Wire `dotf mem session-start --format=stdout|markdown` in `cli/internal/cmd/mem.go`
+- [ ] **Gate:** Go byte-equivalence harness vs `session-brief.sh --format=…` across the 3 CWDs
+      (dotfiles repo / outside-vault / inside-vault), reusing the `session-start-config.bats` pattern
+- [ ] `go build ./...` + `go test ./...` green
+
+#### PR2b — Claude adapter + `memlink` primitive
+
+- [ ] Extract `ensure-memory-symlink.sh` into an OS-agnostic Go `memlink` primitive (ensure + repair)
+- [ ] Port the Claude-only injectors + the `additionalContext` JSON envelope; golden-fixture diff
+      vs the live shell hook across the 3 CWDs as the gate
+- [ ] Wire the default `dotf mem session-start` (no `--format`) = the Claude hook path
+
+#### PR3 — cutover + delete
+
+- [ ] Repoint the SessionStart hook to `dotf mem session-start` directly (no shim);
       `git rm` `claude-session-start.{sh,ps1}` + `session-brief.sh` + `ensure-memory-symlink.sh`;
-      guard-grep; then HARNESS-026 (#405) can be archived
+      guard-grep that no production caller references them; then HARNESS-026 (#405) can be archived
+- [ ] Wire `dotf doctor --fix` to the shared `memlink` primitive (closes the #551 junction half)
 
 ## Closing
 

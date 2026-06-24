@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/spf13/cobra"
@@ -26,7 +30,60 @@ func newMemCmd() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(newMemSessionEndCmd())
+	cmd.AddCommand(newMemSessionStartCmd())
 	return cmd
+}
+
+// newMemSessionStartCmd wires the agent-agnostic session-brief core (CLI-025 PR2a),
+// ported from scripts/session-brief.sh. It renders the vault signals — detection,
+// health, spec counts, lessons-staleness, baseline — via --format=stdout|markdown.
+// File-based agents (opencode/agy/copilot) consume this out-of-band; the Claude
+// SessionStart adapter (PR2b) wraps this same core in its additionalContext envelope.
+func newMemSessionStartCmd() *cobra.Command {
+	var format string
+	cmd := &cobra.Command{
+		Use:   "session-start",
+		Short: "Emit the agent-agnostic session-brief (vault signals) for the given --format",
+		Long: "session-start renders the agnostic session-brief core — vault detection,\n" +
+			"vault-health, active/archived spec counts, lessons-staleness, and vault-baseline\n" +
+			"integrity — that file-based agents (opencode/agy/copilot) inject out-of-band.\n" +
+			"The Claude SessionStart hook wraps this same core in its additionalContext\n" +
+			"envelope. Ported from scripts/session-brief.sh (ADR-023, HARNESS-026).",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cwd := os.Getenv("SESSION_BRIEF_CWD")
+			if cwd == "" {
+				cwd, _ = os.Getwd()
+			}
+			brief := mem.Brief(mem.BriefOptions{
+				Cwd:        cwd,
+				ScriptsDir: memScriptsDir(),
+				StaleDays:  14,
+				Now:        time.Now(),
+			})
+			out, err := mem.RenderBrief(brief, format)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprint(cmd.OutOrStdout(), out)
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: stdout|markdown")
+	return cmd
+}
+
+// memScriptsDir locates the scripts/ dir hosting the sibling vault-health.sh,
+// resolved from the env-contract (DOTFILES_REPO_DIR) — the Go equivalent of
+// session-brief.sh's $(dirname "$0") sibling lookup. "" when unresolved, which
+// makes vaultHealth emit the same "not found" line the shell does.
+func memScriptsDir() string {
+	repo := env.ResolvePath("DOTFILES_REPO_DIR")
+	if repo == "" {
+		return ""
+	}
+	return filepath.Join(repo, "scripts")
 }
 
 // newMemSessionEndCmd wires the SessionEnd hook. Per the resilience contract a
