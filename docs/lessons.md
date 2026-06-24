@@ -1274,3 +1274,23 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Authored the spec retroactively via `dotf spec init OPS-016-… --issue 549` (work-gated on the open issue, ADR-018), filled proposal/tasks/verification + features.json with the real acceptance criteria and evidence, and archived it via `dotf spec archive` once merged. Gate green on the next push.
 
 **Rule**: For any change ≳50 LOC of production diff, scaffold `specs/<id>/` FIRST — never lean on "the issue already explains it" or "this just mirrors an existing check". The gate enforces it mechanically and counts `_test.go` toward the threshold. Corollary on placement: when the change is *pure behaviour* (no repo asset to deploy), its home is a `dotf doctor` check, not a new bootstrap script (ADR-020 C7) — provisioning that just runs `pre-commit install` is behaviour, so it converges into the CLI checker, not shell.
+
+---
+
+### [2026-06-24] A Go-vs-shell byte-equivalence gate is POSIX-only, and it retires at cutover
+
+**Context**: CLI-025 ported the session-start hooks (`session-brief.sh`, `claude-session-start.sh`) to `dotf mem session-start`. Each port shipped a "golden" test that diffs the Go output against the live shell script across representative CWDs.
+
+**Problem**: Two Windows-only divergences make a Go-vs-shell diff impossible to pass there even when the logic is byte-identical. (1) `jq` — the shell hook's JSON encoder — emits **CRLF** on a Windows build, while Go's `encoding/json` emits LF, so every line "differs". (2) The shell runs under Git Bash with MSYS `/tmp/...` paths, but the native Go binary on Windows cannot resolve `/tmp`, so any emitted absolute path (a vault headline, a "not found" line) renders differently (`/c/...` vs `C:\...`). The diff is therefore meaningful **only on Linux**, where both sides use LF and native `/tmp`.
+
+**Solution**: Guard such gates with `if runtime.GOOS == "windows" { t.Skip(...) }` and let them run on the Linux CI job — the POSIX shell is the only equivalence target anyway. And **delete the gate at cutover**: once the shell script is `git rm`'d the gate has no referent to diff against. A byte-equivalence gate proves *fidelity during migration*; the Go unit tests are the *ongoing* regression net. A forever-skipped gate is dead weight — retire it with the shell it compared to.
+
+---
+
+### [2026-06-24] CI golangci-lint enforces staticcheck QF* quickfixes a stale local version skips — heed the gopls hints
+
+**Context**: Two PRs in the CLI-025 chain passed locally (`golangci-lint run` exit 0) but failed the CI `lint` job: an `errcheck` on an unchecked `fmt.Fprint`, and `QF1002` ("could use tagged switch") on a `switch { case x == "": … }`.
+
+**Problem**: The CI action pins golangci-lint **v2.12.2**, which runs the staticcheck `QF*` (quickfix) category; the older binary on the dev machine did not flag them. The editor's `gopls` analyzer DID surface `QF1002` as a hint — but a hint reads as style noise, so it shipped and only CI caught it.
+
+**Solution**: Treat gopls `QF*`/style hints as CI-enforced, not advisory — clear them before pushing. When practical, match CI's golangci-lint version locally; otherwise the cheap habit is: when the editor underlines a staticcheck quickfix, apply it rather than dismiss it.
