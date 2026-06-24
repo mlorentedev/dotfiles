@@ -28,7 +28,7 @@ func TestWriteProjectEntryWritesFilesAndSymlink(t *testing.T) {
 	}
 
 	entry := filepath.Join(vaultDir, "10_projects", "myproj")
-	for _, f := range []string{"00-context.md", "10-roadmap.md", filepath.Join("memory", "MEMORY.md")} {
+	for _, f := range []string{"context.md", "roadmap.md", filepath.Join("memory", "MEMORY.md")} {
 		if _, err := os.Stat(filepath.Join(entry, f)); err != nil {
 			t.Errorf("expected vault file %s: %v", f, err)
 		}
@@ -39,16 +39,16 @@ func TestWriteProjectEntryWritesFilesAndSymlink(t *testing.T) {
 		t.Error("vault entry must NOT contain 11-tasks.md (ADR-018)")
 	}
 
-	ctx, err := os.ReadFile(filepath.Join(entry, "00-context.md"))
+	ctx, err := os.ReadFile(filepath.Join(entry, "context.md"))
 	if err != nil {
-		t.Fatalf("read 00-context.md: %v", err)
+		t.Fatalf("read context.md: %v", err)
 	}
 	ctxStr := string(ctx)
 	if strings.Contains(ctxStr, "{{repo}}") || strings.Contains(ctxStr, "{{stack}}") || strings.Contains(ctxStr, "{{date}}") {
-		t.Errorf("00-context.md still has unsubstituted placeholders:\n%s", ctxStr)
+		t.Errorf("context.md still has unsubstituted placeholders:\n%s", ctxStr)
 	}
 	if !strings.Contains(ctxStr, "myproj") || !strings.Contains(ctxStr, "2026-06-14") {
-		t.Errorf("00-context.md missing substituted repo/date:\n%s", ctxStr)
+		t.Errorf("context.md missing substituted repo/date:\n%s", ctxStr)
 	}
 
 	if runtime.GOOS != "windows" {
@@ -90,7 +90,7 @@ func TestWriteProjectEntrySkipsPresentAndForceRegenerates(t *testing.T) {
 	}
 
 	// Hand-edit, then re-run without --force: the entry must be left untouched.
-	ctxPath := filepath.Join(entry, "00-context.md")
+	ctxPath := filepath.Join(entry, "context.md")
 	if err := os.WriteFile(ctxPath, []byte("hand-edited"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestWriteProjectEntrySkipsPresentAndForceRegenerates(t *testing.T) {
 		t.Errorf("force run Created = %v, want 3 regenerated", third.Created)
 	}
 	if got, _ := os.ReadFile(ctxPath); string(got) == "hand-edited" {
-		t.Error("--force did not regenerate 00-context.md")
+		t.Error("--force did not regenerate context.md")
 	}
 }
 

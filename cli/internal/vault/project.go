@@ -16,8 +16,8 @@ import (
 // Reconciling that — and reaching drift parity with the work-SDK set — is
 // tracked in #400 (kept out of #395 to preserve byte-identical dotf init output).
 var projectEntryFiles = []struct{ template, dest string }{
-	{"vault-context.md", "00-context.md"},
-	{"vault-roadmap.md", "10-roadmap.md"},
+	{"vault-context.md", "context.md"},
+	{"vault-roadmap.md", "roadmap.md"},
 	{"vault-memory.md", filepath.Join("memory", "MEMORY.md")},
 }
 

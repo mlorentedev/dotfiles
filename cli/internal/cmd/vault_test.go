@@ -55,9 +55,9 @@ func TestVaultWorkScaffolds(t *testing.T) {
 		t.Errorf("missing success line:\n%s", stdout)
 	}
 
-	ctx := filepath.Join(vaultDir, "50_work", "45-development", "acme-sensors", "edge-fw", "00-context.md")
+	ctx := filepath.Join(vaultDir, "50_work", "45-development", "acme-sensors", "edge-fw", "context.md")
 	if _, err := os.Stat(ctx); err != nil {
-		t.Errorf("00-context.md not written: %v", err)
+		t.Errorf("context.md not written: %v", err)
 	}
 	b, _ := os.ReadFile(ctx)
 	if !strings.Contains(string(b), `created: "2026-06-13"`) {
@@ -93,7 +93,7 @@ func TestVaultWorkForceFlagPlumbed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("force run: %v", err)
 	}
-	if strings.Contains(stdout, "skipped  00-context.md") {
+	if strings.Contains(stdout, "skipped  context.md") {
 		t.Errorf("--force should regenerate, not skip:\n%s", stdout)
 	}
 }
@@ -113,9 +113,9 @@ func TestVaultProjectScaffolds(t *testing.T) {
 		t.Errorf("missing success line:\n%s", stdout)
 	}
 
-	ctx := filepath.Join(vaultDir, "10_projects", "myrepo", "00-context.md")
+	ctx := filepath.Join(vaultDir, "10_projects", "myrepo", "context.md")
 	if _, err := os.Stat(ctx); err != nil {
-		t.Errorf("00-context.md not written: %v", err)
+		t.Errorf("context.md not written: %v", err)
 	}
 	b, _ := os.ReadFile(ctx)
 	if !strings.Contains(string(b), "myrepo") || !strings.Contains(string(b), `created: "2026-06-13"`) {
@@ -153,7 +153,7 @@ func TestVaultProjectForceFlagPlumbed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("force run: %v", err)
 	}
-	if strings.Contains(stdout, "skipped  00-context.md") {
+	if strings.Contains(stdout, "skipped  context.md") {
 		t.Errorf("--force should regenerate, not skip:\n%s", stdout)
 	}
 }

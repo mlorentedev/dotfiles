@@ -52,7 +52,7 @@ func TestHiveProject(t *testing.T) {
 		vault := t.TempDir()
 		mustMkdirAll(t, filepath.Join(vault, "50_work", "45-development", "FamilyX", "Unrelated"))
 		want := "\n[hive] Work SDK family 'FamilyX' found in vault. Use Hive MCP:" +
-			"\n  - vault_query(project=\"_meta\", path=\"50_work/45-development/FamilyX/00-context.md\") — all repos in family"
+			"\n  - vault_query(project=\"_meta\", path=\"50_work/45-development/FamilyX/context.md\") — all repos in family"
 		if got := hiveProject("/dev/FamilyX-thing", vault); got != want {
 			t.Errorf("got %q, want %q", got, want)
 		}

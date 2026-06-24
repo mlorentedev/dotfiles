@@ -94,7 +94,7 @@ func TestInitWritesVaultEntryWhenVaultPresent(t *testing.T) {
 	}
 
 	entry := filepath.Join(vaultDir, "10_projects", "myproj")
-	for _, f := range []string{"00-context.md", "10-roadmap.md", filepath.Join("memory", "MEMORY.md")} {
+	for _, f := range []string{"context.md", "roadmap.md", filepath.Join("memory", "MEMORY.md")} {
 		if _, err := os.Stat(filepath.Join(entry, f)); err != nil {
 			t.Errorf("expected vault entry file %s after Init: %v", f, err)
 		}
