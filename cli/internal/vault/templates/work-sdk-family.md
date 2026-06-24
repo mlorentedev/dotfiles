@@ -15,7 +15,7 @@ created: "{{date}}"
 
 | Component | Vault Path | Real Path |
 |-----------|-----------|-----------|
-| {{component}} | [[{{component}}/context]] | Fill in source_path |
+| {{component}} | [[{{component}}/00-context]] | Fill in source_path |
 
 ## Work Context
 - Product knowledge: [[../../20-products/{{family}}/00-overview|product overview]] (if exists)

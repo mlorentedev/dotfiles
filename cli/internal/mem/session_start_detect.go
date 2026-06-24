@@ -79,14 +79,14 @@ func workSDKBlock(cwd, vault string) string {
 func workSDKComponentBlock(family, comp string) string {
 	base := "50_work/45-development/" + family + "/" + comp
 	return "\n[hive] Work SDK '" + comp + "' (family: " + family + ") found in vault. Use Hive MCP:" +
-		"\n  - vault_query(project=\"_meta\", path=\"" + base + "/00-context.md\") — project context" +
+		"\n  - vault_query(project=\"_meta\", path=\"" + base + "/context.md\") — project context" +
 		"\n  - vault_query(project=\"_meta\", path=\"" + base + "/memory/MEMORY.md\") — session memory" +
 		"\n  - vault_query(project=\"_meta\", path=\"patterns/workflow-protocol\") — session protocol"
 }
 
 func workSDKFamilyBlock(family string) string {
 	return "\n[hive] Work SDK family '" + family + "' found in vault. Use Hive MCP:" +
-		"\n  - vault_query(project=\"_meta\", path=\"50_work/45-development/" + family + "/00-context.md\") — all repos in family"
+		"\n  - vault_query(project=\"_meta\", path=\"50_work/45-development/" + family + "/context.md\") — all repos in family"
 }
 
 // memorySymlink ensures the Claude per-project auto-memory link to the vault source
