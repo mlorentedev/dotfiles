@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f1",
+    "behavior": "dotf mem session-end archives the MEMORY.md `## Session Handoff` block into 10_projects/<project>/sessions/<date>-<project>-claude.md, and is a resilient no-op on every trivial/missing/malformed input",
+    "verification": "cd cli && go test ./internal/mem/...",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f2",
+    "behavior": "The `dotf mem session-end` command reads the SessionEnd payload on stdin and always exits 0 (never crashes a session), even on malformed input",
+    "verification": "cd cli && go test ./internal/cmd/ -run SessionEnd",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f3",
+    "behavior": "The session-handoff.{sh,ps1} twins are deleted and the SessionEnd hook is wired directly to dotf mem session-end (no shim); a guard pins no regression",
+    "verification": "~/.local/bin/bats tests/guard-no-session-handoff.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

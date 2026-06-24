@@ -1,15 +1,15 @@
 [
   {
     "id": "MEMORY-001-cross-agent-session-bridge-f1",
-    "behavior": "AC1/AC2 — session-handoff.sh archives the MEMORY.md handoff block into 00_meta/sessions/ from a SessionEnd payload, and is a resilient no-op on trivial/missing/empty input",
-    "verification": "~/.local/bin/bats tests/session-handoff.bats",
+    "behavior": "The SessionEnd bridge archives the MEMORY.md handoff block into 10_projects/<project>/sessions/ from a SessionEnd payload, and is a resilient no-op on trivial/missing/empty input. Implementation superseded by CLI-025 (dotf mem session-end); behavior contract unchanged.",
+    "verification": "cd cli && go test ./internal/mem/... ./internal/cmd/ -run SessionEnd",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "MEMORY-001-cross-agent-session-bridge-f2",
-    "behavior": "session-handoff.sh is lint-clean",
-    "verification": "~/.local/bin/shellcheck scripts/session-handoff.sh",
+    "behavior": "The session-end implementation is vet/lint-clean (Go port; the shellcheck of session-handoff.sh retired with the script under CLI-025).",
+    "verification": "cd cli && go vet ./internal/mem/...",
     "state": "pending",
     "evidence": ""
   }

@@ -101,7 +101,6 @@ chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/load-secrets.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 chmod +x "$DOTFILES_DIR/scripts/claude-session-start.sh"
-chmod +x "$DOTFILES_DIR/scripts/session-handoff.sh"
 chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
 chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
 
@@ -1258,7 +1257,11 @@ log_info "Applying Claude settings.json template + registering SessionStart/Sess
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
 EXPECTED_HOOK_COMMAND="$HOME/.dotfiles/scripts/claude-session-start.sh"
-EXPECTED_SESSION_END_COMMAND="$HOME/.dotfiles/scripts/session-handoff.sh"
+# CLI-025: the SessionEnd hook is now the agnostic `dotf mem session-end` noun,
+# invoked directly (no shell-twin shim — session-handoff.{sh,ps1} are deleted).
+# Absolute binary path keeps the hook working even when ~/.local/bin is off the
+# profile PATH (the env-contract owns that invariant; see #531).
+EXPECTED_SESSION_END_COMMAND="$HOME/.local/bin/dotf mem session-end"
 merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_HOOK_COMMAND" "$EXPECTED_SESSION_END_COMMAND"
 
 # Deploy auto-memory symlinks (vault → Claude Code)

@@ -47,10 +47,14 @@ behaviour (cross-OS, single implementation):
   SessionStart `hookSpecificOutput.additionalContext` JSON.
 - **`dotf mem session-end`** — ports `session-handoff` (SessionEnd).
 
-After this work the SessionStart/SessionEnd hooks (`claude-session-start.{sh,ps1}`
-and the SessionEnd registration) are **thin shims** that `exec dotf mem …`, and the
-session-start/end script cluster is deleted. (The `claude-mem-heal.{sh,ps1}` pair is
-deleted separately by #541, not here.)
+After this work the SessionStart/SessionEnd hooks invoke `dotf mem …` **directly**
+(the hook `command` in `settings.json` is the binary path + subcommand — no shim
+script), and the session-start/end script cluster is deleted outright. A thin shim
+would still ship a per-OS `.sh`/`.ps1` pair, re-introducing the very twin-drift the
+CLI convergence exists to kill; direct invocation leaves **zero** shell scripts and
+moves the one residual OS-variance (is `dotf` on PATH / where the binary lives) to
+the single layer that owns it — the env-contract + `dotf doctor` (ADR-025). (The
+`claude-mem-heal.{sh,ps1}` pair is deleted separately by #541, not here.)
 
 ## Out of scope
 
@@ -68,8 +72,9 @@ deleted separately by #541, not here.)
 The session-start/end cluster + a per-session hot path → multiple atomic PRs, each
 build-then-cutover-then-delete (heal PRs removed — see Scope change above):
 
-1. **`dotf mem session-end` + shim + delete `session-handoff.{sh,ps1}`.** Small and
-   independent; can land early.
+1. **`dotf mem session-end` + direct hook registration + delete `session-handoff.{sh,ps1}`.**
+   Small and independent; can land early. The SessionEnd hook command becomes the
+   binary path + `mem session-end` (no shim) and both twins are removed outright.
 2. **`dotf mem session-start` (build).** Port the aggregator, folding `session-brief.sh`
    + `ensure-memory-symlink.sh`. Golden-output test for the `additionalContext` JSON.
 3. **Session-start cutover + delete.** Thin `claude-session-start.{sh,ps1}` to shims;
@@ -77,14 +82,16 @@ build-then-cutover-then-delete (heal PRs removed — see Scope change above):
 
 ## Risks / open questions
 
-- **[OPEN] session-brief core stability.** `session-brief.sh` (ADR-023, HARNESS-026)
-  is the richest piece, and HARNESS-026-session-brief-core still carries unresolved
-  `[AGENT-DRAFT]` tags (flagged at this session's start). Porting an unstable surface
-  invites churn. **Decide:** port it as-is now, or pin HARNESS-026 first and port in
-  PR4 against a frozen contract?
-- **[OPEN] PR ordering / sequencing vs the substrate epic (#469).** Does any #469
-  work touch the same session-start emission, risking a collision? Confirm before
-  scheduling PR4/5.
+- **[RESOLVED 2026-06-23] session-brief core stability.** `session-brief.sh` (ADR-023,
+  HARNESS-026) carries unresolved `[AGENT-DRAFT]` tags, so porting it now invites churn.
+  **Decision:** this question gates only `session-start` (PR2/PR3 fold in `session-brief`);
+  `session-end` (PR1) does not touch it. → **PR1 proceeds now; PR2/PR3 are blocked on
+  pinning HARNESS-026 first** and port against a frozen contract.
+- **[RESOLVED 2026-06-23] PR ordering / sequencing vs the substrate epic (#469).** PR1's
+  surface — `session-handoff` writing to `10_projects/<project>/sessions/` — was just
+  stabilized by #542 ("write records to the project folder, not 00_meta/sessions"). PR1
+  is a faithful port of that just-frozen contract → no collision. The #469 question
+  re-opens only for the `session-start` emission (PR2/PR3); reconfirm before scheduling.
 - **Per-session hot path.** The hooks run on **every** session start; a Go binary's
   cold-start must stay under the shell baseline. `dotf doctor --quick` was already
   optimised for this (CLI-013) — reuse that bar; measure.
@@ -101,8 +108,8 @@ Spec-level (each sub-PR carries its own testable ACs in `tasks.md`):
 
 - [ ] `dotf mem {session-start, session-end}` implemented in `cli/internal/mem`,
   cross-OS, table-tested.
-- [ ] The SessionStart/SessionEnd hooks are thin shims (`exec dotf mem …`), no business
-  logic.
+- [ ] The SessionStart/SessionEnd hooks invoke `dotf mem …` directly (the hook
+  `command` is the binary path + subcommand), with no shim script and no business logic.
 - [ ] The session-start/end script cluster (`claude-session-start.{sh,ps1}`,
   `session-handoff.{sh,ps1}`, `session-brief.sh`, `ensure-memory-symlink.sh`) is deleted
   and a guard-grep pins that no production caller references any of them.
