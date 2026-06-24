@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/mlorentedev/dotfiles/compare/v0.17.0...v0.17.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* **vault:** scaffold number-free context/roadmap filenames (KPM-P) ([#572](https://github.com/mlorentedev/dotfiles/issues/572)) ([4c08b72](https://github.com/mlorentedev/dotfiles/commit/4c08b7270a0a83a74ed6d4261fee46f2f7058fdf))
+
 ## [0.17.0](https://github.com/mlorentedev/dotfiles/compare/v0.16.0...v0.17.0) (2026-06-24)
 
 
