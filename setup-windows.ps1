@@ -130,7 +130,7 @@ if (Test-Path -LiteralPath $utilsPs1Path -PathType Leaf) {
 # can yield a false negative for a plugin not present in that listing, so a setup
 # run can trigger a real install and hit #59870 -- this wrapper is the second
 # layer that catches the false-negative case.
-# Complementary to SDD-021 session-start canary in claude-session-start.ps1
+# Complementary to SDD-021 session-start canary in dotf mem session-start
 # (same 10240-byte threshold, same upstream issue, different detection moment).
 # See dotfiles#33 for the original incomplete trigger fix.
 function Backup-AndRestoreClaudeJson {
@@ -1482,17 +1482,9 @@ if (Test-Path $crystallizeSource) {
     Write-Warn "knowledge-crystallize.ps1 not found at $crystallizeSource"
 }
 
-$sessionStartSource = "$DotfilesDir\scripts\claude-session-start.ps1"
-if (Test-Path $sessionStartSource) {
-    Copy-Item $sessionStartSource "$ScriptsDir\" -Force
-    Write-Success "Deployed claude-session-start.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "claude-session-start.ps1 not found at $sessionStartSource"
-}
-
-# CLI-025: session-handoff.ps1 retired — the SessionEnd hook now calls the
-# agnostic `dotf mem session-end` noun directly (registered below), so there is
-# no per-OS shim script left to deploy.
+# CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired — both session
+# hooks now call agnostic `dotf mem` nouns directly (registered below), so there
+# is no per-OS shim script left to deploy.
 
 # BUG-020: profile-heal.ps1 reconstructs a corrupted PowerShell profile from
 # the SSOT. Pointed at by setup-windows.ps1's preflight error message (BUG-021).
@@ -1652,12 +1644,11 @@ Write-Info "Applying Claude settings.json template + registering SessionStart ho
 # fresh settings.json if missing (closes the v1 doble-paso friction).
 $ClaudeSettings = "$ClaudeHome\settings.json"
 $ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
-$sessionStartCmd = "$ScriptsDir\claude-session-start.ps1"
-$expectedHookCommand = "pwsh -NoProfile -File `"$sessionStartCmd`""
-# CLI-025: the SessionEnd hook is the agnostic `dotf mem session-end` noun,
-# invoked directly (no pwsh -File shim — session-handoff.ps1 is deleted). The
-# absolute binary path keeps it working when ~/.local/bin is off PATH (#531).
+# CLI-025: both session hooks are agnostic `dotf mem` nouns, invoked directly (no
+# pwsh -File shim — claude-session-start.ps1 + session-handoff.ps1 are deleted).
+# The absolute binary path keeps them working when ~/.local/bin is off PATH (#531).
 $dotfBin = "$env:USERPROFILE\.local\bin\dotf.exe"
+$expectedHookCommand = "`"$dotfBin`" mem session-start"
 $expectedSessionEndCommand = "`"$dotfBin`" mem session-end"
 
 Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings -HookCommand $expectedHookCommand -SessionEndCommand $expectedSessionEndCommand

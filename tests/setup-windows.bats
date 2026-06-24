@@ -178,11 +178,10 @@ setup() {
     grep -q 'SessionStart' "$PS1_SCRIPT"
 }
 
-# SessionStart hook command must point at the deploy directory ($ScriptsDir),
-# not the dotfiles staging area. Regression guard for issue #20.
-@test "setup-windows.ps1 SessionStart hook command uses ScriptsDir, not DotfilesDest" {
-    grep -Eq '\$sessionStartCmd\s*=\s*"\$ScriptsDir' "$PS1_SCRIPT"
-    ! grep -Eq '\$sessionStartCmd\s*=\s*"\$DotfilesDest' "$PS1_SCRIPT"
+# CLI-025: the SessionStart hook now invokes the `dotf mem session-start` binary
+# directly (no pwsh -File shim), via the absolute ~/.local/bin path (#531).
+@test "setup-windows.ps1 SessionStart hook command invokes dotf mem session-start" {
+    grep -qE '\$expectedHookCommand\s*=.*\$dotfBin.*mem session-start' "$PS1_SCRIPT"
 }
 
 # Hook registration must self-heal -- never trust "an entry exists" to mean
@@ -625,7 +624,6 @@ setup() {
 
 @test "CLI-018: no production caller references healthcheck.ps1 or doctor.ps1" {
     for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
-             scripts/claude-session-start.ps1 scripts/claude-session-start.sh \
              .github/workflows/ci.yml; do
         if grep -qE '(healthcheck|doctor)\.ps1' "$DOTFILES_DIR/$f"; then
             echo "(healthcheck|doctor).ps1 still referenced in $f" >&2

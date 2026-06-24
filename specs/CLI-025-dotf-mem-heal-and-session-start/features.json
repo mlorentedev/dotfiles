@@ -51,7 +51,14 @@
   {
     "id": "CLI-025-dotf-mem-heal-and-session-start-f8",
     "behavior": "dotf mem session-start (no --format) is the Claude SessionStart hook: it assembles the agnostic brief + Claude injectors in claude-session-start.sh's exact CONTEXT_LINES order and emits the additionalContext JSON envelope, byte-equivalent to the shell hook (golden-fixture gated; jq-equivalent encoding with ordered keys and no HTML escaping)",
-    "verification": "cd cli && go test ./internal/mem/ -run 'ClaudeEnvelope|ClaudeContext|Golden'",
+    "verification": "cd cli && go test ./internal/mem/ -run 'ClaudeEnvelope|ClaudeContext'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f9",
+    "behavior": "The SessionStart hook is repointed to `dotf mem session-start` directly in setup-{linux.sh,windows.ps1} and the session-start shell cluster (claude-session-start.{sh,ps1}, session-brief.sh, ensure-memory-symlink.sh) is deleted; a guard test pins that no deploy/registration file invokes them",
+    "verification": "~/.local/bin/bats tests/setup-linux.bats",
     "state": "pending",
     "evidence": ""
   }

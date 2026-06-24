@@ -5,9 +5,9 @@ created: "2026-06-22"
 
 # Verification - CLI-025-dotf-mem-heal-and-session-start
 
-> Strangler-fig spec. **This records PR1 (`dotf mem session-end`).** PR2/PR3
-> (`session-start`) are deferred behind HARNESS-026 — see the RESOLVED open
-> questions in `proposal.md`. The spec stays `implementing` until PR2/PR3 land.
+> Strangler-fig spec, now COMPLETE. PR1 (`session-end`) + the session-start chain
+> (PR2a core → memlink → PR2b-2a injectors → PR2b-2b adapter → PR3 cutover) all
+> landed. The session hook cluster is one Go noun; every shell twin is deleted.
 
 ## Evidence (PR1 — session-end)
 
@@ -27,7 +27,24 @@ created: "2026-06-22"
 - [x] Cross-spec hygiene: `specs/MEMORY-001-cross-agent-session-bridge/features.json`
   -> repointed its two dangling verifications (deleted bats + shellcheck) at the Go port;
      `behavior` corrected to `10_projects/<project>/sessions/` (the #542 location).
-- [ ] (PR2/PR3) `session-start` port + byte-equivalent `additionalContext` — DEFERRED.
+- [x] (PR2a→PR3) `session-start` port + byte-equivalent `additionalContext` — see below.
+
+## Evidence (session-start — PR2a → PR3)
+
+- [x] **PR2a (#554)** agnostic core `dotf mem session-start --format=stdout|markdown`
+  -> `cli/internal/mem/session_start.go` (the `sb_*` emitters + render); byte-equivalence
+     harness vs `session-brief.sh` green on Linux CI.
+- [x] **memlink (#557)** OS-agnostic vault→memory link primitive (symlink POSIX / junction
+  Windows) -> `cli/internal/memlink`; closes the MEMORY-002 R4 Windows gap; unblocks #551.
+- [x] **PR2b-2a (#566)** Claude injectors (config reader, claude.json-size, knowledge-health,
+  memory-temperature, doctor-drift, hive/work-SDK, auto-memory) -> `cli/internal/mem`, table-tested.
+- [x] **PR2b-2b (#569)** adapter assembly + `additionalContext` envelope (jq-equivalent: ordered
+  keys, no HTML escaping); **golden gate** vs the live `claude-session-start.sh` green on Linux CI.
+- [x] **PR3 (this)** cutover: SessionStart hook repointed to `dotf mem session-start` in
+  `setup-{linux.sh,windows.ps1}`; `git rm` of `claude-session-start.{sh,ps1}` + `session-brief.sh`
+  + `ensure-memory-symlink.sh` (1156 LOC of shell) + 4 obsolete bats + the 2 migration gates
+  (byte-equivalence tests retire with the shell they compared to); guard test pins no
+  deploy/registration file invokes them; `tests/*.bats` 174/174 local, 0 fail.
 
 ## Test status
 

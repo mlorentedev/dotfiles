@@ -21,9 +21,9 @@ fi
 
 # Defaults
 VAULT_NAME="${VAULT_NAME:-knowledge}"
-# VAULT_DIR is the internal handoff from session-brief.sh (already resolved). When
-# run standalone, fall back to the ADR-025 contract seam VAULT_PATH, then the
-# contract's POSIX default. (VAULT_DIR wins so the session-brief handoff is intact.)
+# VAULT_DIR is the internal handoff from the session-start caller (already resolved).
+# When run standalone, fall back to the ADR-025 contract seam VAULT_PATH, then the
+# contract's POSIX default. (VAULT_DIR wins so the caller's handoff is intact.)
 VAULT_DIR="${VAULT_DIR:-${VAULT_PATH:-$HOME/Projects/knowledge}}"
 VERBOSE=false
 OBSIDIAN_CMD="obsidian --no-sandbox"
