@@ -1490,13 +1490,9 @@ if (Test-Path $sessionStartSource) {
     Write-Warn "claude-session-start.ps1 not found at $sessionStartSource"
 }
 
-$sessionHandoffSource = "$DotfilesDir\scripts\session-handoff.ps1"
-if (Test-Path $sessionHandoffSource) {
-    Copy-Item $sessionHandoffSource "$ScriptsDir\" -Force
-    Write-Success "Deployed session-handoff.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "session-handoff.ps1 not found at $sessionHandoffSource"
-}
+# CLI-025: session-handoff.ps1 retired — the SessionEnd hook now calls the
+# agnostic `dotf mem session-end` noun directly (registered below), so there is
+# no per-OS shim script left to deploy.
 
 # BUG-020: profile-heal.ps1 reconstructs a corrupted PowerShell profile from
 # the SSOT. Pointed at by setup-windows.ps1's preflight error message (BUG-021).
@@ -1658,8 +1654,11 @@ $ClaudeSettings = "$ClaudeHome\settings.json"
 $ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
 $sessionStartCmd = "$ScriptsDir\claude-session-start.ps1"
 $expectedHookCommand = "pwsh -NoProfile -File `"$sessionStartCmd`""
-$sessionEndCmd = "$ScriptsDir\session-handoff.ps1"
-$expectedSessionEndCommand = "pwsh -NoProfile -File `"$sessionEndCmd`""
+# CLI-025: the SessionEnd hook is the agnostic `dotf mem session-end` noun,
+# invoked directly (no pwsh -File shim — session-handoff.ps1 is deleted). The
+# absolute binary path keeps it working when ~/.local/bin is off PATH (#531).
+$dotfBin = "$env:USERPROFILE\.local\bin\dotf.exe"
+$expectedSessionEndCommand = "`"$dotfBin`" mem session-end"
 
 Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings -HookCommand $expectedHookCommand -SessionEndCommand $expectedSessionEndCommand
 

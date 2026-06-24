@@ -15,14 +15,30 @@ created: "2026-06-22"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
+> Strangler-fig: 3 PRs (proposal "Decomposition"). **PR1 = `session-end`** (this branch,
+> `feat/CLI-025-dotf-mem-session-end`). PR2/PR3 (`session-start`) are blocked on pinning
+> HARNESS-026 — see the RESOLVED open questions in `proposal.md`.
 
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+### PR1 — `dotf mem session-end` (port `session-handoff.{sh,ps1}`)
+
+- [ ] Failing test: empty stdin / non-JSON / missing `cwd` → clean no-op, no file, exit 0
+- [ ] Failing test: project MEMORY.md absent → no-op
+- [ ] Failing test: `## Session Handoff` block absent or whitespace-only → no-op (trivial session)
+- [ ] Failing test: happy path → writes `<vault>/10_projects/<project>/sessions/<date>-<project>-claude.md`
+      with the SessionEnd frontmatter + extracted block
+- [ ] Implement `cli/internal/mem/session_end.go` — resolve vault via `vault.ResolveVault()`
+      (retires the hardcoded `$HOME/Projects/knowledge` literal, #463), UTC date stamp
+- [ ] Wire `cli/internal/cmd/mem.go` (`newMemCmd` + `session-end` subcommand reading stdin),
+      register in `root.go`; `go build ./...` + `go test ./...` green
+- [ ] Cutover: repoint SessionEnd registration in `setup-{linux.sh,windows.ps1}` at
+      `dotf mem session-end`; `git rm scripts/session-handoff.{sh,ps1}`
+- [ ] Guard test (bats): no production caller references `session-handoff`
+
+### PR2/PR3 — `dotf mem session-start` (DEFERRED — blocked on HARNESS-026)
+
+- [ ] (PR2) Capture golden `additionalContext` fixture from the live shell hook; port the
+      aggregator folding `session-brief.sh` + `ensure-memory-symlink.sh`; byte-equivalence diff
+- [ ] (PR3) Thin `claude-session-start.{sh,ps1}` to shims; `git rm` the cluster; guard-grep
 
 ## Closing
 

@@ -1,42 +1,68 @@
 ---
-tags: [spec, verification, templates]
+tags: [spec, verification]
 created: "2026-06-22"
 ---
 
 # Verification - CLI-025-dotf-mem-heal-and-session-start
 
-## Evidence
+> Strangler-fig spec. **This records PR1 (`dotf mem session-end`).** PR2/PR3
+> (`session-start`) are deferred behind HARNESS-026 — see the RESOLVED open
+> questions in `proposal.md`. The spec stays `implementing` until PR2/PR3 land.
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+## Evidence (PR1 — session-end)
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] `dotf mem session-end` implemented in `cli/internal/mem`, cross-OS, table-tested
+  -> `cli/internal/mem/session_end.go` + `session_end_test.go`
+     (`TestSessionEnd_NoOps` 6 cases, `_HappyPath`, `_DefaultsSessionID`, `_EmptyVaultIsNoOp`).
+     `cd cli && go test ./internal/mem/...` green.
+- [x] The SessionEnd hook invokes `dotf mem session-end` directly (no shim script)
+  -> `setup-linux.sh`: `EXPECTED_SESSION_END_COMMAND="$HOME/.local/bin/dotf mem session-end"`;
+     `setup-windows.ps1`: `$expectedSessionEndCommand = "\"$dotfBin\" mem session-end"`.
+     Stdin wiring + always-exit-0 covered by `cli/internal/cmd/mem_test.go`.
+- [x] `session-handoff.{sh,ps1}` deleted + guard-grep pins no production caller
+  -> `git rm scripts/session-handoff.{sh,ps1}` + the orphaned `tests/session-handoff.bats`;
+     `tests/guard-no-session-handoff.bats` (3/3) pins absence + correct hook wiring.
+- [x] No collision with `tests/claude-settings-template.bats`
+  -> that suite tests the placeholder/merge *mechanism*, not the command value; 24/24 still pass.
+- [x] Cross-spec hygiene: `specs/MEMORY-001-cross-agent-session-bridge/features.json`
+  -> repointed its two dangling verifications (deleted bats + shellcheck) at the Go port;
+     `behavior` corrected to `10_projects/<project>/sessions/` (the #542 location).
+- [ ] (PR2/PR3) `session-start` port + byte-equivalent `additionalContext` — DEFERRED.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Go: `cd cli && go build ./...` OK; `go vet ./...` OK; `go test ./internal/mem/ ./internal/cmd/` OK.
+  Full `go test ./...` has 3 pre-existing `TestEmbeddedTemplatesMatchVault` FAILs
+  (initrepo/spec/vault) = vault-template drift #461, unrelated to this change.
+- Bats: `tests/guard-no-session-handoff.bats` 3/3; `tests/claude-settings-template.bats` 24/24.
+- Manual smoke: deferred (interactive); the cmd test exercises the full stdin->resolve->write path.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- **Direct invocation, not a shim (B over A).** The proposal originally said "thin shim
+  that exec dotf mem". Reframed to direct hook invocation: a shim still ships a per-OS
+  `.sh`/`.ps1` pair, miniaturizing the twin-drift the CLI convergence exists to kill.
+  Hook `command` is now the absolute binary path + `mem session-end`; the only residual
+  OS-variance (dotf on PATH) is owned by the env-contract/`dotf doctor` (ADR-025).
+- **Absolute binary path, not bare `dotf`.** Robust when `~/.local/bin` is off the profile
+  PATH (the live #531 drift); also faithful to the prior pattern (absolute script path).
+- **Converged the twin drift.** The `.sh` used an em-dash heading, the `.ps1` a hyphen;
+  the Go port emits one form (em-dash).
+- **Vault resolver, not the hardcoded literal.** `vault.ResolveVault()` (ADR-025 cascade)
+  replaces the `$HOME/Projects/knowledge` literal the shells hardcoded — retires it for
+  this caller (#463).
 
 ## Promotion candidates
 
-Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
-
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [ ] Lesson for `docs/lessons.md`? yes — "a thin per-OS shim is still a twin; converge to
+  direct CLI invocation and let the env-contract own the PATH invariant" (capture at spec archive).
+- [ ] ADR-worthy? no — applies ADR-020/021/025, introduces nothing new.
+- [ ] New pattern? no — instance of the existing CLI-convergence pattern.
 
 ## Archive checklist
 
+> Do NOT archive yet — PR2/PR3 (session-start) are still open under this spec.
+
 - [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-025-dotf-mem-heal-and-session-start/` -> `specs/archive/CLI-025-dotf-mem-heal-and-session-start/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
+- [ ] Folder moved to `specs/archive/`
 - [ ] Promotions above executed (if any)
