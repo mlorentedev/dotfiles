@@ -1254,3 +1254,13 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Read the whole CI job, not just the grep hits. Removed the stale `healthcheck-ps1.bats` entry and the genuinely-orphaned eza/zoxide flake-guard step (it only fed the removed diagnostic), but KEPT the vault/obsidian fixtures and corrected their stale comments to name the real consumer (`setup-windows.ps1`).
 
 **Rule**: A token guard-grep covers layer 1 (direct references in the exact filename form). It does not catch transitive references (CI test lists, glob runners) or setup steps that only fed the deleted thing. Before deleting "orphaned" setup, grep its consumers by *capability* (the dir/binary/PATH entry it provides), not just by the comment — a comment documents one original reason, not every later consumer.
+
+### [2026-06-23] A thin per-OS shim is still a twin — converge to direct CLI invocation
+
+**Context**: CLI-025 PR1 ported the SessionEnd hook (`session-handoff.{sh,ps1}`) to the Go `dotf mem session-end` noun. The spec's wording said the hook should become a "thin shim that `exec dotf mem …`".
+
+**Problem**: A thin shim still ships a per-OS `.sh`/`.ps1` pair. It *miniaturizes* the cross-OS twin-drift the CLI convergence exists to eliminate rather than removing it — the disease is not the script's size, it's that it exists in plural per OS. Keeping a shim re-introduces, in the last mile, the exact maintenance burden the `dotf` binary was built to kill.
+
+**Solution**: Wire the hook to invoke the binary directly — the Claude Code hook `command` is the single string `<abs dotf path> mem session-end`, identical on Windows and Unix because `dotf`/`dotf.exe` resolves the same subcommand. Delete both twins outright (no replacement). The one residual OS-variance — "is `dotf` on PATH / where the binary lives" — moves to the single layer that already owns it (env-contract + `dotf doctor`, ADR-025). Use the **absolute** binary path (not bare `dotf`) so the hook survives a broken profile PATH (#531).
+
+**Rule**: When converging a shell-twin cluster to a `dotf` noun, delete the twins outright via direct binary invocation; never replace them with thin per-OS shims. Move the only residual OS-variance to the env-contract layer, never into a fallback inside the scripts you are deleting. If a spec says "thin shim", treat that wording as refinable — it predates the convergence clarity.
