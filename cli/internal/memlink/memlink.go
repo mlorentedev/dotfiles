@@ -145,6 +145,7 @@ func linkNoun() string {
 	return "symlink"
 }
 
+// isDir reports whether p exists and is a directory.
 func isDir(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && info.IsDir()
@@ -157,6 +158,8 @@ func isLink(p string) bool {
 	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
 
+// dirNotEmpty reports whether p is a readable directory holding at least one entry
+// (dotfiles included), mirroring the shell's `[ -d … ] && [ "$(ls -A …)" ]`.
 func dirNotEmpty(p string) bool {
 	entries, err := os.ReadDir(p)
 	return err == nil && len(entries) > 0
