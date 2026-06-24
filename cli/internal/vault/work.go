@@ -9,7 +9,7 @@ import (
 // workEntryFiles maps an embedded template to its path under the component entry
 // dir. The parent family context is handled separately (create-if-absent).
 var workEntryFiles = []struct{ template, dest string }{
-	{"work-sdk-context.md", "00-context.md"},
+	{"work-sdk-context.md", "context.md"},
 	{"work-sdk-memory.md", filepath.Join("memory", "MEMORY.md")},
 }
 
@@ -34,8 +34,8 @@ type WorkResult struct {
 
 // WriteWorkEntry scaffolds the work-SDK vault entry under
 // VaultPath/50_work/45-development/<family>/<component>/ from embedded templates:
-// 00-context.md + memory/MEMORY.md (skip-if-present, regenerated under Force), and
-// the parent <family>/00-context.md created only when absent (never clobbered —
+// context.md + memory/MEMORY.md (skip-if-present, regenerated under Force), and
+// the parent <family>/context.md created only when absent (never clobbered —
 // it accumulates the family's repo table across components). It restores the
 // capability removed from init-project.sh in CLI-014 (#388).
 func WriteWorkEntry(opts WorkEntryOptions) (WorkResult, error) {
@@ -75,7 +75,7 @@ func WriteWorkEntry(opts WorkEntryOptions) (WorkResult, error) {
 
 	// Parent family context: create-if-absent, never overwritten (even with
 	// --force) — it carries the family's accumulated repo table.
-	familyFile := filepath.Join(familyDir, "00-context.md")
+	familyFile := filepath.Join(familyDir, "context.md")
 	if fileExists(familyFile) {
 		res.Family = "exists"
 	} else {

@@ -33,7 +33,7 @@ func TestWriteWorkEntryCreatesFilesWithTokensSubstituted(t *testing.T) {
 		t.Errorf("Family = %q, want created", res.Family)
 	}
 
-	ctx := readFile(t, filepath.Join(wantDir, "00-context.md"))
+	ctx := readFile(t, filepath.Join(wantDir, "context.md"))
 	for _, want := range []string{
 		`id: "acme-sensors-edge-fw"`,
 		"# edge-fw: Work SDK Context",
@@ -41,16 +41,16 @@ func TestWriteWorkEntryCreatesFilesWithTokensSubstituted(t *testing.T) {
 		`created: "2026-06-16"`,
 	} {
 		if !strings.Contains(ctx, want) {
-			t.Errorf("00-context.md missing %q", want)
+			t.Errorf("context.md missing %q", want)
 		}
 	}
 	// ${PROJECTS_PATH} is a literal env-var the user fills later, NOT a token.
 	if !strings.Contains(ctx, "${PROJECTS_PATH}") {
-		t.Errorf("00-context.md should keep literal ${PROJECTS_PATH}")
+		t.Errorf("context.md should keep literal ${PROJECTS_PATH}")
 	}
 	// No token delimiter should survive rendering.
 	if strings.Contains(ctx, "{{") {
-		t.Errorf("00-context.md has unrendered token:\n%s", ctx)
+		t.Errorf("context.md has unrendered token:\n%s", ctx)
 	}
 
 	mem := readFile(t, filepath.Join(wantDir, "memory", "MEMORY.md"))
@@ -58,10 +58,10 @@ func TestWriteWorkEntryCreatesFilesWithTokensSubstituted(t *testing.T) {
 		t.Errorf("MEMORY.md missing component header:\n%s", mem)
 	}
 
-	fam := readFile(t, filepath.Join(opts.VaultPath, "50_work", "45-development", "acme-sensors", "00-context.md"))
+	fam := readFile(t, filepath.Join(opts.VaultPath, "50_work", "45-development", "acme-sensors", "context.md"))
 	for _, want := range []string{"# acme-sensors: Product Family Context", "| edge-fw |"} {
 		if !strings.Contains(fam, want) {
-			t.Errorf("family 00-context.md missing %q", want)
+			t.Errorf("family context.md missing %q", want)
 		}
 	}
 }
@@ -71,7 +71,7 @@ func TestWriteWorkEntrySkipsExistingThenForceRegenerates(t *testing.T) {
 	if _, err := WriteWorkEntry(opts); err != nil {
 		t.Fatalf("first write: %v", err)
 	}
-	ctxPath := filepath.Join(opts.VaultPath, "50_work", "45-development", "acme-sensors", "edge-fw", "00-context.md")
+	ctxPath := filepath.Join(opts.VaultPath, "50_work", "45-development", "acme-sensors", "edge-fw", "context.md")
 	if err := os.WriteFile(ctxPath, []byte("HAND-EDITED"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +81,8 @@ func TestWriteWorkEntrySkipsExistingThenForceRegenerates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-run: %v", err)
 	}
-	if !contains(res.Skipped, "00-context.md") {
-		t.Errorf("expected 00-context.md skipped, got Skipped=%v Created=%v", res.Skipped, res.Created)
+	if !contains(res.Skipped, "context.md") {
+		t.Errorf("expected context.md skipped, got Skipped=%v Created=%v", res.Skipped, res.Created)
 	}
 	if got := readFile(t, ctxPath); got != "HAND-EDITED" {
 		t.Errorf("skip-if-present clobbered the file: %q", got)
@@ -94,8 +94,8 @@ func TestWriteWorkEntrySkipsExistingThenForceRegenerates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("force re-run: %v", err)
 	}
-	if !contains(res.Created, "00-context.md") {
-		t.Errorf("expected 00-context.md regenerated under --force, got Created=%v", res.Created)
+	if !contains(res.Created, "context.md") {
+		t.Errorf("expected context.md regenerated under --force, got Created=%v", res.Created)
 	}
 	if got := readFile(t, ctxPath); got == "HAND-EDITED" {
 		t.Errorf("--force did not regenerate the file")
@@ -108,7 +108,7 @@ func TestWriteWorkEntryFamilyContextNotClobberedBySecondComponent(t *testing.T) 
 	if _, err := WriteWorkEntry(first); err != nil {
 		t.Fatalf("first component: %v", err)
 	}
-	famPath := filepath.Join(vault, "50_work", "45-development", "acme-sensors", "00-context.md")
+	famPath := filepath.Join(vault, "50_work", "45-development", "acme-sensors", "context.md")
 	// Simulate the family file having accumulated a hand-maintained repo table.
 	if err := os.WriteFile(famPath, []byte("ACCUMULATED FAMILY TABLE"), 0o644); err != nil {
 		t.Fatal(err)

@@ -42,7 +42,7 @@ Subcommands:
 }
 
 // newVaultProjectCmd builds `dotf vault project [path]`: scaffold the personal-
-// project vault entry under 10_projects/<repo>/ (00-context.md + 10-roadmap.md +
+// project vault entry under 10_projects/<repo>/ (context.md + roadmap.md +
 // memory/MEMORY.md), the same renderer dotf init drives — here as a standalone,
 // vault-only command for an existing repo. <path> defaults to the current dir;
 // the entry name is its basename.
@@ -56,7 +56,7 @@ func newVaultProjectCmd() *cobra.Command {
 		Use:   "project [path]",
 		Short: "Scaffold a personal-project vault entry (10_projects)",
 		Long: `project scaffolds the personal-project vault entry under 10_projects/<repo>/:
-00-context.md, 10-roadmap.md, and memory/MEMORY.md (with {{repo}}/{{stack}}/{{date}}
+context.md, roadmap.md, and memory/MEMORY.md (with {{repo}}/{{stack}}/{{date}}
 substituted). It is the standalone twin of the entry dotf init writes — same
 embedded templates, same renderer (cli/internal/vault).
 
@@ -130,9 +130,9 @@ func newVaultWorkCmd() *cobra.Command {
 		Use:   "work <family> <component>",
 		Short: "Scaffold a work-SDK vault entry (50_work/45-development)",
 		Long: `work scaffolds a vault-only entry for a work-SDK component under
-50_work/45-development/<family>/<component>/: 00-context.md (with a source_path
+50_work/45-development/<family>/<component>/: context.md (with a source_path
 placeholder pointing at the real repo), memory/MEMORY.md, and the parent
-<family>/00-context.md (created only when absent — it carries the family's repo
+<family>/context.md (created only when absent — it carries the family's repo
 table across components).
 
 Skip-if-present: a re-run never clobbers an entry that may have accumulated real
@@ -165,8 +165,8 @@ never overwritten).`,
 			for _, f := range res.Skipped {
 				cmd.Printf("  skipped  %s (present; --force to regenerate)\n", f)
 			}
-			cmd.Printf("  family   [%s] %s/00-context.md\n", res.Family, args[0])
-			cmd.Printf("Next: fill source_path in %s/00-context.md with the real repo path.\n", res.EntryDir)
+			cmd.Printf("  family   [%s] %s/context.md\n", res.Family, args[0])
+			cmd.Printf("Next: fill source_path in %s/context.md with the real repo path.\n", res.EntryDir)
 			return nil
 		},
 	}
