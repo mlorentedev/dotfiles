@@ -1,5 +1,5 @@
 {
-  "_comment": "SSOT for claude-session-start.{sh,ps1} (SDD-004). Both readers source this file at startup. Add or disable injectors here; do NOT touch the per-OS hook scripts unless you are adding new probe logic. See specs/archive/SDD-004-session-start-config/ for the contract.",
+  "_comment": "SSOT for the `dotf mem session-start` adapter (SDD-004; CLI-025). The Go adapter reads these thresholds + injector flags at session start (cli/internal/mem). Add or disable injectors here. See specs/archive/SDD-004-session-start-config/ for the contract.",
   "version": 1,
   "thresholds": {
     "claude_json_min_bytes": 10240,

@@ -90,10 +90,12 @@ created: "2026-06-22"
 
 #### PR3 — cutover + delete
 
-- [ ] Repoint the SessionStart hook to `dotf mem session-start` directly (no shim);
-      `git rm` `claude-session-start.{sh,ps1}` + `session-brief.sh` + `ensure-memory-symlink.sh`;
-      guard-grep that no production caller references them; then HARNESS-026 (#405) can be archived
-- [ ] Wire `dotf doctor --fix` to the shared `memlink` primitive (closes the #551 junction half)
+- [x] Repoint the SessionStart hook to `dotf mem session-start` directly (no shim) in
+      `setup-{linux.sh,windows.ps1}`; `git rm` `claude-session-start.{sh,ps1}` + `session-brief.sh`
+      + `ensure-memory-symlink.sh` (+ their bats + the 2 now-obsolete byte-equivalence gates);
+      guard test pins no deploy/registration file invokes them; HARNESS-026 (#405) now archivable
+- [ ] (follow-up, tracked as #551 / HARNESS-040 — NOT this spec) Wire `dotf doctor --fix` to the
+      shared `memlink` primitive, the junction-repair half consuming the merged memlink package
 
 ## Closing
 

@@ -118,10 +118,10 @@ setup() {
     grep -q 'SessionStart' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-# Hook command must point at the canonical deploy directory under ~/.dotfiles/scripts,
-# matching where the install step actually lands claude-session-start.sh.
-@test "setup-linux.sh SessionStart hook command points at dotfiles scripts dir" {
-    grep -qE 'EXPECTED_HOOK_COMMAND="\$HOME/\.dotfiles/scripts/claude-session-start\.sh"' "$DOTFILES_DIR/setup-linux.sh"
+# CLI-025: the SessionStart hook now invokes the `dotf mem session-start` binary
+# directly (no shell shim), via the absolute ~/.local/bin path (#531).
+@test "setup-linux.sh SessionStart hook command invokes dotf mem session-start" {
+    grep -qE 'EXPECTED_HOOK_COMMAND="\$HOME/\.local/bin/dotf mem session-start"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # Hook registration must self-heal -- never trust "an entry exists" to mean
@@ -132,6 +132,19 @@ setup() {
 @test "setup-linux.sh SessionStart hook self-heals on path drift" {
     grep -qF 'EXPECTED_HOOK_COMMAND' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# CLI-025 cutover guard: no deploy/registration file may deploy or invoke the
+# retired session-start shell cluster (claude-session-start.{sh,ps1}, session-brief.sh,
+# ensure-memory-symlink.sh) — the Go `dotf mem session-start` adapter replaced it and
+# the scripts are git-rm'd. Path-anchored so Go provenance comments don't false-match.
+@test "setup: no deploy/registration file invokes the retired session-start scripts" {
+    for f in setup-linux.sh setup-windows.ps1 ai/claude/settings.json .github/workflows/ci.yml; do
+        if grep -qE 'scripts[\\/](claude-session-start|session-brief|ensure-memory-symlink)' "$DOTFILES_DIR/$f"; then
+            echo "retired session-start script still deployed/invoked in $f" >&2
+            return 1
+        fi
+    done
 }
 
 # --- MCP server registration (SSOT + idempotence) ---
@@ -343,13 +356,6 @@ setup() {
 @test "setup-windows.ps1 runs dotf doctor post-setup (CLI-018)" {
     grep -qF 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
     grep -qF 'Running post-setup dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
-}
-
-# CLI-013/CLI-018: both SessionStart hooks surface env-contract drift via the
-# light `dotf doctor --quick` (the full sweep is too heavy to fork per session).
-@test "SessionStart hooks surface drift via dotf doctor --quick (both OSes)" {
-    grep -q 'dotf doctor --quick' "$DOTFILES_DIR/scripts/claude-session-start.sh"
-    grep -q 'dotf doctor --quick' "$DOTFILES_DIR/scripts/claude-session-start.ps1"
 }
 
 # Required binaries in the contract must include min_version pins.

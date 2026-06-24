@@ -100,7 +100,6 @@ chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/load-secrets.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
-chmod +x "$DOTFILES_DIR/scripts/claude-session-start.sh"
 chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
 chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
 
@@ -927,7 +926,7 @@ fi
 # snapshot_claude_json copies the file to a tempfile BEFORE the call;
 # restore_claude_json_if_truncated restores it AFTER, iff the snapshot was
 # >= 10 KB and the new file is < 50% of the snapshot size. Complementary to
-# SDD-021 session-start canary in claude-session-start.sh (same 10240-byte
+# SDD-021 session-start canary in dotf mem session-start (same 10240-byte
 # threshold, same upstream issue). See dotfiles#33 for the original incomplete
 # trigger fix that motivated this layer.
 snapshot_claude_json() {
@@ -1256,11 +1255,11 @@ merge_claude_settings() {
 log_info "Applying Claude settings.json template + registering SessionStart/SessionEnd hooks..."
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
-EXPECTED_HOOK_COMMAND="$HOME/.dotfiles/scripts/claude-session-start.sh"
-# CLI-025: the SessionEnd hook is now the agnostic `dotf mem session-end` noun,
-# invoked directly (no shell-twin shim — session-handoff.{sh,ps1} are deleted).
-# Absolute binary path keeps the hook working even when ~/.local/bin is off the
-# profile PATH (the env-contract owns that invariant; see #531).
+# CLI-025: both session hooks are agnostic `dotf mem` nouns, invoked directly (no
+# shell-twin shim — claude-session-start.{sh,ps1} + session-handoff.{sh,ps1} are
+# deleted). Absolute binary path keeps the hooks working even when ~/.local/bin is
+# off the profile PATH (the env-contract owns that invariant; see #531).
+EXPECTED_HOOK_COMMAND="$HOME/.local/bin/dotf mem session-start"
 EXPECTED_SESSION_END_COMMAND="$HOME/.local/bin/dotf mem session-end"
 merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_HOOK_COMMAND" "$EXPECTED_SESSION_END_COMMAND"
 
