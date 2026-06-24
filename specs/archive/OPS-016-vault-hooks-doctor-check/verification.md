@@ -42,7 +42,7 @@ All criteria proven by table tests in `cli/internal/doctor/checks_vault_hooks_te
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/OPS-016-vault-hooks-doctor-check/` -> `specs/archive/OPS-016-vault-hooks-doctor-check/`
-- [ ] Backlog entry ticked with PR link (#553)
-- [ ] Promotion (lesson above) executed into `docs/lessons.md`
+- [x] `proposal.md` frontmatter set to `status: archived` (via `dotf spec archive`)
+- [x] Folder moved: `specs/OPS-016-vault-hooks-doctor-check/` -> `specs/archive/OPS-016-vault-hooks-doctor-check/`
+- [x] Backlog tracked via issue `#549` (closed on merge of #553); vault `11-tasks.md` retired (ADR-018 — board is the SSOT)
+- [x] Promotion (lesson above) executed into `docs/lessons.md`
