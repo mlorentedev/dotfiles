@@ -13,6 +13,17 @@ template_version: "1.0"
 > First implementation slice of ADR-023 (agnostic session-start). Establishes the
 > `session-brief` core contract and migrates the first signal under it.
 
+> **RECONCILED WITH CLI-025 (2026-06-23).** This spec is **implemented and on main**:
+> `scripts/session-brief.sh` (the agnostic core, its `sb_*` emitters, the
+> `--format=stdout|markdown` contract, the 16-test bats suite, and the 3-CWD byte-equivalence
+> harness) shipped, and `claude-session-start.sh` sources it. Its **mechanism — a POSIX-`sh`
+> core — is interim.** CLI-025 PR2 ports it to Go (`dotf mem session-start`, preserving the
+> `--format` contract) and PR3 deletes the shell core, so the agnostic session-brief core
+> becomes the `dotf` binary (the "eliminate scripts via the CLI" direction). The **design here
+> is the contract CLI-025 PR2 reproduces**; the byte-equivalence harness is reused as PR2's gate.
+> **Archive this spec once CLI-025 PR3 deletes `session-brief.sh`** (keeping it readable until
+> then so PR2 has the reference). See `specs/CLI-025-dotf-mem-heal-and-session-start/proposal.md`.
+
 ## Why
 
 <!-- from issue #405: HARNESS-026: Agnostic session-start: session-brief core + per-agent adapters (ADR-023) -->

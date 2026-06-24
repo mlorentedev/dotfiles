@@ -34,11 +34,17 @@ created: "2026-06-22"
       `dotf mem session-end`; `git rm scripts/session-handoff.{sh,ps1}`
 - [ ] Guard test (bats): no production caller references `session-handoff`
 
-### PR2/PR3 — `dotf mem session-start` (DEFERRED — blocked on HARNESS-026)
+### PR2/PR3 — `dotf mem session-start` (UNBLOCKED — ports HARNESS-026's shipped shell core)
 
-- [ ] (PR2) Capture golden `additionalContext` fixture from the live shell hook; port the
-      aggregator folding `session-brief.sh` + `ensure-memory-symlink.sh`; byte-equivalence diff
-- [ ] (PR3) Thin `claude-session-start.{sh,ps1}` to shims; `git rm` the cluster; guard-grep
+> HARNESS-026 is DONE on main (`session-brief.sh` + 16 bats + 3-CWD byte-equivalence harness).
+> PR2 ports it to Go; the binary absorbs the agnostic `--format` role; PR3 deletes the shell core.
+
+- [ ] (PR2) Port `session-brief.sh`'s `sb_*` emitters + `--format=stdout|markdown` contract into
+      `cli/internal/mem` (Go), folding `ensure-memory-symlink.sh`; reuse HARNESS-026's 3-CWD
+      byte-equivalence harness + a golden `additionalContext` fixture as the regression gate
+- [ ] (PR3) Repoint the SessionStart hook to `dotf mem session-start` directly (no shim);
+      `git rm` `claude-session-start.{sh,ps1}` + `session-brief.sh` + `ensure-memory-symlink.sh`;
+      guard-grep; then HARNESS-026 (#405) can be archived
 
 ## Closing
 
