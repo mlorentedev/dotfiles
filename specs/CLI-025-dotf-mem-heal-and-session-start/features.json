@@ -40,5 +40,12 @@
     "verification": "cd cli && go test ./internal/memlink/",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f7",
+    "behavior": "The Claude session-start injectors (SDD-004 config reader, claude.json-size, knowledge-health, memory-temperature, doctor-drift, hive/work-SDK detect, auto-memory link) each produce their exact CONTEXT_LINES contribution, ported byte-equivalent from claude-session-start.sh",
+    "verification": "cd cli && go test ./internal/mem/ -run 'AdapterConfig|Encode|ClaudeJSON|Knowledge|MemoryTemp|DoctorDrift|HiveProject|MemorySymlink'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

@@ -73,12 +73,19 @@ created: "2026-06-22"
       `cli/internal/memlink` (resolution + symlink/junction create), consumed next by the adapter
       and by `dotf doctor --fix` (#551).
 
-#### PR2b-2 — Claude adapter
+#### PR2b-2a — Claude adapter injectors (this PR)
 
-- [ ] Port the Claude-only injectors + the `additionalContext` JSON envelope; golden-fixture diff
-      vs the live shell hook across the 3 CWDs as the gate
-- [ ] Wire the default `dotf mem session-start` (no `--format`) = the Claude hook path, composing
-      `mem.Brief` (PR2a) + `memlink.Ensure` (PR2b-1)
+- [x] Port the Claude-only injectors as pure functions, each returning its exact CONTEXT_LINES
+      contribution: SDD-004 config reader, `claude.json-size`, `knowledge-health`,
+      `memory-temperature`, `doctor-drift`, `hive`/`work-SDK` detect, `auto-memory` link
+      (delegates to `memlink.Ensure`). Table-tested byte-exact.
+
+#### PR2b-2b — Claude adapter assembly + gate
+
+- [ ] Assemble the injectors + the `mem.Brief` (PR2a) `sb_*` blocks in the exact CONTEXT_LINES
+      order, wrap in the `additionalContext` JSON envelope, wire the default `dotf mem
+      session-start` (no `--format`) = the Claude hook path
+- [ ] Golden-fixture byte-equivalence diff vs the live shell hook across the 3 CWDs as the gate
 
 #### PR3 — cutover + delete
 
