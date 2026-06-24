@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/mlorentedev/dotfiles/compare/v0.15.0...v0.16.0) (2026-06-24)
+
+
+### Features
+
+* **doctor:** provision knowledge-vault git hooks (OPS-016) ([#553](https://github.com/mlorentedev/dotfiles/issues/553)) ([ca02475](https://github.com/mlorentedev/dotfiles/commit/ca0247542ff484a4b4ab0f5afd69de0771e0521d))
+* **mem:** port session-brief agnostic core to dotf mem session-start (CLI-025) ([#554](https://github.com/mlorentedev/dotfiles/issues/554)) ([0cadeac](https://github.com/mlorentedev/dotfiles/commit/0cadeac3c91943535e9d9172b1bf5fe7708ebdbf))
+
 ## [0.15.0](https://github.com/mlorentedev/dotfiles/compare/v0.14.1...v0.15.0) (2026-06-24)
 
 
