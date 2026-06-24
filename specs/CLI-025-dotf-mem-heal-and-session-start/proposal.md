@@ -40,11 +40,14 @@ A new `dotf mem` noun with two subcommands, faithful ports of the existing
 behaviour (cross-OS, single implementation):
 
 - **`dotf mem session-start`** — ports the SessionStart aggregator and folds in
-  `session-brief.sh` + `ensure-memory-symlink.sh`: SDD-004 config gate, session-brief
-  core (vault detect/health/specs/lessons-staleness), silent `dotf doctor --quick`
-  drift surfacing, hive project detection, memory-symlink ensure, knowledge health,
-  memory-temperature scan, and the SDD-021 `.claude.json` size monitor. Emits the
-  SessionStart `hookSpecificOutput.additionalContext` JSON.
+  `session-brief.sh` (HARNESS-026's agnostic core) + `ensure-memory-symlink.sh`: SDD-004
+  config gate, session-brief core (vault detect/health/specs/lessons-staleness), silent
+  `dotf doctor --quick` drift surfacing, hive project detection, memory-symlink ensure,
+  knowledge health, memory-temperature scan, and the SDD-021 `.claude.json` size monitor.
+  Emits the SessionStart `hookSpecificOutput.additionalContext` JSON. **Absorbs HARNESS-026's
+  agnostic role**: the Go noun preserves the `--format=stdout|markdown` contract, so the
+  binary — not a shell script — becomes the agnostic session-brief core that opencode/agy/
+  copilot consume (via the HARNESS-001 compiler) and Claude consumes via this hook.
 - **`dotf mem session-end`** — ports `session-handoff` (SessionEnd).
 
 After this work the SessionStart/SessionEnd hooks invoke `dotf mem …` **directly**
@@ -75,18 +78,27 @@ build-then-cutover-then-delete (heal PRs removed — see Scope change above):
 1. **`dotf mem session-end` + direct hook registration + delete `session-handoff.{sh,ps1}`.**
    Small and independent; can land early. The SessionEnd hook command becomes the
    binary path + `mem session-end` (no shim) and both twins are removed outright.
-2. **`dotf mem session-start` (build).** Port the aggregator, folding `session-brief.sh`
-   + `ensure-memory-symlink.sh`. Golden-output test for the `additionalContext` JSON.
-3. **Session-start cutover + delete.** Thin `claude-session-start.{sh,ps1}` to shims;
-   `git rm` session-start + session-brief + ensure-memory-symlink; guard-grep.
+2. **`dotf mem session-start` (build).** Port the aggregator + HARNESS-026's already-shipped
+   `session-brief.sh` (reusing its `--format` contract and reproducing its `sb_*` output) +
+   `ensure-memory-symlink.sh`. Reuse HARNESS-026's 3-CWD byte-equivalence harness as the gate;
+   golden-output test for the `additionalContext` JSON.
+3. **Session-start cutover + delete.** Repoint the SessionStart hook to invoke `dotf mem
+   session-start` directly (no shim, per PR1's decision); `git rm` `claude-session-start.{sh,ps1}`
+   + `session-brief.sh` (HARNESS-026's shell core) + `ensure-memory-symlink.sh`; guard-grep. This
+   is the PR3 that lets HARNESS-026 be archived.
 
 ## Risks / open questions
 
-- **[RESOLVED 2026-06-23] session-brief core stability.** `session-brief.sh` (ADR-023,
-  HARNESS-026) carries unresolved `[AGENT-DRAFT]` tags, so porting it now invites churn.
-  **Decision:** this question gates only `session-start` (PR2/PR3 fold in `session-brief`);
-  `session-end` (PR1) does not touch it. → **PR1 proceeds now; PR2/PR3 are blocked on
-  pinning HARNESS-026 first** and port against a frozen contract.
+- **[RESOLVED 2026-06-23] session-brief core stability — HARNESS-026 is DONE, not a blocker.**
+  Correction: `session-brief.sh` (ADR-023, HARNESS-026) is already **implemented and on main**
+  — the agnostic core, its `sb_*` emitters, the `--format=stdout|markdown` contract, the
+  16-test bats suite, and the 3-CWD byte-equivalence harness all shipped; `claude-session-start.sh`
+  already sources it. (The earlier "unresolved `[AGENT-DRAFT]`" read was a flagger false-positive:
+  `tasks.md` contains that literal string as the *description* of the `sb_specs` emitter, not as an
+  open draft.) → **PR2/PR3 are UNBLOCKED.** HARNESS-026 is the tested **reference to port from**,
+  not a contract to pin. PR2 ports the existing shell core to Go and absorbs its agnostic role
+  (see the What/Decomposition updates below); HARNESS-026's shell `session-brief.sh` is deleted at
+  PR3 cutover, completing the convergence.
 - **[RESOLVED 2026-06-23] PR ordering / sequencing vs the substrate epic (#469).** PR1's
   surface — `session-handoff` writing to `10_projects/<project>/sessions/` — was just
   stabilized by #542 ("write records to the project folder, not 00_meta/sessions"). PR1
