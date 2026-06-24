@@ -33,5 +33,12 @@
     "verification": "cd cli && go test ./internal/mem/ -run 'TestSpecs|TestVaultBaseline|TestVaultDetect|TestVaultHealth|TestLessonsStaleness|TestRenderBrief|TestBrief'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f6",
+    "behavior": "The OS-agnostic memlink primitive links an agent's per-project memory dir to its vault source (symlink on POSIX, directory junction on Windows), idempotently and best-effort, converging ensure-memory-symlink.sh and the Windows junction hook; source resolution honours the three vault conventions",
+    "verification": "cd cli && go test ./internal/memlink/",
+    "state": "pending",
+    "evidence": ""
   }
 ]
