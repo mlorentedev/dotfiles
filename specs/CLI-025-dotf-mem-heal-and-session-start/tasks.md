@@ -82,10 +82,11 @@ created: "2026-06-22"
 
 #### PR2b-2b — Claude adapter assembly + gate
 
-- [ ] Assemble the injectors + the `mem.Brief` (PR2a) `sb_*` blocks in the exact CONTEXT_LINES
-      order, wrap in the `additionalContext` JSON envelope, wire the default `dotf mem
-      session-start` (no `--format`) = the Claude hook path
-- [ ] Golden-fixture byte-equivalence diff vs the live shell hook across the 3 CWDs as the gate
+- [x] Assemble the injectors + the `mem.Brief` (PR2a) `sb_*` blocks in the exact CONTEXT_LINES
+      order, wrap in the `additionalContext` JSON envelope (jq-equivalent: ordered keys, no HTML
+      escaping), wire the default `dotf mem session-start` (no `--format`) = the Claude hook path
+- [x] Golden-fixture byte-equivalence diff vs the live `claude-session-start.sh` across 3 CWDs
+      (POSIX-only gate; runs on the Linux test job)
 
 #### PR3 — cutover + delete
 
