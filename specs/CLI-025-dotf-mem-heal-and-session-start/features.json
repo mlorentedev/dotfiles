@@ -19,5 +19,19 @@
     "verification": "~/.local/bin/bats tests/guard-no-session-handoff.bats",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f4",
+    "behavior": "dotf mem session-start emits the agnostic session-brief byte-equivalent to scripts/session-brief.sh across representative CWDs and both --format values (POSIX gate; the Windows .ps1 equivalence lands in PR2b)",
+    "verification": "cd cli && go test ./internal/mem/ -run TestSessionStartByteEquivalence",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-025-dotf-mem-heal-and-session-start-f5",
+    "behavior": "The sb_* emitters (vault detect/health/specs/lessons/baseline) and the --format=stdout|markdown runner are ported faithfully, preserving the leading-blank framing and exact message text",
+    "verification": "cd cli && go test ./internal/mem/ -run 'TestSpecs|TestVaultBaseline|TestVaultDetect|TestVaultHealth|TestLessonsStaleness|TestRenderBrief|TestBrief'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
