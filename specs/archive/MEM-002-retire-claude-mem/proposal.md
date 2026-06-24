@@ -1,7 +1,7 @@
 ---
 id: "MEM-002-retire-claude-mem"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-22"
 issue: "mlorentedev/dotfiles#541"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, memory, claude-mem, retirement]
@@ -99,3 +99,5 @@ next `setup`.
 - Decision: hive `docs/adr/adr-016-cross-agent-memory-consolidation.md` (Q2)
 - Issue: #541 · unblocks #494 · closes #439 (declined) + #232 (obsolete) · deferred index hive#263
 - Removal map: 2026-06-22 architecture session footprint audit
+
+<!-- archived 2026-06-24 — PR: https://github.com/mlorentedev/dotfiles/pull/544 -->

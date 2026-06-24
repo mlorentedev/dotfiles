@@ -20,8 +20,8 @@ created: "2026-06-22"
   -> `echo '{}' | bash scripts/claude-session-start.sh` -> valid JSON; `contains claude-mem: False`.
 - [x] claude-mem troubleshooting docs archived (not deleted); CLAUDE.md section removed
   -> `git mv docs/troubleshooting/claude-mem-{surrogate-400,broken-marketplace}.md docs/troubleshooting/archive/`; "Claude-Only MCP: claude-mem" section removed from `ai/claude/CLAUDE.md`.
-- [ ] claude-mem uninstalled from this machine (verified absent from `~/.claude/plugins`)
-  -> DEFERRED to after this session: the plugin is live in the current session (self-heals at SessionStart). Run `claude plugin uninstall claude-mem@thedotmack` (or re-run `setup`, which now carries the idempotent cleanup) once this session ends.
+- [x] claude-mem uninstalled from this machine (verified absent from `~/.claude/plugins`)
+  -> Confirmed 2026-06-23 post-merge: `claude plugin list` shows no `claude-mem@thedotmack`; `command -v claude-mem` exits non-zero. The plugin is gone from this machine.
 
 ## Test status
 
