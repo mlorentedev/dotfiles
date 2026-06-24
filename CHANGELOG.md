@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/mlorentedev/dotfiles/compare/v0.14.1...v0.15.0) (2026-06-24)
+
+
+### Features
+
+* **mem:** port session-handoff to dotf mem session-end, delete shell twins (CLI-025) ([#546](https://github.com/mlorentedev/dotfiles/issues/546)) ([75c40ea](https://github.com/mlorentedev/dotfiles/commit/75c40eae947666270f97f8cef17ccb94d57ef41d))
+
 ## [0.14.1](https://github.com/mlorentedev/dotfiles/compare/v0.14.0...v0.14.1) (2026-06-23)
 
 
