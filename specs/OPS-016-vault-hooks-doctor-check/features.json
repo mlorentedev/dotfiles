@@ -1,0 +1,44 @@
+[
+  {
+    "id": "OPS-016-vault-hooks-doctor-check-f1",
+    "behavior": "AC1: with both vault hooks installed and pre-commit-managed, checkVaultHooks PASSES and performs no mutation.",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckVaultHooks_BothInstalledPasses$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-016-vault-hooks-doctor-check-f2",
+    "behavior": "AC2: gate missing and --fix not set -> FAIL with remediation, no install attempted.",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckVaultHooks_MissingFailsWithoutFix$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-016-vault-hooks-doctor-check-f3",
+    "behavior": "AC3: under --fix with pre-commit available, both hooks are installed via `pre-commit install --hook-type pre-commit --hook-type pre-push` in the vault; idempotent on re-run; an install failure is reported.",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckVaultHooks_(InstalledOnFix|InstallFailureIsReported)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-016-vault-hooks-doctor-check-f4",
+    "behavior": "AC4: under --fix with the vault present but pre-commit absent -> loud FAIL, never a silent skip.",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckVaultHooks_MissingToolFailsLoudOnFix$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-016-vault-hooks-doctor-check-f5",
+    "behavior": "AC5: no vault checkout at the resolved path -> SKIP (non-fatal).",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckVaultHooks_NoVaultSkips$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-016-vault-hooks-doctor-check-f6",
+    "behavior": "AC6: the vault path is resolved via the VAULT_PATH seam (no hardcode); the whole check suite drives behavior through injected VAULT_PATH.",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckVaultHooks_'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
