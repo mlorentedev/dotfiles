@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.17.0](https://github.com/mlorentedev/dotfiles/compare/v0.16.0...v0.17.0) (2026-06-24)
+
+
+### Features
+
+* **mem:** assemble the Claude session-start adapter + golden gate (CLI-025) ([#569](https://github.com/mlorentedev/dotfiles/issues/569)) ([dd95039](https://github.com/mlorentedev/dotfiles/commit/dd95039855db89a31709520e2be562f979c31cd5))
+* **mem:** Claude session-start injectors (CLI-025) ([#566](https://github.com/mlorentedev/dotfiles/issues/566)) ([ecfff9d](https://github.com/mlorentedev/dotfiles/commit/ecfff9d256ac22cd1437cfde179d224f1be693da))
+* **mem:** cut over the SessionStart hook to dotf mem session-start, delete the shell cluster (CLI-025) ([#570](https://github.com/mlorentedev/dotfiles/issues/570)) ([0a18373](https://github.com/mlorentedev/dotfiles/commit/0a18373a37682c58f64fac9d3b555cc1dd430903))
+* **memlink:** OS-agnostic vault-&gt;memory link primitive (CLI-025) ([#557](https://github.com/mlorentedev/dotfiles/issues/557)) ([edec57c](https://github.com/mlorentedev/dotfiles/commit/edec57c5607deb2e49c3edc1db3545e813b6712c))
+
 ## [0.16.0](https://github.com/mlorentedev/dotfiles/compare/v0.15.0...v0.16.0) (2026-06-24)
 
 
