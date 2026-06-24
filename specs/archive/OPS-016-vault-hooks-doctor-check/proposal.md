@@ -1,7 +1,7 @@
 ---
 id: "OPS-016-vault-hooks-doctor-check"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-24"
 issue: "mlorentedev/dotfiles#549"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -50,3 +50,5 @@ Observable outcomes. Each must be testable.
 - Sibling check: HARNESS-040 / `#551` (`dotf doctor --fix` for junction + env-contract drift; shares the `--fix` subsystem)
 - Pattern: `00_meta/patterns/pattern-vault-health` · vault `feedback-no-ci-for-vault`, knowledge#114 (no-CI / backstop removal)
 - Mirrors: `cli/internal/doctor/checks_guard.go` (`checkGuardHooks`)
+
+<!-- archived 2026-06-24 — PR: https://github.com/mlorentedev/dotfiles/pull/553 -->
