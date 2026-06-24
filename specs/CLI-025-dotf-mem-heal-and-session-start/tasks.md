@@ -66,12 +66,19 @@ created: "2026-06-22"
       (dotfiles repo / outside-vault / inside-vault), reusing the `session-start-config.bats` pattern
 - [ ] `go build ./...` + `go test ./...` green
 
-#### PR2b — Claude adapter + `memlink` primitive
+#### PR2b-1 — `memlink` primitive (PR #557)
 
-- [ ] Extract `ensure-memory-symlink.sh` into an OS-agnostic Go `memlink` primitive (ensure + repair)
+- [x] Extract `ensure-memory-symlink.sh` into an OS-agnostic Go `memlink` primitive; the Windows
+      junction branch also closes the MEMORY-002 R4 gap the shell twin deferred. Standalone package
+      `cli/internal/memlink` (resolution + symlink/junction create), consumed next by the adapter
+      and by `dotf doctor --fix` (#551).
+
+#### PR2b-2 — Claude adapter
+
 - [ ] Port the Claude-only injectors + the `additionalContext` JSON envelope; golden-fixture diff
       vs the live shell hook across the 3 CWDs as the gate
-- [ ] Wire the default `dotf mem session-start` (no `--format`) = the Claude hook path
+- [ ] Wire the default `dotf mem session-start` (no `--format`) = the Claude hook path, composing
+      `mem.Brief` (PR2a) + `memlink.Ensure` (PR2b-1)
 
 #### PR3 — cutover + delete
 
