@@ -1306,3 +1306,43 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Put the encoding in the shared `memlink` primitive (`ClaudeProjectKey` maps `/ \ :` → `-`; `ClaudeMemoryTarget` joins the full path) so the session-start adapter and doctor compute an identical target on every OS, and deleted the local `mem.encodeProjectPath`. Widened `isLink` to `ModeSymlink|ModeIrregular`. Named test subtests without `,`/`()` so they don't poison `t.TempDir()` paths; ticketed the real cmd-quoting robustness fix (#575) rather than rabbit-holing on `cmd /s /c` quoting in this PR.
 
 **Rule**: When code that creates/inspects filesystem links is "ported from shell", re-derive the Windows facts from scratch — separators, the drive colon, junction-vs-symlink mode bits, and cmd argument quoting are all places POSIX intuition is wrong. Keep one OS-aware encoding as SSOT shared by every caller; never let two callers re-encode a path independently. And keep test names free of shell/cmd metacharacters — `t.TempDir()` embeds the test name, so a comma or paren in a subtest name becomes a real path component.
+
+### [2026-06-25] PR title is the release contract under squash + release-please
+
+**Context**: Shipping ADR-028 secrets work as squash-merged PRs; release-please (release-type: simple) cuts releases from conventional-commit subjects.
+
+**Problem**: #584 (registry + `dotf secrets ls/show`) squash-merged with a non-conventional PR title ("Secrets registry: ..."). Squash promotes the PR title to the merge-commit subject, which release-please parses. It logged `unexpected token ' ' at 1:8` and counted 0 releasable commits -> no 0.19.0 release ever opened, even though a user-facing feat had landed. The feature sat on main, unreleased and undeployed, silently.
+
+**Solution**: Landed the next `feat(secrets):` PR to re-trigger release-please (it swept #584 into the 0.19.0 tag). Opened #589 to add a conventional-commit PR-title gate.
+
+**Rule**: With squash-merge the PR TITLE is the release-parsed subject -- it must be a valid Conventional Commit. A non-conventional title doesn't error; it silently drops the change from versioning. When a feature merged but no release PR appears, check the merge-commit subject first.
+
+### [2026-06-25] agy bakes secrets into JSON; opencode/pi self-decrypt (they ignore ambient env)
+
+**Context**: Migrating setup off the load-secrets eager-source (which populated $NAN_API_KEY/$OPENROUTER_API_KEY in the setup process env for deploy-time config materialization).
+
+**Problem**: Assumed both opencode and agy consumed the eager-loaded ambient env. They don't. `substitute_env_placeholders` (utils.sh) / `Substitute-EnvPlaceholders` (utils.ps1) resolve {env:VAR} by reading env-mapping.conf and age-decrypting the .secret.age file DIRECTLY -- they ignore the ambient env. Only the agy MCP block reads $env:OPENROUTER_API_KEY, because agy does NOT expand env vars inside JSON, so the key must be baked into mcp_config.json at deploy. So the eager NAN_API_KEY fetch was dead code, and env-mapping.conf can't be deleted while the substitute functions still read it.
+
+**Solution**: B3 fetches only OPENROUTER_API_KEY via `dotf secrets show` for agy; dropped the dead NAN fetch. Left env-mapping.conf; tracked the substitute-functions -> registry migration (a future `dotf secrets render`) as the last step before deleting env-mapping.conf (#587).
+
+**Rule**: Trace each secret consumer to its ACTUAL resolution path before migrating it. Two configs using {env:VAR} can resolve via completely different mechanisms (self-decrypt vs deploy-time bake vs runtime). Read the substitution function; don't assume ambient env.
+
+### [2026-06-25] A new top-level dir backing a dotf runtime read must be deployed by setup
+
+**Context**: #584 added secrets/registry.yaml and made deployed `dotf secrets {ls,show,run}` read it from $DOTFILES_DIR/secrets/registry.yaml. 0.19.0 shipped it.
+
+**Problem**: setup-{linux,windows} only deployed sensitive/ and scripts/ into ~/.dotfiles -- never the new secrets/ dir. So on a 0.19.0 machine, `dotf secrets run` (and the opencode/pi/agy wrappers that call it) failed `read registry: ... cannot find the path`. A post-deploy smoke caught it; otherwise it would have broken the AI-CLI wrappers silently.
+
+**Solution**: B2 (#591) deploys secrets/registry.yaml to $DOTFILES_DIR/secrets/, mirroring sensitive/. Stopgap-copied on the current machine to unbreak it immediately.
+
+**Rule**: When a `dotf` subcommand reads a file from $DOTFILES_DIR at runtime, setup MUST deploy that file/dir -- adding it to the repo is not enough. Always smoke a deployed binary after a release; the smoke is what catches deployed-vs-source drift (redeploy is part of "done").
+
+### [2026-06-25] CI gotchas: Set-Content CRLF on .sh, and repointing tests creates duplicate names
+
+**Context**: PR-C deleted files and edited tests via PowerShell Set-Content and bats edits.
+
+**Problem**: (1) PowerShell `Set-Content` writes CRLF on Windows. Applied to scripts/test.sh (.gitattributes eol=lf) it CRLF'd the whole file -> shellcheck SC1017 on every line locally (git normalizes on commit, but the working copy + local checks break). (2) Repointing a removed test to an existing assertion ("dotfiles-sync.sh is executable") created a duplicate @test NAME within verify-setup.bats -> bats refuses to parse the file, failing the `test` AND `integration` jobs.
+
+**Solution**: Stripped CR from test.sh (`sed -i 's/\r$//'`). Deleted the repointed tests outright.
+
+**Rule**: Don't rewrite .sh files with PowerShell Set-Content (it injects CRLF); use an LF-preserving edit or strip \r after. When removing a feature, DELETE its tests -- don't repoint them to another assertion, or you risk a duplicate @test name (a per-file bats parse error).
