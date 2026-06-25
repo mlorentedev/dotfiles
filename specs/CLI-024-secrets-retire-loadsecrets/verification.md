@@ -5,17 +5,30 @@ created: "2026-06-25"
 
 # Verification - CLI-024-secrets-retire-loadsecrets
 
-> PR-B1 only. Branch `feat/nan-scripts-via-dotf-secrets` (off main). B2/C verified
-> with their own PRs.
+> Cumulative across the PR sequence (B1 #588, B2 #591, B3 #593). PR-C (twin
+> deletion) + the env-mapping.conf migration close the remaining ACs.
 
 ## Evidence
 
 - [x] **AC1** — nan-* resolve `NAN_API_KEY` via `dotf secrets show nan-api-key`
-  → test `tests/nan-scripts-secrets.bats` (7/7), edits to
-  `scripts/nan-{bench,debug,quality-bench}.sh`.
-- [ ] **AC2/AC3** — setup migration + twin deletion → PR-B2 / PR-C.
-- [x] **AC4** — neighbouring suites green; no regressions.
+  → test `tests/nan-scripts-secrets.bats` (7/7). (#588, merged.)
+- [x] **AC2** — setup resolves the agy deploy-time secret via `dotf secrets show`,
+  with no eager load-secrets source → `tests/setup-{linux,windows}.bats` `#587`
+  (#591 deploys the registry; #593 retires the eager-source). opencode/pi
+  self-resolve via `substitute_env_placeholders`, so only agy needed migrating.
+- [ ] **AC3** — twin deletion → PR-C (env-mapping.conf deferred: the substitute
+  twins still read it — separate migration).
+- [x] **AC4** — all bats green; PowerShell AST parse 0 errors; no regressions.
 - [ ] **AC5** — PAT lesson archived → PR-C.
+
+## B3 evidence (#593)
+
+- Linux: `bash -n` + `shellcheck -S error` clean; `tests/setup-linux.bats` `#587` green.
+- Windows: PowerShell AST `ParseFile` → **0 errors**; `tests/setup-windows.bats`
+  `#587` green; deploy-block vars (`$DotfilesDir/$DotfilesDest`, `Write-*`,
+  `Ensure-Directory`) all defined at L75-107, before the new (early) location.
+- Live (Windows): `dotf secrets show openrouter-api-key` → rc=0, 73-char value
+  (agy's materialization source), value not printed.
 
 ## TDD log — AC1
 
