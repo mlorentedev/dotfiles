@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.1](https://github.com/mlorentedev/dotfiles/compare/v0.21.0...v0.21.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **spec-gate:** exclude Go *_test.go from the production-LOC count ([#603](https://github.com/mlorentedev/dotfiles/issues/603)) ([5d726ce](https://github.com/mlorentedev/dotfiles/commit/5d726ce166b9a1e2f4dd79bdea112f6eebe69b60)), closes [#517](https://github.com/mlorentedev/dotfiles/issues/517)
+
 ## [0.21.0](https://github.com/mlorentedev/dotfiles/compare/v0.20.0...v0.21.0) (2026-06-25)
 
 
