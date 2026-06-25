@@ -99,9 +99,9 @@ setup() {
 }
 
 @test "setup-windows.ps1 preflights the age identity key (warn, not fail)" {
-    # Without ~/.config/age/key.txt, load-secrets.ps1 silently no-ops at
-    # shell startup and opencode/agy 401 with no clue. Preflight WARNs (must
-    # not abort -- encrypted files still deploy so a key imported later works).
+    # Without ~/.config/age/key.txt, dotf secrets can't decrypt and opencode/agy
+    # 401 with no clue. Preflight WARNs (must not abort -- encrypted files still
+    # deploy so a key imported later works).
     grep -qF 'age identity key not found' "$PS1_SCRIPT"
     grep -qF 'AGE_KEY_PATH' "$PS1_SCRIPT"
     grep -qF 'docs/SECRETS.md' "$PS1_SCRIPT"
@@ -171,10 +171,6 @@ setup() {
 
 @test "setup-windows.ps1 deploys obs-cli.ps1" {
     grep -q 'obs-cli.ps1' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 deploys load-secrets.ps1" {
-    grep -q 'load-secrets.ps1' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 sets up secrets system" {

@@ -35,13 +35,14 @@ created: "2026-06-25"
 - [x] Verify: bash -n + shellcheck; PowerShell AST parse 0 errors; bats `#587` green;
   live smoke `dotf secrets show openrouter-api-key` (len 73).
 
-## PR-C — delete the load-secrets twins  (next)
+## PR-C — delete the load-secrets twins  (THIS PR)
 
 - [x] Consumer sweep done (no rc/profile sourcing; only `scripts/test.sh` + tests reference the twin).
-- [ ] `git rm scripts/load-secrets.{sh,ps1}` + `tests/load-secrets.bats`.
-- [ ] Drop setup chmod (`setup-linux`) + the `load-secrets.ps1` deploy block (`setup-windows`).
-- [ ] Retire the `scripts/test.sh` "Secrets Loading" section (tests the twin) + the integration Dockerfile ref.
-- [ ] Archive the fine-grained-PAT lesson in `docs/runbooks/guide-bitacora-setup.md`.
+- [x] `git rm scripts/load-secrets.{sh,ps1}` + `tests/load-secrets.bats`.
+- [x] Drop setup chmod (`setup-linux`) + the `load-secrets.ps1` deploy block (`setup-windows`).
+- [x] Retire the `scripts/test.sh` "Secrets Loading" section (tests the twin) + update the integration Dockerfile comment.
+- [x] Repoint the two `verify-setup.bats` twin-deploy assertions to the registry / dotfiles-sync.
+- [x] Archive the fine-grained-PAT lesson in `docs/runbooks/guide-bitacora-setup.md`.
 
 ## Deferred — `env-mapping.conf` + the substitute twins
 
