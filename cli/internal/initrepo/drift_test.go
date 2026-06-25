@@ -40,10 +40,18 @@ func TestEmbeddedTemplatesMatchVault(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read embedded %s: %v", embedded, err)
 		}
-		if !bytes.Equal(got, want) {
+		if !eqIgnoringEOL(got, want) {
 			t.Errorf("embedded templates/%s drifted from vault %s.\n"+
 				"Re-vendor: cp %s cli/internal/initrepo/templates/%s",
 				embedded, vaultName, filepath.Join(tmplDir, vaultName), embedded)
 		}
 	}
+}
+
+// eqIgnoringEOL compares ignoring CR, so CRLF and LF are equal. The embedded copy
+// is EOL-normalized to LF by .gitattributes; the vault is a separate repo this one
+// does not govern, so a byte-exact compare is line-ending-fragile across machines
+// (CRLF on a Windows checkout) and masks real content drift (#597).
+func eqIgnoringEOL(a, b []byte) bool {
+	return bytes.Equal(bytes.ReplaceAll(a, []byte("\r"), nil), bytes.ReplaceAll(b, []byte("\r"), nil))
 }

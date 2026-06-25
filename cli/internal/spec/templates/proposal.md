@@ -14,7 +14,7 @@ template_version: "1.0"
 
 ## Why
 
-Single paragraph. The user or business problem this feature solves. Link to the vault roadmap or `11-tasks.md` entry if applicable. If you cannot write this in 3 sentences, you do not understand the problem yet.
+Single paragraph. The user or business problem this feature solves. Link to the vault roadmap or the bitácora board issue if applicable. If you cannot write this in 3 sentences, you do not understand the problem yet.
 
 ## What
 
@@ -44,6 +44,6 @@ Observable outcomes. Each must be testable.
 
 ## References
 
-- Vault: `10_projects/<repo>/11-tasks.md` (backlog entry)
+- Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - Related ADR: `<repo>/docs/adr/adr-XXX.md` (if any)
 - Related patterns: `00_meta/patterns/<pattern>.md` (if any)
