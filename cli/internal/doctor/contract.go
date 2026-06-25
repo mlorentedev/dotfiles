@@ -27,10 +27,10 @@ type ContractEnvVar struct {
 	Validation string            `json:"validation"`
 }
 
-// requiredOnLinux reports whether this var must be present on Linux: either
-// globally required, or scoped required_on: linux.
-func (e ContractEnvVar) requiredOnLinux() bool {
-	return e.Required || e.RequiredOn == "linux"
+// requiredOn reports whether this var must be present on the given OS dialect:
+// either globally required, or scoped required_on to that same OS.
+func (e ContractEnvVar) requiredOn(os string) bool {
+	return e.Required || e.RequiredOn == os
 }
 
 // ContractBinary is a required binary with an optional pinned minimum version

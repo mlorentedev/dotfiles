@@ -134,7 +134,10 @@ func newToolsListCmd() *cobra.Command {
 			_, _ = fmt.Fprintln(w, "NAME\tVERSION\tPROFILE\tASSET ("+runtime.GOOS+"/"+runtime.GOARCH+")")
 			for _, t := range cat.Tools {
 				asset := t.AssetName(runtime.GOOS, runtime.GOARCH)
-				if asset == "" {
+				switch {
+				case t.Source.Type == "npm":
+					asset = "npm:" + t.Source.Package // npm tools are platform-agnostic
+				case asset == "":
 					asset = "(no build for this platform)"
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", t.Name, t.Version, t.Profile, asset)
