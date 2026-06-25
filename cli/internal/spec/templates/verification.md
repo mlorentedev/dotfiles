@@ -38,5 +38,5 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved: `specs/<feature-id>/` -> `specs/archive/<feature-id>/`
-- [ ] Backlog entry in vault `11-tasks.md` ticked with PR link
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
