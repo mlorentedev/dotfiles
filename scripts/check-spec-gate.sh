@@ -98,6 +98,7 @@ _excluded() {
         *generated*) return 0 ;;
     esac
     case "$base" in
+        *_test.go) return 0 ;;   # Go test files are tests, not production (#517)
         *.lock|*.lockb) return 0 ;;
         package-lock.json|pnpm-lock.yaml|go.sum) return 0 ;;
         .gitignore|CHANGELOG.md) return 0 ;;
