@@ -75,10 +75,6 @@ setup() {
     [ -f "$DOTFILES_DIR/scripts/utils.sh" ]
 }
 
-@test "load-secrets.sh copied to ~/.dotfiles/scripts" {
-    [ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]
-}
-
 @test "aliases.zsh copied to ~/.dotfiles/.zsh" {
     [ -f "$DOTFILES_DIR/.zsh/aliases.zsh" ]
 }
@@ -148,10 +144,6 @@ setup() {
 
 @test "utils.sh is executable" {
     [ -x "$DOTFILES_DIR/scripts/utils.sh" ]
-}
-
-@test "load-secrets.sh is executable" {
-    [ -x "$DOTFILES_DIR/scripts/load-secrets.sh" ]
 }
 
 @test "github-secrets-manager.sh is executable" {

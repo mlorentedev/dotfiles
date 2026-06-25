@@ -1626,17 +1626,6 @@ if (Test-Path $obsCliSource) {
     Write-Warn "obs-cli.ps1 not found at $obsCliSource"
 }
 
-$loadSecretsSource = "$DotfilesDir\scripts\load-secrets.ps1"
-if (Test-Path $loadSecretsSource) {
-    Ensure-Directory "$DotfilesDest\scripts"
-    Copy-Item $loadSecretsSource "$DotfilesDest\scripts\" -Force
-    Write-Success "Deployed load-secrets.ps1 to $DotfilesDest\scripts\"
-    Write-Info "To load secrets at startup, add to your PowerShell profile:"
-    Write-Info "  . `"$DotfilesDest\scripts\load-secrets.ps1`""
-} else {
-    Write-Warn "load-secrets.ps1 not found at $loadSecretsSource"
-}
-
 # 7b. DEPLOY SECRETS SYSTEM moved earlier (right after Install-Dotf) so the
 # opencode/agy config blocks above substitute their secrets at deploy time; the
 # load-secrets eager dot-source was retired (ADR-028 / #587).

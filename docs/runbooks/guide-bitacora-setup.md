@@ -148,6 +148,12 @@ jobs:
 > **Gotcha (2026-06-06):** `actions/add-to-project@v1` is unresolvable — there is no floating
 > `v1` tag. Pin `@v1.0.2` (latest v1) or `@v2.0.0`. `BITACORA_PAT` needs `project` + `repo` scope.
 
+> **Gotcha (2026-06-25):** `BITACORA_PAT` must be a **classic** PAT carrying the `project`
+> scope (plus `repo`). **Fine-grained PATs cannot write user-owned Projects v2** — both
+> `add-to-project` and the Projects v2 GraphQL (§7b) fail (403 / `unknown owner type`),
+> regardless of the fine-grained "Projects: read & write" permission. If `add-to-project`
+> 403s after a token rotation, regenerate `BITACORA_PAT` as a **classic** token.
+
 ### 7b. `bitacora-status.yml` — moves an **assigned** issue to *In Progress* (HARNESS-010)
 
 Fires on `issues: [assigned]`, so self-assigning at pickup flips `Status` automatically (§5). It is
