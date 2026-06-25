@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-024-secrets-registry-f1",
+    "behavior": "AC1: registry.yaml resolves to the same secret set as env-mapping.conf (round-trip drift guard)",
+    "verification": "cd cli && go test ./internal/secrets/ -run TestRealRegistry_RoundTripsEnvMapping",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-f2",
+    "behavior": "AC2: dotf secrets show <single-env-id> prints the decrypted value with no trailing newline",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSecretsShow_SingleEnv_ScrubbedNoTrailingNewline",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-f3",
+    "behavior": "AC3/AC5: show rejects file and multi-var and unknown ids with a non-zero exit",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSecretsShow_RejectsFileAndMultiAndUnknown",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-f4",
+    "behavior": "AC4: dotf secrets ls lists every id with plane and exposed vars, no values",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSecretsLs_ListsIdsAndVars_NoValues",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-f5",
+    "behavior": "AC5: --only resolves a registry id (all vars) or an env-var name (just it)",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestResolveOnly_IdSelectsAllVars_NameSelectsOne",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-f6",
+    "behavior": "AC6: ParseRegistry fail-fast on malformed/duplicate-id/unknown-backend/missing-source",
+    "verification": "cd cli && go test ./internal/secrets/ -run TestParseRegistry_Validation",
+    "state": "pending",
+    "evidence": ""
+  }
+]

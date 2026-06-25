@@ -51,13 +51,3 @@ func TestRunChild_LaunchFailureIsError(t *testing.T) {
 		t.Fatal("expected a launch error for a missing binary")
 	}
 }
-
-func TestParseOnly(t *testing.T) {
-	if parseOnly("") != nil || parseOnly("  ") != nil {
-		t.Error("empty --only must be nil (= all)")
-	}
-	set := parseOnly("A, B ,,C")
-	if len(set) != 3 || !set["A"] || !set["B"] || !set["C"] {
-		t.Errorf("parseOnly = %v, want {A,B,C}", set)
-	}
-}
