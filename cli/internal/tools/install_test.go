@@ -192,6 +192,104 @@ func TestInstall_WindowsBinaryName(t *testing.T) {
 	}
 }
 
+// bwTool mirrors the packages.json npm entry under test.
+func bwTool() Tool {
+	return Tool{
+		Name:    "bw",
+		Version: "2026.5.0",
+		Profile: "full",
+		Source:  Source{Type: "npm", Package: "@bitwarden/cli"},
+	}
+}
+
+// newNpmInstaller wires an Installer whose npm Run is recorded into rec and whose
+// PATH version probe is faked via CurrentVersion (current = installed version,
+// "" = absent). Dest is irrelevant — npm globals never touch it.
+func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
+	return &Installer{
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+		Dest:           "/unused",
+		Out:            io.Discard,
+		CurrentVersion: func(string) string { return current },
+		Run: func(name string, args ...string) error {
+			*rec = append(*rec, name+" "+strings.Join(args, " "))
+			return runErr
+		},
+	}
+}
+
+func TestInstallNpm_Fresh(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	res, err := in.Install(bwTool())
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if res != Installed {
+		t.Errorf("Result = %v, want Installed", res)
+	}
+	want := "npm install -g @bitwarden/cli@2026.5.0"
+	if len(rec) != 1 || rec[0] != want {
+		t.Errorf("Run calls = %v, want exactly [%q]", rec, want)
+	}
+}
+
+func TestInstallNpm_UpgradeWhenBelowPin(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("2026.4.0", &rec, nil)
+	res, err := in.Install(bwTool())
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if res != Upgraded {
+		t.Errorf("Result = %v, want Upgraded", res)
+	}
+	if len(rec) != 1 {
+		t.Errorf("expected one npm install call, got %v", rec)
+	}
+}
+
+func TestInstallNpm_SkipWhenAtOrAbovePin(t *testing.T) {
+	for _, current := range []string{"2026.5.0", "2026.6.0", "2027.0.0"} {
+		t.Run(current, func(t *testing.T) {
+			var rec []string
+			in := newNpmInstaller(current, &rec, nil)
+			res, err := in.Install(bwTool())
+			if err != nil {
+				t.Fatalf("Install: %v", err)
+			}
+			if res != Skipped {
+				t.Errorf("Result = %v, want Skipped", res)
+			}
+			if len(rec) != 0 {
+				t.Errorf("must not run npm when already at/above pin, got %v", rec)
+			}
+		})
+	}
+}
+
+func TestInstallNpm_RunFailure(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, fmt.Errorf("npm: command not found"))
+	if _, err := in.Install(bwTool()); err == nil {
+		t.Fatal("expected error when npm install fails")
+	}
+}
+
+func TestInstallNpm_MissingPackage(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	tool := bwTool()
+	tool.Source.Package = ""
+	if _, err := in.Install(tool); err == nil {
+		t.Fatal("expected error when npm source declares no package")
+	}
+	if len(rec) != 0 {
+		t.Errorf("must not run npm with no package, got %v", rec)
+	}
+}
+
 func TestDecideAction(t *testing.T) {
 	cases := []struct {
 		installed, pin string
