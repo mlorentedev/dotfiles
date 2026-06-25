@@ -31,6 +31,10 @@ setup() {
     [ -d "$DOTFILES_DIR/sensitive" ]
 }
 
+@test "~/.dotfiles/secrets/registry.yaml exists (dotf secrets mapping SSOT) [#587]" {
+    [ -f "$DOTFILES_DIR/secrets/registry.yaml" ]
+}
+
 @test "~/.dotfiles/ssh directory exists" {
     [ -d "$DOTFILES_DIR/ssh" ]
 }

@@ -87,6 +87,16 @@ setup() {
     grep -qF 'Eager-load secrets' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-windows.ps1 deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
+    grep -qF 'Deployed secrets/registry.yaml' "$PS1_SCRIPT"
+    grep -qF 'registry.yaml' "$PS1_SCRIPT"
+}
+
+@test "parity: both setups deploy the secrets registry [#587]" {
+    grep -qF 'registry.yaml' "$PS1_SCRIPT"
+    grep -qF 'registry.yaml' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 preflights the age identity key (warn, not fail)" {
     # Without ~/.config/age/key.txt, load-secrets.ps1 silently no-ops at
     # shell startup and opencode/agy 401 with no clue. Preflight WARNs (must
