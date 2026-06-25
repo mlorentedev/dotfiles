@@ -17,12 +17,6 @@ import (
 // byte-equivalence is pinned by its own unit test. An injector with nothing to say
 // returns "".
 
-// encodeProjectPath maps a CWD to Claude Code's per-project key by replacing '/'
-// with '-' (the shell's `tr '/' '-'`).
-func encodeProjectPath(cwd string) string {
-	return strings.ReplaceAll(cwd, "/", "-")
-}
-
 // claudeJSONSize warns when ~/.claude/.claude.json has been truncated below
 // threshold bytes (the upstream `claude plugin install` strip bug, SDD-021). Empty
 // when the file is absent or a healthy size.
