@@ -545,6 +545,70 @@ if (Test-Path $installDotfScript) {
     Write-Warn "scripts\install-dotf.ps1 not found; skipping dotf install"
 }
 
+# ============================================================================
+# DEPLOY SECRETS SYSTEM (early: before the opencode/agy config blocks below that
+# substitute secrets at deploy time, and after dotf is installed above so the
+# deploy-time fetch can read the registry). Cross-OS parity with setup-linux.sh,
+# whose sensitive/registry deploy is likewise early.
+# ============================================================================
+Write-Info "Setting up secrets system..."
+
+# Preflight: warn if age identity key is missing. Without it `dotf secrets` can't
+# decrypt, so $env:NAN_API_KEY / OPENROUTER_API_KEY / etc. resolve empty --
+# opencode + agy then 401 with no clear cause. Non-fatal: encrypted files still
+# deploy so a key imported later works without re-running setup.
+$ageKey = if ($env:AGE_KEY_PATH) { $env:AGE_KEY_PATH } else { Join-Path $env:USERPROFILE '.config\age\key.txt' }
+if (-not (Test-Path -LiteralPath $ageKey)) {
+    Write-Warn "age identity key not found at $ageKey"
+    Write-Warn "  Encrypted secrets will deploy but won't decrypt on demand."
+    Write-Warn "  To enable: place your age identity at `$env:USERPROFILE\.config\age\key.txt"
+    Write-Warn "  (or set `$env:AGE_KEY_PATH). Generate: age-keygen -o `$HOME\.config\age\key.txt"
+    Write-Warn "  See: docs/SECRETS.md"
+}
+
+$sensitiveSource = "$DotfilesDir\sensitive"
+$sensitiveDest = "$DotfilesDest\sensitive"
+if (Test-Path $sensitiveSource) {
+    Ensure-Directory $sensitiveDest
+    $mappingSource = "$sensitiveSource\env-mapping.conf"
+    if (Test-Path $mappingSource) {
+        Copy-Item $mappingSource "$sensitiveDest\" -Force
+        Write-Success "Deployed env-mapping.conf"
+    }
+    $ageFiles = Get-ChildItem -Path $sensitiveSource -Filter '*.secret.age' -ErrorAction SilentlyContinue
+    if ($ageFiles) {
+        foreach ($ageFile in $ageFiles) {
+            Copy-Item $ageFile.FullName "$sensitiveDest\" -Force
+        }
+        Write-Success "Deployed $($ageFiles.Count) encrypted secret files"
+    }
+} else {
+    Write-Warn "Sensitive directory not found at $sensitiveSource"
+}
+
+# Deploy the secrets registry (ADR-028 §2 mapping SSOT). dotf secrets reads it
+# from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
+# and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
+$registrySource = "$DotfilesDir\secrets\registry.yaml"
+if (Test-Path -LiteralPath $registrySource) {
+    Ensure-Directory "$DotfilesDest\secrets"
+    Copy-Item $registrySource "$DotfilesDest\secrets\" -Force
+    Write-Success "Deployed secrets/registry.yaml"
+} else {
+    Write-Warn "secrets/registry.yaml not found at $registrySource"
+}
+
+# Deploy-time secret for the agy MCP config: agy does NOT expand env vars inside
+# JSON, so OPENROUTER_API_KEY must be baked into mcp_config.json at deploy. The
+# agy block below reads it from $env; fetch it via the `dotf secrets` facade
+# (ADR-028) now that dotf + the registry/store are in place, into THIS one-shot
+# setup process only -- never the user's session (that export was retired in
+# #581). opencode/pi {env:NAN_API_KEY} is resolved independently by
+# Substitute-EnvPlaceholders (age-decrypts directly).
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    $env:OPENROUTER_API_KEY = (& dotf secrets show openrouter-api-key 2>$null)
+}
+
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
 # tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
 # as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
@@ -1573,75 +1637,9 @@ if (Test-Path $loadSecretsSource) {
     Write-Warn "load-secrets.ps1 not found at $loadSecretsSource"
 }
 
-# ============================================================================
-# 7b. DEPLOY SECRETS SYSTEM
-# ============================================================================
-
-Write-Info "Setting up secrets system..."
-
-# Preflight: warn if age identity key is missing. Without it, load-secrets.ps1
-# silently no-ops at shell startup (Invoke-AgeDecrypt returns $null on failure)
-# so $env:NAN_API_KEY / OPENROUTER_API_KEY / etc. stay empty -- opencode + agy
-# then 401 with no clear cause. Non-fatal: encrypted files still get deployed
-# so a key imported later still works without re-running setup. Mirrors the
-# Linux preflight in setup-linux.sh.
-$ageKey = if ($env:AGE_KEY_PATH) { $env:AGE_KEY_PATH } else { Join-Path $env:USERPROFILE '.config\age\key.txt' }
-if (-not (Test-Path -LiteralPath $ageKey)) {
-    Write-Warn "age identity key not found at $ageKey"
-    Write-Warn "  Encrypted secrets will deploy but won't decrypt at shell startup."
-    Write-Warn "  To enable: place your age identity at `$env:USERPROFILE\.config\age\key.txt"
-    Write-Warn "  (or set `$env:AGE_KEY_PATH). Generate: age-keygen -o `$HOME\.config\age\key.txt"
-    Write-Warn "  See: docs/SECRETS.md"
-}
-
-$sensitiveSource = "$DotfilesDir\sensitive"
-$sensitiveDest = "$DotfilesDest\sensitive"
-
-if (Test-Path $sensitiveSource) {
-    Ensure-Directory $sensitiveDest
-
-    # Copy env-mapping.conf
-    $mappingSource = "$sensitiveSource\env-mapping.conf"
-    if (Test-Path $mappingSource) {
-        Copy-Item $mappingSource "$sensitiveDest\" -Force
-        Write-Success "Deployed env-mapping.conf"
-    }
-
-    # Copy all .secret.age files
-    $ageFiles = Get-ChildItem -Path $sensitiveSource -Filter '*.secret.age' -ErrorAction SilentlyContinue
-    if ($ageFiles) {
-        foreach ($ageFile in $ageFiles) {
-            Copy-Item $ageFile.FullName "$sensitiveDest\" -Force
-        }
-        Write-Success "Deployed $($ageFiles.Count) encrypted secret files"
-    }
-} else {
-    Write-Warn "Sensitive directory not found at $sensitiveSource"
-}
-
-# Deploy the secrets registry (ADR-028 §2 mapping SSOT). dotf secrets reads it
-# from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
-# and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
-$registrySource = "$DotfilesDir\secrets\registry.yaml"
-if (Test-Path -LiteralPath $registrySource) {
-    Ensure-Directory "$DotfilesDest\secrets"
-    Copy-Item $registrySource "$DotfilesDest\secrets\" -Force
-    Write-Success "Deployed secrets/registry.yaml"
-} else {
-    Write-Warn "secrets/registry.yaml not found at $registrySource"
-}
-
-# Eager-load secrets: dot-source load-secrets.ps1 NOW (after the .secret.age
-# files + env-mapping.conf are at $DotfilesDest\sensitive) so every subsequent
-# block in this setup has $env:NAN_API_KEY / OPENROUTER_API_KEY / VAULT_PATH /
-# TS_AUTHKEY / etc. available. Cross-OS parity with setup-linux.sh:115-122.
-# Wrapped to swallow internal failures (no age key, no env-mapping, etc.) so
-# setup never aborts on secrets issues -- preflight already warned the user.
-$loadSecretsDeployed = Join-Path $DotfilesDest 'scripts\load-secrets.ps1'
-if (Test-Path -LiteralPath $loadSecretsDeployed) {
-    $env:DOTFILES_DIR = $DotfilesDest
-    try { . $loadSecretsDeployed 2>&1 | Out-Null } catch { }
-}
+# 7b. DEPLOY SECRETS SYSTEM moved earlier (right after Install-Dotf) so the
+# opencode/agy config blocks above substitute their secrets at deploy time; the
+# load-secrets eager dot-source was retired (ADR-028 / #587).
 
 # ============================================================================
 # 7c. REGISTER SESSIONSTART HOOK
