@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/mlorentedev/dotfiles/compare/v0.19.0...v0.19.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **secrets:** deploy secrets/registry.yaml in setup so dotf secrets works ([#591](https://github.com/mlorentedev/dotfiles/issues/591)) ([bc33bbc](https://github.com/mlorentedev/dotfiles/commit/bc33bbcd4aa1d1130e93a04fabefd5debe03cfc6))
+
 ## [0.19.0](https://github.com/mlorentedev/dotfiles/compare/v0.18.0...v0.19.0) (2026-06-25)
 
 
