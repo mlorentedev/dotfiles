@@ -93,9 +93,7 @@ func workSDKFamilyBlock(family string) string {
 // and surfaces the "[auto-memory] Created …" line when it created one. Computes
 // Claude's encoded target path and delegates the OS-agnostic link to memlink.
 func memorySymlink(cwd, vault, home string) string {
-	encoded := encodeProjectPath(cwd)
-	target := filepath.Join(home, ".claude", "projects", encoded, "memory")
-	msg, _ := memlink.Ensure(cwd, target, "", vault)
+	msg, _ := memlink.Ensure(cwd, memlink.ClaudeMemoryTarget(home, cwd), "", vault)
 	if msg == "" {
 		return ""
 	}

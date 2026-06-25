@@ -59,6 +59,61 @@ func Ensure(cwd, target, project, vault string) (string, error) {
 	return fmt.Sprintf("[auto-memory] Created %s for %s", linkNoun(), project), nil
 }
 
+// LinkState classifies an auto-memory target for reporting — the read-only
+// counterpart to Ensure. Ensure mutates; Status only observes, so `dotf doctor`
+// can report PASS/WARN/FAIL/SKIP without the side effect of creating a link.
+type LinkState int
+
+const (
+	// StateLinked: target is already a symlink/junction. Healthy.
+	StateLinked LinkState = iota
+	// StateRealDir: target is a non-empty real directory — the agent's own data.
+	// Ensure deliberately leaves it untouched; doctor must NOT destroy it either.
+	// A manual reconcile into the vault is required (knowledge#120 divergence).
+	StateRealDir
+	// StateRepairable: a vault source exists and the target is missing or empty,
+	// so Ensure (or doctor --fix) would create the link.
+	StateRepairable
+	// StateNoSource: no vault source resolves for this project — nothing to link.
+	StateNoSource
+)
+
+// Status classifies target without mutating it, mirroring Ensure's decision
+// order exactly so the two never disagree about what Ensure would do.
+func Status(cwd, target, project, vault string) LinkState {
+	if project == "" {
+		project = filepath.Base(cwd)
+	}
+	if isLink(target) {
+		return StateLinked
+	}
+	if isDir(target) && dirNotEmpty(target) {
+		return StateRealDir
+	}
+	if resolveVaultMemory(cwd, project, vault) == "" {
+		return StateNoSource
+	}
+	return StateRepairable
+}
+
+// ClaudeProjectKey encodes a working directory into Claude Code's per-project key
+// — the directory name under ~/.claude/projects. Claude maps every path separator
+// AND the Windows drive colon to '-', so `/home/me/proj` and `C:\Users\me\proj`
+// become `-home-me-proj` and `C--Users-me-proj`. The retired shell twin mapped
+// only '/', silently producing the wrong key — and thus the wrong junction target
+// — on Windows (the root cause of the unlinked auto-memory dir, #551).
+func ClaudeProjectKey(cwd string) string {
+	return strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(cwd)
+}
+
+// ClaudeMemoryTarget is the per-project auto-memory directory Claude surfaces:
+// `<home>/.claude/projects/<ClaudeProjectKey(cwd)>/memory`. Shared by the
+// session-start adapter (which creates the link) and `dotf doctor` (which
+// verifies it), so the two compute an identical path on every OS.
+func ClaudeMemoryTarget(home, cwd string) string {
+	return filepath.Join(home, ".claude", "projects", ClaudeProjectKey(cwd), "memory")
+}
+
 // resolveVaultMemory finds the vault memory source for a project via the three
 // conventions in precedence order, returning "" when none resolves to a real dir.
 // This is the agent- and OS-agnostic core shared by every caller.
@@ -130,8 +185,10 @@ func createLink(src, target string) error {
 	if runtime.GOOS == "windows" {
 		// `mklink /J <link> <existing-target>` is a cmd builtin, so it runs via
 		// `cmd /c`. Args are passed as argv elements (not concatenated into a shell
-		// string), and both paths are CLI-resolved vault/.claude locations, not user
-		// input — no shell-metachar surface.
+		// string); os/exec quotes any with spaces. Both paths are CLI-resolved
+		// vault/.claude locations, not user input — no shell-metachar surface.
+		// (A path component containing a bare cmd delimiter such as a comma is a
+		// known narrow gap — see HARNESS follow-up; spaces already round-trip.)
 		return exec.Command("cmd", "/c", "mklink", "/J", target, src).Run()
 	}
 	return os.Symlink(src, target)
@@ -152,10 +209,14 @@ func isDir(p string) bool {
 }
 
 // isLink reports whether p is a symlink (POSIX) or a junction/reparse point
-// (Windows). Go surfaces both as ModeSymlink via Lstat on the supported toolchain.
+// (Windows). POSIX symlinks carry ModeSymlink; Windows junctions — which `dotf`
+// uses because they need no privilege — surface via Lstat as ModeIrregular (NOT
+// ModeSymlink) on the Go 1.26 toolchain (verified empirically), so accept both.
+// A plain directory is ModeDir and matches neither, so this never misfires on
+// the agent's own real memory dir.
 func isLink(p string) bool {
 	info, err := os.Lstat(p)
-	return err == nil && info.Mode()&os.ModeSymlink != 0
+	return err == nil && info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0
 }
 
 // dirNotEmpty reports whether p is a readable directory holding at least one entry
