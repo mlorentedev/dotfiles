@@ -70,11 +70,21 @@ else
 fi
 
 # AI provider endpoints — NaN community (primary, OpenAI-compatible).
-# API key in $NAN_API_KEY (loaded by load-secrets.sh from sensitive/nan.api-key.secret.age).
+# API key in $NAN_API_KEY - injected on demand via `dotf secrets run` (see below), not the ambient shell.
 export NAN_BASE_URL="https://api.nan.builders/v1"
 
-# Load encrypted secrets as environment variables
-[[ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]] && source "$DOTFILES_DIR/scripts/load-secrets.sh"
+# Secrets are NOT auto-loaded into the ambient shell (ADR-028 "not always
+# exposed"). On demand: `dotf secrets run -- <cmd>` injects the decrypted secrets
+# into that child process only. The AI CLIs that read their keys from the
+# environment are wrapped to launch through it, so the secret lives only in their
+# process, never this shell. No `--only` -> full mapped set (parity with the old
+# ambient export). Recursion-safe: dotf resolves the real binary on PATH, not
+# this function.
+if command -v dotf >/dev/null 2>&1; then
+    opencode() { dotf secrets run -- opencode "$@"; }
+    pi() { dotf secrets run -- pi "$@"; }
+    agy() { dotf secrets run -- agy "$@"; }
+fi
 export APPS_HOME="$HOME/Applications"
 export NINJA_HOME="$HOME/.console-ninja"
 

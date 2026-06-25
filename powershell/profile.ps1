@@ -12,7 +12,7 @@ Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value agy
 
 # AI provider endpoints -- NaN community (primary, OpenAI-compatible).
-# API key in $env:NAN_API_KEY (loaded by load-secrets.ps1 from sensitive/nan.api-key.secret.age).
+# API key in $env:NAN_API_KEY -- injected on demand via `dotf secrets run` (wrappers below), not the ambient session.
 $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 
 # OpenCode (primary AI coding agent -- install is admin-only on Windows, so
@@ -214,18 +214,21 @@ if (Test-Path $DotfPathsFile) {
 }
 
 # AI provider endpoint -- NaN community (primary, OpenAI-compatible).
-# Mirrors NAN_BASE_URL set in .bashrc/.zshrc. API key comes from the
-# load-secrets.ps1 sourcing below (sensitive/nan.api-key.secret.age).
+# Mirrors NAN_BASE_URL set in .bashrc/.zshrc. The API key is injected on demand
+# via `dotf secrets run` (see the wrappers below), not the ambient session.
 $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 
-# Load encrypted secrets as environment variables (cross-OS parity with .bashrc:62-63).
-# load-secrets.ps1 decrypts sensitive/*.secret.age via age and sets each value
-# with SetEnvironmentVariable(..., 'Process') -- session-scoped, never persisted
-# to the user registry. Mandatory for opencode (reads {env:NAN_API_KEY} from
-# opencode.jsonc) and agy (reads ANTHROPIC_API_KEY etc. from environment).
-$_secretsScript = Join-Path $env:DOTFILES_DIR 'scripts\load-secrets.ps1'
-if (Test-Path -LiteralPath $_secretsScript) { . $_secretsScript }
-Remove-Variable -Name _secretsScript -ErrorAction SilentlyContinue
+# Secrets are NOT auto-loaded into the ambient session (ADR-028 "not always
+# exposed"). On demand: `dotf secrets run -- <cmd>` injects the decrypted secrets
+# into that child process only. The AI CLIs that read their keys from the
+# environment are wrapped to launch through it, so the secret lives only in their
+# process, never this session. Recursion-safe: dotf resolves the real binary on
+# PATH, not this function.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    function opencode { dotf secrets run -- opencode @args }
+    function pi { dotf secrets run -- pi @args }
+    function agy { dotf secrets run -- agy @args }
+}
 
 # ============================================================================
 # STARTUP MESSAGE
