@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/mlorentedev/dotfiles/compare/v0.18.0...v0.19.0) (2026-06-25)
+
+
+### Features
+
+* **secrets:** resolve nan-* scripts' NAN_API_KEY via dotf secrets show ([#588](https://github.com/mlorentedev/dotfiles/issues/588)) ([3245be5](https://github.com/mlorentedev/dotfiles/commit/3245be5e449b0a3749c452d1c76f22638fe85163))
+
 ## [0.18.0](https://github.com/mlorentedev/dotfiles/compare/v0.17.1...v0.18.0) (2026-06-25)
 
 
