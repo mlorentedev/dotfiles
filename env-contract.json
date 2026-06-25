@@ -1,5 +1,5 @@
 {
-  "_comment": "Declarative contract for structural environment expectations — the DEFAULTS layer of cross-machine path resolution (ADR-025). Read by `dotf doctor`/`dotf env generate` and the legacy doctor.{sh,ps1}. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` resolves env -> machine.json -> these defaults (per OS) and renders paths.sh/paths.ps1 that the shell profiles source. v1 covers structural paths only; tooling-required vars and version pins live in versions.conf and sensitive/env-mapping.conf.",
+  "_comment": "Declarative contract for structural environment expectations — the DEFAULTS layer of cross-machine path resolution (ADR-025). Read by `dotf doctor`/`dotf env generate` and the legacy doctor.{sh,ps1}. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` resolves env -> machine.json -> these defaults (per OS) and renders paths.sh/paths.ps1 that the shell profiles source. v1 covers structural paths only; tooling-required vars and version pins live in versions.conf and secrets/registry.yaml.",
   "env_vars": [
     {
       "name": "DOTFILES_DIR",

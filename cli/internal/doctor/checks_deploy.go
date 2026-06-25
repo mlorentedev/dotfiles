@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // checkSymlinks reproduces healthcheck section 4: the dotfiles symlinks resolve.
@@ -108,44 +109,32 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 	}
 }
 
-// checkSecrets reproduces healthcheck section 8: every env-mapping.conf entry
-// resolves to an existing *.secret.age, and no orphan .age file lacks a mapping.
+// checkSecrets reproduces healthcheck section 8 over the registry SSOT: every
+// age-backed secrets/registry.yaml entry resolves to an existing *.secret.age,
+// and no orphan .age file lacks a registry entry. (bw-backed secrets carry no
+// age blob, so Entries already skips them — they never read as orphans here.)
 func checkSecrets(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Secrets integrity")
 	secretsDir := filepath.Join(cfg.DotfilesDir, "sensitive")
-	mapping := filepath.Join(secretsDir, "env-mapping.conf")
 
-	raw, err := os.ReadFile(mapping)
+	reg, err := loadRegistry(cfg)
 	if err != nil {
-		rep.Fail("env-mapping.conf not found")
+		rep.Fail("secrets/registry.yaml not found or invalid")
 		return
 	}
-	rep.Pass("env-mapping.conf exists")
+	rep.Pass("secrets/registry.yaml exists")
 
 	referenced := map[string]bool{}
-	for _, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
-			continue
+	for _, e := range reg.Entries(sys.home()) {
+		referenced[e.File] = true
+		display := e.Var
+		if e.IsFile {
+			display = e.Var + " [file]"
 		}
-		varName, val, _ := strings.Cut(line, "=")
-		varName = strings.TrimSpace(varName)
-		val = strings.TrimSpace(val)
-
-		var fname, display string
-		if strings.HasPrefix(varName, "@") {
-			fname, _, _ = strings.Cut(val, ">") // @VAR=file>dest  → file
-			display = strings.TrimPrefix(varName, "@") + " [file]"
+		if pathExists(filepath.Join(secretsDir, e.File+".secret.age")) {
+			rep.Pass(fmt.Sprintf("%s -> %s.secret.age", display, e.File))
 		} else {
-			fname = val
-			display = varName
-		}
-		referenced[fname] = true
-
-		if pathExists(filepath.Join(secretsDir, fname+".secret.age")) {
-			rep.Pass(fmt.Sprintf("%s -> %s.secret.age", display, fname))
-		} else {
-			rep.Fail(fmt.Sprintf("%s -> %s.secret.age (missing)", display, fname))
+			rep.Fail(fmt.Sprintf("%s -> %s.secret.age (missing)", display, e.File))
 		}
 	}
 
@@ -153,9 +142,19 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 	for _, f := range ageFiles {
 		base := strings.TrimSuffix(filepath.Base(f), ".secret.age")
 		if !referenced[base] {
-			rep.Fail("orphan: " + base + ".secret.age (no mapping)")
+			rep.Fail("orphan: " + base + ".secret.age (no registry entry)")
 		}
 	}
+}
+
+// loadRegistry reads and parses secrets/registry.yaml under the dotfiles dir.
+// Shared by checkSecrets and githubPATSecrets (both consume the mapping SSOT).
+func loadRegistry(cfg *Config) (*secrets.Registry, error) {
+	raw, err := os.ReadFile(filepath.Join(cfg.DotfilesDir, "secrets", "registry.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	return secrets.ParseRegistry(raw)
 }
 
 // checkTmux reproduces healthcheck section 9: tmux is installed and ~/.tmux.conf

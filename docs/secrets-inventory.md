@@ -2,7 +2,7 @@
 
 > Working artifact for the secrets-management redesign (branch `arch/secrets-management`).
 > Three sources: **(a) dotfiles age files**, **(b) env-var mapping**, **(c) Bitwarden**.
-> (a)+(b) are filled below from `sensitive/env-mapping.conf` + `sensitive/*.secret.age`.
+> (a)+(b) are filled below from `secrets/registry.yaml` + `sensitive/*.secret.age`.
 > Fill column **In Bitwarden?** from: `bw list items --pretty | jq -r '.[] | (.folder // "-") + " / " + .name'` (names only — no values).
 >
 > Goal: one SSOT backend per secret (no duplication). `dotf secrets` reads the registry derived from this table.

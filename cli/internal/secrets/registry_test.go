@@ -1,7 +1,6 @@
 package secrets
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -66,20 +65,19 @@ func entriesByVar(es []Entry) map[string]Entry {
 	return m
 }
 
-func TestRegistry_Entries_RoundTripWithMapping(t *testing.T) {
+func TestRegistry_Entries_FlattensExposeShapes(t *testing.T) {
 	const home = "/home/u"
-	const mapping = "" +
-		"NAN_API_KEY=nan.api-key\n" +
-		"GITHUB_PERSONAL_ACCESS_TOKEN=github.token\n" +
-		"RELEASE_TOKEN=github.token\n" +
-		"X_API_KEY=x.api-key\n" +
-		"X_BEARER_TOKEN=x.bearer-token\n" +
-		"@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config\n" +
-		"@SSH_KEY=id_ed25519>~/.ssh/id_ed25519\n"
-
-	want, err := ParseMapping(strings.NewReader(mapping), home)
-	if err != nil {
-		t.Fatalf("ParseMapping: %v", err)
+	// The expected flattened entries for sampleRegistry — one per env var, file
+	// secrets carrying their ~-expanded Dest. (Previously cross-checked against
+	// env-mapping.conf via ParseMapping; that twin was retired with #587.)
+	want := []Entry{
+		{Var: "NAN_API_KEY", File: "nan.api-key"},
+		{Var: "GITHUB_PERSONAL_ACCESS_TOKEN", File: "github.token"},
+		{Var: "RELEASE_TOKEN", File: "github.token"},
+		{Var: "X_API_KEY", File: "x.api-key"},
+		{Var: "X_BEARER_TOKEN", File: "x.bearer-token"},
+		{Var: "KUBECONFIG", File: "kubelab.kubeconfig", IsFile: true, Dest: home + "/.kube/kubelab.config"},
+		{Var: "SSH_KEY", File: "id_ed25519", IsFile: true, Dest: home + "/.ssh/id_ed25519"},
 	}
 	reg, err := ParseRegistry([]byte(sampleRegistry))
 	if err != nil {
@@ -89,7 +87,7 @@ func TestRegistry_Entries_RoundTripWithMapping(t *testing.T) {
 
 	wm, gm := entriesByVar(want), entriesByVar(got)
 	if len(wm) != len(gm) {
-		t.Fatalf("entry count: registry=%d mapping=%d (%v vs %v)", len(gm), len(wm), gm, wm)
+		t.Fatalf("entry count: registry=%d expected=%d (%v vs %v)", len(gm), len(wm), gm, wm)
 	}
 	for v, we := range wm {
 		ge, ok := gm[v]
@@ -98,7 +96,7 @@ func TestRegistry_Entries_RoundTripWithMapping(t *testing.T) {
 			continue
 		}
 		if ge.File != we.File || ge.IsFile != we.IsFile || ge.Dest != we.Dest {
-			t.Errorf("var %s: registry=%+v mapping=%+v", v, ge, we)
+			t.Errorf("var %s: registry=%+v expected=%+v", v, ge, we)
 		}
 	}
 }

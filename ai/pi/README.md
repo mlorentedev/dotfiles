@@ -35,5 +35,5 @@ Default: `nan/mimo-v2.5` (1M context), thinking level `high`. Change in `setting
 ## Secret
 
 `NAN_API_KEY` lives only in the age store (`sensitive/nan.api-key.secret.age`, mapped in
-`sensitive/env-mapping.conf`). The literal never appears in a committed file. Rotate it at the
+`secrets/registry.yaml`). The literal never appears in a committed file. Rotate it at the
 NaN dashboard if ever exposed.

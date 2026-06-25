@@ -9,6 +9,11 @@ owner: manu
 
 # Secrets Management
 
+> ⚠️ **Out of date — pending rewrite ([#600](https://github.com/mlorentedev/dotfiles/issues/600)).**
+> The `sensitive/env-mapping.conf` workflow below was retired in #587. Secrets are now
+> mapped in **`secrets/registry.yaml`** (ADR-028) and accessed via `dotf secrets {run,show,render}`.
+> Treat the `env-mapping.conf` steps here as historical until this runbook is refreshed.
+
 Complete guide for managing encrypted secrets in the dotfiles. Uses [age](https://github.com/FiloSottile/age) encryption with automatic environment variable loading.
 
 ## Architecture

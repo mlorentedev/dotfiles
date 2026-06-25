@@ -5,7 +5,7 @@
 #
 # Syncs:
 #   - Git changes (push from repo, pull to local)
-#   - Secrets: *.secret.age, env-mapping.conf, .secrets-audit.log
+#   - Secrets: *.secret.age, .secrets-audit.log (registry.yaml is git-tracked)
 
 set -euo pipefail
 
@@ -49,9 +49,8 @@ sync_secrets() {
 
     synced=0
 
-    # Sync .age files, env-mapping.conf, and audit log
+    # Sync .age files and the audit log (the registry.yaml mapping is git-tracked)
     files_to_sync=(
-        "env-mapping.conf"
         ".secrets-audit.log"
     )
 

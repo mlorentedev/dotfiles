@@ -102,7 +102,7 @@ chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 chmod +x "$DOTFILES_DIR/scripts/vault-health.sh"
 chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
 
-# Copy sensitive directory (env-mapping.conf and encrypted files)
+# Copy sensitive directory (encrypted *.secret.age files; the mapping lives in secrets/registry.yaml)
 log_info "Setting up sensitive directory..."
 
 # Preflight: warn if age identity key is missing. Without it `dotf secrets`
@@ -267,7 +267,8 @@ fi
 # facade (ADR-028) now that dotf + the registry/store are deployed above, into
 # THIS one-shot setup process only -- never the user's interactive shell (that
 # export was retired in #581). opencode/pi `{env:NAN_API_KEY}` is resolved
-# independently by substitute_env_placeholders, which age-decrypts directly.
+# independently by `dotf secrets render` at deploy time (and opencode/pi's own
+# runtime resolver as fallback), which age-decrypt directly.
 if command -v dotf >/dev/null 2>&1; then
     OPENROUTER_API_KEY="$(dotf secrets show openrouter-api-key 2>/dev/null || true)"; export OPENROUTER_API_KEY
 fi
@@ -700,15 +701,14 @@ if [ -f "$OPENCODE_CONFIG_SRC" ]; then
     OPENCODE_CONFIG_TMP=$(mktemp)
     cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
     # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020 convergence). Gate on the subcommand SUCCEEDING, not just dotf's presence:
-    # a stale dotf passes `command -v` but fails `secrets render`, and under set -e that
-    # would abort setup instead of falling back. Running it in the `if` condition exempts
-    # it from set -e, so any failure drops to the twin (kept until dotf is guaranteed
-    # current; its deletion lands with #587).
+    # ADR-020/ADR-028). Gate on the subcommand SUCCEEDING, not just dotf's presence: a
+    # stale dotf passes `command -v` but fails `secrets render`, and under set -e that
+    # would abort setup. Running it in the `if` condition exempts it from set -e; if it
+    # fails, the {env:VAR} placeholders are left intact for opencode's runtime resolver.
     if command -v dotf >/dev/null 2>&1 && dotf secrets render "$OPENCODE_CONFIG_TMP"; then
         : # materialized via dotf secrets render
     else
-        substitute_env_placeholders "$OPENCODE_CONFIG_TMP"
+        log_warning "dotf secrets render unavailable; opencode.jsonc deployed with literal {env:VAR} placeholders (resolved at runtime)"
     fi
     mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
     log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
@@ -816,7 +816,7 @@ if [ -f "$PI_MODELS_SRC" ]; then
     if command -v dotf >/dev/null 2>&1 && dotf secrets render "$PI_MODELS_TMP"; then
         : # materialized via dotf secrets render
     else
-        substitute_env_placeholders "$PI_MODELS_TMP"
+        log_warning "dotf secrets render unavailable; pi models.json deployed with literal {env:VAR} placeholders (resolved at runtime)"
     fi
     if [ -f "$PI_MODELS_DST" ] && cmp -s "$PI_MODELS_TMP" "$PI_MODELS_DST"; then
         log_info "pi models.json already in sync"

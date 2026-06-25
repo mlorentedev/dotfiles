@@ -54,8 +54,12 @@ func loadRegistry() (*secrets.Registry, error) {
 }
 
 // newSecretsLsCmd lists registry ids with plane + exposed vars — never values.
+// With --pairs it instead prints one "VAR\t<age-source>" line per env secret
+// (file secrets excluded), the machine-readable form github-secrets-manager.sh
+// consumes in place of the retired env-mapping.conf.
 func newSecretsLsCmd() *cobra.Command {
-	return &cobra.Command{
+	var pairs bool
+	c := &cobra.Command{
 		Use:          "ls",
 		Short:        "List registry secret ids with plane and exposed vars (no values)",
 		Args:         cobra.NoArgs,
@@ -66,6 +70,15 @@ func newSecretsLsCmd() *cobra.Command {
 				return err
 			}
 			w := cmd.OutOrStdout()
+			if pairs {
+				for _, e := range reg.Entries(env.Home()) {
+					if e.IsFile {
+						continue // file secrets are not GitHub Actions secrets
+					}
+					_, _ = fmt.Fprintf(w, "%s\t%s\n", e.Var, e.File)
+				}
+				return nil
+			}
 			for i := range reg.Secrets {
 				s := &reg.Secrets[i]
 				_, _ = fmt.Fprintf(w, "%-26s %-9s %s\n", s.ID, s.Plane, strings.Join(s.Vars(), ","))
@@ -73,6 +86,8 @@ func newSecretsLsCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&pairs, "pairs", false, "print VAR<TAB>age-source for each env secret (file secrets excluded)")
+	return c
 }
 
 // newSecretsShowCmd prints one secret's decrypted value to stdout (no trailing

@@ -4,8 +4,8 @@
 # Usage: ./github-secrets-manager.sh [OPTIONS] [ENV_PATH]
 #
 # Options:
-#   --from-mapping    Use env-mapping.conf as source (decrypts secrets)
-#   --list            List available secrets from env-mapping.conf
+#   --from-mapping    Use the secrets registry as source (decrypts secrets)
+#   --list            List available secrets from the registry
 #   --select VAR...   Only upload specific variables
 #
 # Without options, reads from .env files
@@ -19,7 +19,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # Configuration
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
 SECRETS_DIR="$DOTFILES_DIR/sensitive"
-SECRETS_MAPPING_FILE="$SECRETS_DIR/env-mapping.conf"
 SECRETS_KEY_PATH="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
 
 # Parse arguments
@@ -40,18 +39,18 @@ done
 require_command "gh" "GitHub CLI" "Visit: https://cli.github.com/"
 
 if $USE_MAPPING; then
+    require_command "dotf" "dotfiles CLI" "Run the dotfiles setup to install it"
     require_command "age" "age encryption" "Visit: https://github.com/FiloSottile/age"
     file_exists "$SECRETS_KEY_PATH" || exit_error "Age key not found at $SECRETS_KEY_PATH"
-    file_exists "$SECRETS_MAPPING_FILE" || exit_error "Mapping file not found at $SECRETS_MAPPING_FILE"
 fi
 
-# List secrets from mapping
+# List env secrets from the registry (`dotf secrets ls --pairs` emits VAR<TAB>age-source,
+# file secrets already excluded). Replaces the retired env-mapping.conf (#587).
 if $LIST_ONLY; then
-    log_info "Available secrets in env-mapping.conf:"
+    log_info "Available secrets in the registry:"
     echo ""
-    while IFS='=' read -r var_name filename || [[ -n "$var_name" ]]; do
-        [[ -z "$var_name" || "$var_name" =~ ^# ]] && continue
-        [[ "$var_name" == @* ]] && continue  # File secrets not suitable for GitHub Actions
+    while IFS=$'\t' read -r var_name filename || [[ -n "$var_name" ]]; do
+        [[ -z "$var_name" ]] && continue
         [[ "$var_name" =~ ^GITHUB_ ]] && continue  # GitHub reserves this prefix
         encrypted_file="$SECRETS_DIR/${filename}.secret.age"
         if file_exists "$encrypted_file"; then
@@ -59,7 +58,7 @@ if $LIST_ONLY; then
         else
             echo "  $var_name (missing .age file)"
         fi
-    done < "$SECRETS_MAPPING_FILE"
+    done < <(dotf secrets ls --pairs)
     exit 0
 fi
 
@@ -73,7 +72,7 @@ log_success "Configuring secrets for repository: $REPO"
 
 # Define source based on mode
 if $USE_MAPPING; then
-    log_info "Using env-mapping.conf as source"
+    log_info "Using the secrets registry as source"
 else
     if [[ -n "$1" ]]; then
         ENV_FILES=("$1")
@@ -140,13 +139,13 @@ process_secret() {
 
 # Process based on mode
 if $USE_MAPPING; then
-    # Process from env-mapping.conf (decrypt and upload)
-    log_info "Processing secrets from env-mapping.conf..."
+    # Process env secrets from the registry (decrypt and upload). `dotf secrets ls
+    # --pairs` emits VAR<TAB>age-source with file secrets excluded (#587).
+    log_info "Processing secrets from the registry..."
     echo ""
 
-    while IFS='=' read -r var_name filename || [[ -n "$var_name" ]]; do
-        [[ -z "$var_name" || "$var_name" =~ ^# ]] && continue
-        [[ "$var_name" == @* ]] && continue  # File secrets not suitable for GitHub Actions
+    while IFS=$'\t' read -r var_name filename || [[ -n "$var_name" ]]; do
+        [[ -z "$var_name" ]] && continue
         [[ "$var_name" =~ ^GITHUB_ ]] && { log_warning "Skipping $var_name (GITHUB_ prefix reserved)"; continue; }
 
         # Check if selected
@@ -168,7 +167,7 @@ if $USE_MAPPING; then
         fi
 
         process_secret "$var_name" "$value"
-    done < "$SECRETS_MAPPING_FILE"
+    done < <(dotf secrets ls --pairs)
 else
     # Process from .env files
     for env_file in "${ENV_FILES[@]}"; do
@@ -184,7 +183,7 @@ log_success "Secrets upload completed (${#PROCESSED_SECRETS[@]} secrets)"
 
 # Show usage hints
 if $USE_MAPPING; then
-    log_info "Uploaded from env-mapping.conf"
+    log_info "Uploaded from the secrets registry"
     log_info "Use --select VAR1 VAR2 to upload specific secrets"
 else
     log_info "SSH Key Configuration:"
