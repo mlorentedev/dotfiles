@@ -116,6 +116,15 @@ _commit() {
     [ "$status" -eq 0 ]
 }
 
+@test "excludes Go *_test.go from LOC count (#517)" {
+    mkdir -p cli/internal/foo
+    printf 'line %d\n' {1..200} > cli/internal/foo/foo_test.go
+    printf 'line %d\n' {1..10} > small.txt
+    _commit "go test file does not count as production"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 0 ]
+}
+
 @test "excludes specs/archive/ from LOC count" {
     mkdir -p specs/archive/OLD-001-archived
     printf 'line %d\n' {1..200} > specs/archive/OLD-001-archived/proposal.md
