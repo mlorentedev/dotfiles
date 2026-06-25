@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/mlorentedev/dotfiles/compare/v0.20.0...v0.21.0) (2026-06-25)
+
+
+### Features
+
+* **secrets:** retire the deploy-time shell twins and env-mapping.conf ([#601](https://github.com/mlorentedev/dotfiles/issues/601)) ([83476da](https://github.com/mlorentedev/dotfiles/commit/83476da2bc325a21eda64b3c8369a1f5876dfcf1))
+
 ## [0.20.0](https://github.com/mlorentedev/dotfiles/compare/v0.19.1...v0.20.0) (2026-06-25)
 
 
