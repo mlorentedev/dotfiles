@@ -22,16 +22,109 @@ func newSecretsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secrets",
 		Short: "On-demand secrets — inject into a child process, never the shell (ADR-028)",
-		Long: "secrets decrypts the age-encrypted secrets mapped in sensitive/env-mapping.conf\n" +
-			"and exposes them on demand. `run` injects them into one child process only, so\n" +
-			"they never live in the ambient shell environment (ADR-028 Phase 1).",
+		Long: "secrets reads the registry (secrets/registry.yaml) and exposes the mapped\n" +
+			"secrets on demand. `run` injects them into one child process only (never the\n" +
+			"ambient shell); `show` prints one value; `ls` lists ids (ADR-028 §2).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}
 	cmd.AddCommand(newSecretsRunCmd())
+	cmd.AddCommand(newSecretsLsCmd())
+	cmd.AddCommand(newSecretsShowCmd())
 	return cmd
+}
+
+// registryPath resolves secrets/registry.yaml (the mapping SSOT); a var so tests
+// can point it at a fixture. ageDecryptor is the decrypt seam (nil → AgeDecrypt).
+var (
+	registryPath = func() string { return filepath.Join(env.DotfilesDir(env.Home()), "secrets", "registry.yaml") }
+	ageDecryptor secrets.Decryptor
+)
+
+func loadRegistry() (*secrets.Registry, error) {
+	data, err := os.ReadFile(registryPath())
+	if err != nil {
+		return nil, fmt.Errorf("read registry: %w", err)
+	}
+	return secrets.ParseRegistry(data)
+}
+
+// newSecretsLsCmd lists registry ids with plane + exposed vars — never values.
+func newSecretsLsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "ls",
+		Short:        "List registry secret ids with plane and exposed vars (no values)",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			reg, err := loadRegistry()
+			if err != nil {
+				return err
+			}
+			w := cmd.OutOrStdout()
+			for i := range reg.Secrets {
+				s := &reg.Secrets[i]
+				_, _ = fmt.Fprintf(w, "%-26s %-9s %s\n", s.ID, s.Plane, strings.Join(s.Vars(), ","))
+			}
+			return nil
+		},
+	}
+}
+
+// newSecretsShowCmd prints one secret's decrypted value to stdout (no trailing
+// newline, for `KEY=$(dotf secrets show <id>)`). Single-env secrets only — file
+// and multi-var secrets must go through `run` (a value to stdout would be ambiguous).
+func newSecretsShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "show <id>",
+		Short:        "Print one secret's decrypted value to stdout, no trailing newline",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			reg, err := loadRegistry()
+			if err != nil {
+				return err
+			}
+			name, src, err := showSource(reg, args[0])
+			if err != nil {
+				return err
+			}
+			secretsDir := filepath.Join(env.DotfilesDir(env.Home()), "sensitive")
+			loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: ageKeyPath(), Decrypt: ageDecryptor}
+			kv, err := loader.EnvFor([]secrets.Entry{{Var: name, File: src}}, nil)
+			if err != nil {
+				return err
+			}
+			_, val, _ := strings.Cut(kv[0], "=") // EnvFor scrubs newlines → capture-friendly
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), val)
+			return nil
+		},
+	}
+}
+
+// showSource picks the single env var + age source `show` will decrypt, rejecting
+// file and multi-var secrets with guidance to use `run`.
+func showSource(reg *secrets.Registry, idOrVar string) (name, src string, err error) {
+	s := reg.Lookup(idOrVar)
+	if s == nil {
+		return "", "", fmt.Errorf("unknown secret %q (try `dotf secrets ls`)", idOrVar)
+	}
+	if !s.AgeBacked() {
+		return "", "", fmt.Errorf("%q uses the %s backend, not yet supported (ADR-028 Phase 3)", s.ID, s.Backend)
+	}
+	if s.Expose.File != nil {
+		return "", "", fmt.Errorf("%q is a file secret; use `dotf secrets run --only %s -- <cmd>`", s.ID, s.ID)
+	}
+	if len(s.Expose.Env.Vars) != 1 {
+		return "", "", fmt.Errorf("%q exposes %d vars; use `dotf secrets run --only %s -- <cmd>`", s.ID, len(s.Expose.Env.Vars), s.ID)
+	}
+	v := s.Expose.Env.Vars[0]
+	if src = v.Age; src == "" {
+		src = s.Age
+	}
+	return v.Name, src, nil
 }
 
 func newSecretsRunCmd() *cobra.Command {
@@ -39,7 +132,7 @@ func newSecretsRunCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "run [--only VAR,...] -- <cmd> [args...]",
 		Short: "Decrypt mapped secrets and run <cmd> with them in its environment only",
-		Long: "run decrypts the mapped secrets (env-mapping.conf, over the age store as-is)\n" +
+		Long: "run decrypts the mapped secrets (secrets/registry.yaml, over the age store)\n" +
 			"and launches <cmd> with them added to ITS environment — the parent shell is\n" +
 			"never touched. File secrets (@VAR=file>dest) are materialized to dest (0600)\n" +
 			"and VAR points at the path. --only scopes the injection to named vars. The\n" +
@@ -55,8 +148,16 @@ func newSecretsRunCmd() *cobra.Command {
 			}
 			childArgv := args[dash:]
 
+			reg, err := loadRegistry()
+			if err != nil {
+				return err
+			}
+			sel, err := resolveOnly(reg, only)
+			if err != nil {
+				return err
+			}
 			secretsDir := filepath.Join(env.DotfilesDir(env.Home()), "sensitive")
-			childEnv, err := buildChildEnv(secretsDir, ageKeyPath(), parseOnly(only))
+			childEnv, err := buildChildEnv(reg, secretsDir, ageKeyPath(), sel)
 			if err != nil {
 				return err
 			}
@@ -70,30 +171,43 @@ func newSecretsRunCmd() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&only, "only", "", "comma-separated env var names to inject (default: all mapped)")
+	c.Flags().StringVar(&only, "only", "", "comma-separated registry ids or env-var names to inject (default: all mapped)")
 	return c
 }
 
-// buildChildEnv parses env-mapping.conf, decrypts the selected secrets, and
-// returns the parent environment with the decrypted KEY=VALUE pairs appended.
-func buildChildEnv(secretsDir, keyPath string, only map[string]bool) ([]string, error) {
-	mapping := filepath.Join(secretsDir, "env-mapping.conf")
-	f, err := os.Open(mapping)
-	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", mapping, err)
-	}
-	defer func() { _ = f.Close() }()
-
-	entries, err := secrets.ParseMapping(f, env.Home())
-	if err != nil {
-		return nil, err
-	}
-	loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: keyPath}
+// buildChildEnv flattens the registry to entries, decrypts the selected secrets,
+// and returns the parent environment with the decrypted KEY=VALUE pairs appended.
+func buildChildEnv(reg *secrets.Registry, secretsDir, keyPath string, only map[string]bool) ([]string, error) {
+	entries := reg.Entries(env.Home())
+	loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: keyPath, Decrypt: ageDecryptor}
 	injected, err := loader.EnvFor(entries, only)
 	if err != nil {
 		return nil, err
 	}
 	return append(os.Environ(), injected...), nil
+}
+
+// resolveOnly expands a comma-separated --only value into the set of env-var names
+// to inject. Each token is a registry id (→ all the secret's vars) or an env/file
+// var name (→ just itself). Empty → nil (= all mapped). Unknown token → error.
+func resolveOnly(reg *secrets.Registry, s string) (map[string]bool, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+	set := map[string]bool{}
+	for _, tok := range strings.Split(s, ",") {
+		if tok = strings.TrimSpace(tok); tok == "" {
+			continue
+		}
+		vars, ok := reg.Selector(tok)
+		if !ok {
+			return nil, fmt.Errorf("--only: unknown id or env var %q", tok)
+		}
+		for _, v := range vars {
+			set[v] = true
+		}
+	}
+	return set, nil
 }
 
 // runChild runs argv with environ and inherited stdio, returning the child's exit
@@ -124,18 +238,4 @@ func ageKeyPath() string {
 		return p
 	}
 	return filepath.Join(env.Home(), ".config", "age", "key.txt")
-}
-
-// parseOnly splits a comma-separated --only value into a set, or nil (= all).
-func parseOnly(s string) map[string]bool {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	set := map[string]bool{}
-	for _, v := range strings.Split(s, ",") {
-		if v = strings.TrimSpace(v); v != "" {
-			set[v] = true
-		}
-	}
-	return set
 }
