@@ -8,16 +8,15 @@
 
 set -euo pipefail
 
-# Load secrets if not already exported
-if [ -z "${NAN_API_KEY:-}" ]; then
-    if [ -f scripts/load-secrets.sh ]; then
-        . scripts/load-secrets.sh
-        secrets_refresh >/dev/null 2>&1
-    fi
+# NAN_API_KEY: injected by `dotf secrets run -- <this script>`, or self-fetched
+# on demand via `dotf secrets show` (ADR-028 — never the ambient shell env).
+if [ -z "${NAN_API_KEY:-}" ] && command -v dotf >/dev/null 2>&1; then
+    NAN_API_KEY="$(dotf secrets show nan-api-key 2>/dev/null || true)"
+    export NAN_API_KEY
 fi
 
 if [ -z "${NAN_API_KEY:-}" ]; then
-    echo "ERROR: NAN_API_KEY not set. Run: . scripts/load-secrets.sh && secrets_refresh" >&2
+    echo "ERROR: NAN_API_KEY not set. Run: dotf secrets run -- $0" >&2
     exit 1
 fi
 

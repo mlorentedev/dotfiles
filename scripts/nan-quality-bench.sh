@@ -8,11 +8,13 @@
 
 set -euo pipefail
 
-# Load secrets
-if [ -z "${NAN_API_KEY:-}" ]; then
-    [ -f scripts/load-secrets.sh ] && . scripts/load-secrets.sh && secrets_refresh >/dev/null 2>&1
+# NAN_API_KEY: injected by `dotf secrets run`, or self-fetched via `dotf secrets
+# show` on demand (ADR-028 — never the ambient shell env).
+if [ -z "${NAN_API_KEY:-}" ] && command -v dotf >/dev/null 2>&1; then
+    NAN_API_KEY="$(dotf secrets show nan-api-key 2>/dev/null || true)"
+    export NAN_API_KEY
 fi
-[ -z "${NAN_API_KEY:-}" ] && { echo "ERROR: NAN_API_KEY not set" >&2; exit 1; }
+[ -z "${NAN_API_KEY:-}" ] && { echo "ERROR: NAN_API_KEY not set. Run: dotf secrets run -- $0" >&2; exit 1; }
 
 OUT="${1:-/tmp/nan-bench-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$OUT"
