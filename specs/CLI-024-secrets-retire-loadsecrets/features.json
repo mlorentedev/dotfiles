@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-024-secrets-retire-loadsecrets-f1",
+    "behavior": "nan-bench/nan-debug/nan-quality-bench resolve NAN_API_KEY via `dotf secrets show nan-api-key`; none source load-secrets or call secrets_refresh",
+    "verification": "bats tests/nan-scripts-secrets.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-retire-loadsecrets-f2",
+    "behavior": "setup-{linux,windows} resolve mid-setup secrets via `dotf secrets show`; neither eager-sources load-secrets",
+    "verification": "bats tests/setup-windows.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-retire-loadsecrets-f3",
+    "behavior": "load-secrets.{sh,ps1} + sensitive/env-mapping.conf are deleted; no runtime reference remains",
+    "verification": "! grep -rln --include='*.sh' --include='*.ps1' -e 'load-secrets' -e 'env-mapping.conf' scripts setup-linux.sh setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
