@@ -1619,6 +1619,18 @@ if (Test-Path $sensitiveSource) {
     Write-Warn "Sensitive directory not found at $sensitiveSource"
 }
 
+# Deploy the secrets registry (ADR-028 §2 mapping SSOT). dotf secrets reads it
+# from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
+# and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
+$registrySource = "$DotfilesDir\secrets\registry.yaml"
+if (Test-Path -LiteralPath $registrySource) {
+    Ensure-Directory "$DotfilesDest\secrets"
+    Copy-Item $registrySource "$DotfilesDest\secrets\" -Force
+    Write-Success "Deployed secrets/registry.yaml"
+} else {
+    Write-Warn "secrets/registry.yaml not found at $registrySource"
+}
+
 # Eager-load secrets: dot-source load-secrets.ps1 NOW (after the .secret.age
 # files + env-mapping.conf are at $DotfilesDest\sensitive) so every subsequent
 # block in this setup has $env:NAN_API_KEY / OPENROUTER_API_KEY / VAULT_PATH /

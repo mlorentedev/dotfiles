@@ -125,6 +125,14 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     cp -rf "$CURRENT_DIR/sensitive/"* "$DOTFILES_DIR/sensitive/" 2>/dev/null || true
 fi
 
+# Deploy the secrets registry (ADR-028 §2 mapping SSOT). dotf secrets reads it
+# from $DOTFILES_DIR/secrets/registry.yaml; without it `dotf secrets {ls,show,run}`
+# and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy just above.
+ensure_directory "$DOTFILES_DIR/secrets"
+if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
+    cp -rf "$CURRENT_DIR/secrets/"* "$DOTFILES_DIR/secrets/" 2>/dev/null || true
+fi
+
 # Eager-load secrets: source load-secrets.sh NOW (after sensitive/ deploy is in
 # place at $DOTFILES_DIR/sensitive) so every subsequent block in this setup
 # has $NAN_API_KEY / $OPENROUTER_API_KEY / $VAULT_PATH / $TS_AUTHKEY / etc.

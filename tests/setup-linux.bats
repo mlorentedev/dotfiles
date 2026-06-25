@@ -48,6 +48,11 @@ setup() {
     grep -q 'jq-linux-amd64' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-linux.sh deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
+    grep -qF 'DOTFILES_DIR/secrets' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'secrets/registry.yaml' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-linux.sh installs gh if missing" {
     grep -q 'command -v gh' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'cli/cli/releases' "$DOTFILES_DIR/setup-linux.sh"
