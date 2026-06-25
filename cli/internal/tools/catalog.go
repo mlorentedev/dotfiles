@@ -25,13 +25,21 @@ type Tool struct {
 	Source  Source `json:"source"`
 }
 
-// Source declares how to fetch a tool. The pilot supports only "github-release":
-// a pinned per-OS/arch release binary (verified against the release checksums by
-// the installer — CLI-029 PR-B), mirroring the deterministic age/install-dotf
-// pattern rather than relying on winget/apt availability.
+// Source declares how to fetch a tool. Two kinds:
+//   - "github-release": a pinned per-OS/arch release binary, verified against the
+//     release checksums by the installer (CLI-029 PR-B), mirroring the
+//     deterministic age/install-dotf pattern rather than relying on winget/apt.
+//   - "npm": a globally-installed npm package (Package), pinned by Version. Used
+//     for tools whose first-class distribution is npm and that do not ship a
+//     raw, checksum-manifested github-release binary — e.g. the Bitwarden CLI
+//     (@bitwarden/cli), whose releases are zip archives under a cli-v{date} tag
+//     with no sha256 manifest (#577, ADR-028 Phase 0).
 type Source struct {
 	Type string `json:"type"`
 	Repo string `json:"repo"`
+	// Package is the npm package name for source.type "npm" (e.g.
+	// "@bitwarden/cli"). Unused by github-release sources.
+	Package string `json:"package,omitempty"`
 	// Asset maps GOOS -> a release-asset filename template. A per-OS map (not a
 	// single template) is required because release naming is irregular across OSes
 	// — e.g. sops is "sops-v{version}.linux.{goarch}" but "sops-v{version}.{goarch}.exe"
