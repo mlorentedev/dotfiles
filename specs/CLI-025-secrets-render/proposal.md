@@ -1,7 +1,7 @@
 ---
 id: "CLI-025-secrets-render"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-06-25"
 issue: "mlorentedev/dotfiles#587"
 tags: [spec, proposal, secrets, cli, go]

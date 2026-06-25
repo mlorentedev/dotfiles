@@ -89,6 +89,30 @@ func TestSecretsShow_RejectsBwBackend(t *testing.T) {
 	}
 }
 
+func TestSecretsRender_SubstitutesInPlace(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	old := ageDecryptor
+	ageDecryptor = func(_, _ string) ([]byte, error) { return []byte("rendered-value\n"), nil }
+	t.Cleanup(func() { ageDecryptor = old })
+
+	cfg := filepath.Join(t.TempDir(), "opencode.jsonc")
+	if err := os.WriteFile(cfg, []byte(`{"k":"{env:NAN_API_KEY}","h":"{env:HOME}"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := newSecretsRenderCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{cfg})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(cfg)
+	// NAN_API_KEY is registry-mapped → substituted; HOME is not → left for runtime.
+	if want := `{"k":"rendered-value","h":"{env:HOME}"}`; string(got) != want {
+		t.Errorf("render = %q, want %q", got, want)
+	}
+}
+
 func TestResolveOnly_IdSelectsAllVars_NameSelectsOne(t *testing.T) {
 	reg, err := secrets.ParseRegistry([]byte(testRegistry))
 	if err != nil {

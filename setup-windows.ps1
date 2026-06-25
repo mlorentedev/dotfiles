@@ -1032,10 +1032,15 @@ if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
     # still works after substitution.
     $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
     Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
-    if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
+    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
+    # ADR-020 convergence); the PowerShell twin stays as the bootstrap fallback until
+    # dotf is guaranteed on PATH (its deletion lands with #587).
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        & dotf secrets render $opencodeConfigTmp
+    } elseif (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
         [void](Substitute-EnvPlaceholders -Path $opencodeConfigTmp)
     } else {
-        Write-Warn "Substitute-EnvPlaceholders missing; deploying opencode.jsonc with literal {env:VAR} placeholders intact"
+        Write-Warn "neither dotf nor Substitute-EnvPlaceholders available; deploying opencode.jsonc with literal {env:VAR} placeholders intact"
     }
     if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
         [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
@@ -1159,10 +1164,12 @@ $piModelsDst = Join-Path $piAgentDir 'models.json'
 if (Test-Path -LiteralPath $piModelsSrc -PathType Leaf) {
     $piModelsTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "pi-models-$PID.json")
     Copy-Item -LiteralPath $piModelsSrc -Destination $piModelsTmp -Force
-    if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        & dotf secrets render $piModelsTmp
+    } elseif (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
         [void](Substitute-EnvPlaceholders -Path $piModelsTmp)
     } else {
-        Write-Warn "Substitute-EnvPlaceholders missing; deploying pi models.json with literal {env:VAR} placeholders intact"
+        Write-Warn "neither dotf nor Substitute-EnvPlaceholders available; deploying pi models.json with literal {env:VAR} placeholders intact"
     }
     if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
         [void](Deploy-File -Source $piModelsTmp -Destination $piModelsDst)

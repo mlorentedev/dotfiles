@@ -11,16 +11,17 @@ created: "2026-06-25"
 
 ## PR-A — `dotf secrets render` + wire setups
 
-- [ ] **RED**: `cli/internal/secrets/render_test.go` — table-driven: (1) a mapped
+- [x] **RED**: `cli/internal/secrets/render_test.go` — table-driven: (1) a mapped
   `{env:VAR}` is replaced with the decrypted value, (2) an unmapped `{env:HOME}` is
   left intact, (3) atomic write + `0600`, (4) no trailing-newline drift. Inject a fake
   decryptor + a fixture registry (reuse the `registry_seed_test.go` pattern).
-- [ ] **GREEN**: `cli/internal/secrets/render.go` — `Render(path, reg, decryptor)`:
-  build `VAR → ageSource` from `reg.Entries()`, regex `\{env:([A-Z_][A-Z0-9_]*)\}`,
-  decrypt mapped vars (skip `bw`/unmapped), atomic temp-file rewrite at `0600`.
-- [ ] **GREEN**: `cli/internal/cmd/secrets.go` — `dotf secrets render <file>` wires
-  `registryPath()` + `ageDecryptor` into `Render`. `--dry-run` optional.
-- [ ] Wire `setup-linux.sh` + `setup-windows.ps1`: replace the
+- [x] **GREEN**: `cli/internal/secrets/render.go` — `Render(path, reg, loader, home)`:
+  builds `VAR → entry` from `reg.Entries()` (env only), regex `\{env:([A-Z_][A-Z0-9_]*)\}`,
+  decrypts mapped vars via `Loader.EnvFor` (skip `bw`/unmapped), atomic temp-file rewrite
+  at `0600`. Lenient on undecryptable (leave intact), fail-fast on a duplicate var.
+- [x] **GREEN**: `cli/internal/cmd/secrets.go` — `dotf secrets render <file>` wires
+  `registryPath()` + `ageDecryptor` into `Render`. (No `--dry-run`; not needed.)
+- [x] Wire `setup-linux.sh` + `setup-windows.ps1`: replace the
   `substitute_env_placeholders` / `Substitute-EnvPlaceholders` calls (opencode.jsonc,
   pi models.json) with `dotf secrets render <config>`, guarded by `command -v dotf`.
 - [ ] Bump `versions.conf` is automatic (release-please). Use a `feat(secrets):` title.
