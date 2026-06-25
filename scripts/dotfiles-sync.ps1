@@ -3,8 +3,9 @@
     Bidirectional sync between dotfiles repo and installation
 
 .DESCRIPTION
-    Syncs secrets (*.secret.age, env-mapping.conf, .secrets-audit.log)
-    bidirectionally (newest wins), then pushes repo and pulls to local.
+    Syncs secrets (*.secret.age, .secrets-audit.log) bidirectionally
+    (newest wins), then pushes repo and pulls to local. The registry.yaml
+    mapping is git-tracked, so it travels with the repo push/pull.
 
 .PARAMETER SecretsOnly
     Only sync secrets, skip git push/pull.
@@ -106,7 +107,7 @@ function Sync-Secrets {
     Write-Info "Syncing secrets..."
 
     $synced = 0
-    $filesToSync = @('env-mapping.conf', '.secrets-audit.log')
+    $filesToSync = @('.secrets-audit.log')
 
     # Collect all .secret.age files from both dirs
     $ageFiles = @()

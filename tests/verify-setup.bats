@@ -91,10 +91,6 @@ setup() {
     [ -f "$DOTFILES_DIR/ssh/config" ]
 }
 
-@test "env-mapping.conf copied to ~/.dotfiles/sensitive" {
-    [ -f "$DOTFILES_DIR/sensitive/env-mapping.conf" ]
-}
-
 # =============================================================================
 # Section 3: Deployed files (regular files, post-SDD-007 copy-only model)
 # =============================================================================

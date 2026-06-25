@@ -10,16 +10,17 @@ import (
 	"time"
 )
 
-// patOneSecret is the minimal env-mapping.conf for the single-secret cases: one
-// github.* PAT-backed mapping, read from GITHUB_PERSONAL_ACCESS_TOKEN.
-const patOneSecret = "GITHUB_PERSONAL_ACCESS_TOKEN=github.token\n"
+// patOneSecret is the minimal registry for the single-secret cases: one github.*
+// PAT-backed secret, exposed as GITHUB_PERSONAL_ACCESS_TOKEN.
+const patOneSecret = "version: 1\nsecrets:\n" +
+	"  - {id: github-token, plane: app, backend: age, age: github.token, expose: {env: GITHUB_PERSONAL_ACCESS_TOKEN}}\n"
 
 // patCfg builds a Config rooted at a temp dotfiles dir with the given
-// env-mapping.conf, mirroring how checkPATExpiry resolves the mapping.
-func patCfg(t *testing.T, mapping string) *Config {
+// secrets/registry.yaml, mirroring how checkPATExpiry resolves PAT secrets.
+func patCfg(t *testing.T, registry string) *Config {
 	t.Helper()
 	dotfiles := t.TempDir()
-	writeFile(t, filepath.Join(dotfiles, "sensitive", "env-mapping.conf"), mapping)
+	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"), registry)
 	return &Config{DotfilesDir: dotfiles}
 }
 
@@ -107,9 +108,9 @@ func TestCheckPATExpiry_Classification(t *testing.T) {
 // by two env vars yet must be probed exactly once (dedupe by .age filename), and
 // a non-github secret is never probed at all.
 func TestCheckPATExpiry_ProbesEachFilenameOnce(t *testing.T) {
-	mapping := "GITHUB_PERSONAL_ACCESS_TOKEN=github.token\n" +
-		"RELEASE_TOKEN=github.token\n" + // same filename → must NOT add a second probe
-		"DOCKERHUB_TOKEN=dockerhub.token\n" // not github.* → must be ignored
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: github-token, plane: app, backend: age, age: github.token, expose: {env: [GITHUB_PERSONAL_ACCESS_TOKEN, RELEASE_TOKEN]}}\n" + // same age source → must NOT add a second probe
+		"  - {id: dockerhub-token, plane: app, backend: age, age: dockerhub.token, expose: {env: DOCKERHUB_TOKEN}}\n" // not github.* → must be ignored
 
 	env := map[string]string{
 		"GITHUB_PERSONAL_ACCESS_TOKEN": "tok",
@@ -127,7 +128,7 @@ func TestCheckPATExpiry_ProbesEachFilenameOnce(t *testing.T) {
 
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkPATExpiry(sys, patCfg(t, mapping), rep)
+	checkPATExpiry(sys, patCfg(t, registry), rep)
 
 	if calls != 1 {
 		t.Fatalf("want exactly 1 probe (github.token deduped, dockerhub ignored); got %d\n%s", calls, buf.String())
@@ -139,8 +140,8 @@ func TestCheckPATExpiry_ProbesEachFilenameOnce(t *testing.T) {
 // When only the SECOND alias is exported, the token must still be probed — a
 // single unset alias must not yield a false SKIP.
 func TestCheckPATExpiry_FallsBackToSecondAlias(t *testing.T) {
-	mapping := "GITHUB_PERSONAL_ACCESS_TOKEN=github.token\n" +
-		"RELEASE_TOKEN=github.token\n"
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: github-token, plane: app, backend: age, age: github.token, expose: {env: [GITHUB_PERSONAL_ACCESS_TOKEN, RELEASE_TOKEN]}}\n"
 
 	sys := newSys(map[string]string{"RELEASE_TOKEN": "tok"}, nil, nil) // first alias unset
 	sys.Now = func() time.Time { return fixedTestNow }
@@ -152,7 +153,7 @@ func TestCheckPATExpiry_FallsBackToSecondAlias(t *testing.T) {
 
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkPATExpiry(sys, patCfg(t, mapping), rep)
+	checkPATExpiry(sys, patCfg(t, registry), rep)
 
 	if calls != 1 {
 		t.Fatalf("a set fallback alias must be probed, not SKIPped; got %d probe(s)\n%s", calls, buf.String())
@@ -167,7 +168,7 @@ func TestCheckPATExpiry_FallsBackToSecondAlias(t *testing.T) {
 // zero HTTP probes even with a token in the environment.
 func TestCheckPATExpiry_QuickSkipsProbe(t *testing.T) {
 	dotfiles := t.TempDir()
-	writeFile(t, filepath.Join(dotfiles, "sensitive", "env-mapping.conf"), patOneSecret)
+	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"), patOneSecret)
 
 	sys := newSys(map[string]string{
 		"DOTFILES_DIR":                 dotfiles,
@@ -202,7 +203,7 @@ func TestCheckPATExpiry_NoSecrets(t *testing.T) {
 
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkPATExpiry(sys, patCfg(t, "DOCKERHUB_TOKEN=dockerhub.token\n"), rep)
+	checkPATExpiry(sys, patCfg(t, "version: 1\nsecrets:\n  - {id: dockerhub-token, plane: app, backend: age, age: dockerhub.token, expose: {env: DOCKERHUB_TOKEN}}\n"), rep)
 
 	if calls != 0 {
 		t.Fatalf("no github.* secrets must mean no probe; got %d\n%s", calls, buf.String())

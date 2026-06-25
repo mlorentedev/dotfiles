@@ -17,12 +17,17 @@ the setups; PR-B deletes the twins + `env-mapping.conf` and closes #587.
   substituted (0 remaining), `{env:HOME}` + an unmapped var left intact (1 each).
 - [x] **AC2** (atomic write, 0600, no trailing-newline drift) -> `secrets/render_test.go`
   `TestRender_Mode0600_NoTrailingNewlineDrift`; smoke confirmed last byte is `}` (no newline added).
-- [~] **AC3** (setups materialize via `dotf secrets render`; twins gone) -> PR-A wires
-  `setup-linux.sh` (opencode, pi) + `setup-windows.ps1` (opencode, pi) to `dotf secrets render`,
-  guarded by `command -v dotf` / `Get-Command dotf` with the twin as bootstrap fallback. The
-  twins' *deletion* is PR-B.
-- [ ] **AC4** (`env-mapping.conf` deleted; drift-guard test removed) -> PR-B.
-- [ ] **AC5** (bats + integration green cross-OS; #587 closes) -> PR-B.
+- [x] **AC3** (setups materialize via `dotf secrets render`; twins gone) -> PR-A wired
+  both setups to `dotf secrets render`; PR-B deleted `substitute_env_placeholders`
+  (`utils.sh`) + `Substitute-EnvPlaceholders` (`utils.ps1`) + `tests/sdd-009-*` and
+  simplified the setup fallback to render-or-literal. *Verify:* grep-clean of the twins
+  (only descriptive comments remain); `bash -n` + PSScriptAnalyzer parse pass.
+- [x] **AC4** (`env-mapping.conf` deleted; drift-guard test removed) -> `git rm
+  sensitive/env-mapping.conf` + `ParseMapping` + `registry_seed_test.go` + `TestParseMapping`.
+  Its 3 other live consumers were migrated to the registry: the doctor
+  (`checks_pat`/`checks_deploy`) and `github-secrets-manager.sh`, via the new
+  `dotf secrets ls --pairs` (`TestSecretsLs_Pairs_EnvOnly`).
+- [x] **AC5** (cross-OS green; #587 closes) -> `go test ./...` 11 ok; `Closes #587` on PR-B.
 
 Parity bonus added beyond the twins: a var exposed by two distinct secrets is a
 non-deterministic registry and is rejected fail-fast (`TestRender_DuplicateVar_FailsFast`);
@@ -49,6 +54,12 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   entries so file secrets are never materialized to disk as a render side effect.
 - **Two-PR split kept.** PR-A leaves the twins in place as a bootstrap fallback so the new
   path can be validated by a real setup/integration run before PR-B removes the safety net.
+- **PR-B scope grew on a grep sweep.** `env-mapping.conf` was assumed to have only the render
+  twins as consumers; a pre-deletion grep found 4 more (doctor `checks_pat`/`checks_deploy`,
+  `github-secrets-manager.sh`, `dotfiles-sync.{sh,ps1}`, a setup-windows deploy step). Rather
+  than ship a broken `dotf doctor` / secrets-uploader, all were migrated to the registry SSOT
+  in the same PR, with `dotf secrets ls --pairs` added as the machine-readable enabler. The
+  full runbook/troubleshooting rewrite was the one piece deferred (→ #600) to keep this bounded.
 
 ## Promotion candidates
 

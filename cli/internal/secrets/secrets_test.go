@@ -8,43 +8,6 @@ import (
 	"testing"
 )
 
-func TestParseMapping(t *testing.T) {
-	home := "/home/u"
-	in := strings.NewReader(`
-# a comment
-GITHUB_PERSONAL_ACCESS_TOKEN=github.token
-
-  OPENAI_API_KEY = chatgpt.api-key
-@KUBECONFIG=kubelab.kubeconfig>~/.kube/kubelab.config
-@SSH_KEY=id_ed25519>~/.ssh/id_ed25519
-not-a-mapping-line
-`)
-	entries, err := ParseMapping(in, home)
-	if err != nil {
-		t.Fatalf("ParseMapping: %v", err)
-	}
-	if len(entries) != 4 {
-		t.Fatalf("got %d entries, want 4: %+v", len(entries), entries)
-	}
-
-	want := map[string]Entry{
-		"GITHUB_PERSONAL_ACCESS_TOKEN": {Var: "GITHUB_PERSONAL_ACCESS_TOKEN", File: "github.token"},
-		"OPENAI_API_KEY":               {Var: "OPENAI_API_KEY", File: "chatgpt.api-key"},
-		"KUBECONFIG":                   {Var: "KUBECONFIG", File: "kubelab.kubeconfig", IsFile: true, Dest: home + "/.kube/kubelab.config"},
-		"SSH_KEY":                      {Var: "SSH_KEY", File: "id_ed25519", IsFile: true, Dest: home + "/.ssh/id_ed25519"},
-	}
-	for _, e := range entries {
-		w, ok := want[e.Var]
-		if !ok {
-			t.Errorf("unexpected entry %+v", e)
-			continue
-		}
-		if e != w {
-			t.Errorf("entry %s = %+v, want %+v", e.Var, e, w)
-		}
-	}
-}
-
 // fakeDecryptor returns deterministic plaintext per age file (with a trailing
 // newline, as `age -d` does) so the loader's newline-stripping is exercised.
 func fakeDecryptor(t *testing.T) Decryptor {

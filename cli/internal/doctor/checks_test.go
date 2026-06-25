@@ -243,10 +243,13 @@ func TestCheckSecrets(t *testing.T) {
 	secrets := filepath.Join(dotfiles, "sensitive")
 	writeFile(t, filepath.Join(secrets, "OPENAI.secret.age"), "x")
 	writeFile(t, filepath.Join(secrets, "KUBECONFIG.secret.age"), "x")
-	writeFile(t, filepath.Join(secrets, "orphan.secret.age"), "x") // no mapping → orphan
-	// mapping references OPENAI (env) + KUBECONFIG (file) + MISSING (no .age file).
-	writeFile(t, filepath.Join(secrets, "env-mapping.conf"),
-		"# comment\nOPENAI=OPENAI\n@KUBECONFIG=KUBECONFIG>~/.kube/config\nMISSING=MISSING\n")
+	writeFile(t, filepath.Join(secrets, "orphan.secret.age"), "x") // no registry entry → orphan
+	// registry references OPENAI (env) + KUBECONFIG (file) + MISSING (no .age file).
+	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"),
+		"version: 1\nsecrets:\n"+
+			"  - {id: openai, plane: app, backend: age, age: OPENAI, expose: {env: OPENAI}}\n"+
+			"  - {id: kubeconfig, plane: infra, backend: age, age: KUBECONFIG, expose: {file: {var: KUBECONFIG, path: \"~/.kube/config\", mode: \"0600\"}}}\n"+
+			"  - {id: missing, plane: app, backend: age, age: MISSING, expose: {env: MISSING}}\n")
 
 	cfg := &Config{DotfilesDir: dotfiles}
 	var buf bytes.Buffer

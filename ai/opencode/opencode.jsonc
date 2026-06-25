@@ -208,8 +208,8 @@
     // (compaction block sits at top level — see below the provider block)
 
     // Ollama — homelab endpoint (VPN-only). User wires the API key as a secret
-    // (sensitive/ollama.api-key.secret.age, mapping line in env-mapping.conf
-    // commented until the file exists). Model list intentionally empty — user
+    // (sensitive/ollama.api-key.secret.age, registry entry in
+    // secrets/registry.yaml). Model list intentionally empty — user
     // adds models as they pull them on the homelab side; opencode discovers via
     // /v1/models when the endpoint is reachable.
     "ollama": {

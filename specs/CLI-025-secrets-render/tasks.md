@@ -31,18 +31,27 @@ created: "2026-06-25"
 
 ## PR-B — delete the twins + env-mapping.conf (closes #587)
 
-- [ ] Remove `substitute_env_placeholders` (`scripts/utils.sh`) +
+- [x] Remove `substitute_env_placeholders` (`scripts/utils.sh`) +
   `Substitute-EnvPlaceholders` (`scripts/utils.ps1`) + their tests
-  (`tests/sdd-009-deploy-time-secrets.bats`, `*.Tests.ps1`).
-- [ ] `git rm sensitive/env-mapping.conf`; remove the registry↔env-mapping drift-guard
-  test (`cli/internal/secrets/registry_seed_test.go` — or repoint it to a static fixture).
-- [ ] Grep sweep: no runtime reference to `env-mapping.conf` / the twins remains.
-- [ ] `gh issue close 587` (or let the closing PR's `Closes #587` do it).
+  (`tests/sdd-009-deploy-time-secrets.bats`, `*.Tests.ps1`); simplify the setup
+  fallback to render-or-literal (no twin).
+- [x] `git rm sensitive/env-mapping.conf`; remove `ParseMapping` + the
+  registry↔env-mapping drift-guard test (`registry_seed_test.go`) + `TestParseMapping`;
+  the round-trip test repointed to a static expected.
+- [x] **Out-of-plan: env-mapping.conf had 3 more live consumers.** Migrated the doctor
+  (`checks_pat.githubPATSecrets`, `checks_deploy.checkSecrets`) and
+  `github-secrets-manager.sh` (`--list`/`--from-mapping`) to the registry; added
+  `dotf secrets ls --pairs` (env `VAR<TAB>age-source`) as the enabler; dropped
+  env-mapping.conf from `dotfiles-sync.{sh,ps1}` and the setup-windows deploy step.
+- [x] Grep sweep: no runtime reference to `env-mapping.conf` / the twins remains
+  (only descriptive comments + historical spec records).
+- [x] `Closes #587` on the PR. Runbook/troubleshooting full rewrite tracked in #600.
 
 ## Closing
 
-- [ ] Every AC in `proposal.md` covered by a test; `features.json` updated.
-- [ ] `go test ./...`, bats, integration green; `dotf spec archive CLI-025-secrets-render`.
+- [x] Every AC in `proposal.md` covered by a test; PR-A + PR-B green.
+- [x] `go test ./...` green (11 ok), shellcheck + PSScriptAnalyzer parse clean.
+- [ ] On merge: `dotf spec archive CLI-025-secrets-render`.
 
 ## Pre-flight notes (read before coding)
 

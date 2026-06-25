@@ -9,6 +9,11 @@ owner: manu
 
 # Troubleshooting: Secrets
 
+> ⚠️ **Partly out of date — pending rewrite ([#600](https://github.com/mlorentedev/dotfiles/issues/600)).**
+> `sensitive/env-mapping.conf` was retired in #587; the var→file mapping now lives in
+> **`secrets/registry.yaml`** (ADR-028). Commands below that grep `env-mapping.conf` should
+> target the registry (`dotf secrets ls` lists the mapped ids). The age-decrypt steps still apply.
+
 ## Secret not loading
 
 ```bash

@@ -570,11 +570,8 @@ $sensitiveSource = "$DotfilesDir\sensitive"
 $sensitiveDest = "$DotfilesDest\sensitive"
 if (Test-Path $sensitiveSource) {
     Ensure-Directory $sensitiveDest
-    $mappingSource = "$sensitiveSource\env-mapping.conf"
-    if (Test-Path $mappingSource) {
-        Copy-Item $mappingSource "$sensitiveDest\" -Force
-        Write-Success "Deployed env-mapping.conf"
-    }
+    # The var->file mapping moved to secrets/registry.yaml (deployed below); sensitive/
+    # now holds only the encrypted .age blobs.
     $ageFiles = Get-ChildItem -Path $sensitiveSource -Filter '*.secret.age' -ErrorAction SilentlyContinue
     if ($ageFiles) {
         foreach ($ageFile in $ageFiles) {
@@ -604,7 +601,7 @@ if (Test-Path -LiteralPath $registrySource) {
 # (ADR-028) now that dotf + the registry/store are in place, into THIS one-shot
 # setup process only -- never the user's session (that export was retired in
 # #581). opencode/pi {env:NAN_API_KEY} is resolved independently by
-# Substitute-EnvPlaceholders (age-decrypts directly).
+# `dotf secrets render` at deploy time (and their own runtime resolver as fallback).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
     $env:OPENROUTER_API_KEY = (& dotf secrets show openrouter-api-key 2>$null)
 }
@@ -1033,21 +1030,16 @@ if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
     $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
     Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
     # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020 convergence). dotf presence is not success: a stale binary runs but exits
-    # non-zero, so check $LASTEXITCODE and fall back to the twin / literal placeholders
-    # rather than deploying a half-rendered file (the twin stays until dotf is guaranteed
-    # current; its deletion lands with #587).
+    # ADR-020/ADR-028). dotf presence is not success: a stale binary runs but exits
+    # non-zero, so check $LASTEXITCODE; if render did not succeed, leave the {env:VAR}
+    # placeholders intact for opencode's runtime resolver rather than a half-rendered file.
     $opencodeRendered = $false
     if (Get-Command dotf -ErrorAction SilentlyContinue) {
         & dotf secrets render $opencodeConfigTmp
         $opencodeRendered = ($LASTEXITCODE -eq 0)
     }
     if (-not $opencodeRendered) {
-        if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
-            [void](Substitute-EnvPlaceholders -Path $opencodeConfigTmp)
-        } else {
-            Write-Warn "dotf secrets render unavailable/failed and Substitute-EnvPlaceholders missing; deploying opencode.jsonc with literal {env:VAR} placeholders intact"
-        }
+        Write-Warn "dotf secrets render unavailable/failed; deploying opencode.jsonc with literal {env:VAR} placeholders (resolved at runtime)"
     }
     if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
         [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
@@ -1178,11 +1170,7 @@ if (Test-Path -LiteralPath $piModelsSrc -PathType Leaf) {
         $piRendered = ($LASTEXITCODE -eq 0)
     }
     if (-not $piRendered) {
-        if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
-            [void](Substitute-EnvPlaceholders -Path $piModelsTmp)
-        } else {
-            Write-Warn "dotf secrets render unavailable/failed and Substitute-EnvPlaceholders missing; deploying pi models.json with literal {env:VAR} placeholders intact"
-        }
+        Write-Warn "dotf secrets render unavailable/failed; deploying pi models.json with literal {env:VAR} placeholders (resolved at runtime)"
     }
     if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
         [void](Deploy-File -Source $piModelsTmp -Destination $piModelsDst)

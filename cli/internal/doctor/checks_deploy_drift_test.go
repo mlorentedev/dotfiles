@@ -118,7 +118,7 @@ func TestCheckDeployDrift(t *testing.T) {
 func TestIsManagedDeployPath(t *testing.T) {
 	managed := []string{
 		"versions.conf", ".zshrc", ".bashrc", ".profile", ".gitconfig", "tmux.conf",
-		".zsh/aliases.zsh", "ssh/config", "scripts/utils.sh", "sensitive/env-mapping.conf",
+		".zsh/aliases.zsh", "ssh/config", "scripts/utils.sh", "sensitive/chatgpt.api-key.secret.age",
 	}
 	unmanaged := []string{"README.md", "go.mod", "cli/main.go", "docs/lessons.md", ".github/workflows/ci.yml"}
 	for _, p := range managed {

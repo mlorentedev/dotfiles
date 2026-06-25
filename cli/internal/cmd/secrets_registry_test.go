@@ -47,6 +47,27 @@ func TestSecretsLs_ListsIdsAndVars_NoValues(t *testing.T) {
 	}
 }
 
+func TestSecretsLs_Pairs_EnvOnly(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	var out bytes.Buffer
+	cmd := newSecretsLsCmd()
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--pairs"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	// VAR<TAB>age-source, one per env var; file secrets (KUBECONFIG) excluded.
+	for _, want := range []string{"NAN_API_KEY\tnan.api-key", "X_API_KEY\tx.api-key", "X_BEARER_TOKEN\tx.bearer-token"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("--pairs missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "KUBECONFIG") {
+		t.Errorf("--pairs must exclude file secrets, got:\n%s", got)
+	}
+}
+
 func TestSecretsShow_SingleEnv_ScrubbedNoTrailingNewline(t *testing.T) {
 	useTempRegistry(t, testRegistry)
 	old := ageDecryptor

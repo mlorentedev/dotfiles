@@ -18,7 +18,7 @@
 | `powershell/` | PowerShell profile (Windows counterpart of `.zsh/`) |
 | `scripts/` | Shell tooling as `.sh`/`.ps1` twins — **shrinking**: each twin is deleted when its logic ports to a `dotf` subcommand (ADR-020, epic #131); end state is thin bootstrap helpers only |
 | `secrets/` | Secrets registry (`registry.yaml`) — the mapping SSOT (id → store source → env/file → consumers) read by `dotf secrets` (ADR-028) |
-| `sensitive/` | age-encrypted secrets (`*.secret.age`) + `env-mapping.conf` |
+| `sensitive/` | age-encrypted secrets (`*.secret.age`); var mapping in `secrets/registry.yaml` |
 | `specs/` | Active per-feature SDD specs; closed ones move to `specs/archive/` |
 | `ssh/` | SSH client config + public key (deployed by setup) |
 | `systemd/` | systemd user units (self-update + hive-upgrade timers, Linux) |
