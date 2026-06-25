@@ -106,15 +106,14 @@ chmod +x "$DOTFILES_DIR/scripts/knowledge-crystallize.sh"
 # Copy sensitive directory (env-mapping.conf and encrypted files)
 log_info "Setting up sensitive directory..."
 
-# Preflight: warn if age identity key is missing. Without it, load-secrets.sh
-# silently no-ops at shell startup (Invoke-AgeDecrypt returns null on failure)
-# so $NAN_API_KEY / $OPENROUTER_API_KEY / etc. stay empty -- opencode + agy
-# then 401 with no clear cause. Non-fatal: encrypted files still get deployed
-# so a key imported later still works without re-running setup.
+# Preflight: warn if age identity key is missing. Without it `dotf secrets`
+# can't decrypt, so $NAN_API_KEY / $OPENROUTER_API_KEY / etc. resolve empty --
+# opencode + agy then 401 with no clear cause. Non-fatal: encrypted files still
+# deploy so a key imported later works without re-running setup.
 AGE_KEY="${AGE_KEY_PATH:-$HOME/.config/age/key.txt}"
 if [ ! -f "$AGE_KEY" ]; then
     log_warning "age identity key not found at $AGE_KEY"
-    log_warning "  Encrypted secrets will deploy but won't decrypt at shell startup."
+    log_warning "  Encrypted secrets will deploy but won't decrypt on demand."
     log_warning "  To enable: place your age identity at \$HOME/.config/age/key.txt"
     log_warning "  (or set AGE_KEY_PATH). Generate: age-keygen -o ~/.config/age/key.txt"
     log_warning "  See: docs/SECRETS.md"
@@ -133,17 +132,9 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     cp -rf "$CURRENT_DIR/secrets/"* "$DOTFILES_DIR/secrets/" 2>/dev/null || true
 fi
 
-# Eager-load secrets: source load-secrets.sh NOW (after sensitive/ deploy is in
-# place at $DOTFILES_DIR/sensitive) so every subsequent block in this setup
-# has $NAN_API_KEY / $OPENROUTER_API_KEY / $VAULT_PATH / $TS_AUTHKEY / etc.
-# available. Soft-source (subshell + `|| true`) so failures (no age key, no
-# env-mapping yet, etc.) don't abort setup. Replaces the lazy on-demand
-# sourcing previously scattered through this script (e.g. the agy MCP
-# OPENROUTER_API_KEY recovery block).
-if [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
-    # shellcheck source=/dev/null
-    . "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1 || true
-fi
+# Deploy-time secrets are fetched via `dotf secrets show` after dotf is installed
+# (see the block right after install_dotf) -- the load-secrets eager-source was
+# retired here (ADR-028 / #587).
 
 
 # utils.sh is sourced declaratively from .zsh/functions.sh (loaded by both
@@ -271,6 +262,17 @@ else
     log_warning "scripts/install-dotf.sh not found; skipping dotf install"
 fi
 
+# Deploy-time secret for the agy MCP config: agy does NOT expand env vars inside
+# JSON, so OPENROUTER_API_KEY must be baked into mcp_config.json at deploy. The
+# agy block below reads it from the environment; fetch it via the `dotf secrets`
+# facade (ADR-028) now that dotf + the registry/store are deployed above, into
+# THIS one-shot setup process only -- never the user's interactive shell (that
+# export was retired in #581). opencode/pi `{env:NAN_API_KEY}` is resolved
+# independently by substitute_env_placeholders, which age-decrypts directly.
+if command -v dotf >/dev/null 2>&1; then
+    OPENROUTER_API_KEY="$(dotf secrets show openrouter-api-key 2>/dev/null || true)"; export OPENROUTER_API_KEY
+fi
+
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
 # tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
 # as install_dotf, driven by data instead of a per-OS install block. Best-effort:
@@ -394,11 +396,9 @@ if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
         # (fresh-install path on CI containers without the master MCP yet).
         OLD_KEY=$(jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/config/mcp_config.json" 2>/dev/null | grep -v "null" || true)
     fi
-    if ([ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]) && [ -f "$CURRENT_DIR/scripts/load-secrets.sh" ]; then
-        # Soft-source: avoid set -e tripping when load-secrets internals fail
-        # in CI containers without an age key / sensitive/ vault available.
-        (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1) || true
-        OLD_KEY=$( (source "$CURRENT_DIR/scripts/load-secrets.sh" >/dev/null 2>&1 && secrets_show OPENROUTER_API_KEY 2>/dev/null) || echo "" )
+    if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]; then
+        # Last resort: fetch straight from the dotf secrets facade (ADR-028).
+        OLD_KEY="$(dotf secrets show openrouter-api-key 2>/dev/null || true)"
     fi
 
     # Substitute ${VAULT_PATH} placeholder with the canonical Linux vault dir.
