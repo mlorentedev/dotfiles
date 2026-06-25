@@ -13,17 +13,19 @@ import (
 // persist it, not mutating an ephemeral child environment.
 func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 	rep.Section("Environment variables (contract)")
+	osName := contractOS(sys)
 	for _, e := range c.EnvVars {
-		if e.RequiredOn == "windows" {
-			rep.Pass(e.Name + " (windows-scoped, skipped on Linux)")
+		// A var scoped to a different OS than this one does not apply here.
+		if e.RequiredOn != "" && e.RequiredOn != osName {
+			rep.Pass(fmt.Sprintf("%s (%s-scoped, skipped on %s)", e.Name, e.RequiredOn, osName))
 			continue
 		}
 
 		current := sys.Getenv(e.Name)
 		if current == "" {
-			def := expandHome(sys, e.Default["linux"])
+			def := expandHome(sys, e.Default[osName])
 			if def == "" {
-				if e.requiredOnLinux() {
+				if e.requiredOn(osName) {
 					rep.Fail(e.Name + " unset and no default available (required)")
 				} else {
 					rep.Pass(e.Name + " unset (optional, no default)")
@@ -32,7 +34,7 @@ func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 			}
 			if fix {
 				rep.Fix(fmt.Sprintf("%s unset — add to your shell profile: export %s=%q", e.Name, e.Name, def))
-			} else if e.requiredOnLinux() {
+			} else if e.requiredOn(osName) {
 				rep.Warn(fmt.Sprintf("%s unset (required); default %q — run --fix or set in profile", e.Name, def))
 			} else {
 				rep.Warn(fmt.Sprintf("%s unset; default %q would be reported with --fix", e.Name, def))
@@ -59,7 +61,7 @@ func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 // will set it on next login), never a hard FAIL.
 func checkContractPath(sys *System, c *Contract, rep *Report) {
 	rep.Section("PATH entries (contract)")
-	for _, entry := range c.RequiredPathEntries["linux"] {
+	for _, entry := range c.RequiredPathEntries[contractOS(sys)] {
 		expanded := expandHome(sys, entry)
 		if pathContains(sys, expanded) {
 			rep.Pass(expanded + " in PATH")
@@ -101,6 +103,19 @@ func checkRequiredBinaries(sys *System, c *Contract, rep *Report) {
 			rep.Fail(fmt.Sprintf("%s %s is older than minimum %s", b.Name, actual, b.MinVersion))
 		}
 	}
+}
+
+// contractOS maps the runtime GOOS to the env-contract's OS dialect key. The
+// contract declares only two dialects: "linux" (POSIX — $HOME paths, the shell
+// profiles) and "windows" ($env:USERPROFILE paths). macOS ("darwin") and the
+// "" test default share the POSIX/linux dialect, so only Windows branches. This
+// replaces the formerly hardcoded "linux" key, which made the env-contract sweep
+// report Linux paths on Windows — a false-positive drift every session (#551).
+func contractOS(sys *System) string {
+	if sys.GOOS == "windows" {
+		return "windows"
+	}
+	return "linux"
 }
 
 // contractBinaryNames returns the set of binary names already version-checked by

@@ -72,6 +72,69 @@ func TestResolveVaultMemory(t *testing.T) {
 	})
 }
 
+// --- ClaudeProjectKey / ClaudeMemoryTarget: cross-OS encoding ----------------
+
+func TestClaudeProjectKey(t *testing.T) {
+	for in, want := range map[string]string{
+		"/home/me/Projects/dotfiles":                     "-home-me-Projects-dotfiles",
+		`C:\Users\mlorente\Projects\Workspace\dotfiles`:  "C--Users-mlorente-Projects-Workspace-dotfiles",
+	} {
+		if got := ClaudeProjectKey(in); got != want {
+			t.Errorf("ClaudeProjectKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestClaudeMemoryTarget(t *testing.T) {
+	got := ClaudeMemoryTarget("/h", "/home/me/proj")
+	want := filepath.Join("/h", ".claude", "projects", "-home-me-proj", "memory")
+	if got != want {
+		t.Errorf("ClaudeMemoryTarget = %q, want %q", got, want)
+	}
+}
+
+// --- Status: the read-only classifier doctor reports on ----------------------
+
+func TestStatus(t *testing.T) {
+	t.Run("no source → StateNoSource", func(t *testing.T) {
+		target := filepath.Join(t.TempDir(), "memory")
+		if got := Status("/nowhere/x", target, "x", t.TempDir()); got != StateNoSource {
+			t.Errorf("got %v, want StateNoSource", got)
+		}
+	})
+
+	t.Run("source exists, target missing → StateRepairable", func(t *testing.T) {
+		vault := t.TempDir()
+		mkdirAll(t, filepath.Join(vault, "10_projects", "p", "memory"))
+		target := filepath.Join(t.TempDir(), "memory")
+		if got := Status("/x/p", target, "p", vault); got != StateRepairable {
+			t.Errorf("got %v, want StateRepairable", got)
+		}
+	})
+
+	t.Run("real non-empty dir → StateRealDir (Ensure would leave it; doctor must not destroy)", func(t *testing.T) {
+		vault := t.TempDir()
+		mkdirAll(t, filepath.Join(vault, "10_projects", "p", "memory"))
+		target := filepath.Join(t.TempDir(), "memory")
+		writeFile(t, filepath.Join(target, "own.md"), "agent data")
+		if got := Status("/x/p", target, "p", vault); got != StateRealDir {
+			t.Errorf("got %v, want StateRealDir", got)
+		}
+	})
+
+	t.Run("already linked → StateLinked", func(t *testing.T) {
+		vault := t.TempDir()
+		writeFile(t, filepath.Join(vault, "10_projects", "p", "memory", "MEMORY.md"), "x")
+		target := filepath.Join(t.TempDir(), "agent", "p", "memory")
+		if _, err := Ensure("/w/p", target, "p", vault); err != nil {
+			t.Fatalf("Ensure setup: %v", err)
+		}
+		if got := Status("/w/p", target, "p", vault); got != StateLinked {
+			t.Errorf("got %v, want StateLinked", got)
+		}
+	})
+}
+
 // --- Ensure: idempotency + happy path ----------------------------------------
 
 func TestEnsure(t *testing.T) {

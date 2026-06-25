@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 )
 
 // This file is the Claude session-start adapter (CLI-025 PR2b-2b): it composes the
@@ -65,8 +67,7 @@ func ClaudeContext(in ClaudeContextInput) string {
 	ctx += vaultHealth(vaultRoot, vaultName, in.ScriptsDir)
 	ctx += memorySymlink(in.Cwd, in.Vault, in.Home)
 
-	encoded := encodeProjectPath(in.Cwd)
-	memoryDir := filepath.Join(in.Home, ".claude", "projects", encoded, "memory")
+	memoryDir := memlink.ClaudeMemoryTarget(in.Home, in.Cwd)
 	ctx += knowledgeHealth(filepath.Join(memoryDir, "MEMORY.md"),
 		cfg.threshold("memory_md_max_lines", 150), cfg.threshold("crystallize_max_days", 14), in.Now)
 	ctx += vaultBaseline(vaultRoot)

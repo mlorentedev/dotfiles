@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-040-doctor-fix-drift-repair-f1",
+    "behavior": "Missing auto-memory junction with a present vault source FAILs; --fix recreates it; re-run is an idempotent PASS",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckAutoMemoryLink/(source_exists|fix_links_it)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-040-doctor-fix-drift-repair-f2",
+    "behavior": "No vault source resolves -> SKIP, not FAIL",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckAutoMemoryLink/no_vault_source'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-040-doctor-fix-drift-repair-f3",
+    "behavior": "A real non-empty auto-memory dir is a WARN and is never destroyed by --fix",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckAutoMemoryLink/real_non-empty_dir'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-040-doctor-fix-drift-repair-f4",
+    "behavior": "env-contract checks select the OS dialect from GOOS (windows vs linux), ending false-positive drift on Windows while leaving linux output unchanged",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestContractOS|TestCheckContractPath_Dialects|TestCheckContractEnvVars'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-040-doctor-fix-drift-repair-f5",
+    "behavior": "Shared cross-OS Claude project-key encoding and read-only link Status in memlink",
+    "verification": "cd cli && go test ./internal/memlink/ -run 'TestClaudeProjectKey|TestClaudeMemoryTarget|TestStatus'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-func TestEncodeProjectPath(t *testing.T) {
-	if got := encodeProjectPath("/home/me/Projects/dotfiles"); got != "-home-me-Projects-dotfiles" {
-		t.Errorf("got %q", got)
-	}
-}
-
 func TestClaudeJSONSize(t *testing.T) {
 	t.Run("absent file is silent", func(t *testing.T) {
 		if got := claudeJSONSize(filepath.Join(t.TempDir(), "nope.json"), 10240); got != "" {
