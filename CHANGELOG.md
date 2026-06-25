@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/mlorentedev/dotfiles/compare/v0.19.1...v0.20.0) (2026-06-25)
+
+
+### Features
+
+* **secrets:** add dotf secrets render and wire setups off the shell twins ([#596](https://github.com/mlorentedev/dotfiles/issues/596)) ([5cc62f3](https://github.com/mlorentedev/dotfiles/commit/5cc62f3287d397a6279478937838ee03d7b9a499))
+
 ## [0.19.1](https://github.com/mlorentedev/dotfiles/compare/v0.19.0...v0.19.1) (2026-06-25)
 
 
