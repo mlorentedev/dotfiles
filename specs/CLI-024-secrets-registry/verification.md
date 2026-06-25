@@ -34,7 +34,7 @@ dies in PR-C).
 ## AC4 — `ls` lists ids + plane + vars, no values
 
 - `TestSecretsLs_ListsIdsAndVars_NoValues`.
-- Smoke: `dotf secrets ls` → 26 ids, each `id  plane  VAR[,VAR…]`, no values printed.
+- Smoke: `dotf secrets ls` → 25 ids, each `id  plane  VAR[,VAR…]`, no values printed.
 
 ## AC5 — `run` reads the registry; `--only` id or env name
 

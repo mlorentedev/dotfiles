@@ -162,6 +162,9 @@ func (r *Registry) Entries(home string) []Entry {
 	var es []Entry
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
+		if !s.AgeBacked() {
+			continue // bw secrets carry no age source; resolved in ADR-028 Phase 3
+		}
 		if s.Expose.File != nil {
 			es = append(es, Entry{
 				Var:    s.Expose.File.Var,
@@ -180,6 +183,12 @@ func (r *Registry) Entries(home string) []Entry {
 		}
 	}
 	return es
+}
+
+// AgeBacked reports whether the secret is resolvable by the age reader. The bw
+// backend is declared in the schema (a target) but only resolved in ADR-028 Phase 3.
+func (s *Secret) AgeBacked() bool {
+	return s.Backend == "age" || s.Backend == "age-offline"
 }
 
 // Vars lists the env-var names a secret exposes (the file var for a file secret).

@@ -66,7 +66,7 @@ func newSecretsLsCmd() *cobra.Command {
 			w := cmd.OutOrStdout()
 			for i := range reg.Secrets {
 				s := &reg.Secrets[i]
-				fmt.Fprintf(w, "%-26s %-9s %s\n", s.ID, s.Plane, strings.Join(s.Vars(), ","))
+				_, _ = fmt.Fprintf(w, "%-26s %-9s %s\n", s.ID, s.Plane, strings.Join(s.Vars(), ","))
 			}
 			return nil
 		},
@@ -98,7 +98,7 @@ func newSecretsShowCmd() *cobra.Command {
 				return err
 			}
 			_, val, _ := strings.Cut(kv[0], "=") // EnvFor scrubs newlines → capture-friendly
-			fmt.Fprint(cmd.OutOrStdout(), val)
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), val)
 			return nil
 		},
 	}
@@ -110,6 +110,9 @@ func showSource(reg *secrets.Registry, idOrVar string) (name, src string, err er
 	s := reg.Lookup(idOrVar)
 	if s == nil {
 		return "", "", fmt.Errorf("unknown secret %q (try `dotf secrets ls`)", idOrVar)
+	}
+	if !s.AgeBacked() {
+		return "", "", fmt.Errorf("%q uses the %s backend, not yet supported (ADR-028 Phase 3)", s.ID, s.Backend)
 	}
 	if s.Expose.File != nil {
 		return "", "", fmt.Errorf("%q is a file secret; use `dotf secrets run --only %s -- <cmd>`", s.ID, s.ID)

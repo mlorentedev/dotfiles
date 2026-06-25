@@ -124,13 +124,27 @@ func TestRegistry_Lookup_IdThenVar(t *testing.T) {
 	}
 }
 
+func TestRegistry_Entries_SkipsBwBackend(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: age-one, plane: app, backend: age, age: a.key, expose: {env: A_KEY}}\n" +
+		"  - {id: bw-one, plane: app, backend: bw, expose: {env: B_KEY}}\n"
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	es := reg.Entries("/h")
+	if len(es) != 1 || es[0].Var != "A_KEY" {
+		t.Errorf("Entries = %+v, want only A_KEY (bw not age-readable yet)", es)
+	}
+}
+
 func TestParseRegistry_Validation(t *testing.T) {
 	cases := map[string]string{
-		"bad version":      "version: 2\nsecrets: []\n",
-		"duplicate id":     "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A}}\n  - {id: a, plane: app, backend: age, age: g, expose: {env: B}}\n",
-		"unknown backend":  "version: 1\nsecrets:\n  - {id: a, plane: app, backend: vault, age: f, expose: {env: A}}\n",
+		"bad version":       "version: 2\nsecrets: []\n",
+		"duplicate id":      "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A}}\n  - {id: a, plane: app, backend: age, age: g, expose: {env: B}}\n",
+		"unknown backend":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: vault, age: f, expose: {env: A}}\n",
 		"both env and file": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A, file: {var: V, path: /p}}}\n",
-		"missing source":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, expose: {env: A}}\n",
+		"missing source":    "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, expose: {env: A}}\n",
 	}
 	for name, yml := range cases {
 		t.Run(name, func(t *testing.T) {

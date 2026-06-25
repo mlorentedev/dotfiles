@@ -35,7 +35,7 @@ created: "2026-06-25"
 ### 3. Seed data (`secrets/registry.yaml`)
 
 - [x] **T3.1** author `secrets/registry.yaml` from `docs/secrets-inventory.md` + `env-mapping.conf`
-      (~26 secrets; plane/consumers/rotate from inventory; `backend: age`, floor=`age-offline`).
+      (25 secrets; plane/consumers/rotate from inventory; `backend: age`, floor=`age-offline`).
 - [x] **T3.2** test loads the **real** `secrets/registry.yaml`; asserts entry set ==
       `ParseMapping(real env-mapping.conf)` (drift guard until env-mapping dies in PR-C).
 

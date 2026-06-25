@@ -78,6 +78,17 @@ func TestSecretsShow_RejectsFileAndMultiAndUnknown(t *testing.T) {
 	}
 }
 
+func TestSecretsShow_RejectsBwBackend(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-one, plane: app, backend: bw, expose: {env: B_KEY}}\n")
+	cmd := newSecretsShowCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"bw-one"})
+	if err := cmd.Execute(); err == nil {
+		t.Error("show on a bw-backed secret must error (bw not supported until Phase 3)")
+	}
+}
+
 func TestResolveOnly_IdSelectsAllVars_NameSelectsOne(t *testing.T) {
 	reg, err := secrets.ParseRegistry([]byte(testRegistry))
 	if err != nil {
