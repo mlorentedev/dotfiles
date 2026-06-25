@@ -18,25 +18,25 @@ created: "2026-06-25"
   - Conclusion: catalog's `github-release` installer (raw binary + `v{version}` tag + mandatory sha256 manifest) fits neither → add `source.type: "npm"` for bw; leave age imperative.
 - [x] Local toolchain confirmed: `go 1.25.6`, `npm 11.17.0`, `bw 2026.5.0`, `age` present.
 
-## Implementation — commit 1: npm catalog source + bw
+## Implementation — commit 1: npm catalog source + bw  (`7f84bc4`)
 
-- [ ] **RED**: `install_test.go` — npm cases (fresh installs, at/above-pin skips, below-pin upgrades, npm-absent error) with faked `Run` + version probe seams.
-- [ ] **GREEN**: `catalog.go` — add `Source.Package` field (npm package name).
-- [ ] **GREEN**: `install.go` — add `Run` command seam (default `exec`); dispatch `Install` on `Source.Type`; `installNpm` (probe PATH version → `decideAction` → `npm install -g pkg@version`); reuse `decideAction`/`Result`. No behaviour change to the `github-release` path (sops tests stay green).
-- [ ] **GREEN**: `cmd/tools.go` — `list` renders npm tools as `npm:<package>` (not "(no build for this platform)").
-- [ ] `packages.json` — add `bw` (`@bitwarden/cli`, pinned `2026.5.0`, profile `full`, `source.type: npm`).
-- [ ] `go test ./internal/tools/... && go build ./...` green.
+- [x] **RED**: `install_test.go` — npm cases (fresh installs, at/above-pin skips, below-pin upgrades, npm-absent error, missing package) with faked `Run` + version probe seams.
+- [x] **GREEN**: `catalog.go` — add `Source.Package` field (npm package name).
+- [x] **GREEN**: `install.go` — add `Run` command seam (default `exec`); dispatch `Install` on `Source.Type` (`installRelease`/`installNpm`); `current()` picks the version probe by source type (Dest for github-release, PATH for npm); `installNpm` (probe → `decideAction` → `npm install -g pkg@version`); reuse `decideAction`/`Result`. No behaviour change to the `github-release` path (sops tests stay green).
+- [x] **GREEN**: `cmd/tools.go` — `list` renders npm tools as `npm:<package>` (not "(no build for this platform)").
+- [x] `packages.json` — add `bw` (`@bitwarden/cli`, pinned `2026.5.0`, profile `full`, `source.type: npm`).
+- [x] `go test ./internal/tools/... && go build ./...` green.
 
-## Implementation — commit 2: dotf doctor secrets-tooling check
+## Implementation — commit 2: dotf doctor secrets-tooling check  (`f2eb911`)
 
-- [ ] **RED**: `checks_secrets_tooling_test.go` — table over {bw,age present/absent} × {age key present/absent}: present→PASS, absent bin→FAIL, absent key→WARN.
-- [ ] **GREEN**: `checks_secrets_tooling.go` — `checkSecretsTooling(sys, cfg, rep)`: `sys.has("bw")`/`sys.has("age")`; age key at `$AGE_KEY_PATH` or `~/.config/age/key.txt`.
-- [ ] Wire `checkSecretsTooling` into `doctor.Run` (non-quick sweep), next to `checkSecrets`.
-- [ ] `go test ./internal/doctor/...` green.
+- [x] **RED**: `checks_secrets_tooling_test.go` — table over {bw,age present/absent} × {age key present/absent} + AGE_KEY_PATH override: present→PASS, absent bin→FAIL, absent key→WARN.
+- [x] **GREEN**: `checks_secrets_tooling.go` — `checkSecretsTooling(sys, rep)`: `sys.has("bw")`/`sys.has("age")`; age key at `$AGE_KEY_PATH` or `~/.config/age/key.txt`.
+- [x] Wire `checkSecretsTooling` into `doctor.Run` (non-quick sweep), next to `checkSecrets`.
+- [x] `go test ./internal/doctor/...` green.
 
 ## Closing
 
-- [ ] Full `go test ./...` + `go build ./...` green
-- [ ] `verification.md` filled with command evidence (test output, `dotf tools list`, a `dotf doctor` excerpt)
+- [x] `go build ./...` green; `go test ./internal/{tools,cmd,doctor}/...` green (pre-existing, unrelated `TestEmbeddedTemplatesMatchVault` template-drift FAILs in initrepo/spec/vault — not touched here)
+- [x] `verification.md` filled with command evidence (test output, `dotf tools list`, a `dotf doctor` excerpt)
 - [ ] PR opened referencing this spec folder + issue #577 (no auto-merge)
 - [ ] On merge: move to `specs/archive/OPS-017-secrets-tooling/`
