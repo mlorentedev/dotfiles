@@ -177,10 +177,6 @@ setup() {
     grep -q 'Setting up secrets system' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 copies env-mapping.conf" {
-    grep -q 'env-mapping.conf' "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 registers SessionStart hook" {
     grep -q 'SessionStart' "$PS1_SCRIPT"
 }
@@ -352,8 +348,8 @@ setup() {
     grep -qE 'Deploy-File.*opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 opencode deploy calls Substitute-EnvPlaceholders (SDD-009)" {
-    grep -qE 'Substitute-EnvPlaceholders.*opencodeConfigTmp' "$PS1_SCRIPT"
+@test "setup-windows.ps1 opencode deploy renders via dotf secrets render (SDD-009/#587)" {
+    grep -qE 'dotf secrets render \$opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {
