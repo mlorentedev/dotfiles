@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.0](https://github.com/mlorentedev/dotfiles/compare/v0.17.1...v0.18.0) (2026-06-25)
+
+
+### Features
+
+* **doctor:** repair auto-memory junction + OS-aware env-contract checks (HARNESS-040) ([#576](https://github.com/mlorentedev/dotfiles/issues/576)) ([6d2627c](https://github.com/mlorentedev/dotfiles/commit/6d2627cb2ac6aeb2da1b93ceeed6a150674025d7)), closes [#551](https://github.com/mlorentedev/dotfiles/issues/551)
+* **secrets:** stop ambient secret export; wrap AI CLIs via dotf secrets run ([#581](https://github.com/mlorentedev/dotfiles/issues/581)) ([e957c4f](https://github.com/mlorentedev/dotfiles/commit/e957c4f110732ba0503020a3db6d0e7433a9102b)), closes [#493](https://github.com/mlorentedev/dotfiles/issues/493)
+
 ## [0.17.1](https://github.com/mlorentedev/dotfiles/compare/v0.17.0...v0.17.1) (2026-06-24)
 
 
