@@ -23,7 +23,10 @@ created: "2026-06-25"
   `registryPath()` + `ageDecryptor` into `Render`. (No `--dry-run`; not needed.)
 - [x] Wire `setup-linux.sh` + `setup-windows.ps1`: replace the
   `substitute_env_placeholders` / `Substitute-EnvPlaceholders` calls (opencode.jsonc,
-  pi models.json) with `dotf secrets render <config>`, guarded by `command -v dotf`.
+  pi models.json) with `dotf secrets render <config>`, gated on the subcommand
+  *succeeding* (Linux: `command -v dotf && dotf secrets render` in the `if` condition,
+  which exempts it from `set -e`; Windows: `Get-Command dotf` + `$LASTEXITCODE` check),
+  with the twin as fallback so a stale dotf never aborts setup.
 - [ ] Bump `versions.conf` is automatic (release-please). Use a `feat(secrets):` title.
 
 ## PR-B — delete the twins + env-mapping.conf (closes #587)

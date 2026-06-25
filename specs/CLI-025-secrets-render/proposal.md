@@ -42,7 +42,8 @@ is removed, and the registry↔env-mapping drift-guard test is retired.
 
 - The Bitwarden (`bw`) backend — Phase 3 / #585. `render` reads the age backend only,
   via `Secret.AgeBacked()` (same gate as `show`/`run`).
-- Non-secret placeholders (`{env:HOME}`, `{env:OLLAMA_API_KEY}`) — left intact.
+- Unmapped placeholders (no registry entry — e.g. `{env:HOME}`, `{env:OLLAMA_API_KEY}`)
+  — left intact, even if the name looks secret: the decision is registry-based, not value-based.
 - The agy `mcp_config.json` materialization (a jq-merge, not a `{env:VAR}`
   substitution; already on `dotf secrets show` since B3) — untouched.
 
