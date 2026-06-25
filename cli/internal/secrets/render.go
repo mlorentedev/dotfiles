@@ -140,10 +140,10 @@ func atomicWrite(path string, content []byte) error {
 		return fmt.Errorf("render: create temp for %s: %w", path, err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // no-op once the rename succeeds
+	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename succeeds
 
 	if _, err := tmp.Write(content); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("render: write temp for %s: %w", path, err)
 	}
 	if err := tmp.Close(); err != nil {
