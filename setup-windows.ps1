@@ -1032,10 +1032,22 @@ if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
     # still works after substitution.
     $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
     Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
-    if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
-        [void](Substitute-EnvPlaceholders -Path $opencodeConfigTmp)
-    } else {
-        Write-Warn "Substitute-EnvPlaceholders missing; deploying opencode.jsonc with literal {env:VAR} placeholders intact"
+    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
+    # ADR-020 convergence). dotf presence is not success: a stale binary runs but exits
+    # non-zero, so check $LASTEXITCODE and fall back to the twin / literal placeholders
+    # rather than deploying a half-rendered file (the twin stays until dotf is guaranteed
+    # current; its deletion lands with #587).
+    $opencodeRendered = $false
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        & dotf secrets render $opencodeConfigTmp
+        $opencodeRendered = ($LASTEXITCODE -eq 0)
+    }
+    if (-not $opencodeRendered) {
+        if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
+            [void](Substitute-EnvPlaceholders -Path $opencodeConfigTmp)
+        } else {
+            Write-Warn "dotf secrets render unavailable/failed and Substitute-EnvPlaceholders missing; deploying opencode.jsonc with literal {env:VAR} placeholders intact"
+        }
     }
     if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
         [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
@@ -1159,10 +1171,18 @@ $piModelsDst = Join-Path $piAgentDir 'models.json'
 if (Test-Path -LiteralPath $piModelsSrc -PathType Leaf) {
     $piModelsTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "pi-models-$PID.json")
     Copy-Item -LiteralPath $piModelsSrc -Destination $piModelsTmp -Force
-    if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
-        [void](Substitute-EnvPlaceholders -Path $piModelsTmp)
-    } else {
-        Write-Warn "Substitute-EnvPlaceholders missing; deploying pi models.json with literal {env:VAR} placeholders intact"
+    # Gate on $LASTEXITCODE, not just dotf presence (see opencode block).
+    $piRendered = $false
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        & dotf secrets render $piModelsTmp
+        $piRendered = ($LASTEXITCODE -eq 0)
+    }
+    if (-not $piRendered) {
+        if (Get-Command Substitute-EnvPlaceholders -ErrorAction SilentlyContinue) {
+            [void](Substitute-EnvPlaceholders -Path $piModelsTmp)
+        } else {
+            Write-Warn "dotf secrets render unavailable/failed and Substitute-EnvPlaceholders missing; deploying pi models.json with literal {env:VAR} placeholders intact"
+        }
     }
     if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
         [void](Deploy-File -Source $piModelsTmp -Destination $piModelsDst)
