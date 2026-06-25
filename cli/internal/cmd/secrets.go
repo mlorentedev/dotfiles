@@ -24,7 +24,8 @@ func newSecretsCmd() *cobra.Command {
 		Short: "On-demand secrets — inject into a child process, never the shell (ADR-028)",
 		Long: "secrets reads the registry (secrets/registry.yaml) and exposes the mapped\n" +
 			"secrets on demand. `run` injects them into one child process only (never the\n" +
-			"ambient shell); `show` prints one value; `ls` lists ids (ADR-028 §2).",
+			"ambient shell); `show` prints one value; `render` materializes {env:VAR}\n" +
+			"placeholders in a config file; `ls` lists ids (ADR-028 §2).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -33,6 +34,7 @@ func newSecretsCmd() *cobra.Command {
 	cmd.AddCommand(newSecretsRunCmd())
 	cmd.AddCommand(newSecretsLsCmd())
 	cmd.AddCommand(newSecretsShowCmd())
+	cmd.AddCommand(newSecretsRenderCmd())
 	return cmd
 }
 
@@ -99,6 +101,46 @@ func newSecretsShowCmd() *cobra.Command {
 			}
 			_, val, _ := strings.Cut(kv[0], "=") // EnvFor scrubs newlines → capture-friendly
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), val)
+			return nil
+		},
+	}
+}
+
+// newSecretsRenderCmd materializes a config file in place: it substitutes every
+// {env:VAR} placeholder whose VAR is a registry-exposed env secret with that
+// secret's decrypted value (ADR-028 / SDD-009). It is the Go replacement for the
+// substitute_env_placeholders / Substitute-EnvPlaceholders shell twins, wired
+// into setup for opencode.jsonc and pi's models.json. Unmapped/undecryptable
+// placeholders are left intact for the runtime resolver (never fatal).
+func newSecretsRenderCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "render <file>",
+		Short: "Substitute {env:VAR} placeholders in <file> with decrypted secret values (in place)",
+		Long: "render rewrites <file> in place, replacing each {env:VAR} placeholder whose\n" +
+			"VAR is a registry-mapped env secret (secrets/registry.yaml, over the age\n" +
+			"store) with the decrypted value. Placeholders with no registry mapping, or\n" +
+			"whose secret cannot be decrypted, are left intact for the runtime resolver —\n" +
+			"setup must complete even when some secrets are absent. Atomic write, 0600.",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			reg, err := loadRegistry()
+			if err != nil {
+				return err
+			}
+			secretsDir := filepath.Join(env.DotfilesDir(env.Home()), "sensitive")
+			loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: ageKeyPath(), Decrypt: ageDecryptor}
+			res, err := secrets.Render(args[0], reg, loader, env.Home())
+			if err != nil {
+				return err
+			}
+			errOut := cmd.ErrOrStderr()
+			if len(res.Unmapped) > 0 {
+				_, _ = fmt.Fprintf(errOut, "render: unmapped placeholders left for runtime resolution: %s\n", strings.Join(res.Unmapped, " "))
+			}
+			if len(res.Unresolved) > 0 {
+				_, _ = fmt.Fprintf(errOut, "warning: render: mapped but undecryptable, left intact (check age key/secret files): %s\n", strings.Join(res.Unresolved, " "))
+			}
 			return nil
 		},
 	}

@@ -699,7 +699,17 @@ OPENCODE_CONFIG_DST="$HOME/.config/opencode/opencode.jsonc"
 if [ -f "$OPENCODE_CONFIG_SRC" ]; then
     OPENCODE_CONFIG_TMP=$(mktemp)
     cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
-    substitute_env_placeholders "$OPENCODE_CONFIG_TMP"
+    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
+    # ADR-020 convergence). Gate on the subcommand SUCCEEDING, not just dotf's presence:
+    # a stale dotf passes `command -v` but fails `secrets render`, and under set -e that
+    # would abort setup instead of falling back. Running it in the `if` condition exempts
+    # it from set -e, so any failure drops to the twin (kept until dotf is guaranteed
+    # current; its deletion lands with #587).
+    if command -v dotf >/dev/null 2>&1 && dotf secrets render "$OPENCODE_CONFIG_TMP"; then
+        : # materialized via dotf secrets render
+    else
+        substitute_env_placeholders "$OPENCODE_CONFIG_TMP"
+    fi
     mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
     log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
 else
@@ -802,7 +812,12 @@ PI_MODELS_DST="$PI_AGENT_DIR/models.json"
 if [ -f "$PI_MODELS_SRC" ]; then
     PI_MODELS_TMP=$(mktemp)
     cp "$PI_MODELS_SRC" "$PI_MODELS_TMP"
-    substitute_env_placeholders "$PI_MODELS_TMP"
+    # Gate on `secrets render` succeeding, not just dotf presence (see opencode block).
+    if command -v dotf >/dev/null 2>&1 && dotf secrets render "$PI_MODELS_TMP"; then
+        : # materialized via dotf secrets render
+    else
+        substitute_env_placeholders "$PI_MODELS_TMP"
+    fi
     if [ -f "$PI_MODELS_DST" ] && cmp -s "$PI_MODELS_TMP" "$PI_MODELS_DST"; then
         log_info "pi models.json already in sync"
         rm -f "$PI_MODELS_TMP"
