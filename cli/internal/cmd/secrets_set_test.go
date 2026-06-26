@@ -20,6 +20,16 @@ type fakeWriter struct {
 	locked   bool
 	sets     map[string]string
 	created  map[string]string
+	tamper   func(string) string // optional: corrupt the STORED value so a read-back differs (parity tests)
+}
+
+// store reflects a write into cur so a subsequent Field read-back sees it (migrate's
+// parity gate); tamper, when set, mangles the stored value to force a mismatch.
+func (f *fakeWriter) store(item, field, value string) {
+	if f.tamper != nil {
+		value = f.tamper(value)
+	}
+	f.cur[item+"/"+field] = value
 }
 
 func newFakeWriter() *fakeWriter {
@@ -46,11 +56,14 @@ func (f *fakeWriter) Field(item, field string) (string, error) {
 
 func (f *fakeWriter) SetField(item, field, value string) error {
 	f.sets[item+"/"+field] = value
+	f.store(item, field, value)
 	return nil
 }
 
 func (f *fakeWriter) CreateItem(item, field, value string) error {
 	f.created[item+"/"+field] = value
+	delete(f.notFound, item) // the item now exists → subsequent reads resolve
+	f.store(item, field, value)
 	return nil
 }
 

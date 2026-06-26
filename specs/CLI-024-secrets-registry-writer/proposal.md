@@ -22,20 +22,32 @@ human-maintained SSOT with section headers and aligned trailing comments.
 
 ## What
 
-`SetBackendBW(data []byte, id, item, field string) ([]byte, error)` rewrites the
-registry block of secret `id` to the bw backend and returns the new bytes:
+`SetBackendBW(data []byte, id string) ([]byte, error)` **activates** secret `id`'s
+pre-declared Bitwarden backend and returns the new bytes:
 
 - flips its `backend:` value to `bw`,
-- drops its `age:` source line,
-- inserts `bw: { item: <item>, field: <field> }`,
-- **touches only those lines** — every comment, blank line, alignment space, and
+- drops its now-dead `age:` source line,
+- **keeps the already-declared `bw: { item, field }` block byte-for-byte in place** —
+  it neither computes nor relocates the target,
+- **touches only those two lines** — every comment, blank line, alignment space, and
   other secret is byte-for-byte identical,
-- is **idempotent** (already-bw with the same item/field → input unchanged),
+- is **idempotent** (already-bw, no age line → input unchanged),
 - and **re-validates** the result through `ParseRegistry` before returning.
 
+**Why no `item`/`field` parameters (model shift since the #617 draft):** the
+env-var-per-entry registry (ADR-028 §2 addendum) pre-declares `bw:` on every migratable
+entry, dormant while `backend: age`. The declared block is therefore the SINGLE source
+for both `migrate`'s parity write and the post-flip resolution — passing item/field to
+the writer would be a second, divergeable copy of that SSOT. So the writer only toggles
+the backend and drops age; it reads the target it needs from the entry itself. This pins
+the value parity verified and the value resolved after the cutover to the same
+item/field, with no chance of drift.
+
 It is scoped to the single, scalar env-var shape (`expose: { env: VAR }`) that the
-bulk of the registry uses, in block form. Multi-var / per-var (dockerhub, x-twitter)
-and file secrets are rejected with a clear error (the multi-field path is #612 M3/M6).
+bulk of the registry uses, in block form. The entry MUST carry a `bw:` target to
+activate (else fail-loud — nothing to flip to). Multi-var / per-var (dockerhub,
+x-twitter) and file secrets are rejected with a clear error (the multi-field path is
+#612 M3/M6).
 
 **Approach decision (empirically driven):** a yaml.v3 Node round-trip was probed
 against the real `registry.yaml` and **rejected** — re-encoding the parsed document
@@ -53,8 +65,10 @@ implementation is deliberate line surgery, guarded by `ParseRegistry` re-validat
 ## Risks / open questions
 
 - **Fidelity.** The golden test flips a real-registry secret and asserts every line
-  *outside* the target block is byte-identical (the transformation is net-zero lines,
-  so indices are stable) — the strongest guarantee that nothing else drifted.
+  *outside* the target block is byte-identical (the transformation drops exactly one
+  line — the dead `age:` — so the tail shifts up by one; the test asserts content
+  preservation before/after the block, not stable indices) — the strongest guarantee
+  that nothing else drifted.
 - **Block detection.** Targets block form (`- id: x` then indented keys); an
   inline-mapping secret is reported as "not found in block form" (the real registry is
   all block form). Documented.
@@ -64,13 +78,14 @@ implementation is deliberate line surgery, guarded by `ParseRegistry` re-validat
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `SetBackendBW` flips backend→bw, drops age, inserts `bw:{item,field}`,
-  leaving comments/blanks/other-secrets byte-identical. *Verify:* unit test +
-  golden against the real `registry.yaml`.
-- [ ] **AC2** — idempotent (second apply == first; already-bw same item/field
-  unchanged). *Verify:* Go test.
-- [ ] **AC3** — guarded: unknown id, multi-var, file secret, empty item/field each
-  error fail-fast; the result re-validates via `ParseRegistry`. *Verify:* Go test.
+- [ ] **AC1** — `SetBackendBW` flips backend→bw, drops age, keeps the pre-declared
+  `bw:` block in place, leaving comments/blanks/other-secrets byte-identical (one line
+  shorter overall). *Verify:* unit test + golden against the real `registry.yaml`.
+- [ ] **AC2** — idempotent (second apply == first; already-bw → unchanged).
+  *Verify:* Go test.
+- [ ] **AC3** — guarded: unknown id, multi-var, file secret, and **no declared bw:
+  target** each error fail-fast; the result re-validates via `ParseRegistry`.
+  *Verify:* Go test.
 - [ ] **AC4** — `go test ./internal/secrets && go vet && gofmt && go build` clean; no
   command wired (primitive only). *Verify:* CI.
 

@@ -94,7 +94,7 @@ func Render(path string, reg *Registry, loader *Loader, home string) (Result, er
 	if res.Substituted == 0 {
 		return res, nil // every placeholder unmapped/unresolved — no rewrite needed
 	}
-	if err := atomicWrite(path, []byte(out)); err != nil {
+	if err := AtomicWrite(path, []byte(out)); err != nil {
 		return res, err
 	}
 	return res, nil
@@ -151,29 +151,30 @@ func resolve(loader *Loader, e Entry) (string, error) {
 	return value, nil
 }
 
-// atomicWrite stages content to a temp file in the target's directory, sets 0600,
+// AtomicWrite stages content to a temp file in the target's directory, sets 0600,
 // and renames it over the target. Same-dir keeps the rename on one filesystem;
-// os.Rename replaces an existing file on both POSIX and Windows (MoveFileEx).
-func atomicWrite(path string, content []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".render-*.tmp")
+// os.Rename replaces an existing file on both POSIX and Windows (MoveFileEx). Shared
+// by render (config files) and migrate (the registry cutover).
+func AtomicWrite(path string, content []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
-		return fmt.Errorf("render: create temp for %s: %w", path, err)
+		return fmt.Errorf("atomic write: create temp for %s: %w", path, err)
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename succeeds
 
 	if _, err := tmp.Write(content); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("render: write temp for %s: %w", path, err)
+		return fmt.Errorf("atomic write: write temp for %s: %w", path, err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("render: close temp for %s: %w", path, err)
+		return fmt.Errorf("atomic write: close temp for %s: %w", path, err)
 	}
 	if err := os.Chmod(tmpName, 0o600); err != nil {
-		return fmt.Errorf("render: chmod temp for %s: %w", path, err)
+		return fmt.Errorf("atomic write: chmod temp for %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("render: replace %s: %w", path, err)
+		return fmt.Errorf("atomic write: replace %s: %w", path, err)
 	}
 	return nil
 }

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-024-secrets-migrate-f1",
+    "behavior": "age single-scalar-env secret migrates: bw written, parity passes, registry flipped to backend bw with item/field, age file untouched",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsMigrate.*(EndToEnd|Migrates)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-migrate-f2",
+    "behavior": "parity mismatch (bw readback != age value) aborts before any registry change; registry stays backend age",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsMigrate.*Parity' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-migrate-f3",
+    "behavior": "idempotent: already-bw secret re-verifies and exits 0 with zero writes, registry byte-identical",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsMigrate.*Idempotent' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-migrate-f4",
+    "behavior": "scope guards: file / ci:*-consumer / shared-age-source / missing-bw-block each error with no bw write and no registry change",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsMigrate.*(Scope|Guard|Reject)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-migrate-f5",
+    "behavior": "--dry-run reports intended write+flip, performs no bw write and no registry change",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsMigrate.*DryRun' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-migrate-f6",
+    "behavior": "suite green, vet + golangci (v2, no default exclusions) clean, additive (set unchanged)",
+    "verification": "cd cli && go test ./internal/... -count=1 && go vet ./... && golangci-lint run --exclude-use-default=false ./internal/cmd/... ./internal/secrets/...",
+    "state": "pending",
+    "evidence": ""
+  }
+]

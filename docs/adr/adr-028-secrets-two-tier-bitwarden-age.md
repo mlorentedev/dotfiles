@@ -231,8 +231,9 @@ use `notes`/custom fields for now — the native SSH Key item type (5) needs a
 field}` block. A secret declares its `bw:` target **at rewrite time, while still
 `backend: age`**, so the value can be written to bw and parity-checked before the
 backend flip. `migrate` never derives `item`/`field` from the `id`; a missing `bw:`
-block is an error (`--item`/`--field` exist only as a one-off override). At cutover,
-`SetBackendBW` flips `backend: age → bw` and re-emits the already-declared target.
+block is an error. At cutover, `SetBackendBW` flips `backend: age → bw` and keeps the
+already-declared target in place (it takes no item/field — the declared block is the
+single source for both the parity write and the post-flip resolution).
 
 ### Registry identity — the `id` is the env var; the `item` groups and is mutable
 

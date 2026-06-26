@@ -16,15 +16,15 @@ created: "2026-06-26"
 
 ## Implementation
 
-- [x] `SetBackendBW(data, id, item, field)` — line surgery: flip `backend:` to bw,
-  drop `age:`, insert `bw: { item, field }`; touches only those lines. Guarded to the
-  single scalar env-var shape; idempotent; re-validated via `ParseRegistry`. Helpers:
-  `secretBlock`, `assertSingleScalarEnv`, `leadingSpaces`, `isInlineMapping`.
+- [x] `SetBackendBW(data, id)` — line surgery: flip `backend:` to bw, drop `age:`, keep
+  the pre-declared `bw:` block in place; touches only those two lines. Guarded to the
+  single scalar env-var shape WITH a declared bw: target; idempotent; re-validated via
+  `ParseRegistry`. Helpers: `secretBlock`, `assertMigratable`, `leadingSpaces`.
 - [x] Tests: `TestSetBackendBW_FlipsOnlyTargetBlock` (preservation of comment
   alignment + blank line + other block), `TestSetBackendBW_RealRegistry_OnlyTargetChanges`
-  (golden: net-zero lines ⇒ every line outside the target block byte-identical against
-  the real registry.yaml), `TestSetBackendBW_Idempotent`, `TestSetBackendBW_Guards`
-  (unknown id / multi-var / file / empty item / empty field).
+  (golden: exactly one line dropped ⇒ every line outside the target block content-
+  identical against the real registry.yaml), `TestSetBackendBW_Idempotent`,
+  `TestSetBackendBW_Guards` (unknown id / multi-var / file / no declared bw: target).
 
 ## Closing
 
