@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-024-secrets-set-f1",
+    "behavior": "set is idempotent: stored value equals new value -> no writer call, exit 0 (unchanged)",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSet.*(Idempotent|Unchanged)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-set-f2",
+    "behavior": "set writes on change with one SetField; env value trailing-newline-trimmed, file value byte-exact",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSet.*(Update|Shape|Normaliz)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-set-f3",
+    "behavior": "multi-var secret needs [var]; missing arg errors listing vars; given arg writes the matching field",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSet.*Disambig' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-set-f4",
+    "behavior": "create-absent gated: ErrBWItemNotFound + --yes -> CreateItem; no --yes (non-interactive) errors; locked read error never creates",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSet.*Create' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-set-f5",
+    "behavior": "empty value refused (no write); --dry-run performs no write and exits 0",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSet.*(Empty|DryRun)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-set-f6",
+    "behavior": "bw.go sentinels + CreateItem RMW; secrets suite green; additive (registry.yaml untouched)",
+    "verification": "cd cli && go test ./internal/... -count=1 && go vet ./... && go build ./... && test -z \"$(gofmt -l internal)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

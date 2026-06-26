@@ -24,9 +24,10 @@ func newSecretsCmd() *cobra.Command {
 		Short: "On-demand secrets — inject into a child process, never the shell (ADR-028)",
 		Long: "secrets reads the registry (secrets/registry.yaml) and exposes the mapped\n" +
 			"secrets on demand. `run` injects them into one child process only (never the\n" +
-			"ambient shell); `show` prints one value; `render` materializes {env:VAR}\n" +
-			"placeholders in a config file; `verify` health-checks resolution without\n" +
-			"printing values; `ls` lists ids (ADR-028 §2).",
+			"ambient shell); `show` prints one value; `set` writes one value into Bitwarden\n" +
+			"(idempotent); `render` materializes {env:VAR} placeholders in a config file;\n" +
+			"`verify` health-checks resolution without printing values; `ls` lists ids\n" +
+			"(ADR-028 §2).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -35,6 +36,7 @@ func newSecretsCmd() *cobra.Command {
 	cmd.AddCommand(newSecretsRunCmd())
 	cmd.AddCommand(newSecretsLsCmd())
 	cmd.AddCommand(newSecretsShowCmd())
+	cmd.AddCommand(newSecretsSetCmd())
 	cmd.AddCommand(newSecretsRenderCmd())
 	cmd.AddCommand(newSecretsVerifyCmd())
 	return cmd

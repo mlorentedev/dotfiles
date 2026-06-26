@@ -4,10 +4,32 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 )
+
+// ErrBWItemNotFound marks a `bw get item` failure where Bitwarden reports the item
+// does not exist (its "Not found." message), as distinct from a locked or
+// unauthenticated vault (a different message, surfaced as-is). `dotf secrets set`
+// keys its create-absent path on this sentinel: ONLY a genuinely-missing item may
+// trigger a create, so a locked vault can never be mistaken for absent and spawn a
+// duplicate item. The discrimination is by CLI message (fragile by nature); `bw serve`
+// would expose a proper status code behind the same seam later.
+var ErrBWItemNotFound = errors.New("bw item not found")
+
+// ErrBWFieldNotFound marks an item that was fetched fine but does not carry the
+// requested field. For `dotf secrets set` this is a writable case (append the field),
+// distinct from a missing item (create) or a locked vault (fail) — the three branches
+// the write path must keep apart.
+var ErrBWFieldNotFound = errors.New("bw field not found on item")
+
+// isNotFound reports whether a bw CLI error message indicates a missing item (rather
+// than a locked/unauthenticated vault, which yields a different message).
+func isNotFound(msg string) bool {
+	return strings.Contains(strings.ToLower(msg), "not found")
+}
 
 // BWReader fetches a single field value from a Bitwarden item. The seam that keeps
 // the bw backend unit-testable with no Bitwarden vault and no unlock — tests inject
@@ -48,6 +70,9 @@ func (g BWGet) Field(item, field string) (string, error) {
 		if msg == "" {
 			msg = err.Error()
 		}
+		if isNotFound(msg) {
+			return "", fmt.Errorf("%w: bw get item %q: %s", ErrBWItemNotFound, item, msg)
+		}
 		return "", fmt.Errorf("bw get item %q: %s", item, msg)
 	}
 	return fieldFromItem(stdout.Bytes(), field)
@@ -80,7 +105,7 @@ func fieldFromItem(data []byte, field string) (string, error) {
 	switch field {
 	case "password", "username":
 		if it.Login == nil {
-			return "", fmt.Errorf("field %q requested but item has no login block", field)
+			return "", fmt.Errorf("%w: field %q requested but item has no login block", ErrBWFieldNotFound, field)
 		}
 		if field == "password" {
 			return it.Login.Password, nil
@@ -94,7 +119,7 @@ func fieldFromItem(data []byte, field string) (string, error) {
 			return f.Value, nil
 		}
 	}
-	return "", fmt.Errorf("field %q not found on item", field)
+	return "", fmt.Errorf("%w: field %q", ErrBWFieldNotFound, field)
 }
 
 // BWWriter writes a field value into a Bitwarden item. The write analog of BWReader:
@@ -175,6 +200,9 @@ type BWPut struct {
 func (p BWPut) SetField(item, field, value string) error {
 	cur, err := p.run(nil, "get", "item", item)
 	if err != nil {
+		if isNotFound(err.Error()) {
+			return fmt.Errorf("%w: %q (use `dotf secrets set` to create it)", ErrBWItemNotFound, item)
+		}
 		return fmt.Errorf("bw get item %q (it must already exist to edit): %w", item, err)
 	}
 	id, err := itemID(cur)
@@ -190,6 +218,45 @@ func (p BWPut) SetField(item, field, value string) error {
 		return fmt.Errorf("bw edit item %q: %w", item, err)
 	}
 	return nil
+}
+
+// BWCreator creates a brand-new Bitwarden item. It is split from BWWriter because
+// creating is the privileged, duplicate-risky path `dotf secrets set` gates behind an
+// explicit confirm / --yes; an update-only caller (e.g. migrate's re-verify) needs only
+// BWWriter and must not be able to create by accident.
+type BWCreator interface {
+	CreateItem(item, field, value string) error
+}
+
+// CreateItem creates a new login item named item carrying field=value. It applies the
+// same read-modify-write (setItemField) to a minimal login template, base64-encodes
+// it, and pipes it to `bw create item` — so a created item and an edited item place a
+// field identically. Live-verified (canary, #612 C8), not in CI, like BWPut.SetField.
+func (p BWPut) CreateItem(item, field, value string) error {
+	body, err := newItemBody(item, field, value)
+	if err != nil {
+		return err
+	}
+	enc := base64.StdEncoding.EncodeToString(body)
+	if _, err := p.run(strings.NewReader(enc), "create", "item"); err != nil {
+		return fmt.Errorf("bw create item %q: %w", item, err)
+	}
+	return nil
+}
+
+// newItemBody builds the JSON for a new login item named item carrying field=value, by
+// applying setItemField to a minimal login template. The pure, unit-tested core of
+// CreateItem (CreateItem itself is the live-tested shell-out).
+func newItemBody(item, field, value string) ([]byte, error) {
+	base, err := json.Marshal(map[string]any{
+		"type":  1, // login
+		"name":  item,
+		"login": map[string]any{},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return setItemField(base, field, value)
 }
 
 // run executes `bw <args...> --nointeraction` with optional stdin, returning stdout
