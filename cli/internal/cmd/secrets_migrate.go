@@ -26,8 +26,8 @@ func newSecretsMigrateCmd() *cobra.Command {
 			"fully working on age (safe rollback); the .secret.age file is KEPT (retire is\n" +
 			"separate). Idempotent: an already-bw secret is re-verified and left alone.\n" +
 			"--yes creates the absent Bitwarden item; --dry-run reports without writing.\n\n" +
-			"Out of scope (refused with a specific reason): file secrets, ci:* consumers\n" +
-			"(until `sync`), and a secret sharing its age source with another (use --split).",
+			"Out of scope (refused with a specific reason): file secrets and a secret\n" +
+			"sharing its age source with another (use --split).",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -117,11 +117,9 @@ func migrateGuard(reg *secrets.Registry, s *secrets.Secret) error {
 	if s.BW == nil || s.BW.Item == "" {
 		return fmt.Errorf("%q has no bw: target — declare it in the registry first", s.ID)
 	}
-	for _, c := range s.Consumers {
-		if strings.HasPrefix(c, "ci:") {
-			return fmt.Errorf("%q has a ci:* consumer (%s) — migrate only after `sync` (C5) makes `ls --pairs` backend-agnostic, else it drops from github-secrets-manager", s.ID, c)
-		}
-	}
+	// A ci:* consumer is no longer a barrier: `dotf secrets sync ci` resolves the value
+	// backend-agnostically, so a migrated (bw) secret still reaches Actions. The former
+	// guard (age-only `ls --pairs` would drop it) was retired with the shell upload path.
 	if s.Age != "" {
 		shared := 0
 		for i := range reg.Secrets {
