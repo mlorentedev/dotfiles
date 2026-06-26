@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-024-secrets-bw-writer-f1",
+    "behavior": "setItemField sets login/notes/custom-update/custom-append, preserving every other key and sibling field; bad JSON errors",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'SetItemField' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-writer-f2",
+    "behavior": "itemID extracts the id (errors when absent); a BWWriter mock round-trips through the interface",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'ItemID|BWWriter' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-writer-f3",
+    "behavior": "secrets suite green, vet + fmt clean, module builds (BWPut compiles)",
+    "verification": "cd cli && go test ./internal/secrets/ -count=1 && go vet ./... && go build ./... && test -z \"$(gofmt -l internal/secrets)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
