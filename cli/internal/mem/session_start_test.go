@@ -2,8 +2,8 @@ package mem
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -135,8 +135,10 @@ func TestVaultHealth(t *testing.T) {
 	})
 
 	t.Run("reports ALL CHECKS PASSED on a clean stub", func(t *testing.T) {
-		if _, err := exec.LookPath("bash"); err != nil {
-			t.Skip("bash required to run vault-health.sh stub")
+		// Gate on the interpreter vaultHealth actually uses (resolveBash), not a bare
+		// LookPath — on Windows that would find the System32 WSL launcher and not skip.
+		if !isExecutable(resolveBash()) {
+			t.Skip("a real bash is required to run the vault-health.sh stub")
 		}
 		sd := t.TempDir()
 		stub := filepath.Join(sd, "vault-health.sh")
@@ -147,6 +149,37 @@ func TestVaultHealth(t *testing.T) {
 		want := "\nVault health: ALL CHECKS PASSED"
 		if got := vaultHealth("/v", "v", sd); got != want {
 			t.Errorf("vaultHealth() = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestResolveBash(t *testing.T) {
+	t.Run("DOTF_BASH override wins", func(t *testing.T) {
+		want := filepath.Join(t.TempDir(), "my-bash")
+		t.Setenv("DOTF_BASH", want)
+		if got := resolveBash(); got != want {
+			t.Errorf("resolveBash() = %q, want the DOTF_BASH override %q", got, want)
+		}
+	})
+
+	if runtime.GOOS != "windows" {
+		t.Skip("the System32 WSL-launcher skip is Windows-specific")
+	}
+	t.Run("skips the System32 WSL launcher and picks a real bash", func(t *testing.T) {
+		t.Setenv("DOTF_BASH", "") // force PATH resolution
+		root := t.TempDir()
+		t.Setenv("SystemRoot", root)
+		sys32 := filepath.Join(root, "System32")
+		real := filepath.Join(root, "tools")
+		mustMkdirAll(t, sys32)
+		mustMkdirAll(t, real)
+		mustWrite(t, filepath.Join(sys32, "bash.exe"), "") // the WSL launcher decoy
+		realBash := filepath.Join(real, "bash.exe")
+		mustWrite(t, realBash, "") // a Git-Bash-style real interpreter
+		// System32 first on PATH — the bug picked it; resolveBash must skip it.
+		t.Setenv("PATH", sys32+string(os.PathListSeparator)+real)
+		if got := resolveBash(); got != realBash {
+			t.Errorf("resolveBash() = %q, want the non-System32 bash %q", got, realBash)
 		}
 	})
 }
