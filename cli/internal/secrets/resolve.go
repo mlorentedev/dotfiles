@@ -113,6 +113,33 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 	return env, nil
 }
 
+// Verify resolves one entry through its backend resolver as a read-only health check:
+// it confirms the secret produces a non-empty value, applying run's empty-value
+// rejection, but it never materializes a file secret and never returns the value
+// (no leak, no side effect). It returns nil when the secret resolves, ErrSecretAbsent
+// (wrapped) when it is genuinely not provisioned here, or the specific failure
+// otherwise — so `dotf secrets verify` can classify OK / MISSING / FAILED.
+func (l *Loader) Verify(e Entry) error {
+	r, ok := l.resolvers()[e.Backend]
+	if !ok {
+		return fmt.Errorf("unknown backend %q", e.Backend)
+	}
+	plaintext, err := r.Resolve(e)
+	if err != nil {
+		return err
+	}
+	if e.IsFile {
+		if len(plaintext) == 0 {
+			return fmt.Errorf("resolved to empty content")
+		}
+		return nil
+	}
+	if stripNewlines(string(plaintext)) == "" {
+		return fmt.Errorf("resolved to an empty value")
+	}
+	return nil
+}
+
 // ageResolver decrypts the age file backing an entry. The Decryptor seam keeps
 // resolution testable with no age binary; AgeDecrypt is the production default.
 type ageResolver struct {

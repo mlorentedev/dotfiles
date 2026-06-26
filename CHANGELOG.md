@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.23.0](https://github.com/mlorentedev/dotfiles/compare/v0.22.0...v0.23.0) (2026-06-26)
+
+
+### Features
+
+* **secrets:** add `dotf secrets verify` health check ([#616](https://github.com/mlorentedev/dotfiles/issues/616)) ([c706f87](https://github.com/mlorentedev/dotfiles/commit/c706f87df9b3956c1ebe829601a39c41f4105b30))
+
+
+### Bug Fixes
+
+* **secrets:** make resolution fail loud instead of silently empty ([#613](https://github.com/mlorentedev/dotfiles/issues/613)) ([411c7c0](https://github.com/mlorentedev/dotfiles/commit/411c7c09ed373dd99509b262ad5f89f1b6dcc52f))
+
 ## [0.22.0](https://github.com/mlorentedev/dotfiles/compare/v0.21.1...v0.22.0) (2026-06-26)
 
 
