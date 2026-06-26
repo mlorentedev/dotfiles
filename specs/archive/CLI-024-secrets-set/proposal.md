@@ -1,7 +1,7 @@
 ---
 id: "CLI-024-secrets-set"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-26"
 issue: "mlorentedev/dotfiles#612"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, secrets, cli, go, bitwarden]
@@ -103,3 +103,5 @@ item/field a registry secret maps to:
   `cli/internal/secrets/registry_write.go` (`SetBackendBW`, #617),
   `cli/internal/cmd/secrets.go` (`verify` command + the `bwReader` injection pattern).
 - ADR: `docs/adr/adr-028-secrets-two-tier-bitwarden-age.md`.
+
+<!-- archived 2026-06-26 — PR: https://github.com/mlorentedev/dotfiles/pull/621 -->
