@@ -3,6 +3,7 @@ package secrets
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -263,6 +264,45 @@ func (s *Secret) bwEntries(home string) []Entry {
 		es = append(es, Entry{Var: v.Name, Backend: "bw", Item: item, Field: field})
 	}
 	return es
+}
+
+// BWTarget resolves the Bitwarden (item, field, isFile) that an exposed var of this
+// secret writes to — the write-side counterpart of the bwEntries read flattening,
+// consumed by `dotf secrets set`. With varName == "" it resolves the secret's sole
+// target (an error if the secret is multi-var, forcing the caller to disambiguate). It
+// requires a bw source; an age-only secret has no item to write to yet (migrate first).
+func (s *Secret) BWTarget(varName string) (item, field string, isFile bool, err error) {
+	if s.BW == nil || s.BW.Item == "" {
+		return "", "", false, fmt.Errorf("secret %q has no bw source; `set` writes the Bitwarden backend (migrate it first)", s.ID)
+	}
+	item = s.BW.Item
+
+	if s.Expose.File != nil {
+		if varName != "" && varName != s.Expose.File.Var {
+			return "", "", false, fmt.Errorf("secret %q exposes file var %q, not %q", s.ID, s.Expose.File.Var, varName)
+		}
+		return item, s.BW.Field, true, nil
+	}
+
+	fieldOf := func(v EnvVar) string {
+		if v.Field != "" {
+			return v.Field
+		}
+		return s.BW.Field
+	}
+	vars := s.Expose.Env.Vars
+	if varName == "" {
+		if len(vars) != 1 {
+			return "", "", false, fmt.Errorf("secret %q exposes %d vars; name one: dotf secrets set %s <var> (vars: %s)", s.ID, len(vars), s.ID, strings.Join(s.Vars(), ", "))
+		}
+		return item, fieldOf(vars[0]), false, nil
+	}
+	for _, v := range vars {
+		if v.Name == varName {
+			return item, fieldOf(v), false, nil
+		}
+	}
+	return "", "", false, fmt.Errorf("secret %q has no var %q (vars: %s)", s.ID, varName, strings.Join(s.Vars(), ", "))
 }
 
 // Vars lists the env-var names a secret exposes (the file var for a file secret).
