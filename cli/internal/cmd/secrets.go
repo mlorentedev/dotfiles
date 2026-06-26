@@ -180,8 +180,10 @@ func newSecretsRunCmd() *cobra.Command {
 		Long: "run decrypts the mapped secrets (secrets/registry.yaml, over the age store)\n" +
 			"and launches <cmd> with them added to ITS environment — the parent shell is\n" +
 			"never touched. File secrets (@VAR=file>dest) are materialized to dest (0600)\n" +
-			"and VAR points at the path. --only scopes the injection to named vars. The\n" +
-			"child's exit code is propagated.\n\n" +
+			"and VAR points at the path. --only scopes the injection to named vars. Backend\n" +
+			"unlock credentials (e.g. BW_SESSION) are stripped from the child env, so <cmd>\n" +
+			"gets only the granted secrets, not the key to the whole vault. The child's exit\n" +
+			"code is propagated.\n\n" +
 			"Everything after -- is the command to run, e.g.:\n" +
 			"  dotf secrets run -- goreleaser release\n" +
 			"  dotf secrets run --only OPENAI_API_KEY -- python yt_metrics.py",
@@ -220,13 +222,40 @@ func newSecretsRunCmd() *cobra.Command {
 }
 
 // buildChildEnv flattens the registry to entries, resolves the selected secrets
-// (per-backend), and returns the parent environment with the KEY=VALUE pairs appended.
+// (per-backend), and returns the child environment: the parent env with the backend
+// unlock credentials stripped, plus the granted KEY=VALUE pairs. The child gets only
+// the secrets it was granted — never the master credential that opens the whole
+// vault (defense in depth; cf. 1Password's `op run` + `env -u OP_SERVICE_ACCOUNT_TOKEN`).
 func buildChildEnv(reg *secrets.Registry, only map[string]bool) ([]string, error) {
 	injected, err := secretLoader().EnvFor(reg.Entries(env.Home()), only)
 	if err != nil {
 		return nil, err
 	}
-	return append(os.Environ(), injected...), nil
+	return append(stripBackendAuth(os.Environ()), injected...), nil
+}
+
+// backendAuthVars are credentials that unlock a secret backend (the vault keys
+// themselves, not resolved secrets). dotf secrets run strips them from the child
+// environment so a launched tool cannot turn around and read the whole vault.
+var backendAuthVars = map[string]bool{
+	"BW_SESSION":               true, // Bitwarden unlock token (opens the whole vault)
+	"BW_PASSWORD":              true, // Bitwarden master password (API-key login)
+	"BW_CLIENTSECRET":          true, // Bitwarden API client secret
+	"OP_SERVICE_ACCOUNT_TOKEN": true, // 1Password service-account token
+}
+
+// stripBackendAuth returns environ without any backend-unlock credential (matched by
+// the KEY before '='). The input slice is not mutated.
+func stripBackendAuth(environ []string) []string {
+	out := make([]string, 0, len(environ))
+	for _, kv := range environ {
+		name, _, _ := strings.Cut(kv, "=")
+		if backendAuthVars[name] {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 // resolveOnly expands a comma-separated --only value into the set of env-var names
