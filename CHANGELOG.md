@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/mlorentedev/dotfiles/compare/v0.25.0...v0.26.0) (2026-06-26)
+
+
+### Features
+
+* **secrets:** reorganize registry — one entry per env var + bw: targets ([#624](https://github.com/mlorentedev/dotfiles/issues/624)) ([c2ddf95](https://github.com/mlorentedev/dotfiles/commit/c2ddf95091ecc7ff57e2cac717ed4275cd010e52))
+
 ## [0.25.0](https://github.com/mlorentedev/dotfiles/compare/v0.24.0...v0.25.0) (2026-06-26)
 
 
