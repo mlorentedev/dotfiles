@@ -138,17 +138,21 @@ func newSecretsShowCmd() *cobra.Command {
 // {env:VAR} placeholder whose VAR is a registry-exposed env secret with that
 // secret's decrypted value (ADR-028 / SDD-009). It is the Go replacement for the
 // substitute_env_placeholders / Substitute-EnvPlaceholders shell twins, wired
-// into setup for opencode.jsonc and pi's models.json. Unmapped/undecryptable
-// placeholders are left intact for the runtime resolver (never fatal).
+// into setup for opencode.jsonc and pi's models.json. Unmapped placeholders and
+// genuinely-absent secrets are left intact for the runtime resolver; a real
+// resolution failure is surfaced with its specific cause (and fatal under --strict).
 func newSecretsRenderCmd() *cobra.Command {
-	return &cobra.Command{
+	var strict bool
+	c := &cobra.Command{
 		Use:   "render <file>",
 		Short: "Substitute {env:VAR} placeholders in <file> with decrypted secret values (in place)",
 		Long: "render rewrites <file> in place, replacing each {env:VAR} placeholder whose\n" +
-			"VAR is a registry-mapped env secret (secrets/registry.yaml, over the age\n" +
-			"store) with the decrypted value. Placeholders with no registry mapping, or\n" +
-			"whose secret cannot be decrypted, are left intact for the runtime resolver —\n" +
-			"setup must complete even when some secrets are absent. Atomic write, 0600.",
+			"VAR is a registry-mapped env secret (secrets/registry.yaml) with the resolved\n" +
+			"value. Placeholders with no registry mapping, or whose secret is genuinely\n" +
+			"absent on this machine, are left intact for the runtime resolver — setup\n" +
+			"completes. A real failure (wrong age key, locked vault, empty value, bw\n" +
+			"item/field typo) is reported with its specific cause and leaves the placeholder\n" +
+			"intact; --strict turns any such failure into a non-zero exit. Atomic write, 0600.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -164,12 +168,20 @@ func newSecretsRenderCmd() *cobra.Command {
 			if len(res.Unmapped) > 0 {
 				_, _ = fmt.Fprintf(errOut, "render: unmapped placeholders left for runtime resolution: %s\n", strings.Join(res.Unmapped, " "))
 			}
-			if len(res.Unresolved) > 0 {
-				_, _ = fmt.Fprintf(errOut, "warning: render: mapped but undecryptable, left intact (check age key/secret files): %s\n", strings.Join(res.Unresolved, " "))
+			if len(res.Missing) > 0 {
+				_, _ = fmt.Fprintf(errOut, "render: secrets not provisioned here, left intact: %s\n", strings.Join(res.Missing, " "))
+			}
+			for _, u := range res.Unresolved {
+				_, _ = fmt.Fprintf(errOut, "warning: render: %s could not be resolved: %v\n", u.Var, u.Err)
+			}
+			if strict && len(res.Unresolved) > 0 {
+				return fmt.Errorf("render: %d placeholder(s) failed to resolve (--strict)", len(res.Unresolved))
 			}
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&strict, "strict", false, "exit non-zero if any mapped secret fails to resolve (absent secrets still tolerated)")
+	return c
 }
 
 func newSecretsRunCmd() *cobra.Command {
@@ -277,6 +289,11 @@ func resolveOnly(reg *secrets.Registry, s string) (map[string]bool, error) {
 		for _, v := range vars {
 			set[v] = true
 		}
+	}
+	// An explicit --only that resolves to nothing (e.g. "," or "  ,  ") must never
+	// silently inject zero secrets — that runs the child unauthenticated (#612 A3).
+	if len(set) == 0 {
+		return nil, fmt.Errorf("--only %q selected no secrets", s)
 	}
 	return set, nil
 }

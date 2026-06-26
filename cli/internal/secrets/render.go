@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,13 +14,24 @@ import (
 // identifier. Same grammar the shell twin (substitute_env_placeholders) used.
 var envToken = regexp.MustCompile(`\{env:([A-Z_][A-Z0-9_]*)\}`)
 
-// Result reports what Render did, so the caller can surface the shell twin's
-// operator diagnostics: which placeholders were substituted, left for the
-// runtime resolver (Unmapped), or mapped-but-undecryptable (Unresolved).
+// Result reports what Render did, so the caller can surface precise operator
+// diagnostics and decide whether to fail. A mapped placeholder that didn't resolve
+// is split two ways (#612 A2): Missing (the secret is genuinely absent on this
+// machine — expected during partial setup, quiet/info) vs Unresolved (a real
+// failure — wrong key, locked vault, empty value, bw item/field typo — surfaced
+// loudly with the specific error, and fatal under --strict).
 type Result struct {
 	Substituted int
-	Unmapped    []string // {env:VAR} with no registry entry — left intact (info)
-	Unresolved  []string // mapped but decrypt failed/empty — left intact (warning)
+	Unmapped    []string        // {env:VAR} with no registry entry — left intact (info)
+	Missing     []string        // mapped but the secret is absent (age file missing) — left intact (info)
+	Unresolved  []UnresolvedVar // mapped but a real failure — left intact, surfaced with its error
+}
+
+// UnresolvedVar pairs a placeholder var with the specific error that blocked it, so
+// render no longer collapses every distinct failure into one opaque bucket.
+type UnresolvedVar struct {
+	Var string
+	Err error
 }
 
 // Render rewrites the config at path in place, substituting every {env:VAR}
@@ -64,9 +76,15 @@ func Render(path string, reg *Registry, loader *Loader, home string) (Result, er
 			res.Unmapped = append(res.Unmapped, name)
 			continue
 		}
-		value, ok := resolve(loader, entry)
-		if !ok {
-			res.Unresolved = append(res.Unresolved, name)
+		value, err := resolve(loader, entry)
+		if err != nil {
+			// Absent (secret not provisioned here) stays quiet/non-fatal; any other
+			// error is a real failure surfaced with its specific cause (#612 A2).
+			if errors.Is(err, ErrSecretAbsent) {
+				res.Missing = append(res.Missing, name)
+			} else {
+				res.Unresolved = append(res.Unresolved, UnresolvedVar{Var: name, Err: err})
+			}
 			continue
 		}
 		out = strings.ReplaceAll(out, "{env:"+name+"}", value)
@@ -116,19 +134,21 @@ func envSourceMap(reg *Registry, home string) (map[string]Entry, error) {
 	return bySource, nil
 }
 
-// resolve decrypts a single env entry by reusing EnvFor (the one decrypt+strip
-// path shared with run/show). EnvFor fails fast; here a failure is non-fatal —
-// it maps to "unresolved, leave the placeholder intact" (twin parity).
-func resolve(loader *Loader, e Entry) (string, bool) {
+// resolve decrypts a single env entry by reusing EnvFor (the one resolve+strip path
+// shared with run/show). It returns the underlying error verbatim (no longer
+// swallowed) so Render can classify absent vs misconfigured and surface the specific
+// cause. EnvFor already rejects an empty value, so an empty secret arrives here as a
+// real error, not a silent "".
+func resolve(loader *Loader, e Entry) (string, error) {
 	kv, err := loader.EnvFor([]Entry{e}, nil)
-	if err != nil || len(kv) == 0 {
-		return "", false
+	if err != nil {
+		return "", err
+	}
+	if len(kv) == 0 {
+		return "", fmt.Errorf("no value produced for %q", e.Var)
 	}
 	_, value, _ := strings.Cut(kv[0], "=")
-	if value == "" {
-		return "", false
-	}
-	return value, true
+	return value, nil
 }
 
 // atomicWrite stages content to a temp file in the target's directory, sets 0600,

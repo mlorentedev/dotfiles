@@ -1,12 +1,20 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// ErrSecretAbsent marks a secret that is genuinely not provisioned on this machine
+// (its age file does not exist), as opposed to a real failure (wrong key, locked
+// vault, decrypt error). render treats absent as a quiet, non-fatal case; everything
+// else is surfaced loudly (#612 A2).
+var ErrSecretAbsent = errors.New("secret not provisioned")
 
 // Decryptor decrypts the age file at ageFile using the identity at keyPath,
 // returning the plaintext. The seam that keeps EnvFor unit-testable with no age
@@ -15,8 +23,13 @@ type Decryptor func(ageFile, keyPath string) ([]byte, error)
 
 // AgeDecrypt shells out to `age --decrypt --identity <key> <file>` — the same
 // tool and key load-secrets.sh uses (Phase 0 provisions age). Plaintext is
-// returned in memory; it is never written to disk for env secrets.
+// returned in memory; it is never written to disk for env secrets. A missing age
+// file is reported as ErrSecretAbsent (not provisioned here) so render can keep it
+// quiet; a present-but-undecryptable file surfaces age's error.
 func AgeDecrypt(ageFile, keyPath string) ([]byte, error) {
+	if _, err := os.Stat(ageFile); errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%w: %s", ErrSecretAbsent, filepath.Base(ageFile))
+	}
 	out, err := exec.Command("age", "--decrypt", "--identity", keyPath, ageFile).Output()
 	if err != nil {
 		return nil, fmt.Errorf("age decrypt %s: %w", filepath.Base(ageFile), err)
@@ -80,13 +93,22 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 		}
 
 		if e.IsFile {
+			if len(plaintext) == 0 {
+				return nil, fmt.Errorf("secret %q resolved to empty content (backend %q) — refusing to materialize", e.Var, e.Backend)
+			}
 			if err := materialize(e.Dest, plaintext); err != nil {
 				return nil, err
 			}
 			env = append(env, e.Var+"="+e.Dest)
 			continue
 		}
-		env = append(env, e.Var+"="+stripNewlines(string(plaintext)))
+		value := stripNewlines(string(plaintext))
+		if value == "" {
+			// A blank secret would launch the child unauthenticated with no signal —
+			// the silent-empty incident class. Fail loud instead (#612 A1).
+			return nil, fmt.Errorf("secret %q resolved to an empty value (backend %q) — refusing to inject", e.Var, e.Backend)
+		}
+		env = append(env, e.Var+"="+value)
 	}
 	return env, nil
 }

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-024-secrets-fail-loud-f1",
+    "behavior": "run/show fail fast on an empty resolved value; field:password on a non-login bw item errors",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -run 'EmptyValue|BwEmptyValue|NonLogin' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-fail-loud-f2",
+    "behavior": "render surfaces the specific error per misconfigured var; absent stays quiet/non-fatal; --strict exits non-zero on a real failure",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -run 'Render_Absent|Render_Unresolved|Render_Empty|Render_Strict' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-fail-loud-f3",
+    "behavior": "an explicit --only resolving to zero secrets is an error",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'ResolveOnly_EmptyTokens' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-fail-loud-f4",
+    "behavior": "secrets + cmd suites green, vet + fmt clean",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -count=1 && go vet ./... && test -z \"$(gofmt -l internal/secrets internal/cmd)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

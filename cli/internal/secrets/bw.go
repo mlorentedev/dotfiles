@@ -54,7 +54,7 @@ func (g BWGet) Field(item, field string) (string, error) {
 
 // bwItem is the subset of `bw get item` JSON that BWGet reads.
 type bwItem struct {
-	Login struct {
+	Login *struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	} `json:"login"`
@@ -67,17 +67,23 @@ type bwItem struct {
 
 // fieldFromItem extracts field from a `bw get item` JSON payload. The typed login
 // fields and the note are first-class names; any other name is matched against the
-// item's custom fields[] — an unknown name is an error (catches a registry typo),
-// while an empty typed field is returned as-is (parity with an empty age secret).
+// item's custom fields[] — an unknown name is an error (catches a registry typo).
+// Requesting a login field on an item with no login block (e.g. field: password on
+// a secure note) is an error too, not a silent empty value (#612 A1). An empty but
+// present value is left to EnvFor's empty-value guard.
 func fieldFromItem(data []byte, field string) (string, error) {
 	var it bwItem
 	if err := json.Unmarshal(data, &it); err != nil {
 		return "", fmt.Errorf("parse bw item JSON: %w", err)
 	}
 	switch field {
-	case "password":
-		return it.Login.Password, nil
-	case "username":
+	case "password", "username":
+		if it.Login == nil {
+			return "", fmt.Errorf("field %q requested but item has no login block", field)
+		}
+		if field == "password" {
+			return it.Login.Password, nil
+		}
 		return it.Login.Username, nil
 	case "notes":
 		return it.Notes, nil

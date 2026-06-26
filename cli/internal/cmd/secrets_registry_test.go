@@ -233,6 +233,58 @@ func TestSecretsRender_SubstitutesInPlace(t *testing.T) {
 	}
 }
 
+func TestSecretsShow_EmptyValue_Errors(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-empty, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: E_KEY}}\n")
+	useBwReader(t, fakeBW{"it/password": ""})
+	cmd := newSecretsShowCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"bw-empty"})
+	if err := cmd.Execute(); err == nil {
+		t.Error("show must error when the secret resolves to an empty value")
+	}
+}
+
+// render default stays non-fatal on one failing secret (placeholder left, exit 0);
+// --strict turns the same real failure into a non-zero exit (#612 A2).
+func TestSecretsRender_Strict_NonZeroOnFailure(t *testing.T) {
+	old := ageDecryptor
+	ageDecryptor = func(_, _ string) ([]byte, error) { return nil, fmt.Errorf("age: vault locked") }
+	t.Cleanup(func() { ageDecryptor = old })
+
+	render := func(args ...string) error {
+		useTempRegistry(t, testRegistry)
+		cfg := filepath.Join(t.TempDir(), "c.jsonc")
+		if err := os.WriteFile(cfg, []byte(`{"k":"{env:NAN_API_KEY}"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		c := newSecretsRenderCmd()
+		c.SetOut(io.Discard)
+		c.SetErr(io.Discard)
+		c.SetArgs(append(args, cfg))
+		return c.Execute()
+	}
+	if err := render(); err != nil {
+		t.Fatalf("render default must not fail on one unresolved secret: %v", err)
+	}
+	if err := render("--strict"); err == nil {
+		t.Error("render --strict must exit non-zero when a mapped secret fails to resolve")
+	}
+}
+
+func TestResolveOnly_EmptyTokens_Errors(t *testing.T) {
+	reg, err := secrets.ParseRegistry([]byte(testRegistry))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveOnly(reg, ","); err == nil {
+		t.Error("--only with only-empty tokens must error (it selects nothing)")
+	}
+	if _, err := resolveOnly(reg, "  ,  "); err == nil {
+		t.Error("--only with whitespace-only tokens must error")
+	}
+}
+
 func TestResolveOnly_IdSelectsAllVars_NameSelectsOne(t *testing.T) {
 	reg, err := secrets.ParseRegistry([]byte(testRegistry))
 	if err != nil {
