@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,6 +11,25 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
+
+// fakeBW is a map-backed secrets.BWReader ("item/field" → value) so command tests
+// resolve bw secrets with no unlocked Bitwarden.
+type fakeBW map[string]string
+
+func (f fakeBW) Field(item, field string) (string, error) {
+	if v, ok := f[item+"/"+field]; ok {
+		return v, nil
+	}
+	return "", fmt.Errorf("fake bw: no %s/%s", item, field)
+}
+
+// useBwReader points the bwReader seam at a fake for the duration of a test.
+func useBwReader(t *testing.T, r secrets.BWReader) {
+	t.Helper()
+	old := bwReader
+	bwReader = r
+	t.Cleanup(func() { bwReader = old })
+}
 
 const testRegistry = `
 version: 1
@@ -99,14 +119,48 @@ func TestSecretsShow_RejectsFileAndMultiAndUnknown(t *testing.T) {
 	}
 }
 
-func TestSecretsShow_RejectsBwBackend(t *testing.T) {
-	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-one, plane: app, backend: bw, expose: {env: B_KEY}}\n")
+func TestSecretsShow_ResolvesBwBackend(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-one, plane: app, backend: bw, bw: {item: bw-item, field: password}, expose: {env: B_KEY}}\n")
+	useBwReader(t, fakeBW{"bw-item/password": "bw-secret"})
+	var out bytes.Buffer
 	cmd := newSecretsShowCmd()
-	cmd.SetOut(io.Discard)
+	cmd.SetOut(&out)
 	cmd.SetErr(io.Discard)
 	cmd.SetArgs([]string{"bw-one"})
-	if err := cmd.Execute(); err == nil {
-		t.Error("show on a bw-backed secret must error (bw not supported until Phase 3)")
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("show bw-one: %v", err)
+	}
+	if out.String() != "bw-secret" {
+		t.Errorf("show bw = %q, want %q (resolved from Bitwarden, no trailing newline)", out.String(), "bw-secret")
+	}
+}
+
+// TestSecretsRun_ResolvesBwBackend exercises run's wiring: registry → secretLoader →
+// EnvFor → bwResolver → the bw reader. --only selects the bw secret by id.
+func TestSecretsRun_ResolvesBwBackend(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-foo, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: FOO}}\n")
+	useBwReader(t, fakeBW{"it/password": "bw-secret-value"})
+
+	reg, err := loadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel, err := resolveOnly(reg, "bw-foo") // --only by id → the secret's vars
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := buildChildEnv(reg, sel)
+	if err != nil {
+		t.Fatalf("buildChildEnv: %v", err)
+	}
+	found := false
+	for _, kv := range env {
+		if kv == "FOO=bw-secret-value" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("run did not inject the bw secret FOO=bw-secret-value into the child env")
 	}
 }
 

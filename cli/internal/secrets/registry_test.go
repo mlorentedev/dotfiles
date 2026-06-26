@@ -122,17 +122,81 @@ func TestRegistry_Lookup_IdThenVar(t *testing.T) {
 	}
 }
 
-func TestRegistry_Entries_SkipsBwBackend(t *testing.T) {
+func TestRegistry_Entries_IncludesBwBackend(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
 		"  - {id: age-one, plane: app, backend: age, age: a.key, expose: {env: A_KEY}}\n" +
-		"  - {id: bw-one, plane: app, backend: bw, expose: {env: B_KEY}}\n"
+		"  - {id: bw-one, plane: app, backend: bw, bw: {item: bw-item, field: password}, expose: {env: B_KEY}}\n"
 	reg, err := ParseRegistry([]byte(yml))
 	if err != nil {
 		t.Fatalf("ParseRegistry: %v", err)
 	}
-	es := reg.Entries("/h")
-	if len(es) != 1 || es[0].Var != "A_KEY" {
-		t.Errorf("Entries = %+v, want only A_KEY (bw not age-readable yet)", es)
+	got := entriesByVar(reg.Entries("/h"))
+	if len(got) != 2 {
+		t.Fatalf("Entries = %+v, want both age + bw entries", got)
+	}
+	if a := got["A_KEY"]; a.Backend != "age" || a.File != "a.key" {
+		t.Errorf("A_KEY = %+v, want backend=age file=a.key", a)
+	}
+	if b := got["B_KEY"]; b.Backend != "bw" || b.Item != "bw-item" || b.Field != "password" {
+		t.Errorf("B_KEY = %+v, want backend=bw item=bw-item field=password", b)
+	}
+}
+
+func TestParseRegistry_BwShapes(t *testing.T) {
+	const yml = `
+version: 1
+secrets:
+  - id: single
+    plane: app
+    backend: bw
+    bw: { item: single-item, field: password }
+    expose: { env: SINGLE }
+  - id: multi
+    plane: app
+    backend: bw
+    bw: { item: multi-item }
+    expose:
+      env:
+        A_KEY: { field: a-field }
+        B_KEY: { field: b-field }
+  - id: bwfile
+    plane: infra
+    backend: bw
+    bw: { item: kube-item, field: notes }
+    expose: { file: { var: KUBECONFIG, path: "~/.kube/c", mode: "0600" } }
+`
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	got := entriesByVar(reg.Entries("/home/u"))
+	if e := got["SINGLE"]; e.Backend != "bw" || e.Item != "single-item" || e.Field != "password" {
+		t.Errorf("SINGLE = %+v (single var inherits top-level field)", e)
+	}
+	if e := got["A_KEY"]; e.Item != "multi-item" || e.Field != "a-field" {
+		t.Errorf("A_KEY = %+v (shared item, per-var field)", e)
+	}
+	if e := got["B_KEY"]; e.Item != "multi-item" || e.Field != "b-field" {
+		t.Errorf("B_KEY = %+v", e)
+	}
+	if e := got["KUBECONFIG"]; !e.IsFile || e.Item != "kube-item" || e.Field != "notes" || e.Dest != "/home/u/.kube/c" {
+		t.Errorf("KUBECONFIG = %+v (bw file secret, ~-expanded dest)", e)
+	}
+}
+
+func TestParseRegistry_BwValidation(t *testing.T) {
+	cases := map[string]string{
+		"bw missing bw block":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: bw, expose: {env: A}}\n",
+		"bw missing item":       "version: 1\nsecrets:\n  - {id: a, plane: app, backend: bw, bw: {field: password}, expose: {env: A}}\n",
+		"bw env missing field":  "version: 1\nsecrets:\n  - {id: a, plane: app, backend: bw, bw: {item: it}, expose: {env: A}}\n",
+		"bw file missing field": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: bw, bw: {item: it}, expose: {file: {var: V, path: /p}}}\n",
+	}
+	for name, yml := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseRegistry([]byte(yml)); err == nil {
+				t.Errorf("expected error for %q, got nil", name)
+			}
+		})
 	}
 }
 

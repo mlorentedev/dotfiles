@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-024-secrets-bw-backend-f1",
+    "behavior": "Registry parses + validates bw {item, field} and per-var field; a bw secret with no item/field source is rejected fail-fast",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestParseRegistry|TestRegistry' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-backend-f2",
+    "behavior": "Entries() emits bw entries tagged Backend/Item/Field (no longer skipped) and EnvFor resolves them via the injected BWReader",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestEnvFor|TestRegistry_Entries' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-backend-f3",
+    "behavior": "dotf secrets show <bw-id> and run --only <bw-id> resolve from Bitwarden via the bw resolver; showSource no longer rejects bw",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'Secrets' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-backend-f4",
+    "behavior": "A locked/unreachable Bitwarden yields a clear, actionable error (no hang, no plaintext to disk)",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestEnvFor_BwError|TestBwResolver' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-backend-f5",
+    "behavior": "Full suite + vet + fmt clean; registry.yaml unchanged (no secret flipped)",
+    "verification": "cd cli && go test ./... -count=1 && go vet ./... && test -z \"$(gofmt -l internal/secrets internal/cmd)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
