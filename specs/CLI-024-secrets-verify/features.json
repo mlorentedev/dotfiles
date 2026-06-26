@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-024-secrets-verify-f1",
+    "behavior": "Loader.Verify resolves without materializing/leaking; nil on ok, ErrSecretAbsent on absent, error otherwise",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'Loader_Verify' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-verify-f2",
+    "behavior": "dotf secrets verify reports OK/MISSING/FAILED per var, prints no values, exits non-zero on any FAILED",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsVerify_ReportsStatuses' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-verify-f3",
+    "behavior": "verify <id> scopes to the selected secret(s); unknown id errors",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsVerify_ScopesById|SecretsVerify_UnknownId' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-verify-f4",
+    "behavior": "secrets + cmd suites green, vet + fmt clean",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -count=1 && go vet ./... && test -z \"$(gofmt -l internal/secrets internal/cmd)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

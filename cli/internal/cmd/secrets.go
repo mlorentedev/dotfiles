@@ -25,7 +25,8 @@ func newSecretsCmd() *cobra.Command {
 		Long: "secrets reads the registry (secrets/registry.yaml) and exposes the mapped\n" +
 			"secrets on demand. `run` injects them into one child process only (never the\n" +
 			"ambient shell); `show` prints one value; `render` materializes {env:VAR}\n" +
-			"placeholders in a config file; `ls` lists ids (ADR-028 §2).",
+			"placeholders in a config file; `verify` health-checks resolution without\n" +
+			"printing values; `ls` lists ids (ADR-028 §2).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -35,6 +36,7 @@ func newSecretsCmd() *cobra.Command {
 	cmd.AddCommand(newSecretsLsCmd())
 	cmd.AddCommand(newSecretsShowCmd())
 	cmd.AddCommand(newSecretsRenderCmd())
+	cmd.AddCommand(newSecretsVerifyCmd())
 	return cmd
 }
 
@@ -57,6 +59,70 @@ func secretLoader() *secrets.Loader {
 		Decrypt:    ageDecryptor,
 		BW:         bwReader,
 	}
+}
+
+// backendOf is the display label for an entry's backend ("age" when unset).
+func backendOf(e secrets.Entry) string {
+	if e.Backend == "" {
+		return "age"
+	}
+	return e.Backend
+}
+
+// newSecretsVerifyCmd resolves each selected registry secret and reports OK / MISSING
+// / FAILED per var — never the value (a read-only health check). No args verifies all
+// entries; ids/var-names scope it via the --only selector. Exit is non-zero when any
+// secret FAILED; --require-all also fails on a MISSING secret.
+func newSecretsVerifyCmd() *cobra.Command {
+	var requireAll bool
+	c := &cobra.Command{
+		Use:   "verify [id...]",
+		Short: "Resolve each registry secret and report OK/MISSING/FAILED (no values printed)",
+		Long: "verify resolves each registry secret through its backend and reports a per-var\n" +
+			"status without printing the value or materializing any file:\n" +
+			"  OK       resolved to a non-empty value\n" +
+			"  MISSING  not provisioned on this machine (age file absent) — tolerated\n" +
+			"  FAILED   a real failure (wrong key, locked Bitwarden, empty value, typo)\n" +
+			"No args verifies all; ids/var-names scope it. Exit is non-zero on any FAILED\n" +
+			"(--require-all also fails on MISSING).",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			reg, err := loadRegistry()
+			if err != nil {
+				return err
+			}
+			only, err := resolveOnly(reg, strings.Join(args, ","))
+			if err != nil {
+				return err
+			}
+			loader := secretLoader()
+			w := cmd.OutOrStdout()
+			var ok, missing, failed int
+			for _, e := range reg.Entries(env.Home()) {
+				if only != nil && !only[e.Var] {
+					continue
+				}
+				switch err := loader.Verify(e); {
+				case err == nil:
+					ok++
+					_, _ = fmt.Fprintf(w, "OK       %-30s %s\n", e.Var, backendOf(e))
+				case errors.Is(err, secrets.ErrSecretAbsent):
+					missing++
+					_, _ = fmt.Fprintf(w, "MISSING  %-30s %s\n", e.Var, backendOf(e))
+				default:
+					failed++
+					_, _ = fmt.Fprintf(w, "FAILED   %-30s %s: %v\n", e.Var, backendOf(e), err)
+				}
+			}
+			_, _ = fmt.Fprintf(w, "\n%d ok, %d missing, %d failed\n", ok, missing, failed)
+			if failed > 0 || (requireAll && missing > 0) {
+				return fmt.Errorf("verify: %d failed, %d missing", failed, missing)
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&requireAll, "require-all", false, "also fail when a secret is MISSING (not provisioned here)")
+	return c
 }
 
 func loadRegistry() (*secrets.Registry, error) {
