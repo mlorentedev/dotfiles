@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.24.0](https://github.com/mlorentedev/dotfiles/compare/v0.23.0...v0.24.0) (2026-06-26)
+
+
+### Features
+
+* **ci:** lint bats [@test](https://github.com/test) names to stop silent-skipped tests ([#619](https://github.com/mlorentedev/dotfiles/issues/619)) ([614f4ec](https://github.com/mlorentedev/dotfiles/commit/614f4ec99b207b3ef9dd744f892099c4e681e05b))
+* **secrets:** add BWWriter (bw write seam, read-modify-write) ([#620](https://github.com/mlorentedev/dotfiles/issues/620)) ([f936649](https://github.com/mlorentedev/dotfiles/commit/f9366496b04ba868c8b122224fab07a51a47c97e))
+* **secrets:** add SetBackendBW registry mutation primitive ([#617](https://github.com/mlorentedev/dotfiles/issues/617)) ([c6f659f](https://github.com/mlorentedev/dotfiles/commit/c6f659f77f461c603ab734a21bfa2a2ae17bb5f7))
+
 ## [0.23.0](https://github.com/mlorentedev/dotfiles/compare/v0.22.0...v0.23.0) (2026-06-26)
 
 
