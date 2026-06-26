@@ -118,3 +118,28 @@ func TestFieldFromItem(t *testing.T) {
 		t.Error("invalid JSON must error")
 	}
 }
+
+// A typed login field requested against an item with no login block (e.g. a secure
+// note) must error, not return a silent empty value (#612 A1).
+func TestFieldFromItem_NonLoginItem_Errors(t *testing.T) {
+	const noteJSON = `{"notes":"some note","fields":[{"name":"api-key","value":"ak-1"}]}`
+	if _, err := fieldFromItem([]byte(noteJSON), "password"); err == nil {
+		t.Error("field: password against a non-login item must error")
+	}
+	if v, err := fieldFromItem([]byte(noteJSON), "notes"); err != nil || v != "some note" {
+		t.Errorf("notes = %q (err %v)", v, err)
+	}
+	if v, err := fieldFromItem([]byte(noteJSON), "api-key"); err != nil || v != "ak-1" {
+		t.Errorf("custom field = %q (err %v)", v, err)
+	}
+}
+
+// A bw field that resolves to an empty value must fail fast in EnvFor — never inject
+// VAR= into the child (#612 A1).
+func TestEnvFor_BwEmptyValue_FailsFast(t *testing.T) {
+	l := &Loader{BW: fakeBW{"it/password": ""}}
+	_, err := l.EnvFor([]Entry{{Var: "X", Backend: "bw", Item: "it", Field: "password"}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "empty value") {
+		t.Fatalf("empty bw value must fail fast, got err=%v", err)
+	}
+}

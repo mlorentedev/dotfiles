@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -111,25 +112,77 @@ func TestRender_NoPlaceholders_NoOp(t *testing.T) {
 	}
 }
 
-// Parity with the shell twin: a mapped var whose secret cannot be decrypted is
-// left intact and reported as unresolved — render must NOT fail-fast (setup must
-// still complete; the placeholder falls through to the runtime resolver).
-func TestRender_UnresolvedDecryptError_LeftIntact(t *testing.T) {
+// A mapped var whose secret hits a real decrypt error is left intact (render is
+// non-fatal by default) but reported as Unresolved WITH its specific error (no
+// longer swallowed) — the placeholder falls through to the runtime resolver.
+func TestRender_UnresolvedDecryptError_LeftIntactWithError(t *testing.T) {
 	reg := parseRenderReg(t, renderRegistry)
 	path := renderFixture(t, `x={env:NAN_API_KEY}`)
 	l := loaderFor(t)
-	l.Decrypt = func(string, string) ([]byte, error) { return nil, os.ErrNotExist }
+	l.Decrypt = func(string, string) ([]byte, error) { return nil, fmt.Errorf("age: no identity matched") }
 
 	res, err := Render(path, reg, l, "/h")
 	if err != nil {
-		t.Fatalf("Render must not fail on an undecryptable secret: %v", err)
+		t.Fatalf("Render must not fail on a single undecryptable secret: %v", err)
 	}
 	got, _ := os.ReadFile(path)
 	if string(got) != `x={env:NAN_API_KEY}` {
 		t.Errorf("undecryptable placeholder should be left intact, got %q", got)
 	}
-	if len(res.Unresolved) != 1 || res.Unresolved[0] != "NAN_API_KEY" {
-		t.Errorf("Unresolved = %v, want [NAN_API_KEY]", res.Unresolved)
+	if len(res.Unresolved) != 1 || res.Unresolved[0].Var != "NAN_API_KEY" {
+		t.Fatalf("Unresolved = %v, want one entry for NAN_API_KEY", res.Unresolved)
+	}
+	if res.Unresolved[0].Err == nil || !strings.Contains(res.Unresolved[0].Err.Error(), "no identity matched") {
+		t.Errorf("Unresolved error not surfaced: %v", res.Unresolved[0].Err)
+	}
+	if len(res.Missing) != 0 {
+		t.Errorf("a decrypt error is not 'absent'; Missing = %v", res.Missing)
+	}
+}
+
+// A genuinely-absent secret (ErrSecretAbsent) is the quiet, non-fatal case: left
+// intact, classified Missing (not Unresolved), no error.
+func TestRender_AbsentSecret_QuietMissing(t *testing.T) {
+	reg := parseRenderReg(t, renderRegistry)
+	path := renderFixture(t, `x={env:NAN_API_KEY}`)
+	l := loaderFor(t)
+	l.Decrypt = func(string, string) ([]byte, error) { return nil, fmt.Errorf("%w: nan.api-key", ErrSecretAbsent) }
+
+	res, err := Render(path, reg, l, "/h")
+	if err != nil {
+		t.Fatalf("Render must not fail on an absent secret: %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != `x={env:NAN_API_KEY}` {
+		t.Errorf("absent placeholder should be left intact, got %q", got)
+	}
+	if len(res.Missing) != 1 || res.Missing[0] != "NAN_API_KEY" {
+		t.Errorf("Missing = %v, want [NAN_API_KEY]", res.Missing)
+	}
+	if len(res.Unresolved) != 0 {
+		t.Errorf("absent must not be Unresolved; Unresolved = %v", res.Unresolved)
+	}
+}
+
+// An empty resolved value is a real failure now (EnvFor rejects it) → Unresolved,
+// not a silent substitution of "".
+func TestRender_EmptyValue_Unresolved(t *testing.T) {
+	reg := parseRenderReg(t, renderRegistry)
+	path := renderFixture(t, `x={env:NAN_API_KEY}`)
+	l := loaderFor(t)
+	l.Decrypt = func(string, string) ([]byte, error) { return []byte("\n"), nil } // strips to ""
+
+	res, err := Render(path, reg, l, "/h")
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != `x={env:NAN_API_KEY}` {
+		t.Errorf("empty-valued placeholder should be left intact, got %q", got)
+	}
+	if len(res.Unresolved) != 1 || res.Unresolved[0].Var != "NAN_API_KEY" {
+		t.Fatalf("Unresolved = %v, want NAN_API_KEY (empty value)", res.Unresolved)
+	}
+	if !strings.Contains(res.Unresolved[0].Err.Error(), "empty value") {
+		t.Errorf("expected an empty-value error, got %v", res.Unresolved[0].Err)
 	}
 }
 
