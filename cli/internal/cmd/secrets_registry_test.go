@@ -305,3 +305,74 @@ func TestResolveOnly_IdSelectsAllVars_NameSelectsOne(t *testing.T) {
 		t.Error("unknown --only token must error")
 	}
 }
+
+func TestSecretsVerify_ReportsStatuses_NoValues(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: age-ok, plane: app, backend: age, age: a.key, expose: {env: AGE_OK}}\n"+
+		"  - {id: age-missing, plane: app, backend: age, age: gone, expose: {env: AGE_MISSING}}\n"+
+		"  - {id: bw-fail, plane: app, backend: bw, bw: {item: nope, field: password}, expose: {env: BW_FAIL}}\n")
+	old := ageDecryptor
+	ageDecryptor = func(ageFile, _ string) ([]byte, error) {
+		if strings.Contains(ageFile, "gone") {
+			return nil, fmt.Errorf("%w: gone", secrets.ErrSecretAbsent)
+		}
+		return []byte("the-secret-value\n"), nil
+	}
+	t.Cleanup(func() { ageDecryptor = old })
+	useBwReader(t, fakeBW{}) // every bw lookup fails
+
+	var out bytes.Buffer
+	cmd := newSecretsVerifyCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(io.Discard)
+	err := cmd.Execute()
+
+	got := out.String()
+	for _, want := range []string{"OK", "AGE_OK", "MISSING", "AGE_MISSING", "FAILED", "BW_FAIL"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("verify output missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "the-secret-value") {
+		t.Error("verify must NOT print secret values")
+	}
+	if err == nil {
+		t.Error("verify must exit non-zero when a secret FAILED")
+	}
+}
+
+func TestSecretsVerify_ScopesById(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: a, plane: app, backend: age, age: a, expose: {env: AAA}}\n"+
+		"  - {id: b, plane: app, backend: age, age: b, expose: {env: BBB}}\n")
+	old := ageDecryptor
+	ageDecryptor = func(string, string) ([]byte, error) { return []byte("v\n"), nil }
+	t.Cleanup(func() { ageDecryptor = old })
+
+	var out bytes.Buffer
+	cmd := newSecretsVerifyCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"a"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("verify a: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "AAA") {
+		t.Errorf("verify a must check AAA: %s", got)
+	}
+	if strings.Contains(got, "BBB") {
+		t.Errorf("verify a must NOT check BBB: %s", got)
+	}
+}
+
+func TestSecretsVerify_UnknownId_Errors(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	cmd := newSecretsVerifyCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"no-such-id"})
+	if err := cmd.Execute(); err == nil {
+		t.Error("verify with an unknown id must error")
+	}
+}
