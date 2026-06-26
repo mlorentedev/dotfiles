@@ -1356,3 +1356,13 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Every daily harness already loads a harness-managed instructions file (~/.claude/CLAUDE.md, ~/.config/opencode/AGENTS.md, ~/.pi/agent/AGENTS.md, ~/.copilot/copilot-instructions.md). "Presence" therefore equals injecting the forced-skills directive into that file via a marked region -- one uniform mechanism across all four harnesses, in a distinct AGENT-PRESENCE marker namespace that coexists with the patterns region. Text injection is cross-OS by nature, so the OS axis disappears.
 
 **Rule**: For determinism, separate the LEVEL from the MECHANISM. Presence (skill in context every turn) is the cheapest level and needs no plugin -- a system-prompt hook that only ADDS TEXT is equivalent to injecting that text into an always-loaded file. Reserve the provider plugins (SessionStart / chat.system.transform / session_start / PreToolUse) for the Action level, where gating actually requires code. Default to the agnostic injection primitive; reach for a provider hook only when it buys something injection cannot.
+
+### [2026-06-25] bats silently drops @test names with non-ASCII chars or duplicates — lint them
+
+**Context**: HARNESS-043 (#607) had a `@test` name with an em-dash; bats 1.13.0 reported "executed 36 instead of 37" and exited 0. A prior lesson noted duplicate `@test` names break parsing. The auto-curation analyzer (CURATOR-001, #135) flagged the recurrence; implementing the proposed lint surfaced 6 more non-ASCII `@test` names already in the suite (em-dash, `<=`), 3 of them silently skipped in opencode.bats (44 declared, only 41 run).
+
+**Problem**: bats translates `@test "<name>"` into a shell function name. Non-ASCII bytes make bats fail to register the function ("unknown test name"); duplicate names make it refuse to parse the whole file. In both cases the SUITE still exits 0 — a green test that never ran. CI's `bats tests/*.bats` was passing while 3 opencode tests were dead.
+
+**Solution**: `scripts/check-bats-names.sh` scans `tests/*.bats` for (a) non-ASCII characters in `@test` names and (b) duplicate names within a file, failing with `file:line`. Wired into the CI `lint` job. Fixed the 6 existing violations (em-dash to `-`, `<=` glyph to ASCII `<=`), recovering the silently-skipped tests (opencode.bats 41 -> 44, all green). **Promoted to check**: `scripts/check-bats-names.sh`.
+
+**Rule**: Keep `@test` names ASCII and unique within a file. A passing bats suite does not prove every test ran — only an executed-vs-declared count or a name lint proves that. If a test name carries an em-dash or a `<=` glyph, it is probably not running.

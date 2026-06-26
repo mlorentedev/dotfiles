@@ -154,7 +154,7 @@ setup() {
     grep -qE '"model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc exposes 4 chat NaN models (non-chat models intentionally excluded — opencode schema rejects 'embedding' modality)" {
+@test "opencode.jsonc exposes 4 chat NaN models (non-chat models intentionally excluded - opencode schema rejects 'embedding' modality)" {
     for m in deepseek-v4-flash qwen3.6 gemma4 mimo-v2.5; do
         grep -qE "\"$m\":" "$OPENCODE_CFG" || { echo "missing chat model $m" >&2; false; }
     done
@@ -227,7 +227,7 @@ setup() {
 
 # --- Per-agent pointer files (AI-013 fold-in) ---
 
-@test "ai/claude/CLAUDE.md is a pointer to AGENTS.md (≤ 100 lines)" {
+@test "ai/claude/CLAUDE.md is a pointer to AGENTS.md (<= 100 lines)" {
     # Threshold bumped 70→80 in AI-019 (model-tier overlay added ~8 lines).
     # Bumped 80→100 in ENGINE-001: the HARNESS engine injects the generated
     # "Overrides of Harness Defaults" block (no-attribution + english-only +
@@ -237,7 +237,7 @@ setup() {
     [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 100 ]]
 }
 
-@test "ai/agy/AGY.md is a pointer to AGENTS.md (≤ 50 lines)" {
+@test "ai/agy/AGY.md is a pointer to AGENTS.md (<= 50 lines)" {
     grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/agy/AGY.md"
     [[ $(wc -l < "$DOTFILES_DIR/ai/agy/AGY.md") -le 50 ]]
 }

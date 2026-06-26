@@ -122,7 +122,7 @@ provision() {
     grep -qF 'rebase --abort' "$HERMES_HOME/vault-pull.sh"
 }
 
-@test "idempotent (full, DRY_RUN=0): two real runs are a no-op — no dupes" {
+@test "idempotent (full, DRY_RUN=0): two real runs are a no-op - no dupes" {
     stub uv
     stub_git
     stub_crontab

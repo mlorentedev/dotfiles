@@ -116,7 +116,7 @@ EOF
     grep -qF '=== Done:' "$log"
 }
 
-@test "vault-maintenance-weekly.sh runs cleanly under bash — guards the printf '--' regression" {
+@test "vault-maintenance-weekly.sh runs cleanly under bash - guards the printf '--' regression" {
     # Regression guard: section headers used `printf '--- ... ---'`, which under
     # bash abort with "printf: --: invalid option" and (set -e) kill the run before
     # the sections write. Fixed to `printf '%s\n' '--- ... ---'`. This FAILS on the

@@ -37,6 +37,10 @@ jobs:
         run: |
           ./scripts/compile-harness.sh --check
 
+      - name: Lint bats @test names (no silent-skipped tests)
+        run: |
+          ./scripts/check-bats-names.sh tests/
+
   lint-powershell:
     runs-on: ubuntu-latest
     steps:
