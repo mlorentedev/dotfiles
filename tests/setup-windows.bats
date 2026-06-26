@@ -73,24 +73,35 @@ setup() {
     grep -qF "PSObject.Properties['prerequisite_command']" "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 eager-sources load-secrets.ps1 after sensitive deploy" {
-    # Every block AFTER sensitive/ copy must see $env:NAN_API_KEY / VAULT_PATH /
-    # TS_AUTHKEY etc. populated. Cross-OS parity with setup-linux.sh's same
-    # eager source. Wrapped in try/catch so setup never aborts on secrets issues.
-    grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
-    grep -qE '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
-    grep -qF 'try { . $loadSecretsDeployed' "$PS1_SCRIPT"
+@test "setup-windows.ps1 does NOT eager-source load-secrets; resolves the agy secret via dotf [#587]" {
+    # Migrated off the load-secrets eager dot-source (ADR-028). agy's
+    # OPENROUTER_API_KEY is baked into mcp_config.json via `dotf secrets show`
+    # after Install-Dotf, before the agy block (opencode/pi self-resolve).
+    ! grep -qE '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
+    ! grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
+    grep -qF 'dotf secrets show openrouter-api-key' "$PS1_SCRIPT"
 }
 
-@test "parity: both setups eager-load secrets after sensitive deploy" {
-    grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
-    grep -qF 'Eager-load secrets' "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: both setups resolve the agy deploy-time secret via dotf secrets show [#587]" {
+    for s in "$PS1_SCRIPT" "$DOTFILES_DIR/setup-linux.sh"; do
+        grep -qF 'dotf secrets show openrouter-api-key' "$s"
+    done
+}
+
+@test "setup-windows.ps1 deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
+    grep -qF 'Deployed secrets/registry.yaml' "$PS1_SCRIPT"
+    grep -qF 'registry.yaml' "$PS1_SCRIPT"
+}
+
+@test "parity: both setups deploy the secrets registry [#587]" {
+    grep -qF 'registry.yaml' "$PS1_SCRIPT"
+    grep -qF 'registry.yaml' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-windows.ps1 preflights the age identity key (warn, not fail)" {
-    # Without ~/.config/age/key.txt, load-secrets.ps1 silently no-ops at
-    # shell startup and opencode/agy 401 with no clue. Preflight WARNs (must
-    # not abort -- encrypted files still deploy so a key imported later works).
+    # Without ~/.config/age/key.txt, dotf secrets can't decrypt and opencode/agy
+    # 401 with no clue. Preflight WARNs (must not abort -- encrypted files still
+    # deploy so a key imported later works).
     grep -qF 'age identity key not found' "$PS1_SCRIPT"
     grep -qF 'AGE_KEY_PATH' "$PS1_SCRIPT"
     grep -qF 'docs/SECRETS.md' "$PS1_SCRIPT"
@@ -162,16 +173,8 @@ setup() {
     grep -q 'obs-cli.ps1' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys load-secrets.ps1" {
-    grep -q 'load-secrets.ps1' "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 sets up secrets system" {
     grep -q 'Setting up secrets system' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 copies env-mapping.conf" {
-    grep -q 'env-mapping.conf' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 registers SessionStart hook" {
@@ -345,8 +348,8 @@ setup() {
     grep -qE 'Deploy-File.*opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 opencode deploy calls Substitute-EnvPlaceholders (SDD-009)" {
-    grep -qE 'Substitute-EnvPlaceholders.*opencodeConfigTmp' "$PS1_SCRIPT"
+@test "setup-windows.ps1 opencode deploy renders via dotf secrets render (SDD-009/#587)" {
+    grep -qE 'dotf secrets render \$opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {

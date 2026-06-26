@@ -36,7 +36,7 @@ RUN useradd -m -s /bin/bash testuser
 USER testuser
 WORKDIR /home/testuser
 
-# Generate age key so load-secrets.sh doesn't fail
+# Generate age key so dotf secrets / deploy-time substitution can decrypt
 RUN mkdir -p /home/testuser/.config/age \
     && age-keygen -o /home/testuser/.config/age/key.txt 2>/dev/null
 

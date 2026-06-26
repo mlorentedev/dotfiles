@@ -75,12 +75,16 @@ func fileContains(p, substr string) bool {
 	return strings.Contains(string(raw), substr)
 }
 
-// expandHome substitutes $HOME and ${HOME} with the resolved home dir, leaving
-// other variables untouched — the exact scope of doctor.sh's expand_path.
+// expandHome substitutes the home-dir tokens of both contract dialects with the
+// resolved home dir, leaving other variables untouched — the POSIX $HOME/${HOME}
+// (doctor.sh's expand_path) plus PowerShell's $env:USERPROFILE, so the windows
+// dialect resolves even when the GOOS seam selects it on a POSIX test host.
 func expandHome(sys *System, s string) string {
 	home := sys.home()
 	s = strings.ReplaceAll(s, "${HOME}", home)
 	s = strings.ReplaceAll(s, "$HOME", home)
+	s = strings.ReplaceAll(s, "${env:USERPROFILE}", home)
+	s = strings.ReplaceAll(s, "$env:USERPROFILE", home)
 	return s
 }
 

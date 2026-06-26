@@ -52,20 +52,22 @@ setup() {
     ! grep -qF "'Projects\\dotfiles\\scripts\\nan-debug.sh'" "$PROFILE_SCRIPT"
 }
 
-# --- Secrets sourcing (cross-OS parity: .bashrc sources load-secrets.sh) ---
+# --- On-demand secrets (ADR-028: no ambient export; wrap AI CLIs via dotf secrets run) ---
 
-@test "profile.ps1 sources load-secrets.ps1 (cross-OS parity with .bashrc)" {
-    # .bashrc:63 sources load-secrets.sh. PowerShell parity requires profile.ps1
-    # to dot-source load-secrets.ps1 so $env:NAN_API_KEY / OPENROUTER_API_KEY /
-    # etc. are populated for opencode (reads {env:NAN_API_KEY} from opencode.jsonc),
-    # agy, and copilot. Without this, opencode.jsonc references resolve to empty.
-    grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
-    grep -qF 'Test-Path -LiteralPath' "$PROFILE_SCRIPT"
+@test "profile.ps1 does NOT auto-source load-secrets and wraps AI CLIs via dotf secrets run (ADR-028)" {
+    # ADR-028 "not always exposed": secrets are NOT loaded into the ambient
+    # session. opencode (reads {env:NAN_API_KEY} from opencode.jsonc), pi and agy
+    # are wrapped to launch through `dotf secrets run`, so the secret lives only
+    # in their child process — never the session.
+    ! grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+    grep -qE 'function opencode \{ dotf secrets run' "$PROFILE_SCRIPT"
 }
 
-@test "parity: load-secrets sourced in both .bashrc and profile.ps1" {
-    grep -qE 'load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
-    grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+@test "parity: neither .bashrc nor profile.ps1 auto-loads secrets; both wrap the AI CLIs" {
+    ! grep -qE 'source .*load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
+    ! grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+    grep -qE 'opencode\(\) \{ dotf secrets run' "$DOTFILES_DIR/.bashrc"
+    grep -qE 'function opencode \{ dotf secrets run' "$PROFILE_SCRIPT"
 }
 
 # --- Cross-OS oc behaviour (intentional asymmetry, documented) ---

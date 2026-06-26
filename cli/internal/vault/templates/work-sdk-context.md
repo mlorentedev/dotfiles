@@ -20,7 +20,7 @@ created: "{{date}}"
 - **Key Tools:**
 
 ## Repos in this Family
-See [[../00-context|{{family}} family context]] for all repos.
+See [[../context|{{family}} family context]] for all repos.
 
 ## Critical Links
 - **Real repo path:** Fill in source_path above with actual ${PROJECTS_PATH}/... path

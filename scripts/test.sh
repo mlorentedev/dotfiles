@@ -67,7 +67,7 @@ echo "Shell: ${ZSH_VERSION:+zsh $ZSH_VERSION}${BASH_VERSION:+bash $BASH_VERSION}
 
 # ==================================================
 section "1/15" "Script Syntax Validation"
-for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
+for script in utils.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
     if [[ -f "$SCRIPTS_DIR/$script" ]]; then
         if bash -n "$SCRIPTS_DIR/$script" 2>/dev/null; then
             pass "$script syntax OK"
@@ -354,70 +354,6 @@ export_var "TEST_EXPORT_VAR" "test_value_123"
 unset_var "TEST_EXPORT_VAR"
 [[ -z "$TEST_EXPORT_VAR" ]] && pass "unset_var: unsets variable" || fail "unset_var: still set"
 
-# ==================================================
-section "11/15" "Secrets Loading (load-secrets.sh)"
-# ==================================================
-
-if [[ -f "$SCRIPTS_DIR/load-secrets.sh" ]]; then
-    pass "load-secrets.sh: file exists"
-
-    # Source it
-    . "$SCRIPTS_DIR/load-secrets.sh"
-
-    subsection "Function definitions"
-    type secrets_load >/dev/null 2>&1 && pass "secrets_load: defined" || fail "secrets_load: not defined"
-    type secrets_list >/dev/null 2>&1 && pass "secrets_list: defined" || fail "secrets_list: not defined"
-    type secrets_refresh >/dev/null 2>&1 && pass "secrets_refresh: defined" || fail "secrets_refresh: not defined"
-    type secrets_add >/dev/null 2>&1 && pass "secrets_add: defined" || fail "secrets_add: not defined"
-    type secrets_rotate >/dev/null 2>&1 && pass "secrets_rotate: defined" || fail "secrets_rotate: not defined"
-    type secrets_check >/dev/null 2>&1 && pass "secrets_check: defined" || fail "secrets_check: not defined"
-    type secrets_clean >/dev/null 2>&1 && pass "secrets_clean: defined" || fail "secrets_clean: not defined"
-    type secrets_show >/dev/null 2>&1 && pass "secrets_show: defined" || fail "secrets_show: not defined"
-    type secrets_help >/dev/null 2>&1 && pass "secrets_help: defined" || fail "secrets_help: not defined"
-    type secrets_audit >/dev/null 2>&1 && pass "secrets_audit: defined" || fail "secrets_audit: not defined"
-
-    subsection "env-mapping.conf"
-    if [[ -f "$SENSITIVE_DIR/env-mapping.conf" ]]; then
-        pass "env-mapping.conf: exists"
-
-        mapping_count=$(grep -v '^#' "$SENSITIVE_DIR/env-mapping.conf" | grep -v '^$' | grep -c '=' 2>/dev/null || echo 0)
-        [[ "$mapping_count" -gt 0 ]] && pass "env-mapping.conf: has $mapping_count mappings" || fail "env-mapping.conf: no mappings found"
-    else
-        fail "env-mapping.conf: not found at $SENSITIVE_DIR/env-mapping.conf"
-    fi
-
-    subsection "secrets_list output"
-    list_output=$(secrets_list 2>&1)
-    [[ $? -eq 0 ]] && pass "secrets_list: executes without error" || fail "secrets_list: error during execution"
-    echo "$list_output" | grep -q "Secret mappings" && pass "secrets_list: shows header" || fail "secrets_list: no header"
-
-    subsection "secrets_check output"
-    check_output=$(secrets_check 2>&1)
-    echo "$check_output" | grep -q "Checking secrets integrity" && pass "secrets_check: shows header" || fail "secrets_check: no header"
-    echo "$check_output" | grep -q "Summary:" && pass "secrets_check: shows summary" || fail "secrets_check: no summary"
-
-    subsection "secrets_clean --dry-run"
-    clean_output=$(secrets_clean --dry-run 2>&1)
-    echo "$clean_output" | grep -q "Dry run complete" && pass "secrets_clean: dry-run works" || fail "secrets_clean: dry-run failed"
-
-    subsection "secrets_help output"
-    help_output=$(secrets_help 2>&1)
-    echo "$help_output" | grep -q "Secrets Management Commands" && pass "secrets_help: shows header" || fail "secrets_help: no header"
-    echo "$help_output" | grep -q "secrets_add" && pass "secrets_help: documents secrets_add" || fail "secrets_help: missing secrets_add"
-    echo "$help_output" | grep -q "secrets_rotate" && pass "secrets_help: documents secrets_rotate" || fail "secrets_help: missing secrets_rotate"
-
-    subsection "secrets_audit"
-    # Just check it runs without error (audit log may or may not exist)
-    secrets_audit >/dev/null 2>&1
-    [[ $? -eq 0 ]] && pass "secrets_audit: executes without error" || fail "secrets_audit: error"
-
-    subsection "secrets_sync"
-    type secrets_sync >/dev/null 2>&1 && pass "secrets_sync: defined" || fail "secrets_sync: not defined"
-    echo "$help_output" | grep -q "secrets_sync" && pass "secrets_help: documents secrets_sync" || fail "secrets_help: missing secrets_sync"
-    echo "$help_output" | grep -q "secrets_show" && pass "secrets_help: documents secrets_show" || fail "secrets_help: missing secrets_show"
-else
-    fail "load-secrets.sh: not found"
-fi
 
 # ==================================================
 section "12/15" "Dotfiles Sync Script"
@@ -528,7 +464,7 @@ for link in "$HOME/.zsh/aliases.zsh" "$HOME/.zsh/functions.zsh" "$HOME/.zsh/nvm.
 done
 
 subsection "Script permissions"
-for script in utils.sh load-secrets.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
+for script in utils.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
     if [[ -x "$SCRIPTS_DIR/$script" ]]; then
         pass "$script: executable"
     elif [[ -f "$SCRIPTS_DIR/$script" ]]; then

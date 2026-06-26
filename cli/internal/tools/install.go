@@ -79,8 +79,14 @@ type Installer struct {
 	Fetch        Fetcher   // download seam; default HTTPFetch
 	Out          io.Writer // progress sink; default os.Stdout
 	// CurrentVersion reports the installed version of the named tool, or "" when
-	// absent/unparseable. The reconcile seam — default runs <Dest>/<bin> --version.
+	// absent/unparseable. The reconcile seam: when injected (tests) it overrides
+	// the default probe; when nil, current() picks a default by source type —
+	// <Dest>/<bin> --version for github-release, <name> --version on PATH for npm.
 	CurrentVersion func(name string) string
+	// Run executes name with args — the npm-install seam (`npm install -g …`).
+	// Default streams to Out via os/exec; tests inject a recorder so installNpm is
+	// network- and npm-free.
+	Run func(name string, args ...string) error
 }
 
 func (in *Installer) defaults() {
@@ -99,21 +105,48 @@ func (in *Installer) defaults() {
 	if in.Out == nil {
 		in.Out = os.Stdout
 	}
-	if in.CurrentVersion == nil {
-		in.CurrentVersion = in.installedVersion
+	if in.Run == nil {
+		in.Run = func(name string, args ...string) error {
+			cmd := exec.Command(name, args...)
+			cmd.Stdout, cmd.Stderr = in.Out, in.Out
+			return cmd.Run()
+		}
 	}
 }
 
-// Install converges the tool to its pinned version: a no-op when already at or
-// above the pin, otherwise download → verify sha256 → place + chmod. A failure
-// at any step leaves Dest untouched (the binary is staged in a temp dir and only
-// moved into place after verification passes).
+// current resolves the installed version of t, dispatching the default probe by
+// source type when CurrentVersion is not injected: a github-release tool is
+// probed at Dest/<bin> (where the installer places it), an npm tool on PATH
+// (where npm/scoop/choco place globals). "" means absent/unparseable.
+func (in *Installer) current(t Tool) string {
+	if in.CurrentVersion != nil {
+		return in.CurrentVersion(t.Name)
+	}
+	if t.Source.Type == "npm" {
+		return in.pathVersion(t.Name)
+	}
+	return in.installedVersion(t.Name)
+}
+
+// Install converges the tool to its pinned version, dispatching on source type.
+// Both backends share the reconcile policy (decideAction): a no-op when already
+// at or above the pin, never a downgrade.
 func (in *Installer) Install(t Tool) (Result, error) {
 	in.defaults()
-
-	if t.Source.Type != "github-release" {
+	switch t.Source.Type {
+	case "github-release":
+		return in.installRelease(t)
+	case "npm":
+		return in.installNpm(t)
+	default:
 		return Skipped, fmt.Errorf("%s: unsupported source type %q", t.Name, t.Source.Type)
 	}
+}
+
+// installRelease provisions a github-release tool: download → verify sha256 →
+// place + chmod. A failure at any step leaves Dest untouched (the binary is
+// staged in a temp dir and only moved into place after verification passes).
+func (in *Installer) installRelease(t Tool) (Result, error) {
 	asset := t.AssetName(in.GOOS, in.GOARCH)
 	if asset == "" {
 		return Skipped, fmt.Errorf("%s: no release asset for %s/%s", t.Name, in.GOOS, in.GOARCH)
@@ -123,7 +156,7 @@ func (in *Installer) Install(t Tool) (Result, error) {
 		return Skipped, fmt.Errorf("%s: no checksums file declared — refusing to install unverified", t.Name)
 	}
 
-	switch decideAction(in.CurrentVersion(t.Name), t.Version) {
+	switch decideAction(in.current(t), t.Version) {
 	case actionSkip:
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
 		return Skipped, nil
@@ -132,6 +165,50 @@ func (in *Installer) Install(t Tool) (Result, error) {
 	default: // actionInstall
 		return in.fetchVerifyPlace(t, asset, sumsName, Installed)
 	}
+}
+
+// installNpm provisions an npm-distributed tool (source.type "npm") by pinning it
+// with `npm install -g <package>@<version>`. The reconcile policy is shared with
+// the release path: skip when a PATH binary is already at or above the pin (so a
+// scoop/choco/brew-installed bw is never re-installed), install when absent,
+// upgrade when below. There is no download/verify/place — npm owns placement —
+// and no sha256 gate (the trade-off accepted in the spec R1: an official
+// first-party CLI pinned by version, vs. the rewrite a checksum-manifested
+// github-release would need for bw's archive+cli-v-tag releases).
+func (in *Installer) installNpm(t Tool) (Result, error) {
+	pkg := t.Source.Package
+	if pkg == "" {
+		return Skipped, fmt.Errorf("%s: npm source declares no package", t.Name)
+	}
+	action := decideAction(in.current(t), t.Version)
+	if action == actionSkip {
+		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
+		return Skipped, nil
+	}
+	spec := pkg + "@" + t.Version
+	if err := in.Run("npm", "install", "-g", spec); err != nil {
+		return Skipped, fmt.Errorf("%s: npm install -g %s: %w", t.Name, spec, err)
+	}
+	res := Installed
+	if action == actionUpgrade {
+		res = Upgraded
+	}
+	_, _ = fmt.Fprintf(in.Out, "%s %s %s via npm (%s)\n", t.Name, t.Version, res, pkg)
+	return res, nil
+}
+
+// pathVersion is the npm default version probe: run `<name> --version`, resolving
+// the binary on PATH (where npm/scoop/choco place globals — not in Dest). Absent
+// or unparseable → "" (decideAction treats that as below-pin → install).
+func (in *Installer) pathVersion(name string) string {
+	out, err := exec.Command(name, "--version").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	if m := semverRE.Find(out); m != nil {
+		return string(m)
+	}
+	return ""
 }
 
 // fetchVerifyPlace runs the download → verify → place pipeline and returns res

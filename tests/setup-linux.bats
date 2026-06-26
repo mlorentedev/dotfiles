@@ -48,6 +48,20 @@ setup() {
     grep -q 'jq-linux-amd64' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-linux.sh deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
+    grep -qF 'DOTFILES_DIR/secrets' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'secrets/registry.yaml' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh resolves the agy deploy-time secret via dotf, not the load-secrets twin [#587]" {
+    # agy's OPENROUTER_API_KEY is fetched via dotf (opencode/pi materialize via
+    # `dotf secrets render` over the registry, and their own runtime resolver).
+    grep -qF 'dotf secrets show openrouter-api-key' "$DOTFILES_DIR/setup-linux.sh"
+    # the eager-source + the old secrets_show twin API are gone
+    ! grep -qE 'load-secrets\.sh" >/dev/null 2>&1' "$DOTFILES_DIR/setup-linux.sh"
+    ! grep -qF 'secrets_show ' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-linux.sh installs gh if missing" {
     grep -q 'command -v gh' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'cli/cli/releases' "$DOTFILES_DIR/setup-linux.sh"

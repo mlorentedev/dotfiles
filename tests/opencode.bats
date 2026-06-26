@@ -30,8 +30,8 @@ setup() {
     grep -q 'mv "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode deploy calls substitute_env_placeholders (SDD-009)" {
-    grep -q 'substitute_env_placeholders "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
+@test "setup-linux.sh opencode deploy renders via dotf secrets render (SDD-009/#587)" {
+    grep -q 'dotf secrets render "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh opencode block has post-deploy assertion" {
@@ -286,6 +286,6 @@ setup() {
 @test "setup-linux.sh deploys tui.json as a plain copy, no secret substitution (DX-004 AC3)" {
     grep -q 'TUI_SRC="\$CURRENT_DIR/ai/opencode/tui.json"' "$SETUP_SCRIPT"
     grep -q 'cmp -s "\$TUI_SRC" "\$TUI_DST"' "$SETUP_SCRIPT"
-    # tui.json carries no secrets: it must NOT go through substitute_env_placeholders
-    ! grep -qE 'substitute_env_placeholders "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
+    # tui.json carries no secrets: it must NOT go through dotf secrets render
+    ! grep -qE 'dotf secrets render "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
 }

@@ -31,6 +31,10 @@ setup() {
     [ -d "$DOTFILES_DIR/sensitive" ]
 }
 
+@test "~/.dotfiles/secrets/registry.yaml exists (dotf secrets mapping SSOT) [#587]" {
+    [ -f "$DOTFILES_DIR/secrets/registry.yaml" ]
+}
+
 @test "~/.dotfiles/ssh directory exists" {
     [ -d "$DOTFILES_DIR/ssh" ]
 }
@@ -71,10 +75,6 @@ setup() {
     [ -f "$DOTFILES_DIR/scripts/utils.sh" ]
 }
 
-@test "load-secrets.sh copied to ~/.dotfiles/scripts" {
-    [ -f "$DOTFILES_DIR/scripts/load-secrets.sh" ]
-}
-
 @test "aliases.zsh copied to ~/.dotfiles/.zsh" {
     [ -f "$DOTFILES_DIR/.zsh/aliases.zsh" ]
 }
@@ -89,10 +89,6 @@ setup() {
 
 @test "ssh/config copied to ~/.dotfiles/ssh" {
     [ -f "$DOTFILES_DIR/ssh/config" ]
-}
-
-@test "env-mapping.conf copied to ~/.dotfiles/sensitive" {
-    [ -f "$DOTFILES_DIR/sensitive/env-mapping.conf" ]
 }
 
 # =============================================================================
@@ -144,10 +140,6 @@ setup() {
 
 @test "utils.sh is executable" {
     [ -x "$DOTFILES_DIR/scripts/utils.sh" ]
-}
-
-@test "load-secrets.sh is executable" {
-    [ -x "$DOTFILES_DIR/scripts/load-secrets.sh" ]
 }
 
 @test "github-secrets-manager.sh is executable" {

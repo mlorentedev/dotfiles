@@ -4,7 +4,7 @@
 # and sourced LAST by .bashrc, so it can override aliases/exports/prompt above.
 #
 # NON-SENSITIVE config only. Secrets (API keys, tokens) belong in the age system
-# (sensitive/*.secret.age + sensitive/env-mapping.conf), NEVER here.
+# (sensitive/*.secret.age + secrets/registry.yaml), NEVER here.
 
 # Host-specific PATH prepend (a tool installed by hand on this box only):
 # export PATH="$HOME/Applications/some-tool/bin:$PATH"

@@ -176,8 +176,8 @@ jobs:
 
       # Deliberately Windows PowerShell 5.1 so the BUG-005 pwsh re-exec path
       # is exercised in CI, not just direct-pwsh invocation (proposal R2).
-      # Both vars point at the checkout: Substitute-EnvPlaceholders derives
-      # the secrets dir from DOTFILES_DIR, and the BUG-021 pre-export
+      # Both vars point at the checkout: `dotf secrets render` derives the
+      # registry path from DOTFILES_DIR, and the BUG-021 pre-export
       # derives the repo root from DOTFILES_REPO_DIR -- its default assumes
       # ~\Projects\dotfiles, which does not exist on a runner.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)

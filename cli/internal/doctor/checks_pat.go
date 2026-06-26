@@ -3,8 +3,6 @@ package doctor
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -44,7 +42,7 @@ func checkPATExpiry(sys *System, cfg *Config, rep *Report) {
 
 	secrets := githubPATSecrets(cfg)
 	if len(secrets) == 0 {
-		rep.Skip("no github.* PAT-backed secrets in env-mapping.conf")
+		rep.Skip("no github.* PAT-backed secrets in the registry")
 		return
 	}
 
@@ -124,46 +122,31 @@ func reportPATExpiry(filename string, hdr http.Header, now time.Time, warnDays i
 	}
 }
 
-// githubPATSecrets parses env-mapping.conf and returns the unique github.*
-// PAT-backed secrets, one per .age filename, each carrying ALL of its env
-// aliases (github.token is mapped by both GITHUB_PERSONAL_ACCESS_TOKEN and
-// RELEASE_TOKEN — kept together so it is probed once but resolvable from either).
-// A missing or unreadable mapping yields nil (checkSecrets owns the "mapping
-// exists" assertion).
+// githubPATSecrets reads secrets/registry.yaml and returns the unique github.*
+// PAT-backed secrets, one per age source (the dedupe key), each carrying ALL of
+// its env aliases (github.token is exposed as both GITHUB_PERSONAL_ACCESS_TOKEN
+// and RELEASE_TOKEN — kept together so it is probed once but resolvable from
+// either). A missing or invalid registry yields nil (checkSecrets owns the
+// "registry exists" assertion). The age source is the .age basename, so it
+// doubles as the probe's display name (e.g. "github.token").
 func githubPATSecrets(cfg *Config) []patSecret {
-	mapping := filepath.Join(cfg.DotfilesDir, "sensitive", "env-mapping.conf")
-	raw, err := os.ReadFile(mapping)
+	reg, err := loadRegistry(cfg)
 	if err != nil {
 		return nil
 	}
 
-	idx := map[string]int{} // filename → index into out
+	idx := map[string]int{} // age source → index into out
 	var out []patSecret
-	for _, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
+	for _, e := range reg.Entries("") { // home unused: github secrets are env, not file
+		if e.IsFile || !strings.HasPrefix(e.File, "github.") {
 			continue
 		}
-		varName, val, _ := strings.Cut(line, "=")
-		varName = strings.TrimSpace(varName)
-		val = strings.TrimSpace(val)
-
-		// File secrets (@VAR=file>dest): the filename is the part before '>'.
-		fname := val
-		if strings.HasPrefix(varName, "@") {
-			fname, _, _ = strings.Cut(val, ">")
-			fname = strings.TrimSpace(fname)
-			varName = strings.TrimPrefix(varName, "@")
-		}
-		if !strings.HasPrefix(fname, "github.") {
+		if i, ok := idx[e.File]; ok {
+			out[i].envVars = append(out[i].envVars, e.Var)
 			continue
 		}
-		if i, ok := idx[fname]; ok {
-			out[i].envVars = append(out[i].envVars, varName)
-			continue
-		}
-		idx[fname] = len(out)
-		out = append(out, patSecret{filename: fname, envVars: []string{varName}})
+		idx[e.File] = len(out)
+		out = append(out, patSecret{filename: e.File, envVars: []string{e.Var}})
 	}
 	return out
 }

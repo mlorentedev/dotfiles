@@ -2,7 +2,7 @@
 
 > **Status:** primary OpenCode provider (SDD-007 consolidation, 2026-05-25).
 > **Replaces:** OpenCode Go subscription (cancelled — manual action in Zen dashboard).
-> **Coexists with:** OpenRouter (frontier fallback), Ollama at `ollama.kubelab.live` (VPN-only homelab — user-managed; API key slot reserved in `sensitive/env-mapping.conf` as `OLLAMA_API_KEY`, commented until the encrypted file exists).
+> **Coexists with:** OpenRouter (frontier fallback), Ollama at `ollama.kubelab.live` (VPN-only homelab — user-managed; API key slot reserved in `secrets/registry.yaml` as `OLLAMA_API_KEY`, commented until the encrypted file exists).
 > **Upstream docs:** https://nan.builders/docs · **Dashboard:** https://cloud.nan.builders/ · **Support:** Discord `#support`.
 
 ## Service summary
@@ -51,7 +51,7 @@ Errors to expect: `401` invalid key, `404` unknown model, `429` rate limit, `500
 
 ### 2. Encrypt + commit the key
 
-NaN's API key is loaded via the repo's age-based secret system. The encrypted file lives at `sensitive/nan.api-key.secret.age`; the mapping in `sensitive/env-mapping.conf` already exposes it as `NAN_API_KEY`.
+NaN's API key is loaded via the repo's age-based secret system. The encrypted file lives at `sensitive/nan.api-key.secret.age`; the mapping in `secrets/registry.yaml` already exposes it as `NAN_API_KEY`.
 
 ```bash
 # From the repo root:
@@ -96,7 +96,7 @@ curl https://api.nan.builders/v1/chat/completions \
 
 | File | Role |
 |---|---|
-| `sensitive/env-mapping.conf` | line `NAN_API_KEY=nan.api-key` — secret loader entry |
+| `secrets/registry.yaml` | exposes `nan.api-key` as `NAN_API_KEY` (registry entry) |
 | `sensitive/nan.api-key.secret.age` | encrypted key (user creates, see Setup §2) |
 | `ai/opencode/opencode.jsonc` | provider block `nan` (default model + 3 chat models) |
 | `.zsh/aliases.zsh` + `.bashrc` + `powershell/profile.ps1` | `qqn` alias + `NAN_BASE_URL` export |

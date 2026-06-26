@@ -55,7 +55,6 @@ admin needed; some changes show after an Explorer restart.
 │   ├── vault.sh                # Vault tooling dispatcher
 │   └── …                       # ~50 scripts total (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets
-│   ├── env-mapping.conf        # ENV_VAR=filename mapping
 │   └── *.secret.age            # Encrypted files (tracked)
 ├── AGENTS.md                   # Cross-agent SSOT (canonical system prompt)
 ├── ai/                         # Per-agent config overlays (thin pointers to AGENTS.md)
@@ -111,7 +110,7 @@ secrets_check                       # Validate mapping integrity
 
 Non-sensitive, per-machine shell config (a host-only `PATH` prepend, a VM-only alias) goes in `~/.zshrc.local` / `~/.bashrc.local` — gitignored, sourced **last** so it can override anything above. Copy from the committed `.zshrc.local.example` / `.bashrc.local.example`.
 
-> **`.local` is not for secrets.** API keys, tokens and credentials always go through the age system above (`sensitive/*.secret.age` + `env-mapping.conf`), never a `.local` file.
+> **`.local` is not for secrets.** API keys, tokens and credentials always go through the age system above (`sensitive/*.secret.age` + `secrets/registry.yaml`), never a `.local` file.
 
 ### Cross-machine paths (ADR-025)
 

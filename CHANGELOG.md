@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.21.1](https://github.com/mlorentedev/dotfiles/compare/v0.21.0...v0.21.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **spec-gate:** exclude Go *_test.go from the production-LOC count ([#603](https://github.com/mlorentedev/dotfiles/issues/603)) ([5d726ce](https://github.com/mlorentedev/dotfiles/commit/5d726ce166b9a1e2f4dd79bdea112f6eebe69b60)), closes [#517](https://github.com/mlorentedev/dotfiles/issues/517)
+
+## [0.21.0](https://github.com/mlorentedev/dotfiles/compare/v0.20.0...v0.21.0) (2026-06-25)
+
+
+### Features
+
+* **secrets:** retire the deploy-time shell twins and env-mapping.conf ([#601](https://github.com/mlorentedev/dotfiles/issues/601)) ([83476da](https://github.com/mlorentedev/dotfiles/commit/83476da2bc325a21eda64b3c8369a1f5876dfcf1))
+
+## [0.20.0](https://github.com/mlorentedev/dotfiles/compare/v0.19.1...v0.20.0) (2026-06-25)
+
+
+### Features
+
+* **secrets:** add dotf secrets render and wire setups off the shell twins ([#596](https://github.com/mlorentedev/dotfiles/issues/596)) ([5cc62f3](https://github.com/mlorentedev/dotfiles/commit/5cc62f3287d397a6279478937838ee03d7b9a499))
+
+## [0.19.1](https://github.com/mlorentedev/dotfiles/compare/v0.19.0...v0.19.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **secrets:** deploy secrets/registry.yaml in setup so dotf secrets works ([#591](https://github.com/mlorentedev/dotfiles/issues/591)) ([bc33bbc](https://github.com/mlorentedev/dotfiles/commit/bc33bbcd4aa1d1130e93a04fabefd5debe03cfc6))
+
+## [0.19.0](https://github.com/mlorentedev/dotfiles/compare/v0.18.0...v0.19.0) (2026-06-25)
+
+
+### Features
+
+* **secrets:** resolve nan-* scripts' NAN_API_KEY via dotf secrets show ([#588](https://github.com/mlorentedev/dotfiles/issues/588)) ([3245be5](https://github.com/mlorentedev/dotfiles/commit/3245be5e449b0a3749c452d1c76f22638fe85163))
+
+## [0.18.0](https://github.com/mlorentedev/dotfiles/compare/v0.17.1...v0.18.0) (2026-06-25)
+
+
+### Features
+
+* **doctor:** repair auto-memory junction + OS-aware env-contract checks (HARNESS-040) ([#576](https://github.com/mlorentedev/dotfiles/issues/576)) ([6d2627c](https://github.com/mlorentedev/dotfiles/commit/6d2627cb2ac6aeb2da1b93ceeed6a150674025d7)), closes [#551](https://github.com/mlorentedev/dotfiles/issues/551)
+* **secrets:** stop ambient secret export; wrap AI CLIs via dotf secrets run ([#581](https://github.com/mlorentedev/dotfiles/issues/581)) ([e957c4f](https://github.com/mlorentedev/dotfiles/commit/e957c4f110732ba0503020a3db6d0e7433a9102b)), closes [#493](https://github.com/mlorentedev/dotfiles/issues/493)
+
 ## [0.17.1](https://github.com/mlorentedev/dotfiles/compare/v0.17.0...v0.17.1) (2026-06-24)
 
 
