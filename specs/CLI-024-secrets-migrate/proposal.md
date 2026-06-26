@@ -24,8 +24,9 @@ one secret, behind a parity gate.
 
 ## What
 
-A new `dotf secrets migrate <id> [--item NAME] [--field NAME] [--yes] [--dry-run]` that
-cuts a single secret over from age to bw:
+A new `dotf secrets migrate <id> [--yes] [--dry-run]` that cuts a single secret over
+from age to bw (the bw target is read from the entry's pre-declared `bw:` block, not
+passed as flags):
 
 1. **Resolve + scope-guard.** Look up the secret (by its env-var `id`). Under the
    env-var-per-entry model every entry is single-var, so `SetBackendBW` accepts them all
@@ -54,8 +55,8 @@ cuts a single secret over from age to bw:
 5. **Parity gate (the safety interlock).** Re-read the value back from bw and compare to
    the age value **under the run-time transform** (env: newline-stripped). On mismatch:
    **abort before touching the registry**, reporting a non-leaking diff (e.g. lengths).
-6. **Flip the registry — last.** Only after parity passes, `SetBackendBW(registry, id,
-   item, field)` rewrites `secrets/registry.yaml` atomically (`backend: bw` + `bw:` block,
+6. **Flip the registry — last.** Only after parity passes, `FlipRegistryToBW(registry,
+   id)` rewrites `secrets/registry.yaml` atomically (`backend: bw`, declared `bw:` kept,
    age source dropped — comment-preserving, #617).
 7. **Final verify.** Confirm the secret now resolves via bw (#616). Report success. The
    `.secret.age` file is **kept** (retiring it is C6 `retire`, deliberately separate).
@@ -87,8 +88,8 @@ bw write and no registry change.
   "API Credential" / Vault grouped-KV model. The registry's `bw:` block is the **SSOT**
   for the mapping; `migrate`/`set` read it, never derive a convention from the id. The
   registry rewrite declares `bw:` on every entry up front (even age-backed ones), so
-  `SetBackendBW` at flip time just re-emits the already-declared target + drops the age
-  source. Per-purpose split (A2) is applied **selectively** where a credential rotates or
+  `SetBackendBW` at flip time just keeps the already-declared target in place + drops the
+  age source. Per-purpose split (A2) is applied **selectively** where a credential rotates or
   revokes independently (the github 8-in-1 split, C9). Convention to be encoded in the
   rewrite and surfaced in ADR-028 / `docs/secrets-inventory.md`.
 - **Parity is functional, not raw-byte.** Defined as equality of the *resolved* value

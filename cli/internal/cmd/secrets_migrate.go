@@ -87,8 +87,10 @@ func newSecretsMigrateCmd() *cobra.Command {
 					id, len(value), len(normalizeValue(back, false)))
 			}
 
-			// Flip the registry — the last mutation.
-			if err := secrets.FlipRegistryToBW(registryPath(), id, item, field); err != nil {
+			// Flip the registry — the last mutation. The target is the entry's
+			// pre-declared bw: block (the same item/field parity verified above), so the
+			// flip only toggles backend + drops age; it needs no item/field of its own.
+			if err := secrets.FlipRegistryToBW(registryPath(), id); err != nil {
 				return err
 			}
 			if err := loader.Verify(secrets.Entry{Var: id, Backend: "bw", Item: item, Field: field}); err != nil {
