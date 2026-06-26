@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.22.0](https://github.com/mlorentedev/dotfiles/compare/v0.21.1...v0.22.0) (2026-06-26)
+
+
+### Features
+
+* **harness:** agnostic agent-skill presence by uniform injection ([#607](https://github.com/mlorentedev/dotfiles/issues/607)) ([3d61c2c](https://github.com/mlorentedev/dotfiles/commit/3d61c2cbb0456948a9eae157405a3a321e857df8)), closes [#559](https://github.com/mlorentedev/dotfiles/issues/559)
+* **secrets:** add the Bitwarden backend resolver to dotf secrets ([#606](https://github.com/mlorentedev/dotfiles/issues/606)) ([736273b](https://github.com/mlorentedev/dotfiles/commit/736273b8922c75539c913df537b289e52520f87a))
+* **secrets:** strip backend unlock credentials from the run child env ([#610](https://github.com/mlorentedev/dotfiles/issues/610)) ([8b56f1f](https://github.com/mlorentedev/dotfiles/commit/8b56f1f1205789ac28aee35305cc08bb9f42d129))
+
 ## [0.21.1](https://github.com/mlorentedev/dotfiles/compare/v0.21.0...v0.21.1) (2026-06-25)
 
 
