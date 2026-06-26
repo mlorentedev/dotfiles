@@ -164,6 +164,51 @@ func TestSecretsRun_ResolvesBwBackend(t *testing.T) {
 	}
 }
 
+func TestStripBackendAuth(t *testing.T) {
+	in := []string{"PATH=/bin", "BW_SESSION=tok", "FOO=bar", "OP_SERVICE_ACCOUNT_TOKEN=x", "BW_CLIENTSECRET=y", "EMPTY="}
+	got := strings.Join(stripBackendAuth(in), " ")
+	for _, banned := range []string{"BW_SESSION", "OP_SERVICE_ACCOUNT_TOKEN", "BW_CLIENTSECRET"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("%s must be stripped from the child env, got: %s", banned, got)
+		}
+	}
+	for _, kept := range []string{"PATH=/bin", "FOO=bar", "EMPTY="} {
+		if !strings.Contains(got, kept) {
+			t.Errorf("non-auth var %q must be kept, got: %s", kept, got)
+		}
+	}
+}
+
+// TestBuildChildEnv_StripsBackendAuth proves the resolved secret reaches the child
+// while the backend unlock token (BW_SESSION) does not — the child gets what it was
+// granted, never the key that opens the whole vault.
+func TestBuildChildEnv_StripsBackendAuth(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-foo, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: FOO}}\n")
+	useBwReader(t, fakeBW{"it/password": "granted-value"})
+	t.Setenv("BW_SESSION", "unlock-token-must-not-leak")
+
+	reg, err := loadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := buildChildEnv(reg, nil)
+	if err != nil {
+		t.Fatalf("buildChildEnv: %v", err)
+	}
+	var grantedFound bool
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "BW_SESSION=") {
+			t.Error("BW_SESSION must NOT be passed to the child environment")
+		}
+		if kv == "FOO=granted-value" {
+			grantedFound = true
+		}
+	}
+	if !grantedFound {
+		t.Error("the granted secret FOO=granted-value must still reach the child env")
+	}
+}
+
 func TestSecretsRender_SubstitutesInPlace(t *testing.T) {
 	useTempRegistry(t, testRegistry)
 	old := ageDecryptor
