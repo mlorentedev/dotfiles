@@ -234,6 +234,17 @@ backend flip. `migrate` never derives `item`/`field` from the `id`; a missing `b
 block is an error (`--item`/`--field` exist only as a one-off override). At cutover,
 `SetBackendBW` flips `backend: age → bw` and re-emits the already-declared target.
 
+### Registry identity — the `id` is the env var; the `item` groups and is mutable
+
+One registry entry per **env var**, and the `id` **is** that env var name — the stable
+consumer contract apps depend on (`OPENAI_API_KEY`, `X_BEARER_TOKEN`). The Bitwarden
+`bw.item` is a **mutable pointer**: it GROUPS related vars (the 7 `X_*` entries share
+`item: x-twitter-api`, distinct `field`s) and can be renamed by editing only that line —
+consumers never reference it. A consequence: every entry is single-var, so
+`SetBackendBW`/`migrate` apply uniformly with **no multi-field special case** (the
+former M3/M6 blocker dissolves). Global env-var uniqueness falls out for free, since the
+`id` is the var and ids are unique (closes the B1 audit gap at the schema level).
+
 ### Schema reconciliation — `folder` is not part of the mapping
 
 The shipped `BWSource` is `{ item, field }` — **no `folder` key** (the §"Registry
