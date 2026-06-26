@@ -192,7 +192,7 @@ func createAbsent(cmd *cobra.Command, item, field, value string, dryRun, assumeY
 	if err := bwWriter.CreateItem(item, field, value); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "created item  %s (field %s)\n", item, field)
+	_, _ = fmt.Fprintf(out, "created item  %s (field %s)\n", item, field)
 	return nil
 }
 
