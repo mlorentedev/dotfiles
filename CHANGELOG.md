@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/mlorentedev/dotfiles/compare/v0.24.0...v0.25.0) (2026-06-26)
+
+
+### Features
+
+* **secrets:** add `dotf secrets set` idempotent bw write command ([#621](https://github.com/mlorentedev/dotfiles/issues/621)) ([3c6a7ab](https://github.com/mlorentedev/dotfiles/commit/3c6a7ab52663fff3ca305ba97c905d52d63acb5c))
+
 ## [0.24.0](https://github.com/mlorentedev/dotfiles/compare/v0.23.0...v0.24.0) (2026-06-26)
 
 
