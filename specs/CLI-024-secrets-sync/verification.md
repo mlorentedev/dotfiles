@@ -21,8 +21,11 @@ created: "2026-06-26"
   (zero setter calls; output has byte lengths, asserts neither secret value appears).
 - [x] **AC5 — `--repo` default + bad slug** -> `TestSecretsSyncCi_RepoResolution`
   (origin default via injected `repoOriginResolver`; invalid `owner/name` errors, no upload).
-- [ ] **AC6 — parity gate before retirement** -> **PR-B**: parity check logged + the diff
-  removes the script, its bats, `ls --pairs`, and `TestSecretsLs_Pairs_EnvOnly`.
+- [x] **AC6 — retirement (PR-B)** -> the diff removes `github-secrets-manager.sh`, its bats,
+  `ls --pairs` + `TestSecretsLs_Pairs_EnvOnly`, and lifts the migrate `ci:*` guard; all
+  dangling references updated. ⚠ The **parity check** (`sync ci --dry-run` set == the legacy
+  script's uploaded set) is the operator's pre-merge gate (#612 C8, needs `gh auth`), logged
+  on the PR before merging.
 - [x] **AC7 — clean + additive (PR-A scope)** -> full suite green; `go vet` + `golangci-lint
   --exclude-use-default=false` exit 0; gofmt-clean. (Retirements are PR-B.)
 

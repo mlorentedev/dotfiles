@@ -142,10 +142,6 @@ setup() {
     [ -x "$DOTFILES_DIR/scripts/utils.sh" ]
 }
 
-@test "github-secrets-manager.sh is executable" {
-    [ -x "$DOTFILES_DIR/scripts/github-secrets-manager.sh" ]
-}
-
 @test "age-encrypt-decrypt.sh is executable" {
     [ -x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh" ]
 }

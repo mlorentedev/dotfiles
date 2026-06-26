@@ -67,7 +67,7 @@ echo "Shell: ${ZSH_VERSION:+zsh $ZSH_VERSION}${BASH_VERSION:+bash $BASH_VERSION}
 
 # ==================================================
 section "1/15" "Script Syntax Validation"
-for script in utils.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
+for script in utils.sh age-encrypt-decrypt.sh install-precommit.sh dotfiles-sync.sh; do
     if [[ -f "$SCRIPTS_DIR/$script" ]]; then
         if bash -n "$SCRIPTS_DIR/$script" 2>/dev/null; then
             pass "$script syntax OK"
@@ -385,39 +385,6 @@ else
 fi
 
 # ==================================================
-section "13/15" "GitHub Secrets Manager"
-# ==================================================
-
-if [[ -f "$SCRIPTS_DIR/github-secrets-manager.sh" ]]; then
-    pass "github-secrets-manager.sh: file exists"
-
-    if bash -n "$SCRIPTS_DIR/github-secrets-manager.sh" 2>/dev/null; then
-        pass "github-secrets-manager.sh: syntax OK"
-    else
-        fail "github-secrets-manager.sh: syntax errors"
-    fi
-
-    subsection "--list option"
-    # Test --list option (should work without gh auth for listing)
-    list_output=$("$SCRIPTS_DIR/github-secrets-manager.sh" --list 2>&1)
-    if echo "$list_output" | grep -q "Available secrets\|GITHUB_PERSONAL_ACCESS_TOKEN\|Error"; then
-        pass "github-secrets-manager.sh --list: produces output"
-    else
-        fail "github-secrets-manager.sh --list: no output"
-    fi
-
-    subsection "--from-mapping option parsing"
-    # Just test that the option is recognized (won't actually upload without gh auth)
-    if "$SCRIPTS_DIR/github-secrets-manager.sh" --from-mapping --help 2>&1 | grep -q "Usage\|Error\|authenticated"; then
-        pass "github-secrets-manager.sh: recognizes --from-mapping"
-    else
-        pass "github-secrets-manager.sh: --from-mapping parsed (may need gh auth)"
-    fi
-else
-    fail "github-secrets-manager.sh: not found"
-fi
-
-# ==================================================
 section "14/15" "Environment Variables Configuration"
 # ==================================================
 
@@ -464,7 +431,7 @@ for link in "$HOME/.zsh/aliases.zsh" "$HOME/.zsh/functions.zsh" "$HOME/.zsh/nvm.
 done
 
 subsection "Script permissions"
-for script in utils.sh age-encrypt-decrypt.sh github-secrets-manager.sh install-precommit.sh dotfiles-sync.sh; do
+for script in utils.sh age-encrypt-decrypt.sh install-precommit.sh dotfiles-sync.sh; do
     if [[ -x "$SCRIPTS_DIR/$script" ]]; then
         pass "$script: executable"
     elif [[ -f "$SCRIPTS_DIR/$script" ]]; then
