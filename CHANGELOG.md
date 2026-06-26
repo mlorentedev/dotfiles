@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/mlorentedev/dotfiles/compare/v0.27.0...v0.28.0) (2026-06-26)
+
+
+### Features
+
+* **secrets:** dotf secrets sync ci (backend-agnostic Actions materialization) ([#632](https://github.com/mlorentedev/dotfiles/issues/632)) ([e34ab89](https://github.com/mlorentedev/dotfiles/commit/e34ab89b95d3ce92ab126196be2f47c8359de209))
+
 ## [0.27.0](https://github.com/mlorentedev/dotfiles/compare/v0.26.0...v0.27.0) (2026-06-26)
 
 
