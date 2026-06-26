@@ -385,7 +385,7 @@ EOF
     [ ! -f "$REPO/harness/enforced/demo.md" ]
 }
 
-@test "ENGINE-002: AC6 behavioral — the drift gate dotf doctor wires passes clean, fails tampered" {
+@test "ENGINE-002: AC6 behavioral - the drift gate dotf doctor wires passes clean, fails tampered" {
     # `dotf doctor` gates on `if compile-harness.sh --check; then pass; else fail`
     # (checkHarnessDrift). Running the full doctor here can't isolate that gate
     # (unrelated tool/vault checks would dominate its exit code), so we exercise the
@@ -398,4 +398,172 @@ EOF
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
     [[ "$output" == *"DRIFT"* ]]
+}
+
+# --- ADR-027 / HARNESS-043: agents (curator dogfood slice) ---
+# --refresh writes committed AGENT.md records (vault definitions -> harness/agents).
+# --deploy renders each record to its harness-native agent path (agent-md = single
+# file) and enforces forced-skill PRESENCE by injecting an AGENT-PRESENCE marked
+# region into each harness's always-loaded instructions file (uniform across
+# claude/opencode/pi/copilot), coexisting with the patterns region. --check
+# validates the record renders offline.
+
+seed_agents_fixture() {
+    FAKEHOME="$TMP/home"
+    mkdir -p "$FAKEHOME"
+    cat > "$REPO/harness/manifest.json" <<'EOF'
+{ "version": 1, "vault_subpath": "00_meta/patterns",
+  "enforced": [], "targets": [],
+  "agents": { "vault_subpath": "00_meta/agents/definitions", "record_dir": "harness/agents",
+    "schema": "harness/agent-frontmatter.schema.json",
+    "deploy": [ { "agent": "claude", "render": "agent-md", "dir": ".claude/agents" } ],
+    "presence": [
+      { "agent": "claude",   "file": ".claude/CLAUDE.md" },
+      { "agent": "opencode", "file": ".config/opencode/AGENTS.md" },
+      { "agent": "pi",       "file": ".pi/agent/AGENTS.md" },
+      { "agent": "copilot",  "file": ".copilot/copilot-instructions.md" } ] } }
+EOF
+    cat > "$REPO/harness/agent-frontmatter.schema.json" <<'EOF'
+{ "required": ["name", "description", "kind"] }
+EOF
+    mkdir -p "$VAULT/00_meta/agents/definitions/curator"
+    cat > "$VAULT/00_meta/agents/definitions/curator/AGENT.md" <<'EOF'
+---
+name: curator
+description: Crystallize-phase persona.
+kind: invocable
+model: top
+capabilities: [read, search, edit]
+skills: [vault-doctor, crystallize, genre-picker]
+targets: [claude, opencode, pi, copilot]
+---
+
+# Curator
+
+Body line one.
+EOF
+}
+
+# Seed a harness instructions file with a pre-existing patterns region + user
+# content, so a presence injection must coexist with (never disturb) both.
+seed_instructions_file() {
+    mkdir -p "$(dirname "$1")"
+    printf 'user intro\n\n<!-- BEGIN HARNESS GENERATED -->\npatterns content\n<!-- END HARNESS GENERATED -->\n\nuser outro\n' > "$1"
+}
+
+@test "agents: --refresh writes a verbatim AGENT.md record (no provenance, no \$HOME)" {
+    seed_agents_fixture
+    run_refresh
+    [ "$status" -eq 0 ]
+    [ -f "$REPO/harness/agents/curator/AGENT.md" ]
+    diff "$VAULT/00_meta/agents/definitions/curator/AGENT.md" "$REPO/harness/agents/curator/AGENT.md"
+    ! grep -q '^generated' "$REPO/harness/agents/curator/AGENT.md"
+    [ ! -d "$FAKEHOME/.claude/agents" ]
+}
+
+@test "agents: --deploy renders agent-md (name+description+provenance; neutral keys dropped)" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    [ -f "$F" ]
+    grep -q '^name: curator' "$F"
+    grep -q '^description: ' "$F"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$F"
+    grep -q '^generated_from: 00_meta/agents/definitions/curator/AGENT.md' "$F"
+    grep -qF 'Body line one.' "$F"
+    # neutral-only / deferred keys must NOT leak into the native agent frontmatter
+    ! grep -qE '^(kind|model|capabilities|skills|targets):' "$F"
+}
+
+@test "agents: --deploy injects a presence region (forced skills) into every harness instructions file" {
+    seed_agents_fixture
+    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
+    seed_instructions_file "$FAKEHOME/.config/opencode/AGENTS.md"
+    seed_instructions_file "$FAKEHOME/.pi/agent/AGENTS.md"
+    seed_instructions_file "$FAKEHOME/.copilot/copilot-instructions.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    for f in "$FAKEHOME/.claude/CLAUDE.md" "$FAKEHOME/.config/opencode/AGENTS.md" \
+             "$FAKEHOME/.pi/agent/AGENTS.md" "$FAKEHOME/.copilot/copilot-instructions.md"; do
+        # presence region present, naming the persona + its forced skills
+        grep -q 'BEGIN HARNESS AGENT-PRESENCE' "$f"
+        grep -q 'END HARNESS AGENT-PRESENCE' "$f"
+        grep -q 'curator' "$f"
+        grep -q 'vault-doctor' "$f"
+        # the pre-existing patterns region + user content survive untouched
+        grep -q 'patterns content' "$f"
+        grep -q 'user intro' "$f"
+        grep -q 'user outro' "$f"
+    done
+}
+
+@test "agents: presence injection is idempotent and leaves the patterns region intact" {
+    seed_agents_fixture
+    F="$FAKEHOME/.config/opencode/AGENTS.md"
+    seed_instructions_file "$F"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    # exactly one presence region after two deploys (no accumulation)
+    [ "$(grep -c 'BEGIN HARNESS AGENT-PRESENCE' "$F")" -eq 1 ]
+    [ "$(grep -c 'END HARNESS AGENT-PRESENCE' "$F")" -eq 1 ]
+    # the patterns region is still single and intact
+    [ "$(grep -c 'BEGIN HARNESS GENERATED' "$F")" -eq 1 ]
+    grep -q 'patterns content' "$F"
+}
+
+@test "agents: --check validates the record renders offline (no vault)" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run env VAULT_PATH="$TMP/nonexistent" "$SCRIPT" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no harness drift"* ]]
+}
+
+@test "agents: --check fails when a record is missing a required key (kind)" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    printf -- '---\nname: curator\ndescription: no kind on purpose.\n---\n\n# x\n' > "$REPO/harness/agents/curator/AGENT.md"
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"kind"* ]]
+}
+
+@test "agents: per-agent targets[] excludes a non-targeted harness from deploy" {
+    seed_agents_fixture
+    mkdir -p "$VAULT/00_meta/agents/definitions/scribe"
+    printf -- '---\nname: scribe\ndescription: opencode only.\nkind: invocable\ntargets: [opencode]\n---\n\n# Scribe\n' > "$VAULT/00_meta/agents/definitions/scribe/AGENT.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    [ -f "$FAKEHOME/.claude/agents/curator.md" ]
+    [ ! -f "$FAKEHOME/.claude/agents/scribe.md" ]
+}
+
+@test "agents: presence appends a fresh region when the file has no presence markers" {
+    seed_agents_fixture
+    F="$FAKEHOME/.pi/agent/AGENTS.md"
+    mkdir -p "$(dirname "$F")"
+    printf 'just user content, no markers\n' > "$F"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    grep -q 'just user content' "$F"
+    grep -q 'BEGIN HARNESS AGENT-PRESENCE' "$F"
+    grep -q 'vault-doctor' "$F"
+}
+
+@test "agents: presence respects per-agent targets[] (a persona only appears for harnesses it targets)" {
+    seed_agents_fixture
+    mkdir -p "$VAULT/00_meta/agents/definitions/scribe"
+    printf -- '---\nname: scribe\ndescription: opencode only.\nkind: invocable\nskills: [docs-skill]\ntargets: [opencode]\n---\n\n# Scribe\n' > "$VAULT/00_meta/agents/definitions/scribe/AGENT.md"
+    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
+    seed_instructions_file "$FAKEHOME/.config/opencode/AGENTS.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    # claude: curator targets it, scribe does not
+    grep -q 'curator' "$FAKEHOME/.claude/CLAUDE.md"
+    ! grep -q 'scribe' "$FAKEHOME/.claude/CLAUDE.md"
+    # opencode: both personas target it
+    grep -q 'curator' "$FAKEHOME/.config/opencode/AGENTS.md"
+    grep -q 'scribe' "$FAKEHOME/.config/opencode/AGENTS.md"
 }
