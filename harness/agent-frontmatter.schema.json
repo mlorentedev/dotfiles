@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mlorentedev.dev/schemas/agent-frontmatter.schema.json",
+  "title": "AGENT.md frontmatter",
+  "description": "Contract for neutral cross-harness agent definitions validated by compile-harness.sh before render (ADR-027). The definition is provider-neutral; the compile layer maps neutral fields (model tier, capabilities) and emits each harness's determinism hooks. Required = the universal subset every persona carries (name + description for the native agent file, kind to branch coexistence). Lives in the repo (not the vault) so validation runs offline, consistent with the skill pipeline (SDD-008).",
+  "type": "object",
+  "required": ["name", "description", "kind"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "description": "Persona identifier; also the deployed agent file name." },
+    "description": { "type": "string", "minLength": 1, "description": "When-to-invoke / trigger text the harness matches against." },
+    "kind": { "type": "string", "enum": ["invocable", "autonomous"], "description": "invocable = no 80_agents/ state; autonomous = persona cataloged here, live state in 80_agents/<name>/." },
+    "model": { "type": "string", "description": "Neutral tier (top|mid|low); mapped to a provider id via model-map at compile (H-044). Dropped from the slice render." },
+    "capabilities": { "description": "Neutral capability vocab (e.g. [read, search, edit, shell, web]); mapped to provider tools via capability-map at compile (H-044)." },
+    "skills": { "description": "Forced-consumption skills; compiled to the harness determinism hook (presence/action/dispatch)." },
+    "targets": { "description": "Optional per-agent harness allowlist (e.g. [claude]); absent = all harnesses." },
+    "id": { "type": "string" },
+    "type": { "type": "string" },
+    "status": { "type": "string" },
+    "created": {}
+  },
+  "additionalProperties": true
+}

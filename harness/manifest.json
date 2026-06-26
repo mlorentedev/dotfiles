@@ -33,5 +33,19 @@
       { "agent": "pi",       "render": "skill",   "dir": ".pi/agent/skills" }
     ],
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
+  },
+  "agents": {
+    "vault_subpath": "00_meta/agents/definitions",
+    "record_dir": "harness/agents",
+    "schema": "harness/agent-frontmatter.schema.json",
+    "deploy": [
+      { "agent": "claude", "render": "agent-md", "dir": ".claude/agents" }
+    ],
+    "presence": [
+      { "agent": "claude",   "file": ".claude/CLAUDE.md" },
+      { "agent": "opencode", "file": ".config/opencode/AGENTS.md" },
+      { "agent": "pi",       "file": ".pi/agent/AGENTS.md" },
+      { "agent": "copilot",  "file": ".copilot/copilot-instructions.md" }
+    ]
   }
 }
