@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.27.0](https://github.com/mlorentedev/dotfiles/compare/v0.26.0...v0.27.0) (2026-06-26)
+
+
+### Features
+
+* **secrets:** add `dotf secrets migrate` (age→bw cutover, parity-gated) ([#627](https://github.com/mlorentedev/dotfiles/issues/627)) ([0453fc2](https://github.com/mlorentedev/dotfiles/commit/0453fc24af9094550bbcb14fa6405d7edc9b9cc3))
+
+
+### Bug Fixes
+
+* **mem:** resolve a real bash, not the System32 WSL launcher, for vault-health ([#629](https://github.com/mlorentedev/dotfiles/issues/629)) ([1a664d4](https://github.com/mlorentedev/dotfiles/commit/1a664d4c3fc6f2a49069376b44feca00d517e517))
+
 ## [0.26.0](https://github.com/mlorentedev/dotfiles/compare/v0.25.0...v0.26.0) (2026-06-26)
 
 
