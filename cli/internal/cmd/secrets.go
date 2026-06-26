@@ -137,13 +137,10 @@ func loadRegistry() (*secrets.Registry, error) {
 	return secrets.ParseRegistry(data)
 }
 
-// newSecretsLsCmd lists registry ids with plane + exposed vars — never values.
-// With --pairs it instead prints one "VAR\t<age-source>" line per age env secret
-// (file and bw secrets excluded), the machine-readable form github-secrets-manager.sh
-// consumes in place of the retired env-mapping.conf. bw secrets carry no age source,
-// so the age-based CI-push path skips them (rethought in the migration follow-up).
+// newSecretsLsCmd lists registry ids with plane + exposed vars — never values. The CI
+// upload path is `dotf secrets sync ci` (backend-agnostic), which owns selection end to
+// end; the former `--pairs` (VAR<TAB>age-source, age-only) was the backend leak it retired.
 func newSecretsLsCmd() *cobra.Command {
-	var pairs bool
 	c := &cobra.Command{
 		Use:          "ls",
 		Short:        "List registry secret ids with plane and exposed vars (no values)",
@@ -155,15 +152,6 @@ func newSecretsLsCmd() *cobra.Command {
 				return err
 			}
 			w := cmd.OutOrStdout()
-			if pairs {
-				for _, e := range reg.Entries(env.Home()) {
-					if e.IsFile || e.Backend == "bw" {
-						continue // file secrets aren't GitHub Actions secrets; bw has no age source
-					}
-					_, _ = fmt.Fprintf(w, "%s\t%s\n", e.Var, e.File)
-				}
-				return nil
-			}
 			for i := range reg.Secrets {
 				s := &reg.Secrets[i]
 				_, _ = fmt.Fprintf(w, "%-26s %-9s %s\n", s.ID, s.Plane, strings.Join(s.Vars(), ","))
@@ -171,7 +159,6 @@ func newSecretsLsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().BoolVar(&pairs, "pairs", false, "print VAR<TAB>age-source for each env secret (file secrets excluded)")
 	return c
 }
 

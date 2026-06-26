@@ -56,8 +56,8 @@ gh auth status
 # Check you're in a git repo
 gh repo view
 
-# Try listing first
-github-secrets-manager.sh --list
+# Preview the VAR->repo set first (no values, no upload)
+dotf secrets sync ci --repo OWNER/REPO --dry-run
 ```
 
 **Common causes:**

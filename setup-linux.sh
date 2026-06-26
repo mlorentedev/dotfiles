@@ -95,7 +95,6 @@ deploy_file "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
 # readline config (POLISH-004): case-insensitive completion + smart history.
 deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
-chmod +x "$DOTFILES_DIR/scripts/github-secrets-manager.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"

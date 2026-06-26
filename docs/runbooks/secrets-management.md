@@ -87,12 +87,16 @@ source ~/.zshrc
 
 ### GitHub Secrets
 
+`dotf secrets sync ci` materializes a repo's CI secrets to its GitHub Actions secrets,
+backend-agnostically (age **or** Bitwarden). A secret feeds a repo's CI when its
+`consumers:` contains `ci:<owner>/<repo>`.
+
 | Command | Description |
 |---------|-------------|
-| `github-secrets-manager.sh --list` | List secrets in env-mapping.conf |
-| `github-secrets-manager.sh --from-mapping` | Upload all to GitHub |
-| `github-secrets-manager.sh --from-mapping --select VAR1 VAR2` | Upload specific |
-| `github-secrets-manager.sh /path/to/.env` | Upload from .env file |
+| `dotf secrets ls` | List registry secret ids, plane, and exposed vars (no values) |
+| `dotf secrets sync ci --repo OWNER/REPO --dry-run` | Preview the VAR→repo set (no values, no upload) |
+| `dotf secrets sync ci --repo OWNER/REPO` | Upload the repo's `ci:<owner>/<repo>` secrets to its Actions secrets |
+| `dotf secrets sync ci` | Same, targeting the current repo's origin |
 
 ## Adding a New Env Var Secret
 
@@ -165,7 +169,7 @@ File secret behavior:
 - Files deployed with `chmod 600`
 - Caching: skips re-decrypt if dest is newer than `.age` source
 - `secrets_refresh` removes deployed file to force re-decrypt
-- File secrets are skipped by `github-secrets-manager.sh`
+- File secrets are skipped by `dotf secrets sync ci` (not GitHub Actions secrets)
 
 ## Syncing After Changes
 
