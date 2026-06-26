@@ -57,7 +57,7 @@ teardown() {
     [ ! -f "$DST" ]
 }
 
-@test "deploy_file: drift recovery — removes pre-existing symlink at target" {
+@test "deploy_file: drift recovery - removes pre-existing symlink at target" {
     # Simulate legacy state: ln -sf strategy left a symlink
     other="$TEST_TMPDIR/somewhere-else"
     echo "stale" > "$other"
