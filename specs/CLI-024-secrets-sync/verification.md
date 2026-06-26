@@ -5,34 +5,35 @@ created: "2026-06-26"
 
 # Verification - CLI-024-secrets-sync
 
-> Status: **draft** — filled at implementation time. The AC skeleton below is the checklist
-> the implementer ticks with concrete proof (test name + commit). No evidence is fabricated
-> ahead of the work.
+> Status: **PR-A implemented + verified** (the `sync ci` command). AC6/AC7-retirement land in
+> PR-B (the parity-gated removal of the shell twin). No evidence is fabricated.
 
 ## Evidence
 
-- [ ] **AC1 — selects + uploads the repo's CI set** -> `TestSecretsSyncCi_SelectsRepoSet`
+- [x] **AC1 — selects + uploads the repo's CI set** -> `TestSecretsSyncCi_SelectsRepoSet`
   (fake resolver + fake setter; asserts the exact `(repo, VAR, value)` calls; other-repo
-  entries not selected).
-- [ ] **AC2 — backend-agnostic** -> `TestSecretsSyncCi_AgeAndBwUploadIdentically`
-  (one age + one bw entry both reach the setter).
-- [ ] **AC3 — exclusions specific + silent-free** -> `TestSecretsSyncCi_Exclusions`
+  entries not selected) + `TestSelectCI` (pure-helper coverage).
+- [x] **AC2 — backend-agnostic** -> `TestSecretsSyncCi_AgeAndBwUploadIdentically`
+  (one age + one bw entry both reach the setter with their resolved values).
+- [x] **AC3 — exclusions specific + silent-free** -> `TestSecretsSyncCi_Exclusions`
   (file / floor|age-offline / `GITHUB_*` each skipped with a distinct reason, no setter call).
-- [ ] **AC4 — `--dry-run` inert + non-leaking** -> `TestSecretsSyncCi_DryRunInert`
-  (zero setter calls; output has byte lengths, never a value).
-- [ ] **AC5 — `--repo` default + bad slug** -> `TestSecretsSyncCi_RepoResolution`
-  (origin default via injected repo-root; invalid `owner/name` errors).
-- [ ] **AC6 — parity gate before retirement** -> parity check logged below + the diff removes
-  the script, its bats, `ls --pairs`, and `TestSecretsLs_Pairs_EnvOnly`.
-- [ ] **AC7 — clean + additive** -> full suite green; `go vet` + `golangci-lint
-  --exclude-use-default=false` exit 0; gofmt-clean on LF blobs.
+- [x] **AC4 — `--dry-run` inert + non-leaking** -> `TestSecretsSyncCi_DryRunInert`
+  (zero setter calls; output has byte lengths, asserts neither secret value appears).
+- [x] **AC5 — `--repo` default + bad slug** -> `TestSecretsSyncCi_RepoResolution`
+  (origin default via injected `repoOriginResolver`; invalid `owner/name` errors, no upload).
+- [ ] **AC6 — parity gate before retirement** -> **PR-B**: parity check logged + the diff
+  removes the script, its bats, `ls --pairs`, and `TestSecretsLs_Pairs_EnvOnly`.
+- [x] **AC7 — clean + additive (PR-A scope)** -> full suite green; `go vet` + `golangci-lint
+  --exclude-use-default=false` exit 0; gofmt-clean. (Retirements are PR-B.)
 
 ## Test status
 
-- `cd cli && go test ./...` -> _pending_
-- Lint: `golangci-lint run --exclude-use-default=false ./internal/...`; `go vet ./...` -> _pending_
-- Parity (AC6): `dotf secrets sync ci --repo mlorentedev/dotfiles --dry-run` VAR set vs the
-  legacy `github-secrets-manager.sh --from-mapping --list` set -> _pending_ (record both lists).
+- `cd cli && go test ./...` -> all packages `ok` (secrets + cmd suites incl. the 7 new tests).
+- Lint: `golangci-lint run --exclude-use-default=false ./internal/...` exit 0; `go vet ./...`
+  clean; `gofmt -l` clean on the new files.
+- Smoke: `go run ./cmd/dotf secrets sync ci --help` renders the command + flags.
+- Parity (AC6, PR-B): `dotf secrets sync ci --repo mlorentedev/dotfiles --dry-run` VAR set vs
+  the legacy `github-secrets-manager.sh --from-mapping --list` set -> _to record in PR-B_.
 - Live `gh secret set` + a real `bw`-backed resolve are the canary smoke (#612 C8) with the
   operator's `bw unlock` + `gh auth` — Windows-empirical, not CI.
 

@@ -89,13 +89,20 @@ so `migrate <ci-var>` no longer drops it — the `migrateGuard`'s `ci:*` refusal
 
 ## Risks / open questions
 
-- **Consumer-tag migration is a registry edit with cross-repo reach.** This slice migrates
-  **dotfiles' own** CI tags (`ci:release`, `ci:bitacora`, `ci:image-push`) to
-  `ci:mlorentedev/dotfiles` — the entries C5 actually unblocks and can verify. The
-  remaining purpose tags belonging to *other* repos (`ci:payments`, `ci:newsletter`,
-  `ci:social`, `ci:publish`, `ci:yt-metrics`) are swept to `ci:<owner>/<repo>` **with the
-  operator confirming each owner/repo** — tracked as an explicit task here, never silently
-  dropped (a half-migrated registry is tolerated by the parser and by `migrateGuard`'s
+- **Consumer-tag migration is a registry edit with cross-repo reach.** Which entries are
+  dotfiles' own is determined by **evidence, not naming**: a grep of `.github/workflows/`
+  shows dotfiles actually consumes only `RELEASE_TOKEN` (`ci:release`, used by
+  release-please + pat-expiry) and `BITACORA_PAT` (`ci:bitacora`, used by add-to-project +
+  bitacora-status + pat-expiry). `GITHUB_TOKEN` is the built-in Actions token, never a
+  registry secret. So this slice migrates **only** `ci:release` + `ci:bitacora` →
+  `ci:mlorentedev/dotfiles`. **`ci:image-push` (DOCKERHUB_TOKEN/USERNAME) is NOT dotfiles'**
+  — no dotfiles workflow references it — so it joins the operator-confirmed sweep, not this
+  slice. Mislabeling it as dotfiles would push another repo's DockerHub creds into dotfiles'
+  Actions — precisely the cross-repo leak the `ci:<owner>/<repo>` routing exists to prevent.
+  The remaining purpose tags (`ci:image-push`, `ci:payments`, `ci:newsletter`, `ci:social`,
+  `ci:publish`, `ci:yt-metrics`) are swept to `ci:<owner>/<repo>` **with the operator
+  confirming each owner/repo** — tracked as an explicit task here, never silently dropped (a
+  half-migrated registry is tolerated by the parser and by `migrateGuard`'s
   `HasPrefix(c, "ci:")` check, so the sweep can land incrementally without breakage).
 - **`GITHUB_*` vars cannot become Actions secrets.** GitHub reserves the prefix; the
   legacy script skips them. `sync ci` must exclude them with a clear message — and the real
