@@ -43,11 +43,14 @@ created: "2026-06-26"
 
 ## PR-B (next — retirement, parity-gated)
 
-- [ ] **Parity gate, then retire** — confirm `sync ci --dry-run` VAR set == the legacy script's
-  uploaded set for dotfiles; then delete `scripts/github-secrets-manager.sh`,
-  `tests/github-secrets-manager.bats`, the `ls --pairs` flag, and `TestSecretsLs_Pairs_EnvOnly`.
-- [ ] **Lift the migrate guard** — remove the `ci:*` refusal in `secrets_migrate.go`'s
-  `migrateGuard` (now that `sync` is the backend-agnostic upload path) + drop/adjust its test.
+- [x] **Retire the legacy path** — deleted `scripts/github-secrets-manager.sh`,
+  `tests/github-secrets-manager.bats`, the `ls --pairs` flag + `TestSecretsLs_Pairs_EnvOnly`,
+  and the dangling references (test.sh, setup-linux.sh, verify-setup.bats, pat-expiry.yml,
+  runbooks/troubleshooting docs). ⚠ **Parity gate is a pre-merge step (operator):** confirm
+  `sync ci --dry-run` VAR set == the legacy script's uploaded set before merging (#612 C8,
+  Windows-empirical — needs `gh auth`).
+- [x] **Lift the migrate guard** — removed the `ci:*` refusal in `secrets_migrate.go`'s
+  `migrateGuard` (now that `sync` is the backend-agnostic upload path) + dropped its test case.
 
 ## Follow-ups (tracked, not in this slice)
 

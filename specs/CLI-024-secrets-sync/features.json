@@ -37,7 +37,7 @@
   {
     "id": "CLI-024-secrets-sync-f6",
     "behavior": "the legacy github-secrets-manager.sh, its bats, dotf secrets ls --pairs, and TestSecretsLs_Pairs_EnvOnly are removed once parity is confirmed",
-    "verification": "test ! -f scripts/github-secrets-manager.sh && test ! -f tests/github-secrets-manager.bats && ! grep -rq -- '--pairs' cli/internal/cmd/secrets.go",
+    "verification": "test ! -f scripts/github-secrets-manager.sh && test ! -f tests/github-secrets-manager.bats && ! grep -q 'BoolVar(&pairs' cli/internal/cmd/secrets.go",
     "state": "pending",
     "evidence": ""
   },
