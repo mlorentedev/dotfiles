@@ -39,11 +39,25 @@ func newSecretsCmd() *cobra.Command {
 }
 
 // registryPath resolves secrets/registry.yaml (the mapping SSOT); a var so tests
-// can point it at a fixture. ageDecryptor is the decrypt seam (nil → AgeDecrypt).
+// can point it at a fixture. ageDecryptor is the age decrypt seam (nil → AgeDecrypt);
+// bwReader is the Bitwarden read seam (BWGet in production), both overridable so
+// command tests inject fakes with no age key and no unlocked Bitwarden.
 var (
 	registryPath = func() string { return filepath.Join(env.DotfilesDir(env.Home()), "secrets", "registry.yaml") }
 	ageDecryptor secrets.Decryptor
+	bwReader     secrets.BWReader = secrets.BWGet{}
 )
+
+// secretLoader builds the resolution engine wired with both backend seams, over the
+// age store in <dotfiles>/sensitive and the operator's Bitwarden via bwReader.
+func secretLoader() *secrets.Loader {
+	return &secrets.Loader{
+		SecretsDir: filepath.Join(env.DotfilesDir(env.Home()), "sensitive"),
+		KeyPath:    ageKeyPath(),
+		Decrypt:    ageDecryptor,
+		BW:         bwReader,
+	}
+}
 
 func loadRegistry() (*secrets.Registry, error) {
 	data, err := os.ReadFile(registryPath())
@@ -54,9 +68,10 @@ func loadRegistry() (*secrets.Registry, error) {
 }
 
 // newSecretsLsCmd lists registry ids with plane + exposed vars — never values.
-// With --pairs it instead prints one "VAR\t<age-source>" line per env secret
-// (file secrets excluded), the machine-readable form github-secrets-manager.sh
-// consumes in place of the retired env-mapping.conf.
+// With --pairs it instead prints one "VAR\t<age-source>" line per age env secret
+// (file and bw secrets excluded), the machine-readable form github-secrets-manager.sh
+// consumes in place of the retired env-mapping.conf. bw secrets carry no age source,
+// so the age-based CI-push path skips them (rethought in the migration follow-up).
 func newSecretsLsCmd() *cobra.Command {
 	var pairs bool
 	c := &cobra.Command{
@@ -72,8 +87,8 @@ func newSecretsLsCmd() *cobra.Command {
 			w := cmd.OutOrStdout()
 			if pairs {
 				for _, e := range reg.Entries(env.Home()) {
-					if e.IsFile {
-						continue // file secrets are not GitHub Actions secrets
+					if e.IsFile || e.Backend == "bw" {
+						continue // file secrets aren't GitHub Actions secrets; bw has no age source
 					}
 					_, _ = fmt.Fprintf(w, "%s\t%s\n", e.Var, e.File)
 				}
@@ -104,13 +119,11 @@ func newSecretsShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			name, src, err := showSource(reg, args[0])
+			entry, err := reg.ShowEntry(args[0])
 			if err != nil {
 				return err
 			}
-			secretsDir := filepath.Join(env.DotfilesDir(env.Home()), "sensitive")
-			loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: ageKeyPath(), Decrypt: ageDecryptor}
-			kv, err := loader.EnvFor([]secrets.Entry{{Var: name, File: src}}, nil)
+			kv, err := secretLoader().EnvFor([]secrets.Entry{entry}, nil)
 			if err != nil {
 				return err
 			}
@@ -143,9 +156,7 @@ func newSecretsRenderCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			secretsDir := filepath.Join(env.DotfilesDir(env.Home()), "sensitive")
-			loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: ageKeyPath(), Decrypt: ageDecryptor}
-			res, err := secrets.Render(args[0], reg, loader, env.Home())
+			res, err := secrets.Render(args[0], reg, secretLoader(), env.Home())
 			if err != nil {
 				return err
 			}
@@ -159,29 +170,6 @@ func newSecretsRenderCmd() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-// showSource picks the single env var + age source `show` will decrypt, rejecting
-// file and multi-var secrets with guidance to use `run`.
-func showSource(reg *secrets.Registry, idOrVar string) (name, src string, err error) {
-	s := reg.Lookup(idOrVar)
-	if s == nil {
-		return "", "", fmt.Errorf("unknown secret %q (try `dotf secrets ls`)", idOrVar)
-	}
-	if !s.AgeBacked() {
-		return "", "", fmt.Errorf("%q uses the %s backend, not yet supported (ADR-028 Phase 3)", s.ID, s.Backend)
-	}
-	if s.Expose.File != nil {
-		return "", "", fmt.Errorf("%q is a file secret; use `dotf secrets run --only %s -- <cmd>`", s.ID, s.ID)
-	}
-	if len(s.Expose.Env.Vars) != 1 {
-		return "", "", fmt.Errorf("%q exposes %d vars; use `dotf secrets run --only %s -- <cmd>`", s.ID, len(s.Expose.Env.Vars), s.ID)
-	}
-	v := s.Expose.Env.Vars[0]
-	if src = v.Age; src == "" {
-		src = s.Age
-	}
-	return v.Name, src, nil
 }
 
 func newSecretsRunCmd() *cobra.Command {
@@ -213,8 +201,7 @@ func newSecretsRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			secretsDir := filepath.Join(env.DotfilesDir(env.Home()), "sensitive")
-			childEnv, err := buildChildEnv(reg, secretsDir, ageKeyPath(), sel)
+			childEnv, err := buildChildEnv(reg, sel)
 			if err != nil {
 				return err
 			}
@@ -232,12 +219,10 @@ func newSecretsRunCmd() *cobra.Command {
 	return c
 }
 
-// buildChildEnv flattens the registry to entries, decrypts the selected secrets,
-// and returns the parent environment with the decrypted KEY=VALUE pairs appended.
-func buildChildEnv(reg *secrets.Registry, secretsDir, keyPath string, only map[string]bool) ([]string, error) {
-	entries := reg.Entries(env.Home())
-	loader := &secrets.Loader{SecretsDir: secretsDir, KeyPath: keyPath, Decrypt: ageDecryptor}
-	injected, err := loader.EnvFor(entries, only)
+// buildChildEnv flattens the registry to entries, resolves the selected secrets
+// (per-backend), and returns the parent environment with the KEY=VALUE pairs appended.
+func buildChildEnv(reg *secrets.Registry, only map[string]bool) ([]string, error) {
+	injected, err := secretLoader().EnvFor(reg.Entries(env.Home()), only)
 	if err != nil {
 		return nil, err
 	}

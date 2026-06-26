@@ -9,8 +9,8 @@ import (
 
 // Registry is secrets/registry.yaml — the mapping SSOT of ADR-028 §2: it ties each
 // logical secret (a stable kebab id) to its store source, the env/file it exposes,
-// and its consumers/rotation. This package reads the age backend (current reality);
-// `backend: bw` resolution lands when items migrate (ADR-028 Phase 3).
+// and its consumers/rotation. Both the age backend (the local age store) and the bw
+// backend (Bitwarden, ADR-028 Phase 3) resolve here; the Loader dispatches per entry.
 type Registry struct {
 	Version int      `yaml:"version"`
 	Secrets []Secret `yaml:"secrets"`
@@ -18,15 +18,27 @@ type Registry struct {
 
 // Secret is one registry entry. Age is the base name under sensitive/ (no
 // .secret.age) used as the source for age/age-offline backends, unless an
-// expose.env var overrides it per-var.
+// expose.env var overrides it per-var. BW is the Bitwarden source for the bw
+// backend, unless an expose.env var overrides the field per-var.
 type Secret struct {
-	ID        string   `yaml:"id"`
-	Plane     string   `yaml:"plane"`   // app | infra | personal | floor
-	Backend   string   `yaml:"backend"` // age | age-offline | bw
-	Age       string   `yaml:"age"`
-	Expose    Expose   `yaml:"expose"`
-	Consumers []string `yaml:"consumers"`
-	Rotate    string   `yaml:"rotate"`
+	ID        string    `yaml:"id"`
+	Plane     string    `yaml:"plane"`   // app | infra | personal | floor
+	Backend   string    `yaml:"backend"` // age | age-offline | bw
+	Age       string    `yaml:"age"`
+	BW        *BWSource `yaml:"bw"`
+	Expose    Expose    `yaml:"expose"`
+	Consumers []string  `yaml:"consumers"`
+	Rotate    string    `yaml:"rotate"`
+}
+
+// BWSource is a bw backend source: the Bitwarden item (its unique name or id) and,
+// for a single-var or file secret, the field within it. Multi-var secrets share
+// the item and set the field per-var (expose.env: { VAR: { field: ... } }). The
+// Bitwarden folder is org metadata, not a lookup key — `bw get` resolves by item
+// name/id (ADR-028 §2; folder taxonomy is the curation issue).
+type BWSource struct {
+	Item  string `yaml:"item"`
+	Field string `yaml:"field"`
 }
 
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
@@ -43,17 +55,20 @@ type FileExpose struct {
 	Mode string `yaml:"mode"`
 }
 
-// EnvVar is one exposed env var with an optional per-var age source override.
+// EnvVar is one exposed env var with optional per-var source overrides: Age for
+// age backends, Field for the bw backend.
 type EnvVar struct {
-	Name string
-	Age  string // "" → use the secret's top-level Age
+	Name  string
+	Age   string // "" → use the secret's top-level Age
+	Field string // "" → use the secret's top-level BW.Field
 }
 
 // EnvExpose normalizes the three YAML shapes of expose.env:
 //
-//	env: VAR                    → one var (source = secret.age)
-//	env: [VAR1, VAR2]           → many vars, same source
-//	env: { VAR: {age: file} }   → per-var sources
+//	env: VAR                     → one var (source = secret.age / secret.bw)
+//	env: [VAR1, VAR2]            → many vars, same source
+//	env: { VAR: {age: file} }    → per-var age source
+//	env: { VAR: {field: name} }  → per-var bw field
 type EnvExpose struct {
 	Vars []EnvVar
 }
@@ -72,12 +87,13 @@ func (e *EnvExpose) UnmarshalYAML(node *yaml.Node) error {
 		// Content is a flat [key, value, key, value, ...] list.
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			var src struct {
-				Age string `yaml:"age"`
+				Age   string `yaml:"age"`
+				Field string `yaml:"field"`
 			}
 			if err := node.Content[i+1].Decode(&src); err != nil {
 				return err
 			}
-			e.Vars = append(e.Vars, EnvVar{Name: node.Content[i].Value, Age: src.Age})
+			e.Vars = append(e.Vars, EnvVar{Name: node.Content[i].Value, Age: src.Age, Field: src.Field})
 		}
 	default:
 		return fmt.Errorf("expose.env: unsupported YAML node (kind %d)", node.Kind)
@@ -124,10 +140,14 @@ func (r *Registry) validate() error {
 			return fmt.Errorf("secret %q: expose must have exactly one of env|file", s.ID)
 		}
 
-		// age/age-offline must resolve a source for everything they expose; bw
-		// sources are validated when the bw backend lands (Phase 3).
-		if s.Backend == "age" || s.Backend == "age-offline" {
+		// Each backend must resolve a source for everything it exposes.
+		switch s.Backend {
+		case "age", "age-offline":
 			if err := s.checkAgeSources(); err != nil {
+				return err
+			}
+		case "bw":
+			if err := s.checkBwSources(); err != nil {
 				return err
 			}
 		}
@@ -154,41 +174,95 @@ func (s *Secret) checkAgeSources() error {
 	return nil
 }
 
-// Entries flattens the registry into the same []Entry the age Loader consumes, so
-// `run` resolves through the existing decrypt path. File exposes become IsFile
-// entries (Dest = ~-expanded path); env exposes become one entry per var, each
-// pointing at its per-var or the secret's top-level age source.
+// checkBwSources verifies every exposed var/file has a Bitwarden item + field.
+func (s *Secret) checkBwSources() error {
+	if s.BW == nil || s.BW.Item == "" {
+		return fmt.Errorf("secret %q: bw backend needs bw.item", s.ID)
+	}
+	if s.Expose.File != nil {
+		if s.BW.Field == "" {
+			return fmt.Errorf("secret %q: bw file expose needs bw.field", s.ID)
+		}
+		if s.Expose.File.Var == "" || s.Expose.File.Path == "" {
+			return fmt.Errorf("secret %q: file expose needs var+path", s.ID)
+		}
+		return nil
+	}
+	for _, v := range s.Expose.Env.Vars {
+		if v.Field == "" && s.BW.Field == "" {
+			return fmt.Errorf("secret %q: bw env %q has no field source", s.ID, v.Name)
+		}
+	}
+	return nil
+}
+
+// Entries flattens the registry into the []Entry the Loader consumes, so run/show/
+// render resolve through one path. Each entry is tagged with its Backend; the Loader
+// dispatches to the matching Resolver. File exposes become IsFile entries (Dest =
+// ~-expanded path); env exposes become one entry per var, each carrying its per-var
+// (or the secret's top-level) source — an age base name, or a bw item+field.
 func (r *Registry) Entries(home string) []Entry {
 	var es []Entry
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
-		if !s.AgeBacked() {
-			continue // bw secrets carry no age source; resolved in ADR-028 Phase 3
-		}
-		if s.Expose.File != nil {
-			es = append(es, Entry{
-				Var:    s.Expose.File.Var,
-				File:   s.Age,
-				IsFile: true,
-				Dest:   expandHome(s.Expose.File.Path, home),
-			})
+		if s.Backend == "bw" {
+			es = append(es, s.bwEntries(home)...)
 			continue
 		}
-		for _, v := range s.Expose.Env.Vars {
-			src := v.Age
-			if src == "" {
-				src = s.Age
-			}
-			es = append(es, Entry{Var: v.Name, File: src})
-		}
+		es = append(es, s.ageEntries(home)...)
 	}
 	return es
 }
 
-// AgeBacked reports whether the secret is resolvable by the age reader. The bw
-// backend is declared in the schema (a target) but only resolved in ADR-028 Phase 3.
-func (s *Secret) AgeBacked() bool {
-	return s.Backend == "age" || s.Backend == "age-offline"
+// ageEntries flattens an age/age-offline secret. The per-var age override falls
+// back to the secret's top-level Age source.
+func (s *Secret) ageEntries(home string) []Entry {
+	if s.Expose.File != nil {
+		return []Entry{{
+			Var:     s.Expose.File.Var,
+			Backend: s.Backend,
+			File:    s.Age,
+			IsFile:  true,
+			Dest:    expandHome(s.Expose.File.Path, home),
+		}}
+	}
+	es := make([]Entry, 0, len(s.Expose.Env.Vars))
+	for _, v := range s.Expose.Env.Vars {
+		src := v.Age
+		if src == "" {
+			src = s.Age
+		}
+		es = append(es, Entry{Var: v.Name, Backend: s.Backend, File: src})
+	}
+	return es
+}
+
+// bwEntries flattens a bw secret. All vars share the item; the per-var field
+// override falls back to the secret's top-level BW.Field.
+func (s *Secret) bwEntries(home string) []Entry {
+	var item, topField string
+	if s.BW != nil {
+		item, topField = s.BW.Item, s.BW.Field
+	}
+	if s.Expose.File != nil {
+		return []Entry{{
+			Var:     s.Expose.File.Var,
+			Backend: "bw",
+			Item:    item,
+			Field:   topField,
+			IsFile:  true,
+			Dest:    expandHome(s.Expose.File.Path, home),
+		}}
+	}
+	es := make([]Entry, 0, len(s.Expose.Env.Vars))
+	for _, v := range s.Expose.Env.Vars {
+		field := v.Field
+		if field == "" {
+			field = topField
+		}
+		es = append(es, Entry{Var: v.Name, Backend: "bw", Item: item, Field: field})
+	}
+	return es
 }
 
 // Vars lists the env-var names a secret exposes (the file var for a file secret).
@@ -218,6 +292,28 @@ func (r *Registry) Selector(token string) ([]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ShowEntry resolves a single-env-var secret to its Entry for `show` (one value to
+// stdout). File and multi-var secrets are rejected — a single value to stdout is
+// ambiguous for them; use `run`. The returned Entry is backend-tagged (age or bw),
+// reusing the same flattening as Entries (home is irrelevant: env vars never
+// materialize a file).
+func (r *Registry) ShowEntry(idOrVar string) (Entry, error) {
+	s := r.Lookup(idOrVar)
+	if s == nil {
+		return Entry{}, fmt.Errorf("unknown secret %q (try `dotf secrets ls`)", idOrVar)
+	}
+	if s.Expose.File != nil {
+		return Entry{}, fmt.Errorf("%q is a file secret; use `dotf secrets run --only %s -- <cmd>`", s.ID, s.ID)
+	}
+	if len(s.Expose.Env.Vars) != 1 {
+		return Entry{}, fmt.Errorf("%q exposes %d vars; use `dotf secrets run --only %s -- <cmd>`", s.ID, len(s.Expose.Env.Vars), s.ID)
+	}
+	if s.Backend == "bw" {
+		return s.bwEntries("")[0], nil
+	}
+	return s.ageEntries("")[0], nil
 }
 
 // Lookup resolves a token to its secret: id first (the stable handle), then an
