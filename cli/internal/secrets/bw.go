@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -94,4 +95,122 @@ func fieldFromItem(data []byte, field string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("field %q not found on item", field)
+}
+
+// BWWriter writes a field value into a Bitwarden item. The write analog of BWReader:
+// the seam that keeps the write path unit-testable with no Bitwarden vault — tests
+// inject a fake; production is BWPut (a `bw edit` shell-out).
+type BWWriter interface {
+	SetField(item, field, value string) error
+}
+
+// setItemField returns itemJSON with field set to value, preserving EVERY other key
+// of the item (read-modify-write) so a sibling field — or the item's id/type/name —
+// is never clobbered. It works on a generic map (not the narrow bwItem struct) so
+// unknown keys survive. password/username set the typed login (created if absent);
+// notes sets the note; any other name updates the matching custom field or appends a
+// new hidden one (type 1).
+func setItemField(itemJSON []byte, field, value string) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(itemJSON, &m); err != nil {
+		return nil, fmt.Errorf("parse bw item JSON: %w", err)
+	}
+	switch field {
+	case "password", "username":
+		login, _ := m["login"].(map[string]any)
+		if login == nil {
+			login = map[string]any{}
+			m["login"] = login
+		}
+		login[field] = value
+	case "notes":
+		m["notes"] = value
+	default:
+		setCustomField(m, field, value)
+	}
+	return json.Marshal(m)
+}
+
+// setCustomField updates the custom field named field in m's fields[], or appends a
+// new hidden field (type 1) when none matches — never touching the other fields.
+func setCustomField(m map[string]any, field, value string) {
+	fields, _ := m["fields"].([]any)
+	for _, f := range fields {
+		if fm, ok := f.(map[string]any); ok {
+			if name, _ := fm["name"].(string); name == field {
+				fm["value"] = value
+				return
+			}
+		}
+	}
+	m["fields"] = append(fields, map[string]any{"name": field, "value": value, "type": 1})
+}
+
+// itemID extracts the Bitwarden item id from its JSON (the handle `bw edit item`
+// needs). An item with no id is a malformed payload.
+func itemID(itemJSON []byte) (string, error) {
+	var m struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(itemJSON, &m); err != nil {
+		return "", fmt.Errorf("parse bw item JSON: %w", err)
+	}
+	if m.ID == "" {
+		return "", fmt.Errorf("bw item has no id")
+	}
+	return m.ID, nil
+}
+
+// BWPut is the production BWWriter: it updates an existing item via read-modify-write
+// (`bw get item` → setItemField → base64 → `bw edit item <id>`). Thin I/O verified by
+// a live smoke with the operator's unlocked session, not in CI (the analog of BWGet).
+// The new value reaches `bw` through stdin (base64), never a temp file. Creating an
+// absent item is deferred to `dotf secrets set` — `SetField` errors clearly when the
+// item is missing rather than risk spawning a duplicate on a locked/transient failure.
+type BWPut struct {
+	Bin string // bw binary name/path; "" → "bw"
+}
+
+// SetField sets field on item to value, preserving the item's other fields.
+func (p BWPut) SetField(item, field, value string) error {
+	cur, err := p.run(nil, "get", "item", item)
+	if err != nil {
+		return fmt.Errorf("bw get item %q (it must already exist to edit): %w", item, err)
+	}
+	id, err := itemID(cur)
+	if err != nil {
+		return err
+	}
+	updated, err := setItemField(cur, field, value)
+	if err != nil {
+		return err
+	}
+	enc := base64.StdEncoding.EncodeToString(updated)
+	if _, err := p.run(strings.NewReader(enc), "edit", "item", id); err != nil {
+		return fmt.Errorf("bw edit item %q: %w", item, err)
+	}
+	return nil
+}
+
+// run executes `bw <args...> --nointeraction` with optional stdin, returning stdout
+// or an error carrying bw's stderr.
+func (p BWPut) run(stdin *strings.Reader, args ...string) ([]byte, error) {
+	bin := p.Bin
+	if bin == "" {
+		bin = "bw"
+	}
+	cmd := exec.Command(bin, append(args, "--nointeraction")...) //nolint:gosec // args are operator-controlled registry data
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("%s", msg)
+	}
+	return stdout.Bytes(), nil
 }
