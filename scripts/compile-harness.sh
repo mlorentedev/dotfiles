@@ -31,6 +31,14 @@ set -euo pipefail
 BEGIN_PREFIX='<!-- BEGIN HARNESS GENERATED'
 END_MARKER='<!-- END HARNESS GENERATED -->'
 
+# Distinct marker namespace for agent-presence injection (ADR-027). Kept separate
+# from BEGIN_PREFIX/END_MARKER so an agent-presence region coexists with the
+# patterns / skill-catalog region in the same always-loaded instructions file
+# without either disturbing the other (validate_markers expects exactly one
+# GENERATED pair; presence uses its own pair).
+AGENT_BEGIN_PREFIX='<!-- BEGIN HARNESS AGENT-PRESENCE'
+AGENT_END_MARKER='<!-- END HARNESS AGENT-PRESENCE -->'
+
 usage() {
     cat <<EOF
 Usage: compile-harness.sh (--refresh | --deploy | --check | --help)
@@ -189,6 +197,7 @@ target_inject() { jq -r --arg f "$1" '.targets[] | select(.file==$f) | .inject[]
 # parse, so provenance is injected as `generated_*` frontmatter fields instead.
 
 has_skills() { jq -e '.skills' "$MANIFEST" >/dev/null 2>&1; }
+has_agents() { jq -e '.agents' "$MANIFEST" >/dev/null 2>&1; }
 
 # Does this skill target this agent? Reads `targets:` from SKILL.md frontmatter.
 # Absent `targets:` => all agents (default).
@@ -219,6 +228,27 @@ render_skill() {
             if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
         }
         fm==1 && kind=="command" && /^name:/ { next }   # opencode commands key off filename
+        { print }
+    ' "$record"
+}
+
+# --- agents (kind: render, ADR-027) ---
+# Render one neutral AGENT.md record to a harness-native agent file on stdout.
+# agent-md (claude/opencode): keep only name/description in the frontmatter (the
+# native required subset), inject `generated_*` provenance, body verbatim. The
+# neutral-only / deferred keys (kind, model, capabilities, skills, targets) are
+# dropped here — model/capability mapping is H-044; consumption is enforced by
+# the emitted hook (deploy_agent_hooks), not by frontmatter.
+render_agent() {
+    local record="$1" srcpath="$2" sha
+    sha="$(sha_of "$record")"
+    awk -v gf="$srcpath" -v gs="$sha" '
+        /^---[[:space:]]*$/ {
+            fm++
+            if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
+            if (fm==2) { print; next }
+        }
+        fm==1 { if ($0 ~ /^(name|description):/) print; next }
         { print }
     ' "$record"
 }
@@ -369,16 +399,52 @@ EOF
         done
     fi
 
+    # 4. agents (ADR-027): vault 00_meta/agents/definitions/<n> -> committed record
+    #    (frontmatter validated). Like skills, render to $HOME is at --deploy time.
+    if has_agents; then
+        local ag_vsub ag_recdir ag_schema ag_dir
+        ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
+        ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
+        ag_schema="$REPO_ROOT/$(jq -r '.agents.schema // "harness/agent-frontmatter.schema.json"' "$MANIFEST")"
+        if [[ ! -d "$VAULT_PATH/$ag_vsub" ]]; then
+            printf '[ERROR] --refresh needs the vault agents dir: %s\n' "$VAULT_PATH/$ag_vsub" >&2
+            exit 2
+        fi
+        mkdir -p "$ag_recdir"
+        for ag_dir in "$VAULT_PATH/$ag_vsub"/*/; do
+            [[ -f "$ag_dir/AGENT.md" ]] || continue
+            validate_skill_frontmatter "$ag_dir/AGENT.md" "$ag_schema"
+            name="$(basename "$ag_dir")"
+            rm -rf "${ag_recdir:?}/$name"
+            mkdir -p "$ag_recdir/$name"
+            cp -rf "$ag_dir"* "$ag_recdir/$name/"
+            printf '[refresh] agent record: %s/%s\n' "$(jq -r '.agents.record_dir' "$MANIFEST")" "$name"
+        done
+        for rec in "$ag_recdir"/*/; do
+            [[ -d "$rec" ]] || continue
+            name="$(basename "$rec")"
+            [[ -d "$VAULT_PATH/$ag_vsub/$name" ]] || { rm -rf "$rec"; printf '[refresh] dropped stale agent record: %s\n' "$name"; }
+        done
+    fi
+
     printf '[refresh] OK\n'
 }
 
 # --- deploy (offline): render committed records to per-agent $HOME paths ---
 do_deploy() {
     require_tools
-    if ! has_skills; then
-        printf '[deploy] no skills block in manifest; nothing to deploy\n'
+    if ! has_skills && ! has_agents; then
+        printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
         return 0
     fi
+    if has_skills; then deploy_skills; fi
+    if has_agents; then deploy_agents; fi
+    printf '[deploy] OK\n'
+}
+
+# Render committed skill records to their per-agent $HOME paths (offline),
+# de-symlinking first, then inject the copilot catalog.
+deploy_skills() {
     local sk_vsub sk_recdir agent render dir sk_dir name outp destdir
     sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
     sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
@@ -434,7 +500,6 @@ do_deploy() {
             printf '[deploy] catalog target absent or unmarked, skipping: %s\n' "$cat_file" >&2
         fi
     fi
-    printf '[deploy] OK\n'
 }
 
 # Remove previously-deployed outputs that are now stale: the skill no longer has
@@ -466,6 +531,109 @@ deploy_prune() {
                 ;;
         esac
     done < <(jq -r '.skills.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
+}
+
+# --- agents (ADR-027): render neutral AGENT.md records to each harness's native
+# agent path, then enforce skill consumption by injecting a presence region into
+# each harness's always-loaded instructions file. Presence is UNIFORM across
+# harnesses — one marked-region injection primitive, no provider-specific hook.
+# The plugin primitives (chat.system.transform / session_start / PreToolUse) are
+# the Action level, deferred to H-045. Mirrors deploy_skills; agent-md render is
+# a single file. ---
+deploy_agents() {
+    local ag_vsub ag_recdir agent render dir ag_dir name outp
+    ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
+    ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
+    if [[ ! -d "$ag_recdir" ]]; then
+        printf '[ERROR] no agent records at %s (run --refresh first)\n' "$ag_recdir" >&2
+        exit 2
+    fi
+    # 1. render each AGENT.md record -> its per-harness $HOME path (single file),
+    #    de-symlinking first (BUG-100 safety).
+    while IFS=$'\t' read -r agent render dir; do
+        for ag_dir in "$ag_recdir"/*/; do
+            [[ -f "$ag_dir/AGENT.md" ]] || continue
+            name="$(basename "$ag_dir")"
+            skill_targets_agent "$ag_dir/AGENT.md" "$agent" || continue
+            outp="$HOME/$dir/$name.md"
+            [[ -L "$outp" ]] && rm -f "$outp"
+            mkdir -p "$(dirname "$outp")"
+            render_agent "$ag_dir/AGENT.md" "$ag_vsub/$name/AGENT.md" > "$outp"
+            printf '[deploy] agent -> %s\n' "$outp"
+        done
+    done < <(jq -r '.agents.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
+    # 2. presence-level determinism: inject forced skills into each harness's
+    #    always-loaded instructions file (uniform injection — no provider hook).
+    if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then
+        deploy_agent_presence "$ag_recdir"
+    fi
+}
+
+# Build the agent-presence block for <agent>: one line per persona that targets
+# this harness, naming its forced skills. Deterministic order (glob sorts). Empty
+# output (no persona targets this harness) tells the caller to skip injection.
+# Args: <record_dir> <agent>
+build_agent_presence() {
+    local ag_recdir="$1" agent="$2" ag_dir name skills_line first=1
+    for ag_dir in "$ag_recdir"/*/; do
+        [[ -f "$ag_dir/AGENT.md" ]] || continue
+        name="$(basename "$ag_dir")"
+        skill_targets_agent "$ag_dir/AGENT.md" "$agent" || continue
+        if [[ "$first" == 1 ]]; then
+            printf '## Active agent personas — forced skills\n\n'
+            printf 'These personas enforce their skills by injection (determinism by code, not memory). When acting as one, you MUST consume its skills.\n\n'
+            first=0
+        fi
+        skills_line="$(skill_field "$ag_dir/AGENT.md" skills)"
+        printf -- '- **%s** — MUST consume: %s\n' "$name" "${skills_line:-none}"
+    done
+}
+
+# Inject (or refresh) the agent-presence region in a harness instructions file.
+# Uses the AGENT-PRESENCE marker namespace, so it never disturbs the patterns /
+# skill-catalog region (BEGIN_PREFIX). Replaces an existing presence region in
+# place; appends a fresh one if absent. Skips a target file that does not exist.
+# Args: <file_abs> <content_file>
+inject_agent_presence() {
+    local file="$1" content_file="$2" sha begin tmp
+    if [[ ! -f "$file" ]]; then
+        printf '[deploy] presence target absent, skipping: %s\n' "$file" >&2
+        return 0
+    fi
+    sha="$(sha_of "$content_file")"
+    begin="$AGENT_BEGIN_PREFIX (sha256:$sha) — agent presence from vault agent definitions; edit there + re-run setup, do NOT edit between markers -->"
+    tmp="$(mktemp)"
+    if grep -q "^$AGENT_BEGIN_PREFIX" "$file" && grep -qF "$AGENT_END_MARKER" "$file"; then
+        # replace the existing presence region in place (mirrors replace_region)
+        awk -v beginm="$begin" -v endm="$AGENT_END_MARKER" -v bp="$AGENT_BEGIN_PREFIX" -v cf="$content_file" '
+            index($0,bp)==1 { print beginm; while ((getline l < cf) > 0) print l; close(cf); skip=1; next }
+            $0==endm { if (skip){ print; skip=0; next } }
+            skip { next }
+            { print }
+        ' "$file" > "$tmp"
+    else
+        # append a fresh presence region at the end of the file
+        cat "$file" > "$tmp"
+        { printf '\n%s\n' "$begin"; cat "$content_file"; printf '%s\n' "$AGENT_END_MARKER"; } >> "$tmp"
+    fi
+    mv "$tmp" "$file"
+}
+
+# Presence-level determinism for every configured harness: build the persona
+# block for that harness and inject it into its instructions file. One uniform
+# mechanism (marked-region injection) across claude / opencode / pi / copilot.
+deploy_agent_presence() {
+    local ag_recdir="$1" agent file file_abs tmp
+    while IFS=$'\t' read -r agent file; do
+        [[ -n "$agent" ]] || continue
+        tmp="$(mktemp)"
+        build_agent_presence "$ag_recdir" "$agent" > "$tmp"
+        if [[ ! -s "$tmp" ]]; then rm -f "$tmp"; continue; fi   # no persona targets this harness
+        file_abs="$HOME/$file"
+        inject_agent_presence "$file_abs" "$tmp"
+        rm -f "$tmp"
+        printf '[deploy] presence -> %s (%s)\n' "$file_abs" "$agent"
+    done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)"' "$MANIFEST")
 }
 
 do_check() {
@@ -515,6 +683,33 @@ do_check() {
                     rm -f "$tmp"
                 done
                 printf '[check] OK -> record %s\n' "$name"
+            done
+        fi
+    fi
+
+    # agents (ADR-027): each committed AGENT.md record validates + renders cleanly.
+    if has_agents; then
+        local ag_vsub ag_recdir ag_schema ag_dir name tmp
+        ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
+        ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
+        ag_schema="$REPO_ROOT/$(jq -r '.agents.schema // "harness/agent-frontmatter.schema.json"' "$MANIFEST")"
+        if [[ ! -d "$ag_recdir" ]]; then
+            printf '[DRIFT] no agent records at %s (run --refresh)\n' "$ag_recdir" >&2
+            drift=1
+        else
+            for ag_dir in "$ag_recdir"/*/; do
+                [[ -f "$ag_dir/AGENT.md" ]] || continue
+                name="$(basename "$ag_dir")"
+                if ! validate_skill_frontmatter "$ag_dir/AGENT.md" "$ag_schema"; then
+                    drift=1; continue
+                fi
+                tmp="$(mktemp)"
+                if ! render_agent "$ag_dir/AGENT.md" "$ag_vsub/$name/AGENT.md" > "$tmp" 2>/dev/null; then
+                    printf '[DRIFT] agent record %s fails to render (run --refresh)\n' "$name" >&2
+                    drift=1
+                fi
+                rm -f "$tmp"
+                printf '[check] OK -> agent %s\n' "$name"
             done
         fi
     fi
