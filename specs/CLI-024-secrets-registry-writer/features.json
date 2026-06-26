@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-024-secrets-registry-writer-f1",
+    "behavior": "SetBackendBW flips backend age->bw, drops age, inserts bw:{item,field}, touching only the target block (comments/blanks/other secrets byte-identical)",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'SetBackendBW_FlipsOnlyTargetBlock|SetBackendBW_RealRegistry' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-writer-f2",
+    "behavior": "SetBackendBW is idempotent and guards unknown id / multi-var / file / empty item-field",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'SetBackendBW_Idempotent|SetBackendBW_Guards' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-registry-writer-f3",
+    "behavior": "secrets suite green, vet + fmt clean, module builds",
+    "verification": "cd cli && go test ./internal/secrets/ -count=1 && go vet ./... && go build ./... && test -z \"$(gofmt -l internal/secrets)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
