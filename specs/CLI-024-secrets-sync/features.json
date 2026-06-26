@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-024-secrets-sync-f1",
+    "behavior": "sync ci --repo OWNER/REPO selects only entries tagged ci:OWNER/REPO, resolves each via Loader.EnvFor, and calls the setter once per var with (repo, VAR, value); other-repo entries are not selected",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSyncCi.*(Selects|Repo)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-sync-f2",
+    "behavior": "backend-agnostic: an age-backed and a bw-backed entry both tagged for the repo upload identically through the fake setter (the unblock for ci:* migration)",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSyncCi.*(Agnostic|AgeAndBw)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-sync-f3",
+    "behavior": "exclusions: file / floor|age-offline / GITHUB_*-prefixed vars each skipped with a distinct reported reason and zero setter calls",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSyncCi.*(Exclu|Skip|Guard)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-sync-f4",
+    "behavior": "--dry-run reports VAR->repo with byte lengths, never the value, and makes zero setter calls",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSyncCi.*DryRun' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-sync-f5",
+    "behavior": "--repo defaults to the current repo origin slug; an invalid owner/name fails loud",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SecretsSyncCi.*(RepoResolution|Origin|Slug)' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-sync-f6",
+    "behavior": "the legacy github-secrets-manager.sh, its bats, dotf secrets ls --pairs, and TestSecretsLs_Pairs_EnvOnly are removed once parity is confirmed",
+    "verification": "test ! -f scripts/github-secrets-manager.sh && test ! -f tests/github-secrets-manager.bats && ! grep -rq -- '--pairs' cli/internal/cmd/secrets.go",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-sync-f7",
+    "behavior": "suite green, vet + golangci (v2, no default exclusions) clean, additive (new command + seam + registry tag migration + retirements only)",
+    "verification": "cd cli && go test ./internal/... -count=1 && go vet ./... && golangci-lint run --exclude-use-default=false ./internal/...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
