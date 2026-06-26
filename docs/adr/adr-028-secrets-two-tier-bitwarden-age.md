@@ -196,3 +196,69 @@ The registry is generated/seeded from `docs/secrets-inventory.md` and is the sin
 - `docs/secrets-inventory.md` (the 3-source inventory + critical actions).
 - Bitwarden CLI docs (studied 2026-06-25): `bw serve` for the facade; `bw export` is plaintext (→ `age -e`); full headless still needs the master password (the floor).
 - Tickets: #378, #493, #321, #518, #257, #454, #577.
+
+## Addendum (2026-06-26): bw mapping convention — ratified + reconciled with the implementation
+
+The `dotf secrets` lifecycle build-out (#612, the `set`/`migrate` work) exercised §6 and
+surfaced points to ratify and reconcile against the shipped code.
+
+### Item granularity — one item per *credential* (A1 base, A2 selective)
+
+Ratifies the §6 "Field-vs-item rule" as the operative model:
+
+- **A multi-part single credential → ONE item + named fields.** The X OAuth app (7
+  values, rotated together) is `x-twitter-api` with 7 kebab fields; a login pair
+  (DockerHub) is one item with typed `username` + `password`.
+- **Different-purpose credentials → SEPARATE items**, because they rotate / revoke /
+  are consumed independently (least-privilege). The GitHub tokens split per purpose
+  (`github-cli-pat`, `github-release-pat`, `github-bitacora-pat`) — #321.
+
+"Group by service" never overrides "separate by credential": same OAuth app groups,
+different-scope tokens split.
+
+### Value placement — named fields by default
+
+Refines §6's `field: null → password`. Prefer a **named custom field** (`api-key`,
+`api-token`, `auth-key`) even for a single-credential item — self-documenting and
+uniform with multi-field items. Reserve typed `username`/`password` for genuine login
+pairs (DockerHub); `notes` for multi-line blobs (kubeconfig, backup codes). SSH keys
+use `notes`/custom fields for now — the native SSH Key item type (5) needs a
+`fieldFromItem` reader extension (tracked follow-up), so it is **not** used yet.
+
+### The registry `bw:` block is the SSOT — declared up-front, read not guessed
+
+`set` and `migrate` resolve the Bitwarden target **only** from the entry's `bw: {item,
+field}` block. A secret declares its `bw:` target **at rewrite time, while still
+`backend: age`**, so the value can be written to bw and parity-checked before the
+backend flip. `migrate` never derives `item`/`field` from the `id`; a missing `bw:`
+block is an error (`--item`/`--field` exist only as a one-off override). At cutover,
+`SetBackendBW` flips `backend: age → bw` and re-emits the already-declared target.
+
+### Registry identity — the `id` is the env var; the `item` groups and is mutable
+
+One registry entry per **env var**, and the `id` **is** that env var name — the stable
+consumer contract apps depend on (`OPENAI_API_KEY`, `X_BEARER_TOKEN`). The Bitwarden
+`bw.item` is a **mutable pointer**: it GROUPS related vars (the 7 `X_*` entries share
+`item: x-twitter-api`, distinct `field`s) and can be renamed by editing only that line —
+consumers never reference it. A consequence: every entry is single-var, so
+`SetBackendBW`/`migrate` apply uniformly with **no multi-field special case** (the
+former M3/M6 blocker dissolves). Global env-var uniqueness falls out for free, since the
+`id` is the var and ids are unique (closes the B1 audit gap at the schema level).
+
+### Schema reconciliation — `folder` is not part of the mapping
+
+The shipped `BWSource` is `{ item, field }` — **no `folder` key** (the §"Registry
+schema" example showed one). Bitwarden resolves an item by **name or id**; the folder is
+organizational metadata, not a lookup key. Items are organized under
+`Dotfiles/{apps,infra,personal,floor}` separately (matching `plane`) — and the taxonomy
+gains **`Dotfiles/personal`** for the personal-plane recovery codes / app-passwords the
+registry manages (§"folder taxonomy" listed only apps/infra/floor). The implemented
+`expose.env` accepts scalar / list / `{age|field}`-map forms, matching §6's intent.
+
+### Floor stays age-only
+
+Floor secrets (`ssh-id-ed25519`, the age keys) carry **no `bw:` block** and are never
+migrated — they are needed before Bitwarden is reachable (circular dependency, §4).
+
+Implementation: `specs/CLI-024-secrets-set` (write primitive), `specs/CLI-024-secrets-migrate`
+(cutover). A draft A1 registry rewrite seeds the per-entry `bw:` targets.
