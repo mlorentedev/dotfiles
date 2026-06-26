@@ -66,8 +66,8 @@ jobs:
               gh issue create --title "${title}" --label pat-expiry --body \
           "The Actions secret \`${name}\` ${reason}.
 
-          **Rotate it**: re-encrypt the age-secret, run \`secrets_refresh\`, then sync the
-          value to the repository Actions secret (\`github-secrets-manager.sh --select ${name}\`).
+          **Rotate it**: update the secret in its store (age or Bitwarden), then sync the
+          value to the repository Actions secret (\`dotf secrets sync ci --repo <owner/repo>\`).
 
           Filed automatically by \`.github/workflows/pat-expiry.yml\` (OPS-009)."
               echo "::warning::opened a pat-expiry issue for ${name}"

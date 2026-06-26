@@ -130,10 +130,6 @@ func TestSecretsMigrate_ScopeGuards(t *testing.T) {
 			registry: "version: 1\nsecrets:\n  - {id: KUBECONFIG, plane: infra, backend: age, age: k, bw: {item: kc, field: notes}, expose: {file: {var: KUBECONFIG, path: \"~/.k\"}}, consumers: [local]}\n",
 		},
 		{
-			name: "ci consumer", id: "PYPI_TOKEN", wantErr: "ci:",
-			registry: "version: 1\nsecrets:\n  - {id: PYPI_TOKEN, plane: app, backend: age, age: pypi.token, bw: {item: pypi-token, field: api-token}, expose: {env: PYPI_TOKEN}, consumers: [\"ci:publish\"]}\n",
-		},
-		{
 			name: "missing bw block", id: "NOBW", wantErr: "no bw:",
 			registry: "version: 1\nsecrets:\n  - {id: NOBW, plane: app, backend: age, age: x, expose: {env: NOBW}, consumers: [local]}\n",
 		},
