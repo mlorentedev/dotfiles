@@ -17,25 +17,20 @@ created: "2026-06-26"
 
 ## Implementation
 
-- [ ] **Refactor C3 write core** into a reusable helper that takes an explicit value
-  (`writeBWValue(item, field, value, isFile, dryRun, assumeYes)`), so both `set` (value
-  from stdin/prompt) and `migrate` (value from age) share one create/update/parity path.
-  No behaviour change to `set`; its tests stay green.
-- [ ] **`migrate` command skeleton + scope guards** — resolve by env-var id; reject with
+- [x] **Reuse C3 write core** — `applySet` already takes the value as a parameter, so
+  `migrate` calls it directly with the age-resolved value. No refactor, no `set` change.
+- [x] **`migrate` command skeleton + scope guards** — resolve by env-var id; reject with
   specific errors: a file secret, a `ci:*` consumer, an `age:` source shared with another
-  entry (split-pending → C9), and a missing `bw:` block. `--item`/`--field`/`--yes`/
-  `--dry-run` flags. Test the guards first (red).
-- [ ] **Idempotent short-circuit** — already-`bw` → `Loader.Verify` → exit 0, no writes.
-- [ ] **age read → bw write** — resolve the age value via the loader's age resolver;
-  write it via the shared core to the target the entry's `bw:` block declares (model A1,
-  the SSOT). Missing `bw:` block → error; `--item`/`--field` only as an override.
-- [ ] **Parity gate** — re-read bw, compare resolved values (env `stripNewlines`; file
-  exact); mismatch → abort BEFORE any registry change, non-leaking diff.
-- [ ] **Registry flip last** — `SetBackendBW` → atomic write of `secrets/registry.yaml`
-  (reuse render's `atomicWrite`); then final `Verify` via bw.
-- [ ] **Tests** — AC1 migrate end-to-end (fake age resolver + fake bw writer/reader,
-  assert registry bytes flipped + age file untouched); AC2 parity mismatch aborts; AC3
-  idempotent already-bw; AC4 scope guards per shape; AC5 `--dry-run` inert.
+  entry (split-pending → C9), a missing `bw:` block, and floor. `--yes`/`--dry-run` flags.
+- [x] **Idempotent short-circuit** — already-`bw` → `Loader.Verify` → exit 0, no writes.
+- [x] **age read → bw write** — `ageValue` resolves via the loader's age resolver
+  (`EnvFor`); written via `applySet` to the target the entry's `bw:` block declares.
+- [x] **Parity gate** — re-read bw, compare under `normalizeValue`; mismatch → abort
+  BEFORE any registry change, non-leaking length diff.
+- [x] **Registry flip last** — `secrets.FlipRegistryToBW` (`SetBackendBW` + exported
+  `AtomicWrite`); then final `Verify` via bw.
+- [x] **Tests** — AC1 end-to-end (create path, registry flipped); AC2 parity mismatch
+  aborts (fake `tamper`); AC3 idempotent already-bw; AC4 five scope guards; AC5 `--dry-run`.
 
 ## Closing
 

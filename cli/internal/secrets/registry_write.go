@@ -2,9 +2,26 @@ package secrets
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
+
+// FlipRegistryToBW reads the registry at path, rewrites secret `id` to the bw backend
+// (item/field) via SetBackendBW, and writes it back atomically — the file-level cutover
+// `migrate` performs AFTER the parity gate, so a crash mid-write never corrupts the
+// registry and a pre-flip failure leaves it untouched (still resolving via age).
+func FlipRegistryToBW(path, id, item, field string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read registry: %w", err)
+	}
+	out, err := SetBackendBW(data, id, item, field)
+	if err != nil {
+		return err
+	}
+	return AtomicWrite(path, out)
+}
 
 // SetBackendBW rewrites the registry block of secret `id` to the bw backend with the
 // given item/field: it flips `backend:` to bw, drops the `age:` source line, and
