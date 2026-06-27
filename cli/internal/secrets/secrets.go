@@ -16,13 +16,14 @@ import (
 //   - env secret:  resolve the source into $Var.
 //   - file secret: IsFile, resolve to Dest (0600) and set $Var=Dest.
 type Entry struct {
-	Var     string // env var name
-	Backend string // age | age-offline | bw; "" resolves as age (back-compat)
-	File    string // age source: base name under sensitive/, without .secret.age
-	Item    string // bw source: Bitwarden item name/id
-	Field   string // bw source: field within the item
-	IsFile  bool   // true for a file secret
-	Dest    string // materialization path (~ expanded); only when IsFile
+	Var      string // env var name
+	Backend  string // age | age-offline | bw; "" resolves as age (back-compat)
+	File     string // age source: base name under sensitive/, without .secret.age
+	Item     string // bw source: Bitwarden item name/id
+	Field    string // bw source: field within the item
+	IsFile   bool   // true for a file secret
+	Dest     string // materialization path (~ expanded); only when IsFile
+	Validate string // optional liveness-check key carried from the registry (sync ci)
 }
 
 // expandHome rewrites a leading ~ (or ~/...) to home, leaving other paths intact.

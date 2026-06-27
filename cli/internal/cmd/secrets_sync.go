@@ -10,11 +10,14 @@ import (
 )
 
 // ghSecretSetter is the GitHub Actions write seam (GHSecretSet in production), overridable
-// so command tests inject a fake with no gh, no network, no secrets. repoOriginResolver
-// derives the current repo's origin slug for the --repo default; a var so tests bypass git.
+// so command tests inject a fake with no gh, no network, no secrets. ghTokenValidator is
+// the liveness seam for entries marked `validate: github-token` (GHTokenValidate in
+// production), so sync refuses to upload a dead PAT. repoOriginResolver derives the
+// current repo's origin slug for the --repo default; a var so tests bypass git.
 var (
-	ghSecretSetter     secrets.GitHubSecretSetter = secrets.GHSecretSet{}
-	repoOriginResolver                            = defaultOriginRepo
+	ghSecretSetter     secrets.GitHubSecretSetter   = secrets.GHSecretSet{}
+	ghTokenValidator   secrets.GitHubTokenValidator = secrets.GHTokenValidate{}
+	repoOriginResolver                              = defaultOriginRepo
 )
 
 // defaultOriginRepo resolves the current working directory's git origin to an owner/name
@@ -50,6 +53,7 @@ func newSecretsSyncCmd() *cobra.Command {
 func newSecretsSyncCiCmd() *cobra.Command {
 	var repo string
 	var dryRun bool
+	var skipVerify bool
 	c := &cobra.Command{
 		Use:   "ci",
 		Short: "Push a repo's ci:* secrets to its GitHub Actions secrets (age|bw agnostic)",
@@ -92,6 +96,28 @@ func newSecretsSyncCiCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			// Pre-upload liveness gate: an entry marked `validate: github-token` must
+			// authenticate before ANY upload, so a dead/expired PAT is never pushed to
+			// Actions (the BITACORA_PAT incident — a redeploy refreshed updated_at on a
+			// 401 token). Opt-in per entry; liveness can't be probed generically across
+			// providers, so unmarked secrets are untouched. --skip-verify bypasses.
+			if !skipVerify {
+				for i, kv := range env {
+					e := sel.Upload[i]
+					if e.Validate != "github-token" {
+						continue
+					}
+					name := e.Var
+					value := kv[len(name)+1:]
+					if err := ghTokenValidator.Validate(value); err != nil {
+						return fmt.Errorf("%s failed its github-token liveness check — refusing to upload a dead "+
+							"credential (rotate it, or re-run with --skip-verify): %w", name, err)
+					}
+					_, _ = fmt.Fprintf(out, "verified %s (live github token)\n", name)
+				}
+			}
+
 			for i, kv := range env {
 				name := sel.Upload[i].Var
 				value := kv[len(name)+1:] // EnvFor returns "name=value"
@@ -109,5 +135,6 @@ func newSecretsSyncCiCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&repo, "repo", "", "target repo owner/name (default: current repo's origin)")
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report VAR→repo without uploading (names + byte lengths, never values)")
+	c.Flags().BoolVar(&skipVerify, "skip-verify", false, "skip the github-token liveness check for entries marked validate: github-token")
 	return c
 }
