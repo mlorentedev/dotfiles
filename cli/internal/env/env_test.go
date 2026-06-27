@@ -196,7 +196,7 @@ func TestRepoDirNoneFound(t *testing.T) {
 
 func TestResolveRegistryPathPrefersRepoCheckout(t *testing.T) {
 	// The checkout's registry (the version-controlled SSOT) wins over the deployed
-	// copy — the read side of ADR-029 / #635.
+	// copy — the read side of ADR-030 / #635.
 	repo := t.TempDir()
 	want := filepath.Join(repo, "secrets", "registry.yaml")
 	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {

@@ -11,7 +11,7 @@ created: "2026-06-26"
 
 - [x] Branch from main: `fix/secrets-registry-ssot` (worktree)
 - [x] `proposal.md` complete; acceptance criteria testable
-- [x] ADR-029 written (registry source model: checkout-first reads, fail-loud writes)
+- [x] ADR-030 written (registry source model: checkout-first reads, fail-loud writes)
 
 ## Implementation
 

@@ -1,7 +1,7 @@
 ---
-id: "dotfiles-adr-029-secrets-registry-source-model"
+id: "dotfiles-adr-030-secrets-registry-source-model"
 type: adr
-adr: "029"
+adr: "030"
 title: "Secrets registry source model — checkout-first reads, fail-loud checkout-only writes"
 tags: [adr, dotfiles, secrets, registry, cli, go]
 status: accepted
@@ -10,7 +10,7 @@ owner: manu
 relates_to: "adr-025 (cross-machine paths), adr-028 (two-tier secrets)"
 ---
 
-# ADR-029: Secrets registry source model
+# ADR-030: Secrets registry source model
 
 ## Context
 

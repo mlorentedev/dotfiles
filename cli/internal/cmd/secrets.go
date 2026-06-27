@@ -45,7 +45,7 @@ func newSecretsCmd() *cobra.Command {
 }
 
 // registryPath resolves secrets/registry.yaml for READS — repo checkout first, then
-// the deployed copy (ADR-029). registryWritePath is the WRITE seam: it resolves the
+// the deployed copy (ADR-030). registryWritePath is the WRITE seam: it resolves the
 // checkout's registry and fails loud if none is found, so a mutation lands in the
 // version-controlled SSOT and not the throwaway deployed copy (#635). Both are vars so
 // tests can point them at a fixture. ageDecryptor is the age decrypt seam (nil →
