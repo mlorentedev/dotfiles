@@ -30,6 +30,7 @@ type Secret struct {
 	Expose    Expose    `yaml:"expose"`
 	Consumers []string  `yaml:"consumers"`
 	Rotate    string    `yaml:"rotate"`
+	Validate  string    `yaml:"validate"` // optional liveness check on sync (e.g. "github-token")
 }
 
 // BWSource is a bw backend source: the Bitwarden item (its unique name or id) and,
