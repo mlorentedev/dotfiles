@@ -169,6 +169,21 @@ func ResolveRegistryPath() string {
 	return filepath.Join(DotfilesDir(Home()), "secrets", "registry.yaml")
 }
 
+// ResolveSensitiveDir locates the age secret store (sensitive/) for READS. Like
+// ResolveRegistryPath (ADR-030), it prefers the dotfiles checkout — the version-
+// controlled SSOT where rotations land — falling back to the deployed copy under
+// DOTFILES_DIR when no checkout is found or the dir is absent there. Keeping the
+// registry and the values it maps on the same source avoids the split-brain where a
+// repo-side rotation stays invisible until a redeploy (the #635 class, for secret files).
+func ResolveSensitiveDir() string {
+	if root := RepoDir(); root != "" {
+		if p := filepath.Join(root, "sensitive"); isDir(p) {
+			return p
+		}
+	}
+	return filepath.Join(DotfilesDir(Home()), "sensitive")
+}
+
 // RepoRegistryPath returns secrets/registry.yaml inside the dotfiles checkout, or an
 // error when no checkout is found. WRITERS (dotf secrets migrate) MUST use this: the
 // registry is a version-controlled SSOT, so a mutation has to land in the checkout to

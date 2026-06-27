@@ -22,6 +22,13 @@ created: "2026-06-26"
 - [x] `secrets_migrate.go` — flip via `registryWritePath()`, error before the mutation.
 - [x] `useTempRegistry` test helper — override both seams at the fixture.
 
+## Follow-up (ADR-030 addendum — the values follow the mapping)
+
+- [x] `env.ResolveSensitiveDir()` — age store resolves checkout-first too (same model as
+  the registry), so a repo-side rotation is seen without a redeploy; `secretLoader` uses it.
+- [x] Renumber the ADR 029→030 (a post-merge collision: 029 was already taken by
+  `secrets-sync-headless-materialization`).
+
 ## Tests
 
 - [x] `TestRepoDir*` — env, `.git` walk-up, none-found.

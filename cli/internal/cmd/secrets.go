@@ -59,10 +59,11 @@ var (
 )
 
 // secretLoader builds the resolution engine wired with both backend seams, over the
-// age store in <dotfiles>/sensitive and the operator's Bitwarden via bwReader.
+// age store in sensitive/ (checkout-first, ADR-030 — same source as the registry it
+// maps, so a repo-side rotation is seen without a redeploy) and Bitwarden via bwReader.
 func secretLoader() *secrets.Loader {
 	return &secrets.Loader{
-		SecretsDir: filepath.Join(env.DotfilesDir(env.Home()), "sensitive"),
+		SecretsDir: env.ResolveSensitiveDir(),
 		KeyPath:    ageKeyPath(),
 		Decrypt:    ageDecryptor,
 		BW:         bwReader,
