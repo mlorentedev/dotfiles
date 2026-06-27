@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-024-secrets-registry-ssot-f1",
+    "behavior": "ResolveRegistryPath reads the checkout registry when present, falls back to the deployed copy under DOTFILES_DIR otherwise",
+    "verification": "cd cli && go test ./internal/env/ -run 'ResolveRegistryPath' -count=1",
+    "state": "passing",
+    "evidence": "TestResolveRegistryPathPrefersRepoCheckout, TestResolveRegistryPathFallsBackToDeployed PASS"
+  },
+  {
+    "id": "CLI-024-secrets-registry-ssot-f2",
+    "behavior": "RepoRegistryPath returns the checkout registry path and fails loud when no checkout is found; RepoDir resolves via DOTFILES_REPO_DIR and .git walk-up",
+    "verification": "cd cli && go test ./internal/env/ -run 'RepoRegistryPath|RepoDir' -count=1",
+    "state": "passing",
+    "evidence": "TestRepoRegistryPathReturnsCheckoutPath, TestRepoRegistryPathFailsLoudWithoutCheckout, TestRepoDir{PrefersDotfilesRepoDir,WalksUpForGitWhenNoEnv,NoneFound} PASS"
+  },
+  {
+    "id": "CLI-024-secrets-registry-ssot-f3",
+    "behavior": "secrets command suite still green with the split read/write seams; module builds, vet + fmt clean",
+    "verification": "cd cli && go test ./internal/env/ ./internal/cmd/ ./internal/secrets/ -count=1 && go vet ./... && go build ./... && test -z \"$(gofmt -l internal/env internal/cmd)\"",
+    "state": "passing",
+    "evidence": "all three packages ok; vet/build clean; gofmt -l empty"
+  }
+]
