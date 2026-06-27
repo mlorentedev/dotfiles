@@ -28,7 +28,7 @@ This is the same failure `env.ResolveContractPath` (ADR-025) already solved for
 
 ## What
 
-Per **ADR-029**, an asymmetric source model over a shared checkout resolver:
+Per **ADR-030**, an asymmetric source model over a shared checkout resolver:
 
 - `env.RepoDir()` — `DOTFILES_REPO_DIR` (when a real dir) else walk up cwd for `.git`
   (file or dir); `""` when neither.

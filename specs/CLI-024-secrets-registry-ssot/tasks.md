@@ -11,7 +11,7 @@ created: "2026-06-26"
 
 - [x] Branch from main: `fix/secrets-registry-ssot` (worktree)
 - [x] `proposal.md` complete; acceptance criteria testable
-- [x] ADR-029 written (registry source model: checkout-first reads, fail-loud writes)
+- [x] ADR-030 written (registry source model: checkout-first reads, fail-loud writes)
 
 ## Implementation
 
@@ -21,6 +21,13 @@ created: "2026-06-26"
 - [x] `secrets.go` — split seams: `registryPath` → read; `registryWritePath` → write.
 - [x] `secrets_migrate.go` — flip via `registryWritePath()`, error before the mutation.
 - [x] `useTempRegistry` test helper — override both seams at the fixture.
+
+## Follow-up (ADR-030 addendum — the values follow the mapping)
+
+- [x] `env.ResolveSensitiveDir()` — age store resolves checkout-first too (same model as
+  the registry), so a repo-side rotation is seen without a redeploy; `secretLoader` uses it.
+- [x] Renumber the ADR 029→030 (a post-merge collision: 029 was already taken by
+  `secrets-sync-headless-materialization`).
 
 ## Tests
 

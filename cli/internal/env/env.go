@@ -142,7 +142,7 @@ func ResolveContractPath() string {
 // a real directory, else walking up from the working directory for a .git entry (a
 // file in a worktree, a directory in a normal clone — os.Stat matches both). Returns
 // "" when neither locates a checkout. This is the shared "where is the checkout"
-// seam the registry resolvers (ADR-029) build on.
+// seam the registry resolvers (ADR-030) build on.
 func RepoDir() string {
 	if r := os.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
 		return r
@@ -159,7 +159,7 @@ func RepoDir() string {
 // dotfiles checkout (the version-controlled SSOT, and fresher than the deployed
 // copy on a dev machine), falling back to the deployed copy under DOTFILES_DIR when
 // no checkout is found or the file is absent there. Mirrors ResolveContractPath and
-// implements the read side of the registry source model (ADR-029, #635).
+// implements the read side of the registry source model (ADR-030, #635).
 func ResolveRegistryPath() string {
 	if root := RepoDir(); root != "" {
 		if p := filepath.Join(root, "secrets", "registry.yaml"); fileExists(p) {
@@ -167,6 +167,21 @@ func ResolveRegistryPath() string {
 		}
 	}
 	return filepath.Join(DotfilesDir(Home()), "secrets", "registry.yaml")
+}
+
+// ResolveSensitiveDir locates the age secret store (sensitive/) for READS. Like
+// ResolveRegistryPath (ADR-030), it prefers the dotfiles checkout — the version-
+// controlled SSOT where rotations land — falling back to the deployed copy under
+// DOTFILES_DIR when no checkout is found or the dir is absent there. Keeping the
+// registry and the values it maps on the same source avoids the split-brain where a
+// repo-side rotation stays invisible until a redeploy (the #635 class, for secret files).
+func ResolveSensitiveDir() string {
+	if root := RepoDir(); root != "" {
+		if p := filepath.Join(root, "sensitive"); isDir(p) {
+			return p
+		}
+	}
+	return filepath.Join(DotfilesDir(Home()), "sensitive")
 }
 
 // RepoRegistryPath returns secrets/registry.yaml inside the dotfiles checkout, or an

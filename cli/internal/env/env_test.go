@@ -196,7 +196,7 @@ func TestRepoDirNoneFound(t *testing.T) {
 
 func TestResolveRegistryPathPrefersRepoCheckout(t *testing.T) {
 	// The checkout's registry (the version-controlled SSOT) wins over the deployed
-	// copy — the read side of ADR-029 / #635.
+	// copy — the read side of ADR-030 / #635.
 	repo := t.TempDir()
 	want := filepath.Join(repo, "secrets", "registry.yaml")
 	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
@@ -244,5 +244,33 @@ func TestRepoRegistryPathFailsLoudWithoutCheckout(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if _, err := RepoRegistryPath(); err == nil {
 		t.Fatal("RepoRegistryPath() = nil error, want fail-loud when no checkout is found")
+	}
+}
+
+func TestResolveSensitiveDirPrefersRepoCheckout(t *testing.T) {
+	// The checkout's sensitive/ (where a rotation lands) wins over the deployed copy, so
+	// the values track the same source as the registry that maps them (ADR-030).
+	repo := t.TempDir()
+	want := filepath.Join(repo, "sensitive")
+	if err := os.Mkdir(want, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+
+	if got := ResolveSensitiveDir(); got != want {
+		t.Errorf("ResolveSensitiveDir() = %q, want repo copy %q", got, want)
+	}
+}
+
+func TestResolveSensitiveDirFallsBackToDeployed(t *testing.T) {
+	// Checkout present but with no sensitive/ dir → fall through to the deployed store
+	// under DOTFILES_DIR rather than returning a non-existent repo path.
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir()) // empty: no sensitive/
+	deployed := t.TempDir()
+	t.Setenv("DOTFILES_DIR", deployed)
+	want := filepath.Join(deployed, "sensitive")
+
+	if got := ResolveSensitiveDir(); got != want {
+		t.Errorf("ResolveSensitiveDir() = %q, want deployed copy %q", got, want)
 	}
 }

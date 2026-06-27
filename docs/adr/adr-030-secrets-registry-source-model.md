@@ -1,7 +1,7 @@
 ---
-id: "dotfiles-adr-029-secrets-registry-source-model"
+id: "dotfiles-adr-030-secrets-registry-source-model"
 type: adr
-adr: "029"
+adr: "030"
 title: "Secrets registry source model — checkout-first reads, fail-loud checkout-only writes"
 tags: [adr, dotfiles, secrets, registry, cli, go]
 status: accepted
@@ -10,7 +10,7 @@ owner: manu
 relates_to: "adr-025 (cross-machine paths), adr-028 (two-tier secrets)"
 ---
 
-# ADR-029: Secrets registry source model
+# ADR-030: Secrets registry source model
 
 ## Context
 
@@ -99,10 +99,25 @@ stale read is recoverable, unlike the silent write loss in the deployed-copy mod
 - Tests now cover repo-vs-deployed resolution for both seams, including the
   fail-loud-without-checkout path that the prior path-mocking tests could not catch.
 
+## Addendum (the values follow the mapping)
+
+The first cut applied the checkout-first read model to the registry *path* but left the
+age value store (`sensitive/`) resolving deployed-only. That re-created the split-brain
+for the secret *files*: a rotation re-encrypted in the checkout was invisible to
+`dotf secrets` until a redeploy, and a value freshened only in the deployed copy never
+reached the committed SSOT (surfaced live during the 2026-06-26 RELEASE_TOKEN rotation).
+
+The model therefore extends to the value store: `env.ResolveSensitiveDir()` resolves
+`sensitive/` checkout-first with the same deployed fallback, and `secretLoader` uses it.
+The registry and the values it maps now resolve from one source, so a repo-side rotation
+is `re-encrypt → dotf secrets sync ci` with no `DOTFILES_DIR` override and no redeploy.
+The age *private key* (`~/.config/age/key.txt`) is a machine secret, not in the repo, and
+is intentionally unaffected.
+
 ## References
 
 - Issue: #635. Epic: #612 (Phase C). Migration: #585.
-- Code: `cli/internal/env/env.go` (`RepoDir`, `ResolveRegistryPath`, `RepoRegistryPath`),
-  `cli/internal/cmd/secrets.go` (`registryPath`, `registryWritePath`),
-  `cli/internal/cmd/secrets_migrate.go`.
+- Code: `cli/internal/env/env.go` (`RepoDir`, `ResolveRegistryPath`, `RepoRegistryPath`,
+  `ResolveSensitiveDir`), `cli/internal/cmd/secrets.go` (`registryPath`,
+  `registryWritePath`, `secretLoader`), `cli/internal/cmd/secrets_migrate.go`.
 - Prior art: ADR-025 (`ResolveContractPath`, the stale-deployed-copy drift fix).
