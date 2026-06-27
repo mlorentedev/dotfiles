@@ -44,14 +44,18 @@ func newSecretsCmd() *cobra.Command {
 	return cmd
 }
 
-// registryPath resolves secrets/registry.yaml (the mapping SSOT); a var so tests
-// can point it at a fixture. ageDecryptor is the age decrypt seam (nil → AgeDecrypt);
-// bwReader is the Bitwarden read seam (BWGet in production), both overridable so
-// command tests inject fakes with no age key and no unlocked Bitwarden.
+// registryPath resolves secrets/registry.yaml for READS — repo checkout first, then
+// the deployed copy (ADR-029). registryWritePath is the WRITE seam: it resolves the
+// checkout's registry and fails loud if none is found, so a mutation lands in the
+// version-controlled SSOT and not the throwaway deployed copy (#635). Both are vars so
+// tests can point them at a fixture. ageDecryptor is the age decrypt seam (nil →
+// AgeDecrypt); bwReader is the Bitwarden read seam (BWGet in production), all
+// overridable so command tests inject fakes with no age key and no unlocked Bitwarden.
 var (
-	registryPath = func() string { return filepath.Join(env.DotfilesDir(env.Home()), "secrets", "registry.yaml") }
-	ageDecryptor secrets.Decryptor
-	bwReader     secrets.BWReader = secrets.BWGet{}
+	registryPath      = env.ResolveRegistryPath
+	registryWritePath = env.RepoRegistryPath
+	ageDecryptor      secrets.Decryptor
+	bwReader          secrets.BWReader = secrets.BWGet{}
 )
 
 // secretLoader builds the resolution engine wired with both backend seams, over the

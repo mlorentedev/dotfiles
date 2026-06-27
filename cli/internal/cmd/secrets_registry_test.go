@@ -39,16 +39,19 @@ secrets:
   - {id: kubelab-kubeconfig, plane: infra, backend: age, age: kubelab.kubeconfig, expose: {file: {var: KUBECONFIG, path: "~/.kube/c", mode: "0600"}}}
 `
 
-// useTempRegistry points registryPath at a fixture for the duration of a test.
+// useTempRegistry points both the read seam (registryPath) and the write seam
+// (registryWritePath) at one fixture for the duration of a test, so command tests
+// exercise migrate's flip without needing a real checkout.
 func useTempRegistry(t *testing.T, body string) {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "registry.yaml")
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	old := registryPath
+	oldRead, oldWrite := registryPath, registryWritePath
 	registryPath = func() string { return p }
-	t.Cleanup(func() { registryPath = old })
+	registryWritePath = func() (string, error) { return p, nil }
+	t.Cleanup(func() { registryPath, registryWritePath = oldRead, oldWrite })
 }
 
 func TestSecretsLs_ListsIdsAndVars_NoValues(t *testing.T) {

@@ -90,7 +90,14 @@ func newSecretsMigrateCmd() *cobra.Command {
 			// Flip the registry — the last mutation. The target is the entry's
 			// pre-declared bw: block (the same item/field parity verified above), so the
 			// flip only toggles backend + drops age; it needs no item/field of its own.
-			if err := secrets.FlipRegistryToBW(registryPath(), id); err != nil {
+			// Write to the checkout's registry (the version-controlled SSOT), failing
+			// loud if no checkout is found: writing the deployed copy would be silently
+			// reverted on the next redeploy and never reach git (#635).
+			wp, err := registryWritePath()
+			if err != nil {
+				return err
+			}
+			if err := secrets.FlipRegistryToBW(wp, id); err != nil {
 				return err
 			}
 			if err := loader.Verify(secrets.Entry{Var: id, Backend: "bw", Item: item, Field: field}); err != nil {
