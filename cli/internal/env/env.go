@@ -138,6 +138,57 @@ func ResolveContractPath() string {
 	return ""
 }
 
+// RepoDir resolves the dotfiles checkout root: DOTFILES_REPO_DIR when it points at
+// a real directory, else walking up from the working directory for a .git entry (a
+// file in a worktree, a directory in a normal clone — os.Stat matches both). Returns
+// "" when neither locates a checkout. This is the shared "where is the checkout"
+// seam the registry resolvers (ADR-029) build on.
+func RepoDir() string {
+	if r := os.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
+		return r
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		if git := walkUpFor(cwd, ".git"); git != "" {
+			return filepath.Dir(git)
+		}
+	}
+	return ""
+}
+
+// ResolveRegistryPath locates secrets/registry.yaml for READS. It prefers the
+// dotfiles checkout (the version-controlled SSOT, and fresher than the deployed
+// copy on a dev machine), falling back to the deployed copy under DOTFILES_DIR when
+// no checkout is found or the file is absent there. Mirrors ResolveContractPath and
+// implements the read side of the registry source model (ADR-029, #635).
+func ResolveRegistryPath() string {
+	if root := RepoDir(); root != "" {
+		if p := filepath.Join(root, "secrets", "registry.yaml"); fileExists(p) {
+			return p
+		}
+	}
+	return filepath.Join(DotfilesDir(Home()), "secrets", "registry.yaml")
+}
+
+// RepoRegistryPath returns secrets/registry.yaml inside the dotfiles checkout, or an
+// error when no checkout is found. WRITERS (dotf secrets migrate) MUST use this: the
+// registry is a version-controlled SSOT, so a mutation has to land in the checkout to
+// be committed. Writing the deployed copy under ~/.dotfiles is silently reverted on
+// the next redeploy and never reaches git — the durability bug behind #635. This
+// fails loud rather than write a throwaway copy.
+func RepoRegistryPath() (string, error) {
+	root := RepoDir()
+	if root == "" {
+		return "", fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write the registry SSOT to the deployed copy")
+	}
+	return filepath.Join(root, "secrets", "registry.yaml"), nil
+}
+
+// isDir reports whether p exists and is a directory.
+func isDir(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
+}
+
 // walkUpFor walks up from start looking for a file named name, returning its
 // full path or "".
 func walkUpFor(start, name string) string {
