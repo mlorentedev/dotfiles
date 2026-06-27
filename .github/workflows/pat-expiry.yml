@@ -9,8 +9,14 @@ name: PAT expiry preflight
 # github-authentication-token-expiration response header, and opens or UPDATES a
 # deduplicated `pat-expiry`-labelled issue (one per secret, stable title) when a
 # token is invalid/expired or within WARN_DAYS of expiry — so a rotation reminder
-# lands in the backlog BEFORE the next release run goes red. Detection only;
-# automatic rotation is HARNESS-022/#378. See specs/OPS-009-pat-expiry-preflight/.
+# lands in the backlog BEFORE the next release run goes red.
+#
+# A token that is ALREADY invalid/expired also FAILS the job (red), not just files
+# an issue: a backlog reminder was silently ignored once (BITACORA_PAT died, the
+# board automation 401'd for days) so the alarm must be unmissable. An expiring-soon
+# token (still valid, within WARN_DAYS) stays a soft heads-up — issue only, green job
+# — because the whole point is to warn while it still works. Automatic rotation is
+# HARNESS-022/#378. See specs/OPS-009-pat-expiry-preflight/.
 #
 # The issue calls use the default GITHUB_TOKEN (issues: write); each secret under
 # test is used ONLY as the probe's Authorization bearer, never to write.
@@ -101,7 +107,11 @@ jobs:
                 echo "::warning::${name}: api.github.com unreachable — liveness check skipped"
                 return 0
               fi
+              # Already-dead token: file the issue AND fail the job (red). INVALID is a
+              # job-level flag; we keep going so every secret is reported in one run.
               alert "${name}" "is invalid or expired (api.github.com returned HTTP ${status})"
+              echo "::error::${name} is invalid or expired (HTTP ${status}) — rotate it"
+              INVALID=1
               return 0
             fi
 
@@ -127,5 +137,13 @@ jobs:
             fi
           }
 
+          # INVALID flips to 1 inside check_token when a token is already dead. An
+          # expiring-soon (still-valid) token does not flip it — that stays a soft issue.
+          INVALID=0
           check_token "RELEASE_TOKEN" "${RELEASE_TOKEN}"
           check_token "BITACORA_PAT" "${BITACORA_PAT}"
+
+          if [ "${INVALID}" -ne 0 ]; then
+            echo "::error::one or more PAT-backed Actions secrets are invalid/expired — see the pat-expiry issue(s)"
+            exit 1
+          fi
