@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-024-secrets-sync-verify-f1",
+    "behavior": "A selected entry marked validate: github-token whose value fails the probe aborts sync ci before any upload; --skip-verify bypasses; unmarked entries never call the validator",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SyncCi_(DeadToken|SkipVerify|UnmarkedEntry)' -count=1",
+    "state": "passing",
+    "evidence": "TestSecretsSyncCi_DeadTokenAbortsBeforeUpload, _SkipVerifyBypassesValidation, _UnmarkedEntrySkipsValidation PASS"
+  },
+  {
+    "id": "CLI-024-secrets-sync-verify-f2",
+    "behavior": "A live marked token validates then uploads as before, with a verified line",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SyncCi_LiveTokenUploads' -count=1",
+    "state": "passing",
+    "evidence": "TestSecretsSyncCi_LiveTokenUploads PASS"
+  },
+  {
+    "id": "CLI-024-secrets-sync-verify-f3",
+    "behavior": "registry parses the new validate field; full suite green, vet + fmt clean, module builds",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -count=1 && go vet ./... && go build ./... && test -z \"$(gofmt -l internal/secrets internal/cmd)\"",
+    "state": "passing",
+    "evidence": "secrets + cmd packages ok; SetBackendBW golden against the real registry.yaml still passes with the added validate lines; vet/build clean; gofmt -l empty"
+  }
+]

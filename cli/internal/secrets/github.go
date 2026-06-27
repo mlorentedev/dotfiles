@@ -3,6 +3,7 @@ package secrets
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -87,6 +88,7 @@ func (r *Registry) SelectCI(repo string) CISelection {
 				sel.Skipped = append(sel.Skipped, CISkip{e.Var, "GITHUB_* prefix is reserved by Actions — rename the var at the workflow"})
 				continue
 			}
+			e.Validate = s.Validate // carry the opt-in liveness-check key to the uploader
 			sel.Upload = append(sel.Upload, e)
 		}
 	}
@@ -100,4 +102,50 @@ func (s *Secret) envEntries() []Entry {
 		return s.bwEntries("")
 	}
 	return s.ageEntries("")
+}
+
+// GitHubTokenValidator checks that a resolved GitHub token actually authenticates. The
+// seam that lets `dotf secrets sync ci` refuse to upload a dead PAT, while staying
+// testable with no gh and no network (tests inject a fake). Opt-in per registry entry
+// (validate: github-token); other secrets are not GitHub tokens and can't be probed
+// this way — liveness validation does NOT generalize across providers (ADR-028).
+type GitHubTokenValidator interface {
+	Validate(token string) error
+}
+
+// GHTokenValidate is the production GitHubTokenValidator: it runs `gh api user` with the
+// token under test as GH_TOKEN. An expired/revoked token makes the GitHub API return
+// 401/403, so gh exits non-zero and the error propagates. Live-path only (like
+// GHSecretSet/BWGet), never exercised in CI.
+type GHTokenValidate struct {
+	Bin string // gh binary name/path; "" → "gh"
+}
+
+// Validate returns nil when the token authenticates, else an error describing the failure.
+func (g GHTokenValidate) Validate(token string) error {
+	bin := g.Bin
+	if bin == "" {
+		bin = "gh"
+	}
+	cmd := exec.Command(bin, "api", "user", "-q", ".login") //nolint:gosec // fixed args, no user input
+	// Authenticate AS the token under test, not the ambient `gh auth`: strip any inherited
+	// GH_TOKEN/GITHUB_TOKEN before injecting ours, so the probe can't pass on the wrong creds.
+	filtered := make([]string, 0, len(os.Environ())+1)
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GH_TOKEN=") || strings.HasPrefix(kv, "GITHUB_TOKEN=") {
+			continue
+		}
+		filtered = append(filtered, kv)
+	}
+	cmd.Env = append(filtered, "GH_TOKEN="+token)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("gh api user: %s", msg)
+	}
+	return nil
 }
