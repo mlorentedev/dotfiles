@@ -151,3 +151,98 @@ func TestResolveContractPathRepoMissingFallsThrough(t *testing.T) {
 		t.Errorf("ResolveContractPath() = %q, want deployed copy %q", got, want)
 	}
 }
+
+func TestRepoDirPrefersDotfilesRepoDir(t *testing.T) {
+	repo := t.TempDir()
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+	if got := RepoDir(); got != repo {
+		t.Errorf("RepoDir() = %q, want %q", got, repo)
+	}
+}
+
+func TestRepoDirWalksUpForGitWhenNoEnv(t *testing.T) {
+	// No DOTFILES_REPO_DIR → RepoDir walks up from cwd for a .git entry.
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(repo, "cli", "internal")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", "") // force the walk-up branch
+	t.Chdir(sub)
+
+	got, err := filepath.EvalSymlinks(RepoDir()) // tmp dirs may be symlinked (macOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("RepoDir() = %q, want repo root %q", got, want)
+	}
+}
+
+func TestRepoDirNoneFound(t *testing.T) {
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Chdir(t.TempDir()) // a bare tmp dir has no .git ancestor
+	if got := RepoDir(); got != "" {
+		t.Errorf("RepoDir() = %q, want empty (no checkout)", got)
+	}
+}
+
+func TestResolveRegistryPathPrefersRepoCheckout(t *testing.T) {
+	// The checkout's registry (the version-controlled SSOT) wins over the deployed
+	// copy — the read side of ADR-029 / #635.
+	repo := t.TempDir()
+	want := filepath.Join(repo, "secrets", "registry.yaml")
+	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(want, []byte("version: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+
+	if got := ResolveRegistryPath(); got != want {
+		t.Errorf("ResolveRegistryPath() = %q, want repo copy %q", got, want)
+	}
+}
+
+func TestResolveRegistryPathFallsBackToDeployed(t *testing.T) {
+	// Checkout present but carrying no registry → fall through to the deployed copy
+	// under DOTFILES_DIR rather than returning a non-existent repo path.
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir()) // empty: no secrets/registry.yaml
+	deployed := t.TempDir()
+	t.Setenv("DOTFILES_DIR", deployed)
+	want := filepath.Join(deployed, "secrets", "registry.yaml")
+
+	if got := ResolveRegistryPath(); got != want {
+		t.Errorf("ResolveRegistryPath() = %q, want deployed copy %q", got, want)
+	}
+}
+
+func TestRepoRegistryPathReturnsCheckoutPath(t *testing.T) {
+	repo := t.TempDir()
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+	got, err := RepoRegistryPath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := filepath.Join(repo, "secrets", "registry.yaml"); got != want {
+		t.Errorf("RepoRegistryPath() = %q, want %q", got, want)
+	}
+}
+
+func TestRepoRegistryPathFailsLoudWithoutCheckout(t *testing.T) {
+	// The write seam must refuse to fall back to the deployed copy: a migrate written
+	// there is reverted on the next redeploy and never reaches git (#635).
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Chdir(t.TempDir())
+	if _, err := RepoRegistryPath(); err == nil {
+		t.Fatal("RepoRegistryPath() = nil error, want fail-loud when no checkout is found")
+	}
+}
