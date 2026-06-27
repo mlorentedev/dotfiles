@@ -43,6 +43,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # gh label/issue calls need a repo context; this job has no actions/checkout,
+      # so set GH_REPO (gh's default-repo env var) instead of a bare .git. Without it
+      # every gh call dies with "fatal: not a git repository" before any token is
+      # probed — the latent bug that silently broke this preflight since it shipped.
+      GH_REPO: ${{ github.repository }}
       WARN_DAYS: ${{ github.event.inputs.warn_days || '14' }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       BITACORA_PAT: ${{ secrets.BITACORA_PAT }}
