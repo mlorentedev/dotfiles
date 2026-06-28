@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -104,12 +105,20 @@ func TestEnvFor_DecryptError_FailsFast(t *testing.T) {
 // permission assertions stay POSIX-only — matching the existing materialize test.
 func statMode(t *testing.T, path string) os.FileMode {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		// Windows has no POSIX permission bits — os.Chmod only toggles read-only and
+		// Stat reports 0666/0444 regardless of the requested mode. The Mode feature
+		// degrades to best-effort there (NTFS uses ACLs), so the bit-exact assertion
+		// is POSIX-only. The materialization itself is still covered on Windows by the
+		// content/overwrite tests.
+		t.Skip("Windows does not honor POSIX permission bits — assertion is POSIX-only")
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat %s: %v", path, err)
 	}
 	if strings.Contains(fmt.Sprint(info.Mode()), "Irregular") {
-		t.Skip("filesystem drops mode bits (NTFS) — permission assertion is POSIX-only")
+		t.Skip("filesystem drops mode bits — permission assertion is POSIX-only")
 	}
 	return info.Mode().Perm()
 }
