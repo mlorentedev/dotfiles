@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.29.0](https://github.com/mlorentedev/dotfiles/compare/v0.28.0...v0.29.0) (2026-06-28)
+
+
+### Features
+
+* **secrets:** opt-in github-token liveness check before sync ci upload ([#639](https://github.com/mlorentedev/dotfiles/issues/639)) ([906fe21](https://github.com/mlorentedev/dotfiles/commit/906fe2175d61a74267426034d3cef059b0aebd7b))
+
+
+### Bug Fixes
+
+* **secrets:** resolve registry from the checkout SSOT, not the deployed copy ([#635](https://github.com/mlorentedev/dotfiles/issues/635)) ([#636](https://github.com/mlorentedev/dotfiles/issues/636)) ([cf8a9e1](https://github.com/mlorentedev/dotfiles/commit/cf8a9e1001e0c8c413a98ae64886a59bb4cd64e3))
+* **secrets:** resolve the age store checkout-first too + fix ADR-029 collision ([#642](https://github.com/mlorentedev/dotfiles/issues/642)) ([9a51faf](https://github.com/mlorentedev/dotfiles/commit/9a51faf9852d98d976bdad38fc12a27a3f93174f))
+* **secrets:** surface age's stderr on decrypt failure, not 'exit status 1' ([#644](https://github.com/mlorentedev/dotfiles/issues/644)) ([cf9323a](https://github.com/mlorentedev/dotfiles/commit/cf9323ae7e516fba94be7bd799421896fcb36b3b))
+* **setup:** complete claude-mem retirement — strip the marketplace from settings.json ([#645](https://github.com/mlorentedev/dotfiles/issues/645)) ([8afe9f5](https://github.com/mlorentedev/dotfiles/commit/8afe9f5c100fc3855a4002f349207f3633e756fc))
+* **setup:** repair shellcheck install — versioned asset URL + fail-loud curl ([#648](https://github.com/mlorentedev/dotfiles/issues/648)) ([9fec75c](https://github.com/mlorentedev/dotfiles/commit/9fec75caa69cf5e2c0268a15db582acb9c25e25f))
+
 ## [0.28.0](https://github.com/mlorentedev/dotfiles/compare/v0.27.0...v0.28.0) (2026-06-26)
 
 

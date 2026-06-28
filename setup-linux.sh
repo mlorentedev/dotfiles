@@ -318,10 +318,14 @@ fi
 # ShellCheck (shell script linter)
 if ! command -v shellcheck >/dev/null 2>&1; then
     log_info "Installing shellcheck..."
-    curl -Lo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/latest/download/shellcheck-stable.linux.x86_64.tar.xz" 2>/dev/null \
+    # Versioned asset (the `-stable` alias 404s post-v0.10) + `-f` so an HTTP error
+    # fails the curl loudly instead of saving the 404 body as a bogus "tarball" that
+    # only blows up later at xz. The tarball's internal dir is shellcheck-v<ver>/.
+    _sc_ver="v${SHELLCHECK_VERSION:-0.11.0}"
+    curl -fsSLo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/download/${_sc_ver}/shellcheck-${_sc_ver}.linux.x86_64.tar.xz" \
         && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
-        && cp /tmp/shellcheck-stable/shellcheck "$HOME/.local/bin/" \
-        && rm -rf /tmp/shellcheck.tar.xz /tmp/shellcheck-stable \
+        && cp "/tmp/shellcheck-${_sc_ver}/shellcheck" "$HOME/.local/bin/" \
+        && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${_sc_ver}" \
         && log_success "shellcheck installed" \
         || log_warning "shellcheck installation failed"
 else
@@ -1205,6 +1209,21 @@ _claude_cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 rm -rf "$_claude_cfg/plugins/cache/thedotmack/claude-mem" \
        "$_claude_cfg/plugins/marketplaces/thedotmack-claude-mem" \
        "$_claude_cfg/plugins/marketplaces/thedotmack" 2>/dev/null || true
+# The dir removal above is undone on the next Claude start if `thedotmack` is still
+# registered in settings.json — Claude re-clones the marketplace and its SessionStart
+# self-heal hook re-activates claude-mem. The settings merge below is additive (it
+# never strips keys), so delete the marketplace registration explicitly here. Guarded
+# on jq + an existing target; idempotent (the jq -e test skips an already-clean file).
+_claude_settings="$_claude_cfg/settings.json"
+if command -v jq >/dev/null 2>&1 && [ -f "$_claude_settings" ] && \
+   jq -e '.extraKnownMarketplaces.thedotmack' "$_claude_settings" >/dev/null 2>&1; then
+    if _stripped=$(jq 'del(.extraKnownMarketplaces.thedotmack)
+          | if (.extraKnownMarketplaces == {}) then del(.extraKnownMarketplaces) else . end' \
+          "$_claude_settings" 2>/dev/null) && [ -n "$_stripped" ]; then
+        printf '%s\n' "$_stripped" > "$_claude_settings"
+        log_info "Removed retired claude-mem marketplace registration from settings.json"
+    fi
+fi
 
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap

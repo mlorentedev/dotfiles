@@ -311,6 +311,14 @@ setup() {
     true
 }
 
+@test "shellcheck installed to ~/.local/bin (xz-utils present, .tar.xz extracts)" {
+    # setup-linux.sh installs shellcheck from a .tar.xz via `tar xJf`, which needs
+    # the xz binary. The container previously lacked xz-utils, so this step failed
+    # silently ("tar (child): xz: Cannot exec") and the build stayed green — the
+    # install path was never verified. With xz-utils in the image it must land.
+    [ -x "$HOME/.local/bin/shellcheck" ]
+}
+
 # =============================================================================
 # Section 11: tmux
 # =============================================================================
