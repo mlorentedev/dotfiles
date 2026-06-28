@@ -4,7 +4,7 @@ type: adr
 adr: "028"
 title: "Two-Tier Secrets Governance — Bitwarden live SSOT + age DR floor, via a dotf secrets facade"
 tags: [adr, dotfiles, secrets, bitwarden, age, governance]
-status: proposed
+status: accepted
 created: "2026-06-25"
 owner: manu
 supersedes_partial: "adr-002 (the shell-startup ambient load; the single-key model)"
@@ -263,3 +263,32 @@ migrated — they are needed before Bitwarden is reachable (circular dependency,
 
 Implementation: `specs/CLI-024-secrets-set` (write primitive), `specs/CLI-024-secrets-migrate`
 (cutover). A draft A1 registry rewrite seeds the per-entry `bw:` targets.
+
+## Ratification (2026-06-28): accepted — execution begins
+
+The `dotf secrets` lifecycle (`set`/`migrate`/`sync`/`verify`) is shipped and hardened
+(#612 Phase B, v0.29.0), and `bw`/`age` are provisioned (#577). The design above is
+**accepted**; the migration off age begins. Three rollout decisions are ratified here so
+they live in the record, not only in conversation:
+
+1. **Repo-side foundations precede vault-side curation.** The DR escrow (`dotf secrets
+   backup`, §5 — not yet built) and the `recover` runbook (§7) must exist *before* the
+   least-reversible vault mutations (moving the `AGE-SECRET-KEY-*` offline per §4,
+   restructuring live items). Repo-side work needs no `bw unlock`, so it proceeds in
+   parallel with the operational unlock. A one-off manual escrow snapshot is the interim
+   safety net until the command lands.
+
+2. **The §"Phased plan" step-3 "~20" resolves into three tranches** under the shipped
+   `migrate` guard (which refuses file secrets and shared-source entries):
+   - **A — ~23 env secrets, unique age source:** migratable now, batch-by-batch, `verify`
+     each (canary first).
+   - **B — 6 `file:` secrets** (kubeconfig, the recovery/backup codes): need a `migrate`
+     file-target extension before they can cut over.
+   - **C — the 2 shared-source GitHub PATs** (`GITHUB_PERSONAL_ACCESS_TOKEN` +
+     `RELEASE_TOKEN`, both on `github.token`): need `migrate --split` (#321), which issues
+     *distinct* tokens — sequenced last.
+
+3. **Retiring the age files (C6) is gated on the DR escrow existing.** The escrow keeps the
+   age DR export covering everything, so a migrated secret's `.secret.age` is deleted only
+   after the escrow (and its verified round-trip) is in place — never as a side effect of
+   `migrate` (which keeps the age file by design).
