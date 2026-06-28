@@ -202,13 +202,16 @@ func TestParseRegistry_BwValidation(t *testing.T) {
 
 func TestParseRegistry_Validation(t *testing.T) {
 	cases := map[string]string{
-		"bad version":       "version: 2\nsecrets: []\n",
-		"duplicate id":      "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A}}\n  - {id: a, plane: app, backend: age, age: g, expose: {env: B}}\n",
-		"unknown backend":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: vault, age: f, expose: {env: A}}\n",
-		"both env and file": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A, file: {var: V, path: /p}}}\n",
-		"missing source":    "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, expose: {env: A}}\n",
-		"invalid file mode": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {file: {var: V, path: /p, mode: \"x\"}}}\n",
-		"non-octal digit":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {file: {var: V, path: /p, mode: \"99\"}}}\n",
+		"bad version":        "version: 2\nsecrets: []\n",
+		"duplicate id":       "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A}}\n  - {id: a, plane: app, backend: age, age: g, expose: {env: B}}\n",
+		"unknown backend":    "version: 1\nsecrets:\n  - {id: a, plane: app, backend: vault, age: f, expose: {env: A}}\n",
+		"both env and file":  "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A, file: {var: V, path: /p}}}\n",
+		"missing source":     "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, expose: {env: A}}\n",
+		"invalid file mode":  "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {file: {var: V, path: /p, mode: \"x\"}}}\n",
+		"non-octal digit":    "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {file: {var: V, path: /p, mode: \"99\"}}}\n",
+		"age path traversal": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: ../../etc/passwd, expose: {env: A}}\n",
+		"age source slash":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: sub/dir, expose: {env: A}}\n",
+		"invalid var name":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: 1BAD}}\n",
 	}
 	for name, yml := range cases {
 		t.Run(name, func(t *testing.T) {
