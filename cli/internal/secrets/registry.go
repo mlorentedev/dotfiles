@@ -2,7 +2,9 @@ package secrets
 
 import (
 	"fmt"
+	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	yaml "go.yaml.in/yaml/v3"
@@ -142,6 +144,14 @@ func (r *Registry) validate() error {
 			return fmt.Errorf("secret %q: expose must have exactly one of env|file", s.ID)
 		}
 
+		// A file expose's mode is applied at materialization (#612 B2); reject a
+		// non-octal here so the failure surfaces at parse, not as a silent 0600.
+		if hasFile && s.Expose.File.Mode != "" {
+			if _, err := strconv.ParseUint(s.Expose.File.Mode, 8, 32); err != nil {
+				return fmt.Errorf("secret %q: invalid file mode %q (want octal, e.g. 0600)", s.ID, s.Expose.File.Mode)
+			}
+		}
+
 		// Each backend must resolve a source for everything it exposes.
 		switch s.Backend {
 		case "age", "age-offline":
@@ -216,6 +226,21 @@ func (r *Registry) Entries(home string) []Entry {
 	return es
 }
 
+// parseFileMode turns a FileExpose octal mode string ("0640") into an os.FileMode.
+// "" → 0, which materialize reads as "apply the 0600 default". validate() has
+// already rejected a non-octal string at parse, so a parse error here is impossible
+// in practice; it degrades to 0 (the safe default) rather than panicking.
+func parseFileMode(s string) os.FileMode {
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.ParseUint(s, 8, 32)
+	if err != nil {
+		return 0
+	}
+	return os.FileMode(n)
+}
+
 // ageEntries flattens an age/age-offline secret. The per-var age override falls
 // back to the secret's top-level Age source.
 func (s *Secret) ageEntries(home string) []Entry {
@@ -226,6 +251,7 @@ func (s *Secret) ageEntries(home string) []Entry {
 			File:    s.Age,
 			IsFile:  true,
 			Dest:    expandHome(s.Expose.File.Path, home),
+			Mode:    parseFileMode(s.Expose.File.Mode),
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))
@@ -254,6 +280,7 @@ func (s *Secret) bwEntries(home string) []Entry {
 			Field:   topField,
 			IsFile:  true,
 			Dest:    expandHome(s.Expose.File.Path, home),
+			Mode:    parseFileMode(s.Expose.File.Mode),
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))

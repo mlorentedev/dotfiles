@@ -207,6 +207,8 @@ func TestParseRegistry_Validation(t *testing.T) {
 		"unknown backend":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: vault, age: f, expose: {env: A}}\n",
 		"both env and file": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {env: A, file: {var: V, path: /p}}}\n",
 		"missing source":    "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, expose: {env: A}}\n",
+		"invalid file mode": "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {file: {var: V, path: /p, mode: \"x\"}}}\n",
+		"non-octal digit":   "version: 1\nsecrets:\n  - {id: a, plane: app, backend: age, age: f, expose: {file: {var: V, path: /p, mode: \"99\"}}}\n",
 	}
 	for name, yml := range cases {
 		t.Run(name, func(t *testing.T) {

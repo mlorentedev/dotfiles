@@ -152,10 +152,17 @@ func resolve(loader *Loader, e Entry) (string, error) {
 }
 
 // AtomicWrite stages content to a temp file in the target's directory, sets 0600,
-// and renames it over the target. Same-dir keeps the rename on one filesystem;
-// os.Rename replaces an existing file on both POSIX and Windows (MoveFileEx). Shared
-// by render (config files) and migrate (the registry cutover).
+// and renames it over the target. Shared by render (config files) and migrate (the
+// registry cutover) — both want the secret-file 0600 default.
 func AtomicWrite(path string, content []byte) error {
+	return AtomicWriteMode(path, content, 0o600)
+}
+
+// AtomicWriteMode is AtomicWrite with caller-chosen permission bits. Same-dir temp
+// keeps the rename on one filesystem; os.Rename replaces an existing file on both
+// POSIX and Windows (MoveFileEx). The chmod is applied to the temp file before the
+// rename, so the target never appears with looser-than-intended permissions.
+func AtomicWriteMode(path string, content []byte, mode os.FileMode) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return fmt.Errorf("atomic write: create temp for %s: %w", path, err)
@@ -170,7 +177,7 @@ func AtomicWrite(path string, content []byte) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("atomic write: close temp for %s: %w", path, err)
 	}
-	if err := os.Chmod(tmpName, 0o600); err != nil {
+	if err := os.Chmod(tmpName, mode); err != nil {
 		return fmt.Errorf("atomic write: chmod temp for %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
