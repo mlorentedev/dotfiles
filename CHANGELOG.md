@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.30.0](https://github.com/mlorentedev/dotfiles/compare/v0.29.0...v0.30.0) (2026-06-28)
+
+
+### Features
+
+* **git-hooks:** self-assign the linked issue at branch pickup ([#653](https://github.com/mlorentedev/dotfiles/issues/653)) ([ef5db02](https://github.com/mlorentedev/dotfiles/commit/ef5db0254fa832d49d580afb781f6455d5e2d30a))
+
+
+### Bug Fixes
+
+* **secrets:** apply file-secret mode + materialize atomically ([#612](https://github.com/mlorentedev/dotfiles/issues/612) B2/B4) ([#650](https://github.com/mlorentedev/dotfiles/issues/650)) ([c95f460](https://github.com/mlorentedev/dotfiles/commit/c95f460a54bf0a7ebd50177f213ee35ef6613a89))
+* **secrets:** parse-time guards — var uniqueness + name/path validation ([#612](https://github.com/mlorentedev/dotfiles/issues/612) B1/B5) ([#651](https://github.com/mlorentedev/dotfiles/issues/651)) ([db4f8aa](https://github.com/mlorentedev/dotfiles/commit/db4f8aa2d0a08426756ece829a84b93eae5f4d6e))
+
 ## [0.29.0](https://github.com/mlorentedev/dotfiles/compare/v0.28.0...v0.29.0) (2026-06-28)
 
 
