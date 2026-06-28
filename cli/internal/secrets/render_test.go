@@ -208,20 +208,19 @@ func TestRender_FileSecretVar_LeftIntactNotMaterialized(t *testing.T) {
 	}
 }
 
-// render needs a deterministic VAR→source map: if the registry exposes one var
-// from two distinct secrets, render fails fast (the shell twin silently took the
-// first mapping line; render refuses the ambiguity).
-func TestRender_DuplicateVar_FailsFast(t *testing.T) {
+// A var exposed by two secrets is now rejected at PARSE (#612 B1), centralizing for
+// all backends what render's envSourceMap caught age-only. render keeps that dedup as
+// defense-in-depth for a Registry hand-built past validate, but the normal path fails
+// earlier — at ParseRegistry — which this pins (the shell twin silently took the first
+// mapping line; we refuse the ambiguity up front).
+func TestParseRegistry_DuplicateVar_Rejected(t *testing.T) {
 	const dup = `
 version: 1
 secrets:
   - { id: a, plane: app, backend: age, age: a.src, expose: { env: SHARED } }
   - { id: b, plane: app, backend: age, age: b.src, expose: { env: SHARED } }
 `
-	reg := parseRenderReg(t, dup)
-	path := renderFixture(t, `v={env:SHARED}`)
-
-	if _, err := Render(path, reg, loaderFor(t), "/h"); err == nil {
-		t.Fatal("expected Render to fail when one var is exposed by two secrets")
+	if _, err := ParseRegistry([]byte(dup)); err == nil {
+		t.Fatal("expected ParseRegistry to reject a var exposed by two secrets")
 	}
 }

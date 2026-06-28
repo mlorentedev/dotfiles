@@ -3,11 +3,21 @@ package secrets
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
 	yaml "go.yaml.in/yaml/v3"
+)
+
+// validVarName is the env-identifier grammar a var must satisfy to be injectable and
+// {env:VAR}-referenceable. validAgeBase guards an age source base name against path
+// traversal: it is joined into sensitive/<base>.secret.age, so a "/" or ".." could
+// read outside the store. Both are enforced at parse time (#612 B1/B5).
+var (
+	validVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	validAgeBase = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 )
 
 // Registry is secrets/registry.yaml — the mapping SSOT of ADR-028 §2: it ties each
@@ -123,6 +133,7 @@ func (r *Registry) validate() error {
 		return fmt.Errorf("registry version %d unsupported (want 1)", r.Version)
 	}
 	seen := make(map[string]bool, len(r.Secrets))
+	seenVar := make(map[string]string) // var name -> first secret id that exposed it
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
 		if s.ID == "" {
@@ -163,6 +174,40 @@ func (r *Registry) validate() error {
 				return err
 			}
 		}
+
+		// Every exposed var must be a valid env identifier (B5) and unique across the
+		// whole registry (B1): a var mapped by two secrets has no single source, and
+		// render's dedup was age-only, so run/show would silently resolve last-write.
+		for _, v := range s.Vars() {
+			if !validVarName.MatchString(v) {
+				return fmt.Errorf("secret %q: invalid var name %q (want an env identifier [A-Za-z_][A-Za-z0-9_]*)", s.ID, v)
+			}
+			if first, dup := seenVar[v]; dup {
+				return fmt.Errorf("var %q is exposed by both %q and %q — each var must map to exactly one secret", v, first, s.ID)
+			}
+			seenVar[v] = s.ID
+		}
+	}
+	return nil
+}
+
+// checkAgeBase rejects an age source name that is not a bare base name — anything
+// with a path separator or ".." could escape sensitive/ when joined into
+// <base>.secret.age (read-traversal). The charset matches the registry's real names
+// (e.g. "openrouter.api.key", "id_ed25519").
+func checkAgeBase(id, base string) error {
+	if !validAgeBase.MatchString(base) || strings.Contains(base, "..") {
+		return fmt.Errorf("secret %q: unsafe age source name %q (want a bare base name, no path/..)", id, base)
+	}
+	return nil
+}
+
+// checkBwName rejects a control character in a Bitwarden item/field name (it is
+// passed to `bw get item` and echoed in errors). Spaces are allowed — bw item names
+// are freeform.
+func checkBwName(id, kind, name string) error {
+	if strings.ContainsAny(name, "\n\r\t\x00") {
+		return fmt.Errorf("secret %q: bw %s %q contains a control character", id, kind, name)
 	}
 	return nil
 }
@@ -176,11 +221,18 @@ func (s *Secret) checkAgeSources() error {
 		if s.Expose.File.Var == "" || s.Expose.File.Path == "" {
 			return fmt.Errorf("secret %q: file expose needs var+path", s.ID)
 		}
-		return nil
+		return checkAgeBase(s.ID, s.Age)
 	}
 	for _, v := range s.Expose.Env.Vars {
-		if v.Age == "" && s.Age == "" {
+		src := v.Age
+		if src == "" {
+			src = s.Age
+		}
+		if src == "" {
 			return fmt.Errorf("secret %q: env %q has no age source", s.ID, v.Name)
+		}
+		if err := checkAgeBase(s.ID, src); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -190,6 +242,12 @@ func (s *Secret) checkAgeSources() error {
 func (s *Secret) checkBwSources() error {
 	if s.BW == nil || s.BW.Item == "" {
 		return fmt.Errorf("secret %q: bw backend needs bw.item", s.ID)
+	}
+	if err := checkBwName(s.ID, "item", s.BW.Item); err != nil {
+		return err
+	}
+	if err := checkBwName(s.ID, "field", s.BW.Field); err != nil {
+		return err
 	}
 	if s.Expose.File != nil {
 		if s.BW.Field == "" {
