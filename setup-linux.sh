@@ -1205,6 +1205,21 @@ _claude_cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 rm -rf "$_claude_cfg/plugins/cache/thedotmack/claude-mem" \
        "$_claude_cfg/plugins/marketplaces/thedotmack-claude-mem" \
        "$_claude_cfg/plugins/marketplaces/thedotmack" 2>/dev/null || true
+# The dir removal above is undone on the next Claude start if `thedotmack` is still
+# registered in settings.json — Claude re-clones the marketplace and its SessionStart
+# self-heal hook re-activates claude-mem. The settings merge below is additive (it
+# never strips keys), so delete the marketplace registration explicitly here. Guarded
+# on jq + an existing target; idempotent (the jq -e test skips an already-clean file).
+_claude_settings="$_claude_cfg/settings.json"
+if command -v jq >/dev/null 2>&1 && [ -f "$_claude_settings" ] && \
+   jq -e '.extraKnownMarketplaces.thedotmack' "$_claude_settings" >/dev/null 2>&1; then
+    if _stripped=$(jq 'del(.extraKnownMarketplaces.thedotmack)
+          | if (.extraKnownMarketplaces == {}) then del(.extraKnownMarketplaces) else . end' \
+          "$_claude_settings" 2>/dev/null) && [ -n "$_stripped" ]; then
+        printf '%s\n' "$_stripped" > "$_claude_settings"
+        log_info "Removed retired claude-mem marketplace registration from settings.json"
+    fi
+fi
 
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
