@@ -4,13 +4,13 @@ type: skill
 status: active
 created: "2026-05-13"
 name: spec
-description: "Manage Spec-Driven Development per-feature artifacts. Triggers on /spec, \"create a spec for\", \"scaffold spec X\", \"bootstrap substrate for X\", \"fill proposal for X\", \"archive spec X\". Four subcommands: init (scaffold, gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate contract), fill (Socratic 5-question proposal), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent Claude/Copilot via AGENTS.md indirection."
+description: "Manage Spec-Driven Development per-feature artifacts. Triggers on /spec, \"create a spec for\", \"scaffold spec X\", \"bootstrap substrate for X\", \"fill proposal for X\", \"check/lint spec X\", \"archive spec X\". Five subcommands: init (scaffold, gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate contract), fill (Socratic 5-question proposal), check (pre-implementation consistency lint), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent Claude/Copilot via AGENTS.md indirection."
 allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch]
 ---
 
 # Spec Workflow
 
-> Implements `pattern-spec-driven-development`. Four subcommands: `init`, `bootstrap` (optional), `fill`, `archive`.
+> Implements `pattern-spec-driven-development`. Five subcommands: `init`, `bootstrap` (optional), `fill`, `check`, `archive`.
 > **Core principle:** every spec is downstream of an OPEN GitHub issue on the bitácora Project — the work-gate per ADR-018. The vault keeps templates and patterns; task state lives in GitHub.
 
 ## When to use
@@ -19,6 +19,7 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
 - "Create a spec for X" / "scaffold spec X" / "start working on X" -> `init`.
 - "Bootstrap substrate for X" / "the substrate for X doesn't exist yet" / "new runtime needed before features" -> `bootstrap`.
 - "Fill in proposal for X" / "help me write the proposal" -> `fill`.
+- "Check spec X" / "lint spec X" / "does my spec cover everything" -> `check`.
 - "Archive spec X" / "close spec X" -> `archive`.
 
 ## When NOT to use
@@ -120,7 +121,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 ## Subcommand: bootstrap
 
-**Purpose:** Author `bootstrap-contract.md` for specs that scaffold a NEW substrate (new repo, new worker runtime, new microservice). Normative doc — a peer with this file + repo HEAD on a clean machine must reach passing smoke test. Differs from `00-context.md` (descriptive, vault).
+**Purpose:** Author `bootstrap-contract.md` for specs that scaffold a NEW substrate (new repo, new worker runtime, new microservice). Normative doc — a peer with this file + repo HEAD on a clean machine must reach passing smoke test. Differs from `context.md` (descriptive, vault).
 
 **Signature:** `/spec bootstrap <feature-id>`
 
@@ -169,7 +170,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 2. For each section: if non-placeholder content present, ask: "Section `<X>` is already filled. Overwrite, append, or skip?"
 3. Read context for grounding (silent, not shown to user):
    - GitHub issue for this spec (via `gh issue view` — bitácora is the SSOT per ADR-018).
-   - `$VAULT_PATH/10_projects/$REPO_NAME/10-roadmap.md` (strategic frame).
+   - `$VAULT_PATH/10_projects/$REPO_NAME/roadmap.md` (strategic frame).
    - Referenced ADRs (frontmatter only via Hive).
    - Up to 3 sister specs in `$REPO_ROOT/specs/archive/` (for tone consistency).
 4. **GitHub issue link:** if the `issue:` frontmatter field is empty and a GitHub Project issue exists for this spec, ask: "What is the GitHub issue for this spec? (e.g. `kubelab#123` or `skip`)" and populate the field before proceeding.
@@ -195,12 +196,50 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 **Closing:**
 - Summary: list TODO markers (if any), list sections captured.
 - Ask: "Open questions in Risks section — any that BLOCK tasks.md being frozen?" If yes, flag them.
-- Output: "proposal.md drafted. Next: resolve open questions, then start implementing per tasks.md."
+- Output: "proposal.md drafted. Next: resolve open questions, draft `tasks.md`, then run `/spec check <feature-id>` before implementing."
 
 **Edge cases:**
 - User wants to redo a question -> re-ask, overwrite the section.
 - Vault unreachable during context fetch -> degrade gracefully (run without context, ask user to provide manually).
 - All 5 answers are `skip` -> warn user that spec has no content; offer to delete via `archive --abandoned` (v2 feature).
+
+---
+
+## Subcommand: check
+
+**Purpose:** Lightweight **pre-implementation** consistency lint. Cross-checks `proposal.md` acceptance criteria ↔ `tasks.md` implementation tasks BEFORE any code is written: every criterion must have a covering task, and every task should trace to a criterion (or be declared housekeeping). This is the *pre*-impl complement to `adversarial-review` (which runs *post*-impl, before archive) — deliberately lighter than spec-kit's full `/speckit.analyze` (#141).
+
+**Signature:** `/spec check <feature-id>` (also: "lint spec X", "does my spec cover everything", "consistency check X")
+
+**When to use:** after `/spec fill` (acceptance criteria exist) and after `tasks.md` is drafted, BEFORE you freeze tasks and start implementing. Re-run any time tasks or criteria change while the spec is still `draft`.
+
+**Steps:**
+
+1. **Pre-flight:** verify `$REPO_ROOT/specs/<feature-id>/proposal.md` and `tasks.md` exist. If either is missing → suggest `/spec init`/`fill` first. If the Acceptance-criteria section still carries `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` tags, refuse — linting a draft lints noise; tell the user to resolve those first.
+2. **Extract criteria:** read the `## Acceptance criteria` section of `proposal.md`; number the items `AC1..ACn` in order.
+3. **Extract tasks:** read the `## Implementation` section of `tasks.md`. Ignore `## Setup` / `## Closing` — those are housekeeping and are never orphans.
+4. **Build the coverage map** — apply the coverage rule below.
+5. **Report** three findings:
+   - **Uncovered criteria** — any `ACn` with zero covering tasks. Each is a **BLOCKER**: implementation must not start with an untasked criterion.
+   - **Orphan tasks** — any Implementation task that traces to no criterion. Each is a **WARN**: either scope creep (drop it) or a missing criterion (add it to `proposal.md`). Pure refactor/housekeeping tasks are exempt when the task names itself as such.
+   - **Coverage table** — `ACn → [task lines]`, plus which path (deterministic / semantic) decided each row.
+6. **Verdict** (same vocabulary as `adversarial-review`):
+   - **PASS** — every criterion covered, no orphans.
+   - **PASS-WITH-GAPS** — every criterion covered, ≥1 orphan task (review for scope creep).
+   - **FAIL** — ≥1 uncovered criterion. Do not begin implementation until resolved.
+7. **Non-mutating.** `check` only reports — it never edits `proposal.md` or `tasks.md`. The human reconciles, then re-runs if desired.
+
+**Coverage rule (the load-bearing decision of this lint):**
+
+- **Deterministic path** — if Implementation tasks carry `[AC<n>]` markers (see the `spec-tasks.md` legend), trust them: a criterion is covered iff ≥1 task tags its number. Zero ambiguity, but only as honest as the tagging.
+- **Semantic fallback** — for any criterion with no `[AC<n>]` tag anywhere, judge coverage by reading: would a task, once done, *plausibly produce the observable outcome* the criterion asserts? Be strict — a criterion asserting an observable behavior (status code, idempotency, rate limit) needs a task that exercises it, not merely one that names the feature.
+- A spec may mix both: tagged criteria take the deterministic path, untagged ones fall back to semantic. Always report which path decided each criterion so the verdict is auditable.
+
+**Edge cases:**
+- No `## Acceptance criteria` section, or it is empty → FAIL: "nothing to check; run `/spec fill` Q5 first".
+- One task legitimately covers several criteria (e.g. a single integration test) → allowed; list it under each `ACn` it covers.
+- `features.json` already exists (spec further along) → also cross-check it: every criterion should have ≥1 `features.json` entry. A criterion with a covering task but no feature is a softer WARN (verification not yet wired).
+- Mechanical fallback: none yet — `check` is agent-judgment-first by design. A `dotf spec check` shim is a future option if `[AC<n>]`-driven determinism proves sufficient.
 
 ---
 
@@ -248,6 +287,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 ## Integration with existing skills
 
+- **Pre-implementation:** run `/spec check` to lint criteria↔task coverage before coding. `adversarial-review` is the heavier *post*-implementation gate (before archive) — the two sit at opposite ends of the same correctness axis.
 - **Pre-archive:** recommend invoking `verification-before-completion` for evidence audit.
 - **Post-archive deeper crystallization:** `crystallize` can promote a lesson further to a pattern if recurrence detected.
 - **Independent of** `code-review`, `commit-commands:commit-push-pr`, `pr-review-toolkit:*` — those are pre/post-merge gates, separate axis.
@@ -265,7 +305,8 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 | `init` (pre-flight) | GitHub issue via `gh` (work-gate, not a vault read) | nothing |
 | `init` (substitution) | `00_meta/templates/spec-*.md` | (filesystem only — repo specs/) |
 | `bootstrap` (template) | `00_meta/templates/bootstrap-contract.md`, sister contracts in `specs/archive/` | (filesystem only — repo specs/<id>/bootstrap-contract.md) |
-| `fill` (grounding) | GitHub issue, `10-roadmap.md`, referenced ADRs, sister specs | nothing |
+| `fill` (grounding) | GitHub issue, `roadmap.md`, referenced ADRs, sister specs | nothing |
+| `check` (lint) | `proposal.md`, `tasks.md`, optional `features.json` | nothing |
 | `archive` (promotion) | `verification.md` flags | repo `docs/lessons.md`, repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
 | `archive` (backlog tick) | GitHub issue | GitHub issue closed |
 

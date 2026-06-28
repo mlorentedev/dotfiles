@@ -254,11 +254,10 @@ The context window is a public good. Only add context Claude doesn't already hav
 The vault is the single source of truth (SDD-008). Author the skill here
 (`00_meta/skills/<skill-name>/SKILL.md`); `compile-harness.sh` (invoked by setup,
 or run with `--deploy` standalone) renders it into the dotfiles `harness/skills/`
-record and deploys it to each agent:
-- Claude: `~/.claude/skills/<skill-name>/` (full directory, regular copy)
-- OpenCode: `~/.config/opencode/commands/<skill-name>.md`
-- Antigravity: `~/.gemini/skills/<skill-name>/` + `~/.gemini/prompts/<skill-name>.md` (frontmatter stripped)
-- Copilot: a catalog entry in `~/.copilot/copilot-instructions.md`
+record and deploys it to each agent's skill/command directory. The per-agent
+render targets (full directory copy, mechanical command transform,
+frontmatter-stripped prompt, or catalog entry) are owned by
+`pattern-cross-agent-skill-pipeline`.
 
 Add `targets: [claude]` (or any subset) to the frontmatter to limit which agents
 receive the skill; absent = all agents. Edit the skill here and run

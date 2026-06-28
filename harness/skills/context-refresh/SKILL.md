@@ -1,12 +1,12 @@
 ---
 name: context-refresh
 targets: [claude]
-description: Use after a brainstorm / ADR / phase-closing session to refresh a project's 00-context.md patchable fields (phase, focus, blocked_by, recent_adrs, last_updated) WITHOUT touching the stable body. Keeps 00-context.md cheap for agent orientation at session start (HARNESS-006). Triggers on /context-refresh, "actualiza el contexto", "refresh project context", or automatically from /handoff when an ADR was written or a phase milestone closed this session. Do NOT use for backlog/task changes — that state lives in the GitHub Project "bitácora", not here.
+description: Use after a brainstorm / ADR / phase-closing session to refresh a project's context.md patchable fields (phase, focus, blocked_by, recent_adrs, last_updated) WITHOUT touching the stable body. Keeps context.md cheap for agent orientation at session start (HARNESS-006). Triggers on /context-refresh, "actualiza el contexto", "refresh project context", or automatically from /handoff when an ADR was written or a phase milestone closed this session. Do NOT use for backlog/task changes — that state lives in the GitHub Project "bitácora", not here.
 ---
 
 # /context-refresh — Project Context Patcher
 
-Keeps `00-context.md` current and cheap for **agent orientation at session start** (HARNESS-006:
+Keeps `context.md` current and cheap for **agent orientation at session start** (HARNESS-006:
 an agent reads it in <400 tokens and learns WHAT / WHERE / PHASE / FOCUS). This skill patches only
 the five frontmatter *patchable* fields; the stable body is human-owned and is never rewritten.
 
@@ -22,7 +22,7 @@ the five frontmatter *patchable* fields; the stable body is human-owned and is n
 
 ### Step 1 — Locate
 - Resolve the project: explicit arg (`/context-refresh kubelab`), else the repo of the current working
-  directory → `10_projects/<project>/00-context.md`.
+  directory → `10_projects/<project>/context.md`.
 - If the file has no patchable frontmatter block (pre-HARNESS-006 format), STOP and offer to migrate it
   to `00_meta/templates/project-context.md` first — do not patch a legacy file.
 
