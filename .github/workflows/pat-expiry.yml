@@ -11,6 +11,12 @@ name: PAT expiry preflight
 # token is invalid/expired or within WARN_DAYS of expiry — so a rotation reminder
 # lands in the backlog BEFORE the next release run goes red.
 #
+# Liveness is necessary but not sufficient: a token can authenticate yet lack the
+# *permission* its job needs. RELEASE_TOKEN must open release-please's PR, so the
+# job also probes that capability (POST /pulls, non-destructively) and fails when
+# the token is alive but missing 'Pull requests: write' — the gap that let a
+# rotated RELEASE_TOKEN pass this preflight while every release silently broke.
+#
 # A token that is ALREADY invalid/expired also FAILS the job (red), not just files
 # an issue: a backlog reminder was silently ignored once (BITACORA_PAT died, the
 # board automation 401'd for days) so the alarm must be unmissable. An expiring-soon
@@ -61,11 +67,17 @@ jobs:
             --description "PAT-backed Actions secret expiring or invalid (OPS-009)" \
             --color D93F0B --force >/dev/null
 
-          # alert NAME REASON — open a `pat-expiry` issue for NAME, or comment on the
-          # existing open one (dedupe by stable title), so a weekly cron never spams.
+          # alert NAME REASON [REMEDIATION] — open a `pat-expiry` issue for NAME, or
+          # comment on the existing open one (dedupe by stable title), so a weekly cron
+          # never spams. REMEDIATION overrides the default rotate instructions — a
+          # permission gap is fixed by granting a scope, not by rotating the value.
           alert() {
-            local name="$1" reason="$2"
+            local name="$1" reason="$2" remediation="${3:-}"
             local title="PAT expiry: ${name}"
+            if [ -z "${remediation}" ]; then
+              remediation="**Rotate it**: update the secret in its store (age or Bitwarden), then sync the
+          value to the repository Actions secret (\`dotf secrets sync ci --repo <owner/repo>\`)."
+            fi
             local existing
             existing=$(gh issue list --state open --label pat-expiry \
               --json number,title \
@@ -77,8 +89,7 @@ jobs:
               gh issue create --title "${title}" --label pat-expiry --body \
           "The Actions secret \`${name}\` ${reason}.
 
-          **Rotate it**: update the secret in its store (age or Bitwarden), then sync the
-          value to the repository Actions secret (\`dotf secrets sync ci --repo <owner/repo>\`).
+          ${remediation}
 
           Filed automatically by \`.github/workflows/pat-expiry.yml\` (OPS-009)."
               echo "::warning::opened a pat-expiry issue for ${name}"
@@ -142,13 +153,52 @@ jobs:
             fi
           }
 
+          # check_pr_capability NAME VALUE — verify the PAT can OPEN pull requests
+          # (release-please's final step), without creating one. Liveness (GET /user)
+          # passes for a token that authenticates but lacks 'Pull requests: write' —
+          # exactly how a rotated RELEASE_TOKEN silently broke release-please: every
+          # push went red with 403 "Resource not accessible by personal access token"
+          # on POST /pulls, while this preflight stayed green because the token was
+          # still alive. Probe: POST /pulls with a non-existent head branch. GitHub
+          # authorizes BEFORE validating the body, so a permitted token reaches
+          # validation (HTTP 422) and a forbidden one is rejected at authz (HTTP 403).
+          # Nothing is ever created (the head ref does not exist).
+          check_pr_capability() {
+            local name="$1" value="$2"
+            [ -z "${value}" ] && return 0  # empty/offline already handled by check_token
+            local status
+            status=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer ${value}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "User-Agent: pat-expiry-preflight" \
+              "https://api.github.com/repos/${GH_REPO}/pulls" \
+              -d '{"title":"pat-capability-probe","head":"pat-expiry-capability-probe-DO-NOT-CREATE","base":"main"}' \
+              2>/dev/null || echo "000")
+            case "${status}" in
+              422|201) echo "::notice::${name}: can open pull requests (Pull requests: write present)";;
+              403)
+                alert "${name}" \
+                  "authenticates but cannot open pull requests (HTTP 403 on POST /pulls) — release-please cannot create its release PR, so every release is silently blocked" \
+                  "**Grant the permission** (this is a scope gap, not expiry — the token value is unchanged, so no re-sync is needed): on the fine-grained PAT backing \`${name}\`, set **Repository permissions → Pull requests → Read and write** (keep **Contents → Read and write**). For a classic PAT, ensure the full **\`repo\`** scope."
+                echo "::error::${name} lacks 'Pull requests: write' — release-please cannot open the release PR"
+                INVALID=1
+                ;;
+              000) echo "::warning::${name}: api.github.com unreachable — PR-capability check skipped";;
+              *)   echo "::warning::${name}: unexpected HTTP ${status} on PR-capability probe — not failing the job on it";;
+            esac
+          }
+
           # INVALID flips to 1 inside check_token when a token is already dead. An
           # expiring-soon (still-valid) token does not flip it — that stays a soft issue.
           INVALID=0
           check_token "RELEASE_TOKEN" "${RELEASE_TOKEN}"
           check_token "BITACORA_PAT" "${BITACORA_PAT}"
+          # RELEASE_TOKEN's job is to open release-please's PR — assert that capability,
+          # not just that it authenticates (the gap that broke releases). BITACORA_PAT
+          # drives a Projects v2 board, a different capability not probed here.
+          check_pr_capability "RELEASE_TOKEN" "${RELEASE_TOKEN}"
 
           if [ "${INVALID}" -ne 0 ]; then
-            echo "::error::one or more PAT-backed Actions secrets are invalid/expired — see the pat-expiry issue(s)"
+            echo "::error::one or more PAT-backed Actions secrets are invalid/expired or under-scoped — see the pat-expiry issue(s)"
             exit 1
           fi
