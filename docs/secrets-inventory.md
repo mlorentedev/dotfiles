@@ -15,35 +15,39 @@
 
 ## (a)+(b) dotfiles secrets
 
-| # | Logical secret | age file | Env var / file target | Plane | Consumer(s) (confirm) | Target bw item | In Bitwarden? | Flags |
+> **"In Bitwarden?" column confirmed 2026-06-28** via a names/structure-only `bw list items`
+> dump (no values). Vault = 152 items, still **all in "No Folder"**. Legend: `Yes — <item> (<field>)`
+> = value present · `No` = age-only, `migrate` will create the canonical item fresh · `n/a` = floor.
+
+| # | Logical secret | age file | Env var / file target | Plane | Consumer(s) (confirm) | Target bw item | In Bitwarden? (2026-06-28) | Flags |
 |---|---|---|---|---|---|---|---|---|
-| 1 | GitHub token (shared) | `github.token` | `GITHUB_PERSONAL_ACCESS_TOKEN` + `RELEASE_TOKEN` | app | CLI/API, goreleaser+CI release | **split** → `apps/github-cli-pat`, `apps/github-release-pat` | ? | **#321 one-token-many-uses → split per purpose** |
-| 2 | Bitácora PAT | `github.bitacora` | `BITACORA_PAT` | app | bitácora board/Project writes, 20 repos | `apps/github-bitacora-pat` | ? | per-purpose ✔ already split |
-| 3 | DockerHub token | `dockerhub.token` | `DOCKERHUB_TOKEN` | app | CI image push | `apps/dockerhub-token` | ? | |
-| 4 | DockerHub username | `dockerhub.username` | `DOCKERHUB_USERNAME` | app | CI image push | field on `apps/dockerhub-token` | ? | collapse into the token item |
-| 5 | Cloudflare API token | `cloudflare.api-token` | `CLOUDFLARE_API_TOKEN` | app | DNS/infra automation | `infra/cloudflare-api-token` | ? | |
-| 6 | Hetzner API key | `hetzner.api-key` | `HETZNER_API_TOKEN` | app | infra provisioning | `infra/hetzner-api-token` | ? | |
-| 7 | Hetzner SSH key | `hetzner.ssh` | `HETZNER_SSH_KEY` | floor/app | server access | `infra/hetzner-ssh` (SSH Key type) | ? | native SSH Key item |
-| 8 | OpenAI API key | `chatgpt.api-key` | `OPENAI_API_KEY` | app | LLM calls | `apps/openai-api-key` | ? | **naming drift: store says "chatgpt", service is OpenAI** |
-| 9 | OpenRouter API key | `openrouter.api.key` | `OPENROUTER_API_KEY` | app | LLM router | `apps/openrouter-api-key` | ? | **naming drift: double-dot `.api.key`** |
-| 10 | NaN API key | `nan.api-key` | `NAN_API_KEY` | app | NaN cloud engine | `apps/nan-api-key` | ? | |
-| 11 | Stripe API key | `stripe.api-key` | `STRIPE_API_KEY` | app | payments | `apps/stripe-api-key` | ? | |
-| 12 | YouTube API key | `youtube.api-key` | `YOUTUBE_API_KEY` | app | yt-metrics | `apps/youtube-api-key` | ? | |
-| 13 | Beehiiv API key | `beehiiv.api-key` | `BEEHIIV_API_KEY` | app | newsletter | `apps/beehiiv-api-key` | ? | |
-| 14 | Beehiiv DNS records | `beehiiv.dns-records` | `BEEHIIV_DNS_RECORDS` | app | DNS config | `apps/beehiiv-dns` (Secure Note) | ? | not a key — reference data |
-| 15 | PyPI token | `pypi.token` | `PYPI_TOKEN` | app | package publish | `apps/pypi-token` | ? | |
-| 16 | Tailscale auth key | `tailscale.auth-key` | `TS_AUTHKEY` | app/infra | VPN join | `infra/tailscale-auth-key` | ? | short-lived by nature |
-| 17 | Pollex API key | `pollex.api-key` | `POLLEX_API_KEY` | app | pollex NaN engine (#237) | `apps/pollex-api-key` | ? | |
-| 18 | X (Twitter) credential | `x.api-key`, `x.api-key-secret`, `x.access-token`, `x.access-token-secret`, `x.bearer-token`, `x.client-id`, `x.client-secret` | `X_*` (7 vars) | app | X API | **collapse → 1 item** `apps/x-twitter` (7 custom fields) | ? | **7 files → 1 item** |
-| 19 | Zoho app passwords | `zoho.app-passwords` | `ZOHO_APP_PASSWORDS` | personal | mail clients | `personal/zoho-app-passwords` | ? | |
-| 20 | Kubelab kubeconfig | `kubelab.kubeconfig` | file → `~/.kube/kubelab.config` | app/infra | kubectl | `infra/kubelab-kubeconfig` (Secure Note/attachment) | ? | file secret |
+| 1 | GitHub token (shared) | `github.token` | `GITHUB_PERSONAL_ACCESS_TOKEN` + `RELEASE_TOKEN` | app | CLI/API, goreleaser+CI release | **split** → `apps/github-cli-pat`, `apps/github-release-pat` | Yes — `GitHub` 8-in-1 (PAT, release-token) | **#321 one-token-many-uses → split per purpose; C9 `migrate --split`** |
+| 2 | Bitácora PAT | `github.bitacora` | `BITACORA_PAT` | app | bitácora board/Project writes, 20 repos | `apps/github-bitacora-pat` | Yes — `GitHub` 8-in-1 (bitacora token) | per-purpose ✔ already split |
+| 3 | DockerHub token | `dockerhub.token` | `DOCKERHUB_TOKEN` | app | CI image push | `apps/dockerhub-token` | Yes — `DockerHub` (PAT field) | |
+| 4 | DockerHub username | `dockerhub.username` | `DOCKERHUB_USERNAME` | app | CI image push | field on `apps/dockerhub-token` | Yes — `DockerHub` (login username) | collapse into the token item |
+| 5 | Cloudflare API token | `cloudflare.api-token` | `CLOUDFLARE_API_TOKEN` | app | DNS/infra automation | `infra/cloudflare-api-token` | **No** (age-only) | net-new in bw |
+| 6 | Hetzner API key | `hetzner.api-key` | `HETZNER_API_TOKEN` | app | infra provisioning | `infra/hetzner-api-token` | Yes — `Hetzner` login (key field) | |
+| 7 | Hetzner SSH key | `hetzner.ssh` | `HETZNER_SSH_KEY` | floor/app | server access | `infra/hetzner-ssh` (SSH Key type) | Yes — `Hetzner` (SSH Key, type 5) | native SSH Key item |
+| 8 | OpenAI API key | `chatgpt.api-key` | `OPENAI_API_KEY` | app | LLM calls | `apps/openai-api-key` | **No** — only `auth.openai.com` account login | **naming drift: store says "chatgpt", service is OpenAI; good canary (net-new)** |
+| 9 | OpenRouter API key | `openrouter.api.key` | `OPENROUTER_API_KEY` | app | LLM router | `apps/openrouter-api-key` | Yes — **2 entries**: `OPEN ROUTER API KEY` (note) + `openrouter.ai` (login) → **MERGE** | **naming drift: double-dot `.api.key`** |
+| 10 | NaN API key | `nan.api-key` | `NAN_API_KEY` | app | NaN cloud engine | `apps/nan-api-key` | Yes — `cloud.nan.builders` (api-key field) | |
+| 11 | Stripe API key | `stripe.api-key` | `STRIPE_API_KEY` | app | payments | `apps/stripe-api-key` | Partial — `Stripe` login (no explicit api-key field) | confirm where the api key lives |
+| 12 | YouTube API key | `youtube.api-key` | `YOUTUBE_API_KEY` | app | yt-metrics | `apps/youtube-api-key` | **No** (age-only) | net-new in bw |
+| 13 | Beehiiv API key | `beehiiv.api-key` | `BEEHIIV_API_KEY` | app | newsletter | `apps/beehiiv-api-key` | **No** (age-only) | net-new in bw |
+| 14 | Beehiiv DNS records | `beehiiv.dns-records` | `BEEHIIV_DNS_RECORDS` | app | DNS config | `apps/beehiiv-dns` (Secure Note) | **No** (age-only) | not a key — reference data |
+| 15 | PyPI token | `pypi.token` | `PYPI_TOKEN` | app | package publish | `apps/pypi-token` | Yes — `pypi.org` (API token field) | |
+| 16 | Tailscale auth key | `tailscale.auth-key` | `TS_AUTHKEY` | app/infra | VPN join | `infra/tailscale-auth-key` | Yes — `login.tailscale.com` (auth-key field) | short-lived by nature |
+| 17 | Pollex API key | `pollex.api-key` | `POLLEX_API_KEY` | app | pollex NaN engine (#237) | `apps/pollex-api-key` | Yes — `POLLEX_API_KEY` (note) | |
+| 18 | X (Twitter) credential | `x.api-key`, `x.api-key-secret`, `x.access-token`, `x.access-token-secret`, `x.bearer-token`, `x.client-id`, `x.client-secret` | `X_*` (7 vars) | app | X API | **collapse → 1 item** `apps/x-twitter` (7 custom fields) | **No** — only `x.com` personal login (no API item) | **7 files → 1 item; net-new in bw** |
+| 19 | Zoho app passwords | `zoho.app-passwords` | `ZOHO_APP_PASSWORDS` | personal | mail clients | `personal/zoho-app-passwords` | Yes — `mail.zoho.com` (app-specific passwords) | |
+| 20 | Kubelab kubeconfig | `kubelab.kubeconfig` | file → `~/.kube/kubelab.config` | app/infra | kubectl | `infra/kubelab-kubeconfig` (Secure Note/attachment) | **No** — `Kubelab` note holds Slack/Gmail-Authelia only | file secret; `migrate` refuses files |
 | 21 | SSH key (id_ed25519) | `id_ed25519` | file → `~/.ssh/id_ed25519` | **floor** | git clone at bootstrap | **age-floor** (needed before bw) | n/a | keep in floor — boot dependency |
-| 22 | Gmail backup codes | `gmail.backup-code` | file → `~/.secrets/...` | personal | account recovery | `personal/gmail` (field) | ? | |
-| 23 | ChatGPT backup code | `chatgpt.backup-code` | file | personal | account recovery | `personal/openai` (field) | ? | |
-| 24 | ChatGPT recovery code | `chatgpt.recovery-code` | file | personal | account recovery | `personal/openai` (field) | ? | collapse with #23 |
-| 25 | Stripe backup code | `stripe.backup-code` | file | personal | account recovery | `personal/stripe` (field) | ? | |
-| 26 | Zoho recovery code | `zoho.recovery-code` | file | personal | account recovery | `personal/zoho` (field) | ? | collapse with #19 |
-| — | Ollama API key | (commented out) | `OLLAMA_API_KEY` | app | homelab LLM (VPN) | `infra/ollama-api-key` | ? | not yet encrypted |
+| 22 | Gmail backup codes | `gmail.backup-code` | file → `~/.secrets/...` | personal | account recovery | `personal/gmail` (field) | **No** — `Gmail` login exists, no codes field | file secret |
+| 23 | ChatGPT backup code | `chatgpt.backup-code` | file | personal | account recovery | `personal/openai` (field) | **No** (age-only) | file secret |
+| 24 | ChatGPT recovery code | `chatgpt.recovery-code` | file | personal | account recovery | `personal/openai` (field) | **No** (age-only) | collapse with #23 |
+| 25 | Stripe backup code | `stripe.backup-code` | file | personal | account recovery | `personal/stripe` (field) | Yes — `Stripe` (backup-codes field) | file secret |
+| 26 | Zoho recovery code | `zoho.recovery-code` | file | personal | account recovery | `personal/zoho` (field) | **No** — no recovery-code field on `mail.zoho.com` | collapse with #19 |
+| — | Ollama API key | (commented out) | `OLLAMA_API_KEY` | app | homelab LLM (VPN) | `infra/ollama-api-key` | **No** (not yet encrypted) | not yet encrypted |
 
 **Floor (stays local, never only-in-bw):**
 - The **age private key** (root of DR — offline backups only).
