@@ -7,6 +7,7 @@
 package secrets
 
 import (
+	"os"
 	"strings"
 )
 
@@ -14,16 +15,17 @@ import (
 // the Loader resolves. Backend selects the Resolver; the source fields are
 // backend-specific (File for age, Item+Field for bw). Two exposure shapes:
 //   - env secret:  resolve the source into $Var.
-//   - file secret: IsFile, resolve to Dest (0600) and set $Var=Dest.
+//   - file secret: IsFile, resolve to Dest (Mode, 0600 default) and set $Var=Dest.
 type Entry struct {
-	Var      string // env var name
-	Backend  string // age | age-offline | bw; "" resolves as age (back-compat)
-	File     string // age source: base name under sensitive/, without .secret.age
-	Item     string // bw source: Bitwarden item name/id
-	Field    string // bw source: field within the item
-	IsFile   bool   // true for a file secret
-	Dest     string // materialization path (~ expanded); only when IsFile
-	Validate string // optional liveness-check key carried from the registry (sync ci)
+	Var      string      // env var name
+	Backend  string      // age | age-offline | bw; "" resolves as age (back-compat)
+	File     string      // age source: base name under sensitive/, without .secret.age
+	Item     string      // bw source: Bitwarden item name/id
+	Field    string      // bw source: field within the item
+	IsFile   bool        // true for a file secret
+	Dest     string      // materialization path (~ expanded); only when IsFile
+	Mode     os.FileMode // file permissions (0 → 0600 default); only when IsFile
+	Validate string      // optional liveness-check key carried from the registry (sync ci)
 }
 
 // expandHome rewrites a leading ~ (or ~/...) to home, leaving other paths intact.
