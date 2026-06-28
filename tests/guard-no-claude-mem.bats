@@ -77,3 +77,11 @@ collect_hits() {
     grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$REPO/setup-linux.sh"
     grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$REPO/setup-windows.ps1"
 }
+
+@test "MEM-002 also strips the thedotmack marketplace from settings.json (both setups)" {
+    # Removing the plugin dirs without removing the extraKnownMarketplaces.thedotmack
+    # registration leaves Claude re-cloning the marketplace on the next start (the
+    # settings merge is additive). Both setups must delete the registration too.
+    grep -qF 'extraKnownMarketplaces.thedotmack' "$REPO/setup-linux.sh"
+    grep -qF 'extraKnownMarketplaces' "$REPO/setup-windows.ps1"
+}
