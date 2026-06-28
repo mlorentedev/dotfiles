@@ -292,11 +292,11 @@ setup() {
     # Post-SDD-008: setup-linux.sh runs compile-harness.sh --deploy, which renders
     # each committed vault skill record whose targets[] includes opencode to a
     # command .md. The container has no vault, so --refresh is skipped and --deploy
-    # uses the committed records (33 skills, 6 Claude-only opt out -> 27 commands).
+    # uses the committed records (34 skills, 6 Claude-only opt out -> 28 commands).
     [ -d "$HOME/.config/opencode/commands" ]
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
-    [ "$count" -eq 27 ]  # 26 -> 27: added new-ticket record (HARNESS-016 vault skill, no targets: -> all agents)
+    [ "$count" -eq 28 ]  # 27 -> 28: added dispose-proposals record (curator inbox triage skill, targets: all agents)
     # Spot check: audit.md present (portable), creating-skills.md absent (targets:[claude]).
     [ -f "$HOME/.config/opencode/commands/audit.md" ]
     [ ! -f "$HOME/.config/opencode/commands/creating-skills.md" ]

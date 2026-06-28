@@ -64,11 +64,24 @@ In ADDITION to the replaced-in-place continuity block (step 1), write the **full
 
 **Mechanism (never skip): Hive-first, filesystem-fallback.** Prefer Hive `vault_write`; if Hive is unavailable/slow (the failure-mode protocol in `pattern-hive-first-vault-access`), fall back to a native filesystem write to the resolved `$VAULT_PATH/.../sessions/` path + a manual `vault:` commit. The session record is **never skipped** — not for a wedged Hive, a missing junction, or a sandbox denial.
 
-### 2. Knowledge & documentation sync (Standing Order #3 — in-session, never "later")
+### 2. Knowledge harvest & documentation sync (Standing Order #3 — in-session, never "later")
 
-**Vault knowledge:**
-- **Task state lives on the bitácora board, not in the vault** (ADR-018) — reconcile it in step 2b, not here.
-- Capture any non-obvious **project** lesson in the **repo's `docs/lessons.md`** (Context / Problem / Solution / Tags). A genuinely **cross-project / methodology** lesson goes to `00_meta/` (promote to a pattern). New architectural decision -> repo `docs/adr/`; recurring cross-project pattern -> `00_meta/patterns/`.
+**Harvest sweep (systematic — not "capture if you remember").** Before closing, walk the WHOLE session and enumerate every piece of *durable* knowledge it produced, then route each to its home. The placement invariant decides the home: a repo's build/operate docs live in the **repo's `docs/`** (default for operate-layer artifacts), and only cross-project / methodology knowledge goes to the vault `00_meta/` (per [[pattern-knowledge-placement]]).
+
+| Produced this session… | Lands in |
+|---|---|
+| A **project** lesson / gotcha / post-mortem | repo `docs/lessons.md` (Context / Problem / Solution / Tags) |
+| A **cross-project / methodology** lesson | `00_meta/` → promote to a `00_meta/patterns/` pattern |
+| An **architectural decision** | repo `docs/adr/adr-NNN-*.md` (cross-cutting → the platform repo) |
+| A **runbook** (a procedure run more than once) | repo `docs/runbooks/`; cross-project procedure → `00_meta/runbooks/` |
+| A **troubleshooting** entry (a fix worth recalling) | repo `docs/troubleshooting/` |
+| A **discovery** (non-obvious fact about the system) | the doc it belongs to (README / the relevant ADR or runbook) — not a new file |
+
+Rules for the sweep:
+- **Sweep, don't cherry-pick.** Ask explicitly, genre by genre: *did this session produce a lesson? an ADR? a runbook? a troubleshooting note? a discovery?* Place each, or consciously decide it is not durable. A real artifact left unplaced is the gap this step closes (it generalizes the lessons-only gate of HARNESS-024 to every operate-layer genre).
+- **Task state is NOT knowledge** — it lives on the bitácora board (ADR-018), reconciled in step 2b, not here.
+- **Don't proliferate** — patch the existing doc for that genre; create a new file only when no home exists ([[feedback_no_doc_proliferation]]).
+- **Foreign repo → worktree.** Landing a doc in another repo's `docs/` follows that repo's commit/PR discipline via a sibling worktree ([[feedback_worktree_for_foreign_repos]]); never write a non-current repo in place.
 
 **Repo documentation (keep it reflecting the latest state):**
 - If the session changed behavior, structure, commands, public contracts, or setup, update the repo docs that describe them: `README.md` and the repo's `docs/` (ADRs, runbooks, troubleshooting) for repos on the knowledge-placement model. ADRs in this repo live in `docs/adr/`.
@@ -113,7 +126,7 @@ Scope: only repos and vault paths actually touched in this session — not a glo
 
 ### 3c. Context refresh (conditional — `/context-refresh`)
 
-If this session **wrote an ADR, closed a phase milestone, pivoted direction, or changed the active focus**, run `/context-refresh <project>` for each affected project. It patches only the `00-context.md` frontmatter (`phase`, `focus`, `blocked_by`, `recent_adrs`, `last_updated`) so the next session orients in <400 tokens, and never touches the stable body. **Skip** when the session only changed task state — that lives in the bitácora, not `00-context.md`. See [[context-refresh]] (HARNESS-006).
+If this session **wrote an ADR, closed a phase milestone, pivoted direction, or changed the active focus**, run `/context-refresh <project>` for each affected project. It patches only the `context.md` frontmatter (`phase`, `focus`, `blocked_by`, `recent_adrs`, `last_updated`) so the next session orients in <400 tokens, and never touches the stable body. **Skip** when the session only changed task state — that lives in the bitácora, not `context.md`. See [[context-refresh]] (HARNESS-006).
 
 ### 4. Artifact summary
 

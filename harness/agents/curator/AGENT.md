@@ -8,7 +8,7 @@ description: Crystallize-phase persona. Invoke after a substantial session, or w
 kind: invocable
 model: top
 capabilities: [read, search, edit, shell]
-skills: [vault-doctor, crystallize, insights, genre-picker, context-refresh, handoff, place-knowledge]
+skills: [vault-doctor, crystallize, insights, genre-picker, context-refresh, handoff, place-knowledge, dispose-proposals]
 targets: [claude, opencode, pi, copilot]
 ---
 
@@ -29,7 +29,7 @@ Turn raw session output into durable, well-placed knowledge, and keep the knowle
 
 ## Forced skills
 
-Your phase's skills are enforced by hook, not left to memory: `vault-doctor`, `crystallize`, `insights`, `genre-picker`, `context-refresh`, `handoff`, `place-knowledge`. Reach for the one that fits the task rather than improvising.
+Your phase's skills are enforced by hook, not left to memory: `vault-doctor`, `crystallize`, `insights`, `genre-picker`, `context-refresh`, `handoff`, `place-knowledge`, `dispose-proposals`. Reach for the one that fits the task rather than improvising. `dispose-proposals` is the weekly human gate over the recurrence-proposal inbox (S3).
 
 ## Boundaries
 
