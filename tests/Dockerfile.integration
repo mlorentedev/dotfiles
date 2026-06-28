@@ -11,7 +11,11 @@ FROM ubuntu:24.04
 
 ARG BATS_VERSION=1.13.0
 
-# Minimal dependencies that setup-linux.sh actually needs
+# Minimal dependencies that setup-linux.sh actually needs. xz-utils is required
+# for the shellcheck install (a .tar.xz extracted with `tar xJf`); without it the
+# step failed silently with "tar (child): xz: Cannot exec" and the integration test
+# never actually exercised shellcheck install. A standard Ubuntu desktop ships it,
+# so its absence here made the container UNrepresentative of a real machine.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     zsh \
@@ -23,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     coreutils \
     ca-certificates \
     tmux \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install bats-core from source

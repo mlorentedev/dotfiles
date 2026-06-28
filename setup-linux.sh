@@ -318,10 +318,14 @@ fi
 # ShellCheck (shell script linter)
 if ! command -v shellcheck >/dev/null 2>&1; then
     log_info "Installing shellcheck..."
-    curl -Lo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/latest/download/shellcheck-stable.linux.x86_64.tar.xz" 2>/dev/null \
+    # Versioned asset (the `-stable` alias 404s post-v0.10) + `-f` so an HTTP error
+    # fails the curl loudly instead of saving the 404 body as a bogus "tarball" that
+    # only blows up later at xz. The tarball's internal dir is shellcheck-v<ver>/.
+    _sc_ver="v${SHELLCHECK_VERSION:-0.11.0}"
+    curl -fsSLo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/download/${_sc_ver}/shellcheck-${_sc_ver}.linux.x86_64.tar.xz" \
         && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
-        && cp /tmp/shellcheck-stable/shellcheck "$HOME/.local/bin/" \
-        && rm -rf /tmp/shellcheck.tar.xz /tmp/shellcheck-stable \
+        && cp "/tmp/shellcheck-${_sc_ver}/shellcheck" "$HOME/.local/bin/" \
+        && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${_sc_ver}" \
         && log_success "shellcheck installed" \
         || log_warning "shellcheck installation failed"
 else
