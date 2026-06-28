@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -25,16 +26,26 @@ type Decryptor func(ageFile, keyPath string) ([]byte, error)
 // tool and key load-secrets.sh uses (Phase 0 provisions age). Plaintext is
 // returned in memory; it is never written to disk for env secrets. A missing age
 // file is reported as ErrSecretAbsent (not provisioned here) so render can keep it
-// quiet; a present-but-undecryptable file surfaces age's error.
+// quiet; a present-but-undecryptable file surfaces age's own stderr (the actual
+// cause — "no identity matched any of the recipients", a malformed header, …) and
+// not a bare "exit status 1" (#612 B3, parity with BWGet's stderr handling).
 func AgeDecrypt(ageFile, keyPath string) ([]byte, error) {
 	if _, err := os.Stat(ageFile); errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("%w: %s", ErrSecretAbsent, filepath.Base(ageFile))
 	}
-	out, err := exec.Command("age", "--decrypt", "--identity", keyPath, ageFile).Output()
-	if err != nil {
-		return nil, fmt.Errorf("age decrypt %s: %w", filepath.Base(ageFile), err)
+	cmd := exec.Command("age", "--decrypt", "--identity", keyPath, ageFile)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		// .Output() stashes stderr inside *ExitError, but %w renders it as the
+		// opaque "exit status 1"; capture and surface the message itself instead.
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("age decrypt %s: %s", filepath.Base(ageFile), msg)
 	}
-	return out, nil
+	return stdout.Bytes(), nil
 }
 
 // Resolver turns one Entry into its plaintext secret bytes. One implementation per
