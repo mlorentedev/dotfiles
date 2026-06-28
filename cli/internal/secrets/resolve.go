@@ -96,7 +96,7 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 			if len(plaintext) == 0 {
 				return nil, fmt.Errorf("secret %q resolved to empty content (backend %q) — refusing to materialize", e.Var, e.Backend)
 			}
-			if err := materialize(e.Dest, plaintext); err != nil {
+			if err := materialize(e.Dest, plaintext, e.Mode); err != nil {
 				return nil, err
 			}
 			env = append(env, e.Var+"="+e.Dest)
@@ -172,12 +172,17 @@ func (r bwResolver) Resolve(e Entry) ([]byte, error) {
 	return []byte(val), nil
 }
 
-// materialize writes a file secret to dest with 0600, creating parent dirs.
-func materialize(dest string, content []byte) error {
+// materialize writes a file secret to dest atomically (temp file + rename, never a
+// truncated half-write — #612 B4), creating parent dirs. mode sets the file
+// permissions; 0 falls back to 0600, the secret-file default (#612 B2).
+func materialize(dest string, content []byte, mode os.FileMode) error {
+	if mode == 0 {
+		mode = 0o600
+	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 		return fmt.Errorf("create dir for %s: %w", dest, err)
 	}
-	if err := os.WriteFile(dest, content, 0o600); err != nil {
+	if err := AtomicWriteMode(dest, content, mode); err != nil {
 		return fmt.Errorf("write file secret %s: %w", dest, err)
 	}
 	return nil
