@@ -17,7 +17,7 @@ Quick, read-only audit of the Neural Hive knowledge loop and vault structural he
 
 ### Step 1 -- MEMORY.md Health
 
-- Read `~/.claude/projects/<encoded-cwd>/memory/MEMORY.md`
+- Read the project's `memory/MEMORY.md` (agent auto-memory store)
 - Report: line count, Last Crystallized date, days since last crystallization
 - Flag: lines > 150 -> WARNING, Last Crystallized > 14 days -> WARNING
 

@@ -11,7 +11,7 @@ Full maintenance ritual for the Neural Hive knowledge loop. Run when `/insights`
 ## Protocol
 
 ### Step 1 — Audit State
-- Read `~/.claude/projects/<encoded-cwd>/memory/MEMORY.md`
+- Read the project's `memory/MEMORY.md` (agent auto-memory store)
 - Note: line count, Last Crystallized date, days elapsed since last run
 - Read the repo's `docs/lessons.md` for current **project** lesson state (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/patterns/` for cross-project state
 

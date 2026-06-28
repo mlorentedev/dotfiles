@@ -47,21 +47,21 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 **Steps:**
 
 1. Read these vault files in order (Hive `vault_query`):
-   - `$PROJECT_AREA/00-context.md` (technical stack, repo map, hotspots)
-   - `$PROJECT_AREA/10-roadmap.md` (active phase, what is done vs pending)
+   - `$PROJECT_AREA/context.md` (technical stack, repo map, hotspots)
+   - `$PROJECT_AREA/roadmap.md` (active phase, what is done vs pending)
    - GitHub Project board status via `gh project item-list` (task progress — bitácora is the SSOT per ADR-018)
    - the repo's `docs/adr/` directory (latest ADR number, accepted/deferred status — GitHub self-indexes; legacy vault-only projects still use `$PROJECT_AREA/30-architecture/`)
    - `$PROJECT_AREA/30-architecture/plan-*.md` -- newest mtime first
    - `$PROJECT_AREA/memory/MEMORY.md` -- Session Handoff section
 2. If a `$PROJECT_AREA/30-architecture/session-protocol.md` exists, read it -- it is the project-specific overlay (constraints, rejection list, pending ADRs).
-3. **Verify reality, not memory.** For each repo mentioned in `00-context.md`:
+3. **Verify reality, not memory.** For each repo mentioned in `context.md`:
    - Resolve its on-disk path. Read `pyproject.toml` / `package.json` / equivalent for current version.
    - If git, `git log -1 --format=%cI` for last commit date and `git status --short` for dirty state.
 4. **Surface drift** as a structured table BEFORE the user picks the day's topic:
 
    | Layer | Memory says | Reality | Drift? |
    |---|---|---|---|
-   | Repo X version | v0.7.0 (per 00-context) | v0.7.4 (per pyproject) | YES (stale 4 patches) |
+   | Repo X version | v0.7.0 (per context) | v0.7.4 (per pyproject) | YES (stale 4 patches) |
    | Repo Y branches | clean | 3 zombie local branches | YES |
    | Bitácora board status | In Progress | (current state) | YES if stale >7d |
 
@@ -179,12 +179,12 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 
 **Steps:**
 
-1. **Patch `00-context.md` -- delegate to `context-refresh`.** An ADR + phase shift is exactly its trigger. Run `context-refresh` to patch the frontmatter (`phase`, `focus`, `recent_adrs` <- new ADR slug, `last_updated`). Do NOT hand-patch those fields here -- `context-refresh` owns them (HARNESS-021 D4 — avoids duplicating the context-patch logic).
-2. **MEMORY.md Session Handoff -- owned by the `handoff` skill.** The `## Session Handoff` overwrite (continuity block, format per `~/.claude/CLAUDE.md` Auto-Maintenance Rules) is `handoff`'s job; trigger it (or `/handoff`) rather than restating the format. This skill records the *decision*; `handoff` records the *session*.
+1. **Patch `context.md` -- delegate to `context-refresh`.** An ADR + phase shift is exactly its trigger. Run `context-refresh` to patch the frontmatter (`phase`, `focus`, `recent_adrs` <- new ADR slug, `last_updated`). Do NOT hand-patch those fields here -- `context-refresh` owns them (HARNESS-021 D4 — avoids duplicating the context-patch logic).
+2. **MEMORY.md Session Handoff -- owned by the `handoff` skill.** The `## Session Handoff` overwrite (continuity block, in the format the `handoff` skill defines) is `handoff`'s job; trigger it (or `/handoff`) rather than restating the format. This skill records the *decision*; `handoff` records the *session*.
 3. **CURRENT-STATE.md delta** (Exit Phase 2, conditional) -- the one arch-specific recap step. If this session changed a skill / automation / path / mental-model, emit a `vault_patch` proposal for ONLY the affected CURRENT-STATE.md section (never a full rewrite). Trigger map (`pattern-workflow-protocol`): skill -> §1, automation -> §2, lifecycle -> §3, paths -> §4, mental-model/anti-pattern -> §5/§7, sprint-close -> §6.
-4. **claude-mem observation.** Captured automatically by the session hook; no manual `observation_add`. Reopen triggers for a deferred decision live in the ADR itself, not in `/schedule`.
+4. **Conversation-memory observation.** Captured automatically by the session hook; no manual `observation_add`. Reopen triggers for a deferred decision live in the ADR itself, not in `/schedule`.
 
-**Output of Phase F:** `context-refresh` run (00-context patched) + `handoff` triggered (MEMORY.md) + (conditional) CURRENT-STATE.md delta proposal.
+**Output of Phase F:** `context-refresh` run (context patched) + `handoff` triggered (MEMORY.md) + (conditional) CURRENT-STATE.md delta proposal.
 
 ---
 
@@ -198,18 +198,18 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 ## Cross-OS notes
 
 - Linux / macOS: agent uses POSIX commands via `Bash`. Path joining uses `/`.
-- Windows: agent uses PowerShell tool. Path joining uses `\`. Hard-copy deployment (not symlinks): the skill in `~/.claude/skills/architecture-session/` is a COPY of the vault SSOT rendered by `compile-harness.sh`. After editing the vault SSOT, run `compile-harness.sh --deploy` (or re-run setup) to refresh the copy — never edit the deployed copy directly.
+- Windows: agent uses PowerShell tool. Path joining uses `\`. Hard-copy deployment (not symlinks): the skill in each agent's skills directory is a COPY of the vault SSOT rendered by `compile-harness.sh`. After editing the vault SSOT, run `compile-harness.sh --deploy` (or re-run setup) to refresh the copy — never edit the deployed copy directly.
 
 ## Vault connections
 
 | Phase | Reads | Writes |
 |---|---|---|
-| A | `00-context.md`, `10-roadmap.md`, GitHub Project board, repo `docs/adr/`, `plan-*.md`, `memory/MEMORY.md`, `session-protocol.md` | nothing (read-only verification) |
+| A | `context.md`, `roadmap.md`, GitHub Project board, repo `docs/adr/`, `plan-*.md`, `memory/MEMORY.md`, `session-protocol.md` | nothing (read-only verification) |
 | B | `sensor-reference-audit-matrix.md` (or analog) | patches matrix + divergence-log |
 | C | `session-protocol.md` (constraints section) | patches constraint table |
 | D | `session-protocol.md` (rejection list), `00_meta/patterns/_index.md` | nothing (or patches rejection list if new alternatives discarded) |
 | E | `templates/adr.md` | new repo `docs/adr/adr-NNN-*.md` (self-indexing), patches `plan-*.md`, GitHub issues updated |
-| F | (nothing) | delegates to `context-refresh` (00-context.md) + `handoff` (memory/MEMORY.md); OPTIONAL delta proposal for `CURRENT-STATE.md` |
+| F | (nothing) | delegates to `context-refresh` (context.md) + `handoff` (memory/MEMORY.md); OPTIONAL delta proposal for `CURRENT-STATE.md` |
 
 ## Anti-patterns this skill blocks
 
