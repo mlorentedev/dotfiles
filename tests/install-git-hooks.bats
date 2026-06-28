@@ -13,8 +13,10 @@ mk_src() {
     : > "$s/commit-msg"
     : > "$s/prepare-commit-msg"
     : > "$s/pre-push"
+    : > "$s/post-checkout"
     : > "$s/lib/memory-sink-guard.sh"
     : > "$s/lib/chain-local-hook.sh"
+    : > "$s/lib/board-pickup.sh"
 }
 
 setup() {
@@ -46,7 +48,9 @@ teardown() {
     [ "$status" -eq 0 ]
     [ -f "$DEST/pre-commit" ]
     [ -x "$DEST/pre-commit" ]
+    [ -x "$DEST/post-checkout" ]
     [ -f "$DEST/lib/memory-sink-guard.sh" ]
+    [ -f "$DEST/lib/board-pickup.sh" ]
 }
 
 @test "install wires core.hooksPath at the deployed dispatcher" {

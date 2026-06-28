@@ -59,7 +59,7 @@ deploy_git_hooks() {
     cp -rf "$src/." "$dest/"
 
     # git execs these directly; the lib helpers are sourced/exec'd by them.
-    chmod +x "$dest/pre-commit" "$dest/commit-msg" "$dest/prepare-commit-msg" "$dest/pre-push" 2>/dev/null || true
+    chmod +x "$dest/pre-commit" "$dest/commit-msg" "$dest/prepare-commit-msg" "$dest/pre-push" "$dest/post-checkout" 2>/dev/null || true
     if [ -d "$dest/lib" ]; then
         chmod +x "$dest"/lib/*.sh 2>/dev/null || true
     fi
