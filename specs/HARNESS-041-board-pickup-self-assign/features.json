@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-041-board-pickup-self-assign-f1",
+    "behavior": "AC1 — post-checkout dispatcher runs the helper backgrounded, then chains the repo-local hook",
+    "verification": "grep -q 'board-pickup.sh' git-hooks/post-checkout && grep -q 'chain-local-hook.sh post-checkout' git-hooks/post-checkout && grep -Eq 'board-pickup.sh.*&\\s*$' git-hooks/post-checkout",
+    "state": "passing",
+    "evidence": "post-checkout backgrounds the helper (trailing &) then exec-chains the local hook"
+  },
+  {
+    "id": "HARNESS-041-board-pickup-self-assign-f2",
+    "behavior": "AC2 — helper parses <prefix>/<issue>-<slug> and no-ops on flag!=1 or a non-numbered branch",
+    "verification": "bats tests/board-pickup.bats",
+    "state": "passing",
+    "evidence": "bats: flag=0 no-op, non-numbered branch no-op (7/7)"
+  },
+  {
+    "id": "HARNESS-041-board-pickup-self-assign-f3",
+    "behavior": "AC3 — self-assigns via gh issue edit --add-assignee @me, only OPEN issues, current-repo then knowledge",
+    "verification": "grep -q 'add-assignee @me' git-hooks/lib/board-pickup.sh && grep -q 'state' git-hooks/lib/board-pickup.sh && grep -q 'OPEN' git-hooks/lib/board-pickup.sh",
+    "state": "passing",
+    "evidence": "open-state guard + current->knowledge fallback covered by bats (closed issue never assigned; fallback on missing)"
+  },
+  {
+    "id": "HARNESS-041-board-pickup-self-assign-f4",
+    "behavior": "AC4 — install-git-hooks.sh makes post-checkout executable on deploy",
+    "verification": "grep -q 'post-checkout' scripts/install-git-hooks.sh && bats tests/install-git-hooks.bats",
+    "state": "passing",
+    "evidence": "deploy bats asserts [ -x \"$DEST/post-checkout\" ]"
+  },
+  {
+    "id": "HARNESS-041-board-pickup-self-assign-f5",
+    "behavior": "AC5 — hermetic bats suite, no non-ASCII @test names",
+    "verification": "./scripts/check-bats-names.sh tests/ && bats tests/install-git-hooks.bats tests/board-pickup.bats",
+    "state": "passing",
+    "evidence": "check-bats-names clean; 15/15 bats green; shellcheck -S warning clean"
+  }
+]

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Global post-checkout dispatcher (GUARD-001). Installed machine-wide via core.hooksPath,
+# so it runs in EVERY repo. It (1) nudges the linked bitácora board item to In Progress when
+# a numbered feature branch is picked up (the pickup forcing-function, knowledge#140), then
+# (2) chains to the repo-local hook — because a global core.hooksPath makes git ignore
+# .git/hooks/, this exec is what keeps any per-repo post-checkout alive.
+#
+# Args (git): $1 = prev HEAD, $2 = new HEAD, $3 = branch-checkout flag (1 = branch checkout).
+
+set -u
+
+DISPATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# 1. Global concern: board pickup. Backgrounded + silenced on purpose — a board hiccup, a
+#    missing gh/jq, or no network must NEVER block or slow a checkout. The helper self-guards
+#    (branch flag, name pattern, current status, tool availability).
+"$DISPATCH_DIR/lib/board-pickup.sh" "$@" >/dev/null 2>&1 &
+
+# 2. Chain to the repo-local hook (shadowed by the global core.hooksPath).
+exec "$DISPATCH_DIR/lib/chain-local-hook.sh" post-checkout "$@"
