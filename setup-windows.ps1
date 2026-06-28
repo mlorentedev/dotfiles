@@ -805,6 +805,25 @@ foreach ($stale in @(
         (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack'))) {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $stale
 }
+# The dir removal above is undone on the next Claude start if 'thedotmack' is still
+# registered in settings.json -- Claude re-clones the marketplace and its SessionStart
+# self-heal hook re-activates claude-mem. The settings merge later is additive (it
+# never strips keys), so delete the marketplace registration explicitly here.
+$claudeSettings = Join-Path $claudeCfg 'settings.json'
+if (Test-Path $claudeSettings) {
+    try {
+        $cfg = Get-Content $claudeSettings -Raw | ConvertFrom-Json
+        $mk = $cfg.extraKnownMarketplaces
+        if ($mk -and ($mk.PSObject.Properties.Name -contains 'thedotmack')) {
+            $mk.PSObject.Properties.Remove('thedotmack')
+            if ($mk.PSObject.Properties.Count -eq 0) { $cfg.PSObject.Properties.Remove('extraKnownMarketplaces') }
+            $cfg | ConvertTo-Json -Depth 10 | Set-Content $claudeSettings -Encoding UTF8
+            Write-Info "Removed retired claude-mem marketplace registration from settings.json"
+        }
+    } catch {
+        # Non-fatal -- malformed/locked settings.json; the merge step re-validates.
+    }
+}
 
 # Deploy auto-memory junctions from vault (see ADR-007)
 # Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
