@@ -45,13 +45,10 @@ Scheduled cadence (registry `rotate`), suspected exposure, or offboarding:
 
 Scheduled (e.g. weekly) + before any big change:
 
-1. `bw sync`
-2. `bw export --format json --raw | age -r <pubkey> -o sensitive/dr/bitwarden-export.age`
-   — plaintext **never** touches disk (`--raw` → pipe → `age`).
-3. **Overwrite** the previous export (don't accumulate full-vault snapshots in git history); commit.
-4. **Mirror off-box** (#454) and ensure the **age key has an OFFLINE authoritative copy** (`backup-secrets-to-usb.sh` + paper/OS keychain) — it must NOT live only in Bitwarden (circular dependency).
-   - _Target:_ `dotf secrets backup` wraps steps 1-3.
-   - The escrow covers the **entire** vault (API keys, tokens, logins, TOTP seeds) → losing Bitwarden is fully recoverable.
+1. **`dotf secrets backup`** — runs `bw sync` + `bw export --format json --raw`, pipes the plaintext **in memory** into `age` (encrypted to your own recipient, `age-keygen -y` of your identity), and writes `sensitive/dr/bitwarden-export.age` atomically (0600). The plaintext **never** touches disk; the artifact is decrypted back and **verified to round-trip** before the command succeeds (a corrupt escrow is removed, never left behind). Then **commit** it — it overwrites the previous export (git history is the version trail; no snapshot pile-up).
+   - _Manual equivalent (no `dotf` on PATH):_ `bw sync && bw export --format json --raw | age -r "$(age-keygen -y ~/.config/age/key.txt)" -o sensitive/dr/bitwarden-export.age`.
+2. **Mirror off-box** (#454, follow-up) and ensure the **age key has an OFFLINE authoritative copy** (#518: encrypted USB + paper/OS keychain) — it must NOT live only in Bitwarden (circular dependency).
+3. The escrow covers the **entire** vault (API keys, tokens, logins, TOTP seeds) → losing Bitwarden is fully recoverable with the offline age key + a repo clone.
 
 ## Protocol — RECOVER (disaster)
 
@@ -59,9 +56,9 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 
 1. Restore the **age key** from its offline backup → `~/.config/age/key.txt`.
 2. Clone the dotfiles repo.
-3. `age -d -i ~/.config/age/key.txt sensitive/dr/bitwarden-export.age > $TMPDIR/vault.json` (ephemeral / tmpfs).
-4. Stand up a fresh Bitwarden (or any manager) and **import** `vault.json`; or read individual secrets for immediate needs.
-5. Re-establish: `bw login` + unlock; `dotf secrets sync` to re-materialize consumers.
+3. `age -d -i ~/.config/age/key.txt sensitive/dr/bitwarden-export.age > $TMPDIR/vault.json` (ephemeral / tmpfs) — `sensitive/dr/bitwarden-export.age` is the artifact `dotf secrets backup` produced.
+4. Stand up a fresh Bitwarden (or any manager) and **import** `vault.json` (`bw import bitwardenjson $TMPDIR/vault.json`); or read individual secrets for immediate needs.
+5. Re-establish: `bw login` + unlock; `dotf secrets sync` to re-materialize consumers, then `dotf secrets verify` to confirm every registry secret resolves.
 6. **Rotate** anything that may have been exposed during the incident.
 7. Securely delete `$TMPDIR/vault.json`.
    - Account-independent: **age key (offline) + repo clone = full recovery**, even if the Bitwarden account is gone.

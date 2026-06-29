@@ -1,0 +1,65 @@
+[
+  {
+    "id": "CLI-024-secrets-backup-f1",
+    "behavior": "AC1: backup writes a 0600 age escrow to sensitive/dr; the exported plaintext is never written to disk",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBackup_WritesCiphertext_0600|TestBackup_NoPlaintextOnDisk'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f2",
+    "behavior": "AC2: the recipient is derived via the AgeRecipient seam and threaded into the encryptor; no recipient literal in code",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBackup_RecipientThreadedToEncryptor'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f3",
+    "behavior": "AC3: round-trip verify passes on a clean escrow; a tampered ciphertext removes the file and errors",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBackup_RoundTripVerifyPasses|TestBackup_TamperedCiphertext_RemovesFileAndErrors'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f4",
+    "behavior": "AC4: a locked bw (exporter error) and a missing age key (recipient error) fail fast with no file written",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBackup_ExporterError_NoFile|TestBackup_RecipientError_NoFile'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f5",
+    "behavior": "AC5: RepoSensitiveDir prefers the checkout and fails loud when no checkout is found",
+    "verification": "cd cli && go test ./internal/env/ -run 'TestRepoSensitiveDir'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f6",
+    "behavior": "AC1/AC4 cmd: dotf secrets backup happy path produces the escrow; a locked bw errors clearly (fakes, no real bw/age)",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSecretsBackup'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f7",
+    "behavior": "AC6 guard: a plaintext sensitive/dr/*.json is git-ignored (cannot be committed)",
+    "verification": "git check-ignore -q sensitive/dr/bitwarden-export.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f8",
+    "behavior": "AC6 runbook: the governance runbook's BACKUP protocol invokes the real dotf secrets backup (no duplicate recover file)",
+    "verification": "grep -q 'dotf secrets backup' docs/runbooks/guide-secrets-governance.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-backup-f9",
+    "behavior": "AC7: the full Go suite, vet, and gofmt are clean; registry.yaml unchanged",
+    "verification": "cd cli && go test ./... && go vet ./... && test -z \"$(gofmt -l .)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

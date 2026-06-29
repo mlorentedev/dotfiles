@@ -1,0 +1,7 @@
+# DR escrow dir (ADR-028 §5). Deny-by-default: only the age-encrypted escrow and this
+# file are tracked. A plaintext `bw export` (*.json) dropped here — by `dotf secrets
+# backup` going wrong, or a manual run — can NEVER be staged. Guard for the "plaintext
+# never committed" invariant (incident → guard, same PR).
+*
+!.gitignore
+!*.age

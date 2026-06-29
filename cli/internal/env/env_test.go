@@ -274,3 +274,27 @@ func TestResolveSensitiveDirFallsBackToDeployed(t *testing.T) {
 		t.Errorf("ResolveSensitiveDir() = %q, want deployed copy %q", got, want)
 	}
 }
+
+func TestRepoSensitiveDirPrefersRepoCheckout(t *testing.T) {
+	// The DR-escrow write seam returns the checkout's sensitive/ so the escrow is
+	// committable (the write side of ADR-030 / #635).
+	repo := t.TempDir()
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+	got, err := RepoSensitiveDir()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := filepath.Join(repo, "sensitive"); got != want {
+		t.Errorf("RepoSensitiveDir() = %q, want %q", got, want)
+	}
+}
+
+func TestRepoSensitiveDirNoCheckoutFailsLoud(t *testing.T) {
+	// The write seam must refuse the deployed copy: an escrow written there is reverted
+	// on the next redeploy and never reaches git (#635) — fail loud instead.
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Chdir(t.TempDir())
+	if _, err := RepoSensitiveDir(); err == nil {
+		t.Fatal("RepoSensitiveDir() = nil error, want fail-loud when no checkout is found")
+	}
+}
