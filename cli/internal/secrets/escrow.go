@@ -1,0 +1,223 @@
+package secrets
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+// EscrowFileName is the fixed name of the age-encrypted full-vault DR escrow under
+// sensitive/dr/ (ADR-028 §5). A single rolling file — git history is the version trail,
+// so a retention policy is a separate concern.
+const EscrowFileName = "bitwarden-export.age"
+
+// BWExporter produces the entire Bitwarden vault as raw export bytes (JSON), in memory.
+// The seam that keeps Backup unit-testable with no Bitwarden vault and no unlock — tests
+// inject a fake; production is BWExport (a `bw sync` + `bw export` shell-out). The
+// full-vault analog of BWReader/BWGet.
+type BWExporter interface {
+	Export() ([]byte, error)
+}
+
+// BWExport is the production BWExporter: `bw sync` then `bw export --format json --raw`,
+// both `--nointeraction` so a locked vault or a missing BW_SESSION fails fast (bw's stderr
+// surfaced) instead of blocking on a prompt. `--raw` keeps the export on stdout — it never
+// touches a file. Thin I/O, verified by a live smoke, not in CI (the escrow analog of
+// BWGet). The raw JSON is returned in memory; Backup pipes it straight into the encryptor.
+type BWExport struct {
+	Bin string // bw binary name/path; "" → "bw"
+}
+
+// Export refreshes the local cache then returns the full vault export. A failed sync
+// (e.g. offline) aborts rather than silently escrowing a stale vault.
+func (e BWExport) Export() ([]byte, error) {
+	bin := e.Bin
+	if bin == "" {
+		bin = "bw"
+	}
+	if _, err := bwRun(bin, "sync"); err != nil {
+		return nil, fmt.Errorf("bw sync: %w", err)
+	}
+	out, err := bwRun(bin, "export", "--format", "json", "--raw")
+	if err != nil {
+		return nil, fmt.Errorf("bw export: %w", err)
+	}
+	return out, nil
+}
+
+// bwRun executes `bw <args...> --nointeraction`, returning stdout or an error carrying
+// bw's stderr (parity with BWGet/BWPut — never a bare "exit status 1"). --nointeraction
+// guarantees no prompt blocks a non-interactive escrow run.
+func bwRun(bin string, args ...string) ([]byte, error) {
+	cmd := exec.Command(bin, append(args, "--nointeraction")...) //nolint:gosec // args are fixed escrow subcommands
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, errors.New(msg)
+	}
+	return stdout.Bytes(), nil
+}
+
+// Encryptor encrypts plaintext to the given age recipient, returning ciphertext. The seam
+// that keeps Backup testable with no age binary and no key; AgeEncrypt is the production
+// default — the inverse of Decryptor/AgeDecrypt.
+type Encryptor func(plaintext []byte, recipient string) ([]byte, error)
+
+// AgeEncrypt shells out to `age -r <recipient>`, feeding plaintext on stdin and returning
+// the binary ciphertext on stdout. The plaintext never touches disk (stdin pipe) — the
+// mirror of AgeDecrypt's in-memory plaintext. age's stderr is surfaced on failure.
+func AgeEncrypt(plaintext []byte, recipient string) ([]byte, error) {
+	cmd := exec.Command("age", "-r", recipient)
+	cmd.Stdin = bytes.NewReader(plaintext)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("age encrypt: %s", msg)
+	}
+	return stdout.Bytes(), nil
+}
+
+// RecipientFn derives the age recipient (public key) for the identity at keyPath. The seam
+// Backup uses so a test needn't run age-keygen; AgeRecipient is production.
+type RecipientFn func(keyPath string) (string, error)
+
+// AgeRecipient runs `age-keygen -y <keyPath>` to print the public recipient of the private
+// identity — the repo's established self-encrypt convention (load-secrets, the runbooks,
+// and ci.yml all derive the recipient this way). The private key stays the single source
+// of truth; no recipient is stored separately. A missing/unreadable key fails fast.
+func AgeRecipient(keyPath string) (string, error) {
+	cmd := exec.Command("age-keygen", "-y", keyPath)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return "", fmt.Errorf("age-keygen -y %s: %s", keyPath, msg)
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+// BackupConfig wires the DR-escrow run: the seams (all overridable for tests) plus the
+// identity key and the destination dir. ADR-028 §5.
+type BackupConfig struct {
+	Exporter  BWExporter  // required: full-vault export (BWExport in prod)
+	Recipient RecipientFn // nil → AgeRecipient
+	Encrypt   Encryptor   // nil → AgeEncrypt
+	Decrypt   Decryptor   // nil → AgeDecrypt (round-trip verify)
+	KeyPath   string      // age identity — derives the recipient and verifies the artifact
+	DestDir   string      // dir to write into (must be the checkout: env.RepoSensitiveDir + "dr")
+	DestName  string      // "" → EscrowFileName
+}
+
+// Backup runs the disaster-recovery escrow: it exports the entire Bitwarden vault,
+// encrypts it to the operator's own age recipient, writes the ciphertext atomically
+// (0600) under DestDir, then verifies the on-disk artifact round-trips to the exact
+// export. The vault plaintext is piped exporter→encryptor in memory and is NEVER written
+// to disk; only the .age ciphertext lands. A verify failure removes the file. Returns the
+// written path.
+//
+// Order matters for the no-partial-file guarantee: recipient, export, and encrypt all run
+// BEFORE any write, so a locked vault or an absent key fails fast with nothing on disk.
+func Backup(cfg BackupConfig) (string, error) {
+	if cfg.Exporter == nil {
+		return "", errors.New("backup: no exporter configured")
+	}
+	recipientFn := cfg.Recipient
+	if recipientFn == nil {
+		recipientFn = AgeRecipient
+	}
+	encrypt := cfg.Encrypt
+	if encrypt == nil {
+		encrypt = AgeEncrypt
+	}
+	name := cfg.DestName
+	if name == "" {
+		name = EscrowFileName
+	}
+
+	// 1. Recipient from the identity — fail fast if the key is absent/unreadable.
+	recipient, err := recipientFn(cfg.KeyPath)
+	if err != nil {
+		return "", fmt.Errorf("backup: age identity required at %s to encrypt the escrow: %w", cfg.KeyPath, err)
+	}
+	if strings.TrimSpace(recipient) == "" {
+		return "", fmt.Errorf("backup: empty age recipient derived from %s", cfg.KeyPath)
+	}
+
+	// 2. Export the full vault — fail fast if bw is locked/unreachable.
+	plaintext, err := cfg.Exporter.Export()
+	if err != nil {
+		return "", fmt.Errorf("backup: %w", err)
+	}
+	if len(plaintext) == 0 {
+		return "", errors.New("backup: bw export produced an empty vault — refusing to escrow nothing")
+	}
+	defer zero(plaintext) // best-effort scrub of the whole-vault plaintext after use
+
+	// 3. Encrypt in memory; the plaintext never reaches disk.
+	ciphertext, err := encrypt(plaintext, recipient)
+	if err != nil {
+		return "", fmt.Errorf("backup: %w", err)
+	}
+
+	// 4. Atomic 0600 write of the ciphertext only.
+	if err := os.MkdirAll(cfg.DestDir, 0o700); err != nil {
+		return "", fmt.Errorf("backup: create %s: %w", cfg.DestDir, err)
+	}
+	path := filepath.Join(cfg.DestDir, name)
+	if err := AtomicWrite(path, ciphertext); err != nil {
+		return "", fmt.Errorf("backup: %w", err)
+	}
+
+	// 5. Verify the on-disk artifact round-trips to the exact export.
+	if err := verifyEscrow(path, plaintext, cfg); err != nil {
+		_ = os.Remove(path) // never leave a corrupt/empty escrow behind
+		return "", fmt.Errorf("backup: round-trip verify failed (removed %s): %w", name, err)
+	}
+	return path, nil
+}
+
+// verifyEscrow decrypts the just-written escrow and asserts it round-trips to the exact
+// exported plaintext and parses as a non-empty JSON document — the "verified round-trip"
+// ADR-028 §3 gates age-file retirement (C6) on. Decrypting the FILE (not the in-memory
+// ciphertext) also confirms the bytes that actually landed on disk are recoverable.
+func verifyEscrow(path string, want []byte, cfg BackupConfig) error {
+	decrypt := cfg.Decrypt
+	if decrypt == nil {
+		decrypt = AgeDecrypt
+	}
+	got, err := decrypt(path, cfg.KeyPath)
+	if err != nil {
+		return fmt.Errorf("decrypt back: %w", err)
+	}
+	if !bytes.Equal(got, want) {
+		return fmt.Errorf("decrypted escrow does not match the export (%d vs %d bytes)", len(got), len(want))
+	}
+	if !json.Valid(got) {
+		return errors.New("escrow plaintext is not valid JSON (bw export format drift?)")
+	}
+	return nil
+}
+
+// zero overwrites b in place — a best-effort scrub of plaintext from process memory once
+// the escrow is encrypted (defense in depth; Go's GC may still hold copies).
+func zero(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}

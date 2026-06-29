@@ -198,6 +198,20 @@ func RepoRegistryPath() (string, error) {
 	return filepath.Join(root, "secrets", "registry.yaml"), nil
 }
 
+// RepoSensitiveDir returns the sensitive/ dir inside the dotfiles checkout, or an error
+// when no checkout is found. WRITERS (dotf secrets backup's DR escrow) MUST use this: the
+// escrow is version-controlled state, so it has to land in the checkout to be committed —
+// writing the deployed copy under ~/.dotfiles is reverted on the next redeploy and never
+// reaches git (the #635 durability class, the write-side analog of ResolveSensitiveDir).
+// Fails loud rather than write a throwaway copy.
+func RepoSensitiveDir() (string, error) {
+	root := RepoDir()
+	if root == "" {
+		return "", fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write the DR escrow to the deployed copy")
+	}
+	return filepath.Join(root, "sensitive"), nil
+}
+
 // isDir reports whether p exists and is a directory.
 func isDir(p string) bool {
 	fi, err := os.Stat(p)
