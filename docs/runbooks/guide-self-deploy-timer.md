@@ -14,7 +14,8 @@ created: "2026-06-09"
 
 ## What it does
 
-Once a day the timer runs `scripts/dotfiles-selfupdate.sh`, which:
+Once a day the timer runs `dotf update` (the Go port of the former
+`dotfiles-selfupdate` twins, CLI-027), which:
 
 1. Skips if the repo worktree is **dirty** (uncommitted changes).
 2. `git fetch`es; skips on a network failure.
@@ -54,7 +55,7 @@ systemctl --user list-timers dotfiles-selfupdate.timer
 systemctl --user status dotfiles-selfupdate.service   # last run result
 
 # Run it once by hand (safe; no-ops on a clean, current repo)
-./scripts/dotfiles-selfupdate.sh
+dotf update
 ```
 
 ```powershell
@@ -80,6 +81,6 @@ journalctl --user -u dotfiles-selfupdate.service --since today
 
 ## Override the target repo
 
-The script defaults to `$HOME/Projects/dotfiles`. Override with `DOTFILES_REPO_DIR`. The setup
-command it re-runs can be overridden with `DOTFILES_SELFUPDATE_SETUP_CMD` (used by the test suite to
-inject a stub).
+`dotf update` resolves the repo via the ADR-025 seam, defaulting to `$HOME/Projects/dotfiles`;
+override with `DOTFILES_REPO_DIR`. The setup command it re-runs can be overridden with
+`DOTFILES_SELFUPDATE_SETUP_CMD`.
