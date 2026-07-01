@@ -52,6 +52,13 @@ type System struct {
 	// checks (skip POSIX-only tools / tmux / shell-rc symlinks on Windows) are
 	// table-testable; the zero value "" behaves like a POSIX host.
 	GOOS string
+	// AgeRoundTrip proves the age key at keyPath actually decrypts: it derives
+	// the recipient, encrypts a sentinel, and decrypts it back, returning a
+	// non-nil error if any step fails or the bytes don't match. The real impl
+	// (ageRoundTrip) shells out to age/age-keygen via the secrets seams — thin
+	// I/O covered by a live smoke, never CI — so this exists as a seam the
+	// secrets-tooling check calls and tests inject a fake round-trip into.
+	AgeRoundTrip func(keyPath string) error
 }
 
 // realSystem wires System to the live OS.
@@ -85,8 +92,9 @@ func realSystem() *System {
 			defer func() { _ = resp.Body.Close() }()
 			return resp.StatusCode, resp.Header, nil
 		},
-		Now:  time.Now,
-		GOOS: runtime.GOOS,
+		Now:          time.Now,
+		GOOS:         runtime.GOOS,
+		AgeRoundTrip: ageRoundTrip,
 	}
 }
 

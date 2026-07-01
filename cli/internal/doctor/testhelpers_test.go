@@ -55,6 +55,9 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 			return 0, nil, errors.New("no network in tests")
 		},
 		Now: func() time.Time { return fixedTestNow },
+		// Default: the age key round-trips cleanly (a healthy box). Tests
+		// exercising the FAIL / not-called paths inject their own AgeRoundTrip.
+		AgeRoundTrip: func(string) error { return nil },
 	}
 }
 

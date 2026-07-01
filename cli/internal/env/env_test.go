@@ -65,6 +65,45 @@ func TestResolveWindowsExpandsUserprofile(t *testing.T) {
 	}
 }
 
+// TestRealContractRendersAgeKeyDiscovery is the end-to-end regression guard for
+// #518: the actual repo env-contract.json must resolve AGE_KEY_PATH and
+// SOPS_AGE_KEY_FILE to the deployed age key on both OSes, and both must survive
+// into the rendered path files. Discovery is only automatic if the real
+// contract carries these vars with a default (a var without a default is skipped
+// by Resolve), so this ties the shipped contract to the shipped behavior — not a
+// synthetic fixture.
+func TestRealContractRendersAgeKeyDiscovery(t *testing.T) {
+	// Test runs with cwd = cli/internal/env; the repo root is three up.
+	c, err := loadContract(filepath.Join("..", "..", "..", "env-contract.json"))
+	if err != nil {
+		t.Fatalf("load real env-contract.json: %v", err)
+	}
+
+	cases := []struct {
+		goos, home, want string
+	}{
+		{"linux", "/home/me", "/home/me/.config/age/key.txt"},
+		{"windows", `C:\Users\me`, `C:\Users\me\.config\age\key.txt`},
+	}
+	for _, tc := range cases {
+		got := resolved(Resolve(c, &machine{}, tc.goos, tc.home))
+		for _, name := range []string{"AGE_KEY_PATH", "SOPS_AGE_KEY_FILE"} {
+			if got[name] != tc.want {
+				t.Errorf("%s[%s] = %q, want %q", name, tc.goos, got[name], tc.want)
+			}
+		}
+	}
+
+	// Both vars must reach the rendered sh path file, guarded so an already-set
+	// value wins (the ADR-025 cascade rule #1).
+	sh := Render(FormatSh, Resolve(c, &machine{}, "linux", "/home/me"))
+	for _, name := range []string{"AGE_KEY_PATH", "SOPS_AGE_KEY_FILE"} {
+		if !strings.Contains(sh, "export "+name+"=") {
+			t.Errorf("rendered paths.sh missing export for %s:\n%s", name, sh)
+		}
+	}
+}
+
 func TestRenderShKeepsAlreadySetValue(t *testing.T) {
 	out := Render(FormatSh, []ResolvedVar{{Name: "VAULT_PATH", Value: "/data/vault"}})
 	if !strings.Contains(out, `export VAULT_PATH="${VAULT_PATH:-/data/vault}"`) {
