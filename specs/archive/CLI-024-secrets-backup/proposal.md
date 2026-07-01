@@ -1,7 +1,7 @@
 ---
 id: "CLI-024-secrets-backup"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-29"
 issue: "mlorentedev/dotfiles#586"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, secrets, cli, go, age, bitwarden, dr]
@@ -168,3 +168,5 @@ Observable outcomes. Each must be testable with the seams above (no real `bw`/ag
   `CLI-024-secrets-registry`, `CLI-025-secrets-render`.
 - Runbook this automates: `docs/runbooks/guide-secrets-governance.md` (§ the manual escrow
   line this replaces).
+
+<!-- archived 2026-07-01 — PR: https://github.com/mlorentedev/dotfiles/pull/661 -->
