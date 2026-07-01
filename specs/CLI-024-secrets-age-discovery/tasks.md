@@ -39,7 +39,7 @@ created: "2026-07-01"
 - [x] Every acceptance criterion from `proposal.md` is covered by ≥1 test
 - [x] Every acceptance criterion has a matching `features.json` entry with a non-vacuous verification command
 - [x] `go vet ./...` clean; `go test ./...` green (except a pre-existing unrelated `internal/spec` failure — see verification.md); `env-contract.bats` green; touched `.go` gofmt-clean in LF form
-- [ ] Live smoke: real key present → `dotf doctor` shows the round-trip PASS; temporarily corrupt/rename the key → FAIL (capture both in verification.md)
+- [x] Live smoke (Windows, real key): `dotf doctor` → round-trip PASS; bogus `AGE_KEY_PATH` → FAIL (both captured in verification.md; real key untouched)
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in with evidence
 - [ ] PR opened referencing this spec folder and #518

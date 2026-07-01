@@ -44,9 +44,14 @@ Commit hash to be stamped on the squash-merge.
 - Windows-worktree note: `gofmt -l .` locally lists CRLF working-tree files (git `autocrlf`);
   the committed form is LF (`git ls-files --eol` → `i/lf`; `.gitattributes` `* text=auto`), so
   CI's gofmt (Linux, LF) is clean. Verified per-file with `tr -d '\r' | gofmt -d` → empty.
-- Live smoke (production age I/O — thin, not in CI): **pending on a box with a real key** —
-  `dotf doctor` shows "age root-of-trust verified (round-trip)"; temporarily corrupting/renaming
-  `~/.config/age/key.txt` flips it to the FAIL. To be captured before archive.
+- Live smoke (production age I/O — thin, not in CI): **DONE** on the Windows box (2026-07-01,
+  worktree binary, real key at `~/.config/age/key.txt`, age + age-keygen present):
+  - happy path → `[ OK ] age root-of-trust verified (round-trip)`.
+  - FAIL path (non-destructive: `AGE_KEY_PATH` → a temp bogus key, real key untouched) →
+    `[FAIL] age root-of-trust round-trip FAILED for <path>: derive recipient: age-keygen -y ...
+    unknown identity type ... — the DR key cannot decrypt; restore a good key before relying on
+    the escrow`.
+  Proves the production `ageRoundTrip` helper (AgeRecipient/AgeEncrypt/AgeDecrypt) end to end.
 
 ## Decisions made during implementation
 
