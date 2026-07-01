@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.31.0](https://github.com/mlorentedev/dotfiles/compare/v0.30.0...v0.31.0) (2026-07-01)
+
+
+### Features
+
+* **cli:** add dotf update, porting the self-deploy twins to Go ([#667](https://github.com/mlorentedev/dotfiles/issues/667)) ([ccc3189](https://github.com/mlorentedev/dotfiles/commit/ccc31893077d7fa51bd19c37c5c886561f4ff6a8)), closes [#496](https://github.com/mlorentedev/dotfiles/issues/496)
+* **secrets:** add dotf secrets backup DR escrow (ADR-028) ([#661](https://github.com/mlorentedev/dotfiles/issues/661)) ([4683064](https://github.com/mlorentedev/dotfiles/commit/4683064aeb67ace8f4afdf3f694af2035a5a9315))
+* **secrets:** verify age root-of-trust in doctor and declare key discovery vars ([#663](https://github.com/mlorentedev/dotfiles/issues/663)) ([2f52f00](https://github.com/mlorentedev/dotfiles/commit/2f52f007438a88421629ac0d8ee4562f123cd5af))
+
 ## [0.30.0](https://github.com/mlorentedev/dotfiles/compare/v0.29.0...v0.30.0) (2026-06-28)
 
 
