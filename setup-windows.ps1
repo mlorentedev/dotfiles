@@ -1980,25 +1980,25 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 $selfUpdateTask = "DotfilesSelfUpdate"
 switch ("$env:DOTFILES_AUTODEPLOY") {
     "1" {
-        $selfUpdateSrc = Join-Path $DotfilesDir "scripts\dotfiles-selfupdate.ps1"
-        $selfUpdateDst = Join-Path $ClaudeHome "scripts\dotfiles-selfupdate.ps1"
-        if (Test-Path $selfUpdateSrc) {
-            Ensure-Directory (Split-Path $selfUpdateDst -Parent)
-            Copy-Item $selfUpdateSrc $selfUpdateDst -Force
-            $selfUpdateArg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$selfUpdateDst`""
+        # CLI-027: the task runs the Go 'dotf update' directly (no .ps1 wrapper).
+        # dotf resolves the repo via the ADR-025 seam with a
+        # $USERPROFILE\Projects\dotfiles fallback, so the bare task env needs no
+        # DOTFILES_REPO_DIR wiring.
+        $dotfExe = Join-Path $env:USERPROFILE ".local\bin\dotf.exe"
+        if (Test-Path $dotfExe) {
             try {
-                $suAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $selfUpdateArg
+                $suAction = New-ScheduledTaskAction -Execute $dotfExe -Argument "update"
                 $suTrigger = New-ScheduledTaskTrigger -Daily -At 3am
                 $suSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
                 Register-HiveScheduledTask -TaskName $selfUpdateTask -Action $suAction -Trigger $suTrigger `
                     -Settings $suSettings `
-                    -Description "dotfiles self-deploy: daily git pull --ff-only + idempotent setup (OPS-001)"
-                Write-Success "Enabled DotfilesSelfUpdate task (daily, $($script:HiveTaskLogonType) principal)"
+                    -Description "dotfiles self-deploy: daily 'dotf update' (git pull --ff-only + idempotent setup, OPS-001)"
+                Write-Success "Enabled DotfilesSelfUpdate task (daily 'dotf update', $($script:HiveTaskLogonType) principal)"
             } catch {
                 Write-Warn "Could not register DotfilesSelfUpdate task (non-fatal): $_"
             }
         } else {
-            Write-Warn "self-update script not found at $selfUpdateSrc"
+            Write-Warn "dotf not found at $dotfExe -- run setup to install it before enabling self-deploy"
         }
     }
     "0" {

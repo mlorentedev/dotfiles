@@ -1118,7 +1118,7 @@ fi
 #   0     -> disable + remove the timer (clean opt-out / teardown)
 #   unset -> no-op (opt-in, default OFF)
 # Non-fatal: any failure leaves setup succeeding; the timer is a convenience, and
-# `dotfiles-selfupdate.sh` itself no-ops on a dirty/diverged repo (OPS-001).
+# `dotf update` itself no-ops on a dirty/diverged repo (OPS-001).
 if command -v systemctl >/dev/null 2>&1; then
     SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
     case "${DOTFILES_AUTODEPLOY:-}" in

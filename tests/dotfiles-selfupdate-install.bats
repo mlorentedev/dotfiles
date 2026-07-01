@@ -24,9 +24,9 @@ setup() {
     grep -qF 'WantedBy=timers.target' "$DOTFILES_DIR/systemd/dotfiles-selfupdate.timer"
 }
 
-@test "dotfiles-selfupdate.service is a oneshot running the repo selfupdate script" {
+@test "dotfiles-selfupdate.service is a oneshot running 'dotf update'" {
     grep -qF 'Type=oneshot' "$DOTFILES_DIR/systemd/dotfiles-selfupdate.service"
-    grep -qF 'dotfiles-selfupdate.sh' "$DOTFILES_DIR/systemd/dotfiles-selfupdate.service"
+    grep -qF 'dotf update' "$DOTFILES_DIR/systemd/dotfiles-selfupdate.service"
 }
 
 # A --user oneshot gets a minimal PATH; ExecStart must be an absolute path
@@ -70,15 +70,9 @@ setup() {
     grep -qF 'DOTFILES_AUTODEPLOY' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup-windows.ps1 self-deploy task runs the selfupdate ps1 script" {
-    grep -qF 'dotfiles-selfupdate.ps1' "$DOTFILES_DIR/setup-windows.ps1"
-}
-
-# PSScriptAnalyzer fails CI on non-ASCII in .ps1 (em dash / arrows / smart quotes).
-@test "scripts/dotfiles-selfupdate.ps1 exists and is ASCII-only" {
-    [ -f "$DOTFILES_DIR/scripts/dotfiles-selfupdate.ps1" ]
-    LC_ALL=C grep -nP '[^\x00-\x7F]' "$DOTFILES_DIR/scripts/dotfiles-selfupdate.ps1" && return 1
-    return 0
+@test "setup-windows.ps1 self-deploy task runs 'dotf update'" {
+    grep -qF 'dotf.exe' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF 'Argument "update"' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- cross-OS parity ---

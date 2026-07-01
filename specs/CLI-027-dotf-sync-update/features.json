@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-027-dotf-update-f1",
+    "behavior": "PR1 AC1/AC2: dotf update's Run maps every non-actionable condition to a skip (nil error) and makes a real setup failure the only error, propagated; skip branches never re-run setup.",
+    "verification": "cd cli && go test ./internal/update/ -run TestUpdate -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-027-dotf-update-f2",
+    "behavior": "PR1: dotf update is registered and its --help renders cleanly (covered by the CLI help-smoke guard).",
+    "verification": "cd cli && go test ./internal/cmd/ -run EveryCommandHelpRenders -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-027-dotf-update-f3",
+    "behavior": "PR1 AC3: the dotfiles-selfupdate .sh/.ps1 scripts and their behavior bats are deleted and no non-historical caller references them (orphan guard).",
+    "verification": "test -z \"$(git grep -lE 'dotfiles-selfupdate\\.(sh|ps1)' -- ':!docs/adr' ':!specs')\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-027-dotf-update-f4",
+    "behavior": "PR1 AC3: the systemd service and the Windows scheduled task invoke 'dotf update'; the install wiring guards pass.",
+    "verification": "bats tests/dotfiles-selfupdate-install.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-027-dotf-update-f5",
+    "behavior": "PR1 AC4: the CLI vets clean, the touched Go packages are gofmt-clean and pass tests.",
+    "verification": "cd cli && go vet ./internal/update/... ./internal/cmd/... && test -z \"$(gofmt -l internal/update internal/cmd/update.go)\" && go test ./internal/update/... ./internal/cmd/... -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
