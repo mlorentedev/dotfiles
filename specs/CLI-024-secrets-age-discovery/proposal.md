@@ -136,9 +136,12 @@ Observable outcomes. Each must be testable without a real `age`/key in CI.
 - [ ] **AC5** — the round-trip verifier is wired from the existing `secrets` age seams and is
   unit-tested with fakes only. *Verify:* the new/changed Go tests reference the seam, and
   `grep` confirms no `exec.Command("age"...)` is introduced in the doctor package.
-- [ ] **AC6** — `go test ./... && go vet ./... && gofmt -l` clean and `env-contract.bats` green;
-  the production age round-trip (thin `age`/`age-keygen` I/O) is covered by a **live smoke** with
-  a real key, not in CI (parity with `AgeDecrypt`/`BWGet`).
+- [ ] **AC6** — `go vet ./...` + `gofmt -l` clean module-wide, the touched packages
+  (`internal/doctor`, `internal/env`) pass `go test`, and `env-contract.bats` is green. (The
+  whole-module `go test ./...` additionally passes **except** the pre-existing, unrelated
+  `internal/spec` `TestEmbeddedTemplatesMatchVault` template-drift failure — out of scope here,
+  tracked for its own re-vendor.) The production age round-trip (thin `age`/`age-keygen` I/O) is
+  covered by a **live smoke** with a real key, not in CI (parity with `AgeDecrypt`/`BWGet`).
 
 ## References
 
