@@ -1,7 +1,7 @@
 ---
 id: "CLI-024-secrets-age-discovery"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-07-01"
 issue: "mlorentedev/dotfiles#518"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, secrets, cli, go, age, doctor, dr]
@@ -157,3 +157,5 @@ Observable outcomes. Each must be testable without a real `age`/key in CI.
   `cli/internal/initrepo/templates/env-contract.json` (the two contract copies).
 - Prior merged slice: `CLI-024-secrets-backup` (#661 — the escrow this guards; same seam/test idiom).
 - Related patterns: `00_meta/patterns/secrets-security.md`, `pattern-spec-driven-development.md`.
+
+<!-- archived 2026-07-01 — PR: https://github.com/mlorentedev/dotfiles/pull/663 -->
