@@ -6,6 +6,10 @@ created: "{{date:YYYY-MM-DD}}"
 # Tasks - <feature-id>
 
 > TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
+>
+> **Inline markers** (optional, additive — borrowed from `github/spec-kit`, adapt-not-adopt per #141):
+> - `[P]` — this task has **no dependency on another unchecked task**, so it is safe to run in parallel (fan out to a `Workflow`, or just batch). TDD chains (test → implement → refactor of the *same* behavior) are sequential and must NOT carry `[P]`; independent behaviors can.
+> - `[AC<n>]` — this task helps satisfy **acceptance criterion #`<n>`** from `proposal.md`. Lets `/spec check` map coverage deterministically; omit it and the check falls back to semantic judgment.
 
 ## Setup
 
@@ -16,12 +20,13 @@ created: "{{date:YYYY-MM-DD}}"
 ## Implementation
 
 > Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
+> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
 
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
+- [ ] [P] [AC1] Write failing test for <behavior 1>
+- [ ] [AC1] Implement <module/function> to make it pass
 - [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
+- [ ] [P] [AC2] Write failing test for <behavior 2>
+- [ ] [AC2] Implement to make it pass
 - [ ] ...
 
 ## Closing
