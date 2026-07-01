@@ -90,6 +90,24 @@
       }
     },
     {
+      "name": "AGE_KEY_PATH",
+      "required": false,
+      "description": "Age identity key path — the ADR-028 DR root-of-trust. Read by the dotfiles age flow (secrets.ageKeyPath cascade) and rendered into paths.{sh,ps1} by `dotf env generate`, so every shell discovers the key with zero per-shell config. Deliberately carries NO path_exists validation: a freshly provisioned box legitimately has no key until it is restored offline, and the WARN-level `dotf doctor` presence check — not a hard env-contract FAIL — owns 'key missing' (#518).",
+      "default": {
+        "linux": "$HOME/.config/age/key.txt",
+        "windows": "$env:USERPROFILE\\.config\\age\\key.txt"
+      }
+    },
+    {
+      "name": "SOPS_AGE_KEY_FILE",
+      "required": false,
+      "description": "Identity path the `sops` binary reads to auto-discover the age key. Fixes #518: on a fresh box SOPS defaults to ~/.config/sops/age/keys.txt, so with this unset every `sops` decrypt failed silently until it was exported by hand. Points at the same deployed key as AGE_KEY_PATH and is rendered into paths.{sh,ps1} by `dotf env generate`. No path_exists validation, for the same fresh-box reason as AGE_KEY_PATH.",
+      "default": {
+        "linux": "$HOME/.config/age/key.txt",
+        "windows": "$env:USERPROFILE\\.config\\age\\key.txt"
+      }
+    },
+    {
       "name": "HOME",
       "required_on": "linux",
       "description": "POSIX home directory. OS-provided; validated as a real directory.",
