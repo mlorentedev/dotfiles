@@ -27,7 +27,7 @@ allowed-tools: [Bash, Read, AskUserQuestion]
 ## Environment (resolve once)
 
 - **Board:** owner `mlorentedev`, project number `1`, Project ID `PVT_kwHOAM7xJs4BZ6GY`.
-- **Canonical field/ID + convention reference:** dotfiles `docs/runbooks/guide-bitacora-setup.md` §2 (fields), §3 (ID convention), §1b (home repo), §5 (status lifecycle). Resolve field/option IDs **at runtime** (snippet below) — do NOT paste a third copy into a ticket; embedded copies drift (the exact failure class behind OPS-002's protected-branch/rollout lessons).
+- **Canonical field/ID + convention reference:** [[bitacora-project-setup]] §2 (fields), §3 (ID convention), §1b (home repo), §5 (status lifecycle). Resolve field/option IDs **at runtime** (snippet below) — do NOT paste a third copy into a ticket; embedded copies drift (the exact failure class behind OPS-002's protected-branch/rollout lessons).
 - `gh` authenticated with `repo` + `project` scope.
 
 ## The flow (interactive — suggestion-first)
@@ -198,6 +198,14 @@ print('%03d' % (max(ns)+1 if ns else 1))"
 
 NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-002`). Scans both open and closed issues (forward-only, per §3 — never reuse a retired number). If the AREA also has `specs/<AREA>-NNN-*` directories that outrun the issues, cross-check and take the higher.
 
+### Concurrency guard — parallel sessions race scan-then-create (2026-07-07)
+
+`scan → create` is not atomic: on 2026-07-07 three parallel sessions filing tickets minutes apart produced three duplicate IDs (TOOL-017 ×2, DOCS-001 ×2, then TOOL-020 ×2 during remediation). Harden every create:
+
+1. **Re-scan immediately before `gh issue create`** — at create time, not minutes earlier when the proposal was computed.
+2. **Scan the board's `ID` field too, not only the home repo's issue titles** — a concurrent session may have claimed `AREA-NNN` from another repo or before its issue lands in your scan window. If GraphQL is rate-limited, fall back to REST title scans (`gh api repos/<owner>/<repo>/issues`) across the bitácora repos.
+3. **Verify right after creating** — re-run the scan; if a duplicate raced in, renumber immediately. Yield rule: the ticket WITHOUT its board `ID` field set renumbers; if neither is set, the higher issue `#number` yields.
+
 ## Common mistakes
 
 - **Hardcoding field/option IDs** into the skill or a script → silent drift when the project changes. Resolve at runtime (step 4.3); runbook §2 is the human reference, not a copy to fork.
@@ -208,7 +216,7 @@ NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-
 
 ## References
 
-- Runbook: dotfiles `docs/runbooks/guide-bitacora-setup.md` — §1b (home repo), §2 (fields & IDs), §3 (ID convention, CUR-008), §5 (status lifecycle, HARNESS-010).
+- Runbook: [[bitacora-project-setup]] — §1b (home repo), §2 (fields & IDs), §3 (ID convention, CUR-008), §5 (status lifecycle, HARNESS-010).
 - `AGENTS.md` — Standing Order #8 (bitácora status reconciliation) and the detect→ticket rule.
 - Related skills: [[handoff]] (reconciles board status at session end), [[spec]] (`init` is gated on an open issue this skill can create).
 - ADR: dotfiles `docs/adr/adr-018-de-vault-task-placement.md` (task state lives on the board).

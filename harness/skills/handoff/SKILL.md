@@ -102,7 +102,7 @@ gh issue list --repo mlorentedev/dotfiles --state open --json number,title,assig
 
 Or manually check each issue: `gh issue view <N> --json state,assignees,title`.
 
-Leaving an actively-worked issue in `Backlog` is the exact gap HARNESS-010 closes. Mechanics: `dotfiles/docs/runbooks/guide-bitacora-setup.md` §5.
+Leaving an actively-worked issue in `Backlog` is the exact gap HARNESS-010 closes. Mechanics: [[bitacora-project-setup]] §5.
 
 **Best-effort, never a blocker:** if the `gh project` query is unavailable (auth, permissions, or a sandbox denial), do NOT stall the handoff. Instead make sure each touched issue is at least self-assigned or carries a status comment, and record the board change you couldn't apply in **Open threads** so the next session (or Manu) finishes it.
 
