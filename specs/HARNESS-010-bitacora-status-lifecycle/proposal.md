@@ -48,5 +48,5 @@ After this PR:
 ## References
 
 - Issue: `mlorentedev/dotfiles#270` (HARNESS-010); related #265 (HARNESS-009), epic #244 (Flow v2), #258 (OPS-002 rollout).
-- Runbook: `docs/runbooks/guide-bitacora-setup.md` (§5 status lifecycle, §7 workflow template) — OPS-004.
+- Runbook: vault `00_meta/runbooks/bitacora-project-setup.md` (§5 status lifecycle, §7 workflow template) — OPS-004. Migrated out of this repo 2026-07-07 (cross-project procedure, was `docs/runbooks/guide-bitacora-setup.md`).
 - ADR: `docs/adr/adr-018-de-vault-task-placement.md` (task state lives in the bitácora).

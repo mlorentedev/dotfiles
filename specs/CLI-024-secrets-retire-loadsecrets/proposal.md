@@ -75,7 +75,7 @@ Delivered as three atomic PRs against this one spec/issue:
   a repo-wide grep finds no runtime reference. *Verify:* grep sweep is clean.
 - [ ] **AC4** — all bats suites green cross-OS after each PR.
 - [ ] **AC5 (C)** — fine-grained-PAT lesson archived in
-  `docs/runbooks/guide-bitacora-setup.md`.
+  vault `00_meta/runbooks/bitacora-project-setup.md` (migrated from `docs/runbooks/guide-bitacora-setup.md`, 2026-07-07).
 
 ## References
 

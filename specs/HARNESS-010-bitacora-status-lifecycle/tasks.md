@@ -16,7 +16,7 @@ created: "2026-06-07"
 
 - [ ] AC2 — add `.github/workflows/bitacora-status.yml` (`issues:[assigned]` → `Status=In Progress`, `state==open` guard, idempotent `item-add` + `item-edit`)
 - [ ] AC1 — codify the status-lifecycle rule in `AGENTS.md` (Standing Order + Neural Hive Loop Phase 1/2/3 touchpoints)
-- [ ] AC4 — update runbook `guide-bitacora-setup.md` §4/§5/§7 (register workflow in per-repo bundle; mark In Progress automated-on-assign)
+- [ ] AC4 — update vault runbook `00_meta/runbooks/bitacora-project-setup.md` §4/§5/§7 (register workflow in per-repo bundle; mark In Progress automated-on-assign)
 - [ ] AC5 — wire board-status reconciliation into vault `00_meta/skills/handoff/SKILL.md`
 - [ ] AC3 — confirm workflow YAML parses
 

@@ -15,7 +15,7 @@ name: Bitácora status — In Progress on assign
 # Canonical IDs (re-list: gh project field-list 1 --owner mlorentedev --format json):
 #   Project  PVT_kwHOAM7xJs4BZ6GY
 #   Status   PVTSSF_lAHOAM7xJs4BZ6GYzhU1dtI   (option "In Progress" = 6c133cc8)
-# Full reference: docs/runbooks/guide-bitacora-setup.md §2 / §5 / §7.
+# Full reference: vault 00_meta/runbooks/bitacora-project-setup.md §2 / §5 / §7.
 
 on:
   issues:

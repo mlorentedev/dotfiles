@@ -42,7 +42,7 @@ created: "2026-06-25"
 - [x] Drop setup chmod (`setup-linux`) + the `load-secrets.ps1` deploy block (`setup-windows`).
 - [x] Retire the `scripts/test.sh` "Secrets Loading" section (tests the twin) + update the integration Dockerfile comment.
 - [x] Repoint the two `verify-setup.bats` twin-deploy assertions to the registry / dotfiles-sync.
-- [x] Archive the fine-grained-PAT lesson in `docs/runbooks/guide-bitacora-setup.md`.
+- [x] Archive the fine-grained-PAT lesson in `docs/runbooks/guide-bitacora-setup.md` (since migrated to vault `00_meta/runbooks/bitacora-project-setup.md`, 2026-07-07).
 
 ## Deferred — `env-mapping.conf` + the substitute twins
 
