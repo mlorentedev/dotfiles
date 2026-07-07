@@ -85,9 +85,36 @@ the surrounding detection/propagation guards, not the auth mechanism.
 - A classic no-expiry PAT (B) is explicitly off the table: it trades a small recurring
   chore for a large standing risk.
 
+## Amendment (2026-07-07, DOCS-008 / #680)
+
+A docs audit surfaced a direct contradiction between this ADR and the (now-migrated)
+bitácora runbook: this ADR describes the decided/expected state as a **fine-grained**
+PAT, while the runbook's "Gotcha (2026-06-25)" note claimed fine-grained PATs fail on
+*both* `add-to-project` and the Projects v2 GraphQL mutations, and required a **classic**
+PAT.
+
+The live `BITACORA_PAT` secret was checked directly (prefix `ghp_`) and **is a classic
+PAT**, not fine-grained. So the deployed reality matches the runbook's claim, not this
+ADR's Option C as written. Two explanations are equally plausible and neither has been
+verified: (a) the fine-grained migration this ADR describes was never actually carried
+out against the live secret, or (b) it was tried, failed the way the runbook describes,
+and was quietly reverted without updating this record.
+
+**This ADR's Option C is therefore unverified in production, not disproven.** Re-running
+the actual experiment — generate a fresh fine-grained PAT scoped to this board + repos,
+swap it in, and confirm both `add-to-project` (§ workflow) and the raw GraphQL mutations
+succeed end-to-end — is the only way to know which of (a)/(b) is true and whether Option
+C is actually viable. Until that test is done and passes, the operational guidance (now
+in the vault runbook `00_meta/runbooks/bitacora-project-setup.md` §7a) treats **classic**
+as the current, verified-working state, without re-opening the security tradeoff this ADR
+already argued (a long-lived classic PAT is coarser and never expires) — that tradeoff is
+the reason to actually run the fine-grained re-test rather than settle for the status quo.
+
 ## References
 
 - Tiers: #637 (pat-expiry fail-loud), #639 (sync ci liveness), this ADR (#635 follow-up).
 - Constraint: GitHub community discussions #159005 / #64849; GitHub docs, "Choosing
   permissions for a GitHub App".
 - Prior art: ADR-024 (pat-expiry preflight), ADR-028 (two-tier secrets governance).
+- Amendment source: docs audit 2026-07-07 (vault `00_meta/adr` reference / dotfiles
+  `docs/adr/audit-009-documentation.md`, finding D4), issue #680.

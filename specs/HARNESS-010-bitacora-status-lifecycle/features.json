@@ -23,7 +23,7 @@
   {
     "id": "HARNESS-010-bitacora-status-lifecycle-f4",
     "behavior": "AC4 — the bitácora runbook registers bitacora-status.yml in the per-repo deployment bundle",
-    "verification": "grep -q 'bitacora-status.yml' docs/runbooks/guide-bitacora-setup.md",
+    "verification": "test -f \"$HOME/Projects/Workspace/knowledge/00_meta/runbooks/bitacora-project-setup.md\" && grep -q 'bitacora-status.yml' \"$HOME/Projects/Workspace/knowledge/00_meta/runbooks/bitacora-project-setup.md\"",
     "state": "pending",
     "evidence": ""
   },
