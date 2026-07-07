@@ -1,10 +1,11 @@
 ---
-id: codebase-audit-2026-07-06
-type: research
+id: audit-008-codebase-comprehensive
+type: audit
 status: active
-tags: [audit, adversarial-review, dotfiles, cross-platform]
+date: "2026-07-06"
+related: [audit-009-documentation, audit-010-process-workflows, audit-001-repo-structure, audit-002-cross-os-duplication, audit-005-scripts-classification, audit-007-cli-convergence-state]
+tags: [audit, adversarial-review, dotfiles, cross-platform, codebase]
 ---
-
 # Codebase Audit — dotfiles — 2026-07-06
 
 > Exhaustive, adversarial audit. Every file under `git ls-files` (954 tracked files) was read
@@ -20,6 +21,8 @@ tags: [audit, adversarial-review, dotfiles, cross-platform]
 > PowerShell layer around it is where the real defects live** — silent-failure idioms, twin
 > drift, dead configuration that lies about being read, and a class of Windows/Linux encoding
 > and path divergences that the Go layer already fixed but the shells did not.
+>
+> **Companion audits:** `audit-009-documentation.md` (docs), `audit-010-process-workflows.md` (process) — same series; see `related:` frontmatter. Vault decide/position layer: `10_projects/dotfiles/research/2026-07-02-project-coherence-audit.md` (external benchmarking + methodology + backlog).
 
 ---
 
