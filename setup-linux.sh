@@ -114,7 +114,7 @@ if [ ! -f "$AGE_KEY" ]; then
     log_warning "  Encrypted secrets will deploy but won't decrypt on demand."
     log_warning "  To enable: place your age identity at \$HOME/.config/age/key.txt"
     log_warning "  (or set AGE_KEY_PATH). Generate: age-keygen -o ~/.config/age/key.txt"
-    log_warning "  See: docs/SECRETS.md"
+    log_warning "  See: docs/runbooks/secrets-management.md"
 fi
 
 ensure_directory "$DOTFILES_DIR/sensitive"

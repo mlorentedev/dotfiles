@@ -104,7 +104,7 @@ setup() {
     # deploy so a key imported later works).
     grep -qF 'age identity key not found' "$PS1_SCRIPT"
     grep -qF 'AGE_KEY_PATH' "$PS1_SCRIPT"
-    grep -qF 'docs/SECRETS.md' "$PS1_SCRIPT"
+    grep -qF 'docs/runbooks/secrets-management.md' "$PS1_SCRIPT"
     # Must use Write-Warn (non-fatal), not Write-Err.
     grep -B2 'age identity key not found' "$PS1_SCRIPT" | grep -q 'Test-Path'
 }
