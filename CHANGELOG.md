@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.1](https://github.com/mlorentedev/dotfiles/compare/v0.31.0...v0.31.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **secrets:** correct id casing at every dotf secrets show call site ([#709](https://github.com/mlorentedev/dotfiles/issues/709)) ([b354408](https://github.com/mlorentedev/dotfiles/commit/b354408ac2dee917f90b4b445c59388277f4436c)), closes [#698](https://github.com/mlorentedev/dotfiles/issues/698)
+* **secrets:** retire env-mapping.conf again, guard against resurrection ([#705](https://github.com/mlorentedev/dotfiles/issues/705)) ([8e58f8b](https://github.com/mlorentedev/dotfiles/commit/8e58f8b4e1c5755c08f4eb64a2a40dabd6b7d535))
+
 ## [0.31.0](https://github.com/mlorentedev/dotfiles/compare/v0.30.0...v0.31.0) (2026-07-01)
 
 
