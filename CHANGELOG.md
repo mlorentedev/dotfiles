@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.2](https://github.com/mlorentedev/dotfiles/compare/v0.31.1...v0.31.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* **secrets:** stop secret argv leaks and drop forbidden auto-merge in ops scripts ([#711](https://github.com/mlorentedev/dotfiles/issues/711)) ([11e0e3b](https://github.com/mlorentedev/dotfiles/commit/11e0e3b4fb4b228fc7c10403140f7e19612b6221))
+
 ## [0.31.1](https://github.com/mlorentedev/dotfiles/compare/v0.31.0...v0.31.1) (2026-07-08)
 
 
