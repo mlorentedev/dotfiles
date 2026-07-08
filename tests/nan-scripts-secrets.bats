@@ -3,7 +3,7 @@
 # spec CLI-024-secrets-retire-loadsecrets / #587).
 #
 # The nan-* scripts must resolve NAN_API_KEY through the `dotf secrets` facade
-# (`dotf secrets show nan-api-key`, or injected by `dotf secrets run`), never by
+# (`dotf secrets show NAN_API_KEY`, or injected by `dotf secrets run`), never by
 # sourcing the retired `load-secrets` twin. Structural (grep-based) like the
 # other RC/script contract tests in this suite.
 
@@ -30,9 +30,9 @@ setup() {
     done
 }
 
-@test "nan-* scripts self-fetch NAN_API_KEY via dotf secrets show" {
+@test "nan-* scripts self-fetch NAN_API_KEY via dotf secrets show, using the real registry id" {
     for s in "${NAN_SCRIPTS[@]}"; do
-        grep -qF 'dotf secrets show nan-api-key' "$SCRIPTS_DIR/$s" || { echo "no 'dotf secrets show': $s"; return 1; }
+        grep -qF 'dotf secrets show NAN_API_KEY' "$SCRIPTS_DIR/$s" || { echo "no 'dotf secrets show NAN_API_KEY': $s"; return 1; }
     done
 }
 

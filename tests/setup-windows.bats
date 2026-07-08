@@ -79,12 +79,12 @@ setup() {
     # after Install-Dotf, before the agy block (opencode/pi self-resolve).
     ! grep -qE '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
     ! grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
-    grep -qF 'dotf secrets show openrouter-api-key' "$PS1_SCRIPT"
+    grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$PS1_SCRIPT"
 }
 
 @test "parity: both setups resolve the agy deploy-time secret via dotf secrets show [#587]" {
     for s in "$PS1_SCRIPT" "$DOTFILES_DIR/setup-linux.sh"; do
-        grep -qF 'dotf secrets show openrouter-api-key' "$s"
+        grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$s"
     done
 }
 
