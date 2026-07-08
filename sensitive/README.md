@@ -6,21 +6,21 @@ This folder contains age-encrypted secrets. Only `.age` files are committed to g
 
 ```text
 sensitive/
-├── env-mapping.conf     # Maps ENV_VAR=filename
 ├── *.secret.age         # Encrypted (committed)
 ├── *.secret             # Plaintext (gitignored)
 └── *.secret.dec         # Decrypted (gitignored)
 ```
 
+`secrets/registry.yaml` (repo root) is the mapping SSOT — env var / file dest to
+age source, per ADR-028.
+
 ## Quick Commands
 
 ```bash
-secrets_list       # Show all secrets (env vars + file secrets)
-secrets_show VAR   # Show secret content (--raw to decrypt from .age)
-secrets_add        # Add new env var secret
-secrets_add_file   # Add new file secret (kubeconfig, SSH keys, certs)
-secrets_rotate     # Update secret
-secrets_check      # Validate integrity
+dotf secrets ls          # List registry secret ids, plane, and exposed vars
+dotf secrets show VAR    # Show a single secret's decrypted value
+dotf secrets set VAR     # Add or rotate an env var secret
+dotf secrets run -- CMD  # Inject secrets into a child process only (no ambient env)
 ```
 
 ## USB Backup
