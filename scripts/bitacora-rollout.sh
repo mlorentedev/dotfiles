@@ -120,12 +120,10 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens an au
             --body "Canonical \`add-to-project.yml\` + \`bitacora-status.yml\` from \`mlorentedev/dotfiles\` (runbook §7). Deployed via \`scripts/bitacora-rollout.sh\` — this repo's default branch is protected, so the rollout lands through a PR." >/dev/null \
             || { err "$repo: pr create failed"; return; }
     fi
-    # Auto-merge needs the repo setting enabled; if not, leave the PR open for review.
-    if gh pr merge --repo "$OWNER/$repo" "$branch" --squash --auto >/dev/null 2>&1; then
-        ok "$repo: protected branch — PR opened with auto-merge (${PR_FILES[*]})"
-    else
-        ok "$repo: protected branch — PR opened, merge manually (${PR_FILES[*]})"
-    fi
+    # Merge is a supervised human action: auto-merge is forbidden repo-wide
+    # (it lands a PR the instant CI is green, bypassing human review), so the
+    # rollout only opens the PR and leaves the merge to a reviewer.
+    ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
 }
 
 for repo in "${REPOS[@]}"; do
@@ -145,7 +143,10 @@ for repo in "${REPOS[@]}"; do
     if [ "$CHECK" = 1 ]; then
         echo "   (dry-run) gh secret set BITACORA_PAT --repo $OWNER/$repo"
     else
-        if gh secret set BITACORA_PAT --repo "$OWNER/$repo" --body "$BITACORA_PAT" 2>/dev/null; then
+        # Feed the token via stdin, not --body: an argv value is world-readable
+        # in /proc/<pid>/cmdline for the call's duration. printf (no trailing
+        # newline) keeps the PAT byte-exact.
+        if printf '%s' "$BITACORA_PAT" | gh secret set BITACORA_PAT --repo "$OWNER/$repo" 2>/dev/null; then
             ok "$repo: BITACORA_PAT set"
         else
             err "$repo: secret set failed"
