@@ -11,7 +11,7 @@ set -euo pipefail
 # NAN_API_KEY: injected by `dotf secrets run -- <this script>`, or self-fetched
 # on demand via `dotf secrets show` (ADR-028 — never the ambient shell env).
 if [ -z "${NAN_API_KEY:-}" ] && command -v dotf >/dev/null 2>&1; then
-    NAN_API_KEY="$(dotf secrets show nan-api-key 2>/dev/null || true)"
+    NAN_API_KEY="$(dotf secrets show NAN_API_KEY 2>/dev/null || true)"
     export NAN_API_KEY
 fi
 

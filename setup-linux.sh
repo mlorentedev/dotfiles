@@ -269,7 +269,11 @@ fi
 # independently by `dotf secrets render` at deploy time (and opencode/pi's own
 # runtime resolver as fallback), which age-decrypt directly.
 if command -v dotf >/dev/null 2>&1; then
-    OPENROUTER_API_KEY="$(dotf secrets show openrouter-api-key 2>/dev/null || true)"; export OPENROUTER_API_KEY
+    if ! OPENROUTER_API_KEY="$(dotf secrets show OPENROUTER_API_KEY 2>&1)"; then
+        log_warning "dotf secrets show OPENROUTER_API_KEY failed: $OPENROUTER_API_KEY"
+        OPENROUTER_API_KEY=""
+    fi
+    export OPENROUTER_API_KEY
 fi
 
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
@@ -401,7 +405,7 @@ if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
     fi
     if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]; then
         # Last resort: fetch straight from the dotf secrets facade (ADR-028).
-        OLD_KEY="$(dotf secrets show openrouter-api-key 2>/dev/null || true)"
+        OLD_KEY="$(dotf secrets show OPENROUTER_API_KEY 2>/dev/null || true)"
     fi
 
     # Substitute ${VAULT_PATH} placeholder with the canonical Linux vault dir.

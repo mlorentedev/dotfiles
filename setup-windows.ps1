@@ -603,7 +603,11 @@ if (Test-Path -LiteralPath $registrySource) {
 # #581). opencode/pi {env:NAN_API_KEY} is resolved independently by
 # `dotf secrets render` at deploy time (and their own runtime resolver as fallback).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    $env:OPENROUTER_API_KEY = (& dotf secrets show openrouter-api-key 2>$null)
+    $env:OPENROUTER_API_KEY = (& dotf secrets show OPENROUTER_API_KEY 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf secrets show OPENROUTER_API_KEY failed: $env:OPENROUTER_API_KEY"
+        $env:OPENROUTER_API_KEY = ""
+    }
 }
 
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
