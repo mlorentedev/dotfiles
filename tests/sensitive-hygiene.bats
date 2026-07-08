@@ -11,8 +11,11 @@ setup() {
 }
 
 @test "no tracked file references the nonexistent docs/SECRETS.md" {
-    # Pathspec excludes this file itself -- it names the string as its own
-    # search pattern, which would otherwise make the guard fail on itself.
-    run git -C "$DOTFILES_DIR" grep -l "docs/SECRETS.md" -- . ':!tests/sensitive-hygiene.bats'
+    # Pathspec exclusions: this file itself names the string as its own
+    # search pattern (would otherwise fail on itself), and docs/lessons.md
+    # discusses the incident in prose -- a historical mention is not a live
+    # dead reference, and the guard's job is to catch the latter.
+    run git -C "$DOTFILES_DIR" grep -l "docs/SECRETS.md" -- . \
+        ':!tests/sensitive-hygiene.bats' ':!docs/lessons.md'
     [ "$status" -ne 0 ]
 }
