@@ -74,12 +74,17 @@ for prompt_name in $(printf '%s\n' "${!PROMPTS[@]}" | sort); do
 
         out_file="$OUT/${prompt_name}--${model}.md"
         echo "  → $model ..."
+        # Auth token via -K stdin config, not -H on argv (argv is world-readable
+        # in /proc/<pid>/cmdline). Unquoted heredoc so $NAN_API_KEY expands.
         response=$(curl -sS -m 90 \
             -w '\n__METRICS__:%{time_total}|%{time_starttransfer}' \
-            -H "Authorization: Bearer $NAN_API_KEY" \
+            -K - \
             -H "Content-Type: application/json" \
             -d "$body" \
-            "$BASE_URL/chat/completions" 2>/dev/null) || { echo "    ERROR curl" >&2; continue; }
+            "$BASE_URL/chat/completions" 2>/dev/null <<CURL_CFG
+header = "Authorization: Bearer $NAN_API_KEY"
+CURL_CFG
+        ) || { echo "    ERROR curl" >&2; continue; }
 
         json="${response%$'\n__METRICS__:'*}"
         metrics="${response##*__METRICS__:}"

@@ -52,11 +52,16 @@ RST=$'\033[0m'
 body=$(jq -n --arg model "$MODEL" --arg prompt "$PROMPT" \
     '{model: $model, messages: [{role: "user", content: $prompt}], max_tokens: 2000, temperature: 0.6, top_p: 0.95}')
 
+# Auth token via -K stdin config, not -H on argv (argv is world-readable
+# in /proc/<pid>/cmdline). Unquoted heredoc so $NAN_API_KEY expands.
 response=$(curl -sS -m 120 \
-    -H "Authorization: Bearer $NAN_API_KEY" \
+    -K - \
     -H "Content-Type: application/json" \
     -d "$body" \
-    "$BASE_URL/chat/completions") || { echo "curl failed" >&2; exit 1; }
+    "$BASE_URL/chat/completions" <<CURL_CFG
+header = "Authorization: Bearer $NAN_API_KEY"
+CURL_CFG
+) || { echo "curl failed" >&2; exit 1; }
 
 reasoning=$(echo "$response" | jq -r '.choices[0].message.reasoning_content // .choices[0].message.provider_specific_fields.reasoning // ""')
 answer=$(echo "$response" | jq -r '.choices[0].message.content // "<no content>"')

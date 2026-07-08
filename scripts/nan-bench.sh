@@ -34,12 +34,17 @@ for model in "${MODELS[@]}"; do
         '{model: $model, messages: [{role: "user", content: $prompt}], max_tokens: 200}')
 
     # -w: wall time. ttfb = time_starttransfer (TLS+TCP+server-first-byte).
+    # Auth token via -K stdin config, not -H on argv (argv is world-readable
+    # in /proc/<pid>/cmdline). Unquoted heredoc so $NAN_API_KEY expands.
     response=$(curl -sS -m 60 \
         -w '\n__METRICS__:%{time_total}|%{time_starttransfer}' \
-        -H "Authorization: Bearer $NAN_API_KEY" \
+        -K - \
         -H "Content-Type: application/json" \
         -d "$body" \
-        "$BASE_URL/chat/completions" 2>/dev/null) || {
+        "$BASE_URL/chat/completions" 2>/dev/null <<CURL_CFG
+header = "Authorization: Bearer $NAN_API_KEY"
+CURL_CFG
+    ) || {
         printf '%-22s %s\n' "$model" "  ERROR (curl exit)"
         continue
     }

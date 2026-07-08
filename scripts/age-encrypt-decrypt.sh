@@ -67,19 +67,29 @@ decrypt_all() {
 
     init_counter "processed_count"
 
+    # .dec files are plaintext secrets at rest. umask 077 forces 600 (never
+    # world-readable); the trap and the failure-path rm wipe every file we
+    # produced if we exit before finishing, so a failed run leaves no plaintext.
+    umask 077
+    local -a decrypted=()
+    trap 'if [ "${#decrypted[@]}" -gt 0 ]; then rm -f "${decrypted[@]}"; fi' INT TERM
+
     for file in "$SECRETS_DIR"/*.age; do
         file_exists "$file" || continue
 
         outfile="${file%.age}.dec"
         log_info "Decrypting: $(basename "$file") -> $(basename "$outfile")"
 
+        decrypted+=("$outfile")
         if age_decrypt "$file" "$AGE_DEFAULT_KEY" > "$outfile"; then
             increment_counter "processed_count"
         else
+            rm -f "${decrypted[@]}"
             exit_error "Failed to decrypt $file"
         fi
     done
 
+    trap - INT TERM
     log_success "Decrypted $(get_counter processed_count) files"
 }
 

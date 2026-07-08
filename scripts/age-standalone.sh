@@ -85,6 +85,13 @@ decrypt_all() {
 
     log_info "Decrypting *.age files in $SECRETS_DIR"
 
+    # .dec files are plaintext secrets at rest. umask 077 forces 600 and the
+    # explicit chmod covers age -o ignoring the umask; the trap and failure-path
+    # rm wipe everything produced if we exit early, so no plaintext is left.
+    umask 077
+    local -a decrypted=()
+    trap 'if [ "${#decrypted[@]}" -gt 0 ]; then rm -f "${decrypted[@]}"; fi' INT TERM
+
     for file in "$SECRETS_DIR"/*.age; do
         [[ -f "$file" ]] || continue
 
@@ -92,10 +99,16 @@ decrypt_all() {
         log_info "Decrypting: $(basename "$file")"
 
         rm -f "$outfile"
-        age -d -i "$KEY_PATH" -o "$outfile" "$file" || die "Failed to decrypt $file"
+        decrypted+=("$outfile")
+        if ! age -d -i "$KEY_PATH" -o "$outfile" "$file"; then
+            rm -f "${decrypted[@]}"
+            die "Failed to decrypt $file"
+        fi
+        chmod 600 "$outfile" 2>/dev/null || true
         count=$((count + 1))
     done
 
+    trap - INT TERM
     log_success "Decrypted $count files"
 }
 
