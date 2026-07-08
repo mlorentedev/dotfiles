@@ -1065,6 +1065,16 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 
 **Rule**: When extracting logic out of a `set -e` script into a function or sibling, audit the function's *last command's* exit status — a trailing `[ cond ] && action` returns 1 when the condition is false, and a bare call to that function then aborts the parent. Make best-effort helpers end in explicit `return 0`. And trust output-parity (byte-equivalence) tests over fixture tests that copy only a subset of the deploy tree: the subset can hide a newly-introduced sibling dependency that only bites when the full tree is present.
 
+### [2026-06-16] Extract the shared resolution logic, not the whole caller — keep agent-specific detail in the hook
+
+**Context**: MEMORY-002 pulled the vault→memory symlink target resolution out of `claude-session-start.sh` into a standalone `ensure-memory-symlink.sh`, so other agents (or `dotf init`) could reuse the linking mechanics without reimplementing it.
+
+**Problem**: The naive extraction boundary is "move the whole function" — but the original function mixed two concerns: computing Claude's agent-specific encoded project key (`encode_project_path`) and the agnostic vault-source-to-target linking mechanics (resolve, link, idempotent no-op). Extracting the whole thing either drags Claude-specific encoding into a script every other agent must also call, or forces each agent to reimplement the encoding step redundantly.
+
+**Solution**: Split at the seam: `encode_project_path` (agent-specific) stays in the Claude hook; the shared script receives the already-computed target and only does the generic resolve+link+safety-check. A future agent (or `dotf init`) supplies its own encoding scheme and calls the same shared script.
+
+**Rule**: When extracting shared plumbing out of an agent-specific caller, extract only the pure "given X, do Y" mechanics — leave every agent-specific naming/encoding decision in the caller. The caller computes what makes it unique; the shared script does what would be identical no matter which caller invoked it.
+
 ### [2026-06-17] A byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename
 
 **Context**: CLI-015 PR2 (#395/#403) extracted `dotf init`'s inlined vault-entry renderer into `cli/internal/vault` as `WriteProjectEntry`, moving three `vault-*` templates with it. The inherited plan (from the prior session's handoff) was "Full SSOT + drift": vendor the templates into the vault SSOT and drift-test them, mirroring PR1's work-SDK precedent.
@@ -1154,6 +1164,16 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Create the issue/PR via REST — `gh api -X POST /repos/<owner>/<repo>/issues --input -` (and `/pulls`), feeding a JSON body; check both buckets with `gh api /rate_limit --jq '.resources'`. PowerShell gotchas: capture a fetched body as a single string (`-join "\n"`, since the tool splits multiline output into an array) and use case-sensitive `-creplace` — plain `-replace` is case-insensitive and corrupts e.g. `adr-023` → `ADR-025`; build the payload with a single-quoted here-string `@'...'@` so `$`-vars stay literal.
 
 **Rule**: On a `gh` "GraphQL rate limit" error, don't wait — fall back to `gh api` REST endpoints (separate bucket), verified via `gh api /rate_limit`. For scripted body edits: single-string + case-sensitive replace + literal here-string.
+
+### [2026-06-18] A release binary goreleaser already builds is worthless until each OS's setup script actually downloads it
+
+**Context**: WIN-006 wired Windows setup to fetch a prebuilt `dotf` release binary instead of requiring a local Go toolchain.
+
+**Problem**: `dotf`'s cross-platform binaries were already produced by `goreleaser` on every tagged release — but `setup-windows.ps1` had no step that downloaded them. That made "dotf doesn't work on a fresh Windows box" read as a CLI-porting problem ("needs Go"), when the actual gap was one missing fetch-and-verify step in setup.
+
+**Solution**: Add `install-dotf.ps1` (a PowerShell mirror of the existing `install-dotf.sh`), dot-sourced by `setup-windows.ps1` non-fatally before anything needs `dotf`.
+
+**Rule**: Before treating "doesn't work on OS X" as a build/porting problem, check whether the artifact already exists and the gap is purely a missing fetch step in that OS's setup path. Producing a release artifact and consuming it in every deploy path are two separable deliverables — verify both exist before assuming a bigger rewrite is needed.
 
 ### [2026-06-19] Orca regenerates its Copilot hooks — re-apply the fix idempotently and guard the drift (DX-006)
 
@@ -1400,6 +1420,16 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Three tiers. (0) Make `pat-expiry.yml` **fail the job** (red `::error` + `exit 1`) on an invalid/expired token, not just file an ignorable issue; fix the `GH_REPO` checkout bug so it runs at all. (1) Opt-in pre-upload liveness in `sync ci`: a registry entry marked `validate: github-token` is probed with `gh api user` (authenticating *as* the token under test) **before any upload**; a dead token aborts the whole sync. (2) Structural — migrate the board automation to a GitHub App installation token so the long-lived PAT stops existing.
 
 **Rule**: Validating a secret's *liveness* is a separate concern from writing it, and from monitoring its expiry — do all three deliberately. Liveness validation does **not** generalize across providers (each is a bespoke probe, or none), so make it opt-in per credential, scoped to what you can cheaply probe (GitHub tokens via `gh api user`), and fail loud *before* the upload — never push a credential that does not authenticate. And the durable fix for "this PAT keeps expiring" is to delete the PAT (OIDC / GitHub App short-lived tokens), not to monitor it better.
+
+### [2026-06-26] Name-match at the consumer boundary, decouple at the storage boundary
+
+**Context**: `dotf secrets sync ci` (CLI-024-secrets-sync) uploads registry secrets to a repo's GitHub Actions secrets.
+
+**Problem**: A secret crosses two boundaries with different naming pressures — the consumer boundary (`gh secret set` / a workflow's `${{ secrets.X }}` need an exact name match) and the storage boundary (Bitwarden's own item/field organization, grouped by service or account for a human browsing the vault). Forcing one naming scheme across both either breaks the consumer's exact-match requirement or fights the storage layer's own organizing logic.
+
+**Solution**: The Actions secret name is always identical to the exposed env var — a flat 1:1 convention at the consumer boundary. Bitwarden storage (`bw: {item, field}`) stays decoupled and is free to group related secrets by service/account; the registry (`secrets/registry.yaml`) is the only place that maps between the two.
+
+**Rule**: At a consumer boundary — anywhere a caller's literal expectation must match exactly (env var names, API param names) — name-match precisely. At a storage boundary — anywhere only the system itself reads the layout — organize for the storage's own convenience. Never let storage-layer naming leak into a consumer contract, and keep exactly one seam (here, the registry) that translates between the two.
 
 ### [2026-06-27] A CLI that reads its config from the *deployed* copy, not the checkout, silently reverts its own writes
 
