@@ -11,8 +11,9 @@
 #   check-spec-gate.sh --base-ref REF --head-ref REF [--threshold N] [--explain]
 #
 # Env (consumed when set, normally populated by the CI workflow from PR):
-#   SDD_LABELS    Comma-separated PR labels
-#   SDD_PR_BODY   PR body text
+#   SDD_LABELS     Comma-separated PR labels
+#   SDD_PR_BODY    PR body text
+#   SDD_PR_AUTHOR  PR author login (gates the "dependencies" bot skip)
 #
 # Exit:
 #   0  OK (under threshold OR spec folder present OR valid skip)
@@ -22,6 +23,13 @@
 set -euo pipefail
 
 THRESHOLD=50
+# Minimum added+removed LOC WITHIN active specs/<id>/ folders for the change to
+# count as a genuine spec touch. Defeats the "edit one line of an unrelated stale
+# spec to legitimise a large PR" bypass (#686/C25): a real new/updated spec is
+# far larger than this floor, a one-line alibi is not. (The complete spec<->PR
+# linkage pairs with #670, which archives shipped specs and shrinks the alibi
+# surface.)
+SPEC_FLOOR=10
 BASE_REF=""
 HEAD_REF=""
 EXPLAIN=0
@@ -37,8 +45,9 @@ Usage: check-spec-gate.sh --base-ref REF --head-ref REF [--threshold N] [--expla
   -h, --help        Show this help
 
 Env:
-  SDD_LABELS    Comma-separated PR labels (CI sets this; locally optional)
-  SDD_PR_BODY   PR body text (CI sets this; locally optional)
+  SDD_LABELS     Comma-separated PR labels (CI sets this; locally optional)
+  SDD_PR_BODY    PR body text (CI sets this; locally optional)
+  SDD_PR_AUTHOR  PR author login; gates the "dependencies" skip to bot authors
 
 Exit codes:
   0  OK
@@ -71,12 +80,22 @@ fi
 
 SDD_LABELS="${SDD_LABELS:-}"
 SDD_PR_BODY="${SDD_PR_BODY:-}"
+SDD_PR_AUTHOR="${SDD_PR_AUTHOR:-}"
 
 _has_label() {
     case ",${SDD_LABELS}," in
         *",${1},"*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# The "dependencies" auto-skip is only legitimate for bot-authored dependency
+# PRs. Gating it on the author closes the bypass where any human collaborator
+# adds the "dependencies" label to neutralise the gate — spec-gate.yml re-runs
+# on `labeled` (#686/C25). Exact string match, not a case glob: "[bot]" is all
+# glob metacharacters.
+_is_dependency_bot() {
+    [[ "$1" == "dependabot[bot]" || "$1" == "dependabot-preview[bot]" || "$1" == "renovate[bot]" ]]
 }
 
 _skip_rationale_nonempty() {
@@ -95,7 +114,11 @@ _excluded() {
     case "$path" in
         docs/*.md) return 0 ;;   # doc-only (ADRs, lessons, runbooks): prose, not production
         tests/*|specs/archive/*) return 0 ;;
-        *generated*) return 0 ;;
+        # No broad *generated* glob (#686/C25): it excluded any path merely
+        # CONTAINING "generated" (e.g. a hand-written internal/generated_names.go)
+        # — a silent bypass. Zero generated files exist in-tree today; when a real
+        # one is introduced, add an explicit entry here (e.g. *.pb.go), never a
+        # substring match.
     esac
     case "$base" in
         *_test.go) return 0 ;;   # Go test files are tests, not production (#517)
@@ -137,8 +160,11 @@ _normalize_rename_path() {
 }
 
 if _has_label "dependencies"; then
-    printf '[OK] spec-gate skipped: PR carries "dependencies" label (dependabot/renovate)\n'
-    exit 0
+    if _is_dependency_bot "$SDD_PR_AUTHOR"; then
+        printf '[OK] spec-gate skipped: "dependencies" label on a bot-authored PR (%s)\n' "$SDD_PR_AUTHOR"
+        exit 0
+    fi
+    printf '[INFO] "dependencies" label present but author "%s" is not a recognised dependency bot — not honouring the skip; evaluating the gate normally.\n' "${SDD_PR_AUTHOR:-<unset>}" >&2
 fi
 
 if _has_label "skip-sdd"; then
@@ -155,9 +181,23 @@ EOF
 fi
 
 TOTAL_LOC=0
+SPEC_LOC=0
 SPEC_TOUCHED=0
 INCLUDED=()
 EXCLUDED=()
+
+# Fail CLOSED on a diff error. If BASE_REF/HEAD_REF do not resolve (shallow or
+# fresh clone without origin/main, a typo'd ref, a detached worktree), git diff
+# errors — and an enforcement gate must NOT let that silently pass. The previous
+# `2>/dev/null || true` swallowed the error, the loop read nothing, TOTAL_LOC
+# stayed 0, and the gate exited 0 on ANY PR (#686/C3). `if !` keeps `set -e`
+# from aborting before we can emit a clear, actionable message.
+if ! DIFF_OUTPUT=$(git diff --numstat "${BASE_REF}...${HEAD_REF}" 2>/dev/null); then
+    printf '[ERROR] git diff "%s...%s" failed — base/head ref could not be resolved.\n' "$BASE_REF" "$HEAD_REF" >&2
+    printf '        The Discipline Gate fails closed (exit 2): it will not pass a PR whose diff cannot be computed.\n' >&2
+    printf '        In CI, ensure the base ref is fetched (fetch-depth: 0 or an explicit git fetch origin <base>).\n' >&2
+    exit 2
+fi
 
 while IFS=$'\t' read -r added removed path; do
     [[ -z "${path:-}" ]] && continue
@@ -167,7 +207,7 @@ while IFS=$'\t' read -r added removed path; do
     [[ "$removed" == "-" ]] && removed=0
 
     if _is_active_spec_path "$path"; then
-        SPEC_TOUCHED=1
+        SPEC_LOC=$((SPEC_LOC + added + removed))
     fi
 
     if _excluded "$path"; then
@@ -178,12 +218,19 @@ while IFS=$'\t' read -r added removed path; do
     file_loc=$((added + removed))
     TOTAL_LOC=$((TOTAL_LOC + file_loc))
     INCLUDED+=("$path:$file_loc")
-done < <(git diff --numstat "${BASE_REF}...${HEAD_REF}" 2>/dev/null || true)
+done <<< "$DIFF_OUTPUT"
+
+# A spec touch only counts if it is substantive (#686/C25). A trivial edit to an
+# unrelated active spec (the "one-line alibi") must not legitimise a large PR.
+if (( SPEC_LOC >= SPEC_FLOOR )); then
+    SPEC_TOUCHED=1
+fi
 
 if [[ "$EXPLAIN" -eq 1 ]]; then
     printf '[INFO] Spec-gate breakdown (%s...%s)\n' "$BASE_REF" "$HEAD_REF"
     printf '  Threshold: %d LOC\n' "$THRESHOLD"
     printf '  Production LOC (added+removed): %d\n' "$TOTAL_LOC"
+    printf '  Active-spec LOC (added+removed): %d (floor %d to count as a spec touch)\n' "$SPEC_LOC" "$SPEC_FLOOR"
     if [[ "$SPEC_TOUCHED" -eq 1 ]]; then
         printf '  Spec folder touched: yes\n'
     else
