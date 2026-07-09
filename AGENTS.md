@@ -141,7 +141,7 @@ Vault layout (`00_meta/{templates,patterns}`, `10_projects/<repo>/`, `50_work/`)
 and the Frontmatter Law (every vault `.md` carries `id` / `type` / `status` /
 `tags`) are the SSOT in `00_meta/patterns/pattern-ai-protocol.md` (Section 5).
 
-## MCP Server Usage (Portable)
+## MCP Server Usage Rules (Portable)
 
 Per-server *when-to-use* for discovery; detailed tool flow, edge cases, and
 failure-mode fallbacks are the SSOT in each server's pattern body.
@@ -188,8 +188,12 @@ in TDD order; (5) implement, ticking boxes; (6) `verification.md` with evidence;
 
 **Proactive:** if you detect a trigger while scoping, propose `/spec init`
 yourself (name the trigger) and let the user decide — the full activation rule is
-the SSOT in the `/spec` skill. No "I'll spec/document it later": Standing Order #3
-is in-session (file a tracked task if it genuinely cannot fit now).
+the SSOT in the `/spec` skill.
+
+**Banned phrases** (Standing Order #3 is **in-session, not 'later'**):
+"I'll do knowledge hygiene later", "will add the spec entry after merge",
+"let me commit first and document later". If a hygiene action genuinely cannot
+fit this turn, file a tracked task — never a verbal-only promise.
 
 ## Response Protocol
 
