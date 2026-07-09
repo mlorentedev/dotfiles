@@ -24,6 +24,21 @@ CURRENT_DIR=$(pwd)
 # Create necessary directories
 export DOTFILES_DIR="$HOME/.dotfiles"
 
+# Refuse an in-place install (#695). The supported layout clones the repo to a
+# SEPARATE directory (e.g. ~/dotfiles-repo) and deploys into ~/.dotfiles. When
+# the repo is cloned directly into ~/.dotfiles, CURRENT_DIR == DOTFILES_DIR and
+# setup's deploy copies collapse to same-file operations: `cp -f X X` aborts
+# under `set -euo pipefail` (env-contract deploy), and the git-hooks clean-mirror
+# (rm -rf dest + cp src/.) would EMPTY the dispatcher while still logging success.
+# Fail fast HERE, before any directory is created or any file is copied.
+if [ "$CURRENT_DIR" = "$DOTFILES_DIR" ]; then
+    log_error "Refusing in-place install: the repo is checked out in \$DOTFILES_DIR ($DOTFILES_DIR)."
+    log_error "That directory is the DEPLOY TARGET, not the checkout. Clone somewhere else and re-run:"
+    log_error "    git clone https://github.com/mlorentedev/dotfiles.git ~/dotfiles-repo"
+    log_error "    cd ~/dotfiles-repo && bash setup-linux.sh"
+    exit 1
+fi
+
 # Single source of truth for tool versions (REFACTOR-011): source the manifest
 # from the checkout so $OPENCODE_VERSION / etc. are reliable
 # regardless of the parent shell. Read from $CURRENT_DIR: the copy under
