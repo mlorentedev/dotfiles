@@ -100,3 +100,13 @@ teardown() {
     run install_git_hooks "$TMP/empty/git-hooks" "$DOTF"
     [ "$status" -ne 0 ]
 }
+
+# #695: in the in-place layout src and dest resolve to the same dir. The
+# clean-mirror (rm -rf dest THEN cp src/. dest) would EMPTY the dispatcher and
+# still report success. deploy_git_hooks must detect the collision and no-op.
+@test "deploy_git_hooks is a safe no-op when src and dest are the same dir (#695)" {
+    run deploy_git_hooks "$SRC" "$SRC"
+    [ "$status" -eq 0 ]
+    [ -f "$SRC/pre-commit" ]                    # dispatcher NOT emptied
+    [ -f "$SRC/lib/memory-sink-guard.sh" ]      # lib subtree intact
+}
