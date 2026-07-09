@@ -1718,19 +1718,13 @@ if ($copilotCmd) {
     Write-Info "GitHub Copilot CLI not installed; the dev tools block above attempts auto-install via winget GitHub.Copilot. Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
 }
 
-# Sync .github/copilot-instructions.md from ai/copilot/ (SDD-005 parity rule).
-# The .github/ copy is what GitHub's web Copilot Chat reads; ai/copilot/ is the
-# SSOT. Setup keeps them in sync so the docs-drift test never fails.
-$ghCopilotDst = Join-Path $DotfilesDir '.github\copilot-instructions.md'
-$aiCopilotSrc = Join-Path $DotfilesDir 'ai\copilot\copilot-instructions.md'
-if (Test-Path -LiteralPath $aiCopilotSrc -PathType Leaf) {
-    if ((Test-Path -LiteralPath $ghCopilotDst) -and (-not (Compare-Object (Get-Content $aiCopilotSrc) (Get-Content $ghCopilotDst)))) {
-        Write-Info ".github/copilot-instructions.md already in sync"
-    } else {
-        Copy-Item -LiteralPath $aiCopilotSrc -Destination $ghCopilotDst -Force
-        Write-Success "Synced .github/copilot-instructions.md from ai/copilot/"
-    }
-}
+# SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.
+# Setup MUST NEVER write into the checkout -- a checkout write leaves git status
+# dirty, and `dotf update` skips any dirty worktree, so a self-deploying machine
+# silently stops updating after the first run (dotfiles#694). Parity between the
+# two copilot-instructions files is enforced by the fail-loud CI test
+# tests/docs-drift.bats, which blocks drift at merge instead of rewriting a
+# committed file at deploy time.
 
 # ============================================================================
 # SDD-008: deploy skills from committed records (option A, render-at-deploy)
