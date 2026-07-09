@@ -13,8 +13,10 @@ Personal development environment: shell configs, AI tool integration, and encryp
 ### Linux
 
 ```bash
-git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
+# Clone the repo to a checkout dir (NOT ~/.dotfiles — that is the deploy target
+# setup writes into; cloning into it makes setup refuse, #695). Requires: git, curl.
+git clone https://github.com/mlorentedev/dotfiles.git ~/dotfiles-repo
+cd ~/dotfiles-repo
 ./setup-linux.sh
 source ~/.zshrc
 ```

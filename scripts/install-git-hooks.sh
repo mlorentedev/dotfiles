@@ -54,6 +54,20 @@ deploy_git_hooks() {
         return 1
     fi
 
+    # Defense in depth (#695): if src and dest are the same directory, the
+    # clean-mirror below (rm -rf dest THEN cp src/. dest) would delete the
+    # dispatcher and copy nothing back — emptying it while still reporting
+    # success. The setup preflight already refuses the in-place layout that
+    # causes this, but the function must be safe on its own. Nothing to mirror
+    # onto itself; just refresh the executable bits.
+    if [ "$src" -ef "$dest" ]; then
+        log_info "install-git-hooks: src and dest are the same directory ($dest) — skipping mirror (already in place)"
+        chmod +x "$dest/pre-commit" "$dest/commit-msg" "$dest/prepare-commit-msg" "$dest/pre-push" "$dest/post-checkout" 2>/dev/null || true
+        [ -d "$dest/lib" ] && chmod +x "$dest"/lib/*.sh 2>/dev/null || true
+        log_success "GUARD dispatcher already in place at $dest"
+        return 0
+    fi
+
     rm -rf "$dest"
     mkdir -p "$dest"
     cp -rf "$src/." "$dest/"

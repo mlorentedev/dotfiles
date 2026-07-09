@@ -13,6 +13,21 @@ setup() {
     zsh -n "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# Behavioral guard for #695: cloning INTO ~/.dotfiles (CURRENT_DIR ==
+# DOTFILES_DIR) must fail fast, BEFORE any destructive copy/mirror, not corrupt
+# the checkout. Minimal fixture: setup-linux.sh + utils.sh under $HOME/.dotfiles.
+@test "setup-linux.sh refuses an in-place install (CURRENT_DIR == DOTFILES_DIR) (#695)" {
+    local tmp; tmp="$(mktemp -d)"
+    mkdir -p "$tmp/.dotfiles/scripts"
+    cp "$DOTFILES_DIR/setup-linux.sh" "$tmp/.dotfiles/setup-linux.sh"
+    cp "$DOTFILES_DIR/scripts/utils.sh" "$tmp/.dotfiles/scripts/utils.sh"
+    run env HOME="$tmp" bash -c "cd '$tmp/.dotfiles' && bash ./setup-linux.sh"
+    rm -rf "$tmp"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"in-place"* ]]
+    [[ "$output" == *"dotfiles-repo"* ]]
+}
+
 # --- Developer tools section ---
 
 @test "setup-linux.sh creates ~/.local/bin directory" {
