@@ -59,14 +59,24 @@ _commit() {
     [[ "$output" == *"below threshold"* ]] || [[ "$output" == *"OK"* ]]
 }
 
-@test "exits 0 when diff >= threshold AND specs folder is touched" {
+@test "exits 0 when diff >= threshold AND a substantive spec folder is touched" {
     mkdir -p specs/SDD-999-test
-    printf 'placeholder proposal\n' > specs/SDD-999-test/proposal.md
+    printf 'proposal line %d\n' {1..12} > specs/SDD-999-test/proposal.md
     printf 'line %d\n' {1..60} > big.txt
     _commit "big change with spec"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
     [[ "$output" == *"spec folder touched"* ]] || [[ "$output" == *"OK"* ]]
+}
+
+@test "a trivial (sub-floor) active-spec touch does NOT satisfy the gate (#686/C25)" {
+    mkdir -p specs/SDD-777-stale
+    printf 'x\n' > specs/SDD-777-stale/proposal.md   # 1 line, below SPEC_FLOOR
+    printf 'line %d\n' {1..60} > big.txt
+    _commit "large PR with a trivial stale-spec alibi"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
 }
 
 @test "exits 1 when diff >= threshold AND no specs folder" {
@@ -98,13 +108,39 @@ _commit() {
     [[ "$output" == *"rationale"* ]]
 }
 
-@test "exits 0 when dependencies label present (dependabot bypass)" {
+@test "exits 0 when dependencies label present AND author is a bot (#686/C25)" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "dep bump"
-    run env SDD_LABELS="dependencies" SDD_PR_BODY="" \
+    run env SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="dependabot[bot]" \
         "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
-    [[ "$output" == *"dependencies"* ]]
+    [[ "$output" == *"bot-authored"* ]]
+}
+
+@test "dependencies label from a NON-bot author does not bypass the gate (#686/C25)" {
+    printf 'line %d\n' {1..60} > big.txt
+    _commit "dep bump masquerade"
+    run env SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="some-human" \
+        "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
+}
+
+@test "fails closed (exit 2) when the base ref does not resolve (#686/C3)" {
+    printf 'line %d\n' {1..60} > big.txt
+    _commit "change against a bogus base"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref origin/does-not-exist --head-ref feature
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"could not be resolved"* ]] || [[ "$output" == *"fails closed"* ]]
+}
+
+@test "a hand-written *generated* path is counted, not excluded (#686/C25)" {
+    # Previously any path merely containing "generated" was silently excluded.
+    printf 'line %d\n' {1..60} > internal_generated_names.go
+    _commit "large generated-named file, no spec"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
 }
 
 @test "excludes tests/ from LOC count" {
