@@ -16,14 +16,20 @@ jobs:
   spec-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Fetch base ref
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+        # Full fetch (NOT --depth=1): check-spec-gate.sh diffs "origin/BASE...HEAD",
+        # whose three-dot form needs the merge-base. A shallow depth-1 base ref
+        # cannot reach the merge-base of a branch that lags main by more than one
+        # commit, so `git diff` errors and the gate (correctly) fails closed
+        # (#686/C3). checkout above already fetched full head history (fetch-depth
+        # 0); this brings the base's full history so the merge-base is reachable.
+        run: git fetch --no-tags --prune origin "$BASE_REF"
 
       - name: Run SDD spec-gate
         env:
