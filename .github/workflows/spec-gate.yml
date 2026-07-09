@@ -30,6 +30,7 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           SDD_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           SDD_PR_BODY: ${{ github.event.pull_request.body }}
+          SDD_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           ./scripts/check-spec-gate.sh \
             --base-ref "origin/$BASE_REF" \

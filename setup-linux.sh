@@ -24,6 +24,21 @@ CURRENT_DIR=$(pwd)
 # Create necessary directories
 export DOTFILES_DIR="$HOME/.dotfiles"
 
+# Refuse an in-place install (#695). The supported layout clones the repo to a
+# SEPARATE directory (e.g. ~/dotfiles-repo) and deploys into ~/.dotfiles. When
+# the repo is cloned directly into ~/.dotfiles, CURRENT_DIR == DOTFILES_DIR and
+# setup's deploy copies collapse to same-file operations: `cp -f X X` aborts
+# under `set -euo pipefail` (env-contract deploy), and the git-hooks clean-mirror
+# (rm -rf dest + cp src/.) would EMPTY the dispatcher while still logging success.
+# Fail fast HERE, before any directory is created or any file is copied.
+if [ "$CURRENT_DIR" = "$DOTFILES_DIR" ]; then
+    log_error "Refusing in-place install: the repo is checked out in \$DOTFILES_DIR ($DOTFILES_DIR)."
+    log_error "That directory is the DEPLOY TARGET, not the checkout. Clone somewhere else and re-run:"
+    log_error "    git clone https://github.com/mlorentedev/dotfiles.git ~/dotfiles-repo"
+    log_error "    cd ~/dotfiles-repo && bash setup-linux.sh"
+    exit 1
+fi
+
 # Single source of truth for tool versions (REFACTOR-011): source the manifest
 # from the checkout so $OPENCODE_VERSION / etc. are reliable
 # regardless of the parent shell. Read from $CURRENT_DIR: the copy under
@@ -919,26 +934,14 @@ else
     log_info "GitHub Copilot CLI not installed, skipping Copilot config (install via snap/apt/curl: https://docs.github.com/copilot/how-tos/copilot-cli)"
 fi
 
-# Sync .github/copilot-instructions.md from ai/copilot/ (SDD-005 parity rule).
-# The .github/ copy is what GitHub's web Copilot Chat reads; ai/copilot/ is the
-# SSOT. Setup keeps them in sync so the docs-drift test never fails.
-# The pointer banner differs: .github/ uses a markdown link [\`AGENTS.md\`](../AGENTS.md)
-# while ai/copilot/ uses a plain backticked reference. Everything else must match.
-GH_COPILOT_DST="$CURRENT_DIR/.github/copilot-instructions.md"
-AI_COPILOT_SRC="$CURRENT_DIR/ai/copilot/copilot-instructions.md"
-if [ -f "$AI_COPILOT_SRC" ]; then
-    # Strip the pointer banner (lines starting with '> ') from ai/copilot/
-    BODY=$(sed -E '/^> /d' "$AI_COPILOT_SRC")
-    # Prepend the .github/-specific pointer banner
-    GH_BANNER="> **First, read [\`AGENTS.md\`](../AGENTS.md) at the repo root** — canonical SSOT for behaviour rules across all agents (Standing Orders, Decision Hierarchy, Neural Hive Loop, MCP usage, Operational Rules). This file contains only Copilot-specific extensions on top.\n>\n> If \`AGENTS.md\` is missing from the current repo, default to the canonical version at \`\$DOTFILES_REPO_DIR/AGENTS.md\` (resolved via \`machine.json\` per ADR-025; falls back to \`~/Projects/Workspace/dotfiles/AGENTS.md\`)."
-    NEW_CONTENT="$GH_BANNER\n\n$BODY"
-    if [ -f "$GH_COPILOT_DST" ] && printf '%s' "$NEW_CONTENT" | cmp -s - "$GH_COPILOT_DST"; then
-        log_info ".github/copilot-instructions.md already in sync"
-    else
-        printf '%s' "$NEW_CONTENT" > "$GH_COPILOT_DST"
-        log_success "Synced .github/copilot-instructions.md from ai/copilot/ (with .github/ pointer banner)"
-    fi
-fi
+# SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.
+# Setup deploys to $HOME only and MUST NEVER write into the checkout — a checkout
+# write leaves `git status` dirty, and `dotf update` skips any dirty worktree,
+# so a self-deploying machine silently stops updating after the first run
+# (dotfiles#694). The two copilot-instructions files are kept in parity by the
+# fail-loud test tests/docs-drift.bats (runs in CI), which is the correct
+# enforcement point: drift blocks the merge instead of a deploy rewriting a
+# committed file behind the user's back.
 
 # BUG-004 + BUG-011: defense-in-depth wrapper around EVERY `claude <subcommand>`
 # invocation in this script. The Claude Code CLI's deserialize-modify-serialize

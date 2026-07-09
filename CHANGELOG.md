@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.3](https://github.com/mlorentedev/dotfiles/compare/v0.31.2...v0.31.3) (2026-07-09)
+
+
+### Bug Fixes
+
+* **setup:** stop setup writing into the checkout so dotf update keeps deploying ([#714](https://github.com/mlorentedev/dotfiles/issues/714)) ([c30ee07](https://github.com/mlorentedev/dotfiles/commit/c30ee077b76cf859507a8648506243a0c24c751f)), closes [#694](https://github.com/mlorentedev/dotfiles/issues/694)
+
 ## [0.31.2](https://github.com/mlorentedev/dotfiles/compare/v0.31.1...v0.31.2) (2026-07-08)
 
 
