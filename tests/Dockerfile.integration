@@ -7,7 +7,7 @@
 #     -f tests/Dockerfile.integration -t dotfiles-integration-test .
 #   docker run --rm dotfiles-integration-test
 
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ARG BATS_VERSION=1.13.0
 
