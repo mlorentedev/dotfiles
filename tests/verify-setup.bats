@@ -346,3 +346,26 @@ setup() {
     tmux -L "$socket" kill-server 2>/dev/null || true
     [ "$rc" -eq 0 ]
 }
+
+# =============================================================================
+# Section: Checkout hygiene — setup must never write into the repo checkout
+# =============================================================================
+
+# Guard for dotfiles#694. Setup deploys to $HOME only; it must NEVER write into
+# the checkout it runs from. A checkout write leaves `git status` dirty, and
+# `dotf update` (cli/internal/update/update.go) skips any dirty worktree with
+# exit 0 — so a self-deploying machine silently stops updating after the first
+# run while the timer stays green forever. This asserts exactly what update.go
+# checks (empty `git status --porcelain`) against the same checkout: setup ran at
+# image-build time, this runs at container-run time. Any future checkout write —
+# not just the copilot-instructions sync that motivated this — trips the guard.
+@test "setup leaves the repo checkout clean (no dirty worktree) [#694]" {
+    [ -d "$REPO_DIR/.git" ] || skip "repo checkout is not a git repo in this container"
+    run git -C "$REPO_DIR" status --porcelain
+    [ "$status" -eq 0 ]
+    if [ -n "$output" ]; then
+        echo "setup dirtied the checkout — dotf update would skip forever (#694):" >&2
+        echo "$output" >&2
+    fi
+    [ -z "$output" ]
+}

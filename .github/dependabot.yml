@@ -1,0 +1,51 @@
+# Dependabot: weekly, grouped dependency PRs for human review.
+#
+# Grouping keeps the noise down (one PR per ecosystem per week bundling all
+# minor + patch bumps); major bumps come as their own PRs so they get individual
+# scrutiny. Every PR carries the "dependencies" label, which is the ONLY way the
+# SDD spec-gate skip applies (check-spec-gate.sh gates that skip to bot authors,
+# #686/C25). Auto-merge is intentionally NOT enabled: every PR is reviewed and
+# merged by a human (repo policy).
+version: 2
+updates:
+  # Go modules for the dotf CLI.
+  - package-ecosystem: "gomod"
+    directory: "/cli"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions used across .github/workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Base image in the integration test container (FROM ubuntu:24.04).
+  - package-ecosystem: "docker"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      docker-minor-patch:
+        update-types: ["minor", "patch"]
