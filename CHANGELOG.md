@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.4](https://github.com/mlorentedev/dotfiles/compare/v0.31.3...v0.31.4) (2026-07-09)
+
+
+### Bug Fixes
+
+* **setup:** refuse the in-place install layout that corrupts the checkout ([#726](https://github.com/mlorentedev/dotfiles/issues/726)) ([d21b01d](https://github.com/mlorentedev/dotfiles/commit/d21b01d93c755c99e6dc568f3e353b23496ace6c)), closes [#695](https://github.com/mlorentedev/dotfiles/issues/695)
+* **spec-gate:** fail closed and close the three SDD-gate bypass routes ([#716](https://github.com/mlorentedev/dotfiles/issues/716)) ([3565d4b](https://github.com/mlorentedev/dotfiles/commit/3565d4b1bd1feb176662615242adf08b62e7a9b6)), closes [#686](https://github.com/mlorentedev/dotfiles/issues/686)
+
 ## [0.31.3](https://github.com/mlorentedev/dotfiles/compare/v0.31.2...v0.31.3) (2026-07-09)
 
 
