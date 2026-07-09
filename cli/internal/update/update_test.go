@@ -44,15 +44,18 @@ func TestUpdate(t *testing.T) {
 	cfg := Config{Repo: "/repo"}
 
 	tests := []struct {
-		name       string
-		mutate     func(g fakeGit) // tweak the healthy fake for this branch
-		setupErr   error           // RunSetup result
-		wantStatus string
-		wantErr    bool
-		setupRuns  bool // whether RunSetup must be invoked
+		name          string
+		mutate        func(g fakeGit) // tweak the healthy fake for this branch
+		setupErr      error           // RunSetup result
+		wantStatus    string
+		wantMsgSubstr string // if set, out.Message must contain it
+		wantErr       bool
+		setupRuns     bool // whether RunSetup must be invoked
 	}{
 		{name: "not a repo", mutate: func(g fakeGit) { g.fail["rev-parse --git-dir"] = true }, wantStatus: "not-a-repo"},
-		{name: "dirty worktree", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M setup.sh" }, wantStatus: "dirty"},
+		// The dirty-skip message must name the offending path so a silently
+		// skipping scheduled run stays diagnosable (dotfiles#694).
+		{name: "dirty worktree", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M setup.sh" }, wantStatus: "dirty", wantMsgSubstr: "setup.sh"},
 		{name: "fetch offline", mutate: func(g fakeGit) { g.fail["fetch --quiet"] = true }, wantStatus: "offline"},
 		{name: "no upstream", mutate: func(g fakeGit) { g.fail["rev-parse --abbrev-ref --symbolic-full-name @{u}"] = true }, wantStatus: "no-upstream"},
 		{name: "already current", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, wantStatus: "current"},
@@ -82,6 +85,9 @@ func TestUpdate(t *testing.T) {
 			}
 			if out.Status != tt.wantStatus {
 				t.Errorf("status = %q, want %q (msg: %s)", out.Status, tt.wantStatus, out.Message)
+			}
+			if tt.wantMsgSubstr != "" && !strings.Contains(out.Message, tt.wantMsgSubstr) {
+				t.Errorf("message = %q, want it to contain %q", out.Message, tt.wantMsgSubstr)
 			}
 			if ranSetup != tt.setupRuns {
 				t.Errorf("RunSetup invoked = %v, want %v — a skip branch must never re-run setup", ranSetup, tt.setupRuns)

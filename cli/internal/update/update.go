@@ -48,8 +48,16 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 	}
 	// Never touch a dirty worktree (the primary failure mode). An unreadable
 	// status is treated as "cannot confirm clean" → skip (fail-safe).
-	if out, err := d.Git("status", "--porcelain"); err != nil || strings.TrimSpace(out) != "" {
-		return skip("dirty", "dirty worktree in "+cfg.Repo+" — skipping (commit or stash your changes first)")
+	out, err := d.Git("status", "--porcelain")
+	if err != nil {
+		return skip("dirty", "cannot read git status in "+cfg.Repo+" — skipping (fail-safe: cannot confirm the worktree is clean)")
+	}
+	// Name the dirtying paths in the message. A scheduled self-update that skips
+	// on a dirty worktree is otherwise a silent no-op forever (dotfiles#694): the
+	// timer stays green while the deploy never runs. Surfacing the exact paths
+	// makes that state diagnosable from the run log alone.
+	if dirt := strings.TrimSpace(out); dirt != "" {
+		return skip("dirty", "dirty worktree in "+cfg.Repo+" — skipping (commit or stash first). Dirtying paths:\n"+dirt)
 	}
 	// A fetch failure is transient (network) → skip and retry next slot.
 	if _, err := d.Git("fetch", "--quiet"); err != nil {
