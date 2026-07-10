@@ -147,12 +147,25 @@ func cwdFromPayload(payload []byte) string {
 	return p.Cwd
 }
 
-// memScriptsDir locates the scripts/ dir hosting the sibling vault-health.sh,
-// resolved from the env-contract (DOTFILES_REPO_DIR) — the Go equivalent of
-// session-brief.sh's $(dirname "$0") sibling lookup. "" when unresolved, which
-// makes vaultHealth emit the same "not found" line the shell does.
+// memRepoDir resolves the dotfiles checkout for mem's sibling-script and config
+// lookups: the ADR-025 cascade value when it names a real directory, else the
+// .git walk-up (env.RepoDir). "" when neither resolves, so callers emit the same
+// "not found" line the shell twin does — instead of probing the phantom contract
+// default ~/Projects/dotfiles, which reads as "run setup" even after setup ran
+// (#696).
+func memRepoDir() string {
+	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" && dirExists(r) {
+		return r
+	}
+	return env.RepoDir()
+}
+
+// memScriptsDir locates the scripts/ dir hosting the sibling vault-health.sh —
+// the Go equivalent of session-brief.sh's $(dirname "$0") sibling lookup. ""
+// when unresolved, which makes vaultHealth emit the same "not found" line the
+// shell does.
 func memScriptsDir() string {
-	repo := env.ResolvePath("DOTFILES_REPO_DIR")
+	repo := memRepoDir()
 	if repo == "" {
 		return ""
 	}
@@ -160,13 +173,13 @@ func memScriptsDir() string {
 }
 
 // memConfigPath resolves session-start-config.json: the SESSION_START_CONFIG
-// override, else <DOTFILES_REPO_DIR>/session-start-config.json (the shell's
+// override, else <checkout>/session-start-config.json (the shell's
 // $SCRIPT_DIR/../session-start-config.json). "" falls back to historical defaults.
 func memConfigPath() string {
 	if c := os.Getenv("SESSION_START_CONFIG"); c != "" {
 		return c
 	}
-	repo := env.ResolvePath("DOTFILES_REPO_DIR")
+	repo := memRepoDir()
 	if repo == "" {
 		return ""
 	}

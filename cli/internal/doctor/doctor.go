@@ -91,6 +91,7 @@ func Run(opts Options) (int, error) {
 		checkOpenCode(sys, cfg, rep)
 		checkHarnessDrift(sys, cfg, rep)
 		checkDeployDrift(sys, cfg, rep)
+		checkRepoDirResolves(rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep)
 	}

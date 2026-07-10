@@ -24,7 +24,42 @@ func newEnvCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newEnvGenerateCmd())
 	cmd.AddCommand(newEnvPathCmd())
+	cmd.AddCommand(newEnvSetCmd())
 	return cmd
+}
+
+func newEnvSetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set <KEY> <VALUE>",
+		Short: "Set a per-machine path override in machine.json (write-side of `env path`)",
+		Long: "set writes one structural path override into\n" +
+			"~/.config/dotfiles/machine.json — the write-side counterpart of `env path`.\n" +
+			"KEY must be a var declared in env-contract.json (an unknown key is rejected,\n" +
+			"so a typo cannot create a dead override no resolver reads); every other\n" +
+			"override is preserved and re-setting the same value is a no-op. First-run\n" +
+			"setup uses this to seed DOTFILES_REPO_DIR to the checkout it runs from, so the\n" +
+			"ADR-025 cascade resolves the real repo instead of the contract default.",
+		Args:         cobra.ExactArgs(2),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			key, value := args[0], args[1]
+			contractPath := env.ResolveContractPath()
+			if contractPath == "" {
+				return fmt.Errorf("env-contract.json not found: set DOTFILES_DIR or run from the repo")
+			}
+			machinePath := env.MachinePath(env.Home())
+			changed, err := env.SetMachinePath(contractPath, machinePath, key, value)
+			if err != nil {
+				return err
+			}
+			if changed {
+				cmd.Printf("set %s in %s\n", key, machinePath)
+			} else {
+				cmd.Printf("unchanged %s (already %s)\n", key, value)
+			}
+			return nil
+		},
+	}
 }
 
 func newEnvPathCmd() *cobra.Command {
