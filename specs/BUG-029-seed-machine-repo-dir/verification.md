@@ -32,14 +32,17 @@ contract default instead of `""`.
 | doctor repo-dir health check | `go test ./cli/internal/doctor/...` | pass |
 | Build | `go build ./...` | clean |
 | Shell syntax | `bash -n setup-linux.sh` | clean |
-| machine.json seeded post-setup | `bats tests/verify-setup.bats` (integration) | pass (Linux CI) |
+| machine.json seeded post-setup | `bats tests/verify-setup.bats` (integration) | skip until a release ships `env set` (see note) |
 
 ## CI evidence (post-push, T8)
 
 - [ ] `test` (Go unit + bats) green on ubuntu-latest.
-- [ ] `integration` green — after container setup, `machine.json` exists with
-      `DOTFILES_REPO_DIR` = the checkout, and `dotf env path DOTFILES_REPO_DIR`
-      resolves to a real dir.
+- [ ] `integration` green — the two machine.json guards **skip** in the current
+      container (it installs the *released* dotf, which predates `env set`, and
+      dotf is not on the bats-time PATH); they self-activate once a release ships
+      `env set`. The seed logic itself is guarded by the Go unit tests + doctor
+      check, which do run. Harness gap (integration should exercise the PR's built
+      binary) tracked in #734.
 - [ ] `lint`, `lint-powershell`, `spec-gate` green.
 
 ### Pre-existing failures ruled out (Windows-local only)
