@@ -69,9 +69,9 @@ func writeMachine(path string, m *machine) error {
 		return fmt.Errorf("create temp machine.json: %w", err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // no-op once the rename below succeeds
+	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename below succeeds
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("write temp machine.json: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
