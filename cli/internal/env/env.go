@@ -110,32 +110,45 @@ func MachinePath(home string) string {
 	return filepath.Join(cfg, "dotfiles", "machine.json")
 }
 
-// ResolveContractPath locates env-contract.json: first under DOTFILES_DIR (the
-// deployed copy), then by walking up from the current directory (so the CLI
-// works from inside a checkout). Returns "" when none is found.
-func ResolveContractPath() string {
-	// Prefer the repo's contract when DOTFILES_REPO_DIR points at a real checkout.
-	// On a dev machine the checkout is fresher than the deployed copy under
-	// ~/.dotfiles, so this prevents the stale-deployed-copy drift where a relocated
-	// repo keeps generating from an out-of-date ~/.dotfiles/env-contract.json. Read
-	// with os.Getenv (not ResolvePath): ResolvePath calls back into here, so going
-	// through the cascade would recurse. A non-existent path (stale value) just
-	// falls through to the deployed copy below.
-	if repo := os.Getenv("DOTFILES_REPO_DIR"); repo != "" {
-		if p := filepath.Join(repo, "env-contract.json"); fileExists(p) {
+// ResolveRepoFirst locates a repo-tracked config file (env-contract.json,
+// versions.conf) using the repo-first precedence shared by `dotf env` and
+// `dotf doctor` (#697): the checkout copy — the version-controlled SSOT, fresher
+// on a dev machine whose deploy dir lags — wins over the deployed copy under
+// DOTFILES_DIR, with a final walk-up from startDir so it resolves from inside a
+// checkout even with no env var set. Returns "" when none exists. Centralizing
+// this precedence is what stops doctor and env from drifting into contradictory
+// stale/fresh verdicts about the same file. Callers pass their own repoDir /
+// dotfilesDir / startDir (doctor through its System seam, env from globals), so a
+// non-existent tier is simply skipped.
+func ResolveRepoFirst(name, repoDir, dotfilesDir, startDir string) string {
+	if repoDir != "" {
+		if p := filepath.Join(repoDir, name); fileExists(p) {
 			return p
 		}
 	}
-	home := Home()
-	if p := filepath.Join(DotfilesDir(home), "env-contract.json"); fileExists(p) {
-		return p
+	if dotfilesDir != "" {
+		if p := filepath.Join(dotfilesDir, name); fileExists(p) {
+			return p
+		}
 	}
-	if cwd, err := os.Getwd(); err == nil {
-		if p := walkUpFor(cwd, "env-contract.json"); p != "" {
+	if startDir != "" {
+		if p := walkUpFor(startDir, name); p != "" {
 			return p
 		}
 	}
 	return ""
+}
+
+// ResolveContractPath locates env-contract.json repo-first (see ResolveRepoFirst):
+// the checkout copy under DOTFILES_REPO_DIR wins over the deployed copy under
+// DOTFILES_DIR, then a walk-up from the working directory. This prevents the
+// stale-deployed-copy drift where a machine whose ~/.dotfiles lags the repo keeps
+// generating from an out-of-date contract. DOTFILES_REPO_DIR is read with
+// os.Getenv (not ResolvePath): ResolvePath calls back into here, so going through
+// the cascade would recurse. Returns "" when none is found.
+func ResolveContractPath() string {
+	cwd, _ := os.Getwd()
+	return ResolveRepoFirst("env-contract.json", os.Getenv("DOTFILES_REPO_DIR"), DotfilesDir(Home()), cwd)
 }
 
 // RepoDir resolves the dotfiles checkout root: DOTFILES_REPO_DIR when it points at

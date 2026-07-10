@@ -113,6 +113,10 @@ func loadContractSection(sys *System, cfg *Config, rep *Report) *Contract {
 		rep.Fail(fmt.Sprintf("env-contract.json unreadable (%v) — contract checks skipped", err))
 		return nil
 	}
-	rep.Pass("env-contract.json loaded from " + cfg.ContractPath)
+	rep.Pass("env-contract.json loaded")
+	// Provenance (always shown, even in non-verbose where Pass is suppressed) so a
+	// stale-deployed-copy read is self-diagnosing rather than a silent contradiction
+	// with `dotf env generate` (#697).
+	rep.Info("contract: " + cfg.ContractPath)
 	return contract
 }

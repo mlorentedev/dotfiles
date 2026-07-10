@@ -191,6 +191,54 @@ func TestResolveContractPathRepoMissingFallsThrough(t *testing.T) {
 	}
 }
 
+func TestResolveRepoFirstPrefersRepoOverDeployed(t *testing.T) {
+	// Both the checkout copy and the deployed copy exist; the checkout (the fresher
+	// SSOT) must win, so doctor and env never read a stale deployed copy (#697).
+	repo := t.TempDir()
+	deployed := t.TempDir()
+	repoFile := filepath.Join(repo, "env-contract.json")
+	if err := os.WriteFile(repoFile, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deployed, "env-contract.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveRepoFirst("env-contract.json", repo, deployed, ""); got != repoFile {
+		t.Errorf("ResolveRepoFirst() = %q, want repo copy %q", got, repoFile)
+	}
+}
+
+func TestResolveRepoFirstFallsBackDeployedThenWalkUpThenEmpty(t *testing.T) {
+	// repoDir has no copy -> deployed wins.
+	deployed := t.TempDir()
+	deployedFile := filepath.Join(deployed, "versions.conf")
+	if err := os.WriteFile(deployedFile, []byte("A=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveRepoFirst("versions.conf", filepath.Join(deployed, "no-repo"), deployed, ""); got != deployedFile {
+		t.Errorf("deployed fallback = %q, want %q", got, deployedFile)
+	}
+
+	// Neither repoDir nor dotfilesDir has it -> walk up from startDir.
+	root := t.TempDir()
+	rootFile := filepath.Join(root, "versions.conf")
+	if err := os.WriteFile(rootFile, []byte("A=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(root, "a", "b")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveRepoFirst("versions.conf", "", filepath.Join(root, "nope"), sub); got != rootFile {
+		t.Errorf("walk-up = %q, want %q", got, rootFile)
+	}
+
+	// None of the tiers has it -> "".
+	if got := ResolveRepoFirst("absent.conf", "", t.TempDir(), t.TempDir()); got != "" {
+		t.Errorf("no match = %q, want empty", got)
+	}
+}
+
 func TestRepoDirPrefersDotfilesRepoDir(t *testing.T) {
 	repo := t.TempDir()
 	t.Setenv("DOTFILES_REPO_DIR", repo)
