@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.5](https://github.com/mlorentedev/dotfiles/compare/v0.31.4...v0.31.5) (2026-07-10)
+
+
+### Bug Fixes
+
+* **doctor:** resolve contract/versions repo-first via a shared resolver ([#736](https://github.com/mlorentedev/dotfiles/issues/736)) ([54fe5ca](https://github.com/mlorentedev/dotfiles/commit/54fe5ca75a7f40de02185a08e139be501b152f71))
+* **env:** seed machine.json so update/mem resolve the real checkout ([#732](https://github.com/mlorentedev/dotfiles/issues/732)) ([374d816](https://github.com/mlorentedev/dotfiles/commit/374d81680e87c22101b2d3c06f30d27428845502))
+
 ## [0.31.4](https://github.com/mlorentedev/dotfiles/compare/v0.31.3...v0.31.4) (2026-07-09)
 
 
