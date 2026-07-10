@@ -107,6 +107,11 @@ var versionMatches = []versionedDir{
 // version to the pin: a drift is a WARN, not a FAIL.
 func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Version match (versions.conf)")
+	if cfg.VersionsPath != "" {
+		// Provenance (#697): show which versions.conf the pins came from, so a stale
+		// deployed copy producing nonsensical drift directions is self-diagnosing.
+		rep.Info("versions.conf: " + cfg.VersionsPath)
+	}
 	if sys.GOOS == "windows" {
 		// Windows installs these via winget, not ~/Applications/<tool>-<version>,
 		// so the versioned-dir check does not apply (parity with healthcheck.ps1

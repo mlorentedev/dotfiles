@@ -6,42 +6,47 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // Config holds the resolved locations and parsed manifests a doctor run needs:
-// the deployed dotfiles dir, the version pins from versions.conf, and the path
-// to env-contract.json. It mirrors how healthcheck.sh sourced versions.conf and
-// doctor.sh resolved the contract.
+// the deployed dotfiles dir, the version pins from versions.conf, and the paths
+// to env-contract.json and versions.conf (kept for the provenance line that makes
+// a stale-copy read self-diagnosing). It mirrors how healthcheck.sh sourced
+// versions.conf and doctor.sh resolved the contract.
 type Config struct {
 	DotfilesDir  string
 	Versions     map[string]string
 	ContractPath string
+	VersionsPath string
 }
 
 // loadConfig resolves DOTFILES_DIR (defaulting to $HOME/.dotfiles), then locates
-// versions.conf and env-contract.json under it, falling back to the git repo
-// root walked up from startDir (so `dotf doctor` works from inside a checkout,
-// not just against a deployed ~/.dotfiles). A missing versions.conf is tolerated
-// (version checks skip); a missing contract is reported by the caller.
+// versions.conf and env-contract.json **repo-first** — the same precedence
+// `dotf env generate` uses (env.ResolveRepoFirst) — so doctor and env never read
+// different copies of the same file and hand out contradictory stale/fresh
+// verdicts on a machine whose deploy dir lags the repo (#697). The checkout is
+// resolved like env does (DOTFILES_REPO_DIR when it points at a real dir, else
+// the .git walk-up from startDir). A missing versions.conf is tolerated (version
+// checks skip); a missing contract is reported by the caller.
 func loadConfig(sys *System, startDir string) (*Config, error) {
 	dotfilesDir := sys.env("DOTFILES_DIR", filepath.Join(sys.home(), ".dotfiles"))
 
-	repoRoot, _ := findRepoRoot(startDir)
-
-	cfg := &Config{
-		DotfilesDir: dotfilesDir,
-		Versions:    map[string]string{},
-		ContractPath: firstExisting(
-			filepath.Join(dotfilesDir, "env-contract.json"),
-			joinIf(repoRoot, "env-contract.json"),
-		),
+	repoDir := sys.env("DOTFILES_REPO_DIR", "")
+	if !isDir(repoDir) {
+		repoDir, _ = findRepoRoot(startDir)
 	}
 
-	if vp := firstExisting(
-		filepath.Join(dotfilesDir, "versions.conf"),
-		joinIf(repoRoot, "versions.conf"),
-	); vp != "" {
-		v, err := parseVersionsConf(vp)
+	cfg := &Config{
+		DotfilesDir:  dotfilesDir,
+		Versions:     map[string]string{},
+		ContractPath: envpkg.ResolveRepoFirst("env-contract.json", repoDir, dotfilesDir, startDir),
+		VersionsPath: envpkg.ResolveRepoFirst("versions.conf", repoDir, dotfilesDir, startDir),
+	}
+
+	if cfg.VersionsPath != "" {
+		v, err := parseVersionsConf(cfg.VersionsPath)
 		if err != nil {
 			return nil, err
 		}
@@ -99,23 +104,3 @@ func findRepoRoot(start string) (string, error) {
 	}
 }
 
-// firstExisting returns the first path that exists, or "".
-func firstExisting(paths ...string) string {
-	for _, p := range paths {
-		if p == "" {
-			continue
-		}
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}
-
-// joinIf joins dir/name, or returns "" when dir is empty.
-func joinIf(dir, name string) string {
-	if dir == "" {
-		return ""
-	}
-	return filepath.Join(dir, name)
-}
