@@ -52,17 +52,31 @@ Env:
 	return cmd
 }
 
-// repoForUpdate resolves the dotfiles checkout to fast-forward. The seam
-// (ResolvePath: env → machine.json → contract default, ADR-025) is primary; the
-// literal fallback is the last resort for a bare scheduler env (systemd --user /
-// Task Scheduler) that lacks DOTFILES_REPO_DIR *and* cannot discover the
-// contract. It reproduces the shell twins' '${DOTFILES_REPO_DIR:-$HOME/Projects/
-// dotfiles}' exactly, so self-deploy stays self-contained under a timer.
+// repoForUpdate resolves the dotfiles checkout to fast-forward. The cascade
+// (ResolvePath: env → machine.json → contract default, ADR-025) is primary, but
+// only when it points at a real directory: on a fresh machine with no
+// machine.json the contract default is the phantom ~/Projects/dotfiles, which
+// must not win over a discoverable checkout (#696). It then falls back to the
+// .git walk-up (interactive `dotf update` from inside a checkout), and finally to
+// the literal default for a bare scheduler env (systemd --user / Task Scheduler)
+// with neither a seeded machine.json nor a discoverable repo — reproducing the
+// shell twins' '${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}'.
 func repoForUpdate() string {
-	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" {
+	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" && dirExists(r) {
+		return r
+	}
+	if r := env.RepoDir(); r != "" {
 		return r
 	}
 	return filepath.Join(env.Home(), "Projects", "dotfiles")
+}
+
+// dirExists reports whether p exists and is a directory. Shared by the repo-dir
+// resolvers in this package (update, mem) to reject a cascade value that names a
+// path that is not actually there.
+func dirExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
 }
 
 // gitRunner returns a Git seam that runs `git -C <repo> <args...>` and returns

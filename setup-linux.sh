@@ -1450,6 +1450,16 @@ fi
 # `dotf doctor` run below sees no path drift. Sourcing it here makes this setup
 # shell match what the next login shell will see.
 if command -v dotf >/dev/null 2>&1; then
+    # Seed DOTFILES_REPO_DIR into machine.json to the checkout setup runs from,
+    # BEFORE generating the path file, so the cascade (and the generated paths.sh)
+    # resolve the real repo instead of the phantom contract default — otherwise
+    # `dotf update`/`mem` no-op on a fresh machine (BUG-029/#696). Idempotent and
+    # preserves any other overrides (e.g. VAULT_PATH).
+    if dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR" >/dev/null; then
+        log_success "Seeded DOTFILES_REPO_DIR=$CURRENT_DIR in machine.json"
+    else
+        log_warning "dotf env set DOTFILES_REPO_DIR failed (update/mem fall back to the git walk-up)"
+    fi
     if dotf env generate; then
         log_success "Generated $DOTFILES_DIR/paths.sh (dotf env generate)"
         # shellcheck disable=SC1091

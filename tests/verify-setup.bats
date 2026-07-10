@@ -369,3 +369,33 @@ setup() {
     fi
     [ -z "$output" ]
 }
+
+# =============================================================================
+# Section: machine.json seeding (BUG-029 / #696)
+# =============================================================================
+#
+# Setup seeds ~/.config/dotfiles/machine.json with DOTFILES_REPO_DIR = the
+# checkout it runs from, so the ADR-025 cascade (and the generated paths file)
+# resolve the real repo instead of the phantom contract default. Without the
+# seed, `dotf update` reports "not a git repo: ~/Projects/dotfiles" and exits 0
+# (self-deploy is a silent no-op) and `dotf mem` says "run setup" though setup
+# ran — on every fresh machine. These guard exactly that class.
+
+@test "setup seeds machine.json with DOTFILES_REPO_DIR = the checkout [#696]" {
+    machine="$HOME/.config/dotfiles/machine.json"
+    [ -f "$machine" ]
+    run grep -F "$REPO_DIR" "$machine"
+    if [ "$status" -ne 0 ]; then
+        echo "machine.json did not record the checkout path $REPO_DIR:" >&2
+        cat "$machine" >&2
+    fi
+    [ "$status" -eq 0 ]
+}
+
+@test "dotf env path DOTFILES_REPO_DIR resolves to the real checkout [#696]" {
+    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
+    run dotf env path DOTFILES_REPO_DIR
+    [ "$status" -eq 0 ]
+    [ "$output" = "$REPO_DIR" ]
+    [ -d "$output/.git" ]
+}

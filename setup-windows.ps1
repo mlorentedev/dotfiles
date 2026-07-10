@@ -1631,6 +1631,17 @@ if (Test-Path $contractSource) {
 # it. Guarded on dotf being installed (the Windows dotf install path is still on
 # the WIN queue); until then profile.ps1 uses its bootstrap fallback.
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    # Seed DOTFILES_REPO_DIR into machine.json to the checkout ($DotfilesDir), BEFORE
+    # generating the path file, so the cascade (and the generated paths.ps1) resolve
+    # the real repo instead of the phantom contract default -- otherwise 'dotf
+    # update'/'mem' no-op on a fresh machine (BUG-029/#696). Idempotent; preserves
+    # any other overrides.
+    dotf env set DOTFILES_REPO_DIR $DotfilesDir | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Seeded DOTFILES_REPO_DIR=$DotfilesDir in machine.json"
+    } else {
+        Write-Warn "dotf env set DOTFILES_REPO_DIR failed (update/mem fall back to the git walk-up)"
+    }
     dotf env generate | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Generated $DotfilesDest\paths.ps1 (dotf env generate)"
