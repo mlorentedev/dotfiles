@@ -104,3 +104,32 @@ function Test-FileDrift {
     Write-Host "[FAIL] $DisplayName has drifted from $Source (edit in repo + re-run setup)" -ForegroundColor Red
     return $false
 }
+
+# Get-ClaudeProjectKeyEncoded: the pure encoding of a working directory into
+# Claude Code's per-project key (the directory name under ~/.claude/projects) --
+# every '/', '\' and drive ':' maps to '-' (C:\Users\me\p -> C--Users-me-p). This
+# MUST stay byte-for-byte equal to memlink.ClaudeProjectKey (Go); a Pester guard
+# asserts that parity. It is the fast, no-subprocess path for hot loops (e.g. the
+# filesystem scan in knowledge-crystallize.ps1's decoder) and the offline fallback
+# for Get-ClaudeProjectKey.
+function Get-ClaudeProjectKeyEncoded {
+    param([Parameter(Mandatory)][string]$Path)
+    return $Path.Replace('/', '-').Replace('\', '-').Replace(':', '-')
+}
+
+# Get-ClaudeProjectKey: the authoritative single-shot key for a working directory.
+# The single source of the encoding is the Go layer (memlink.ClaudeProjectKey), so
+# this calls `dotf mem project-key` when dotf is on PATH and only falls back to the
+# pure encoder above when it is not. Centralized here so the Windows twins cannot
+# re-drift from Go the way they did in #689 (which deleted ':' instead of mapping
+# it, producing the wrong single-dash key Claude never reads). Use this for
+# per-project resolution; use Get-ClaudeProjectKeyEncoded inside hot loops.
+function Get-ClaudeProjectKey {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (Get-Command dotf -ErrorAction SilentlyContinue) {
+        $key = (& dotf mem project-key $Path 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -eq 0 -and $key) { return $key.Trim() }
+    }
+    return Get-ClaudeProjectKeyEncoded $Path
+}
