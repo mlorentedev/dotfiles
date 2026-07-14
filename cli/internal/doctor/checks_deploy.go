@@ -347,7 +347,10 @@ func checkAntigravity(sys *System, rep *Report) {
 	}
 
 	agyData := sys.env("AGY_APP_DATA", filepath.Join(sys.home(), ".gemini", "antigravity-cli"))
-	if strings.HasPrefix(agyData, "/") {
+	// filepath.IsAbs, not HasPrefix(_, "/"): an absolute Windows path
+	// (C:\Users\...\.gemini\antigravity-cli) is not '/'-rooted, so the POSIX-only
+	// check false-FAILed it whenever agy was on PATH on Windows (#691 / C20).
+	if filepath.IsAbs(agyData) {
 		rep.Pass("AGY_APP_DATA is absolute")
 	} else {
 		rep.Fail("AGY_APP_DATA is relative or unset: " + agyData)

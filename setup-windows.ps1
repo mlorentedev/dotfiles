@@ -332,6 +332,27 @@ if (Test-Path $packagesSource) {
 }
 
 # ============================================================================
+# 1b2. GUARD-001 MEMORY-SINK HOOKS (#691)
+# ============================================================================
+# Deploy the dispatcher into the ~/.dotfiles mirror and wire core.hooksPath
+# machine-wide, so the guard that rejects MEMORY.md/memory/ outside the vault is
+# active in every repo -- parity with setup-linux.sh (which had no Windows twin).
+# The wired path (Join-Path $DotfilesDest 'git-hooks') equals the Go
+# filepath.Join(cfg.DotfilesDir, "git-hooks") that `dotf doctor` verifies.
+# Non-fatal: doctor verifies + repairs thereafter.
+$installHooksPs1 = Join-Path $PSScriptRoot 'scripts\install-git-hooks.ps1'
+if (Test-Path -LiteralPath $installHooksPs1) {
+    . $installHooksPs1
+    if (Install-GitHooks -Source (Join-Path $PSScriptRoot 'git-hooks') -DotfilesDir $DotfilesDest) {
+        Write-Success "GUARD-001 memory-sink hooks installed"
+    } else {
+        Write-Warn "GUARD-001 hooks install incomplete (continuing; run 'dotf doctor --fix')"
+    }
+} else {
+    Write-Warn "scripts\install-git-hooks.ps1 not found; skipping memory-sink guard install"
+}
+
+# ============================================================================
 # 1c. DEVELOPER TOOLS (via winget)
 # ============================================================================
 
