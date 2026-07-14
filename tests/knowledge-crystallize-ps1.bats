@@ -29,8 +29,13 @@ setup() {
     grep -q '\[switch\]\$All' "$PS1_SCRIPT"
 }
 
-@test "knowledge-crystallize.ps1 has Get-EncodedPath function" {
-    grep -q 'function Get-EncodedPath' "$PS1_SCRIPT"
+@test "knowledge-crystallize.ps1 sources the shared project-key helper (no local encoder)" {
+    # #689: the local Get-EncodedPath re-implemented the key encoding and drifted
+    # (deleting ':' -> the wrong single-dash key). It now sources utils.ps1 and
+    # resolves the key via Get-ClaudeProjectKey (dotf-backed single source).
+    grep -q "utils.ps1" "$PS1_SCRIPT"
+    grep -q 'Get-ClaudeProjectKey' "$PS1_SCRIPT"
+    ! grep -q 'function Get-EncodedPath' "$PS1_SCRIPT"
 }
 
 @test "knowledge-crystallize.ps1 has Get-DecodedPath function" {
@@ -57,8 +62,12 @@ setup() {
     grep -q "ErrorActionPreference = 'Stop'" "$PS1_SCRIPT"
 }
 
-@test "knowledge-crystallize.ps1 path encoding strips colon (Windows convention)" {
-    grep -q "Replace.*':'.*''" "$PS1_SCRIPT"
+@test "knowledge-crystallize.ps1 does not strip the drive colon (the #689 regression)" {
+    # The bug mapped ':' to '' (delete), producing C-Users-... which Claude never
+    # reads. The correct key maps ':' to '-' (C--Users-...). Guard both: the buggy
+    # delete pattern is gone, and the decoder expects the double-dash drive key.
+    ! grep -q "Replace.*':'.*''" "$PS1_SCRIPT"
+    grep -q "A-Za-z\].*--" "$PS1_SCRIPT"
 }
 
 @test "knowledge-crystallize.ps1 handles filesystem scan for dashes in dir names" {
