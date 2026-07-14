@@ -12,6 +12,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/doctor"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
+	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,31 @@ func newMemCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newMemSessionEndCmd())
 	cmd.AddCommand(newMemSessionStartCmd())
+	cmd.AddCommand(newMemProjectKeyCmd())
 	return cmd
+}
+
+// newMemProjectKeyCmd exposes memlink.ClaudeProjectKey as a CLI so the Windows
+// PowerShell twins (setup-windows.ps1, knowledge-crystallize.ps1) obtain the
+// Claude auto-memory key from the one Go implementation instead of re-deriving it
+// — the datum-duplication that drifted and mis-encoded the junction on Windows
+// (BUG-031/#689; #551 fixed only the Go side). Prints the key for <path> and a
+// trailing newline.
+func newMemProjectKeyCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "project-key <path>",
+		Short: "Print Claude Code's per-project auto-memory key for a working directory",
+		Long: "project-key encodes a working directory into Claude Code's per-project key\n" +
+			"(the directory name under ~/.claude/projects) — every '/', '\\' and drive ':'\n" +
+			"maps to '-'. It is the single source the PowerShell setup/crystallize twins\n" +
+			"call so their junction target can never drift from the Go layer again.",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), memlink.ClaudeProjectKey(args[0]))
+			return err
+		},
+	}
 }
 
 // newMemSessionEndCmd wires the SessionEnd hook. Per the resilience contract a

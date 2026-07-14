@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,5 +52,27 @@ func TestMemSessionEnd_MalformedInputExitsZero(t *testing.T) {
 	cmd.SetErr(io.Discard)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("malformed input must still exit 0, got %v", err)
+	}
+}
+
+// TestMemProjectKey exercises `dotf mem project-key <path>`: the single source of
+// the Claude auto-memory encoding that the PowerShell twins call instead of
+// re-implementing it (BUG-031/#689). Output must equal memlink.ClaudeProjectKey.
+func TestMemProjectKey(t *testing.T) {
+	for in, want := range map[string]string{
+		`C:\Users\me\p`: "C--Users-me-p",
+		"/home/me/p":    "-home-me-p",
+	} {
+		cmd := newMemCmd()
+		var out bytes.Buffer
+		cmd.SetArgs([]string{"project-key", in})
+		cmd.SetOut(&out)
+		cmd.SetErr(io.Discard)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("project-key %q: unexpected error %v", in, err)
+		}
+		if got := strings.TrimSpace(out.String()); got != want {
+			t.Errorf("project-key %q = %q, want %q", in, got, want)
+		}
 	}
 }
