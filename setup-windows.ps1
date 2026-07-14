@@ -889,7 +889,10 @@ if (Test-Path $VaultRoot) {
             $cwdPath = $projectDir
         }
 
-        $encodedPath = $cwdPath.Replace('\', '-').Replace(':', '')
+        # Key MUST match Claude Code / memlink.ClaudeProjectKey (':' maps to '-',
+        # not deleted). Get-ClaudeProjectKey (utils.ps1) sources it from `dotf`
+        # so this junction target can never drift from the Go layer again (#689).
+        $encodedPath = Get-ClaudeProjectKey $cwdPath
         $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encodedPath\memory"
         $parentDir = Split-Path $targetDir -Parent
 

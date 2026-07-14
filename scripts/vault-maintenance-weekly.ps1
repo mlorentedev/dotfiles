@@ -17,10 +17,12 @@ $output = @()
 $output += "=== Vault Maintenance: $(Get-Date) ==="
 $output += ""
 
-# Step 1: MEMORY.md maintenance across all projects
-$output += "--- knowledge-crystallize --all ---"
+# Step 1: MEMORY.md maintenance across all projects.
+# -All is a PowerShell [switch]; the POSIX-style "--all" bound positionally to
+# $ProjectDir and left $All false, so this task never fanned out (#689 / C5).
+$output += "--- knowledge-crystallize -All ---"
 try {
-    $crystOutput = & "$ScriptDir\knowledge-crystallize.ps1" --all 2>&1
+    $crystOutput = & "$ScriptDir\knowledge-crystallize.ps1" -All 2>&1
     $output += $crystOutput
 } catch {
     $output += "Error: $_"

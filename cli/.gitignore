@@ -1,1 +1,4 @@
 dist/
+# Local `go build -o bin/...` output — goreleaser publishes from dist/; a manual
+# build (e.g. to exercise a PR binary) must never be committed.
+bin/

@@ -41,6 +41,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Shared PowerShell helpers. Get-ClaudeProjectKey / Get-ClaudeProjectKeyEncoded
+# are the single source of the Claude auto-memory key encoding (they defer to the
+# Go layer via `dotf mem project-key`), so this script cannot re-drift from Claude
+# Code the way it did in #689 (deleting ':' -> the wrong single-dash key).
+. (Join-Path $PSScriptRoot 'utils.ps1')
+
 # ============================================================================
 # HELPERS
 # ============================================================================
@@ -49,22 +55,17 @@ function Write-Info    { param([string]$m) Write-Host "[INFO]    $m" -Foreground
 function Write-Success { param([string]$m) Write-Host "[SUCCESS] $m" -ForegroundColor Green }
 function Write-Warn    { param([string]$m) Write-Host "[WARNING] $m" -ForegroundColor Yellow }
 
-# Encode a path the same way Claude Code does on Windows:
-# Replace all '\' with '-' and strip the ':' after drive letters
-# e.g. C:\Users\manu\Projects\dotfiles -> C-Users-manu-Projects-dotfiles
-function Get-EncodedPath {
-    param([string]$Path)
-    return $Path.Replace('\', '-').Replace(':', '')
-}
-
-# Decode a Claude Code encoded path back to a real filesystem path.
-# Two-stage: drive-letter heuristic first, then filesystem scan.
+# Decode a Claude Code encoded key back to a real filesystem path.
+# Two-stage: drive-letter heuristic first, then filesystem scan. The key format is
+# the double-dash drive encoding (C:\... -> C--...), matching Get-ClaudeProjectKey.
 function Get-DecodedPath {
     param([string]$Encoded)
 
-    # Stage 1: Drive-letter heuristic
-    # Pattern: single uppercase letter + '-Users-' or '-' -> C:\...
-    if ($Encoded -match '^([A-Za-z])-(.+)$') {
+    # Stage 1: Drive-letter heuristic.
+    # A key from a Windows path starts with '<drive>--' because the drive ':' and
+    # its trailing '\' both map to '-' (C:\Users -> C--Users). Capture the drive,
+    # then turn the remaining '-' back into path separators.
+    if ($Encoded -match '^([A-Za-z])--(.+)$') {
         $drive    = $Matches[1].ToUpper()
         $rest     = $Matches[2].Replace('-', '\')
         $candidate = "${drive}:\${rest}"
@@ -73,20 +74,21 @@ function Get-DecodedPath {
         }
     }
 
-    # Stage 2: Filesystem scan under USERPROFILE (handles dashes in dir names)
+    # Stage 2: Filesystem scan under USERPROFILE (handles dashes in dir names).
+    # Uses the pure encoder (no per-directory subprocess) for the hot comparison.
     $found = Get-ChildItem -Path $env:USERPROFILE -Recurse -Directory -Depth 4 `
         -ErrorAction SilentlyContinue |
-        Where-Object { (Get-EncodedPath $_.FullName) -eq $Encoded } |
+        Where-Object { (Get-ClaudeProjectKeyEncoded $_.FullName) -eq $Encoded } |
         Select-Object -First 1
 
     if ($found) { return $found.FullName }
     return $null
 }
 
-# Find the MEMORY.md path for a given project directory
+# Find the MEMORY.md path for a given project directory.
 function Get-MemoryFilePath {
     param([string]$ProjectPath)
-    $encoded = Get-EncodedPath $ProjectPath
+    $encoded = Get-ClaudeProjectKey $ProjectPath
     return Join-Path $env:USERPROFILE ".claude\projects\$encoded\memory\MEMORY.md"
 }
 
@@ -251,7 +253,7 @@ if ($All) {
 
     $memoryFile = Get-MemoryFilePath -ProjectPath $ProjectDir
     if (-not (Test-Path $memoryFile)) {
-        $encoded = Get-EncodedPath $ProjectDir
+        $encoded = Get-ClaudeProjectKey $ProjectDir
         Write-Warn "No MEMORY.md found for $ProjectDir"
         Write-Warn "Expected: $env:USERPROFILE\.claude\projects\$encoded\memory\MEMORY.md"
         Write-Warn "Run Claude Code in this project first to initialize the memory directory."
