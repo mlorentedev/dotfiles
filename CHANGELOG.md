@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.6](https://github.com/mlorentedev/dotfiles/compare/v0.31.5...v0.31.6) (2026-07-14)
+
+
+### Bug Fixes
+
+* **doctor:** install GUARD-001 memory-sink hooks on Windows + fix agy abs-path check ([#741](https://github.com/mlorentedev/dotfiles/issues/741)) ([2b58ebf](https://github.com/mlorentedev/dotfiles/commit/2b58ebf9a133e7383ba8213841101c6e4c22ffe5)), closes [#691](https://github.com/mlorentedev/dotfiles/issues/691)
+* **mem:** own the Claude project-key encoding in Go so the Windows twins can't drift ([#739](https://github.com/mlorentedev/dotfiles/issues/739)) ([c4f1a7c](https://github.com/mlorentedev/dotfiles/commit/c4f1a7c4427f13a8e31f5e4bdece7b03bf134db3))
+
 ## [0.31.5](https://github.com/mlorentedev/dotfiles/compare/v0.31.4...v0.31.5) (2026-07-10)
 
 
