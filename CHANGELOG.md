@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.7](https://github.com/mlorentedev/dotfiles/compare/v0.31.6...v0.31.7) (2026-08-05)
+
+
+### Bug Fixes
+
+* **shell:** move the gemini prompt helper out of the git-plugin alias namespace ([#744](https://github.com/mlorentedev/dotfiles/issues/744)) ([f7232d3](https://github.com/mlorentedev/dotfiles/commit/f7232d31413ac99bdd313ab3fea0e7e66bc465e3))
+
 ## [0.31.6](https://github.com/mlorentedev/dotfiles/compare/v0.31.5...v0.31.6) (2026-07-14)
 
 
