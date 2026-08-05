@@ -137,9 +137,9 @@ alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
-# Gemini saved-prompt helper `gpr` lives in .zsh/functions.sh (shared bash/zsh,
-# sourced below). It was renamed from `gp` to stop colliding with the
-# `gp=git pull` git alias.
+# Gemini saved-prompt helper `agyp` lives in .zsh/functions.sh (shared bash/zsh,
+# sourced below). Named out of the `g*` namespace, which oh-my-zsh's git plugin
+# owns: the earlier `gp` and `gpr` names both collided with its aliases.
 
 # qq / qf: bash quick-question wrappers. `_qq_call` lives in .zsh/functions.sh
 # (REFACTOR-010, shared with zsh). Bash leaves `foo?` literal when no match

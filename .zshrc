@@ -117,9 +117,9 @@ alias g='agy'
 alias c='claude'
 alias obsidian='obsidian --no-sandbox'
 
-# Gemini saved-prompt helper `gpr` lives in .zsh/functions.sh (shared bash/zsh,
-# sourced below). Renamed from `gp` so it no longer collides with the
-# `gp=git pull` alias from aliases.zsh (the alias won, leaving the helper dead).
+# Gemini saved-prompt helper `agyp` lives in .zsh/functions.sh (shared bash/zsh,
+# sourced below). Named out of the `g*` namespace, which oh-my-zsh's git plugin
+# owns: the earlier `gp` and `gpr` names both collided with its aliases.
 
 # Claude Code - use slash commands inside session:
 #   claude
