@@ -158,18 +158,26 @@ oc() { opencode --pure "$@"; }
 ocfull() { opencode "$@"; }
 
 # ---------------------------------------------------------------------------
-# gpr: run a saved Gemini/AGY prompt. Shared bash/zsh (REFACTOR-010 style).
-# Was duplicated as `gp` in both .bashrc and .zshrc, where it COLLIDED with the
-# `gp=git pull` alias (in zsh the alias won at call time, so the helper was
-# unreachable). Renamed to `gpr` and centralized here: one definition, no
-# collision.
-#   gpr <prompt-name> [extra args]   -> ~/.gemini/prompts/<prompt-name>.md
-gpr() {
-    [ -z "${1:-}" ] && { printf 'usage: gpr <prompt-name> [args]\n' >&2; return 1; }
+# agyp: run a saved Gemini/AGY prompt. Shared bash/zsh (REFACTOR-010 style).
+#
+# Namespace history — this helper collided with oh-my-zsh's `git` plugin TWICE:
+#   `gp`  -> shadowed by `alias gp='git push'`      (silent: alias wins at call time)
+#   `gpr` -> shadowed by `alias gpr='git pull --rebase'`
+# The second one was worse than a shadow: zsh expands aliases at PARSE time, so
+# `gpr() {` parsed as `git pull --rebase () {` -> a parse error that aborted the
+# REST of this file, silently dropping the utils.sh load below in every zsh
+# session (bash was unaffected: the git plugin is zsh-only).
+#
+# The `g*` namespace belongs to that plugin (~150 aliases) — do not re-enter it.
+# `agyp` = the `agy` tool + "prompt", outside the minefield. Enforced by
+# tests/shell-alias-collision.bats, which fails CI on any future collision.
+#   agyp <prompt-name> [extra args]   -> ~/.gemini/prompts/<prompt-name>.md
+agyp() {
+    [ -z "${1:-}" ] && { printf 'usage: agyp <prompt-name> [args]\n' >&2; return 1; }
     local prompt_file="$HOME/.gemini/prompts/$1.md"
     shift
     if [ ! -f "$prompt_file" ]; then
-        printf 'gpr: prompt not found at %s\n' "$prompt_file" >&2
+        printf 'agyp: prompt not found at %s\n' "$prompt_file" >&2
         return 1
     fi
     agy -i "$(< "$prompt_file")"$'\n\n'"$*"
