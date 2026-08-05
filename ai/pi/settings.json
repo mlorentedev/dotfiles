@@ -6,6 +6,7 @@
     "nan/qwen3.6",
     "nan/gemma4",
     "nan/deepseek-v4-flash",
+    "nan/deepseek-v4-flash-0731",
     "nan/mimo-v2.5",
     "openrouter/qwen/qwen3-coder:free",
     "openrouter/moonshotai/kimi-k2.6:free",
