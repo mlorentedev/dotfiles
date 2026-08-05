@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.0](https://github.com/mlorentedev/dotfiles/compare/v0.31.7...v0.32.0) (2026-08-05)
+
+
+### Features
+
+* **pi:** add the deepseek-v4-flash-0731 model and cross-file config guards ([#749](https://github.com/mlorentedev/dotfiles/issues/749)) ([d2ded93](https://github.com/mlorentedev/dotfiles/commit/d2ded93dec2e9688965a74bdda1a47aeba318a4b))
+
 ## [0.31.7](https://github.com/mlorentedev/dotfiles/compare/v0.31.6...v0.31.7) (2026-08-05)
 
 
