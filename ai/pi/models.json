@@ -64,6 +64,24 @@
           "maxTokens": 65536
         },
         {
+          "id": "deepseek-v4-flash-0731",
+          "name": "deepseek 0731 (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 1048576,
+          "maxTokens": 65536
+        },
+        {
           "id": "mimo-v2.5",
           "name": "mimo (NaN)",
           "api": "openai-completions",
