@@ -1,12 +1,13 @@
 #!/usr/bin/env bats
 # Guard (incident->guard, AI-025): the pi coding agent config carries no
 # plaintext secret in git, and the curated model set stays consistent with
-# opencode (NaN + free + non-big-3 paid OpenRouter).
+# its own README (NaN + non-big-3 paid OpenRouter).
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PI_MODELS="$DOTFILES_DIR/ai/pi/models.json"
     export PI_SETTINGS="$DOTFILES_DIR/ai/pi/settings.json"
+    export PI_README="$DOTFILES_DIR/ai/pi/README.md"
 }
 
 @test "ai/pi/models.json exists" {
@@ -83,6 +84,44 @@ setup() {
     dupes="$(jq -r '.. | objects | select(has("id") and has("name")) | .name' "$PI_MODELS" \
         | LC_ALL=C sort | uniq -d)"
     [ -z "$dupes" ] || { echo "duplicate model display names: $dupes"; return 1; }
+}
+
+# --- Config vs its own documentation -------------------------------------
+# Same class one level up (2026-08-05): dropping the `:free` OpenRouter tier
+# from enabledModels left ai/pi/README.md advertising three models the picker
+# no longer offers -- and exposed two older drifts nobody had noticed, both
+# from edits that changed the config without reading the doc beside it. A
+# reader trusts the README; nothing made the README answer to the config.
+
+@test "ai/pi/README.md model list matches settings.json enabledModels" {
+    command -v jq >/dev/null || skip "jq not available"
+    # The tier bullets under "## Model environment" are the documented set:
+    # take every backticked token from the "- **Tier**: `a`, `b`" lines.
+    doc="$(sed -n '/^## Model environment/,/^## /p' "$PI_README" \
+        | grep '^- \*\*' | grep -o '`[^`]*`' | tr -d '`' | LC_ALL=C sort -u)"
+    # enabledModels are provider-qualified (`nan/x`, `openrouter/vendor/y`)
+    # while the README names the bare id, so compare on the last path segment.
+    cfg="$(jq -r '.enabledModels[]' "$PI_SETTINGS" | sed 's|.*/||' | LC_ALL=C sort -u)"
+    # Set equality, not containment: one-directional would have missed the
+    # model added to the config in #749 and never listed in the README.
+    [ "$doc" = "$cfg" ] || {
+        echo "README model list and settings.json enabledModels disagree (< README, > config):"
+        diff <(printf '%s\n' "$doc") <(printf '%s\n' "$cfg") | sed 's/^/  /'
+        return 1
+    }
+}
+
+@test "ai/pi/README.md documents the actual default model" {
+    command -v jq >/dev/null || skip "jq not available"
+    # The README advertised `nan/mimo-v2.5` while the config had shipped
+    # `qwen3.6` for who knows how long: the default is the single value a new
+    # user meets first, and it was the one the doc got wrong.
+    want="$(jq -r '.defaultProvider + "/" + .defaultModel' "$PI_SETTINGS")"
+    got="$(grep -m1 '^Default: ' "$PI_README" | grep -o '`[^`]*`' | head -1 | tr -d '`')"
+    [ "$got" = "$want" ] || {
+        echo "README Default: says '$got', settings.json says '$want'"
+        return 1
+    }
 }
 
 # CLI-018: the "missing age identity is optional for pi models.json" assertion
