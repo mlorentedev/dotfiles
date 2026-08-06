@@ -1241,14 +1241,18 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     }
 }
 
+# settings.json is SEED-IF-MISSING (Linux parity: setup-linux.sh pi settings
+# block). pi rewrites this file at runtime -- lastChangelogVersion, theme, the
+# model picked in the TUI -- so a "copy unless identical" check can never match
+# and would reset those on every setup run.
 $piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
 $piSettingsDst = Join-Path $piAgentDir 'settings.json'
 if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
-    if ((Test-Path -LiteralPath $piSettingsDst) -and (-not (Compare-Object (Get-Content $piSettingsSrc) (Get-Content $piSettingsDst)))) {
-        Write-Info "pi settings.json already in sync"
+    if (Test-Path -LiteralPath $piSettingsDst) {
+        Write-Info "pi settings.json present, preserving local edits"
     } else {
-        Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst -Force
-        Write-Success "Deployed pi settings.json to $piSettingsDst"
+        Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst
+        Write-Success "Seeded pi settings.json at $piSettingsDst"
     }
 }
 

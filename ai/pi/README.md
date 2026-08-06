@@ -14,10 +14,13 @@ SSOT (see root `AGENTS.md`).
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
 
-Because `settings.json` is seed-if-missing, editing it **here** changes only what a fresh
-machine gets. To adopt a change on a machine that already has `~/.pi/agent/settings.json`,
-edit that file too (or delete it and re-run setup, losing the runtime keys pi wrote there:
-`lastChangelogVersion`, `theme`, and any model picked in the TUI).
+`settings.json` is the one deployed config pi itself rewrites — `lastChangelogVersion`,
+`theme`, the model picked in the TUI — so setup seeds it and then leaves it alone. Editing
+it **here** therefore changes only what a *fresh* machine gets: to adopt a change on a
+machine that already has `~/.pi/agent/settings.json`, edit that file too, or delete it and
+re-run setup to take the committed defaults wholesale. `tests/pi-config.bats` pins that
+contract in both setup scripts — until #754 they compared source against destination and,
+because the deployed file always differs, overwrote it on every run.
 
 ## Install
 
