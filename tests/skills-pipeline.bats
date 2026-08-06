@@ -101,7 +101,7 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
 @test "AC1 smoke: no deployed skill path is a symlink" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
-    [ -z "$(find "$FAKEHOME/.claude/skills" "$FAKEHOME/.config/opencode/commands" "$FAKEHOME/.gemini/skills" "$FAKEHOME/.gemini/prompts" -type l 2>/dev/null)" ]
+    [ -z "$(find "$FAKEHOME/.claude/skills" "$FAKEHOME/.config/opencode/commands" "$FAKEHOME/.gemini/skills" "$FAKEHOME/.gemini/prompts" "$FAKEHOME/.copilot/skills" -type l 2>/dev/null)" ]
 }
 
 @test "AC6 smoke: the copilot catalog lists /spec but not the Claude-only skill" {
@@ -109,4 +109,34 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
     [ "$status" -eq 0 ]
     grep -qF -- '**spec**' "$FAKEHOME/.copilot/copilot-instructions.md"
     ! grep -q 'creating-skills' "$FAKEHOME/.copilot/copilot-instructions.md"
+}
+
+@test "HARNESS-051: copilot gets native /spec and /handoff skills" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ -f "$FAKEHOME/.copilot/skills/spec/SKILL.md" ]
+    grep -q '^name: spec' "$FAKEHOME/.copilot/skills/spec/SKILL.md"
+    [ -f "$FAKEHOME/.copilot/skills/handoff/SKILL.md" ]
+    grep -q '^name: handoff' "$FAKEHOME/.copilot/skills/handoff/SKILL.md"
+    [ ! -L "$FAKEHOME/.copilot/skills/spec" ]
+    [ ! -L "$FAKEHOME/.copilot/skills/handoff" ]
+}
+
+@test "HARNESS-051: copilot target filtering and auxiliary files are preserved" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ ! -d "$FAKEHOME/.copilot/skills/creating-skills" ]
+    [ -f "$FAKEHOME/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
+}
+
+@test "HARNESS-051: copilot deploy prunes only generated stale skills" {
+    mkdir -p "$FAKEHOME/.copilot/skills/user-skill" "$FAKEHOME/.copilot/skills/stale-skill"
+    printf -- '---\nname: user-skill\ndescription: user managed\n---\n' \
+        > "$FAKEHOME/.copilot/skills/user-skill/SKILL.md"
+    printf -- '---\ngenerated: true\nname: stale-skill\ndescription: stale generated\n---\n' \
+        > "$FAKEHOME/.copilot/skills/stale-skill/SKILL.md"
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ -f "$FAKEHOME/.copilot/skills/user-skill/SKILL.md" ]
+    [ ! -d "$FAKEHOME/.copilot/skills/stale-skill" ]
 }

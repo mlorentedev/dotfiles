@@ -48,3 +48,10 @@ teardown() {
     grep -qE '^> .*AGENTS\.md' "$AI_COPILOT"
     grep -qE '^> .*AGENTS\.md' "$GH_COPILOT"
 }
+
+@test "copilot-instructions: both describe native Agent Skills discovery" {
+    grep -qF '~/.copilot/skills/' "$AI_COPILOT"
+    grep -qF '~/.copilot/skills/' "$GH_COPILOT"
+    ! grep -qF 'Copilot has no per-skill discovery mechanism' "$AI_COPILOT"
+    ! grep -qF 'Copilot has no per-skill discovery mechanism' "$GH_COPILOT"
+}
