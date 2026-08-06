@@ -95,13 +95,26 @@ setup() {
 
 @test "ai/pi/README.md model list matches settings.json enabledModels" {
     command -v jq >/dev/null || skip "jq not available"
-    # The tier bullets under "## Model environment" are the documented set:
-    # take every backticked token from the "- **Tier**: `a`, `b`" lines.
-    doc="$(sed -n '/^## Model environment/,/^## /p' "$PI_README" \
-        | grep '^- \*\*' | grep -o '`[^`]*`' | tr -d '`' | LC_ALL=C sort -u)"
-    # enabledModels are provider-qualified (`nan/x`, `openrouter/vendor/y`)
-    # while the README names the bare id, so compare on the last path segment.
-    cfg="$(jq -r '.enabledModels[]' "$PI_SETTINGS" | sed 's|.*/||' | LC_ALL=C sort -u)"
+    # Both sides normalise to `provider/leaf`. Comparing bare leaf ids would
+    # make `nan/foo` equal `openrouter/vendor/foo`, so a model documented under
+    # the wrong tier would pass; carrying the provider keeps the tiers honest.
+    # A bullet whose label is neither known tier yields `?/...`, which cannot
+    # match anything -- a new tier has to teach this test about itself.
+    doc="$(sed -n '/^## Model environment/,/^## /p' "$PI_README" | awk '
+        /^- \*\*/ {
+            p = "?"
+            if ($0 ~ /^- \*\*NaN\*\*/) p = "nan"
+            else if ($0 ~ /^- \*\*Paid OpenRouter\*\*/) p = "openrouter"
+            line = $0
+            while (match(line, /`[^`]*`/)) {
+                print p "/" substr(line, RSTART + 1, RLENGTH - 2)
+                line = substr(line, RSTART + RLENGTH)
+            }
+        }' | LC_ALL=C sort -u)"
+    # `openrouter/deepseek/deepseek-v4-pro` -> `openrouter/deepseek-v4-pro`:
+    # the README names the bare id under its tier, not the vendor path.
+    cfg="$(jq -r '.enabledModels[] | split("/") | .[0] + "/" + .[-1]' "$PI_SETTINGS" \
+        | LC_ALL=C sort -u)"
     # Set equality, not containment: one-directional would have missed the
     # model added to the config in #749 and never listed in the README.
     [ "$doc" = "$cfg" ] || {
@@ -122,6 +135,39 @@ setup() {
         echo "README Default: says '$got', settings.json says '$want'"
         return 1
     }
+}
+
+# --- The deploy contract the docs promise ---------------------------------
+# Both setup scripts shipped the neighbouring "copy unless byte-identical"
+# shape for settings.json. pi rewrites that file at runtime and the committed
+# copy is forbidden to carry lastChangelogVersion (asserted above), so the
+# comparison could never match once pi had run: the "already in sync" branch
+# was dead code and every setup run reset the user's theme and default model,
+# while README and tests had described it as seed-if-missing since AI-025.
+# Source-level assertions, matching tests/harness-refresh-announce.bats -- the
+# integration container seeds a fresh HOME, so it cannot observe the second run.
+
+@test "setup-linux.sh seeds pi settings.json only when absent" {
+    block="$(sed -n '/^PI_SETTINGS_SRC=/,/^fi$/p' "$DOTFILES_DIR/setup-linux.sh")"
+    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
+    printf '%s\n' "$block" | grep -qF 'if [ -f "$PI_SETTINGS_DST" ]' \
+        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
+    printf '%s\n' "$block" | grep -qF 'cmp -s "$PI_SETTINGS_SRC"' \
+        && { echo "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"; return 1; }
+    return 0
+}
+
+@test "setup-windows.ps1 seeds pi settings.json only when absent (Linux parity)" {
+    block="$(sed -n '/^\$piSettingsSrc = /,/^}$/p' "$DOTFILES_DIR/setup-windows.ps1")"
+    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
+    printf '%s\n' "$block" | grep -qF 'if (Test-Path -LiteralPath $piSettingsDst)' \
+        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
+    printf '%s\n' "$block" | grep -qF 'Compare-Object' \
+        && { echo "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"; return 1; }
+    # -Force would overwrite a file the guard is meant to protect.
+    printf '%s\n' "$block" | grep -qF '-Force' \
+        && { echo "Copy-Item still passes -Force"; return 1; }
+    return 0
 }
 
 # CLI-018: the "missing age identity is optional for pi models.json" assertion
