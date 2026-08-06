@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1](https://github.com/mlorentedev/dotfiles/compare/v0.32.0...v0.32.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **pi:** seed settings.json instead of overwriting it on every setup run ([#756](https://github.com/mlorentedev/dotfiles/issues/756)) ([aae1376](https://github.com/mlorentedev/dotfiles/commit/aae13761ad5c25ebe68e71a1dd4e4e34451706b3))
+
 ## [0.32.0](https://github.com/mlorentedev/dotfiles/compare/v0.31.7...v0.32.0) (2026-08-05)
 
 
