@@ -59,6 +59,49 @@ function Get-DotfVersion {
     return $null
 }
 
+# Place $Source at $Target, tolerating a *live* dotf. Windows locks a running
+# image: it refuses to overwrite or delete dotf.exe while any dotf process is
+# live, but it *does* allow renaming one. So stage the new binary beside the
+# target, park the live one, then swap — the analogue of install-dotf.sh's
+# atomic mv (BUG-037). Throws on failure, having restored the previous binary.
+function Set-DotfBinary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Target
+    )
+
+    # Self-contained: callers other than Install-Dotf (Pester) must get the same
+    # terminating-error behaviour, or the rollback below would never fire.
+    $ErrorActionPreference = 'Stop'
+
+    $staged = "$Target.new"
+    $parked = "$Target.old"
+
+    # A park left behind by an earlier upgrade (its image was still locked then)
+    # would otherwise block this one.
+    Remove-Item -LiteralPath $parked -Force -ErrorAction SilentlyContinue
+    Copy-Item -LiteralPath $Source -Destination $staged -Force
+
+    if (Test-Path -LiteralPath $Target) {
+        Move-Item -LiteralPath $Target -Destination $parked -Force
+    }
+    try {
+        Move-Item -LiteralPath $staged -Destination $Target -Force
+    } catch {
+        # Never leave the user without a dotf: put the previous one back.
+        if (Test-Path -LiteralPath $parked) {
+            Move-Item -LiteralPath $parked -Destination $Target -Force
+        }
+        Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue
+        throw
+    }
+
+    # Best effort: a park still locked by the outgoing process is cleared by the
+    # next upgrade, so a failure here must not fail the install.
+    Remove-Item -LiteralPath $parked -Force -ErrorAction SilentlyContinue
+}
+
 # Idempotently install the pinned dotf release. No-op when the pinned version is
 # already on PATH; converges on drift. Returns $true on success, $false on any
 # download/verify error (no binary left in Dest). Never throws — setup wires it
@@ -126,8 +169,9 @@ function Install-Dotf {
             throw "dotf.exe not found in $artifact"
         }
         New-Item -ItemType Directory -Force -Path $Dest | Out-Null
-        Copy-Item -Path $exe -Destination (Join-Path $Dest 'dotf.exe') -Force
-        Write-Host "dotf $Version installed to $Dest\dotf.exe"
+        $target = Join-Path $Dest 'dotf.exe'
+        Set-DotfBinary -Source $exe -Target $target
+        Write-Host "dotf $Version installed to $target"
         return $true
     } catch {
         Write-Warning "install-dotf: $($_.Exception.Message)"

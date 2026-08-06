@@ -107,9 +107,20 @@ install_dotf() {
 
     if [ "$_dotf_rc" -eq 0 ]; then
         ensure_directory "$dest"
-        if cp "$_dotf_tmp/dotf" "$dest/dotf" && chmod 0755 "$dest/dotf"; then
+        # Stage beside the target, then rename into place. Writing *onto* a live
+        # binary fails with ETXTBSY (BUG-037), which broke the upgrade path in
+        # exactly the case dotf is in daily use — the long-lived
+        # `dotf secrets run -- <agent>` wrappers hold it open. rename(2) has no
+        # such restriction, is atomic, and leaves any already-running process on
+        # its own inode. Staging inside $dest keeps it on one filesystem, which
+        # is what makes the rename atomic rather than a copy.
+        _dotf_staged="$dest/.dotf.new.$$"
+        if cp "$_dotf_tmp/dotf" "$_dotf_staged" &&
+            chmod 0755 "$_dotf_staged" &&
+            mv -f "$_dotf_staged" "$dest/dotf"; then
             log_success "dotf $version installed to $dest/dotf"
         else
+            rm -f "$_dotf_staged"
             log_error "install_dotf: failed to place binary in $dest"
             _dotf_rc=1
         fi
