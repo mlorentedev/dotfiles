@@ -14,6 +14,11 @@ SSOT (see root `AGENTS.md`).
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
 
+Because `settings.json` is seed-if-missing, editing it **here** changes only what a fresh
+machine gets. To adopt a change on a machine that already has `~/.pi/agent/settings.json`,
+edit that file too (or delete it and re-run setup, losing the runtime keys pi wrote there:
+`lastChangelogVersion`, `theme`, and any model picked in the TUI).
+
 ## Install
 
 Pinned via `PI_VERSION` in `versions.conf`, installed by `setup-{linux,windows}` (guarded on `npm`):
@@ -24,13 +29,17 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 ## Model environment
 
-Curated for a consistent free + NaN environment, shared with opencode's picker:
+Curated NaN-first: NaN covers the free tier, with three paid OpenRouter models behind it.
 
-- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `mimo-v2.5`
-- **Free OpenRouter** (most powerful, rate-limited): `qwen3-coder:free`, `kimi-k2.6:free`, `nemotron-3-ultra-550b-a55b:free`
+- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `deepseek-v4-flash-0731`, `mimo-v2.5`
 - **Paid OpenRouter** (3, none from OpenAI/Google/Anthropic): `deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`
 
-Default: `nan/mimo-v2.5` (1M context), thinking level `high`. Change in `settings.json`.
+pi's picker omits the rate-limited `:free` OpenRouter tier that `ai/opencode/opencode.jsonc`
+still lists — the two sets are curated independently. `tests/pi-config.bats` asserts this list
+stays equal to `settings.json`'s `enabledModels`.
+
+Default: `nan/qwen3.6`, thinking level `high`. Change in `settings.json`. (Per-model context
+windows live in `models.json` — the one place they cannot drift from.)
 
 ## Secret
 
