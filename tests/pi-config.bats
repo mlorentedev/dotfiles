@@ -147,27 +147,46 @@ setup() {
 # Source-level assertions, matching tests/harness-refresh-announce.bats -- the
 # integration container seeds a fresh HOME, so it cannot observe the second run.
 
-@test "setup-linux.sh seeds pi settings.json only when absent" {
-    block="$(sed -n '/^PI_SETTINGS_SRC=/,/^fi$/p' "$DOTFILES_DIR/setup-linux.sh")"
-    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
-    printf '%s\n' "$block" | grep -qF 'if [ -f "$PI_SETTINGS_DST" ]' \
-        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
-    printf '%s\n' "$block" | grep -qF 'cmp -s "$PI_SETTINGS_SRC"' \
-        && { echo "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"; return 1; }
+# extract_block <file> <start-regex> <end-regex>: the deploy block, CR stripped.
+# setup-windows.ps1 is CRLF (.gitattributes), so an end anchor like /^}$/ never
+# matches -- sed then prints to EOF and the negative assertions below would
+# silently cover the whole rest of the file instead of this block. The caller
+# checks the size for exactly that reason.
+extract_block() {
+    tr -d '\r' < "$1" | sed -n "/$2/,/$3/p"
+}
+
+# assert_absent <needle> <message>: grep for a literal that may start with `-`.
+# `grep -qF '-Force'` parses the pattern as options (-F -o -r -c -e), leaves -e
+# without its argument and exits 2, so the guard never fires -- a check that
+# only knows how to pass. `-e` states that the next word is the pattern.
+assert_absent() {
+    printf '%s\n' "$block" | grep -qF -e "$1" && { echo "$2"; return 1; }
     return 0
 }
 
-@test "setup-windows.ps1 seeds pi settings.json only when absent (Linux parity)" {
-    block="$(sed -n '/^\$piSettingsSrc = /,/^}$/p' "$DOTFILES_DIR/setup-windows.ps1")"
+@test "setup-linux.sh seeds pi settings.json only when absent" {
+    block="$(extract_block "$DOTFILES_DIR/setup-linux.sh" '^PI_SETTINGS_SRC=' '^fi$')"
     [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
-    printf '%s\n' "$block" | grep -qF 'if (Test-Path -LiteralPath $piSettingsDst)' \
+    [ "$(printf '%s\n' "$block" | wc -l)" -le 20 ] \
+        || { echo "range never closed -- assertions would cover unrelated code"; return 1; }
+    printf '%s\n' "$block" | grep -qF -e 'if [ -f "$PI_SETTINGS_DST" ]' \
         || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
-    printf '%s\n' "$block" | grep -qF 'Compare-Object' \
-        && { echo "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"; return 1; }
-    # -Force would overwrite a file the guard is meant to protect.
-    printf '%s\n' "$block" | grep -qF '-Force' \
-        && { echo "Copy-Item still passes -Force"; return 1; }
-    return 0
+    assert_absent 'cmp -s "$PI_SETTINGS_SRC"' \
+        "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"
+}
+
+@test "setup-windows.ps1 seeds pi settings.json only when absent (Linux parity)" {
+    block="$(extract_block "$DOTFILES_DIR/setup-windows.ps1" '^\$piSettingsSrc = ' '^}$')"
+    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
+    [ "$(printf '%s\n' "$block" | wc -l)" -le 20 ] \
+        || { echo "range never closed -- assertions would cover unrelated code"; return 1; }
+    printf '%s\n' "$block" | grep -qF -e 'if (Test-Path -LiteralPath $piSettingsDst)' \
+        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
+    assert_absent 'Compare-Object' \
+        "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"
+    # -Force would overwrite the very file the guard exists to protect.
+    assert_absent '-Force' "Copy-Item still passes -Force"
 }
 
 # CLI-018: the "missing age identity is optional for pi models.json" assertion
