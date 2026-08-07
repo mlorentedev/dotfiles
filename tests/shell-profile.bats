@@ -4,6 +4,17 @@
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     REPO_ROOT="$BATS_TEST_DIRNAME/.."
+    STUB_DIR="$BATS_TEST_TMPDIR/stub"
+}
+
+# Put a fake `bash` first on PATH that exits with $1, modelling a real
+# interactive shell: `bash -i -c exit` inherits the status of the last command
+# the profile ran, so a non-zero exit is ordinary, not a malfunction.
+stub_shell_exiting() {
+    mkdir -p "$STUB_DIR"
+    printf '#!/bin/sh\nexit %s\n' "$1" > "$STUB_DIR/bash"
+    chmod +x "$STUB_DIR/bash"
+    PATH="$STUB_DIR:$PATH"
 }
 
 @test "shell-profile.sh --help shows usage" {
@@ -48,6 +59,32 @@ setup() {
     local run_count
     run_count=$(printf '%s' "$output" | grep -c "^  run:" || true)
     [[ "$run_count" -eq 4 ]]
+}
+
+@test "time-only mode still reports stats when the shell exits non-zero" {
+    # BUG-035: the script runs under `set -euo pipefail`, so the profiled
+    # shell's non-zero exit propagated through the pipeline and aborted the run
+    # before any stats were printed. A loaded interactive profile exits non-zero
+    # routinely, which is why this reproduced on a real machine but never in CI,
+    # where a bare `bash -i -c exit` happens to return 0.
+    stub_shell_exiting 1
+
+    run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --runs 2
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"min:"* ]]
+    [[ "$output" == *"median:"* ]]
+    [[ "$output" == *"mean:"* ]]
+    [[ "$output" == *"max:"* ]]
+}
+
+@test "detail mode survives a shell that exits non-zero" {
+    # Same root cause on the --detail path: the profiling run is the last
+    # command before `exit 0`, so `set -e` swallowed the success exit too.
+    stub_shell_exiting 1
+
+    run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --detail
+    [[ $status -eq 0 ]]
+    [[ "$output" == *"Detail profile"* ]]
 }
 
 @test ".bashrc has DOTFILES_PROFILE opt-in hook" {

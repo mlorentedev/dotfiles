@@ -14,6 +14,14 @@ SSOT (see root `AGENTS.md`).
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
 
+`settings.json` is the one deployed config pi itself rewrites — `lastChangelogVersion`,
+`theme`, the model picked in the TUI — so setup seeds it and then leaves it alone. Editing
+it **here** therefore changes only what a *fresh* machine gets: to adopt a change on a
+machine that already has `~/.pi/agent/settings.json`, edit that file too, or delete it and
+re-run setup to take the committed defaults wholesale. `tests/pi-config.bats` pins that
+contract in both setup scripts — until #754 they compared source against destination and,
+because the deployed file always differs, overwrote it on every run.
+
 ## Install
 
 Pinned via `PI_VERSION` in `versions.conf`, installed by `setup-{linux,windows}` (guarded on `npm`):
@@ -24,13 +32,17 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 ## Model environment
 
-Curated for a consistent free + NaN environment, shared with opencode's picker:
+Curated NaN-first: NaN covers the free tier, with three paid OpenRouter models behind it.
 
-- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `mimo-v2.5`
-- **Free OpenRouter** (most powerful, rate-limited): `qwen3-coder:free`, `kimi-k2.6:free`, `nemotron-3-ultra-550b-a55b:free`
+- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `deepseek-v4-flash-0731`, `mimo-v2.5`
 - **Paid OpenRouter** (3, none from OpenAI/Google/Anthropic): `deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`
 
-Default: `nan/mimo-v2.5` (1M context), thinking level `high`. Change in `settings.json`.
+pi's picker omits the rate-limited `:free` OpenRouter tier that `ai/opencode/opencode.jsonc`
+still lists — the two sets are curated independently. `tests/pi-config.bats` asserts this list
+stays equal to `settings.json`'s `enabledModels`.
+
+Default: `nan/qwen3.6`, thinking level `high`. Change in `settings.json`. (Per-model context
+windows live in `models.json` — the one place they cannot drift from.)
 
 ## Secret
 

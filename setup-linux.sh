@@ -861,14 +861,22 @@ if [ -f "$AGENTS_SRC" ]; then
     fi
 fi
 
+# settings.json is SEED-IF-MISSING, unlike models.json/tui.json above: pi
+# rewrites this file at runtime (lastChangelogVersion, theme, the model picked
+# in the TUI), so it is the one deployed config the user's own tool edits.
+# It previously used the same "copy unless identical" shape as its neighbours,
+# which for a self-mutating file means copy ALWAYS -- tests/pi-config.bats
+# forbids lastChangelogVersion in the committed copy, so `cmp` could never
+# match once pi had run, and every setup run silently reset the user's theme
+# and default model. Seed it, then never touch it again.
 PI_SETTINGS_SRC="$CURRENT_DIR/ai/pi/settings.json"
 PI_SETTINGS_DST="$PI_AGENT_DIR/settings.json"
 if [ -f "$PI_SETTINGS_SRC" ]; then
-    if [ -f "$PI_SETTINGS_DST" ] && cmp -s "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"; then
-        log_info "pi settings.json already in sync"
+    if [ -f "$PI_SETTINGS_DST" ]; then
+        log_info "pi settings.json present, preserving local edits"
     else
         cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
-        log_success "Deployed pi settings.json to $PI_SETTINGS_DST"
+        log_success "Seeded pi settings.json at $PI_SETTINGS_DST"
     fi
 fi
 

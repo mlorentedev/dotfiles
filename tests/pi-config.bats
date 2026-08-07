@@ -1,12 +1,13 @@
 #!/usr/bin/env bats
 # Guard (incident->guard, AI-025): the pi coding agent config carries no
 # plaintext secret in git, and the curated model set stays consistent with
-# opencode (NaN + free + non-big-3 paid OpenRouter).
+# its own README (NaN + non-big-3 paid OpenRouter).
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PI_MODELS="$DOTFILES_DIR/ai/pi/models.json"
     export PI_SETTINGS="$DOTFILES_DIR/ai/pi/settings.json"
+    export PI_README="$DOTFILES_DIR/ai/pi/README.md"
 }
 
 @test "ai/pi/models.json exists" {
@@ -83,6 +84,109 @@ setup() {
     dupes="$(jq -r '.. | objects | select(has("id") and has("name")) | .name' "$PI_MODELS" \
         | LC_ALL=C sort | uniq -d)"
     [ -z "$dupes" ] || { echo "duplicate model display names: $dupes"; return 1; }
+}
+
+# --- Config vs its own documentation -------------------------------------
+# Same class one level up (2026-08-05): dropping the `:free` OpenRouter tier
+# from enabledModels left ai/pi/README.md advertising three models the picker
+# no longer offers -- and exposed two older drifts nobody had noticed, both
+# from edits that changed the config without reading the doc beside it. A
+# reader trusts the README; nothing made the README answer to the config.
+
+@test "ai/pi/README.md model list matches settings.json enabledModels" {
+    command -v jq >/dev/null || skip "jq not available"
+    # Both sides normalise to `provider/leaf`. Comparing bare leaf ids would
+    # make `nan/foo` equal `openrouter/vendor/foo`, so a model documented under
+    # the wrong tier would pass; carrying the provider keeps the tiers honest.
+    # A bullet whose label is neither known tier yields `?/...`, which cannot
+    # match anything -- a new tier has to teach this test about itself.
+    doc="$(sed -n '/^## Model environment/,/^## /p' "$PI_README" | awk '
+        /^- \*\*/ {
+            p = "?"
+            if ($0 ~ /^- \*\*NaN\*\*/) p = "nan"
+            else if ($0 ~ /^- \*\*Paid OpenRouter\*\*/) p = "openrouter"
+            line = $0
+            while (match(line, /`[^`]*`/)) {
+                print p "/" substr(line, RSTART + 1, RLENGTH - 2)
+                line = substr(line, RSTART + RLENGTH)
+            }
+        }' | LC_ALL=C sort -u)"
+    # `openrouter/deepseek/deepseek-v4-pro` -> `openrouter/deepseek-v4-pro`:
+    # the README names the bare id under its tier, not the vendor path.
+    cfg="$(jq -r '.enabledModels[] | split("/") | .[0] + "/" + .[-1]' "$PI_SETTINGS" \
+        | LC_ALL=C sort -u)"
+    # Set equality, not containment: one-directional would have missed the
+    # model added to the config in #749 and never listed in the README.
+    [ "$doc" = "$cfg" ] || {
+        echo "README model list and settings.json enabledModels disagree (< README, > config):"
+        diff <(printf '%s\n' "$doc") <(printf '%s\n' "$cfg") | sed 's/^/  /'
+        return 1
+    }
+}
+
+@test "ai/pi/README.md documents the actual default model" {
+    command -v jq >/dev/null || skip "jq not available"
+    # The README advertised `nan/mimo-v2.5` while the config had shipped
+    # `qwen3.6` for who knows how long: the default is the single value a new
+    # user meets first, and it was the one the doc got wrong.
+    want="$(jq -r '.defaultProvider + "/" + .defaultModel' "$PI_SETTINGS")"
+    got="$(grep -m1 '^Default: ' "$PI_README" | grep -o '`[^`]*`' | head -1 | tr -d '`')"
+    [ "$got" = "$want" ] || {
+        echo "README Default: says '$got', settings.json says '$want'"
+        return 1
+    }
+}
+
+# --- The deploy contract the docs promise ---------------------------------
+# Both setup scripts shipped the neighbouring "copy unless byte-identical"
+# shape for settings.json. pi rewrites that file at runtime and the committed
+# copy is forbidden to carry lastChangelogVersion (asserted above), so the
+# comparison could never match once pi had run: the "already in sync" branch
+# was dead code and every setup run reset the user's theme and default model,
+# while README and tests had described it as seed-if-missing since AI-025.
+# Source-level assertions, matching tests/harness-refresh-announce.bats -- the
+# integration container seeds a fresh HOME, so it cannot observe the second run.
+
+# extract_block <file> <start-regex> <end-regex>: the deploy block, CR stripped.
+# setup-windows.ps1 is CRLF (.gitattributes), so an end anchor like /^}$/ never
+# matches -- sed then prints to EOF and the negative assertions below would
+# silently cover the whole rest of the file instead of this block. The caller
+# checks the size for exactly that reason.
+extract_block() {
+    tr -d '\r' < "$1" | sed -n "/$2/,/$3/p"
+}
+
+# assert_absent <needle> <message>: grep for a literal that may start with `-`.
+# `grep -qF '-Force'` parses the pattern as options (-F -o -r -c -e), leaves -e
+# without its argument and exits 2, so the guard never fires -- a check that
+# only knows how to pass. `-e` states that the next word is the pattern.
+assert_absent() {
+    printf '%s\n' "$block" | grep -qF -e "$1" && { echo "$2"; return 1; }
+    return 0
+}
+
+@test "setup-linux.sh seeds pi settings.json only when absent" {
+    block="$(extract_block "$DOTFILES_DIR/setup-linux.sh" '^PI_SETTINGS_SRC=' '^fi$')"
+    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
+    [ "$(printf '%s\n' "$block" | wc -l)" -le 20 ] \
+        || { echo "range never closed -- assertions would cover unrelated code"; return 1; }
+    printf '%s\n' "$block" | grep -qF -e 'if [ -f "$PI_SETTINGS_DST" ]' \
+        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
+    assert_absent 'cmp -s "$PI_SETTINGS_SRC"' \
+        "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"
+}
+
+@test "setup-windows.ps1 seeds pi settings.json only when absent (Linux parity)" {
+    block="$(extract_block "$DOTFILES_DIR/setup-windows.ps1" '^\$piSettingsSrc = ' '^}$')"
+    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
+    [ "$(printf '%s\n' "$block" | wc -l)" -le 20 ] \
+        || { echo "range never closed -- assertions would cover unrelated code"; return 1; }
+    printf '%s\n' "$block" | grep -qF -e 'if (Test-Path -LiteralPath $piSettingsDst)' \
+        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
+    assert_absent 'Compare-Object' \
+        "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"
+    # -Force would overwrite the very file the guard exists to protect.
+    assert_absent '-Force' "Copy-Item still passes -Force"
 }
 
 # CLI-018: the "missing age identity is optional for pi models.json" assertion
