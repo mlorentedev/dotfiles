@@ -14,6 +14,19 @@ template_version: "1.0"
 > the MCP entry). Tracking SSOT: `mlorentedev/hive` issue #176. This is the last
 > dotfiles piece before the multi-machine rollout.
 
+> **Forward pointer (2026-08-07).** The mechanism this spec feeds has changed.
+> The timer it installed still exists, but what it *runs* is being migrated by
+> **AI-028** (dotfiles#791): hive shipped the A3 versioned-layout swap in 1.43.0,
+> so the Windows trigger collapses to a bare `hive self-upgrade` and the
+> stop-daemon / `uv tool upgrade` / start-daemon orchestration goes away. Linux
+> keeps `uv tool`.
+>
+> This spec's own premise also proved fragile in a way worth recording: it gated
+> everything on parsing `uv tool list`. When that install vanished, the timer
+> exited 0 in silence every 15 minutes for months while the hive MCP was dead.
+> Fixed in dotfiles#796 (AI-028 PR1) — a missing install now exits non-zero so it
+> surfaces in Task Scheduler's `LastTaskResult`.
+
 ## Why
 
 hive shipped the *mechanism* for zero-downtime upgrades in v1.32.2:
