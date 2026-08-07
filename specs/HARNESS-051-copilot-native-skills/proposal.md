@@ -42,10 +42,10 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] **AC1 - Native discovery:** `compile-harness.sh --deploy` writes Copilot-targeted records to `~/.copilot/skills/<name>/SKILL.md` as regular copies.
-- [ ] **AC2 - Complete and filtered render:** auxiliary files are copied for Copilot, while a skill with `targets: [claude]` is absent from the Copilot directory.
-- [ ] **AC3 - Safe convergence:** a stale generated Copilot skill is pruned, but an unmarked user-managed skill is preserved.
-- [ ] **AC4 - Product recognition:** the installed Copilot CLI lists `handoff` after deployment into an isolated Copilot home.
+- [x] **AC1 - Native discovery:** `compile-harness.sh --deploy` writes Copilot-targeted records to `~/.copilot/skills/<name>/SKILL.md` as regular copies.
+- [x] **AC2 - Complete and filtered render:** auxiliary files are copied for Copilot, while a skill with `targets: [claude]` is absent from the Copilot directory.
+- [x] **AC3 - Safe convergence:** a stale generated Copilot skill is pruned, but an unmarked user-managed skill is preserved.
+- [x] **AC4 - Product recognition:** the installed Copilot CLI lists `handoff` after deployment into an isolated Copilot home.
 
 ## References
 
