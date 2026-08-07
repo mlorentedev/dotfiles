@@ -29,16 +29,22 @@ tree entirely. The baseline capture in step 1 is what makes AC3 provable.
 
 ## Closing
 
+- [x] [AC6] Add `tests/test-sh-resolution.bats` and prove it red against the pre-fix script
 - [x] Every acceptance criterion from `proposal.md` is covered by evidence
 - [x] Lint passes (`bash -n`, `shellcheck -S warning`)
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#799)
 
 ## Note on verification shape
 
-This change has no unit-test surface: `scripts/test.sh` *is* the test suite, and
-there is no harness that runs the runner. Verification is therefore
-differential — the same suite executed on both platforms, before and after, with
-the failing sets compared. That is recorded in `verification.md` with the actual
-counts rather than asserted in a new test file.
+The first pass verified this differentially — the same suite on both platforms,
+before and after, failing sets compared — on the reasoning that `scripts/test.sh`
+*is* the test suite and there is no harness that runs the runner.
+
+That was weaker than the repo's own rule for `.sh` changes, and a review caught it.
+`tests/test-sh-resolution.bats` now asserts the resolution contract directly by
+running the script under a decoy `DOTFILES_DIR` shaped like the Windows deploy
+mirror. It is red on the pre-fix script, so it is a genuine guard rather than a
+restatement of the outcome. The differential evidence stays, as the wider
+no-regression signal.

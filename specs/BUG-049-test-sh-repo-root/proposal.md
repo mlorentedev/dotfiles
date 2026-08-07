@@ -38,10 +38,18 @@ both platforms. Two concepts that shared one variable are separated:
 
 `test.sh` is not itself deployed, so running it at all means running it from a
 checkout — the source files it asserts on exist only there. Separately, the suite
-asserted POSIX-only facts unconditionally (symlink semantics, mode bits, and the
-`~/.zshrc` / `~/.bashrc` / `~/.zsh/*.zsh` targets that `setup-windows.ps1`
-deliberately does not create); those become explicit skips on Windows, carrying the
-same reason the setup itself prints.
+asserted POSIX-only facts unconditionally; those become explicit skips on Windows,
+carrying the same reason the setup itself prints. Precisely three:
+
+1. `symlink_valid` and `verify_symlink` — POSIX symlink semantics.
+2. The `create_temp_file` **`600` mode assertion** — NTFS has no POSIX mode bits.
+3. The `~/.zshrc` / `~/.bashrc` / `~/.zsh/*.zsh` targets `setup-windows.ps1`
+   deliberately does not create.
+
+Note what is **not** skipped: the `Script permissions` loop, which checks `-x` on the
+repo's own `scripts/*.sh`. Git Bash reports those from the index's exec bit, so the
+loop passes on Windows and keeps its coverage. "Mode bits" above means the
+`create_temp_file` `600` check specifically, not every permission assertion.
 
 ## Out of scope
 
@@ -69,11 +77,12 @@ same reason the setup itself prints.
 
 ## Acceptance criteria
 
-- [ ] **AC1 — Tests the committed tree:** with `$DOTFILES_DIR` exported and pointing at the deploy mirror, the suite still reports `Testing from: <repo checkout>`.
-- [ ] **AC2 — Unblocks Windows commits:** `bash scripts/test.sh` exits 0 on Windows, and the `dotfiles-test` pre-commit hook reports `Passed`.
-- [ ] **AC3 — No Linux regression:** the set of failing checks in a bare Linux container is identical before and after the change.
-- [ ] **AC4 — Skips are visible:** every POSIX-only assertion skipped on Windows prints a reason and is counted, not dropped.
-- [ ] **AC5 — Environment assertions are honest:** `DOTFILES_DIR` is never assigned by the script before being asserted.
+- [x] **AC1 — Tests the committed tree:** with `$DOTFILES_DIR` exported and pointing at the deploy mirror, the suite still reports `Testing from: <repo checkout>`.
+- [x] **AC2 — Unblocks Windows commits:** `bash scripts/test.sh` exits 0 on Windows, and the `dotfiles-test` pre-commit hook reports `Passed`.
+- [x] **AC3 — No Linux regression:** the set of failing checks in a bare Linux container is identical before and after the change.
+- [x] **AC4 — Skips are visible:** every POSIX-only assertion skipped on Windows prints a reason and is counted, not dropped.
+- [x] **AC5 — Environment assertions are honest:** `DOTFILES_DIR` is never assigned by the script before being asserted.
+- [x] **AC6 — Regression guard:** an executable test asserts the resolution contract and fails against the pre-fix script.
 
 ## References
 
