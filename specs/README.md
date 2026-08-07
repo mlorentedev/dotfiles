@@ -21,9 +21,12 @@ Completed or abandoned specs move here after `/spec archive`. **The archive is c
 storage** — do not open files here during normal work. The spec-gate CI explicitly
 excludes `specs/archive/*` from production diff counting.
 
-As of 2026-06, the archive contains ~44 specs. This is the main driver of "too much
-content" perception in the repo — not OS mixing or script sprawl. The active tree has
-~26 specs. See COLD-001 (#251) for the cold-store formalisation work.
+As of 2026-08, the archive holds ~117 specs and the active tree ~23. Those counts
+are load-bearing, not trivia: an active spec that has actually shipped is an
+**alibi** for the gate's `SPEC_FLOOR` heuristic — any large PR can touch ten lines
+of one and satisfy the Discipline Gate. Archiving on merge is what keeps that
+surface small, and is now enforced (see below). See COLD-001 (#251) for the
+cold-store formalisation work.
 
 ## Discipline Gate
 
