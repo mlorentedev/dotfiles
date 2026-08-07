@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-051-copilot-native-skills"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-05"
 issue: "mlorentedev/dotfiles#753"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -55,3 +55,5 @@ Observable outcomes. Each must be testable.
 - Original pipeline: [#141](https://github.com/mlorentedev/dotfiles/issues/141), `specs/archive/SDD-008-skill-pipeline/`
 - Future Go migration: [#495](https://github.com/mlorentedev/dotfiles/issues/495)
 - GitHub documentation: `Adding agent skills for GitHub Copilot CLI`
+
+<!-- archived 2026-08-07 — PR: https://github.com/mlorentedev/dotfiles/pull/771 -->
