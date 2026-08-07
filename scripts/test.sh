@@ -44,25 +44,46 @@ subsection() {
     printf '  %b--- %s ---%b\n' "$CYAN" "$1" "$NC"
 }
 
-# Determine paths
-if [[ -n "$DOTFILES_DIR" ]]; then
-    echo "Using custom DOTFILES_DIR: $DOTFILES_DIR"
-elif [[ -d "$HOME/.dotfiles" ]]; then
-    DOTFILES_DIR="$HOME/.dotfiles"
-elif [[ -d "$(dirname "${BASH_SOURCE[0]}")/.." ]]; then
-    DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-else
-    echo "Error: Could not find dotfiles directory"
+# Determine paths.
+#
+# Two different things used to share one variable, and conflating them made this
+# suite unrunnable as a pre-commit hook on Windows (#794):
+#
+#   REPO_DIR     — the tree UNDER TEST. Always this script's own repo, never the
+#                  deploy mirror. `scripts/test.sh` is not itself deployed (the
+#                  Windows mirror carries only a subset of scripts/), so running
+#                  it at all means running it from a checkout — and the source
+#                  files it asserts on (utils.sh, setup-linux.sh …) exist only
+#                  there. Honouring an ambient $DOTFILES_DIR pointed the syntax
+#                  checks at the mirror, where those files are absent, and every
+#                  commit failed with "utils.sh not found".
+#   DOTFILES_DIR — the DEPLOY ENVIRONMENT, asserted as such in section 14/15
+#                  below. Read, never overwritten, so that check stays honest
+#                  instead of testing a value this script just assigned.
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || {
+    echo "Error: could not resolve the repo root from ${BASH_SOURCE[0]}"
     exit 1
-fi
+}
 
-SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-SENSITIVE_DIR="$DOTFILES_DIR/sensitive"
+SCRIPTS_DIR="$REPO_DIR/scripts"
+SENSITIVE_DIR="$REPO_DIR/sensitive"
+
+# Windows (Git Bash / MSYS) cannot satisfy the POSIX-only assertions in this
+# suite: symlink semantics, mode bits, and the ~/.zshrc … deploy targets that
+# setup-windows.ps1 deliberately does not create ("[SKIP] .zshrc (POSIX-only;
+# Windows uses $PROFILE)"). Asserting them there is a guaranteed red on a machine
+# that is correctly configured, which is the second half of #794 — the first
+# being the deploy-mirror mix-up above. Skipped with the same reason the setup
+# gives, never silently dropped.
+case "$(uname -s 2>/dev/null)" in
+    MINGW* | MSYS* | CYGWIN*) IS_WINDOWS=1 ;;
+    *) IS_WINDOWS=0 ;;
+esac
 
 echo "========================================"
 echo "   DOTFILES COMPREHENSIVE TEST SUITE"
 echo "========================================"
-echo "Testing from: $DOTFILES_DIR"
+echo "Testing from: $REPO_DIR"
 echo "Shell: ${ZSH_VERSION:+zsh $ZSH_VERSION}${BASH_VERSION:+bash $BASH_VERSION}"
 
 # ==================================================
@@ -79,8 +100,8 @@ for script in utils.sh age-encrypt-decrypt.sh install-precommit.sh dotfiles-sync
     fi
 done
 
-if [[ -f "$DOTFILES_DIR/setup-linux.sh" ]]; then
-    bash -n "$DOTFILES_DIR/setup-linux.sh" 2>/dev/null && pass "setup-linux.sh syntax OK" || fail "setup-linux.sh syntax errors"
+if [[ -f "$REPO_DIR/setup-linux.sh" ]]; then
+    bash -n "$REPO_DIR/setup-linux.sh" 2>/dev/null && pass "setup-linux.sh syntax OK" || fail "setup-linux.sh syntax errors"
 fi
 
 # ==================================================
@@ -112,6 +133,9 @@ dir_exists "$SCRIPTS_DIR" && pass "dir_exists: finds existing dir" || fail "dir_
 dir_exists "/nonexistent/dir_xyz" && fail "dir_exists: false positive" || pass "dir_exists: returns false for missing"
 
 subsection "symlink_valid"
+if [[ "$IS_WINDOWS" == "1" ]]; then
+    skip "symlink_valid" "POSIX symlink semantics unavailable on Windows"
+else
 # Create temp symlink for testing
 TEST_LINK="/tmp/test_symlink_$$"
 TEST_TARGET="/tmp/test_target_$$"
@@ -121,6 +145,7 @@ symlink_valid "$TEST_LINK" && pass "symlink_valid: valid symlink" || fail "symli
 rm -f "$TEST_TARGET"
 symlink_valid "$TEST_LINK" && fail "symlink_valid: broken symlink passed" || pass "symlink_valid: detects broken symlink"
 rm -f "$TEST_LINK"
+fi
 
 subsection "var_is_set"
 # shellcheck disable=SC2034
@@ -280,7 +305,7 @@ if command_exists gh; then
         subsection "gh_get_repo"
         # Save current dir and go to a repo
         ORIG_DIR=$(pwd)
-        cd "$DOTFILES_DIR" 2>/dev/null || cd "$HOME/Projects/dotfiles" 2>/dev/null || true
+        cd "$REPO_DIR" 2>/dev/null || true
 
         repo=$(gh_get_repo 2>/dev/null)
         if [[ -n "$repo" ]]; then
@@ -306,8 +331,12 @@ subsection "create_temp_file"
 tmp=$(create_temp_file "dotfiles_test")
 [[ -f "$tmp" ]] && pass "create_temp_file: creates file" || fail "create_temp_file: no file created"
 [[ "$tmp" == /tmp/dotfiles_test* ]] && pass "create_temp_file: correct prefix" || fail "create_temp_file: wrong prefix '$tmp'"
-perms=$(stat -c "%a" "$tmp" 2>/dev/null || stat -f "%Lp" "$tmp" 2>/dev/null)
-[[ "$perms" == "600" ]] && pass "create_temp_file: secure permissions (600)" || fail "create_temp_file: insecure permissions ($perms)"
+if [[ "$IS_WINDOWS" == "1" ]]; then
+    skip "create_temp_file permissions" "NTFS has no POSIX mode bits"
+else
+    perms=$(stat -c "%a" "$tmp" 2>/dev/null || stat -f "%Lp" "$tmp" 2>/dev/null)
+    [[ "$perms" == "600" ]] && pass "create_temp_file: secure permissions (600)" || fail "create_temp_file: insecure permissions ($perms)"
+fi
 rm -f "$tmp"
 
 subsection "ensure_line_in_file"
@@ -328,6 +357,9 @@ ensure_line_in_file "/nonexistent_xyz" "test"
 rm -f "$TEST_FILE"
 
 subsection "verify_symlink"
+if [[ "$IS_WINDOWS" == "1" ]]; then
+    skip "verify_symlink" "POSIX symlink semantics unavailable on Windows"
+else
 TEST_TARGET="/tmp/verify_target_$$"
 TEST_LINK="/tmp/verify_link_$$"
 echo "content" > "$TEST_TARGET"
@@ -342,6 +374,7 @@ verify_symlink "$TEST_LINK" "test_link" >/dev/null 2>&1
 [[ $? -eq 1 ]] && pass "verify_symlink: returns 1 for broken" || fail "verify_symlink: should return 1"
 
 rm -f "$TEST_LINK"
+fi
 
 # ==================================================
 section "10/15" "Environment Functions"
@@ -389,7 +422,17 @@ section "14/15" "Environment Variables Configuration"
 # ==================================================
 
 subsection "DOTFILES_DIR"
-[[ -n "$DOTFILES_DIR" ]] && pass "DOTFILES_DIR: set to '$DOTFILES_DIR'" || fail "DOTFILES_DIR: not set"
+# This used to be vacuous: the path-resolution block above assigned DOTFILES_DIR
+# and then this asserted the value it had just written, so it could never fail.
+# Now that the tree under test is REPO_DIR, the variable is read-only here and
+# the assertion is real -- which means an un-provisioned environment (a CI
+# container, a fresh clone) genuinely has it unset. That is not a code defect, so
+# it is an explicit SKIP rather than a red that blocks a commit (#794).
+if [[ -n "$DOTFILES_DIR" ]]; then
+    pass "DOTFILES_DIR: set to '$DOTFILES_DIR'"
+else
+    skip "DOTFILES_DIR" "not exported (shell not provisioned by setup)"
+fi
 
 subsection "DOTFILES_REPO_DIR"
 if [[ -n "$DOTFILES_REPO_DIR" ]]; then
@@ -408,20 +451,14 @@ section "15/15" "Installation Verification"
 # ==================================================
 
 subsection "Symlinks"
-for link in "$HOME/.zshrc" "$HOME/.bashrc"; do
+# These are Linux deploy targets. setup-windows.ps1 emits an explicit
+# "[SKIP] .zshrc (POSIX-only; Windows uses $PROFILE)" for each, so on Windows
+# their absence is the correct state, not a failure.
+for link in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.zsh/aliases.zsh" "$HOME/.zsh/functions.zsh" "$HOME/.zsh/nvm.zsh"; do
     name=$(basename "$link")
-    if [[ -L "$link" && -e "$link" ]]; then
-        pass "$name: valid symlink"
-    elif [[ -f "$link" ]]; then
-        pass "$name: exists (not symlink)"
-    else
-        fail "$name: missing"
-    fi
-done
-
-for link in "$HOME/.zsh/aliases.zsh" "$HOME/.zsh/functions.zsh" "$HOME/.zsh/nvm.zsh"; do
-    name=$(basename "$link")
-    if [[ -L "$link" && -e "$link" ]]; then
+    if [[ "$IS_WINDOWS" == "1" ]]; then
+        skip "$name" "POSIX-only; Windows uses \$PROFILE"
+    elif [[ -L "$link" && -e "$link" ]]; then
         pass "$name: valid symlink"
     elif [[ -f "$link" ]]; then
         pass "$name: exists"
@@ -442,7 +479,15 @@ for script in utils.sh age-encrypt-decrypt.sh install-precommit.sh dotfiles-sync
 done
 
 subsection "Directories"
-[[ -d "$DOTFILES_DIR" ]] && pass "\$HOME/.dotfiles: exists" || fail "\$HOME/.dotfiles: missing"
+# The deploy mirror is an environment fact, so it keeps reading $DOTFILES_DIR
+# (falling back to the documented default when the shell has not exported it).
+# scripts/ and sensitive/ are asserted on the tree under test, not the mirror.
+deploy_dir="${DOTFILES_DIR:-$HOME/.dotfiles}"
+if [[ -d "$deploy_dir" ]]; then
+    pass "$deploy_dir: exists"
+else
+    skip "deploy mirror" "$deploy_dir not present (run setup)"
+fi
 [[ -d "$SCRIPTS_DIR" ]] && pass "scripts/: exists" || fail "scripts/: missing"
 [[ -d "$SENSITIVE_DIR" ]] && pass "sensitive/: exists" || fail "sensitive/: missing"
 
