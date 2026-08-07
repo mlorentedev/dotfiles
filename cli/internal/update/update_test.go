@@ -53,6 +53,10 @@ func TestUpdate(t *testing.T) {
 		setupRuns     bool // whether RunSetup must be invoked
 	}{
 		{name: "not a repo", mutate: func(g fakeGit) { g.fail["rev-parse --git-dir"] = true }, wantStatus: "not-a-repo"},
+		// An unreadable status must fail safe (skip, not proceed as if clean) —
+		// distinct from the dirty-worktree branch below, which reads fine but
+		// reports changes.
+		{name: "cannot read git status", mutate: func(g fakeGit) { g.fail["status --porcelain"] = true }, wantStatus: "dirty", wantMsgSubstr: "cannot read git status"},
 		// The dirty-skip message must name the offending path so a silently
 		// skipping scheduled run stays diagnosable (dotfiles#694).
 		{name: "dirty worktree", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M setup.sh" }, wantStatus: "dirty", wantMsgSubstr: "setup.sh"},

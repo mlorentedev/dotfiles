@@ -160,13 +160,17 @@ ocfull() { opencode "$@"; }
 # ---------------------------------------------------------------------------
 # agyp: run a saved Gemini/AGY prompt. Shared bash/zsh (REFACTOR-010 style).
 #
-# Namespace history — this helper collided with oh-my-zsh's `git` plugin TWICE:
-#   `gp`  -> shadowed by `alias gp='git push'`      (silent: alias wins at call time)
-#   `gpr` -> shadowed by `alias gpr='git pull --rebase'`
-# The second one was worse than a shadow: zsh expands aliases at PARSE time, so
-# `gpr() {` parsed as `git pull --rebase () {` -> a parse error that aborted the
-# REST of this file, silently dropping the utils.sh load below in every zsh
-# session (bash was unaffected: the git plugin is zsh-only).
+# Namespace history — this helper collided with oh-my-zsh's `git` plugin TWICE,
+# both rooted in the same cause: zsh resolves aliases before execution or
+# sourcing reaches function-definition syntax.
+#   `gp`  -> shadowed by `alias gp='git push'` — the alias wins over the function
+#            at the interactive prompt, so `gp` silently ran git push instead.
+#   `gpr` -> shadowed by `alias gpr='git pull --rebase'` — worse, because when
+#            oh-my-zsh loads before this file, `gpr() {` itself gets expanded to
+#            `git pull --rebase () {` while functions.sh is being sourced: a
+#            parse error that aborted the REST of this file, silently dropping
+#            the utils.sh load below in every zsh session (bash was unaffected:
+#            the git plugin is zsh-only).
 #
 # The `g*` namespace belongs to that plugin (~150 aliases) — do not re-enter it.
 # `agyp` = the `agy` tool + "prompt", outside the minefield. Enforced by
