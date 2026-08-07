@@ -1,0 +1,51 @@
+[
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f1",
+    "behavior": "With no repo-local hook and a .pre-commit-config.yaml present, the dispatcher routes the stage to `pre-commit hook-impl --hook-type <stage>` with the config passed explicitly.",
+    "verification": "bats tests/precommit-fallback.bats -f 'AC1'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f2",
+    "behavior": "A non-zero exit from pre-commit propagates out of the dispatcher, so the operation is actually blocked.",
+    "verification": "bats tests/precommit-fallback.bats -f 'AC2'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f3",
+    "behavior": "The pre-push ref list on stdin reaches pre-commit unmodified, so it scans the commits being pushed rather than the staged file set.",
+    "verification": "bats tests/precommit-fallback.bats -f 'AC3'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f4",
+    "behavior": "An executable repo-local hook still wins and pre-commit is not additionally invoked, so no gate runs twice.",
+    "verification": "bats tests/precommit-fallback.bats -f 'AC4'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f5",
+    "behavior": "A missing config or a missing pre-commit binary is a clean exit 0, so the machine-wide dispatcher never breaks git in unrelated repos.",
+    "verification": "bats tests/precommit-fallback.bats -f 'AC5'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f6",
+    "behavior": "The fallback is stage-generic: pre-commit and commit-msg route correctly and forward their own arguments.",
+    "verification": "bats tests/precommit-fallback.bats -f 'AC6'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-036-precommit-under-global-hookspath-f7",
+    "behavior": "The GUARD-001 memory-sink guard still runs first and can still veto a commit.",
+    "verification": "bats tests/guard-memory-sink.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

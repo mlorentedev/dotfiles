@@ -113,6 +113,23 @@ function project-init {
     }
 }
 
+# PowerShell resolves commands Alias -> Function -> Cmdlet -> Application, so a
+# built-in alias silently makes a same-named function unreachable — no parse
+# error, no warning, the function is just dead (BUG-034). The four names below
+# carry over from .zsh/aliases.zsh, where they already mean exactly this;
+# cross-OS parity is the point of this profile, so clear the built-ins rather
+# than rename out of the collision. Only the *alias* is given up — each cmdlet
+# stays reachable under its full name:
+#   gp  -> Get-ItemProperty     gl  -> Get-Location
+#   gcs -> Get-PSCallStack      gbp -> Get-PSBreakpoint
+# `Remove-Item Alias:` rather than `Remove-Alias` so this also works on Windows
+# PowerShell 5.1; -Force is required because the built-ins ship ReadOnly.
+# Guarded by tests/powershell-profile-alias.Tests.ps1, which fails CI if any
+# function defined here is left shadowed.
+foreach ($shadowingAlias in 'gp', 'gl', 'gcs', 'gbp') {
+    Remove-Item -Path "Alias:$shadowingAlias" -Force -ErrorAction SilentlyContinue
+}
+
 # Quick navigation to projects
 function gprj { Set-Location "$env:USERPROFILE\Projects" }
 function gcs { Set-Location "$env:USERPROFILE\Projects\cheat-sheets" }
