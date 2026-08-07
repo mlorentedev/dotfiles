@@ -65,7 +65,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? **yes** — a fault-tolerance guard and a broken-state guard that share an exit code make failure invisible; "quiet by design" and "quiet because broken" must be distinguishable at the observable surface.
+- [x] Lesson for the repo's `docs/lessons.md`? **captured 2026-08-07** — *"A guard that is quiet when idle and quiet when broken is not a guard"*. Written during the session rather than deferred to archive, since the spec still has PR2 outstanding.
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no — likely no; ADR-015 in the hive repo owns the mechanism decision, this repo consumes it>
 - [ ] New pattern candidate for `00_meta/patterns/`? <yes / no — candidate: "a health signal that cannot distinguish healthy-idle from broken is not a health signal". Only if it recurs outside this incident.>
 
