@@ -11,7 +11,12 @@
       0. Only act when a NEWER version is actually published. Otherwise return
          immediately and leave the daemon untouched -- at a 15-minute cadence
          the overwhelming majority of runs are this fast no-op, so the daemon is
-         never restarted just to check for updates.
+         never restarted just to check for updates. Three distinct outcomes,
+         deliberately NOT collapsed into one silent exit (dotfiles#791):
+           - already current  -> silent, exit 0 (the intended common case)
+           - PyPI unreachable -> message,  exit 0 (transient, not a fault)
+           - no install found -> message,  exit 1 (broken machine; surfaces in
+             Task Scheduler's LastTaskResult instead of reading green)
       1. If a hive process OTHER than the daemon holds the uv-tool install
          (an open `hive client` session), DEFER this cycle. The daemon keeps
          running the current version; the upgrade lands the next cycle the
@@ -45,11 +50,39 @@ if (-not (Test-Path $uv)) {
 # Step 0: only proceed when a newer version is actually published. Comparing
 # installed vs latest BEFORE touching the daemon means a 15-minute cadence does
 # not restart the daemon on every tick -- only on an actual release.
+#
+# These three outcomes used to collapse into one guard that exited 0 in silence,
+# which made a BROKEN machine indistinguishable from a healthy idle one. On the
+# maintainer's box the uv-tool install vanished, so this ran every 15 minutes
+# for months reporting LastTaskResult 0 while the hive MCP was dead
+# (dotfiles#791). Fault tolerance became fault invisibility. Each outcome now
+# reports for itself.
 $installedMatch = (& $uv tool list 2>$null | Select-String '^hive-vault\s+v?([\d.]+)')
 $installed = if ($installedMatch) { $installedMatch.Matches[0].Groups[1].Value } else { $null }
+
+# Broken machine: there is nothing to upgrade because there is no install. Exit
+# NON-ZERO so Task Scheduler's LastTaskResult stops reporting success -- that is
+# the only signal visible without capturing stdout, and it is the one that read
+# green throughout the outage.
+if (-not $installed) {
+    Write-Output "hive-upgrade: no hive-vault install found ('uv tool list' reports none)."
+    Write-Output "hive-upgrade: nothing to upgrade. The install is missing or malformed -- see docs/troubleshooting/hive-mcp-orphaned-trampoline.md."
+    exit 1
+}
+
 $latest = $null
 try { $latest = (Invoke-RestMethod 'https://pypi.org/pypi/hive-vault/json' -TimeoutSec 15).info.version } catch { $latest = $null }
-if (-not $installed -or -not $latest -or ([version]$installed -ge [version]$latest)) {
+
+# Transient: PyPI unreachable. Say so, but exit 0 -- an offline tick is not a
+# broken machine, and failing here would cry wolf every 15 minutes on a laptop.
+if (-not $latest) {
+    Write-Output "hive-upgrade: could not resolve the latest hive-vault version from PyPI; skipping this cycle (installed $installed)."
+    exit 0
+}
+
+# Already current: the deliberate quiet no-op. Silent by design so the daemon is
+# never restarted just to discover there is nothing to do.
+if ([version]$installed -ge [version]$latest) {
     exit 0
 }
 

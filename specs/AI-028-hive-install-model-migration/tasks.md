@@ -20,10 +20,12 @@ created: "2026-08-07"
 
 ### PR1 — loud-vs-quiet failure (AC1) — independent, ships first
 
-- [ ] [P] [AC1] Write failing test in `tests/hive-upgrade-timer.bats`: with no hive install resolvable, the script emits a non-empty message naming the condition (not a bare `exit 0`).
-- [ ] [P] [AC1] Write failing test: with the install present and already at the latest version, the script stays silent (the deliberate 15-minute no-op is preserved — this guards against "fix the silence by making it noisy always").
-- [ ] [AC1] `windows/hive-upgrade.ps1`: split the single `-not $installed -or ... -ge ...` guard into two branches — "no install found" (loud, distinct exit path) and "already current" (quiet `exit 0`).
-- [ ] [AC1] Refactor: keep the step-0 fast-path contract intact (still no daemon restart on a no-op tick) and the function under the repo's size conventions.
+- [x] [P] [AC1] Write failing test in `tests/hive-upgrade-timer.bats`: with no hive install resolvable, the script emits a non-empty message naming the condition (not a bare `exit 0`).
+- [x] [P] [AC1] Write failing test: with the install present and already at the latest version, the script stays silent (the deliberate 15-minute no-op is preserved — this guards against "fix the silence by making it noisy always").
+- [x] [AC1] `windows/hive-upgrade.ps1`: split the single `-not $installed -or ... -ge ...` guard into **three** branches, not two. The plan said two; the collapsed guard actually hid a third outcome — PyPI unreachable — which is transient rather than a fault. Final contract: already-current → silent, `exit 0`; PyPI unreachable → message, `exit 0`; no install → message, **`exit 1`**.
+- [x] [AC1] Exit non-zero on the no-install branch, so the condition surfaces in Task Scheduler's `LastTaskResult`. Stdout is not captured by the scheduler, so the exit code is the only signal visible without running the script by hand — and it is precisely the one that read green throughout the outage.
+- [x] [AC1] Add a test pinning that the branches stay separate (`! grep -qF '-not $installed -or'`), so a future tidy-up cannot silently re-collapse them.
+- [x] [AC1] Refactor: step-0 fast-path contract intact (still no daemon restart on a no-op tick); `.DESCRIPTION` documents the three outcomes; script stays ASCII-only for PSScriptAnalyzer.
 
 ### PR2 — bootstrap + A3 trigger (AC2, AC3, AC4) — gated on hive#328
 

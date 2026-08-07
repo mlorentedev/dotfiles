@@ -178,6 +178,35 @@ setup() {
 # A `uv tool ... --reinstall` removes the locked venv dir (os error 5) and
 # corrupts the install -- the script documents the hazard in a comment but must
 # never actually run it (so the check is on a real uv command, not the word).
+# AI-028 / #791: the three step-0 outcomes used to collapse into one silent
+# `exit 0`, so a machine with NO install was indistinguishable from a healthy
+# idle one. It ran every 15 minutes for months reporting LastTaskResult 0 while
+# the hive MCP was dead. These four cases pin each outcome to its own signal.
+
+@test "hive-upgrade.ps1 is loud and non-zero when no install is found" {
+    run grep -A3 -F 'no hive-vault install found' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"exit 1"* ]]
+}
+
+@test "hive-upgrade.ps1 stays silent when the install is already current" {
+    # The deliberate 15-min no-op: no output, exit 0, daemon untouched.
+    run grep -A2 -F '[version]$installed -ge [version]$latest' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"exit 0"* ]]
+    [[ "$output" != *"Write-Output"* ]]
+}
+
+@test "hive-upgrade.ps1 reports an unreachable PyPI without failing the tick" {
+    run grep -A3 -F 'could not resolve the latest' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"exit 0"* ]]
+}
+
+@test "hive-upgrade.ps1 does not collapse no-install into the already-current guard" {
+    ! grep -qF '-not $installed -or' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+}
+
 @test "hive-upgrade.ps1 never runs uv tool ... --reinstall" {
     ! grep -qE '\$uv tool.*--reinstall' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
 }

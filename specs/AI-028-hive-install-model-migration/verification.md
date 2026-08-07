@@ -31,7 +31,7 @@ Supporting facts captured at the same time:
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] AC1 (loud-vs-quiet) -> test `<name>` in `tests/hive-upgrade-timer.bats` + B5 flips to non-empty output
+- [x] AC1 (loud-vs-quiet) -> `tests/hive-upgrade-timer.bats`: `hive-upgrade.ps1 is loud and non-zero when no install is found`, `... stays silent when the install is already current`, `... reports an unreachable PyPI without failing the tick`, `... does not collapse no-install into the already-current guard`. Suite green 33/33; script ASCII-clean. B5/B6 flip once the SSOT is deployed (see the deploy caveat below).
 - [ ] AC2 (bootstrap) -> commit `<hash>` + B1/B2/B3 flip on the broken box
 - [ ] AC3 (bare `hive self-upgrade`, no stop/start) -> test `<name>`
 - [ ] AC4 (no `uv tool list` inference on Windows) -> test `<name>` + B4 flips (task registered)
@@ -41,9 +41,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `<command> -> <output>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+```
+$ bats tests/hive-upgrade-timer.bats
+33 tests, 0 failures          # 4 new (cases 26-29), 29 pre-existing unchanged
+
+$ LC_ALL=C grep -nP '[^\x00-\x7F]' windows/hive-upgrade.ps1
+(no output)                   # ASCII clean for PSScriptAnalyzer CI
+```
+
+- Manual smoke test: pending for PR2/PR3. PR1 is a text-contract change to a PowerShell script; bats asserts the contract, and the live flip of B5/B6 needs the SSOT deployed to `~/.claude/scripts/` first.
+- No regressions: the 29 pre-existing cases in `hive-upgrade-timer.bats` are untouched and green, including `only acts when a newer version is published`, which pins the fast-path contract this change had to preserve.
 
 > **Do not verify against the deployed copy.** `~/.claude/scripts/hive-upgrade.ps1` is deployed from `windows/hive-upgrade.ps1` by setup. Re-deploy (or invoke the SSOT directly) before treating B5 as flipped, or a stale copy will read as a pass.
 
