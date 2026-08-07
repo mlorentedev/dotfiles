@@ -1,0 +1,65 @@
+[
+  {
+    "id": "SDD-038-archive-on-merge-f1",
+    "behavior": "A PR closing an issue tracked by an active spec fails the gate, names the spec, and prints the dotf spec archive command. Covers a spec created in the same PR, and multiple closing references.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC1'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f2",
+    "behavior": "The same PR passes once specs/archive/<id>/ exists at the head ref.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC2'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f3",
+    "behavior": "Non-closing references (Refs #N, Part of #N, a bare #N in prose) do not trigger the check.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC3'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f4",
+    "behavior": "All three issue: frontmatter shapes in-tree are matched (owner/repo#N, repo#N, bare N), plus the full-URL closing form, case-insensitively.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC4'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f5",
+    "behavior": "A closing reference qualified with another repository is ignored.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC5'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f6",
+    "behavior": "The check runs below the LOC threshold and is not skipped by the skip-sdd label.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC6'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f7",
+    "behavior": "skip-archive plus a non-empty '## Archive skip rationale' passes; the label without the rationale fails.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC7'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f8",
+    "behavior": "An empty PR body, a closed issue with no matching active spec, a spec without issue frontmatter, and an already-archived spec are all clean passes.",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC8'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-038-archive-on-merge-f9",
+    "behavior": "The pre-existing LOC half of the Discipline Gate is unchanged.",
+    "verification": "bats tests/check-spec-gate.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -31,4 +31,11 @@ The spec-gate CI job (`scripts/check-spec-gate.sh`) fails any PR with ≥ 50 LOC
 production diff that lacks an active `specs/<id>/` folder. Escape hatch: `skip-sdd`
 label + `## SDD skip rationale` section in the PR body.
 
+It also enforces the lifecycle's terminal step: a PR that **closes** an issue must
+archive the active spec tracking it (`dotf spec archive <id>`), matched via the
+spec's `issue:` frontmatter. This runs regardless of diff size and is not waived by
+`skip-sdd`. Reference an issue without a closing keyword (`Refs #N`) when the work
+genuinely continues; the escape hatch is the `skip-archive` label + an
+`## Archive skip rationale` section.
+
 See `AGENTS.md` "Spec-Driven Development" for the full trigger criteria and workflow.

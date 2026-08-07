@@ -99,13 +99,192 @@ _is_dependency_bot() {
 }
 
 _skip_rationale_nonempty() {
+    local heading="$1"
     local extracted
-    extracted=$(printf '%s\n' "$SDD_PR_BODY" | awk '
-        /^## SDD skip rationale[[:space:]]*$/ { in_block=1; next }
+    extracted=$(printf '%s\n' "$SDD_PR_BODY" | awk -v h="## $heading" '
+        $0 ~ ("^" h "[[:space:]]*$") { in_block=1; next }
         in_block && /^## / { exit }
         in_block { print }
     ' | tr -d '[:space:]')
     [[ -n "$extracted" ]]
+}
+
+# ---------------------------------------------------------------------------
+# Archive-on-merge (SDD-038): a PR that CLOSES an issue must archive the active
+# spec tracking it. Keyed on GitHub's closing keywords rather than on "a spec
+# was touched" — `Refs #N` legitimately leaves a spec active when the issue's
+# work continues in a follow-up.
+# ---------------------------------------------------------------------------
+
+# owner/name of this repo, used to reject cross-repo closing references.
+# CI exports GITHUB_REPOSITORY; otherwise derive it from origin. Empty means
+# ownership cannot be proven, in which case QUALIFIED references are ignored
+# rather than guessed at (a bare `#N` is this repo by definition).
+_repo_slug() {
+    if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+        printf '%s' "$GITHUB_REPOSITORY"
+        return 0
+    fi
+    local url
+    url=$(git remote get-url origin 2>/dev/null) || return 0
+    url="${url%.git}"
+    case "$url" in
+        *github.com[:/]*) printf '%s' "${url##*github.com}" | sed -E 's#^[:/]##' ;;
+    esac
+}
+
+# Issue numbers this PR body closes, one per line. Only GitHub's own closing
+# verbs count; `Refs`, `Part of` and a bare number in prose must not fire.
+_closing_issue_numbers() {
+    local slug="$1"
+    local body="$2"
+
+    # Fold the full-URL form into the qualified short form so one matcher covers
+    # both. `|` as the sed delimiter because `#` is part of the replacement.
+    body=$(printf '%s\n' "$body" | sed -E \
+        's|https?://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/([0-9]+)|\1#\2|g')
+
+    # `|| true`: no closing reference is the COMMON case, but grep exits 1 on no
+    # match and this script runs under `set -euo pipefail`. Left unguarded, an
+    # ordinary "Refs #N" PR aborts the gate — failing closed for the wrong
+    # reason, which blocks legitimate work.
+    local matches
+    matches=$(printf '%s\n' "$body" \
+        | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+' \
+        || true)
+    [[ -z "$matches" ]] && return 0
+
+    printf '%s\n' "$matches" \
+        | awk '{ print $NF }' \
+        | while IFS= read -r ref; do
+            [[ -z "$ref" ]] && continue
+            local qualifier="${ref%#*}"
+            local number="${ref##*#}"
+            if [[ -n "$qualifier" ]]; then
+                # Someone else's issue number must never archive our spec.
+                if [[ -z "$slug" || "$qualifier" != "$slug" ]]; then
+                    continue
+                fi
+            fi
+            printf '%s\n' "$number"
+        done
+}
+
+# The issue number declared by a proposal.md on stdin, or nothing. Three shapes
+# exist in-tree — "owner/repo#N", "repo#N" and a bare unquoted N — and the
+# quoted forms are followed by a trailing `#` comment, so the value is extracted
+# before any number is read out of it.
+_frontmatter_issue_number() {
+    awk '
+        NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit }
+        NR > 1 && $0 ~ /^---[[:space:]]*$/ { exit }
+        /^issue:[[:space:]]*/ {
+            sub(/^issue:[[:space:]]*/, "")
+            if (substr($0, 1, 1) == "\"") { sub(/^"/, ""); sub(/".*$/, "") }
+            else { sub(/[[:space:]].*$/, "") }
+            sub(/^.*#/, "")
+            if ($0 ~ /^[0-9]+$/) print $0
+            exit
+        }
+    '
+}
+
+# "<issue-number><TAB><spec-id>" for every ACTIVE spec at the given ref. Read at
+# the base ref: at head an archived spec is (correctly) gone, so base is the only
+# ref where the issue -> spec linkage is still observable.
+_active_spec_issue_map() {
+    local ref="$1"
+    local paths
+    paths=$(git ls-tree -r --name-only "$ref" -- specs/ 2>/dev/null) || return 1
+
+    printf '%s\n' "$paths" | while IFS= read -r path; do
+        case "$path" in
+            specs/archive/*) continue ;;
+            specs/*/proposal.md) ;;
+            *) continue ;;
+        esac
+        local id="${path#specs/}"
+        id="${id%/proposal.md}"
+        case "$id" in */*) continue ;; esac   # only specs/<id>/proposal.md
+        local num
+        num=$(git show "$ref:$path" 2>/dev/null | _frontmatter_issue_number) || continue
+        # An `if`, not `[[ ... ]] && printf`: the latter is the loop body's last
+        # command, so a spec WITHOUT an issue: field would make the whole while
+        # loop exit 1 and the caller fail closed on perfectly valid data.
+        if [[ -n "$num" ]]; then
+            printf '%s\t%s\n' "$num" "$id"
+        fi
+    done
+}
+
+_check_archive_on_merge() {
+    # No PR body (local pre-push runs) means nothing to enforce.
+    [[ -z "$SDD_PR_BODY" ]] && return 0
+
+    local slug numbers
+    slug=$(_repo_slug)
+    numbers=$(_closing_issue_numbers "$slug" "$SDD_PR_BODY" | sort -u)
+    [[ -z "$numbers" ]] && return 0
+
+    local map base_map head_map
+    if ! base_map=$(_active_spec_issue_map "$BASE_REF"); then
+        printf '[ERROR] Could not read specs/ at base ref "%s".\n' "$BASE_REF" >&2
+        printf '        The gate fails closed: it will not pass a PR whose spec state cannot be read.\n' >&2
+        exit 2
+    fi
+    # Union with head: base alone would miss a PR that CREATES a spec and closes
+    # its issue in the same change — precisely the "never archived" pattern this
+    # gate exists to stop. A spec archived at head is no longer under specs/<id>/,
+    # so it cannot appear here and cannot produce a false positive.
+    if ! head_map=$(_active_spec_issue_map "$HEAD_REF"); then
+        printf '[ERROR] Could not read specs/ at head ref "%s".\n' "$HEAD_REF" >&2
+        exit 2
+    fi
+    map=$(printf '%s\n%s\n' "$base_map" "$head_map" | grep -v '^$' | sort -u || true)
+    [[ -z "$map" ]] && return 0
+
+    local violations=()
+    local num spec_num spec_id archived
+    while IFS= read -r num; do
+        [[ -z "$num" ]] && continue
+        while IFS=$'\t' read -r spec_num spec_id; do
+            [[ -n "$spec_id" && "$spec_num" == "$num" ]] || continue
+            # Ask the head TREE, not the diff: a move only shows up as a rename
+            # when git's rename detection fires, and the same change can surface
+            # as delete+add. Presence cannot be fooled by how git renders it.
+            archived=$(git ls-tree -r --name-only "$HEAD_REF" -- "specs/archive/$spec_id/" 2>/dev/null) || archived=""
+            [[ -n "$archived" ]] || violations+=("$spec_id (#$num)")
+        done <<< "$map"
+    done <<< "$numbers"
+
+    (( ${#violations[@]} == 0 )) && return 0
+
+    if _has_label "skip-archive"; then
+        if _skip_rationale_nonempty "Archive skip rationale"; then
+            printf '[OK] archive-on-merge skipped: "skip-archive" label + non-empty "## Archive skip rationale" in PR body\n'
+            return 0
+        fi
+        cat >&2 <<'EOF'
+[FAIL] "skip-archive" label present but the "## Archive skip rationale" section is empty or missing in the PR body.
+EOF
+        exit 1
+    fi
+
+    {
+        printf '[FAIL] SDD archive-on-merge violation:\n'
+        printf '       This PR closes an issue whose spec is still active:\n'
+        for v in "${violations[@]}"; do printf '         %s\n' "$v"; done
+        printf '\n'
+        printf '       The SDD lifecycle ends by archiving the spec in the SAME PR\n'
+        printf '       (Discipline Gate step 7). Run:\n\n'
+        for v in "${violations[@]}"; do printf '         dotf spec archive %s\n' "${v%% *}"; done
+        printf '\n'
+        printf '       If the work genuinely continues elsewhere, reference the issue\n'
+        printf '       without a closing keyword (e.g. "Refs #N"), or add the\n'
+        printf '       "skip-archive" label AND a non-empty "## Archive skip rationale"\n'
+        printf '       section to the PR body.\n'
+    } >&2
+    exit 1
 }
 
 _excluded() {
@@ -159,6 +338,12 @@ _normalize_rename_path() {
     printf '%s' "$p"
 }
 
+# Archive-on-merge runs FIRST and unconditionally (SDD-038). A three-line PR can
+# still end an issue's life, so it must not sit behind the LOC early exit below;
+# and `skip-sdd` asserts "this change needs no spec", which says nothing about
+# whether an existing spec's work is finished.
+_check_archive_on_merge
+
 if _has_label "dependencies"; then
     if _is_dependency_bot "$SDD_PR_AUTHOR"; then
         printf '[OK] spec-gate skipped: "dependencies" label on a bot-authored PR (%s)\n' "$SDD_PR_AUTHOR"
@@ -168,7 +353,7 @@ if _has_label "dependencies"; then
 fi
 
 if _has_label "skip-sdd"; then
-    if _skip_rationale_nonempty; then
+    if _skip_rationale_nonempty "SDD skip rationale"; then
         printf '[OK] spec-gate skipped: "skip-sdd" label + non-empty "## SDD skip rationale" in PR body\n'
         exit 0
     fi
