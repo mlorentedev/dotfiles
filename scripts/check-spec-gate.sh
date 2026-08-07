@@ -243,7 +243,11 @@ _check_archive_on_merge() {
     map=$(printf '%s\n%s\n' "$base_map" "$head_map" | grep -v '^$' | sort -u || true)
     [[ -z "$map" ]] && return 0
 
-    local violations=()
+    # Newline-delimited accumulator, not a bash array (AGENTS.md: avoid
+    # bash-only syntax) — this script's shebang is bash-only anyway, but the
+    # `<<<` here-string idiom already used throughout keeps this consistent
+    # with the rest of the file rather than introducing a second convention.
+    local violations=""
     local num spec_num spec_id archived
     while IFS= read -r num; do
         [[ -z "$num" ]] && continue
@@ -253,11 +257,11 @@ _check_archive_on_merge() {
             # when git's rename detection fires, and the same change can surface
             # as delete+add. Presence cannot be fooled by how git renders it.
             archived=$(git ls-tree -r --name-only "$HEAD_REF" -- "specs/archive/$spec_id/" 2>/dev/null) || archived=""
-            [[ -n "$archived" ]] || violations+=("$spec_id (#$num)")
+            [[ -n "$archived" ]] || violations="${violations}${spec_id} (#${num})"$'\n'
         done <<< "$map"
     done <<< "$numbers"
 
-    (( ${#violations[@]} == 0 )) && return 0
+    [[ -z "$violations" ]] && return 0
 
     if _has_label "skip-archive"; then
         if _skip_rationale_nonempty "Archive skip rationale"; then
@@ -273,11 +277,11 @@ EOF
     {
         printf '[FAIL] SDD archive-on-merge violation:\n'
         printf '       This PR closes an issue whose spec is still active:\n'
-        for v in "${violations[@]}"; do printf '         %s\n' "$v"; done
+        while IFS= read -r v; do [[ -n "$v" ]] && printf '         %s\n' "$v"; done <<< "$violations"
         printf '\n'
         printf '       The SDD lifecycle ends by archiving the spec in the SAME PR\n'
         printf '       (Discipline Gate step 7). Run:\n\n'
-        for v in "${violations[@]}"; do printf '         dotf spec archive %s\n' "${v%% *}"; done
+        while IFS= read -r v; do [[ -n "$v" ]] && printf '         dotf spec archive %s\n' "${v%% *}"; done <<< "$violations"
         printf '\n'
         printf '       If the work genuinely continues elsewhere, reference the issue\n'
         printf '       without a closing keyword (e.g. "Refs #N"), or add the\n'

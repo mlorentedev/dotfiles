@@ -99,7 +99,11 @@ add_local_hook() {
     refline='refs/heads/main 1111111111111111111111111111111111111111 refs/heads/main 2222222222222222222222222222222222222222'
     run bash -c "printf '%s\n' '$refline' | '$CHAIN' pre-push origin git@example.com:o/r.git"
     [ "$status" -eq 0 ]
-    [ "$(cat "$STDIN_LOG")" = "$refline" ]
+    # cmp, not a `$(...)` string comparison -- command substitution strips
+    # trailing newlines, so a dispatcher bug that dropped the final \n would
+    # pass silently under `[ "$(cat ...)" = "$refline" ]`.
+    printf '%s\n' "$refline" > "$WORK/expected-stdin"
+    cmp -s "$STDIN_LOG" "$WORK/expected-stdin"
 }
 
 @test "AC1: the remote name and url are forwarded to pre-commit" {
