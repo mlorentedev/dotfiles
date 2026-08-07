@@ -75,10 +75,36 @@ function Deploy-GitHooks {
     return $true
 }
 
+# Test-GuardDispatcher: does $Dir hold a GUARD-001 dispatcher? Structural test --
+# the pre-commit entrypoint AND the memory-sink guard it delegates to (BUG-040).
+# Not a marker grep: pre-commit execs lib/memory-sink-guard.sh, so without that
+# script the guard cannot run whatever the files claim.
+function Test-GuardDispatcher {
+    param([string]$Dir)
+    if (-not $Dir) { return $false }
+    return (Test-Path -LiteralPath (Join-Path $Dir 'pre-commit')) -and
+           (Test-Path -LiteralPath (Join-Path $Dir 'lib\memory-sink-guard.sh'))
+}
+
+# Test-SameHooksPath: compare two hooksPath values as paths, not as bytes. git
+# reports core.hooksPath with forward slashes even on Windows, so a byte compare
+# against a backslash Join-Path target is a false negative; trailing separators
+# are the same class of noise. PowerShell -eq on strings is already
+# case-insensitive, which matches Windows path semantics.
+function Test-SameHooksPath {
+    param([string]$A, [string]$B)
+    $norm = { param($p) if (-not $p) { '' } else { ($p -replace '/', '\').TrimEnd('\') } }
+    return ((& $norm $A) -eq (& $norm $B))
+}
+
 # Set-GlobalHooksPath: point git's global core.hooksPath at the deployed
 # dispatcher -- but ONLY when unset. An unrelated value is preserved (machine-wide
 # blast radius) and surfaced as a warning; an already-correct value is a no-op.
 # Mirrors the `dotf doctor` checkGuardHooks contract.
+#
+# "Correct" means the guard RUNS, not that the path matches the mirror (BUG-040):
+# developing the hooks from a repo checkout points hooksPath at an equivalent
+# dispatcher, which is active and used to be reported INACTIVE on every run.
 function Set-GlobalHooksPath {
     param([Parameter(Mandatory)][string]$Target)
 
@@ -94,8 +120,14 @@ function Set-GlobalHooksPath {
         Write-Host "[FAIL] install-git-hooks: failed to set core.hooksPath" -ForegroundColor Red
         return $false
     }
-    if ($current -eq $Target) {
+    if (Test-SameHooksPath -A $current -B $Target) {
         Write-Host "[INFO] core.hooksPath already wired to the GUARD dispatcher" -ForegroundColor Blue
+        return $true
+    }
+    if (Test-GuardDispatcher -Dir $current) {
+        # Active via a different tree. Name it so the divergence from the deploy
+        # mirror stays visible rather than silently blessed.
+        Write-Host "[SUCCESS] GUARD dispatcher active via $current (not the deploy mirror $Target)" -ForegroundColor Green
         return $true
     }
     Write-Host "[WARNING] core.hooksPath is '$current' (not the GUARD dispatcher) -- preserving it; the memory-sink guard is INACTIVE. Point it at $Target, or chain the dispatcher from your hooks, manually." -ForegroundColor Yellow
