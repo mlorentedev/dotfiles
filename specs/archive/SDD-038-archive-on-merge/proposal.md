@@ -30,7 +30,7 @@ Observable: a PR whose body says `Closes #123`, where `specs/FOO-001/proposal.md
 
 **Presence at the head ref, not a rename in the diff.** `git diff --numstat` only reports `specs/{ => archive}/<id>/…` when rename detection fires; the same move can surface as delete+add (heavy edits in the same commit, `diff.renames=false`, or a config-driven similarity threshold). Asking the head tree directly — does `specs/archive/<id>/` exist? — cannot be fooled by how git chose to render the change.
 
-**Active specs are enumerated at the base ref.** At head the spec is (correctly) gone, so base is the only ref where the issue→spec linkage is still observable.
+**Active specs are enumerated from base ∪ head, not base alone.** Base alone misses a PR that *creates* a spec and closes its issue in the same change — exactly the "created, shipped, never archived" pattern this gate exists to stop. An archived spec is no longer under `specs/<id>/` at head, so the union cannot produce a false positive.
 
 **Runs before, and independently of, the LOC logic.** A three-line PR can close a spec'd issue, so the archive check must not sit behind the `TOTAL_LOC < THRESHOLD` early exit. It is also deliberately *not* skipped by `skip-sdd`: that label asserts "this change needs no spec", which says nothing about whether an existing spec's work is finished.
 
