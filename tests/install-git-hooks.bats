@@ -77,6 +77,51 @@ teardown() {
     [ "$output" = "/home/u/.my-hooks" ]
 }
 
+# BUG-040 AC1: hooksPath pointing at a DIFFERENT tree that is nonetheless a GUARD
+# dispatcher means the guard IS running (the normal state when the hooks are
+# developed from a repo checkout). Reporting it INACTIVE was the false negative.
+@test "an equivalent dispatcher at another path is reported active, not INACTIVE" {
+    OTHER="$TMP/checkout/git-hooks"
+    mk_src "$OTHER"
+    git config --global core.hooksPath "$OTHER"
+
+    run install_git_hooks "$SRC" "$DOTF"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"INACTIVE"* ]]
+    [[ "$output" == *"$OTHER"* ]]
+
+    # No-clobber still stands: the value is reported, never repointed.
+    run git config --global --get core.hooksPath
+    [ "$output" = "$OTHER" ]
+}
+
+# BUG-040 AC2: a pre-commit alone is NOT a GUARD dispatcher — pre-commit execs
+# lib/memory-sink-guard.sh, so without it the guard genuinely cannot run. The
+# effectiveness test must not be relaxed into "any hooks dir passes".
+@test "a pre-commit without the memory-sink guard still warns" {
+    OTHER="$TMP/other/git-hooks"
+    mkdir -p "$OTHER"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$OTHER/pre-commit"
+    git config --global core.hooksPath "$OTHER"
+
+    run install_git_hooks "$SRC" "$DOTF"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"preserving it"* ]]
+    [[ "$output" == *"INACTIVE"* ]]
+}
+
+# BUG-040 AC3: a trailing separator names the same directory; it must resolve to
+# the already-wired tier, not fall through to the foreign-path WARN.
+@test "a trailing-slash variant of the target counts as already wired" {
+    install_git_hooks "$SRC" "$DOTF"
+    git config --global core.hooksPath "$DEST/"
+
+    run install_git_hooks "$SRC" "$DOTF"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already wired to the GUARD dispatcher"* ]]
+    [[ "$output" != *"INACTIVE"* ]]
+}
+
 @test "clean-mirror removes a stale hook on re-deploy" {
     install_git_hooks "$SRC" "$DOTF"
     touch "$DEST/stale-hook"

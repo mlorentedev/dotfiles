@@ -128,6 +128,80 @@ func TestCheckGuardHooks_AlreadyWiredIsIdempotent(t *testing.T) {
 	}
 }
 
+// guardDispatcher writes a full GUARD dispatcher (entrypoint + the memory-sink
+// guard it delegates to) at dir, so it is recognizable as an *equivalent*
+// dispatcher rather than merely a directory holding some pre-commit file.
+func guardDispatcher(t *testing.T, dir string) string {
+	t.Helper()
+	writeExec(t, filepath.Join(dir, "pre-commit"))
+	writeExec(t, filepath.Join(dir, "lib", "memory-sink-guard.sh"))
+	return dir
+}
+
+// AC1: hooksPath at a DIFFERENT directory that is nonetheless a GUARD dispatcher
+// means the guard IS running. Reporting it INACTIVE is the #766 false negative:
+// the check tested path identity instead of gate effectiveness.
+func TestCheckGuardHooks_EquivalentDispatcherElsewherePasses(t *testing.T) {
+	cfg, target := guardCfg(t, true)
+	elsewhere := guardDispatcher(t, filepath.Join(t.TempDir(), "checkout", "git-hooks"))
+	g := &recordingGit{getValue: elsewhere}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkGuardHooks(g.system(), cfg, rep, true)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("an equivalent dispatcher must not FAIL, got %d", rep.Failures())
+	}
+	if strings.Contains(buf.String(), "GUARD inactive") {
+		t.Errorf("guard IS active via %s; must not report it inactive: %s", elsewhere, buf.String())
+	}
+	if !strings.Contains(buf.String(), elsewhere) {
+		t.Errorf("the active path must be named so the divergence stays visible, got: %s", buf.String())
+	}
+	if g.issued("git config --global core.hooksPath " + target) {
+		t.Error("must NOT repoint hooksPath; no-clobber stands")
+	}
+}
+
+// AC2: a directory with a pre-commit but WITHOUT the memory-sink guard is not a
+// GUARD dispatcher — the guard genuinely cannot run, so the WARN must survive.
+func TestCheckGuardHooks_ForeignPreCommitStillWarns(t *testing.T) {
+	cfg, _ := guardCfg(t, true)
+	foreign := filepath.Join(t.TempDir(), "other", "git-hooks")
+	writeExec(t, filepath.Join(foreign, "pre-commit")) // entrypoint only, no lib/
+	g := &recordingGit{getValue: foreign}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkGuardHooks(g.system(), cfg, rep, true)
+
+	if !strings.Contains(buf.String(), "preserving it") {
+		t.Errorf("a pre-commit without the memory-sink guard must still WARN, got: %s", buf.String())
+	}
+}
+
+// AC3: git reports core.hooksPath with forward slashes even on Windows, so a
+// byte compare against a filepath.Join target is a false negative there.
+func TestCheckGuardHooks_SeparatorAndTrailingSlashNormalize(t *testing.T) {
+	cfg, target := guardCfg(t, true)
+	g := &recordingGit{getValue: filepath.ToSlash(target) + "/"}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkGuardHooks(g.system(), cfg, rep, true)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("a separator-variant of the target must not FAIL, got %d", rep.Failures())
+	}
+	if !strings.Contains(buf.String(), "wired to the GUARD dispatcher") {
+		t.Errorf("want the tier-1 wired PASS, got: %s", buf.String())
+	}
+	if g.issued("git config --global core.hooksPath " + target) {
+		t.Error("idempotent: a normalized-equal hooksPath must not be re-written")
+	}
+}
+
 func TestCheckGuardHooks_UnrelatedIsPreservedNotClobbered(t *testing.T) {
 	cfg, target := guardCfg(t, true)
 	g := &recordingGit{getValue: "/home/u/.my-hooks"}

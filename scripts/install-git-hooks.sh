@@ -81,10 +81,22 @@ deploy_git_hooks() {
     return 0
 }
 
+# is_guard_dispatcher <dir>: does <dir> hold a GUARD-001 dispatcher? Structural
+# test — the pre-commit entrypoint AND the memory-sink guard it delegates to
+# (BUG-040). Not a marker grep: pre-commit execs lib/memory-sink-guard.sh, so
+# without that script the guard cannot run whatever the files claim.
+is_guard_dispatcher() {
+    [ -f "$1/pre-commit" ] && [ -f "$1/lib/memory-sink-guard.sh" ]
+}
+
 # wire_global_hooks_path <target_dir>: point git's global core.hooksPath at the
 # deployed dispatcher — but ONLY when unset. An unrelated value is preserved
 # (machine-wide blast radius) and surfaced as a warning; an already-correct value
 # is a no-op. Mirrors the `dotf doctor` checkGuardHooks contract.
+#
+# "Correct" means the guard RUNS, not that the path matches the mirror (BUG-040):
+# developing the hooks from a repo checkout points hooksPath at an equivalent
+# dispatcher, which is active and used to be reported INACTIVE on every run.
 wire_global_hooks_path() {
     local target="$1" current
     current="$(git config --global --get core.hooksPath 2>/dev/null || true)"
@@ -96,8 +108,12 @@ wire_global_hooks_path() {
             log_error "install-git-hooks: failed to set core.hooksPath"
             return 1
         fi
-    elif [ "$current" = "$target" ]; then
+    elif [ "$current" = "$target" ] || { [ -d "$current" ] && [ "$current" -ef "$target" ]; }; then
         log_info "core.hooksPath already wired to the GUARD dispatcher"
+    elif is_guard_dispatcher "$current"; then
+        # Active via a different tree. Name it so the divergence from the deploy
+        # mirror stays visible rather than silently blessed.
+        log_success "GUARD dispatcher active via $current (not the deploy mirror $target)"
     else
         log_warning "core.hooksPath is '$current' (not the GUARD dispatcher) — preserving it; the memory-sink guard is INACTIVE. Point it at $target, or chain the dispatcher from your hooks, manually."
     fi

@@ -3,6 +3,7 @@ package doctor
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -29,10 +30,8 @@ func checkGuardHooks(sys *System, cfg *Config, rep *Report, fix bool) {
 	}
 
 	current := gitGlobalHooksPath(sys)
-	switch current {
-	case target:
-		rep.Pass("core.hooksPath wired to the GUARD dispatcher")
-	case "":
+	switch {
+	case current == "":
 		if !fix {
 			rep.Fail("core.hooksPath unset — GUARD memory-sink guard inactive; run `dotf doctor --fix`")
 			return
@@ -42,11 +41,44 @@ func checkGuardHooks(sys *System, cfg *Config, rep *Report, fix bool) {
 			return
 		}
 		rep.Fix("wired core.hooksPath → " + target)
+	case samePath(current, target):
+		rep.Pass("core.hooksPath wired to the GUARD dispatcher")
+	case isGuardDispatcher(current):
+		// BUG-040: the question is whether a GUARD dispatcher RUNS, not whether
+		// the path matches the deploy mirror. Developing the hooks from a repo
+		// checkout points hooksPath at an equivalent dispatcher — active, and
+		// previously reported INACTIVE on every run. Name the path so the
+		// divergence from the mirror stays visible instead of silently blessed.
+		rep.Pass("GUARD dispatcher active via " + current + " (not the deploy mirror " + target + ")")
 	default:
 		// Unrelated pre-existing value: preserve it, never clobber.
 		rep.Warn(fmt.Sprintf("core.hooksPath is %s (not the GUARD dispatcher) — preserving it; "+
 			"GUARD inactive. Point it at %s, or chain the dispatcher from your hooks, manually.", current, target))
 	}
+}
+
+// isGuardDispatcher reports whether dir holds a GUARD-001 dispatcher: the
+// pre-commit entrypoint AND the memory-sink guard it delegates to. Structural
+// rather than a marker grep — pre-commit execs lib/memory-sink-guard.sh, so
+// without that script the guard cannot run no matter what the files say.
+func isGuardDispatcher(dir string) bool {
+	return pathExists(filepath.Join(dir, "pre-commit")) &&
+		pathExists(filepath.Join(dir, "lib", "memory-sink-guard.sh"))
+}
+
+// samePath compares two hooksPath values as paths, not as bytes. git reports
+// core.hooksPath with forward slashes even on Windows, so comparing it to a
+// filepath.Join target is a false negative there; trailing separators and
+// drive-letter case are the same class of noise.
+func samePath(a, b string) bool {
+	norm := func(p string) string {
+		return filepath.Clean(filepath.FromSlash(strings.TrimRight(p, `/\`)))
+	}
+	na, nb := norm(a), norm(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(na, nb)
+	}
+	return na == nb
 }
 
 // gitGlobalHooksPath returns the global core.hooksPath, or "" when unset.
