@@ -18,6 +18,7 @@ Thumbs.db
 # Machine-local shell overrides (IDEAS-001) — non-sensitive, per-machine
 .zshrc.local
 .bashrc.local
+.tmux.conf.local
 
 # Cross-machine path resolution (ADR-025). The per-machine override lives at
 # ~/.config/dotfiles/machine.json (outside the repo); the generated path files
