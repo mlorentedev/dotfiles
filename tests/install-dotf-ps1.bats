@@ -61,6 +61,17 @@ setup() {
     grep -qF 'MyInvocation.InvocationName' "$PS1"
 }
 
+@test "replaces a locked dotf.exe by moving it aside, not by overwriting it" {
+    # BUG-037 parity. Windows refuses to overwrite or delete a *running* image,
+    # but it does allow renaming one, so the swap has to park the live exe and
+    # move the staged one into place — the analogue of install-dotf.sh's mv.
+    # Behavioral coverage lives in install-dotf-ps1.Tests.ps1 (Pester).
+    grep -qE 'function +Set-DotfBinary' "$PS1"
+    grep -qF 'Move-Item' "$PS1"
+    # The naive one-shot copy straight onto the live target must be gone.
+    ! grep -qF "Copy-Item -Path \$exe" "$PS1"
+}
+
 @test "setup-windows.ps1 dot-sources install-dotf.ps1 and calls Install-Dotf" {
     grep -qF 'install-dotf.ps1' "$SETUP_WIN"
     grep -qF 'Install-Dotf' "$SETUP_WIN"
