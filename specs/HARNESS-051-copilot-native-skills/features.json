@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-051-copilot-native-skills-f1",
+    "behavior": "Copilot-targeted records deploy as regular native skills under ~/.copilot/skills.",
+    "verification": "bats tests/skills-pipeline.bats --filter 'HARNESS-051: copilot gets native'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-051-copilot-native-skills-f2",
+    "behavior": "Copilot deployment preserves auxiliary files and honors targets filtering.",
+    "verification": "bats tests/skills-pipeline.bats --filter 'HARNESS-051: copilot target filtering'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-051-copilot-native-skills-f3",
+    "behavior": "Copilot deployment prunes only generated stale skill directories.",
+    "verification": "bats tests/skills-pipeline.bats --filter 'HARNESS-051: copilot deploy prunes'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-051-copilot-native-skills-f4",
+    "behavior": "The installed Copilot CLI recognizes handoff from an isolated deployed home.",
+    "verification": "powershell -NoProfile -File tests/copilot-native-skills-smoke.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-051-copilot-native-skills-f5",
+    "behavior": "The copilot skill target is skipped, and ~/.copilot is never created, when no copilot binary is on PATH.",
+    "verification": "bats tests/skills-pipeline.bats --filter 'BUG-771: copilot native skills are not deployed'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

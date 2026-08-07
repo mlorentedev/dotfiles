@@ -162,7 +162,8 @@ seed_skills_fixture() {
     "deploy": [ { "agent": "claude",   "render": "skill",   "dir": ".claude/skills" },
                 { "agent": "opencode", "render": "command", "dir": ".config/opencode/commands" },
                 { "agent": "agy",      "render": "skill",   "dir": ".gemini/skills" },
-                { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" } ],
+                { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" },
+                { "agent": "copilot",  "render": "skill",   "dir": ".copilot/skills" } ],
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" } } }
 EOF
     cat > "$REPO/harness/skill-frontmatter.schema.json" <<'EOF'
@@ -211,7 +212,7 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     [ ! -d "$FAKEHOME/.claude" ]
 }
 
-@test "render: --deploy renders records to \$HOME with provenance (claude + opencode)" {
+@test "render: --deploy renders records to \$HOME with provenance (claude + opencode + copilot)" {
     seed_skills_fixture
     run_refresh; [ "$status" -eq 0 ]
     run_deploy; [ "$status" -eq 0 ]
@@ -224,6 +225,9 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     ! grep -q '^name:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     grep -q '^description:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
+    # copilot uses the Agent Skills directory format and keeps the whole record
+    grep -q '^name: demo-skill' "$FAKEHOME/.copilot/skills/demo-skill/SKILL.md"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.copilot/skills/demo-skill/SKILL.md"
 }
 
 @test "AC1: --deploy replaces a pre-existing vault symlink with a regular copy" {
@@ -246,8 +250,9 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     # the record keeps the aux file
     [ -f "$REPO/harness/skills/demo-skill/reference.md" ]
     run_deploy; [ "$status" -eq 0 ]
-    # claude (dir render) gets aux file; opencode (single-file command) does not
+    # dir renders get aux files; opencode (single-file command) does not
     [ -f "$FAKEHOME/.claude/skills/demo-skill/reference.md" ]
+    [ -f "$FAKEHOME/.copilot/skills/demo-skill/reference.md" ]
     [ ! -f "$FAKEHOME/.config/opencode/commands/reference.md" ]
 }
 
@@ -285,6 +290,7 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     [ ! -f "$FAKEHOME/.config/opencode/commands/claude-only.md" ]
     [ ! -d "$FAKEHOME/.gemini/skills/claude-only" ]
     [ ! -f "$FAKEHOME/.gemini/prompts/claude-only.md" ]
+    [ ! -d "$FAKEHOME/.copilot/skills/claude-only" ]
 }
 
 @test "AC1: --deploy prunes an output whose skill dropped this agent from targets[]" {
