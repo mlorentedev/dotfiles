@@ -90,10 +90,10 @@ setup() {
     [[ "$status" -ne 0 ]]
 }
 
-# --- enabledPlugins: 13 universal plugins, all true (was 14 pre-BUG-007) ---
+# --- enabledPlugins: 5 universal plugins, all true (was 13 pre-usage-audit) ---
 
-@test "template enabledPlugins has exactly 13 universal plugins" {
-    [[ "$(jq '.enabledPlugins | length' "$SETTINGS_TEMPLATE")" == "13" ]]
+@test "template enabledPlugins has exactly 5 universal plugins" {
+    [[ "$(jq '.enabledPlugins | length' "$SETTINGS_TEMPLATE")" == "5" ]]
 }
 
 @test "template enabledPlugins values all set to true" {
@@ -101,32 +101,42 @@ setup() {
 }
 
 @test "template enabledPlugins includes core plugins from the existing user setup" {
-    # Sample 5 representative plugins. Asserting a sample catches accidental
-    # removal while keeping the test list maintainable. (`github` was on this
-    # list pre-BUG-007; replaced with `feature-dev` which is also widely used.)
-    jq -e '.enabledPlugins["code-review@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
-    jq -e '.enabledPlugins["commit-commands@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
-    jq -e '.enabledPlugins["feature-dev@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
-    jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
-    jq -e '.enabledPlugins["claude-md-management@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    # Exactly 5 remain (not a sample) — each has recorded usage: security-guidance
+    # and gopls-lsp have real saved findings/diagnostics; the output-style pair
+    # drives the current session mode; frontend-design has no substitute yet.
+    jq -e '.enabledPlugins["security-guidance@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    jq -e '.enabledPlugins["gopls-lsp@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    jq -e '.enabledPlugins["frontend-design@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    jq -e '.enabledPlugins["explanatory-output-style@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
+    jq -e '.enabledPlugins["learning-output-style@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
 }
 
-# Inverse assertion (BUG-007, incident → guard pattern from SDD-006):
-# `github@claude-plugins-official` is broken/unused and was removed. CI MUST
-# fail if it ever returns to the template (accidental re-add, copy-paste
-# from old docs, etc.). The setup scripts' plugin install loop is checked
-# below as a cross-OS parity guard.
-@test "template enabledPlugins must NOT include github (BUG-007 removed)" {
-    run jq -e '.enabledPlugins["github@claude-plugins-official"]' "$SETTINGS_TEMPLATE"
-    [ "$status" -ne 0 ]
+# Inverse assertions (BUG-007, incident → guard pattern from SDD-006):
+# these plugins were removed for zero recorded usage across every saved
+# session transcript (2026-08-06 audit) or, for `github`, being broken
+# (BUG-007). CI MUST fail if any returns to the template (accidental re-add,
+# copy-paste from old docs, etc.). The setup scripts' plugin install loops
+# are checked below as a cross-OS parity guard.
+@test "template enabledPlugins must NOT include plugins removed for zero usage" {
+    for plugin in github code-simplifier claude-md-management claude-code-setup \
+        ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
+        run jq -e ".enabledPlugins[\"${plugin}@claude-plugins-official\"]" "$SETTINGS_TEMPLATE"
+        [ "$status" -ne 0 ]
+    done
 }
 
-@test "setup-linux.sh plugin install loop must NOT include github (BUG-007 removed)" {
-    ! grep -qE '"github@claude-plugins-official"' "$DOTFILES_DIR/setup-linux.sh"
+@test "setup-linux.sh plugin install loop must NOT include plugins removed for zero usage" {
+    for plugin in github code-simplifier claude-md-management claude-code-setup \
+        ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
+        ! grep -qE "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-linux.sh"
+    done
 }
 
-@test "setup-windows.ps1 plugin install loop must NOT include github (BUG-007 removed)" {
-    ! grep -qE '"github@claude-plugins-official"' "$DOTFILES_DIR/setup-windows.ps1"
+@test "setup-windows.ps1 plugin install loop must NOT include plugins removed for zero usage" {
+    for plugin in github code-simplifier claude-md-management claude-code-setup \
+        ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
+        ! grep -qE "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-windows.ps1"
+    done
 }
 
 # --- Negative assertions: user/machine-specific keys MUST NOT be in template ---

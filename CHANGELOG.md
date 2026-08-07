@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.32.2](https://github.com/mlorentedev/dotfiles/compare/v0.32.1...v0.32.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **hooks:** run pre-commit gates that a global core.hooksPath made uninstallable ([#765](https://github.com/mlorentedev/dotfiles/issues/765)) ([90c4409](https://github.com/mlorentedev/dotfiles/commit/90c440914c74f14cdee91e755b8b6cf9749df9d8)), closes [#748](https://github.com/mlorentedev/dotfiles/issues/748)
+* **install-dotf:** swap the binary atomically so upgrades survive a live dotf ([#760](https://github.com/mlorentedev/dotfiles/issues/760)) ([c55dfd7](https://github.com/mlorentedev/dotfiles/commit/c55dfd7aa6f3270204d72e5f8cc3cafd9c78546f)), closes [#750](https://github.com/mlorentedev/dotfiles/issues/750)
+* **pwsh:** clear the built-in aliases that made four profile functions dead ([#763](https://github.com/mlorentedev/dotfiles/issues/763)) ([30e2c8e](https://github.com/mlorentedev/dotfiles/commit/30e2c8e48fa348a65193587936ea7f2e01f0a721)), closes [#745](https://github.com/mlorentedev/dotfiles/issues/745)
+* **shell-profile:** keep the profiled shell's exit status from aborting the run ([#762](https://github.com/mlorentedev/dotfiles/issues/762)) ([2ee1105](https://github.com/mlorentedev/dotfiles/commit/2ee1105211f87fb7d53cc3438634d14113e50bb5)), closes [#746](https://github.com/mlorentedev/dotfiles/issues/746)
+
 ## [0.32.1](https://github.com/mlorentedev/dotfiles/compare/v0.32.0...v0.32.1) (2026-08-06)
 
 
