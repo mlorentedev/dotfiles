@@ -13,8 +13,8 @@ created: "2026-08-07"
 
 - [x] Worktree created from `origin/main`: `dotfiles-wt-hive-install-model`, branch `feat/hive-install-model-migration`
 - [x] Gating issue open and assigned: dotfiles#791
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions" — 1 `[AGENT-DRAFT]` remains (Linux path)
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions" — the Linux `[AGENT-DRAFT]` is resolved
 
 ## Implementation
 
@@ -40,11 +40,11 @@ created: "2026-08-07"
 
 ### PR3 — decision reconciliation + docs (AC5, AC6) — independent of PR2
 
-- [ ] [AC5] Amend `specs/AI-022-hive-daemon-activation/tasks.md`: the "A1, NOT A3" decision is superseded — hive spiked A3 on 2026-06-24 and shipped it in 1.43.0. Record the supersession with dates rather than deleting the original reasoning.
-- [ ] [AC5] Add a forward pointer in `specs/archive/AI-023-hive-auto-upgrade-timer/` to this spec.
-- [ ] [AC6] Record the Linux decision explicitly (resolve the `[AGENT-DRAFT]` in `proposal.md` first) in this spec and in the amended `AI-022`.
-- [ ] Update `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`: either retire it (if the new model makes the failure unreachable) or point it at the new install model and at #574 for repair.
-- [ ] Document the install model in one place — what owns the layout, what bootstraps it, what triggers upgrades, and which OS uses which mechanism.
+- [x] [AC5] Amend `specs/AI-022-hive-daemon-activation/tasks.md`: the "A1, NOT A3" decision is superseded — hive spiked A3 on 2026-06-24 and shipped it in 1.43.0. Record the supersession with dates rather than deleting the original reasoning.
+- [x] [AC5] Add a forward pointer in `specs/archive/AI-023-hive-auto-upgrade-timer/` to this spec.
+- [x] [AC6] Record the Linux decision explicitly (resolved: Linux keeps `uv tool`) in this spec and in the amended `AI-022`.
+- [x] Update `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`: either retire it (if the new model makes the failure unreachable) or point it at the new install model and at #574 for repair.
+- [ ] **Deferred to PR2 (deliberately).** Document the install model in one place — what owns the layout, what bootstraps it, what triggers upgrades, and which OS uses which mechanism. Writing it now would document the A1 state that PR2 replaces; the doc lands with the change it describes.
 
 ## Closing
 
@@ -58,7 +58,7 @@ created: "2026-08-07"
 
 ## Machine-readable features
 
-This spec emits a sibling `features.json` following [[pattern-feature-list-as-primitive]]. Authored once `tasks.md` freezes (after the Linux `[AGENT-DRAFT]` resolves), so verification commands name real test names rather than guesses.
+This spec emits a sibling `features.json` following [[pattern-feature-list-as-primitive]]. Authored when PR2 lands, so verification commands name real test names rather than guesses. PR1's criterion (AC1) is already pinned by four named bats cases.
 
 **Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state.
 

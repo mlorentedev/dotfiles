@@ -35,8 +35,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC2 (bootstrap) -> commit `<hash>` + B1/B2/B3 flip on the broken box
 - [ ] AC3 (bare `hive self-upgrade`, no stop/start) -> test `<name>`
 - [ ] AC4 (no `uv tool list` inference on Windows) -> test `<name>` + B4 flips (task registered)
-- [ ] AC5 (A1/A3 reconciliation) -> commit `<hash>`
-- [ ] AC6 (Linux decision recorded) -> commit `<hash>`
+- [x] AC5 (A1/A3 reconciliation) -> `AI-022/tasks.md` supersession block + `AI-023` forward pointer
+- [x] AC6 (Linux decision recorded) -> Linux keeps `uv tool`; recorded in both `proposal.md` and `AI-022/tasks.md`
 - [ ] AC7 (end-to-end on the broken box) -> B1–B8 all flip; B8 is the user-visible one
 
 ## Test status

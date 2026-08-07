@@ -122,6 +122,19 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 uv tool list
 ```
 
+**Since 2026-08-07 the auto-upgrade timer detects it for you.** This failure
+recurred on the maintainer's box and sat unnoticed for months, because
+`hive-upgrade.ps1` treated "no install found" and "already up to date" as the same
+silent `exit 0`. It now exits **non-zero** with a message when no install is
+resolvable, so the condition surfaces in Task Scheduler without anyone running
+anything (dotfiles#796 / AI-028 PR1):
+
+```powershell
+Get-ScheduledTaskInfo -TaskName DotfilesHiveUpgrade   # LastTaskResult != 0 => broken install
+```
+
+That is detection, not repair — the recipe above is still the fix until #574 lands.
+
 The durable, cross-machine version of this check + repair is **#574** — `dotf doctor`
 should FAIL loudly when the Hive install cannot start and `dotf doctor --fix` should run
 the stop-daemon → force-reinstall recipe idempotently. Until that lands, this note is the
