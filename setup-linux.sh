@@ -1180,16 +1180,9 @@ if command -v claude >/dev/null 2>&1; then
     plugins_added=0
     plugins_skipped=0
     for plugin in \
-        "code-simplifier@claude-plugins-official" \
         "gopls-lsp@claude-plugins-official" \
         "security-guidance@claude-plugins-official" \
-        "claude-md-management@claude-plugins-official" \
-        "claude-code-setup@claude-plugins-official" \
-        "frontend-design@claude-plugins-official" \
-        "ralph-loop@claude-plugins-official" \
-        "code-review@claude-plugins-official" \
-        "commit-commands@claude-plugins-official" \
-        "pr-review-toolkit@claude-plugins-official"; do
+        "frontend-design@claude-plugins-official"; do
         if printf '%s' "$installed_plugins" | grep -qF "$plugin"; then
             plugins_skipped=$((plugins_skipped + 1))
         else
