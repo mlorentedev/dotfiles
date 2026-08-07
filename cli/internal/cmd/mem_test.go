@@ -59,20 +59,27 @@ func TestMemSessionEnd_MalformedInputExitsZero(t *testing.T) {
 // the Claude auto-memory encoding that the PowerShell twins call instead of
 // re-implementing it (BUG-031/#689). Output must equal memlink.ClaudeProjectKey.
 func TestMemProjectKey(t *testing.T) {
-	for in, want := range map[string]string{
-		`C:\Users\me\p`: "C--Users-me-p",
-		"/home/me/p":    "-home-me-p",
-	} {
-		cmd := newMemCmd()
-		var out bytes.Buffer
-		cmd.SetArgs([]string{"project-key", in})
-		cmd.SetOut(&out)
-		cmd.SetErr(io.Discard)
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("project-key %q: unexpected error %v", in, err)
-		}
-		if got := strings.TrimSpace(out.String()); got != want {
-			t.Errorf("project-key %q = %q, want %q", in, got, want)
-		}
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"windows path", `C:\Users\me\p`, "C--Users-me-p"},
+		{"posix path", "/home/me/p", "-home-me-p"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := newMemCmd()
+			var out bytes.Buffer
+			cmd.SetArgs([]string{"project-key", tc.in})
+			cmd.SetOut(&out)
+			cmd.SetErr(io.Discard)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("project-key %q: unexpected error %v", tc.in, err)
+			}
+			if got := strings.TrimSpace(out.String()); got != tc.want {
+				t.Errorf("project-key %q = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
