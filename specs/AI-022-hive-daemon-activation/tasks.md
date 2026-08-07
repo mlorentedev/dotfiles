@@ -52,6 +52,32 @@ Decision: ADR-015 (hive) — A1 orchestrated stop-before-upgrade, NOT A3 junctio
 loaded native module while a session holds it) is tracked upstream in uv
 (astral-sh/uv#8528, #11930, #11134).
 
+> **SUPERSEDED 2026-08-07 — hive chose A3 and shipped it.** The decision above was
+> recorded here on 2026-06-05. Three weeks later hive ran the A3 spike it had
+> deferred and it **passed** on real non-admin Windows (2026-06-24,
+> `hive/specs/HIVE-267-upgrade-swap/verification.md`): a junction was created
+> without admin, and `current` was repointed while the old version was locked with
+> no "Access is denied". hive then implemented A3 (`src/hive/_runtime.py`,
+> `hive self-upgrade`) and published it in **1.43.0**.
+>
+> So the "over-engineering" judgement was overtaken by evidence, and neither repo
+> noticed: hive shipped A3 while this repo kept running A1, and the two specs
+> contradicted each other in writing for six weeks. That drift is itself the
+> lesson — a decision recorded in repo A about a mechanism owned by repo B needs a
+> pointer back, or it silently becomes fiction.
+>
+> **Current state:** A3 is the Windows mechanism. Linux keeps `uv tool` (see below).
+> The migration of this repo's three install sites is **AI-028** (dotfiles#791);
+> its PR2 is gated on hive#328, because `self_upgrade` builds the versioned layout
+> but installs no launcher on PATH.
+>
+> **Linux decision (AI-028 AC6), recorded explicitly so it is a choice and not an
+> omission:** Linux **keeps `uv tool install --upgrade`**. A3 exists to work around
+> Windows' inability to replace an in-use executable; POSIX has no such constraint,
+> so the versioned-dir + junction machinery would buy nothing and add a second
+> install model to maintain. `ai/hermes/setup.sh:83` and `setup-linux.sh` are
+> unchanged by AI-028.
+
 ## Machine-readable features
 
 See sibling `features.json`. Structural/static checks (JSON shape, syntax, lint,
