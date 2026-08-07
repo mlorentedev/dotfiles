@@ -31,6 +31,8 @@ EOF
 }
 
 teardown() {
+    # A test that parks a live binary in dest must not leak the process.
+    [ -z "${BUSY_PID:-}" ] || kill "$BUSY_PID" 2>/dev/null || true
     [ -z "${TMP:-}" ] || rm -rf "$TMP"
 }
 
@@ -84,6 +86,59 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"already installed"* ]]
     [ ! -e "$DEST/dotf" ]
+}
+
+@test "converges over a running dotf: a live binary in dest is replaced, not refused" {
+    # BUG-037: writing onto a *running* binary fails with ETXTBSY, so the upgrade
+    # path broke in exactly the situation dotf is in daily use — the long-lived
+    # `dotf secrets run -- <agent>` wrappers hold the binary open for hours.
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    mkdir -p "$DEST"
+    # A shell script never triggers ETXTBSY (the kernel does not hold it as an
+    # executable text image), so stand in a real ELF and keep it running.
+    cp "$(command -v sleep)" "$DEST/dotf"
+    chmod 0755 "$DEST/dotf"
+    "$DEST/dotf" 30 &
+    BUSY_PID=$!
+
+    run install_dotf "$VERSION" "$DEST" "$BASE"
+    [ "$status" -eq 0 ]
+
+    run "$DEST/dotf"
+    [ "$output" = "dotf version $VERSION" ]
+
+    # Swapping the binary must not disturb the process already running it.
+    kill -0 "$BUSY_PID" 2>/dev/null
+}
+
+@test "install leaves no staging artifact behind in dest" {
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    run install_dotf "$VERSION" "$DEST" "$BASE"
+    [ "$status" -eq 0 ]
+
+    # Exactly one entry, the binary: a leftover staging file would accumulate on
+    # every upgrade and (unremoved) mask a later failed swap.
+    run bash -c "find '$DEST' -mindepth 1 | wc -l"
+    [ "$output" -eq 1 ]
+    [ -x "$DEST/dotf" ]
+}
+
+@test "a failed verify leaves an already-installed binary intact" {
+    # The staging swap must never widen the failure window: an aborted install
+    # has to leave the previous dotf runnable.
+    printf '%s  %s\n' "deadbeefdeadbeef" "$ART" > "$FIXTURE/v$VERSION/checksums.txt"
+
+    mkdir -p "$DEST"
+    printf '#!/bin/sh\necho "dotf version 0.0.1"\n' > "$DEST/dotf"
+    chmod 0755 "$DEST/dotf"
+
+    run install_dotf "$VERSION" "$DEST" "$BASE"
+    [ "$status" -ne 0 ]
+
+    run "$DEST/dotf"
+    [ "$output" = "dotf version 0.0.1" ]
 }
 
 @test "standalone (executed, no arg, no DOTF_VERSION env) resolves the pinned version from versions.conf" {
