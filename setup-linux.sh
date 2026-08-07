@@ -1421,7 +1421,11 @@ if command -v crontab >/dev/null 2>&1; then
     if crontab -l 2>/dev/null | grep -q "vault-maintenance-weekly"; then
         log_info "Weekly vault maintenance cron already installed"
     else
-        (crontab -l 2>/dev/null; echo "$CRON_CMD # dotfiles: vault-maintenance-weekly") | crontab -
+        # `crontab -l` exits 1 when the user has no crontab yet. Under the
+        # script's `set -euo pipefail` that kills the subshell before the echo
+        # runs, and pipefail then aborts the whole setup — so a fresh node never
+        # gets past this line. `|| true` keeps the empty-crontab case benign.
+        (crontab -l 2>/dev/null || true; echo "$CRON_CMD # dotfiles: vault-maintenance-weekly") | crontab -
         log_success "Installed weekly vault maintenance cron (Sundays 10:07)"
     fi
 else

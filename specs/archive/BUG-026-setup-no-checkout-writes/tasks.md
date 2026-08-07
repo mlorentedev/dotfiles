@@ -1,10 +1,6 @@
 ---
-id: "BUG-026-setup-no-checkout-writes"
-type: spec
-status: implementing
-created: "2026-07-09"
 tags: [spec, tasks]
-template_version: "1.0"
+created: "2026-07-09"
 ---
 
 # Tasks — BUG-026-setup-no-checkout-writes

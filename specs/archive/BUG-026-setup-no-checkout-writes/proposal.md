@@ -1,10 +1,6 @@
 ---
-id: "BUG-026-setup-no-checkout-writes"
-type: spec
-status: archived
-created: "2026-07-09"
 tags: [spec, proposal, setup, idempotency, self-deploy, ci-guard]
-template_version: "1.0"
+created: "2026-07-09"
 ---
 
 # BUG-026-setup-no-checkout-writes
