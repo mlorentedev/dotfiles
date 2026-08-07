@@ -194,16 +194,23 @@ claude mcp list
 | Plugin | Purpose |
 |--------|---------|
 | `claude-mem@thedotmack` | Long-term memory across sessions |
-| `code-simplifier` | Simplify complex code |
 | `github` | GitHub API integration |
 | `security-guidance` | Security best practices |
-| `claude-md-management` | CLAUDE.md management |
-| `claude-code-setup` | Project setup assistance |
 | `frontend-design` | Frontend design |
-| `ralph-loop` | Iterative development loop |
-| `code-review` | Automated code review |
-| `commit-commands` | Git commit helpers |
-| `pr-review-toolkit` | PR review workflow |
+| `gopls-lsp` | Go language server |
+| `explanatory-output-style` | Educational insights output style |
+| `learning-output-style` | Interactive learning output style |
+
+Removed 2026-08-06 (zero invocations across all recorded session transcripts —
+superseded by a built-in or a vault-native skill, see `docs/lessons.md`):
+`code-simplifier` (-> `/simplify`), `claude-md-management` (-> `/handoff`,
+`/crystallize`, `/context-refresh`), `claude-code-setup` (-> this repo's own
+`compile-harness.sh`), `ralph-loop` (-> built-in `loop` skill), `code-review`
+plugin (-> built-in `/code-review`), `commit-commands` (-> AGENTS.md git
+Standing Orders), `pr-review-toolkit` (-> `/code-review` + `/security-review`),
+`feature-dev` (-> `architecture-session` + `writing-plans` + `executing-plans`).
+Also dropped the unmanaged duplicate `ralph-wiggum@claude-code-plugins` (never
+declared here, installed out-of-band, identical to `ralph-loop`).
 
 ### Language-Specific (Optional, per-machine)
 

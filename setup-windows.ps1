@@ -767,16 +767,9 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
 if ($claudeCmd) {
     Write-Info "Installing Claude Code plugins..."
     $plugins = @(
-        "code-simplifier@claude-plugins-official",
         "gopls-lsp@claude-plugins-official",
         "security-guidance@claude-plugins-official",
-        "claude-md-management@claude-plugins-official",
-        "claude-code-setup@claude-plugins-official",
-        "frontend-design@claude-plugins-official",
-        "ralph-loop@claude-plugins-official",
-        "code-review@claude-plugins-official",
-        "commit-commands@claude-plugins-official",
-        "pr-review-toolkit@claude-plugins-official"
+        "frontend-design@claude-plugins-official"
     )
     # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
     # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
