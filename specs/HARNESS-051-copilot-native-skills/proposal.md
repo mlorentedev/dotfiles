@@ -37,6 +37,7 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 - **Resolved - user-managed skills:** stale-output pruning already requires the `generated: true` provenance marker, so unrelated personal skills under `~/.copilot/skills` remain untouched.
 - **Resolved - cross-platform parity:** both deploy engines consume the same `skills.deploy[]` manifest matrix; adding one declarative target reaches Linux and Windows without changing either engine.
 - **Resolved - Copilot support:** GitHub documents `~/.copilot/skills/<name>/SKILL.md` as the personal skill location for Copilot CLI and Copilot App.
+- **Resolved - presence gating (found closing this spec, not anticipated at proposal time):** `setup-linux.sh` has a written, deliberate "no auto-install" policy for Copilot (BUG-003) — unlike opencode/agy/pi, which this repo's setup installs itself, Copilot is left to the user. The integration container's `tests/verify-setup.bats` already asserted `~/.copilot` must not exist when Copilot is absent (BUG-001/PR#40), for the instructions-catalog deploy. The native-skill deploy added here missed that same rule. Fixed by a manifest-declared `requires_command` on the copilot `skills.deploy[]` entry, checked by both engines before writing — opencode/agy/pi have no such field and remain unconditional.
 
 ## Acceptance criteria
 
@@ -46,6 +47,7 @@ Observable outcomes. Each must be testable.
 - [x] **AC2 - Complete and filtered render:** auxiliary files are copied for Copilot, while a skill with `targets: [claude]` is absent from the Copilot directory.
 - [x] **AC3 - Safe convergence:** a stale generated Copilot skill is pruned, but an unmarked user-managed skill is preserved.
 - [x] **AC4 - Product recognition:** the installed Copilot CLI lists `handoff` after deployment into an isolated Copilot home.
+- [x] **AC5 - Detect-and-act:** `~/.copilot` is never created by the skill deploy when no `copilot` binary is on PATH, matching the existing rule for the instructions-catalog deploy.
 
 ## References
 

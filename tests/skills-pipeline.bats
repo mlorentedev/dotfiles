@@ -18,6 +18,16 @@ setup() {
 
 teardown() { cd / || true; rm -rf "$FAKEHOME"; }
 
+# The copilot skill target has a manifest-declared requires_command (BUG-771:
+# native skills must not create ~/.copilot on a box that never installed
+# Copilot). Tests that exercise the deploy itself need a fake `copilot` on
+# PATH; tests proving the gate need PATH left alone.
+stub_copilot() {
+    mkdir -p "$FAKEHOME/stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$FAKEHOME/stub/copilot"
+    chmod +x "$FAKEHOME/stub/copilot"
+}
+
 @test "AC8 smoke: /spec is discoverable for claude + opencode after deploy" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
@@ -112,7 +122,8 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
 }
 
 @test "HARNESS-051: copilot gets native /spec and /handoff skills" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    stub_copilot
+    run env HOME="$FAKEHOME" PATH="$FAKEHOME/stub:$PATH" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     [ -f "$FAKEHOME/.copilot/skills/spec/SKILL.md" ]
     grep -q '^name: spec' "$FAKEHOME/.copilot/skills/spec/SKILL.md"
@@ -123,10 +134,23 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
 }
 
 @test "HARNESS-051: copilot target filtering and auxiliary files are preserved" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    stub_copilot
+    run env HOME="$FAKEHOME" PATH="$FAKEHOME/stub:$PATH" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     [ ! -d "$FAKEHOME/.copilot/skills/creating-skills" ]
     [ -f "$FAKEHOME/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
+}
+
+@test "BUG-771: copilot native skills are not deployed when the copilot binary is absent" {
+    # No stub_copilot here -- this PATH has no copilot on it (true of this
+    # test suite's own environment already, which is exactly the class of
+    # box the gate exists for: setup-linux.sh never auto-installs Copilot).
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    [ ! -e "$FAKEHOME/.copilot/skills" ]
+    # The catalog injection is a separate, un-gated feature (it only edits an
+    # already-present instructions.md) and must be unaffected.
+    grep -qF -- '**spec**' "$FAKEHOME/.copilot/copilot-instructions.md"
 }
 
 @test "HARNESS-051: copilot deploy prunes only generated stale skills" {

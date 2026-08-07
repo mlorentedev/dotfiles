@@ -1838,6 +1838,27 @@ function Deploy-SkillRecord {
     $records = @(Get-ChildItem -LiteralPath $recordDir -Directory -ErrorAction SilentlyContinue)
 
     foreach ($d in $manifest.skills.deploy) {
+        # Optional per-target requires_command (manifest-declared, not hardcoded
+        # here): a tool this repo does not auto-install itself (Copilot, per
+        # BUG-003's explicit "no auto-install" policy) only gets its config
+        # deployed once genuinely present, mirroring the same gate on the Linux
+        # engine and the existing detect-and-act rule for Copilot's
+        # instructions.md. Tools this repo DOES install have no requires_command
+        # and deploy unconditionally, same as before.
+        #
+        # .PSObject.Properties guard, not $d.requires_command directly: utils.ps1
+        # sets Set-StrictMode Latest, and most deploy entries have no
+        # requires_command key at all, so direct access throws instead of
+        # returning $null (same class of bug as the winget ContainsKey guard
+        # above).
+        $requiresCmd = $null
+        if ($d.PSObject.Properties.Match('requires_command').Count -gt 0) {
+            $requiresCmd = $d.requires_command
+        }
+        if ($requiresCmd -and -not (Get-Command $requiresCmd -ErrorAction SilentlyContinue)) {
+            Write-Info "skill target $($d.agent) skipped: $requiresCmd not on PATH"
+            continue
+        }
         $destBase = Join-Path $env:USERPROFILE ($d.dir -replace '/', '\')
         Ensure-Directory $destBase
         foreach ($rec in $records) {

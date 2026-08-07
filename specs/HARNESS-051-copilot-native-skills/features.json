@@ -26,5 +26,12 @@
     "verification": "powershell -NoProfile -File tests/copilot-native-skills-smoke.ps1",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "HARNESS-051-copilot-native-skills-f5",
+    "behavior": "The copilot skill target is skipped, and ~/.copilot is never created, when no copilot binary is on PATH.",
+    "verification": "bats tests/skills-pipeline.bats --filter 'BUG-771: copilot native skills are not deployed'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

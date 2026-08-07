@@ -25,6 +25,7 @@ created: "2026-08-05"
 - [x] [AC1] Add the native Copilot skill target to `harness/manifest.json`.
 - [x] [AC1] Update both Copilot instruction overlays to describe native discovery accurately.
 - [x] [AC4] Deploy to an isolated home and confirm `copilot skill list` recognizes `handoff`.
+- [x] [AC5] Gate the copilot skill target on a manifest-declared `requires_command`, checked by both deploy engines, so `~/.copilot` is never created when Copilot is absent (found via the integration container's pre-existing `verify-setup.bats` regression, not anticipated at proposal time).
 
 ## Closing
 
