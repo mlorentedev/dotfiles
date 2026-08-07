@@ -445,7 +445,7 @@ do_deploy() {
 # Render committed skill records to their per-agent $HOME paths (offline),
 # de-symlinking first, then inject the copilot catalog.
 deploy_skills() {
-    local sk_vsub sk_recdir agent render dir sk_dir name outp destdir
+    local sk_vsub sk_recdir agent render dir requires sk_dir name outp destdir
     sk_vsub="$(jq -r '.skills.vault_subpath' "$MANIFEST")"
     sk_recdir="$REPO_ROOT/$(jq -r '.skills.record_dir' "$MANIFEST")"
     if [[ ! -d "$sk_recdir" ]]; then
@@ -455,7 +455,18 @@ deploy_skills() {
 
     # 1. render each record -> its per-agent $HOME path, de-symlinking first so a
     #    pre-existing vault symlink (BUG-100) becomes a regular copy.
-    while IFS=$'\t' read -r agent render dir; do
+    while IFS=$'\t' read -r agent render dir requires; do
+        # Optional per-target "requires_command" (manifest-declared, not
+        # hardcoded here): a tool this repo does not auto-install itself
+        # (Copilot, per BUG-003's explicit "no auto-install" policy) only gets
+        # its config deployed once it is genuinely present -- the same
+        # detect-and-act rule setup-linux.sh already applies to Copilot's
+        # instructions.md. Tools this repo DOES install (opencode, agy, pi)
+        # have no requires_command and deploy unconditionally, same as before.
+        if [[ -n "$requires" ]] && ! command -v "$requires" >/dev/null 2>&1; then
+            printf '[deploy] skill target %s skipped: %s not on PATH\n' "$agent" "$requires"
+            continue
+        fi
         for sk_dir in "$sk_recdir"/*/; do
             [[ -f "$sk_dir/SKILL.md" ]] || continue
             name="$(basename "$sk_dir")"
@@ -477,7 +488,7 @@ deploy_skills() {
             esac
             printf '[deploy] skill -> %s\n' "$outp"
         done
-    done < <(jq -r '.skills.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
+    done < <(jq -r '.skills.deploy[] | "\(.agent)\t\(.render)\t\(.dir)\t\(.requires_command // "")"' "$MANIFEST")
 
     # 2. prune our own stale outputs (skill removed, or targets[] dropped this
     #    agent). Safe: only files carrying our provenance marker are removed.

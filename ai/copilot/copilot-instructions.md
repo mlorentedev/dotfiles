@@ -40,11 +40,11 @@ When AI-017/AI-018 close, replace this block with the literal model IDs.
 
 ## Skills
 
-Copilot has no per-skill discovery mechanism, so the cross-agent skill pipeline
-(SDD-008) injects a catalog of the available skills below. The list is generated
-from the vault skill records (`harness/skills/`) at deploy time and honors each
-skill's `targets[]`; edit the skill in the vault and re-run setup — do NOT edit
-between the markers.
+The cross-agent skill pipeline deploys compatible records as native personal
+Agent Skills under `~/.copilot/skills/`, including each complete `SKILL.md` and
+its resources. The generated catalog below remains an always-loaded index; both
+surfaces honor each skill's `targets[]`. Edit the skill in the vault and re-run
+setup — do NOT edit between the markers.
 
 <!-- BEGIN HARNESS GENERATED -->
 <!-- END HARNESS GENERATED -->
