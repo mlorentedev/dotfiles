@@ -54,7 +54,10 @@ fi
 if $DETAIL; then
     echo "=== Detail profile: $SHELL_CHOICE (DOTFILES_PROFILE=1) ==="
     echo ""
-    DOTFILES_PROFILE=1 "$SHELL_CHOICE" -i -c exit
+    # `|| true`: an interactive shell reports the status of the last command its
+    # profile ran, so a non-zero exit is ordinary, not a failure to profile.
+    # Without this, `set -e` aborts here and the run reports failure (BUG-035).
+    DOTFILES_PROFILE=1 "$SHELL_CHOICE" -i -c exit || true
     exit 0
 fi
 
@@ -64,8 +67,16 @@ echo ""
 
 samples=""
 for _ in $(seq 1 "$RUNS"); do
-    # `time` writes to stderr in `real Xm Y.YYYs` format; capture and convert to seconds.
-    raw=$( { time "$SHELL_CHOICE" -i -c exit ; } 2>&1 | awk '/^real/ {print $2}')
+    # `time` writes to stderr in `real Xm Y.YYYs` format; capture and convert to
+    # seconds. The `|| true` keeps the *profiled* shell's exit status from
+    # aborting the run: under `set -euo pipefail` a non-zero exit propagated
+    # through the pipeline and killed the script before any stats were printed
+    # (BUG-035). A loaded interactive profile exits non-zero routinely — the
+    # status reflects the last command it ran, not a failure to start — which is
+    # why this only bit on real machines and never in CI, where a bare
+    # `bash -i -c exit` happens to return 0. Scoping it to the shell keeps
+    # `set -e` protecting the awk that parses the measurement.
+    raw=$( { time "$SHELL_CHOICE" -i -c exit || true ; } 2>&1 | awk '/^real/ {print $2}')
     # Format: "0m0.234s" → 0.234
     seconds=$(printf '%s' "$raw" | awk -F'[ms]' '{ printf "%.3f", $1 * 60 + $2 }')
     printf '  run: %ss\n' "$seconds"
