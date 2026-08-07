@@ -7,7 +7,7 @@ created: "2026-08-06"
 
 ## Evidence
 
-19 tests in `tests/spec-gate-archive.bats`. 9 were red before the implementation; the other 10 were green throughout and pin the behaviour that must **not** change — the "must not fire" cases, which are the dangerous direction for an enforcement gate.
+20 tests in `tests/spec-gate-archive.bats`. 10 were red before the implementation; the other 10 were green throughout and pin the behaviour that must **not** change — the "must not fire" cases, which are the dangerous direction for an enforcement gate.
 
 - [x] AC1 — closing without archiving fails, names the spec, prints the command -> `AC1: closing an issue whose active spec is not archived fails the gate`, `AC1: a spec created and closed in the same PR must still be archived`, `AC1: multiple closing references are all checked`
 - [x] AC2 — passes once archived -> `AC2: the same PR passes once the spec folder is archived`
@@ -21,7 +21,7 @@ created: "2026-08-06"
 
 ## Test status
 
-- `bats tests/spec-gate-archive.bats tests/check-spec-gate.bats` -> **45/45 pass, 0 failures** (19 new + 25 pre-existing + 1 added mid-implementation).
+- `bats tests/spec-gate-archive.bats tests/check-spec-gate.bats` -> **45/45 pass, 0 failures** (20 new + 25 pre-existing).
 - `shellcheck -x scripts/check-spec-gate.sh` -> clean.
 
 ### Dogfood against real repository data

@@ -40,7 +40,3 @@ created: "2026-07-14"
 > `features.json` omitted, matching the current precedent (BUG-029, BUG-030 ship
 > proposal/tasks/verification only). Acceptance criteria map to Go/Pester tests
 > named in `verification.md`.
-
-## Machine-readable features
-
-See sibling `features.json`. Pass-state is harness-gated (agent may not set `passing`).
