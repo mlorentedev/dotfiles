@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # check-spec-gate.sh: SDD Tier 4 enforcement gate.
 #
