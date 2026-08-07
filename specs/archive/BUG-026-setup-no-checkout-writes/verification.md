@@ -1,17 +1,13 @@
 ---
-id: "BUG-026-setup-no-checkout-writes"
-type: spec
-status: implementing
-created: "2026-07-09"
 tags: [spec, verification]
-template_version: "1.0"
+created: "2026-07-09"
 ---
 
 # Verification — BUG-026-setup-no-checkout-writes
 
 ## Reproduction (pre-fix, from #694)
 
-```
+```console
 git clone --depth 5 https://github.com/mlorentedev/dotfiles.git ~/dotfiles-repo
 cd ~/dotfiles-repo && bash setup-linux.sh          # exit 0
 git status --porcelain                              # " M .github/copilot-instructions.md"

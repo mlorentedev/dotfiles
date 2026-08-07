@@ -52,8 +52,9 @@ Source: issue #689 (audit codebase-audit-2026-07-06 findings C16, C11, C5).
   `knowledge-crystallize.ps1` obtain the key via `dotf mem project-key`, guarded on
   `dotf` being on PATH (the existing `if (Get-Command dotf ...)` pattern at
   `setup-windows.ps1:605/619/645`). When `dotf` is absent the inline fallback uses
-  the **corrected** encoding `.Replace('\','-').Replace(':','-')` (matches Go), so
-  bootstrap never hard-depends on the CLI yet never re-emits the buggy key.
+  the **corrected** encoding `.Replace('/','-').Replace('\','-').Replace(':','-')`
+  (matches Go), so bootstrap never hard-depends on the CLI yet never re-emits the
+  buggy key.
 - **Decoder follows the encoder.** `knowledge-crystallize.ps1`'s `Get-DecodedPath`
   is updated from the single-dash assumption (`^([A-Za-z])-`) to the real
   double-dash key (`^([A-Za-z])--`), so `--all` discovery maps real
