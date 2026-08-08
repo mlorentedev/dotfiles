@@ -128,6 +128,30 @@ dedup_current_date() {
     mv "$tmp_file" "$file"
 }
 
+# Append a new section WITHOUT displacing the "## Session Handoff" block.
+#
+# HARNESS-029 requires that block to be the LAST section of MEMORY.md: it is
+# rewritten every session, so keeping it out of the auto-loaded KV-cache prefix
+# stops it from busting the provider prompt cache on every new session. A bare
+# `>> "$file"` appends after it and silently breaks that invariant — which is
+# what happened on the first crystallize of a HARNESS-029-compliant file.
+#
+# So: insert before the handoff block when present, append when it is not.
+append_before_handoff() {
+    local file="$1" block="$2"
+
+    if grep -q '^## Session Handoff' "$file" 2>/dev/null; then
+        local tmp_file="${file}.tmp.$$"
+        awk -v block="$block" '
+            !done && /^## Session Handoff/ { printf "%s\n", block; done=1 }
+            { print }
+        ' "$file" > "$tmp_file"
+        mv "$tmp_file" "$file"
+    else
+        printf '%s\n' "$block" >> "$file"
+    fi
+}
+
 # Update the # currentDate section to today's date
 update_current_date() {
     local file="$1" today="$2"
@@ -142,7 +166,7 @@ update_current_date() {
         mv "$tmp_file" "$file"
         log_info "Updated currentDate to $today"
     else
-        printf '\n# currentDate\nToday'\''s date is %s.\n' "$today" >> "$file"
+        append_before_handoff "$file" "$(printf '# currentDate\nToday'\''s date is %s.\n' "$today")"
         log_info "Added currentDate section ($today)"
     fi
 }
@@ -168,7 +192,7 @@ stamp_last_crystallized() {
         mv "$tmp_file" "$file"
         log_info "Added Last Crystallized stamp ($today)"
     else
-        printf '\n## Last Crystallized: %s\n' "$today" >> "$file"
+        append_before_handoff "$file" "$(printf '## Last Crystallized: %s\n' "$today")"
         log_info "Added Last Crystallized stamp ($today)"
     fi
 }

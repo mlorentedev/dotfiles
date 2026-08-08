@@ -67,3 +67,61 @@ setup() {
     run "$SCRIPTS_DIR/knowledge-crystallize.sh" --help
     [[ "$output" == *"USAGE"* ]]
 }
+
+# --- behavioural: HARNESS-029 invariant -------------------------------------
+# The ## Session Handoff block must remain the LAST section of MEMORY.md.
+# Regression: update_current_date/stamp_last_crystallized used to append to EOF
+# when their marker was absent, displacing the block on the first crystallize.
+
+setup_fake_project() {
+    FAKE_HOME="$(mktemp -d)"
+    FAKE_PROJECT="$FAKE_HOME/Projects/demo"
+    mkdir -p "$FAKE_PROJECT"
+    local encoded
+    encoded="$(printf '%s' "$FAKE_PROJECT" | tr '/' '-')"
+    FAKE_MEM_DIR="$FAKE_HOME/.claude/projects/$encoded/memory"
+    mkdir -p "$FAKE_MEM_DIR"
+    cat > "$FAKE_MEM_DIR/MEMORY.md" <<'EOF'
+# Memory Index — demo
+
+- [Some memory](some-memory.md) — hook
+
+## Session Handoff
+
+> Updated: 2026-01-01
+**Last task:** something
+**Next action:** something else
+EOF
+}
+
+@test "knowledge-crystallize.sh keeps Session Handoff as the last section" {
+    setup_fake_project
+    HOME="$FAKE_HOME" run bash "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.sh" "$FAKE_PROJECT"
+    [ "$status" -eq 0 ]
+
+    # Both stamps must land BEFORE the handoff block, never after it.
+    local handoff_line date_line stamp_line
+    handoff_line=$(grep -n '^## Session Handoff' "$FAKE_MEM_DIR/MEMORY.md" | cut -d: -f1)
+    date_line=$(grep -n '^# currentDate' "$FAKE_MEM_DIR/MEMORY.md" | cut -d: -f1)
+    stamp_line=$(grep -n '^## Last Crystallized:' "$FAKE_MEM_DIR/MEMORY.md" | cut -d: -f1)
+
+    [ -n "$handoff_line" ]
+    [ "$date_line" -lt "$handoff_line" ]
+    [ "$stamp_line" -lt "$handoff_line" ]
+    rm -rf "$FAKE_HOME"
+}
+
+@test "knowledge-crystallize.sh is idempotent on the handoff invariant" {
+    setup_fake_project
+    HOME="$FAKE_HOME" bash "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.sh" "$FAKE_PROJECT"
+    HOME="$FAKE_HOME" bash "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.sh" "$FAKE_PROJECT"
+
+    # A second run must not duplicate sections nor move the block.
+    [ "$(grep -c '^# currentDate' "$FAKE_MEM_DIR/MEMORY.md")" -eq 1 ]
+    [ "$(grep -c '^## Last Crystallized:' "$FAKE_MEM_DIR/MEMORY.md")" -eq 1 ]
+    local handoff_line date_line
+    handoff_line=$(grep -n '^## Session Handoff' "$FAKE_MEM_DIR/MEMORY.md" | cut -d: -f1)
+    date_line=$(grep -n '^# currentDate' "$FAKE_MEM_DIR/MEMORY.md" | cut -d: -f1)
+    [ "$date_line" -lt "$handoff_line" ]
+    rm -rf "$FAKE_HOME"
+}
