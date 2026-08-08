@@ -35,6 +35,24 @@
     ],
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   },
+  "doctrine": {
+    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge"],
+    "deploy": [
+      {
+        "agent": "agy",
+        "file": ".gemini/GEMINI.md",
+        "char_cap": 12000,
+        "why": "Antigravity reads global rules from ~/.gemini/GEMINI.md and caps EACH rules file at 12000 characters (antigravity.google/docs/rules-workflows). AGENTS.md is 21851 characters, so a full copy cannot be delivered here; this target receives the compact doctrine payload instead. The file is shared with Gemini CLI, so injection is append-and-replace-in-place, never an overwrite."
+      },
+      {
+        "agent": "codex",
+        "file": ".codex/AGENTS.md",
+        "shadowed_by": ".codex/AGENTS.override.md",
+        "char_cap": 32768,
+        "why": "Codex reads ~/.codex/AGENTS.md (or AGENTS.override.md in preference) and stops adding files once the global+project chain reaches project_doc_max_bytes, 32 KiB by default (learn.chatgpt.com/docs/agent-configuration/agents-md). A 21851-character global copy would crowd out the repo's own AGENTS.md, which is the more specific file, so this target receives the compact payload."
+      }
+    ]
+  },
   "agents": {
     "vault_subpath": "00_meta/agents/definitions",
     "record_dir": "harness/agents",
