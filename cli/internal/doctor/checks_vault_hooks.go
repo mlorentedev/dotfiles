@@ -46,8 +46,13 @@ func checkVaultHooks(sys *System, rep *Report, fix bool) {
 	// gitleaks + the hardcoded-path guard live on pre-push, the structural checks
 	// on pre-commit (the vault's .pre-commit-config.yaml). A bare or hand-rolled
 	// hook squatting the path does not count.
-	preCommitOK := vaultHookInstalled(vault, "pre-commit")
-	prePushOK := vaultHookInstalled(vault, "pre-push")
+	// Resolve what git will RUN for each stage, not whether pre-commit's own
+	// generated file sits in .git/hooks. Once core.hooksPath is set machine-wide
+	// `pre-commit install` refuses outright, so that file is one the design
+	// guarantees absent — and this check reported the gate INACTIVE while gitleaks
+	// was verifiably running through the GUARD dispatcher's fallback.
+	preCommitOK := stageReachesPreCommit(sys, vault, "pre-commit")
+	prePushOK := stageReachesPreCommit(sys, vault, "pre-push")
 	if preCommitOK && prePushOK {
 		rep.Pass("vault pre-commit + pre-push hooks installed (gitleaks gate active)")
 		return

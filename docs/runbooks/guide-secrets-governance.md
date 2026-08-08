@@ -74,6 +74,21 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 7. Securely delete `$TMPDIR/vault.json`.
    - Account-independent: **age key (offline) + repo clone = full recovery**, even if the Bitwarden account is gone.
 
+### Drill it
+
+Run this chain against the real offline backup periodically — not as an incident,
+as a rehearsal — then record it:
+
+```sh
+touch ~/.dotfiles/.dr-drill
+```
+
+`dotf doctor` reads that marker and warns when no drill is recorded, or when the
+last one is over 180 days old. It cannot check the chain works; only running it
+can. This runbook's step 1 had **no instructions at all** until someone ran it
+(#848) — an escrow that exists proves a file was written, never that anyone can
+restore from it.
+
 ## Maintainability (what keeps it from drifting)
 
 - `dotf doctor` checks (target): `bw`/`age` present (#577); DR-export freshness; **registry ↔ vault consistency** (flag `Dotfiles/**` items that break the naming/registry convention).
