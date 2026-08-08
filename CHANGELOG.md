@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.33.0](https://github.com/mlorentedev/dotfiles/compare/v0.32.2...v0.33.0) (2026-08-08)
+
+
+### Features
+
+* **harness:** bind the standing orders to the moment a change is declared done ([#821](https://github.com/mlorentedev/dotfiles/issues/821)) ([5d2a477](https://github.com/mlorentedev/dotfiles/commit/5d2a4778a25502ab00118c06a0b8358044c9acfb)), closes [#820](https://github.com/mlorentedev/dotfiles/issues/820)
+* **harness:** deliver doctrine to agy and codex, sized to what each platform reads ([#819](https://github.com/mlorentedev/dotfiles/issues/819)) ([b4ab91e](https://github.com/mlorentedev/dotfiles/commit/b4ab91e2c0a46779dea0ed3e30590c46e49d12fe))
+* **harness:** enforce the PR sizing policy on the compact-doctrine agents ([#830](https://github.com/mlorentedev/dotfiles/issues/830)) ([48fff1a](https://github.com/mlorentedev/dotfiles/commit/48fff1a19c2b73ac2f4b61e5e33bada973283114))
+* **harness:** one frontmatter contract for the skill library, enforced by the engine ([#826](https://github.com/mlorentedev/dotfiles/issues/826)) ([256f597](https://github.com/mlorentedev/dotfiles/commit/256f5979dc0256f01ee2c65016f74a329adbfac9)), closes [#823](https://github.com/mlorentedev/dotfiles/issues/823)
+* **skills:** add pr-review-triage, the disposition step after a PR comes back ([#822](https://github.com/mlorentedev/dotfiles/issues/822)) ([36dd38a](https://github.com/mlorentedev/dotfiles/commit/36dd38ab9e72926ad1b39f4f80cc291074479860))
+* **tmux:** add a ~/.tmux.conf.local override seam ([#788](https://github.com/mlorentedev/dotfiles/issues/788)) ([326a020](https://github.com/mlorentedev/dotfiles/commit/326a020556c762f73461da67c55b8a5f4cb4f98b))
+
+
+### Bug Fixes
+
+* **bitacora:** stop the board losing items on an API failure ([#813](https://github.com/mlorentedev/dotfiles/issues/813)) ([cb9d070](https://github.com/mlorentedev/dotfiles/commit/cb9d0700088881084bc95215757a0e768c03ec0f)), closes [#809](https://github.com/mlorentedev/dotfiles/issues/809)
+* **guard:** test hooksPath effectiveness, not string equality ([#801](https://github.com/mlorentedev/dotfiles/issues/801)) ([804ee32](https://github.com/mlorentedev/dotfiles/commit/804ee32b8ef3a2056be560aca37278f31327b14d)), closes [#766](https://github.com/mlorentedev/dotfiles/issues/766)
+* **harness:** report unmanaged skill copies at deploy, and unfence five portable skills ([#812](https://github.com/mlorentedev/dotfiles/issues/812)) ([ee146be](https://github.com/mlorentedev/dotfiles/commit/ee146bee33082253a9afea6fcde295059c7bd5d3))
+* **hive-upgrade:** distinguish a missing install from an idle no-op (AI-028 PR1) ([#796](https://github.com/mlorentedev/dotfiles/issues/796)) ([6c47989](https://github.com/mlorentedev/dotfiles/commit/6c47989642a165c8d9f24a18fa55a56ab5e70b6e))
+* **hooks:** make the local hook stack executable on Windows and accept scoped commits ([#795](https://github.com/mlorentedev/dotfiles/issues/795)) ([17c7d40](https://github.com/mlorentedev/dotfiles/commit/17c7d4067aa2f9c1022748c82072096d52e6a5d3)), closes [#794](https://github.com/mlorentedev/dotfiles/issues/794)
+* **hooks:** resolve local hooks through the shared git dir ([#805](https://github.com/mlorentedev/dotfiles/issues/805)) ([6873eca](https://github.com/mlorentedev/dotfiles/commit/6873ecaf2eeb64b2d71353439a1925fc73603c76))
+* **spec-gate:** count a mandated archive as the Discipline Gate's spec touch ([#808](https://github.com/mlorentedev/dotfiles/issues/808)) ([c4fac9a](https://github.com/mlorentedev/dotfiles/commit/c4fac9a895e4a1a68a37c3f005b55d0895c594cb))
+* **spec-gate:** scan the PR body for closing keywords as markdown, not as text ([#815](https://github.com/mlorentedev/dotfiles/issues/815)) ([47a9ab2](https://github.com/mlorentedev/dotfiles/commit/47a9ab2f9f530e5334acd9d75458acfb418fb81d))
+* **spec:** make the agent-tag pre-flight match what the tooling emits ([#814](https://github.com/mlorentedev/dotfiles/issues/814)) ([4917986](https://github.com/mlorentedev/dotfiles/commit/49179861f64d067b1f5897bfc9037da4a84ecdfb))
+* **test:** test the committed tree, not the deploy mirror ([#799](https://github.com/mlorentedev/dotfiles/issues/799)) ([7381860](https://github.com/mlorentedev/dotfiles/commit/7381860ced619e828c85c9daec53d9f88d27aef1)), closes [#794](https://github.com/mlorentedev/dotfiles/issues/794)
+
 ## [0.32.2](https://github.com/mlorentedev/dotfiles/compare/v0.32.1...v0.32.2) (2026-08-07)
 
 
