@@ -11,7 +11,6 @@
 package mem
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -21,6 +20,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // BriefOptions configures the agnostic session-brief core. Now and StaleDays are
@@ -193,8 +194,13 @@ func specs(cwd string) string {
 	return "\n" + msg.String()
 }
 
-// dirHasDraftTag reports whether any file under dir contains a literal
-// [AGENT-DRAFT] or [AGENT-SUGGESTION] tag — the shell's recursive grep -rlE.
+// dirHasDraftTag reports whether any file under dir carries an UNRESOLVED agent
+// tag, using the same predicate as the `dotf spec archive` pre-flight
+// (spec.ScanUnresolvedTags) so the two never disagree about what "unresolved"
+// means. They did: this used a literal substring scan, which both missed the
+// canonical emitted `[AGENT-DRAFT — review before archive]` form and fired on
+// specs merely documenting the markers — flagging a spec at session start that
+// `dotf spec archive` would have been happy to archive, and vice versa.
 func dirHasDraftTag(dir string) bool {
 	found := false
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
@@ -205,7 +211,7 @@ func dirHasDraftTag(dir string) bool {
 		if err != nil {
 			return nil
 		}
-		if bytes.Contains(b, []byte("[AGENT-DRAFT]")) || bytes.Contains(b, []byte("[AGENT-SUGGESTION]")) {
+		if len(spec.ScanUnresolvedTags(string(b))) > 0 {
 			found = true
 			return filepath.SkipAll
 		}
