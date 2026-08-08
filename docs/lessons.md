@@ -1808,3 +1808,33 @@ So a naive `common_dir=$(git rev-parse --git-common-dir)` yields the literal str
 **Solution**: Route status polling and issue creation through `gh api` — `repos/{o}/{r}/commits/{sha}/check-runs` to read checks, `POST repos/{o}/{r}/issues` to file — and set the interval from how fast the state actually changes: 60s+ for a CI run, never 20s.
 
 **Rule**: Before writing any loop against a hosted API, establish which transport each call uses and what it costs; a wait loop is the highest-volume caller in a session and must always take the cheapest path. And when a tool starts failing on rate limits, check the *other* pool before concluding you are blocked — a red run under an exhausted quota is often a partial success whose remaining phase never ran, not a failure of the work itself.
+
+### [2026-08-08] A merged PR is not a deployed change, and the deploy takes whatever branch the checkout happens to be on
+
+**Context**: #840 fixed a dispatcher bug that aborted `git commit` in every repo on the machine. It merged, `main` was released as 0.33.1, and the deploy was re-run. Everything reported success.
+
+**Problem**: The fix had not reached the machine. `git commit` still failed in a clean throwaway repo, and `grep --hook-dir ~/.dotfiles/git-hooks/lib/chain-local-hook.sh` returned zero — with an mtime from minutes earlier, so the deploy *had* run and had faithfully copied the old file. The checkout was still on `chore/sync-harness-skill-records`, the branch of an unrelated PR merged an hour before, four commits behind `main`. `setup-linux.sh` deploys from the working tree it is invoked in; it has no opinion about whether that tree is current. Green CI, a merged PR and a cut release together say nothing about what is installed.
+
+**Solution**: `git checkout main && git pull` before deploying, then verify in two tiers — the repo tier (`grep` the source) and the machine tier (`grep` the deployed copy plus an end-to-end probe: a real `git commit` in a temp repo). The end-to-end probe is what actually closed it; a file comparison alone would have missed a deploy that copied the right bytes to the wrong place.
+
+**Rule**: The deploy's input is the working tree, not the branch you believe you are on — so "merged" and "deployed" are independent facts and only the second one runs on your machine. Never close a fix on the strength of a merge; re-check the branch, then assert against the installed artifact and, where the fix has an observable behaviour, against the behaviour itself. This is the same two-tier discipline as the dotfiles deploy rule, with the branch check added: the tier-1 source can be correct and still be the wrong source.
+
+### [2026-08-08] A workaround installed to route around a bug outlives the bug silently, because nothing re-examines it
+
+**Context**: `dotf doctor` reported the GUARD-001 memory-sink guard healthy. It was not running in the dotfiles repo at all — the repo carried a local `core.hooksPath` override pointing at its own `.git/hooks`, and local scope beats the global dispatcher.
+
+**Problem**: The override was almost certainly installed to route around the dispatcher bug later filed as BUG-055: with the fallback crashing, pointing `core.hooksPath` at the repo's own hooks was the only way to keep `git commit` working there. That also explains why dotfiles was the single repo immune to a machine-wide breakage. Once BUG-055 was fixed the workaround had no purpose, but nothing re-examines a config value after the reason for it disappears — so it kept quietly disabling a security guard in the repo that ships that guard. Removing it revealed a second casualty nobody had noticed: `validate-commit-msg` had never run in this repo either.
+
+**Solution**: Probe before removing (`~/.dotfiles/git-hooks/commit-msg` and `pre-commit` both exit 0 now), then unset, then verify by effect rather than by path — stage a `memory/MEMORY.md` and confirm the commit is blocked with exit 1, and confirm a clean tree still exits 0.
+
+**Rule**: A local override is a decision with no expiry date and no owner. When you fix a bug, search for the workarounds it caused — they are invisible precisely because they succeeded, and each one may be suppressing something unrelated. The tell that the *check* is also wrong: `dotf doctor` reported "all ok" both before and after the guard went from inert to active, because it read the global scope while git resolves the effective one. A guard check must ask *does this run here*, never *is the machine wired correctly* — the same distinction BUG-040 already ruled once.
+
+### [2026-08-08] A test that does not isolate from the machine ends up measuring the machine
+
+**Context**: `tests/board-pickup.bats` failed on a clean `main` with no local changes: "assigns once, no redundant fallback" saw two log entries where it expected one. The obvious reading — and the one first published on the issue — was that the double-assignment bug it guards against was live.
+
+**Problem**: The helper was correct. GUARD-001 wires `core.hooksPath` globally, so the fixture's own `git checkout` fired the machine's real `post-checkout` dispatcher, which launches the helper under test in the background. The assertion counted the machine's hook plus the explicit call. Worse, the leak is racy — the dispatcher backgrounds the helper, so whether the second line lands before the assertion is a timing question, which is how a test like this passes locally and fails elsewhere. A sibling suite already defended against exactly this and said so in a comment; this file never got the same treatment.
+
+**Solution**: Neutralise `core.hooksPath` in the fixture's own config rather than per call, so all thirteen git invocations are covered along with any added later. Add a guard for the isolation itself — a bare checkout must leave the log empty — with a `sleep`, since an immediate assertion could pass on timing rather than on isolation.
+
+**Rule**: Any suite that shells out to `git` inherits the developer's global git config, and a machine-wide `core.hooksPath` turns "run a git command" into "run the product". Isolate at the fixture level, not the call site, and add an assertion that the isolation holds — otherwise the isolation is a convention that decays the moment someone adds a fourteenth call. And when a test contradicts the code, resolve which one is wrong before reporting it as evidence: a red test is a claim about the test *and* the code together.
