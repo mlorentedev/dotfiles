@@ -1,0 +1,38 @@
+---
+tags: [spec, tasks, templates]
+created: "2026-08-08"
+---
+
+# Tasks - HARNESS-061-effectiveness-probes
+
+> TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
+>
+> **Inline markers** (optional, additive — borrowed from `github/spec-kit`, adapt-not-adopt per #141):
+> - `[P]` — this task has **no dependency on another unchecked task**, so it is safe to run in parallel (fan out to a `Workflow`, or just batch). TDD chains (test → implement → refactor of the *same* behavior) are sequential and must NOT carry `[P]`; independent behaviors can.
+> - `[AC<n>]` — this task helps satisfy **acceptance criterion #`<n>`** from `proposal.md`. Lets `/spec check` map coverage deterministically; omit it and the check falls back to semantic judgment.
+
+## Setup
+
+- [ ] Branch created from main: `feat/HARNESS-061-effectiveness-probes`
+- [ ] `proposal.md` is complete and acceptance criteria are testable
+- [ ] No open questions left in `proposal.md` "Risks / open questions"
+
+## Implementation
+
+- [x] `[AC1]` `hookprobe.go`: `effectiveHooksPath` — read the value git resolves for a repo, local beating global
+- [x] `[AC1]` `hooksDirFor` — resolve via `--git-common-dir`, so linked worktrees and `--separate-git-dir` behave (BUG-043's lesson)
+- [x] `[AC3]` `hookForStage` — executable only; git ignores a hook it cannot run
+- [x] `[AC2]` `stageReachesPreCommit` — the generated hook OR a dispatcher with a config to act on
+- [x] `[AC1]` `checkGuardHooks`: probe each repo that matters by effect, naming the repo and the remedy
+- [x] `[AC2]` `checkVaultHooks`: resolve what git would run instead of testing for `.git/hooks/<stage>`
+- [x] `[AC4]` `[P]` `tests/stub-real-pairing.bats`: pairing guard + exemption table
+- [x] `[AC5]` `[P]` staleness test for the exemption table
+- [x] `[AC6]` `[P]` `checks_dr.go`: escrow freshness + drill marker, WARN not FAIL
+- [x] `[AC7]` red-direction tests for every new check
+
+## Verification
+
+- [x] `go test ./...` — 12 packages green
+- [x] `bats tests/*.bats` — only the pre-existing #807 failure remains
+- [x] `shellcheck` clean
+- [x] Red-teamed: removing each fix turns its guard red
