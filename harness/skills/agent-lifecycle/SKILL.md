@@ -1,4 +1,9 @@
 ---
+id: agent-lifecycle-skill
+type: skill
+status: active
+created: "2026-06-09"
+owner: manu
 name: agent-lifecycle
 description: "Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery, vault integration, config optimization, cronjob scheduling, and container deployment. Absorbs agent-bootstrap, agent-config-optimization, cronjob-management, and vault-integration (the standalone agent-config-optimization skill is retired into this skill's Section 3)."
 version: 1.0.0

@@ -1,4 +1,9 @@
 ---
+id: project-maturation-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: project-maturation
 description: Use when a project needs a structured quality audit and improvement plan. Triggers include new projects needing hardening, repos with missing tests or CI, codebases before first release, or when technical debt has accumulated across multiple dimensions.
 ---

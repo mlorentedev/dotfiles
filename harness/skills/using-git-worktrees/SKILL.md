@@ -1,4 +1,9 @@
 ---
+id: using-git-worktrees-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: using-git-worktrees
 description: Use when starting feature work that needs isolation from current workspace, or before executing implementation plans that should not affect the main working directory.
 ---

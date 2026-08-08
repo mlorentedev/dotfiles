@@ -1,4 +1,9 @@
 ---
+id: context-refresh-skill
+type: skill
+status: active
+created: "2026-06-06"
+owner: manu
 name: context-refresh
 description: Use after a brainstorm / ADR / phase-closing session to refresh a project's context.md patchable fields (phase, focus, blocked_by, recent_adrs, last_updated) WITHOUT touching the stable body. Keeps context.md cheap for agent orientation at session start (HARNESS-006). Triggers on /context-refresh, "actualiza el contexto", "refresh project context", or automatically from /handoff when an ADR was written or a phase milestone closed this session. Do NOT use for backlog/task changes — that state lives in the GitHub Project "bitácora", not here.
 ---

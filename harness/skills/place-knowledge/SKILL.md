@@ -1,4 +1,9 @@
 ---
+id: place-knowledge-skill
+type: skill
+status: active
+created: "2026-05-28"
+owner: manu
 name: place-knowledge
 description: Onboard a repository to the knowledge-placement model — move its build/operate docs (ADRs, runbooks, troubleshooting, lessons) out of a personal knowledge store into the repo's `docs/`, leaving the store with only the cross-project brain. Triggers on "/place-knowledge", "onboard <repo> to the placement model", "migrate knowledge to repo docs", "move ADRs/lessons/runbooks out of the vault", "make this repo's docs self-contained / share-ready". Implements pattern-knowledge-placement; runs the onboard-project-to-placement-model runbook. Validated on 11 repos (KPM-001, 2026-05-28).
 ---

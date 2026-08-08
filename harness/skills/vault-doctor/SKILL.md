@@ -1,4 +1,9 @@
 ---
+id: vault-doctor-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: vault-doctor
 description: Use when the Obsidian vault needs structural maintenance — unresolved links, missing frontmatter, orphan notes, or stale content. Triggers include vault_health reporting failures, /insights showing structural warnings, or periodic vault cleanup sessions.
 ---

@@ -1,4 +1,9 @@
 ---
+id: test-driven-development-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: test-driven-development
 description: Use when implementing any feature or bugfix, before writing implementation code
 ---

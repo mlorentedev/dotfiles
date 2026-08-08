@@ -1,4 +1,9 @@
 ---
+id: terraform-skill
+type: skill
+status: active
+created: "2026-06-02"
+owner: manu
 name: terraform
 description: Use when writing, reviewing, or debugging Terraform/OpenTofu modules, tests, CI, scans, or state ops — diagnoses the failure mode (identity churn, secret exposure, blast radius, CI drift, compliance, state corruption, provider-upgrade risk, testing blind spots) with version-aware guards, then generates fixes.
 source: https://github.com/antonbabenko/terraform-skill (terraform-skill)

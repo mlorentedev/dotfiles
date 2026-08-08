@@ -1,4 +1,9 @@
 ---
+id: async-python-patterns-skill
+type: skill
+status: active
+created: "2026-06-02"
+owner: manu
 name: async-python-patterns
 description: Master Python asyncio, concurrent programming, and async/await patterns for high-performance applications. Use when building async APIs, concurrent systems, or I/O-bound applications requiring non-blocking operations.
 source: https://github.com/wshobson/agents (async-python-patterns)

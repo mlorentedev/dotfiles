@@ -273,8 +273,11 @@ is_generated_output() {
 }
 
 # Validate a SKILL.md's YAML frontmatter against the committed schema's
-# `required` keys. Required = universal subset (name, description); vault skills
-# carry more. Fails loudly with file context so a malformed skill never renders.
+# `required` keys — presence and non-emptiness of each top-level key, nothing
+# more. The schema's `type`/`const`/`minLength` clauses document the contract for
+# a human reader and for any real JSON Schema validator; this loop does not
+# evaluate them, so do not read a passing --check as type validation. Fails
+# loudly with file context so a malformed skill never renders.
 validate_skill_frontmatter() {
     local f="$1" schema="$2" req
     [[ -f "$schema" ]] || { printf '[ERROR] skill schema not found: %s\n' "$schema" >&2; return 1; }

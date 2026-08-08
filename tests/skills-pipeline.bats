@@ -202,3 +202,49 @@ stub_copilot() {
     grep -q 'not a second source of truth' harness/skills/verification-before-completion/SKILL.md
     grep -q 'The Closing Pass' harness/skills/verification-before-completion/SKILL.md
 }
+
+# HERMES-018: one frontmatter contract for the whole library, enforced by the
+# engine rather than by convention. These assert the real records.
+
+@test "HERMES-018: the schema requires the store's frontmatter law, not just name+description" {
+    local k
+    for k in name description id type status created owner; do
+        jq -e --arg k "$k" '.required | index($k)' harness/skill-frontmatter.schema.json >/dev/null \
+            || { echo "schema does not require: $k"; return 1; }
+    done
+}
+
+@test "HERMES-018: every committed skill record satisfies the contract" {
+    local d name missing=0 k
+    for d in harness/skills/*/; do
+        [ -f "$d/SKILL.md" ] || continue
+        name="$(basename "$d")"
+        for k in name description id type status created owner; do
+            awk -v key="$k" '/^---[[:space:]]*$/{n++; next} n==1 && $0 ~ "^" key ": *[^ ]" {found=1} n>=2{exit} END{exit !found}' \
+                "$d/SKILL.md" || { echo "$name is missing $k"; missing=1; }
+        done
+    done
+    [ "$missing" -eq 0 ]
+}
+
+@test "HERMES-018: --check rejects a record that drops a required key" {
+    local victim="harness/skills/audit/SKILL.md" backup
+    backup="$(mktemp)"
+    cp "$victim" "$backup"
+    sed -i '/^owner: /d' "$victim"
+    run bash scripts/compile-harness.sh --check
+    cp "$backup" "$victim"; rm -f "$backup"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"owner"* ]]
+}
+
+@test "HERMES-018: a vendored skill carries provenance and an attribution row" {
+    local d name
+    for d in harness/skills/*/; do
+        [ -f "$d/SKILL.md" ] || continue
+        grep -q '^source:' "$d/SKILL.md" || continue
+        name="$(basename "$d")"
+        grep -q '^license:' "$d/SKILL.md" || { echo "$name has source but no license"; return 1; }
+        grep -qF "\`$name\`" harness/skills/ATTRIBUTION.md || { echo "$name is vendored but absent from ATTRIBUTION.md"; return 1; }
+    done
+}

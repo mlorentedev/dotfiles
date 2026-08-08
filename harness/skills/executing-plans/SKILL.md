@@ -1,4 +1,9 @@
 ---
+id: executing-plans-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: executing-plans
 description: Use when you have a written implementation plan to execute, typically after /writing-plans produces a plan file.
 ---

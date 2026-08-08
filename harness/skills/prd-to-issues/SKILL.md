@@ -1,4 +1,9 @@
 ---
+id: prd-to-issues-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: prd-to-issues
 description: Use when creating GitHub issues from a PRD, syncing an existing PRD to GitHub, or converting requirements documents into tracked issues.
 ---

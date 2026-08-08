@@ -3,6 +3,7 @@ id: enrich-us-skill
 type: skill
 status: active
 created: "2026-05-14"
+owner: manu
 name: enrich-us
 description: Take a backlog item or pasted user story and rewrite it into an implementation-ready form (fields, endpoints, files-to-modify, DoD, non-functional requirements). Triggers on /enrich-us, "enrich SDD-014", "rewrite this user story", "make this ticket implementation-ready". Single-shot rewrite (NOT Socratic — that is /spec fill's job). Outputs `## Original` + `## Enhanced` sections. Ported and adapted from LIDR-academy/lidr-specboot.
 allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_patch]

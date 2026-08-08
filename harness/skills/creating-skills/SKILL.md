@@ -1,4 +1,9 @@
 ---
+id: creating-skills-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: creating-skills
 description: Use when creating a new skill, updating an existing skill, or verifying a skill works before deployment. Covers skill anatomy, TDD testing methodology, and Claude Search Optimization for trigger descriptions.
 ---

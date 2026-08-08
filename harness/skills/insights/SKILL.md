@@ -1,4 +1,9 @@
 ---
+id: insights-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: insights
 targets: [claude]
 description: Use when checking AI workflow health, vault structural integrity, or knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale MEMORY.md, unvaulted observations, vault structural issues, or before starting a major sprint.
