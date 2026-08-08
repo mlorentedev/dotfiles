@@ -1,6 +1,5 @@
 ---
 name: creating-skills
-targets: [claude]
 description: Use when creating a new skill, updating an existing skill, or verifying a skill works before deployment. Covers skill anatomy, TDD testing methodology, and Claude Search Optimization for trigger descriptions.
 ---
 

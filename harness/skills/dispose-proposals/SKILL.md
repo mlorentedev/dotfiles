@@ -1,6 +1,5 @@
 ---
 name: dispose-proposals
-targets: [claude, opencode, pi, copilot]
 description: Triage the CURATOR recurrence-proposal inbox — the weekly human gate that turns emitted proposal drafts into bitácora issues. Triggers on "/curator dispose", "dispose the proposal inbox", "triage curator proposals", "process recurrence proposals", "review the proposals queue", and as a step of the weekly curator session. Reads 80_agents/hermes-nan/proposals/*.md (status pending), applies the curation SOP (promote / keep / merge / wontfix), and on accept files a proposal-labelled issue and marks the draft disposed.
 ---
 
