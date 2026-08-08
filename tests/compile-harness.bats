@@ -496,6 +496,90 @@ seed_instructions_file() {
     printf 'user intro\n\n<!-- BEGIN HARNESS GENERATED -->\npatterns content\n<!-- END HARNESS GENERATED -->\n\nuser outro\n' > "$1"
 }
 
+# HARNESS-054: the two surfaces that cannot take a full instructions file get the
+# compact doctrine payload instead. Extends the agents fixture with a doctrine
+# block and the enforced record its payload renders from.
+seed_doctrine_fixture() {
+    seed_agents_fixture
+    # a persona with no targets[] is universal, so presence reaches every surface
+    # including the two this fixture adds
+    sed -i '/^targets: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    mkdir -p "$REPO/harness/enforced"
+    printf -- '- rule one\n- rule two\n' > "$REPO/harness/enforced/demo.md"
+    local tmp
+    tmp="$(mktemp)"
+    jq '.doctrine = {
+          "inject": ["demo"],
+          "deploy": [
+            { "agent": "agy",   "file": ".gemini/GEMINI.md",  "char_cap": 12000 },
+            { "agent": "codex", "file": ".codex/AGENTS.md",
+              "shadowed_by": ".codex/AGENTS.override.md", "char_cap": 32768 } ] }' \
+        "$REPO/harness/manifest.json" > "$tmp" && mv "$tmp" "$REPO/harness/manifest.json"
+}
+
+@test "HARNESS-054: --deploy creates the doctrine file for a surface that has none" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    [ ! -f "$FAKEHOME/.gemini/GEMINI.md" ]
+    [ ! -f "$FAKEHOME/.codex/AGENTS.md" ]
+    run_deploy; [ "$status" -eq 0 ]
+    for f in "$FAKEHOME/.gemini/GEMINI.md" "$FAKEHOME/.codex/AGENTS.md"; do
+        [ -f "$f" ]
+        grep -q 'rule one' "$f"                      # enforced rules travelled
+        grep -q 'MUST consume' "$f"                   # presence travelled
+        grep -q 'BEGIN HARNESS GENERATED' "$f"
+    done
+}
+
+@test "HARNESS-054: doctrine injection preserves user content and is idempotent" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    mkdir -p "$FAKEHOME/.gemini"
+    printf 'my own gemini rules\n' > "$FAKEHOME/.gemini/GEMINI.md"
+    run_deploy; [ "$status" -eq 0 ]
+    grep -q 'my own gemini rules' "$FAKEHOME/.gemini/GEMINI.md"
+    local before
+    before="$(md5sum < "$FAKEHOME/.gemini/GEMINI.md")"
+    run_deploy; [ "$status" -eq 0 ]
+    [ "$(md5sum < "$FAKEHOME/.gemini/GEMINI.md")" = "$before" ]
+    [ "$(grep -c 'BEGIN HARNESS GENERATED' "$FAKEHOME/.gemini/GEMINI.md")" -eq 1 ]
+    grep -q 'my own gemini rules' "$FAKEHOME/.gemini/GEMINI.md"
+}
+
+@test "HARNESS-054: a file over the platform's documented cap warns" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    mkdir -p "$FAKEHOME/.gemini"
+    head -c 12500 /dev/zero | tr '\0' 'x' > "$FAKEHOME/.gemini/GEMINI.md"
+    run_deploy; [ "$status" -eq 0 ]
+    [[ "$output" == *"over the 12000"* ]]
+}
+
+@test "HARNESS-054: a shadow file that wins at read time warns" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    mkdir -p "$FAKEHOME/.codex"
+    printf 'override wins\n' > "$FAKEHOME/.codex/AGENTS.override.md"
+    run_deploy; [ "$status" -eq 0 ]
+    [[ "$output" == *"shadows"* ]]
+    [[ "$output" == *"never read"* ]]
+}
+
+@test "HARNESS-054: every declared agent surface carries a generated region" {
+    seed_doctrine_fixture
+    for f in ".claude/CLAUDE.md" ".config/opencode/AGENTS.md" ".pi/agent/AGENTS.md" ".copilot/copilot-instructions.md"; do
+        seed_instructions_file "$FAKEHOME/$f"
+    done
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    # presence surfaces + doctrine surfaces, together, with nothing declared and unserved
+    local f
+    while read -r f; do
+        [ -f "$FAKEHOME/$f" ] || { echo "declared surface never created: $f"; return 1; }
+        grep -q 'HARNESS' "$FAKEHOME/$f" || { echo "declared surface carries no region: $f"; return 1; }
+    done < <(jq -r '(.agents.presence[]?.file), (.doctrine.deploy[]?.file)' "$REPO/harness/manifest.json")
+}
+
 @test "agents: --refresh writes a verbatim AGENT.md record (no provenance, no \$HOME)" {
     seed_agents_fixture
     run_refresh

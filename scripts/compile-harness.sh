@@ -439,6 +439,9 @@ do_deploy() {
     fi
     if has_skills; then deploy_skills; fi
     if has_agents; then deploy_agents; fi
+    if has_doctrine && has_agents; then
+        deploy_doctrine "$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
+    fi
     printf '[deploy] OK\n'
 }
 
@@ -612,6 +615,83 @@ build_agent_presence() {
         skills_line="$(skill_field "$ag_dir/AGENT.md" skills)"
         printf -- '- **%s** — MUST consume: %s\n' "$name" "${skills_line:-none}"
     done
+}
+
+# --- doctrine (HARNESS-054) ---
+# Most harnesses receive the whole cross-agent AGENTS.md (opencode, pi) or a full
+# instructions file of their own (claude, copilot), so the enforced rules travel
+# with it. Two cannot, and the reason is a documented platform limit rather than
+# a preference:
+#
+#   agy   — Antigravity reads ~/.gemini/GEMINI.md and caps EACH rules file at
+#           12000 characters; AGENTS.md is ~21851. It also shares that file with
+#           Gemini CLI, so the region is injected, never overwritten.
+#   codex — Codex stops adding instruction files once the global+project chain
+#           reaches 32 KiB, so a full global copy would crowd out the repo's own
+#           AGENTS.md — the more specific file, and the one you least want lost.
+#
+# Both therefore receive the COMPACT payload: the enforced rules plus the agent
+# presence block, ~2 KB. Same content, same marker mechanism, smaller render —
+# exclusion by demonstrated incompatibility, not by agent identity. Rationale and
+# sources live in manifest.json next to each row.
+has_doctrine() { jq -e '.doctrine.deploy' "$MANIFEST" >/dev/null 2>&1; }
+
+deploy_doctrine() {
+    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars ids
+    mapfile -t ids < <(jq -r '.doctrine.inject[]' "$MANIFEST")
+    while IFS=$'\t' read -r agent file cap shadow; do
+        [[ -n "$agent" ]] || continue
+        file_abs="$HOME/$file"
+        payload="$(mktemp)"
+        {
+            printf '## Non-negotiable rules (harness-enforced)\n\n'
+            render_region "${ids[@]}"
+            printf '\n'
+            build_agent_presence "$ag_recdir" "$agent"
+        } > "$payload"
+
+        # A shadow file wins over ours at read time, so a silent deploy here
+        # would look successful while changing nothing the agent ever reads.
+        if [[ -n "$shadow" && -e "$HOME/$shadow" ]]; then
+            printf '[deploy] WARN %s shadows %s — the deployed doctrine is never read\n' \
+                "$HOME/$shadow" "$file_abs" >&2
+        fi
+
+        mkdir -p "$(dirname "$file_abs")"
+        if [[ ! -f "$file_abs" ]]; then
+            printf '# Global rules\n\n> Cross-agent doctrine. The marked region is generated — edit the vault pattern and re-run setup.\n' \
+                > "$file_abs"
+            printf '[deploy] doctrine: created %s\n' "$file_abs"
+        fi
+
+        sha="$(sha_of "$payload")"
+        begin="$BEGIN_PREFIX (sha256:$sha) — cross-agent doctrine from vault $(jq -r '.vault_subpath' "$MANIFEST"); edit there + re-run setup, do NOT edit between markers -->"
+        tmp="$(mktemp)"
+        if grep -q "^$BEGIN_PREFIX" "$file_abs" && grep -qF "$END_MARKER" "$file_abs"; then
+            awk -v beginm="$begin" -v endm="$END_MARKER" -v bp="$BEGIN_PREFIX" -v cf="$payload" '
+                index($0,bp)==1 { print beginm; while ((getline l < cf) > 0) print l; close(cf); skip=1; next }
+                $0==endm { if (skip){ print; skip=0; next } }
+                skip { next }
+                { print }
+            ' "$file_abs" > "$tmp"
+        else
+            cat "$file_abs" > "$tmp"
+            { printf '\n%s\n' "$begin"; cat "$payload"; printf '%s\n' "$END_MARKER"; } >> "$tmp"
+        fi
+        mv "$tmp" "$file_abs"
+        rm -f "$payload"
+        printf '[deploy] doctrine -> %s\n' "$file_abs"
+
+        # The cap covers the WHOLE file, user content included: the platform
+        # truncates or rejects the file, and it does not care who wrote which half.
+        if [[ "$cap" != 0 ]]; then
+            chars="$(wc -m < "$file_abs")"
+            if (( chars > cap )); then
+                printf '[deploy] WARN %s is %s characters, over the %s the platform documents — content past the cap may never be read\n' \
+                    "$file_abs" "$chars" "$cap" >&2
+            fi
+        fi
+    done < <(jq -r '.doctrine.deploy[] | "\(.agent)\t\(.file)\t\(.char_cap // 0)\t\(.shadowed_by // "")"' "$MANIFEST")
 }
 
 # Inject (or refresh) the agent-presence region in a harness instructions file.

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-054-f1",
+    "behavior": "Every agent surface the manifest declares receives both the enforced rules and the presence block",
+    "verification": "bats tests/compile-harness.bats -f 'HARNESS-054: --deploy creates the doctrine file'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-054-f2",
+    "behavior": "A test fails when a declared agent surface is missing its region",
+    "verification": "bats tests/compile-harness.bats -f 'HARNESS-054: every declared agent surface carries a generated region'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-054-f3",
+    "behavior": "Injection preserves pre-existing user content and is idempotent across re-deploys",
+    "verification": "bats tests/compile-harness.bats -f 'HARNESS-054: doctrine injection preserves user content and is idempotent'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-054-f4",
+    "behavior": "A target over its platform's documented cap warns, naming both numbers",
+    "verification": "bats tests/compile-harness.bats -f \"HARNESS-054: a file over the platform's documented cap warns\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-054-f5",
+    "behavior": "A codex override file that shadows the deployed doctrine warns",
+    "verification": "bats tests/compile-harness.bats -f 'HARNESS-054: a shadow file that wins at read time warns'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-054-f6",
+    "behavior": "The agy and codex rationale, byte numbers and sources live next to the manifest rows",
+    "verification": "jq -e '[.doctrine.deploy[] | select((.why | length) > 200 and (.char_cap | type) == \"number\")] | length == 2' harness/manifest.json",
+    "state": "pending",
+    "evidence": ""
+  }
+]

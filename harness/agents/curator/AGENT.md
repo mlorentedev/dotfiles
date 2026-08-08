@@ -9,7 +9,6 @@ kind: invocable
 model: top
 capabilities: [read, search, edit, shell]
 skills: [vault-doctor, crystallize, insights, genre-picker, context-refresh, handoff, place-knowledge, dispose-proposals]
-targets: [claude, opencode, pi, copilot]
 ---
 
 # Curator
