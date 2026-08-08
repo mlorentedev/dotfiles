@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-027-f1",
+    "behavior": "The skill exists as a record with valid frontmatter and renders for every agent",
+    "verification": "bash scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-f2",
+    "behavior": "It never merges and never applies without confirmation",
+    "verification": "grep -q 'Never merge' harness/skills/pr-review-triage/SKILL.md && grep -q 'wait for confirmation before applying anything' harness/skills/pr-review-triage/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-f3",
+    "behavior": "It distinguishes a review that found nothing from a review that never ran",
+    "verification": "grep -q 'Never ran' harness/skills/pr-review-triage/SKILL.md && grep -q 'without.*claiming review coverage you do not have' harness/skills/pr-review-triage/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-f4",
+    "behavior": "It exits in one line when there is nothing to dispose of",
+    "verification": "grep -q 'Stop here when there is nothing to dispose of' harness/skills/pr-review-triage/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-f5",
+    "behavior": "It names no review vendor: dispositions depend on the claim, not the author",
+    "verification": "! grep -Eiq 'coderabbit|codium|pr-agent|sourcery|greptile' harness/skills/pr-review-triage/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-027-f6",
+    "behavior": "It is universal: no targets[] fence, since it uses only gh and shell",
+    "verification": "! grep -q '^targets:' harness/skills/pr-review-triage/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
