@@ -243,6 +243,12 @@ Any of the five may be skipped, but only as a stated decision naming which one a
 
 - **Escalate, don't grind.** When autonomous (unattended or fan-out), stop and surface the moment the **same failure repeats** (≥2 tries, no new info), a **taste/ownership decision** appears (naming, scope, UX, a trade-off the user should own), or the **diff exceeds the ~300 LOC atomic-PR cap**. Silently grinding, or making an owner's call unasked, is the failure — escalation is not. (`docs/adr/adr-017-alignment-audit-karpathy-anthropic.md`.)
 
+### Parallel Sessions
+
+- **Allocate ticket IDs from a live query, never from a cached scan.** Several sessions can be open on the same repo at once, so the highest `AREA-NNN` you saw earlier in the session is a stale reading by the time you file. Re-query immediately before creating the issue. (2026-08-08: a scan showed `HARNESS` max `059`; minutes later a concurrent session had taken `060` and `061`, and only a peer's warning stopped a duplicate ID being filed. A duplicate ID is not rejected by anything — the board carries both silently.)
+- **A peer agent's report is a lead, not a fact.** Verify identifiers, counts and states a peer hands you against the source before acting on them — it is cheap to confirm and expensive to propagate. The same applies in reverse: when you tell a peer a number, say where you read it.
+- **Do not resume a long-idle session to deliver a message.** Waking a session that has been dormant for weeks restarts it on stale context. Prefer a durable artifact — an issue, a comment on the work itself — that reaches whoever picks the work up next, whether or not you ever identify them.
+
 ### Change Management & Engineering
 
 - **Read before writing** — read existing code/changelogs/docs first; never assume. **One issue at a time** for CI/lint fixes (confirm each passes). **Backward compatibility** on multi-file refactors (open/closed; run all tests). **TDD** — failing test first, then the fix.
