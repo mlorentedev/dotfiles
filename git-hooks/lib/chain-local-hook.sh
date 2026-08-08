@@ -17,8 +17,14 @@
 # ref list on stdin and only hook-impl parses it into --from-ref/--to-ref. A
 # `run --hook-stage pre-push` would fall back to the staged file set and report
 # green on the wrong input, which is worse than the no-op it replaces. It is the
-# same entry point pre-commit's own generated hook uses; omitting --hook-dir is
-# its supported dispatcher path (upstream marks that branch "git 2.54+ hooks").
+# same entry point pre-commit's own generated hook uses, and --hook-dir is passed
+# for the same reason that hook passes it: hook_impl feeds the value straight into
+# os.path.join() to look for a <stage>.legacy hook, BEFORE running anything. Omit
+# it and pre-commit 4.4.0 raises TypeError on None and the stage exits 3 — which,
+# on a dispatcher wired machine-wide, aborts `git commit` in every repo that has a
+# config and no locally-installed hook (BUG-055). An earlier comment here claimed
+# omitting it was an upstream-supported dispatcher path; it is not, and nothing
+# tested the claim because the suite stubs pre-commit out.
 #
 # Which hooks a stage actually has is pre-commit's decision, not ours: a config
 # declaring nothing for this stage exits 0 by itself, so there is no YAML to
@@ -72,6 +78,7 @@ if [ -f "$pre_commit_config" ] && command -v pre-commit >/dev/null 2>&1; then
     exec pre-commit hook-impl \
         --config "$pre_commit_config" \
         --hook-type "$hook_type" \
+        --hook-dir "$common_dir/hooks" \
         -- "$@"
 fi
 
