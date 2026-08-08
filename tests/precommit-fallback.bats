@@ -63,6 +63,21 @@ add_local_hook() {
     chmod +x "$FIXTURE/.git/hooks/$1"
 }
 
+# Fixture git that cannot reach the box's own hooks. GUARD-001 sets core.hooksPath
+# globally, so an unqualified `git commit`/`git worktree add` here would dispatch
+# into the very script under test and pollute the assertions.
+fixture_git() { git -C "$FIXTURE" -c core.hooksPath="$WORK/no-hooks" "$@"; }
+
+# A linked worktree of the fixture, committing whatever is staged first so the
+# checkout carries the same tracked files. `git worktree add` needs a HEAD.
+add_linked_worktree() {
+    fixture_git config user.email t@t.io
+    fixture_git config user.name tester
+    fixture_git add -A
+    fixture_git commit -q -m init --allow-empty
+    fixture_git worktree add -q "$WORK/linked" -b linked
+}
+
 @test "AC1: with no local hook, a pre-commit config routes the stage to hook-impl" {
     stub_precommit 0
     add_precommit_config
@@ -196,4 +211,80 @@ add_local_hook() {
 
     run bash -c "'$CHAIN' pre-commit < /dev/null"
     [ "$status" -eq 0 ]
+}
+
+# BUG-043. In a linked worktree $toplevel/.git is a `gitdir:` pointer FILE, not a
+# directory, so the old "$toplevel/.git/hooks/<type>" never resolved and every
+# repo-local hook was silently skipped there. Hooks are not per-worktree state:
+# git keeps them in the COMMON git dir, which is what `--git-common-dir` reports.
+# These cases create a real worktree rather than simulating one -- the bug lives
+# in the layout git actually produces, so a fixture that fakes it proves nothing.
+
+@test "BUG-043: a repo-local hook in the shared git dir runs from a linked worktree" {
+    stub_precommit 0
+    add_precommit_config
+    add_linked_worktree
+    add_local_hook pre-commit
+    cd "$WORK/linked"
+
+    # The layout fact the bug turns on, asserted rather than assumed: if a future
+    # git made this a directory again, the test below would pass for a new reason.
+    [ -f .git ]
+
+    run bash -c "'$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    [ -f "$WORK/local-ran" ]
+    # The config is tracked, so it exists here too -- absence of ARGS_LOG proves
+    # the local hook won, not that there was nothing to fall through to.
+    [ -f .pre-commit-config.yaml ]
+    [ ! -f "$ARGS_LOG" ]
+}
+
+@test "BUG-043: a failing repo-local hook still blocks from a linked worktree" {
+    # The red direction. Without it, a dispatcher that found nothing and exited 0
+    # would satisfy the green case above by doing nothing at all.
+    stub_precommit 0
+    add_precommit_config
+    add_linked_worktree
+    add_local_hook pre-commit 1
+    cd "$WORK/linked"
+
+    run bash -c "'$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 1 ]
+    [ ! -f "$ARGS_LOG" ]
+}
+
+@test "BUG-043: a git too old for --git-common-dir falls back to the classic layout" {
+    # `git rev-parse` echoes an option it does not understand back at the caller
+    # and still exits 0, so a git older than 2.5 answers the common-dir probe with
+    # the literal flag. Resolving hooks under that string would skip every local
+    # hook silently -- the exact failure this fix removes, reintroduced by it.
+    add_local_hook pre-commit
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'case "$*" in'
+        printf '    *--show-toplevel*)   printf "%%s\\n" "%s" ;;\n' "$FIXTURE"
+        echo '    *--git-common-dir*) printf "%s\n" "--git-common-dir" ;;'
+        echo '    *) exit 1 ;;'
+        echo 'esac'
+    } > "$STUB/git"
+    chmod +x "$STUB/git"
+    cd "$FIXTURE"
+
+    run bash -c "PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    [ -f "$WORK/local-ran" ]
+}
+
+@test "BUG-043: with no local hook, a linked worktree still falls through to pre-commit" {
+    # The other branch, in the same environment: fixing hook resolution must not
+    # cost the BUG-036 fallback for worktrees of pre-commit-managed repos.
+    stub_precommit 0
+    add_precommit_config
+    add_linked_worktree
+    cd "$WORK/linked"
+
+    run bash -c "'$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-commit"* ]]
 }

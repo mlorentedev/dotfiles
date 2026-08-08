@@ -37,7 +37,27 @@ shift
 
 toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
-local_hook="$toplevel/.git/hooks/$hook_type"
+# Hooks are shared repo state, not per-worktree state: git keeps them in the
+# COMMON git dir. In a linked worktree — and under --separate-git-dir —
+# $toplevel/.git is a `gitdir:` pointer FILE, not a directory, so assuming that
+# layout resolved to a path that cannot exist and silently skipped every local
+# hook there (BUG-043). `--git-common-dir` answers relative to the cwd in an
+# ordinary checkout and absolute in a linked worktree; asking from $toplevel
+# makes both forms resolve against the same base, with no need for
+# --path-format=absolute (git 2.31+) and therefore no version floor of our own.
+common_dir="$(cd "$toplevel" && git rev-parse --git-common-dir 2>/dev/null)"
+case "$common_dir" in
+    /*) ;;
+    *)  common_dir="$toplevel/$common_dir" ;;
+esac
+# `git rev-parse` echoes back an option it does not understand and still exits 0,
+# so a git predating --git-common-dir (< 2.5) hands us the literal flag instead of
+# a path. Require a real directory and fall back to the classic layout, rather
+# than resolving hooks under a bogus path and reintroducing the silent skip this
+# very change removes.
+[ -d "$common_dir" ] || common_dir="$toplevel/.git"
+
+local_hook="$common_dir/hooks/$hook_type"
 [ -x "$local_hook" ] && exec "$local_hook" "$@"
 
 pre_commit_config="$toplevel/.pre-commit-config.yaml"
