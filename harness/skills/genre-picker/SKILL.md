@@ -34,7 +34,7 @@ Only **cross-project** knowledge ("what an agent does / a principle / a procedur
 
 ## Step 1 — the boundary tests (apply IN ORDER, first match wins)
 
-1. **Executed by an agent when a trigger phrase fires?** → **Skill** → `00_meta/skills/<name>/SKILL.md` (author per [[creating-skills]]).
+1. **Executed by an agent when a trigger phrase fires?** → **Skill** → `00_meta/skills/<name>/SKILL.md` (author per [[00_meta/skills/creating-skills/SKILL|creating-skills]]).
 2. **An ordered sequence of steps run start→finish, AND cross-project?** → **Runbook** → `00_meta/runbooks/<name>.md` (skeleton: [[runbook]]). *A one-repo procedure → repo `docs/runbooks/`; stop here.*
 3. **A principle applied with judgment (no fixed step order; mostly the *what & why*)?** → **Pattern** → `00_meta/patterns/pattern-<topic>.md`.
 4. **A blank skeleton to instantiate a new file of some type?** → **Template** → `00_meta/templates/<name>.md` (register it in [[templates/_index]]).
@@ -67,5 +67,5 @@ Only **cross-project** knowledge ("what an agent does / a principle / a procedur
 ## References
 
 - [[pattern-knowledge-placement]] — taxonomy SSOT (the boundary tests live here) + the store/repo/forge placement matrix
-- [[creating-skills]] — how to author a skill once classified as one
+- [[00_meta/skills/creating-skills/SKILL|creating-skills]] — how to author a skill once classified as one
 - [[pattern-project-structure]] — store-side project layout

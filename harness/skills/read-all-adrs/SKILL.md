@@ -47,5 +47,5 @@ allowed-tools: [Read, Grep, Glob]
 ## References
 
 - Adapted from `davidondrej/skills/read-all-adrs` (external skills audit, 2026-07-07) — the original is a bare "read them all" instruction with no completion artifact; this version adds the inventory table and drift-flagging as the verifiable output.
-- [[architecture-session]] — Phase B's reference audit consumes this skill's inventory.
+- [[00_meta/skills/architecture-session/SKILL|architecture-session]] — Phase B's reference audit consumes this skill's inventory.
 - [[pattern-knowledge-placement]] — where ADRs live (repo `docs/adr/`, project-bound, never the vault).
