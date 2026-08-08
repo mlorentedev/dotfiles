@@ -1,6 +1,5 @@
 ---
 name: dispatching-parallel-agents
-targets: [claude]
 description: Use when facing 2+ independent tasks that can run concurrently without shared state or sequential dependencies.
 ---
 

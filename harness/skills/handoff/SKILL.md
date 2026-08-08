@@ -116,7 +116,8 @@ Leaving an actively-worked issue in `Backlog` is the exact gap HARNESS-010 close
 
 Remove transient clutter before closing:
 
-- **Merged branches (local):** `git branch --merged main | grep -vE '^\*|main|master' | xargs -r git branch -d`. Inspect output — do not force-delete (`-D`) without reading why a branch is unmerged.
+- **Stale branches (local):** follow the local-side procedure in [[pattern-github-branch-hygiene]] — do not improvise a recipe here. In short: `git fetch --prune`, take the `': gone]'` branches, **verify each against a merged PR**, then `git branch -D` (required, because squash-merge means the tip is never an ancestor). Never touch a branch that is checked out, backs a worktree, or has an open PR.
+  > **Do not use `git branch --merged` / `-d`.** Squash-merge is the repo standard, so `--merged` lists nothing and `-d` refuses every branch worth deleting — the step becomes a silent no-op. This skill prescribed exactly that until 2026-08-06, which is why 18 stale branches accumulated across three repos while the handoff ran regularly. The pattern is the SSOT; this bullet only points at it.
 - **Remote gone refs:** `git fetch --prune` on every repo touched. Removes stale remote-tracking refs for branches deleted upstream.
 - **Done worktrees:** any worktree whose PR is merged must be removed (`git worktree remove <path>`). If not yet merged, name it in **Open threads** with PR number.
 - **Temp / scratch files:** inspect `git status` for untracked `.bak`, `*.tmp`, scratch notes. **Never delete a file without explicit user confirmation** — list the candidates and ask; never `git clean -f`.
