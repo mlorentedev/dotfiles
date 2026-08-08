@@ -60,7 +60,7 @@ This rule generalizes to **every** process that writes `MEMORY.md` (crystallize,
 In ADDITION to the replaced-in-place continuity block (step 1), write the **full session** as a new timestamped file so nothing is lost: `MEMORY.md` keeps only the *latest* handoff; this folder is the permanent, greppable history (ADR-014 + **MEMORY-003**).
 
 - **Path:** `<project-area>/sessions/<YYYY-MM-DD>-<project>-<agent>.md` — the project's OWN vault folder (e.g. `10_projects/knowledge/sessions/`, `50_work/45-development/<sdk>/sessions/`), **never `00_meta/sessions/`** (per `feedback_sessions_in_project_folder.md`; already the convention in `ts-bridge`, `nan-video-pipeline`, `kubelab`, `iris`). Resolve the vault root via `$VAULT_PATH` — never a hardcoded literal.
-- **Content:** frontmatter (`date`, `agent`, `project`, `session_id` if the runtime exposes one, `type: session`) + the same four handoff fields as step 1, but here you MAY be fuller than the ~8-line cap — this is the journal, not the snapshot.
+- **Content:** frontmatter (`id` — the filename slug without `.md`; `type: session`; `status: active`; `date`; `agent`; `project`; `session_id` if the runtime exposes one) + the same four handoff fields as step 1, but here you MAY be fuller than the ~8-line cap — this is the journal, not the snapshot. **`id`, `type` and `status` are the three keys `vault_health` validates** — a note that omits them lands as a frontmatter error, which is how 130 of 196 session files came to be non-compliant before this was specified.
 - **Append-only:** one file per session. Never overwrite a prior session file; if a same-day file already exists, suffix `-2`, `-3`. (The `MEMORY.md` block is the only single-slot snapshot — replaced in place per step 1, never appended; this `sessions/` log is what accumulates. Satisfies the HARNESS-029 append-only-log requirement.)
 
 **Mechanism (never skip): Hive-first, filesystem-fallback.** Prefer Hive `vault_write`; if Hive is unavailable/slow (the failure-mode protocol in `pattern-hive-first-vault-access`), fall back to a native filesystem write to the resolved `$VAULT_PATH/.../sessions/` path + a manual `vault:` commit. The session record is **never skipped** — not for a wedged Hive, a missing junction, or a sandbox denial.
@@ -128,7 +128,7 @@ Scope: only repos and vault paths actually touched in this session — not a glo
 
 ### 3c. Context refresh (conditional — `/context-refresh`)
 
-If this session **wrote an ADR, closed a phase milestone, pivoted direction, or changed the active focus**, run `/context-refresh <project>` for each affected project. It patches only the `context.md` frontmatter (`phase`, `focus`, `blocked_by`, `recent_adrs`, `last_updated`) so the next session orients in <400 tokens, and never touches the stable body. **Skip** when the session only changed task state — that lives in the bitácora, not `context.md`. See [[context-refresh]] (HARNESS-006).
+If this session **wrote an ADR, closed a phase milestone, pivoted direction, or changed the active focus**, run `/context-refresh <project>` for each affected project. It patches only the `context.md` frontmatter (`phase`, `focus`, `blocked_by`, `recent_adrs`, `last_updated`) so the next session orients in <400 tokens, and never touches the stable body. **Skip** when the session only changed task state — that lives in the bitácora, not `context.md`. See [[00_meta/skills/context-refresh/SKILL|context-refresh]] (HARNESS-006).
 
 ### 4. Artifact summary
 
