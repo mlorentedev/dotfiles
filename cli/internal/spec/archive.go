@@ -31,9 +31,58 @@ var fenceLinePattern = regexp.MustCompile("^\\s{0,3}(`{3,}|~{3,})")
 // by definition resolved — the line records work already done.
 var completedTaskPattern = regexp.MustCompile(`^\s*[-*+]\s+\[[xX]\]`)
 
-// codeSpanPattern matches an inline code span, so its contents can be dropped
-// before scanning. Backtick runs are matched symmetrically enough for prose.
-var codeSpanPattern = regexp.MustCompile("`+[^`]*`+")
+// stripCodeSpans removes inline code spans from one line, honouring CommonMark's
+// rule that the opening and closing backtick runs must be the SAME length.
+//
+// A regexp cannot express that: Go's RE2 has no backreferences, and the obvious
+// "`+[^`]*`+" accepts unequal runs. That form strips `[AGENT-DRAFT]“, which is
+// NOT a code span — so a live marker written with mismatched backticks would be
+// silently dropped and the spec would archive carrying it. For a guard, that
+// false negative is the dangerous direction, and it is the same class of defect
+// this whole change exists to remove.
+//
+// A run with no partner of equal length is left in place, so an unbalanced
+// backtick makes the scanner REPORT rather than skip. Code spans that cross a
+// line boundary are not tracked, for the same reason: both choices err toward
+// refusing an archive, never toward passing one.
+func stripCodeSpans(line string) string {
+	var out strings.Builder
+	for i := 0; i < len(line); {
+		if line[i] != '`' {
+			out.WriteByte(line[i])
+			i++
+			continue
+		}
+		open := i
+		for i < len(line) && line[i] == '`' {
+			i++
+		}
+		runLen := i - open
+
+		end := -1
+		for j := i; j < len(line); {
+			if line[j] != '`' {
+				j++
+				continue
+			}
+			k := j
+			for k < len(line) && line[k] == '`' {
+				k++
+			}
+			if k-j == runLen {
+				end = k
+				break
+			}
+			j = k
+		}
+		if end == -1 {
+			out.WriteString(line[open:i]) // no equal-length partner: not a span
+			continue
+		}
+		i = end // drop the span, delimiters included
+	}
+	return out.String()
+}
 
 // ScanUnresolvedTags returns the 1-based numbers of lines in content that carry
 // an UNRESOLVED agent tag. A tag that is quoted rather than live is not a hit:
@@ -65,7 +114,7 @@ func ScanUnresolvedTags(content string) []int {
 		if fenceMark != "" || completedTaskPattern.MatchString(line) {
 			continue
 		}
-		if agentTagPattern.MatchString(codeSpanPattern.ReplaceAllString(line, "")) {
+		if agentTagPattern.MatchString(stripCodeSpans(line)) {
 			hits = append(hits, i+1)
 		}
 	}

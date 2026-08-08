@@ -291,6 +291,23 @@ func TestScanUnresolvedTags(t *testing.T) {
 			name:    "inside a tilde-fenced block",
 			content: "~~~\n[AGENT-SUGGESTION — accept or remove]\n~~~\n",
 		},
+		{
+			// CommonMark requires the opening and closing runs to be equal, so
+			// this is NOT a code span. Stripping it anyway would hide a live
+			// marker -- the false-negative direction a guard must never take.
+			name:    "mismatched backtick runs are not a code span",
+			content: "a `[AGENT-DRAFT]`` b\n",
+			want:    []int{1},
+		},
+		{
+			name:    "an unterminated backtick run leaves the line scannable",
+			content: "a ` [AGENT-DRAFT] b\n",
+			want:    []int{1},
+		},
+		{
+			name:    "a double-backtick span is still a span when balanced",
+			content: "a ``[AGENT-DRAFT]`` b\n",
+		},
 		// --- must fire: the tag is live ---
 		{
 			name:    "the canonical emitted form in prose",

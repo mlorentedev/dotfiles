@@ -28,7 +28,7 @@ checkbox whose text states the marker is resolved, and inside a code span.
 
 After the fix, the patched binary emits:
 
-```
+```text
 [specs] 29 active, 119 archived
 ```
 
@@ -77,3 +77,33 @@ marker as a code span, because it is a quotation of an issue title rather than a
 editorial directive. The patched binary then archives cleanly. That is the
 workflow this change restores: resolve the marker, do not reach for
 `--force-with-drafts`.
+
+## Review follow-up
+
+CodeRabbit flagged the inline-span stripper as accepting **unequal** backtick
+runs, and it was right — confirmed by execution before accepting it:
+
+```text
+"a `[AGENT-DRAFT]` b"      -> "a  b"      (valid span, correctly stripped)
+"a `[AGENT-DRAFT]`` b"     -> "a  b"      (NOT a span -- marker silently hidden)
+"a ``[AGENT-DRAFT]` b"     -> "a  b"      (NOT a span -- marker silently hidden)
+```
+
+CommonMark requires the opening and closing runs to be the same length, so rows
+two and three are not code spans and their markers are live. Stripping them
+anyway would let a spec archive carrying one — the same false-negative class this
+whole change exists to remove, reintroduced by the fix's own exclusion rule.
+
+Go's RE2 has no backreferences, so the balanced-run rule cannot be written as a
+regexp at all; `stripCodeSpans` scans for a closing run of exactly the opening
+length. An unmatched run is left in place, so an unbalanced backtick makes the
+scanner **report** rather than skip. Three cases pin it: mismatched runs still
+fire, an unterminated run leaves the line scannable, and a balanced
+double-backtick span is still excluded.
+
+The same review raised two markdownlint findings. MD040 (a fenced block with no
+language) is fixed above. The `[AC1]`-style acceptance-criterion labels being
+read as markdown reference links is **not** changed: markdownlint is not in this
+repo's CI, and the shape is the established convention across every spec in the
+tree (`BUG-049`, the merged `BUG-050`). Changing it here alone would make this
+spec the inconsistent one.
