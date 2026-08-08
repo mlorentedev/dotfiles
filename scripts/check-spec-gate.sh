@@ -133,11 +133,59 @@ _repo_slug() {
     esac
 }
 
+# A PR body with fenced code blocks and inline code spans removed.
+#
+# GitHub does not linkify — and therefore does not close from — a reference
+# inside code, so neither may this gate. That is the whole criterion: the gate's
+# contract is to fire exactly when GitHub would close the issue.
+#
+# Note what is deliberately NOT stripped: ordinary prose. Narrowing the match to
+# line-leading declarations was considered and rejected — GitHub matches a
+# closing keyword anywhere in the body, so a gate that only saw line-leading ones
+# would stay silent while GitHub closed the issue, leaving the spec un-archived.
+# For a check whose entire job is to demand the archive, a miss is far worse than
+# a cry of wolf, and code blocks are the only region where "this is not a
+# directive" is provable rather than guessed.
+_strip_markdown_code() {
+    local line marker fence=""
+    # Single-quoted on purpose: these are ERE patterns, and the backticks must
+    # reach the regex engine rather than the shell. Held in variables because an
+    # unquoted backtick inside [[ =~ ]] would be command substitution.
+    local fence_re='^[[:space:]]{0,3}(`{3,}|~{3,})'
+    # shellcheck disable=SC2016
+    local span_re='`[^`]*`'
+
+    while IFS= read -r line; do
+        if [[ "$line" =~ $fence_re ]]; then
+            marker="${BASH_REMATCH[1]}"
+            if [[ -z "$fence" ]]; then
+                fence="$marker"
+            elif [[ "${marker:0:1}" == "${fence:0:1}" && ${#marker} -ge ${#fence} ]]; then
+                fence=""   # a closing fence must match the opener's char and length
+            fi
+            continue
+        fi
+        [[ -n "$fence" ]] && continue
+        # Inline spans: the shape a worked example takes when it sits in a
+        # sentence rather than in its own block.
+        while [[ "$line" =~ $span_re ]]; do
+            line="${line/"${BASH_REMATCH[0]}"/}"
+        done
+        printf '%s\n' "$line"
+    done <<< "$1"
+}
+
 # Issue numbers this PR body closes, one per line. Only GitHub's own closing
 # verbs count; `Refs`, `Part of` and a bare number in prose must not fire.
 _closing_issue_numbers() {
     local slug="$1"
     local body="$2"
+
+    # #773: a documentation PR about this very gate is the likeliest thing to
+    # carry a realistic example of the string the gate looks for. #767's body
+    # tripped its own check twice — once on a fenced `SDD_PR_BODY='Closes #670'`
+    # transcript, once on a sentence describing a different, future PR.
+    body=$(_strip_markdown_code "$body")
 
     # Fold the full-URL form into the qualified short form so one matcher covers
     # both. `|` as the sed delimiter because `#` is part of the replacement.
@@ -150,7 +198,7 @@ _closing_issue_numbers() {
     # reason, which blocks legitimate work.
     local matches
     matches=$(printf '%s\n' "$body" \
-        | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+' \
+        | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+' \
         || true)
     [[ -z "$matches" ]] && return 0
 

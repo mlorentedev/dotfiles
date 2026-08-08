@@ -390,3 +390,67 @@ big_change() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]]
 }
+
+# BUG-042: the closing-keyword scan read the raw PR body with no awareness of
+# markdown. A PR *documenting* this gate is the likeliest thing in the repo to
+# carry a realistic example of the exact string the gate hunts for — #767's own
+# body tripped its own check twice.
+
+@test "BUG-042: a closing keyword inside a fenced block does not fire" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY=$'Documenting the gate.\n\n```console\n$ SDD_PR_BODY=\'Closes #123\' ./scripts/check-spec-gate.sh\n```\n\nRefs #123'
+
+    run_gate
+    [ "$status" -eq 0 ]
+}
+
+@test "BUG-042: a closing keyword inside an inline code span does not fire" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY='The gate fires on `Closes #123` anywhere in the body. Refs #123'
+
+    run_gate
+    [ "$status" -eq 0 ]
+}
+
+@test "BUG-042: a genuine closing keyword in ordinary prose still fires" {
+    # The red direction, and the reason the fix does NOT anchor to line starts:
+    # GitHub matches anywhere in the body, so a gate that only saw line-leading
+    # declarations would go silent while GitHub closed the issue.
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY="This rewrites the loader and closes #123 along the way."
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FOO-001-demo"* ]]
+}
+
+@test "BUG-042: a fence closes only on a matching delimiter, so later prose is still scanned" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY=$'```\nquoted Closes #999\n```\n\nAnd for real: Closes #123'
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FOO-001-demo"* ]]
+}
+
+@test "BUG-042: the colon form is a closing declaration too" {
+    # `Closes: #N` was missed entirely by the space-only pattern — a body written
+    # that way unambiguously declares a closure, so the gate must demand the
+    # archive rather than wave it through.
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY="Closes: #123"
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FOO-001-demo"* ]]
+}
