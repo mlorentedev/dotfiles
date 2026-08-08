@@ -110,6 +110,32 @@ function Remove-DuplicateDate {
     Set-Content -Path $FilePath -Value $cleaned -Encoding UTF8 -NoNewline
 }
 
+# Append a new section WITHOUT displacing the "## Session Handoff" block.
+#
+# HARNESS-029 requires that block to be the LAST section of MEMORY.md: it is
+# rewritten every session, so keeping it out of the auto-loaded KV-cache prefix
+# stops it from busting the provider prompt cache on every new session. A bare
+# Add-Content appends after it and silently breaks that invariant - which is
+# what happened on the first crystallize of a HARNESS-029-compliant file.
+#
+# So: insert before the handoff block when present, append when it is not.
+function Add-SectionBeforeHandoff {
+    param([string]$FilePath, [string]$Block)
+    $content = Get-Content $FilePath -Raw
+
+    if ($content -match '(?m)^## Session Handoff') {
+        $newContent = [regex]::Replace(
+            $content,
+            '(?m)^## Session Handoff',
+            ($Block.TrimEnd() + "`n`n## Session Handoff"),
+            1
+        )
+        Set-Content -Path $FilePath -Value $newContent -Encoding UTF8 -NoNewline
+    } else {
+        Add-Content -Path $FilePath -Value $Block -Encoding UTF8
+    }
+}
+
 # Update the # currentDate section to today
 function Update-CurrentDate {
     param([string]$FilePath, [string]$Today)
@@ -124,7 +150,7 @@ function Update-CurrentDate {
         Set-Content -Path $FilePath -Value $newContent -Encoding UTF8 -NoNewline
         Write-Info "Updated currentDate to $Today"
     } else {
-        Add-Content -Path $FilePath -Value "`n# currentDate`nToday's date is $Today." -Encoding UTF8
+        Add-SectionBeforeHandoff -FilePath $FilePath -Block "`n# currentDate`nToday's date is $Today."
         Write-Info "Added currentDate section ($Today)"
     }
 }
@@ -151,7 +177,7 @@ function Set-LastCrystallized {
         Set-Content -Path $FilePath -Value $newContent -Encoding UTF8 -NoNewline
         Write-Info "Added Last Crystallized stamp ($Today)"
     } else {
-        Add-Content -Path $FilePath -Value "`n## Last Crystallized: $Today" -Encoding UTF8
+        Add-SectionBeforeHandoff -FilePath $FilePath -Block "`n## Last Crystallized: $Today"
         Write-Info "Added Last Crystallized stamp ($Today)"
     }
 }

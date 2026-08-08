@@ -113,3 +113,26 @@ setup() {
     "
     [[ "$status" -eq 0 ]]
 }
+
+# --- HARNESS-029 invariant (static; behaviour is covered by the CI test-windows
+# job, since pwsh is not assumed present on the Linux dev box) ----------------
+
+@test "knowledge-crystallize.ps1 has Add-SectionBeforeHandoff helper" {
+    grep -q 'function Add-SectionBeforeHandoff' "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.ps1"
+}
+
+@test "knowledge-crystallize.ps1 never bare-appends a stamp past the handoff block" {
+    # A raw Add-Content of currentDate / Last Crystallized lands after the
+    # ## Session Handoff block and breaks HARNESS-029. Those two call sites must
+    # route through Add-SectionBeforeHandoff instead.
+    run grep -nE 'Add-Content .*(currentDate|Last Crystallized)' \
+        "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.ps1"
+    [ "$status" -ne 0 ]
+}
+
+@test "knowledge-crystallize.ps1 stamps route through the handoff-safe helper" {
+    grep -q 'Add-SectionBeforeHandoff -FilePath $FilePath -Block "`n# currentDate' \
+        "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.ps1"
+    grep -q 'Add-SectionBeforeHandoff -FilePath $FilePath -Block "`n## Last Crystallized' \
+        "$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.ps1"
+}
