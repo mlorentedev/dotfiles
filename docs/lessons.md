@@ -1719,3 +1719,62 @@ Note: the body's `---` is safe because it's inside the `|` scalar.
 **Solution**: Send the compact payload -- enforced rules plus presence, ~2 KB -- through the same marked-region mechanism, and record the limit, the measured size and the source URL next to each manifest row so the decision is re-derivable rather than trusted. Inject: replace our own region or append a fresh one, never rewrite the file. Two warnings cover what could otherwise pass unnoticed: a file over its platform's documented cap (checked after injection, against the *whole* file, since the platform counts bytes we did not write), and a shadow file that wins at read time. No skills row was added for codex, because no primary source documents its skill-discovery path and inferring one is exactly the guesswork the ticket existed to remove.
 
 **Rule**: Before deploying an instruction file to an agent you cannot run, read that agent's own docs for the size limit and the file-precedence order -- both are load-bearing and neither is guessable, and a limit is usually enforced by truncation rather than by an error. When a target file is shared with another tool, the pipeline owns a region, not the file. And when you cannot smoke-test, say so in the PR and name the specific assumptions instead of letting green CI imply a coverage it never had.
+
+### [2026-08-08] The defensive half of a fix is the least-reviewed code in the PR, and its failures are silent by construction
+
+**Context**: Two fixes in one session, both to guards, both with a hole in the code added to *protect* the guard rather than in the guard itself. `#805` resolved a worktree's hook dir via `git rev-parse --git-common-dir` and validated the answer with `[ -d "$common_dir" ]`. `#814` excluded quoted agent markers by stripping inline code spans with `` `+[^`]*`+ ``.
+
+**Problem**: Each defence had exactly one input that walked straight through it. In `#805` an empty probe result was joined into `"$toplevel/"` — and the worktree root **always** is a directory, so the one answer that most needed rejecting was the one the directory test waved through, resolving hooks under `<toplevel>//hooks`. In `#814` the pattern accepted *unequal* backtick runs, so `` `[AGENT-DRAFT]`` `` — which CommonMark does not treat as a code span at all — was stripped, hiding a live marker. Both holes reintroduced precisely the silent failure their PR existed to remove. Neither was found by the author; both came from review.
+
+**Solution**: `#805` requires the resolved path to be non-empty *as well as* a directory, and leaves an empty probe empty through the join rather than turning it into something that looks valid. `#814` replaced the regexp with a scanner that requires a closing run of exactly the opening length — Go's RE2 has no backreferences, so the balanced-delimiter rule **cannot be written as a regexp at all**, and reaching for one was itself the tell. Both now err toward refusing rather than passing.
+
+**Rule**: When a fix adds validation to protect its own new logic, review that validation harder than the logic — it is the part written last, tested least, and the only part whose failure is silent by definition. Two questions catch most of it: *what is the degenerate input* (empty string, zero, unterminated delimiter), and *does the check accidentally hold for it?* A path test passes for `"$root/"`, a length check passes for `0`, a "looks like a span" regex passes for a malformed span. And when the correct rule cannot be expressed in the tool you reached for, that is evidence the shortcut is wrong, not that the rule needs relaxing.
+
+### [2026-08-08] `git rev-parse` echoes an option it does not understand back at you, and exits 0
+
+**Context**: Fixing hook resolution in a linked worktree (`#776`) by asking git for the shared git dir instead of assuming `$toplevel/.git`.
+
+**Problem**: `--git-common-dir` arrived in git 2.5. On anything older, `git rev-parse` does not error — it treats the unrecognised flag as a revision-ish argument and prints it back:
+
+```console
+$ git rev-parse --git-nonexistent-dir
+--git-nonexistent-dir
+$ echo $?
+0
+```
+
+So a naive `common_dir=$(git rev-parse --git-common-dir)` yields the literal string `--git-common-dir` as its "path", resolves hooks beneath it, finds nothing, and skips silently — the exact failure being fixed, reintroduced for older git.
+
+**Solution**: Validate that the answer is a real directory before using it, and fall back to the classic layout otherwise. Separately, `--git-common-dir` answers *relative to the cwd* in an ordinary checkout and *absolute* in a linked worktree; asking from `$toplevel` makes both forms resolve against the same base, which avoids needing `--path-format=absolute` (git 2.31+) and so introduces no version floor of its own.
+
+**Rule**: `git rev-parse` is a parser, not a validator: an exit code of 0 means "I produced output", not "I understood you". Never consume its output without checking the *shape* of what came back. This generalises to any tool whose contract is "echo the resolved form of your arguments" — the ones that gracefully pass through what they cannot interpret are exactly the ones that turn a version-compatibility problem into a silent wrong answer.
+
+### [2026-08-08] A guard can be inverted: matching only the shape that is always a false positive, and blind to the shape that is always a true positive
+
+**Context**: `#769` reported that `dotf spec archive` refused specs that merely *quote* the `[AGENT-DRAFT]` / `[AGENT-SUGGESTION]` markers — inside a code span, or on a completed `- [x]` line. The obvious reading is "the matcher is too broad".
+
+**Problem**: The matcher was also too *narrow*, and that half was worse. The pattern required `]` immediately after the keyword, but `/spec fill` emits the suffixed form (`[AGENT-DRAFT — review before archive]`) documented in the skill. That form had never matched, so the archive lock **had never once fired on a marker emitted the way the tooling emits it**. Proof was in the tree, not in reasoning: `specs/archive/CLI-002-repo-structure/proposal.md` sits in the archive today still carrying a live suffixed marker. Meanwhile the one shape the pattern did match — the bare form — is the shape this repo writes when *documenting* the markers rather than using them. The guard matched exactly what is always a false positive and was blind to exactly what is always a true positive. The reported symptom was the benign half.
+
+**Solution**: Widen the pattern to both emitted shapes and exclude the quoted contexts (fences, code spans, ticked items), with one predicate shared by every call site — a second consumer, the session-start injector, had drifted to its own cruder scan and disagreed with the archiver about what "unresolved" even meant.
+
+**Rule**: When a matcher produces false positives, check the false-negative direction in the same pass — a pattern written from memory of the format rather than from the emitter is as likely to be wrong about what it *misses* as about what it catches. Establish the canonical form from the **producer** (the emitter, the schema, the skill that writes it), never from the matcher under suspicion; the matcher cannot be both the artefact under review and the reference. And test the claim against the corpus: one grep over the archive turned "the lock may not fire" into a named file.
+
+### [2026-08-08] Two enforcement gates, each correct alone, can compose into a state no change can satisfy
+
+**Context**: `check-spec-gate.sh` runs a Discipline Gate (a large diff must touch an **active** `specs/<id>/`) and an archive-on-merge check (a PR closing an issue must **archive** that issue's spec). `#397` had hardened the first against archive-moves; `#767` later made archive-moves mandatory.
+
+**Problem**: For any PR both over the LOC threshold and closing its own issue, archiving satisfies the second and breaks the first, and not archiving does the reverse. Neither half is wrong in isolation, and each was reviewed in isolation — the contradiction was created by composition, months apart, and only surfaced when a PR happened to be both large and closing. The practical cost is worse than the block: the escape hatches become the normal path, so both gates erode.
+
+**Solution**: Count a spec archived *in fulfilment of* archive-on-merge as the Discipline Gate's spec touch — reachable only through the `issue:` frontmatter of a spec whose issue the PR closes, so a gratuitous archive-move still earns nothing and `#397` stands. The ticket's own proposed fix (count `specs/archive/<id>/` as a touch) does not work, and measuring said so: the gate accumulates LOC against a floor of 10, and a real archive move renders as **4 LOC** — three pure renames at `0 0` plus the `status:` rewrite. Counting its lines would have left the gate exactly as unsatisfiable while looking fixed.
+
+**Rule**: Two gates over the same artifact are a system, not two features; whenever one is added or tightened, enumerate the states the *other* now forbids. The tell is an escape hatch being used routinely — that is a design report, not a workflow preference. And before implementing a proposed fix, measure how the artifact it keys on actually renders (`git show --numstat` on a real instance), because a fix aimed at the wrong mechanism can pass review, ship, and change nothing.
+
+### [2026-08-08] A structural assertion over a file also matches the comments that explain it
+
+**Context**: Pinning the design of two workflows with bats cases — that `add-to-project.yml` classifies rate-limit failures separately, carries no blanket `continue-on-error`, and no longer uses `actions/add-to-project`.
+
+**Problem**: All three assertions failed on first run, and the code was correct. Each workflow's header *explains at length* why those constructs are or are not used, so `grep -c 'continue-on-error'` matched the sentence arguing against it, and `grep -c 'actions/add-to-project'` matched the paragraph explaining why it was removed. Well-documented code is the code most likely to defeat a text assertion about itself — the better the rationale, the more the forbidden strings appear.
+
+**Solution**: Strip comment lines before matching, and assert on *syntactic* forms that only occur in code (`continue-on-error:` with the colon, `uses: actions/add-to-project`) rather than bare names. The red run is what surfaced it; a green-first assertion would have shipped as a test that could never fail.
+
+**Rule**: Same family as the 2026-08-06 plugin audit above — that one judged usage from a capability listing, this one judges structure from a file that documents itself. Both reduce to: **descriptive text about X is not evidence about X**, even when it lives in the artifact itself. When asserting on a file's structure, exclude the commentary first, or key on syntax that prose cannot accidentally produce.
