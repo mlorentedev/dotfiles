@@ -304,3 +304,89 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
     [[ "$output" == *"FOO-007-b"* ]]
     [[ "$output" != *"FOO-007-a"* ]]
 }
+
+# BUG-050: the two halves of the gate were mutually unsatisfiable for a PR that
+# is over the LOC threshold AND closes its own issue. Archiving satisfied
+# archive-on-merge and broke the Discipline Gate (specs/archive/* is deliberately
+# not an active-spec touch, #397); not archiving did the reverse. The only ways
+# through were the escape hatches, so the normal path had become the escaped one.
+
+# A production change over the 50 LOC threshold, so BOTH halves are live at once
+# — the only configuration in which they conflict.
+big_change() {
+    seq 1 60 > payload.sh
+    git add -A
+    git commit -q -m "big change"
+}
+
+@test "BUG-050: a large PR that archives its own spec satisfies both halves" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    big_change
+    archive_spec FOO-001-demo
+    export SDD_PR_BODY="Closes #123"
+
+    run_gate
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"spec folder touched"* ]]
+}
+
+@test "BUG-050: an archive move alone is far under SPEC_FLOOR, so it cannot count by LOC" {
+    # Why the mandated archive sets the touch outright instead of feeding
+    # SPEC_LOC: a real archive renders as ~4 LOC against a floor of 10, so
+    # counting its lines would leave the gate exactly as unsatisfiable.
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    big_change
+    archive_spec FOO-001-demo
+    export SDD_PR_BODY="Closes #123"
+
+    run "$GATE" --base-ref main --head-ref feature --explain
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Active-spec LOC (added+removed): 0"* ]]
+    [[ "$output" == *"Specs archived for archive-on-merge"* ]]
+    [[ "$output" == *"FOO-001-demo"* ]]
+}
+
+@test "BUG-050: a gratuitous archive-move earns no spec touch (#397 intact)" {
+    # The red direction. Credit is reachable only through the `issue:`
+    # frontmatter of a spec whose issue THIS PR closes — archiving something
+    # unrelated must remain worthless, or the fix reopens the bypass #397 shut.
+    seed_active_spec BAR-002-other '"mlorentedev/dotfiles#456"'
+    start_feature
+    big_change
+    archive_spec BAR-002-other
+    export SDD_PR_BODY="Closes #123"
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
+}
+
+@test "BUG-050: a spec created and archived in the same PR counts" {
+    # Invisible to the ACTIVE map at base (it does not exist yet) and at head
+    # (it is already archived), so the linkage can only come from the archived
+    # tree at head.
+    start_feature
+    big_change
+    seed_active_spec FOO-003-new '"mlorentedev/dotfiles#123"'
+    archive_spec FOO-003-new
+    export SDD_PR_BODY="Closes #123"
+
+    run_gate
+    [ "$status" -eq 0 ]
+}
+
+@test "BUG-050: closing nothing leaves an archive move worthless as before" {
+    # No closing keyword means no mandate, so the archived path must not become
+    # a free spec touch for any large PR that happens to move a spec.
+    seed_active_spec BAR-002-other '"mlorentedev/dotfiles#456"'
+    start_feature
+    big_change
+    archive_spec BAR-002-other
+    export SDD_PR_BODY="Refs #456"
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
+}
