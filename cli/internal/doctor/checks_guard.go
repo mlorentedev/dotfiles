@@ -77,16 +77,28 @@ func checkGuardHooks(sys *System, cfg *Config, rep *Report, fix bool) {
 
 // guardProbeRepos lists the git checkouts worth probing by effect: the dotfiles
 // repo (where the guard is developed, and the worst place for it to be silently
-// off) and the vault (the guard's single sink, so a repo whose memory artifacts
-// are supposed to be the exception). Absent or non-git paths are dropped rather
-// than reported — a machine without the vault is a valid state, already SKIPped
-// by checkVault.
+// off) and the vault (the guard's single sink, so the one repo whose memory
+// artifacts are the exception). Absent or non-git paths are dropped rather than
+// reported — a machine without the vault is a valid state, already SKIPped by
+// checkVault.
+//
+// Both come from the environment contract ONLY, never from resolveRepoDir's
+// cwd-walk fallback. Two reasons, and the second is the one that bit:
+//
+//   - Probing "whatever repo the caller happens to be sitting in" is surprising
+//     for a machine-health command, and its output would change with cwd.
+//   - It reaches ambient filesystem state, so the unit tests stopped being unit
+//     tests: in CI the walk found the real checkout and every pre-existing
+//     guard case went red on a machine property none of them were asserting.
+//     That is the same defect this whole change exists to prevent, committed
+//     while writing the prevention — a test that does not isolate from the
+//     machine ends up measuring the machine.
 func guardProbeRepos(sys *System, cfg *Config) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, r := range []string{
-		resolveRepoDir(sys),
-		sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge")),
+		sys.Getenv("DOTFILES_REPO_DIR"),
+		sys.Getenv("VAULT_PATH"),
 	} {
 		if r == "" || seen[r] || !isDir(filepath.Join(r, ".git")) {
 			continue

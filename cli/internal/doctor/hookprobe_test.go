@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -187,7 +188,15 @@ func TestVaultHooks_DispatcherWithoutConfig_IsNotAGate(t *testing.T) {
 
 // A non-executable hook is one git silently ignores. Resolution must treat it as
 // absent, or the probe re-introduces the file-exists question it replaced.
+//
+// POSIX-only by nature, not by convenience: Windows has no execute bit, and
+// isExecFile says so explicitly (every regular file is executable there). The
+// distinction this asserts does not exist on that platform, so skipping is the
+// honest answer rather than weakening the assertion for both.
 func TestHookForStage_NonExecutableIsNotAHook(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no execute bit on Windows; isExecFile treats every regular file as executable")
+	}
 	root := t.TempDir()
 	repo := gitRepo(t, filepath.Join(root, "repo"))
 	p := filepath.Join(repo, ".git", "hooks", "pre-commit")
