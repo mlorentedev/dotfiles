@@ -164,3 +164,41 @@ stub_copilot() {
     [ -f "$FAKEHOME/.copilot/skills/user-skill/SKILL.md" ]
     [ ! -d "$FAKEHOME/.copilot/skills/stale-skill" ]
 }
+
+# HARNESS-056: the Definition of Done is doctrine, so it must reach EVERY
+# surface, not only the ones whose instruction file happens to be convenient.
+# These assert the real records, not a fixture.
+
+@test "HARNESS-056: every enforced target injects the definition-of-done" {
+    local missing=0 f
+    while read -r f; do
+        jq -e --arg f "$f" '.targets[] | select(.file==$f) | .inject | index("definition-of-done")' \
+            harness/manifest.json >/dev/null || { echo "target does not inject it: $f"; missing=1; }
+    done < <(jq -r '.targets[].file' harness/manifest.json)
+    jq -e '.doctrine.inject | index("definition-of-done")' harness/manifest.json >/dev/null \
+        || { echo "compact doctrine payload does not carry it"; missing=1; }
+    [ "$missing" -eq 0 ]
+}
+
+@test "HARNESS-056: the injected region reaches the committed instruction files" {
+    grep -q 'Working code is not a finished change' AGENTS.md
+    grep -q 'Working code is not a finished change' ai/claude/CLAUDE.md
+}
+
+@test "HARNESS-056: the compact doctrine payload carries it and stays under its cap" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    local f cap chars
+    while IFS=$'\t' read -r f cap; do
+        [ -f "$FAKEHOME/$f" ]
+        grep -q 'Working code is not a finished change' "$FAKEHOME/$f"
+        chars="$(wc -m < "$FAKEHOME/$f")"
+        [ "$chars" -lt "$cap" ] || { echo "$f is $chars chars, at or over its $cap cap"; return 1; }
+    done < <(jq -r '.doctrine.deploy[] | "\(.file)\t\(.char_cap)"' harness/manifest.json)
+}
+
+@test "HARNESS-056: the checklist binds the standing orders instead of restating them" {
+    # a second source of truth is the failure mode this change exists to avoid
+    grep -q 'not a second source of truth' harness/skills/verification-before-completion/SKILL.md
+    grep -q 'The Closing Pass' harness/skills/verification-before-completion/SKILL.md
+}

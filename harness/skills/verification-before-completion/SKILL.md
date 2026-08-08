@@ -130,6 +130,24 @@ From 24 failure memories:
 - Implications of success
 - ANY communication suggesting completion/correctness
 
+## The Closing Pass
+
+The Iron Law above covers **evidence**. Evidence is one of five checks a finished change owes, and it is the only one this skill used to enforce — which is why the other four kept being skipped while verification passed. Before claiming done, walk the Definition of Done (the harness injects it verbatim into your instructions file; it is authored in `pattern-change-lifecycle.md`) and produce a verdict per item, not a feeling:
+
+| Check | What to actually do | Unmet means |
+|---|---|---|
+| **Debt** | List every defect you noticed and did not fix. | Fix it in scope, or file a ticket with root cause. A mention in chat is not an exit. |
+| **Knowledge** | Name what you learned that is not obvious from the diff. | Write it where it belongs — repo `docs/` for build/operate, the store for cross-project — in this session. |
+| **Board** | Read the ticket's real status. | Move it. Picked up when you start, blocked when blocked, closed by the change that closed it. |
+| **Review** | Check whether an open PR has checks or comments waiting. | Triage them. Each comment is applied, ticketed, or declined with a reason. |
+| **Evidence** | The Iron Law above. | Run the command. |
+
+Three rules keep this from becoming theatre:
+
+1. **Report the verdict, not the intention.** "Filed as #123" and "no debt found" are both verdicts. "I should ticket that" is not.
+2. **A skip is a stated decision.** Any of the five may be skipped when it does not apply — say which and why. Silence is not a skip, it is the failure mode.
+3. **Do not paraphrase the standing orders.** This checklist binds them to a moment; it is not a second source of truth. When they disagree, the standing order wins and this table is wrong.
+
 ## The Bottom Line
 
 **No shortcuts for verification.**

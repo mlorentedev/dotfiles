@@ -28,7 +28,7 @@ If session start context reports memory files needing archive (>60 days cold):
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:e9c8d9d67d9ce58f) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:9bbc453bc3f4cd17) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -40,6 +40,18 @@ If session start context reports memory files needing archive (>60 days cold):
 - Phase/milestone tracking belongs in the bitácora GitHub Project (issues + board), not in git history or the vault (per ADR-018).
 - **Auto-merge is forbidden in every repository.** Never run `gh pr merge --auto`, never enable "Auto-merge" in the GitHub UI, and keep the repo setting `allow_auto_merge=false`. Auto-merge lands a PR the instant CI goes green — bypassing the human review gate in §1.
 - Every PR merges deliberately, after a human has reviewed it and CI is green (squash or rebase per §4, diff verified per §5). Merge is a supervised action, never a queued automatic one. An agent merges only when the user has authorized merging that specific PR.
+
+> Injected verbatim into every agent's instructions (harness `enforced` id `definition-of-done`) and executed by the `verification-before-completion` skill. It **binds** existing standing orders to the moment of closing; it does not restate them.
+
+Working code is not a finished change. Before saying done, each of these is true:
+
+1. **Debt** — every defect noticed along the way is fixed in scope or filed as a ticket with its root cause. A mention in conversation is not an exit.
+2. **Knowledge** — what was learned is written where it belongs, this session: build/operate detail in the repo (`docs/lessons.md`, `docs/adr/`), cross-project insight in the store.
+3. **Board** — the ticket matches reality: picked up when you start, blocked when blocked, closed with the change that closed it.
+4. **Review** — an open PR is not finished work. Its checks and its reviewer comments are triaged, and each comment is applied, ticketed, or declined with a reason.
+5. **Evidence** — no completion claim without the command output that proves it, produced in this session.
+
+Any of the five may be skipped, but only as a stated decision naming which one and why. Silence is not a skip.
 <!-- END HARNESS GENERATED -->
 * **Skills.** `~/.claude/skills/<skill>/SKILL.md` auto-load via slash commands. Skill auto-loading is a Claude Code feature, not portable. Skill **content** is portable: the harness render path (`harness/skills/<name>/` with `targets[]`, deployed offline by `compile-harness.sh --deploy` — ADR-021) emits each skill as an OpenCode command at `~/.config/opencode/commands/<name>.md`. (AI-012 shipped the original transform in PR #43; the standalone `skills-to-opencode.sh` was since retired.)
 * **TaskCreate / TaskUpdate / TaskList.** Use for non-trivial multi-step work (≥3 distinct steps). Mark `in_progress` BEFORE starting; mark `completed` immediately on finish. Don't batch updates.
