@@ -39,4 +39,4 @@ created: "2026-08-08"
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved: `specs/HARNESS-054/` -> `specs/archive/HARNESS-054/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed: lesson appended to `docs/lessons.md`; `pattern-cross-agent-agent-pipeline.md` § Render kinds now records the reduced-render rule
