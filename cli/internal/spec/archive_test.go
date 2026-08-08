@@ -263,3 +263,112 @@ func TestArchiveRecordsPRURL(t *testing.T) {
 		t.Errorf("PR provenance comment missing or malformed:\n%s", got)
 	}
 }
+
+// BUG-041. The pre-flight was inverted: it matched the bare `[AGENT-DRAFT]`
+// shape, which this repo writes when DOCUMENTING the markers, and missed the
+// suffixed shape /spec fill actually emits — so it cried wolf on prose and let a
+// live tag into the archive (specs/archive/CLI-002-repo-structure/proposal.md).
+func TestScanUnresolvedTags(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		want    []int
+	}{
+		// --- must NOT fire: the tag is quoted, not live ---
+		{
+			name:    "inside an inline code span",
+			content: "- [ ] Add `sb_specs` (active/archived counts + `[AGENT-DRAFT]` flagging)\n",
+		},
+		{
+			name:    "on a completed checklist item",
+			content: "- [x] No open questions left — the Linux [AGENT-DRAFT] is resolved\n",
+		},
+		{
+			name:    "inside a fenced code block",
+			content: "before\n```console\n$ dotf spec archive X\nError: [AGENT-DRAFT] found\n```\nafter\n",
+		},
+		{
+			name:    "inside a tilde-fenced block",
+			content: "~~~\n[AGENT-SUGGESTION — accept or remove]\n~~~\n",
+		},
+		// --- must fire: the tag is live ---
+		{
+			name:    "the canonical emitted form in prose",
+			content: "Some rationale. [AGENT-SUGGESTION — accept or remove] More text.\n",
+			want:    []int{1},
+		},
+		{
+			name:    "the canonical draft form in prose",
+			content: "intro\n<!-- [AGENT-DRAFT — review before archive] -->\n",
+			want:    []int{2},
+		},
+		{
+			name:    "the bare form in a plain HTML comment",
+			content: "line one\n<!-- [AGENT-DRAFT] write the why -->\nline three\n",
+			want:    []int{2},
+		},
+		{
+			name:    "on an UNticked checklist item",
+			content: "- [ ] do it [AGENT-SUGGESTION] consider Y\n",
+			want:    []int{1},
+		},
+		{
+			name:    "after a fenced block has closed",
+			content: "```\n[AGENT-DRAFT]\n```\n[AGENT-DRAFT — review before archive]\n",
+			want:    []int{4},
+		},
+		{
+			name:    "a longer closing fence still closes the block",
+			content: "```\nquoted [AGENT-DRAFT]\n````\nlive [AGENT-DRAFT]\n",
+			want:    []int{4},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ScanUnresolvedTags(tc.content)
+			if len(got) != len(tc.want) {
+				t.Fatalf("lines %v, want %v\ncontent:\n%s", got, tc.want, tc.content)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("lines %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// The regression this fix exists to prevent, at the level the user experiences
+// it: a spec documenting the markers must archive with no --force-with-drafts.
+func TestArchiveAcceptsSpecThatOnlyQuotesTags(t *testing.T) {
+	root := t.TempDir()
+	writeSpec(t, root, "AI-002-y", map[string]string{
+		"proposal.md":     "---\nstatus: implementing\n---\nprose\n",
+		"tasks.md":        "- [x] Add `sb_specs` (`[AGENT-DRAFT]` flagging — lifted from detect_repo_specs)\n",
+		"verification.md": "```\n[AGENT-SUGGESTION]\n```\n",
+	})
+
+	if _, err := Archive(root, "AI-002-y", ArchiveOptions{}); err != nil {
+		t.Fatalf("archive refused a spec that only quotes the markers: %v", err)
+	}
+}
+
+// The red direction. Without this, a scanner that matched nothing at all would
+// satisfy every case above.
+func TestArchiveStillRefusesTheEmittedTagForm(t *testing.T) {
+	root := t.TempDir()
+	writeSpec(t, root, "AI-003-z", map[string]string{
+		"proposal.md":     "---\nstatus: implementing\n---\nWhy: [AGENT-DRAFT — review before archive]\n",
+		"tasks.md":        "- [ ] do it\n",
+		"verification.md": "clean\n",
+	})
+
+	_, err := Archive(root, "AI-003-z", ArchiveOptions{})
+	if err == nil {
+		t.Fatal("archive accepted a spec carrying the canonical emitted tag form")
+	}
+	if !strings.Contains(err.Error(), "AGENT-DRAFT") {
+		t.Fatalf("refusal does not name the tag: %v", err)
+	}
+}
