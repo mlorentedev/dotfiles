@@ -1,7 +1,7 @@
 ---
 id: "BUG-060-crystallize-handoff-order"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-08"
 issue: "mlorentedev/dotfiles#850"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -75,3 +75,5 @@ when it exists, and append only when it does not. Running crystallize on a HARNE
   characterization tests for twin ports)
 - ADR-020 §5 (strangler-fig on contact) — satisfied by sequencing through #490
 - HARNESS-029 — the last-section invariant, specified in the vault `handoff` SKILL.md §1
+
+<!-- archived 2026-08-08 — PR: https://github.com/mlorentedev/dotfiles/pull/851 -->

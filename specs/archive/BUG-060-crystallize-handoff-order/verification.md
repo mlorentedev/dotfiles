@@ -56,8 +56,13 @@ template_version: "1.0"
 
 ## Archive checklist
 
-- [ ] PR merged, CI green
-- [ ] `proposal.md` frontmatter -> `status: archived`
-- [ ] Folder moved to `specs/archive/BUG-060-crystallize-handoff-order/`
-- [ ] Issue #850 closed with the PR link
-- [ ] Promotions above executed or declined with a reason
+Archived **inside** the PR, which is what the spec-gate enforces: a PR carrying `Closes #N` must
+end the SDD lifecycle in the same change rather than leaving a `/spec archive` owed. (Exactly the
+debt this session found stranded on WEB-019 in another repo.) The merge itself is therefore the
+last unticked box, and it is the human's.
+
+- [x] `proposal.md` frontmatter -> `status: archived`
+- [x] Folder moved to `specs/archive/BUG-060-crystallize-handoff-order/`
+- [x] Promotions decided (see above): lesson deferred to a cross-project vault entry, ADR declined,
+      pattern folded into `pattern-ai-memory` rather than created
+- [ ] PR #851 merged and #850 auto-closed - the human's gate, auto-merge forbidden
