@@ -43,6 +43,16 @@ EOF
     REPO="$TMP/repo"
     mkdir -p "$REPO"
     git -C "$REPO" init -q
+
+    # GUARD-001 wires core.hooksPath globally, so an unqualified `git checkout`
+    # in this fixture fires the machine's real post-checkout dispatcher — which
+    # backgrounds *this very helper* and appends its own line to $GHLOG. Every
+    # count assertion below would then measure the machine's hooks as well as the
+    # helper under test. Neutralising it in the fixture's own config (rather than
+    # per call, as tests/precommit-fallback.bats does) covers all 13 git
+    # invocations here and any added later.
+    mkdir -p "$TMP/no-hooks"
+    git -C "$REPO" config core.hooksPath "$TMP/no-hooks"
     git -C "$REPO" config user.email t@t
     git -C "$REPO" config user.name t
     git -C "$REPO" remote add origin "git@github.com:mlorentedev/dotfiles.git"
@@ -104,4 +114,18 @@ run_helper() { ( cd "$REPO" && bash "$HELPER" "$@" ); }
     run run_helper "" "" "1"
     [ "$status" -eq 0 ]
     [ "$(grep -c 'mlorentedev/knowledge 52' "$GHLOG")" -eq 1 ]
+}
+
+@test "fixture isolation: a checkout must not fire the machine's post-checkout dispatcher" {
+    # Guard for the isolation itself, not for the helper. Without the
+    # core.hooksPath neutralisation in setup(), the global GUARD-001 dispatcher
+    # runs the real post-checkout, which launches board-pickup.sh in the
+    # background -- so every count assertion in this file silently measures two
+    # runs. That is exactly how "assigns once, no redundant fallback" came to
+    # fail on a clean main while the helper itself was correct.
+    git -C "$REPO" checkout -q -b feat/77-x
+    # The dispatcher backgrounds the helper (`... &`), so an immediate check can
+    # pass on timing alone. Wait long enough that a leaked run would have landed.
+    sleep 1
+    [ ! -s "$GHLOG" ]
 }
