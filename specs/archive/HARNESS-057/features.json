@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-057-f1",
+    "behavior": "The schema requires the store's frontmatter law, not just name and description",
+    "verification": "bats tests/skills-pipeline.bats -f \"HERMES-018: the schema requires the store's frontmatter law\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-057-f2",
+    "behavior": "Every committed skill record satisfies the seven-key contract",
+    "verification": "bats tests/skills-pipeline.bats -f 'HERMES-018: every committed skill record satisfies the contract'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-057-f3",
+    "behavior": "The guard bites: --check rejects a record that drops a required key",
+    "verification": "bats tests/skills-pipeline.bats -f 'HERMES-018: --check rejects a record that drops a required key'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-057-f4",
+    "behavior": "A vendored skill carries source, license and an attribution row; a home-grown one carries none",
+    "verification": "bats tests/skills-pipeline.bats -f 'HERMES-018: a vendored skill carries provenance and an attribution row'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

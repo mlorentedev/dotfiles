@@ -1,4 +1,9 @@
 ---
+id: crystallize-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: crystallize
 targets: [claude]
 description: Use when /insights shows unvaulted observations, stale MEMORY.md, or after completing a significant sprint. Addresses knowledge gaps between session observations and vault lessons.

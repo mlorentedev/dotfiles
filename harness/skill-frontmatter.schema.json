@@ -2,18 +2,63 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://mlorentedev.dev/schemas/skill-frontmatter.schema.json",
   "title": "SKILL.md frontmatter",
-  "description": "Contract for skill frontmatter validated by compile-harness.sh before render (SDD-008). Required fields are the universal subset present in every skill (Claude Code convention: name + description); vault skills additionally carry id/type/status/allowed-tools. Lives in the repo (not the vault) so validation runs offline, consistent with ENGINE-001's committed source-of-record.",
+  "description": "Contract for skill frontmatter, validated by compile-harness.sh before every render (SDD-008). Required = the store's Frontmatter Law (id/type/status/created/owner) plus the two keys every agent needs to find a skill at all (name/description). The engine previously required only the latter pair, which let three frontmatter dialects coexist in one library; requiring the full set is what makes the store's law and the engine's contract the same statement. Lives in the repo rather than the store so validation runs offline, consistent with ENGINE-001's committed source-of-record.",
   "type": "object",
-  "required": ["name", "description"],
+  "required": [
+    "name",
+    "description",
+    "id",
+    "type",
+    "status",
+    "created",
+    "owner"
+  ],
   "properties": {
-    "name": { "type": "string", "minLength": 1, "description": "Skill identifier; also the deployed directory/command name." },
-    "description": { "type": "string", "minLength": 1, "description": "Trigger/when-to-use text agents match against." },
-    "allowed-tools": { "description": "Optional tool allowlist (Claude Code)." },
-    "targets": { "description": "Optional per-skill agent allowlist (e.g. [claude, opencode]); absent = all agents." },
-    "id": { "type": "string" },
-    "type": { "type": "string" },
-    "status": { "type": "string" },
-    "created": {}
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Skill identifier; also the deployed directory/command name."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Trigger/when-to-use text agents match against."
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Store-wide unique id; by convention <name>-skill."
+    },
+    "type": {
+      "type": "string",
+      "const": "skill",
+      "description": "Meta-type. A file under the skills tree that is not a skill is misfiled, not differently typed — see the genre-picker skill."
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Lifecycle state (active, draft, superseded, …)."
+    },
+    "created": {
+      "description": "Authoring date. Derived from the file's first commit, never from the day the field was backfilled — a fabricated date is worse than an absent one."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who answers for this skill when it is wrong."
+    },
+    "allowed-tools": {
+      "description": "Optional tool allowlist. Advisory: harnesses that do not understand it ignore it."
+    },
+    "targets": {
+      "description": "Optional per-agent allowlist; absent = every agent. Declare it only for a dependency no other harness can be given — see the per-skill targeting rule in pattern-cross-agent-skill-pipeline."
+    },
+    "source": {
+      "description": "Upstream repository, required for a vendored skill and absent for a home-grown one. A vendored skill also carries license and a row in harness/skills/ATTRIBUTION.md."
+    },
+    "license": {
+      "description": "Upstream license identifier; pairs with source."
+    }
   },
   "additionalProperties": true
 }

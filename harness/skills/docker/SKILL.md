@@ -1,4 +1,9 @@
 ---
+id: docker-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: docker
 description: Use when containerizing applications, setting up local development environments, or creating multi-service Docker deployments.
 ---

@@ -3,6 +3,7 @@ id: new-ticket-skill
 type: skill
 status: active
 created: "2026-06-10"
+owner: manu
 name: new-ticket
 description: "Create a bitácora ticket interactively with suggested defaults. Triggers on /new-ticket, 'new ticket', 'create a ticket', 'file an issue on the board', 'crea un ticket', 'nuevo ticket', and the detect-then-ticket standing order. Proposes Type, Priority, Status, assignee and the AREA-NNN-slug ID, the human confirms, then it opens the issue and sets the board fields."
 allowed-tools: [Bash, Read, AskUserQuestion]

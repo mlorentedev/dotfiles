@@ -1,4 +1,9 @@
 ---
+id: systematic-debugging-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
 ---

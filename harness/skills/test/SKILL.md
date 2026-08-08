@@ -1,4 +1,9 @@
 ---
+id: test-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: test
 description: Use when creating tests for functions, classes, or modules. Covers edge cases, failure modes, boundary conditions, and proper mocking. Supports pytest (Python), testing package (Go), vitest/jest (JS/TS), and built-in test (Rust).
 ---

@@ -1,4 +1,9 @@
 ---
+id: writing-plans-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: writing-plans
 description: Use when you have a spec or requirements for a multi-step task, before touching code. Use after brainstorming or requirements gathering to create an actionable implementation plan.
 ---

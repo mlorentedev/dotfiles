@@ -3,6 +3,7 @@ id: adversarial-review-skill
 type: skill
 status: active
 created: "2026-05-14"
+owner: manu
 name: adversarial-review
 description: Independent red-team verification pass on a spec-driven change BEFORE archiving. Triggers on /adversarial-review, "red-team this", "devil's advocate AI-001", "independent verification before archive". Reads `specs/<feature-id>/{proposal,tasks,verification}.md` + diff/PR, refutes acceptance criteria, classifies findings Blocker/Major/Minor, issues PASS/PASS-WITH-GAPS/FAIL verdict. Pairs with /spec archive lock. Ported and adapted from LIDR-academy/lidr-specboot.
 allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_search]

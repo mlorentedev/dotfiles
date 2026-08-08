@@ -1,4 +1,9 @@
 ---
+id: pattern-loader-skill
+type: skill
+status: active
+created: "2026-05-31"
+owner: manu
 name: pattern-loader
 description: Use when a task matches a known workflow pattern in vault/00_meta/patterns/. Searches the pattern catalog, loads the most relevant pattern, and applies it. Ensures agents always use the latest version of patterns without caching stale copies in memory.
 ---

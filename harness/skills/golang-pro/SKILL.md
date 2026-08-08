@@ -1,4 +1,9 @@
 ---
+id: golang-pro-skill
+type: skill
+status: active
+created: "2026-06-02"
+owner: manu
 name: golang-pro
 description: Idiomatic Go for concurrency (goroutines, channels, select), microservices (gRPC/REST), generics, interfaces, robust error handling, and pprof performance work. Use when building Go applications requiring concurrent programming, microservices architecture, or high-performance systems; for goroutines, channels, generics, gRPC, CLIs, benchmarks, or table-driven tests.
 source: https://github.com/jeffallan/claude-skills (golang-pro)

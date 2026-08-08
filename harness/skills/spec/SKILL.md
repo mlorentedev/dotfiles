@@ -3,6 +3,7 @@ id: spec-skill
 type: skill
 status: active
 created: "2026-05-13"
+owner: manu
 name: spec
 description: "Manage Spec-Driven Development per-feature artifacts. Triggers on /spec, \"create a spec for\", \"scaffold spec X\", \"bootstrap substrate for X\", \"fill proposal for X\", \"check/lint spec X\", \"archive spec X\". Five subcommands: init (scaffold, gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate contract), fill (Socratic 5-question proposal), check (pre-implementation consistency lint), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent Claude/Copilot via AGENTS.md indirection."
 allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch]

@@ -1,4 +1,9 @@
 ---
+id: dispatching-parallel-agents-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: dispatching-parallel-agents
 description: Use when facing 2+ independent tasks that can run concurrently without shared state or sequential dependencies.
 ---

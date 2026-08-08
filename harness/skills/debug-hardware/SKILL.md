@@ -1,4 +1,9 @@
 ---
+id: debug-hardware-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: debug-hardware
 description: Use when troubleshooting hardware or firmware issues -- device communication, register configuration, signal processing, camera/sensor behavior, or embedded systems.
 ---

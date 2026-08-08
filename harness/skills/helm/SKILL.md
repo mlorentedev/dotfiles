@@ -1,4 +1,9 @@
 ---
+id: helm-skill
+type: skill
+status: active
+created: "2026-06-02"
+owner: manu
 name: helm
 description: Create, test, and package Helm charts — Chart.yaml, templates, _helpers.tpl, dependencies/subcharts, lint/template/dry-run, and repo/OCI publishing. Use when the user mentions Helm charts, helm lint/template/package, or Kubernetes packaging.
 source: https://github.com/laurigates/claude-plugins (helm-chart-development)

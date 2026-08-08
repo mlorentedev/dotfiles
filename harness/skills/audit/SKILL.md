@@ -1,4 +1,9 @@
 ---
+id: audit-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: audit
 description: Use when reviewing code for security vulnerabilities (SQL injection, XSS, hardcoded secrets, CSRF), performance issues (N+1 queries, memory leaks, blocking async), or code quality concerns (complexity, error handling, type safety).
 ---

@@ -1,4 +1,9 @@
 ---
+id: verification-before-completion-skill
+type: skill
+status: active
+created: "2026-05-30"
+owner: manu
 name: verification-before-completion
 description: Use when about to claim work is complete, fixed, or passing -- before committing, creating PRs, or closing tasks. Evidence before assertions.
 ---
