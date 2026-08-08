@@ -8,6 +8,14 @@
 # Bypass (only with explicit user approval):
 #   SKIP=gitleaks git commit ...
 
+# Pin the stage — see the same block in cli/internal/initrepo/templates/. Only
+# `gitleaks` below declares no stage of its own, so this is what stops it running
+# once per dispatched hook type (it was firing twice on every commit here). Its
+# effective stage becomes pre-commit, which gates strictly earlier than pre-push:
+# secrets are blocked before they enter history rather than before they leave the
+# machine.
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
