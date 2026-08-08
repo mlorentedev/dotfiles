@@ -237,6 +237,7 @@ Any of the five may be skipped, but only as a stated decision naming which one a
 ### Interaction Discipline
 
 - **Wait before acting** — don't explore/implement/launch until the prompt is finished. **Ask before exploring** a codebase; no unprompted exploration. **Hands off unless asked** — no terminal/Docker/tests unless requested; when the user says they'll handle it, give instructions only. **Never delete without confirmation** — no removing existing content (README links, doc sections, backlog items) without explicit approval.
+- **Hand the PR over; don't watch CI.** After opening a PR, report it and move to the next piece of work — never sit in a watch loop (`gh pr checks --watch`) waiting for checks. The human reviews the PR and reports a red build. Query the status **once** only when something actually depends on the result (a stacked branch, a follow-up commit). Watching burns wall-clock while the queue waits and tells the reviewer nothing they are not already looking at.
 
 ### Autonomy Boundaries
 
