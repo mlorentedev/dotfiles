@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.34.0](https://github.com/mlorentedev/dotfiles/compare/v0.33.1...v0.34.0) (2026-08-08)
+
+
+### Features
+
+* **doctor:** probe whether guards fire, not where their files sit ([#853](https://github.com/mlorentedev/dotfiles/issues/853)) ([b412597](https://github.com/mlorentedev/dotfiles/commit/b412597167d170d5d89c6119220aa2cd17f8b5a8))
+
+
+### Bug Fixes
+
+* **hooks:** pin default_stages so a stage-agnostic hook runs once, not once per hook type ([#846](https://github.com/mlorentedev/dotfiles/issues/846)) ([256808a](https://github.com/mlorentedev/dotfiles/commit/256808a0d985ceefb94346238b024baa75b1d05f))
+* keep the Session Handoff block last when crystallizing MEMORY.md ([#851](https://github.com/mlorentedev/dotfiles/issues/851)) ([dbe91db](https://github.com/mlorentedev/dotfiles/commit/dbe91db65d22182e94f7b1df6ed6a8842f77dd6b))
+
 ## [0.33.1](https://github.com/mlorentedev/dotfiles/compare/v0.33.0...v0.33.1) (2026-08-08)
 
 
