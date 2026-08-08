@@ -1,3 +1,10 @@
+---
+id: "condition-based-waiting"
+type: reference
+status: active
+tags: []
+---
+
 # Condition-Based Waiting
 
 ## Overview
