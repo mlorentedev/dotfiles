@@ -9,10 +9,17 @@ owner: manu
 
 # Secrets Management
 
-> ⚠️ **Out of date — pending rewrite ([#600](https://github.com/mlorentedev/dotfiles/issues/600)).**
+> ⚠️ **Partly out of date — pending rewrite ([#600](https://github.com/mlorentedev/dotfiles/issues/600)).**
 > The `sensitive/env-mapping.conf` workflow below was retired in #587. Secrets are now
 > mapped in **`secrets/registry.yaml`** (ADR-028) and accessed via `dotf secrets {run,show,render}`.
 > Treat the `env-mapping.conf` steps here as historical until this runbook is refreshed.
+>
+> **[§ Physical Backup (USB + VeraCrypt)](#physical-backup-usb--veracrypt) is NOT affected and is current.**
+> ADR-028 keeps age as the DR floor, so the encrypted-USB procedure still applies —
+> it is called from step 1 of the disaster chain in
+> [`guide-secrets-governance.md` § RECOVER](guide-secrets-governance.md#protocol--recover-disaster).
+> Said explicitly because a banner at the top of a document is read as covering all of it,
+> and this is the only place the physical procedure is written down.
 
 Complete guide for managing encrypted secrets in the dotfiles. Uses [age](https://github.com/FiloSottile/age) encryption with automatic environment variable loading.
 
