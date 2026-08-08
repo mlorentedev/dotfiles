@@ -292,14 +292,26 @@ setup() {
     # Post-SDD-008: setup-linux.sh runs compile-harness.sh --deploy, which renders
     # each committed vault skill record whose targets[] includes opencode to a
     # command .md. The container has no vault, so --refresh is skipped and --deploy
-    # uses the committed records (36 skills, 6 Claude-only opt out -> 30 commands).
+    # uses the committed records.
     [ -d "$HOME/.config/opencode/commands" ]
+    # Expected count is DERIVED, never hardcoded: every deployed skill whose
+    # targets[] admits opencode (absent targets = all agents) must have a command.
+    # A literal count rots on every skill added or unfenced.
+    local expected=0 f
+    for f in "$HOME"/.claude/skills/*/SKILL.md; do
+        [ -f "$f" ] || continue
+        local targets
+        targets=$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^targets:/{print; exit}' "$f")
+        if [ -z "$targets" ] || [[ "$targets" == *opencode* ]]; then
+            expected=$((expected + 1))
+        fi
+    done
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
-    [ "$count" -eq 30 ]  # 28 -> 30: added research-prompt + read-all-adrs records (external-skills audit, targets: all agents)
-    # Spot check: audit.md present (portable), creating-skills.md absent (targets:[claude]).
+    [ "$count" -eq "$expected" ]
+    # Spot check: audit.md present (portable), crystallize.md absent (targets:[claude]).
     [ -f "$HOME/.config/opencode/commands/audit.md" ]
-    [ ! -f "$HOME/.config/opencode/commands/creating-skills.md" ]
+    [ ! -f "$HOME/.config/opencode/commands/crystallize.md" ]
     # rendered command carries provenance + drops name: (opencode keys off filename)
     grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/audit.md"
     ! grep -q '^name:' "$HOME/.config/opencode/commands/audit.md"

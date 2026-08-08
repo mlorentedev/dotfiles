@@ -74,10 +74,10 @@ stub_copilot() {
 @test "AC8 smoke: a Claude-only skill is NOT exposed to opencode/agy" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
-    # creating-skills is targets:[claude]
-    [ -f "$FAKEHOME/.claude/skills/creating-skills/SKILL.md" ]
-    [ ! -f "$FAKEHOME/.config/opencode/commands/creating-skills.md" ]
-    [ ! -d "$FAKEHOME/.gemini/skills/creating-skills" ]
+    # crystallize is targets:[claude] (agent-local auto-memory store)
+    [ -f "$FAKEHOME/.claude/skills/crystallize/SKILL.md" ]
+    [ ! -f "$FAKEHOME/.config/opencode/commands/crystallize.md" ]
+    [ ! -d "$FAKEHOME/.gemini/skills/crystallize" ]
 }
 
 @test "AI-022: pi gets /spec as a native skill (regular copy, not a symlink)" {
@@ -91,8 +91,8 @@ stub_copilot() {
 @test "AI-022: a Claude-only skill is NOT exposed to pi" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
-    # creating-skills is targets:[claude]
-    [ ! -d "$FAKEHOME/.pi/agent/skills/creating-skills" ]
+    # crystallize is targets:[claude] (agent-local auto-memory store)
+    [ ! -d "$FAKEHOME/.pi/agent/skills/crystallize" ]
 }
 
 @test "AI-022: deploy leaves pi-installed sibling symlinks alone" {
@@ -118,7 +118,7 @@ stub_copilot() {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     grep -qF -- '**spec**' "$FAKEHOME/.copilot/copilot-instructions.md"
-    ! grep -q 'creating-skills' "$FAKEHOME/.copilot/copilot-instructions.md"
+    ! grep -qF -- '**crystallize**' "$FAKEHOME/.copilot/copilot-instructions.md"
 }
 
 @test "HARNESS-051: copilot gets native /spec and /handoff skills" {
@@ -137,7 +137,7 @@ stub_copilot() {
     stub_copilot
     run env HOME="$FAKEHOME" PATH="$FAKEHOME/stub:$PATH" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
-    [ ! -d "$FAKEHOME/.copilot/skills/creating-skills" ]
+    [ ! -d "$FAKEHOME/.copilot/skills/crystallize" ]
     [ -f "$FAKEHOME/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
 }
 
