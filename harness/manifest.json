@@ -6,7 +6,8 @@
     { "id": "english-only",        "source": "pattern-git-workflow.md#8-language-policy" },
     { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" },
     { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" },
-    { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" }
+    { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" },
+    { "id": "pr-sizing",           "source": "pattern-git-workflow.md#10-pr-sizing-policy" }
   ],
   "targets": [
     {
@@ -37,7 +38,7 @@
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   },
   "doctrine": {
-    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"],
+    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-sizing"],
     "deploy": [
       {
         "agent": "agy",
