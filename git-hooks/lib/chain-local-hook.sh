@@ -37,7 +37,34 @@ shift
 
 toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
-local_hook="$toplevel/.git/hooks/$hook_type"
+# Hooks are shared repo state, not per-worktree state: git keeps them in the
+# COMMON git dir. In a linked worktree — and under --separate-git-dir —
+# $toplevel/.git is a `gitdir:` pointer FILE, not a directory, so assuming that
+# layout resolved to a path that cannot exist and silently skipped every local
+# hook there (BUG-043). `--git-common-dir` answers relative to the cwd in an
+# ordinary checkout and absolute in a linked worktree; asking from $toplevel
+# makes both forms resolve against the same base, with no need for
+# --path-format=absolute (git 2.31+) and therefore no version floor of our own.
+common_dir="$(cd "$toplevel" && git rev-parse --git-common-dir 2>/dev/null)"
+case "$common_dir" in
+    /*) ;;                                    # linked worktree: already absolute
+    ?*) common_dir="$toplevel/$common_dir" ;; # ordinary checkout: relative to $toplevel
+esac                                          # empty (probe failed): left empty on purpose
+# Two ways the probe lies, both ending in a silently skipped hook:
+#
+#   - `git rev-parse` echoes back an option it does not understand and still exits
+#     0, so a git predating --git-common-dir (< 2.5) hands us the literal flag;
+#   - the probe can fail outright (a $toplevel that vanished between the two calls
+#     — there is no `set -e` here), leaving the answer empty. That is the input
+#     that matters: an empty value joined above would have become "$toplevel/",
+#     which always passes a directory test, so it would walk straight through the
+#     guard below and resolve hooks under "<toplevel>//hooks".
+#
+# Require a non-empty path that is a real directory; otherwise fall back to the
+# classic layout rather than resolving hooks somewhere they cannot be.
+[ -n "$common_dir" ] && [ -d "$common_dir" ] || common_dir="$toplevel/.git"
+
+local_hook="$common_dir/hooks/$hook_type"
 [ -x "$local_hook" ] && exec "$local_hook" "$@"
 
 pre_commit_config="$toplevel/.pre-commit-config.yaml"
