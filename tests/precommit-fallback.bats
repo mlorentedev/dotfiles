@@ -276,6 +276,48 @@ add_linked_worktree() {
     [ -f "$WORK/local-ran" ]
 }
 
+@test "BUG-043: a failing common-dir probe falls back to the classic layout" {
+    # The empty answer is the one input that can walk through the directory test:
+    # joined naively it becomes "$toplevel/", which always IS a directory, so the
+    # guard would pass and hooks would resolve under "<toplevel>//hooks" -- the
+    # silent skip this whole change exists to remove, reintroduced by its own
+    # defence. There is no `set -e` here, so a failed probe does not abort.
+    add_local_hook pre-commit
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'case "$*" in'
+        printf '    *--show-toplevel*)   printf "%%s\\n" "%s" ;;\n' "$FIXTURE"
+        echo '    *) exit 1 ;;'
+        echo 'esac'
+    } > "$STUB/git"
+    chmod +x "$STUB/git"
+    cd "$FIXTURE"
+
+    run bash -c "PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    [ -f "$WORK/local-ran" ]
+}
+
+@test "BUG-043: a --separate-git-dir checkout resolves hooks through the common dir" {
+    # $toplevel/.git is a pointer file here too, for a different reason than a
+    # linked worktree. The same resolution fixes it, which is a claim worth
+    # asserting rather than arguing.
+    stub_precommit 0
+    mkdir -p "$WORK/sep"
+    git init -q --separate-git-dir "$WORK/extgit" "$WORK/sep"
+    mkdir -p "$WORK/extgit/hooks"
+    printf '#!/usr/bin/env bash\ntouch "%s/local-ran"\nexit 0\n' "$WORK" \
+        > "$WORK/extgit/hooks/pre-commit"
+    chmod +x "$WORK/extgit/hooks/pre-commit"
+    cd "$WORK/sep"
+
+    [ -f .git ]
+
+    run bash -c "'$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    [ -f "$WORK/local-ran" ]
+}
+
 @test "BUG-043: with no local hook, a linked worktree still falls through to pre-commit" {
     # The other branch, in the same environment: fixing hook resolution must not
     # cost the BUG-036 fallback for worktrees of pre-commit-managed repos.

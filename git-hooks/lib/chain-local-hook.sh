@@ -47,15 +47,22 @@ toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 # --path-format=absolute (git 2.31+) and therefore no version floor of our own.
 common_dir="$(cd "$toplevel" && git rev-parse --git-common-dir 2>/dev/null)"
 case "$common_dir" in
-    /*) ;;
-    *)  common_dir="$toplevel/$common_dir" ;;
-esac
-# `git rev-parse` echoes back an option it does not understand and still exits 0,
-# so a git predating --git-common-dir (< 2.5) hands us the literal flag instead of
-# a path. Require a real directory and fall back to the classic layout, rather
-# than resolving hooks under a bogus path and reintroducing the silent skip this
-# very change removes.
-[ -d "$common_dir" ] || common_dir="$toplevel/.git"
+    /*) ;;                                    # linked worktree: already absolute
+    ?*) common_dir="$toplevel/$common_dir" ;; # ordinary checkout: relative to $toplevel
+esac                                          # empty (probe failed): left empty on purpose
+# Two ways the probe lies, both ending in a silently skipped hook:
+#
+#   - `git rev-parse` echoes back an option it does not understand and still exits
+#     0, so a git predating --git-common-dir (< 2.5) hands us the literal flag;
+#   - the probe can fail outright (a $toplevel that vanished between the two calls
+#     — there is no `set -e` here), leaving the answer empty. That is the input
+#     that matters: an empty value joined above would have become "$toplevel/",
+#     which always passes a directory test, so it would walk straight through the
+#     guard below and resolve hooks under "<toplevel>//hooks".
+#
+# Require a non-empty path that is a real directory; otherwise fall back to the
+# classic layout rather than resolving hooks somewhere they cannot be.
+[ -n "$common_dir" ] && [ -d "$common_dir" ] || common_dir="$toplevel/.git"
 
 local_hook="$common_dir/hooks/$hook_type"
 [ -x "$local_hook" ] && exec "$local_hook" "$@"
