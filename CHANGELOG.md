@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.1](https://github.com/mlorentedev/dotfiles/compare/v0.33.0...v0.33.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* **hooks:** pass --hook-dir so the dispatcher fallback does not abort every commit ([#840](https://github.com/mlorentedev/dotfiles/issues/840)) ([c938d1e](https://github.com/mlorentedev/dotfiles/commit/c938d1efbe8b6039baabe8ea7dae0a3fba569dee)), closes [#837](https://github.com/mlorentedev/dotfiles/issues/837)
+
 ## [0.33.0](https://github.com/mlorentedev/dotfiles/compare/v0.32.2...v0.33.0) (2026-08-08)
 
 
