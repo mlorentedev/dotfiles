@@ -13,8 +13,16 @@
 #      (canonical copies = THIS repo's .github/workflows/; deployed via the contents API)
 #   4. backfill: put every open issue and PR on the board (item-add is idempotent)
 #
-# Usage: ./scripts/bitacora-rollout.sh [--check] [repo ...]
+# Usage: ./scripts/bitacora-rollout.sh [--check] [--backfill-only] [repo ...]
 #        (no repo args = every non-archived, non-fork repo of $OWNER)
+#
+#   --check          dry-run; print what would change, mutate nothing
+#   --backfill-only  run step 4 alone. Provisioning (link, secret, workflow push)
+#                    stays a deliberate human act; this is the reconciliation
+#                    half, idempotent and safe on a schedule. Used by
+#                    .github/workflows/bitacora-reconcile.yml to heal items an
+#                    event-driven add dropped (OPS-023, #809). Needs no age key.
+#
 # Exit:  0 ok, 1 on any failed step
 
 set -euo pipefail
@@ -29,11 +37,13 @@ SECRET_FILE="${BITACORA_SECRET_FILE:-$REPO_ROOT/sensitive/github.bitacora.secret
 AGE_KEY="${AGE_KEY_FILE:-$HOME/.config/age/key.txt}"
 
 CHECK=0
+BACKFILL_ONLY=0
 REPOS=()
 for arg in "$@"; do
     case "$arg" in
         --check) CHECK=1 ;;
-        --help|-h) sed -n '3,20p' "$0"; exit 0 ;;
+        --backfill-only) BACKFILL_ONLY=1 ;;
+        --help|-h) sed -n '3,22p' "$0"; exit 0 ;;
         *) REPOS+=("$arg") ;;
     esac
 done
@@ -54,7 +64,12 @@ fi
 echo "=== bitácora rollout$( [ "$CHECK" = 1 ] && echo ' (--check, read-only)') — ${#REPOS[@]} repo(s) ==="
 
 # ── Secret: explicit env wins; otherwise decrypt the age-encrypted PAT ──
-if [ -z "${BITACORA_PAT:-}" ]; then
+if [ "$BACKFILL_ONLY" = 1 ]; then
+    # Step 2 is skipped, so no PAT value is needed here: `gh` authenticates from
+    # GH_TOKEN. This is what lets the reconciler run in CI, where the age key
+    # that would decrypt the secret does not exist.
+    :
+elif [ -z "${BITACORA_PAT:-}" ]; then
     BITACORA_PAT="$(age --decrypt -i "$AGE_KEY" "$SECRET_FILE" 2>/dev/null | tr -d '[:space:]')" \
         || { err "cannot decrypt $SECRET_FILE (set BITACORA_PAT or fix the age key)"; exit 1; }
 fi
@@ -126,9 +141,40 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens an au
     ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
 }
 
+# backfill_repo REPO — ensure every OPEN issue and PR of REPO is on the board.
+# `item-add` returns the existing item when the content is already there, so this
+# is idempotent and safe to run on a schedule; that idempotence is what makes it
+# usable as the reconciler for items an event-driven add dropped (OPS-023, #809).
+backfill_repo() {
+    local repo="$1" url backfilled=0
+    while IFS= read -r url; do
+        [ -z "$url" ] && continue
+        if run gh project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" >/dev/null; then
+            backfilled=$((backfilled + 1))
+        else
+            err "$repo: item-add failed for $url"
+        fi
+    done < <(
+        gh issue list --repo "$OWNER/$repo" --state open --limit 200 --json url -q '.[].url' 2>/dev/null
+        gh pr list    --repo "$OWNER/$repo" --state open --limit 200 --json url -q '.[].url' 2>/dev/null
+    )
+    ok "$repo: backfill — $backfilled open item(s) ensured on board"
+}
+
 for repo in "${REPOS[@]}"; do
     echo
     echo "── $repo ──"
+
+    # --backfill-only stops here and runs step 4 alone (OPS-023, #809). The
+    # scheduled reconciler needs step 4's idempotent item-add and nothing else:
+    # steps 1-3 link the board, upload a secret and PUSH WORKFLOW FILES, which
+    # is provisioning, not reconciliation, and must stay a deliberate human act.
+    # It also keeps the reconciler runnable from CI, where BITACORA_PAT arrives
+    # as an Actions secret and the age key needed by step 2 does not exist.
+    if [ "$BACKFILL_ONLY" = 1 ]; then
+        backfill_repo "$repo"
+        continue
+    fi
 
     # 1. Link to the project board
     if echo "$LINKED" | grep -qx "$repo"; then
@@ -162,20 +208,8 @@ for repo in "${REPOS[@]}"; do
         deploy_via_pr "$repo"
     fi
 
-    # 4. Backfill open issues + PRs (item-add returns the existing item when already on board)
-    backfilled=0
-    while IFS= read -r url; do
-        [ -z "$url" ] && continue
-        if run gh project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" >/dev/null; then
-            backfilled=$((backfilled + 1))
-        else
-            err "$repo: item-add failed for $url"
-        fi
-    done < <(
-        gh issue list --repo "$OWNER/$repo" --state open --limit 200 --json url -q '.[].url' 2>/dev/null
-        gh pr list    --repo "$OWNER/$repo" --state open --limit 200 --json url -q '.[].url' 2>/dev/null
-    )
-    ok "$repo: backfill — $backfilled open item(s) ensured on board"
+    # 4. Backfill open issues + PRs
+    backfill_repo "$repo"
 done
 
 echo
