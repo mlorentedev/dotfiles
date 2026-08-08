@@ -1,3 +1,10 @@
+---
+id: "root-cause-tracing"
+type: reference
+status: active
+tags: []
+---
+
 # Root Cause Tracing
 
 ## Overview

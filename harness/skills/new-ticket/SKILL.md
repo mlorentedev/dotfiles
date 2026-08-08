@@ -219,5 +219,5 @@ NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-
 
 - Runbook: [[bitacora-project-setup]] — §1b (home repo), §2 (fields & IDs), §3 (ID convention, CUR-008), §5 (status lifecycle, HARNESS-010).
 - `AGENTS.md` — Standing Order #8 (bitácora status reconciliation) and the detect→ticket rule.
-- Related skills: [[handoff]] (reconciles board status at session end), [[spec]] (`init` is gated on an open issue this skill can create).
+- Related skills: [[00_meta/skills/handoff/SKILL|handoff]] (reconciles board status at session end), [[00_meta/skills/spec/SKILL|spec]] (`init` is gated on an open issue this skill can create).
 - ADR: dotfiles `docs/adr/adr-018-de-vault-task-placement.md` (task state lives on the board).
