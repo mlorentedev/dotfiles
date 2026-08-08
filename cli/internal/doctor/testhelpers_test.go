@@ -77,6 +77,20 @@ func writeExec(t *testing.T, path string) {
 }
 
 // mkdirAll creates a directory tree.
+// writeExecFile writes content at path with the executable bit set. Distinct
+// from writeExec (fixed stub body) and writeFile (no exec bit): a hook needs
+// both its real content AND the bit, because git silently ignores a hook file it
+// cannot execute — a fixture with the bit off models a gate that does not fire.
+func writeExecFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func mkdirAll(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(path, 0o755); err != nil {

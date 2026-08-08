@@ -55,6 +55,58 @@ func checkGuardHooks(sys *System, cfg *Config, rep *Report, fix bool) {
 		rep.Warn(fmt.Sprintf("core.hooksPath is %s (not the GUARD dispatcher) — preserving it; "+
 			"GUARD inactive. Point it at %s, or chain the dispatcher from your hooks, manually.", current, target))
 	}
+
+	// Everything above answers a question about the MACHINE. git resolves
+	// core.hooksPath local-over-global, so a correctly wired machine says nothing
+	// about whether the guard fires in any particular repo — which is how a
+	// repo-local override left the guard inert in the dotfiles checkout itself
+	// while this section reported "all ok", before AND after the override was
+	// removed (BUG-056). Probe the repos that matter by effect.
+	for _, repo := range guardProbeRepos(sys, cfg) {
+		switch {
+		case guardRunsIn(sys, repo):
+			rep.Pass("guard fires in " + repo)
+		case effectiveHooksPath(sys, repo) != "":
+			rep.Fail("guard INACTIVE in " + repo + " — core.hooksPath is overridden there (" +
+				effectiveHooksPath(sys, repo) + "); unset it with `git -C " + repo + " config --unset core.hooksPath`")
+		default:
+			rep.Fail("guard INACTIVE in " + repo + " — the pre-commit hook git runs there is not a GUARD dispatcher")
+		}
+	}
+}
+
+// guardProbeRepos lists the git checkouts worth probing by effect: the dotfiles
+// repo (where the guard is developed, and the worst place for it to be silently
+// off) and the vault (the guard's single sink, so the one repo whose memory
+// artifacts are the exception). Absent or non-git paths are dropped rather than
+// reported — a machine without the vault is a valid state, already SKIPped by
+// checkVault.
+//
+// Both come from the environment contract ONLY, never from resolveRepoDir's
+// cwd-walk fallback. Two reasons, and the second is the one that bit:
+//
+//   - Probing "whatever repo the caller happens to be sitting in" is surprising
+//     for a machine-health command, and its output would change with cwd.
+//   - It reaches ambient filesystem state, so the unit tests stopped being unit
+//     tests: in CI the walk found the real checkout and every pre-existing
+//     guard case went red on a machine property none of them were asserting.
+//     That is the same defect this whole change exists to prevent, committed
+//     while writing the prevention — a test that does not isolate from the
+//     machine ends up measuring the machine.
+func guardProbeRepos(sys *System, cfg *Config) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, r := range []string{
+		sys.Getenv("DOTFILES_REPO_DIR"),
+		sys.Getenv("VAULT_PATH"),
+	} {
+		if r == "" || seen[r] || !isDir(filepath.Join(r, ".git")) {
+			continue
+		}
+		seen[r] = true
+		out = append(out, r)
+	}
+	return out
 }
 
 // isGuardDispatcher reports whether dir holds a GUARD-001 dispatcher: the

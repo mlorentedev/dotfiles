@@ -85,6 +85,7 @@ func Run(opts Options) (int, error) {
 		checkPathFiles(sys, cfg, rep)
 		checkSecrets(sys, cfg, rep)
 		checkSecretsTooling(sys, rep)
+		checkDisasterRecovery(sys, cfg, rep)
 		checkPATExpiry(sys, cfg, rep)
 		checkGuardHooks(sys, cfg, rep, opts.Fix)
 		checkTmux(sys, cfg, rep)
