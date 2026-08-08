@@ -83,6 +83,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y age zsh
 
+      # tests/precommit-fallback-real.bats runs the REAL pre-commit through a real
+      # `git commit` (BUG-055). It skips when the binary is absent, so without this
+      # step the one check that exercises upstream's actual behaviour would skip
+      # here and the suite would go green on the stubbed cases alone -- which is
+      # exactly how BUG-055 shipped.
+      - name: Install pre-commit
+        run: |
+          pipx install pre-commit || pip install --user pre-commit
+          pre-commit --version
+
       - name: Install bats-core
         run: |
           source versions.conf

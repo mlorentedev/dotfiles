@@ -330,3 +330,39 @@ add_linked_worktree() {
     [ "$status" -eq 0 ]
     [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-commit"* ]]
 }
+
+# BUG-055. The fallback omitted --hook-dir. pre-commit's hook_impl passes that
+# value straight into os.path.join() looking for a <stage>.legacy hook BEFORE it
+# runs anything, so None raised TypeError and the stage exited 3 -- aborting
+# `git commit` in every repo on a machine whose core.hooksPath points here and
+# that has no locally-installed hook for the stage. The cases below pin the
+# argument; tests/precommit-fallback-real.bats pins the behaviour, because a
+# stubbed pre-commit accepts any argument list and so cannot tell us the built
+# command is one the real tool survives.
+
+@test "BUG-055: the fallback passes --hook-dir, resolved to the repo's real hooks dir" {
+    stub_precommit 0
+    add_precommit_config
+    cd "$FIXTURE"
+
+    run bash -c "'$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    # The value, not merely the flag: a present-but-wrong path would satisfy a
+    # bare substring check while still resolving .legacy hooks nowhere. This is
+    # what pre-commit's own generated hook computes (dirname "$0").
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]]
+}
+
+@test "BUG-055: --hook-dir resolves through the COMMON git dir from a linked worktree" {
+    # Same reasoning as BUG-043 above: hooks are shared repo state. A worktree's
+    # own .git is a pointer file, so a naive "$toplevel/.git/hooks" would hand
+    # pre-commit a path that cannot exist.
+    stub_precommit 0
+    add_precommit_config
+    add_linked_worktree
+    cd "$WORK/linked"
+
+    run bash -c "'$CHAIN' pre-commit < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]]
+}
