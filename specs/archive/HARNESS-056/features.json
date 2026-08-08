@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-056-f1",
+    "behavior": "The Definition of Done exists in the pattern under a stable anchor and is registered as an enforced id",
+    "verification": "jq -e '.enforced[] | select(.id==\"definition-of-done\") | .source == \"pattern-change-lifecycle.md#definition-of-done\"' harness/manifest.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-056-f2",
+    "behavior": "Every declared agent surface injects it, the compact doctrine payload included",
+    "verification": "bats tests/skills-pipeline.bats -f 'HARNESS-056: every enforced target injects the definition-of-done'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-056-f3",
+    "behavior": "The injected region reaches the committed instruction files",
+    "verification": "bats tests/skills-pipeline.bats -f 'HARNESS-056: the injected region reaches the committed instruction files'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-056-f4",
+    "behavior": "The deployed compact payload carries it and stays under each documented character cap",
+    "verification": "bats tests/skills-pipeline.bats -f 'HARNESS-056: the compact doctrine payload carries it and stays under its cap'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-056-f5",
+    "behavior": "The skill executes the checklist and binds the standing orders rather than restating them",
+    "verification": "bats tests/skills-pipeline.bats -f 'HARNESS-056: the checklist binds the standing orders instead of restating them'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-056-f6",
+    "behavior": "The harness reports no drift after the change",
+    "verification": "bash scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  }
+]

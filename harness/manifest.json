@@ -5,20 +5,21 @@
     { "id": "no-attribution",      "source": "pattern-git-workflow.md#6-attribution-policy" },
     { "id": "english-only",        "source": "pattern-git-workflow.md#8-language-policy" },
     { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" },
-    { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" }
+    { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" },
+    { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" }
   ],
   "targets": [
     {
       "agent": "agents",
       "kind": "native",
       "file": "AGENTS.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"]
     },
     {
       "agent": "claude",
       "kind": "pointer",
       "file": "ai/claude/CLAUDE.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"]
     }
   ],
   "skills": {
@@ -36,7 +37,7 @@
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   },
   "doctrine": {
-    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge"],
+    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"],
     "deploy": [
       {
         "agent": "agy",
