@@ -1,3 +1,10 @@
+---
+id: "defense-in-depth"
+type: reference
+status: active
+tags: []
+---
+
 # Defense-in-Depth Validation
 
 ## Overview
