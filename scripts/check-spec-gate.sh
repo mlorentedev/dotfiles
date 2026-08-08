@@ -217,6 +217,57 @@ _active_spec_issue_map() {
     done
 }
 
+# "<issue-number><TAB><spec-id>" for every ARCHIVED spec at the given ref — the
+# mirror of _active_spec_issue_map, and the other half of the linkage. Once a
+# spec is archived it leaves specs/<id>/ entirely, so the active map cannot see
+# what a PR archived; a spec created AND archived in one change is invisible to
+# the active map at base and at head alike.
+_archived_spec_issue_map() {
+    local ref="$1"
+    local paths
+    paths=$(git ls-tree -r --name-only "$ref" -- specs/archive/ 2>/dev/null) || return 1
+
+    printf '%s\n' "$paths" | while IFS= read -r path; do
+        case "$path" in
+            specs/archive/*/proposal.md) ;;
+            *) continue ;;
+        esac
+        local id="${path#specs/archive/}"
+        id="${id%/proposal.md}"
+        case "$id" in */*) continue ;; esac   # only specs/archive/<id>/proposal.md
+        local num
+        num=$(git show "$ref:$path" 2>/dev/null | _frontmatter_issue_number) || continue
+        # Same `if` reasoning as _active_spec_issue_map: a trailing failed test
+        # would make the whole while loop exit 1 on valid data.
+        if [[ -n "$num" ]]; then
+            printf '%s\t%s\n' "$num" "$id"
+        fi
+    done
+}
+
+# Spec IDs this PR archived in fulfilment of archive-on-merge: archived at head
+# AND linked, through proposal.md's `issue:` frontmatter, to an issue this PR
+# closes. Anything else archived in the same diff is not here, so #397's
+# protection against a gratuitous archive-move dodging the gate is untouched.
+_mandated_archive_ids() {
+    [[ -z "$SDD_PR_BODY" ]] && return 0
+    local slug numbers map num spec_num spec_id
+    slug=$(_repo_slug)
+    numbers=$(_closing_issue_numbers "$slug" "$SDD_PR_BODY" | sort -u)
+    [[ -z "$numbers" ]] && return 0
+    map=$(_archived_spec_issue_map "$HEAD_REF") || return 0
+    [[ -z "$map" ]] && return 0
+
+    while IFS= read -r num; do
+        [[ -z "$num" ]] && continue
+        while IFS=$'\t' read -r spec_num spec_id; do
+            if [[ -n "$spec_id" && "$spec_num" == "$num" ]]; then
+                printf '%s\n' "$spec_id"
+            fi
+        done <<< "$map"
+    done <<< "$numbers"
+}
+
 _check_archive_on_merge() {
     # No PR body (local pre-push runs) means nothing to enforce.
     [[ -z "$SDD_PR_BODY" ]] && return 0
@@ -320,6 +371,25 @@ _is_active_spec_path() {
     esac
 }
 
+# `specs/archive/<id>/...` where <id> is a spec this PR archived to satisfy
+# archive-on-merge. Such a path counts as THE spec touch outright rather than
+# feeding SPEC_LOC, because an archive move barely registers as a diff: a real
+# one (#787) is 4 LOC — the `status:` rewrite plus three pure renames — against
+# SPEC_FLOOR=10. Counting its lines would leave the gate exactly as
+# unsatisfiable as before (#800).
+#
+# This does not reopen the "one-line alibi" #686/C25 closed. That bypass is a
+# trivial edit to an UNRELATED active spec; this path is reachable only through
+# the `issue:` frontmatter of a spec whose issue this very PR closes, so there is
+# no unrelated spec to hide behind.
+_is_mandated_archive_path() {
+    [[ -n "$MANDATED_ARCHIVE_IDS" ]] || return 1
+    case "$1" in specs/archive/*/*) ;; *) return 1 ;; esac
+    local id="${1#specs/archive/}"
+    id="${id%%/*}"
+    printf '%s\n' "$MANDATED_ARCHIVE_IDS" | grep -qxF "$id"
+}
+
 # git diff --numstat compresses a rename into one path with the common
 # prefix/suffix factored out: "specs/{ => archive}/<id>/proposal.md" (brace
 # form) or "old/path => new/path" (full form). Both must collapse to the
@@ -374,6 +444,9 @@ SPEC_LOC=0
 SPEC_TOUCHED=0
 INCLUDED=()
 EXCLUDED=()
+# Computed once, before the diff walk: the specs this PR archived because
+# archive-on-merge required it (#800). Empty for every PR that closes nothing.
+MANDATED_ARCHIVE_IDS=$(_mandated_archive_ids || true)
 
 # Fail CLOSED on a diff error. If BASE_REF/HEAD_REF do not resolve (shallow or
 # fresh clone without origin/main, a typo'd ref, a detached worktree), git diff
@@ -397,6 +470,8 @@ while IFS=$'\t' read -r added removed path; do
 
     if _is_active_spec_path "$path"; then
         SPEC_LOC=$((SPEC_LOC + added + removed))
+    elif _is_mandated_archive_path "$path"; then
+        SPEC_TOUCHED=1
     fi
 
     if _excluded "$path"; then
@@ -420,6 +495,12 @@ if [[ "$EXPLAIN" -eq 1 ]]; then
     printf '  Threshold: %d LOC\n' "$THRESHOLD"
     printf '  Production LOC (added+removed): %d\n' "$TOTAL_LOC"
     printf '  Active-spec LOC (added+removed): %d (floor %d to count as a spec touch)\n' "$SPEC_LOC" "$SPEC_FLOOR"
+    if [[ -n "$MANDATED_ARCHIVE_IDS" ]]; then
+        printf '  Specs archived for archive-on-merge (count as a spec touch):\n'
+        while IFS= read -r _id; do
+            [[ -n "$_id" ]] && printf '    %s\n' "$_id"
+        done <<< "$MANDATED_ARCHIVE_IDS"
+    fi
     if [[ "$SPEC_TOUCHED" -eq 1 ]]; then
         printf '  Spec folder touched: yes\n'
     else
