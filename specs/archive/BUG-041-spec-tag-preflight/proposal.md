@@ -1,7 +1,7 @@
 ---
 id: "BUG-041-spec-tag-preflight"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-08"
 issue: "mlorentedev/dotfiles#769"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -12,7 +12,7 @@ template_version: "1.0"
 
 ## Why
 
-<!-- from issue #769: BUG-041: dotf spec archive pre-flight false-positives on [AGENT-DRAFT] inside code spans and completed tasks -->
+<!-- from issue #769: BUG-041: dotf spec archive pre-flight false-positives on `[AGENT-DRAFT]` inside code spans and completed tasks -->
 
 The archive lock was inverted in **both** directions, and the reported symptom was
 only the milder half.

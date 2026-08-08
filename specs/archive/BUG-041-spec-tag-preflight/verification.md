@@ -57,7 +57,23 @@ the full Go suite is green across 12 packages.
 
 ## Self-application
 
-The old binary cannot archive this spec. Its prose necessarily discusses the
-markers, so the unpatched pre-flight refuses — the exact bug being fixed. The
-archive commit in this PR was produced with the binary built from this branch,
-which makes the fix a precondition of the PR's own completion.
+The unpatched binary refuses to archive this very spec, and it refuses on the
+line that quotes the issue title:
+
+```console
+$ dotf spec archive BUG-041-spec-tag-preflight       # installed (unpatched) build
+Error: unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags found:
+  proposal.md:15: <!-- from issue #769: BUG-041: dotf spec archive pre-flight
+  false-positives on [AGENT-DRAFT] inside code spans and completed tasks -->
+resolve them (accept/edit/delete) before archiving, or use --force-with-drafts
+```
+
+The bug blocking its own fix, on a line whose content is the bug's description.
+
+Note what the fix does *not* do: it does not wave this line through. A bare
+marker in live prose is a real marker (AC3), and an HTML comment is prose. The
+resolution is the one the fix makes available and the tooling intends — quote the
+marker as a code span, because it is a quotation of an issue title rather than an
+editorial directive. The patched binary then archives cleanly. That is the
+workflow this change restores: resolve the marker, do not reach for
+`--force-with-drafts`.
