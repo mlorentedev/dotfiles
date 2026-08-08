@@ -54,7 +54,18 @@ Scheduled (e.g. weekly) + before any big change:
 
 Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain):
 
-1. Restore the **age key** from its offline backup → `~/.config/age/key.txt`.
+1. **Restore the age key from its offline backup** → `~/.config/age/key.txt`. Everything below decrypts with this key, so nothing else in the chain can start until it is in place. The authoritative offline copy is an encrypted USB (VeraCrypt); `lsblk` identifies the device, which is not stable across machines.
+
+   ```bash
+   sudo apt install age veracrypt            # a fresh machine has neither
+   veracrypt /dev/sdX1 /media/secrets        # prompts for the volume password
+   install -m 600 -D /media/secrets/key.txt ~/.config/age/key.txt
+   veracrypt -d /media/secrets               # unmount when done
+   ```
+
+   A USB written by `backup-secrets-to-usb.sh` also carries `ci-age-key.txt`, a standalone decrypt script and a `secrets/` mirror, so `cd /media/secrets && ./age-standalone.sh decrypt` recovers everything **without the repo**. A hand-copied USB holds `key.txt` alone — still enough for this chain, which is what matters here.
+
+   Creating and refreshing that USB lives in [`secrets-management.md` § Physical Backup](secrets-management.md#physical-backup-usb--veracrypt). That runbook carries an out-of-date banner scoped to its `env-mapping.conf` workflow; the VeraCrypt procedure is **not** part of what was retired and remains current under ADR-028, which keeps age as the DR floor.
 2. Clone the dotfiles repo.
 3. `age -d -i ~/.config/age/key.txt sensitive/dr/bitwarden-export.age > $TMPDIR/vault.json` (ephemeral / tmpfs) — `sensitive/dr/bitwarden-export.age` is the artifact `dotf secrets backup` produced.
 4. Stand up a fresh Bitwarden (or any manager) and **import** `vault.json` (`bw import bitwardenjson $TMPDIR/vault.json`); or read individual secrets for immediate needs.
