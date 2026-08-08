@@ -516,6 +516,20 @@ deploy_skills() {
 # Remove previously-deployed outputs that are now stale: the skill no longer has
 # a record, or its targets[] no longer includes that agent. Only touches files
 # that carry our provenance marker (never user-authored skills).
+#
+# The marker is the only proof of ownership, so an output written by any
+# PRE-provenance deploy mechanism is unprunable — it survives every re-deploy and
+# keeps serving a stale copy (HARNESS-053: five skills frozen in ~/.gemini/skills
+# since the symlink era, two of them fenced to another agent). Deleting unmarked
+# files is not an option (that is how a hand-authored skill dies), so report the
+# residue instead: warn when an unmarked entry SHADOWS a record name. Third-party
+# skills that own their name — no record, no shadow — stay silent.
+warn_unmanaged_output() {
+    local recdir="$1" name="$2" path="$3"
+    [[ -f "$recdir/$name/SKILL.md" ]] || return 0
+    printf '[deploy] WARN unmanaged copy of a managed skill (no provenance marker, not prunable) -> %s\n' "$path" >&2
+}
+
 deploy_prune() {
     local sk_recdir="$1" agent render dir f sd name
     while IFS=$'\t' read -r agent render dir; do
@@ -523,8 +537,8 @@ deploy_prune() {
             command|prompt)
                 for f in "$HOME/$dir"/*.md; do
                     [[ -f "$f" ]] || continue
-                    is_generated_output "$f" || continue
                     name="$(basename "$f" .md)"
+                    is_generated_output "$f" || { warn_unmanaged_output "$sk_recdir" "$name" "$f"; continue; }
                     if [[ ! -f "$sk_recdir/$name/SKILL.md" ]] || ! skill_targets_agent "$sk_recdir/$name/SKILL.md" "$agent"; then
                         rm -f "$f"; printf '[deploy] pruned stale -> %s\n' "$f"
                     fi
@@ -533,8 +547,8 @@ deploy_prune() {
             *)
                 for sd in "$HOME/$dir"/*/; do
                     [[ -d "$sd" ]] || continue
-                    is_generated_output "$sd/SKILL.md" || continue
                     name="$(basename "$sd")"
+                    is_generated_output "$sd/SKILL.md" || { warn_unmanaged_output "$sk_recdir" "$name" "$sd"; continue; }
                     if [[ ! -f "$sk_recdir/$name/SKILL.md" ]] || ! skill_targets_agent "$sk_recdir/$name/SKILL.md" "$agent"; then
                         rm -rf "$sd"; printf '[deploy] pruned stale -> %s\n' "$sd"
                     fi

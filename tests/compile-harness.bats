@@ -306,6 +306,45 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     [ -f "$FAKEHOME/.claude/skills/demo-skill/SKILL.md" ]
 }
 
+@test "HARNESS-053: --deploy warns on an unmarked copy of a managed skill and never deletes it" {
+    seed_skills_fixture
+    # the skill is fenced to another agent, so a re-deploy never overwrites the
+    # residue on agy — exactly the case the prune cannot reach
+    printf -- '---\nname: demo-skill\ndescription: claude only.\ntargets: [claude]\n---\n\n# Demo\n' \
+        > "$VAULT/00_meta/skills/demo-skill/SKILL.md"
+    run_refresh; [ "$status" -eq 0 ]
+    # residue from a pre-provenance deploy: right name, no `generated:` marker
+    mkdir -p "$FAKEHOME/.gemini/skills/demo-skill"
+    printf -- '---\nname: demo-skill\ndescription: stale copy.\n---\n\n# Old body\n' \
+        > "$FAKEHOME/.gemini/skills/demo-skill/SKILL.md"
+    # a third-party skill owning a name we do not manage must stay silent
+    mkdir -p "$FAKEHOME/.gemini/skills/vendor-skill"
+    printf -- '---\nname: vendor-skill\ndescription: not ours.\n---\n\n# Vendor\n' \
+        > "$FAKEHOME/.gemini/skills/vendor-skill/SKILL.md"
+
+    run_deploy; [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN unmanaged copy"* ]]
+    [[ "$output" == *"demo-skill"* ]]
+    [[ "$output" != *"vendor-skill"* ]]
+    [ -f "$FAKEHOME/.gemini/skills/vendor-skill/SKILL.md" ]
+    # reported, never deleted — the marker is the only proof of ownership
+    [ -f "$FAKEHOME/.gemini/skills/demo-skill/SKILL.md" ]
+    grep -q 'stale copy' "$FAKEHOME/.gemini/skills/demo-skill/SKILL.md"
+}
+
+@test "HARNESS-053: a marked output still prunes when its skill drops the agent" {
+    seed_skills_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    [ -d "$FAKEHOME/.gemini/skills/demo-skill" ]
+    printf -- '---\nname: demo-skill\ndescription: now claude only.\ntargets: [claude]\n---\n\n# Demo\n' \
+        > "$VAULT/00_meta/skills/demo-skill/SKILL.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    [ ! -d "$FAKEHOME/.gemini/skills/demo-skill" ]
+    [[ "$output" == *"pruned stale"* ]]
+}
+
 @test "AC3: --check validates records render, offline (no vault)" {
     seed_skills_fixture
     run_refresh; [ "$status" -eq 0 ]

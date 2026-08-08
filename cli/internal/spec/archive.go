@@ -10,9 +10,116 @@ import (
 )
 
 // agentTagPattern matches the editorial markers a spec must not carry into the
-// archive. Mirrors the `grep -rnE '\[AGENT-(DRAFT|SUGGESTION)\]'` pre-flight in
-// archive-spec.sh.
-var agentTagPattern = regexp.MustCompile(`\[AGENT-(DRAFT|SUGGESTION)\]`)
+// archive, in BOTH shapes the tooling produces: the bare `[AGENT-DRAFT]` and the
+// suffixed `[AGENT-DRAFT — review before archive]` that /spec fill actually
+// writes (harness/skills/spec/SKILL.md, "Capture rules").
+//
+// The original pattern required `]` immediately after the keyword, mirroring
+// archive-spec.sh's grep. That never matched the canonical emitted form, so the
+// archive lock did not lock: specs/archive/CLI-002-repo-structure/proposal.md:19
+// was archived still carrying a live `[AGENT-SUGGESTION — accept or remove]`.
+// Inverted twice over, in fact — the only shape it did match, the bare one, is
+// the shape this repo writes when documenting the markers rather than using them.
+var agentTagPattern = regexp.MustCompile(`\[AGENT-(DRAFT|SUGGESTION)\b[^\]]*\]`)
+
+// fenceLinePattern matches a fenced-code delimiter, capturing the run of fence
+// characters so a closing fence can be required to be at least as long as the
+// opening one (CommonMark), and of the same character.
+var fenceLinePattern = regexp.MustCompile("^\\s{0,3}(`{3,}|~{3,})")
+
+// completedTaskPattern matches a ticked checklist item. A tag on such a line is
+// by definition resolved — the line records work already done.
+var completedTaskPattern = regexp.MustCompile(`^\s*[-*+]\s+\[[xX]\]`)
+
+// stripCodeSpans removes inline code spans from one line, honouring CommonMark's
+// rule that the opening and closing backtick runs must be the SAME length.
+//
+// A regexp cannot express that: Go's RE2 has no backreferences, and the obvious
+// "`+[^`]*`+" accepts unequal runs. That form strips `[AGENT-DRAFT]“, which is
+// NOT a code span — so a live marker written with mismatched backticks would be
+// silently dropped and the spec would archive carrying it. For a guard, that
+// false negative is the dangerous direction, and it is the same class of defect
+// this whole change exists to remove.
+//
+// A run with no partner of equal length is left in place, so an unbalanced
+// backtick makes the scanner REPORT rather than skip. Code spans that cross a
+// line boundary are not tracked, for the same reason: both choices err toward
+// refusing an archive, never toward passing one.
+func stripCodeSpans(line string) string {
+	var out strings.Builder
+	for i := 0; i < len(line); {
+		if line[i] != '`' {
+			out.WriteByte(line[i])
+			i++
+			continue
+		}
+		open := i
+		for i < len(line) && line[i] == '`' {
+			i++
+		}
+		runLen := i - open
+
+		end := -1
+		for j := i; j < len(line); {
+			if line[j] != '`' {
+				j++
+				continue
+			}
+			k := j
+			for k < len(line) && line[k] == '`' {
+				k++
+			}
+			if k-j == runLen {
+				end = k
+				break
+			}
+			j = k
+		}
+		if end == -1 {
+			out.WriteString(line[open:i]) // no equal-length partner: not a span
+			continue
+		}
+		i = end // drop the span, delimiters included
+	}
+	return out.String()
+}
+
+// ScanUnresolvedTags returns the 1-based numbers of lines in content that carry
+// an UNRESOLVED agent tag. A tag that is quoted rather than live is not a hit:
+//
+//   - inside a fenced code block or an inline code span — documentation ABOUT the
+//     markers, which this repo writes constantly because it builds the tooling
+//     that emits them;
+//   - on a completed checklist line (`- [x]`), which records finished work.
+//
+// The exclusions are shape-based rather than a real markdown parse on purpose: a
+// spec is not arbitrary markdown, and a parser would be a far heavier dependency
+// than the two shapes that actually produce false positives here. Both shapes are
+// pinned by tests in the red direction — a genuine tag must still be found.
+func ScanUnresolvedTags(content string) []int {
+	var (
+		hits      []int
+		fenceMark string
+	)
+	for i, line := range strings.Split(content, "\n") {
+		if m := fenceLinePattern.FindStringSubmatch(line); m != nil {
+			switch {
+			case fenceMark == "":
+				fenceMark = m[1]
+			case m[1][0] == fenceMark[0] && len(m[1]) >= len(fenceMark):
+				fenceMark = ""
+			}
+			continue
+		}
+		if fenceMark != "" || completedTaskPattern.MatchString(line) {
+			continue
+		}
+		if agentTagPattern.MatchString(stripCodeSpans(line)) {
+			hits = append(hits, i+1)
+		}
+	}
+	return hits
+}
 
 // statusLinePattern matches a `status:` line, capturing the `status: ` prefix
 // (group 1) separately from the value token so only the value is rewritten.
@@ -49,10 +156,9 @@ func FindUnresolvedTags(specDir string) ([]string, error) {
 		if relErr != nil {
 			rel = path
 		}
-		for i, line := range strings.Split(string(data), "\n") {
-			if agentTagPattern.MatchString(line) {
-				hits = append(hits, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
-			}
+		lines := strings.Split(string(data), "\n")
+		for _, n := range ScanUnresolvedTags(string(data)) {
+			hits = append(hits, fmt.Sprintf("%s:%d: %s", rel, n, strings.TrimSpace(lines[n-1])))
 		}
 		return nil
 	})

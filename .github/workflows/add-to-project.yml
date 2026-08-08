@@ -3,9 +3,30 @@ name: Add to bitácora
 # Puts every opened/reopened issue and PR onto the cross-repo bitácora board
 # (GitHub Project #1). Pairs with bitacora-status.yml (which flips an assigned
 # issue to In Progress). Canonical copy for the OPS-002 (#258) multi-repo rollout.
-
-# Note: actions/add-to-project@v1 only supports issues, not PRs. We use it for
-# issues and fall back to gh project item-add for PRs.
+#
+# OPS-023 (#809): this workflow used to drop items silently. Both paths failed
+# hard with no retry and no alert, and nobody watches an Actions run fired by an
+# `issues: opened` event — a missing ticket looks exactly like a ticket that was
+# never filed. Five confirmed instances across three days and two repos.
+#
+# The failure modes are NOT interchangeable, so they are classified rather than
+# lumped into one `continue-on-error`, which would turn a bad token or a deleted
+# board into the same silent drop this exists to stop:
+#
+#   primary rate limit -> soft-fail, NO retry. GitHub bills the 5,000-point
+#                         GraphQL pool to the ACCOUNT (not the token), so an
+#                         interactive session can drain it and the reset is up to
+#                         an hour away. Retrying would burn the job and still
+#                         lose. bitacora-reconcile.yml heals the drop instead.
+#   transient          -> retry with backoff (5xx, network, secondary limit).
+#   anything else      -> red, loudly.
+#
+# Both event types now go through the same GraphQL mutation. The old issues path
+# used actions/add-to-project@v2.0.0, which cannot be wrapped in a retry without
+# either re-running the whole job or adding a third-party retry action (a new
+# supply-chain dependency in a repo that SHA-pins its actions, #692). The content
+# node ID is already in the event payload, so unifying costs nothing and removes
+# the PR path's separate node-ID lookup.
 
 on:
   issues:
@@ -17,41 +38,91 @@ jobs:
   add-to-project:
     # Fork PRs run without repository secrets — BITACORA_PAT would be empty and the
     # job would fail (Codex review on kubelab#237). Skip them; fork PRs reach the
-    # board via the rollout backfill or a manual item-add.
+    # board via the reconciler or a manual item-add.
     if: github.event_name == 'issues' || github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
     steps:
-      # Issues: use the official action (works fine for issues)
-      - name: Add issue to project
-        if: github.event_name == 'issues'
-        uses: actions/add-to-project@v2.0.0
-        with:
-          project-url: https://github.com/users/mlorentedev/projects/1
-          github-token: ${{ secrets.BITACORA_PAT }}
-
-      # PRs: use gh CLI directly (the action doesn't support PRs)
-      - name: Add PR to project
-        if: github.event_name == 'pull_request'
+      - name: Add to bitácora board
         env:
           GH_TOKEN: ${{ secrets.BITACORA_PAT }}
+          # Present for exactly one of the two events; `||` picks whichever fired.
+          CONTENT_NODE_ID: ${{ github.event.issue.node_id || github.event.pull_request.node_id }}
         run: |
-          # Get the project ID
-          PROJECT_ID=$(gh api graphql -f query='
-            query { user(login: "mlorentedev") { projectV2(number: 1) { id } } }
-          ' --jq '.data.user.projectV2.id')
-          # Get the PR node ID
-          PR_NODE_ID=$(gh pr view ${{ github.event.pull_request.number }} \
-            --repo ${{ github.repository }} --json id --jq '.id')
-          if [ -z "$PROJECT_ID" ] || [ -z "$PR_NODE_ID" ]; then
-            echo "Failed to resolve project ID or PR node ID"
-            echo "PROJECT_ID=$PROJECT_ID PR_NODE_ID=$PR_NODE_ID"
+          set -euo pipefail
+
+          # Exit 10 is this script's private "rate-limited, not our problem now"
+          # signal — distinct from 1 (real failure) so the caller can soft-fail
+          # only that case.
+          RATE_LIMITED=10
+
+          # gh_graphql <args...> — one GraphQL call with the three-way handling
+          # described in the header. Prints the response on success.
+          gh_graphql() {
+            local attempt=1 max=3 out
+            while :; do
+              if out=$(gh api graphql "$@" 2>&1); then
+                printf '%s' "$out"
+                return 0
+              fi
+              case "$out" in
+                *"API rate limit exceeded"*|*"API rate limit already exceeded"*)
+                  printf '%s\n' "$out" >&2
+                  return "$RATE_LIMITED"
+                  ;;
+                *"secondary rate limit"*|*"abuse detection"*|*"was submitted too quickly"*|\
+                *"HTTP 50"*|*"timeout"*|*"Connection reset"*|*"EOF"*)
+                  if [ "$attempt" -ge "$max" ]; then
+                    printf '::error::transient failure persisted after %d attempts\n' "$max"
+                    printf '%s\n' "$out" >&2
+                    return 1
+                  fi
+                  printf '::warning::transient failure (attempt %d/%d), retrying\n' "$attempt" "$max"
+                  sleep $(( attempt * 5 ))
+                  attempt=$(( attempt + 1 ))
+                  ;;
+                *)
+                  printf '%s\n' "$out" >&2
+                  return 1
+                  ;;
+              esac
+            done
+          }
+
+          if [ -z "${CONTENT_NODE_ID}" ]; then
+            printf '::error::no content node id in the %s event payload\n' "${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          # Add the PR to the project
-          gh api graphql -f query='
-            mutation($project: ID!, $contentId: ID!) {
-              addProjectV2ItemById(input: {projectId: $project, contentId: $contentId}) {
-                item { id }
+
+          rc=0
+          PROJECT_ID=$(gh_graphql -f query='
+            query { user(login: "mlorentedev") { projectV2(number: 1) { id } } }
+          ' --jq '.data.user.projectV2.id') || rc=$?
+
+          if [ "$rc" -eq 0 ] && [ -n "${PROJECT_ID}" ]; then
+            gh_graphql -f query='
+              mutation($project: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {projectId: $project, contentId: $contentId}) {
+                  item { id }
+                }
               }
-            }
-          ' -f project="$PROJECT_ID" -f contentId="$PR_NODE_ID"
+            ' -f project="$PROJECT_ID" -f contentId="$CONTENT_NODE_ID" >/dev/null || rc=$?
+          elif [ "$rc" -eq 0 ]; then
+            printf '::error::project id resolved empty with no API error\n'
+            rc=1
+          fi
+
+          case "$rc" in
+            0)
+              printf '::notice::added to the bitácora board\n'
+              ;;
+            "$RATE_LIMITED")
+              # Green on purpose. The item IS off the board, and that is recorded
+              # for the reconciler rather than pretended away — failing the job
+              # here would only add a red run nobody reads to a drop nobody sees.
+              printf '::warning::primary GraphQL pool exhausted (billed per account, not per token) — this item is NOT on the board; bitacora-reconcile.yml will add it within a day\n'
+              ;;
+            *)
+              printf '::error::could not add this item to the bitácora board — this is not a rate limit, so it will not self-heal\n'
+              exit 1
+              ;;
+          esac

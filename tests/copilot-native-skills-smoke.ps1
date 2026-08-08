@@ -62,7 +62,7 @@ try {
 
     $handoff = Join-Path $copilotHome 'skills\handoff\SKILL.md'
     $auxiliary = Join-Path $copilotHome 'skills\systematic-debugging\root-cause-tracing.md'
-    $claudeOnly = Join-Path $copilotHome 'skills\creating-skills'
+    $claudeOnly = Join-Path $copilotHome 'skills\crystallize'
     if (-not (Test-Path -LiteralPath $handoff)) {
         throw "Windows deploy did not create $handoff"
     }
