@@ -1778,3 +1778,33 @@ So a naive `common_dir=$(git rev-parse --git-common-dir)` yields the literal str
 **Solution**: Strip comment lines before matching, and assert on *syntactic* forms that only occur in code (`continue-on-error:` with the colon, `uses: actions/add-to-project`) rather than bare names. The red run is what surfaced it; a green-first assertion would have shipped as a test that could never fail.
 
 **Rule**: Same family as the 2026-08-06 plugin audit above — that one judged usage from a capability listing, this one judges structure from a file that documents itself. Both reduce to: **descriptive text about X is not evidence about X**, even when it lives in the artifact itself. When asserting on a file's structure, exclude the commentary first, or key on syntax that prose cannot accidentally produce.
+
+### [2026-08-08] A health report over a tree another process is writing is a dirty read, and re-running it is how you find out
+
+**Context**: Running `/insights` and then `/vault-doctor` over the knowledge vault. `vault_health` reported frontmatter errors; the plan was to backfill them.
+
+**Problem**: Two runs minutes apart disagreed — the first found 30 issues (truncated, 25 errors), the second 46 (9 errors), with an entire project's worth of errors having vanished in between. The instinct is to suspect the checker's cache. The cause was a second agent session committing to the same vault: 32 commits in 90 minutes, one of them a 143-file frontmatter backfill that landed at 04:09:20 UTC, precisely between the two reads. Spot-checking the seven files still listed as errors, **four already carried the exact keys the report said they lacked**. Repairing from that snapshot would have produced a diff "fixing" four already-correct files — noise indistinguishable from work, layered on top of another session's live edits.
+
+**Solution**: Verify each flagged item against the file on disk before acting on any aggregate scan, and read a disagreement between two runs as evidence of a *writer*, not of a flaky tool. Then wait for the tree to go quiet — clean working tree plus a no-commit interval — and re-diagnose from scratch instead of repairing from the stale snapshot.
+
+**Rule**: A scan of shared mutable state is a report about a moment that has already passed, and its aggregate counts are the least trustworthy part of it — they are the part carrying no per-item evidence. Before acting on one, take a lock, pin a revision, or re-verify the specific items you intend to touch. Never let the first read decide the work when a cheap second read can tell you whether the ground is moving.
+
+### [2026-08-08] A comment asserting an upstream contract is not evidence of that contract
+
+**Context**: `chain-local-hook.sh` chains the machine-wide GUARD dispatcher to repo-local hooks. Where a repo has no local hook for the stage, it falls back to invoking `pre-commit hook-impl` directly, deliberately omitting `--hook-dir`. A comment above that branch explains the choice: *"omitting --hook-dir is its supported dispatcher path (upstream marks that branch 'git 2.54+ hooks')"*.
+
+**Problem**: On the installed pre-commit 4.4.0 the call is fatal. `hook_impl` feeds `hook_dir` straight into `os.path.join(hook_dir, f'{hook_type}.legacy')` *before* running any configured hook, so `None` raises `TypeError` and the stage exits 3. The fallback fires for every stage a repo has not locally installed, so `git commit` aborted in **any** repo on the machine carrying a `.pre-commit-config.yaml` — confirmed in a throwaway repo where the commit was simply never created. The dispatcher is installed globally through `core.hooksPath`, making the blast radius every repository on the box, and it shipped green because the tests only exercised the branch where a local hook exists.
+
+**Solution**: Pass `--hook-dir "$common_dir/hooks"` — the value pre-commit's own generated hook computes, and one already resolved a few lines earlier for the local-hook probe. Filed as BUG-055 with the guard it implies: a test that runs a real `git commit` in a temp repo carrying a config and **no** installed hooks, asserting the commit exists afterwards.
+
+**Rule**: Same family as the structural-assertion lesson above, one level up. There, prose inside an artifact was mistaken for evidence about that artifact; here, prose inside *our* code was mistaken for evidence about *someone else's*. A sentence naming an upstream behaviour is a claim to be tested against the installed version, never a citation. The cheapest available test — running by hand, once, the exact command the code will run — would have caught this before it reached a machine-wide hook.
+
+### [2026-08-08] `gh` splits its subcommands across two rate-limit pools, so a polling loop can exhaust the one you need
+
+**Context**: Waiting on a PR's CI with a background loop calling `gh pr checks` every 20 seconds, while separately reading the issue backlog.
+
+**Problem**: `gh issue list`, `gh pr checks` and `gh pr view` travel over GraphQL; `gh api repos/...` travels over REST, and the two carry independent hourly quotas. The polling loop drained GraphQL to 0/5000 while REST sat untouched near 4900/5000 — so `gh pr checks` and `gh issue create` both failed while every equivalent REST call kept working. The same exhaustion had already broken an unrelated `release-please` run that hour: the release published correctly and only its *second* phase, building the next release PR, died on the limit, leaving a red run beside a perfectly good release.
+
+**Solution**: Route status polling and issue creation through `gh api` — `repos/{o}/{r}/commits/{sha}/check-runs` to read checks, `POST repos/{o}/{r}/issues` to file — and set the interval from how fast the state actually changes: 60s+ for a CI run, never 20s.
+
+**Rule**: Before writing any loop against a hosted API, establish which transport each call uses and what it costs; a wait loop is the highest-volume caller in a session and must always take the cheapest path. And when a tool starts failing on rate limits, check the *other* pool before concluding you are blocked — a red run under an exhausted quota is often a partial success whose remaining phase never ran, not a failure of the work itself.
