@@ -1,0 +1,120 @@
+name: Reconcile bitácora
+
+# OPS-023 (#809). The event-driven add (add-to-project.yml) soft-fails when the
+# primary GraphQL pool is exhausted, because that pool is billed per ACCOUNT and
+# an interactive session can drain it for up to an hour. That is the right call
+# in the moment — but it leaves the item off the board, and a missing ticket is
+# indistinguishable from one that was never filed.
+#
+# This is the healer. `bitacora-rollout.sh --backfill-only` ensures every OPEN
+# issue and PR is on the board; `gh project item-add` returns the existing item
+# when the content is already there, so a run that finds nothing wrong is a
+# no-op. Provisioning (linking, secrets, pushing workflow files) is deliberately
+# NOT in scope — this job only adds board items.
+#
+# Daily, not weekly: five drops were confirmed in three days, and an item off the
+# board is invisible while it waits.
+#
+# Loudness is asymmetric on purpose. Healed drift is a `::notice::` count — it is
+# the system working, not an incident. A reconciler that cannot RUN is different:
+# it is the backstop failing silently, the exact class of fault this ticket
+# exists to remove, so it opens a deduplicated labelled issue and goes red,
+# mirroring pat-expiry.yml (OPS-009).
+
+on:
+  schedule:
+    - cron: '43 4 * * *' # 04:43 UTC daily — off-peak, clear of the release and pat-expiry crons
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: 'Space-separated repo names (empty = every non-archived, non-fork repo)'
+        required: false
+        default: ''
+
+permissions:
+  issues: write
+
+concurrency:
+  group: bitacora-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Reconcile the board
+        env:
+          # BITACORA_PAT, not GITHUB_TOKEN: Projects v2 writes need the classic
+          # scopes the default token does not carry.
+          GH_TOKEN: ${{ secrets.BITACORA_PAT }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_REPOS: ${{ github.event.inputs.repos || '' }}
+        run: |
+          set -uo pipefail   # deliberately not -e: the classification below is the error handling
+
+          # TARGET_REPOS is a workflow_dispatch input, so it is attacker-shaped
+          # even though dispatching needs write access. It must be word-split to
+          # pass several repos, and an unquoted expansion is exactly how a
+          # workflow injection lands — so every token is validated against the
+          # GitHub repo-name charset first and anything else is refused outright.
+          repos=()
+          for r in $TARGET_REPOS; do
+            case "$r" in
+              *[!A-Za-z0-9._-]*)
+                printf '::error::refusing repo name %s — only [A-Za-z0-9._-] is accepted\n' "$r"
+                exit 1
+                ;;
+            esac
+            repos+=("$r")
+          done
+
+          out=$(./scripts/bitacora-rollout.sh --backfill-only "${repos[@]}" 2>&1)
+          rc=$?
+          printf '%s\n' "$out"
+
+          if [ "$rc" -eq 0 ]; then
+            printf '::notice::bitácora reconciled — every open item is on the board\n'
+            exit 0
+          fi
+
+          # The healer hitting the very limit it heals is expected, not an
+          # incident: tomorrow's run picks it up. Green, but never silent.
+          case "$out" in
+            *"API rate limit exceeded"*|*"API rate limit already exceeded"*)
+              printf '::warning::reconciler hit the primary GraphQL pool — some items may still be off the board; the next daily run will retry\n'
+              exit 0
+              ;;
+          esac
+
+          # Anything else means the backstop itself is broken. File it where it
+          # will be seen rather than leaving it in a run log nobody opens.
+          gh label create bitacora-reconcile \
+            --description "The bitácora reconciler failed (OPS-023)" \
+            --color D93F0B --force >/dev/null || true
+
+          title="Bitácora reconciler is failing"
+          existing=$(gh issue list --state open --label bitacora-reconcile \
+            --json number,title \
+            --jq "[.[] | select(.title==\"${title}\") | .number] | first // empty")
+
+          # Dedupe by stable title, so a daily cron comments instead of spamming.
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" \
+              --body "Still failing on $(date -u +%F). Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            printf '::notice::updated existing issue #%s\n' "${existing}"
+          else
+            gh issue create --title "${title}" --label bitacora-reconcile --body \
+          "\`bitacora-reconcile.yml\` failed, so items dropped by the event-driven add are no longer being healed.
+
+          This is the backstop for OPS-023 (#809). While it is down, a board gap is silent again.
+
+          Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          Filed automatically by \`.github/workflows/bitacora-reconcile.yml\`."
+            printf '::warning::opened a bitacora-reconcile issue\n'
+          fi
+
+          printf '::error::bitácora reconciliation failed for a non-rate-limit reason\n'
+          exit 1
