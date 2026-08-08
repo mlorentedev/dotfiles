@@ -1,7 +1,7 @@
 ---
 id: "BUG-050-spec-gate-satisfiable"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-07"
 issue: "mlorentedev/dotfiles#800"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -69,14 +69,14 @@ Scope:
 
 ## Acceptance criteria
 
-- [ ] **AC1** A PR over the LOC threshold that archives the spec of the issue it
+- [x] **AC1** A PR over the LOC threshold that archives the spec of the issue it
       closes passes both halves (today: impossible without a label).
-- [ ] **AC2** #397 intact: archiving a spec **not** linked to a closed issue earns
+- [x] **AC2** #397 intact: archiving a spec **not** linked to a closed issue earns
       no spec touch, and a large PR doing only that still fails.
-- [ ] **AC3** A spec created and archived in the same PR counts — the case
+- [x] **AC3** A spec created and archived in the same PR counts — the case
       neither active map can observe.
-- [ ] **AC4** No closing keyword ⇒ no mandate ⇒ an archive move remains worthless.
-- [ ] **AC5** Every new assertion verified red against the unfixed gate, and the
+- [x] **AC4** No closing keyword ⇒ no mandate ⇒ an archive move remains worthless.
+- [x] **AC5** Every new assertion verified red against the unfixed gate, and the
       two "protection preserved" assertions verified green both before and after.
 
 ## Risks / open questions
