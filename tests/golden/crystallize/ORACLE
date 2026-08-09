@@ -1,6 +1,13 @@
-# Oracle revisions for the crystallize golden corpus.
+# Oracle for the crystallize golden corpus.
 # Regenerate with tests/golden/crystallize/capture.sh
+#
+# The assertion is on CONTENT (sha256), not on a commit SHA: CI checks out
+# shallow, where `git log -1 -- <path>` names the merge commit for every file,
+# and a rebase changes a SHA without changing a byte.
+#
 # Captured: 2026-08-09
+# git (informational): 9caedc1 scripts/knowledge-crystallize.sh
+# git (informational): 9caedc1 scripts/knowledge-crystallize.ps1
 
-9caedc12b7315438eea3994ef20ce1e8d932af15  scripts/knowledge-crystallize.sh
-9caedc12b7315438eea3994ef20ce1e8d932af15  scripts/knowledge-crystallize.ps1
+0be7559f651881393c1ebc285b939851e707a1b9d7e7e8abb756010f0b069865  scripts/knowledge-crystallize.sh
+b68b516edc22068357af18d3f3484fb420cbddcf3a769b66cc162267ec983297  scripts/knowledge-crystallize.ps1

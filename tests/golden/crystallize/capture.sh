@@ -34,15 +34,32 @@ for name in "${cases[@]}"; do
     printf 'captured %s (exit %s)\n' "$name" "$(cat "$case_dir/expected/exit")"
 done
 
-# Pin the oracle per file rather than to a branch tip: the tip moves for unrelated
-# reasons, and "which revision produced these bytes" is the only question the
-# record has to answer.
+# Pin the oracle by CONTENT HASH, not by commit SHA.
+#
+# A commit SHA answers "which revision", but it is the wrong assertion twice
+# over: CI checks out shallow (actions/checkout defaults to fetch-depth 1), so
+# `git log -1 -- <path>` reports the synthetic merge commit for EVERY file and
+# the check fails on a corpus that is perfectly valid; and a rebase rewrites the
+# SHA without changing a byte. A sha256 of the bytes that produced these goldens
+# is available with no git history at all and is what actually matters.
+#
+# The git revision is still recorded, as a comment, for humans reading the file.
 {
-    printf '# Oracle revisions for the crystallize golden corpus.\n'
+    printf '# Oracle for the crystallize golden corpus.\n'
     printf '# Regenerate with tests/golden/crystallize/capture.sh\n'
-    printf '# Captured: %s\n\n' "$(date -u +%Y-%m-%d)"
+    printf '#\n'
+    printf '# The assertion is on CONTENT (sha256), not on a commit SHA: CI checks out\n'
+    printf '# shallow, where `git log -1 -- <path>` names the merge commit for every file,\n'
+    printf '# and a rebase changes a SHA without changing a byte.\n'
+    printf '#\n'
+    printf '# Captured: %s\n' "$(date -u +%Y-%m-%d)"
     for f in scripts/knowledge-crystallize.sh scripts/knowledge-crystallize.ps1; do
-        printf '%s  %s\n' "$(git -C "$REPO_ROOT" log -1 --format=%H -- "$f")" "$f"
+        printf '# git (informational): %s %s\n' \
+            "$(git -C "$REPO_ROOT" log -1 --format=%h -- "$f" 2>/dev/null || printf 'unknown')" "$f"
+    done
+    printf '\n'
+    for f in scripts/knowledge-crystallize.sh scripts/knowledge-crystallize.ps1; do
+        printf '%s  %s\n' "$(sha256sum "$REPO_ROOT/$f" | cut -d' ' -f1)" "$f"
     done
 } > "$HERE/ORACLE"
 

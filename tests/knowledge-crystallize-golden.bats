@@ -122,16 +122,23 @@ assert_golden() {
     }
 }
 
-@test "the oracle revisions are recorded and still match the working tree" {
+# Assert on CONTENT, never on a commit SHA. The SHA version of this test passed
+# locally and failed in CI: actions/checkout is shallow by default, so
+# `git log -1 -- <path>` names the synthetic merge commit for every file. A
+# rebase would have broken it too, without a byte changing.
+@test "the oracle content hashes are recorded and still match the working tree" {
     [ -f "$HERE/ORACLE" ]
-    local f recorded current
+    local f recorded current seen=0
     while read -r recorded f; do
         case "$recorded" in '#'*|'') continue ;; esac
-        current="$(git -C "$BATS_TEST_DIRNAME/.." log -1 --format=%H -- "$f")"
+        seen=$((seen + 1))
+        current="$(sha256sum "$BATS_TEST_DIRNAME/../$f" | cut -d' ' -f1)"
         if [ "$recorded" != "$current" ]; then
-            printf 'oracle moved for %s: corpus captured at %s, tree has %s — recapture deliberately\n' \
-                "$f" "$recorded" "$current" >&2
+            printf 'oracle changed: %s no longer matches the bytes the corpus was captured from.\n' "$f" >&2
+            printf 'Recapture deliberately (tests/golden/crystallize/capture.sh) and say why in the commit.\n' >&2
             return 1
         fi
     done < "$HERE/ORACLE"
+    # A malformed ORACLE that parses to zero entries would make this test vacuous.
+    [ "$seen" -eq 2 ]
 }
