@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.35.0](https://github.com/mlorentedev/dotfiles/compare/v0.34.0...v0.35.0) (2026-08-09)
+
+
+### Features
+
+* **doctor:** migrate YAML-wrapped MEMORY.md files back to plain markdown ([#866](https://github.com/mlorentedev/dotfiles/issues/866)) ([13a8b6d](https://github.com/mlorentedev/dotfiles/commit/13a8b6d97cbb8c8fb3c5ee794b4dd06e47aafe88)), closes [#864](https://github.com/mlorentedev/dotfiles/issues/864)
+
+
+### Bug Fixes
+
+* **crystallize:** refuse a YAML-wrapped MEMORY.md instead of corrupting it ([#862](https://github.com/mlorentedev/dotfiles/issues/862)) ([9caedc1](https://github.com/mlorentedev/dotfiles/commit/9caedc12b7315438eea3994ef20ce1e8d932af15)), closes [#857](https://github.com/mlorentedev/dotfiles/issues/857)
+
 ## [0.34.0](https://github.com/mlorentedev/dotfiles/compare/v0.33.1...v0.34.0) (2026-08-08)
 
 
