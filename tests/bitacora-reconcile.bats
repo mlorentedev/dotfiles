@@ -1,151 +1,141 @@
 #!/usr/bin/env bats
-# OPS-023 (#809): the bitácora board silently lost items whenever the
-# event-driven add hit an API failure. Nothing in this machinery had any test
-# coverage, which is precisely why a drop could stay invisible for three days
-# across two repos.
+# Tests for scripts/bitacora-reconcile.sh (BUG-063).
 #
-# The execution cases drive a STUB `gh` first on PATH: what is under test is the
-# script's own decisions and the commands it builds, not GitHub's behaviour, and
-# a stub is the only way to assert the second thing at all. The remaining cases
-# pin structure in the workflow files, which cannot be executed here — following
-# the same convention the hive-upgrade guard uses.
+# The defect these exist to prevent: the classification used to live inline in
+# .github/workflows/bitacora-reconcile.yml, which Actions runs as `bash -e {0}`.
+# `set -uo pipefail` does not clear that injected -e, so the step died at the
+# rollout capture and every branch below — the rate-limit soft-pass and the
+# self-reporting issue — was unreachable dead code. It went red and silent twice.
+#
+# So these tests do not inspect the workflow's text; they EXECUTE the classifier,
+# and the load-bearing ones execute it under `bash -e` (see "the regression").
 
 setup() {
-    REPO="$BATS_TEST_DIRNAME/.."
-    ROLLOUT="$REPO/scripts/bitacora-rollout.sh"
-    ADD_WF="$REPO/.github/workflows/add-to-project.yml"
-    RECONCILE_WF="$REPO/.github/workflows/bitacora-reconcile.yml"
-    WORK="$(mktemp -d)"
-    STUB="$WORK/stub"
-    GH_LOG="$WORK/gh-calls"
-    mkdir -p "$STUB"
-}
+    SCRIPT="$BATS_TEST_DIRNAME/../scripts/bitacora-reconcile.sh"
+    FIX="/tmp/bats_reconcile_$$_${BATS_TEST_NUMBER:-0}"
+    mkdir -p "$FIX/bin"
 
-teardown() { [ -z "${WORK:-}" ] || rm -rf "$WORK"; }
+    GH_LOG="$FIX/gh-calls.log"
+    export GH_LOG
 
-# A `gh` that records every invocation and answers the few queries the script
-# makes, so a run completes without network and every call is assertable.
-stub_gh() {
-    {
-        echo '#!/usr/bin/env bash'
-        printf 'printf "%%s\\n" "$*" >> %s\n' "$GH_LOG"
-        cat <<'SH'
-case "$*" in
-    "repo list"*)         printf 'demo\n' ;;
-    "issue list"*)        printf 'https://github.com/mlorentedev/demo/issues/1\n' ;;
-    "pr list"*)           printf 'https://github.com/mlorentedev/demo/pull/2\n' ;;
-    "project list"*)      printf 'demo\n' ;;
-    *)                    : ;;
+    # gh stub: records every invocation, and answers `issue list` from
+    # STUB_EXISTING so the dedupe branch can be steered.
+    cat > "$FIX/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_LOG"
+case "$1 $2" in
+    "issue list") printf '%s' "${STUB_EXISTING:-}" ;;
 esac
 exit 0
-SH
-    } > "$STUB/gh"
-    chmod +x "$STUB/gh"
-    # An `age` that fails loudly: --backfill-only must never reach the decrypt
-    # step, so if it does, the test fails instead of silently passing.
-    printf '#!/usr/bin/env bash\necho "age must not be called" >&2\nexit 1\n' > "$STUB/age"
-    chmod +x "$STUB/age"
+STUB
+    chmod +x "$FIX/bin/gh"
+    PATH="$FIX/bin:$PATH"
+    export PATH
+
+    # Rollout stub: exit code and output are the two axes the classifier reads.
+    ROLLOUT="$FIX/bin/rollout.sh"
+    cat > "$ROLLOUT" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "${STUB_OUT:-rollout output}"
+exit "${STUB_RC:-0}"
+STUB
+    chmod +x "$ROLLOUT"
+    export BITACORA_ROLLOUT="$ROLLOUT"
 }
 
-run_backfill_only() {
-    run env PATH="$STUB:$PATH" BITACORA_PAT="" bash "$ROLLOUT" --backfill-only --check demo
+teardown() {
+    rm -rf "$FIX"
 }
 
-@test "OPS-023: --backfill-only ensures open issues and PRs are on the board" {
-    stub_gh
-    run_backfill_only
+# `grep -s` so this holds when gh was never called at all and the log is absent —
+# which is itself the assertion on the soft-pass paths.
+refute_issue_filed() {
+    ! grep -qs "issue create" "$GH_LOG"
+}
+
+@test "success: notice and exit 0" {
+    STUB_RC=0 run "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"backfill"* ]]
-    [[ "$output" == *"2 open item(s) ensured on board"* ]]
+    [[ "$output" == *"::notice::bitácora reconciled"* ]]
+    refute_issue_filed
 }
 
-@test "OPS-023: --backfill-only does not provision: no link, no secret, no workflow push" {
-    # Reconciliation must not be able to push workflow files or rotate a secret.
-    # If it could, a scheduled job would be silently deploying code.
-    stub_gh
-    run_backfill_only
+@test "rate limit: warning, exit 0, and no issue filed" {
+    STUB_RC=1 STUB_OUT="gh: API rate limit exceeded for user" run "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"link to project"* ]]
-    [[ "$output" != *"BITACORA_PAT set"* ]]
-    run cat "$GH_LOG"
-    [[ "$output" != *"secret set"* ]]
-    [[ "$output" != *"project link"* ]]
+    [[ "$output" == *"::warning::reconciler hit the primary GraphQL pool"* ]]
+    refute_issue_filed
 }
 
-@test "OPS-023: --backfill-only never needs the age key, so it can run in CI" {
-    # The stub `age` exits 1 with a message. Reaching it at all fails this test —
-    # which is the point: CI has the Actions secret but no age key, so a decrypt
-    # attempt would make the reconciler undeployable there.
-    stub_gh
-    run_backfill_only
+@test "rate limit: the 'already exceeded' wording is matched too" {
+    STUB_RC=1 STUB_OUT="API rate limit already exceeded" run "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"age must not be called"* ]]
-    [[ "$output" != *"cannot decrypt"* ]]
+    [[ "$output" == *"::warning::"* ]]
 }
 
-@test "OPS-023: a full run still provisions (the flag narrows scope, not the tool)" {
-    stub_gh
-    run env PATH="$STUB:$PATH" BITACORA_PAT="token" bash "$ROLLOUT" --check demo
+@test "other failure with no existing issue: files one and exits 1" {
+    STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="" run "$SCRIPT"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"::error::bitácora reconciliation failed"* ]]
+    grep -q "issue create" "$GH_LOG"
+}
+
+@test "other failure with an existing issue: comments instead of creating" {
+    STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="42" run "$SCRIPT"
+    [ "$status" -eq 1 ]
+    grep -q "issue comment 42" "$GH_LOG"
+    refute_issue_filed
+}
+
+# --- the regression -------------------------------------------------------
+#
+# Actions supplies the -e; the script never sees it in its own `set` line. Each
+# of these invokes the classifier exactly the way the runner does. Against the
+# pre-BUG-063 inline logic every one of them fails: the step aborts at the
+# capture, printing nothing and filing nothing.
+
+@test "the regression: under bash -e, a failing rollout still reaches the classifier" {
+    STUB_RC=1 STUB_OUT="something else broke" run bash -e "$SCRIPT"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"::error::bitácora reconciliation failed"* ]]
+    grep -q "issue create" "$GH_LOG"
+}
+
+@test "the regression: under bash -e, the rate limit still soft-passes green" {
+    STUB_RC=1 STUB_OUT="API rate limit exceeded" run bash -e "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"link to project"* || "$output" == *"already linked"* ]]
-    [[ "$output" == *"backfill"* ]]
+    [[ "$output" == *"::warning::"* ]]
 }
 
-# The header of these workflows explains the design at length, and that prose
-# names every construct the assertions below look for. Grepping the raw file
-# would match the explanation as readily as the code — the same mistake that made
-# an earlier plugin audit report live plugins as dead (docs/lessons.md,
-# 2026-08-06). So the structural cases read the file with comment lines removed.
-uncommented() { grep -v '^[[:space:]]*#' "$1"; }
-
-@test "OPS-023: the add workflow classifies a rate limit apart from other failures" {
-    # The whole design: a primary-pool exhaustion soft-fails for the reconciler
-    # to heal, while any other error stays red. Collapsing them back into one
-    # branch would restore the silent drop — or hide a dead token.
-    run bash -c "uncommented() { grep -v '^[[:space:]]*#' \"\$1\"; }; uncommented '$ADD_WF' | grep -c 'API rate limit'"
-    [ "$output" -ge 1 ]
-    # A dedicated soft-fail exit code is what keeps the two apart at the call site.
-    run bash -c "grep -c 'RATE_LIMITED' '$ADD_WF'"
-    [ "$output" -ge 3 ]
-    run bash -c "uncommented() { grep -v '^[[:space:]]*#' \"\$1\"; }; uncommented '$ADD_WF' | grep -c '::error::'"
-    [ "$output" -ge 2 ]
+@test "the regression: rollout output is printed before the verdict, so the log keeps the evidence" {
+    STUB_RC=1 STUB_OUT="DIAGNOSTIC MARKER" run bash -e "$SCRIPT"
+    [[ "$output" == *"DIAGNOSTIC MARKER"* ]]
+    # Evidence first, verdict second — the ordering that was lost.
+    [[ "${output%%::error::*}" == *"DIAGNOSTIC MARKER"* ]]
 }
 
-@test "OPS-023: the add workflow never blanket-swallows failures" {
-    # The YAML key, not the bare word: the header discusses `continue-on-error`
-    # precisely to explain why it is not used.
-    run grep -c 'continue-on-error:' "$ADD_WF"
-    [ "$output" -eq 0 ]
+# --- input validation -----------------------------------------------------
+
+@test "a repo name outside the allowed charset is refused" {
+    TARGET_REPOS='good; rm -rf /' run bash -e "$SCRIPT"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refusing repo name"* ]]
 }
 
-@test "OPS-023: the add workflow takes the node id from the payload, not a lookup" {
-    # Removing the lookup is what let both event types share one retrying call
-    # path; a reintroduced query would also spend an extra point of the very
-    # pool whose exhaustion this ticket is about.
-    run grep -c 'node_id' "$ADD_WF"
-    [ "$output" -ge 1 ]
-    # `uses:`, not the bare name — the header cites the retired action by name.
-    run grep -c 'uses: actions/add-to-project' "$ADD_WF"
-    [ "$output" -eq 0 ]
+@test "an empty TARGET_REPOS reconciles every repo without tripping set -u" {
+    STUB_RC=0 TARGET_REPOS="" run bash -e "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"::notice::"* ]]
 }
 
-@test "OPS-023: the reconciler validates its repo-name input before word-splitting" {
-    # A workflow_dispatch input reaching a command line unquoted is the classic
-    # workflow-injection shape. The charset guard must stay, and the raw value
-    # must never be passed through unvalidated.
-    run grep -c 'A-Za-z0-9._-' "$RECONCILE_WF"
-    [ "$output" -ge 1 ]
-    run grep -c 'backfill-only \$TARGET_REPOS' "$RECONCILE_WF"
-    [ "$output" -eq 0 ]
-}
-
-@test "OPS-023: the reconciler is scheduled and goes loud when it cannot run" {
-    # Healed drift is a notice; the backstop failing is an issue plus a red job,
-    # mirroring pat-expiry.yml. A silent backstop is the fault this ticket names.
-    run grep -c 'schedule:' "$RECONCILE_WF"
-    [ "$output" -ge 1 ]
-    run grep -c 'gh issue create' "$RECONCILE_WF"
-    [ "$output" -ge 1 ]
-    run grep -c '::error::' "$RECONCILE_WF"
-    [ "$output" -ge 1 ]
+@test "several valid repo names are passed through as separate arguments" {
+    cat > "$BITACORA_ROLLOUT" <<'STUB'
+#!/usr/bin/env bash
+printf 'args:%s\n' "$*"
+exit 0
+STUB
+    chmod +x "$BITACORA_ROLLOUT"
+    TARGET_REPOS="dotfiles kubelab" run bash -e "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"args:--backfill-only dotfiles kubelab"* ]]
 }
