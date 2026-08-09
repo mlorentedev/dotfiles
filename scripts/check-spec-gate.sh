@@ -9,6 +9,7 @@
 #
 # Usage:
 #   check-spec-gate.sh --base-ref REF --head-ref REF [--threshold N] [--explain]
+#                      [--adjacency-issues FILE]
 #
 # Env (consumed when set, normally populated by the CI workflow from PR):
 #   SDD_LABELS     Comma-separated PR labels
@@ -33,15 +34,25 @@ SPEC_FLOOR=10
 BASE_REF=""
 HEAD_REF=""
 EXPLAIN=0
+# Path to the open-issue feed for the advisory adjacency report (HARNESS-063).
+# Empty on every local run: the fetch needs a token, so it lives in the workflow
+# and this script stays offline for the pre-push hook (#854).
+ADJACENCY_ISSUES=""
 
 usage() {
     cat <<'EOF'
 Usage: check-spec-gate.sh --base-ref REF --head-ref REF [--threshold N] [--explain]
+                          [--adjacency-issues FILE]
 
   --base-ref REF    Base ref to diff against (e.g. origin/main)
   --head-ref REF    Head ref of the change (e.g. HEAD)
   --threshold N     LOC threshold above which a spec folder is required (default 50)
   --explain         Print the LOC breakdown per file
+  --adjacency-issues FILE
+                    TSV of open issues ("<number><TAB><title and body, newlines
+                    flattened>"). Emits an ADVISORY report of other open issues
+                    naming a file this change touches. Never affects the verdict;
+                    a missing or unreadable file is silently ignored.
   -h, --help        Show this help
 
 Env:
@@ -62,6 +73,7 @@ while [[ $# -gt 0 ]]; do
         --head-ref) HEAD_REF="$2"; shift 2 ;;
         --threshold) THRESHOLD="$2"; shift 2 ;;
         --explain) EXPLAIN=1; shift ;;
+        --adjacency-issues) ADJACENCY_ISSUES="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) printf '[ERROR] Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
     esac
@@ -390,6 +402,120 @@ EOF
     exit 1
 }
 
+# ---------------------------------------------------------------------------
+# Advisory adjacency report (HARNESS-063): OTHER open issues naming a file this
+# change touches. Purely informational — it never gates.
+#
+# The case it exists for: #851 merged a correct fix for #850 while #849 sat open
+# describing the same file's other input shape. Every gate here looked only at
+# the issue the PR closes, so nothing connected them and the defect shipped
+# green (#857).
+# ---------------------------------------------------------------------------
+
+# Basenames too generic for a name match to carry information — matching these
+# would report a large slice of the backlog on every PR that touches one.
+ADJACENCY_GENERIC_BASENAMES="README.md AGENTS.md CLAUDE.md CHANGELOG.md Makefile Dockerfile go.mod go.sum"
+
+# The changed files worth matching on: the ones this gate already treats as
+# production. Measured against the live backlog, matching the whole diff reported
+# 37 issues of which 3 carried signal — the rest matched template basenames
+# (`proposal.md`, `tasks.md`, `docs/lessons.md`) that nearly every PR touches. A
+# wall of noise is read once and ignored forever, which is the same outcome as
+# having no check.
+#
+# Reusing _excluded() is the second helper-reuse decision here, so it gets the
+# same scrutiny the first one failed: its error policy is "not production code",
+# and inheriting it means an issue about a test file or a doc will not surface.
+# That is acceptable where the first reuse was not — an unhandled INPUT SHAPE,
+# the defect class this check exists for, lives in production code by definition,
+# and precision is what makes the report legible enough to act on.
+_adjacency_candidate_files() {
+    local path
+    while IFS= read -r path; do
+        if [[ -z "$path" ]]; then continue; fi
+        if _excluded "$path"; then continue; fi
+        if _is_active_spec_path "$path"; then continue; fi
+        printf '%s\n' "$path"
+    done <<< "$1"
+    return 0
+}
+
+# "<number><TAB><matched-path><TAB><haystack>" per adjacent issue.
+#
+# Matches over UNSTRIPPED title+body, unlike _closing_issue_numbers, and the
+# difference is deliberate rather than an oversight. That matcher strips code
+# spans because there a false POSITIVE is the expensive error: it would demand an
+# archive GitHub never triggers, blocking legitimate work. Here the expensive
+# error is the false NEGATIVE — #849 cites its path only inside an inline code
+# span, so stripping would hide the one issue this check exists to surface.
+# Reusing _strip_markdown_code() would inherit its error policy along with its
+# code; tests/spec-gate-adjacency.bats pins that so a future refactor goes red.
+_adjacent_open_issues() {
+    local feed="$1" files="$2" closed="$3"
+    local num haystack path base
+    while IFS=$'\t' read -r num haystack; do
+        if [[ -z "$num" || -z "${haystack:-}" ]]; then continue; fi
+        if printf '%s\n' "$closed" | grep -qxF "$num"; then continue; fi
+        while IFS= read -r path; do
+            if [[ -z "$path" ]]; then continue; fi
+            if [[ "$haystack" == *"$path"* ]]; then
+                printf '%s\t%s\t%s\n' "$num" "$path" "$haystack"
+                break
+            fi
+            base="${path##*/}"
+            case " $ADJACENCY_GENERIC_BASENAMES " in *" $base "*) continue ;; esac
+            if [[ "$haystack" == *"$base"* ]]; then
+                printf '%s\t%s\t%s\n' "$num" "$base" "$haystack"
+                break
+            fi
+        done <<< "$files"
+    done < "$feed"
+    return 0
+}
+
+# Emits the report to stdout, plus a CI annotation and step-summary table when
+# running under Actions. Every failure path returns 0: an advisory check that can
+# break the gate is worse than no advisory check at all.
+_report_adjacent_issues() {
+    if [[ -z "$ADJACENCY_ISSUES" || ! -r "$ADJACENCY_ISSUES" ]]; then return 0; fi
+
+    local files closed rows num path haystack
+    files=$(git diff --name-only "${BASE_REF}...${HEAD_REF}" 2>/dev/null) || return 0
+    files=$(_adjacency_candidate_files "$files")
+    if [[ -z "$files" ]]; then return 0; fi
+    closed=$(_closing_issue_numbers "$(_repo_slug)" "$SDD_PR_BODY" | sort -u || true)
+    rows=$(_adjacent_open_issues "$ADJACENCY_ISSUES" "$files" "$closed" || true)
+    if [[ -z "$rows" ]]; then return 0; fi
+
+    printf '[INFO] Adjacent open issues (advisory — this does not gate the PR):\n'
+    while IFS=$'\t' read -r num path haystack; do
+        if [[ -z "$num" ]]; then continue; fi
+        printf '         #%-6s names %s\n' "$num" "$path"
+        printf '                 %.88s\n' "$haystack"
+    done <<< "$rows"
+    printf '       One of these may describe the same defect on an input shape this\n'
+    printf '       change does not cover. Fold it in, or record why it is separate,\n'
+    printf '       before merging (HARNESS-063).\n'
+
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        printf '::warning title=Adjacent open issues::%s\n' \
+            "$(printf '%s' "$rows" | awk -F'\t' '{printf "#%s (%s) ", $1, $2}')"
+    fi
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+            printf '\n### Adjacent open issues (advisory)\n\n'
+            printf '| Issue | Names | Title |\n|---|---|---|\n'
+            while IFS=$'\t' read -r num path haystack; do
+                if [[ -z "$num" ]]; then continue; fi
+                # shellcheck disable=SC2016  # backticks are markdown code spans
+                # for the step-summary table, not command substitution.
+                printf '| #%s | `%s` | %.88s |\n' "$num" "$path" "$haystack"
+            done <<< "$rows"
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
+    return 0
+}
+
 _excluded() {
     local path="$1"
     local base="${path##*/}"
@@ -459,6 +585,11 @@ _normalize_rename_path() {
     esac
     printf '%s' "$p"
 }
+
+# The advisory report runs before every gate and every early exit, so a PR that
+# skips SDD or fails archive-on-merge still surfaces its adjacent issues — those
+# are exactly the PRs where a second open issue is most likely to be missed.
+_report_adjacent_issues
 
 # Archive-on-merge runs FIRST and unconditionally (SDD-038). A three-line PR can
 # still end an issue's life, so it must not sit behind the LOC early exit below;
