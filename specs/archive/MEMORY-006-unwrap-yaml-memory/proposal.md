@@ -1,7 +1,7 @@
 ---
 id: "MEMORY-006-unwrap-yaml-memory"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-09"
 issue: "mlorentedev/dotfiles#864"
 tags: [spec, proposal]

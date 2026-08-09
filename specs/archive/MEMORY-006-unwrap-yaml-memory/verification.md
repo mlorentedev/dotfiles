@@ -213,10 +213,12 @@ CLEAN
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to `specs/archive/MEMORY-006-unwrap-yaml-memory/`
-- [ ] Bitácora ticket closed with PR link (ADR-018)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to `specs/archive/MEMORY-006-unwrap-yaml-memory/`
+- [x] Bitácora ticket closed with PR link (ADR-018)
 
-> **Not archived by this PR yet.** The migration has been proven in a sandbox but
-> not run against live memory — that write is Manu's call, per this spec's own
-> acceptance. The PR carries `Refs #864`.
+> **PR #866 merged as `13a8b6d`.** The migration ran against live memory after
+> the dry-run diff was reviewed and approved; the migrated files are vault commit
+> `9f73dfc4`. #866 deliberately carried `Refs #864` rather than a closing keyword
+> — the ticket closes with this archive PR, which is the archive-on-merge
+> sequence the gate expects.

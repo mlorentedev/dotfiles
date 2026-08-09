@@ -61,8 +61,8 @@ before the transform exists.
 - [x] Lesson in `docs/lessons.md`.
 - [x] File what was found along the way rather than mentioning it — **#865**
       (the wrap also truncated content).
-- [ ] PR #866 merged, CI green.
-- [ ] `dotf spec archive MEMORY-006-unwrap-yaml-memory`, #864 closed.
+- [x] PR #866 merged (`13a8b6d`), CI green.
+- [x] `dotf spec archive MEMORY-006-unwrap-yaml-memory`, #864 closed.
 
 ## Counts, stated once so they stay consistent
 
