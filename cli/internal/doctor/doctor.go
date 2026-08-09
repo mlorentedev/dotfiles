@@ -82,6 +82,7 @@ func Run(opts Options) (int, error) {
 		checkVault(sys, rep)
 		checkVaultHooks(sys, rep, opts.Fix)
 		checkAutoMemoryLink(sys, start, rep, opts.Fix)
+		checkMemoryShape(sys, rep, opts.Fix)
 		checkPathFiles(sys, cfg, rep)
 		checkSecrets(sys, cfg, rep)
 		checkSecretsTooling(sys, rep)
