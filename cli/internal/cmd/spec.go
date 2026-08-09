@@ -136,9 +136,10 @@ agent) or by hand. Do not skip the Why.`,
 
 func newSpecArchiveCmd() *cobra.Command {
 	var (
-		prURL       string
-		abandoned   bool
-		forceDrafts bool
+		prURL         string
+		abandoned     bool
+		forceDrafts   bool
+		forceNoReview bool
 	)
 
 	cmd := &cobra.Command{
@@ -149,8 +150,11 @@ under --abandoned) and rewrite the proposal status to archived/abandoned.
 
 Mechanical only — the Go twin of scripts/archive-spec.sh. A pre-flight refuses to
 archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain (override
-with --force-with-drafts). Vault promotion (lessons/ADR/pattern) and any backlog
-tick stay interactive via "/spec archive" in an agent.`,
+with --force-with-drafts). A second pre-flight refuses without a fresh, passing
+review.md from /adversarial-review (override with --force-without-review, or
+declare "review: waived" with a reason in proposal.md). Vault promotion
+(lessons/ADR/pattern) and any backlog tick stay interactive via "/spec archive"
+in an agent.`,
 		Example:      "  dotf spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
@@ -167,10 +171,11 @@ tick stay interactive via "/spec archive" in an agent.`,
 			}
 
 			target, err := spec.Archive(repoRoot, id, spec.ArchiveOptions{
-				Abandoned:       abandoned,
-				ForceWithDrafts: forceDrafts,
-				PRURL:           prURL,
-				Date:            now().Format("2006-01-02"),
+				Abandoned:          abandoned,
+				ForceWithDrafts:    forceDrafts,
+				ForceWithoutReview: forceNoReview,
+				PRURL:              prURL,
+				Date:               now().Format("2006-01-02"),
 			})
 			if err != nil {
 				return err
@@ -198,5 +203,6 @@ tick stay interactive via "/spec archive" in an agent.`,
 	cmd.Flags().StringVar(&prURL, "pr", "", "record this PR URL in proposal.md (informational)")
 	cmd.Flags().BoolVar(&abandoned, "abandoned", false, "route to specs/archive/_abandoned/ and set status abandoned")
 	cmd.Flags().BoolVar(&forceDrafts, "force-with-drafts", false, "archive even with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags")
+	cmd.Flags().BoolVar(&forceNoReview, "force-without-review", false, "archive even without a fresh, passing review.md")
 	return cmd
 }

@@ -22,7 +22,7 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 - `/adversarial-review <feature-id-or-PR>` explicitly.
 - "Red-team this change" / "devil's advocate pass on AI-001" / "independent verification before archive".
 - Verification window: after implementation merged / about-to-merge, BEFORE archiving the spec.
-- **Pair with**: `/spec archive` lock — that command refuses to archive while any `[AGENT-DRAFT]` tags remain; this skill catches the gaps *before* that final gate.
+- **Pair with**: `/spec archive` lock — that command refuses to archive while any `[AGENT-DRAFT]` tags remain, **and** (since CLI-034) refuses without a fresh, passing `review.md`. This skill produces that artifact; skipping it now blocks the archive rather than merely weakening it.
 
 ## When NOT to use
 
@@ -139,6 +139,27 @@ End with a clear verdict:
 
 ## Output format
 
+**Persist the verdict — do not only print it.** Write the block below to
+`specs/<feature-id>/review.md` in the reviewed repo, with the frontmatter shown. `dotf spec archive`
+reads that frontmatter as its second pre-flight (CLI-034); a review that exists only in the chat
+transcript does not satisfy the gate, and the archive will refuse.
+
+```yaml
+---
+spec: "<feature-id>"                  # MUST equal the containing folder name — a review copied
+                                      # from a sibling spec is refused as describing another change
+verdict: "PASS"                       # PASS | PASS-WITH-GAPS | FAIL
+reviewed_sha: "<40-hex commit sha>"   # the commit you actually examined (`git rev-parse HEAD`)
+reviewer: "<agent or model id>"       # e.g. claude-opus-5, deepseek-v4-flash
+date: "YYYY-MM-DD"
+---
+```
+
+`reviewed_sha` is not bookkeeping: the gate rejects the review as **stale** if `proposal.md`,
+`tasks.md` or `features.json` changed after it. Record the sha you read, never a later one.
+
+The body of the file is the markdown below, unchanged.
+
 ```markdown
 ## Adversarial review
 
@@ -191,4 +212,7 @@ PASS | PASS WITH GAPS | FAIL
 
 ## Completion
 
-Always end with: (a) the verdict, (b) whether `dotf spec archive` / `/spec archive` is **advisable** in the current state, (c) if FAIL, the minimum set of actions that would flip it to PASS.
+1. **Write `specs/<feature-id>/review.md`** with the frontmatter and body from "Output format". This is the deliverable; the chat summary is not.
+2. Always end with: (a) the verdict, (b) whether `dotf spec archive` / `/spec archive` is **advisable** in the current state, (c) if FAIL, the minimum set of actions that would flip it to PASS.
+
+If the change genuinely does not warrant a review, do not skip silently — the archive will refuse. Declare it in `proposal.md` frontmatter as `review: waived` with a non-empty `review_waived_reason:`, so the decision is auditable in the diff rather than invisible in a habit.

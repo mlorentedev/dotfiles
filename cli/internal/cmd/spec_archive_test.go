@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-// seedSpec writes a minimal specs/<id>/proposal.md under root for archive tests.
+// seedSpec writes a minimal ARCHIVABLE specs/<id>/ under root: the proposal the
+// caller cares about, plus the passing review.md the CLI-034 gate now requires.
+// Tests that exercise the gate itself write their own review instead.
 func seedSpec(t *testing.T, root, id, proposal string) {
 	t.Helper()
 	dir := filepath.Join(root, "specs", id)
@@ -15,6 +17,10 @@ func seedSpec(t *testing.T, root, id, proposal string) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "proposal.md"), []byte(proposal), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	review := "---\nspec: \"" + id + "\"\nverdict: \"PASS\"\nreviewed_sha: \"0000000000000000000000000000000000000000\"\n---\nno blocking findings\n"
+	if err := os.WriteFile(filepath.Join(dir, "review.md"), []byte(review), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
