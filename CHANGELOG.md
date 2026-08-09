@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.35.1](https://github.com/mlorentedev/dotfiles/compare/v0.35.0...v0.35.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **ci:** harden the reconciler's own reporting path against the same -e trap ([#872](https://github.com/mlorentedev/dotfiles/issues/872)) ([58f7419](https://github.com/mlorentedev/dotfiles/commit/58f74195d1f687ddc39b40f8eefcc75adcb94fee))
+* **ci:** make the bitacora reconciler's error handling reachable under Actions' injected -e ([#870](https://github.com/mlorentedev/dotfiles/issues/870)) ([2752873](https://github.com/mlorentedev/dotfiles/commit/27528733f274509e0933b0b452e7f5391aaba0ee))
+
 ## [0.35.0](https://github.com/mlorentedev/dotfiles/compare/v0.34.0...v0.35.0) (2026-08-09)
 
 
