@@ -1,0 +1,7 @@
+[INFO] Project: <HOME>/Projects/demo
+[INFO] Date: <TODAY>
+[INFO] MEMORY.md: <HOME>/.claude/projects/<HOMEKEY>-Projects-demo/memory/MEMORY.md
+[ERROR] Refusing to stamp <HOME>/.claude/projects/<HOMEKEY>-Projects-demo/memory/MEMORY.md
+[ERROR] Its body sits inside a YAML block scalar, which this script cannot edit
+[ERROR] without corrupting the file (#857). Stamp it by hand until the
+[ERROR] YAML-aware 'dotf vault crystallize' lands (#490).
