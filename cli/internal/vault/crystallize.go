@@ -56,6 +56,17 @@ var yamlBlockOpenRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*:[ \t]*\|[-+0-
 
 var yamlDocStartRe = regexp.MustCompile(`^---[ \t]*$`)
 
+// emit writes to w, dropping the write error explicitly.
+//
+// These are the CLI's own progress lines: a failed write to stdout is not
+// actionable and the shell twin ignores it too, so threading an error through
+// every transform would add noise without adding a recovery path. Mirrors
+// internal/doctor/report.go's printf helper, and satisfies errcheck at the one
+// place the decision is made rather than at each of the twenty call sites.
+func emit(w io.Writer, format string, a ...any) {
+	_, _ = fmt.Fprintf(w, format, a...)
+}
+
 // splitLines models awk's record splitting: records are separated by "\n", and a
 // trailing newline does not produce a final empty record.
 func splitLines(content string) []string {
@@ -246,25 +257,25 @@ func ProcessProject(w io.Writer, memoryFile, today string) error {
 	content := string(raw)
 
 	if IsYAMLBlockScalar(content) {
-		fmt.Fprintf(w, "[ERROR] Refusing to stamp %s\n", memoryFile)
-		fmt.Fprintf(w, "[ERROR] Its body sits inside a YAML block scalar, which this script cannot edit\n")
-		fmt.Fprintf(w, "[ERROR] without corrupting the file (#857). Stamp it by hand until the\n")
-		fmt.Fprintf(w, "[ERROR] YAML-aware 'dotf vault crystallize' lands (#490).\n")
+		emit(w, "[ERROR] Refusing to stamp %s\n", memoryFile)
+		emit(w, "[ERROR] Its body sits inside a YAML block scalar, which this script cannot edit\n")
+		emit(w, "[ERROR] without corrupting the file (#857). Stamp it by hand until the\n")
+		emit(w, "[ERROR] YAML-aware 'dotf vault crystallize' lands (#490).\n")
 		return fmt.Errorf("%w: %s is a YAML block scalar", ErrRefused, memoryFile)
 	}
 
 	lines := splitLines(content)
 
 	if n := countLinesWithPrefix(lines, markerCurrentDate); n > 1 {
-		fmt.Fprintf(w, "[INFO] Removing %d duplicate # currentDate entries...\n", n-1)
+		emit(w, "[INFO] Removing %d duplicate # currentDate entries...\n", n-1)
 		lines = DedupCurrentDate(lines)
 	}
 
 	lines, logLine := UpdateCurrentDate(lines, today)
-	fmt.Fprintln(w, logLine)
+	emit(w, "%s\n", logLine)
 
 	lines, logLine = StampLastCrystallized(lines, today)
-	fmt.Fprintln(w, logLine)
+	emit(w, "%s\n", logLine)
 
 	out := joinLines(lines)
 	if err := os.WriteFile(memoryFile, []byte(out), 0o600); err != nil {
@@ -272,27 +283,27 @@ func ProcessProject(w io.Writer, memoryFile, today string) error {
 	}
 
 	if n := newlineCount(out); n > lineLimit {
-		fmt.Fprintf(w, "[WARNING] MEMORY.md has %d lines (limit: %d) — run /crystallize to trim\n", n, lineLimit)
+		emit(w, "[WARNING] MEMORY.md has %d lines (limit: %d) — run /crystallize to trim\n", n, lineLimit)
 	} else {
-		fmt.Fprintf(w, "[SUCCESS] MEMORY.md line count: %d / %d\n", n, lineLimit)
+		emit(w, "[SUCCESS] MEMORY.md line count: %d / %d\n", n, lineLimit)
 	}
 
-	fmt.Fprintf(w, "[SUCCESS] Updated: %s\n", memoryFile)
+	emit(w, "[SUCCESS] Updated: %s\n", memoryFile)
 	return nil
 }
 
 // PrintChecklist reproduces print_checklist() byte for byte, em-dashes included.
 func PrintChecklist(w io.Writer) {
-	fmt.Fprint(w, "\n=== Knowledge Crystallization Checklist ===\n\n")
-	fmt.Fprint(w, "Manual steps (AI-assisted, run in Claude Code):\n")
-	fmt.Fprint(w, "  [ ] /insights  — audit observation backlog\n")
-	fmt.Fprint(w, "  [ ] /crystallize — promote observations to vault lessons\n")
-	fmt.Fprint(w, "  [ ] Check ~/Projects/knowledge/00_meta/patterns/ for new patterns\n")
-	fmt.Fprint(w, "  [ ] Update 11-tasks.md backlog progress bar\n\n")
-	fmt.Fprint(w, "Automated (done by this script):\n")
-	fmt.Fprint(w, "  [x] currentDate updated\n")
-	fmt.Fprint(w, "  [x] Last Crystallized stamped\n")
-	fmt.Fprint(w, "  [x] Duplicate date entries removed\n\n")
+	emit(w, "\n=== Knowledge Crystallization Checklist ===\n\n")
+	emit(w, "Manual steps (AI-assisted, run in Claude Code):\n")
+	emit(w, "  [ ] /insights  — audit observation backlog\n")
+	emit(w, "  [ ] /crystallize — promote observations to vault lessons\n")
+	emit(w, "  [ ] Check ~/Projects/knowledge/00_meta/patterns/ for new patterns\n")
+	emit(w, "  [ ] Update 11-tasks.md backlog progress bar\n\n")
+	emit(w, "Automated (done by this script):\n")
+	emit(w, "  [x] currentDate updated\n")
+	emit(w, "  [x] Last Crystallized stamped\n")
+	emit(w, "  [x] Duplicate date entries removed\n\n")
 }
 
 // memoryFileFor is find_memory_file(): <home>/.claude/projects/<key>/memory/MEMORY.md.
@@ -341,18 +352,18 @@ func isDir(p string) bool {
 // project has no MEMORY.md — the shell warns and exits 0 in that case, so this is
 // not an error.
 func CrystallizeOne(w io.Writer, home, projectDir, today string) (ok bool, err error) {
-	fmt.Fprintf(w, "[INFO] Project: %s\n", projectDir)
-	fmt.Fprintf(w, "[INFO] Date: %s\n", today)
+	emit(w, "[INFO] Project: %s\n", projectDir)
+	emit(w, "[INFO] Date: %s\n", today)
 
 	memoryFile := memoryFileFor(home, projectDir)
 	if _, statErr := os.Stat(memoryFile); statErr != nil {
-		fmt.Fprintf(w, "[WARNING] No MEMORY.md found for %s\n", projectDir)
-		fmt.Fprintf(w, "[WARNING] Expected: %s\n", memoryFile)
-		fmt.Fprintf(w, "[WARNING] Run Claude Code in this project first to initialize the memory directory.\n")
+		emit(w, "[WARNING] No MEMORY.md found for %s\n", projectDir)
+		emit(w, "[WARNING] Expected: %s\n", memoryFile)
+		emit(w, "[WARNING] Run Claude Code in this project first to initialize the memory directory.\n")
 		return false, nil
 	}
 
-	fmt.Fprintf(w, "[INFO] MEMORY.md: %s\n", memoryFile)
+	emit(w, "[INFO] MEMORY.md: %s\n", memoryFile)
 	if err := ProcessProject(w, memoryFile, today); err != nil {
 		return true, err
 	}
@@ -368,8 +379,8 @@ func CrystallizeOne(w io.Writer, home, projectDir, today string) (ok bool, err e
 // BUG-062 guard exists to stop, so the arithmetic is load-bearing.
 func CrystallizeAll(w io.Writer, home, today string) error {
 	projectsDir := filepath.Join(home, ".claude", "projects")
-	fmt.Fprintf(w, "[INFO] Discovering all projects in %s...\n", projectsDir)
-	fmt.Fprint(w, "\n")
+	emit(w, "[INFO] Discovering all projects in %s...\n", projectsDir)
+	emit(w, "\n")
 
 	matches, _ := filepath.Glob(filepath.Join(projectsDir, "*", "memory", "MEMORY.md"))
 	sort.Strings(matches)
@@ -385,27 +396,27 @@ func CrystallizeAll(w io.Writer, home, today string) error {
 		projectDir := decodePath(home, encoded)
 
 		if projectDir == "" {
-			fmt.Fprintf(w, "[WARNING] [%s] → not found on disk (different machine or deleted — skipping)\n", encoded)
+			emit(w, "[WARNING] [%s] → not found on disk (different machine or deleted — skipping)\n", encoded)
 			skipped++
-			fmt.Fprint(w, "\n")
+			emit(w, "\n")
 			continue
 		}
 
-		fmt.Fprintf(w, "[INFO] [%s] → %s\n", encoded, projectDir)
+		emit(w, "[INFO] [%s] → %s\n", encoded, projectDir)
 		if err := ProcessProject(w, memoryFile, today); err != nil {
-			fmt.Fprintf(w, "[WARNING] Failed to process %s — skipping\n", projectDir)
+			emit(w, "[WARNING] Failed to process %s — skipping\n", projectDir)
 			skipped++
 		}
-		fmt.Fprint(w, "\n")
+		emit(w, "\n")
 	}
 
 	if found == 0 {
-		fmt.Fprintf(w, "[WARNING] No MEMORY.md files found in %s\n", projectsDir)
-		fmt.Fprintf(w, "[WARNING] Open any project in Claude Code first to initialize its memory directory.\n")
+		emit(w, "[WARNING] No MEMORY.md files found in %s\n", projectsDir)
+		emit(w, "[WARNING] Open any project in Claude Code first to initialize its memory directory.\n")
 		return nil
 	}
 
-	fmt.Fprintf(w, "[SUCCESS] Processed %d / %d projects (%d skipped)\n", found-skipped, found, skipped)
+	emit(w, "[SUCCESS] Processed %d / %d projects (%d skipped)\n", found-skipped, found, skipped)
 	PrintChecklist(w)
 	return nil
 }
