@@ -130,10 +130,20 @@ func writeAtomic(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	name := tmp.Name()
-	defer os.Remove(name)
+	// Best-effort cleanup: after a successful Rename the temp name is gone, so
+	// this Remove is expected to fail and its error carries no information.
+	defer func() { _ = os.Remove(name) }()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close() // the write error is the one worth reporting
+		return err
+	}
+	// Sync before Close: os.Rename gives atomic VISIBILITY, not durability. A
+	// crash after the rename can otherwise expose a file whose data blocks were
+	// never persisted — and this write replaces the only copy of a project's
+	// session continuity.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {

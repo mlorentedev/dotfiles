@@ -67,7 +67,17 @@ func TestCheckMemoryShape(t *testing.T) {
 		if !strings.Contains(buf.String(), "dotf doctor --fix") {
 			t.Errorf("expected a --fix hint, got\n%s", buf.String())
 		}
-		if !strings.Contains(buf.String(), "wrapped: "+path) {
+		// The check reports the EvalSymlinks-RESOLVED path, because that is the
+		// file it would actually write and because resolving is what lets two
+		// aliased project keys collapse to one entry. On Windows the temp root
+		// is reached through a junction, so the resolved form differs from the
+		// path this test joined — resolve here too rather than asserting a
+		// literal that only holds on Linux.
+		wantPath, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			t.Fatalf("resolving %s: %v", path, err)
+		}
+		if !strings.Contains(buf.String(), "wrapped: "+wantPath) {
 			t.Errorf("expected the offending path to be named, got\n%s", buf.String())
 		}
 		after, _ := os.ReadFile(path)

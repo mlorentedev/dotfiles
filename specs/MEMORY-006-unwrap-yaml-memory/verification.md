@@ -45,16 +45,28 @@ notes and session history. The test skips cleanly where the vault is absent
 mistaken for a pass. The shapes it covers are reproduced by the synthetic
 fixtures in `memshape_test.go`, which are safe to commit and are what CI runs.
 
-**Two findings came out of this test, not out of review.**
+**Counts, kept distinct** (they answer three different questions): **17** project
+keys are wrapped, resolving to **16** distinct files (two keys alias one vault
+directory), while the **historical** corpus at `1c216229` is **23** pairs —
+it includes entries since archived or renamed, and files unwrapped by hand later.
+The pair count is asserted exactly, so a regression in detection cannot hide
+behind a single surviving pass.
 
-1. **The de-indent assertion had to become a prefix match**, because the May wrap
-   was *lossy*: it dropped each file's trailing `# currentDate` section. The
-   strongest true statement is that de-indenting recovers the surviving content
-   byte-for-byte in the original's own formatting.
-2. **One file lost far more than that** — `python-sensor-sdk-platform` went 205
-   lines → 36. Filed separately as **#865 (MEMORY-007)**; it is a content
-   restore, independent of this shape migration, and fully recoverable from
-   `1c216229^`.
+**Three findings came out of this test, not out of review.**
+
+1. **The May wrap was lossy**, dropping each file's trailing `# currentDate`
+   section — so equality was never the right contract.
+2. **It also truncated MID-LINE**, which the first version of this test missed.
+   `kasa-provisioner`'s wrapped body ends at `|`, one byte of the table separator
+   `|-------|--------|`; a second file kept 1 byte of 61. The first assertion
+   trimmed trailing newlines and prefix-matched the whole string, which silently
+   accepted that as clean. The contract is now: every **complete** recovered line
+   matches byte-for-byte, and only the final line may be a prefix. Caught by
+   applying a reviewer's objection to the trimming — the objection was right, and
+   what the trim hid was worse than the reviewer supposed.
+3. **One file lost far more than a tail** — `python-sensor-sdk-platform` went 205
+   lines → 36. Filed as **#865 (MEMORY-007)**; a content restore, independent of
+   this shape migration, recoverable from `1c216229^`.
 
 ## Mutation probe
 

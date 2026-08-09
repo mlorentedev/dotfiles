@@ -12,9 +12,14 @@ template_version: "1.0"
 
 ## Why
 
-17 auto-memory `MEMORY.md` files store their body inside a YAML block scalar
-(`content: |`) instead of plain markdown. That shape is **invalid state**, not a
-supported variant:
+Auto-memory `MEMORY.md` files store their body inside a YAML block scalar
+(`content: |`) instead of plain markdown — **17 project keys resolving to 16
+distinct files** (two keys alias one vault directory after a rename). The
+*historical* corpus in vault commit `1c216229` is larger, **23 pairs**, because
+it includes entries since archived or renamed; those three numbers are kept
+distinct throughout this spec and tabulated in `tasks.md`.
+
+That shape is **invalid state**, not a supported variant:
 
 | Fact | Source |
 |---|---|
@@ -86,10 +91,18 @@ existing `checkAutoMemoryLink` contract exactly: verify always, repair only unde
 - [ ] De-indent = YAML block indent **+** uniform residual indent, both derived
       from the file. No literal width anywhere in the implementation.
 - [ ] **Validated against ground truth:** vault commit `1c216229` holds the
-      pre-wrap version of all 17 files. Run the algorithm over each file as it
-      existed in that commit and byte-compare against `1c216229^`. Seventeen real
-      before/after pairs authored by neither this code nor its author — a stronger
-      corpus than invented fixtures, and what #672 asks for in spirit.
+      pre-wrap version of every affected file. Run the algorithm over each file
+      as it existed in that commit and compare against `1c216229^` — real
+      before/after pairs authored by neither this code nor its author, a stronger
+      corpus than invented fixtures and what #672 asks for in spirit.
+
+      **The contract is not whole-file equality**, because the May wrap was lossy
+      in two ways (both measured, see `verification.md`): it dropped each file's
+      trailing `# currentDate` section — and 169 lines from one work project —
+      *and* it truncated mid-line in two files. So the assertion is: every
+      **complete** recovered line equals its counterpart byte-for-byte, and only
+      the final line may be a prefix of its counterpart. The unrecoverable
+      remainder is **#865**, not this ticket.
 - [ ] Migrated files crystallize successfully — proven by running crystallize,
       not by inspecting indentation.
 - [ ] Frontmatter is preserved byte-for-byte apart from the removed `content` key.

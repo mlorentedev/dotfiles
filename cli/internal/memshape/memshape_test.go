@@ -28,6 +28,20 @@ func TestIsWrapped(t *testing.T) {
 		{"explicit indent indicator", "---\nid: x\ncontent: |2\n  # Title\n", true},
 		{"no leading ---", "id: x\ncontent: |\n    # Title\n", false},
 		{"empty", "", false},
+		// A MIGRATED file also opens with `---` and closes its frontmatter with
+		// `---`. Its markdown body may then hold a column-0 block-scalar
+		// lookalike — in prose or inside a fenced yaml example. Scanning past
+		// the terminator would re-flag this package's own output forever.
+		{
+			"opener-shaped line in the BODY of a migrated file",
+			"---\nid: x\ntype: memory\n---\n\n# Title\n\nnote: |\n  not frontmatter\n",
+			false,
+		},
+		{
+			"fenced yaml example containing an opener",
+			"---\nid: x\n---\n\n# Title\n\n```yaml\ncontent: |\n  example\n```\n",
+			false,
+		},
 		// A body line that merely looks like an opener must not trip detection
 		// from column 0 — but a real opener is at column 0, so an indented
 		// lookalike inside a body is not a false positive here.
@@ -111,6 +125,19 @@ func TestUnwrap(t *testing.T) {
 			name: "single-line body",
 			src:  "---\nid: x\ncontent: |\n    # Only\n",
 			want: "---\nid: x\n---\n\n# Only\n",
+		},
+		{
+			// Trailing blank lines are content and must survive exactly. The
+			// ground-truth test cannot pin this — the May wrap truncated those
+			// files, so their tails are not comparable — so it is pinned here,
+			// where nothing was lost.
+			name: "trailing blank lines are preserved exactly",
+			src: "---\nid: x\ncontent: |\n" +
+				"    # Title\n" +
+				"      body\n" +
+				"\n" +
+				"\n",
+			want: "---\nid: x\n---\n\n# Title\nbody\n\n\n",
 		},
 	}
 

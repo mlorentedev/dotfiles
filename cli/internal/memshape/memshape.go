@@ -32,21 +32,39 @@ var blockOpener = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_-]*):[ \t]*\|[-+0-9]
 var ErrNotWrapped = errors.New("memshape: not a YAML-wrapped MEMORY.md")
 
 // IsWrapped reports whether src is a MEMORY.md whose body sits inside a YAML
-// block scalar: a `---` first line plus a block-scalar opener.
+// block scalar: a `---` first line plus a block-scalar opener *in the
+// frontmatter*.
 //
 // Structural, never an indent probe. The indent is not a constant — it is
 // derived per file in Unwrap — so nothing here may key on a literal width.
+//
+// The scan stops at the frontmatter terminator, and that bound is load-bearing
+// rather than tidiness. A MIGRATED file also begins with `---` and closes its
+// frontmatter with `---`; its markdown body may then legitimately contain a
+// column-0 `note: |`, or a fenced yaml example holding `content: |`. Scanning
+// past the terminator would re-flag such a file forever — doctor would FAIL on
+// it and Unwrap would refuse it — which is a false positive on the very shape
+// this package produces.
 func IsWrapped(src string) bool {
-	lines := strings.Split(src, "\n")
+	return openerLine(strings.Split(src, "\n")) >= 0
+}
+
+// openerLine returns the index of the block-scalar opener within the leading
+// frontmatter, or -1 when there is none. Shared by IsWrapped and Unwrap so the
+// two can never disagree about what counts as wrapped.
+func openerLine(lines []string) int {
 	if len(lines) == 0 || strings.TrimRight(lines[0], " \t") != "---" {
-		return false
+		return -1
 	}
-	for _, l := range lines[1:] {
-		if blockOpener.MatchString(l) {
-			return true
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimRight(lines[i], " \t") == "---" {
+			return -1 // frontmatter closed with no opener: a plain-markdown file
+		}
+		if blockOpener.MatchString(lines[i]) {
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 // leadingSpaces counts the leading space characters of l.
@@ -90,19 +108,8 @@ func blank(l string) bool { return strings.TrimSpace(l) == "" }
 // signature. hive — the one file wrapped with a uniform indent — exercises the
 // residual==0 path and is the regression case against over-stripping.
 func Unwrap(src string) (string, error) {
-	if !IsWrapped(src) {
-		return "", ErrNotWrapped
-	}
-
 	lines := strings.Split(src, "\n")
-
-	opener := -1
-	for i, l := range lines {
-		if blockOpener.MatchString(l) {
-			opener = i
-			break
-		}
-	}
+	opener := openerLine(lines)
 	if opener < 0 {
 		return "", ErrNotWrapped
 	}
