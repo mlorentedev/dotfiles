@@ -9,7 +9,7 @@
   {
     "id": "CLI-034-f2",
     "behavior": "Archive refuses when review.md carries verdict: FAIL (and on an unrecognized verdict)",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveBlocksOnFailVerdict|TestArchiveBlocksOnUnknownVerdict' -v",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveBlocksOnFailVerdict|TestArchiveBlocksOnUnknownVerdict|TestArchiveBlocksOnForeignReview' -v",
     "state": "pending",
     "evidence": ""
   },
@@ -37,14 +37,14 @@
   {
     "id": "CLI-034-f6",
     "behavior": "A review whose reviewed_sha predates a contract-file change is rejected as stale; an unresolvable sha is also stale",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveBlocksOnStaleReview|TestArchiveUnresolvableShaIsStale' -v",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestGitStalenessDetectsContractChange|TestGitStalenessUnresolvableShaIsStale' -v",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-034-f7",
     "behavior": "review.md's own commit does not trip staleness, and verification.md changes do not trip it",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestStalenessIgnoresReviewOwnCommit|TestStalenessIgnoresVerificationMd' -v",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestGitStalenessIgnoresReviewOwnCommit|TestGitStalenessIgnoresVerificationMd' -v",
     "state": "pending",
     "evidence": ""
   },

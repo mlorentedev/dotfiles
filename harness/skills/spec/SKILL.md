@@ -248,13 +248,15 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 **Purpose:** Close a spec. Interactive promotion to vault, then mechanical archive.
 
-**Signature:** `/spec archive <feature-id> [--pr <url>] [--abandoned]`
+**Signature:** `/spec archive <feature-id> [--pr <url>] [--abandoned] [--force-with-drafts] [--force-without-review]`
 
 **Steps:**
 
 1. **Pre-flight:**
    - Read `$REPO_ROOT/specs/<feature-id>/proposal.md`, `tasks.md`, `verification.md`.
    - **Tag check:** scan all three files for `[AGENT-DRAFT]` or `[AGENT-SUGGESTION]` markers. If any found, REFUSE to archive unless `--force-with-drafts` is passed. Output list of files + lines with unresolved tags.
+   - **Review check (CLI-034):** the folder must contain `review.md` with a `verdict:` of `PASS` or `PASS-WITH-GAPS`, whose `spec:` matches the folder and whose `reviewed_sha` predates no change to `proposal.md` / `tasks.md` / `features.json`. A missing, malformed, failing, foreign or stale review REFUSES the archive. Produce it with `adversarial-review` — ideally from a **different session or agent** than the implementer, since independence is the point. Two declared escapes, never a judgment call in the moment: `review: waived` + a non-empty `review_waived_reason:` in `proposal.md` frontmatter, or `--force-without-review`.
+     - The two checks answer different questions: the tag check asks whether the spec is *finished being written*; the review check asks whether anyone *independently argued against it*.
    - Count unchecked acceptance criteria. If >0, warn: "N criteria still unchecked. Continue?" Ask.
    - If `--abandoned` flag: skip step 2 entirely, mark as `status: abandoned`, route to `specs/archive/_abandoned/<id>/` in step 3.
 
