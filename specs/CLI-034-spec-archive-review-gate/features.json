@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-034-f1",
+    "behavior": "Archive refuses when review.md is absent, naming the artifact and both declared escapes",
+    "verification": "cd cli && go test ./internal/spec/ -run TestArchiveBlocksOnMissingReview -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f2",
+    "behavior": "Archive refuses when review.md carries verdict: FAIL (and on an unrecognized verdict)",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveBlocksOnFailVerdict|TestArchiveBlocksOnUnknownVerdict' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f3",
+    "behavior": "Archive proceeds on verdict PASS and PASS-WITH-GAPS",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveProceedsOnPass|TestArchiveProceedsOnPassWithGaps' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f4",
+    "behavior": "review: waived with a non-empty reason skips the gate; waived without a reason still refuses",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveWaivedWithReason|TestArchiveWaivedWithoutReasonRefuses' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f5",
+    "behavior": "--force-without-review archives despite a missing or FAIL review",
+    "verification": "cd cli && go test ./internal/spec/ -run TestArchiveForceWithoutReview -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f6",
+    "behavior": "A review whose reviewed_sha predates a contract-file change is rejected as stale; an unresolvable sha is also stale",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveBlocksOnStaleReview|TestArchiveUnresolvableShaIsStale' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f7",
+    "behavior": "review.md's own commit does not trip staleness, and verification.md changes do not trip it",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestStalenessIgnoresReviewOwnCommit|TestStalenessIgnoresVerificationMd' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-034-f8",
+    "behavior": "Vault SSOT skills document the review.md contract and the archive pre-flight, and the harness render matches",
+    "verification": "grep -q 'specs/<feature-id>/review.md' \"$VAULT_PATH/00_meta/skills/adversarial-review/SKILL.md\" && grep -q 'force-without-review' \"$VAULT_PATH/00_meta/skills/spec/SKILL.md\" && ./scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  }
+]
