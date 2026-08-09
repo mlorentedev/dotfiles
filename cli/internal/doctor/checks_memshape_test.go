@@ -132,6 +132,44 @@ func TestCheckMemoryShape(t *testing.T) {
 		}
 	})
 
+	t.Run("two project keys aliasing one file are handled once", func(t *testing.T) {
+		// A renamed project leaves its old key behind, still symlinked to the new
+		// entry's memory dir — youtube-toolkit and yt-metrics-cli both resolve to
+		// 10_projects/yt-metrics-cli/memory on this machine. Found by running the
+		// real migration: the file was listed twice, migrated through the first
+		// alias, then re-read through the second as already-plain and reported as
+		// a shape failure that never happened.
+		home := t.TempDir()
+		realDir := filepath.Join(home, ".claude", "projects", "-new", "memory")
+		mkdirAll(t, realDir)
+		if err := os.WriteFile(filepath.Join(realDir, "MEMORY.md"), []byte(wrappedFixture), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		aliasDir := filepath.Join(home, ".claude", "projects", "-old")
+		mkdirAll(t, aliasDir)
+		if err := os.Symlink(realDir, filepath.Join(aliasDir, "memory")); err != nil {
+			t.Skipf("symlinks unavailable: %v", err)
+		}
+
+		sys := newSys(map[string]string{"HOME": home}, nil, nil)
+
+		var verify bytes.Buffer
+		rep := capture(&verify)
+		checkMemoryShape(sys, rep, false)
+		if got := strings.Count(verify.String(), "wrapped: "); got != 1 {
+			t.Errorf("expected the aliased file to be listed once, got %d\n%s", got, verify.String())
+		}
+
+		var fixed bytes.Buffer
+		checkMemoryShape(sys, capture(&fixed), true)
+		if strings.Contains(fixed.String(), "shape not recognised") {
+			t.Errorf("alias misreported as a shape failure:\n%s", fixed.String())
+		}
+		if got := strings.Count(fixed.String(), "migrated to plain markdown"); got != 1 {
+			t.Errorf("expected exactly 1 migration, got %d\n%s", got, fixed.String())
+		}
+	})
+
 	t.Run("an unrecognised shape is warned about, never rewritten", func(t *testing.T) {
 		// A block opener followed by a column-0 key: the block ends early and
 		// this is a shape we have never seen. Refusing beats guessing on a file

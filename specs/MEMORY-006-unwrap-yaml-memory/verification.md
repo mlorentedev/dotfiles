@@ -106,6 +106,65 @@ written straight through to the real files. It only did not because an unrelated
 assertion that no symlink survives into the sandbox. A dry run that can touch
 production is not a dry run, and luck is not isolation.
 
+## Live migration — run and verified
+
+Run against the real corpus after the dry run was reviewed and approved.
+
+```console
+$ dotf doctor --fix
+[Auto-memory file shape]
+  [FIX ] migrated to plain markdown: … (×16 distinct files)
+
+$ dotf doctor
+[Auto-memory file shape]
+  (1 checks, all ok)
+```
+
+**AC4 proven by effect, not inspection.** Crystallize was run against a migrated
+project and now succeeds where it previously refused:
+
+```console
+$ ./scripts/knowledge-crystallize.sh ~/Projects/pollex
+[INFO]    Added currentDate section (2026-08-08)
+[INFO]    Updated Last Crystallized to 2026-08-08
+[SUCCESS] MEMORY.md line count: 108 / 150
+```
+
+And the HARNESS-029 invariant survives the stamp — the handoff block is still
+last:
+
+```console
+$ grep -n '^## Last Crystallized:\|^# currentDate\|^## Session Handoff' …/pollex/…/MEMORY.md
+99:## Last Crystallized: 2026-08-08
+101:# currentDate
+103:## Session Handoff        <- still the final section
+```
+
+That is the whole chain: the migration restores column-0 markers, crystallize
+finds them, and `append_before_handoff` places the stamp correctly because it can
+finally see the block it must stay above.
+
+### A defect the live run found that the fixtures could not
+
+The first live run emitted `left unchanged, shape not recognised` for
+`yt-metrics-cli` — a file that the vault showed as successfully migrated.
+
+Cause: **two project keys alias one vault file.** `-home-manu-Projects-youtube-toolkit`
+and `-home-manu-Projects-yt-metrics-cli` both symlink to
+`10_projects/yt-metrics-cli/memory` — a rename whose old key was never removed.
+The scan listed the file twice, migrated it through the first alias, then re-read
+it through the second as already-plain and reported that as a shape failure.
+
+Nothing was corrupted — the message was wrong, not the write. But a check whose
+diagnosis misdescribes reality is the defect class this whole ticket is about, so
+it was fixed in scope: entries are deduplicated by `filepath.EvalSymlinks`, and
+`ErrNotWrapped` during the fix loop is now reported as "already plain markdown"
+rather than as an unrecognised shape. Pinned by
+*"two project keys aliasing one file are handled once"*.
+
+No mutation probe was needed for that case: the production run **is** the
+evidence that the test's assertion fails without the fix.
+
 ## Test status
 
 ```console

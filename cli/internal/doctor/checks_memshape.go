@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,18 +38,33 @@ func checkMemoryShape(sys *System, rep *Report, fix bool) {
 		return
 	}
 
+	// Deduplicate by resolved target. Several project keys can alias ONE vault
+	// file — a renamed project leaves its old key behind, still symlinked to the
+	// new entry (youtube-toolkit and yt-metrics-cli both point at
+	// 10_projects/yt-metrics-cli/memory). Without this, the same file is listed
+	// twice, migrated through the first alias, and then re-read through the
+	// second as already-plain — reported as a shape failure that never happened.
+	seen := make(map[string]bool)
 	var wrapped []string
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		path := filepath.Join(projects, e.Name(), "memory", "MEMORY.md")
-		body, err := os.ReadFile(path)
+		real, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			continue // dangling link, or no memory dir for this project
+		}
+		if seen[real] {
+			continue
+		}
+		body, err := os.ReadFile(real)
 		if err != nil {
 			continue
 		}
+		seen[real] = true
 		if memshape.IsWrapped(string(body)) {
-			wrapped = append(wrapped, path)
+			wrapped = append(wrapped, real)
 		}
 	}
 	sort.Strings(wrapped)
@@ -77,6 +93,13 @@ func checkMemoryShape(sys *System, rep *Report, fix bool) {
 			continue
 		}
 		out, err := memshape.Unwrap(string(src))
+		if errors.Is(err, memshape.ErrNotWrapped) {
+			// Plain already — it changed under us between the scan and the write.
+			// Not a defect and not this run's business; say so accurately rather
+			// than reporting a shape failure that did not happen.
+			rep.Info("already plain markdown, skipped: " + p)
+			continue
+		}
 		if err != nil {
 			// An unrecognised shape is left exactly as it is. Refusing beats
 			// guessing on a file holding real session continuity.
