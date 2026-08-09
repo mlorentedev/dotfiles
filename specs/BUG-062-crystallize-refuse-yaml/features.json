@@ -1,0 +1,37 @@
+[
+  {
+    "id": "BUG-062-crystallize-refuse-yaml-f1",
+    "behavior": "A MEMORY.md wrapped in a YAML block scalar is refused with a non-zero exit, at both four- and six-space indentation.",
+    "verification": "bats tests/knowledge-crystallize-yaml-guard.bats -f 'refuses a block-scalar'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-062-crystallize-refuse-yaml-f2",
+    "behavior": "The refused file is byte-identical afterwards and still parses as YAML.",
+    "verification": "bats tests/knowledge-crystallize-yaml-guard.bats -f 'byte-identical|parses as YAML'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-062-crystallize-refuse-yaml-f3",
+    "behavior": "A plain-markdown MEMORY.md keeps working and the Session Handoff block stays last.",
+    "verification": "bats tests/knowledge-crystallize-yaml-guard.bats -f 'plain-markdown MEMORY.md is untouched'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-062-crystallize-refuse-yaml-f4",
+    "behavior": "--all counts a refusal as skipped rather than processed, in both twins.",
+    "verification": "bats tests/knowledge-crystallize-yaml-guard.bats -f 'counted as skipped'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-062-crystallize-refuse-yaml-f5",
+    "behavior": "The PowerShell twin carries the same guard, asserted structurally because pwsh is unavailable on the Linux dev box.",
+    "verification": "bats tests/knowledge-crystallize-yaml-guard.bats -f 'PowerShell twin carries'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

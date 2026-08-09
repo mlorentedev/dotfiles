@@ -225,9 +225,35 @@ print_checklist() {
     printf '  [x] Duplicate date entries removed\n\n'
 }
 
+# True when MEMORY.md stores its body inside a YAML block scalar (`content: |`),
+# the shape Claude Code's auto-memory uses for some projects.
+#
+# Structural detection, not an indent probe: the indent width is NOT fixed —
+# pollex indents six spaces, hive four — so nothing here may key on a literal
+# width. A wrapper is a `---` first line plus a `<key>: |` block-scalar opener.
+is_yaml_block_scalar() {
+    local file="$1"
+    head -n 1 "$file" 2>/dev/null | grep -q '^---[[:space:]]*$' || return 1
+    grep -qE '^[A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*\|[-+0-9]*[[:space:]]*$' "$file"
+}
+
 # Process a single project: update MEMORY.md, check health
 process_project() {
     local project_dir="$1" memory_file="$2" today="$3"
+
+    # BUG-062 (#857): every marker below is anchored at column 0, so on a
+    # block-scalar file none of them match, control reaches the bare append, and
+    # the text lands OUTSIDE the block — breaking the handoff invariant,
+    # duplicating the date stamp, and making the file stop parsing as YAML, all
+    # while printing [SUCCESS]. Refusing is strictly better than corrupting.
+    # The YAML-aware implementation belongs to the Go port (#490).
+    if is_yaml_block_scalar "$memory_file"; then
+        log_error "Refusing to stamp $memory_file"
+        log_error "Its body sits inside a YAML block scalar, which this script cannot edit"
+        log_error "without corrupting the file (#857). Stamp it by hand until the"
+        log_error "YAML-aware 'dotf vault crystallize' lands (#490)."
+        return 1
+    fi
 
     dedup_current_date "$memory_file"
     update_current_date "$memory_file" "$today"
@@ -257,8 +283,13 @@ run_all() {
 
         if [ -n "$project_dir" ]; then
             log_info "[$encoded_name] → $project_dir"
-            process_project "$project_dir" "$memory_file" "$today" || \
+            # A refusal counts as skipped, not processed: reporting "5 / 5" while
+            # having declined one is the same "prints success while doing nothing"
+            # failure this guard exists to stop.
+            if ! process_project "$project_dir" "$memory_file" "$today"; then
                 log_warning "Failed to process $project_dir — skipping"
+                skipped=$((skipped + 1))
+            fi
         else
             log_warning "[$encoded_name] → not found on disk (different machine or deleted — skipping)"
             skipped=$((skipped + 1))
@@ -307,7 +338,9 @@ if ! MEMORY_FILE=$(find_memory_file "$PROJECT_DIR"); then
 fi
 
 log_info "MEMORY.md: $MEMORY_FILE"
-process_project "$PROJECT_DIR" "$MEMORY_FILE" "$TODAY"
+if ! process_project "$PROJECT_DIR" "$MEMORY_FILE" "$TODAY"; then
+    exit 1
+fi
 print_checklist
 
 exit 0
