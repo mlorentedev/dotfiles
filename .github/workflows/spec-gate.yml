@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  issues: read      # adjacency report (HARNESS-063) lists other open issues
+
 jobs:
   spec-gate:
     runs-on: ubuntu-latest
@@ -30,6 +34,20 @@ jobs:
         # (#686/C3). checkout above already fetched full head history (fetch-depth
         # 0); this brings the base's full history so the merge-base is reachable.
         run: git fetch --no-tags --prune origin "$BASE_REF"
+
+      # The token lives here, not in check-spec-gate.sh: that script also runs in
+      # the pre-push hook (#854), where there is none. One list call, flattened to
+      # TSV; the matching itself is offline and fixture-tested. Any failure leaves
+      # no file behind, and the gate then behaves exactly as it did before.
+      - name: Collect open issues for the adjacency report
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh issue list --state open --limit 500 --json number,title,body \
+            --jq '.[] | [.number, ((.title + " " + (.body // "")) | gsub("[\n\r\t]"; " "))] | @tsv' \
+            > "$RUNNER_TEMP/adjacency.tsv" || rm -f "$RUNNER_TEMP/adjacency.tsv"
 
       - name: Run SDD spec-gate
         env:

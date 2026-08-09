@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-063-spec-gate-adjacency-f1",
+    "behavior": "On a PR that closes an issue, CI emits an advisory report naming every other open issue whose title or body references a file in the diff, and which file matched.",
+    "verification": "bats tests/spec-gate-adjacency.bats -f 'replaying PR 851'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-063-spec-gate-adjacency-f2",
+    "behavior": "Red-tested against #851: replaying its changed-file list against #849-open flags it, and matching runs over unstripped text so reusing _strip_markdown_code goes red.",
+    "verification": "bats tests/spec-gate-adjacency.bats -f 'inline code span'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-063-spec-gate-adjacency-f3",
+    "behavior": "The report is advisory: a PR with adjacent issues exits with the same status it would have exited with without them.",
+    "verification": "bats tests/spec-gate-adjacency.bats -f 'cannot change the exit status'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-063-spec-gate-adjacency-f4",
+    "behavior": "With no adjacency feed the script's output is byte-identical to the previous version, keeping the offline pre-push path (#854) intact.",
+    "verification": "bats tests/spec-gate-adjacency.bats -f 'byte-identical'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
