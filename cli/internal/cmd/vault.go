@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -30,7 +33,8 @@ Unlike dotf init, vault is a vault-only command: a missing vault is an error
 
 Subcommands:
   work <family> <component>   scaffold a work-SDK entry under 50_work/45-development/
-  project [path]              scaffold a personal-project entry under 10_projects/`,
+  project [path]              scaffold a personal-project entry under 10_projects/
+  crystallize [path]          maintain a project's MEMORY.md dates and health`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -38,6 +42,88 @@ Subcommands:
 	}
 	cmd.AddCommand(newVaultWorkCmd())
 	cmd.AddCommand(newVaultProjectCmd())
+	cmd.AddCommand(newVaultCrystallizeCmd())
+	return cmd
+}
+
+// newVaultCrystallizeCmd builds `dotf vault crystallize [path]`, the Go port of
+// scripts/knowledge-crystallize.{sh,ps1} (CLI-021 / #490).
+//
+// It lands under the EXISTING `vault` noun on purpose: that noun already meant
+// "scaffold a vault entry" while the knowledge half — crystallize, maintain,
+// health — lived only in shell twins. Two disjoint meanings under one word is the
+// collision #490 exists to resolve, which is why this is not a top-level command.
+//
+// Built beside the twins: nothing is deleted and no caller is repointed here.
+// Both paths work after this, byte-identically on the golden corpus. The cutover
+// is CLI-023 (#492).
+func newVaultCrystallizeCmd() *cobra.Command {
+	var all bool
+
+	cmd := &cobra.Command{
+		Use:   "crystallize [path]",
+		Short: "Maintain MEMORY.md dates and report knowledge health",
+		Long: `crystallize updates a project's auto-memory MEMORY.md:
+
+  1. Removes duplicate "# currentDate" entries
+  2. Updates "# currentDate" to today
+  3. Stamps "## Last Crystallized: YYYY-MM-DD"
+  4. Warns when MEMORY.md exceeds 150 lines
+  5. Prints the manual AI-workflow checklist
+
+Insertions land BEFORE a "## Session Handoff" block when one is present, so that
+block stays last (HARNESS-029) and does not bust the provider prompt cache.
+
+A MEMORY.md whose body sits inside a YAML block scalar is REFUSED rather than
+corrupted (#857); under --all such a project counts as skipped, not processed.
+
+[path] defaults to the current directory.`,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			today := time.Now().Format("2006-01-02")
+			out := c.OutOrStdout()
+
+			if all {
+				fmt.Fprintf(out, "[INFO] Date: %s\n", today)
+				return vault.CrystallizeAll(out, home, today)
+			}
+
+			target := "."
+			if len(args) == 1 {
+				target = args[0]
+			}
+			abs, err := filepath.Abs(target)
+			if err != nil {
+				return err
+			}
+			// The shell does `cd "$PROJECT_DIR" && pwd`, so a non-existent path is
+			// an error there too rather than a silently-accepted string.
+			if st, serr := os.Stat(abs); serr != nil || !st.IsDir() {
+				return fmt.Errorf("no such directory: %s", abs)
+			}
+			abs, err = filepath.EvalSymlinks(abs)
+			if err != nil {
+				return err
+			}
+
+			_, err = vault.CrystallizeOne(out, home, abs, today)
+			if errors.Is(err, vault.ErrRefused) {
+				// The refusal already printed its four [ERROR] lines. Cobra would
+				// append a duplicate "Error:" line and break byte-parity with the
+				// shell; the non-zero exit is what matters and is preserved.
+				c.SilenceErrors = true
+			}
+			return err
+		},
+	}
+
+	cmd.Flags().BoolVar(&all, "all", false,
+		"Discover and process every project under ~/.claude/projects")
 	return cmd
 }
 

@@ -83,6 +83,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y age zsh
 
+      # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
+      # is byte-identical to the shell oracle on the golden corpus (CLI-021). It
+      # SKIPS when the Go toolchain is absent, and a skipped parity check is a
+      # green suite that proves nothing -- the same shape as BUG-055 and #807. The
+      # runner's preinstalled Go is not pinned to cli/go.mod, so set it up here.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
       # tests/precommit-fallback-real.bats runs the REAL pre-commit through a real
       # `git commit` (BUG-055). It skips when the binary is absent, so without this
       # step the one check that exercises upstream's actual behaviour would skip

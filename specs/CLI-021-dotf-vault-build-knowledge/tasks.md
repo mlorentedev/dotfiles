@@ -54,15 +54,27 @@ a silent regeneration to turn a red golden green.
 
 ## 2. Increment 1 — `dotf vault crystallize`
 
-- [ ] Wire the subcommand under the existing `vault` noun (NOT top-level — that is the collision).
-- [ ] Path encode/decode: reuse the existing `dotf mem project-key` code path, do not
-      reimplement (the #689 drive-colon regression lives here).
-- [ ] Port: dedup currentDate, update currentDate, stamp Last Crystallized, line-count warning,
-      checklist output, `--all` discovery.
-- [ ] **HARNESS-029:** insert before `## Session Handoff` when present. Add a test that fails
-      against a naive append, mirroring BUG-060.
-- [ ] Golden tests green: Go output byte-identical to shell for every fixture.
-- [ ] Table-driven unit tests for encode/decode and section insertion.
+- [x] Wire the subcommand under the existing `vault` noun (NOT top-level — that is the collision).
+- [x] Path encode/decode: reuse the existing `dotf mem project-key` code path, do not
+      reimplement (the #689 drive-colon regression lives here). → `memlink.ClaudeProjectKey` /
+      `ClaudeMemoryTarget`. Note it also maps `\` and `:` where the shell maps only `/`; on the
+      POSIX paths the shell handles the two encodings are identical.
+- [x] Port: dedup currentDate, update currentDate, stamp Last Crystallized, line-count warning,
+      checklist output, `--all` discovery. → `cli/internal/vault/crystallize.go`.
+- [x] **HARNESS-029:** insert before `## Session Handoff` when present. Add a test that fails
+      against a naive append, mirroring BUG-060. → verified by mutation: replacing the guard with
+      an unconditional append turns 4 cases red.
+- [x] Golden tests green: Go output byte-identical to shell for every fixture. →
+      `tests/knowledge-crystallize-go-parity.bats`, **13/13 byte-identical**, driven by the SAME
+      goldens and the SAME runner as the shell suite. `help` is excluded and why is documented
+      (cobra generates its usage; the shell hand-rolls it).
+- [x] Table-driven unit tests for encode/decode and section insertion. →
+      `cli/internal/vault/crystallize_test.go`.
+
+**Deliberate divergence, stated because the goldens structurally cannot catch it:** the shell
+colours its log tags via `utils.sh`; no Go command in this CLI emits ANSI, so this one does not
+either. Normalisation strips ANSI before comparing, so parity is green either way — which is
+exactly why it is written down rather than left to be discovered.
 
 ## 3. Increment 2 — `dotf vault health`
 
