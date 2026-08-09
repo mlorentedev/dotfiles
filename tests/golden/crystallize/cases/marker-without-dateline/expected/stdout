@@ -1,0 +1,21 @@
+[INFO] Project: <HOME>/Projects/demo
+[INFO] Date: <TODAY>
+[INFO] MEMORY.md: <HOME>/.claude/projects/<HOMEKEY>-Projects-demo/memory/MEMORY.md
+[INFO] Updated currentDate to <TODAY>
+[INFO] Added Last Crystallized stamp (<TODAY>)
+[SUCCESS] MEMORY.md line count: 12 / 150
+[SUCCESS] Updated: <HOME>/.claude/projects/<HOMEKEY>-Projects-demo/memory/MEMORY.md
+
+=== Knowledge Crystallization Checklist ===
+
+Manual steps (AI-assisted, run in Claude Code):
+  [ ] /insights  — audit observation backlog
+  [ ] /crystallize — promote observations to vault lessons
+  [ ] Check ~/Projects/knowledge/00_meta/patterns/ for new patterns
+  [ ] Update 11-tasks.md backlog progress bar
+
+Automated (done by this script):
+  [x] currentDate updated
+  [x] Last Crystallized stamped
+  [x] Duplicate date entries removed
+

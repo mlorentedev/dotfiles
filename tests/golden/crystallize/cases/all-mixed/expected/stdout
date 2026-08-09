@@ -1,0 +1,33 @@
+[INFO] Date: <TODAY>
+[INFO] Discovering all projects in <HOME>/.claude/projects...
+
+[WARNING] [-nonexistent-project-path-xyz] → not found on disk (different machine or deleted — skipping)
+
+[INFO] [<HOMEKEY>-Projects-alpha] → <HOME>/Projects/alpha
+[INFO] Added currentDate section (<TODAY>)
+[INFO] Added Last Crystallized stamp (<TODAY>)
+[SUCCESS] MEMORY.md line count: 11 / 150
+[SUCCESS] Updated: <HOME>/.claude/projects/<HOMEKEY>-Projects-alpha/memory/MEMORY.md
+
+[INFO] [<HOMEKEY>-Projects-beta] → <HOME>/Projects/beta
+[ERROR] Refusing to stamp <HOME>/.claude/projects/<HOMEKEY>-Projects-beta/memory/MEMORY.md
+[ERROR] Its body sits inside a YAML block scalar, which this script cannot edit
+[ERROR] without corrupting the file (#857). Stamp it by hand until the
+[ERROR] YAML-aware 'dotf vault crystallize' lands (#490).
+[WARNING] Failed to process <HOME>/Projects/beta — skipping
+
+[SUCCESS] Processed 1 / 3 projects (2 skipped)
+
+=== Knowledge Crystallization Checklist ===
+
+Manual steps (AI-assisted, run in Claude Code):
+  [ ] /insights  — audit observation backlog
+  [ ] /crystallize — promote observations to vault lessons
+  [ ] Check ~/Projects/knowledge/00_meta/patterns/ for new patterns
+  [ ] Update 11-tasks.md backlog progress bar
+
+Automated (done by this script):
+  [x] currentDate updated
+  [x] Last Crystallized stamped
+  [x] Duplicate date entries removed
+

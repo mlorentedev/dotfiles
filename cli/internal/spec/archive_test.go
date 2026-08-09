@@ -137,6 +137,7 @@ func TestArchiveMovesAndSetsStatus(t *testing.T) {
 	writeSpec(t, root, "AI-001-x", map[string]string{
 		"proposal.md": "---\nstatus: implementing # draft | implementing\n---\n# AI-001-x\n",
 		"tasks.md":    "tasks\n",
+		"review.md":   passingReview("AI-001-x"),
 	})
 
 	target, err := Archive(root, "AI-001-x", ArchiveOptions{})
@@ -158,7 +159,10 @@ func TestArchiveMovesAndSetsStatus(t *testing.T) {
 
 func TestArchiveAbandonedRoute(t *testing.T) {
 	root := t.TempDir()
-	writeSpec(t, root, "AI-001-x", map[string]string{"proposal.md": "---\nstatus: draft\n---\n"})
+	writeSpec(t, root, "AI-001-x", map[string]string{
+		"proposal.md": "---\nstatus: draft\n---\n",
+		"review.md":   passingReview("AI-001-x"),
+	})
 
 	target, err := Archive(root, "AI-001-x", ArchiveOptions{Abandoned: true})
 	if err != nil {
@@ -221,6 +225,7 @@ func TestArchiveForceWithDrafts(t *testing.T) {
 	root := t.TempDir()
 	writeSpec(t, root, "AI-001-x", map[string]string{
 		"proposal.md": "---\nstatus: draft\n---\n<!-- [AGENT-DRAFT] todo -->\n",
+		"review.md":   passingReview("AI-001-x"),
 	})
 
 	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithDrafts: true}); err != nil {
@@ -252,7 +257,10 @@ func TestArchiveRejectsTraversalID(t *testing.T) {
 
 func TestArchiveRecordsPRURL(t *testing.T) {
 	root := t.TempDir()
-	writeSpec(t, root, "AI-001-x", map[string]string{"proposal.md": "---\nstatus: draft\n---\nbody\n"})
+	writeSpec(t, root, "AI-001-x", map[string]string{
+		"proposal.md": "---\nstatus: draft\n---\nbody\n",
+		"review.md":   passingReview("AI-001-x"),
+	})
 
 	target, err := Archive(root, "AI-001-x", ArchiveOptions{PRURL: "https://example/pr/9", Date: "2026-06-13"})
 	if err != nil {
@@ -364,6 +372,7 @@ func TestArchiveAcceptsSpecThatOnlyQuotesTags(t *testing.T) {
 		"proposal.md":     "---\nstatus: implementing\n---\nprose\n",
 		"tasks.md":        "- [x] Add `sb_specs` (`[AGENT-DRAFT]` flagging — lifted from detect_repo_specs)\n",
 		"verification.md": "```\n[AGENT-SUGGESTION]\n```\n",
+		"review.md":       passingReview("AI-002-y"),
 	})
 
 	if _, err := Archive(root, "AI-002-y", ArchiveOptions{}); err != nil {
