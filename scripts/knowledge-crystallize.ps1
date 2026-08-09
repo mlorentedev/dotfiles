@@ -212,9 +212,37 @@ function Write-Checklist {
     Write-Host ""
 }
 
+# True when MEMORY.md stores its body inside a YAML block scalar ("content: |"),
+# the shape Claude Code's auto-memory uses for some projects.
+#
+# Structural detection, not an indent probe: the indent width is NOT fixed -
+# pollex indents six spaces, hive four - so nothing here may key on a literal
+# width. A wrapper is a "---" first line plus a "<key>: |" block-scalar opener.
+function Test-YamlBlockScalar {
+    param([string]$FilePath)
+
+    $lines = @(Get-Content -Path $FilePath -ErrorAction SilentlyContinue)
+    if ($lines.Count -eq 0) { return $false }
+    if ($lines[0] -notmatch '^---\s*$') { return $false }
+    foreach ($line in $lines) {
+        if ($line -match '^[A-Za-z_][A-Za-z0-9_-]*:\s*\|[-+0-9]*\s*$') { return $true }
+    }
+    return $false
+}
+
 # Core logic: process one project's MEMORY.md
 function Invoke-ProjectCrystallize {
     param([string]$MemoryFile, [string]$Today)
+
+    # BUG-062 (#857): every marker below is anchored at column 0, so on a
+    # block-scalar file none of them match, control reaches the bare append, and
+    # the text lands OUTSIDE the block - breaking the handoff invariant,
+    # duplicating the date stamp, and making the file stop parsing as YAML, all
+    # while printing [SUCCESS]. Refusing is strictly better than corrupting.
+    # The YAML-aware implementation belongs to the Go port (#490).
+    if (Test-YamlBlockScalar -FilePath $MemoryFile) {
+        throw "Refusing to stamp $MemoryFile - its body sits inside a YAML block scalar, which this script cannot edit without corrupting the file (#857). Stamp it by hand until the YAML-aware 'dotf vault crystallize' lands (#490)."
+    }
 
     Remove-DuplicateDate  -FilePath $MemoryFile
     Update-CurrentDate    -FilePath $MemoryFile -Today $Today
@@ -250,9 +278,12 @@ if ($All) {
             Write-Info "[$encodedName] -> $projectPath"
             try {
                 Invoke-ProjectCrystallize -MemoryFile $memoryFile -Today $Today
-                $processed++
             } catch {
+                # A refusal counts as skipped, not processed: reporting "5 / 5"
+                # while having declined one is the same "prints success while
+                # doing nothing" failure this guard exists to stop.
                 Write-Warn "Failed to process $projectPath`: $_"
+                $skipped++
             }
         } else {
             Write-Warn "[$encodedName] -> not found on disk (different machine or deleted - skipping)"
@@ -287,6 +318,11 @@ if ($All) {
     }
 
     Write-Info "MEMORY.md: $memoryFile"
-    Invoke-ProjectCrystallize -MemoryFile $memoryFile -Today $Today
+    try {
+        Invoke-ProjectCrystallize -MemoryFile $memoryFile -Today $Today
+    } catch {
+        Write-Warn "$_"
+        exit 1
+    }
     Write-Checklist
 }
