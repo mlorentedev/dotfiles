@@ -130,10 +130,15 @@ var statusLinePattern = regexp.MustCompile(`^(status:\s+)\S+(.*)$`)
 
 // ArchiveOptions configures Archive.
 type ArchiveOptions struct {
-	Abandoned       bool   // route to specs/archive/_abandoned/<id>; status -> abandoned
-	ForceWithDrafts bool   // archive even with unresolved [AGENT-*] tags
-	PRURL           string // when set, append an archived/PR provenance comment
-	Date            string // YYYY-MM-DD for the PR comment (caller-supplied; deterministic in tests)
+	Abandoned          bool   // route to specs/archive/_abandoned/<id>; status -> abandoned
+	ForceWithDrafts    bool   // archive even with unresolved [AGENT-*] tags
+	ForceWithoutReview bool   // archive even without a passing, fresh review.md
+	PRURL              string // when set, append an archived/PR provenance comment
+	Date               string // YYYY-MM-DD for the PR comment (caller-supplied; deterministic in tests)
+
+	// Staleness overrides how a review's freshness is decided. nil uses the
+	// repository's git history; tests inject a fake to avoid building one.
+	Staleness StalenessChecker
 }
 
 // FindUnresolvedTags walks specDir and returns "relpath:line: text" for every
@@ -222,6 +227,15 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 			return "", fmt.Errorf("unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags found:\n  %s\n"+
 				"resolve them (accept/edit/delete) before archiving, or use --force-with-drafts",
 				strings.Join(tags, "\n  "))
+		}
+	}
+
+	// Second pre-flight (CLI-034): the adversarial-review verdict. The tag check
+	// above asks "is the spec finished being written"; this one asks "did anyone
+	// independently argue against it".
+	if !opts.ForceWithoutReview {
+		if err := checkReviewGate(repoRoot, id, specDir, opts.Staleness); err != nil {
+			return "", err
 		}
 	}
 
