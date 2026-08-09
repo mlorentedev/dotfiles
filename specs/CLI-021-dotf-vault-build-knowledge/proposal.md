@@ -57,6 +57,9 @@ independently shippable and the atomic-PR cap will not hold all of them at once.
 
 ## Risks / open questions
 
+- **The oracle now refuses the wrapped shape.** Since #862 (`9caedc1`) both twins exit 1 on a
+  block-scalar `MEMORY.md`. That is the behaviour to port faithfully; the golden corpus therefore
+  covers plain-markdown shapes only, with the refusal as its own case.
 - **Characterization fidelity is the whole risk.** #672 (CLI-031) requires golden characterization
   tests for every twin port. The two behavioural BATS cases added in BUG-060 are the seed corpus;
   they must be extended to fixtures the *shell* generates, byte-compared against the Go output, not
@@ -71,8 +74,24 @@ independently shippable and the atomic-PR cap will not hold all of them at once.
 - **Windows path encoding is a known trap** — see the #689 regression (drive colon stripped, wrong
   single-dash key). The `.ps1` already defers to `dotf mem project-key` for this; the Go port must
   reuse that same code path, not reimplement it.
-- **Open question:** does `vault health` mean the shell's local checks, or the Hive `vault_health`
-  MCP tool? Same word, two surfaces. Resolve before increment 2 is written.
+- ~~**Open question:** does `vault health` mean the shell's local checks, or the Hive
+  `vault_health` MCP tool?~~ **Resolved 2026-08-09: the shell's local checks.** This is a twin
+  port, so the oracle has to be the script — #672's golden characterization tests cannot run
+  against an MCP surface. Aligning the two notions of "health" is separate work, if wanted at all.
+
+## Decisions taken before implementation (2026-08-09)
+
+- **The flip stays in #492.** Confirmed against this spec's own acceptance and the parent ADR
+  row 5, and *not* merged into this ticket. Correcting an earlier claim: this port alone closes
+  neither #857 nor #858 — #858 can close here (the fixture-shape inventory is its direction 2),
+  #857 closes via #864, and the cutover stays #492's.
+- **The wrapped-`MEMORY.md` shape leaves this ticket entirely.** It was measured before any code
+  was written (`evidence-yaml-roundtrip.md`): the shape is invalid state the vault's own template
+  forbids, produced once by accident across 17 files in vault commit `1c216229` (2026-05-26) and
+  never since, and no `yaml.v3` roundtrip can edit it without destroying the markdown hard breaks
+  the handoff convention depends on. It is handled by **#864**'s migration plus **#862**'s
+  permanent refusal guard — not by CLI capability. Building support would have made this CLI a
+  permanent consumer of a shape the vault declares invalid.
 
 ## Acceptance criteria
 
