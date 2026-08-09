@@ -94,13 +94,29 @@ gc_run_case() {
     local runs=1
     [ -f "$case_dir/runs" ] && runs=$(cat "$case_dir/runs")
 
+    # Which implementation is under test. The SAME corpus drives both, which is
+    # the entire point: "byte-identical to the shell" is only a claim you can
+    # make if one set of expectations judges both.
+    local mode="${GC_IMPL_MODE:-shell}"
+
     local raw="$sandbox/raw.out"
     local n=1
     while [ "$n" -le "$runs" ]; do
         rc=0
         # `|| rc=$?` rather than relying on the caller's flags — the same lesson
         # the reconciler cost us (docs/lessons.md, 2026-08-09).
-        HOME="$fake_home" bash "$impl" "${args[@]}" >"$raw" 2>&1 || rc=$?
+        case "$mode" in
+            shell)
+                HOME="$fake_home" bash "$impl" "${args[@]}" >"$raw" 2>&1 || rc=$?
+                ;;
+            go)
+                HOME="$fake_home" "$GC_DOTF_BIN" vault crystallize "${args[@]}" >"$raw" 2>&1 || rc=$?
+                ;;
+            *)
+                printf 'gc_run_case: unknown GC_IMPL_MODE: %s\n' "$mode" >&2
+                return 1
+                ;;
+        esac
         n=$((n + 1))
     done
 
