@@ -416,6 +416,30 @@ EOF
 # would report a large slice of the backlog on every PR that touches one.
 ADJACENCY_GENERIC_BASENAMES="README.md AGENTS.md CLAUDE.md CHANGELOG.md Makefile Dockerfile go.mod go.sum"
 
+# The changed files worth matching on: the ones this gate already treats as
+# production. Measured against the live backlog, matching the whole diff reported
+# 37 issues of which 3 carried signal — the rest matched template basenames
+# (`proposal.md`, `tasks.md`, `docs/lessons.md`) that nearly every PR touches. A
+# wall of noise is read once and ignored forever, which is the same outcome as
+# having no check.
+#
+# Reusing _excluded() is the second helper-reuse decision here, so it gets the
+# same scrutiny the first one failed: its error policy is "not production code",
+# and inheriting it means an issue about a test file or a doc will not surface.
+# That is acceptable where the first reuse was not — an unhandled INPUT SHAPE,
+# the defect class this check exists for, lives in production code by definition,
+# and precision is what makes the report legible enough to act on.
+_adjacency_candidate_files() {
+    local path
+    while IFS= read -r path; do
+        if [[ -z "$path" ]]; then continue; fi
+        if _excluded "$path"; then continue; fi
+        if _is_active_spec_path "$path"; then continue; fi
+        printf '%s\n' "$path"
+    done <<< "$1"
+    return 0
+}
+
 # "<number><TAB><matched-path><TAB><haystack>" per adjacent issue.
 #
 # Matches over UNSTRIPPED title+body, unlike _closing_issue_numbers, and the
@@ -457,6 +481,7 @@ _report_adjacent_issues() {
 
     local files closed rows num path haystack
     files=$(git diff --name-only "${BASE_REF}...${HEAD_REF}" 2>/dev/null) || return 0
+    files=$(_adjacency_candidate_files "$files")
     if [[ -z "$files" ]]; then return 0; fi
     closed=$(_closing_issue_numbers "$(_repo_slug)" "$SDD_PR_BODY" | sort -u || true)
     rows=$(_adjacent_open_issues "$ADJACENCY_ISSUES" "$files" "$closed" || true)

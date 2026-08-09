@@ -90,6 +90,29 @@ _write_849_feed() {
     [[ "$output" != *"#850"* ]]
 }
 
+@test "adjacency: spec-template and doc filenames do not drag in the backlog" {
+    # Measured against the live backlog: matching the whole diff reported 37
+    # issues, 3 with signal. The other 34 matched `proposal.md`, `tasks.md` or
+    # `docs/lessons.md` — files nearly every PR touches. Only files this gate
+    # already counts as production are matched.
+    mkdir -p specs/SDD-999-test docs scripts
+    printf 'proposal line %d\n' {1..12} > specs/SDD-999-test/proposal.md
+    printf 'lesson line %d\n' {1..12} > docs/lessons.md
+    printf 'line %d\n' {1..60} > scripts/real-change.sh
+    _commit "spec + lesson + one production file"
+    {
+        printf '%s\t%s\n' 111 'SDD-039: spec-tree hygiene — decide the scaffold-only specs, see proposal.md'
+        printf '%s\t%s\n' 222 'HARNESS-024: enforce lessons capture in docs/lessons.md at handoff'
+        printf '%s\t%s\n' 333 'BUG-999: scripts/real-change.sh mishandles the second input shape'
+    } > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" != *"111"* ]]
+    [[ "$output" != *"222"* ]]
+    [[ "$output" == *"333"* ]]
+}
+
 @test "adjacency: the report is advisory and cannot change the exit status" {
     _replay_851_diff
     _write_849_feed
