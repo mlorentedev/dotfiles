@@ -139,3 +139,63 @@ STUB
     [ "$status" -eq 0 ]
     [[ "$output" == *"args:--backfill-only dotfiles kubelab"* ]]
 }
+
+# --- the reporting path must survive -e too (CodeRabbit on PR #870) ----------
+#
+# The first cut of this script reproduced the very defect it fixes: the dedupe
+# lookup was a bare `existing=$(gh issue list ...)`, so under `bash -e` a failing
+# gh aborted the script before the ::error:: and before anything was filed. The
+# original suite missed it because every stub gh SUCCEEDED.
+
+_gh_failing_on() {
+    cat > "$FIX/bin/gh" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "\$GH_LOG"
+case "\$1 \$2" in
+    "$1") printf 'gh: simulated failure\n' >&2; exit 1 ;;
+    "issue list") printf '%s' "\${STUB_EXISTING:-}" ;;
+esac
+exit 0
+STUB
+    chmod +x "$FIX/bin/gh"
+}
+
+@test "under bash -e, a failing issue-list lookup still reaches the error verdict" {
+    _gh_failing_on "issue list"
+    STUB_RC=1 STUB_OUT="something else broke" run bash -e "$SCRIPT"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"::error::bitácora reconciliation failed"* ]]
+}
+
+@test "a failed lookup refuses to file, so the stable-title issue is never duplicated" {
+    _gh_failing_on "issue list"
+    STUB_RC=1 STUB_OUT="something else broke" run bash -e "$SCRIPT"
+    [[ "$output" == *"not filing, to avoid a duplicate"* ]]
+    refute_issue_filed
+}
+
+@test "a failed issue create reports the failure instead of claiming success" {
+    _gh_failing_on "issue create"
+    STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="" run bash -e "$SCRIPT"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"could not open a bitacora-reconcile issue"* ]]
+    [[ "$output" != *"::warning::opened a bitacora-reconcile issue"* ]]
+}
+
+@test "a failed issue comment reports the failure instead of claiming success" {
+    _gh_failing_on "issue comment"
+    STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="42" run bash -e "$SCRIPT"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"could not comment on issue #42"* ]]
+    [[ "$output" != *"::notice::updated existing issue"* ]]
+}
+
+# --- TARGET_REPOS must not glob (CodeRabbit on PR #870) ---------------------
+
+@test "TARGET_REPOS='*' is refused, not expanded against the working directory" {
+    mkdir -p "$FIX/cwd" && touch "$FIX/cwd/dotfiles" "$FIX/cwd/kubelab"
+    cd "$FIX/cwd" || return 1
+    TARGET_REPOS='*' run bash -e "$SCRIPT"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refusing repo name"* ]]
+}
