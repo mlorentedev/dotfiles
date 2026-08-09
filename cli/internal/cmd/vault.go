@@ -89,7 +89,9 @@ corrupted (#857); under --all such a project counts as skipped, not processed.
 			out := c.OutOrStdout()
 
 			if all {
-				fmt.Fprintf(out, "[INFO] Date: %s\n", today)
+				// `_, _ =` per the house convention (internal/cmd/secrets_sync.go):
+				// a failed write to the CLI's own stdout is not actionable.
+				_, _ = fmt.Fprintf(out, "[INFO] Date: %s\n", today)
 				return vault.CrystallizeAll(out, home, today)
 			}
 
