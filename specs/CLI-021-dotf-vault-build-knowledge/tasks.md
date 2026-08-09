@@ -20,16 +20,37 @@ oracle, so its output must be captured while it is still the only implementation
 
 ## 1. Golden corpus (before any Go)
 
-- [ ] Build a fixture set of `MEMORY.md` inputs covering: fresh file (no markers); file with
+- [x] Build a fixture set of `MEMORY.md` inputs covering: fresh file (no markers); file with
       `# currentDate` only; with `## Last Crystallized:` only; with both; with duplicates; with a
       `## Session Handoff` block (the HARNESS-029 case from BUG-060); without one; over the
-      150-line limit.
-- [ ] Capture the **shell's** output for each fixture as the golden file. Record the exact script
-      revision used as the oracle.
-- [ ] Port the two BUG-060 behavioural BATS cases into the corpus (handoff stays last; idempotent
-      across two runs) — they are the seed, not the whole set.
-- [ ] Enumerate every behaviour where `.sh` and `.ps1` disagree today. Linux is the reference;
-      anything `.ps1`-only must be listed before it is dropped.
+      150-line limit. **14 cases** in `tests/golden/crystallize/cases/`; the listed set plus
+      `marker-without-dateline`, `handoff-with-duplicates`, `yaml-wrapped`, `no-memory-file`,
+      `help` and `all-mixed`.
+- [x] Capture the **shell's** output for each fixture as the golden file. Record the exact script
+      revision used as the oracle. → `tests/golden/crystallize/{capture.sh,ORACLE}`; oracle pinned
+      **per file** at `9caedc1` (not a branch tip), and a test fails the suite if the tree moves
+      away from it, so a recapture must be deliberate.
+- [x] Port the two BUG-060 behavioural BATS cases into the corpus (handoff stays last; idempotent
+      across two runs) — they are the seed, not the whole set. → `handoff-no-markers`,
+      `idempotent-twice` (byte-identical to the single-run golden, which is the assertion).
+- [x] Enumerate every behaviour where `.sh` and `.ps1` disagree today. Linux is the reference;
+      anything `.ps1`-only must be listed before it is dropped. → `divergences.md`: 5 divergences.
+      **`pwsh` is absent on this machine, so the `.ps1` column is read, not measured** — empirical
+      `.ps1` capture is deferred to a Windows session (stated deferral, not an omission).
+
+### Captured while porting — oracle defects, NOT fixed here
+
+Reproduced faithfully as fixtures and ticketed, per the proposal's "Out of scope":
+
+- **#873 (BUG-064)** — `marker-without-dateline`: logs `Updated currentDate` and prints
+  `[x] currentDate updated` having written no date at all. The "prints success while doing nothing"
+  class this script's own BUG-062 comment argues against.
+- **#874 (BUG-065)** — the standalone fallback defines `log_info`/`log_success`/`log_warning` but
+  **not `log_error`**, which the BUG-062 refusal path calls; without `utils.sh` that guard dies on
+  127 instead of refusing.
+
+Fixing either in the port requires a **deliberate recapture** with the reason in the commit — never
+a silent regeneration to turn a red golden green.
 
 ## 2. Increment 1 — `dotf vault crystallize`
 

@@ -1,0 +1,6 @@
+# Oracle revisions for the crystallize golden corpus.
+# Regenerate with tests/golden/crystallize/capture.sh
+# Captured: 2026-08-09
+
+9caedc12b7315438eea3994ef20ce1e8d932af15  scripts/knowledge-crystallize.sh
+9caedc12b7315438eea3994ef20ce1e8d932af15  scripts/knowledge-crystallize.ps1

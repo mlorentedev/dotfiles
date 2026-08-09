@@ -1,0 +1,21 @@
+knowledge-crystallize.sh — AI knowledge maintenance tool
+
+USAGE
+    ./scripts/knowledge-crystallize.sh [OPTIONS] [PROJECT_DIR]
+
+DESCRIPTION
+    Locates the MEMORY.md for PROJECT_DIR (defaults to CWD), then:
+      1. Removes duplicate # currentDate entries (keeps latest)
+      2. Updates # currentDate to today
+      3. Stamps ## Last Crystallized: YYYY-MM-DD
+      4. Warns if MEMORY.md exceeds 150 lines
+      5. Prints a checklist of manual AI workflow actions
+
+OPTIONS
+    --all         Auto-discover and process ALL projects from ~/.claude/projects/
+    -h, --help    Show this help message
+
+EXAMPLES
+    ./scripts/knowledge-crystallize.sh
+    ./scripts/knowledge-crystallize.sh ~/Projects/kubelab
+    ./scripts/knowledge-crystallize.sh --all

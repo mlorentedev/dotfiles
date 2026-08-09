@@ -1,0 +1,5 @@
+[INFO] Project: <HOME>/Projects/demo
+[INFO] Date: <TODAY>
+[WARNING] No MEMORY.md found for <HOME>/Projects/demo
+[WARNING] Expected: <HOME>/.claude/projects/<HOMEKEY>-Projects-demo/memory/MEMORY.md
+[WARNING] Run Claude Code in this project first to initialize the memory directory.
