@@ -66,8 +66,11 @@ place: the claim is already carried behaviourally by the four- and six-space
 cases, either of which turns red if the guard keys on a width. Worth recording
 because it is the same defect class as the issue this branch serves.
 
-- No regressions: full `bats tests/*.bats` — see the run recorded at the bottom of
-  this file.
+- No regressions: full `bats tests/*.bats` → **1100 passed, 1 failed, 71 skipped**
+  of 1101. The single failure is `install-dotf.bats` *"converges over a running
+  dotf"*, which fails identically on pristine `main` at `bed3f1f` (measured this
+  session) and is tracked as **#807** — its fixture never holds a binary busy.
+  Untouched by this change.
 
 ## Decisions made during implementation
 
