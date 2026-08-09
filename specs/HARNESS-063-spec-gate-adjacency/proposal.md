@@ -83,8 +83,11 @@ fixture file holding #849's real title and body, not a mocked API.
 Observable outcomes. Each must be testable.
 
 - [ ] On a PR that closes an issue, CI emits an advisory report naming every other
-      open issue whose title or body references a file in the diff, and which file
-      matched.
+      open issue whose title or body references a **production** file in the diff
+      (production as `_excluded()` already defines it, and excluding active spec
+      folders), and which file matched. Narrowed from "a file in the diff" after
+      measuring against the live backlog: template and doc filenames matched 34 of
+      37 rows and buried the signal — see `verification.md`.
 - [ ] **Red-tested against #851.** Replaying #851's changed-file list
       (`scripts/knowledge-crystallize.sh`, `.ps1`) against a fixture holding #849
       as open flags it. The fixture keeps #849's real formatting, so the test fails

@@ -1,7 +1,7 @@
 [
   {
     "id": "HARNESS-063-spec-gate-adjacency-f1",
-    "behavior": "On a PR that closes an issue, CI emits an advisory report naming every other open issue whose title or body references a file in the diff, and which file matched.",
+    "behavior": "On a PR that closes an issue, CI emits an advisory report naming every other open issue whose title or body references a production file in the diff, and which file matched.",
     "verification": "bats tests/spec-gate-adjacency.bats -f 'replaying PR 851'",
     "state": "pending",
     "evidence": ""

@@ -97,8 +97,10 @@ pinned by case 5. After the fix, on the same input:
 offline pre-push path criterion 4 exists to protect, and #492 owns the eventual
 port. The check demonstrates itself on its own PR.
 
-- No regressions: full suite `bats tests/*.bats` → **1100 passed, 1 failed,
-  71 skipped** of 1101. The single failure is `install-dotf.bats` *"converges over
+- No regressions: full suite `bats tests/*.bats`, re-run *after* the precision fix
+  (`53b7d04`) → **1101 passed, 1 failed, 71 skipped** of 1102. The pre-fix run is
+  not cited: it measured an artifact state that no longer exists, which is this
+  spec's own defect class. The single failure is `install-dotf.bats` *"converges over
   a running dotf"*, which fails identically on pristine `main` at `bed3f1f`
   (verified in this session) and is already tracked as **#807** — the busy-binary
   fixture never holds a binary busy. Untouched by this change.
