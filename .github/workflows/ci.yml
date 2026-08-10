@@ -125,6 +125,17 @@ jobs:
           ln -sf ~/.dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
 
       - name: Run bats test suite
+        env:
+          # tests/spec-gate-pr-real.bats drives the REAL `gh`, and an
+          # unauthenticated gh exits at the auth check before it validates
+          # --json field names -- so without a token that suite would assert
+          # nothing and still go green. Deliberately NOT named GH_TOKEN: only
+          # that suite reads this, so no other suite's auth state changes and
+          # none of them can start making real API calls. It buys no API access
+          # either -- with a token present, field validation and repo resolution
+          # both resolve offline. Same intent as the setup-go and pre-commit
+          # steps above: make sure the real-dependency checks cannot skip here.
+          DOTF_TEST_GH_TOKEN: ${{ github.token }}
         run: |
           bats tests/*.bats
 
