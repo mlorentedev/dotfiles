@@ -1,0 +1,5 @@
+--no-sandbox vault --vault knowledge
+--no-sandbox orphans --vault knowledge --vault knowledge
+--no-sandbox dead-ends --vault knowledge --vault knowledge
+--no-sandbox unresolved --vault knowledge --vault knowledge
+--no-sandbox tags --vault knowledge --vault knowledge

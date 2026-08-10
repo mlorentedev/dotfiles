@@ -1,0 +1,38 @@
+========================================
+   VAULT HEALTH REPORT
+========================================
+Vault: knowledge (<VAULT>)
+
+[1/7] Working Tree Integrity
+  FAIL: 1 file(s) deleted from working tree but still in HEAD — likely sync/watcher race
+         D 00_meta/n2.md
+        Recovery: cd <VAULT> && git checkout -- <file>
+
+[2/7] Vault Connectivity
+  PASS: Obsidian CLI connected to vault 'knowledge'
+  INFO: Total markdown files: 2
+
+[3/7] Orphans & Dead-Ends
+  PASS: Orphans: 0/2 (0%)
+  PASS: Dead-ends: 0/2 (0%)
+
+[4/7] Unresolved Links
+  PASS: No unresolved links
+
+[5/7] Frontmatter Coverage
+  PASS: id: 2/2 (100%)
+  PASS: type: 2/2 (100%)
+  PASS: status: 2/2 (100%)
+  PASS: tags: 2/2 (100%)
+  PASS: created: 2/2 (100%)
+  PASS: owner: 2/2 (100%)
+
+[6/7] Tag Hygiene
+  INFO: Total unique tags: 1
+
+[7/7] Backlog Integrity
+  SKIP: Backlog integrity - no 10_projects/*/11-tasks.md found
+
+========================================
+Results: 10 passed, 1 failed, 1 skipped
+========================================
