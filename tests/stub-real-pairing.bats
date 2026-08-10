@@ -24,6 +24,11 @@ setup() {
 # the sibling.
 #
 #   bitacora-reconcile        stubs `gh` — a real run mutates the live GitHub project board
+#   bitacora-rollout          stubs `gh` — same; a real run adds items to the live board. This
+#                             suite is a worked example of the limitation BUG-055 names: #884 was
+#                             a call the real `gh` rejects and the stub accepts, so no stub could
+#                             have caught it. What the suite CAN pin is which call is made, and it
+#                             does; the API's verdict on that call only arrives from a real run.
 #   board-pickup              stubs `gh` — same; a real run self-assigns real issues
 #   guard-memory-sink         stubs `git` — the real path is covered end-to-end by the dispatcher's own commit-time behaviour
 #   hermes-setup              stubs remote installers — a real run provisions an agent host
@@ -34,7 +39,7 @@ setup() {
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
 exempt() {
     case "$1" in
-        bitacora-reconcile|board-pickup|guard-memory-sink|hermes-setup|install-dotf|\
+        bitacora-reconcile|bitacora-rollout|board-pickup|guard-memory-sink|hermes-setup|install-dotf|\
         shell-profile|skills-pipeline|vault-health|vault-maintenance-weekly) return 0 ;;
         *) return 1 ;;
     esac
