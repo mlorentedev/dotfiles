@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.36.0](https://github.com/mlorentedev/dotfiles/compare/v0.35.1...v0.36.0) (2026-08-10)
+
+
+### Features
+
+* **vault:** dotf vault crystallize, byte-identical to the shell oracle (CLI-021 increment 1) ([#882](https://github.com/mlorentedev/dotfiles/issues/882)) ([a697b54](https://github.com/mlorentedev/dotfiles/commit/a697b54cac0d652fd013ebc3b44e867b22ea7e96))
+
+
+### Bug Fixes
+
+* **bitacora:** back-fill the board via GraphQL, not gh project item-add ([#888](https://github.com/mlorentedev/dotfiles/issues/888)) ([aef6786](https://github.com/mlorentedev/dotfiles/commit/aef6786085a2a86b93575f30887021fa9f4f81bb))
+* **ci:** read spec-gate PR metadata live instead of from the event payload ([#885](https://github.com/mlorentedev/dotfiles/issues/885)) ([327feac](https://github.com/mlorentedev/dotfiles/commit/327feac2ef99de7f4a8ac039fd20304012750294))
+
 ## [0.35.1](https://github.com/mlorentedev/dotfiles/compare/v0.35.0...v0.35.1) (2026-08-09)
 
 
