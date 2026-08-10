@@ -44,11 +44,20 @@ node_modules/
 .yarn/
 
 # AI
-.claude/
+# .claude/ is deliberately NOT ignored wholesale: CLAUDE.md is this repo's
+# project instructions (binding, reviewable, restorable) and belongs in git.
+# Only the genuinely machine-local entries are excluded.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/plans/
 .gemini/
 .ai/
 AGY.md
 CLAUDE.md
+# ...except this repo's own project instructions, which are binding and must be
+# versioned, reviewable and restorable. The rule above still catches a deployed
+# CLAUDE.md landing at the repo root.
+!.claude/CLAUDE.md
 .aider*
 .antigravitycli/
 .antigravitycli.bak/

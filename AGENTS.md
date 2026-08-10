@@ -74,6 +74,10 @@ agents apply without a lookup: strict typing (`mypy --strict` / TS `strict` / Go
 generics over `interface{}` / Java `Optional<T>`), table-driven tests, stdlib
 before new deps, no blocking I/O in an async path.
 
+**Shell (`scripts/*.sh`, `setup-*.sh`): every script must run under bash *and*
+zsh.** The prohibited-pattern table is in `.claude/CLAUDE.md` — read it before
+editing any `.sh`, whichever agent you are.
+
 ## Security (Immediate HALT)
 
 Stop generation and warn if you detect:
