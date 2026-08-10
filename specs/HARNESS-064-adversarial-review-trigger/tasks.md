@@ -26,20 +26,20 @@ created: "2026-08-10"
 - [x] [AC4] Write the `agents-md.bats` pin for the trigger (evidence phrasing, the literal
       "verification window", the implementer-cannot-review clause) and **capture it failing**
 - [x] [AC1] [AC2] [AC3] Add the proactive trigger paragraph to `AGENTS.md` → pin goes green
-- [ ] [P] [AC5] Add the Agent-Side Activation Rule to the vault `adversarial-review` SKILL (checks
+- [x] [P] [AC5] Add the Agent-Side Activation Rule to the vault `adversarial-review` SKILL (checks
       the agent runs · how to phrase the proposal · when NOT to propose) and cross-reference it from
       "When to use"
-- [ ] [AC6] `compile-harness.sh --refresh`, staging **only** `harness/skills/adversarial-review/`;
+- [x] [AC6] `compile-harness.sh --refresh`, staging **only** `harness/skills/adversarial-review/`;
       confirm `--check` reports no drift
-- [ ] Emit `features.json` mapping every acceptance criterion to an executable verification command
+- [x] Emit `features.json` mapping every acceptance criterion to an executable verification command
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous command
-- [ ] Lint passes (`shellcheck`, `check-bats-names.sh`)
-- [ ] No unrelated changes in the diff — in particular, no other skill's render swept in by `--refresh`
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous command
+- [x] Lint passes (`shellcheck`, `check-bats-names.sh`)
+- [x] No unrelated changes in the diff — in particular, no other skill's render swept in by `--refresh`
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder, with `skip-archive` + a rationale section (the spec
       stays active until an independent session reviews it — the first live exercise of that pair)
 
