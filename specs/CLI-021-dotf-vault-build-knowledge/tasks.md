@@ -15,8 +15,14 @@ oracle, so its output must be captured while it is still the only implementation
 
 ## 0. Resolve the open question first
 
-- [ ] Decide what `vault health` means — the shell's local checks, or the Hive `vault_health` MCP
-      tool. Blocks increment 2; does not block increment 1.
+- [x] Decide what `vault health` means — the shell's local checks, or the Hive `vault_health` MCP
+      tool. Blocks increment 2; does not block increment 1. → **the shell's local checks**, resolved
+      in `proposal.md` (§Risks, struck through) and landed with the golden corpus in `eda3430`
+      (#876). This is a twin port, so the oracle has to be the script: #672's golden
+      characterization tests cannot run against an MCP surface. Aligning the two notions of
+      "health" is separate work, if wanted at all.
+      *The decision was recorded in the proposal but not ticked here, so increment 2 read as
+      blocked for a session longer than it was.*
 
 ## 1. Golden corpus (before any Go)
 
@@ -78,8 +84,34 @@ exactly why it is written down rather than left to be discovered.
 
 ## 3. Increment 2 — `dotf vault health`
 
-- [ ] Blocked on task 0.
+**Unblocked:** task 0 is resolved (the shell's local checks).
+
+**The proposal's "smallest, no writes, safest" is wrong, and the correction matters for
+sequencing.** Increment 2 is read-only, but it is not the small one. `vault-health.sh` is 284
+lines against crystallize's ~200, and it carries two seams crystallize did not have:
+
+1. **An external binary contract.** Four of its seven sections shell out to `obsidian`, which talks
+   over IPC to a running GUI. Characterizing it means stubbing that binary on `PATH` (the precedent
+   is the `gh` stub in `bitacora-reconcile.bats`) — and the stub must **log its argv into the
+   compared artefacts**, or the port could drift in *how* it invokes obsidian while stdout stays
+   byte-identical.
+2. **A subprocess seam.** Section 7 execs `check-backlog-integrity.sh` and
+   `check-backlog-merged.sh`, resolved through the shell's own `$SCRIPT_DIR`. A Go binary has no
+   script dir, so it needs an explicit location seam (ADR-025 / `dotf env path`), failing loud when
+   unresolvable rather than silently skipping the section.
+
+- [x] Resolve task 0.
+- [ ] Golden corpus at `tests/golden/vault-health/`, obsidian stubbed on `PATH`, argv logged into
+      the compared artefacts. One case per branch, not per combination.
+- [ ] Port. **Exec the two backlog scripts, do not port them** — they are separate `vault`
+      dispatcher subcommands (`check-tasks`, `check-merged`), outside #490's three increments, and
+      they survive the CLI-023 cutover, so the exec dependency stays valid afterwards. Porting them
+      is ~240 lines of scope creep into another ticket's territory.
 - [ ] Read-only; no writes under any flag.
+
+Two twin divergences surfaced while scoping this increment — no `vault-health.ps1` exists at all,
+and the PowerShell weekly runs no health step despite its header. Both recorded in
+`divergences.md`, §Increment 2.
 
 ## 4. Increment 3 — `dotf vault maintain`
 
