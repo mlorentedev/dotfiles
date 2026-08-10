@@ -85,16 +85,17 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 
 **Steps:**
 
-1. **Inventory the available references.** Read the project's `30-architecture/sensor-reference-audit-matrix.md` (or equivalent inventory file). If absent, create it from `00_meta/templates/` and offer to the user.
-2. **Pick the audit set.** Minimum N=2 references plus the gold standard (if one exists). For the platform case (`python-sensor-sdk-platform`), gold standard is Hydra3D; pick 2+ additional sensors maximizing paradigm diversity (per ADR-015 decision criteria).
-3. **For each reference, populate the audit matrix.** The matrix columns are project-defined (in `session-protocol.md`); typical fields:
+1. **Reference #1 is always the local library — grep `00_meta/patterns/` for the topic BEFORE any external search.** The store holds patterns already audited against industry references, and it records constraints found nowhere else. It is also the least discoverable layer: most patterns are referenced from nowhere and no index reaches agent context (dotfiles#538), so nothing surfaces them automatically — the search has to be deliberate. An audit that cites only external sources has skipped the cheapest and most specific one, and will re-derive a decision the store already made. If the grep returns nothing, say so explicitly in the divergence log rather than leaving the omission silent.
+2. **Inventory the remaining references.** Read the project's own inventory file if one exists (e.g. `30-architecture/<domain>-reference-audit-matrix.md`). If absent, create it from `00_meta/templates/` and offer it to the user.
+3. **Pick the audit set.** Minimum N=2 references plus the gold standard (if one exists). For the platform case (`python-sensor-sdk-platform`), gold standard is Hydra3D; pick 2+ additional sensors maximizing paradigm diversity (per ADR-015 decision criteria).
+4. **For each reference, populate the audit matrix.** The matrix columns are project-defined (in `session-protocol.md`); typical fields:
    - Paradigm / domain category
    - Bus / transport (USB3, PCIe, Ethernet, ...)
    - Register / API surface size
    - Config format (binary, JSON, MATLAB .dat, ...)
    - Whether MATLAB SDK / Python POC / firmware ref exists
    - Key divergence flag (1-line "what makes this one different")
-4. **Emit a divergence-log section** at the end of the audit: list patterns that emerge from the intersection (these are **template candidates**) and patterns unique to one reference (these are **NOT template candidates**).
+5. **Emit a divergence-log section** at the end of the audit: list patterns that emerge from the intersection (these are **template candidates**) and patterns unique to one reference (these are **NOT template candidates**).
 
 **Refusal condition.** If the user wants to skip Phase B because they "already know" what is generic, respond once: "ADR-015 / Regla del 3 says the audit IS the evidence. Audit at least N=2 references or we are speculating. Continue, or skip with `--force-no-audit` flag (NOT RECOMMENDED, will be tagged in the resulting ADR)."
 
