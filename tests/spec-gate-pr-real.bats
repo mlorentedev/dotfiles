@@ -11,8 +11,29 @@
 # a repository, so the contract can be pinned with the real binary and no token,
 # no network and no live PR.
 
+# A real-dependency suite that quietly skips is a green proving nothing
+# (BUG-055, #807). So a missing precondition is FATAL under CI -- where the
+# workflow supplies the token -- and only relaxed on a dev machine.
+_need() {
+    [ -z "${CI:-}" ] && skip "$1"
+    printf 'real-dependency precondition unmet in CI: %s\n' "$1" >&2
+    return 1
+}
+
 setup() {
-    command -v gh >/dev/null || skip "gh not installed"
+    command -v gh >/dev/null || _need "gh is not installed"
+
+    # Scoped to THIS suite rather than exporting GH_TOKEN for the whole bats
+    # run: every other suite keeps the auth state it has today, so none of them
+    # can start making real API calls as a side effect of this file.
+    [ -n "${DOTF_TEST_GH_TOKEN:-}" ] && export GH_TOKEN="$DOTF_TEST_GH_TOKEN"
+
+    # An UNAUTHENTICATED gh exits at the auth check before it ever validates
+    # --json field names. Without this precondition the field tests below assert
+    # nothing while still reporting green -- which is precisely how they passed
+    # locally (authenticated) and failed in CI (not) on their first run.
+    gh auth status >/dev/null 2>&1 || _need "gh is not authenticated"
+
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     OUTSIDE="/tmp/bats_specgatepr_real_$$_${BATS_TEST_NUMBER:-0}"
     mkdir -p "$OUTSIDE"
