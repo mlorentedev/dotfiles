@@ -20,8 +20,14 @@ created: "2026-08-09"
 
 ## Status
 
-Accepted. Lands inside the existing **HARNESS-042** epic (#558) — not a new track. No part is
-gated: the cross-machine deploy gate (`knowledge#120`) that ADR-027 inherited is closed.
+Accepted. Lands inside the existing **HARNESS-042** epic (#558) — not a new track.
+
+"Not gated" refers to **acceptance and authoring**: no external precondition blocks recording this
+decision or starting work, because the cross-machine deploy gate (`knowledge#120`) that ADR-027
+inherited is closed. Individual implementation paths do have dependencies, and they are named in
+Implementation — in particular the Orca backend waits on #462, #649 and #899. The subprocess floor
+and level-1 native fan-out have no such dependency, which is why the design does not stall behind
+them.
 
 ## Date
 
@@ -113,6 +119,27 @@ it is ours, and ADR-020 already assigns it this class of surface. Orca is the **
 when present**, never the substrate — that is what keeps C7 (reversibility) true without giving up
 the coordination layer Orca already provides.
 
+**Command surface, and why it is not `dotf harness`.** `dotf harness` is already assigned to
+`refresh` / `deploy` / `check` by CLI-026 — the *compile* side, which turns definitions into
+rendered artifacts. The executor is the *run* side and takes its own noun: **`dotf agent`**, with
+`run` as the only verb v1 needs (`list` / `status` follow the dispatcher). Keeping them separate
+is not cosmetic: one is idempotent and offline, the other spawns processes and consumes quota.
+
+The minimal contract, fixed here because the three backends must be interchangeable:
+
+| Element | Decision |
+|---|---|
+| Request | role, task text, working copy, tier override (optional), pool deny/allow from the machine |
+| Result | exit status, captured output bounded by an output cap, the pool and model actually used, tokens/duration where the backend reports them |
+| Timeout | required per dispatch; a backend that cannot enforce one is not eligible |
+| Cancellation | the dispatcher must be able to abandon a worker and release its semaphore slot without waiting for it |
+| Errors | distinguish *pool unavailable* (advance the chain) from *task failed* (do not advance) — collapsing them turns a bad answer into a silent retry on a different model |
+
+**The wire schema, field names and exit codes are deliberately not fixed here** — that belongs to
+the implementation spec under #558, not to a decision record. What is fixed is the noun, the
+separation from `dotf harness`, and the five semantics above, because a backend that cannot honour
+them cannot be plugged in later.
+
 ### 3. `harness/model-map.json` — pools, harnesses, tiers, chains
 
 Four blocks, because they have four different consumers:
@@ -150,13 +177,32 @@ Four blocks, because they have four different consumers:
 - **`chains` resolves at run time** and is read only by the level-2 dispatcher: a Claude `Task`
   cannot fail over to NaN, so cross-pool fallback exists only outside the session.
 - **`concurrency` is a semaphore the dispatcher enforces**, not a comment. With
-  `reserve_interactive: 2`, a fan-out can claim at most 3 of NaN's 5 slots and can never starve the
-  interactive TUI. **Adaptive reservation is explicitly out of scope** for v1: the reserve is a
-  static number, honest and simple.
+  `reserve_interactive: 2`, a fan-out claims at most 3 of NaN's 5 slots.
+  **This bounds `dotf`-dispatched work only, and that limit must not be overstated:** a hand-run
+  `qq`, a pi TUI turn or a hive embedding call consumes a slot the semaphore never sees. The
+  reserve is therefore a *heuristic that makes starvation unlikely*, not a guarantee that it
+  cannot happen. The honest guarantee is narrower and still worth having: **`dotf` alone will
+  never be the cause of exhaustion.** Two consequences: a dispatch that hits a 429 treats it as
+  *pool unavailable* and advances the chain rather than retrying into the wall, and any real
+  guarantee would need the pool's own concurrency accounting, which NaN does not expose.
+  **Adaptive reservation is explicitly out of scope** for v1: the reserve is a static number.
 - **pi's own default is `qwen3.6`** (`ai/pi/settings.json`) while the mid tier resolves to
   `deepseek-v4-flash`. **The map wins after render**; pi's picker default is a user preference for
   interactive use and is left alone. `glm5.2` is not available on the current subscription and is
   absent from the map.
+- **Model identifiers: alias where the harness self-rotates, canonical id where it does not.**
+  ADR-011 records literal ids (`claude-opus-4-7`, `claude-sonnet-4-6`) precisely so a provider
+  rotation is a one-line overlay edit. Claude Code additionally accepts the aliases
+  `opus` / `sonnet` / `haiku`, which resolve to the current member of each family, so **for Claude
+  the map emits the alias** and rotation cost drops from one line to zero. Every other pool has no
+  alias mechanism and takes the **canonical id** (`deepseek-v4-flash`, `qwen3.6-plus`). The map is
+  the place this distinction is declared; a consumer must never have to guess whether a string is
+  an alias or an id, so the schema tags it.
+- **Embeddings and other non-chat services belong in the map too.** `qwen3-embedding` and `rerank`
+  are not chat tiers and do not fit `tiers`/`chains`, but hive's embedding endpoint is one of the
+  four provider surfaces §8 makes the map responsible for generating. The schema therefore carries
+  a `services` block (`embeddings`, `rerank`, and any future non-chat endpoint) alongside `tiers`;
+  without it the generation step in #902 has no source for the value it must write.
 
 ### 4. The `top` tier has no fallback, on purpose
 
@@ -201,6 +247,15 @@ neutral core and `temperature` / `maxSteps` / `permissionMode` do not.
 leaves. Without a depth rule, two non-leaf roles pointing at each other is an infinite loop that
 the semaphore only converts into a deadlock. Deeper DAGs are Orca's job at level 2.
 
+**Depth-1 is enforced where a native target exists and declared where it does not** — Claude via
+`tools: Agent(role)`, OpenCode via `permission.task` globs, pi via the adapter allowlist. **On
+Copilot it is declared, not enforced**: its delegation is model-driven and `.agent.md` has no
+field that forbids a subagent from delegating further. Two mitigations, neither pretending to be
+the missing one: the deployed worker agents carry an explicit instruction not to delegate, and the
+Copilot pool's fan-out is bounded by its own `/fleet` accounting rather than by ours. This is the
+honest-degradation rule of C1 applied to safety, and it belongs in the risk column, not hidden in
+a uniform-sounding sentence.
+
 ### 7. Machine facts are probed, never stored — with one declared exception
 
 `dotf` discovers which pools exist on the machine it is running on. A per-machine inventory file
@@ -214,18 +269,33 @@ denied machine.
 
 The design is only worth having if it survives the three ways this setup actually changes hands.
 
-**Axis 1 — the machine is gone.** Rebuild is `install-dotf` + `setup`, nothing else. The only
+**Axis 1 — the machine is gone.** Rebuild is `install-dotf` + `setup`, nothing else. Almost all
 local state this design creates is *probed*, never written, so there is nothing to back up and
 nothing to drift. API keys come back through the secrets tier (ADR-028: Bitwarden SSOT with the
 age floor), so the pool probes pass again as soon as secrets materialize. **Acceptance: a fresh
 machine reaches an identical orchestration posture with zero manual steps and zero GUI clicks.**
+
+**The one exception is `machine.json`, and it is the security-relevant one.** `pools.deny` lives
+there (§7), so a rebuilt corporate machine that has not yet restored it would probe successfully
+for personal pools and **default to allowing them** — the failure would be silent and in the
+wrong direction. Two rules follow. First, `machine.json` is part of the restored state, not
+regenerated from probes, and its restoration is ordered **before** the first dispatch is possible.
+Second, denial fails safe: **a machine whose identity cannot be established denies every
+non-local pool** until it is declared, so the unknown case degrades to "no cross-pool dispatch"
+rather than to "all pools allowed".
 That is what makes #899 (broken CLI wrapper) and #462 (Orca not installed by bootstrap) blockers
 rather than conveniences — an executor that needs a button pressed in an app is not replicable.
 
-**Axis 2 — a different project.** Deploy surfaces are user-level (`~/.claude`,
-`~/.config/opencode`, `~/.pi`, `~/.github`), so every repo inherits the roster, the maps and the
-doctrine with no per-repo setup. `dotf init` scaffolds optional repo-level overrides; defaults
-never require them.
+**Axis 2 — a different project.** Deploy surfaces are user-level — `~/.claude/agents/`,
+`~/.config/opencode/`, `~/.pi/agent/agents/` and **`~/.copilot/agents/*.agent.md`** — so every repo
+inherits the roster, the maps and the doctrine with no per-repo setup. `dotf init` scaffolds
+optional repo-level overrides; defaults never require them.
+
+One precedence detail worth deciding deliberately rather than discovering: for Copilot, a
+same-named agent in `~/.copilot/agents/` **wins over** the repo's `.github/agents/`. That is the
+behaviour we want for a personal roster that must be identical everywhere, but it means a repo
+cannot override a personal persona by name — a repo that needs different behaviour must use a
+different name. Recorded here so the collision is a choice, not a surprise.
 
 **Axis 3 — a different model provider.** This is the axis the first draft of this decision
 underweighted, on the reasoning that NaN is swappable in theory but not in practice. Treating it
@@ -253,6 +323,19 @@ This generation step is new scope on top of #560 and is called out in Implementa
    tier→id map; that is necessary and not sufficient once more than one pool is reachable.
 4. ADR-027 §5's "pi is first-class via one reusable adapter" is unchanged and reinforced: the
    `harnesses` block names `adapter` as pi's render kind.
+
+**Migration of the contracts these amendments change.** Both are additive, and the defaults are
+chosen so nothing breaks between the amendment landing and the roster being rewritten:
+
+| Change | Existing state | Rule |
+|---|---|---|
+| `surface` added | `curator` (the only definition today) declares none | absent ⇒ `both`, which is today's effective behaviour; the schema keeps it optional until the roster (#562) sets it explicitly |
+| `delegates_to` added | none declared | absent ⇒ `[]` (leaf). **Fails closed**: an un-migrated definition cannot delegate, so the depth rule holds during migration rather than after it |
+| Copilot `catalog` → `agent-md` | Copilot receives an injected catalog block today | the catalog injection is removed **in the same change** that starts writing `~/.copilot/agents/`, never both at once; the harness deploy's prune path (#843) removes the stale block |
+| `model-map.json` appears | tier is dropped at render today | until the map exists, render behaviour is unchanged; the map is additive and the drift gate only starts asserting once it ships |
+
+No migration script is needed: one definition exists, and the fail-closed defaults mean the
+transitional state is safe rather than merely brief.
 
 ## Addendum to ADR-011
 
