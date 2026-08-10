@@ -151,7 +151,7 @@ STUB
     [[ "$output" == *"1 ensured, 1 failed"* ]]
 }
 
-@test "a repo with nothing to add stays green — the healthy no-op" {
+@test "a repo with nothing to add stays green - the healthy no-op" {
     export STUB_ISSUES=''
     export STUB_PRS=''
     run "$SCRIPT" --backfill-only demo
