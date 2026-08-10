@@ -141,25 +141,76 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens an au
     ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
 }
 
+# resolve_project_id — the board's GraphQL node ID, fetched once per run.
+#
+# Needed because the backfill adds items with the addProjectV2ItemById mutation
+# rather than `gh project item-add --owner`. Those are not interchangeable: the
+# CLI form first resolves the owner's TYPE, probing the user and organization
+# nodes, and BITACORA_PAT cannot perform that lookup — it answers `unknown owner
+# type` for every single item. The direct mutation never does it, because the
+# project node ID is already known, which is why the event-driven
+# add-to-project.yml has been green with the very same token all along (#884).
+#
+# Fixing this here rather than by widening the PAT's scopes is deliberate: no
+# other automation needs owner-type resolution, so granting a scope to satisfy
+# one CLI call would enlarge a leaked token's blast radius for no gain.
+resolve_project_id() {
+    PROJECT_ID="$(gh api graphql \
+        -f query="query { user(login: \"$OWNER\") { projectV2(number: $PROJECT_NUMBER) { id } } }" \
+        -q '.data.user.projectV2.id' 2>/dev/null || true)"
+    if [ -z "$PROJECT_ID" ]; then
+        err "cannot resolve project #$PROJECT_NUMBER for $OWNER — check BITACORA_PAT"
+        return 1
+    fi
+}
+
 # backfill_repo REPO — ensure every OPEN issue and PR of REPO is on the board.
-# `item-add` returns the existing item when the content is already there, so this
-# is idempotent and safe to run on a schedule; that idempotence is what makes it
-# usable as the reconciler for items an event-driven add dropped (OPS-023, #809).
+# addProjectV2ItemById returns the existing item when the content is already
+# there, so this is idempotent and safe to run on a schedule; that idempotence is
+# what makes it usable as the reconciler for items the event-driven add dropped
+# (OPS-023, #809).
+#
+# The node IDs come free: the issue/PR listing has to happen anyway, and asking
+# it for `id` alongside `url` yields the GraphQL node ID the mutation wants
+# without a second round-trip per item.
 backfill_repo() {
-    local repo="$1" url backfilled=0
-    while IFS= read -r url; do
-        [ -z "$url" ] && continue
-        if run gh project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" >/dev/null; then
+    local repo="$1" node_id url backfilled=0 failed=0
+    while IFS=' ' read -r node_id url; do
+        [ -z "$node_id" ] && continue
+        # SC2016: $project and $contentId are GraphQL variables bound by the -f
+        # flags below, not shell expansions. Single quotes are required — letting
+        # the shell substitute them would send an empty query to the API.
+        # shellcheck disable=SC2016
+        if run gh api graphql \
+            -f query='mutation($project: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {projectId: $project, contentId: $contentId}) { item { id } }
+            }' \
+            -f project="$PROJECT_ID" -f contentId="$node_id" >/dev/null 2>&1; then
             backfilled=$((backfilled + 1))
         else
+            failed=$((failed + 1))
             err "$repo: item-add failed for $url"
         fi
     done < <(
-        gh issue list --repo "$OWNER/$repo" --state open --limit 200 --json url -q '.[].url' 2>/dev/null
-        gh pr list    --repo "$OWNER/$repo" --state open --limit 200 --json url -q '.[].url' 2>/dev/null
+        gh issue list --repo "$OWNER/$repo" --state open --limit 200 --json id,url -q '.[] | "\(.id) \(.url)"' 2>/dev/null
+        gh pr list    --repo "$OWNER/$repo" --state open --limit 200 --json id,url -q '.[] | "\(.id) \(.url)"' 2>/dev/null
     )
-    ok "$repo: backfill — $backfilled open item(s) ensured on board"
+    # The tag has to come from the outcome, not from the count. `0 ensured` is
+    # the healthy no-op AND the total-failure case, so a hardcoded ✅ reported a
+    # repo where every add failed exactly like one with nothing to do (#887).
+    if [ "$failed" -eq 0 ]; then
+        ok "$repo: backfill — $backfilled open item(s) ensured on board"
+    else
+        err "$repo: backfill — $backfilled ensured, $failed failed"
+    fi
 }
+
+# One resolution for the whole run, and a hard stop when it fails: without the
+# project node ID every single mutation below would fail identically, so 27
+# repos' worth of per-item errors would bury the one line that explains them.
+if [ "$BACKFILL_ONLY" = 1 ]; then
+    resolve_project_id || exit 1
+fi
 
 for repo in "${REPOS[@]}"; do
     echo

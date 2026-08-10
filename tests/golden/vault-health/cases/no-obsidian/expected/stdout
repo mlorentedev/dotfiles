@@ -1,0 +1,10 @@
+========================================
+   VAULT HEALTH REPORT
+========================================
+Vault: knowledge (<VAULT>)
+
+[1/7] Working Tree Integrity
+  SKIP: Working tree integrity - vault is not a git repo
+
+[2/7] Vault Connectivity
+[ERROR] Obsidian CLI not found in PATH
