@@ -23,12 +23,50 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 - "Red-team this change" / "devil's advocate pass on AI-001" / "independent verification before archive".
 - Verification window: after implementation merged / about-to-merge, BEFORE archiving the spec.
 - **Pair with**: `/spec archive` lock — that command refuses to archive while any `[AGENT-DRAFT]` tags remain, **and** (since CLI-034) refuses without a fresh, passing `review.md`. This skill produces that artifact; skipping it now blocks the archive rather than merely weakening it.
+- **Proposed, not only requested** (since HARNESS-064): an always-on trigger in `AGENTS.md` ("Spec-Driven Development" → *Proactive (verification window)*) makes an agent offer this review while the PR is still open. See "Agent-Side Activation Rule" below for how that decision is made and phrased.
 
 ## When NOT to use
 
 - During implementation (use `enrich-us` or `/spec fill` instead — wrong phase).
 - For trivial changes that bypassed SDD per Skip rules.
 - As a single-agent self-review (the value is *independence* — different session/agent from the implementer).
+
+## Agent-Side Activation Rule
+
+> **Proactive mode.** This skill is otherwise *reactive* — it runs when a human types `/adversarial-review …`. This rule makes the agent *proactive*: when a spec's implementation is complete and its PR is about to be opened or merged, the agent PROPOSES the review itself. The always-on trigger that primes this lives in `AGENTS.md` ("Spec-Driven Development" → *Proactive (verification window)*); this section is the SSOT for *how* the agent decides and *how* it phrases the proposal.
+>
+> The agent proposes; it does **not** supply the verdict for a change it implemented. That is the single-agent self-review forbidden above, and it is why the proposal names the *choice* of reviewer instead of making it.
+
+### Checks the agent runs
+
+When implementation looks finished — tasks ticked, tests green, a PR being drafted or about to merge — silently evaluate:
+
+1. **Active spec** — does `specs/<feature-id>/` exist with `status:` not yet `archived`? No spec, no proposal.
+2. **Implementation complete** — are the `tasks.md` implementation boxes ticked and `verification.md` carrying evidence? Proposing mid-implementation is the wrong phase.
+3. **No fresh review** — is `specs/<feature-id>/review.md` absent, or present with a `reviewed_sha` older than the last change to `proposal.md` / `tasks.md` / `features.json`? A fresh, passing review already meets the requirement.
+4. **Not waived** — does `proposal.md` declare `review: waived` with a non-empty reason? A declared waiver is a decision already taken; do not re-litigate it.
+
+If 1–3 hold and 4 does not → propose.
+
+### How to phrase the proposal
+
+State the evidence, name the consequence, leave the choice of reviewer to the human. Template:
+
+> `<feature-id>` is implemented and its PR is about to merge — this is the **verification window**. `dotf spec archive` will refuse without a fresh, passing `specs/<feature-id>/review.md`, and I implemented this change, so **I cannot be the reviewer**. Run `/adversarial-review <feature-id>` in a separate session? Give it a deliberately thin prompt — the feature-id and the repo, no design rationale — or the independence is cosmetic.
+
+- **Say which session you are.** If you implemented the change, that fact is what makes the proposal necessary; leading with it is the evidence, not a disclaimer.
+- **Name the escapes honestly.** If the review genuinely does not fit, the declared paths are `review: waived` + a reason in `proposal.md`, or `--force-without-review`. Surface them; never take one unilaterally.
+- **Once per change.** If the user declines, proceed and do not re-propose for the same spec.
+
+### When NOT to propose
+
+Silence is correct when ANY of these hold:
+
+- **No active spec** — the change was Skip-SDD, or the spec is already archived.
+- **Still implementing** — wrong phase; this review reads a finished change.
+- **A fresh, passing `review.md` already exists** for the current contract files.
+- **`review: waived`** is declared with a reason.
+- **Already declined** for this spec in the current thread (once-per-change debounce — do not nag).
 
 ## Inputs
 

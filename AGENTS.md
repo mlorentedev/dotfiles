@@ -190,6 +190,16 @@ in TDD order; (5) implement, ticking boxes; (6) `verification.md` with evidence;
 yourself (name the trigger) and let the user decide — the full activation rule is
 the SSOT in the `/spec` skill.
 
+**Proactive (verification window):** in the window between (6) and (7) — after
+implementation, while the PR is about to be opened or merged — propose
+`/adversarial-review <feature-id>` yourself. Name the spec and state the
+evidence: `dotf spec archive` refuses without a fresh, passing `review.md`, so
+skipping the review now blocks the archive rather than merely weakening it.
+Propose, never self-serve: the value is independence, so the implementing
+session **cannot be the reviewer** — the human picks which session or agent
+supplies it. Full activation rule (checks, phrasing, when NOT to propose) is the
+SSOT in the `/adversarial-review` skill.
+
 **Banned phrases** (Standing Order #3 is **in-session, not 'later'**):
 "I'll do knowledge hygiene later", "will add the spec entry after merge",
 "let me commit first and document later". If a hygiene action genuinely cannot

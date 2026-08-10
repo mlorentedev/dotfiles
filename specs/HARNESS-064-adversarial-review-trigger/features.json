@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-064-adversarial-review-trigger-f1",
+    "behavior": "AGENTS.md carries the adversarial-review trigger phrased as a proposal that states its evidence (the feature-id and that dotf spec archive refuses without review.md)",
+    "verification": "bats tests/agents-md.bats -f 'carries the adversarial-review trigger'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-064-adversarial-review-trigger-f2",
+    "behavior": "The trigger names the window with the literal phrase 'verification window', not 'before archiving'",
+    "verification": "bats tests/agents-md.bats -f 'names the verification window'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-064-adversarial-review-trigger-f3",
+    "behavior": "The trigger states that the implementing session cannot supply its own review, so the proposal cannot be self-answered",
+    "verification": "bats tests/agents-md.bats -f 'forbids the implementer supplying their own review'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-064-adversarial-review-trigger-f4",
+    "behavior": "The adversarial-review SKILL carries the full Agent-Side Activation Rule and cross-references the AGENTS.md trigger from 'When to use'",
+    "verification": "grep -qF 'Agent-Side Activation Rule' harness/skills/adversarial-review/SKILL.md && grep -qF 'When NOT to propose' harness/skills/adversarial-review/SKILL.md && grep -qF 'Proactive (verification window)' harness/skills/adversarial-review/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-064-adversarial-review-trigger-f5",
+    "behavior": "The harness render is regenerated from the vault SSOT and reports no drift",
+    "verification": "./scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  }
+]
