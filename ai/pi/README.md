@@ -32,14 +32,18 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 ## Model environment
 
-Curated NaN-first: NaN covers the free tier, with three paid OpenRouter models behind it.
+NaN only — the free tier, with no paid fallback in the picker.
 
 - **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `deepseek-v4-flash-0731`, `mimo-v2.5`
-- **Paid OpenRouter** (3, none from OpenAI/Google/Anthropic): `deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`
 
-pi's picker omits the rate-limited `:free` OpenRouter tier that `ai/opencode/opencode.jsonc`
-still lists — the two sets are curated independently. `tests/pi-config.bats` asserts this list
-stays equal to `settings.json`'s `enabledModels`.
+The three paid OpenRouter models (`deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`) were
+dropped from the picker: a paid model one keystroke away in a model list is a cost you take by
+accident, not by decision. Frontier work goes through `ai/opencode/opencode.jsonc`, where reaching
+for OpenRouter is an explicit act.
+
+pi's picker also omits the rate-limited `:free` OpenRouter tier that `opencode.jsonc` still lists —
+the two sets are curated independently. `tests/pi-config.bats` asserts this list stays equal to
+`settings.json`'s `enabledModels`.
 
 Default: `nan/qwen3.6`, thinking level `high`. Change in `settings.json`. (Per-model context
 windows live in `models.json` — the one place they cannot drift from.)
