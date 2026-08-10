@@ -9,6 +9,15 @@ created: "2026-05-19"
 
 ## Status
 
+> **Scope clarified by [ADR-032](adr-032-cross-harness-agent-orchestration.md) (2026-08-09).**
+> The "propose, don't force" rule below (§2, no auto-switching) governs **the interactive
+> session's own model** and is unchanged. An orchestrator selecting a tier and a pool for a
+> *delegated* subtask, inside a declared concurrency and cost budget, is a different plane and is
+> permitted. The bill-shock rationale does not carry there — Claude and NaN are both flat
+> subscriptions and per-token spend is escalation-only — but the silent-quality-drop rationale
+> does, and ADR-032 honours it: the top tier has no fallback and queues or escalates rather than
+> degrading to a mid model.
+
 Accepted — 2026-05-19. Shipped in PR [#60](https://github.com/mlorentedev/dotfiles/pull/60) (AI-019).
 
 ## Context
