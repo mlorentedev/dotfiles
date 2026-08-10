@@ -99,3 +99,25 @@ setup() {
     ! grep -qF 'for work projects' "$AGENTS_MD"
     ! grep -qF '30-architecture/adr' "$AGENTS_MD"
 }
+
+# --- HARNESS-064: adversarial-review trigger (#879) ---
+#
+# CLI-034 bound the review ARTIFACT to `dotf spec archive`; nothing bound the
+# MOMENT. These pin the trigger that puts it in the verification window, where a
+# reviewer's finding is still cheap to act on. A rule nothing checks is a rule
+# that does not fire — which is the defect this whole spec exists to remove, so
+# not pinning it would repeat that defect at one remove.
+
+@test "AGENTS.md carries the adversarial-review trigger with its evidence" {
+    grep -qF '/adversarial-review' "$AGENTS_MD"
+    grep -qF 'dotf spec archive' "$AGENTS_MD"
+    grep -qF 'review.md' "$AGENTS_MD"
+}
+
+@test "AGENTS.md names the verification window, not just 'before archiving'" {
+    grep -qF 'verification window' "$AGENTS_MD"
+}
+
+@test "AGENTS.md trigger forbids the implementer supplying their own review" {
+    grep -qF 'cannot be the reviewer' "$AGENTS_MD"
+}
