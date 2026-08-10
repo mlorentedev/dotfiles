@@ -9,6 +9,14 @@
 *.zsh  text eol=lf
 *.bats text eol=lf
 
+# Git hook dispatchers (GUARD-001): tracked but EXTENSIONLESS, executed by bash on
+# every commit/push via core.hooksPath. They match none of the *.sh/*.bash rules
+# above, so without an explicit eol they check out CRLF under core.autocrlf=true on
+# Windows -- the shebang becomes "#!/usr/bin/env bash\r", bash resolves interpreter
+# "bash\r" (nonexistent), and every hook dies "No such file or directory" (BUG-068).
+# The umbrella also re-covers git-hooks/lib/*.sh already caught by *.sh; harmless.
+git-hooks/** text eol=lf
+
 # Windows shells: native tooling expects CRLF.
 *.ps1  text eol=crlf
 *.psm1 text eol=crlf

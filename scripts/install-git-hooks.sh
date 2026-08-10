@@ -27,6 +27,23 @@ if ! command -v log_info >/dev/null 2>&1; then
     . "$_GH_SCRIPT_DIR/utils.sh"
 fi
 
+# _gh_normalize_lf <dir>: strip CR from every text file under <dir> (CRLF -> LF) so
+# the deployed POSIX dispatchers keep LF shebangs. cp is byte-verbatim, so a
+# CRLF-tainted checkout (predating the .gitattributes eol=lf rule, or a stray
+# core.autocrlf=true) would propagate "#!/usr/bin/env bash\r" into the mirror --
+# bash then resolves interpreter "bash\r" and every hook dies "No such file or
+# directory" (BUG-068). Binary files are left untouched (grep -I).
+_gh_normalize_lf() {
+    local dir="$1" f tmp cr
+    cr="$(printf '\r')"
+    find "$dir" -type f 2>/dev/null | while IFS= read -r f; do
+        LC_ALL=C grep -Iq . "$f" 2>/dev/null || continue     # skip binary
+        LC_ALL=C grep -q "$cr" "$f" 2>/dev/null || continue  # already LF-only
+        tmp="$f.lf.$$"
+        tr -d "$cr" < "$f" > "$tmp" && mv -f "$tmp" "$f"
+    done
+}
+
 # deploy_git_hooks <src_dir> <dest_dir>: clean-mirror the dispatcher tree into
 # the deploy mirror and make the entrypoints executable. A clean mirror (not a
 # bare `cp`) so a hook removed upstream never lingers in the mirror and keeps
@@ -71,6 +88,9 @@ deploy_git_hooks() {
     rm -rf "$dest"
     mkdir -p "$dest"
     cp -rf "$src/." "$dest/"
+
+    # BUG-068: make the deployed dispatchers LF regardless of the source EOL.
+    _gh_normalize_lf "$dest"
 
     # git execs these directly; the lib helpers are sourced/exec'd by them.
     chmod +x "$dest/pre-commit" "$dest/commit-msg" "$dest/prepare-commit-msg" "$dest/pre-push" "$dest/post-checkout" 2>/dev/null || true

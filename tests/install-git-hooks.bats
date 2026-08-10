@@ -155,3 +155,15 @@ teardown() {
     [ -f "$SRC/pre-commit" ]                    # dispatcher NOT emptied
     [ -f "$SRC/lib/memory-sink-guard.sh" ]      # lib subtree intact
 }
+
+# BUG-068: cp is byte-verbatim, so a CRLF-tainted checkout would propagate a CRLF
+# shebang into the deploy mirror and every hook would die "No such file or
+# directory". deploy_git_hooks must normalize the deployed dispatchers to LF.
+@test "deploy normalizes CRLF hook shebangs to LF (BUG-068)" {
+    printf '#!/usr/bin/env bash\r\nexit 0\r\n' > "$SRC/pre-commit"
+    run deploy_git_hooks "$SRC" "$DEST"
+    [ "$status" -eq 0 ]
+    run grep -c "$(printf '\r')" "$DEST/pre-commit"
+    [ "$output" -eq 0 ]
+    [ "$(head -1 "$DEST/pre-commit")" = "#!/usr/bin/env bash" ]
+}
