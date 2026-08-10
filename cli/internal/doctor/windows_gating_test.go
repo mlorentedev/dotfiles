@@ -2,7 +2,9 @@ package doctor
 
 // Regression coverage for BUG-052 (#804): dotf doctor emitted checks that can
 // never pass on Windows (terraform FAIL, bats false-negative, compile-harness
-// SKIP with a misleading reason), pushing a healthy machine to exit 1.
+// SKIP with a misleading reason), pushing a healthy machine to exit 1. Each case
+// asserts the stable status tag (PASS/SKIP/FAIL) the branch must produce, with a
+// supplemental substring only to identify the reported tool or platform reason.
 
 import (
 	"bytes"
@@ -12,82 +14,137 @@ import (
 	"testing"
 )
 
-// terraform is optional (winget on Windows, Applications on Linux), so its
-// absence must be a SKIP under optional tools, never a core-tools FAIL.
-func TestCheckCoreTools_TerraformNotCore(t *testing.T) {
-	// Every genuinely-core tool on PATH; terraform absent.
-	onPath := []string{"git", "zsh", "bash", "curl", "wget", "jq", "eza", "direnv", "node", "npm", "zoxide", "docker", "kubectl"}
-	rep := capture(&bytes.Buffer{})
-	checkCoreTools(newSys(nil, onPath, nil), nil, rep)
-	if rep.Failures() != 0 {
-		t.Fatalf("terraform absence must not fail core-tools; got %d failures", rep.Failures())
-	}
+// coreToolsNoTerraform is the full core set once terraform is reclassified as
+// optional — every genuinely-core tool, terraform absent.
+var coreToolsNoTerraform = []string{
+	"git", "zsh", "bash", "curl", "wget", "jq", "eza",
+	"direnv", "node", "npm", "zoxide", "docker", "kubectl",
 }
 
-func TestCheckOptionalTools_TerraformSkipWhenAbsent(t *testing.T) {
-	var buf bytes.Buffer
-	rep := capture(&buf)
-	checkOptionalTools(newSys(nil, nil, nil), &Config{}, nil, rep)
-	if rep.Failures() != 0 {
-		t.Fatalf("optional tools must never FAIL; got %d", rep.Failures())
+// terraform must not be a core tool (its absence is not a FAIL) and must be
+// reported among the optional tools (its absence is a SKIP). One case per branch.
+func TestTerraformIsOptionalNotCore(t *testing.T) {
+	tests := []struct {
+		name       string
+		run        func(*Report)
+		status     Status
+		want       int
+		mustReport string // supplemental: identifies the tool in output
+	}{
+		{
+			name:   "all core present, terraform absent → no core FAIL",
+			run:    func(r *Report) { checkCoreTools(newSys(nil, coreToolsNoTerraform, nil), nil, r) },
+			status: StatusFail,
+			want:   0,
+		},
+		{
+			name:       "terraform absent → optional SKIP, never FAIL",
+			run:        func(r *Report) { checkOptionalTools(newSys(nil, nil, nil), &Config{}, nil, r) },
+			status:     StatusFail,
+			want:       0,
+			mustReport: "terraform",
+		},
 	}
-	if !strings.Contains(buf.String(), "terraform") {
-		t.Error("terraform should be reported among optional tools")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			tt.run(rep)
+			if got := rep.totals[tt.status]; got != tt.want {
+				t.Errorf("%v count = %d, want %d\n%s", statusTag[tt.status], got, tt.want, buf.String())
+			}
+			if tt.mustReport != "" && !strings.Contains(buf.String(), tt.mustReport) {
+				t.Errorf("output should report %q; got:\n%s", tt.mustReport, buf.String())
+			}
+		})
 	}
 }
 
 // On Windows exec.LookPath only resolves names carrying a PATHEXT extension, so
 // an extensionless POSIX script on PATH (~/.local/bin/bats, a bash script) was
-// reported missing. has() must emulate `command -v` and find it.
-func TestSystemHas_WindowsExtensionlessOnPath(t *testing.T) {
-	dir := t.TempDir()
-	writeExec(t, filepath.Join(dir, "bats"))
-	sys := &System{
-		GOOS: "windows",
-		Getenv: func(k string) string {
-			if k == "PATH" {
-				return dir
-			}
-			return ""
-		},
-		LookPath: func(string) (string, error) { return "", errors.New("PATHEXT miss") },
+// reported missing. has() must emulate `command -v` there — but the filesystem
+// fallback is Windows-only, so a POSIX host still trusts LookPath alone.
+func TestSystemHas_ExtensionlessOnPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		goos        string
+		lookPathHit bool
+		fileOnPath  bool
+		want        bool
+	}{
+		{"windows: LookPath miss, script on PATH → found", "windows", false, true, true},
+		{"windows: LookPath miss, nothing on PATH → not found", "windows", false, false, false},
+		{"windows: LookPath hit → found regardless", "windows", true, false, true},
+		{"posix: LookPath miss, script on PATH → NOT found (no fs fallback)", "linux", false, true, false},
+		{"posix: LookPath hit → found", "linux", true, false, true},
 	}
-	if !sys.has("bats") {
-		t.Fatal("has() must resolve an extensionless script on PATH on Windows")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tt.fileOnPath {
+				writeExec(t, filepath.Join(dir, "bats"))
+			}
+			sys := &System{
+				GOOS: tt.goos,
+				Getenv: func(k string) string {
+					if k == "PATH" {
+						return dir
+					}
+					return ""
+				},
+				LookPath: func(string) (string, error) {
+					if tt.lookPathHit {
+						return filepath.Join(dir, "bats.exe"), nil
+					}
+					return "", errors.New("not found")
+				},
+			}
+			if got := sys.has("bats"); got != tt.want {
+				t.Errorf("has(bats) = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
-// The fallback is Windows-only: on POSIX, LookPath is authoritative and a
-// filesystem scan would mask a genuinely-missing tool.
-func TestSystemHas_PosixNoFilesystemFallback(t *testing.T) {
-	dir := t.TempDir()
-	writeExec(t, filepath.Join(dir, "bats"))
-	sys := &System{
-		GOOS: "linux",
-		Getenv: func(k string) string {
-			if k == "PATH" {
-				return dir
+// The compile-harness drift gate is Linux-only. On Windows it SKIPs with the
+// platform reason; on Linux with the script absent it SKIPs with the not-found
+// reason; on Linux with a passing --check it PASSes. One case per branch.
+func TestCheckCompileHarnessDrift(t *testing.T) {
+	tests := []struct {
+		name       string
+		goos       string
+		withScript bool
+		checkOK    bool
+		status     Status
+		mustReport string
+	}{
+		{"windows → SKIP, Linux-only reason", "windows", false, false, StatusSkip, "Linux-only"},
+		{"linux, no script → SKIP, not found", "linux", false, false, StatusSkip, "not found"},
+		{"linux, script, --check clean → PASS", "linux", true, true, StatusPass, "no drift"},
+		{"linux, script, --check drift → FAIL", "linux", true, false, StatusFail, "drift"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dotfiles := t.TempDir()
+			compile := filepath.Join(dotfiles, "scripts", "compile-harness.sh")
+			var cmdOut map[string]string
+			if tt.withScript {
+				writeExec(t, compile)
+				if tt.checkOK {
+					cmdOut = map[string]string{"bash " + compile + " --check": "ok"}
+				}
 			}
-			return ""
-		},
-		LookPath: func(string) (string, error) { return "", errors.New("not found") },
-	}
-	if sys.has("bats") {
-		t.Fatal("has() must not filesystem-scan on POSIX; LookPath is authoritative")
-	}
-}
-
-func TestCheckHarnessDrift_WindowsSkipsLinuxEngine(t *testing.T) {
-	var buf bytes.Buffer
-	rep := capture(&buf)
-	cfg := &Config{DotfilesDir: t.TempDir()}
-	sys := newSys(nil, nil, nil)
-	sys.GOOS = "windows"
-	checkHarnessDrift(sys, cfg, rep)
-	if rep.Failures() != 0 {
-		t.Fatalf("windows harness check must not FAIL; got %d", rep.Failures())
-	}
-	if !strings.Contains(buf.String(), "Windows") && !strings.Contains(buf.String(), "Linux-only") {
-		t.Errorf("windows skip must state the platform reason; got:\n%s", buf.String())
+			sys := newSys(nil, nil, cmdOut)
+			sys.GOOS = tt.goos
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkCompileHarnessDrift(sys, &Config{DotfilesDir: dotfiles}, rep)
+			if got := rep.totals[tt.status]; got != 1 {
+				t.Errorf("expected one %v; totals=%v\n%s", statusTag[tt.status], rep.totals, buf.String())
+			}
+			if !strings.Contains(buf.String(), tt.mustReport) {
+				t.Errorf("output should state %q; got:\n%s", tt.mustReport, buf.String())
+			}
+		})
 	}
 }

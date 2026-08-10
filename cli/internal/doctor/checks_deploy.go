@@ -269,15 +269,19 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 // checkDeployDrift (CLI-019).
 func checkHarnessDrift(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Harness + skill drift")
-	scriptsDir := filepath.Join(cfg.DotfilesDir, "scripts")
+	checkCompileHarnessDrift(sys, cfg, rep)
+	checkDeployedSkillSymlinks(sys, rep)
+}
 
-	compile := filepath.Join(scriptsDir, "compile-harness.sh")
+// checkCompileHarnessDrift runs the compile-harness --check drift gate. It is
+// Linux-only: compile-harness.sh is the Linux generation engine, so on Windows
+// (which deploys committed records via Deploy-SkillRecord and has no --check
+// port yet — CLI-035) it SKIPs with the platform reason rather than the
+// misleading "not found" of a mirror that never holds the script (BUG-052).
+func checkCompileHarnessDrift(sys *System, cfg *Config, rep *Report) {
+	compile := filepath.Join(cfg.DotfilesDir, "scripts", "compile-harness.sh")
 	switch {
 	case sys.GOOS == "windows":
-		// compile-harness.sh is the Linux generation engine; Windows deploys the
-		// committed records via Deploy-SkillRecord and has no drift-check port yet
-		// (CLI-035 unifies both into `dotf harness`). SKIP with the platform reason
-		// instead of the misleading "not found" of a mirror that never holds it.
 		rep.Skip("harness drift gate is Linux-only; Windows deploys committed records, no --check port yet (CLI-035)")
 	case !isExecFile(compile):
 		rep.Skip("compile-harness.sh not found at " + compile)
@@ -288,8 +292,11 @@ func checkHarnessDrift(sys *System, cfg *Config, rep *Report) {
 			rep.Fail("harness/skill drift (run: compile-harness.sh --refresh, then re-deploy)")
 		}
 	}
+}
 
-	// Deployed skill paths must be regular copies, never symlinks (BUG-100).
+// checkDeployedSkillSymlinks enforces the BUG-100 invariant: deployed skill
+// paths must be regular copies, never symlinks.
+func checkDeployedSkillSymlinks(sys *System, rep *Report) {
 	home := sys.home()
 	skillDirs := []string{
 		filepath.Join(home, ".claude", "skills"),
