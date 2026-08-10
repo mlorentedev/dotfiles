@@ -101,8 +101,22 @@ lines against crystallize's ~200, and it carries two seams crystallize did not h
    unresolvable rather than silently skipping the section.
 
 - [x] Resolve task 0.
-- [ ] Golden corpus at `tests/golden/vault-health/`, obsidian stubbed on `PATH`, argv logged into
-      the compared artefacts. One case per branch, not per combination.
+- [x] Golden corpus at `tests/golden/vault-health/`, obsidian stubbed on `PATH`, argv logged into
+      the compared artefacts. One case per branch, not per combination. → **16 cases**, 19 tests in
+      `tests/vault-health-golden.bats`, exits 0/1/2 all covered.
+      - `PATH` is **replaced, not extended**, and the replacement is asserted: a real `obsidian`
+        binary exists on this machine (`~/.local/bin` → an AppImage), so a leaked `PATH` could have
+        run the real GUI against the real vault. The runner refuses to proceed unless `obsidian`
+        resolves into the sandbox — or nowhere, for the absent case.
+      - **Oracle defect captured:** `obsidian_cmd()` appends `--vault "$VAULT_NAME"` and four of
+        its five callers pass it again, so those invocations carry the flag twice. stdout is
+        identical either way — **only the argv artefact sees it**, which is the whole argument for
+        capturing argv. Reproduced faithfully, ticketed, not fixed here.
+      - Boundary cases (`orphans-boundary`, `unresolved-boundary`, `frontmatter-boundary`) exist
+        because mutation testing demanded them: moving the orphan threshold 30→25 turned only one
+        unrelated case red, since every fixture sat comfortably inside a band. A boundary no
+        fixture lands on is a boundary no test defends. With them, the same mutation goes red on
+        the case named for it.
 - [ ] Port. **Exec the two backlog scripts, do not port them** — they are separate `vault`
       dispatcher subcommands (`check-tasks`, `check-merged`), outside #490's three increments, and
       they survive the CLI-023 cutover, so the exec dependency stays valid afterwards. Porting them

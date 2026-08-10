@@ -1,0 +1,12 @@
+# Oracle for the vault-health golden corpus (CLI-021 increment 2).
+#
+# sha256 of each file the goldens were captured from. A test fails the
+# suite when the working tree drifts from these, so a recapture is always
+# a deliberate, reviewable act.
+#
+# Captured at git revision 8ad7e2f (informational only - never assert on it,
+# CI checks out shallow and rebases change it for free).
+
+c8b840b8dfdae2ec2af17859cc1c32501c13340872bf3702c2602154763679ee  scripts/vault-health.sh
+5bdb882ab09463774c94c52d31374263939104f83e04a4981ff13f2067c8b4c7  scripts/check-backlog-integrity.sh
+9e821023adc69de7a37301ef9852a110323865868c46ff634f4fa135175740f9  scripts/check-backlog-merged.sh
