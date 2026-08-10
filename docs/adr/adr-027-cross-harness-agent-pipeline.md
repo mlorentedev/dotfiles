@@ -16,6 +16,15 @@ created: "2026-06-21"
 
 ## Status
 
+> **Amended by [ADR-032](adr-032-cross-harness-agent-orchestration.md) (2026-08-09).** Four
+> changes, all recorded there: Copilot is promoted from the `catalog` render kind to a full
+> `agent-md` target (its "no per-agent mechanism" premise is obsolete — Copilot CLI now has
+> `.github/agents/*.agent.md`, `/fleet` parallel dispatch and automatic delegation); the neutral
+> schema gains `surface` and `delegates_to`; `model-map.json` gains `pools` and `harnesses`
+> blocks, because a tier→id map is not sufficient once more than one pool is reachable; and the
+> orchestration policy §3 left open — who decides to fan out, and under what budget — is defined.
+> Everything else below stands.
+
 Accepted (model). The **authoring** of definitions and the **engine** (render + offline CI) are NOT gated. Only the **cross-machine auto-deploy** step inherits ADR-026's `knowledge#120` gate. Lands via the existing `HARNESS-001` deploy-engine epic — not a new infrastructure track.
 
 ## Date

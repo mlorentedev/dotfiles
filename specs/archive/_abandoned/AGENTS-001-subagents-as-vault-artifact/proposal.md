@@ -1,13 +1,37 @@
 ---
 id: "AGENTS-001-subagents-as-vault-artifact"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
 ---
 
 # AGENTS-001-subagents-as-vault-artifact
+
+> **Superseded by [ADR-027](../../docs/adr/adr-027-cross-harness-agent-pipeline.md), 2026-08-09. Never implemented; abandoned rather than archived.**
+>
+> This proposal was written on 2026-05-27 against ADR-010 gap-3, when the working assumption was
+> that only Claude Code had a subagent runtime. ADR-027 (accepted 2026-06-21) audited every
+> harness and found the assumption false: Claude, OpenCode and Copilot converge on
+> markdown + frontmatter, Antigravity uses pure YAML, and pi is served by one reusable adapter.
+> Three of this proposal's load-bearing choices were replaced as a result:
+>
+> | This proposal | ADR-027 |
+> |---|---|
+> | `targets: [claude]`, single-target by design | every harness, via render kinds (`agent-md` / `agent-yaml` / `catalog`) |
+> | `model: opus\|sonnet\|haiku` — native ids in the SSOT | neutral tier `top\|mid\|low`, resolved by `model-map.json` at compile |
+> | `tools: []` free-form | neutral `capabilities`, resolved by `capability-map.json` |
+> | a dedicated `render-claude-agents.sh` | the `agents` block of the existing manifest engine |
+>
+> Its "Out of scope" line — *"inter-subagent orchestration — fan-out / pipeline patterns are
+> runtime concerns, not artifact concerns"* — is the specific judgement ADR-027 §3 reversed:
+> deterministic consumption is compiled into each harness's hooks, so orchestration IS part of
+> what the artifact declares.
+>
+> What survived: the artifact-lifecycle idea itself. `harness/agent-frontmatter.schema.json`,
+> `harness/agents/`, and the drift-gate discipline all exist today and trace back here. Live
+> work continues under epic #558 (HARNESS-042).
 
 > **Naming**: file lives at `<repo>/specs/AGENTS-001-subagents-as-vault-artifact/proposal.md`. `AGENTS-001-subagents-as-vault-artifact` is `YYYY-MM-DD-<slug>` or `<TICKET-NN>`.
 
