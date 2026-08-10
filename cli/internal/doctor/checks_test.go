@@ -8,12 +8,13 @@ import (
 )
 
 func TestCheckCoreTools_MissingFails(t *testing.T) {
-	// Everything on PATH except terraform.
-	onPath := []string{"git", "zsh", "bash", "curl", "wget", "jq", "eza", "direnv", "node", "npm", "zoxide", "docker", "kubectl"}
+	// Everything core on PATH except docker → exactly one FAIL. terraform is no
+	// longer core (moved to optional tools, BUG-052), so its absence adds nothing.
+	onPath := []string{"git", "zsh", "bash", "curl", "wget", "jq", "eza", "direnv", "node", "npm", "zoxide", "kubectl"}
 	rep := capture(&bytes.Buffer{})
 	checkCoreTools(newSys(nil, onPath, nil), nil, rep)
 	if rep.Failures() != 1 {
-		t.Fatalf("expected exactly 1 failure (terraform), got %d", rep.Failures())
+		t.Fatalf("expected exactly 1 failure (docker), got %d", rep.Failures())
 	}
 }
 

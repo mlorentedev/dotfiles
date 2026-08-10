@@ -33,6 +33,11 @@ Thumbs.db
 node_modules/
 *.log
 
+# Go build artifacts — the CLI installs to ~/.local/bin via install-dotf; a local
+# `go build` in cli/ leaves an untracked binary that must never be committed.
+/cli/dotf
+/cli/dotf.exe
+
 # IDE/Editor files
 .vscode/
 .idea/

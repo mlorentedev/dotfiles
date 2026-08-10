@@ -273,6 +273,12 @@ func checkHarnessDrift(sys *System, cfg *Config, rep *Report) {
 
 	compile := filepath.Join(scriptsDir, "compile-harness.sh")
 	switch {
+	case sys.GOOS == "windows":
+		// compile-harness.sh is the Linux generation engine; Windows deploys the
+		// committed records via Deploy-SkillRecord and has no drift-check port yet
+		// (CLI-035 unifies both into `dotf harness`). SKIP with the platform reason
+		// instead of the misleading "not found" of a mirror that never holds it.
+		rep.Skip("harness drift gate is Linux-only; Windows deploys committed records, no --check port yet (CLI-035)")
 	case !isExecFile(compile):
 		rep.Skip("compile-harness.sh not found at " + compile)
 	default:

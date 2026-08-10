@@ -20,6 +20,14 @@ func isDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+// isRegularFile reports whether p exists and is a regular file (follows
+// symlinks, ignores the exec bit) — the cross-platform "this path is a file"
+// test has()'s Windows fallback needs, where the POSIX exec bit is meaningless.
+func isRegularFile(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.Mode().IsRegular()
+}
+
 // isExecFile reports whether p is a regular executable file — the `[ -x ]`
 // test the twins used for versioned tool binaries. On Windows the POSIX exec
 // bit does not exist (os.Chmod cannot set it), so a regular file suffices;

@@ -9,7 +9,7 @@ import (
 // coreTools is healthcheck.sh section 1's PATH expectation set.
 var coreTools = []string{
 	"git", "zsh", "bash", "curl", "wget", "jq", "eza",
-	"direnv", "node", "npm", "zoxide", "docker", "kubectl", "terraform",
+	"direnv", "node", "npm", "zoxide", "docker", "kubectl",
 }
 
 // posixOnlyTools are absent on Windows by design — skip them there instead of
@@ -176,9 +176,11 @@ func checkToolHomeEnvVars(sys *System, rep *Report) {
 	}
 }
 
-// optionalTools is healthcheck section 6's advisory set.
+// optionalTools is healthcheck section 6's advisory set. terraform lives here
+// (not in coreTools): it is an optional IaC tool, so its absence is a SKIP, not a
+// FAIL that pushes doctor to exit 1 on a machine that never wanted it (BUG-052).
 var optionalTools = []string{
-	"age", "gh", "claude", "gemini", "agy", "bats", "shellcheck", "helm", "ansible", "pip",
+	"age", "gh", "claude", "gemini", "agy", "bats", "shellcheck", "helm", "ansible", "pip", "terraform",
 }
 
 // checkOptionalTools reproduces healthcheck section 6 folded with the contract's

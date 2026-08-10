@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -108,9 +109,41 @@ func (s *System) env(key, def string) string {
 }
 
 // has reports whether name resolves on PATH (the `command -v` test).
+//
+// On Windows exec.LookPath only resolves names carrying a PATHEXT extension
+// (.exe/.cmd/...), so an extensionless POSIX script installed on PATH — e.g.
+// ~/.local/bin/bats, a bash script the setup lays down — reports as missing even
+// though it runs fine under a shell. When LookPath misses on Windows, fall back
+// to a `command -v`-style scan of PATH for a regular file whose name matches
+// exactly. POSIX hosts resolve these through LookPath already, so the fallback is
+// Windows-only: scanning the filesystem on POSIX would mask a genuinely-missing
+// tool (BUG-052).
 func (s *System) has(name string) bool {
-	_, err := s.LookPath(name)
-	return err == nil
+	if _, err := s.LookPath(name); err == nil {
+		return true
+	}
+	if s.GOOS == "windows" {
+		return s.hasExtensionlessOnPath(name)
+	}
+	return false
+}
+
+// hasExtensionlessOnPath scans PATH for a regular file named exactly name. A
+// name that already carries an extension would have been found by LookPath, so
+// it is not re-scanned here.
+func (s *System) hasExtensionlessOnPath(name string) bool {
+	if filepath.Ext(name) != "" {
+		return false
+	}
+	for _, dir := range s.pathEntries() {
+		if dir == "" {
+			continue
+		}
+		if isRegularFile(filepath.Join(dir, name)) {
+			return true
+		}
+	}
+	return false
 }
 
 // home resolves the user's home directory, preferring HOME (POSIX) then
