@@ -10,11 +10,26 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Metadata-only events must NOT kill a run in flight. Applying this gate's own
+  # documented escape takes TWO changes — the "skip-archive" label and a
+  # "## Archive skip rationale" section in the body — which fire `labeled` and
+  # `edited` within the same second. Under an unconditional cancel they raced
+  # into cancelling each other, leaving an older, already-stale failure as the
+  # visible check (BUG-066, observed on #877).
+  #
+  # The discriminator is github.event.ACTION, not github.event_name: the latter
+  # is "pull_request" for all six trigger types and never tells them apart.
+  #
+  # This serializes nothing — a group still holds one pending run, so a newer
+  # pending run supersedes an older one. What it buys is that the newest run
+  # always survives to completion and reads final live metadata, so the check
+  # settles green by itself.
+  cancel-in-progress: ${{ !contains(fromJSON('["labeled", "unlabeled", "edited"]'), github.event.action) }}
 
 permissions:
   contents: read
-  issues: read      # adjacency report (HARNESS-063) lists other open issues
+  issues: read        # adjacency report (HARNESS-063) lists other open issues
+  pull-requests: read # live labels/body/author (BUG-066); an explicit block zeroes the rest
 
 jobs:
   spec-gate:
@@ -39,6 +54,10 @@ jobs:
       # the pre-push hook (#854), where there is none. One list call, flattened to
       # TSV; the matching itself is offline and fixture-tested. Any failure leaves
       # no file behind, and the gate then behaves exactly as it did before.
+      #
+      # Until now this file was written and never read: the gate step below never
+      # passed --adjacency-issues, so HARNESS-063's report had never once run in
+      # CI despite being fixture-tested and green. Wired below.
       - name: Collect open issues for the adjacency report
         continue-on-error: true
         env:
@@ -49,14 +68,23 @@ jobs:
             --jq '.[] | [.number, ((.title + " " + (.body // "")) | gsub("[\n\r\t]"; " "))] | @tsv' \
             > "$RUNNER_TEMP/adjacency.tsv" || rm -f "$RUNNER_TEMP/adjacency.tsv"
 
+      # Labels, body and author are NOT taken from github.event.pull_request.*
+      # any more: a re-run replays the original payload, so a payload-sourced
+      # gate judged the PR as it was before the operator fixed it (BUG-066).
+      # spec-gate-pr.sh reads them live and fails closed if that read fails —
+      # falling back to the payload would reinstate the exact staleness this
+      # replaces. The PR number and base ref stay on the payload deliberately:
+      # both are immutable for the PR's life, so neither can go stale.
       - name: Run SDD spec-gate
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-          SDD_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          SDD_PR_BODY: ${{ github.event.pull_request.body }}
-          SDD_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          ./scripts/check-spec-gate.sh \
+          ./scripts/spec-gate-pr.sh \
+            --pr "$PR_NUMBER" \
             --base-ref "origin/$BASE_REF" \
             --head-ref HEAD \
-            --explain
+            --explain \
+            --adjacency-issues "$RUNNER_TEMP/adjacency.tsv"
