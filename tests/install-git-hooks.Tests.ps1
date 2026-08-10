@@ -44,6 +44,20 @@ Describe 'Deploy-GitHooks (clean mirror + safety guards)' {
         New-Item -ItemType Directory -Path $empty -Force | Out-Null
         Deploy-GitHooks -Source $empty -Destination $script:dest | Should -BeFalse
     }
+
+    # BUG-068: Copy-Item is byte-verbatim, so a CRLF-tainted working tree would
+    # propagate a CRLF shebang into the mirror and every hook would die "No such
+    # file or directory". Deploy must normalize the deployed dispatchers to LF.
+    It 'normalizes CRLF hook shebangs to LF on deploy (BUG-068)' {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $script:src 'pre-commit'), "#!/usr/bin/env bash`r`nexit 0`r`n")
+        Deploy-GitHooks -Source $script:src -Destination $script:dest | Should -BeTrue
+
+        $bytes = [System.IO.File]::ReadAllBytes((Join-Path $script:dest 'pre-commit'))
+        ($bytes -contains 13) | Should -BeFalse
+        [System.Text.Encoding]::ASCII.GetString($bytes[0..18]) | Should -BeExactly '#!/usr/bin/env bash'
+        $bytes[19] | Should -Be 10
+    }
 }
 
 Describe 'Set-GlobalHooksPath (wire when unset, preserve otherwise)' {

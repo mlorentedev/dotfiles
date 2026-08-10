@@ -21,6 +21,30 @@
 
 Set-StrictMode -Version Latest
 
+# Repair-HookLineEndings <Path>: strip CR from every text file under <Path> so the
+# deployed POSIX dispatchers keep LF shebangs. Copy-Item is byte-verbatim, so a
+# CRLF-tainted working tree (a checkout predating the .gitattributes 'eol=lf' rule,
+# under core.autocrlf=true) would otherwise propagate "#!/usr/bin/env bash\r" into
+# the mirror -- bash then resolves interpreter "bash\r" and every hook dies with
+# "No such file or directory" (BUG-068). Binary files are left untouched.
+function Repair-HookLineEndings {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
+        Justification = 'LineEndings names a byte-sequence concept; a singular form would misname it.')]
+    param([Parameter(Mandatory)][string]$Path)
+
+    foreach ($file in (Get-ChildItem -LiteralPath $Path -Recurse -File)) {
+        $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+        if ($bytes -contains 0) { continue }      # binary: never normalize
+        if ($bytes -notcontains 13) { continue }  # no CR: already LF
+        $out = [System.Collections.Generic.List[byte]]::new($bytes.Length)
+        for ($i = 0; $i -lt $bytes.Length; $i++) {
+            if ($bytes[$i] -eq 13 -and ($i + 1) -lt $bytes.Length -and $bytes[$i + 1] -eq 10) { continue }
+            $out.Add($bytes[$i])
+        }
+        [System.IO.File]::WriteAllBytes($file.FullName, $out.ToArray())
+    }
+}
+
 # Deploy-GitHooks: clean-mirror the dispatcher tree into the deploy mirror. A
 # clean mirror (remove-then-copy, not a bare copy) so a hook removed upstream
 # never lingers and keeps firing -- a stale security hook is worse than none.
@@ -71,6 +95,7 @@ function Deploy-GitHooks {
     if (Test-Path -LiteralPath $Destination) { Remove-Item -LiteralPath $Destination -Recurse -Force }
     New-Item -ItemType Directory -Path $Destination -Force | Out-Null
     Copy-Item -Path (Join-Path $Source '*') -Destination $Destination -Recurse -Force
+    Repair-HookLineEndings -Path $Destination   # BUG-068: LF shebangs regardless of source EOL
     Write-Host "[SUCCESS] GUARD dispatcher deployed to $Destination" -ForegroundColor Green
     return $true
 }
