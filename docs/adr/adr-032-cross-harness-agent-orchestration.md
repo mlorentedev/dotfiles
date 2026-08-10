@@ -399,7 +399,24 @@ Inside epic #558, in this order:
    claim, not a property. Needs its own ticket under #558.
 2. **#563** — Copilot promoted to `agent-md`; the pi adapter; #895 folded in as its empirical input.
 3. **#562** — the roster, now carrying `surface` and `delegates_to`.
-4. **`enforced/orchestration.md`** + dispatch hooks (#561).
+4. **`enforced/orchestration.md`** + dispatch hooks (#561). **Held behind #881.** That issue's
+   audit found the `harness/enforced/` layer carries six rule ids and not one skill, and set a
+   hold: do not add enforcement layers until the first one has been exercised end to end.
+   Orchestration would be the seventh id, so it inherits the hold. As of 2026-08-09 the gate
+   #881 waits on has still produced **no** `review.md` artifact, so the hold is live — the
+   tickets closing (#875, #879) is not the same as the mechanism running.
+
+   The record is also **written pointer-shaped** (~500 characters: the trigger, the two hard
+   boundaries, and a link to the `dispatching-parallel-agents` skill for the detail), because the
+   injected set is 2,532 characters against a GOV-004 (#673) target of ~9,000 for the whole
+   `AGENTS.md` — 28% already, and 41% with a `definition-of-done`-sized addition. The character
+   budget proposed to bound that is folded into #881 rather than tracked here, since it is the
+   same governance question from the cost side.
+
+   Nothing else in this ADR depends on step 4: levels 1 and 2, the maps and the schema all ship
+   without it. What is lost while it is held is only the *default-on* property (C3) — the
+   capability works, it just has to be asked for. That is the honest trade, and it is preferable
+   to shipping a seventh record onto a layer with no evidence it changes behaviour.
 5. **#462** is reprioritized from optional to prerequisite for the Orca backend, with **#649**
    (installer must handle `.deb` / AppImage / installers, not just binaries) and **#899** (the CLI
    wrapper is broken outside Orca's own terminals) as named blockers.
