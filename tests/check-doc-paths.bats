@@ -28,7 +28,20 @@ instruction_files() {
         "README.md" \
         "ai/claude/CLAUDE.md" \
         "ai/copilot/copilot-instructions.md" \
-        ".github/copilot-instructions.md"
+        ".github/copilot-instructions.md" \
+        "cli/AGENTS.md" \
+        "ai/hermes/AGENTS.md"
+}
+
+# Absolute paths of the same set, for checks that grep file contents directly.
+# The two lists were separate and drifted immediately: `cli/AGENTS.md` and
+# `ai/hermes/AGENTS.md` are instruction files by this suite's own criterion and
+# were governed by neither. One source, two consumers.
+governed_files() {
+    local f
+    while IFS= read -r f; do
+        printf '%s\n' "$DOTFILES_DIR/$f"
+    done < <(instruction_files)
 }
 
 @test "check-doc-paths.sh exists and is executable" {
@@ -114,6 +127,15 @@ instruction_files() {
     [[ "$output" == *"escapes the repo root"* ]]
 }
 
+@test "check-doc-paths: a .. token that is not repo-rooted stays ignored [#916]" {
+    # The traversal check must not fire on tokens the guard promises to ignore.
+    # Ordering it before the rooted gate turned a false-negative fix into a
+    # false positive on `not-a-real-dir/../x.md`.
+    printf 'Unrelated: `not-a-real-toplevel/../other/thing.md` here.\n' > "$SCRATCH/doc.md"
+    run "$GUARD" "$SCRATCH/doc.md"
+    [ "$status" -eq 0 ]
+}
+
 @test "check-doc-paths: the source builtin needs ./ to read versions.conf under zsh [#916]" {
     # The DOCS-013 review found `. versions.conf` in .claude/CLAUDE.md, which
     # resolves to an empty version under zsh: a slashless argument to `.` is
@@ -137,10 +159,18 @@ instruction_files() {
     # not `. x`"), so a grep that cannot tell an instruction from a warning about
     # that instruction fires on the very text teaching people to avoid it. The
     # first draft of this test did exactly that.
-    local hits
-    hits="$(grep -rnE '^[^#]*[^./a-zA-Z0-9_-]\. [a-zA-Z_][a-zA-Z0-9_.-]*\.(conf|sh|zsh)' \
-        "$DOTFILES_DIR/.claude/CLAUDE.md" "$DOTFILES_DIR/AGENTS.md" "$DOTFILES_DIR/README.md" \
-        | grep -v '^\s*#' || true)"
+    # `(^|[^./a-zA-Z0-9_-])` — the alternation is the fix for a real miss: the
+    # first draft required a delimiter character immediately before `. file`,
+    # so a source line flush-left inside a ```bash fence — the exact shape the
+    # original bug took — matched nothing and the test stayed green through two
+    # mutations. A guard blind to the canonical form of its own bug is theatre.
+    local hits f
+    hits=""
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        hits="$hits$(grep -nE '(^|[^./a-zA-Z0-9_-])\. [a-zA-Z_][a-zA-Z0-9_.-]*\.(conf|sh|zsh)' "$f" \
+            | grep -v ':[[:space:]]*#' | sed "s|^|$f:|" || true)"
+    done < <(governed_files)
     if [ -n "$hits" ]; then
         echo "bare source (needs ./) in an instruction file:" >&2
         echo "$hits" >&2

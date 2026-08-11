@@ -131,18 +131,6 @@ for target in "$@"; do
 
         token="${token#./}"
 
-        # A `..` component lets a token resolve outside REPO_ROOT while still
-        # passing is_repo_rooted — `scripts/../../other-repo/README.md` has the
-        # first segment `scripts` and was reported OK. That is a false negative,
-        # the failure mode this guard exists to avoid, so reject it loudly.
-        case "/$token/" in
-            */../*)
-                printf '%s: path escapes the repo root: %s\n' "$target" "$token" >&2
-                missing_in_file=$((missing_in_file + 1))
-                continue
-                ;;
-        esac
-
         # Only rooted paths are checked. A bare filename is deliberately
         # ignored: prose names plenty of files that live elsewhere by design —
         # vault patterns (`pattern-language-standards.md`), per-machine config
@@ -152,6 +140,24 @@ for target in "$@"; do
         # guard someone deletes.
         printf '%s' "$token" | grep -q '/' || continue
         is_repo_rooted "$token" || continue
+
+        # A `..` component lets a token resolve outside REPO_ROOT while still
+        # passing is_repo_rooted — `scripts/../../other-repo/README.md` has the
+        # first segment `scripts` and was reported OK. That is a false negative,
+        # the failure mode this guard exists to avoid, so reject it loudly.
+        #
+        # Order matters and was wrong once: this ran BEFORE the rooted checks
+        # above, so it fired on `not-a-real-dir/../x.md` — a token the guard
+        # promises to ignore by construction. Fixing a false negative created a
+        # false positive. It must stay after the gate that decides "is this ours
+        # to judge at all".
+        case "/$token/" in
+            */../*)
+                printf '%s: path escapes the repo root: %s\n' "$target" "$token" >&2
+                missing_in_file=$((missing_in_file + 1))
+                continue
+                ;;
+        esac
 
         case "$token" in
             *'*'*)

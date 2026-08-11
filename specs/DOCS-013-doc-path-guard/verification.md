@@ -138,3 +138,43 @@ one class-level over all three instruction files.
 A **fresh** adversarial review at the new sha. A Major cannot be waived by
 re-reading the reviewed commit, so `dotf spec archive` stays blocked until a
 passing `review.md` exists for this head.
+
+---
+
+## Round 3 — after the second adversarial review
+
+Round 2 (`reviewed_sha f91a08d`) verified every round-1 finding and every
+CodeRabbit finding as genuinely fixed, then returned **FAIL** on three Majors it
+found itself, none inherited. All reproduced before being accepted.
+
+| # | Finding | Reproduction | Fix |
+|---|---|---|---|
+| 1 | The `..` traversal check ran **before** the rooted gate, so it fired on `not-a-real-toplevel/../other/thing.md` — a token the guard promises to ignore by construction | guard exited 1 on a non-rooted token | Moved after `is_repo_rooted`; new case 10 pins it |
+| 2 | The zsh-sourcing test's regex required a delimiter before `. file`, so a source line **flush-left in a fenced block** — the exact shape the original bug took — matched nothing | `grep -E` on `. versions.conf` at column 1 → no match | `(^\|[^./a-zA-Z0-9_-])` alternation; mutation-verified in two files |
+| 3 | `cli/AGENTS.md` and `ai/hermes/AGENTS.md` are instruction files by this suite's own criterion and were governed by neither list | both exist, both ungoverned | Added; the two lists now derive from one source |
+| Minor | The prohibited-patterns blockquote still said "the last two rows" after this PR appended a third | grep | "last three rows" |
+
+Finding 1 is the one worth remembering: **fixing a false negative introduced a
+false positive**, in the same guard, in the same PR. Ordering a new check before
+the gate that decides "is this ours to judge at all" is how.
+
+Finding 2 is worse in kind. The round-2 `verification.md` claimed that exact
+mutation turned the test red. It did not — the claim was written from intent
+rather than from a run, and the reviewer caught it by running it. A guard blind
+to the canonical form of its own bug is theatre.
+
+### Round-3 evidence
+
+- `bats tests/check-doc-paths.bats` → **12/12**
+- Mutation, the form round 2 proved invisible: `. versions.conf` flush-left in a
+  fenced block turns case 12 **red** in `README.md` **and** in the newly
+  governed `cli/AGENTS.md`; restoring turns it green
+- Mutation: a non-rooted `..` token no longer trips the guard (case 10)
+- Guard clean on all **eight** instruction files
+- `shellcheck` clean; `bash -n` + `zsh -n` clean
+
+### Still owed
+
+A third review at the new sha. Two rounds have each found real defects the
+previous one missed, so the base rate here does not support assuming the third
+finds nothing.

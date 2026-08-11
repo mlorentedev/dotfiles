@@ -1,66 +1,104 @@
 ---
 spec: "DOCS-013-doc-path-guard"
 verdict: "FAIL"
-reviewed_sha: "d6681a63d84d8746b40b87ac685a951cb979086b"
+reviewed_sha: "f91a08d7c9936773911a1ede1e306e4e359f074e"
 reviewer: "claude-sonnet-5"
-date: "2026-08-10"
+date: "2026-08-11"
 ---
 
 ## Adversarial review
 
-**Scope**: DOCS-013-doc-path-guard / PR mlorentedev/dotfiles#922 (`fix/claude-md-staleness`)
-**Sources**: `gh pr diff 922`, `gh pr view 922`, `gh pr checks 922`, `specs/DOCS-013-doc-path-guard/{proposal,tasks,verification}.md`, the reviewed commit checked out at `/home/manu/Projects/dotfiles-wt-claudemd` (d6681a6), plus a from-source build of `cli/cmd/dotf` and a full `bats tests/*.bats` run on both this branch and current `main` (2c4b506).
+**Scope**: DOCS-013-doc-path-guard, re-review at a new commit. No PR is open; diffed directly
+against `main` (`6a40da3`) with `git -C /home/manu/Projects/dotfiles-wt-r2 diff main...HEAD`.
+`main` already carries the first half of this feature (merged as #922); this branch
+(`fix/docs-013-review-findings`, head `f91a08d7c`) is the fix pass responding to the prior
+`review.md` (verdict FAIL at `d6681a6`, one Major + six Minors) plus CodeRabbit findings on #922.
 
-**Process note**: `gh pr view 922` was read (title/body/commits/files) before the diff, ahead of the review skill's prescribed order — the PR body's narrative was seen before candidate findings were written down. Flagging this rather than hiding it. Counter-evidence that anchoring did not dominate the outcome: the three findings that actually move the verdict — the zsh substitution bug, the surviving mutant in the false-positive test, and the red `spec-gate` CI check — appear nowhere in the author's PR narrative and were found by independently building the CLI, mutating the script, and running `gh pr checks`.
+**Sources**: full diff (`scripts/check-doc-paths.sh`, `.claude/CLAUDE.md`, `README.md`,
+`tests/check-doc-paths.bats`, `specs/DOCS-013-doc-path-guard/{verification.md,review.md}`),
+the spec triad, a from-source `cli/cmd/dotf` build (`go build ./cmd/dotf`), the prior `review.md`,
+and direct reproduction/mutation of the script and its tests in the worktree (all mutations
+reverted; worktree confirmed clean before writing this file).
 
 ### Spec and task alignment
 
-All 7 acceptance criteria in `proposal.md` are checked `[x]` and I independently reproduced every one of them from a clean rebuild, not from the author's transcript:
+All 7 acceptance criteria in `proposal.md` remain independently reproducible at this sha
+(`check-doc-paths.sh` OK on all claimed files, zero false positives on `AGENTS.md`, no
+`Projects/knowledge` literal, `bats tests/check-doc-paths.bats` → 11/11). The round-1 Major
+(zsh-broken `. versions.conf` in the golangci-lint pin) is genuinely fixed: `zsh -c 'echo
+"v$(. ./versions.conf; echo "$GOLANGCI_LINT_VERSION")"'` → `v2.12.2`, reproduced directly. All
+six round-1 Minors were checked and are applied as claimed: the "live claim" callout is scoped to
+slash-containing paths, `versionMatches`/`matchPin` wording matches the actual Go source
+(`cli/internal/doctor/checks_tools.go:96`, `checks_deploy.go:416`, called from
+`checks_golangci.go:63`), the shebang is `#!/usr/bin/env bash`, both `setup-macos.sh` mentions in
+`README.md` are de-backticked, and case 6's defense-in-depth status is now documented in both the
+script and the test comment. CodeRabbit's three findings (README's stale "auto-loaded at login" /
+"21 skills" / "316 tests", the stale basename-resolution script header, the path-traversal false
+negative) are also fixed and independently verified: `harness/skills/` has exactly 37 entries,
+`grep -c '^@test' tests/*.bats` sums to 1209 (README's "1200+" holds), and `dotf secrets --help`
+from a from-source build lists exactly the nine subcommands the rewritten Secrets System section
+names. A full `bats tests/*.bats` run reproduces **1208 passed, 1 failed** of 1209 — the one
+failure is `not ok 405 converges over a running dotf: a live binary in dest is replaced, not
+refused` (BUG-054/#807), the same pre-existing, disclosed, unrelated failure the prior review
+already traced to `main`; no new regression.
 
-- `./scripts/check-doc-paths.sh .claude/CLAUDE.md` → `OK` (AC1)
-- `grep -n env-mapping .claude/CLAUDE.md` → only plain-text/backticked mentions describing it as retired, both "adding a secret" recipes now use `dotf secrets set/verify/run` — verified these subcommands are real via `dotf secrets --help` on a from-source build (AC2)
-- Verification Commands section names `GOLANGCI_LINT_VERSION`, `golangci-lint run`, and `dotf doctor` reports the drift under "Go lint toolchain" — confirmed the exact string exists at `cli/internal/doctor/checks_golangci.go:42` (AC3)
-- `grep -n 'Projects/knowledge' .claude/CLAUDE.md` → no matches (AC4)
-- Guard exits 1 on a seeded dead path and on an empty glob match — reproduced directly, not just via bats (AC5)
-- Guard exits 0 on all six instruction files, individually — reproduced directly (AC6)
-- `bats tests/check-doc-paths.bats` → 8/8 (AC7)
-
-`tasks.md` claims map to real diff hunks; nothing is ticked without corresponding code. `verification.md`'s own numbers were re-run and matched exactly: `bats tests/*.bats` → **1205 passed, 1 failed** of 1206 on this branch (the failure is test 402, the pre-existing `#807`/BUG-054 case), and the same root failure reproduces on current `main` (2c4b506, test 394 of 1198) — confirmed pre-existing and not introduced by this PR. `shellcheck`, `bash -n`, `zsh -n` all clean as claimed. The `<claude-mem-context>` block is untouched as declared out of scope.
-
-Where the diligence stops short: `verification.md`'s Evidence and Test-status sections do not mention that GitHub's `spec-gate` check is currently **FAILING** on this PR (see Finding 2) — a real, currently-observable CI state the "Evidence" section should have surfaced.
+Where this stops short: the fixes for round 1 introduced their own defects, and the file-set this
+PR claims to have made complete (six/eight "instruction files") is not actually complete. None of
+these are in the prior review's six Minors or one Major — this pass found them independently, by
+reproducing the round-2 verification claims rather than reading them.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location |
 |----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | Verification Commands (`.claude/CLAUDE.md:51`) | The new golangci-lint pin snippet `go install …@v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")` resolves the version to **empty** under zsh, producing `@v` instead of `@v2.12.2`. Under POSIX `.`/source semantics, a slashless argument is searched via `$PATH` only; bash additionally falls back to the current directory, zsh does not. This is exactly the "instructions are acted on as fact" failure class `#916` exists to fix, shipped in the same PR that introduces the guard against it, in the project's default interactive shell. | Reproduced with `pwd` confirmed identical: `bash -c 'echo "v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")"'` → `v2.12.2`; `zsh -c` of the same → `zsh:.:1: no such file or directory: versions.conf` then `v`. Fixed form `. ./versions.conf` → `v2.12.2` under zsh too. | UNTESTED. `versions-conf.bats` test "versions.conf sourceable under zsh" (line ~1179 in the full run) sources the file differently (with a `./`-qualified or already-rooted path) and does not exercise this bare-relative form, so the suite stays green over this exact bug. | code — `.claude/CLAUDE.md:51`, change `. versions.conf` → `. ./versions.conf` |
-| Minor | REAL | `.claude/CLAUDE.md` self-consistency (lines 84-88, 124, 149-150) | The new "Editing this file" callout states, unqualified, "a backticked repo path is a live claim." The guard only checks *slash-containing* tokens (bare filenames are exempt by design). The same file's own new prose backticks three dead bare filenames — `` `env-mapping.conf` `` (line 124), `` `healthcheck.sh` ``/`` `doctor.sh` `` (line 149) — none of which exist anywhere in the repo, and none of which the guard flags. No reader is actually misled (every instance is surrounded by "retired"/"no longer exists"), but the stated rule oversells what the mechanism enforces, in the very file that introduces the rule. | `find . -iname doctor.sh -o -iname healthcheck.sh -o -iname env-mapping.conf` → no matches; `./scripts/check-doc-paths.sh .claude/CLAUDE.md` → still `OK`. | UNTESTED | spec/docs — scope the callout to "a backticked repo-relative path containing `/`", or de-backtick the three dead names |
-| Minor | REAL | Mergeability / Evidence completeness | `gh pr checks 922` shows `spec-gate: fail` (twice, at 03:15 and 03:16 UTC). CI log: `[FAIL] SDD archive-on-merge violation: This PR closes an issue whose spec is still active: DOCS-013-doc-path-guard (#916)` — it wants `dotf spec archive DOCS-013-doc-path-guard` run in this same PR (Discipline Gate step 7), which itself needs a passing `review.md` (this file). `verification.md`'s Evidence section lists only local pre-commit/pre-push results and never mentions this. The author's local `./scripts/check-spec-gate.sh --explain` genuinely cannot evaluate this rule — it needs live PR body/issue state, only available to the CI-only `spec-gate-pr.sh` adapter — so this is an omission, not a fabrication. Functionally this is the process working as designed (this review is the missing piece), not a defect in the change. | `gh pr checks 922` → `spec-gate fail … https://github.com/mlorentedev/dotfiles/actions/runs/31454885301/job/93666513902`; confirmed via `gh run view --log-failed`. | UNTESTED / not applicable (CI-state, not code) | process — resolve by committing this review.md, then running `dotf spec archive DOCS-013-doc-path-guard` in this PR (or skip-archive label + rationale) |
-| Minor | REAL | Test discrimination (`tests/check-doc-paths.bats` case 6) | `verification.md` (AC6 row) frames case 6 as pinning "nine token shapes" that caused 13 false positives on `AGENTS.md`. Mutation-tested: removing the leading-character skip for `~`, `$`, and `://` (case `` `/*|'~'*|'$'*|-*|*://*'` `` → `` `/*|-*'` ``) leaves all 8 bats tests green — the three affected example lines (`~/.claude/skills/`, `$VAULT_PATH/…`, `https://…`) are independently rejected by `is_repo_rooted` regardless (their first path segment, `~`, `$VAULT_PATH`, `https:`, is never a real top-level repo entry). So 3 of the 9 "pinned" shapes pass by luck through a different code path, not the filter case 6 nominally tests. | Reproduced by mutation: edited `scripts/check-doc-paths.sh` to drop the `~`/`$`/`://` branch, ran `bats tests/check-doc-paths.bats` → 8/8 unchanged, then restored the original file (confirmed via `diff` — worktree is byte-identical to pre-mutation state). Two other mutations (reintroducing the ALL-CAPS false-negative; disabling the exists-check; removing `<`/`>`/`&` from the char-class filter) all correctly turned tests red, confirming the suite *does* discriminate for those paths — this is specifically about the `~`/`$`/`://` branch. | Named test exists (`check-doc-paths: ignores non-path tokens that merely look pathish [#916]`) but does not discriminate this filter in isolation | tests / script comment — either add a case where the leading-char filter is load-bearing independent of `is_repo_rooted`, or note in the script comment that this branch is currently defense-in-depth, not uniquely load-bearing |
-| Minor | REAL | Guard blind spot (by design) | Bare filenames (no `/`) are never checked — a deliberate, disclosed tradeoff (`proposal.md` "Alternatives rejected": basename resolution produced false positives on `machine.json`, `review.md`, vault patterns). The blind spot is real and already has a live instance in the repo: `README.md` (pre-existing, untouched by this PR) says "there is no `` `setup-macos.sh` `` yet" twice — a backticked reference to a file that has never existed, invisible to the new guard. | `find . -iname setup-macos.sh` → no matches; `./scripts/check-doc-paths.sh README.md` → `OK`. | UNTESTED (accepted tradeoff, not a bug) | n/a — documented tradeoff; noting the concrete instance for future readers |
-| Minor | REAL | Doc nit (`.claude/CLAUDE.md:137-139`) | "Add the version check … `versionMatches` for a versioned `$APPS_HOME` dir, or `matchPin` against the live binary" presents the two as parallel, but `matchPin` is a function (`cli/internal/doctor/checks_deploy.go:416`) while `versionMatches` is an exported package-level table (`cli/internal/doctor/checks_tools.go:96`, `var versionMatches = []versionedDir{...}`), not something you call. Directionally correct (you do add an entry to that table) but imprecisely framed. | `grep -n "^func matchPin\|versionMatches" cli/internal/doctor/*.go` | UNTESTED | docs — "append an entry to the `versionMatches` table" |
-| Minor | REAL | Style nit | `scripts/check-doc-paths.sh` uses `#!/bin/bash`, while `.claude/CLAUDE.md`'s own "Adding a new shell script" workflow (governed by this same guard) says step 1 is "use `#!/usr/bin/env bash` shebang." 10 of 29 existing scripts already deviate, so this isn't a new pattern, but the new file introducing the convention doesn't follow the repo's own documented one. | `head -1 scripts/check-doc-paths.sh` → `#!/bin/bash` | UNTESTED | code — one-line change if desired |
+| Major | REAL | `check-doc-paths.sh` traversal fix (lines 134-143) | The `..`-escape check runs *before* `is_repo_rooted` and fires on **any** backticked token containing a `/../` component, even one whose first segment is not a real top-level repo entry. This reintroduces the exact false-positive failure mode the guard's own design section warns against ("A guard with false positives is worse than none — it gets bypassed"): a token that should be silently ignored by construction (non-rooted, e.g. describing an unrelated/hypothetical path) instead fails the guard with "path escapes the repo root". | Reproduced: `printf 'See \`not-a-real-toplevel-dir/../other/thing.md\` for context.\n' > doc.md; ./scripts/check-doc-paths.sh doc.md` → exit 1, `path escapes the repo root: not-a-real-toplevel-dir/../other/thing.md`. Also reproduced for a token that nets back inside the repo (`scripts/../scripts/utils.sh` → also rejected, which is at least consistent, but the non-rooted case is the real defect). | UNTESTED — the only escape test (`check-doc-paths: rejects a token that escapes the repo root [#916]`) uses `scripts/../../dotfiles/README.md`, where `scripts` **is** a real top-level entry, so it never exercises the non-rooted branch. | code — move the `..`-rejection after (or fold it into) the `is_repo_rooted` gate so a token with a fictitious first segment is ignored, not flagged. While there: the script header lists "contains no `..` component" among the conditions for a token being *checked*, which reads as "silently ignored" like the other bullets in that list — the implementation actually rejects loudly, so the header should say so |
+| Major | REAL | `tests/check-doc-paths.bats` — zsh-sourcing regression test (line 132) | The regex `^[^#]*[^./a-zA-Z0-9_-]\. [a-zA-Z_][a-zA-Z0-9_.-]*\.(conf\|sh\|zsh)` requires a delimiter character immediately before `. file`. A source line at true start-of-line — flush-left inside a ` ```bash ` fence, exactly the style used throughout this file's own existing code blocks, and exactly the form the original round-1 bug took — has nothing before the `.`, so the regex never matches it. The test protects an inline-backticked mention (where the leading backtick supplies the delimiter) but not the live, copy-pasteable command form it was written to guard. | Reproduced twice by mutation, both reverted cleanly: (1) inserted a flush-left `. versions.conf` line into `.claude/CLAUDE.md`'s own Verification-Commands fence — `bats tests/check-doc-paths.bats` stayed 11/11 green. (2) Same insertion into `README.md`'s install snippet (`cd ~/dotfiles-repo` / `. versions.conf` / `./setup-linux.sh`) — also stayed green. This directly contradicts `verification.md`'s Round-2 claim: *"Mutation: a bare `. versions.conf` added to a live README code block turns case 11 red; removing it turns it green again."* That claim does not reproduce for the realistic flush-left form. | Named test exists (`check-doc-paths: no instruction file sources a config without ./ [#916]`) but does not discriminate the case it names — effectively UNTESTED for the shape that matters | tests — broaden the regex's leading alternative to also match true start-of-line, e.g. `(^\|[^./a-zA-Z0-9_-])\. `; then re-verify the verification.md claim before trusting it |
+| Major | REAL | Governed file-set completeness (`instruction_files()` in `tests/check-doc-paths.bats`, and `verification.md`'s "six instruction files" claim) | `cli/AGENTS.md` and `ai/hermes/AGENTS.md` are genuine, pre-existing instruction files — each opens with agent-directed meta-instructions ("Nearest-file instructions for the Go CLI…", "Target agent: Hermes Agent…") and each fits the test file's own stated governance criterion ("files that tell an agent what to do") verbatim. Neither is in `instruction_files()` (pre-existing six-file list, inherited unchanged from #922 — not new in this diff) nor in the *new* zsh-sourcing regression test's three-file list (`.claude/CLAUDE.md`, `AGENTS.md`, `README.md` only — half of the set the suite already governs). `check-doc-paths.sh` is not wired into any CI workflow, tracked git hook (`git-hooks/{pre-commit,pre-push,commit-msg,prepare-commit-msg,post-checkout}`), or `.github/hooks/` script — checked all three locations, no hits beyond the bats file and the script's own usage text. So these two files currently have **zero** protection against the exact stale-path regression class #916 exists to catch, despite `verification.md` and the "Editing this file" callout implying the convention now covers instruction files uniformly. | `git show main:cli/AGENTS.md`, `git show main:ai/hermes/AGENTS.md` — both predate this branch. `./scripts/check-doc-paths.sh cli/AGENTS.md ai/hermes/AGENTS.md` (also run under real `zsh`, not just `zsh -n`) → both currently `OK` (dormant, not a live failure today), but nothing re-checks them going forward. | UNTESTED | tests — add both files to `instruction_files()` and to the zsh-sourcing regex's file list |
+| Minor | REAL | `.claude/CLAUDE.md` self-consistency (prohibited-patterns table, lines ~9-24) | This PR appended a new table row (`. file` bare-sourcing) as the table's new last row, whose own "Why" column says "**Fails silently.**" — but the summary blockquote immediately below still says "The last two rows fail **silently**", now off by one: three consecutive rows are silent-failure cases, not two. | Read directly; `sed -n '9,24p' .claude/CLAUDE.md`. | UNTESTED | docs — "last two rows" → "last three rows" |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | C | All 7 named ACs independently verified met, but a Major defect (zsh-broken pin snippet) sits in the same "instructions must match reality" surface the PR exists to fix — that's a substantial negative-path gap, not a minor one. |
-| Verification       | B | Every claimed number/command was independently reproduced exactly (1205/1206, 8/8, 0 false positives on 6 files); gap is not disclosing the red `spec-gate` check and not testing the doc's own command snippets under zsh despite testing the guard script itself under zsh. |
-| Scope              | A | Diff matches the proposal exactly: guard + two doc files + spec triad + tests; `<claude-mem-context>` explicitly and correctly left alone. |
-| Reliability        | B | The guard script's own error handling, exit codes, and glob/nullglob logic are solid and verified under both bash and zsh as interpreters, not just via shebang; the zsh defect lives in doc prose, not the script's control flow. |
-| Maintainability    | B | Script is well-commented with rationale for each filter; minor smells are the untested-in-isolation leading-char filter and the `versionMatches` wording imprecision. |
-| Handoff-readiness  | B | Spec triad complete and honest (verification.md's own Sign-off explicitly declares the review "owed, not performed"); clear next action once this file lands. |
+| Correctness        | C | All 7 ACs and the round-1 Major reproduce as fixed, but the traversal fix and the file-set claim both have substantial, reproducible negative-path gaps of their own. |
+| Verification       | C | Most claims (version pin, `versionMatches`/`matchPin`, skill/test counts, `dotf secrets` interface, full-suite regression) independently reproduced exactly — but one specific, load-bearing Round-2 mutation claim does not reproduce, which is worse than an unverifiable claim because it was asserted as tested. |
+| Scope              | B | Diff matches the fix-pass proposal (round-1 findings + CodeRabbit findings); no unrelated changes. |
+| Reliability        | B | The guard's core matching logic is sound and re-verified by actually *executing* (not just parsing) under both bash and zsh — including the traversal repros — with identical output; the new traversal branch's false-positive class is the one soft spot. |
+| Maintainability    | B | Well-commented, each defensive branch explains its own rationale; the off-by-one blockquote is a small, isolated smell. |
+| Handoff-readiness  | C | Spec triad present and mostly honest, but `verification.md`'s Round-2 evidence contains a claim that does not hold up under reproduction, which is exactly the failure mode a handoff reader can't detect without re-running it themselves. |
 
 ### Verdict
 FAIL
 
-One Major finding (the zsh-broken `golangci-lint` pin snippet) is sufficient per the skill's aggregation rule to force FAIL regardless of the otherwise-clean rubric. The guard script itself (`scripts/check-doc-paths.sh`) is sound — every one of its own behavioral claims was independently reproduced, including two defensive mutation tests that correctly went red. The Major sits in adjacent new content (the Verification Commands prose), not in the guard's logic, but it is squarely inside this PR's diff and inside the exact "does the instruction actually work" claim the PR is making about itself.
+Three Major findings, each independently reproduced in this session (not inherited from the prior
+review, which did not find any of them): a new false-positive class in the traversal fix, a
+regression test that misses the realistic form of the bug it exists to catch — contradicting
+`verification.md`'s own mutation-test claim — and two known instruction files silently excluded
+from the only enforcement path this guard has. Per the skill's aggregation rule, any one Major
+forces FAIL regardless of the otherwise-solid rubric; three do so more firmly. The round-1 Major
+and all six round-1 Minors, plus all three CodeRabbit findings, are genuinely fixed and were
+independently reproduced rather than taken on faith.
 
 ### Recommended next steps (before archive)
 
-1. **Required to flip to PASS**: fix `.claude/CLAUDE.md:51` — `. versions.conf` → `. ./versions.conf` (or equivalent slash-qualified form). Re-verify: `zsh -c 'echo "v$(. ./versions.conf; echo "$GOLANGCI_LINT_VERSION")"'` → expect `v2.12.2`. Re-run `bats tests/check-doc-paths.bats` (unaffected but cheap) and get a fresh review with a new `reviewed_sha` — a Major cannot be waived by re-reading the same commit.
-2. Optional, non-blocking, cheap: scope the "backticked repo path is a live claim" callout to slash-containing paths (or de-backtick the three dead bare names it currently contains); clarify the `versionMatches`/`matchPin` wording; consider `#!/usr/bin/env bash` for the new script; consider naming which bats case is meant to cover the `~`/`$`/`://` filter, or note in the script that it is currently defense-in-depth.
-3. **Separately, process not code**: once this review passes, commit `review.md`, then run `dotf spec archive DOCS-013-doc-path-guard` in this same PR (or add the `skip-archive` label with a rationale) to resolve the currently-failing `spec-gate` CI check — this is expected, not a defect, and is exactly the mechanism `#881`/`#875` have been waiting on the first artifact of.
+1. **Required to flip to PASS**: fix the traversal-check ordering in `scripts/check-doc-paths.sh`
+   so `..`-rejection only fires on tokens that are already `is_repo_rooted`. Re-verify: the
+   `not-a-real-toplevel-dir/../other/thing.md` reproduction above must exit 0 (silently ignored),
+   while the existing `scripts/../../dotfiles/README.md` case must still exit 1.
+2. **Required to flip to PASS**: broaden the zsh-sourcing regression regex in
+   `tests/check-doc-paths.bats` to catch a flush-left `. file` line, and re-run the exact
+   reproduction in this review (insert `. versions.conf` as a standalone line in a `README.md`
+   bash fence, confirm the test goes red, remove it, confirm green) before trusting
+   `verification.md`'s claim again.
+3. **Required to flip to PASS**: add `cli/AGENTS.md` and `ai/hermes/AGENTS.md` to
+   `instruction_files()` (and to the zsh-sourcing test's file list), and confirm both still pass
+   `check-doc-paths.sh` cleanly (they do today).
+4. Optional, cheap: fix `.claude/CLAUDE.md`'s "last two rows" → "last three rows" in the
+   prohibited-patterns blockquote.
+5. After 1-3 land, get a **fresh** review at the new sha — a Major cannot be waived by re-reading
+   the same commit, and this file's own findings were only found by re-running the round-2
+   verification claims rather than reading them.
 
-`dotf spec archive` is **not advisable** in the current state — verdict is FAIL, and the gate's own `Verdict.Blocks()` logic (`cli/internal/spec/review.go:37-39`) refuses to archive on anything other than PASS or PASS-WITH-GAPS, so it would refuse this artifact by design.
+`dotf spec archive` is **not advisable** in the current state — verdict is FAIL, and
+`cli/internal/spec/review.go`'s `Verdict.Blocks()` refuses to archive on anything other than PASS
+or PASS-WITH-GAPS.
