@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -49,8 +50,10 @@ diffs from repositories you do not own.`,
 			if err != nil {
 				return err
 			}
-			cmd.Println(out)
-			return nil
+			// The review body is the command's product and is routinely piped —
+			// it must reach stdout, which cmd.Println does not do.
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), out)
+			return err
 		},
 	}
 

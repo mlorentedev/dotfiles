@@ -417,8 +417,19 @@ setup() {
 @test "dotf env path DOTFILES_REPO_DIR resolves to the real checkout [#696]" {
     command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
     dotf env set --help >/dev/null 2>&1 || skip "installed dotf predates 'env set'; seed not exercised"
-    run dotf env path DOTFILES_REPO_DIR
-    [ "$status" -eq 0 ]
-    [ "$output" = "$REPO_DIR" ]
-    [ -d "$output/.git" ]
+    # Captured through a plain $(...) with stderr discarded — the exact idiom
+    # setup-linux.sh uses. `run` is avoided on purpose: it merges stdout and
+    # stderr into $output, so it passed all the way through BUG-070 (#915)
+    # while every real caller was capturing an empty string.
+    local resolved
+    resolved="$(dotf env path DOTFILES_REPO_DIR 2>/dev/null)"
+    [ "$resolved" = "$REPO_DIR" ]
+    [ -d "$resolved/.git" ]
+}
+
+@test "dotf version reaches stdout so install-dotf can grep the semver [#915]" {
+    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
+    local ver
+    ver="$(dotf version 2>/dev/null)"
+    [[ "$ver" == dotf\ version\ * ]]
 }

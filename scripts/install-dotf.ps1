@@ -134,9 +134,12 @@ function Install-Dotf {
 
         # Idempotence: skip when the pinned version is already on PATH.
         if (Get-Command dotf -ErrorAction SilentlyContinue) {
-            # `dotf version` may print to stderr, so capture both streams (2>&1)
-            # and pull the semver out with a regex — robust to the stream and to
-            # empty output (StrictMode makes `@()[-1]` throw, so never index blind).
+            # The stream merge (2>&1) is kept deliberately: BUG-070 (#915) fixed
+            # `dotf version` to write to stdout, but this installer runs against
+            # whatever dotf is already on PATH — including binaries built before
+            # that fix, which answer on stderr. Merging both streams and regexing
+            # the semver is correct for either. (StrictMode makes `@()[-1]` throw,
+            # so never index blind.)
             $verRaw = (& dotf version 2>&1 | Out-String)
             $current = if ($verRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
             if ($current -eq $Version) {

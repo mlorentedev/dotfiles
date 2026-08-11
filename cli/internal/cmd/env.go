@@ -74,8 +74,10 @@ func newEnvPathCmd() *cobra.Command {
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.Println(env.ResolvePath(args[0]))
-			return nil
+			// Fprintln(OutOrStdout()), never cmd.Println: Cobra's Print* family
+			// writes to OutOrStderr(), and this value is read through $(...).
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), env.ResolvePath(args[0]))
+			return err
 		},
 	}
 }
@@ -114,7 +116,9 @@ func newEnvGenerateCmd() *cobra.Command {
 			}
 			switch {
 			case stdout:
-				cmd.Print(res.Content)
+				if _, werr := fmt.Fprint(cmd.OutOrStdout(), res.Content); werr != nil {
+					return werr
+				}
 			case check:
 				if res.Drifted {
 					return fmt.Errorf("%s is stale — run `dotf env generate`", res.Output)

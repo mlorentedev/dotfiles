@@ -85,9 +85,13 @@ install_dotf() {
     _dotf_archname="$(_dotf_arch "$(uname -m)")" || return 1
 
     if command_exists dotf; then
-        # `dotf version` may print to stderr, so capture both streams (2>&1) and
-        # extract the semver — robust to the stream and to empty output (parity
-        # with install-dotf.ps1; root cause: dotf writes version to stderr).
+        # The stream merge (2>&1) is kept deliberately: BUG-070 (#915) fixed
+        # `dotf version` to write to stdout, but this installer's whole job is
+        # to run against whatever dotf is already on PATH — including binaries
+        # built before that fix, which answer on stderr. Merging both streams
+        # and regexing the semver is correct for either. Do not tighten it to
+        # stdout-only; that would silently break the idempotence skip on an old
+        # binary and reinstall on every run.
         _dotf_current="$(dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
         if [ "$_dotf_current" = "$version" ]; then
             log_info "dotf $version already installed; skipping"
