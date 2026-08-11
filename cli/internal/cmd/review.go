@@ -52,8 +52,8 @@ diffs from repositories you do not own.`,
 			}
 			// The review body is the command's product and is routinely piped —
 			// it must reach stdout, which cmd.Println does not do.
-			fmt.Fprintln(cmd.OutOrStdout(), out)
-			return nil
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), out)
+			return err
 		},
 	}
 

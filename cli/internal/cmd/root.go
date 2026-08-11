@@ -43,7 +43,9 @@ func newVersionCmd(version string) *cobra.Command {
 		Run: func(cmd *cobra.Command, _ []string) {
 			// install-dotf.{sh,ps1} grep this for the installed semver, so it
 			// must reach stdout — cmd.Printf writes to OutOrStderr().
-			fmt.Fprintf(cmd.OutOrStdout(), "dotf version %s\n", version)
+			// Run (not RunE) — no error to return, so discard explicitly, as
+			// secrets.go does. A failed write to stdout here is not actionable.
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "dotf version %s\n", version)
 		},
 	}
 }
