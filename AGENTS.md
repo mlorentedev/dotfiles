@@ -168,7 +168,10 @@ archive a spec. Subcommands via `dotf spec …` (Go CLI, works in CI/Windows):
 `init` ("create/scaffold spec X"), `fill` ("write the proposal"), `archive`
 ("close spec X"). Specs live at `specs/<feature-id>/`, archived at
 `specs/archive/` (never deleted — audit trail). `<feature-id>`:
-`^[A-Z]+-\d+(-[a-z0-9-]+)?$` or `^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$`.
+`^([A-Z]+[0-9]*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`
+— the AREA may carry digits (`ADR028-004`), the number an optional sub-id letter
+(`SDD-012b`). Verbatim copy of `idPattern` in `cli/internal/spec/spec.go`, held
+to it by `TestIDPatternProseMatchesCode`; do not reword it.
 
 **Skip SDD for**: typos, comment-only edits, mechanical refactors, bug fixes
 <20 lines with obvious cause, doc-only changes.
