@@ -53,7 +53,6 @@ admin needed; some changes show after an Explorer restart.
 ├── cli/                        # `dotf` Go CLI (doctor, init, env, spec) — primary user-facing tool
 ├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
-│   ├── load-secrets.sh / .ps1  # Secrets → env vars (sourced at login)
 │   ├── vault.sh                # Vault tooling dispatcher
 │   └── …                       # ~50 scripts total (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets
@@ -93,7 +92,7 @@ scripts that a human ever runs directly — everything else is a library, hook, 
 | `vault <subcommand>` | `scripts/vault.sh` | Vault tooling: `vault health`, `vault maintenance`, `vault check-escapes` |
 | `profile-shell` | `scripts/shell-profile.sh` | Measure shell startup time (zsh/bash, --detail for per-function) |
 | `obs` | `scripts/obs-cli.sh` | Open Obsidian vault (Linux, --no-sandbox, GUI check) |
-| `. scripts/load-secrets.sh` | `scripts/load-secrets.sh` | Decrypt age secrets → env vars (auto-sourced at login; manual when adding a new secret) |
+| `dotf secrets run -- <cmd>` | `dotf` CLI | Inject mapped secrets into one child process only, never the ambient shell (ADR-028). `show`/`ls`/`verify` for single values, inventory and health |
 
 ## Key Commands
 
