@@ -37,8 +37,16 @@ func captureRealStreams(t *testing.T, args ...string) (stdout, stderr string, er
 	// Drain concurrently: a command writing more than the pipe buffer would
 	// otherwise block forever on the write.
 	outCh, errCh := make(chan string, 1), make(chan string, 1)
-	go func() { defer outR.Close(); b, _ := io.ReadAll(outR); outCh <- string(b) }()
-	go func() { defer errR.Close(); b, _ := io.ReadAll(errR); errCh <- string(b) }()
+	go func() {
+		defer func() { _ = outR.Close() }()
+		b, _ := io.ReadAll(outR)
+		outCh <- string(b)
+	}()
+	go func() {
+		defer func() { _ = errR.Close() }()
+		b, _ := io.ReadAll(errR)
+		errCh <- string(b)
+	}()
 
 	func() {
 		defer func() {
