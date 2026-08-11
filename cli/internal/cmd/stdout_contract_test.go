@@ -3,6 +3,7 @@ package cmd
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -36,8 +37,8 @@ func captureRealStreams(t *testing.T, args ...string) (stdout, stderr string, er
 	// Drain concurrently: a command writing more than the pipe buffer would
 	// otherwise block forever on the write.
 	outCh, errCh := make(chan string, 1), make(chan string, 1)
-	go func() { b, _ := io.ReadAll(outR); outCh <- string(b) }()
-	go func() { b, _ := io.ReadAll(errR); errCh <- string(b) }()
+	go func() { defer outR.Close(); b, _ := io.ReadAll(outR); outCh <- string(b) }()
+	go func() { defer errR.Close(); b, _ := io.ReadAll(errR); errCh <- string(b) }()
 
 	func() {
 		defer func() {
@@ -97,15 +98,27 @@ func TestStdoutContracts(t *testing.T) {
 
 // TestEnvGenerateStdoutFlagWritesToStdout is separated because --stdout is the
 // starkest case: a flag named for the stream it was not using.
+//
+// The contract is written into a temp DOTFILES_REPO_DIR rather than inherited
+// from the ambient checkout, so the case cannot degrade into a skip. A skip
+// here would be indistinguishable from a pass while silently testing nothing —
+// the failure mode this whole file exists to close.
 func TestEnvGenerateStdoutFlagWritesToStdout(t *testing.T) {
 	dir := t.TempDir()
+	contract := `{"env_vars":[{"name":"PROBE_DIR","required":false,` +
+		`"default":{"linux":"$HOME/probe","windows":"$env:USERPROFILE\\probe"}}]}`
+	if err := os.WriteFile(filepath.Join(dir, "env-contract.json"), []byte(contract), 0o600); err != nil {
+		t.Fatalf("seed contract: %v", err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", dir)
 	t.Setenv("DOTFILES_DIR", dir)
 
 	stdout, stderr, err := captureRealStreams(t, "env", "generate", "--stdout")
 	if err != nil {
-		t.Skipf("env generate unavailable in this environment: %v (stderr=%q)", err, stderr)
+		t.Fatalf("env generate --stdout failed: %v (stderr=%q)", err, strings.TrimSpace(stderr))
 	}
-	if strings.TrimSpace(stdout) == "" {
-		t.Errorf("--stdout wrote nothing to stdout; stderr was: %q", strings.TrimSpace(stderr))
+	if !strings.Contains(stdout, "PROBE_DIR") {
+		t.Errorf("--stdout did not write the rendered contract to stdout (got %q); stderr was: %q",
+			strings.TrimSpace(stdout), strings.TrimSpace(stderr))
 	}
 }
