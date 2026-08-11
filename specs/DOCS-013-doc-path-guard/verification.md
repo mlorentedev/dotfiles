@@ -68,3 +68,73 @@ identical to a clean repo.
       implemented the change and therefore cannot review it. `dotf spec archive`
       refuses without a fresh passing `review.md`, so this must be supplied by
       another session before the spec can be archived.
+
+---
+
+## Round 2 — after the adversarial review
+
+The round-1 review (`review.md`, verdict **FAIL**, reviewed_sha `d6681a6`) found
+one Major that neither the author nor CodeRabbit caught, plus six Minors. All
+were reproduced independently before being accepted.
+
+### The Major
+
+`.claude/CLAUDE.md:51` documented the golangci-lint install as
+`@v$(. versions.conf; …)`. A slashless argument to the `.` builtin is searched
+on `$PATH` only; bash additionally falls back to the cwd, zsh does not. Under
+zsh — the default interactive shell here — it resolved to **empty**, producing
+`@v`:
+
+```console
+$ bash -c 'echo "v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")"'
+v2.12.2
+$ zsh -c 'echo "v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")"'
+zsh:.:1: no such file or directory: versions.conf
+v
+```
+
+A wrong instruction, shipped in the PR whose purpose was to stop instructions
+being wrong, by the same bash/zsh divergence class the file's own
+prohibited-patterns table documents twenty lines above it.
+
+Fixed to `. ./versions.conf`; verified `2.12.2` under zsh. The pattern is now a
+row in that table, and two tests pin it: one on `versions.conf` specifically,
+one class-level over all three instruction files.
+
+### Minors applied
+
+| Finding | Resolution |
+|---|---|
+| "backticked path is a live claim" oversells the guard (bare names unchecked) | Callout scoped to slash-containing paths, with the blind spot stated |
+| Case 6 pins 9 shapes but 3 pass via `is_repo_rooted`, not the filter | Not papered over — the filter is now labelled defense-in-depth in the script, and the test comment says it pins the outcome, not the mechanism |
+| `versionMatches` described as callable | "append an entry to the `versionMatches` table" |
+| `#!/bin/bash` vs the repo's documented `#!/usr/bin/env bash` | Changed |
+| `setup-macos.sh` — live instance of the bare-name blind spot | De-backticked both README mentions |
+| red `spec-gate` not disclosed in Evidence | Disclosed here; archive-on-merge resolves when this review lands |
+
+### CodeRabbit findings (PR #922), all reproduced
+
+- README:42 claimed secrets are "auto-loaded at login", contradicting the
+  ADR-028 text this PR added at :95. Also stale in the same block: "21 custom
+  skills" (37) and "316 BATS tests" (1206).
+- The script header still described basename resolution that was removed.
+- **Path traversal**: `scripts/../../dotfiles/README.md` passed `is_repo_rooted`
+  and was reported `OK` while resolving outside the repo — a false negative.
+  CodeRabbit's stated mechanism was slightly off (it predicted a wrong success
+  on a nonexistent path); the real shape is silent acceptance. Rejected now,
+  with a regression test.
+
+### Round-2 evidence
+
+- `bats tests/check-doc-paths.bats` → **11/11**
+- Mutation: a bare `. versions.conf` added to a live README code block turns
+  case 11 red; removing it turns it green again
+- `zsh -c '. ./versions.conf; echo $GOLANGCI_LINT_VERSION'` → `2.12.2`
+- `shellcheck` clean; `bash -n` + `zsh -n` clean
+- Guard clean on all instruction files
+
+### Still owed
+
+A **fresh** adversarial review at the new sha. A Major cannot be waived by
+re-reading the reviewed commit, so `dotf spec archive` stays blocked until a
+passing `review.md` exists for this head.

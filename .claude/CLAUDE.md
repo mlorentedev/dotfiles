@@ -18,6 +18,7 @@ All shell scripts MUST work in **both bash and zsh**. Before modifying any `.sh`
 | `${!var}` (indirect) | See `utils.sh` zsh branch | bash/zsh have different indirect syntax |
 | `for d in path/*/` where `path` may not exist | `bash -c 'shopt -s nullglob; …'`, or test the dir first | **Fails silently.** zsh's default `NOMATCH` makes an unmatched glob abort the *whole* compound command — the loop never runs and prints nothing |
 | `set -- $var` / unquoted `$var` to split into fields | read line by line, or `${=var}` in zsh | **Fails silently.** zsh does not word-split unquoted parameters: you get one field containing everything, not N |
+| `. file` (no slash) to source from the cwd | `. ./file` | **Fails silently.** A slashless argument to `.` is searched on `$PATH` only; bash also falls back to the cwd, zsh does not. In a `$(...)` the result is an empty string, not an error |
 
 > The last two rows fail **silently**: they return an empty or single-element result instead of an
 > error, and empty reads as a finding. Every row above them breaks loudly. Before believing an
@@ -48,7 +49,11 @@ major reports "0 issues" on code CI rejects (BUG-071). `dotf doctor` reports
 the drift under *Go lint toolchain*; install the pin with:
 
 ```bash
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")
+# `. ./versions.conf`, not `. versions.conf` — a slashless argument to the
+# source builtin is searched on $PATH only, so bash finds it in the cwd and zsh
+# does not. Under zsh the bare form expands to an empty version and installs
+# `@v`. Same class as the prohibited-pattern table above.
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(. ./versions.conf; echo "$GOLANGCI_LINT_VERSION")
 ```
 
 ```bash
@@ -81,11 +86,17 @@ dotf doctor
 | `AGENTS.md` (root) | Cross-agent SSOT | Canonical system prompt read by OpenCode (natively) and Claude (via this file's pointer). Per-agent files in `ai/<agent>/` and `.github/` delegate here. |
 | `tmux.conf` | tmux configuration (Linux only) | Deployed via symlink to `~/.tmux.conf` by `setup-linux.sh` |
 
-> **Editing this file: a backticked repo path is a live claim.**
+> **Editing this file: a backticked repo path *containing a slash* is a live claim.**
 > `scripts/check-doc-paths.sh` fails CI when one does not resolve — that is how
 > this file came to name seven files that no longer existed (#916). To mention a
 > path that is gone ("the old loader lived at scripts/load-secrets.sh"), write it
 > in plain text, not backticks.
+>
+> The slash qualifier is not a detail: bare filenames are **not** checked, by
+> design — resolving them by basename flagged vault patterns and `machine.json`
+> on `AGENTS.md`. So a backticked bare name like `env-mapping.conf` passes the
+> guard whether or not it exists. Prefer the rooted form when you want the
+> guard's protection.
 
 ## Secrets System (ADR-028)
 
@@ -134,9 +145,10 @@ Run `dotf secrets <sub> --help` for the exact flags; do not reconstruct the old
 1. Add `NEWTOOL_VERSION=X.Y.Z` to `versions.conf`
 2. Add `export NEWTOOL_HOME="$APPS_HOME/newtool-${NEWTOOL_VERSION:-X.Y.Z}"` to both `.zshrc` and `.bashrc`
 3. Add `export PATH="$NEWTOOL_HOME/bin:$PATH"` in both RC files (if the tool has binaries)
-4. Add the version check to `cli/internal/doctor/` — `versionMatches` for a
-   versioned `$APPS_HOME` dir, or `matchPin` against the live binary for tools
-   installed elsewhere (see `checks_golangci.go` for the latter shape)
+4. Add the version check to `cli/internal/doctor/` — append an entry to the
+   `versionMatches` table for a versioned `$APPS_HOME` dir, or call `matchPin`
+   against the live binary for tools installed elsewhere (see
+   `cli/internal/doctor/checks_golangci.go` for the latter shape)
 5. Run tests: `~/.local/bin/bats tests/versions-conf.bats` and `cd cli && go test ./internal/doctor/`
 
 ### Running the health check

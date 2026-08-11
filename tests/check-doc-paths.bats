@@ -69,6 +69,11 @@ instruction_files() {
 # The false-positive cases below are the reason this guard is usable at all. An
 # earlier revision flagged all of them, which on AGENTS.md meant 13 bogus
 # failures — and a guard that cries wolf gets deleted rather than obeyed.
+#
+# Honest limit, found by mutation during the DOCS-013 adversarial review: three
+# of these shapes (`~/…`, `$VAR/…`, `https://…`) stay rejected even with the
+# leading-character filter removed, because is_repo_rooted rejects them too.
+# This case pins the OUTCOME for all nine, not the mechanism for those three.
 @test "check-doc-paths: ignores non-path tokens that merely look pathish [#916]" {
     {
         printf 'Model `opencode-go/qwen3.6-plus` is pinned.\n'
@@ -97,4 +102,48 @@ instruction_files() {
 @test "check-doc-paths: usage error without arguments [#916]" {
     run "$GUARD"
     [ "$status" -eq 2 ]
+}
+
+@test "check-doc-paths: rejects a token that escapes the repo root [#916]" {
+    # `scripts/../../<something real>` passes is_repo_rooted (first segment is
+    # `scripts`) and used to resolve — and be reported OK — outside the repo.
+    # A false negative, which is the failure mode this guard exists to avoid.
+    printf 'Escaping: `scripts/../../dotfiles/README.md` is outside.\n' > "$SCRATCH/doc.md"
+    run "$GUARD" "$SCRATCH/doc.md"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"escapes the repo root"* ]]
+}
+
+@test "check-doc-paths: the source builtin needs ./ to read versions.conf under zsh [#916]" {
+    # The DOCS-013 review found `. versions.conf` in .claude/CLAUDE.md, which
+    # resolves to an empty version under zsh: a slashless argument to `.` is
+    # searched on $PATH only, and unlike bash, zsh does not fall back to the
+    # cwd. Pin the working form, and pin that the broken one really is broken —
+    # otherwise this regresses the moment someone "simplifies" the path.
+    local good bad
+    good="$(zsh -c "cd '$DOTFILES_DIR' && . ./versions.conf && printf '%s' \"\$GOLANGCI_LINT_VERSION\"" 2>/dev/null)"
+    [ -n "$good" ]
+
+    # The broken form yields an empty string, not an error the caller notices.
+    bad="$(zsh -c "cd '$DOTFILES_DIR' && . versions.conf && printf '%s' \"\$GOLANGCI_LINT_VERSION\"" 2>/dev/null || true)"
+    [ -z "$bad" ]
+}
+
+@test "check-doc-paths: no instruction file sources a config without ./ [#916]" {
+    # Class-level guard: a bare `. <file>` in a documented command is a zsh trap.
+    #
+    # Comment lines are excluded, and that exclusion is load-bearing rather than
+    # convenient: .claude/CLAUDE.md documents the anti-pattern by name ("`. ./x`,
+    # not `. x`"), so a grep that cannot tell an instruction from a warning about
+    # that instruction fires on the very text teaching people to avoid it. The
+    # first draft of this test did exactly that.
+    local hits
+    hits="$(grep -rnE '^[^#]*[^./a-zA-Z0-9_-]\. [a-zA-Z_][a-zA-Z0-9_.-]*\.(conf|sh|zsh)' \
+        "$DOTFILES_DIR/.claude/CLAUDE.md" "$DOTFILES_DIR/AGENTS.md" "$DOTFILES_DIR/README.md" \
+        | grep -v '^\s*#' || true)"
+    if [ -n "$hits" ]; then
+        echo "bare source (needs ./) in an instruction file:" >&2
+        echo "$hits" >&2
+    fi
+    [ -z "$hits" ]
 }

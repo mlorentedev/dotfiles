@@ -1,6 +1,6 @@
 # Dotfiles
 
-Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Supported today on **Linux** and **Windows**. **macOS is planned** (roadmap) — there is no `setup-macos.sh` yet, so the Linux bootstrap is unverified on macOS.
+Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Supported today on **Linux** and **Windows**. **macOS is planned** (roadmap) — there is no setup-macos.sh yet, so the Linux bootstrap is unverified on macOS.
 
 | Platform | Status | Bootstrap |
 |---|---|---|
@@ -39,11 +39,11 @@ admin needed; some changes show after an Explorer restart.
 ## Features
 
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
-- **Encrypted secrets** — Age-encrypted tokens and file secrets, auto-loaded at login
-- **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 21 custom skills, unified by `AGENTS.md` SSOT
+- **Encrypted secrets** — Bitwarden SSOT with an age-encrypted DR floor; injected into a single child process on demand via `dotf secrets run`, never into the ambient shell (ADR-028)
+- **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 37 custom skills, unified by `AGENTS.md` SSOT
 - **Cross-platform** — Symlinks on Linux, copies on Windows (no admin required); macOS planned
 - **Editor & shell ergonomics** — `.editorconfig` for cross-IDE consistency + `.inputrc` for case-insensitive tab-completion and arrow-key history search
-- **Tested** — 316 BATS tests + ShellCheck + PSScriptAnalyzer in CI
+- **Tested** — 1200+ BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
 
@@ -223,7 +223,7 @@ Full reference and pane-layout recipes: [`docs/runbooks/guide-tmux.md`](docs/run
 
 **Windows:** git, PowerShell
 
-**macOS:** planned — not yet supported (no `setup-macos.sh`)
+**macOS:** planned — not yet supported (no setup-macos.sh)
 
 **Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
 
