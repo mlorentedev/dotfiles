@@ -16,6 +16,18 @@ setup() {
 
 teardown() {
     rm -rf "$SCRATCH"
+    # The probe case (below) stages a fabricated instruction file in the REAL
+    # working tree — it has to, because discovery reads the git index. Cleanup
+    # lives here rather than at the end of that test because bats aborts a test
+    # body at the first failing command: an unguarded `git add -N` that failed
+    # (an index.lock from a concurrent session is enough) would skip the
+    # cleanup and strand a file claiming a dead path in a tree the whole suite
+    # shares. teardown always runs; test-body ordering does not.
+    if [ -n "${PROBE_REL:-}" ]; then
+        git -C "$DOTFILES_DIR" rm -q --cached "$PROBE_REL" 2>/dev/null || true
+        rm -rf "$DOTFILES_DIR/$(dirname "$PROBE_REL")"
+        PROBE_REL=""
+    fi
 }
 
 # The files this guard governs: those that tell an agent what to do.
@@ -124,20 +136,29 @@ governed_files() {
     # cannot happen silently. `git ls-files` reads the index, so a staged file
     # counts — which is what matters, since a new instruction file arrives
     # staged in the same commit as the code it describes.
-    local probe="ai/probe-agent/AGENTS.md"
+    #
+    # PROBE_REL is set BEFORE anything is created, so teardown can clean up even
+    # if the very next line fails. Do not inline the cleanup here.
+    PROBE_REL="ai/probe-agent/AGENTS.md"
     mkdir -p "$DOTFILES_DIR/ai/probe-agent"
-    printf 'Run `scripts/definitely-not-here.sh` first.\n' > "$DOTFILES_DIR/$probe"
-    git -C "$DOTFILES_DIR" add -N "$probe"
+    printf 'Run `scripts/definitely-not-here.sh` first.\n' > "$DOTFILES_DIR/$PROBE_REL"
+    git -C "$DOTFILES_DIR" add -N "$PROBE_REL"
 
-    local discovered guard_status
-    discovered="$(instruction_files | grep -c "^$probe$" || true)"
-    (cd "$DOTFILES_DIR" && "$GUARD" "$probe" >/dev/null 2>&1) && guard_status=0 || guard_status=1
+    instruction_files | grep -qx "$PROBE_REL"
+    run bash -c "cd '$DOTFILES_DIR' && '$GUARD' '$PROBE_REL'"
+    [ "$status" -eq 1 ]
+}
 
-    git -C "$DOTFILES_DIR" rm -q --cached "$probe" 2>/dev/null || true
-    rm -rf "$DOTFILES_DIR/ai/probe-agent"
+@test "check-doc-paths: a file under an excluded prefix is not discovered [#916]" {
+    # The exclusions carry reasons but no real file exercises them today, so
+    # without this they are prose. A regression that dropped the exclusion would
+    # pull generated harness records and frozen specs into the governed set.
+    PROBE_REL="harness/probe-agent/AGENTS.md"
+    mkdir -p "$DOTFILES_DIR/harness/probe-agent"
+    printf 'Generated record naming `scripts/gone.sh`.\n' > "$DOTFILES_DIR/$PROBE_REL"
+    git -C "$DOTFILES_DIR" add -N "$PROBE_REL"
 
-    [ "$discovered" -eq 1 ]
-    [ "$guard_status" -eq 1 ]
+    ! instruction_files | grep -qx "$PROBE_REL"
 }
 
 @test "check-doc-paths: usage error without arguments [#916]" {

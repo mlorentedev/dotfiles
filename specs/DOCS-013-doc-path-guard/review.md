@@ -1,139 +1,97 @@
 ---
 spec: "DOCS-013-doc-path-guard"
 verdict: "FAIL"
-reviewed_sha: "f5ee9a3e68d7629788f12202ffb936f05e14461e"
+reviewed_sha: "20c4807560a00610c08c35e36e44532c81f875ec"
 reviewer: "claude-sonnet-5"
 date: "2026-08-11"
 ---
 
 ## Adversarial review
 
-**Scope**: DOCS-013-doc-path-guard, round 3. No PR open;
-`git -C /home/manu/Projects/dotfiles-wt-r2 diff main...HEAD` (base `6267bea`, head `f5ee9a3e`)
-touching `scripts/check-doc-paths.sh`, `tests/check-doc-paths.bats`, `.claude/CLAUDE.md`,
-`README.md`. `main` already carries round 1 (#922); this branch is rounds 2+3.
-**Sources**: `specs/DOCS-013-doc-path-guard/{proposal,tasks,verification}.md`, read only
-*after* independently reviewing the diff and running the code, per instruction. Every
-mutation and factual claim below was executed in this session, not inferred from
-`verification.md`'s prose.
+**Scope**: DOCS-013-doc-path-guard, round 4. No PR open; reviewed via
+`git -C /home/manu/Projects/dotfiles-wt-r2 diff main...HEAD` at `20c4807`
+(branch `fix/docs-013-review-findings`, base `main` `6267bea`). Round 4's own
+commit is `20c4807` alone (`test(docs): discover governed instruction files
+instead of listing them`); `f91a08d`/`f5ee9a3` are rounds 2/3's already-reviewed
+fixes, re-verified here only in passing.
 
-### Method
+**Sources**: `specs/DOCS-013-doc-path-guard/{proposal,tasks,verification}.md`,
+`scripts/check-doc-paths.sh`, `tests/check-doc-paths.bats`, `cli/internal/spec/review.go`
+(frontmatter contract), plus direct execution — bats, shellcheck, bash -n/zsh -n,
+manual mutation of the discovery regex and of git-level failure conditions in a
+disposable local clone (discarded before writing this file).
 
-Read the diff and the full `scripts/check-doc-paths.sh` / `tests/check-doc-paths.bats`
-cold. Ran the guard directly under `zsh scripts/check-doc-paths.sh …` (interpreting the
-script's actual content under zsh, not just its bash shebang) against all governed files —
-clean. Then mutation-tested each of the twelve `@test` cases individually: edited the
-one code path each test claims to cover (disabled a branch, reordered two checks, dropped
-a filter clause, flipped a condition), ran only that test with `bats -f`, confirmed red,
-reverted via a saved baseline copy, confirmed the full suite green again before moving to
-the next. Independently reproduced the zsh-vs-bash `.` builtin behavior in a scratch
-directory (not by reading the test). Built `dotf` from `cmd/dotf` (unchanged between
-`main` and this branch — confirmed via `git diff main...HEAD --stat -- cli/`, empty) and
-ran its subcommands to check every CLI claim in the prose. Cross-checked the governed-file
-list against `harness/manifest.json`'s deploy targets, `setup-linux.sh`/`setup-windows.ps1`
-deploy logic, and a repo-wide `find` for agent-instruction-shaped files.
+Per the brief: diff read and code run before `verification.md`; `verification.md`'s
+round-4 claims were then independently reproduced rather than trusted.
 
 ### Spec and task alignment
 
-Round 2 (`reviewed_sha f91a08d`) returned FAIL on three Majors: traversal-check ordering,
-a regex blind spot on flush-left source lines, and two ungoverned instruction files
-(`cli/AGENTS.md`, `ai/hermes/AGENTS.md`). All three are addressed in this diff, and two of
-the three are cleanly fixed — see Findings for the third. The one Minor (stale "last two
-rows" blockquote) is also fixed. Acceptance criteria in `proposal.md` are unchanged since
-round 1 and not stale relative to this review (no commit after `6a40da3` touches
-`proposal.md`, `tasks.md`, or `features.json`).
+- Round 3's Major (`ai/agy/AGY.md` ungoverned) is fixed, and fixed at the class
+  level as `tasks.md`/`verification.md` claim: `instruction_files()` now
+  discovers from `git ls-files` instead of a hand-written list. Verified by
+  running the exact pipeline in the bats file — it returns exactly the 9 files
+  named in the test's own comments (`AGENTS.md`, `ai/agy/AGY.md`,
+  `ai/claude/CLAUDE.md`, `ai/copilot/copilot-instructions.md`,
+  `ai/hermes/AGENTS.md`, `.claude/CLAUDE.md`, `cli/AGENTS.md`,
+  `.github/copilot-instructions.md`, `README.md`), and no more.
+- `verification.md`'s testable round-4 claims were reproduced, not just read:
+  `bats tests/check-doc-paths.bats` → 13/13 (confirmed, 3 runs); discovery
+  returns 9 files (confirmed by direct execution); `shellcheck` clean and
+  `bash -n`/`zsh -n` clean (confirmed); the probe test leaves the worktree
+  clean **on the success path** (confirmed, repeated 3x). No false claim
+  found this round — a contrast with round 2's verification.md, which
+  asserted a mutation turned a test red without having run it.
+- The "~40 scripts" and "1200+ BATS tests" corrections in `README.md` check
+  out against the actual tree (39 `scripts/*.sh`+`*.ps1`, 1211 `@test` cases).
+- Acceptance criteria in `proposal.md` are otherwise unchanged from round 1
+  and were not re-litigated here; rounds 1–3 already verified them.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location |
-|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | governed-file list | `ai/agy/AGY.md` is an instruction/pointer file structurally identical to the two files round 3 added (`cli/AGENTS.md`, `ai/hermes/AGENTS.md`) — same "read AGENTS.md first, agent-specific extensions" shape as `ai/claude/CLAUDE.md` — but is absent from `instruction_files()` in `tests/check-doc-paths.bats`. `check-doc-paths.sh` is invoked nowhere else in the repo (`grep -rl check-doc-paths` outside `tests/` and the script itself returns nothing), so this bats list is the entire enforcement surface. `ai/agy/AGY.md` is deployed by both `setup-linux.sh:509-514` and `setup-windows.ps1:1397-1404` (each verifies the deployed copy points at `AGENTS.md`), and this very PR's own `README.md:63` documents it as a peer of `ai/claude/CLAUDE.md` in the Structure tree. A #916-class incident (the precipitating bug for this entire feature) landing in `AGY.md` would ship silently, forever — exactly the failure mode this spec exists to close, on a file this round's own fix pattern (widen the governed list) should have caught. `check-doc-paths.sh ai/agy/AGY.md` currently exits 0, so there is no live incident today — this is a coverage gap, not an active false-negative. | `find ai -maxdepth 1 -type d` → `agy claude copilot hermes nan opencode pi`; `grep -n AGY.md setup-linux.sh setup-windows.ps1`; `bash scripts/check-doc-paths.sh ai/agy/AGY.md` → `OK` (file itself is currently clean, but ungoverned) | UNTESTED — no bats case in `tests/check-doc-paths.bats` names or exercises `ai/agy/AGY.md` | tests — add `"ai/agy/AGY.md"` to `instruction_files()` in `tests/check-doc-paths.bats` |
-| Minor | REAL | README accuracy | `README.md`'s Structure tree claims `# ~50 scripts total` for `scripts/`; actual count is 39 files (no subdirectories). Pre-existing since round 1 (`git show main:README.md` has the same line before this branch), not a regression introduced by this round, and not part of this diff — but it is a factual statement in a file this feature's own AC governs ("every repo path... resolves"), and it fails the same "prose is a live claim" spirit the guard enforces for backticked paths (the count itself isn't backticked, so `check-doc-paths.sh` cannot and does not catch it — out of the guard's declared scope by design). | `find scripts -maxdepth 1 -type f \| wc -l` → 39 | UNTESTED — no test checks prose counts | docs — correct the README count (e.g. "~40") or drop the approximation |
-| — | THEORETICAL | guard design | The guard only extracts backticked tokens (`grep -o '`[^`[:space:]]*`'`); a markdown link whose visible text is *not* backticked (`[see here](docs/foo.md)` rather than `` [`docs/foo.md`](docs/foo.md) ``) bypasses token extraction entirely, not just the already-disclosed bare-filename blind spot. No live instance exists today — every repo-relative markdown link in both governed files was checked by hand and either is also backticked (and thus already covered) or resolves. Surfacing only; not scored against the verdict (THEORETICAL, no reproduction). | Manual `grep -noE '\]\([^)]+\)'` sweep of `README.md` and `.claude/CLAUDE.md`, all 9 targets resolved | UNTESTED | spec/docs — worth a line in the script's own "what counts as a repo path" header if the convention should also apply to plain markdown links |
+|---|---|---|---|---|---|---|
+| Major | REAL | tests/check-doc-paths.bats — probe hermeticity | The new probe test's cleanup (`git rm --cached` + `rm -rf`) only runs if every command *before* it succeeds. `git -C "$DOTFILES_DIR" add -N "$probe"` is not wrapped in `run`/`\|\| true`; under bats' errexit-on-bare-command-failure, a failure there aborts the test *before* cleanup and leaves `ai/probe-agent/AGENTS.md` — a fabricated instruction file claiming a dead path — sitting untracked in the real working tree the whole suite shares (not a scratch dir). | Reproduced directly: in a disposable local clone pinned to `20c4807`, `touch .git/index.lock` before running `bats --filter "newly added instruction file"` — the test correctly reports `not ok` (`git add -N` fails with status 128, "Unable to create '.git/index.lock': File exists"), but `ai/probe-agent/` is left on disk afterward. Confirmed the `discovered=` assignment is *not* the risk (it already has `\|\| true`) — the risk is specifically the unguarded `git add -N` line. Separately, a genuine discovery regression (regex forced to match nothing) was also reproduced and, in that case, cleanup *does* survive — so the gap is narrower than "cleanup is broken," but it is real for this one command. Independent corroboration that concurrent git activity against this exact worktree/branch is not a contrived scenario: a human commit (`094cbff`) landed on this same branch in this same worktree partway through this review session. | UNTESTED — no case exercises a git-level failure during the probe; `teardown()` (lines 17-19) only removes `$SCRATCH`, not `ai/probe-agent`, so there is no defense-in-depth if the inline ordering is ever disturbed by a future edit. | tests — wrap the mutating setup commands so a failure can't skip cleanup (e.g. `git -C "$DOTFILES_DIR" add -N "$probe" \|\| true`, or move the `rm -rf`/`git rm --cached` into `teardown()` unconditionally so bats' own guarantee — teardown always runs — covers this instead of manual line ordering) |
+| Minor | THEORETICAL | tests/check-doc-paths.bats — exclusion coverage | The `grep -vE '^harness/\|^specs/\|^docs/'` exclusion in `instruction_files()` is not exercised by any real file today (the discovered set is byte-identical before and after applying the exclusion — verified by running both halves of the pipeline separately) and no test stages a synthetic file under those prefixes to prove the exclusion actually fires. I confirmed by hand (synthetic `AGENTS.md` under `harness/`, `specs/…`, and `docs/adr/` in a disposable clone) that it does work, but that check lives only in this review, not in the suite. | UNTESTED | tests — a fourth probe case (or an extension of case 8) that stages a file under one excluded prefix and asserts it is *not* discovered would close this the same way case 8 closed the enumeration gap |
+| Minor | informational | scripts/check-doc-paths.sh — CI wiring | The guard is still never invoked as a standalone CI step; its only enforcement path is the "every instruction file's repo paths resolve" bats case, which does run in the required `test` job (`actions/checkout@v7` keeps `.git`, so `git ls-files` works there) — so the proposal's "fails CI" claim holds, just indirectly. Pre-existing since round 1, not introduced or changed by round 4; noted for completeness, not scored against this round. | n/a | n/a (not this round's scope) |
 
-### Independently reproduced (not merely trusted from `verification.md`)
-
-- **Traversal-ordering fix (round 2 Major #1):** reordering the `..`-escape check back to
-  *before* `is_repo_rooted` (the exact bug shape) turns case 10
-  (`a .. token that is not repo-rooted stays ignored`) red; restoring the order turns it
-  green. The fix in the diff (`is_repo_rooted` gate before the `case "/$token/" in */../*`
-  block) is correct.
-- **Regex blind spot fix (round 2 Major #2):** round 2's `verification.md` claimed a
-  mutation "turns case 11 red... this session did not run it" is the exact failure class
-  round 2 itself caught in round 1's write-up. I did not repeat that mistake: I directly
-  grepped a flush-left `. versions.conf` line inside a fenced block with both the old
-  (delimiter-required) and new (`(^|[^./a-zA-Z0-9_-])`-alternation) regex — the old one
-  misses it, the new one catches it. Also reintroduced the literal historical bug
-  (`. versions.conf` in place of `. ./versions.conf`) into a scratch copy of
-  `.claude/CLAUDE.md` and confirmed case 12 goes red, then reverted.
-- **All twelve `@test` cases discriminate** what their names claim — each was mutation-
-  tested individually (chmod -x for case 1; a real broken path injected into a scratch
-  copy of a governed file for case 2; disabling/inverting the relevant `if`/condition for
-  cases 3, 4, 5, 7, 8; reordering for case 10; removing the traversal case entirely for
-  case 9; targeted removal of filter clauses for case 6). One nuance on case 6: of its
-  nine sub-shapes, only the `<`/`>` branch of the metacharacter filter is load-bearing
-  (removing it makes `ai/<agent>/` a false failure, because `ai` is a real top-level repo
-  directory); the `&` branch is redundant with `is_repo_rooted` for the tested `&>/dev/null`
-  shape, same as the three shapes the script's own comment already discloses for the
-  leading-character filter. This matches the test's own comment ("pins the OUTCOME... not
-  the mechanism") and is not a new gap — case 6 still fails on a real regression
-  (`<`/`>` removed), just not on every conceivable sub-mutation.
-- **zsh vs. bash `.` builtin claim:** reproduced from scratch in a throwaway directory,
-  independent of the test file — `. testconf.conf` (no slash) resolves the variable under
-  bash and fails silently (empty variable) under zsh; `. ./testconf.conf` works under both.
-  Matches the claim in `.claude/CLAUDE.md`'s prohibited-pattern table and the
-  `versions.conf` install snippet.
-- **CLI/doc factual claims**, checked against a `dotf` binary built from `cmd/dotf` at this
-  head (`cli/` is byte-identical to `main` on this branch): `dotf secrets run`,
-  `dotf secrets ls/verify/show/set`, `dotf env path <KEY>`, `dotf doctor --fix` (repairs
-  `core.hooksPath` and junctions — both confirmed in `cli/internal/doctor/`) all exist and
-  match their described behavior. `cli/internal/doctor/checks_golangci.go` exists and calls
-  `matchPin`; `versionMatches` is a real table in `checks_tools.go`. 37 `SKILL.md` records
-  under `harness/skills/` (matches "37 custom skills"). 1210 `@test` cases across 82 `.bats`
-  files (matches "1200+ BATS tests"). `env-mapping.conf`, `doctor.sh`, `healthcheck.sh`
-  confirmed absent from the repo (matches the "retired" claims). All markdown links in both
-  files resolve. `shellcheck scripts/check-doc-paths.sh` clean; `check-md-escapes.sh` clean
-  on all four touched files; `docs-drift.bats` (a separate content-sync guard, unaffected by
-  this diff) still 6/6.
+No Blockers found. The traversal-ordering fix and the flush-left zsh-regex fix
+(rounds 2/3) were re-run as part of the full `check-doc-paths.bats` pass and
+still hold; I did not re-derive them from scratch since they were not touched
+by `20c4807` and were independently verified in rounds 2 and 3.
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
-|-----------|-------------|----------------------|
-| Correctness        | B | The reordering and regex fixes are genuinely correct and mutation-verified; the one real defect is the incomplete governed-file list (Major above). |
-| Verification       | B | Every specific round-3 evidence claim I re-ran (case 10, case 12, zsh execution, shellcheck) reproduced cleanly; historical caution from round 2's unverified claim is why I re-ran rather than trusted, and round 3 held up. |
-| Scope              | A | Diff is precisely the three round-2 Majors + one Minor, nothing extraneous. |
-| Reliability        | B | `set -euo pipefail`, correct exit codes (0/1/2) on all paths tested, including usage error and not-a-file. |
-| Maintainability    | B | Dense but load-bearing comments explain WHY at each branch; no dead code. |
-| Handoff-readiness  | B | `verification.md` is thorough and its Round 3 section's claims reproduce; `proposal.md`'s acceptance text still says "six instruction files" against an actual eight (soon nine) — small, pre-existing drift, not touched this round. |
+|---|---|---|
+| Correctness | B | Discovery mechanism, regex, and exclusions all verified correct against real and synthetic data; the one gap is in a test's own robustness, not in the guard's behavior |
+| Verification | B | Every round-4 claim in `verification.md` was independently reproduced and held up (unlike round 2's false claim) — but verification stopped at the happy path for the new probe test and missed the failure-path hermeticity gap this review found |
+| Scope | B | Broader than the one-line fix round 3 asked for, but the broadening is deliberately justified against this chain's own 3-round record of the same defect class recurring — a documented, reasoned deviation, not creep |
+| Reliability | C | The probe test's cleanup is not guaranteed under a reproduced git-level failure; a real, if narrow, error path is unhandled |
+| Maintainability | B | Clear naming, extensive rationale comments consistent with repo convention, no dead code; `shellcheck` and both shell parsers clean |
+| Handoff-readiness | B | `verification.md` and the round-by-round record are thorough and accurate; this round's own gap (cleanup hermeticity) had not yet been captured anywhere before this review |
 
 ### Verdict
 FAIL
 
-One REAL Major (incomplete governed-file list — the exact defect class round 3's own fix
-was supposed to close, on a file meeting the identical criterion) forces FAIL under the
-skill's severity-axis rule, independent of the all-B rubric. This is a narrower gap than
-rounds 1 and 2 found: no active false negative or false positive ships today, the fix is a
-one-line addition to an existing list, and everything else examined — the traversal-
-ordering fix, the regex-alternation fix, all twelve tests' discriminating power, and every
-sampled factual claim in both governed files — held up under direct execution.
+One REAL Major (UNTESTED, reproduced): the probe test can leave fabricated
+instruction-file content behind in the real working tree if `git add -N` fails
+partway through — a plausible condition for this project's own documented
+workflow (parallel sessions sharing a worktree), and one that materialized
+literally during this review as an unrelated concurrent commit on the same
+branch.
 
 ### Recommended next steps (before archive)
 
-- Add `"ai/agy/AGY.md"` to `instruction_files()` in `tests/check-doc-paths.bats` (one line;
-  `governed_files()` derives from it automatically, so no second edit needed). Re-run
-  `bats tests/check-doc-paths.bats` to confirm it stays green at 12/12 with the ninth file
-  included, and update `verification.md`'s "Guard clean on all **eight**" claim to nine.
-- While there: double check no other `ai/<agent>/*.md` pointer file was missed. This
-  session's `find ai -maxdepth 1 -type d` found exactly seven agent directories
-  (`agy claude copilot hermes nan opencode pi`); `nan`, `opencode`, and `pi` carry only
-  human-facing `README.md` config docs (not "SYSTEM META-INSTRUCTION" pointer files reading
-  `AGENTS.md`), so they are correctly out of scope — but a fresh grep is cheap insurance
-  given this is the second round in a row this exact category has needed a fix.
-- Optional, non-blocking: correct README's "~50 scripts total" (actual 39), and consider
-  whether the guard's backtick-only extraction should also flag non-backticked markdown
-  links to repo paths — both are Minor/THEORETICAL and do not need to gate this round.
-- Re-run `/adversarial-review` at the new head after the fix — given the base rate so far
-  (three rounds, three distinct real defects, two of them in code the previous round had
-  already examined), a fourth pass over a one-line, low-risk fix can reasonably be light,
-  but should still exist per this feature's own "incident-to-guard" logic.
+- Fix the probe test (`tests/check-doc-paths.bats`, the `git -C "$DOTFILES_DIR"
+  add -N "$probe"` line): make the failure of that command unable to skip the
+  cleanup two lines later — either neutralize it (`\|\| true`, matching how the
+  `discovered=` line already handles this) and let the subsequent assertions
+  report the real failure, or move `git rm --cached`/`rm -rf` into `teardown()`
+  so bats' own always-runs guarantee replaces reliance on manual statement
+  order.
+- Add a case that stages a synthetic file under one of the `harness/`, `specs/`,
+  or `docs/` prefixes and asserts `instruction_files()` excludes it — the
+  exclusion is currently correct but unpinned by any committed test.
+- Both are small, targeted, and consistent with this round's own principle
+  (discovery over enumeration, mechanism over instance) — this is not a case
+  for reverting the discovery rewrite, only for finishing its error handling.

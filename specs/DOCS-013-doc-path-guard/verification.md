@@ -238,3 +238,64 @@ revisions in round 1.
 A fourth review at the new sha. Three rounds have each found real defects, and
 this round changed the test suite's own foundation, so the base rate does not
 support assuming the next one finds nothing.
+
+---
+
+## Round 5 — after the fourth adversarial review
+
+Round 4 (`reviewed_sha 20c4807`) reproduced every claim round 4's
+`verification.md` made and found them all true — no false claim this round,
+unlike round 2. It returned **FAIL** on one Major.
+
+**The Major: the probe case could strand a fabricated instruction file in the
+real working tree.** The case stages `ai/probe-agent/AGENTS.md` — it must, since
+discovery reads the git index — and cleaned up two lines later. bats aborts a
+test body at the first failing command, so an unguarded `git add -N` that failed
+(a concurrent session's `index.lock` is enough) would skip the cleanup and leave
+a file claiming a dead path in the tree the whole suite shares.
+
+Not contrived: a real commit landed on this branch in this worktree *during* the
+review, which is the same concurrency the finding depends on.
+
+Reproduced both ways before and after the fix:
+
+```console
+# bats abort skips later lines — confirmed on a minimal case
+$ ... false; rm -f "$PROBE"   -> $PROBE still present
+
+# the real scenario, after moving cleanup into teardown()
+$ touch "$(git rev-parse --git-dir)/index.lock"
+$ bats tests/check-doc-paths.bats      # 2 probe cases fail, as they must
+$ ls ai/probe-agent harness/probe-agent
+   -> absent; teardown ran despite the failure
+$ git status --short                    # no stray files
+```
+
+Cleanup moved into `teardown()` rather than guarded with `|| true`: bats
+guarantees teardown runs, so the invariant no longer depends on statement order
+inside a test body. `PROBE_REL` is set *before* anything is created, so teardown
+can clean up even if the very next line fails.
+
+Also applied, from round 4's Minor: a case asserting a file staged under an
+excluded prefix (`harness/`) is **not** discovered. The exclusions carried
+reasons but no test, so a regression dropping them would have pulled generated
+records and frozen specs into the governed set silently.
+
+### Round-5 evidence
+
+- `bats tests/check-doc-paths.bats` → **14/14**
+- Fault injection (`index.lock` present): probe cases fail, **nothing leaks**,
+  `git status` clean
+- Guard clean on all 9 discovered instruction files
+
+### Round 4's remaining Minor, accepted not fixed
+
+`check-doc-paths.sh` has no standalone CI step; enforcement is the one bats
+case. Pre-existing since round 1 and outside this PR's diff. The bats suite runs
+in the `test` job, so it *is* enforced in CI — a dedicated step would improve
+the failure message, not the coverage. Left as-is deliberately.
+
+### Still owed
+
+A fifth review at the new sha, per this chain's convention. Four rounds have
+each found a real defect; the last two were in the fix for the previous one.
