@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.37.0](https://github.com/mlorentedev/dotfiles/compare/v0.36.0...v0.37.0) (2026-08-10)
+
+
+### Features
+
+* **agents:** propose the adversarial review in the verification window ([#896](https://github.com/mlorentedev/dotfiles/issues/896)) ([db272ac](https://github.com/mlorentedev/dotfiles/commit/db272ac4d8a97154f609f48c913d7b443c2c1e7a))
+
+
+### Bug Fixes
+
+* **doctor:** stop dotf doctor failing on a healthy Windows box (BUG-052) ([#910](https://github.com/mlorentedev/dotfiles/issues/910)) ([eff2ece](https://github.com/mlorentedev/dotfiles/commit/eff2ece4376d07d36454e7054a3017b26cf17f22))
+* **git-hooks:** force LF eol on tracked hooks so Windows commits run ([#913](https://github.com/mlorentedev/dotfiles/issues/913)) ([b8d3897](https://github.com/mlorentedev/dotfiles/commit/b8d38975eb740c0079d5c216d596bb6921bae699)), closes [#911](https://github.com/mlorentedev/dotfiles/issues/911)
+
 ## [0.36.0](https://github.com/mlorentedev/dotfiles/compare/v0.35.1...v0.36.0) (2026-08-10)
 
 
