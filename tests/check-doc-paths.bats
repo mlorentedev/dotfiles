@@ -18,20 +18,26 @@ teardown() {
     rm -rf "$SCRATCH"
 }
 
-# The files this guard governs: those that tell an agent what to do. Historical
-# records (docs/lessons.md) are deliberately absent — they name retired scripts
-# on purpose, and that is correct.
+# The files this guard governs: those that tell an agent what to do.
+# DISCOVERED, not enumerated. Three consecutive adversarial-review rounds each
+# found a different instruction file missing from a hand-written list
+# (`cli/AGENTS.md` and `ai/hermes/AGENTS.md` in round 2, `ai/agy/AGY.md` in
+# round 3). A list maintained by hand rots exactly the way the docs this guard
+# watches rot, so enumerating it a fourth time would patch the instance and
+# leave the class. Anything matching the naming contract is governed the day it
+# lands; excluding one requires saying so below, with a reason.
 instruction_files() {
-    printf '%s\n' \
-        ".claude/CLAUDE.md" \
-        "AGENTS.md" \
-        "README.md" \
-        "ai/claude/CLAUDE.md" \
-        "ai/copilot/copilot-instructions.md" \
-        ".github/copilot-instructions.md" \
-        "cli/AGENTS.md" \
-        "ai/hermes/AGENTS.md"
+    git -C "$DOTFILES_DIR" ls-files '*.md' \
+        | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md)$|^README\.md$' \
+        | grep -vE '^harness/|^specs/|^docs/'
 }
+# Exclusions above, each for a stated reason:
+#   harness/  — generated records; the vault source is the thing to fix, and
+#               `compile-harness.sh --check` already guards their rendering
+#   specs/    — per-feature proposals, frozen once archived; they describe a
+#               change at a moment, not standing instructions
+#   docs/     — historical records (docs/lessons.md names retired scripts on
+#               purpose); see this file's header
 
 # Absolute paths of the same set, for checks that grep file contents directly.
 # The two lists were separate and drifted immediately: `cli/AGENTS.md` and
@@ -110,6 +116,28 @@ governed_files() {
     printf 'Records live at `harness/skills/nope-not-real/SKILL.md`.\n' > "$SCRATCH/doc.md"
     run "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
+}
+
+@test "check-doc-paths: a newly added instruction file is governed automatically [#916]" {
+    # The point of discovery over enumeration. Three review rounds each found a
+    # different file missing from a hand-written list; this asserts the fourth
+    # cannot happen silently. `git ls-files` reads the index, so a staged file
+    # counts — which is what matters, since a new instruction file arrives
+    # staged in the same commit as the code it describes.
+    local probe="ai/probe-agent/AGENTS.md"
+    mkdir -p "$DOTFILES_DIR/ai/probe-agent"
+    printf 'Run `scripts/definitely-not-here.sh` first.\n' > "$DOTFILES_DIR/$probe"
+    git -C "$DOTFILES_DIR" add -N "$probe"
+
+    local discovered guard_status
+    discovered="$(instruction_files | grep -c "^$probe$" || true)"
+    (cd "$DOTFILES_DIR" && "$GUARD" "$probe" >/dev/null 2>&1) && guard_status=0 || guard_status=1
+
+    git -C "$DOTFILES_DIR" rm -q --cached "$probe" 2>/dev/null || true
+    rm -rf "$DOTFILES_DIR/ai/probe-agent"
+
+    [ "$discovered" -eq 1 ]
+    [ "$guard_status" -eq 1 ]
 }
 
 @test "check-doc-paths: usage error without arguments [#916]" {

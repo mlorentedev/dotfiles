@@ -54,7 +54,7 @@ admin needed; some changes show after an Explorer restart.
 ├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
 │   ├── vault.sh                # Vault tooling dispatcher
-│   └── …                       # ~50 scripts total (hooks, CI helpers, secret tools)
+│   └── …                       # ~40 scripts total (hooks, CI helpers, secret tools)
 ├── sensitive/                  # Encrypted secrets
 │   └── *.secret.age            # Encrypted files (tracked)
 ├── AGENTS.md                   # Cross-agent SSOT (canonical system prompt)

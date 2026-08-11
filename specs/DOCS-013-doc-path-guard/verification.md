@@ -178,3 +178,63 @@ to the canonical form of its own bug is theatre.
 A third review at the new sha. Two rounds have each found real defects the
 previous one missed, so the base rate here does not support assuming the third
 finds nothing.
+
+---
+
+## Round 4 — after the third adversarial review
+
+Round 3 (`reviewed_sha f5ee9a3`) reproduced both round-2 Major fixes by mutation
+and confirmed them genuinely correct, verified all twelve bats cases discriminate
+by mutating the code each covers, and checked the CLI claims against a
+from-source build. It returned **FAIL** on one Major.
+
+**The Major: `ai/agy/AGY.md` was ungoverned.** A real, deployed agent-instruction
+pointer, structurally identical to the two files round 2 had just caused to be
+added — the same defect class, third occurrence.
+
+### The fix is not the one that was asked for
+
+Round 3's stated fix was one line: add `"ai/agy/AGY.md"` to `instruction_files()`.
+That patches the instance and leaves the class. The evidence against it is this
+review chain's own record:
+
+| Round | Missing file(s) found |
+|---|---|
+| 2 | `cli/AGENTS.md`, `ai/hermes/AGENTS.md` |
+| 3 | `ai/agy/AGY.md` |
+
+Three rounds, three misses, from a list maintained by hand — which is precisely
+the rot this guard exists to catch, reproduced inside the guard's own test.
+
+`instruction_files()` now **discovers** its set from the git index by naming
+contract, with an explicit exclusion list carrying a reason per entry
+(`harness/` generated, `specs/` frozen, `docs/` historical). A file matching the
+contract is governed the day it is staged; excluding one requires writing down
+why. Discovery raised the governed set from 8 to 9 immediately, picking up
+`ai/agy/AGY.md` without it being named.
+
+New case 8 pins the mechanism rather than the outcome: it stages a probe
+instruction file containing a dead path, asserts discovery finds it and the
+guard fails on it, then removes it. `git ls-files` reads the index, so a
+staged-but-uncommitted file counts — the case that matters, since a new
+instruction file arrives staged alongside the code it describes.
+
+Also applied: `README.md`'s "~50 scripts total" corrected to ~40 (actual 39).
+Round 3's second Minor — that a non-backticked markdown link to a repo path
+would be missed — is accepted as a known limit with no live instance; widening
+extraction beyond backticks reopens the false-positive problem that cost two
+revisions in round 1.
+
+### Round-4 evidence
+
+- `bats tests/check-doc-paths.bats` → **13/13**
+- Discovery governs 9 files, verified by listing them
+- Probe test leaves the worktree clean (`git status --short` shows only the
+  intended edits)
+- `shellcheck` clean; `bash -n` + `zsh -n` clean
+
+### Still owed
+
+A fourth review at the new sha. Three rounds have each found real defects, and
+this round changed the test suite's own foundation, so the base rate does not
+support assuming the next one finds nothing.
