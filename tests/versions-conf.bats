@@ -76,3 +76,24 @@ setup() {
     [[ $status -eq 0 ]]
     [[ -n "$output" ]]
 }
+
+@test "versions.conf sets GOLANGCI_LINT_VERSION [#919]" {
+    . "$VERSIONS_CONF"
+    [[ -n "$GOLANGCI_LINT_VERSION" ]]
+}
+
+@test "cli.yml pins golangci-lint from versions.conf, never the action default [#919]" {
+    local wf="$DOTFILES_DIR/.github/workflows/cli.yml"
+    # The action resolves 'latest' when no version is given, which is what made
+    # a local run unable to reproduce CI (BUG-071). Assert the pin is both
+    # sourced from versions.conf and handed to the action.
+    grep -q 'GOLANGCI_LINT_VERSION' "$wf"
+    grep -q 'version: \${{ steps.golangci.outputs.version }}' "$wf"
+}
+
+@test "cli.yml fails loudly when the golangci-lint pin is missing [#919]" {
+    local wf="$DOTFILES_DIR/.github/workflows/cli.yml"
+    # A silently-empty version input falls back to 'latest', reintroducing the
+    # bug while looking green. The resolve step must exit non-zero instead.
+    grep -q 'GOLANGCI_LINT_VERSION missing from versions.conf' "$wf"
+}
