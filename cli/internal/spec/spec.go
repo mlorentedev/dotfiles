@@ -25,9 +25,17 @@ var templateNames = []string{"proposal.md", "tasks.md", "verification.md"}
 //go:embed templates/proposal.md templates/tasks.md templates/verification.md
 var templatesFS embed.FS
 
-// idPattern mirrors init-spec.sh exactly: an AREA-NNN ticket with an optional
-// sub-id letter (SDD-012b) and optional slug, or a YYYY-MM-DD dated slug.
-var idPattern = regexp.MustCompile(`^([A-Z]+-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`)
+// idPattern is the canonical feature-id grammar: an AREA-NNN ticket whose AREA
+// may carry digits (ADR028-004), with an optional sub-id letter (SDD-012b) and
+// optional slug, or a YYYY-MM-DD dated slug.
+//
+// This regex is the enforcement point, so it is the canonical form; the prose
+// copies in AGENTS.md and the spec SKILL are held to it verbatim by
+// TestIDPatternProseMatchesCode. Widening it is safe, narrowing it is not:
+// ValidateID is also the path-traversal guard for the specs/ directory (#362,
+// TestArchiveRejectsTraversalID), so any change must keep "/", "." and ".."
+// unmatched.
+var idPattern = regexp.MustCompile(`^([A-Z]+[0-9]*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`)
 
 // ValidateID returns an error naming the expected grammar if id is not a valid
 // feature-id.
@@ -35,13 +43,18 @@ func ValidateID(id string) error {
 	if !idPattern.MatchString(id) {
 		return fmt.Errorf(
 			"invalid feature-id: %s\n        expected: TICKET-NNN[letter][-slug] "+
-				"(e.g. AI-001-ollama-public, SDD-012b-guard) or YYYY-MM-DD-slug", id)
+				"(e.g. AI-001-ollama-public, SDD-012b-guard, ADR028-004) "+
+				"or YYYY-MM-DD-slug", id)
 	}
 	return nil
 }
 
 // RepoRoot walks up from start until it finds a directory containing .git
 // (a directory in a normal clone, a file in a git worktree — both are accepted).
+//
+// start MUST be absolute. The walk terminates on filepath.Dir(dir) == dir, and
+// filepath.Dir(".") is ".", so a relative start returns "not in a git repo" on
+// the first iteration even when the caller is inside one.
 func RepoRoot(start string) (string, error) {
 	dir := start
 	for {

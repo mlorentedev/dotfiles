@@ -15,6 +15,9 @@ func TestValidateID(t *testing.T) {
 		"CLI-007-dot-spec-init",
 		"BUG-007", // ticket with no slug
 		"2026-05-13-foo",
+		"ADR028-004", // AREA carrying digits (the ADR028-* bitacora series)
+		"ADR028-004-classify-stateful-service-placement",
+		"ADR028-004b", // digits in AREA and a sub-id letter together
 	}
 	for _, id := range valid {
 		if err := ValidateID(id); err != nil {
