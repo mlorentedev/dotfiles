@@ -31,7 +31,7 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 
 Two modes, auto-detected:
 
-1. **Backlog-id mode.** Input matches `^[A-Z]+-\d+(-[a-z0-9-]+)?$` (e.g. `SDD-014`, `AI-001-ollama-public`). Resolve the original:
+1. **Backlog-id mode.** Input matches `^[A-Z]+[0-9]*-\d+[a-z]?(-[a-z0-9-]+)?$` (e.g. `SDD-014`, `AI-001-ollama-public`, `ADR028-004`). Deliberately a SUBSET of the spec `idPattern`: the AREA may carry digits and the number an optional sub-id letter, but the `YYYY-MM-DD-slug` alternative is excluded — a dated slug is not a backlog id, so it must not enter this mode. Resolve the original:
    - Read the GitHub issue via `gh issue view <id> --json title,body` (bitácora is the SSOT per ADR-018).
    - If not found, ask the user to paste the story.
 
