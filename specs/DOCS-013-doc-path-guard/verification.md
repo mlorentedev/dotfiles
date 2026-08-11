@@ -68,3 +68,234 @@ identical to a clean repo.
       implemented the change and therefore cannot review it. `dotf spec archive`
       refuses without a fresh passing `review.md`, so this must be supplied by
       another session before the spec can be archived.
+
+---
+
+## Round 2 — after the adversarial review
+
+The round-1 review (`review.md`, verdict **FAIL**, reviewed_sha `d6681a6`) found
+one Major that neither the author nor CodeRabbit caught, plus six Minors. All
+were reproduced independently before being accepted.
+
+### The Major
+
+`.claude/CLAUDE.md:51` documented the golangci-lint install as
+`@v$(. versions.conf; …)`. A slashless argument to the `.` builtin is searched
+on `$PATH` only; bash additionally falls back to the cwd, zsh does not. Under
+zsh — the default interactive shell here — it resolved to **empty**, producing
+`@v`:
+
+```console
+$ bash -c 'echo "v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")"'
+v2.12.2
+$ zsh -c 'echo "v$(. versions.conf; echo "$GOLANGCI_LINT_VERSION")"'
+zsh:.:1: no such file or directory: versions.conf
+v
+```
+
+A wrong instruction, shipped in the PR whose purpose was to stop instructions
+being wrong, by the same bash/zsh divergence class the file's own
+prohibited-patterns table documents twenty lines above it.
+
+Fixed to `. ./versions.conf`; verified `2.12.2` under zsh. The pattern is now a
+row in that table, and two tests pin it: one on `versions.conf` specifically,
+one class-level over all three instruction files.
+
+### Minors applied
+
+| Finding | Resolution |
+|---|---|
+| "backticked path is a live claim" oversells the guard (bare names unchecked) | Callout scoped to slash-containing paths, with the blind spot stated |
+| Case 6 pins 9 shapes but 3 pass via `is_repo_rooted`, not the filter | Not papered over — the filter is now labelled defense-in-depth in the script, and the test comment says it pins the outcome, not the mechanism |
+| `versionMatches` described as callable | "append an entry to the `versionMatches` table" |
+| `#!/bin/bash` vs the repo's documented `#!/usr/bin/env bash` | Changed |
+| `setup-macos.sh` — live instance of the bare-name blind spot | De-backticked both README mentions |
+| red `spec-gate` not disclosed in Evidence | Disclosed here; archive-on-merge resolves when this review lands |
+
+### CodeRabbit findings (PR #922), all reproduced
+
+- README:42 claimed secrets are "auto-loaded at login", contradicting the
+  ADR-028 text this PR added at :95. Also stale in the same block: "21 custom
+  skills" (37) and "316 BATS tests" (1206).
+- The script header still described basename resolution that was removed.
+- **Path traversal**: `scripts/../../dotfiles/README.md` passed `is_repo_rooted`
+  and was reported `OK` while resolving outside the repo — a false negative.
+  CodeRabbit's stated mechanism was slightly off (it predicted a wrong success
+  on a nonexistent path); the real shape is silent acceptance. Rejected now,
+  with a regression test.
+
+### Round-2 evidence
+
+- `bats tests/check-doc-paths.bats` → **11/11**
+- Mutation: a bare `. versions.conf` added to a live README code block turns
+  case 11 red; removing it turns it green again
+- `zsh -c '. ./versions.conf; echo $GOLANGCI_LINT_VERSION'` → `2.12.2`
+- `shellcheck` clean; `bash -n` + `zsh -n` clean
+- Guard clean on all instruction files
+
+### Still owed
+
+A **fresh** adversarial review at the new sha. A Major cannot be waived by
+re-reading the reviewed commit, so `dotf spec archive` stays blocked until a
+passing `review.md` exists for this head.
+
+---
+
+## Round 3 — after the second adversarial review
+
+Round 2 (`reviewed_sha f91a08d`) verified every round-1 finding and every
+CodeRabbit finding as genuinely fixed, then returned **FAIL** on three Majors it
+found itself, none inherited. All reproduced before being accepted.
+
+| # | Finding | Reproduction | Fix |
+|---|---|---|---|
+| 1 | The `..` traversal check ran **before** the rooted gate, so it fired on `not-a-real-toplevel/../other/thing.md` — a token the guard promises to ignore by construction | guard exited 1 on a non-rooted token | Moved after `is_repo_rooted`; new case 10 pins it |
+| 2 | The zsh-sourcing test's regex required a delimiter before `. file`, so a source line **flush-left in a fenced block** — the exact shape the original bug took — matched nothing | `grep -E` on `. versions.conf` at column 1 → no match | `(^\|[^./a-zA-Z0-9_-])` alternation; mutation-verified in two files |
+| 3 | `cli/AGENTS.md` and `ai/hermes/AGENTS.md` are instruction files by this suite's own criterion and were governed by neither list | both exist, both ungoverned | Added; the two lists now derive from one source |
+| Minor | The prohibited-patterns blockquote still said "the last two rows" after this PR appended a third | grep | "last three rows" |
+
+Finding 1 is the one worth remembering: **fixing a false negative introduced a
+false positive**, in the same guard, in the same PR. Ordering a new check before
+the gate that decides "is this ours to judge at all" is how.
+
+Finding 2 is worse in kind. The round-2 `verification.md` claimed that exact
+mutation turned the test red. It did not — the claim was written from intent
+rather than from a run, and the reviewer caught it by running it. A guard blind
+to the canonical form of its own bug is theatre.
+
+### Round-3 evidence
+
+- `bats tests/check-doc-paths.bats` → **12/12**
+- Mutation, the form round 2 proved invisible: `. versions.conf` flush-left in a
+  fenced block turns case 12 **red** in `README.md` **and** in the newly
+  governed `cli/AGENTS.md`; restoring turns it green
+- Mutation: a non-rooted `..` token no longer trips the guard (case 10)
+- Guard clean on all **eight** instruction files
+- `shellcheck` clean; `bash -n` + `zsh -n` clean
+
+### Still owed
+
+A third review at the new sha. Two rounds have each found real defects the
+previous one missed, so the base rate here does not support assuming the third
+finds nothing.
+
+---
+
+## Round 4 — after the third adversarial review
+
+Round 3 (`reviewed_sha f5ee9a3`) reproduced both round-2 Major fixes by mutation
+and confirmed them genuinely correct, verified all twelve bats cases discriminate
+by mutating the code each covers, and checked the CLI claims against a
+from-source build. It returned **FAIL** on one Major.
+
+**The Major: `ai/agy/AGY.md` was ungoverned.** A real, deployed agent-instruction
+pointer, structurally identical to the two files round 2 had just caused to be
+added — the same defect class, third occurrence.
+
+### The fix is not the one that was asked for
+
+Round 3's stated fix was one line: add `"ai/agy/AGY.md"` to `instruction_files()`.
+That patches the instance and leaves the class. The evidence against it is this
+review chain's own record:
+
+| Round | Missing file(s) found |
+|---|---|
+| 2 | `cli/AGENTS.md`, `ai/hermes/AGENTS.md` |
+| 3 | `ai/agy/AGY.md` |
+
+Three rounds, three misses, from a list maintained by hand — which is precisely
+the rot this guard exists to catch, reproduced inside the guard's own test.
+
+`instruction_files()` now **discovers** its set from the git index by naming
+contract, with an explicit exclusion list carrying a reason per entry
+(`harness/` generated, `specs/` frozen, `docs/` historical). A file matching the
+contract is governed the day it is staged; excluding one requires writing down
+why. Discovery raised the governed set from 8 to 9 immediately, picking up
+`ai/agy/AGY.md` without it being named.
+
+New case 8 pins the mechanism rather than the outcome: it stages a probe
+instruction file containing a dead path, asserts discovery finds it and the
+guard fails on it, then removes it. `git ls-files` reads the index, so a
+staged-but-uncommitted file counts — the case that matters, since a new
+instruction file arrives staged alongside the code it describes.
+
+Also applied: `README.md`'s "~50 scripts total" corrected to ~40 (actual 39).
+Round 3's second Minor — that a non-backticked markdown link to a repo path
+would be missed — is accepted as a known limit with no live instance; widening
+extraction beyond backticks reopens the false-positive problem that cost two
+revisions in round 1.
+
+### Round-4 evidence
+
+- `bats tests/check-doc-paths.bats` → **13/13**
+- Discovery governs 9 files, verified by listing them
+- Probe test leaves the worktree clean (`git status --short` shows only the
+  intended edits)
+- `shellcheck` clean; `bash -n` + `zsh -n` clean
+
+### Still owed
+
+A fourth review at the new sha. Three rounds have each found real defects, and
+this round changed the test suite's own foundation, so the base rate does not
+support assuming the next one finds nothing.
+
+---
+
+## Round 5 — after the fourth adversarial review
+
+Round 4 (`reviewed_sha 20c4807`) reproduced every claim round 4's
+`verification.md` made and found them all true — no false claim this round,
+unlike round 2. It returned **FAIL** on one Major.
+
+**The Major: the probe case could strand a fabricated instruction file in the
+real working tree.** The case stages `ai/probe-agent/AGENTS.md` — it must, since
+discovery reads the git index — and cleaned up two lines later. bats aborts a
+test body at the first failing command, so an unguarded `git add -N` that failed
+(a concurrent session's `index.lock` is enough) would skip the cleanup and leave
+a file claiming a dead path in the tree the whole suite shares.
+
+Not contrived: a real commit landed on this branch in this worktree *during* the
+review, which is the same concurrency the finding depends on.
+
+Reproduced both ways before and after the fix:
+
+```console
+# bats abort skips later lines — confirmed on a minimal case
+$ ... false; rm -f "$PROBE"   -> $PROBE still present
+
+# the real scenario, after moving cleanup into teardown()
+$ touch "$(git rev-parse --git-dir)/index.lock"
+$ bats tests/check-doc-paths.bats      # 2 probe cases fail, as they must
+$ ls ai/probe-agent harness/probe-agent
+   -> absent; teardown ran despite the failure
+$ git status --short                    # no stray files
+```
+
+Cleanup moved into `teardown()` rather than guarded with `|| true`: bats
+guarantees teardown runs, so the invariant no longer depends on statement order
+inside a test body. `PROBE_REL` is set *before* anything is created, so teardown
+can clean up even if the very next line fails.
+
+Also applied, from round 4's Minor: a case asserting a file staged under an
+excluded prefix (`harness/`) is **not** discovered. The exclusions carried
+reasons but no test, so a regression dropping them would have pulled generated
+records and frozen specs into the governed set silently.
+
+### Round-5 evidence
+
+- `bats tests/check-doc-paths.bats` → **14/14**
+- Fault injection (`index.lock` present): probe cases fail, **nothing leaks**,
+  `git status` clean
+- Guard clean on all 9 discovered instruction files
+
+### Round 4's remaining Minor, accepted not fixed
+
+`check-doc-paths.sh` has no standalone CI step; enforcement is the one bats
+case. Pre-existing since round 1 and outside this PR's diff. The bats suite runs
+in the `test` job, so it *is* enforced in CI — a dedicated step would improve
+the failure message, not the coverage. Left as-is deliberately.
+
+### Still owed
+
+A fifth review at the new sha, per this chain's convention. Four rounds have
+each found a real defect; the last two were in the fix for the previous one.

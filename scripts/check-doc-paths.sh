@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # check-doc-paths.sh: fail when an instruction file names a repo path that does
 # not exist.
@@ -21,10 +21,14 @@
 #
 #   - it contains no whitespace, shell metacharacters or <placeholder> markers;
 #   - it is repo-relative (no leading /, ~, $ or -) and not a URL;
-#   - AND EITHER its first segment is a real top-level entry of this repo
-#     (computed from disk, so the rule needs no maintenance), OR it is a bare
-#     filename with a known extension, matched against the git index by
-#     basename so prose like `utils.sh` resolves to scripts/utils.sh.
+#   - it contains no `..` component, so a token cannot resolve outside the repo;
+#   - AND it contains a slash whose first segment is a real top-level entry of
+#     this repo (computed from disk, so the rule needs no maintenance).
+#
+# Bare filenames are NOT checked. Resolving them by basename was tried and
+# reverted: it flagged vault patterns, `machine.json` and `review.md` on
+# AGENTS.md — files that legitimately live elsewhere. The cost is a real blind
+# spot (a backticked `missing.md` passes), accepted deliberately.
 #
 # Everything else — model ids like `opencode-go/qwen3.6-plus`, command
 # fragments, vault paths, deployed ~/ locations — is ignored by construction
@@ -97,6 +101,13 @@ for target in "$@"; do
         [ -n "$token" ] || continue
 
         # Absolute, home-relative, variable-rooted, flag-like, or a URL.
+        #
+        # Defense-in-depth, not uniquely load-bearing: mutation-testing this
+        # branch away leaves the suite green, because is_repo_rooted rejects
+        # these shapes anyway (`~`, `$VAULT_PATH`, `https:` are never top-level
+        # repo entries). Kept because it states the intent at the point of
+        # reading and does not depend on that ordering holding forever — but
+        # do not mistake the tests for proof that it fires.
         case "$token" in
             /*|'~'*|'$'*|-*|*://*) continue ;;
         esac
@@ -129,6 +140,24 @@ for target in "$@"; do
         # guard someone deletes.
         printf '%s' "$token" | grep -q '/' || continue
         is_repo_rooted "$token" || continue
+
+        # A `..` component lets a token resolve outside REPO_ROOT while still
+        # passing is_repo_rooted — `scripts/../../other-repo/README.md` has the
+        # first segment `scripts` and was reported OK. That is a false negative,
+        # the failure mode this guard exists to avoid, so reject it loudly.
+        #
+        # Order matters and was wrong once: this ran BEFORE the rooted checks
+        # above, so it fired on `not-a-real-dir/../x.md` — a token the guard
+        # promises to ignore by construction. Fixing a false negative created a
+        # false positive. It must stay after the gate that decides "is this ours
+        # to judge at all".
+        case "/$token/" in
+            */../*)
+                printf '%s: path escapes the repo root: %s\n' "$target" "$token" >&2
+                missing_in_file=$((missing_in_file + 1))
+                continue
+                ;;
+        esac
 
         case "$token" in
             *'*'*)
