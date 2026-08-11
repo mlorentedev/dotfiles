@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.37.1](https://github.com/mlorentedev/dotfiles/compare/v0.37.0...v0.37.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ci:** pin golangci-lint from versions.conf instead of the action default ([#920](https://github.com/mlorentedev/dotfiles/issues/920)) ([2c4b506](https://github.com/mlorentedev/dotfiles/commit/2c4b506d754d2fc4bc4fe9d738dfbd293fb6bd54))
+* **docs:** apply three rounds of adversarial review to the doc-path guard (DOCS-013) ([#924](https://github.com/mlorentedev/dotfiles/issues/924)) ([caa7af5](https://github.com/mlorentedev/dotfiles/commit/caa7af559dc28c0cb97d31f61a413c705dd914b2))
+* **spec:** accept digit-bearing AREAs in feature-ids and reconcile the seven copies ([#923](https://github.com/mlorentedev/dotfiles/issues/923)) ([6267bea](https://github.com/mlorentedev/dotfiles/commit/6267bea16ba11039f8c39e488e93c6b40e845c6c))
+
 ## [0.37.0](https://github.com/mlorentedev/dotfiles/compare/v0.36.0...v0.37.0) (2026-08-10)
 
 
