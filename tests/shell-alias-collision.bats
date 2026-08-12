@@ -83,18 +83,35 @@ fake_home() {
     # define in that shape is a collision waiting to happen -- both `gp` and
     # `gpr` were. Stay out of the namespace rather than play whack-a-mole.
     #
-    # This rule is the hermetic half of the guard: the authoritative cross-check
-    # below can only run where oh-my-zsh is installed, which CI is not.
+    # This rule is the fast, hermetic half of the guard: the authoritative
+    # cross-check runs against a vendored snapshot of the plugin's alias
+    # names below, so it executes everywhere including CI (BUG-045 AC2).
     #
-    # `gz` predates the rule and is verified collision-free against the plugin by
-    # that cross-check, so it is grandfathered -- the rule's job is to stop NEW
-    # names entering the namespace, not to churn a working helper.
-    grandfathered=" gz "
+    # `gz` and `getcertnames` predate the rule and are verified collision-free
+    # against the plugin by that cross-check (run manually against the real
+    # ~/.oh-my-zsh install, BUG-045), so both are grandfathered -- the rule's
+    # job is to stop NEW names entering the namespace, not to churn a working
+    # helper.
+    #
+    # BUG-045: the length cap (originally 1-4 chars total) missed the real
+    # distribution -- the installed plugin has g-prefixed aliases up to 9
+    # chars in the issue's examples and 20 in the wild (`git-svn-dcommit-push`,
+    # hyphenated, outside this pattern's letters-only shape). A fixed cap is
+    # arbitrary and was already proven too low once. `g|g[a-z]*` is a bash
+    # GLOB, not a regex: `g` alone (the plugin ships `alias g='git'`) needs
+    # its own alternative, since `g[a-z]*` requires at least one more
+    # character; `g[a-z]*` after that is deliberately broader than
+    # "all-lowercase" -- it also matches a hyphen, digit or uppercase letter
+    # right after the first one (e.g. `git-foo`, `gX9`). Over-matching here is
+    # fine because staying out of the namespace is the whole rule; a real
+    # helper that needs a g-prefixed name just gets grandfathered like `gz`
+    # and `getcertnames` were.
+    grandfathered=" gz getcertnames "
     offenders=""
     for name in $(function_names "$ZSH_SOURCED"); do
         case "$grandfathered" in *" $name "*) continue ;; esac
         case "$name" in
-            g|g[a-z]|g[a-z][a-z]|g[a-z][a-z][a-z]) offenders="$offenders $name" ;;
+            g|g[a-z]*) offenders="$offenders $name" ;;
         esac
     done
     [ -z "$offenders" ] || {
@@ -113,14 +130,36 @@ fake_home() {
     }
 }
 
-@test "no sourced function name collides with an installed oh-my-zsh git alias" {
-    plugin="${ZSH:-$HOME/.oh-my-zsh}/plugins/git/git.plugin.zsh"
-    [ -f "$plugin" ] || skip "oh-my-zsh git plugin not installed here"
+@test "no sourced function name collides with the vendored oh-my-zsh git-plugin alias snapshot" {
+    # The authoritative cross-check, made to actually run in CI (BUG-045 AC2):
+    # oh-my-zsh isn't installed on CI runners, so a check against the live
+    # plugin (below) always skipped there. Comparing against a vendored
+    # snapshot of just the alias NAMES -- not the plugin file, which is ~400
+    # lines of code we don't own -- runs everywhere, always.
+    fixture="$REPO/tests/fixtures/omz-git-plugin-aliases.txt"
     collisions="$(LC_ALL=C comm -12 \
         <(function_names "$ZSH_SOURCED") \
-        <(alias_names "$plugin"))"
+        <(grep -v '^#' "$fixture" | LC_ALL=C sort -u))"
     [ -z "$collisions" ] || {
-        echo "function/alias collisions with the oh-my-zsh git plugin: $collisions"
+        echo "function/alias collisions with the vendored oh-my-zsh git-plugin snapshot: $collisions"
+        return 1
+    }
+}
+
+@test "the vendored oh-my-zsh git-plugin snapshot is still fresh against the real install" {
+    # Staleness detector, not a collision check (the test above owns that,
+    # hermetically, against the fixture). Skips where oh-my-zsh isn't
+    # installed -- Manu's dev machine is the only place this can run, and
+    # it's the signal to re-run tests/fixtures/capture-omz-git-aliases.sh.
+    plugin="${ZSH:-$HOME/.oh-my-zsh}/plugins/git/git.plugin.zsh"
+    [ -f "$plugin" ] || skip "oh-my-zsh git plugin not installed here"
+    fixture="$REPO/tests/fixtures/omz-git-plugin-aliases.txt"
+    diff_out="$(diff \
+        <(grep -v '^#' "$fixture" | LC_ALL=C sort -u) \
+        <(alias_names "$plugin") || true)"
+    [ -z "$diff_out" ] || {
+        echo "vendored snapshot is stale -- re-run tests/fixtures/capture-omz-git-aliases.sh:"
+        echo "$diff_out"
         return 1
     }
 }
