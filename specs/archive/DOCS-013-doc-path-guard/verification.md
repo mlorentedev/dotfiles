@@ -299,3 +299,160 @@ the failure message, not the coverage. Left as-is deliberately.
 
 A fifth review at the new sha, per this chain's convention. Four rounds have
 each found a real defect; the last two were in the fix for the previous one.
+
+---
+
+## Round 6 — after the fifth adversarial review
+
+Round 5 (`reviewed_sha 3c6d77d`, run against `main` directly — no PR, no
+branch, the feature was already merged) returned **FAIL** on one REAL Major and
+one Minor.
+
+**The Major recalibrates the diminishing-returns read from round 4.** It was
+not a defect in a previous fix — nothing round 5 found existed because of
+anything rounds 2-4 touched. `instruction_files()`'s discovery regex matched
+`AGENTS.md` / `CLAUDE.md` / `AGY.md` / `GEMINI.md` / `copilot-instructions.md`
+anywhere in the tree, but anchored `README.md` to the repo root only
+(`^README\.md$`) — an asymmetry that was never in the exclusion list this file
+says every exclusion needs a reason for, and had been there since before round
+1. Reproduced by widening the pattern and running the guard against every
+non-excluded `README.md` in the repo (`git ls-files '*README.md' | grep -vE
+'^harness/|^specs/|^docs/'` → 6 files): `cli/README.md` and `ai/nan/README.md`
+had real dead paths, and — dimensioning the blast radius past what the review
+itself reported — so did `ai/opencode/README.md`, a third file the reviewer
+didn't name. One of the three, `scripts/healthcheck.sh` in `cli/README.md`, is
+the exact file whose staleness in `.claude/CLAUDE.md` was this whole spec's
+founding incident (#916).
+
+**The Minor**: mutating the discovery alternation (dropping `AGY.md`, the same
+silent-drop class rounds 2-4 each independently found once) left all 14 tests
+green. Nothing pinned that the discovered set actually contains a member of
+each pattern.
+
+### Fix
+
+- `tests/check-doc-paths.bats`: folded `README\.md` into the main alternation
+  `(^|/)(...)$` instead of a separate `^README\.md$` anchor.
+- `cli/README.md`: de-backticked `scripts/healthcheck.sh` and
+  `scripts/doctor.sh` — both retired, named only as history in a sentence
+  about what `dotf doctor` consolidates. Matches this guard's own stated
+  convention ("to name a path that no longer exists, write it in plain text").
+- `ai/nan/README.md`: `specs/SDD-007-ai-tooling-consolidation/proposal.md` →
+  `specs/archive/SDD-007-iac-deploy-strategy/proposal.md` (the spec's `id:` is
+  `SDD-007-ai-tooling-consolidation`; its folder was named
+  `SDD-007-iac-deploy-strategy` before archiving — a real rename this guard
+  caught).
+- `ai/opencode/README.md`: de-backticked `ai/ollama/`, a forward-looking
+  "when wired" reference to a directory that does not exist yet — not a stale
+  claim, but backticks make the guard treat it as a live one.
+- Two new bats cases: `cli/README.md` is discovered (pins the nested-README
+  fix), and a discovery-floor case asserting one real member per pattern
+  (`AGENTS.md`, `ai/agy/AGY.md`, `.claude/CLAUDE.md`,
+  `ai/copilot/copilot-instructions.md`, `README.md`) — membership assertions,
+  not an exact list or count, so it does not resurrect the hand-maintained list
+  round 3 replaced with discovery. `GEMINI.md` has no real member in this repo
+  today and is deliberately not asserted.
+
+### Round-6 evidence
+
+- `bats tests/check-doc-paths.bats` → **16/16**
+- Guard clean on all 6 non-excluded `README.md` files in the repo, not just the
+  2 the review named
+- Both new cases mutation-verified before being trusted: reverting the
+  alternation to drop `AGY.md` turns the discovery-floor case red and leaves
+  the nested-README case green; reverting `README.md` back to a root-only
+  anchor turns the nested-README case red and leaves the discovery-floor case
+  green — each case fails on the mutation it exists for, not on an unrelated
+  one
+- `shellcheck` clean; `bash -n` / `zsh -n` clean
+- `check-md-escapes.sh` clean on every touched file
+
+### Still owed
+
+A sixth review at the new sha. Note for the standing "when to stop" question
+this chain keeps asking: round 5's Major was not introduced by fixing round 4
+— it was real, independent, and predates this chain's first commit. That
+argues against reading round 4's "last two defects were in the previous fix"
+as evidence the chain had reached diminishing returns; it argues instead that
+five fresh, independent passes have now found five real, distinct defects.
+
+---
+
+## Round 7 — after the sixth adversarial review
+
+Round 6 (`reviewed_sha b5209f6`) returned **FAIL** on one REAL Blocker, found
+by running the exact command CI runs rather than by inspection.
+
+**The Blocker, and two honest confessions, not one.**
+
+**(a) The defect itself.** The new bats case added in round 6's fix —
+`"check-doc-paths: discovery floor — each governed pattern has a known real
+member [#916]"` — used a literal U+2014 em dash instead of a hyphen.
+`scripts/check-bats-names.sh` is a required `lint` job step (CURATOR-001/#615)
+guarding exactly this: non-ASCII in a `@test` name silently unregisters the
+test. Confirmed by the reviewer: the byte is `e2 80 94`, it is new to round 6's
+own commit (the same file at `main` is clean under the same script), and the
+one-character fix (em dash → hyphen) restores both the name-lint and the full
+bats suite.
+
+**(b) What let it through.** Round 6's own `verification.md` entry (above)
+listed `bats tests/check-doc-paths.bats` and shellcheck/parser evidence, but
+never ran `check-bats-names.sh` or the full `bats tests/*.bats` sweep — the
+exact baseline round 1 established and every round since round 2 was supposed
+to carry forward. That is a second instance of the class round 2 caught first:
+a verification claim that reads as complete without having run everything CI
+runs. Recorded here rather than smoothed over, because the honest record is
+what gives this chain evidentiary weight for #881; a cleaned-up account of "one
+small typo, fixed" would understate what actually happened twice in one spec.
+
+**Aggravating note**: this exact defect class — non-ASCII in an instruction
+artifact's structural text — bit this same session once already, earlier in
+the DOCS-013 chain (an em dash in a `@test` name, caught the same way). Second
+occurrence, and the cost scaled: from a free local lint catch to a full
+~140k-token adversarial-review round spent finding a one-character defect.
+
+**Benchmark note for #881, so a future model-recall replay is not
+inflated:** this Blocker was found by running a deterministic script CI already
+runs — `check-bats-names.sh` — not by anything requiring model judgment. When
+replaying a candidate model against this chain's shas, round 6→7 should not be
+scored as a test of model capability; it is an argument for running
+deterministic checks (name-lint, `bats`, `shellcheck`) *before* an adversarial
+review round, not instead of one, regardless of which model reviews.
+
+### Fix
+
+- `tests/check-doc-paths.bats:168`: em dash → hyphen in the `@test` name.
+- `scripts/check-doc-paths.sh`: added one doctrine line generalizing round 5's
+  point-fix — a path that does not exist *yet* ("will live at X when wired")
+  is not a live claim either, so it also belongs in plain text, not backticks.
+  Closes round 6's THEORETICAL Minor (the exception existed on one file with
+  no general rule written down).
+- No code behavior changed; both fixes are text-only.
+
+### Round-7 evidence
+
+- `./scripts/check-bats-names.sh tests/` → `OK (82 file(s) clean)`
+- `bats tests/check-doc-paths.bats` → **16/16**
+- `bats tests/*.bats` (full suite, the baseline round 1 established) →
+  **1213/1214**, the one failure being the pre-existing, disclosed
+  `#807`/`BUG-054` case, unrelated to this spec — confirmed by running it, not
+  by citing round 6's claim of it
+- `shellcheck` clean; `bash -n` / `zsh -n` clean on `check-doc-paths.sh`
+
+### Known local/CI gap (ticketed, not fixed here)
+
+The local pre-commit hook that ran on this branch's commits does not invoke
+`check-bats-names.sh` — only CI's `lint` job does. That gap is exactly how
+round 6's Blocker shipped past a local commit. Fixing the hook is a repo-wide
+change to `.git-hooks`/pre-commit config, out of this spec's scope (the rubric
+scores Scope, and this chain has been disciplined about not creeping it) and
+low severity on its own (CI does catch it) — but the cost of the gap, measured
+in this round, is a full adversarial-review pass burned on a one-character
+defect. Ticketed separately rather than folded into this PR.
+
+### Still owed
+
+A seventh review at the new sha. The per-round defects are now mechanical
+(a stray character, a missing standard-evidence step) rather than logical —
+the convergence signal to watch for is the local loop matching the CI loop,
+which this round's fix directly closes.
