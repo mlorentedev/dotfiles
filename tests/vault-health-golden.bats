@@ -11,12 +11,17 @@
 # stdout stayed identical, and every stdout-only assertion would still pass. The
 # argv log is therefore a compared artefact, not a debugging aid.
 #
-# One oracle DEFECT is captured faithfully and ticketed separately, per the
+# One oracle DEFECT was captured faithfully rather than fixed silently, per the
 # CLI-021 proposal — a port that "improves while translating" cannot be
-# characterization-tested:
+# characterization-tested — and ticketed separately (#891):
 #   obsidian_cmd() appends `--vault "$VAULT_NAME"`, and four of its five callers
-#   pass the same flag again, so those invocations carry `--vault` twice. Visible
-#   only in expected/obsidian-argv; stdout is identical either way.
+#   passed the same flag again, so those invocations carried `--vault` twice.
+#   Visible only in expected/obsidian-argv; stdout was identical either way.
+# #891 fixed the oracle and deliberately recaptured this corpus to match — see
+# that commit for the reason. Left in this header as a record of the class:
+# the same shape can recur, and the next instance should also get its own
+# ticket + deliberate recapture rather than a silent "cleanup" folded into
+# an unrelated change.
 
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/vault-health"
@@ -153,14 +158,20 @@ assert_golden() {
     [ "$seen" -eq 3 ]
 }
 
-@test "the argv log records the duplicated --vault flag the oracle emits" {
-    # Not a style note: it is the oracle's observable behaviour, and this test
-    # exists so a port that silently "cleans it up" goes red with an explanation
-    # instead of a bare diff. Fixing it is a deliberate recapture, ticketed.
-    grep -q 'orphans --vault knowledge --vault knowledge' \
+@test "the argv log no longer records a duplicated --vault flag (#891)" {
+    # Was: this test pinned the oracle's observable defect (obsidian_cmd()
+    # already appends --vault, and four of its five callers passed it again),
+    # so a port that silently "cleaned it up" would go red with an explanation
+    # instead of a bare diff. #891 fixed the oracle itself (dropped the
+    # redundant flag from the four callers) and this corpus was deliberately
+    # recaptured (tests/golden/vault-health/capture.sh) to match — so this test
+    # now pins the FIXED shape, and a regression back to double-passing the
+    # flag is what would turn it red.
+    ! grep -q -- '--vault knowledge --vault knowledge' \
         "$HERE/cases/all-pass/expected/obsidian-argv"
-    # The connectivity probe passes it only once - the inconsistency across call
-    # sites is itself evidence the duplication is accidental.
+    grep -qx -- '--no-sandbox orphans --vault knowledge' \
+        "$HERE/cases/all-pass/expected/obsidian-argv"
+    # The connectivity probe always passed it once; unaffected by the fix.
     grep -qx -- '--no-sandbox vault --vault knowledge' \
         "$HERE/cases/all-pass/expected/obsidian-argv"
 }

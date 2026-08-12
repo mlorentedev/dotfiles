@@ -37,6 +37,19 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      # #925: scripts/test.sh (above) is a legacy smoke suite that never ran
+      # bats and never ran this script. An em-dash in a new @test name
+      # (bats silently drops such a test, CURATOR-001/#615) shipped past a
+      # local commit ("dotfiles-test: Passed") and was only caught by a
+      # fresh adversarial-review subagent running check-bats-names.sh
+      # directly — a full review round burned on a one-character defect.
+      - id: check-bats-names
+        name: Check bats @test names (non-ASCII / duplicates)
+        entry: ./scripts/check-bats-names.sh tests/
+        language: script
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: sdd-spec-gate
         name: SDD spec-gate (Tier 4)
         entry: ./scripts/check-spec-gate.sh

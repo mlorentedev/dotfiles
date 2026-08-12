@@ -128,10 +128,10 @@ fi
 # ==================================================
 section "3/7" "Orphans & Dead-Ends"
 
-ORPHAN_OUTPUT=$(obsidian_cmd orphans --vault "$VAULT_NAME" 2>/dev/null || true)
+ORPHAN_OUTPUT=$(obsidian_cmd orphans 2>/dev/null || true)
 ORPHAN_COUNT=$(echo "$ORPHAN_OUTPUT" | grep -c '[^[:space:]]') || ORPHAN_COUNT=0
 
-DEADEND_OUTPUT=$(obsidian_cmd dead-ends --vault "$VAULT_NAME" 2>/dev/null || true)
+DEADEND_OUTPUT=$(obsidian_cmd dead-ends 2>/dev/null || true)
 DEADEND_COUNT=$(echo "$DEADEND_OUTPUT" | grep -c '[^[:space:]]') || DEADEND_COUNT=0
 
 if [ "$TOTAL_FILES" -gt 0 ]; then
@@ -171,7 +171,7 @@ fi
 # ==================================================
 section "4/7" "Unresolved Links"
 
-UNRESOLVED_OUTPUT=$(obsidian_cmd unresolved --vault "$VAULT_NAME" 2>/dev/null || true)
+UNRESOLVED_OUTPUT=$(obsidian_cmd unresolved 2>/dev/null || true)
 UNRESOLVED_COUNT=$(echo "$UNRESOLVED_OUTPUT" | grep -c '[^[:space:]]') || UNRESOLVED_COUNT=0
 
 if [ "$UNRESOLVED_COUNT" -eq 0 ]; then
@@ -221,7 +221,7 @@ fi
 # ==================================================
 section "6/7" "Tag Hygiene"
 
-TAG_OUTPUT=$(obsidian_cmd tags --vault "$VAULT_NAME" 2>/dev/null || true)
+TAG_OUTPUT=$(obsidian_cmd tags 2>/dev/null || true)
 TAG_COUNT=$(echo "$TAG_OUTPUT" | grep -c '[^[:space:]]') || TAG_COUNT=0
 info "Total unique tags: $TAG_COUNT"
 
