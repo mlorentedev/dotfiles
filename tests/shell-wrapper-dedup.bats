@@ -64,12 +64,16 @@ setup() {
 # --- AC6: Gemini helper named out of the git-plugin namespace (gp -> gpr -> agyp) ---
 
 @test "AC6: agyp is the Gemini helper, defined once in functions.sh" {
-    run grep -lE '^agyp\(\)' "$REPO_ROOT/.zsh/functions.sh" "$REPO_ROOT/.zsh/aliases.zsh" "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc"
+    run grep -lE '^agyp\(\)' "$REPO_ROOT/.zsh/functions.sh" "$REPO_ROOT/.zsh/functions.zsh" "$REPO_ROOT/.zsh/nvm.zsh" "$REPO_ROOT/.zsh/aliases.zsh" "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc"
     [ "$output" = "$REPO_ROOT/.zsh/functions.sh" ]
 }
 
 @test "AC6: neither colliding gemini helper name (gp, gpr) survives in any rc file" {
-    ! grep -qE '^(function )?(gp|gpr)\(\)' "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc" "$REPO_ROOT/.zsh/functions.sh"
+    # BUG-045: widened to the full set of files an interactive shell sources
+    # (matches shell-alias-collision.bats' ZSH_SOURCED) -- .zsh/functions.zsh
+    # and .zsh/nvm.zsh were missing here, so a collision defined in either
+    # would have gone undetected by this specific check.
+    ! grep -qE '^(function )?(gp|gpr)\(\)' "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc" "$REPO_ROOT/.zsh/functions.sh" "$REPO_ROOT/.zsh/functions.zsh" "$REPO_ROOT/.zsh/nvm.zsh"
 }
 
 # --- AC7: utils.sh sourced declaratively; .profile no longer mutates rc files ---
