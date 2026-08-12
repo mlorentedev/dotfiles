@@ -23,6 +23,13 @@ else
     log_info()    { printf '[INFO]    %s\n' "$1"; }
     log_success() { printf '[SUCCESS] %s\n' "$1"; }
     log_warning() { printf '[WARNING] %s\n' "$1"; }
+    # log_error was missing from this set (BUG-065): process_project() calls
+    # it 4x on the BUG-062 refusal path, and under set -euo pipefail a
+    # missing command is exit 127 -- the script dies mid-message instead of
+    # refusing cleanly, exactly the failure mode BUG-062's guard exists to
+    # avoid. Latent today (utils.sh is a sibling and always found), live the
+    # moment this script is copied out of the repo standalone.
+    log_error()   { printf '[ERROR]   %s\n' "$1"; }
 fi
 
 usage() {
