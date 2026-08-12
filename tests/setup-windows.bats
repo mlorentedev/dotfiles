@@ -369,6 +369,48 @@ setup() {
     ! grep -qE '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
+@test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
+    # A previous adversarial review of HARNESS-069 (bash side) found this bug
+    # live on this exact function: it never got the strip-rule fix, so once a
+    # committed record carries its own generated_* provenance, every Windows
+    # skill/command deploy produced duplicate YAML keys. A source-text grep
+    # cannot catch this class -- it has to run the real function.
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+
+    local scratch="$BATS_TEST_TMPDIR/convert-skill-record"
+    mkdir -p "$scratch"
+    local record="$scratch/SKILL.md"
+    # Shaped like a record HARNESS-069's refresh already stamped: its own
+    # generated_* fields already present, pointing at the vault.
+    printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/demo/SKILL.md\ngenerated_sha: aaaaaaaaaaaaaaaa\nname: demo\ndescription: fixture skill.\n---\n\nBody.\n' \
+        > "$record"
+
+    # Extract just this function's body (CRLF-stripped) so the test exercises
+    # a script excerpt rather than dot-sourcing (and running) the whole
+    # multi-hundred-line deploy script.
+    local fn_body
+    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
+    [ -n "$fn_body" ]
+
+    local out="$scratch/out.md"
+    run pwsh -NonInteractive -Command "
+        $fn_body
+        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
+        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
+    "
+    [ "$status" -eq 0 ]
+
+    [ "$(grep -c '^generated:' "$out")" -eq 1 ]
+    [ "$(grep -c '^generated_from:' "$out")" -eq 1 ]
+    [ "$(grep -c '^generated_sha:' "$out")" -eq 1 ]
+    # The fresh set must win -- it must point at the deploy source, not the
+    # stale vault path the record's own (stripped) fields carried.
+    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
+    grep -q '^name: demo' "$out"
+}
+
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
 # SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
 # `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that

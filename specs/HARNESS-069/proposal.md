@@ -34,9 +34,15 @@ mechanism `render_skill`/`render_agent` already use for deploy output, applied
 in place via a new `inject_record_provenance` helper instead of rendered to
 stdout. `render_skill`'s deploy-time injection is updated to strip any
 pre-existing `generated`/`generated_from`/`generated_sha` lines from its
-source before injecting its own, so a record's own provenance (its relation to
-the vault) and a deployed copy's provenance (its relation to the record) never
-stack into two conflicting sets in the same file. `render_agent` already only
+source before injecting its own, so a record's own provenance (`generated_from`
+= the vault path it was refreshed from, `generated_sha` = the vault source's
+hash) and a deployed copy's provenance (`generated_from` = the vault path
+again — where a human edits — `generated_sha` = the RECORD's hash — what the
+copy was built from) never stack into two sets in the same file. The two
+provenance blocks share a `generated_from` convention (always the vault) but
+differ in what `generated_sha` hashes, by design: one checks "does the record
+still match the vault", the other "does the deploy still match the record".
+`render_agent` already only
 passes through `name`/`description` in frontmatter, so it drops the record's
 provenance naturally — verified, not assumed.
 
@@ -75,8 +81,12 @@ provenance naturally — verified, not assumed.
       `harness/skills/<name>/SKILL.md` and `harness/agents/<name>/AGENT.md`,
       pointing at the vault source it was refreshed from.
 - [x] `compile-harness.sh --deploy` output still carries exactly one set of
-      `generated_*` fields (describing the $HOME copy's relation to the
-      record), not two stacked sets.
+      `generated_*` fields, not two stacked sets. That one set is
+      deliberately dual-referent, unchanged by this spec: `generated_from`
+      names the VAULT path (where to edit — the SSOT), `generated_sha`
+      hashes the RECORD (what the $HOME copy was built from — the drift
+      check). Two different files, two different purposes, one field pair;
+      not a defect.
 - [x] `compile-harness.sh --check` still passes clean, offline, with no
       change to its own logic.
 - [x] Existing bats coverage updated to assert the new record content instead

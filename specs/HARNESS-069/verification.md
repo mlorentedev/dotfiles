@@ -69,6 +69,95 @@ created: "2026-08-12"
   verified. Acceptance criteria and tasks below are accurate to what happened,
   not aspirational.
 
+## Round 2 — after the first adversarial review
+
+Round 1 (`reviewed_sha 508ca10`) returned **FAIL** on one REAL Blocker and one
+REAL Major. Both independently verified by reading the actual code, not taken
+on the reviewer's word.
+
+**The Blocker: `setup-windows.ps1`'s PowerShell twin never got the fix.**
+`Convert-SkillRecord` — the PS equivalent of `render_skill` — never received
+the strip-rule that removes a record's own pre-existing `generated_*` lines
+before injecting deploy's fresh set. Since this spec makes every committed
+record carry its own provenance, every Windows `skill`/`command`-kind deploy
+now produces duplicate `generated`/`generated_from`/`generated_sha` YAML
+keys. Confirmed by reading `Convert-SkillRecord` directly (no equivalent
+strip logic existed) and by porting its loop to Python against a real
+on-disk record: 6 `generated*` lines instead of 3. This shipped live on
+`main` with #927 — no test in `test-windows` CI asserts on deployed content,
+only source-text `grep` on the `.ps1` file.
+
+Two sweeps the reviewer did NOT do, done before writing the fix (floor, not
+ceiling): confirmed there is no `Convert-AgentRecord` twin (agent records
+have no PowerShell render path with this risk — `render_agent`'s bash side
+was already allowlist-safe and has no PS equivalent to duplicate), and
+confirmed `Deploy-SkillRecord`'s `$SrcPath` matches bash's vault-relative
+convention exactly (`"$vsub/$($rec.Name)/SKILL.md"`).
+
+**Fix**: mirrored bash's strip rule in `Convert-SkillRecord`, using
+**`-cmatch`** rather than `-match` — PowerShell's `-match` is
+case-insensitive by default, and bash's `grep`/`awk` are not; a byte-for-byte
+port using `-match` would not actually mirror the bash behavior.
+
+**The Major: `proposal.md`'s AC2 wording was wrong, not the code.** AC2 said
+deployed provenance describes "the $HOME copy's relation to the record" —
+but `generated_from` in a deployed copy names the **vault** path (where to
+edit), while `generated_sha` hashes the **record** (what the copy was built
+from). Two referents in one field pair, verified pre-existing (unrelated to
+this spec's diff — `srcpath` at the deploy call sites was never touched) and
+deliberate: `generated_from` is a "where do I fix this" pointer for a human,
+`generated_sha` is a "is this still fresh" drift check. Fixed by rewording
+AC2 and the "What" section in `proposal.md`, plus a doc comment in both
+`render_skill` (bash) and `Convert-SkillRecord` (PS) stating the dual-referent
+semantics explicitly, so the next reader doesn't re-discover this as a bug.
+
+### Fix
+
+- `setup-windows.ps1`: added the `-cmatch '^generated(_from|_sha)?:'` strip
+  rule to `Convert-SkillRecord`, plus a doc comment above the function.
+- `scripts/compile-harness.sh`: expanded `render_skill`'s doc comment to
+  state the dual-referent semantics explicitly (no code change — the bash
+  side was already correct, only the Blocker's explanation was missing).
+- `specs/HARNESS-069/proposal.md`: reworded AC2 and the "What" section.
+- `tests/setup-windows.bats`: one new **runtime** test —
+  `Convert-SkillRecord does not stack a second set of generated_* fields on
+  a record that already carries its own` — extracts the real function body
+  (CRLF-stripped) via awk, feeds a fixture record (already carrying its own
+  `generated_*` fields, as a HARNESS-069-refreshed record would) through
+  `pwsh -NonInteractive -Command`, and asserts exactly one set of each field
+  survives, with the fresh set's `generated_from` (not the stripped stale
+  one) present in the output. Gated on `pwsh` availability like every other
+  PS-invoking test in this suite (`# skip pwsh not available` locally; runs
+  for real in the `test-windows` CI job). This is deliberately NOT a
+  source-text grep — round 1's own Python port of the buggy logic was
+  evidence of reproduction, not a regression test (the #891 corpus lesson:
+  a port tests the port, not the original).
+
+### Round-2 evidence
+
+- `bats tests/setup-windows.bats` → 110/110 (new test present, `# skip pwsh
+  not available` locally on this Linux dev machine — this repo has no local
+  pwsh; the test executes for real only in `test-windows` CI, same as every
+  other PS-runtime test in this suite)
+- `./scripts/check-bats-names.sh tests/setup-windows.bats` → clean
+- `shellcheck scripts/compile-harness.sh`, `bash -n`/`zsh -n` → clean
+- `./scripts/check-md-escapes.sh specs/HARNESS-069/proposal.md` → clean
+- Manual review: `setup-windows.ps1` line-ending integrity confirmed —
+  2120/2120 lines still CRLF after the edit (`.gitattributes` declares
+  `*.ps1 text eol=crlf`), no mixed endings introduced
+- Could not run `pwsh`/PSScriptAnalyzer locally (not installed on this
+  machine) — the new PS code is unverified by a live interpreter on THIS
+  machine; CI's `test-windows` job is the first real execution. Disclosed,
+  not hidden.
+
+### Still owed
+
+A second review at the new sha. And per the reviewer's own note: this is the
+**third** documented instance of the bash/PowerShell twin drifting (same
+class as #776 and others) — commented on #909 (CLI-035, the port that
+deletes both twins) citing this incident as motivation, rather than filing a
+fourth mechanism-level ticket for a class that already has one.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
