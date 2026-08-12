@@ -150,13 +150,33 @@ semantics explicitly, so the next reader doesn't re-discover this as a bug.
   machine; CI's `test-windows` job is the first real execution. Disclosed,
   not hidden.
 
-### Still owed
+### Round 2 review — PASS
 
-A second review at the new sha. And per the reviewer's own note: this is the
-**third** documented instance of the bash/PowerShell twin drifting (same
-class as #776 and others) — commented on #909 (CLI-035, the port that
-deletes both twins) citing this incident as motivation, rather than filing a
-fourth mechanism-level ticket for a class that already has one.
+`reviewed_sha 8e0d891` (this branch's HEAD at review time). Both round 1
+findings independently re-verified closed with fresh reproduction evidence
+(not taken on the prior round's word) — see `review.md` for the full
+methodology, including a byte-for-byte Python cross-validation of the
+Windows strip rule against the real bash `awk` block, and primary-source
+confirmation (GitHub's own `actions/runner-images` docs) that the new pwsh
+regression test executes in the unconditional `test` job on `ubuntu-latest`,
+not only the PR-gated `test-windows` job as this file had claimed.
+
+Five Minor/informational findings, all explicitly scoped by the reviewer as
+optional and not required for PASS: an `inject_record_provenance` strip-rule
+asymmetry with its sibling `render_skill`, a stale test comment
+(`tests/compile-harness.bats:228-230`) still describing the pre-round-1-fix
+single-referent framing, two coverage-asymmetry gaps carried/found (bash AC2
+opencode/copilot field counts, PowerShell `command`/`prompt` kinds), and one
+informational note (no `Convert-AgentRecord` twin exists, confirmed
+pre-existing and out of scope). Filed as #933 rather than extending this
+branch further, since fixing them here would move HEAD past the reviewed sha
+and force a third review round for polish-only changes.
+
+Per the reviewer's own note: this is the **third** documented instance of
+the bash/PowerShell twin drifting (same class as #776 and others) —
+commented on #909 (CLI-035, the port that deletes both twins) citing this
+incident as motivation, rather than filing a fourth mechanism-level ticket
+for a class that already has one.
 
 ## Promotion candidates
 
@@ -168,7 +188,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-069/` -> `specs/archive/HARNESS-069/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-069/` -> `specs/archive/HARNESS-069/`
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018) — pending PR merge
+- [x] Promotions above executed (lesson written to `docs/lessons.md`; no ADR/pattern warranted)
