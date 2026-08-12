@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/agent-lifecycle/SKILL.md
+generated_sha: 68d4aea1064e8033
 id: agent-lifecycle-skill
 type: skill
 status: active

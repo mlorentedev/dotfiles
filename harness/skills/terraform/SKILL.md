@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/terraform/SKILL.md
+generated_sha: 713b30401906ba24
 id: terraform-skill
 type: skill
 status: active

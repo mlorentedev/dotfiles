@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-069-f1",
+    "behavior": "compile-harness.sh --refresh stamps every committed skill/agent record with generated: true, generated_from and generated_sha pointing at the vault source",
+    "verification": "VAULT_PATH=\"$HOME/Projects/knowledge\" ./scripts/compile-harness.sh --refresh >/dev/null && grep -q '^generated: true' harness/skills/handoff/SKILL.md && grep -q '^generated: true' harness/agents/curator/AGENT.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-069-f2",
+    "behavior": "compile-harness.sh --deploy output carries exactly one set of generated_*/generated_from/generated_sha fields, never two stacked sets",
+    "verification": "bats tests/compile-harness.bats --filter 'one set of provenance fields, not stacked'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-069-f3",
+    "behavior": "compile-harness.sh --check still passes clean and offline after the record content change, with no change to --check's own logic",
+    "verification": "VAULT_PATH=\"$HOME/Projects/knowledge\" ./scripts/compile-harness.sh --refresh >/dev/null && ./scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-069-f4",
+    "behavior": "existing bats coverage reflects the new record content instead of asserting its absence, and pins the no-duplication invariant as a regression test",
+    "verification": "bats tests/compile-harness.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

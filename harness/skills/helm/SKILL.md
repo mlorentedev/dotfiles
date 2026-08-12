@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/helm/SKILL.md
+generated_sha: ec76c09971d4fa6e
 id: helm-skill
 type: skill
 status: active

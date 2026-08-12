@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
+generated_sha: 7eeccf01a1d29bee
 id: using-git-worktrees-skill
 type: skill
 status: active

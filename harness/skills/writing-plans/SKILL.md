@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/writing-plans/SKILL.md
+generated_sha: 9fc966e27f0395f7
 id: writing-plans-skill
 type: skill
 status: active

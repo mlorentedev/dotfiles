@@ -189,6 +189,26 @@ sha_of() { sha256sum "$1" | cut -c1-16; }
 
 target_inject() { jq -r --arg f "$1" '.targets[] | select(.file==$f) | .inject[]' "$MANIFEST"; }
 
+# Inject `generated_*` provenance into a COMMITTED record in place (HARNESS-069).
+# Option A's committed harness/{skills,agents}/<name>/{SKILL,AGENT}.md is a
+# rendered artifact of the vault source, but until now carried nothing saying
+# so — opened directly in the repo it read as hand-authored. Mirrors
+# render_skill/render_agent's frontmatter injection, but rewrites in place
+# instead of rendering to stdout, and the sha is of the VAULT SOURCE at refresh
+# time (the field says "this is what I was refreshed from"), not of the record.
+inject_record_provenance() {
+    local file="$1" srcpath="$2" sha="$3" tmp
+    tmp="$(mktemp)"
+    awk -v gf="$srcpath" -v gs="$sha" '
+        /^---[[:space:]]*$/ {
+            fm++
+            if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
+        }
+        { print }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
 # --- skills (kind: render) ---
 # Skills are whole-file transforms: one vault 00_meta/skills/<name>/SKILL.md ->
 # N agent-native outputs (committed in-repo; setup copies them to $HOME). Drift
@@ -228,6 +248,11 @@ render_skill() {
             if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
         }
         fm==1 && kind=="command" && /^name:/ { next }   # opencode commands key off filename
+        # The record (HARNESS-069) already carries its own generated_* fields,
+        # describing its relationship to the vault. Strip them here so deploy
+        # injects one fresh set, describing the deploy targets relationship to
+        # the record, instead of stacking a second set on top.
+        fm==1 && /^generated(_from|_sha)?:/ { next }
         { print }
     ' "$record"
 }
@@ -384,7 +409,8 @@ EOF
         fi
         mkdir -p "$sk_recdir"
         # validate frontmatter, then copy the WHOLE skill dir to the record
-        # (SKILL.md + any auxiliary reference files / scripts), verbatim.
+        # (SKILL.md + any auxiliary reference files / scripts) verbatim, then
+        # stamp SKILL.md alone with generated_* provenance (HARNESS-069).
         for sk_dir in "$VAULT_PATH/$sk_vsub"/*/; do
             [[ -f "$sk_dir/SKILL.md" ]] || continue
             validate_skill_frontmatter "$sk_dir/SKILL.md" "$sk_schema"
@@ -392,6 +418,7 @@ EOF
             rm -rf "${sk_recdir:?}/$name"
             mkdir -p "$sk_recdir/$name"
             cp -rf "$sk_dir"* "$sk_recdir/$name/"
+            inject_record_provenance "$sk_recdir/$name/SKILL.md" "$sk_vsub/$name/SKILL.md" "$(sha_of "$sk_dir/SKILL.md")"
             printf '[refresh] skill record: %s/%s\n' "$(jq -r '.skills.record_dir' "$MANIFEST")" "$name"
         done
         # drop stale records whose vault source no longer exists
@@ -421,6 +448,7 @@ EOF
             rm -rf "${ag_recdir:?}/$name"
             mkdir -p "$ag_recdir/$name"
             cp -rf "$ag_dir"* "$ag_recdir/$name/"
+            inject_record_provenance "$ag_recdir/$name/AGENT.md" "$ag_vsub/$name/AGENT.md" "$(sha_of "$ag_dir/AGENT.md")"
             printf '[refresh] agent record: %s/%s\n' "$(jq -r '.agents.record_dir' "$MANIFEST")" "$name"
         done
         for rec in "$ag_recdir"/*/; do

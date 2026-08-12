@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/async-python-patterns/SKILL.md
+generated_sha: 213441fb6cd3a963
 id: async-python-patterns-skill
 type: skill
 status: active

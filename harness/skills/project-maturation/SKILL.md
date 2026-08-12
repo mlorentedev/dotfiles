@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/project-maturation/SKILL.md
+generated_sha: 47a4c382676c322e
 id: project-maturation-skill
 type: skill
 status: active

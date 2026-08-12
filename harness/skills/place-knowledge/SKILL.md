@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/place-knowledge/SKILL.md
+generated_sha: 7299c70be6094932
 id: place-knowledge-skill
 type: skill
 status: active

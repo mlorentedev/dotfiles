@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/research-prompt/SKILL.md
+generated_sha: 730d271a0d4061d0
 id: research-prompt-skill
 type: skill
 status: active

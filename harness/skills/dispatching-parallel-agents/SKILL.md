@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/dispatching-parallel-agents/SKILL.md
+generated_sha: a716db8d40dd96ce
 id: dispatching-parallel-agents-skill
 type: skill
 status: active

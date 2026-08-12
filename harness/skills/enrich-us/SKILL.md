@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/enrich-us/SKILL.md
+generated_sha: ea27f2a5743c7f9e
 id: enrich-us-skill
 type: skill
 status: active

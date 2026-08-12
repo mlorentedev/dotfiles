@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/insights/SKILL.md
+generated_sha: 3dacc3046a58a23c
 id: insights-skill
 type: skill
 status: active

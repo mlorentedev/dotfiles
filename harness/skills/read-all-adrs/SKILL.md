@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/read-all-adrs/SKILL.md
+generated_sha: 9047ab3da31641f7
 id: read-all-adrs-skill
 type: skill
 status: active

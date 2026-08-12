@@ -200,19 +200,24 @@ EOF
 
 run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
 
-@test "render: --refresh writes a verbatim record only (no provenance, no \$HOME write)" {
+@test "render: --refresh stamps the committed record with its own provenance (HARNESS-069), no \$HOME write" {
     seed_skills_fixture
     run_refresh
     [ "$status" -eq 0 ]
     [ -f "$REPO/harness/skills/demo-skill/SKILL.md" ]
-    # record is a byte-for-byte copy of the vault source; provenance is added at deploy
-    diff "$VAULT/00_meta/skills/demo-skill/SKILL.md" "$REPO/harness/skills/demo-skill/SKILL.md"
-    ! grep -q '^generated' "$REPO/harness/skills/demo-skill/SKILL.md"
+    REC="$REPO/harness/skills/demo-skill/SKILL.md"
+    # the record's body and name/description are unchanged from the vault source
+    grep -q '^name: demo-skill' "$REC"
+    grep -qF 'Body line one.' "$REC"
+    # but it now says what it was refreshed from — not hand-authored
+    grep -q '^generated: true' "$REC"
+    grep -q '^generated_from: 00_meta/skills/demo-skill/SKILL.md' "$REC"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$REC"
     # option A: --refresh never renders to $HOME
     [ ! -d "$FAKEHOME/.claude" ]
 }
 
-@test "render: --deploy renders records to \$HOME with provenance (claude + opencode + copilot)" {
+@test "render: --deploy renders records to \$HOME with one set of provenance fields, not stacked (HARNESS-069)" {
     seed_skills_fixture
     run_refresh; [ "$status" -eq 0 ]
     run_deploy; [ "$status" -eq 0 ]
@@ -220,14 +225,22 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     grep -q '^name: demo-skill' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md"
     grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md"
     grep -q '^generated_from: 00_meta/skills/demo-skill/SKILL.md' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md"
+    # the record's OWN provenance (added at --refresh) must not survive into the
+    # deployed copy alongside deploy's own — exactly one set, describing $HOME's
+    # relationship to the record, not two describing two different relationships
+    [ "$(grep -c '^generated:' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md")" -eq 1 ]
+    [ "$(grep -c '^generated_from:' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md")" -eq 1 ]
+    [ "$(grep -c '^generated_sha:' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md")" -eq 1 ]
     # opencode command drops name:, keeps description + provenance
     [ -f "$FAKEHOME/.config/opencode/commands/demo-skill.md" ]
     ! grep -q '^name:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     grep -q '^description:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
+    [ "$(grep -c '^generated_from:' "$FAKEHOME/.config/opencode/commands/demo-skill.md")" -eq 1 ]
     # copilot uses the Agent Skills directory format and keeps the whole record
     grep -q '^name: demo-skill' "$FAKEHOME/.copilot/skills/demo-skill/SKILL.md"
     grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.copilot/skills/demo-skill/SKILL.md"
+    [ "$(grep -c '^generated_from:' "$FAKEHOME/.copilot/skills/demo-skill/SKILL.md")" -eq 1 ]
 }
 
 @test "AC1: --deploy replaces a pre-existing vault symlink with a regular copy" {
@@ -580,13 +593,16 @@ seed_doctrine_fixture() {
     done < <(jq -r '(.agents.presence[]?.file), (.doctrine.deploy[]?.file)' "$REPO/harness/manifest.json")
 }
 
-@test "agents: --refresh writes a verbatim AGENT.md record (no provenance, no \$HOME)" {
+@test "agents: --refresh stamps the committed AGENT.md record with its own provenance (HARNESS-069), no \$HOME" {
     seed_agents_fixture
     run_refresh
     [ "$status" -eq 0 ]
-    [ -f "$REPO/harness/agents/curator/AGENT.md" ]
-    diff "$VAULT/00_meta/agents/definitions/curator/AGENT.md" "$REPO/harness/agents/curator/AGENT.md"
-    ! grep -q '^generated' "$REPO/harness/agents/curator/AGENT.md"
+    REC="$REPO/harness/agents/curator/AGENT.md"
+    [ -f "$REC" ]
+    grep -q '^name: curator' "$REC"
+    grep -q '^generated: true' "$REC"
+    grep -q '^generated_from: 00_meta/agents/definitions/curator/AGENT.md' "$REC"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$REC"
     [ ! -d "$FAKEHOME/.claude/agents" ]
 }
 
@@ -603,6 +619,12 @@ seed_doctrine_fixture() {
     grep -qF 'Body line one.' "$F"
     # neutral-only / deferred keys must NOT leak into the native agent frontmatter
     ! grep -qE '^(kind|model|capabilities|skills|targets):' "$F"
+    # the record's own provenance (HARNESS-069, added at --refresh) must not
+    # survive alongside deploy's own — render_agent's name/description-only
+    # passthrough already drops it, but pin that behavior explicitly
+    [ "$(grep -c '^generated:' "$F")" -eq 1 ]
+    [ "$(grep -c '^generated_from:' "$F")" -eq 1 ]
+    [ "$(grep -c '^generated_sha:' "$F")" -eq 1 ]
 }
 
 @test "agents: --deploy injects a presence region (forced skills) into every harness instructions file" {
