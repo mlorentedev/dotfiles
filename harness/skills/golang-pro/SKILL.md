@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/golang-pro/SKILL.md
+generated_sha: 369e71f8cb95db74
 id: golang-pro-skill
 type: skill
 status: active

@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/verification-before-completion/SKILL.md
+generated_sha: da15afc3f14995da
 id: verification-before-completion-skill
 type: skill
 status: active

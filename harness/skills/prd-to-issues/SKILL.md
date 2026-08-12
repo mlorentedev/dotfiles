@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/prd-to-issues/SKILL.md
+generated_sha: d2e5d93b7c0cfa45
 id: prd-to-issues-skill
 type: skill
 status: active

@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/genre-picker/SKILL.md
+generated_sha: 628ddd54e3282282
 id: genre-picker-skill
 type: skill
 status: active

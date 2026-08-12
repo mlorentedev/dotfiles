@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/handoff/SKILL.md
+generated_sha: 39a6bf74d30ebc2e
 id: handoff-skill
 type: skill
 status: active

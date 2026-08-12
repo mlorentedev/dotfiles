@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/creating-skills/SKILL.md
+generated_sha: 692db94f0a6fbe39
 id: creating-skills-skill
 type: skill
 status: active

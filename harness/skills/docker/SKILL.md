@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/docker/SKILL.md
+generated_sha: 2a019c5021743efd
 id: docker-skill
 type: skill
 status: active

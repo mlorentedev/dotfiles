@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/mcp-builder/SKILL.md
+generated_sha: b0f680afca0b0f55
 id: mcp-builder-skill
 type: skill
 status: active

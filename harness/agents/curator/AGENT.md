@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/agents/definitions/curator/AGENT.md
+generated_sha: 94a6cfb6a212d027
 id: agent-curator
 type: agent
 status: active

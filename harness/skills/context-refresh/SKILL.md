@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/context-refresh/SKILL.md
+generated_sha: 00078eaf1e444a52
 id: context-refresh-skill
 type: skill
 status: active

@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/test-driven-development/SKILL.md
+generated_sha: acf05932e955f864
 id: test-driven-development-skill
 type: skill
 status: active

@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/systematic-debugging/SKILL.md
+generated_sha: 4073a48a21a67880
 id: systematic-debugging-skill
 type: skill
 status: active

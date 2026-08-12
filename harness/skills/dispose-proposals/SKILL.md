@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/dispose-proposals/SKILL.md
+generated_sha: d8262f03155bdd46
 id: dispose-proposals-skill
 type: skill
 status: active

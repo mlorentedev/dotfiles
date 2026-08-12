@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/audit/SKILL.md
+generated_sha: 4b77476729b7009a
 id: audit-skill
 type: skill
 status: active

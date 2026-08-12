@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/debug-hardware/SKILL.md
+generated_sha: feef6f988e415a5c
 id: debug-hardware-skill
 type: skill
 status: active

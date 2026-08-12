@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/executing-plans/SKILL.md
+generated_sha: fa518485c25a7685
 id: executing-plans-skill
 type: skill
 status: active

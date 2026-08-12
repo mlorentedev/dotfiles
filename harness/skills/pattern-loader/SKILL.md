@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/pattern-loader/SKILL.md
+generated_sha: d84925a7822dfa83
 id: pattern-loader-skill
 type: skill
 status: active

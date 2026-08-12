@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/architecture-session/SKILL.md
+generated_sha: 59addebb95d6329d
 id: architecture-session-skill
 type: skill
 status: active

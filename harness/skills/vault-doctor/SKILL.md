@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/vault-doctor/SKILL.md
+generated_sha: 470ac7cc4e48ae0c
 id: vault-doctor-skill
 type: skill
 status: active
