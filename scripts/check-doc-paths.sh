@@ -38,6 +38,10 @@
 #
 # A backticked repo path is a LIVE claim. To name a path that no longer exists
 # — "the old loader lived at scripts/load-secrets.sh" — write it in plain text.
+# The same holds in the other direction: a path that does not exist YET
+# — "Ollama docs will live at ai/ollama/ when wired" — is also not a live
+# claim, so it also goes in plain text, not backticks (round 5 found this gap
+# point-fixed on one file with no general rule written down).
 # That keeps the invariant simple enough to state in one line, and needs no
 # per-file exception list.
 #
