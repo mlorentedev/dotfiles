@@ -27,6 +27,25 @@ import (
 // System.AgeRoundTrip, which proves a key decrypts rather than that a file
 // exists.
 
+// isGitCheckout reports whether path is a git checkout — a regular clone, a
+// LINKED WORKTREE, or a --separate-git-dir layout alike — by asking git
+// rather than assuming "<path>/.git is a directory" (#806).
+//
+// In a linked worktree (and under --separate-git-dir), <path>/.git is a
+// `gitdir:` pointer FILE, not a directory — the same trap #776/BUG-043 hit on
+// the hooks-dir side. isDir(path/.git) answers "is this a REGULAR checkout",
+// which for the vault's secret gate is the wrong question: it makes the check
+// SKIP — "no vault checkout, no secret gate to provision" — for a vault that
+// is present and whose gate is genuinely unverified. A SKIP that reads as
+// healthy is worse than a FAIL.
+func isGitCheckout(sys *System, path string) bool {
+	if sys == nil || sys.CommandOutput == nil {
+		return isDir(filepath.Join(path, ".git"))
+	}
+	out, err := sys.CommandOutput("git", "-C", path, "rev-parse", "--is-inside-work-tree")
+	return err == nil && strings.TrimSpace(out) == "true"
+}
+
 // effectiveHooksPath reports the core.hooksPath git will ACTUALLY use inside
 // repo. Reading `--global` answers a question about the machine; git resolves
 // local-over-global, so only this answers the question about a repo. "" means

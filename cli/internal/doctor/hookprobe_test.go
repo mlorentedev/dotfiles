@@ -52,6 +52,12 @@ func (p *probeGit) system(vault string) *System {
 			}
 			repo := args[1]
 			switch {
+			case strings.Contains(joined, "--is-inside-work-tree"):
+				// Every repo this fake is asked about is one gitRepo() built, so
+				// it is a checkout in this fake's model — mirrors real git's
+				// answer for both a regular checkout and a linked worktree (#806
+				// covers the pointer-file layout with a real-git test instead).
+				return "true\n", nil
 			case strings.Contains(joined, "--git-common-dir"):
 				return filepath.Join(repo, ".git") + "\n", nil
 			case strings.Contains(joined, "core.hooksPath"):
