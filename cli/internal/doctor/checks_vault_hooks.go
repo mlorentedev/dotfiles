@@ -32,8 +32,11 @@ func checkVaultHooks(sys *System, rep *Report, fix bool) {
 	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
 
 	// Vault absent -> nothing to protect. SKIP, not FAIL: a machine that never
-	// syncs the vault is a valid state.
-	if !isDir(filepath.Join(vault, ".git")) {
+	// syncs the vault is a valid state. Asks git rather than assuming
+	// <vault>/.git is a directory — it is a gitdir: pointer FILE in a linked
+	// worktree, which used to make this SKIP a checkout that was genuinely
+	// present (#806).
+	if !isGitCheckout(sys, vault) {
 		rep.Skip("no vault checkout at " + vault + " — no secret gate to provision")
 		return
 	}
