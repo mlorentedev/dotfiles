@@ -38,7 +38,7 @@ created: "2026-08-12"
 - [x] Full `tests/compile-harness.bats` suite green (44/44)
 - [x] No unrelated changes in the diff — the two stale-comment touch-ups (`verbatim` copy description) are in the same functions this spec changes, not scope creep
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#927)
 
 ## Machine-readable features
 
