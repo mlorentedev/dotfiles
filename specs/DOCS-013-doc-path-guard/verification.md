@@ -299,3 +299,79 @@ the failure message, not the coverage. Left as-is deliberately.
 
 A fifth review at the new sha, per this chain's convention. Four rounds have
 each found a real defect; the last two were in the fix for the previous one.
+
+---
+
+## Round 6 — after the fifth adversarial review
+
+Round 5 (`reviewed_sha 3c6d77d`, run against `main` directly — no PR, no
+branch, the feature was already merged) returned **FAIL** on one REAL Major and
+one Minor.
+
+**The Major recalibrates the diminishing-returns read from round 4.** It was
+not a defect in a previous fix — nothing round 5 found existed because of
+anything rounds 2-4 touched. `instruction_files()`'s discovery regex matched
+`AGENTS.md` / `CLAUDE.md` / `AGY.md` / `GEMINI.md` / `copilot-instructions.md`
+anywhere in the tree, but anchored `README.md` to the repo root only
+(`^README\.md$`) — an asymmetry that was never in the exclusion list this file
+says every exclusion needs a reason for, and had been there since before round
+1. Reproduced by widening the pattern and running the guard against every
+non-excluded `README.md` in the repo (`git ls-files '*README.md' | grep -vE
+'^harness/|^specs/|^docs/'` → 6 files): `cli/README.md` and `ai/nan/README.md`
+had real dead paths, and — dimensioning the blast radius past what the review
+itself reported — so did `ai/opencode/README.md`, a third file the reviewer
+didn't name. One of the three, `scripts/healthcheck.sh` in `cli/README.md`, is
+the exact file whose staleness in `.claude/CLAUDE.md` was this whole spec's
+founding incident (#916).
+
+**The Minor**: mutating the discovery alternation (dropping `AGY.md`, the same
+silent-drop class rounds 2-4 each independently found once) left all 14 tests
+green. Nothing pinned that the discovered set actually contains a member of
+each pattern.
+
+### Fix
+
+- `tests/check-doc-paths.bats`: folded `README\.md` into the main alternation
+  `(^|/)(...)$` instead of a separate `^README\.md$` anchor.
+- `cli/README.md`: de-backticked `scripts/healthcheck.sh` and
+  `scripts/doctor.sh` — both retired, named only as history in a sentence
+  about what `dotf doctor` consolidates. Matches this guard's own stated
+  convention ("to name a path that no longer exists, write it in plain text").
+- `ai/nan/README.md`: `specs/SDD-007-ai-tooling-consolidation/proposal.md` →
+  `specs/archive/SDD-007-iac-deploy-strategy/proposal.md` (the spec's `id:` is
+  `SDD-007-ai-tooling-consolidation`; its folder was named
+  `SDD-007-iac-deploy-strategy` before archiving — a real rename this guard
+  caught).
+- `ai/opencode/README.md`: de-backticked `ai/ollama/`, a forward-looking
+  "when wired" reference to a directory that does not exist yet — not a stale
+  claim, but backticks make the guard treat it as a live one.
+- Two new bats cases: `cli/README.md` is discovered (pins the nested-README
+  fix), and a discovery-floor case asserting one real member per pattern
+  (`AGENTS.md`, `ai/agy/AGY.md`, `.claude/CLAUDE.md`,
+  `ai/copilot/copilot-instructions.md`, `README.md`) — membership assertions,
+  not an exact list or count, so it does not resurrect the hand-maintained list
+  round 3 replaced with discovery. `GEMINI.md` has no real member in this repo
+  today and is deliberately not asserted.
+
+### Round-6 evidence
+
+- `bats tests/check-doc-paths.bats` → **16/16**
+- Guard clean on all 6 non-excluded `README.md` files in the repo, not just the
+  2 the review named
+- Both new cases mutation-verified before being trusted: reverting the
+  alternation to drop `AGY.md` turns the discovery-floor case red and leaves
+  the nested-README case green; reverting `README.md` back to a root-only
+  anchor turns the nested-README case red and leaves the discovery-floor case
+  green — each case fails on the mutation it exists for, not on an unrelated
+  one
+- `shellcheck` clean; `bash -n` / `zsh -n` clean
+- `check-md-escapes.sh` clean on every touched file
+
+### Still owed
+
+A sixth review at the new sha. Note for the standing "when to stop" question
+this chain keeps asking: round 5's Major was not introduced by fixing round 4
+— it was real, independent, and predates this chain's first commit. That
+argues against reading round 4's "last two defects were in the previous fix"
+as evidence the chain had reached diminishing returns; it argues instead that
+five fresh, independent passes have now found five real, distinct defects.

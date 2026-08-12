@@ -39,8 +39,9 @@ for large ones. Streaming is a deliberate non-goal until this hurts enough
 
 ### `dotf doctor` — post-setup diagnostics
 
-The Go consolidation of `scripts/healthcheck.sh` (the 12-section sweep) and
-`scripts/doctor.sh` (the `env-contract.json` verifier), read natively — no `jq`
+The Go consolidation of scripts/healthcheck.sh (the 12-section sweep) and
+scripts/doctor.sh (the env-contract.json verifier) — both retired — read
+natively, no `jq`
 (CLI-012, the first port of [ADR-021](../docs/adr/adr-021-cli-orchestration-roadmap.md)).
 Run after `setup-linux.sh` and on demand:
 

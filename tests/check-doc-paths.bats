@@ -38,9 +38,16 @@ teardown() {
 # watches rot, so enumerating it a fourth time would patch the instance and
 # leave the class. Anything matching the naming contract is governed the day it
 # lands; excluding one requires saying so below, with a reason.
+#
+# Round 5 found README.md itself breaking that promise: every other pattern
+# matched anywhere in the tree, but README.md was anchored to the repo root
+# only (`^README\.md$`), undocumented and not among the exclusions below —
+# leaving `cli/README.md` and `ai/nan/README.md` ungoverned with real dead
+# paths, one of them `scripts/healthcheck.sh`, this guard's own founding
+# incident (#916). Folded into the same alternation as everything else.
 instruction_files() {
     git -C "$DOTFILES_DIR" ls-files '*.md' \
-        | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md)$|^README\.md$' \
+        | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md|README\.md)$' \
         | grep -vE '^harness/|^specs/|^docs/'
 }
 # Exclusions above, each for a stated reason:
@@ -147,6 +154,32 @@ governed_files() {
     instruction_files | grep -qx "$PROBE_REL"
     run bash -c "cd '$DOTFILES_DIR' && '$GUARD' '$PROBE_REL'"
     [ "$status" -eq 1 ]
+}
+
+@test "check-doc-paths: a nested README.md is governed, not only the root one [#916]" {
+    # Round 5: AGENTS.md/CLAUDE.md/AGY.md/GEMINI.md/copilot-instructions.md all
+    # matched anywhere in the tree, but README.md was anchored to root only.
+    # cli/README.md was sitting ungoverned with a dead reference to
+    # scripts/healthcheck.sh — the exact file whose staleness in
+    # .claude/CLAUDE.md was this guard's own founding incident.
+    instruction_files | grep -qx "cli/README.md"
+}
+
+@test "check-doc-paths: discovery floor — each governed pattern has a known real member [#916]" {
+    # Round 5, second finding: mutating the discovery alternation (e.g.
+    # dropping AGY.md) left all tests green — nothing pinned that the
+    # discovered set actually contains a member of each pattern. Membership
+    # assertions, not an exact list or count: an exact list resurrects the
+    # hand-maintained list round 3 replaced with discovery, and would rot the
+    # same way. GEMINI.md has no real member in this repo today, so it is not
+    # asserted here — add its line the day one exists.
+    local found
+    found="$(instruction_files)"
+    printf '%s\n' "$found" | grep -qx "AGENTS.md"
+    printf '%s\n' "$found" | grep -qx "ai/agy/AGY.md"
+    printf '%s\n' "$found" | grep -qx ".claude/CLAUDE.md"
+    printf '%s\n' "$found" | grep -qx "ai/copilot/copilot-instructions.md"
+    printf '%s\n' "$found" | grep -qx "README.md"
 }
 
 @test "check-doc-paths: a file under an excluded prefix is not discovered [#916]" {

@@ -32,7 +32,7 @@ NaN is **provider-level** (API key, model catalog, rate limits, troubleshooting)
 - `scripts/nan-bench.sh` / `nan-quality-bench.sh` / `nan-debug.sh` (direct curl)
 - Any OpenAI-compatible SDK (Python, JS, Go)
 
-Mirroring the existing `ai/claude/`, `ai/copilot/` pattern, each provider/agent owns its own directory. Future Ollama provider docs will live at `ai/ollama/` when wired.
+Mirroring the existing `ai/claude/`, `ai/copilot/` pattern, each provider/agent owns its own directory. Future Ollama provider docs will live at ai/ollama/ when wired (not yet created).
 
 ## Quick reference
 
