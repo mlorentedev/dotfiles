@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.38.0](https://github.com/mlorentedev/dotfiles/compare/v0.37.1...v0.38.0) (2026-08-12)
+
+
+### Features
+
+* **harness:** stamp committed skill/agent records with provenance (HARNESS-069) ([#927](https://github.com/mlorentedev/dotfiles/issues/927)) ([147e4ed](https://github.com/mlorentedev/dotfiles/commit/147e4ed23e42f4865940630ce3076fe7f175c1d4))
+
+
+### Bug Fixes
+
+* **crystallize:** add log_error to the standalone fallback (BUG-065) ([#932](https://github.com/mlorentedev/dotfiles/issues/932)) ([d090032](https://github.com/mlorentedev/dotfiles/commit/d0900321c7d860cb2effe025ca434b00b9aa8832))
+* **docs:** govern nested READMEs and archive DOCS-013 through the review gate ([#926](https://github.com/mlorentedev/dotfiles/issues/926)) ([2eb1a5d](https://github.com/mlorentedev/dotfiles/commit/2eb1a5df0133b7773c9068311b223fc8c9cf7d65))
+* **doctor:** detect a vault linked worktree as a checkout, not absent (BUG-053, [#806](https://github.com/mlorentedev/dotfiles/issues/806)) ([#931](https://github.com/mlorentedev/dotfiles/issues/931)) ([5116466](https://github.com/mlorentedev/dotfiles/commit/5116466e7d19da89d2e8104030c89d5523861e8b))
+* **harness:** PowerShell twin never stripped a record's own generated_* fields (HARNESS-069) ([#934](https://github.com/mlorentedev/dotfiles/issues/934)) ([8170e96](https://github.com/mlorentedev/dotfiles/commit/8170e96cfbffedf1f8067750a4cb47ae309278cb))
+* **tests:** widen the git-alias collision guard past its 4-char cap (BUG-045) ([#935](https://github.com/mlorentedev/dotfiles/issues/935)) ([ac826ed](https://github.com/mlorentedev/dotfiles/commit/ac826edc7dcfdc8afb9329ae89055347575c9616))
+* **vault:** drop the redundant --vault flag from 4 of 5 obsidian_cmd callers ([#891](https://github.com/mlorentedev/dotfiles/issues/891)) ([#930](https://github.com/mlorentedev/dotfiles/issues/930)) ([cde3bcc](https://github.com/mlorentedev/dotfiles/commit/cde3bcc573679aee4e6bc2c757f95127ed578f60))
+
 ## [0.37.1](https://github.com/mlorentedev/dotfiles/compare/v0.37.0...v0.37.1) (2026-08-11)
 
 
