@@ -44,3 +44,20 @@ setup() {
     grep -A1 'sdd-spec-gate' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'spec-gate'
     grep -B1 'pre-push' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'sdd-spec-gate\|stages'
 }
+
+@test ".pre-commit-config.yaml declares check-bats-names at pre-commit stage [#925]" {
+    # scripts/test.sh (the dotfiles-test hook) never ran bats or this script —
+    # a non-ASCII @test name shipped past local pre-commit and was only
+    # caught by a full adversarial-review round. This hook is the guard.
+    grep -q 'check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml"
+    grep -A2 'id: check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'check-bats-names.sh'
+    grep -A5 'id: check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'pre-commit'
+}
+
+@test "check-bats-names.sh exits 0 on this repo's own tests/ tree [#925]" {
+    # The hook is only a guard if it actually passes on a clean tree — pins
+    # that invariant so a future non-ASCII @test name is caught here, not
+    # three rounds of review later.
+    run "$SCRIPTS_DIR/check-bats-names.sh" "$DOTFILES_DIR/tests/"
+    [ "$status" -eq 0 ]
+}
