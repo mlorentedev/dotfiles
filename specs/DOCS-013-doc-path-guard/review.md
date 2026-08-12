@@ -1,132 +1,142 @@
 ---
 spec: "DOCS-013-doc-path-guard"
 verdict: "FAIL"
-reviewed_sha: "3c6d77d768c2afdbbe3e009e5cd55fd52fe590bb"
+reviewed_sha: "b5209f6d729622a6ceb37a8f9d51af6db6bc289f"
 reviewer: "claude-sonnet-5"
 date: "2026-08-11"
 ---
 
 ## Adversarial review
 
-**Scope**: DOCS-013-doc-path-guard, round 5. Merged directly to `main` (squash
-`caa7af5`, PR #924); no open PR to diff against. Reviewed the CURRENT STATE of
-the feature on `main` at `3c6d77d` (`caa7af5` plus one unrelated release commit
-`3c6d77d` and one unrelated spec-grammar commit `6267bea`, neither of which
-touches the governed files). Read the round 1-4 history in `verification.md`
-only to identify what must already hold as a floor, then re-derived everything
-independently rather than trusting the round-4 `review.md`'s FAIL-with-fix
-narrative or round 5's self-reported fix in `verification.md`.
+**Scope**: DOCS-013-doc-path-guard, round 6. One commit
+(`b5209f6`, `fix(docs): govern nested READMEs in the doc-path guard (DOCS-013)`)
+on top of `main` at `3c6d77d` (release 0.37.1), fixing round 5's REAL Major
+(README.md discovery silently root-anchored while every sibling pattern in the
+same regex matched anywhere) and its Minor (no regression floor on the
+discovery alternation itself). Diffed against `main` in this worktree
+(`git diff main...HEAD`); no open PR to cross-reference.
+
+Per the task brief, `review.md` was intentionally not read as part of forming
+this review's frame — only `proposal.md`, `tasks.md` and `verification.md`
+(whose round-by-round log carries the same history `review.md` would). Every
+verification.md claim relevant to this round was independently reproduced,
+including this round's own entries, not taken on the document's word.
 
 **Sources**: `specs/DOCS-013-doc-path-guard/{proposal,tasks,verification}.md`,
 `scripts/check-doc-paths.sh`, `tests/check-doc-paths.bats`,
+`scripts/check-bats-names.sh`, `.github/workflows/ci.yml`,
 `cli/internal/spec/review.go` (frontmatter/staleness contract), plus direct
-execution: `bats`, `shellcheck`, `bash -n`/`zsh -n`, manual fault injection
-(`index.lock` during the probe tests) and two guard-condition mutations, all
-performed in a disposable local clone (`git clone --local`) so the real working
-tree was never touched. Also ran the guard directly against every
-`README.md` in the repo, not only the governed set, to check the discovery
-contract's own boundary rather than only the files it already declares itself
-responsible for.
+execution in the actual worktree (not a disposable clone — the working tree
+was restored to a clean state, verified by diff, after every mutation):
+`bats tests/check-doc-paths.bats`, `bats tests/*.bats` (full suite, 1214
+tests), `./scripts/check-bats-names.sh tests/`, `shellcheck`, `bash -n`/`zsh -n`,
+`./scripts/check-md-escapes.sh`, `./scripts/check-spec-gate.sh`, and three
+guard-condition mutations (README anchor reverted to root-only; `AGY.md`
+dropped from the discovery alternation; the new @test name's em-dash replaced
+with a hyphen), each applied, tested, and reverted individually.
 
 ### Spec and task alignment
 
-- Round 4's Major (`ai/probe-agent/AGENTS.md` could be stranded in the real
-  tree if `git add -N` failed mid-test) is genuinely fixed, verified by
-  reproducing the exact failure condition: `touch .git/index.lock`, then
-  `bats tests/check-doc-paths.bats`. Both probe cases (8 and 9) fail as they
-  must (`git add -N` returns 128), and `find ai harness -iname '*probe*'` plus
-  `git status --short` afterward show nothing — `teardown()`'s unconditional
-  cleanup holds under the concurrency scenario it was written for. This is a
-  real regression test of a real prior defect, not a re-read of the diff.
-- All 14 bats cases pass, three separate ways: on `main` directly, in the
-  disposable clone at the same sha, and again in the clone with the
-  `index.lock` fault present (cases 8/9 correctly `not ok`, the other 12 stay
-  green). `shellcheck`, `bash -n`, `zsh -n` clean.
-- `instruction_files()` discovers exactly the 9 files every prior round
-  settled on (`.claude/CLAUDE.md`, `AGENTS.md`, `README.md`,
-  `.github/copilot-instructions.md`, `ai/agy/AGY.md`, `ai/claude/CLAUDE.md`,
-  `ai/copilot/copilot-instructions.md`, `ai/hermes/AGENTS.md`,
-  `cli/AGENTS.md`), and the guard reports `OK` on every one of them.
-- Two guard-condition mutations, run to confirm the suite is not vacuous:
-  dropping the ALL-CAPS/`KNOWN_EXT` guard's negation (line 128) turns cases
-  4, 6, 7 and 11 red — the suite catches this class, including the exact
-  `SKILL.md` false-negative round 1 already fixed once. Removing `AGY\.md`
-  from the discovery alternation (simulating a silently re-dropped file, the
-  same defect class rounds 2-4 each found once) leaves the suite **fully
-  green** — see Findings.
+- Round 5's Major is genuinely fixed. `tests/check-doc-paths.bats:50` now folds
+  `README\.md` into the same `(^|/)(...)$` alternation as every other pattern,
+  replacing the round-5-flagged `^README\.md$` anchor. Reproduced by mutation:
+  reverting to the root-only anchor turns case 9 ("a nested README.md is
+  governed...") red while case 10 ("discovery floor...") stays green; restoring
+  turns case 9 green again. Matches verification.md's Round 6 claim exactly.
+- Round 5's Minor (no discovery-floor regression test) is genuinely fixed.
+  Case 10 asserts five known members by name. Reproduced by mutation: dropping
+  `AGY\.md` from the alternation turns case 10 red while case 9 stays green;
+  restoring turns it green again. Matches verification.md's claim exactly —
+  both mutations behave precisely as documented, in the direction documented,
+  with no unrelated case affected.
+- The three content fixes are factually correct, not just guard-satisfying:
+  `specs/archive/SDD-007-iac-deploy-strategy/proposal.md` exists and its
+  frontmatter `id:` really is `SDD-007-ai-tooling-consolidation`, confirming
+  `ai/nan/README.md`'s corrected pointer is accurate, not merely resolvable.
+  `scripts/healthcheck.sh` and `scripts/doctor.sh` (de-backticked in
+  `cli/README.md`) are confirmed absent. `ai/ollama/` (de-backticked in
+  `ai/opencode/README.md`) is confirmed absent, consistent with "not yet
+  created."
+- Ran the guard directly against all 6 non-excluded `README.md` files in the
+  repo (`README.md`, `ai/nan/`, `ai/opencode/`, `ai/pi/`, `cli/`,
+  `sensitive/`) — all report `OK`, matching verification.md's claim. `ai/pi/`
+  and `sensitive/` were not touched by this diff but are newly swept into the
+  governed set by the widened regex; both were already clean, so the widening
+  introduced no new false failures on files nobody looked at.
+- No filename pattern in the discovery alternation carries an anchor asymmetric
+  with the others: `AGENTS\.md`, `CLAUDE\.md`, `AGY\.md`, `GEMINI\.md`,
+  `copilot-instructions\.md` and `README\.md` all now sit inside the same
+  `(^|/)(...)$` group. The exclusion filter (`^harness/|^specs/|^docs/`) is
+  separately anchored to string-start for all three prefixes, symmetric with
+  itself; no file in the repo today sits under a *nested* `docs/`, `specs/` or
+  `harness/` (e.g. `ai/x/docs/README.md`) that this would fail to exclude, so
+  it is a live-instance-free asymmetry, structurally identical to the one
+  round 5 found live — worth naming, not worth blocking on (see Findings).
 - `[AGENT-DRAFT]` / `[AGENT-SUGGESTION]` tags: none present in any spec file.
-- Full regression sweep, `bats tests/*.bats` on `main` at `3c6d77d`: **1212
-  total, 1 failure** (`not ok 408 converges over a running dotf: a live binary
-  in dest is replaced, not refused`) — the same pre-existing, disclosed,
-  unrelated failure `verification.md` names (BUG-054/#807). No regression
-  attributable to this spec.
+- `check-spec-gate.sh --base-ref main --head-ref HEAD --explain`: production
+  diff 250 LOC ≥ threshold 50, spec folder touched — gate satisfied.
+- `proposal.md`/`tasks.md` unchanged since `6a40da3`, predating this round's
+  commit — `review.md`'s staleness check (`cli/internal/spec/review.go`) will
+  not flag this review against the contract files.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location |
 |---|---|---|---|---|---|---|
-| Major | REAL | `tests/check-doc-paths.bats` — `instruction_files()` discovery contract | The discovery regex is asymmetric with no stated reason: `AGENTS\.md`, `CLAUDE\.md`, `AGY\.md`, `GEMINI\.md`, `copilot-instructions\.md` are matched anywhere (`(^\|/)…$`), but `README\.md` is matched **only at repo root** (`^README\.md$`). This is not in the exclusion list the same file requires ("excluding one requires saying so below, with a reason") — it is a silent asymmetry in the positive pattern. Consequence, reproduced directly: `./scripts/check-doc-paths.sh cli/README.md` reports 2 missing paths — `scripts/doctor.sh` and, specifically, **`scripts/healthcheck.sh`, backticked**, the exact file whose staleness in `.claude/CLAUDE.md` is this spec's own founding incident (proposal.md "Why": "two sessions in two days acted on one of them — `./scripts/healthcheck.sh`"). `./scripts/check-doc-paths.sh ai/nan/README.md` reports a second dead path, `specs/SDD-007-ai-tooling-consolidation/proposal.md` (that spec ID was reused for a different feature — `specs/archive/SDD-007-iac-deploy-strategy` — so the reference is simply wrong, not just moved). Neither file is in the governed set, so neither failure is caught anywhere: not by this guard, not by any other bats case, not by CI. `docs/` and `specs/`-prefixed README.md files would already be excluded by the existing `grep -vE` line if the anchor were widened, so widening it does not sweep in the two files the exclusion list already reasons about — only genuinely ungoverned ones (`cli/`, `ai/nan/`, `ai/opencode/`, `ai/pi/`, `sensitive/`). | Reproduced directly against the real repo tree (not the clone): `./scripts/check-doc-paths.sh cli/README.md` → `2 missing path(s)`; `./scripts/check-doc-paths.sh ai/nan/README.md` → `1 missing path(s)`; `ls scripts/doctor.sh scripts/healthcheck.sh` → both `No such file or directory`. Confirmed no other test or CI step covers these files (`grep -rln "cli/README\|ai/nan/README" tests/*.bats scripts/*.sh` → no matches). | UNTESTED — no case in `tests/check-doc-paths.bats` exercises README.md discovery outside repo root, and no case pins the discovered set against a regression that narrows it (see the next finding, which is the general form of this one) | code (`tests/check-doc-paths.bats:43`, widen the README alternative to `(^\|/)README\.md$`, matching every sibling pattern) + tests (a case pinning `cli/README.md` or an equivalent nested README as discovered) + docs (fix the two stale references this reveals: de-backtick or update `cli/README.md`'s `scripts/healthcheck.sh`/`scripts/doctor.sh` mentions per this guard's own "retired path → plain text" convention, and correct or drop `ai/nan/README.md`'s dead spec pointer) |
-| Minor | REAL | `tests/check-doc-paths.bats` — discovery has no floor | Mutation-tested: removing `AGY\.md\|` from the discovery alternation in a disposable clone (simulating exactly the silent-drop defect class rounds 2, 3 and 4 each found once — a governed file quietly falling out of the set) leaves all 14 cases green. Nothing in the suite asserts the discovered set contains at least the 9 files every round has settled on, so a future edit narrowing the pattern (a typo in the alternation, a misplaced `\|`) would pass CI silently — the exact failure mode `verification.md` itself names ("a guard that under-reports looks identical to a clean repo"), now demonstrated against the discovery mechanism instead of the path-checking mechanism it was written to fix. | Reproduced: `sed` removed `AGY\.md\|` from `tests/check-doc-paths.bats:43` in the disposable clone, ran `bats tests/check-doc-paths.bats` → `1..14`, all `ok`. Restored, `git status --short` clean afterward. | UNTESTED | tests — add a case asserting `instruction_files() \| wc -l` is at least the known floor (or asserts specific known members are present), so a regression in the alternation itself is caught, not only a regression in what the alternation is applied to |
-| Minor | THEORETICAL | `scripts/check-doc-paths.sh` header convention vs. `ai/opencode/README.md` | The "backticked = live claim, retired = plain text" convention has no third category for a **planned, not-yet-built** path. `ai/opencode/README.md:35` reads "Future Ollama provider docs will live at `ai/ollama/` when wired" — backticked, and `ai/ollama/` does not exist, so if README.md discovery is widened (per the Major above) this line would newly fail even though it is neither a live claim nor a stale one. Not a bug in the shipped guard today (the file isn't governed), but it is a real gap the fix for the Major above will walk directly into. | Manual read; `ls ai/ollama` confirms absent | UNTESTED | docs — de-backtick this one line when README discovery widens, or spec — extend the convention with an explicit "planned path" exception before more of these accumulate |
-| Minor | informational | `scripts/check-doc-paths.sh` — CI wiring | Unchanged since round 4: no standalone CI step; enforcement is only the "every instruction file's repo paths resolve" bats case, which does run in the required `test` job. Pre-existing since round 1, not scored against this round. | n/a | n/a |
+| Blocker | REAL | `tests/check-doc-paths.bats:168` — new `@test` name | The new "discovery floor" test name contains a literal U+2014 EM DASH (`—`) instead of a hyphen: `@test "check-doc-paths: discovery floor — each governed pattern has a known real member [#916]" {`. `scripts/check-bats-names.sh` — the repo's own guard against exactly this class ("bats @test name the runner silently fails to register," CURATOR-001/#615) — flags it, and that script is a **required** step in `.github/workflows/ci.yml`'s `lint` job ("Lint bats @test names (no silent-skipped tests)": `./scripts/check-bats-names.sh tests/`). Running that exact command against this worktree fails deterministically. Confirmed the character is new to this round, not pre-existing: `git show main:tests/check-doc-paths.bats` piped through the same script reports clean; only this round's diff (`git diff main...HEAD` shows the line as a `+` addition) introduces it. This is not a hypothetical CI outcome — it is the literal command CI runs, run here, failing. | `./scripts/check-bats-names.sh tests/` → `tests/check-doc-paths.bats:168: non-ASCII character in @test name (bats silently fails to register it)`, exit 1. `xxd` on the character confirms `e2 80 94` (UTF-8 U+2014). `bats tests/*.bats` (full suite, 1214 tests) surfaces this as `not ok 153 check-bats-names: the repo's own tests/ pass (no silent-skip names remain)`. Mutation-verified the fix: replacing the em-dash with `-` makes both `check-bats-names.sh tests/` and the bats run pass; reverted after confirming. | `check-bats-names: the repo's own tests/ pass (no silent-skip names remain)` (`tests/check-bats-names.bats:54`) — NOT UNTESTED; this existing regression test already catches it, it was simply not run by this round's own verification pass | tests — one-character fix in `tests/check-doc-paths.bats:168`, em-dash to a plain hyphen (or ` - ` / `:`), matching every other `@test` name's ASCII-only convention in the same file |
+| Minor | THEORETICAL | `scripts/check-doc-paths.sh` header convention — "planned path" gap | Round 5 flagged that the "backticked = live claim, retired = plain text" convention has no third category for a planned-but-not-yet-built path, and offered two fixes: de-backtick the one live instance, or extend the documented convention. This round took the first (de-backticked `ai/opencode/README.md`'s `ai/ollama/` mention) but not the second. Swept every governed file for the same shape (`will live at`, `not yet (created\|wired\|built)`, `when wired`) and found no second live instance today, so this is not a currently-failing case — but the general gap in the script's own header comment (which enumerates only "live" and "retired," not "planned") is unaddressed, so the next agent who backticks a forward-looking path anywhere in the repo will hit the identical landmine round 5 hit, with no comment warning them off it. | `grep -nE "will live at\|not yet \(created\|wired\|built\)\|when wired" <every governed file>` → one match, already fixed. No second instance. | UNTESTED — no regression test exists for this class, by design (there is nothing to regress against yet) | docs — extend `scripts/check-doc-paths.sh`'s header convention section with an explicit "planned, not yet built" exception (write it in plain text like a retired path), or accept explicitly as a known, documented limit the way round 4 did for markdown-link extraction |
+| Minor | informational | `specs/DOCS-013-doc-path-guard/verification.md` — Round 6 evidence scope | Round 6's own evidence list (`bats tests/check-doc-paths.bats` 16/16, guard-clean sweep, mutation tests, `shellcheck`, `bash -n`/`zsh -n`, `check-md-escapes.sh`) omits both a full `bats tests/*.bats` sweep and `./scripts/check-bats-names.sh tests/` — the exact required CI step that would have caught the Blocker above in seconds. Round 1's own verification explicitly ran `./scripts/check-bats-names.sh tests/ → OK, 82 files`; this round narrowed the evidence set relative to that established baseline, and the narrowing is precisely how the Blocker shipped undetected. Not a new mechanism defect — a verification-process gap that explains the Blocker rather than compounding it. | Direct comparison: `verification.md`'s Round 1 evidence lists `check-bats-names.sh`; Round 6's does not. Full suite run in this review (1214 tests, 2 failures: the new Blocker and the pre-existing, disclosed #807/BUG-054) confirms what a full sweep would have shown. | n/a (process finding, not a code path) | spec — when this round is amended, restore a full-suite + `check-bats-names.sh` line to the Round 6 evidence list; a standing practice for future rounds worth stating once rather than re-discovering: re-run the full suite and the naming lint every round, not only the file scoped to the round's own fix |
 
-No Blockers found in the mechanism rounds 1-4 already fixed: traversal
-ordering, the flush-left zsh-sourcing regex, the probe-hermeticity fix, and
-the false-positive/false-negative pair from round 1 all re-verified true by
-direct execution and, where a prior round's fix was itself the subject of a
-mutation, by mutation.
+No other Blockers or Majors. Rounds 1-5's mechanisms — traversal ordering, the
+flush-left zsh-sourcing regex, probe hermeticity under `index.lock`, the
+false-positive/false-negative pair, and now the README discovery symmetry —
+all re-verified true by direct execution and, where a prior round's fix was
+itself the subject of a mutation, by mutation. The regression sweep found
+exactly one other failure, `not ok 410 converges over a running dotf: a live
+binary in dest is replaced, not refused` (`coreutils: unknown program 'dotf'`)
+— matches the pre-existing, disclosed #807/BUG-054 signature exactly (same
+underlying cause, shifted test number from added tests); not attributable to
+this spec.
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |---|---|---|
-| Correctness | C | The governed set is internally correct and now hermetic under fault, but the discovery contract has an undocumented boundary that provably lets real stale claims (including the founding-incident path) through today |
-| Verification | B | Every testable claim in `verification.md` reproduced by direct execution across three independent runs (main, clone, fault-injected clone); the round-5 "no leaks under index.lock" claim specifically confirmed, not just re-read |
-| Scope | B | The round-4→5 discovery rewrite is a deliberate, justified widening of the original 6-file list, consistent with this chain's own precedent; this round's finding is about the widening being incomplete, not about scope creep |
-| Reliability | C | Mutation-tested: the discovery mechanism has no regression floor, so a future narrowing of the governed set (accidental or not) fails silently, which is the specific failure mode this spec exists to prevent |
-| Maintainability | B | Clear naming, extensive rationale comments in both files, `shellcheck` and both shell parsers clean, no dead code |
-| Handoff-readiness | B | `verification.md`'s round-by-round record is thorough, accurate, and the round-5 fix claims all reproduced true; this round's findings were not yet captured anywhere |
+| Correctness | D | A real, deterministically reproducible defect ships in the diff: a non-ASCII character in a new `@test` name fails the repo's own required CI lint step outright |
+| Verification | C | What was claimed reproduced faithfully (both mutations behave exactly as documented) but the evidence set was narrower than this round's own baseline (round 1 ran `check-bats-names.sh`; round 6 did not), and that narrowing is exactly how the Blocker went unnoticed |
+| Scope | A | Diff addresses precisely round 5's Major and Minor, nothing extraneous; the three README content fixes are each independently verified factually correct, not just guard-satisfying |
+| Reliability | B | The mechanisms this round touches (discovery regex, two new bats cases) behave correctly and hermetically under the mutations tested; the Blocker is a lint-time defect, not a runtime reliability gap in the guard itself |
+| Maintainability | B | Clear naming and extensive, accurate rationale comments elsewhere in the diff; the one em-dash is a typo-class slip, not a structural issue, and is already scored under Correctness |
+| Handoff-readiness | A | `verification.md`'s round-by-round record remains exemplary — thorough, accurate about what it claims, and every claim it made for this round reproduced true; only the evidence *scope* narrowed, not its honesty |
 
 ### Verdict
 FAIL
 
-One REAL Major (UNTESTED): `README.md` discovery is silently root-anchored
-while every sibling pattern in the same regex is not, and that asymmetry is
-not a documented exclusion but an oversight — proven by two currently-tracked,
-ungoverned files (`cli/README.md`, `ai/nan/README.md`) that carry real dead
-backticked paths right now, one of them a second occurrence of the exact path
-(`scripts/healthcheck.sh`) that motivated this spec in the first place. A
-guard whose own governed-file boundary reproduces the bug class it exists to
-catch, in a file sitting one directory below the ones it does check, cannot
-be called done.
+One REAL Blocker: `tests/check-doc-paths.bats:168`'s new `@test` name contains
+a non-ASCII em-dash, which fails `scripts/check-bats-names.sh` — a required
+step in the `lint` CI job — deterministically and unconditionally. This is not
+a design gap or an edge case; it is the literal command CI runs, run here,
+failing on a one-character typo in code this round itself added. Everything
+else in the round — the README-discovery symmetry fix, the discovery-floor
+regression test, the three content corrections — is genuinely correct,
+independently verified, and matches what `verification.md` claims. This FAIL
+is narrow and mechanical, not a signal that the round's actual design work is
+unsound.
 
 ### Recommended next steps (before archive)
 
-Two independent ways to flip this to PASS — either is small:
-
-- **(a) Widen the boundary.** Change `tests/check-doc-paths.bats:43`'s
-  `^README\.md$` to `(^|/)README\.md$`, matching every other alternative in
-  the same regex. `docs/` and `specs/` README.md files are already excluded
-  by the existing `grep -vE '^harness/|^specs/|^docs/'` line, so this sweeps
-  in exactly `cli/README.md`, `ai/nan/README.md`, `ai/opencode/README.md`,
-  `ai/pi/README.md`, `sensitive/README.md` — nothing already reasoned about.
-  Then fix the two now-caught stale references (de-backtick or correct, per
-  this guard's own convention) and add a case pinning at least one nested
-  README as discovered.
-- **(b) Document it as a deliberate exclusion.** If root-only README.md is
-  actually intended (e.g. because subdirectory READMEs are judged closer to
-  `docs/` than to `AGENTS.md`), say so in the exclusion-reasons comment block
-  the same way `harness/`, `specs/` and `docs/` already are, and add a case
-  pinning that a nested README.md is correctly NOT discovered — matching how
-  case 9 already pins the `harness/` exclusion. This path does **not** fix
-  `cli/README.md`'s and `ai/nan/README.md`'s stale content, which would then
-  need a separate, non-DOCS-013 ticket, disclosed rather than silently
-  dropped (`feedback_fix_or_ticket_tech_debt`).
-- Either path: add a regression test for the discovery floor itself (the
-  Minor above) — e.g. assert `instruction_files()` returns at least the known
-  9 files, or contains a fixed list of must-have members — so a future
-  narrowing of the alternation is caught the same way a future narrowing of
-  the path-checking logic already is.
-- The `ai/opencode/README.md` "planned path" Minor is not blocking; note it
-  in the same PR if convenient, otherwise it is fine to leave for whoever
-  picks up (a).
+- **The fix is one character.** In `tests/check-doc-paths.bats:168`, replace
+  the em-dash (`—`, U+2014) between "discovery floor" and "each governed
+  pattern" with a plain hyphen (or any ASCII punctuation) so the `@test` name
+  is pure ASCII, matching every other test name in the file.
+- Re-run `./scripts/check-bats-names.sh tests/` (must report `OK (82 file(s)
+  clean)`) and `bats tests/*.bats` (must return to 1 failure, the disclosed
+  #807/BUG-054, not 2) before the next review.
+- Optional but recommended, not blocking: fold a full-suite run and
+  `check-bats-names.sh` back into this round's evidence list in
+  `verification.md`, so the record shows what actually gates CI, matching
+  round 1's own baseline.
+- Optional, not blocking, no live instance: extend
+  `scripts/check-doc-paths.sh`'s header with an explicit "planned, not yet
+  built" exception, or note the gap as a deliberately accepted limit the way
+  round 4 did for markdown-link extraction.

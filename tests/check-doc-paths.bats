@@ -165,7 +165,7 @@ governed_files() {
     instruction_files | grep -qx "cli/README.md"
 }
 
-@test "check-doc-paths: discovery floor — each governed pattern has a known real member [#916]" {
+@test "check-doc-paths: discovery floor - each governed pattern has a known real member [#916]" {
     # Round 5, second finding: mutating the discovery alternation (e.g.
     # dropping AGY.md) left all tests green — nothing pinned that the
     # discovered set actually contains a member of each pattern. Membership
