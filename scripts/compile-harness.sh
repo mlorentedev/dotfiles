@@ -234,6 +234,19 @@ skill_targets_agent() {
 #   command -> drop `name:` (opencode commands key off filename) + provenance
 #   prompt  -> strip YAML frontmatter entirely, prepend provenance comment (agy
 #              flat prompts in ~/.gemini/prompts/, mirrors setup's sed strip)
+#
+# The injected `generated_*` fields are deliberately dual-referent, not a
+# single "where did this come from" answer (HARNESS-069): `generated_from` is
+# always the vault path in `srcpath` — where a human edits, the SSOT — while
+# `generated_sha` hashes `record` (the committed harness/skills/... file this
+# call renders FROM), not the vault source. One field pair, two questions:
+# "where do I fix this" and "is this deploy still fresh against the record it
+# was built from". The committed record's OWN provenance (written by
+# inject_record_provenance at --refresh) answers a related but different
+# question the same way — generated_from = vault, generated_sha = the vault
+# source's hash — which is why it must be stripped here rather than passed
+# through: two blocks with the same field names but different sha referents,
+# stacked in one file, would be actively misleading.
 render_skill() {
     local kind="$1" record="$2" srcpath="$3" sha
     sha="$(sha_of "$record")"

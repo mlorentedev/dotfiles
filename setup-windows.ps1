@@ -1792,6 +1792,14 @@ function Get-SkillField {
     return ''
 }
 
+# The injected generated_* fields are deliberately dual-referent, not a
+# single "where did this come from" answer (HARNESS-069): generated_from is
+# always the vault path in $SrcPath -- where a human edits, the SSOT -- while
+# generated_sha hashes $RecordMd (the committed harness\skills\... file this
+# call renders FROM), not the vault source. Mirrors render_skill in
+# scripts/compile-harness.sh exactly; see that function's comment for the
+# full rationale, including why the record's own provenance must be
+# stripped rather than passed through.
 function Convert-SkillRecord {
     param([string]$Kind, [string]$RecordMd, [string]$SrcPath)
     $sha = (Get-FileHash -LiteralPath $RecordMd -Algorithm SHA256).Hash.Substring(0, 16).ToLower()
@@ -1814,6 +1822,15 @@ function Convert-SkillRecord {
             continue
         }
         if ($fm -eq 1 -and $Kind -eq 'command' -and $line -match '^name:') { continue }
+        # The record (HARNESS-069) already carries its own generated_* fields,
+        # describing its relationship to the vault. Strip them here so deploy
+        # injects one fresh set, describing the deploy target's relationship
+        # to the record, instead of stacking a second set on top. Mirrors
+        # render_skill's awk rule in scripts/compile-harness.sh exactly.
+        # -cmatch, not -match: PowerShell's -match is case-insensitive by
+        # default, and bash's grep/awk are not — a faithful mirror needs the
+        # case-sensitive operator.
+        if ($fm -eq 1 -and $line -cmatch '^generated(_from|_sha)?:') { continue }
         $out.Add($line)
     }
     return ($out -join "`n")
