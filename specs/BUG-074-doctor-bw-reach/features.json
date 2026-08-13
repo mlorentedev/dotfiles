@@ -1,0 +1,30 @@
+[
+  {
+    "id": "BUG-074-doctor-bw-reach-f1",
+    "behavior": "An unauthenticated Bitwarden session is reported, with severity keyed to whether the registry actually holds backend: bw entries",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(UnauthenticatedIsReported|SeverityFollowsExposure)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f2",
+    "behavior": "A stale lastSync warns before the refresh token dies, while bw status still reports the vault as locked",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(StaleSyncWarnsWhileStatusLooksHealthy|FreshLockedVaultIsCleanButUnproven)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f3",
+    "behavior": "With a session available, reachability is proven by an authenticated round-trip against the server, not by PATH presence",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(UnlockedVaultProvesReach|UnlockedButSyncFailsIsAFail)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f4",
+    "behavior": "Unusable or unreadable inputs (bad JSON, unknown status, never synced, unreadable registry) degrade to advisory and never claim verified reach",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(DegradesOnUnusableStatus|UnreadableRegistryDegradesSeverity)$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
