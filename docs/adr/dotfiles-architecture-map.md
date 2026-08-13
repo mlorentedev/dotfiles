@@ -1,11 +1,21 @@
 ---
 id: dotfiles-architecture-map
 type: architecture
-status: active
+status: superseded-snapshot
 created: "2026-05-19"
 ---
 
 # Dotfiles Architecture Map
+
+> ⚠️ **Superseded snapshot, frozen as of 2026-05-19.** For current orientation ("where
+> does X live") read [`docs/architecture.md`](../architecture.md) instead — it is
+> CI-guarded (`tests/architecture-md.bats`) and stays in sync with the tree. This map's
+> SSOT list, runtime diagram, and layer tables predate ADR-028 (secrets redesign) and
+> much of the strangler-fig CLI convergence (ADR-020/021); they describe the repo as it
+> was, not as it is. Kept for historical reference — content below is intentionally
+> **not** updated in place. The corrected runtime data-flow diagram lives in
+> `docs/architecture.md`; the corrected secrets flow lives in
+> [`guide-secrets-governance.md`](../runbooks/guide-secrets-governance.md).
 
 > Current-state snapshot of the `dotfiles` repo. Baseline for AUDIT-001 (repo structure), AUDIT-002 (cross-OS duplication), AUDIT-003 (docs drift). Generated 2026-05-19 (AUDIT-004).
 

@@ -11,6 +11,36 @@ owner: manu
 
 > Operational protocols for the two-tier model in [ADR-028](../adr/adr-028-secrets-two-tier-bitwarden-age.md): **Bitwarden = live SSOT**, **age = DR escrow + bootstrap floor**, behind a `dotf secrets` facade + `secrets/registry.yaml`. As the model rolls out, the `dotf secrets` steps activate (Phase 1-2); until then the **manual `bw`/`age` equivalents** apply (marked _manual today_). Supersedes the age-only flow in `secrets-management.md`.
 
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    classDef store fill:#fef3c7,stroke:#d97706,color:#000
+    classDef cmd fill:#dbeafe,stroke:#1e40af,color:#000
+    classDef target fill:#dcfce7,stroke:#15803d,color:#000
+
+    BW[("Bitwarden<br/>live SSOT<br/>Dotfiles/{apps,infra,personal,floor}")]:::store
+    AGE[("age floor<br/>sensitive/*.secret.age<br/>+ offline key")]:::store
+    REG["secrets/registry.yaml<br/>mapping SSOT<br/>id → backend → expose → consumers"]:::store
+
+    RUN["dotf secrets run -- cmd<br/>(child env only)"]:::cmd
+    SYNC["dotf secrets sync ci<br/>(ahead-of-time)"]:::cmd
+    MIG["dotf secrets migrate<br/>(age→bw, parity-gated)"]:::cmd
+    BAK["dotf secrets backup<br/>(bw export | age)"]:::cmd
+
+    LOCAL["local process"]:::target
+    CI["GitHub Actions secrets"]:::target
+    DR["sensitive/dr/bitwarden-export.age<br/>(committed escrow)"]:::target
+
+    REG --> RUN & SYNC & MIG
+    BW --> RUN --> LOCAL
+    AGE --> RUN
+    BW --> SYNC --> CI
+    AGE --> MIG --> BW
+    BW --> BAK --> DR
+    AGE -. "offline key decrypts" .-> DR
+```
+
 ## Conventions (from ADR-028)
 
 - Managed secrets live under **`Dotfiles/{apps,infra,floor}`** in Bitwarden; the ~125 personal items are a separate tree, out of `dotf secrets`' bounds.
