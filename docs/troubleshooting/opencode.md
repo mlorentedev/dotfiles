@@ -24,7 +24,7 @@ created: "2026-08-12"
 
 ## `command -v opencode` fails after `setup-linux.sh`
 
-The install script writes the binary to `$HOME/.opencode/bin/opencode` and `setup-linux.sh` adds that directory to PATH in `.zshrc`/`.bashrc`. Reload the shell or `source ~/.zshrc`. If still missing, re-run `setup-linux.sh` — the `command -v` gate is idempotent and will re-fetch only if the binary is genuinely absent.
+The install script writes the binary to `$HOME/.opencode/bin/opencode` and `setup-linux.sh` adds that directory to PATH in `.zshrc`/`.bashrc`. Reload the shell (`source ~/.zshrc` for zsh, `source ~/.bashrc` for bash) or open a new terminal. If still missing, re-run `setup-linux.sh` — the `command -v` gate is idempotent and will re-fetch only if the binary is genuinely absent.
 
 ## `/models` shows unexpected providers/models
 
@@ -75,7 +75,7 @@ Surfaced 2026-05-17 during AI-011-validation. opencode performs **per-session wo
 
 Surfaced 2026-05-17 in `~/Projects/resume` cwd (opencode-go era). Log pattern:
 
-```
+```text
 service=llm ... agent=build ... stream         <- request sent
 +1327ms bus type=message.part.updated          <- first chunk arrived
 +54s    snapshot prune cleanup                 <- next event, unrelated
@@ -96,7 +96,7 @@ After the first `message.part.updated`, no `message.part.delta` events follow fo
 
 Surfaced 2026-05-17, UTC 02:48 = 10:48 China peak (opencode-go era). Different signature, same root-cause family. Pattern in log:
 
-```
+```text
 service=llm ... agent=build ... stream        <- first request
 ... 21s of message.part.delta events          <- first turn streamed fine
 tool.registry status=started/completed <X>    <- model issued a tool call, opencode resolved it

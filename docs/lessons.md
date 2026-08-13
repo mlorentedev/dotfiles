@@ -17,8 +17,9 @@ owner: manu
 
 ## Index
 
-Chronological, mirrors entry order below (append-only body — this list does
-not re-sort). Regenerate after adding entries with:
+Append-order index; mirrors entry order below (append-only body — this list does
+not re-sort, so it is not strictly chronological where an entry landed out of
+date order). Regenerate after adding entries with:
 
 ```bash
 awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9-]+)\] (.*)$/- [\1] \2/'

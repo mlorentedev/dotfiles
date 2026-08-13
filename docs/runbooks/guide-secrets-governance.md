@@ -45,7 +45,7 @@ flowchart LR
 
 - Managed secrets live under **`Dotfiles/{apps,infra,floor}`** in Bitwarden; the ~125 personal items are a separate tree, out of `dotf secrets`' bounds.
 - The **registry** `secrets/registry.yaml` is the SSOT: `id → bw item/field → env|file → consumers → rotate`.
-- **Values never render** to a human, log, or chat; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`).
+- **Values never render into an unintended channel** — a log, a chat/AI conversation, a shared terminal, CI output; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`). `dotf secrets show`/`run` are the deliberate, interactive-terminal-only exceptions this convention doesn't forbid — the rule is against accidental exposure, not against the primitives that exist specifically to show or use a value.
 
 ## Protocol — ADD a secret
 

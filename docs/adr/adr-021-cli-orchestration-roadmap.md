@@ -62,7 +62,6 @@ Each step is its own spec/PR (SDD), guard-grep-verified, with its twins deleted 
 
 - **`curl | bash` bootstrap** (IDEAS-005) — the entry point; runs before any binary exists.
 - **`install-dotf.sh`** — fetch + verify + place the binary (chicken-and-egg).
-- **secrets env-**export** shim** — a subprocess cannot export into the parent shell.
 - **`shell-profile.sh`** — profiles the shell itself.
 - **`windows-defaults.ps1`, `profile-heal.ps1`** — Windows OS-config.
 - **RC glue** (`.zshrc`/`.bashrc`) and **`utils.sh`** (shrinks as consumers leave, dies with the last shell logic script).

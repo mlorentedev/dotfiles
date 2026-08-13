@@ -16,7 +16,7 @@ created: "2026-05-19"
 > **not** updated in place. The corrected runtime data-flow diagram lives in
 > `docs/architecture.md`; the corrected secrets flow lives in
 > [`guide-secrets-governance.md`](../runbooks/guide-secrets-governance.md).
-
+>
 > Current-state snapshot of the `dotfiles` repo. Baseline for AUDIT-001 (repo structure), AUDIT-002 (cross-OS duplication), AUDIT-003 (docs drift). Generated 2026-05-19 (AUDIT-004).
 
 ## TL;DR

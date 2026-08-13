@@ -13,8 +13,10 @@ created: "2026-05-16"
 > live SSOT for provider/model facts. The steps below are dead as instructions,
 > not merely stale in the model names; a rewrite for the NaN-era setup flow is
 > tracked separately. Kept for historical reference (what the Go-subscription
-> onboarding looked like) and because the coexistence-constraint and daily-usage
-> sections below still apply regardless of provider.
+> onboarding looked like) and because the coexistence-constraint section below
+> still applies regardless of provider — **Daily usage does not**: it still
+> names `deepseek-v4-pro`/the Go catalog and is exactly as stale as the setup
+> steps above, not an exception to them.
 >
 > **Goal (as originally written):** Set up OpenCode with the Go subscription as a secondary AI coding agent (Claude Code stays primary, aider is sunset in PR2). Idempotent installation, three-layer guardrail against accidental PAYG billing.
 >
@@ -84,6 +86,10 @@ Why: a careless `/models` selection of a frontier model under Zen PAYG would tri
 4. With no card on file for PAYG, any inadvertent call to a frontier model **fails** rather than charging. This is the strongest guarantee.
 
 ## Daily usage
+
+> ⚠️ Same Go-subscription era as the setup steps above — see the top banner.
+> Current default and catalog live in `ai/opencode/opencode.jsonc` (`nan/qwen3.6`
+> today), not below.
 
 ```bash
 oc                                  # launch TUI from any repo

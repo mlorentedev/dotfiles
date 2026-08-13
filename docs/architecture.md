@@ -89,7 +89,9 @@ flowchart LR
     CS([New agent session]):::trigger --> MEM["dotf mem session-start<br/>(session-start-config.json)"]:::hook --> CTX["additionalContext"]:::sink
     CMD([Secret needed]):::trigger --> SEC["dotf secrets run -- cmd"]:::hook --> CHILD["child process env only"]:::sink
     TIMER([Daily systemd timer /<br/>Scheduled Task]):::trigger --> UPD["dotf update<br/>(ff-only + setup)"]:::hook --> DEPLOY["~/.dotfiles converged"]:::sink
-    PR([PR opened]):::trigger --> GATE["spec-gate.yml"]:::hook --> FAIL[CI red]:::sink
+    PR([PR opened]):::trigger --> GATE{"spec-gate.yml<br/>discipline gate"}:::hook
+    GATE -- "spec folder present,<br/>or skip-sdd + rationale" --> PASS["CI green"]:::sink
+    GATE -- "neither" --> FAIL["CI red"]:::sink
 ```
 
 ## References
