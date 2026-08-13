@@ -60,6 +60,15 @@ type System struct {
 	// I/O covered by a live smoke, never CI — so this exists as a seam the
 	// secrets-tooling check calls and tests inject a fake round-trip into.
 	AgeRoundTrip func(keyPath string) error
+	// BWBackedSecrets counts the registry entries that resolve through Bitwarden
+	// (backend: bw). It exists so the reach check can key its SEVERITY to real
+	// exposure rather than to a flat policy: an unreachable vault is a WARN while
+	// nothing depends on it and a FAIL the moment something does. The real impl
+	// (bwBackedSecrets) reads the CHECKOUT-preferring registry path, never
+	// cfg.DotfilesDir — the deployed copy lags the checkout during exactly the
+	// migration this check guards (ADR-030, #635), which would hold the severity
+	// at WARN precisely as exposure begins.
+	BWBackedSecrets func() (int, error)
 }
 
 // realSystem wires System to the live OS.
@@ -93,9 +102,10 @@ func realSystem() *System {
 			defer func() { _ = resp.Body.Close() }()
 			return resp.StatusCode, resp.Header, nil
 		},
-		Now:          time.Now,
-		GOOS:         runtime.GOOS,
-		AgeRoundTrip: ageRoundTrip,
+		Now:             time.Now,
+		GOOS:            runtime.GOOS,
+		AgeRoundTrip:    ageRoundTrip,
+		BWBackedSecrets: bwBackedSecrets,
 	}
 }
 

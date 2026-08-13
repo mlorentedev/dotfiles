@@ -58,6 +58,11 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// Default: the age key round-trips cleanly (a healthy box). Tests
 		// exercising the FAIL / not-called paths inject their own AgeRoundTrip.
 		AgeRoundTrip: func(string) error { return nil },
+		// Default: no registry entry resolves through Bitwarden — the state of
+		// the repo before the #585 migration, and the one that keeps an
+		// unreachable vault advisory. Tests exercising the exposed severity
+		// inject their own count.
+		BWBackedSecrets: func() (int, error) { return 0, nil },
 	}
 }
 
