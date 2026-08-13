@@ -313,11 +313,13 @@ func TestCheckOptionalTools_DotfDrift(t *testing.T) {
 	checkOptionalTools(
 		newSys(nil, []string{"dotf", "gh"}, map[string]string{"dotf version": "dotf version 0.1.0"}),
 		cfg, nil, rep)
-	if rep.Failures() != 0 {
-		t.Error("dotf version drift must WARN, not FAIL")
+	// FAIL, not WARN (OPS-025/#869): a stale dotf binary silently carries none of
+	// the guards merged since it was built, so drift here must be loud.
+	if rep.Failures() != 1 {
+		t.Errorf("dotf version drift must FAIL\n%s", buf.String())
 	}
 	if !strings.Contains(buf.String(), "dotf version drift") {
-		t.Errorf("expected dotf drift warning\n%s", buf.String())
+		t.Errorf("expected dotf drift failure\n%s", buf.String())
 	}
 }
 
@@ -331,7 +333,7 @@ func TestCheckHarnessDrift(t *testing.T) {
 	cmd := map[string]string{"bash " + filepath.Join(dotfiles, "scripts", "compile-harness.sh") + " --check": "ok"}
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkHarnessDrift(newSys(map[string]string{"HOME": home}, nil, cmd), cfg, rep)
+	checkHarnessDrift(newSys(map[string]string{"HOME": home}, nil, cmd), cfg, rep, false)
 	if rep.Failures() != 0 {
 		t.Fatalf("compile-harness --check passing should not fail\n%s", buf.String())
 	}
