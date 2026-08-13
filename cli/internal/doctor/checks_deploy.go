@@ -267,10 +267,170 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 // drift gate and the symlink-free-skills invariant. The repo↔deploy-dir drift
 // half of §11 (the standalone diff-check twin) is a separate section,
 // checkDeployDrift (CLI-019).
-func checkHarnessDrift(sys *System, cfg *Config, rep *Report) {
+func checkHarnessDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Harness + skill drift")
 	checkCompileHarnessDrift(sys, cfg, rep)
-	checkDeployedSkillSymlinks(sys, rep)
+	checkHarnessMirrorOrphans(sys, cfg, rep, fix)
+	checkDeployedSkillSymlinks(sys, cfg, rep)
+	checkInstructionDrift(sys, rep)
+}
+
+// deployedInstructionTargets mirrors harness/manifest.json's agents.presence[]
+// (file/source/requires_command) — the four instruction files
+// compile-harness.sh --deploy copies verbatim (HARNESS-058/#828). Kept here
+// rather than parsed from the manifest because the doctor binary must run
+// with no repo/vault present at all; the manifest is only reachable once a
+// repo IS found, at which point this list and the manifest are asserted in
+// sync by TestCheckInstructionDrift_MatchesManifest.
+var deployedInstructionTargets = []struct{ homeRel, repoRel, requiresCommand string }{
+	{".claude/CLAUDE.md", "ai/claude/CLAUDE.md", ""},
+	{".config/opencode/AGENTS.md", "AGENTS.md", ""},
+	{".pi/agent/AGENTS.md", "AGENTS.md", ""},
+	{".copilot/copilot-instructions.md", "ai/copilot/copilot-instructions.md", "copilot"},
+}
+
+// checkInstructionDrift reports (AC2 of HARNESS-058/#828) a deployed
+// instruction file that has drifted from its repo source — never silently.
+// Comparison strips both harness marker-region kinds (the enforced-pattern
+// GENERATED region and the AGENT-PRESENCE region) from each side first: the
+// GENERATED region is baked into the repo source by --refresh so it is
+// identical on both sides already, and the AGENT-PRESENCE region (plus,
+// for copilot, the skill-catalog GENERATED region) is injected into the
+// DEPLOYED copy only, after the copy — a naive byte-compare would false-fail
+// immediately after a clean --deploy.
+//
+// A target with requiresCommand set is skipped entirely when that command is
+// absent, mirroring deploy_instructions' own gate: a leftover
+// copilot-instructions.md on a machine that never had `copilot` installed is
+// never written by --deploy, so comparing it is not "drift" — it is a FAIL no
+// remedy can ever clear, the exact #843 signal-rot this session exists to
+// kill.
+func checkInstructionDrift(sys *System, rep *Report) {
+	home := sys.home()
+	repo := resolveRepoDir(sys)
+	if repo == "" {
+		rep.Skip("repo not found — instruction-file drift check skipped")
+		return
+	}
+	checked, drift := 0, 0
+	for _, tgt := range deployedInstructionTargets {
+		if tgt.requiresCommand != "" && !sys.has(tgt.requiresCommand) {
+			continue
+		}
+		deployed := filepath.Join(home, filepath.FromSlash(tgt.homeRel))
+		source := filepath.Join(repo, filepath.FromSlash(tgt.repoRel))
+		if !pathExists(deployed) || !pathExists(source) {
+			continue // not deployed here — not drift
+		}
+		dc, err1 := os.ReadFile(deployed)
+		sc, err2 := os.ReadFile(source)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		checked++
+		if stripHarnessRegions(string(dc)) != stripHarnessRegions(string(sc)) {
+			rep.Fail("stale: " + tgt.homeRel + " has drifted from " + tgt.repoRel + " (run: compile-harness.sh --deploy)")
+			drift++
+		}
+	}
+	if checked == 0 {
+		rep.Skip("no deployed instruction files found to compare")
+		return
+	}
+	if drift == 0 {
+		rep.Pass(fmt.Sprintf("deployed instruction files match their repo source (%d checked)", checked))
+	}
+}
+
+// Harness marker-region delimiters, mirrored from scripts/compile-harness.sh's
+// BEGIN_PREFIX/END_MARKER and AGENT_BEGIN_PREFIX/AGENT_END_MARKER constants. A
+// drift test (TestHarnessMarkerConstants) asserts they stay byte-identical.
+const (
+	harnessBeginPrefix       = "<!-- BEGIN HARNESS GENERATED"
+	harnessEndMarker         = "<!-- END HARNESS GENERATED -->"
+	agentPresenceBeginPrefix = "<!-- BEGIN HARNESS AGENT-PRESENCE"
+	agentPresenceEndMarker   = "<!-- END HARNESS AGENT-PRESENCE -->"
+)
+
+// stripHarnessRegions removes every harness-managed marker region (both the
+// GENERATED and AGENT-PRESENCE kinds) from content, mirroring
+// compile-harness.sh's region_content in reverse (strip instead of extract).
+func stripHarnessRegions(content string) string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0, len(lines))
+	skip, endMarker := false, ""
+	for _, l := range lines {
+		if skip {
+			if l == endMarker {
+				skip = false
+			}
+			continue
+		}
+		switch {
+		case strings.HasPrefix(l, harnessBeginPrefix):
+			skip, endMarker = true, harnessEndMarker
+		case strings.HasPrefix(l, agentPresenceBeginPrefix):
+			skip, endMarker = true, agentPresenceEndMarker
+		default:
+			out = append(out, l)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// checkHarnessMirrorOrphans detects harness/{skills,agents} records present in
+// the deploy mirror (cfg.DotfilesDir) with no counterpart in the repo — the gap
+// BUG-058/#843 describes: setup-linux.sh's repo->mirror copy
+// (`cp -rf harness/. $DOTFILES_DIR/harness/`) is copy-only, so a record deleted
+// from the repo survives in the mirror forever and keeps failing
+// checkCompileHarnessDrift, which runs FROM the mirror. Per #802's decided
+// semantic (doctor --fix prunes; setup only copies/warns) — generated records
+// are prunable automatically here, unlike sensitive/*.secret.age.
+//
+// Windows has no repo/mirror split — setup-windows.ps1 sets
+// `$DotfilesDir = $PSScriptRoot`, i.e. the deploy dir IS the checkout — so this
+// only applies where a distinct mirror exists.
+func checkHarnessMirrorOrphans(sys *System, cfg *Config, rep *Report, fix bool) {
+	if sys.GOOS == "windows" {
+		return
+	}
+	repo := resolveRepoDir(sys)
+	if repo == "" || filepath.Clean(repo) == filepath.Clean(cfg.DotfilesDir) {
+		return // no checkout found, or the "mirror" IS the checkout — nothing to compare
+	}
+
+	orphans := 0
+	for _, sub := range []string{"skills", "agents"} {
+		mirrorDir := filepath.Join(cfg.DotfilesDir, "harness", sub)
+		if !isDir(mirrorDir) {
+			continue
+		}
+		entries, err := os.ReadDir(mirrorDir)
+		if err != nil {
+			continue
+		}
+		repoDir := filepath.Join(repo, "harness", sub)
+		for _, e := range entries {
+			if !e.IsDir() || isDir(filepath.Join(repoDir, e.Name())) {
+				continue
+			}
+			orphans++
+			rel := filepath.Join("harness", sub, e.Name())
+			target := filepath.Join(mirrorDir, e.Name())
+			if !fix {
+				rep.Fail("orphan mirror record: " + rel + " (no repo counterpart — run: dotf doctor --fix)")
+				continue
+			}
+			if err := os.RemoveAll(target); err != nil {
+				rep.Fail("failed to prune orphan mirror record: " + rel + " (" + err.Error() + ")")
+			} else {
+				rep.Fix("pruned orphan mirror record: " + rel)
+			}
+		}
+	}
+	if orphans == 0 {
+		rep.Pass("harness mirror has no orphan records")
+	}
 }
 
 // checkCompileHarnessDrift runs the compile-harness --check drift gate. It is
@@ -294,35 +454,100 @@ func checkCompileHarnessDrift(sys *System, cfg *Config, rep *Report) {
 	}
 }
 
-// checkDeployedSkillSymlinks enforces the BUG-100 invariant: deployed skill
-// paths must be regular copies, never symlinks.
-func checkDeployedSkillSymlinks(sys *System, rep *Report) {
+// skillSymlinkRoot is a deployed-skill path this repo's harness manages,
+// paired with how to recover the skill NAME from a symlink found under it.
+type skillSymlinkRoot struct {
+	dir      string
+	fileMode bool // true: <name>.md files (opencode commands, agy prompts); false: <name>/ dirs (claude/agy skills)
+}
+
+// checkDeployedSkillSymlinks enforces the BUG-100 invariant — deployed skill
+// paths this repo manages must be regular copies, never symlinks — but only
+// for names the harness actually manages (a `harness/skills/<name>` record
+// exists). Foreign tools legitimately symlink their OWN skills into the same
+// directories: pi's installer links sibling skills from `~/.agents/skills`
+// (documented exclusion, specs/archive/AI-022-pi-harness-slot), and Orca does
+// the same for `~/.claude/skills` (e.g. computer-use, orca-cli). Flagging
+// those fights another tool's filesystem layout — the exact class of bug
+// BUG-100 was about in the first place — so a symlink at an unmanaged name is
+// silent here, mirroring compile-harness.sh's warn_unmanaged_output policy on
+// the deploy side.
+func checkDeployedSkillSymlinks(sys *System, cfg *Config, rep *Report) {
 	home := sys.home()
-	skillDirs := []string{
-		filepath.Join(home, ".claude", "skills"),
-		filepath.Join(home, ".config", "opencode", "commands"),
-		filepath.Join(home, ".gemini", "skills"),
-		filepath.Join(home, ".gemini", "prompts"),
+	roots := []skillSymlinkRoot{
+		{filepath.Join(home, ".claude", "skills"), false},
+		{filepath.Join(home, ".config", "opencode", "commands"), true},
+		{filepath.Join(home, ".gemini", "skills"), false},
+		{filepath.Join(home, ".gemini", "prompts"), true},
 	}
-	var present []string
-	for _, d := range skillDirs {
-		if isDir(d) {
-			present = append(present, d)
+	managed := managedSkillNames(sys, cfg)
+
+	var present, flagged []string
+	for _, r := range roots {
+		if !isDir(r.dir) {
+			continue
+		}
+		present = append(present, r.dir)
+		for _, l := range findSymlinks([]string{r.dir}) {
+			if managed[skillNameForSymlink(r, l)] {
+				flagged = append(flagged, l)
+			}
 		}
 	}
 	if len(present) == 0 {
 		rep.Skip("no deployed skill paths found (run setup to deploy skills)")
 		return
 	}
-	links := findSymlinks(present)
-	if len(links) == 0 {
-		rep.Pass("deployed skills are regular copies (no symlinks in skill paths)")
+	if len(flagged) == 0 {
+		rep.Pass("deployed skills are regular copies (no symlinks at managed skill names)")
 		return
 	}
 	rep.Fail("deployed skill path(s) are symlinks (must be hard copies — BUG-100):")
-	for _, l := range links {
+	for _, l := range flagged {
 		rep.Fail("  " + l)
 	}
+}
+
+// managedSkillNames is the union of harness/skills/ record names from the
+// deploy mirror and (when resolvable) the repo checkout — either one may be
+// what actually rendered the deployed copy, depending on how the machine last
+// deployed.
+func managedSkillNames(sys *System, cfg *Config) map[string]bool {
+	names := map[string]bool{}
+	add := func(recdir string) {
+		entries, err := os.ReadDir(recdir)
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				names[e.Name()] = true
+			}
+		}
+	}
+	add(filepath.Join(cfg.DotfilesDir, "harness", "skills"))
+	if repo := resolveRepoDir(sys); repo != "" {
+		add(filepath.Join(repo, "harness", "skills"))
+	}
+	return names
+}
+
+// skillNameForSymlink recovers the skill name a symlink found under root.dir
+// belongs to: the file's basename minus ".md" for command/prompt renders, or
+// the first path segment below root.dir for skill renders (covers both a
+// symlinked SKILL.md one level in and a symlinked skill directory itself).
+func skillNameForSymlink(root skillSymlinkRoot, symlinkPath string) string {
+	if root.fileMode {
+		return strings.TrimSuffix(filepath.Base(symlinkPath), ".md")
+	}
+	rel, err := filepath.Rel(root.dir, symlinkPath)
+	if err != nil {
+		return ""
+	}
+	if i := strings.IndexRune(rel, filepath.Separator); i >= 0 {
+		return rel[:i]
+	}
+	return rel
 }
 
 // findSymlinks returns every symlink found anywhere under the given roots.

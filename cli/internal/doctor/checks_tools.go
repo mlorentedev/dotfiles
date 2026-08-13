@@ -234,7 +234,11 @@ func checkOptionalTools(sys *System, cfg *Config, c *Contract, rep *Report) {
 		if got == pin {
 			rep.Pass(fmt.Sprintf("dotf %s matches versions.conf", pin))
 		} else {
-			rep.Warn(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./scripts/install-dotf.sh)", got, pin))
+			// FAIL, not WARN (OPS-025/#869): a stale dotf binary means every guard
+			// merged into doctor since it was built is not running at all on this
+			// machine — a categorically worse gap than an ordinary tool being one
+			// version behind, where the check itself still runs.
+			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./scripts/install-dotf.sh)", got, pin))
 		}
 	}
 }

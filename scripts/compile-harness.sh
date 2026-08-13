@@ -477,6 +477,13 @@ EOF
 # --- deploy (offline): render committed records to per-agent $HOME paths ---
 do_deploy() {
     require_tools
+    # Instruction files FIRST (HARNESS-058/#828): deploy_skills injects the
+    # copilot catalog and deploy_agents injects the AGENT-PRESENCE region into
+    # these SAME files below. A full-file copy after either would wipe out what
+    # they just wrote.
+    if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then
+        deploy_instructions
+    fi
     if ! has_skills && ! has_agents; then
         printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
         return 0
@@ -487,6 +494,35 @@ do_deploy() {
         deploy_doctrine "$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
     fi
     printf '[deploy] OK\n'
+}
+
+# Copy each agents.presence[] entry's full instruction-file SSOT (already
+# injected with the enforced-pattern region by --refresh) to its per-agent
+# $HOME path (HARNESS-058/#828). Until now this copy only happened in
+# setup-linux.sh, so a standalone `--deploy` run (no full setup) left
+# claude/opencode/pi/copilot stale after a merge while agy/codex (the compact
+# doctrine payload) stayed current — the same command now converges all six
+# surfaces. De-symlinks first (BUG-100 safety, same as deploy_skills/deploy_agents).
+# Entries with no `source` (none today) are skipped -- presence-only injection,
+# same as before this change.
+deploy_instructions() {
+    local agent file source requires dest
+    while IFS=$'\t' read -r agent file source requires; do
+        [[ -n "$source" ]] || continue
+        if [[ -n "$requires" ]] && ! command -v "$requires" >/dev/null 2>&1; then
+            printf '[deploy] instructions target %s skipped: %s not on PATH\n' "$agent" "$requires"
+            continue
+        fi
+        if [[ ! -f "$REPO_ROOT/$source" ]]; then
+            printf '[ERROR] instruction source missing: %s\n' "$REPO_ROOT/$source" >&2
+            continue
+        fi
+        dest="$HOME/$file"
+        [[ -L "$dest" ]] && rm -f "$dest"
+        mkdir -p "$(dirname "$dest")"
+        cp -f "$REPO_ROOT/$source" "$dest"
+        printf '[deploy] instructions -> %s\n' "$dest"
+    done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)\t\(.source // "")\t\(.requires_command // "")"' "$MANIFEST")
 }
 
 # Render committed skill records to their per-agent $HOME paths (offline),
@@ -747,7 +783,7 @@ inject_agent_presence() {
     local file="$1" content_file="$2" sha begin tmp
     if [[ ! -f "$file" ]]; then
         printf '[deploy] presence target absent, skipping: %s\n' "$file" >&2
-        return 0
+        return 1
     fi
     sha="$(sha_of "$content_file")"
     begin="$AGENT_BEGIN_PREFIX (sha256:$sha) — agent presence from vault agent definitions; edit there + re-run setup, do NOT edit between markers -->"
@@ -779,9 +815,14 @@ deploy_agent_presence() {
         build_agent_presence "$ag_recdir" "$agent" > "$tmp"
         if [[ ! -s "$tmp" ]]; then rm -f "$tmp"; continue; fi   # no persona targets this harness
         file_abs="$HOME/$file"
-        inject_agent_presence "$file_abs" "$tmp"
+        # inject_agent_presence returns 1 (a genuine no-op, not a set -e-worthy
+        # error) when the target file is absent -- only log success when it
+        # actually wrote something, else "presence target absent, skipping"
+        # was immediately followed by a contradicting success line.
+        if inject_agent_presence "$file_abs" "$tmp"; then
+            printf '[deploy] presence -> %s (%s)\n' "$file_abs" "$agent"
+        fi
         rm -f "$tmp"
-        printf '[deploy] presence -> %s (%s)\n' "$file_abs" "$agent"
     done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)"' "$MANIFEST")
 }
 
