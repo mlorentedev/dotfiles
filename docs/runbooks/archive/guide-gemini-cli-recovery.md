@@ -9,6 +9,11 @@ owner: manu
 
 # Gemini CLI Recovery
 
+> ⚠️ **Archived.** Gemini CLI's sunset for Google One / unpaid tiers (originally
+> "a few more weeks" from 2026-05-27) has passed. Users migrate to Antigravity CLI —
+> see [`guide-antigravity-cli-migration.md`](../guide-antigravity-cli-migration.md).
+> Kept for reference in case a `gemini-cli` install still needs this recovery procedure.
+
 Recovery procedure for `@google/gemini-cli` when auto-update corrupts the install.
 
 ## Problem
@@ -57,7 +62,7 @@ gemini --version
 
 ## Mitigation
 
-### Option A: Pin version (recommended for now)
+### Option A: Pin version (was the recommended mitigation while this runbook was active)
 
 Pin `@google/gemini-cli` to a known-working version in `versions.conf`:
 
@@ -82,10 +87,10 @@ File an issue against `@google/gemini-cli` for the broken self-update. This is t
 ## Important Notes
 
 - **Do NOT auto-pin in setup scripts** until upstream behavior is investigated. The self-update may be an intentional security feature (opt-in update), and pinning blocks security patches.
-- **gemini-cli sunset**: Google announced that Gemini CLI will stop serving requests for Google One and unpaid tiers starting June 18th. Users should migrate to Antigravity CLI (AI-020). This makes the recovery runbook time-sensitive — it may only be needed for a few more weeks.
+- **gemini-cli sunset**: Google stopped serving requests for Google One and unpaid tiers starting June 18th, 2026 — that date has passed. Users migrate to Antigravity CLI (AI-020); this recovery procedure is retained only for an install that predates the migration.
 - **Anti-scope**: This runbook does NOT modify setup scripts. Any code fix opens a separate atomic PR.
 
 ## Related
 
-- [AI Tools](../troubleshooting/ai-tools.md) — AI tool installation overview
+- [AI Tools](../../troubleshooting/ai-tools.md) — AI tool installation overview
 - Task backlog (BUG-019, AI-020) — maintainer's knowledge store

@@ -5,7 +5,20 @@ status: active
 created: "2026-05-16"
 ---
 
-> **Goal:** Set up OpenCode with the Go subscription as a secondary AI coding agent (Claude Code stays primary, aider is sunset in PR2). Idempotent installation, three-layer guardrail against accidental PAYG billing.
+> ⚠️ **Stale — describes a retired provider architecture.** The Go subscription
+> this runbook sets up (`/connect` → OpenCode Go, the three-layer PAYG guardrail,
+> `deepseek-v4-pro` default) is **no longer the deployed configuration**. OpenCode's
+> default provider is now `nan` (community provider, `nan/qwen3.6` default,
+> per SDD-007-ai-tooling-consolidation) — see `ai/opencode/opencode.jsonc`, the
+> live SSOT for provider/model facts. The steps below are dead as instructions,
+> not merely stale in the model names; a rewrite for the NaN-era setup flow is
+> tracked separately. Kept for historical reference (what the Go-subscription
+> onboarding looked like) and because the coexistence-constraint section below
+> still applies regardless of provider — **Daily usage does not**: it still
+> names `deepseek-v4-pro`/the Go catalog and is exactly as stale as the setup
+> steps above, not an exception to them.
+>
+> **Goal (as originally written):** Set up OpenCode with the Go subscription as a secondary AI coding agent (Claude Code stays primary, aider is sunset in PR2). Idempotent installation, three-layer guardrail against accidental PAYG billing.
 >
 > **Audience:** future-me on a clean Linux box. Cross-OS Windows side ships separately.
 
@@ -74,6 +87,10 @@ Why: a careless `/models` selection of a frontier model under Zen PAYG would tri
 
 ## Daily usage
 
+> ⚠️ Same Go-subscription era as the setup steps above — see the top banner.
+> Current default and catalog live in `ai/opencode/opencode.jsonc` (`nan/qwen3.6`
+> today), not below.
+
 ```bash
 oc                                  # launch TUI from any repo
 ```
@@ -123,125 +140,14 @@ This constraint disappears once the hive flock follow-up is merged.
 
 ## Troubleshooting
 
-### `command -v opencode` fails after `setup-linux.sh`
-
-The install script writes the binary to `$HOME/.opencode/bin/opencode` and `setup-linux.sh` adds that directory to PATH in `.zshrc`/`.bashrc`. Reload the shell or `source ~/.zshrc`. If still missing, re-run `setup-linux.sh` — the `command -v` gate is idempotent and will re-fetch only if the binary is genuinely absent.
-
-### `/models` shows Sonnet / GPT-5 / Opus / Gemini Pro under `opencode-go`
-
-The model restriction in `opencode.jsonc` is not in effect. Verify:
-
-```bash
-cat ~/.config/opencode/opencode.jsonc
-```
-
-The `provider.opencode-go.models` block must list **only** the Go-catalog model IDs. If it lists more, re-run `setup-linux.sh` to redeploy the canonical from `ai/opencode/opencode.jsonc`.
-
-### MCP server registration conflict between `oc` and `claude`
-
-If you see "vault already locked" errors or unexplained merge conflicts in the vault repo after a session, you may have run both agents in parallel. See the coexistence constraint above. Recovery: `cd ~/Projects/knowledge && git status` — resolve conflicts manually, or `git stash && git pull && git stash pop` if remote diverges.
-
-### `opencode --version` reports a different schema than the deployed config expects
-
-OpenCode is pre-1.0 and the config schema can shift. If the TUI logs a schema error on launch, query the latest schema URL and update `ai/opencode/opencode.jsonc` (and re-run setup). The healthcheck section verifies presence of `$schema` but does not enforce a specific version.
-
-### TUI feels noticeably slower than Claude Code, especially under tmux
-
-Empirically confirmed during AI-011-validation (2026-05-17): opencode 1.15.4 TUI does aggressive full-screen refreshes on each streamed token chunk. When stacked under tmux, every refresh has to be parsed and re-emitted through tmux's ANSI layer, adding visible latency. `opencode run "..."` (non-interactive CLI) is **unaffected**. **Recommended workflow:** run opencode TUI sessions in your terminal's native tabs/splits (outside tmux); keep tmux for shell sessions and persistent SSH (`sshmux`). Claude Code TUI is unaffected -- its render is more conservative.
-
-### Where to launch opencode (cwd matters a lot)
-
-Surfaced 2026-05-17 during AI-011-validation. opencode performs **per-session work bound to the cwd** that scales with the size and churn rate of that directory:
-
-- `service=snapshot ... tracking` -- a full git snapshot of the cwd is taken at session start (and every time a write tool fires). Stored under `~/.local/share/opencode/snapshot/<projectID>/`. For repos with thousands of files this can add 1-2s per snapshot; for a true monorepo or a heavyweight vault it grows worse.
-- `service=file.watcher` (inotify on Linux) -- every file change inside cwd triggers a `bus type=file.watcher.updated` event and may invalidate cached context. If the cwd is being mutated by other processes (Obsidian auto-save, hive MCP auto-commits, vault-maintenance cron, dev server hot reload), opencode is paying constant overhead for nothing relevant to the chat.
-- `service=session.prompt` resolveTools -- runs on every prompt; cheap (~20ms) but adds linearly with prompt count.
-
-**Good cwd for opencode:**
-
-- A specific code repo you are actually editing (`~/Projects/dotfiles`, `~/Projects/<some-feature-repo>`)
-- Small or medium directory, no constant external mutation
-- Git-tracked but with infrequent commits
-
-**Bad cwd for opencode (avoid):**
-
-- `~/Projects/knowledge` (Obsidian vault) -- thousands of `.md` files, constant auto-save churn from Obsidian + hive MCP auto-commits + `dotfiles-vault-maintenance` cron. Snapshot is huge, file watcher fires constantly. Empirically gave 10-20s startup overhead and continuous background noise.
-- `$HOME` directly -- everything below it gets watched.
-- A multi-gigabyte monorepo with submodules.
-- Network-mounted directories (NFS, SMB) -- inotify is unreliable.
-
-**Pattern: query the vault from a code-repo cwd, not the other way around.** If you need vault context while editing code, launch `oc` in the code repo and use the `hive` MCP tools (`vault_query`, `vault_search`) from inside the chat -- those reach the vault without changing the cwd of opencode itself. This matches the architectural intent of having Hive as a per-session-readable knowledge layer (see ADR-009).
-
-### Stream stalls after the first chunk (no `message.part.delta` events following)
-
-Surfaced 2026-05-17 in `~/Projects/resume` cwd. Log pattern:
-
-```
-service=llm ... agent=build ... stream         <- request sent
-+1327ms bus type=message.part.updated          <- first chunk arrived
-+54s    snapshot prune cleanup                 <- next event, unrelated
-```
-
-After the first `message.part.updated`, no `message.part.delta` events follow for tens of seconds. This is **upstream provider congestion** or a model that started a long internal reasoning chain without intermediate output -- it is NOT a local opencode bug and NOT a cwd issue (this surfaced with a small clean repo, snapshot finished in 176ms).
-
-**Tactical recovery (in this order):**
-
-1. `Esc` to cancel the streaming request inside the TUI.
-2. `/models` -> switch to a different Go-catalog model (`kimi-k2.6`, `qwen3.6-plus`, `glm-5.1`). If the new model responds fast, the original model/endpoint was the bottleneck (transient -- retry later).
-3. If all Go models stall -> the entire `opencode-go` provider is congested. Switch provider to `openrouter` via `/models` (uses the existing `OPENROUTER_API_KEY` and the $5 credit balance for frontier models).
-4. If everything stalls -> network or auth issue, not a model issue. Check `tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)"` for ERROR lines and verify `command -v opencode && curl -fsI https://api.opencode.ai/`.
-
-**Probable cause windows for Go-catalog congestion:** Chinese providers (DeepSeek, Kimi, Qwen, GLM, MiMo, MiniMax) follow Asia working hours. UTC 00:00-09:00 is daytime China -- peak load. UTC 16:00-22:00 is night in China -- minimal load. From Europe, slowdowns are most likely around UTC 00:00-04:00 local.
-
-**Empirical fallback data point (2026-05-17, UTC 02:45 = 10:45 China peak):** DeepSeek V4 Pro stream stalled after first chunk; switched to **`qwen3.6-plus`** with same prompt, response was visibly faster and completed normally. Suggests Qwen3.6-plus is a reliable second-line option when DeepSeek is congested. Worth A/B'ing alongside Kimi K2.6 over the first month of use (originally planned default: DeepSeek; A/B candidate: Kimi -- consider adding Qwen as a third).
-
-**Variant of the stall: hang on the second LLM call after a tool result (2026-05-17, UTC 02:48 = 10:48 China peak).** Different signature, same root cause family. Pattern in log:
-
-```
-service=llm ... agent=build ... stream        <- first request
-... 21s of message.part.delta events          <- first turn streamed fine
-tool.registry status=started/completed <X>    <- model issued a tool call, opencode resolved it
-service=session.processor ... process         <- preparing second turn with tool result
-service=llm ... agent=build ... stream        <- SECOND request sent
-[silence for minutes]                         <- second turn never streams
-```
-
-The first turn completes normally; opencode runs the tool the model requested (bash/read/grep/etc.) in <200ms; opencode sends a second LLM call containing the tool result; that second call is the one that hangs. So this is **NOT** a "first chunk stall" -- the first turn worked fine. It is congestion on the second roundtrip, often because the tool result inflates the context size and the provider deprioritises the request.
-
-**Tactical recovery same family of moves:** `Esc` to cancel, retry with a prompt that does not need tool calls (`"what is 2+2?"`) to confirm the model itself is reachable, then either switch model with `/models` or switch provider to `openrouter` for that task. If `/models` shows no fast Go model and you cannot wait, OpenRouter (existing `$5` credit, no PAYG auto-recharge thanks to Layer 3) is the safest temporary jump.
-
-### Live log tailing (when "thinking..." takes forever and you want to see what's happening)
-
-The TUI hides backend events. Open a second terminal tab/split and tail the most recent log:
-
-```bash
-# Quick one-liner
-tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)"
-
-# Filtered (skip noisy file-watcher events and per-token deltas)
-tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)" \
-  | grep --line-buffered -vE "file\.watcher\.updated|bus type=message\.part\.delta"
-```
-
-Or persist as alias in `.zshrc` / `.bashrc`:
-
-```bash
-alias oclog='tail -F "$(ls -t ~/.local/share/opencode/log/*.log | head -1)" | grep --line-buffered -vE "file\.watcher\.updated|bus type=message\.part\.delta"'
-```
-
-Key events to look for: `service=llm ... stream` (request sent), `message.part.updated` (first chunk arrived), `message.part.delta` (token streaming -- if absent for >10s after `stream`, the model is hung). Do NOT use `opencode --print-logs` against the TUI -- it writes to stderr and corrupts the render. Always log via the file path.
-
-### Cost figure in TUI status bar — informational, not actual billing
-
-The number shown at the bottom of the TUI (e.g., `$0.12`) is a **theoretical PAYG equivalent**, calculated as `tokens × per-million-listed-price-of-model`. With the Go subscription, your actual cost is the flat `$10/mo`. The TUI figure is useful only as "what you would pay without the Go plan." For real billing state, always check <https://opencode.ai/zen> → Billing.
-
-### First DeepSeek V4 Pro response time vs Claude Sonnet
-
-DeepSeek V4 Pro on Go infrastructure: ~1–3s first-token latency from Europe, 40–80 tokens/sec sustained. Claude Sonnet 4.6/4.7: ~0.3–0.8s first-token, 80–150 tokens/sec. This is provider geography + inference stack differences, **not a bug**. For latency-sensitive tasks (interactive refactor, line-by-line code review), prefer Claude Code; for cheap bulk iteration (summarisation, scripted edits, mechanical refactors), opencode + DeepSeek wins on $/token.
+Moved to [`docs/troubleshooting/opencode.md`](../troubleshooting/opencode.md) — cwd/snapshot
+forensics, stream-stall recovery, TUI-under-tmux latency, log tailing, and the rest
+of the deep troubleshooting content that used to live in this section (D24 split).
 
 ## References
 
-- Spec: `~/Projects/dotfiles/specs/AI-011-opencode-bootstrap/`
+- Spec (archived): `specs/archive/AI-011-opencode-bootstrap/` (initial bootstrap, 2026-05-17 — the era this runbook's setup steps describe)
 - ADR: [ADR-009](../adr/adr-009-multi-agent-runtime.md)
-- Pattern: `pattern-setup-script-idempotence` (maintainer's cross-project knowledge store)
+- Current provider/model SSOT: `ai/opencode/opencode.jsonc`
+- Troubleshooting: [`docs/troubleshooting/opencode.md`](../troubleshooting/opencode.md)
 - Upstream docs: <https://opencode.ai/docs/> and <https://opencode.ai/go>

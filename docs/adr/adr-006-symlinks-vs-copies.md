@@ -11,6 +11,8 @@ owner: manu
 
 # ADR-006: Symlinks on Linux, Copies on Windows
 
+> **Superseded by [ADR-012](adr-012-deploy-strategy-copy-with-drift-assertion.md) (accepted).** Linux deploy no longer symlinks — `setup-linux.sh` now uses the same atomic-copy-with-drift-assertion strategy as Windows, for the reasons ADR-012 §Context lays out (cross-agent symlink fragility, silent-drift risk). Symlinks remain only for vault↔home bindings and secret files (SSH key, age key), not for the managed config files this ADR was about.
+
 ## Context
 
 The dotfiles must deploy configuration files (shell configs, AI tools, SSH keys) to their expected locations on both Linux/macOS and Windows. The deployment strategy differs because:
