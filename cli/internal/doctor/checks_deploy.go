@@ -275,18 +275,18 @@ func checkHarnessDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	checkInstructionDrift(sys, rep)
 }
 
-// deployedInstructionTargets mirrors harness/manifest.json's
-// agents.presence[].source — the four instruction files compile-harness.sh
-// --deploy copies verbatim (HARNESS-058/#828). Kept here rather than parsed
-// from the manifest because the doctor binary must run with no repo/vault
-// present at all; the manifest is only reachable once a repo IS found, at
-// which point this list and the manifest are asserted in sync by
-// TestCheckInstructionDrift_MatchesManifest.
-var deployedInstructionTargets = []struct{ homeRel, repoRel string }{
-	{".claude/CLAUDE.md", "ai/claude/CLAUDE.md"},
-	{".config/opencode/AGENTS.md", "AGENTS.md"},
-	{".pi/agent/AGENTS.md", "AGENTS.md"},
-	{".copilot/copilot-instructions.md", "ai/copilot/copilot-instructions.md"},
+// deployedInstructionTargets mirrors harness/manifest.json's agents.presence[]
+// (file/source/requires_command) — the four instruction files
+// compile-harness.sh --deploy copies verbatim (HARNESS-058/#828). Kept here
+// rather than parsed from the manifest because the doctor binary must run
+// with no repo/vault present at all; the manifest is only reachable once a
+// repo IS found, at which point this list and the manifest are asserted in
+// sync by TestCheckInstructionDrift_MatchesManifest.
+var deployedInstructionTargets = []struct{ homeRel, repoRel, requiresCommand string }{
+	{".claude/CLAUDE.md", "ai/claude/CLAUDE.md", ""},
+	{".config/opencode/AGENTS.md", "AGENTS.md", ""},
+	{".pi/agent/AGENTS.md", "AGENTS.md", ""},
+	{".copilot/copilot-instructions.md", "ai/copilot/copilot-instructions.md", "copilot"},
 }
 
 // checkInstructionDrift reports (AC2 of HARNESS-058/#828) a deployed
@@ -298,6 +298,13 @@ var deployedInstructionTargets = []struct{ homeRel, repoRel string }{
 // for copilot, the skill-catalog GENERATED region) is injected into the
 // DEPLOYED copy only, after the copy — a naive byte-compare would false-fail
 // immediately after a clean --deploy.
+//
+// A target with requiresCommand set is skipped entirely when that command is
+// absent, mirroring deploy_instructions' own gate: a leftover
+// copilot-instructions.md on a machine that never had `copilot` installed is
+// never written by --deploy, so comparing it is not "drift" — it is a FAIL no
+// remedy can ever clear, the exact #843 signal-rot this session exists to
+// kill.
 func checkInstructionDrift(sys *System, rep *Report) {
 	home := sys.home()
 	repo := resolveRepoDir(sys)
@@ -307,10 +314,13 @@ func checkInstructionDrift(sys *System, rep *Report) {
 	}
 	checked, drift := 0, 0
 	for _, tgt := range deployedInstructionTargets {
+		if tgt.requiresCommand != "" && !sys.has(tgt.requiresCommand) {
+			continue
+		}
 		deployed := filepath.Join(home, filepath.FromSlash(tgt.homeRel))
 		source := filepath.Join(repo, filepath.FromSlash(tgt.repoRel))
 		if !pathExists(deployed) || !pathExists(source) {
-			continue // not deployed here (e.g. copilot absent) — not drift
+			continue // not deployed here — not drift
 		}
 		dc, err1 := os.ReadFile(deployed)
 		sc, err2 := os.ReadFile(source)

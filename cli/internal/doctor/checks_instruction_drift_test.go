@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -134,6 +135,28 @@ func TestCheckInstructionDrift(t *testing.T) {
 		}
 	})
 
+	t.Run("gated target with an absent command is never drift, even if the stale file exists", func(t *testing.T) {
+		repo, home := setup(t)
+		for _, tgt := range deployedInstructionTargets {
+			writeFile(t, filepath.Join(repo, tgt.repoRel), "content\n")
+		}
+		// copilot-instructions.md exists at $HOME and genuinely differs from the
+		// repo source (a leftover from before copilot was uninstalled, say) --
+		// but `copilot` is not on PATH, so --deploy would never have touched it
+		// and this must not be reported as drift (it would be a FAIL no remedy
+		// could ever clear).
+		writeFile(t, filepath.Join(home, ".copilot", "copilot-instructions.md"), "very stale, copilot not installed\n")
+		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil) // "copilot" deliberately not on PATH
+
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkInstructionDrift(sys, rep)
+
+		if rep.Failures() != 0 {
+			t.Fatalf("a gated target with its command absent must never fail\n%s", buf.String())
+		}
+	})
+
 	t.Run("missing deployed file is not drift (not deployed here)", func(t *testing.T) {
 		repo, home := setup(t)
 		// only write repo sources, never deploy any of them
@@ -210,6 +233,72 @@ func TestHarnessMarkerConstants(t *testing.T) {
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("scripts/compile-harness.sh no longer defines %q — update the Go mirror constants", want)
+		}
+	}
+}
+
+// manifestPresenceEntry is the subset of harness/manifest.json's
+// agents.presence[] shape TestCheckInstructionDrift_MatchesManifest needs.
+type manifestPresenceEntry struct {
+	Agent           string `json:"agent"`
+	File            string `json:"file"`
+	Source          string `json:"source"`
+	RequiresCommand string `json:"requires_command"`
+}
+
+// TestCheckInstructionDrift_MatchesManifest is the drift guard
+// deployedInstructionTargets' doc comment promises: harness/manifest.json's
+// agents.presence[] is the actual SSOT compile-harness.sh's deploy_instructions
+// reads at deploy time, and this Go list is a hand-kept mirror the doctor
+// binary uses (it must run with no repo present). If the two diverge, doctor
+// silently checks the wrong thing — this test makes that loud instead. Skips
+// (does not fail) when the repo checkout is unreachable, same shape as
+// TestHarnessMarkerConstants.
+func TestCheckInstructionDrift_MatchesManifest(t *testing.T) {
+	sys := &System{
+		Getenv:   func(string) string { return "" },
+		LookPath: func(string) (string, error) { return "", errors.New("n/a") },
+	}
+	repo := resolveRepoDir(sys)
+	if repo == "" {
+		t.Skip("repo checkout not found from this working directory")
+	}
+	raw, err := os.ReadFile(filepath.Join(repo, "harness", "manifest.json"))
+	if err != nil {
+		t.Skipf("harness/manifest.json unreadable: %v", err)
+	}
+	var m struct {
+		Agents struct {
+			Presence []manifestPresenceEntry `json:"presence"`
+		} `json:"agents"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("harness/manifest.json invalid JSON: %v", err)
+	}
+	if len(m.Agents.Presence) == 0 {
+		t.Fatal("manifest agents.presence is empty — did the schema change under this test?")
+	}
+
+	byFile := make(map[string]manifestPresenceEntry, len(m.Agents.Presence))
+	for _, e := range m.Agents.Presence {
+		byFile[e.File] = e
+	}
+	if len(byFile) != len(deployedInstructionTargets) {
+		t.Fatalf("deployedInstructionTargets has %d entries, manifest agents.presence has %d — keep them in sync",
+			len(deployedInstructionTargets), len(byFile))
+	}
+	for _, tgt := range deployedInstructionTargets {
+		e, ok := byFile[tgt.homeRel]
+		if !ok {
+			t.Errorf("deployedInstructionTargets has %q but manifest agents.presence does not", tgt.homeRel)
+			continue
+		}
+		if e.Source != tgt.repoRel {
+			t.Errorf("%s: Go repoRel=%q, manifest source=%q — keep deployedInstructionTargets in sync", tgt.homeRel, tgt.repoRel, e.Source)
+		}
+		if e.RequiresCommand != tgt.requiresCommand {
+			t.Errorf("%s: Go requiresCommand=%q, manifest requires_command=%q — keep deployedInstructionTargets in sync",
+				tgt.homeRel, tgt.requiresCommand, e.RequiresCommand)
 		}
 	}
 }
