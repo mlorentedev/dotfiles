@@ -98,5 +98,5 @@ Both upstream issues need to close. Once that's confirmed:
 
 - `~/Projects/dotfiles/scripts/claude-mem-heal.sh` — the heal script (canonical)
 - `~/Projects/dotfiles/scripts/claude-session-start.sh` — invokes heal at session start
-- [Troubleshooting: AI Tools](ai-tools.md)
+- [Troubleshooting: AI Tools](../ai-tools.md)
 - Upstream issue: [thedotmack/claude-mem#2385](https://github.com/thedotmack/claude-mem/issues/2385)
