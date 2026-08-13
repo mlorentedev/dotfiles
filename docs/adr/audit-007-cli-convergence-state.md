@@ -1,7 +1,7 @@
 ---
 id: audit-007-cli-convergence-state
 type: audit
-status: active
+status: dated-snapshot
 date: "2026-06-20"
 parent: adr-021-cli-orchestration-roadmap
 related: [adr-020-tooling-cli-go-convergence, adr-021-cli-orchestration-roadmap, audit-002-cross-os-duplication, audit-005-scripts-classification, audit-bug-006-load-secrets-cross-os]
@@ -10,6 +10,12 @@ tags: [cli, dotf, convergence, strangler-fig, cross-os, execution-plan]
 
 # AUDIT-007 — CLI convergence state + execution roadmap
 
+> **Status note:** `status: dated-snapshot` — the plan below is half-executed as of
+> this writing (`secrets`, `mem`, and `update`/`sync` have since shipped Go nouns
+> this snapshot marked as gaps). Treat the plan as historical direction, not a
+> current TODO list; `dotf --help` and `cli/README.md` are the current source of
+> truth for what's shipped.
+>
 > Dated current-state snapshot of the ADR-020/021 strangler-fig migration, with an
 > ordered, PR-by-PR plan to drive the `.sh`/`.ps1` surface down to the ADR-021 end
 > state. Produced 2026-06-20 by a multi-agent audit (8 per-noun maps + synthesis +

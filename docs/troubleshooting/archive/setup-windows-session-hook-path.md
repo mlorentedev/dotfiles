@@ -9,6 +9,10 @@ owner: manu
 
 # Troubleshooting: SessionStart hook on Windows points to non-existent path
 
+> ⚠️ **Archived — resolved.** The fix landed in `setup-windows.ps1` (self-healing on
+> re-run) and Claude Code session hooks have since converged onto `dotf mem
+> session-start`/`session-end` (ADR-014). Kept for the historical root-cause trace.
+
 `setup-windows.ps1` deployed `claude-session-start.ps1` to `~\scripts\` but registered the Claude Code `SessionStart` hook in `~\.claude\settings.json` pointing at `~\.dotfiles\scripts\claude-session-start.ps1`. The script never landed where the hook expected it, so every Claude Code session on Windows started with a non-blocking PowerShell error and the hook silently never ran — losing vault detection, hive project context, `specs/` state surfacing, and `claude-mem-heal`.
 
 Tracked in [mlorentedev/dotfiles#20](https://github.com/mlorentedev/dotfiles/issues/20).
@@ -36,7 +40,7 @@ Two inconsistent paths for the same script inside `setup-windows.ps1`:
 | 621 | `Copy-Item $sessionStartSource "$ScriptsDir\" -Force` | Lands at `~\scripts\claude-session-start.ps1` |
 | 692 | `$sessionStartCmd = "$DotfilesDest\scripts\claude-session-start.ps1"` | Hook points at `~\.dotfiles\scripts\…` (never deployed there) |
 
-Per [adr-005-two-directory-sync](../adr/adr-005-two-directory-sync.md), only `load-secrets.ps1` is intentionally placed under `~\.dotfiles\scripts\` because shell profiles dot-source it from that fixed location. Everything else lives in `~\scripts\`. The hook registration was the lone outlier.
+Per [adr-005-two-directory-sync](../../adr/adr-005-two-directory-sync.md), only `load-secrets.ps1` is intentionally placed under `~\.dotfiles\scripts\` because shell profiles dot-source it from that fixed location. Everything else lives in `~\scripts\`. The hook registration was the lone outlier.
 
 ### Compounding bug — sticky skip
 
@@ -103,5 +107,5 @@ Start a new `claude` session — no PowerShell error, hook output appears at ses
 
 ## Related
 
-- [adr-005-two-directory-sync](../adr/adr-005-two-directory-sync.md) — the two-directory split that motivates the `load-secrets` special case.
+- [adr-005-two-directory-sync](../../adr/adr-005-two-directory-sync.md) — the two-directory split that motivates the `load-secrets` special case.
 - `lesson_dotfiles_two_tier_deploy` — broader lesson on the two-tier deploy convention (maintainer's knowledge store).

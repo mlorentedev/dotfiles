@@ -278,6 +278,10 @@ they live in the record, not only in conversation:
    parallel with the operational unlock. A one-off manual escrow snapshot is the interim
    safety net until the command lands.
 
+   **Addendum (built, #661):** `dotf secrets backup` shipped (`cli/internal/cmd/secrets_backup.go`,
+   `cli/internal/secrets/escrow.go`). The "not yet built" framing above is historical —
+   see §5 for the current behavior.
+
 2. **The §"Phased plan" step-3 "~20" resolves into three tranches** under the shipped
    `migrate` guard (which refuses file secrets and shared-source entries):
    - **A — ~23 env secrets, unique age source:** migratable now, batch-by-batch, `verify`

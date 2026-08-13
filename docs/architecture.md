@@ -3,8 +3,9 @@
 > Normative map of this repository (CLI-002, issue #336). When the real tree and this doc
 > disagree, one of them is a bug — `tests/architecture-md.bats` enforces that every real
 > top-level directory is declared here. The cross-project "where does X live" reference
-> (vault, deploy targets, data flows) lives in the vault architecture map; this doc covers
-> the repo tree only.
+> (other repos, the vault's own layout) lives in the vault architecture map; this doc
+> covers this repo — its tree (below) and its runtime data flow (§Runtime data flow),
+> so orientation never depends on vault access.
 
 ## Top-level directories
 
@@ -24,7 +25,7 @@
 | `systemd/` | systemd user units (self-update + hive-upgrade timers, Linux) |
 | `tests/` | bats (shell) + Pester (PowerShell) suites; structural guards (`agents-md.bats`, `architecture-md.bats`) |
 | `windows/` | Windows-only assets without a Linux twin (e.g. `hive-upgrade.ps1`) |
-| `.zsh/` | zsh config modules (aliases, completions) sourced by `.zshrc` |
+| `.zsh/` | zsh config modules (aliases, functions, nvm) sourced by `.zshrc` |
 | `.github/` | CI workflows (lint, test matrix, integration, cli, spec-gate, bitácora) |
 | `.claude/` | Repo-local Claude Code settings |
 
@@ -70,6 +71,28 @@ Rules:
 Declared in **AGENTS.md §Language Boundary (this repo)** — Go owns user-facing tooling,
 shell owns the thin bootstrap + profile/env, Python is not a layer (ADR-020). That section
 is the SSOT; this doc only points to it.
+
+## Runtime data flow
+
+What triggers what, once setup has already deployed the repo. Corrects the pre-ADR-028
+assumption that secrets populate the shell environment at login — they don't; secrets are
+injected per-child-process, on demand, and everything else is either structural env vars
+(no secrets) or an explicit `dotf` invocation.
+
+```mermaid
+flowchart LR
+    classDef trigger fill:#fee2e2,stroke:#dc2626,color:#000
+    classDef hook fill:#dcfce7,stroke:#15803d,color:#000
+    classDef sink fill:#f3e8ff,stroke:#7e22ce,color:#000
+
+    NS([New shell]):::trigger --> RC[".zshrc/.bashrc<br/>source ~/.dotfiles/paths.sh"]:::hook --> ENV["structural env vars<br/>(ADR-025 — no secrets)"]:::sink
+    CS([New agent session]):::trigger --> MEM["dotf mem session-start<br/>(session-start-config.json)"]:::hook --> CTX["additionalContext"]:::sink
+    CMD([Secret needed]):::trigger --> SEC["dotf secrets run -- cmd"]:::hook --> CHILD["child process env only"]:::sink
+    TIMER([Daily systemd timer /<br/>Scheduled Task]):::trigger --> UPD["dotf update<br/>(ff-only + setup)"]:::hook --> DEPLOY["~/.dotfiles converged"]:::sink
+    PR([PR opened]):::trigger --> GATE{"spec-gate.yml<br/>discipline gate"}:::hook
+    GATE -- "spec folder present,<br/>or skip-sdd + rationale" --> PASS["CI green"]:::sink
+    GATE -- "neither" --> FAIL["CI red"]:::sink
+```
 
 ## References
 

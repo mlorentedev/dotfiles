@@ -63,10 +63,10 @@
       { "agent": "claude", "render": "agent-md", "dir": ".claude/agents" }
     ],
     "presence": [
-      { "agent": "claude",   "file": ".claude/CLAUDE.md" },
-      { "agent": "opencode", "file": ".config/opencode/AGENTS.md" },
-      { "agent": "pi",       "file": ".pi/agent/AGENTS.md" },
-      { "agent": "copilot",  "file": ".copilot/copilot-instructions.md" }
+      { "agent": "claude",   "file": ".claude/CLAUDE.md",               "source": "ai/claude/CLAUDE.md" },
+      { "agent": "opencode", "file": ".config/opencode/AGENTS.md",      "source": "AGENTS.md" },
+      { "agent": "pi",       "file": ".pi/agent/AGENTS.md",             "source": "AGENTS.md" },
+      { "agent": "copilot",  "file": ".copilot/copilot-instructions.md", "source": "ai/copilot/copilot-instructions.md", "requires_command": "copilot" }
     ]
   }
 }

@@ -4,7 +4,7 @@ type: adr
 adr: "029"
 title: "dotf secrets sync — backend-agnostic deploy-time materialization for headless consumers"
 tags: [adr, dotfiles, secrets, sync, ci, bitwarden, age]
-status: proposed
+status: accepted
 created: "2026-06-26"
 owner: manu
 issue: "mlorentedev/dotfiles#612"
@@ -12,6 +12,8 @@ depends_on: "adr-028 (two-tier secrets), adr-020 (CLI strangler-fig)"
 ---
 
 # ADR-029: `dotf secrets sync` — backend-agnostic deploy-time materialization for headless consumers
+
+> **Status: accepted.** `dotf secrets sync` shipped (#612 Phase B, v0.29.0, `cli/internal/cmd/secrets_sync.go`); frontmatter above updated from `proposed` to match. `scripts/github-secrets-manager.sh`, the shell path the Context section below describes as "today['s]" state, has since been deleted — retired on contact once `sync` reached parity, per the strangler-fig pattern (ADR-020). The Context and Consequences sections below are left as originally written (historical record, per the convention in ADR-020's Amendment) — read their present-tense claims ("today," "blocks the epic," "once sync lands") as describing the pre-shipment state this ADR proposed to fix, not current reality.
 
 ## Context
 

@@ -1,13 +1,15 @@
 ---
 id: adr-009-multi-agent-runtime
 type: adr
-status: proposed
+status: accepted
 created: "2026-05-15"
 ---
 
 # ADR-009: AGENTS.md as Single Source of Truth for Cross-Agent System Prompt
 
-## Status: Proposed
+## Status: Accepted
+
+AGENTS.md is fully live as the cross-agent SSOT; every per-agent file delegates to it, guarded by `tests/agents-md.bats`.
 
 ## Date: 2026-05-15
 
@@ -68,13 +70,18 @@ Skills (`ai/skills/*/SKILL.md`) remain Claude-only at the runtime level — the 
 
 ## Implementation Plan
 
+**Completed** — all five steps below shipped; `AGENTS.md` is fully live and step 5's
+promotion criterion is met (`status: accepted` above), guarded by `tests/agents-md.bats`.
+Left as originally written (historical record) rather than deleted, per the convention
+in ADR-020's Amendment.
+
 Tracked via specs in `<repo>/specs/`:
 
-1. `AI-011-opencode-bootstrap` runs `init-repo-agents.ps1` for the first time, producing the initial `AGENTS.md` (currently a stub with the SDD snippet only).
+1. `AI-011-opencode-bootstrap` runs `init-repo-agents.ps1` for the first time, producing the initial `AGENTS.md` (was a stub with the SDD snippet only at the time this was written — no longer, see the Consequences above).
 2. Migrate Standing Orders, decision hierarchy, and MCP usage rules from `CLAUDE.md` into `AGENTS.md` (handled inside `AI-013-copilot-instructions-refresh`).
 3. Shrink `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md` to pointer-style files in the same PR.
 4. Smoke-test each agent loads `AGENTS.md` (Claude reads it via the CLAUDE.md pointer, OpenCode reads it natively, Copilot validated empirically, Gemini via GEMINI.md pointer).
-5. Promote ADR status from Proposed → Accepted once all four agents are confirmed to honour the new layout. Until then, this ADR is Proposed and the implementation should not merge to `main`.
+5. Promote ADR status from Proposed → Accepted once all four agents are confirmed to honour the new layout. (Done — see the status note above.)
 
 ## References
 

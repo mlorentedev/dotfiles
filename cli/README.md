@@ -10,6 +10,24 @@ not `go install`.
 
 ## Commands
 
+| Subcommand | What it does |
+|---|---|
+| `doctor` | Post-setup diagnostics — the consolidated healthcheck + doctor twins (ADR-021) |
+| `env` | Per-machine path resolution (`paths.sh` / `paths.ps1`), ADR-025 |
+| `init` | Scaffold a fully-practiced repo from embedded templates (ADR-022) |
+| `mem` | Cross-agent memory session hooks (session-end / session-start), ADR-014 |
+| `review` | Cross-model code review of a diff read from stdin |
+| `secrets` | On-demand secrets — inject into a child process, never the shell (ADR-028) |
+| `spec` | Spec-driven development scaffolding (ADR-020) |
+| `tools` | Declarative cross-OS package catalog (`packages.json`) |
+| `update` | Self-deploy: fast-forward the dotfiles repo and re-run setup (opt-in, scheduler-invoked) |
+| `vault` | Scaffold knowledge-vault entries |
+| `version` | Print the `dotf` version |
+
+Run `dotf <cmd> --help` for any subcommand's full usage. Two get a deep section below
+because their flags and failure modes are non-obvious; the rest are self-explanatory
+from `--help`.
+
 ### `dotf review` — cross-model code review
 
 Reads a unified diff from stdin and asks a non-Claude model for a decorrelated
