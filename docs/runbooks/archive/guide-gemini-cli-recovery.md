@@ -9,6 +9,11 @@ owner: manu
 
 # Gemini CLI Recovery
 
+> ⚠️ **Archived.** Gemini CLI's sunset for Google One / unpaid tiers (originally
+> "a few more weeks" from 2026-05-27) has passed. Users migrate to Antigravity CLI —
+> see [`guide-antigravity-cli-migration.md`](../guide-antigravity-cli-migration.md).
+> Kept for reference in case a `gemini-cli` install still needs this recovery procedure.
+
 Recovery procedure for `@google/gemini-cli` when auto-update corrupts the install.
 
 ## Problem
@@ -87,5 +92,5 @@ File an issue against `@google/gemini-cli` for the broken self-update. This is t
 
 ## Related
 
-- [AI Tools](../troubleshooting/ai-tools.md) — AI tool installation overview
+- [AI Tools](../../troubleshooting/ai-tools.md) — AI tool installation overview
 - Task backlog (BUG-019, AI-020) — maintainer's knowledge store
