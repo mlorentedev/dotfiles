@@ -48,7 +48,7 @@ The two-tier deploy verification ("edit repo, run setup, then test in shell") be
 ### Negative
 
 - First-run `setup-linux.sh` wall-time +200-400ms across 14 files (bulk `cp` vs `ln -sf`). Acceptable.
-- Workflow muscle memory shift: years of "edit `~/.zshrc` directly" reflex must be retrained. Mitigation: `dot` alias opens `$DOTFILES_DIR` in `$EDITOR` (documented in `.claude/CLAUDE.md`).
+- Workflow muscle memory shift: years of "edit `~/.zshrc` directly" reflex must be retrained. The mitigation planned here (a `dot` alias opening `$DOTFILES_DIR` in `$EDITOR`) was never shipped — no such alias exists in any profile. `dch`/`dotf doctor` catch the drift after the fact instead.
 - Drift detector requires `DEPLOYED_FILES` registry maintenance — every new managed file added to setup must also be added to the registry, or it escapes the drift assertion.
 
 ### Neutral

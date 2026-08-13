@@ -11,6 +11,8 @@ owner: manu
 
 # ADR-002: Age Over GPG for Secrets Encryption
 
+> **Partially superseded by [ADR-028](adr-028-secrets-two-tier-bitwarden-age.md) (accepted).** The tool choice (age over GPG) still stands, but the deployment model described below — automatic decryption at shell login via `scripts/load-secrets.sh`, secrets ambient in the shell environment — is reversed: `dotf secrets run` injects secrets into one child process on demand, never the ambient shell, and Bitwarden is now the live SSOT with age as the DR floor. Read the encryption-tool comparison as current; read the shell-login decryption flow as historical.
+
 ## Context
 
 The dotfiles needed a way to encrypt secrets (API tokens, SSH keys, kubeconfig files) and track them in git. The encrypted files must be decryptable at shell startup without user interaction.

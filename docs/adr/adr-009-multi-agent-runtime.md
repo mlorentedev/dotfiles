@@ -1,13 +1,15 @@
 ---
 id: adr-009-multi-agent-runtime
 type: adr
-status: proposed
+status: accepted
 created: "2026-05-15"
 ---
 
 # ADR-009: AGENTS.md as Single Source of Truth for Cross-Agent System Prompt
 
-## Status: Proposed
+## Status: Accepted
+
+AGENTS.md is fully live as the cross-agent SSOT; every per-agent file delegates to it, guarded by `tests/agents-md.bats`.
 
 ## Date: 2026-05-15
 

@@ -11,6 +11,8 @@ owner: manu
 
 # ADR-005: Two-Directory Sync Pattern
 
+> **Partially superseded by [ADR-028](adr-028-secrets-two-tier-bitwarden-age.md) / [ADR-030](adr-030-secrets-registry-source-model.md) (both accepted).** The two-directory model itself (repo checkout vs. `~/.dotfiles` deploy target) still stands. But the secrets side of this ADR — `secrets_add`/`secrets_rotate` auto-syncing to the repo, `dotfiles-sync --secrets-only` — describes a retired command surface; secrets now route through `dotf secrets` + `secrets/registry.yaml`, with no auto-sync step. `dotfiles-sync.sh` still exists for non-secrets bidirectional sync.
+
 ## Context
 
 The dotfiles serve two purposes: (1) stable local installation for daily use, and (2) active development with frequent commits. Running a development repo as `$HOME/.dotfiles` risks breaking the shell environment during git operations (rebase, branch switches, failed merges).

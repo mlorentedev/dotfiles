@@ -30,6 +30,9 @@ An initial approach stored memory files in the dotfiles repo (`ai/claude/memory/
 
 Register all MCP servers with `--scope user` in both setup scripts:
 
+> This table predates the 2026-05-25 removal of `drawio` and `socket`; `mcp-servers.json`'s
+> `_history` field is the current record of what's registered.
+
 | Server | Transport | Purpose |
 |--------|-----------|---------|
 | drawio | stdio | Diagram generation |

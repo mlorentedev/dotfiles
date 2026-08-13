@@ -4,7 +4,7 @@ type: adr
 adr: "029"
 title: "dotf secrets sync — backend-agnostic deploy-time materialization for headless consumers"
 tags: [adr, dotfiles, secrets, sync, ci, bitwarden, age]
-status: proposed
+status: accepted
 created: "2026-06-26"
 owner: manu
 issue: "mlorentedev/dotfiles#612"
@@ -12,6 +12,8 @@ depends_on: "adr-028 (two-tier secrets), adr-020 (CLI strangler-fig)"
 ---
 
 # ADR-029: `dotf secrets sync` — backend-agnostic deploy-time materialization for headless consumers
+
+> **Status: accepted.** `dotf secrets sync` shipped (#612 Phase B, v0.29.0, `cli/internal/cmd/secrets_sync.go`); frontmatter above updated from `proposed` to match.
 
 ## Context
 

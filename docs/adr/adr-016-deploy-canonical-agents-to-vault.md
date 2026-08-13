@@ -11,6 +11,8 @@ created: "2026-05-31"
 
 # ADR-016: Deploy canonical AGENTS.md to the vault for repo-less agents (HERMES-002)
 
+> **Partially superseded by [ADR-026](adr-026-agent-config-ssot-topology.md) (accepted).** ADR-026 supersedes this ADR's directionality specifically for the cross-project slice, settling it inside the broader four-zone, owner-by-layer SSOT topology. The mechanism this ADR establishes — `compile-harness.sh` projecting root `AGENTS.md` → vault for repo-less agents — still stands; ADR-026 is the model it now sits inside, not a reversal of it.
+
 > Closes the three-layer drift debt anticipated in ADR-015. Builds on ADR-009 (AGENTS.md cross-agent SSOT) and ADR-013 (compile-harness deploy engine). Fuses with the "idea-file packaging" direction recorded in the 2026-05-31 prestudy.
 
 ## Status
