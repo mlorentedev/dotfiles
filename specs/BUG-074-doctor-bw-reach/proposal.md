@@ -65,10 +65,36 @@ migrated secret.
   during exactly the migration this guards, holding severity at advisory as
   exposure begins — the #635 drift class rebuilt inside the fix for a drift bug.
   Resolved: the seam reads `env.ResolveRegistryPath`, which prefers the checkout.
-- **CI must not go red for a headless container.** Verified that no workflow and
-  no `verify-setup.bats` case runs `dotf doctor`, so the FAIL severity cannot
-  turn CI permanently red once secrets migrate. If doctor is ever added to CI,
-  this needs a headless escape hatch.
+- **CI must not go red for a headless container.** The first draft of this risk
+  claimed "no workflow runs `dotf doctor`", from a grep of `.github/workflows`
+  and `verify-setup.bats`. That claim was **false**, and the adversarial review
+  caught it. The real chain is `ci.yml` (`integration` job) →
+  `tests/Dockerfile.integration:55` (`RUN bash setup-linux.sh`) →
+  `setup-linux.sh:1505` (`dotf doctor`). doctor **does** run in CI.
+
+  The conclusion survives, but on two safeguards that had to be verified rather
+  than assumed:
+  1. The invocation is `dotf doctor || log_warning …` — non-fatal by
+     construction, so a FAIL cannot fail the job.
+  2. `bw` is not installed in the integration image, so the reach check `Skip`s
+     before it can evaluate anything.
+
+  Both are load-bearing. Removing either — making doctor fatal in setup, or
+  adding `bw` to the image — turns a migrated registry into a red CI, so
+  whichever of those changes lands first must also add a headless escape hatch.
+
+- **Network subprocesses must be bounded.** `bw status` and `bw sync` are the
+  only network-bound `CommandOutput` callers in doctor, and plain `CommandOutput`
+  has no deadline while the `HTTPGet` seam is capped at 5s. Since doctor is the
+  last step of `setup-linux.sh`, an unbounded hang there hangs a bootstrap.
+  Resolved: both calls go through a new `CommandOutputBounded` seam
+  (`bwStatusTimeout` 15s, `bwSyncTimeout` 45s).
+
+- **The severity producer is the part that can rot silently.** Every check test
+  injects the `BWBackedSecrets` seam, and the real predicate is unreachable on
+  today's machine because all registry entries are still `age` — so neither CI
+  nor a live smoke exercises it. Resolved: `bwBackedSecrets` has its own tests
+  against a temp registry, mutation-verified to fail when the predicate breaks.
 
 ## Acceptance criteria
 

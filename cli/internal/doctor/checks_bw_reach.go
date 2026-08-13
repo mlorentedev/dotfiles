@@ -26,6 +26,16 @@ import (
 // land while the token is still renewable, not once it is already dead.
 const bwStaleSync = 30 * 24 * time.Hour
 
+// Deadlines for the two bw subprocesses. `status` is served from local state and
+// should be near-instant, so its budget only has to cover a cold Node start;
+// `sync` is a real network round-trip against the Bitwarden API and legitimately
+// takes seconds on a large vault. Both are bounded because doctor is the last
+// step of setup-linux.sh — an unbounded hang here hangs a bootstrap.
+const (
+	bwStatusTimeout = 15 * time.Second
+	bwSyncTimeout   = 45 * time.Second
+)
+
 // bwState is the subset of `bw status` this check consumes. Bitwarden emits more
 // fields (serverUrl, userEmail, userId); parsing only what is used keeps the
 // check indifferent to upstream additions.
@@ -79,7 +89,7 @@ func checkBitwardenReach(sys *System, rep *Report) {
 		rep.Warn("registry unreadable (" + regErr.Error() + ") — reach severity degraded to advisory")
 	}
 
-	out, err := sys.CommandOutput("bw", "status")
+	out, err := sys.CommandOutputBounded(bwStatusTimeout, "bw", "status")
 	if err != nil {
 		rep.Warn("`bw status` did not run (" + bwFailDetail(out, err) + ") — reach unverified")
 		return
@@ -129,7 +139,7 @@ func checkBitwardenReach(sys *System, rep *Report) {
 	// what is otherwise a read-only diagnostic. That is deliberate, not a side
 	// effect to apologise for: it makes a periodic `dotf doctor` the keep-alive
 	// that would have prevented the 45-day expiry outright.
-	if syncOut, syncErr := sys.CommandOutput("bw", "sync"); syncErr != nil {
+	if syncOut, syncErr := sys.CommandOutputBounded(bwSyncTimeout, "bw", "sync"); syncErr != nil {
 		rep.Fail("Bitwarden sync FAILED on an unlocked vault (" + bwFailDetail(syncOut, syncErr) + ") — the live SSOT is not reachable")
 		return
 	}
@@ -150,6 +160,13 @@ func checkBWSyncAge(sys *System, rep *Report, lastSync string) {
 		return
 	}
 	age := sys.Now().Sub(ts)
+	if age < 0 {
+		// A sync stamped in the future means the clock moved, not that the vault
+		// is fresh. Reporting "synced -3d ago" would be nonsense, and silently
+		// treating it as fresh would hide a genuinely stale token behind a skew.
+		rep.Warn("Bitwarden lastSync is in the future — check the system clock; staleness cannot be judged")
+		return
+	}
 	days := int(age.Hours() / 24)
 	if age > bwStaleSync {
 		rep.Warn(fmt.Sprintf("Bitwarden last synced %dd ago (>%dd) — the refresh token expires silently on an idle vault; run `bw sync` (BUG-074)",
@@ -162,15 +179,27 @@ func checkBWSyncAge(sys *System, rep *Report, lastSync string) {
 // bwBackedSecrets is the production BWBackedSecrets seam: it counts registry
 // entries whose backend is Bitwarden.
 //
-// It reads env.ResolveRegistryPath — which prefers the dotfiles CHECKOUT and
-// only falls back to the deployed copy — rather than cfg.DotfilesDir. That is
-// load-bearing, not incidental: the deployed copy under ~/.dotfiles lags the
-// checkout until a setup run (doctor has a whole section for that drift), so
-// counting there would report zero bw-backed secrets while the checkout is
-// actively flipping entries to bw. The severity would stay advisory during
-// exactly the migration window this check exists to guard (ADR-030, #635).
+// It reads env.RepoRegistryPath — the CHECKOUT-only path — and deliberately not
+// cfg.DotfilesDir nor env.ResolveRegistryPath. The deployed copy under
+// ~/.dotfiles lags the checkout until a setup run (doctor has a whole section
+// for that drift), so counting there reports zero bw-backed secrets while the
+// checkout is actively flipping entries to bw — pinning severity at advisory
+// during exactly the migration window this check guards (ADR-030, #635).
+//
+// ResolveRegistryPath is the wrong seam for the same reason even though it
+// "prefers" the checkout: when a checkout exists but its registry is absent, it
+// silently falls back to the deployed copy — reintroducing the stale count
+// through the back door. RepoRegistryPath fails loud instead, and the caller
+// degrades severity with a stated reason rather than trusting a number whose
+// source it cannot name. A machine with no checkout at all therefore reports
+// advisory: there, the check genuinely cannot tell a migrated registry from a
+// stale mirror.
 func bwBackedSecrets() (int, error) {
-	raw, err := os.ReadFile(env.ResolveRegistryPath())
+	path, err := env.RepoRegistryPath()
+	if err != nil {
+		return 0, err
+	}
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
 	}

@@ -22,8 +22,22 @@
   },
   {
     "id": "BUG-074-doctor-bw-reach-f4",
-    "behavior": "Unusable or unreadable inputs (bad JSON, unknown status, never synced, unreadable registry) degrade to advisory and never claim verified reach",
-    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(DegradesOnUnusableStatus|UnreadableRegistryDegradesSeverity)$'",
+    "behavior": "Unusable or unreadable inputs (bad JSON, unknown status, never synced, unreadable registry, future-dated sync) degrade to advisory and never claim verified reach",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(DegradesOnUnusableStatus|UnreadableRegistryDegradesSeverity|FutureSyncIsSkewNotFreshness)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f5",
+    "behavior": "The severity producer counts only backend: bw entries, reads the checkout registry rather than the deployed mirror, and errors instead of reporting a silent zero when it cannot read",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWBackedSecrets_'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f6",
+    "behavior": "Network-bound bw subprocesses are killed at their deadline rather than hanging the diagnostic (and, through it, setup-linux.sh)",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCommandOutputBounded_'",
     "state": "pending",
     "evidence": ""
   }

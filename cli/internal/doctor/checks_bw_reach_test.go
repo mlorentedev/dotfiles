@@ -3,9 +3,149 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
+
+// testRegistry is a minimal registry covering every backend the counter must
+// discriminate: two bw entries among an age entry and a floor entry.
+const testRegistry = `version: 1
+secrets:
+  - id: A_AGE
+    plane: app
+    backend: age
+    age: a.key
+    expose: { env: A_AGE }
+  - id: B_BW
+    plane: app
+    backend: bw
+    bw: { item: b-item, field: api-key }
+    expose: { env: B_BW }
+  - id: C_BW
+    plane: app
+    backend: bw
+    bw: { item: c-item, field: api-key }
+    expose: { env: C_BW }
+  - id: D_FLOOR
+    plane: floor
+    backend: age-offline
+    age: d.key
+    expose: { file: { var: D_FLOOR, path: "~/.ssh/id_test", mode: "0600" } }
+`
+
+// TestBWBackedSecrets_CountsOnlyBWBackend exercises the PRODUCTION counter, not
+// the BWBackedSecrets seam.
+//
+// Every other test in this file injects a fake count, so before this test the
+// real predicate had never executed anywhere: not in CI, and not in the live
+// smoke either, since every registry entry is still `age` and the branch is
+// therefore unreachable on the real machine. Breaking `s.Backend == "bw"` left
+// the whole cli/ suite green — the exact mutant the severity seam exists to
+// prevent, surviving unnoticed.
+func TestBWBackedSecrets_CountsOnlyBWBackend(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "secrets"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "secrets", "registry.yaml"), []byte(testRegistry), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", root)
+
+	n, err := bwBackedSecrets()
+	if err != nil {
+		t.Fatalf("counting a valid registry must not error: %v", err)
+	}
+	// 2 of 4: age and age-offline must not count, or severity would escalate on
+	// a fully un-migrated machine.
+	if n != 2 {
+		t.Fatalf("expected 2 bw-backed entries (B_BW, C_BW), got %d", n)
+	}
+}
+
+// The zero case is the one that governs severity today — every entry on age must
+// yield 0, or doctor FAILs on machines where nothing depends on Bitwarden.
+func TestBWBackedSecrets_ZeroWhenNothingMigrated(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "secrets"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	noBW := `version: 1
+secrets:
+  - id: A_AGE
+    plane: app
+    backend: age
+    age: a.key
+    expose: { env: A_AGE }
+`
+	if err := os.WriteFile(filepath.Join(root, "secrets", "registry.yaml"), []byte(noBW), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", root)
+
+	n, err := bwBackedSecrets()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("no bw-backed entry may be counted, got %d", n)
+	}
+}
+
+// Exercises the PRODUCTION CommandOutputBounded closure, not the fake: the
+// deadline is the whole point of the seam, and a fake that ignores it would
+// prove nothing. doctor is the last step of setup-linux.sh, so an unbounded
+// subprocess here hangs a bootstrap.
+func TestCommandOutputBounded_KillsAnOverrunningCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no portable sleep binary on Windows; the deadline logic itself is OS-independent")
+	}
+	sys := realSystem()
+
+	start := time.Now()
+	_, err := sys.CommandOutputBounded(150*time.Millisecond, "sleep", "10")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("a command outliving its deadline must error, not return success")
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("the error must name the timeout, got: %v", err)
+	}
+	// Generous ceiling: this asserts the process was killed rather than waited
+	// out, without being flaky on a loaded CI runner.
+	if elapsed > 5*time.Second {
+		t.Fatalf("deadline did not kill the process; took %s", elapsed)
+	}
+}
+
+// The same seam must stay transparent for commands that finish in time.
+func TestCommandOutputBounded_PassesThroughFastCommands(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no portable echo binary semantics on Windows")
+	}
+	out, err := realSystem().CommandOutputBounded(10*time.Second, "echo", "alive")
+	if err != nil {
+		t.Fatalf("a fast command must not error: %v", err)
+	}
+	if !strings.Contains(out, "alive") {
+		t.Fatalf("output must pass through, got %q", out)
+	}
+}
+
+// An unreadable registry must surface as an error, not as a silent zero — a
+// silent zero is indistinguishable from "nothing migrated" and would downgrade
+// severity exactly when the check can no longer tell.
+func TestBWBackedSecrets_MissingRegistryErrors(t *testing.T) {
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir())
+	if _, err := bwBackedSecrets(); err == nil {
+		t.Fatal("a missing registry must error, never report zero")
+	}
+}
 
 // bwStatusJSON builds a `bw status` payload. Extra upstream fields are included
 // deliberately: the check must ignore what it does not consume.
@@ -99,6 +239,23 @@ func TestBWReach_StaleSyncWarnsWhileStatusLooksHealthy(t *testing.T) {
 	}
 }
 
+// Clock skew must not be laundered into freshness. A sync stamped in the future
+// means the clock moved; treating it as fresh would hide a genuinely expired
+// token behind the skew, and printing "synced -3d ago" is nonsense.
+func TestBWReach_FutureSyncIsSkewNotFreshness(t *testing.T) {
+	cmd := map[string]string{"bw status": bwStatusJSON("locked", "2026-06-20T12:00:00Z")} // 3d after fixedTestNow
+	out, fails := runBWReach(t, []string{"bw"}, cmd, 0)
+	if fails != 0 {
+		t.Fatalf("skew is a WARN, not a FAIL; got %d\n%s", fails, out)
+	}
+	if !strings.Contains(out, "in the future") || !strings.Contains(out, "clock") {
+		t.Fatalf("expected a clock-skew warning; got:\n%s", out)
+	}
+	if strings.Contains(out, "-") && strings.Contains(out, "d ago") {
+		t.Fatalf("must not report a negative age; got:\n%s", out)
+	}
+}
+
 func TestBWReach_FreshLockedVaultIsCleanButUnproven(t *testing.T) {
 	cmd := map[string]string{"bw status": bwStatusJSON("locked", bwSyncFresh)}
 	out, fails := runBWReach(t, []string{"bw"}, cmd, 0)
@@ -139,7 +296,7 @@ func TestBWReach_UnlockedButSyncFailsIsAFail(t *testing.T) {
 	rep := capture(&buf)
 	sys := newSys(nil, []string{"bw"}, nil)
 	sys.BWBackedSecrets = func() (int, error) { return 2, nil }
-	sys.CommandOutput = func(name string, args ...string) (string, error) {
+	sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, error) {
 		if len(args) > 0 && args[0] == "status" {
 			return bwStatusJSON("unlocked", bwSyncFresh), nil
 		}

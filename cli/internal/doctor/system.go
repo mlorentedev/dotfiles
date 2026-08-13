@@ -10,6 +10,7 @@
 package doctor
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -69,6 +70,14 @@ type System struct {
 	// migration this check guards (ADR-030, #635), which would hold the severity
 	// at WARN precisely as exposure begins.
 	BWBackedSecrets func() (int, error)
+	// CommandOutputBounded is CommandOutput with a wall-clock deadline, for
+	// subprocesses that touch the network. Plain CommandOutput has none, which is
+	// fine for local probes but not for a command that can block on a stalled
+	// connection: doctor is the last step of setup-linux.sh, so an unbounded hang
+	// there hangs a bootstrap. It is the exec-side analogue of the 5s cap already
+	// placed on the HTTPGet seam, and exists because that cap taught nothing to
+	// the callers that shell out instead.
+	CommandOutputBounded func(d time.Duration, name string, args ...string) (string, error)
 }
 
 // realSystem wires System to the live OS.
@@ -106,6 +115,15 @@ func realSystem() *System {
 		GOOS:            runtime.GOOS,
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
+		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), d)
+			defer cancel()
+			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			if ctx.Err() != nil {
+				return string(out), fmt.Errorf("%s timed out after %s", name, d)
+			}
+			return string(out), err
+		},
 	}
 }
 

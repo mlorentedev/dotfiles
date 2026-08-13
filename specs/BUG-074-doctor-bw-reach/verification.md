@@ -29,14 +29,41 @@ created: "2026-08-13"
 - Spec gate: `./scripts/check-spec-gate.sh --base-ref origin/main --head-ref HEAD
   --explain` -> 220 production LOC counted, tests correctly excluded (205 + 5).
 
-**Mutation test** — each tier broken deliberately, the guarding test observed
-going red, then reverted:
+**Mutation test** — each behaviour broken deliberately, the guarding test
+observed going red, then reverted.
 
-| Mutation | Result |
-|---|---|
-| severity forced to always-advisory | detected (test red) |
-| staleness warning never fires | detected (test red) |
-| claims reach without running `bw sync` | detected (test red) |
+Round 1 mutated only the *consumers*. The adversarial review showed that was not
+enough: mutating the severity **producer** (`s.Backend == "bw"` →
+`"bitwarden"`, a predicate that can then never match) left the entire `cli/`
+suite green — 13 packages ok, exit 0. The seam introduced for testability had
+left the real implementation with no coverage at all, and the row that claimed
+"severity forced to always-advisory → detected" had mutated `if live > 0`, not
+the code that produces `live`. Round 2 adds the producer tests and re-runs the
+full battery, including the reviewer's own mutant:
+
+| Mutation | Round 1 | Round 2 |
+|---|---|---|
+| severity consumer forced to always-advisory | detected | detected |
+| staleness warning never fires | detected | detected |
+| claims reach without running `bw sync` | detected | detected |
+| **producer: `s.Backend == "bitwarden"`** (reviewer's) | **SURVIVED** | detected |
+| **producer: counts every entry** | not tested | detected |
+| **producer: silent fallback to the deployed copy** | not tested | detected |
+| **bounded exec: deadline ignored** | not tested | detected |
+| **clock: no negative-skew guard** | not tested | detected |
+
+Two of those round-2 mutants describe defects the fixes introduced or exposed,
+not merely untested paths:
+
+- **Silent fallback to the deployed registry.** Writing the producer test
+  revealed that `env.ResolveRegistryPath` falls back to `~/.dotfiles` when the
+  checkout registry is absent — so the counter could read the stale mirror, the
+  exact failure the design section claims to prevent. Fixed by reading
+  `env.RepoRegistryPath` (checkout-only, fails loud).
+- **Unbounded network exec.** `bw status` / `bw sync` ran through a seam with no
+  deadline inside a diagnostic that terminates `setup-linux.sh`. Fixed by
+  `CommandOutputBounded`, tested against the production closure rather than the
+  fake.
 
 **Live smoke**, built binary against the real vault — both states observed:
 

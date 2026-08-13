@@ -42,7 +42,33 @@ created: "2026-08-13"
 - [x] No unrelated changes in the diff (no scope creep) — the diff is the new
       check, its seam, its registration, and its tests
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#950)
+
+## Round 2 — adversarial review remediation
+
+Review 1 returned **FAIL** (0 Blockers, 3 Majors). Every finding was reproduced
+independently before being accepted; none was argued down.
+
+- [x] [AC1] Test the severity **producer**, not just the seam — `bwBackedSecrets`
+      against a temp registry (`TestBWBackedSecrets_CountsOnlyBWBackend`,
+      `_ZeroWhenNothingMigrated`, `_MissingRegistryErrors`). Kills the reviewer's
+      surviving mutant.
+- [x] Fix the defect that writing those tests exposed: the counter read
+      `env.ResolveRegistryPath`, which silently falls back to the deployed copy
+      when the checkout registry is missing. Now `env.RepoRegistryPath`.
+- [x] Bound the network subprocesses — `CommandOutputBounded` seam, applied to
+      `bw status` (15s) and `bw sync` (45s), tested against the production
+      closure (`TestCommandOutputBounded_KillsAnOverrunningCommand`).
+- [x] Rewrite `proposal.md` risk 3 with the real chain: doctor **does** run in CI
+      via `Dockerfile.integration` → `setup-linux.sh:1505`, and the conclusion
+      rests on two named safeguards.
+- [x] Minor: retire the overclaiming `bw (... live secrets SSOT) found` PASS line
+      in `checks_secrets_tooling.go` — it now says only what PATH presence proves.
+- [x] Minor: guard negative sync age (clock skew), with its own mutation-verified
+      test.
+- [x] Correct the `verification.md` mutation table, which overstated round 1.
+- [ ] Fresh adversarial review — these edits touch `proposal.md`/`tasks.md`, which
+      stale review 1 by construction.
 
 ## Machine-readable features
 

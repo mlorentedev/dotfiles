@@ -18,6 +18,23 @@ var fixedTestNow = time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
 // newSys builds a System with deterministic env, PATH membership and command
 // output — the three process-global surfaces a check touches. The filesystem is
 // left real; tests root it at a temp $HOME via the env map.
+// sysCommandOutput is the fake exec table shared by the CommandOutput and
+// CommandOutputBounded seams, so both resolve identically and a test that stubs
+// a command does not have to know which seam the check happens to call.
+func sysCommandOutput(cmdOut map[string]string, name string, args ...string) (string, error) {
+	key := name
+	if len(args) > 0 {
+		key = name + " " + strings.Join(args, " ")
+	}
+	if out, ok := cmdOut[key]; ok {
+		return out, nil
+	}
+	if out, ok := cmdOut[name]; ok {
+		return out, nil
+	}
+	return "", errors.New("no such command: " + key)
+}
+
 func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *System {
 	if env == nil {
 		env = map[string]string{}
@@ -35,17 +52,7 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 			return "", errors.New("not found: " + n)
 		},
 		CommandOutput: func(name string, args ...string) (string, error) {
-			key := name
-			if len(args) > 0 {
-				key = name + " " + strings.Join(args, " ")
-			}
-			if out, ok := cmdOut[key]; ok {
-				return out, nil
-			}
-			if out, ok := cmdOut[name]; ok {
-				return out, nil
-			}
-			return "", errors.New("no such command: " + key)
+			return sysCommandOutput(cmdOut, name, args...)
 		},
 		// Safe defaults so full-sweep tests never nil-panic on the network/clock
 		// seams: the clock is fixed, and HTTPGet reports "offline" (which the
@@ -63,6 +70,11 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// unreachable vault advisory. Tests exercising the exposed severity
 		// inject their own count.
 		BWBackedSecrets: func() (int, error) { return 0, nil },
+		// Bounded exec resolves to the same fake table as CommandOutput; the
+		// deadline is production-only behaviour, exercised by its own test.
+		CommandOutputBounded: func(_ time.Duration, name string, args ...string) (string, error) {
+			return sysCommandOutput(cmdOut, name, args...)
+		},
 	}
 }
 
