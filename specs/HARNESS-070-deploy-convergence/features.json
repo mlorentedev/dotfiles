@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-070-deploy-convergence-f1",
+    "behavior": "dotf doctor FAILs on a harness/{skills,agents} mirror record with no repo counterpart; --fix removes it idempotently",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestCheckHarnessMirrorOrphans -v",
+    "state": "passing",
+    "evidence": "PASS (5 subtests): orphan_record_fails_and_names_the_path, --fix_prunes_the_orphan_and_is_idempotent, no_orphans_->_pass, windows_has_no_separate_mirror_->_no-op, mirror_IS_the_repo_checkout_->_nothing_to_compare"
+  },
+  {
+    "id": "HARNESS-070-deploy-convergence-f2",
+    "behavior": "dotf doctor FAILs (not WARNs) when installed dotf != versions.conf pin",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestCheckOptionalTools_DotfDrift -v",
+    "state": "passing",
+    "evidence": "PASS; also confirmed live: `dotf doctor` on this machine shows `[FAIL] dotf version drift: installed=0.37.0 pinned=0.38.0` after the change (was [WARN] before)"
+  },
+  {
+    "id": "HARNESS-070-deploy-convergence-f3",
+    "behavior": "compile-harness.sh --deploy alone (no setup-linux.sh) updates the 4 instruction files without clobbering skill catalog / agent-presence regions",
+    "verification": "HOME=/tmp/fake-home bash scripts/compile-harness.sh --deploy && bash scripts/compile-harness.sh --check",
+    "state": "passing",
+    "evidence": "Sandboxed run: all 4 files written (.claude/CLAUDE.md, .config/opencode/AGENTS.md, .pi/agent/AGENTS.md; copilot skipped, not on PATH), presence+catalog regions injected afterward with no clobber, second run byte-identical (diff -rq clean), --check exit 0"
+  },
+  {
+    "id": "HARNESS-070-deploy-convergence-f4",
+    "behavior": "dotf doctor reports a deployed instruction file drifted from its repo source (region-stripped compare)",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestCheckInstructionDrift -v",
+    "state": "passing",
+    "evidence": "PASS (4 subtests + 1 constants-pin test); also confirmed live: correctly FAILs on all 4 files on this machine (genuinely stale, matches the known repo<->deploy-dir drift)"
+  },
+  {
+    "id": "HARNESS-070-deploy-convergence-f5",
+    "behavior": "checkDeployedSkillSymlinks does not FAIL on a symlink at a name with no harness/skills/ record",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestCheckDeployedSkillSymlinks -v",
+    "state": "passing",
+    "evidence": "PASS (5 subtests); also confirmed live: [Harness + skill drift] section on this machine went from 4 FAILs to 0 for computer-use/find-skills/orca-cli/orchestration. Filed as #943/BUG-074."
+  }
+]
