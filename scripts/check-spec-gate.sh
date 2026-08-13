@@ -35,8 +35,12 @@ BASE_REF=""
 HEAD_REF=""
 EXPLAIN=0
 # Path to the open-issue feed for the advisory adjacency report (HARNESS-063).
-# Empty on every local run: the fetch needs a token, so it lives in the workflow
-# and this script stays offline for the pre-push hook (#854).
+# Empty on every local run: fetching every open issue needs a token, so this
+# feed is populated by the workflow only -- this script itself never fetches
+# anything. (Distinct from BUG-061/#854's PR-body/labels/author resolution:
+# that is a single PR read, needs no token, and is handled by the separate
+# scripts/spec-gate-prepush.sh wrapper on the local pre-push tier -- see its
+# header for why it lives outside this script rather than inside it.)
 ADJACENCY_ISSUES=""
 
 usage() {
