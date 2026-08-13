@@ -715,6 +715,12 @@ cat >&2 <<EOF
          (b) Add the "skip-sdd" label to the PR AND a non-empty
              "## SDD skip rationale" section in the PR body.
 
+       If this already archived a spec to satisfy archive-on-merge but still
+       failed here: open the PR first (scripts/spec-gate-prepush.sh, wired to
+       this hook, resolves its labels/body/author live via \`gh\` once one
+       exists). Before a PR exists there is nothing to resolve; SDD_PR_BODY can
+       be set by hand for a one-off check: SDD_PR_BODY='Closes #N' $0 ...
+
        Reference: AGENTS.md "Discipline Gate (NON-NEGOTIABLE)" section.
 EOF
 exit 1

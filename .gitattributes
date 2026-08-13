@@ -17,6 +17,21 @@
 # The umbrella also re-covers git-hooks/lib/*.sh already caught by *.sh; harmless.
 git-hooks/** text eol=lf
 
+# BUG-039: the other extensionless-but-text groups in the tree, same reasoning
+# as git-hooks/** above. `dotf init`'s templates are go:embed'd into the CLI
+# binary at build time, so a CRLF checkout here means every repo `dotf init`
+# scaffolds inherits a CRLF Makefile/gitignore/claude-md on a Windows build.
+# Golden-corpus fixtures under tests/golden/ are compared byte-for-byte against
+# script output, so a CRLF checkout would also break the comparison itself, not
+# just the shebang class of failure. A regression test (tests/gitattributes-
+# eol.bats) asserts every tracked extensionless text file resolves an explicit
+# eol, so the next one added outside these groups fails loudly instead of
+# silently depending on which OS someone happens to be checking out on.
+cli/internal/initrepo/templates/** text eol=lf
+tests/golden/**                   text eol=lf
+ssh/config                        text eol=lf
+LICENSE                           text eol=lf
+
 # Windows shells: native tooling expects CRLF.
 *.ps1  text eol=crlf
 *.psm1 text eol=crlf

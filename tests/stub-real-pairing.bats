@@ -23,6 +23,13 @@ setup() {
 # reason. Add a row only when a real test genuinely cannot exist; prefer writing
 # the sibling.
 #
+# Single-sourced: both exempt() and the "no stale entries" test below read this
+# one list, rather than each keeping its own copy. They used to be two
+# independently-maintained copies, and had already drifted — `bitacora-rollout`
+# was exempted here but missing from the stale-entries loop, so an exemption
+# going stale for that one suite specifically would have gone undetected. That
+# is the exact failure mode this file exists to catch, reproduced inside itself.
+#
 #   bitacora-reconcile        stubs `gh` — a real run mutates the live GitHub project board
 #   bitacora-rollout          stubs `gh` — same; a real run adds items to the live board. This
 #                             suite is a worked example of the limitation BUG-055 names: #884 was
@@ -36,20 +43,68 @@ setup() {
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
 #   vault-health              stubs `hive` — a real run needs the daemon and a live vault
+#   vault-health-golden       stubs `obsidian` (from tests/golden/vault-health/lib.sh, not the
+#                             .bats file itself — see #892) — same rationale as vault-health: a
+#                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
+EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup guard-memory-sink hermes-setup
+install-dotf shell-profile skills-pipeline vault-health vault-health-golden vault-maintenance-weekly"
+
 exempt() {
-    case "$1" in
-        bitacora-reconcile|bitacora-rollout|board-pickup|guard-memory-sink|hermes-setup|install-dotf|\
-        shell-profile|skills-pipeline|vault-health|vault-maintenance-weekly) return 0 ;;
-        *) return 1 ;;
-    esac
+    local base
+    for base in $EXEMPT_SUITES; do
+        [ "$base" = "$1" ] && return 0
+    done
+    return 1
 }
 
 # A suite "stubs a binary" when it makes something executable and puts its
 # directory on PATH — the shape that shadows a real tool for the suite's own
 # process. Deliberately structural: it matches intent, not a naming convention.
-stubs_a_binary() {
+_stubs_a_binary_in_file() {
     grep -q 'chmod +x' "$1" && grep -qE 'PATH="?\$' "$1"
+}
+
+# Resolves `. "$VAR/name"` / `source "$VAR/name"` lines to a path under tests/,
+# one level of same-file variable substitution deep — the shape every golden
+# corpus suite uses: `HERE="$BATS_TEST_DIRNAME/golden/x"; . "$HERE/lib.sh"`.
+# Deliberately one level: this resolves what THE SUITE sources, not what a
+# sourced library goes on to source itself.
+_sourced_test_libs() {
+    local f="$1" line name val target rest
+    local -A vars=()
+
+    while read -r name val; do
+        vars["$name"]="$val"
+    done < <(
+        # shellcheck disable=SC2016  # the $BATS_TEST_DIRNAME is a literal
+        # pattern matched against the source file's text, not an expansion here.
+        grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="\$BATS_TEST_DIRNAME/[^"]*"' "$f" |
+        sed -E 's#^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)="\$BATS_TEST_DIRNAME/(.*)"$#\1 \2#'
+    )
+
+    while IFS= read -r line; do
+        target=$(printf '%s' "$line" | grep -oE '"\$[A-Za-z_][A-Za-z0-9_]*/[^"]*"' | tr -d '"')
+        [ -n "$target" ] || continue
+        name="${target#\$}"; name="${name%%/*}"
+        rest="${target#*/}"
+        if [ "$name" = "BATS_TEST_DIRNAME" ]; then
+            printf '%s/%s\n' "$TESTS" "$rest"
+        elif [ -n "${vars[$name]:-}" ]; then
+            printf '%s/%s/%s\n' "$TESTS" "${vars[$name]}" "$rest"
+        fi
+    done < <(grep -E '(^|[^A-Za-z_])(\.|source)[[:space:]]+"\$[A-Za-z_]' "$f")
+}
+
+stubs_a_binary() {
+    _stubs_a_binary_in_file "$1" && return 0
+    local lib
+    while IFS= read -r lib; do
+        [ -f "$lib" ] || continue
+        case "$lib" in "$TESTS"/*) ;; *) continue ;; esac
+        _stubs_a_binary_in_file "$lib" && return 0
+    done < <(_sourced_test_libs "$1")
+    return 1
 }
 
 @test "every suite that stubs a binary either pairs with a real test or is a declared exemption" {
@@ -77,8 +132,7 @@ stubs_a_binary() {
     # cover to a suite that has since grown a real sibling, or to one that no
     # longer exists at all.
     stale=()
-    for base in bitacora-reconcile board-pickup guard-memory-sink hermes-setup install-dotf \
-                shell-profile skills-pipeline vault-health vault-maintenance-weekly; do
+    for base in $EXEMPT_SUITES; do
         [ -f "$TESTS/$base.bats" ] || { stale+=("$base (suite gone)"); continue; }
         [ -f "$TESTS/$base-real.bats" ] && stale+=("$base (now has a real sibling)")
     done
@@ -97,4 +151,18 @@ stubs_a_binary() {
     run stubs_a_binary "$TESTS/precommit-fallback.bats"
     [ "$status" -eq 0 ]
     [ -f "$TESTS/precommit-fallback-real.bats" ]
+}
+
+@test "the source-following is enforceable: vault-health-golden stubs obsidian only via its sourced lib.sh" {
+    # Guards the #892 fix itself. The .bats file greps clean on its own -- the
+    # stubbing lives entirely in tests/golden/vault-health/lib.sh -- so this
+    # pins that stubs_a_binary only catches it by following the `. "$HERE/..."`
+    # line. Without this pin, the source-following could silently regress (e.g.
+    # a refactor changes the variable name) and both tests above would pass
+    # vacuously again, exactly the failure #892 reported.
+    run _stubs_a_binary_in_file "$TESTS/vault-health-golden.bats"
+    [ "$status" -ne 0 ]
+
+    run stubs_a_binary "$TESTS/vault-health-golden.bats"
+    [ "$status" -eq 0 ]
 }
