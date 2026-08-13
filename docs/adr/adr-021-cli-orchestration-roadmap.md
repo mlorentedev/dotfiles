@@ -29,7 +29,7 @@ AUDIT-005 (2026-05-21) classified `scripts/` (the 9-category inventory this road
 
 1. **Port = consolidate, not translate.** Each `dotf` noun absorbs its domain's *accumulated best practice*, not a 1:1 shell translation. **`dotf init` is the flagship**: it scaffolds a new repo fully-practiced from line 1 — bitácora board, `AGENTS.md` + SDD spec scaffolding, guardrail CI (spec-gate + incident→guard), pre-commit hooks, YAML contracts (`env-contract`), the knowledge-placement model. Not "init-project in Go" — the distillate of everything learned cross-project, in one command.
 2. **Prioritise by per-system dependence eliminated × step-collapse.** A divergent `.sh`+`.ps1` pair absorbed into one binary is the highest-value move; a singleton logic script gains the other OS for free.
-3. **Thin-shim for the irreducible shell.** The pieces that *cannot* live in the binary (Claude hooks; the secrets env-export, which must mutate the parent shell) stay as 2-line shell shims that call `dotf` — the logic still goes to Go. E.g. `eval "$(dotf secrets env)"`.
+3. **Thin-shim for the irreducible shell.** The pieces that *cannot* live in the binary (Claude hooks; the secrets env-export, which must mutate the parent shell) stay as 2-line shell shims that call `dotf` — the logic still goes to Go. E.g. `eval "$(dotf secrets env)"`. **Amendment ([ADR-028](adr-028-secrets-two-tier-bitwarden-age.md), accepted):** this shim plan was reversed — no `dotf secrets env` shipped, and none is planned. The no-ambient-secrets decision means secrets never populate the parent shell at all; `dotf secrets run -- <cmd>` (child-process-only injection) is the shipped shape instead.
 4. **Bootstrap goes to `dotf setup` — LAST.** End state: only a minimal `curl | bash` bootstrap (IDEAS-005) + `install-dotf` stay shell; `dotf setup` owns the rest. Ported after the logic nouns (highest risk last).
 5. **First port: `dotf doctor`.** Runs on every setup, eliminates 3 divergent pairs, immediate validation surface, medium risk.
 
@@ -51,7 +51,7 @@ AUDIT-005 (2026-05-21) classified `scripts/` (the 9-category inventory this road
 1. **`dotf doctor`** — healthcheck (448/520), doctor (218/233), diff-check (116/157 DRIFT) + vault-health. ~1,500 LOC dual-maintenance → one; fixes diff-check drift by deletion.
 2. **`dotf init`** *(flagship)* — init-project (460/576) + init-repo ×3. 4 pairs; already shell-orchestrated (REFACTOR-004) → clean Go command tree; bakes in the full practice stack.
 3. **`dotf vault`** — knowledge-crystallize, obs-cli (DRIFT), vault-maintenance-weekly + vault-health. Replaces the *shell* vault-cli AUDIT-005 §5 proposed.
-4. **`dotf secrets`** — load-secrets (1058/405, the worst pair, 0.24). Hybrid: decrypt/map in Go + `eval "$(dotf secrets env)"` shim. Kills the BUG-006 critical divergence.
+4. **`dotf secrets`** — load-secrets (1058/405, the worst pair, 0.24). Kills the BUG-006 critical divergence. Shipped shape supersedes the shim plan above — see the ADR-028 amendment on decision 3.
 5. **`dotf spec` gates** — fold check-spec-gate, check-backlog-*, check-md-escapes (sh-only) into Go; cross-platform for free.
 6. **`dotf sync` / `mem` / `harness`** — remaining pairs + singletons; hooks become thin shims (changelog retired to release-please, CLI-011).
 7. **`dotf setup`** *(last)* — the bootstrap orchestrator moves to Go, leaving only the curl bootstrap + install-dotf in shell.
@@ -62,7 +62,6 @@ Each step is its own spec/PR (SDD), guard-grep-verified, with its twins deleted 
 
 - **`curl | bash` bootstrap** (IDEAS-005) — the entry point; runs before any binary exists.
 - **`install-dotf.sh`** — fetch + verify + place the binary (chicken-and-egg).
-- **secrets env-**export** shim** — a subprocess cannot export into the parent shell.
 - **`shell-profile.sh`** — profiles the shell itself.
 - **`windows-defaults.ps1`, `profile-heal.ps1`** — Windows OS-config.
 - **RC glue** (`.zshrc`/`.bashrc`) and **`utils.sh`** (shrinks as consumers leave, dies with the last shell logic script).

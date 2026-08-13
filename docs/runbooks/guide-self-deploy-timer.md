@@ -24,6 +24,20 @@ Once a day the timer runs `dotf update` (the Go port of the former
 
 Every skip exits 0 (benign). Only a setup command that runs and fails exits non-zero.
 
+```mermaid
+flowchart TB
+    T([timer fires]) --> D{worktree dirty?}
+    D -- yes --> S1["skip (exit 0)"]
+    D -- no --> F{git fetch ok?}
+    F -- no --> S2["skip — network (exit 0)"]
+    F -- yes --> FF{fast-forward possible?}
+    FF -- no --> S3["skip — diverged (exit 0)"]
+    FF -- yes --> M{HEAD moved?}
+    M -- no --> S4["skip — already current (exit 0)"]
+    M -- yes --> SETUP["re-run setup"]
+    SETUP --> OK([exit 0]) & ERR(["exit ≠0 — only real failure"])
+```
+
 ## Enable / disable
 
 The mechanism is opt-in and default OFF — a normal `setup` run never installs it.

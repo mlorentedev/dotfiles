@@ -96,5 +96,5 @@ Once the upstream resolution lands and a repro confirms the bug is gone:
 
 - Upstream issue: [mlorentedev/hive#75](https://github.com/mlorentedev/hive/issues/75)
 - Lesson: [`../lessons.md`](../lessons.md) — 2026-05-15 entry on MCP transport state vs daemon state
-- Adjacent troubleshooting (different failure mode, same surface): [`claude-mem-broken-marketplace.md`](claude-mem-broken-marketplace.md) — also an MCP-layer issue, but server-side packaging rather than session-state transport
+- Adjacent troubleshooting (different failure mode, same surface): [`claude-mem-broken-marketplace.md`](archive/claude-mem-broken-marketplace.md) — also an MCP-layer issue, but server-side packaging rather than session-state transport (archived — the issue it describes is resolved)
 - Spec that explicitly watches this issue during OpenCode bootstrap: `~/Projects/dotfiles/specs/AI-011-opencode-bootstrap/proposal.md` (Risks section)

@@ -41,17 +41,17 @@ admin needed; some changes show after an Explorer restart.
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
 - **Encrypted secrets** — Bitwarden SSOT with an age-encrypted DR floor; injected into a single child process on demand via `dotf secrets run`, never into the ambient shell (ADR-028)
 - **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 37 custom skills, unified by `AGENTS.md` SSOT
-- **Cross-platform** — Symlinks on Linux, copies on Windows (no admin required); macOS planned
+- **Cross-platform** — Atomic copy with drift assertion on both Linux and Windows (no admin required; ADR-012); macOS planned
 - **Editor & shell ergonomics** — `.editorconfig` for cross-IDE consistency + `.inputrc` for case-insensitive tab-completion and arrow-key history search
 - **Tested** — 1200+ BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
 
 ```text
-├── setup-linux.sh              # Linux setup (symlinks); macOS planned
+├── setup-linux.sh              # Linux setup (copy + drift assertion, ADR-012); macOS planned
 ├── setup-windows.ps1           # Windows setup (copies)
-├── cli/                        # `dotf` Go CLI (doctor, init, env, spec) — primary user-facing tool
-├── scripts/                    # Shell utilities (NOT on PATH — see Human entrypoints below)
+├── cli/                        # `dotf` Go CLI — primary user-facing tool, see cli/README.md for the subcommand list
+├── scripts/                    # Shell utilities, on PATH (see Human entrypoints below)
 │   ├── utils.sh                # Shared function library (sourced by other scripts)
 │   ├── vault.sh                # Vault tooling dispatcher
 │   └── …                       # ~40 scripts total (hooks, CI helpers, secret tools)
@@ -79,33 +79,47 @@ admin needed; some changes show after an Explorer restart.
 
 ## Human entrypoints
 
-Scripts in `scripts/` are **not on PATH**. They are invoked via shell aliases (defined in
-`.zsh/aliases.zsh` and `.bashrc`) or sourced at login. The table below lists the ~8
-scripts that a human ever runs directly — everything else is a library, hook, or CI helper.
+`scripts/` **is on PATH** (`.zshrc`/`.bashrc` export both the repo checkout's `scripts/`
+and the deployed `~/.dotfiles/scripts/`), so any script in it runs directly by its full
+filename — no alias needed. A handful get a shorter alias anyway (defined in
+`.zsh/aliases.zsh`, mirrored in `.bashrc` where noted). The table below lists the scripts
+and `dotf` subcommands a human runs directly — everything else in `scripts/` is a
+library, hook, or CI helper.
 
-| Alias / command | Script | What it does |
+| Command | Backs onto | What it does |
 |---|---|---|
 | `./setup-linux.sh` | `setup-linux.sh` | Bootstrap Linux: install tools, deploy configs, register MCPs |
 | `.\setup-windows.ps1` | `setup-windows.ps1` | Bootstrap Windows: same, via PowerShell |
 | `dotf doctor` | `dotf` CLI | Post-setup verification (versions, paths, symlinks, env vars, env-contract) |
 | `dotf init [path] --stack <s>` | `dotf` CLI | Scaffold a new fully-practiced repo (AGENTS.md + SDD, CI, pre-commit, git) |
-| `vault <subcommand>` | `scripts/vault.sh` | Vault tooling: `vault health`, `vault maintenance`, `vault check-escapes` |
-| `profile-shell` | `scripts/shell-profile.sh` | Measure shell startup time (zsh/bash, --detail for per-function) |
-| `obs` | `scripts/obs-cli.sh` | Open Obsidian vault (Linux, --no-sandbox, GUI check) |
-| `dotf secrets run -- <cmd>` | `dotf` CLI | Inject mapped secrets into one child process only, never the ambient shell (ADR-028). `show`/`ls`/`verify` for single values, inventory and health |
+| `vault.sh <subcommand>` | `scripts/vault.sh` | Vault tooling: `vault.sh health`, `vault.sh maintenance`, `vault.sh check-escapes` |
+| `profile-shell` (alias) | `scripts/shell-profile.sh` | Measure shell startup time (zsh/bash, --detail for per-function) |
+| `obs-cli.sh` | `scripts/obs-cli.sh` | Open Obsidian vault (Linux, --no-sandbox, GUI check) |
+| `dotf secrets run -- <cmd>` | `dotf` CLI | Inject mapped secrets into one child process only, never the ambient shell (ADR-028). `show`/`ls`/`verify`/`set`/`backup` for single values, inventory, writes and DR escrow |
+
+The full `dotf` subcommand set (`doctor`, `env`, `init`, `mem`, `review`, `secrets`, `spec`,
+`tools`, `update`, `vault`, `version`) is documented in [`cli/README.md`](cli/README.md);
+run `dotf <cmd> --help` for any of them.
 
 ## Key Commands
 
 ### Secrets
 
+Secrets are never exported into the ambient shell — `dotf secrets` injects them into one
+child process on demand (ADR-028). Bitwarden is the live SSOT; an age-encrypted DR floor
+covers offline recovery. `secrets/registry.yaml` maps every id to its backend, exposed
+vars/files, and consumers.
+
 ```bash
-secrets_add VAR_NAME filename       # Add new env var secret
-secrets_add_file VAR FILE DEST      # Add file secret (kubeconfig, SSH keys)
-secrets_rotate VAR_NAME             # Rotate existing secret
-secrets_show VAR_NAME               # Show value (memory/disk/.age fallback)
-secrets_list                        # List all secrets and status
-secrets_check                       # Validate mapping integrity
+dotf secrets run -- <cmd>           # Inject mapped secrets into <cmd>'s env only
+dotf secrets show ID                # Print one secret's decrypted value to stdout
+dotf secrets set ID                 # Write a value into Bitwarden (stdin or hidden prompt)
+dotf secrets verify                 # Resolve every registry secret, report OK/MISSING/FAILED
+dotf secrets ls                     # List registry ids, plane, exposed vars — no values
+dotf secrets backup                 # Escrow the whole Bitwarden vault, age-encrypted, to sensitive/dr
 ```
+
+Full governance model (folder taxonomy, naming, rotation, DR): [`docs/runbooks/guide-secrets-governance.md`](docs/runbooks/guide-secrets-governance.md).
 
 ### Machine-local overrides
 
@@ -137,10 +151,15 @@ dotf init my-project --stack python  # Scaffold a new fully-practiced repo
 claude                               # Start Claude Code session
 > /audit src/auth.py                 # Use skills via slash commands
 agyp audit "$(cat src/main.py)"     # Gemini saved-prompt helper (~/.gemini/prompts/audit.md)
-oc                                   # OpenCode TUI (Go subscription, DeepSeek V4 Pro default)
-qq por que tardas tanto?             # one-shot question (no quotes needed in zsh) -> qwen3.6-plus (ES-friendly)
-qf explain the C10k problem         # one-shot question -> deepseek-v4-flash (faster, technical)
+oc                                   # OpenCode TUI (Go subscription; default model in ai/opencode/opencode.jsonc)
+qq por que tardas tanto?             # one-shot question (no quotes needed in zsh), ES-friendly
+qf explain the C10k problem         # one-shot question, faster/more technical model
 ```
+
+`qq` and `qf` are thin wrappers around fixed models defined in `.zsh/aliases.zsh`; the
+TUI default and both wrapper targets live in `ai/opencode/opencode.jsonc` — check that
+file rather than this README for the current model names, they change more often than
+this doc does.
 
 **AI skills** are edited in the vault (`00_meta/skills/<name>/`), compiled to committed
 records under `harness/skills/`, and deployed per-agent by `scripts/compile-harness.sh`
@@ -150,8 +169,8 @@ in the vault and re-run setup. Pipeline details: the vault's `pattern-cross-agen
 ### Sync
 
 ```bash
-dotfiles-sync                       # Bidirectional sync + git push/pull
-dotfiles-sync --secrets-only        # Only sync sensitive/ files
+dotfiles-sync.sh                    # Bidirectional sync + git push/pull
+dotfiles-sync.sh --secrets-only     # Only sync sensitive/ files
 ```
 
 ### Diagnostics
@@ -161,7 +180,7 @@ dotf doctor                         # Healthcheck: versions, paths, symlinks, en
 dch                                 # Drift check: repo vs ~/.dotfiles deploy dir
 profile-shell                       # Measure shell startup time (zsh default)
 profile-shell --shell bash --detail # Per-function breakdown via zprof/xtrace
-vault help                          # Vault tooling dispatcher (health / maintenance / check-escapes)
+vault.sh help                       # Vault tooling dispatcher (health / maintenance / check-escapes)
 ```
 
 ### Shell helpers

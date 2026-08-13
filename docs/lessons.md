@@ -15,6 +15,212 @@ owner: manu
 
 ---
 
+## Index
+
+Append-order index; mirrors entry order below (append-only body — this list does
+not re-sort, so it is not strictly chronological where an entry landed out of
+date order). Regenerate after adding entries with:
+
+```bash
+awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9-]+)\] (.*)$/- [\1] \2/'
+```
+
+<!-- Generated 2026-08-12; 191 entries at last regen. -->
+
+- [2026-08-10] Go's exec.LookPath is blind to extensionless scripts on Windows
+- [2025-12-15] echo -e breaks in zsh
+- [2025-12-15] &>/dev/null is not POSIX
+- [2025-12-15] ((count++)) exits with code 1 when count is 0
+- [2025-12-15] ${BASH_SOURCE[0]} is empty in zsh
+- [2026-02-26] Claude Code auto-memory path encoding
+- [2026-02-26] set -u requires ${1:-} for optional positional parameters
+- [2026-02-26] ${VAR:-fallback} pattern for sourced config files
+- [2026-02-27] Always edit the repo copy, never the deployed system copy
+- [2026-02-28] grep -c with 0 matches outputs "0" AND exits with code 1
+- [2026-02-28] Claude Code path encoding: Linux vs Windows differ
+- [2026-02-28] bash set -e does not exit on [ with integer error when in && chain
+- [2026-02-27] Claude Code SessionStart hook for vault health context
+- [2026-03-10] Aider requires Python 3.12 — audioop removed in 3.13
+- [2026-03-12] Single-quoted shell strings prevent variable expansion in JSON
+- [2026-03-12] grep -c '.' counts 1 on empty input (newline matches dot)
+- [2026-03-12] Plaintext secrets must never touch disk — pipe to age directly
+- [2026-03-12] Uninitialized variable under set -u in conditional-only assignment
+- [2026-03-12] \s is not POSIX — use `[[:space:]]` in bash regex
+- [2026-03-12] Stray bare word causes silent set -e abort
+- [2026-03-16] ShellCheck treats "# shellcheck" comments as directives
+- [2026-03-25] Secrets mapping and file inventory must be reconciled automatically
+- [2026-03-18] cp fails when source and destination resolve to the same file via symlink
+- [2026-03-26] PSScriptAnalyzer fails on non-ASCII chars outside here-strings
+- [2026-03-29] File deployment requires delete-then-copy, not additive-only copy
+- [2026-03-25] Config deployment guards vs tool installation guards
+- [2026-05-08] Self-heal third-party plugin breakage at SessionStart
+- [2026-05-11] tmux clipboard needs an external bridge — and that bridge is display-server-specific
+- [2026-05-11] Editing a dotfile in the repo does not take effect until `setup-linux.sh` runs
+- [2026-05-12] Env-vs-disk drift after secret mutation
+- [2026-05-12] git log --pretty=format: drops last commit silently in while-read pipelines
+- [2026-05-15] MCP transport state and daemon state can disagree per-conversation
+- [2026-05-15] bash `IFS=$'\t' read` collapses consecutive tabs (whitespace IFS chars never preserve empty fields)
+- [2026-05-16] PSScriptAnalyzer fails on non-ASCII in .ps1 without BOM
+- [2026-05-18] Verify post-checks with hardcoded strings rot when the verified file is refactored
+- [2026-05-18] detect-and-act scripts go silently inert when upstream products change their surface
+- [2026-05-18] When an invariant changes, dead code emerges silently downstream
+- [2026-05-18] Bulk-copy operations collide silently with per-file deploy logic
+- [2026-05-19] Defensive monitors are not fixes — trigger fix and monitor are siblings, not substitutes
+- [2026-05-19] Wide try/catch misclassifies the error and misleads the next reader
+- [2026-05-19] Incident → guard pattern (red-team thyself)
+- [2026-05-19] Filename glob *.lock does NOT match package-lock.json (basename matters)
+- [2026-05-19] Numeric bats threshold drift is invisible — comment the bump inline
+- [2026-05-19] "chore: close spec lifecycle" pattern — for features that shipped piecemeal before archive
+- [2026-05-19] JSONC native // comments beat _commentKey JSON convention for documentation
+- [2026-05-20] Audit ALL call sites of a vulnerable upstream API when guarding one
+- [2026-05-20] Claude Code marketplace dir naming follows GitHub repo, NOT declared name field
+- [2026-05-20] vault_patch timeout != patch not applied
+- [2026-05-21] Fix ALL surfaces in the same PR when a bug class spans multiple call sites
+- [2026-05-21] The detection probe MUST use the race-free pattern, not the upstream broken one
+- [2026-05-21] Healthcheck must validate end-state, not proxy artifacts
+- [2026-05-21] PowerShell single-quoted strings + grep BRE: backslash counting
+- [2026-05-21] Heal scripts versioned against the upstream bug class they paper over
+- [2026-05-21] Safety-net fixes must be audited against the same bug-class they paper over
+- [2026-05-21] Classify "extract boilerplate" audit findings as bootstrap (chicken-and-egg) vs logic before estimating LOC savings
+- [2026-05-21] Setup-time mutations to repo-symlinked files create permanent drift false-positives
+- [2026-05-21] Byte-equivalence assertions require SCRIPT_DIR control, not just literal diff
+- [2026-05-25] Batch-scaffold N specs in one PR from a research worktree, defer implementation
+- [2026-05-26] Incomplete migration: file rename leaves callers stale
+- [2026-05-26] Stop fighting agent filesystem expectations
+- [2026-05-26] pkill -f self-kill: pattern matches the pkill command line itself
+- [2026-05-27] MEMORY.md files break YAML parsing with `# currentDate` and `---` separators
+- [2026-05-26] PowerShell -replace with [\s\S]*? expands large strings instead of replacing
+- [2026-05-27] PowerShell -replace with [\s\S]*? expands large strings instead of replacing
+- [2026-05-27] PowerShell -replace with [\s\S]*? expands large strings instead of replacing
+- [2026-05-27] Split-Path -LiteralPath and -Parent are mutually exclusive parameter sets in PowerShell
+- [2026-05-30] Verify a plan's file-map against the code before editing load-bearing scripts
+- [2026-05-30] A whole-file transform must inspect the data shape before assuming a uniform model
+- [2026-05-30] Don't commit to a shared vault that has another session's staged work — use an isolated worktree
+- [2026-05-31] A structural integrity guard surfaces latent issues you didn't know you had
+- [2026-05-31] A SCRIPT_DIR root-resolution fix breaks CWD-pinned fixture tests — add an env-override seam, not a code branch
+- [2026-05-31] A skip-guarded test is green in CI but a real assertion locally — it can hide a genuine cross-OS parity gap
+- [2026-05-31] Onboarding a junior/remote agent: verify its self-authored docs, enforce boundaries mechanically
+- [2026-05-31] A cross-environment SSOT validator must split "content drift" (fail) from "runtime absent off-box" (warn)
+- [2026-06-02] A harness consumer spec scoped on a retired axis must be reconciled, not implemented (WORKMODE-001)
+- [2026-06-01] Archived-spec ≠ issue-complete; verify "high-value open" items against git before implementing
+- [2026-06-01] A held spec can be obsoleted by a later ADR — reconcile+close, don't implement-as-written
+- [2026-06-02] Broad sed over a backlog ticks substring mentions, not just the entry — anchor to the line-start id
+- [2026-06-03] A late push to a PR branch can miss the squash — verify the commit is on the PR head, and each deliverable is on main post-merge
+- [2026-06-07] Re-running a failed Actions run replays the *original commit's* workflow file
+- [2026-06-07] `gh project --owner` → "unknown owner type" under a fine-grained PAT; a green CI is not a green workflow
+- [2026-06-09] setup-time `compile-harness.sh --refresh` leaves silent drift -- surface it, don't delete it
+- [2026-06-10] Frontmatter must be strict-YAML clean — the most lenient parser in the fleet is not the contract
+- [2026-06-10] Deploying workflow files to N repos via the contents API: three gotchas the happy path hides
+- [2026-06-10] Tests aimed at a runner that doesn't exist yet are dead weight — and "if available" guards rot silently
+- [2026-06-12] goreleaser monorepo.tag_prefix is Pro-only — verify paywalled features empirically
+- [2026-06-12] Non-streaming chat endpoints behind a gateway drop long generations — a client timeout cannot fix a server-side cut
+- [2026-06-13] `gh project item-list` truncates to `--limit` silently — check `totalCount` before asserting absence
+- [2026-06-13] A bats teardown's last command classifies even *skipped* tests — never end it with a bare `[ cond ] && cmd`
+- [2026-06-13] Sourced-vs-executed guard: use `(return 0 2>/dev/null)`, not a `BASH_SOURCE`-vs-`$0` compare
+- [2026-06-13] A migration's acceptance guard-grep is the completeness oracle, not the spec's hand-listed targets
+- [2026-06-13] Editing a committed render without its source-of-truth is a half-migration that `--refresh` reverts
+- [2026-06-14] Deleting one OS twin while keeping its sibling forces asymmetric parity tests — rewrite them to the migration reality, don't fake symmetry
+- [2026-06-14] A consolidated diagnostic that shells out to a generator is on-demand-cheap but per-event-expensive
+- [2026-06-14] A non-runnable cobra parent with no subcommands is demoted to "Additional help topics"
+- [2026-06-15] A gitignored `//go:embed` asset builds green everywhere and only fails at runtime in a fresh checkout
+- [2026-06-15] Minting a new script to delete four others fights a reduce-the-surface goal — remove and ticket-restore, don't extract
+- [2026-06-16] A migration that *broadens* a system's scope leaves single-repo assumptions hardcoded in the tools built against the old shape
+- [2026-06-16] Extracting a hook function into a sibling script can flip its exit status and silently kill the hook under `set -e`
+- [2026-06-16] Extract the shared resolution logic, not the whole caller — keep agent-specific detail in the hook
+- [2026-06-17] A byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename
+- [2026-06-17] Per-repo git hooks can't enforce a machine-wide invariant — core.hooksPath + a chaining dispatcher is the keystone (GUARD-001)
+- [2026-06-17] A Windows CI tool added only to $GITHUB_PATH vanishes when setup-windows rebuilds PATH from the registry
+- [2026-06-18] A WARN that doesn't move the exit code is invisible to CI — give the CI surface its own probe, don't shell out to the tool
+- [2026-06-18] An npm-global CLI under nvm is invisible to GUI/ADE processes and to any shell on a different node version — install agent CLIs into ~/.local
+- [2026-06-18] An env-var seam is inert until something sets it — a hardcoded fallback that matches reality hides the broken seam
+- [2026-06-18] "Wire all consumers" must enumerate the non-shell ones — services and daemons never source a shell profile
+- [2026-06-18] Number an ADR off the latest origin/main, not your branch base — a stale base collides with ADRs shipped in parallel
+- [2026-06-18] `gh issue/pr create` use GraphQL — when that bucket is rate-limited, `gh api -X POST` (REST) still works
+- [2026-06-18] A release binary goreleaser already builds is worthless until each OS's setup script actually downloads it
+- [2026-06-19] Orca regenerates its Copilot hooks — re-apply the fix idempotently and guard the drift (DX-006)
+- [2026-06-21] Strangler-fig deletion: the parity gate must cover OS-specific side effects, and a "different-by-design" Go path can still be parity (CLI-020)
+- [2026-06-20] Windows winget jq emits CRLF — breaks `< <(jq)` + read
+- [2026-06-21] Catalog installer: release naming is per-repo data, not a convention (CLI-029)
+- [2026-06-21] release-please can close a multi-PR issue from a build-only sub-PR's `Refs` — keep the parent issue out of sub-PR footers
+- [2026-06-21] `git branch --merged` answers "is the tip an ancestor?", not "is the content backed up" — verify before deleting
+- [2026-06-21] Resolving Windows `$PROFILE` from Go must include the OneDrive-redirected Documents root
+- [2026-06-21] In bats, a `! grep -q` guard is exempt from errexit — it won't fail the test when the pattern is found
+- [2026-06-21] A strict cross-OS `dotf doctor` is not a drop-in CI gate for a lenient platform-specific healthcheck
+- [2026-06-21] A delete ripples past the direct caller — token guard-greps miss transitive refs, and "orphaned" fixtures can have hidden consumers
+- [2026-06-23] A thin per-OS shim is still a twin — converge to direct CLI invocation
+- [2026-06-23] A ~120-LOC change is over the SDD bar even when it "obviously" mirrors an existing check
+- [2026-06-24] A Go-vs-shell byte-equivalence gate is POSIX-only, and it retires at cutover
+- [2026-06-24] CI golangci-lint enforces staticcheck QF* quickfixes a stale local version skips — heed the gopls hints
+- [2026-06-25] Three Windows path gotchas behind a "broken" auto-memory junction (Go 1.26)
+- [2026-06-25] PR title is the release contract under squash + release-please
+- [2026-06-25] agy bakes secrets into JSON; opencode/pi self-decrypt (they ignore ambient env)
+- [2026-06-25] A new top-level dir backing a dotf runtime read must be deployed by setup
+- [2026-06-25] CI gotchas: Set-Content CRLF on .sh, and repointing tests creates duplicate names
+- [2026-06-25] Determinism "presence" is cheapest as instructions-file injection, not a provider hook
+- [2026-06-25] bats silently drops @test names with non-ASCII chars or duplicates — lint them
+- [2026-06-26] Never read a locked secret store as "absent" — discriminate before create, or you spawn duplicates
+- [2026-06-26] On Windows, `bash` from PATH is the System32 WSL launcher, not Git Bash — resolve the real interpreter before shelling out
+- [2026-06-26] `secrets sync ci` refreshed `updated_at` on a dead PAT — a successful write is not a live credential
+- [2026-06-26] Name-match at the consumer boundary, decouple at the storage boundary
+- [2026-06-27] A CLI that reads its config from the *deployed* copy, not the checkout, silently reverts its own writes
+- [2026-06-27] "Same set as the script it replaces" is the wrong parity gate when the old tool was itself wrong
+- [2026-06-27] A successful operation is not evidence of the property you depend on — assert the property, not the success
+- [2026-06-27] A "latest/stable" download URL rots silently, and `curl` without `-f` turns a 404 into a corrupt artifact
+- [2026-06-29] A uv tool's Windows launcher is a trampoline that orphans silently — and a running daemon blocks its own repair
+- [2026-07-01] A CLI's `--help`/`Long` strings are untested literals — a dangling doc ref ships green
+- [2026-07-07] `bash` on PATH via scoop is not GNU Bash — it silently mis-executes bashisms
+- [2026-07-08] A guard test that names its own trigger string can match itself once tracked
+- [2026-07-08] Keeping a secret off curl's argv: `-K -` (stdin config) is portable; process-substitution and `mktemp` are not
+- [2026-07-09] A three-dot `origin/BASE...HEAD` diff needs the merge-base — `--depth=1` starves it, and a fail-closed gate makes that loud
+- [2026-07-10] A clean local `golangci-lint` does not certify CI — v1 default-excludes errcheck Close/Remove, v2 does not
+- [2026-07-14] A characterization test can pin the bug you are removing — grep every test extension, not just the source
+- [2026-08-04] zsh expands aliases at parse time, and the resulting parse error still exits 0
+- [2026-08-04] Validating config files in isolation cannot catch a broken reference between them
+- [2026-08-05] A config file the tool itself rewrites must be seeded, not synced
+- [2026-08-05] A guard can be green because its assertion never ran
+- [2026-08-06] An enforcement gate fails in two directions, and the cheap one is the refusal
+- [2026-08-06] A guard installed machine-wide can silently disable every other guard
+- [2026-08-06] GraphQL's primary rate limit is billed to the account, not the token
+- [2026-08-07] A `git revert` cancels a commit's diff but not its message, and GitHub auto-close reads both
+- [2026-08-07] A PR that documents its own text-scanning gate can trip that gate with its own prose
+- [2026-08-07] Whether the harness auto-installs a tool decides whether its config deploy is conditional
+- [2026-08-06] "Zero real invocations" needs the transcript, not the plugin listing — and a removed plugin can still be pinned by a hard-coded count
+- [2026-08-07] A guard that is quiet when idle and quiet when broken is not a guard
+- [2026-08-07] A test suite must test the tree it ships in, not the tree it deployed to
+- [2026-08-07] A linked worktree's checkout is not self-contained — its `.git` is a file, and tools that assume a directory all fail together
+- [2026-08-07] `gh run rerun` replays the original *event payload*, not just the original workflow file
+- [2026-08-07] A deploy can only prune what it marked, and a compatibility fence set by agent identity points the wrong way
+- [2026-08-08] The platform's documented cap decides the render, and a shared file is injected into, never written
+- [2026-08-08] The defensive half of a fix is the least-reviewed code in the PR, and its failures are silent by construction
+- [2026-08-08] `git rev-parse` echoes an option it does not understand back at you, and exits 0
+- [2026-08-08] A guard can be inverted: matching only the shape that is always a false positive, and blind to the shape that is always a true positive
+- [2026-08-08] Two enforcement gates, each correct alone, can compose into a state no change can satisfy
+- [2026-08-08] A structural assertion over a file also matches the comments that explain it
+- [2026-08-08] A health report over a tree another process is writing is a dirty read, and re-running it is how you find out
+- [2026-08-08] A comment asserting an upstream contract is not evidence of that contract
+- [2026-08-08] `gh` splits its subcommands across two rate-limit pools, so a polling loop can exhaust the one you need
+- [2026-08-08] A merged PR is not a deployed change, and the deploy takes whatever branch the checkout happens to be on
+- [2026-08-08] A workaround installed to route around a bug outlives the bug silently, because nothing re-examines it
+- [2026-08-08] A test that does not isolate from the machine ends up measuring the machine
+- [2026-08-09] Reusing a helper inherits its error policy, not just its code
+- [2026-08-09] A guard stops new violations; it does not clean the stock, and the rule then reads as if it did
+- [2026-08-09] The sandbox is not the territory: a dry run that can reach production, and a fixture that cannot know what production contains
+- [2026-08-09] GitHub Actions supplies the `-e`, so `set -uo pipefail` disables nothing
+- [2026-08-09] A freshness check that includes the artifact it validates is stale by construction
+- [2026-08-09] Pin a characterization oracle by content, not by commit — a SHA answers the wrong question
+- [2026-08-09] A check that never ran and an escape that was never taken are the same defect: verified in isolation, never exercised in situ
+- [2026-08-09] A real-dependency test can rest on an undeclared environment precondition, and then it tests one thing locally and another in CI
+- [2026-08-09] Two clients, one resource: the green path and the red path shared a credential, so the credential was never the answer
+- [2026-08-09] Mutation testing does not only catch tautologies — it finds the boundaries your fixtures never land on
+- [2026-08-09] The dangerous shell incompatibility is the one that answers wrongly instead of failing
+- [2026-08-10] Cobra's `Print` family writes to stderr, and a `SetOut` test cannot tell you otherwise
+- [2026-08-11] The reviewer that cannot be you: four rounds, four defects, three of them in the fix for the last one
+- [2026-08-12] An apostrophe in a comment inside an open `awk '...'` block reopens bash's own parser
+- [2026-08-12] A bash `case` pattern is a glob, not a regex — `g[a-z]*` doesn't mean what it looks like it means
+- [2026-08-12] Continuing work on a branch after its PR squash-merged reopens the whole original diff
+
+---
+
 ## Format
 
 ```markdown
@@ -2028,3 +2234,15 @@ The blast radius was also wider than the one function: because `compile-harness.
 **Rule**: once a PR merges (especially via squash, the repo default), the branch is done — checked out follow-up work never continues on it, even in the same worktree, even for "just one more fix." Branch fresh off updated `main` for every new unit of work, per [[feedback_dotfiles_use_worktree]] and [[feedback_cleanup_merged_worktrees]]; those rules exist for exactly this failure mode, not only for tidiness. If work is accidentally continued on a stale branch, `git cherry-pick` the follow-up commits onto a fresh branch from `origin/main` rather than trying to rebase or reset the reused branch into shape.
 
 **Tags**: `git`, `github`, `workflow`, `worktree`
+
+### [2026-08-12] A dangling citation and a missing file are different bugs — check for the first before assuming the second
+
+**Context**: the docs truth-pass batch (#677/#681/#682/#683/#684), plus the standalone #738 ("fresh-machine bug issues cite an audit doc absent from the repo"). Nine-plus GitHub issues cited findings from `docs/audits/docs-audit-2026-07-07.md`, `docs/audits/codebase-audit-2026-07-06.md`, and `docs/audits/process-audit-2026-07-07.md`. None of those three paths existed in the working tree, and #738's own investigation (`git log --all -- 'docs/audits/*'`) had already shown none was ever committed — its proposed fix was either commit the audit (if it existed locally) or edit the citations to point wherever the findings actually live.
+
+**Problem**: a literal filesystem search for those exact filenames *did* return three hits — but in a sibling repo (`kubelab`), not this one. Their content was about kubelab's own Docker/K3s/Proxmox migration, using the same D/C/P finding-ID scheme and the same audit methodology, dated within days of the dotfiles ones. Coincidence, not the source: evidently the same audit-generation process had been run across multiple repos around the same time, and the date-based filenames collided. Taking that hit at face value would have wrongly concluded "the audit is genuinely lost, resolve via option B" and started ticketing orphan findings that weren't actually orphans.
+
+**Solution**: a full-text grep for one of the audit's own distinctive phrases (a finding's exact wording, quoted verbatim in an issue body) across `docs/adr/*.md` turned up `audit-008-codebase-comprehensive.md`, `audit-009-documentation.md`, and `audit-010-process-workflows.md` — all three audits, fully committed, dated exactly right, every cited finding ID present verbatim. They'd been committed under this repo's own `audit-NNN-topic.md` naming convention; the issues' `Source:` lines just cited a different, never-used naming scheme (`docs/audits/<type>-audit-<date>.md`) for the same documents. A `gh issue list --search "docs/audits"` swept for every other issue with the same dangling-path defect (24 total, not just the 4 named in #738) rather than fixing only the ones explicitly listed.
+
+**Rule**: when a cited path doesn't resolve, don't stop at "confirmed missing" — grep the repo for the cited content (a distinctive phrase, a finding ID, a table row) before concluding it was never committed. A file matching the cited *name* in a different repo is not evidence either way; verify its content actually matches what's being cited, not just its filename. And once a citation-convention bug is found in one issue, search for every other issue with the same defect before fixing only the one that was pointed at — the same generation process that produced one dangling citation likely produced several.
+
+**Tags**: `github`, `audit`, `documentation`, `verification`
