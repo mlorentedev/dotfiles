@@ -269,3 +269,50 @@ func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.
 		}
 	}
 }
+
+// The two runners take their prompt differently, and getting agy's wrong does
+// not fail loudly — it produces a reviewer that greets you.
+//
+// agy's --print CONSUMES a value, so `agy --print --model X … "<prompt>"` makes
+// --print swallow "--model": the model goes unset, the prompt is orphaned, and
+// agy answers with a session greeting at exit 0. This was reproduced live: a
+// launched review wrote "I am currently running on Gemini 3.1 Pro. How can I
+// help you today?" into its transcript and nothing else.
+func TestReviewerCommandGivesAgyThePromptAsThePrintValue(t *testing.T) {
+	argv, err := ReviewerCommand(ReviewerEntry{
+		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
+	}, "REVIEW-PROMPT")
+	if err != nil {
+		t.Fatalf("building the agy command: %v", err)
+	}
+
+	if got := argvValue(argv, "--print"); got != "REVIEW-PROMPT" {
+		t.Fatalf("--print must carry the prompt as its value, got %q", got)
+	}
+	// Nothing may sit between --print and the prompt, or that flag is eaten as
+	// the prompt instead.
+	if i := argvIndex(argv, "--print"); i != len(argv)-2 {
+		t.Fatalf("--print must be the last flag, at %d of %d: %v", i, len(argv), argv)
+	}
+	// The model must survive, which is exactly what the broken ordering lost.
+	if got := argvValue(argv, "--model"); got != "gemini-3.1-pro-high" {
+		t.Fatalf("--model must survive the ordering, got %q", got)
+	}
+}
+
+// pi is the other convention, kept apart deliberately so a future edit that
+// "unifies" them breaks a test instead of a reviewer.
+func TestReviewerCommandGivesPiThePromptAsATrailingPositional(t *testing.T) {
+	argv, err := ReviewerCommand(ReviewerEntry{
+		ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x",
+	}, "REVIEW-PROMPT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if argv[len(argv)-1] != "REVIEW-PROMPT" {
+		t.Fatalf("pi takes the prompt positionally, got %q", argv[len(argv)-1])
+	}
+	if argvValue(argv, "--print") == "REVIEW-PROMPT" {
+		t.Fatal("pi's --print is a boolean; giving it the prompt would consume the wrong token")
+	}
+}

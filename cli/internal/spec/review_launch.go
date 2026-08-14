@@ -45,11 +45,21 @@ type ReviewerEntry struct {
 // resolved to nan/deepseek-v4-flash only because ~/.pi/agent/settings.json on
 // that machine said so, while pi's own default provider is google. A pin that
 // depends on unversioned per-machine state is not a pin.
-// prompt is passed as a positional argument because that is what both runners
-// accept — `pi [options] [messages...]` and agy's `--print` both read the prompt
-// from argv, and neither has a --prompt-file flag. Verified against the
-// installed binaries rather than assumed; an earlier draft of this function
-// invented one.
+// The two runners take their prompt DIFFERENTLY, and assuming otherwise is not a
+// cosmetic error — it silently produces a reviewer that answers nothing:
+//
+//	pi   [options] [messages...]   -> prompt is a trailing POSITIONAL
+//	agy  --print <prompt>          -> prompt is the VALUE of --print
+//
+// Because agy's --print consumes a value, writing `agy --print --model X …
+// "<prompt>"` makes --print swallow "--model", leaving the model unset and the
+// prompt orphaned. agy then starts a session and replies with a greeting: exit 0,
+// plausible-looking output, no review. That is exactly how this was nearly
+// shipped — a smoke test read "I am running on Gemini 3.1 Pro" as proof the arm
+// worked, when it was proof the prompt had been discarded.
+//
+// Every flag here is verified against the installed binaries. An earlier draft
+// also invented a --prompt-file that neither runner has.
 func ReviewerCommand(e ReviewerEntry, prompt string) ([]string, error) {
 	if strings.TrimSpace(e.Model) == "" {
 		return nil, fmt.Errorf("pool entry %q has no model to pin — the launcher must not fall back to a runner default", e.ID)
@@ -78,12 +88,16 @@ func ReviewerCommand(e ReviewerEntry, prompt string) ([]string, error) {
 		// effort tier is encoded in the id itself (`…-pro-high` vs `…-pro-low`),
 		// so --effort would be redundant. --print-timeout is passed because its
 		// 5m default is far shorter than a real review.
+		//
+		// --print goes LAST and carries the prompt as its value. Order matters:
+		// any flag placed between --print and the prompt is consumed as the
+		// prompt instead.
 		return append(base,
-			"agy", "--print",
+			"agy",
 			"--model", e.Model,
 			"--output-format", "stream-json",
 			"--print-timeout", reviewerTimeout.String(),
-			prompt,
+			"--print", prompt,
 		), nil
 
 	default:
