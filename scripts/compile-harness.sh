@@ -482,7 +482,7 @@ do_deploy() {
     # these SAME files below. A full-file copy after either would wipe out what
     # they just wrote.
     if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then
-        deploy_instructions
+        deploy_instructions || exit 2
     fi
     if ! has_skills && ! has_agents; then
         printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
@@ -506,7 +506,7 @@ do_deploy() {
 # Entries with no `source` (none today) are skipped -- presence-only injection,
 # same as before this change.
 deploy_instructions() {
-    local agent file source requires dest
+    local agent file source requires dest rc=0
     while IFS=$'\t' read -r agent file source requires; do
         [[ -n "$source" ]] || continue
         if [[ -n "$requires" ]] && ! command -v "$requires" >/dev/null 2>&1; then
@@ -515,6 +515,7 @@ deploy_instructions() {
         fi
         if [[ ! -f "$REPO_ROOT/$source" ]]; then
             printf '[ERROR] instruction source missing: %s\n' "$REPO_ROOT/$source" >&2
+            rc=1
             continue
         fi
         dest="$HOME/$file"
@@ -523,6 +524,11 @@ deploy_instructions() {
         cp -f "$REPO_ROOT/$source" "$dest"
         printf '[deploy] instructions -> %s\n' "$dest"
     done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)\t\(.source // "")\t\(.requires_command // "")"' "$MANIFEST")
+    # A missing source is a manifest/repo defect, not a transient skip -- an
+    # [ERROR] line followed by [deploy] OK was the same silently-contradicting
+    # shape deploy_agent_presence had (fixed earlier this PR); propagate it so
+    # `do_deploy` stops instead of claiming success.
+    return "$rc"
 }
 
 # Render committed skill records to their per-agent $HOME paths (offline),
