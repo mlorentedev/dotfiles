@@ -29,7 +29,7 @@ created: "2026-08-12"
 
 ## Closing
 
-- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion from `proposal.md` has at least one form of verification: AC1/AC2/AC4/AC5 by automated Go tests, AC3 (the `compile-harness.sh --deploy` shell behavior) by repeated manual sandboxed runs only — no automated bats coverage this PR (`tests/*.bats` out of scope this session, see "Out of scope"; a follow-up ticket is proposed, not filed, in the PR body)
 - [x] `features.json` entries added for each criterion
 - [x] Type checks pass (`go build ./... && go vet ./...`)
 - [x] Lint passes (`golangci-lint run` — 0 issues; `shellcheck` — clean)
