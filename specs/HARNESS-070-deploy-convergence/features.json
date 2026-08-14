@@ -15,10 +15,10 @@
   },
   {
     "id": "HARNESS-070-deploy-convergence-f3",
-    "behavior": "compile-harness.sh --deploy alone (no setup-linux.sh) updates the 4 instruction files without clobbering skill catalog / agent-presence regions",
-    "verification": "HOME=/tmp/fake-home bash scripts/compile-harness.sh --deploy && bash scripts/compile-harness.sh --check",
+    "behavior": "compile-harness.sh --deploy alone (no setup-linux.sh) updates the instruction files without clobbering skill catalog / agent-presence regions, gated on `command -v copilot` for the copilot surface",
+    "verification": "HOME=/tmp/fake-home bash scripts/compile-harness.sh --deploy && bash scripts/compile-harness.sh --check   # copilot-absent path; copilot-present path verified separately with a PATH-stubbed `copilot` binary",
     "state": "pending",
-    "evidence": "Sandboxed run: all 4 files written (.claude/CLAUDE.md, .config/opencode/AGENTS.md, .pi/agent/AGENTS.md; copilot skipped, not on PATH), presence+catalog regions injected afterward with no clobber, second run byte-identical (diff -rq clean), --check exit 0"
+    "evidence": "Sandboxed run, copilot absent: 3 files written (.claude/CLAUDE.md, .config/opencode/AGENTS.md, .pi/agent/AGENTS.md; copilot correctly skipped), second run byte-identical (diff -rq clean), --check exit 0. Sandboxed run, copilot present (PATH-stubbed binary): all 4 files written including the copilot catalog + presence injections, no clobber. Both paths also covered by automated Go tests on the doctor side (checkInstructionDrift's 4-vs-3-checked subtests)."
   },
   {
     "id": "HARNESS-070-deploy-convergence-f4",

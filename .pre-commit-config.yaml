@@ -52,7 +52,12 @@ repos:
 
       - id: sdd-spec-gate
         name: SDD spec-gate (Tier 4)
-        entry: ./scripts/check-spec-gate.sh
+        # BUG-061: routed through the prepush adapter, not check-spec-gate.sh
+        # directly -- the adapter resolves this branch's live PR (labels/body/
+        # author) via `gh` when one exists, so archive-on-merge is credited
+        # locally instead of only after push. Falls through to the gate with no
+        # PR context (today's behaviour) when there is none yet.
+        entry: ./scripts/spec-gate-prepush.sh
         args: ['--base-ref', 'origin/main', '--head-ref', 'HEAD']
         language: script
         pass_filenames: false

@@ -35,8 +35,12 @@ BASE_REF=""
 HEAD_REF=""
 EXPLAIN=0
 # Path to the open-issue feed for the advisory adjacency report (HARNESS-063).
-# Empty on every local run: the fetch needs a token, so it lives in the workflow
-# and this script stays offline for the pre-push hook (#854).
+# Empty on every local run: fetching every open issue needs a token, so this
+# feed is populated by the workflow only -- this script itself never fetches
+# anything. (Distinct from BUG-061/#854's PR-body/labels/author resolution:
+# that is a single PR read, needs no token, and is handled by the separate
+# scripts/spec-gate-prepush.sh wrapper on the local pre-push tier -- see its
+# header for why it lives outside this script rather than inside it.)
 ADJACENCY_ISSUES=""
 
 usage() {
@@ -714,6 +718,12 @@ cat >&2 <<EOF
          (a) Create a spec folder: dotf spec init <feature-id>
          (b) Add the "skip-sdd" label to the PR AND a non-empty
              "## SDD skip rationale" section in the PR body.
+
+       If this already archived a spec to satisfy archive-on-merge but still
+       failed here: open the PR first (scripts/spec-gate-prepush.sh, wired to
+       this hook, resolves its labels/body/author live via \`gh\` once one
+       exists). Before a PR exists there is nothing to resolve; SDD_PR_BODY can
+       be set by hand for a one-off check: SDD_PR_BODY='Closes #N' $0 ...
 
        Reference: AGENTS.md "Discipline Gate (NON-NEGOTIABLE)" section.
 EOF

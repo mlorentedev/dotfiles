@@ -48,6 +48,20 @@ func TestStripHarnessRegions(t *testing.T) {
 				"tail\n",
 			want: "head\nmid\ntail\n",
 		},
+		{
+			// inject_agent_presence / replace_region's append branch write a
+			// region as "\n" + BEGIN + body + END + "\n" onto untouched
+			// content -- the blank line right before BEGIN must not survive
+			// the strip, or a freshly-appended region reads as drift forever.
+			name: "drops the blank separator line an appended region leaves behind",
+			in:   "shared content\n" + "\n<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:abc) -->\npersona\n<!-- END HARNESS AGENT-PRESENCE -->\n",
+			want: "shared content\n",
+		},
+		{
+			name: "a genuine blank line NOT before a region is preserved",
+			in:   "para one\n\npara two\n",
+			want: "para one\n\npara two\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -76,12 +90,12 @@ func TestCheckInstructionDrift(t *testing.T) {
 		writeFile(t, filepath.Join(home, homeRel), content)
 	}
 
-	t.Run("matching content -> pass", func(t *testing.T) {
+	t.Run("matching content -> pass (copilot absent, 3 of 4 checked)", func(t *testing.T) {
 		repo, home := setup(t)
 		for _, tgt := range deployedInstructionTargets {
 			writeBoth(t, repo, home, tgt.repoRel, tgt.homeRel, "same content for "+tgt.repoRel+"\n")
 		}
-		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
+		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil) // "copilot" NOT on PATH
 
 		var buf bytes.Buffer
 		rep := capture(&buf)
@@ -90,8 +104,44 @@ func TestCheckInstructionDrift(t *testing.T) {
 		if rep.Failures() != 0 {
 			t.Fatalf("matching content should pass\n%s", buf.String())
 		}
-		if !strings.Contains(buf.String(), "match their repo source") {
-			t.Errorf("expected the pass line\n%s", buf.String())
+		if !strings.Contains(buf.String(), "match their repo source (3 checked)") {
+			t.Errorf("expected the 3-checked pass line (copilot gated out)\n%s", buf.String())
+		}
+	})
+
+	t.Run("matching content -> pass (copilot present, all 4 checked)", func(t *testing.T) {
+		repo, home := setup(t)
+		for _, tgt := range deployedInstructionTargets {
+			writeBoth(t, repo, home, tgt.repoRel, tgt.homeRel, "same content for "+tgt.repoRel+"\n")
+		}
+		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot"}, nil)
+
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkInstructionDrift(sys, rep)
+
+		if rep.Failures() != 0 {
+			t.Fatalf("matching content should pass\n%s", buf.String())
+		}
+		if !strings.Contains(buf.String(), "match their repo source (4 checked)") {
+			t.Errorf("expected the 4-checked pass line (copilot on PATH)\n%s", buf.String())
+		}
+	})
+
+	t.Run("copilot present but genuinely stale -> fails", func(t *testing.T) {
+		repo, home := setup(t)
+		for _, tgt := range deployedInstructionTargets {
+			writeBoth(t, repo, home, tgt.repoRel, tgt.homeRel, "content\n")
+		}
+		writeFile(t, filepath.Join(home, ".copilot", "copilot-instructions.md"), "stale copilot content\n")
+		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot"}, nil)
+
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkInstructionDrift(sys, rep)
+
+		if rep.Failures() != 1 || !strings.Contains(buf.String(), ".copilot/copilot-instructions.md") {
+			t.Fatalf("stale copilot file with copilot present must fail and name it\n%s", buf.String())
 		}
 	})
 
@@ -99,8 +149,12 @@ func TestCheckInstructionDrift(t *testing.T) {
 		repo, home := setup(t)
 		for _, tgt := range deployedInstructionTargets {
 			writeFile(t, filepath.Join(repo, tgt.repoRel), "shared content\n")
+			// Faithful to inject_agent_presence's actual append shape
+			// (compile-harness.sh): "\n" + BEGIN + body + END + "\n" tacked
+			// onto the untouched source — including the blank separator line,
+			// which is exactly what stripHarnessRegions must also drop.
 			deployed := "shared content\n" +
-				"<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:abc) -->\npersona\n<!-- END HARNESS AGENT-PRESENCE -->\n"
+				"\n<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:abc) -->\npersona\n<!-- END HARNESS AGENT-PRESENCE -->\n"
 			writeFile(t, filepath.Join(home, tgt.homeRel), deployed)
 		}
 		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil)

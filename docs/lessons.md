@@ -25,7 +25,7 @@ date order). Regenerate after adding entries with:
 awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9-]+)\] (.*)$/- [\1] \2/'
 ```
 
-<!-- Generated 2026-08-13; 195 entries at last regen. -->
+<!-- Generated 2026-08-13; 198 entries at last regen. -->
 
 - [2026-08-10] Go's exec.LookPath is blind to extensionless scripts on Windows
 - [2025-12-15] echo -e breaks in zsh
@@ -218,10 +218,13 @@ awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9
 - [2026-08-12] An apostrophe in a comment inside an open `awk '...'` block reopens bash's own parser
 - [2026-08-12] A bash `case` pattern is a glob, not a regex — `g[a-z]*` doesn't mean what it looks like it means
 - [2026-08-12] Continuing work on a branch after its PR squash-merged reopens the whole original diff
+- [2026-08-12] A "multi-call binary" bug report can name the wrong mechanism — verify the dispatch, not just the symptom
+- [2026-08-12] "Weaker locally, CI catches it" is not safe when local and CI share the same script
 - [2026-08-12] "Looks like a known bug class" is a hypothesis, not a finding — reproduce before you fix
 - [2026-08-12] `resolveRepoDir`'s cwd fallback silently defeats "unresolvable repo" test cases
 - [2026-08-12] A dangling citation and a missing file are different bugs — check for the first before assuming the second
 - [2026-08-13] A health check that reads local state proves the liveness of nothing
+- [2026-08-13] A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging
 
 ---
 
@@ -2239,6 +2242,30 @@ The blast radius was also wider than the one function: because `compile-harness.
 
 **Tags**: `git`, `github`, `workflow`, `worktree`
 
+### [2026-08-12] A "multi-call binary" bug report can name the wrong mechanism — verify the dispatch, not just the symptom
+
+**Context**: BUG-054, fixing `tests/install-dotf.bats`'s busy-binary fixture so the ETXTBSY swap path it claims to exercise is actually reached. The filed issue diagnosed the root cause precisely — `sleep` copied to a file named `dotf` exits immediately instead of sleeping on a multi-call coreutils build — and proposed a fix: `exec -a sleep "$0" 30` to hand the copy the argv[0] the dispatcher expects while the file on disk keeps the name `install_dotf` needs to swap.
+
+**Problem**: the proposed fix does not work on this machine, and the reason is that "multi-call binary" names a shape, not a single mechanism. GNU coreutils' traditional multi-call dispatch reads argv[0], which is exactly what `exec -a` controls — but this system's `sleep` is `uutils coreutils` (the Rust reimplementation), confirmed by `sleep --version`. Direct testing (`/proc/$PID/cmdline` right after `exec -a sleep ... &`) showed the override reaching the process correctly, yet the copy still refused with `unknown program 'dotf'`. Invoking the SAME bytes at their original resolved path dispatched correctly regardless of argv[0]; invoking the copy at a different path failed regardless of argv[0]. That is only consistent with dispatch keyed on the executable's own resolved path (`current_exe()`/`/proc/self/exe`), not on argv[0] at all — the opposite axis from what the issue assumed and what `exec -a` can influence.
+
+**Solution**: stop trying to satisfy whichever dispatch mechanism a given coreutils build uses, and stand in a binary that has no multi-call dispatch to satisfy in the first place. A copy of `bash`, driven by `"$DEST/dotf" -c 's=$SECONDS; while (( SECONDS - s < 30 )); do :; done'`, busy-spins using only shell builtins — no forked or exec'd child, so the copied ELF's own text image stays open for the whole duration regardless of what its filename is or which coreutils flavor is on the host. Verified before wiring into the test: copying bash to a renamed file and running it directly reproduced ETXTBSY on a second `cp` onto it while busy, confirming the mechanism independent of any dispatch behavior.
+
+**Rule**: a bug report's stated root cause is a hypothesis until it reproduces on the machine actually running the fix, even when the diagnosis reads as obviously correct and even when it comes with a plausible-looking patch. "Multi-call binary" covers at least two different dispatch strategies (argv[0]-keyed, as GNU coreutils and busybox use; resolved-path-keyed, as observed here in uutils coreutils) that look identical from a bug report's black-box symptom but demand opposite fixes. When a fixture needs to hold a *real* executable text image open/busy without depending on a specific tool's argv0-vs-path dispatch behavior, prefer a binary with no multi-call ambiguity at all (a shell, driven by a builtin-only blocking loop) over trying to satisfy whichever mechanism the host happens to implement.
+
+**Tags**: `testing`, `bash`, `coreutils`, `debugging`
+
+### [2026-08-12] "Weaker locally, CI catches it" is not safe when local and CI share the same script
+
+**Context**: BUG-061, fixing a spec-gate false negative where a PR that correctly archived its spec in the same change could not be pushed locally — `check-spec-gate.sh`'s archive-on-merge credit only fires when `SDD_PR_BODY` names a closing keyword, and that variable is empty on every local pre-push run by design. The filed issue offered three fix options; option 2 read "credit an archive move unconditionally in the pre-push tier... weaker, but the #397 protection against a gratuitous archive-move dodging the gate still holds in CI."
+
+**Problem**: option 2 was implemented as stated — locally (empty `SDD_PR_BODY`), any spec that genuinely transitioned from active-at-base to archived-at-head was credited toward the LOC-threshold's "spec folder touched" requirement, without needing a closing-issue link. Two existing regression tests (`tests/check-spec-gate.bats`, the #397 pair) immediately went red: a PR bundling 60 LOC of unrelated production code with a genuine archive of an unrelated spec now passed locally, exactly the "gratuitous archive-move dodging the gate" #397 already closed. The flaw in the reasoning: "CI catches it" only holds when local and CI run *different* logic. Here they run the *same* `check-spec-gate.sh`, gated only by whether `SDD_PR_BODY` happens to be set — so a check made unconditionally permissive "when there's no PR body" is exactly as permissive in CI whenever CI itself has no PR body to supply (or, more subtly, it normalizes local runs to a genuinely weaker invariant than the one the script's own tests pin, which is a contradiction the tests exist to catch). A diff-only heuristic cannot distinguish #854's legitimate author (archiving the spec they are actually implementing) from #397's attacker (archiving something unrelated to bulk-legitimize other code) — their diffs are structurally identical, and no amount of "was this transition genuine" narrowing closes that gap without the PR-body linkage the local run doesn't have.
+
+**Solution**: discard the local-credit approach entirely and implement option 1 instead — `scripts/spec-gate-prepush.sh`, a wrapper mirroring the existing CI adapter (`spec-gate-pr.sh`) that resolves the current branch's live PR via `gh pr view` (no token needed locally; the developer's own `gh auth`) and forwards real `SDD_LABELS`/`SDD_PR_BODY`/`SDD_PR_AUTHOR` to the unmodified gate. Unlike its CI sibling, it falls THROUGH to running the gate with no PR context on any resolution failure (no `gh`, no `jq`, unauthenticated, no PR open yet) rather than failing closed — "no PR context" is the ordinary local baseline here, not a stale-data hazard to guard against. `check-spec-gate.sh` itself needed no change beyond a message pointing at the wrapper and the manual `SDD_PR_BODY=...` override.
+
+**Rule**: when a fix option is phrased as "loosen X here, Y elsewhere still catches it," check first whether "elsewhere" is actually a different code path or just the same code path under different environment variables — if a script is shared between an advisory local tier and an authoritative CI tier, any relaxation gated only on which env vars happen to be set is live everywhere those vars happen to be unset, not only in the tier the fix was aimed at. The repo's own existing regression tests caught this on the first test run after implementing the "obvious" reading of the option — proof that re-running the FULL adjacent test suite (not just new tests for the change at hand) before trusting an implementation is itself the guard.
+
+**Tags**: `testing`, `shell`, `sdd`, `ci`
+
 ### [2026-08-12] "Looks like a known bug class" is a hypothesis, not a finding — reproduce before you fix
 
 **Context**: HARNESS-070 (deploy convergence, #843/#869/#828). The session's brief carried live evidence: `dotf doctor` flagging 4 deployed skills (`computer-use`, `find-skills`, `orca-cli`, `orchestration`) as symlinks, labeled as a "BUG-100" regression — the historical, closed issue #100 about this repo's own deploy strategy fighting `agy`'s filesystem layout.
@@ -2281,8 +2308,19 @@ The blast radius was also wider than the one function: because `compile-harness.
 
 **Problem**: Bitwarden's refresh token expired server-side and doctor printed a green `bw (Bitwarden CLI — live secrets SSOT) found` for the 45 days that followed. The outage surfaced only when an operator ran `bw unlock` by hand and got `invalid_grant` (HTTP 400). Worse, the obvious "deeper" probes are no better: `bw status` is served from local state and keeps reporting a healthy-looking `locked` indefinitely after the server has revoked the grant, and `bw list` / `bw get` read the local cache, so both pass against a dead token. Every cheap observable was a local one, and every local one was a lie.
 
-**Solution**: three tiers, keyed to what can be established without an operator present. (1) `bw status` catches the definite `unauthenticated` break — and names `bw login`, explicitly ruling out `bw unlock`, whose master-password prompt makes an expired token read as a forgotten password. (2) **Elapsed time since the last successful sync** — the only observable that actually moves while the token rots, and the only one available on a locked vault. Threshold 30d, chosen strictly below the observed 45d so the warning lands while the token is still renewable. (3) `bw sync` as a real round-trip when a session exists. Severity is keyed to real exposure (count of `backend: bw` registry entries), so an unreachable vault is advisory while everything still resolves through age, and a FAIL from the first migrated secret.
+**Solution**: three tiers, keyed to what can be established without an operator present. (1) `bw status` catches the definite `unauthenticated` break — and names `bw login`, explicitly ruling out `bw unlock`, whose master-password prompt makes an expired token read as a forgotten password. (2) **Elapsed time since the last successful sync** — the only observable that actually moves while the token rots, and the only one available on a locked vault. Threshold 30d, chosen below the only expiry ever observed (45d) — an educated floor, not a derived one: the incident shows the token dead by 45d, not alive at 30d, and no upstream lifetime is documented. (3) `bw sync` as a real round-trip when a session exists. Severity is keyed to real exposure (count of `backend: bw` registry entries), so an unreachable vault is advisory while everything still resolves through age, and a FAIL from the first migrated secret.
 
 **Rule**: a check on a remote dependency must either exercise the remote path or measure elapsed time since something did. Local status output is a cache of a past success, not evidence of a present one — and a cache that reports "locked" is indistinguishable from one reporting "locked, and also revoked three weeks ago". When the deep probe needs a credential the check cannot assume (an unlocked vault, an API key), the elapsed-time tier is not a consolation prize: it is the only tier that runs in the resting state, so it is the one that catches the silent expiry. Corollary for severity: scale it to what actually breaks today, because a red diagnostic for a harmless condition is how operators are trained to ignore red diagnostics.
 
 **Tags**: `doctor`, `secrets`, `bitwarden`, `health-checks`, `verification`
+### [2026-08-13] A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging
+
+**Context**: HARNESS-070 (#843/#869/#828, PR #948). After pushing a commit addressing CodeRabbit's review findings, `gh api .../pulls/948 --jq '.head.sha'` kept returning the previous commit even though `git fetch` confirmed the remote branch ref had the new one. The first read was "GitHub API/webhook propagation lag" — plausible after a session that had already hit a real rate-limit earlier — and a background poll was armed to wait for the field to catch up.
+
+**Problem**: it wasn't lag. `gh api .../pulls/948` also carried `"state": "closed"` and `"merged": true`, fields the lag theory never checked. The PR had been squash-merged (by the user, via the GitHub UI) roughly 21 hours *before* the review-fix commit was even authored. A merged PR's `head.sha` is frozen at merge time by definition — pushing more commits to its (now-orphaned) branch updates the branch ref, never the PR record, and triggers no CI, because there is no open PR for a workflow to run against. The poll loop's exit condition (`head.sha == <new commit>`) could never become true; it would have spun until manually killed regardless of how long anyone waited.
+
+**Solution**: checked `state`/`merged`/`merged_at` on the same API object instead of only `head.sha`, which immediately explained the mismatch. Fix-forward: opened a new branch off the now-updated `main`, cherry-picked the orphaned fix commit (applied with zero conflicts, confirming no semantic drift from other PRs merged in between), reran the full verification suite on the cherry-picked result, and opened a follow-up PR referencing (not closing) the already-closed issues.
+
+**Rule**: before diagnosing a mismatched `head.sha` (or any "why hasn't my push shown up" symptom) as replication lag, check the PR's `state`/`merged` fields on the very first query — a closed PR explains a frozen `head.sha` completely and rules out every lag-based theory in one call. Don't build a polling loop around a diff-based condition (`head.sha == X`) without first confirming the object it lives on is still open; a wait condition that assumes "eventually consistent" when the true shape is "permanently fixed" spins forever and burns a task slot for nothing.
+
+**Tags**: `github`, `ci`, `verification`, `debugging`
