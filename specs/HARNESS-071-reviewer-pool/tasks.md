@@ -67,24 +67,30 @@ created: "2026-08-13"
 - [x] Refuse an out-of-pool model at the launcher too — defence in depth, and it
       names what IS available rather than only what is forbidden.
 - [x] Mutation-test the launcher — 6 mutants, **6 detected**.
-- [x] [AC7] Prove the Gemini arm with one **real review** — and prove it by
-      dogfooding: this spec's own adversarial review is launched through
-      `dotf spec review --reviewer agy/gemini-3.1-pro-high`, so one run
-      exercises the launcher, the explicit pin, the tmux session, the
-      transcript, and the fallback arm at once.
+- [ ] [AC7] Prove the Gemini arm with one **real review**. STILL OPEN, and the
+      box stays unticked until a review artifact exists.
 
-      Recorded here BEFORE the run, not after: `tasks.md` is a contract file
-      (`cli/internal/spec/review.go`), so ticking this box afterwards would
-      stale the very verdict it refers to. What is claimed is that the run was
-      launched this way; whether Gemini reviews *well* is the verdict's business,
-      and the verdict lives in `review.md`, deliberately outside the contract set.
+      An earlier revision of this file ticked it on the grounds that the run had
+      been *launched* through `dotf spec review --reviewer
+      agy/gemini-3.1-pro-high`. That was the wrong claim to tick: the criterion
+      says review, `verification.md` said in the same breath that the fallback
+      had not cleared the bar, and a `[x]` beside "prove it with a real review"
+      reads as done no matter what the prose underneath says. The adversarial
+      review of this very spec caught it, which is the mechanism working.
 
-      Prior evidence, for contrast: `agy --print --model gemini-3.1-pro-high`
-      already answers non-interactively and identifies itself as Gemini 3.1 Pro,
-      which proves the invocation and the pin but not the reviewing. NaN cleared
-      that higher bar in BUG-074 round 3 by re-running the spec's own mutation
-      battery rather than trusting its table. This run is the equivalent test
-      for the fallback — a fallback never observed doing the job is decoration.
+      What the launch attempts have established so far:
+
+      1. `agy` answers non-interactively on the pinned model and reports itself
+         as Gemini 3.1 Pro — invocation and pin work.
+      2. The first launch through the launcher produced a **greeting and nothing
+         else**, because `agy --print` consumes a value and had swallowed
+         `--model`. Fixed; the argv now passes `--print` last.
+      3. The second launch is running at the time of writing. Until it writes a
+         `review.md`, the arm is unproven.
+
+      NaN cleared this bar in BUG-074 round 3 by re-running the spec's own
+      mutation battery rather than trusting its table. A fallback never observed
+      doing the job is decoration.
 
 ## Slice 3 — the standing rule where agents read it
 

@@ -2,6 +2,7 @@ package spec
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,9 +86,12 @@ func TestArchiveAllowsAnyPoolEntryNotOnlyTheFirst(t *testing.T) {
 }
 
 // dotf runs in repos that have no pool. Requiring one everywhere would break
-// them, so an absent pool skips the check — and deleting the pool stays a
-// visible diff, which is the same auditable-escape philosophy as `review:
-// waived`. This is also why the pre-existing tests (reviewer "test") still pass.
+// them, so an absent pool skips the check when the repo NEVER had one — which is
+// also why the pre-existing tests (reviewer "test") still pass, since a t.TempDir
+// has no git history to contradict them.
+//
+// Deleting a pool the repo does have is a different case entirely and fails
+// closed: see TestArchiveFailsClosedWhenATrackedPoolGoesMissing.
 func TestArchiveSkipsThePoolCheckWhenNoPoolExists(t *testing.T) {
 	root := t.TempDir()
 	archivableSpec(t, root, "AI-001-x", reviewBy("AI-001-x", "claude-opus-5"))
@@ -161,5 +165,72 @@ func TestArchiveForceOverridesThePoolCheck(t *testing.T) {
 		ForceWithoutReview: true,
 	}); err != nil {
 		t.Fatalf("--force-without-review must bypass the pool check too: %v", err)
+	}
+}
+
+// gitInit makes root a real repository with one commit, so history questions
+// have real answers instead of stubbed ones.
+func gitInit(t *testing.T, root string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "t@example.com"},
+		{"config", "user.name", "t"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Skipf("git unavailable: %v\n%s", err, out)
+		}
+	}
+}
+
+func gitCommitAll(t *testing.T, root, msg string) {
+	t.Helper()
+	for _, args := range [][]string{{"add", "-A"}, {"commit", "-q", "-m", msg}} {
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+}
+
+// Absence is ambiguous, and the two meanings need opposite answers.
+//
+// A repo that NEVER had a pool must keep working — dotf runs in repos that never
+// opted into this gate. But a repo whose pool vanished (bad merge, stray delete,
+// .gitignore mistake) must not silently stop checking who reviews: that is a
+// safety check disappearing with no signal at the moment it stops applying.
+func TestArchiveFailsClosedWhenATrackedPoolGoesMissing(t *testing.T) {
+	root := t.TempDir()
+	gitInit(t, root)
+	writePool(t, root, testPool)
+	archivableSpec(t, root, "AI-001-x", reviewBy("AI-001-x", "claude-opus-5"))
+	gitCommitAll(t, root, "add the pool")
+
+	// The pool is now part of this repo's history. Delete it from the tree.
+	if err := os.Remove(filepath.Join(root, "harness", "reviewer-pool.json")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Archive(root, "AI-001-x", ArchiveOptions{Staleness: fakeStaleness{}})
+	if err == nil {
+		t.Fatal("deleting a tracked pool must not silently disable the gate")
+	}
+	if !strings.Contains(err.Error(), "history") {
+		t.Errorf("the error must explain that the gate was enabled and the file is gone, got: %v", err)
+	}
+}
+
+// The other half of the same rule: a repo that never had a pool archives freely,
+// including inside a git work tree. Without this, adopting dotf would require
+// every repo to carry a pool it never asked for.
+func TestArchiveStillSkipsInARepoThatNeverHadAPool(t *testing.T) {
+	root := t.TempDir()
+	gitInit(t, root)
+	archivableSpec(t, root, "AI-001-x", reviewBy("AI-001-x", "claude-opus-5"))
+	gitCommitAll(t, root, "no pool here, and never was")
+
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{Staleness: fakeStaleness{}}); err != nil {
+		t.Fatalf("a repo that never enabled the gate must archive: %v", err)
 	}
 }

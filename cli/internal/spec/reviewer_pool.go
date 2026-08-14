@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -31,18 +32,41 @@ func LoadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 	return loadReviewerPoolEntries(repoRoot)
 }
 
+// poolWasTracked reports whether the pool file exists in this repo's git
+// history. It is how "never enabled" is told apart from "enabled, then lost".
+//
+// The distinction matters because absence alone is ambiguous, and the two
+// meanings need opposite answers: a repo that never had a pool must keep
+// working, while a repo whose pool vanished — a bad merge, a stray delete, a
+// .gitignore mistake — must not silently stop checking who reviews. Reading git
+// rather than adding an "enabled" key keeps the pool one file with one job, and
+// follows the precedent already in this package: gitStaleness answers its own
+// question from the repository's history too.
+func poolWasTracked(repoRoot string) bool {
+	if err := exec.Command("git", "-C", repoRoot, "rev-parse", "--git-dir").Run(); err != nil {
+		return false // not a work tree: no history to ask
+	}
+	out, err := exec.Command("git", "-C", repoRoot, "log", "-1", "--format=%H", "--", ReviewerPoolFile).Output()
+	return err == nil && len(strings.TrimSpace(string(out))) > 0
+}
+
 // loadReviewerPool reads the allow-list.
 //
-// It returns (nil, nil) when the file does not exist, which means "this repo has
-// no opinion about who may review" rather than "nobody may". dotf runs in repos
-// that have no pool at all, and a gate that refused everywhere a pool is absent
-// would break them. Deleting the pool therefore disables the check — deliberately,
-// because that deletion is a visible diff, the same auditable-escape philosophy
-// as `review: waived` needing a stated reason.
+// It returns (nil, nil) only when this repo NEVER had a pool — the default
+// disabled state, which has to keep working because dotf runs in repos that
+// never opted into this gate at all.
 //
-// Every other failure is an error. A pool that exists but cannot be read is the
-// state where the gate cannot tell an allowed reviewer from a forbidden one, and
-// passing there would silently downgrade to no gate while looking like one.
+// A pool that git knows about but that is missing from the tree is the opposite
+// case, and it FAILS CLOSED. Deleting the file is not a sanctioned way to switch
+// the gate off: that would let a safety check disappear with no signal at the
+// moment it stops applying, and it is the "blank the config to hide the work"
+// shape this repo's own guidelines reject. The declared escapes are per-spec and
+// auditable — `review: waived` with a reason in proposal.md, or
+// --force-without-review — and they stay available here.
+//
+// Every other failure is an error too. A pool that exists but cannot be read is
+// the state where the gate cannot tell an allowed reviewer from a forbidden one,
+// and passing there would silently downgrade to no gate while looking like one.
 func loadReviewerPool(repoRoot string) ([]string, error) {
 	entries, err := loadReviewerPoolEntries(repoRoot)
 	if err != nil || entries == nil {
@@ -61,7 +85,12 @@ func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 	path := filepath.Join(repoRoot, ReviewerPoolFile)
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return nil, nil
+		if poolWasTracked(repoRoot) {
+			return nil, fmt.Errorf("%s is missing, but this repo's history has it — the reviewer gate was enabled and the file is gone\n"+
+				"restore it (`git checkout -- %s`), or if the gate is genuinely being retired, remove it in a commit that says so",
+				ReviewerPoolFile, ReviewerPoolFile)
+		}
+		return nil, nil // never enabled here
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s exists but could not be read: %w", ReviewerPoolFile, err)
