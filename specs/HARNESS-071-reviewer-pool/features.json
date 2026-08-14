@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-071-reviewer-pool-f1",
+    "behavior": "A review signed by a model outside the pool cannot be archived, and the refusal names both the reviewer found and the models allowed, so the mismatch is diagnosable without reading source",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveBlocksReviewerOutsideThePool$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f2",
+    "behavior": "Any pool entry may sign, not only the launcher's primary — the array is an allow-list whose first element merely carries the extra meaning of being the default",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveAllows(ReviewerInThePool|AnyPoolEntryNotOnlyTheFirst)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f3",
+    "behavior": "An absent pool skips the check so dotf still works in repos that have none, while a pool that exists but cannot be read refuses rather than silently degrading to no gate",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchive(SkipsThePoolCheckWhenNoPoolExists|RefusesAMalformedPool)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f4",
+    "behavior": "Membership is exact on the trimmed id: padding is forgiven, but a near-miss id that merely resembles a pool entry is refused, since tool names cannot carry the guarantee when one tool serves several providers",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchive(MatchesReviewerExactlyAfterTrimming|RejectsAReviewerThatMerelyResemblesAPoolEntry)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f5",
+    "behavior": "The declared escape still works, so the gate is a gate and not a wall",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveForceOverridesThePoolCheck$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
