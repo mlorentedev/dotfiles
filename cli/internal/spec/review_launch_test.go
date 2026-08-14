@@ -34,7 +34,7 @@ func TestReviewerCommandPinsProviderAndModelExplicitly(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "nan/deepseek-v4-flash", Runner: "pi",
 		Provider: "nan", Model: "deepseek-v4-flash",
-	}, "review this spec", 0)
+	}, "review this spec", 0, "/repo")
 	if err != nil {
 		t.Fatalf("building the pi command: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestReviewerCommandRunsThroughTheSecretsFacade(t *testing.T) {
 		{ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x"},
 		{ID: "agy/y", Runner: "agy", Model: "y"},
 	} {
-		argv, err := ReviewerCommand(e, "p", 0)
+		argv, err := ReviewerCommand(e, "p", 0, "/repo")
 		if err != nil {
 			t.Fatalf("%s: %v", e.ID, err)
 		}
@@ -79,7 +79,7 @@ func TestReviewerCommandRunsThroughTheSecretsFacade(t *testing.T) {
 func TestReviewerCommandRaisesTheAgyPrintTimeout(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
-	}, "p", 0)
+	}, "p", 0, "/repo")
 	if err != nil {
 		t.Fatalf("building the agy command: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestReviewerCommandRaisesTheAgyPrintTimeout(t *testing.T) {
 // A machine-readable stream is the only record of HOW a reviewer reasoned. The
 // verdict alone is not auditable by anyone who was not watching.
 func TestReviewerCommandRequestsAMachineReadableStream(t *testing.T) {
-	pi, err := ReviewerCommand(ReviewerEntry{ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x"}, "p", 0)
+	pi, err := ReviewerCommand(ReviewerEntry{ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x"}, "p", 0, "/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestReviewerCommandRequestsAMachineReadableStream(t *testing.T) {
 		t.Errorf("pi must emit json, got %q", argvValue(pi, "--mode"))
 	}
 
-	agy, err := ReviewerCommand(ReviewerEntry{ID: "agy/y", Runner: "agy", Model: "y"}, "p", 0)
+	agy, err := ReviewerCommand(ReviewerEntry{ID: "agy/y", Runner: "agy", Model: "y"}, "p", 0, "/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestReviewerCommandRefusesRatherThanFallBackToADefault(t *testing.T) {
 	}
 	for name, e := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := ReviewerCommand(e, "p", 0); err == nil {
+			if _, err := ReviewerCommand(e, "p", 0, "/repo"); err == nil {
 				t.Fatal("an unusable pool entry must error, not silently use a default")
 			}
 		})
@@ -296,7 +296,7 @@ func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.
 func TestReviewerCommandGivesAgyThePromptAsThePrintValue(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
-	}, "REVIEW-PROMPT", 0)
+	}, "REVIEW-PROMPT", 0, "/repo")
 	if err != nil {
 		t.Fatalf("building the agy command: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestReviewerCommandGivesAgyThePromptAsThePrintValue(t *testing.T) {
 func TestReviewerCommandGivesPiThePromptAsATrailingPositional(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x",
-	}, "REVIEW-PROMPT", 0)
+	}, "REVIEW-PROMPT", 0, "/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +355,7 @@ func TestDefaultReviewerTimeoutIsBoundedFromBothSides(t *testing.T) {
 func TestReviewerCommandHonoursAnExplicitTimeoutAndTreatsZeroAsUnset(t *testing.T) {
 	e := ReviewerEntry{ID: "agy/y", Runner: "agy", Model: "y"}
 
-	custom, err := ReviewerCommand(e, "p", 90*time.Minute)
+	custom, err := ReviewerCommand(e, "p", 90*time.Minute, "/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,11 +363,79 @@ func TestReviewerCommandHonoursAnExplicitTimeoutAndTreatsZeroAsUnset(t *testing.
 		t.Errorf("an explicit timeout must reach the runner, got %q", got)
 	}
 
-	zero, err := ReviewerCommand(e, "p", 0)
+	zero, err := ReviewerCommand(e, "p", 0, "/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := argvValue(zero, "--print-timeout"); got != DefaultReviewerTimeout.String() {
 		t.Errorf("zero must mean the default, not an absent deadline, got %q", got)
+	}
+}
+
+// agy prompts for approval on every tool call. A detached reviewer has no human
+// to answer, so each call is auto-DENIED — and the failure does not look like
+// one: the observed run read a few files, was refused `git rev-parse HEAD`, and
+// stopped after 14 seconds while reporting `status: SUCCESS` with an empty
+// response and no review.md.
+//
+// Running the suite and mutating the code IS the review, so a reviewer that
+// cannot execute cannot review. pi needs no equivalent, which is precisely why a
+// configured fallback is not a proven one.
+func TestReviewerCommandLetsAgyActWithoutAHumanToApprove(t *testing.T) {
+	argv, err := ReviewerCommand(ReviewerEntry{
+		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
+	}, "p", 0, "/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if argvIndex(argv, "--dangerously-skip-permissions") < 0 {
+		t.Fatal("a detached agy reviewer cannot answer permission prompts, so every tool call is denied")
+	}
+}
+
+// Without --add-dir, agy runs its shell commands in its OWN install directory:
+// `pwd` answers ~/.gemini/antigravity-cli and `git rev-parse HEAD` fails with
+// "not a git repository". A reviewer that cannot reach the tree cannot run the
+// suite or mutate anything — it reviews by reading and grades generously, which
+// is precisely what the first Gemini review did (all A's, one SPECULATIVE Minor,
+// no independent verification).
+//
+// This is the difference between a fallback that produces an artifact and one
+// that produces a review.
+func TestReviewerCommandGivesAgyReachIntoTheRepo(t *testing.T) {
+	argv, err := ReviewerCommand(ReviewerEntry{
+		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
+	}, "p", 0, "/repo/root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := argvValue(argv, "--add-dir"); got != "/repo/root" {
+		t.Fatalf("agy must be given the repo as a workspace or it cannot execute in it, got %q", got)
+	}
+	// The auto-approval above is bounded rather than bare. Verified not to cost
+	// the review anything: git, `go test` and file writes all work under it.
+	if argvIndex(argv, "--sandbox") < 0 {
+		t.Error("unattended auto-approval should run inside the sandbox")
+	}
+	// --print must still be last, or it consumes a flag as the prompt.
+	if i := argvIndex(argv, "--print"); i != len(argv)-2 {
+		t.Fatalf("--print must remain the final flag, at %d of %d", i, len(argv))
+	}
+}
+
+// pi needs neither flag: it runs in the caller's directory and asks for no
+// approval. The arms differ, and pretending otherwise is what produced two
+// silent failures in this one already.
+func TestReviewerCommandDoesNotGivePiAgySpecificFlags(t *testing.T) {
+	argv, err := ReviewerCommand(ReviewerEntry{
+		ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x",
+	}, "p", 0, "/repo/root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, flag := range []string{"--add-dir", "--sandbox", "--dangerously-skip-permissions"} {
+		if argvIndex(argv, flag) >= 0 {
+			t.Errorf("pi must not receive agy's %s", flag)
+		}
 	}
 }

@@ -25,7 +25,7 @@ date order). Regenerate after adding entries with:
 awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9-]+)\] (.*)$/- [\1] \2/'
 ```
 
-<!-- Generated 2026-08-14; 200 entries at last regen. -->
+<!-- Generated 2026-08-14; 201 entries at last regen. -->
 
 - [2026-08-10] Go's exec.LookPath is blind to extensionless scripts on Windows
 - [2025-12-15] echo -e breaks in zsh
@@ -227,6 +227,7 @@ awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9
 - [2026-08-13] A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging
 - [2026-08-13] A default is not a pin: the model that reviewed your code may not be the one you think
 - [2026-08-14] A dormant declared field must be validated on the same schedule it's written, not the schedule it activates on
+- [2026-08-14] An agent that cannot reach the repo still writes a confident review
 
 ---
 
@@ -2350,3 +2351,15 @@ The blast radius was also wider than the one function: because `compile-harness.
 **Rule**: when a schema pre-declares a field that activates later (a dormant `bw:` block, a feature flag's config, a "coming soon" API shape already being written to storage), validate it at write time — the moment a human or a pipeline can put a bad value in — not at activation time. Gating a check on "is this live yet" optimizes for the code path that runs least; the value sits wrong and silent through every state before it, and the state that finally reads it is usually the one where failing loud is most expensive (a live side effect, not a parse error). If existing code already gates a sibling check the same way, that's precedent, not proof it's correct — check what the gated-out state can actually reach before reusing the pattern.
 
 **Tags**: `secrets`, `bitwarden`, `validation`, `spec-driven-development`, `adversarial-review`
+
+### [2026-08-14] An agent that cannot reach the repo still writes a confident review
+
+**Context**: HARNESS-071 (#955) added a reviewer pool and `dotf spec review`, with `agy/gemini-3.1-pro-high` as the non-Anthropic fallback beside `nan/deepseek-v4-flash`. The spec's acceptance criterion demanded each configured arm produce a *real review*, on the grounds that a fallback never observed working is decoration (#898).
+
+**Problem**: the Gemini arm failed three times, and **every failure presented as success**. (1) `agy --print` consumes a value, so `agy --print --model X … "<prompt>"` made `--print` swallow `--model`: the model went unset, the prompt was orphaned, and agy replied with a session greeting at exit 0. (2) agy prompts for approval on every tool call, and a detached run has no human to answer — every call was auto-*denied*, and the run stopped after 14 seconds reporting `{"status":"SUCCESS","response":""}`. (3) Worst: agy runs its shell commands in its **own install directory**, not the caller's — `pwd` answered `~/.gemini/antigravity-cli` and `git rev-parse HEAD` failed with "not a git repository". That run wrote a *well-formed* `review.md`: correct frontmatter, correct spec id, correct self-reported reviewer, verdict PASS. It would have passed the archive gate. And it had not executed a single test.
+
+**Solution**: `--dangerously-skip-permissions` (a detached reviewer cannot answer prompts), `--sandbox` (bounds what that approval reaches — verified to cost nothing: git, `go test` and file writes all work under it), and `--add-dir <repoRoot>`, isolated as the fix for the reach problem: with it alone `pwd` resolves to the repo, git resolves the right sha, and the suite runs from inside the reviewer. `pi` needs none of the three, so the two arms are pinned apart by tests in both directions rather than "unified".
+
+**Rule**: when delegating work to another agent, verify it can *reach and act on* the target before trusting anything it returns — a well-formed artifact is evidence about the agent's formatting, not about its access. The tell was in the output all along: an all-A rubric, one speculative finding restating someone else's, nothing independently verified. Treat a suspiciously agreeable review as a **capability** symptom first and a judgement symptom second. And prove reach with the cheapest possible probe (`pwd`, `git rev-parse`, one real command) before spending twenty minutes on a review whose conclusions you cannot use.
+
+**Tags**: `ai-tooling`, `verification`, `adversarial-review`, `delegation`
