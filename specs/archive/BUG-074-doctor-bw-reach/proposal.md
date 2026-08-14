@@ -1,7 +1,7 @@
 ---
 id: "BUG-074-doctor-bw-reach"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-13"
 issue: "mlorentedev/dotfiles#944"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -151,3 +151,5 @@ migrated secret.
   resolution, via #635)
 - Related issues: #898 (a check never observed failing is not evidence), #852
   (verify behaviour, not representation), #585 (the migration this guards)
+
+<!-- archived 2026-08-14 — PR: https://github.com/mlorentedev/dotfiles/pull/950 -->
