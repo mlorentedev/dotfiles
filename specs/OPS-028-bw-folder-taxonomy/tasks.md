@@ -28,8 +28,8 @@ created: "2026-08-14"
 - [x] Refactor: confirmed `BWPut.SetField` (update-only path, no create) untouched — folder placement only applies at creation
 - [x] [AC5] Ran the existing bw writer test suite unchanged — zero regressions for entries with no `folder:` declared (`go test ./...` full CLI suite green)
 - [x] [AC3] Populated `folder: Dotfiles/apps` on all 21 `plane: app` registry entries with a `bw:` target, `folder: Dotfiles/infra` on all 5 `plane: infra` ones (floor has no `bw:` block; the 6 `plane: personal` entries stay undeclared per Out of scope)
-- [ ] [AC4] Once Bitwarden is unlocked: resolve/create `Dotfiles/apps`, move the existing `openai-api-key` item into it via the `bw` CLI, verify the `api-key` field value is byte-identical before/after — **blocked on `bw unlock`, vault reports `"status":"locked"` as of this session**
-- [ ] [AC4] `dotf secrets verify OPENAI_API_KEY` (DOTFILES_REPO_DIR pointed at this worktree) still reports OK post-move
+- [x] [AC4] Resolved/created `Dotfiles/apps` (folder id `5f1985f7-9d84-45c1-bd18-b4a60012a18f`), moved `openai-api-key` (item id `c028dd20-6b07-4d2f-9db5-b4a50032c202`) into it via read-modify-write (`bw edit item`, only `folderId` touched). SHA-256 of the `api-key` field value matches before/after (`fa7146f0...`) — byte-identical, confirmed without ever printing the plaintext.
+- [x] [AC4] `dotf secrets verify OPENAI_API_KEY` reports `OK ... bw` (checked out on `feat/secrets-bw-migration`, the branch carrying the canary's `backend: bw` flip — this branch, `feat/OPS-028-bw-folder-taxonomy`, is based on `origin/main` and doesn't have that flip yet; the two converge once #951 merges and the migration branch rebases)
 
 ## Closing
 

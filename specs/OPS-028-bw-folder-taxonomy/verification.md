@@ -10,7 +10,7 @@ created: "2026-08-14"
 - [x] AC1 (schema + validation) -> `TestBWSource_Folder`, `TestBWSource_Folder_NoneDeclared`, `TestParseRegistry_BwFolder_RejectsUnratified`
 - [x] AC2 (writer places item in declared folder) -> `TestNewItemBody_Folder`, `TestBWFolderResolver_EmptyNameIsNoop`, `TestSecretsSet_CreateAbsent_UsesDeclaredFolder`, `TestSecretsMigrate_UsesDeclaredFolder`, `TestSecretsSet_DryRun_NeverResolvesFolder`
 - [x] AC3 (registry populated) -> `secrets/registry.yaml`: 21 `plane: app` entries carry `folder: Dotfiles/apps`, 5 `plane: infra` entries carry `folder: Dotfiles/infra` (script-verified count, `dotf secrets ls` confirms the registry still parses)
-- [ ] AC4 (move `openai-api-key`, verify unchanged) -> **not yet run**: Bitwarden vault reports `"status":"locked"` this session; needs `bw unlock` before the live move + `dotf secrets verify OPENAI_API_KEY` can execute
+- [x] AC4 (move `openai-api-key`, verify unchanged) -> folder `Dotfiles/apps` created (id `5f1985f7-9d84-45c1-bd18-b4a60012a18f`), item `openai-api-key` (id `c028dd20-6b07-4d2f-9db5-b4a50032c202`) moved via `bw edit item` touching only `folderId`; SHA-256 of the `api-key` field value identical before/after (`fa7146f04fe351c914bd3291884f31efb43dd15ffb2364429c5457f52bdf7938`); `dotf secrets verify OPENAI_API_KEY` -> `OK ... bw` (run against `feat/secrets-bw-migration`, the branch holding the canary's `bw` flip)
 - [x] AC5 (no regression) -> `TestSecretsSet_CreateAbsent_NoFolderDeclared`; full suite below
 
 ## Test status
