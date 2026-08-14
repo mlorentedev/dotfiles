@@ -90,9 +90,21 @@ design quietly wrong:
 
 Decided explicitly, because these are the design rather than details:
 
-- **Pool file absent → skip the check.** `dotf` runs in repos that have no pool,
-  and requiring one everywhere would break them. Deleting the pool is a visible
-  diff, which is the same auditable-escape philosophy as `review: waived`.
+- **Never had a pool → skip the check.** `dotf` runs in repos that never opted
+  into this gate, and requiring one everywhere would break them.
+- **Had a pool, now missing → refuse.** Absence alone is ambiguous and the two
+  meanings need opposite answers. A bad merge, a stray delete or a `.gitignore`
+  mistake must not silently stop the gate checking who reviews — a safety check
+  disappearing with no signal at the moment it stops applying is the worst
+  shape available. The two cases are told apart by asking git whether the file
+  is in this repo's history, which needs no `enabled` key and follows the
+  precedent already in the package (`gitStaleness` asks history too).
+
+  This also means **deleting the file is not the way to switch the gate off**.
+  An earlier draft treated it as the escape hatch; the adversarial review on
+  #959 pointed out that this is exactly the "blank the config to hide the work"
+  shape a safety check must not have. The declared escapes stay per-spec and
+  auditable: `review: waived` with a reason, or `--force-without-review`.
 - **Pool present but malformed → refuse.** A gate fails toward refusing
   (`archive.go`'s own stated rule).
 - **Exact string match, trimmed.** The refusal prints both the found `reviewer:`
