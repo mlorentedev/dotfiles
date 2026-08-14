@@ -27,7 +27,7 @@ created: "2026-08-14"
 - [x] [AC1] Thread `isFile` into the `applySet` call and the parity-gate's `normalizeValue(back, isFile)` comparison (both currently hardcode `false`).
 - [x] Refactor for clarity; re-run the full Go suite (`go test ./... -count=1`) + `golangci-lint run`.
 - [x] [AC1] [AC5] Live: migrate the 5 non-Zoho file secrets (`KUBECONFIG`, `GMAIL_BACKUP_CODE`, `CHATGPT_BACKUP_CODE`, `CHATGPT_RECOVERY_CODE`, `STRIPE_BACKUP_CODE`) against the real Bitwarden vault; SHA-256 spot-check age-side vs. bw-side on at least the multi-line `KUBECONFIG`.
-- [x] [AC2] [AC5] Live: confirm `dotf secrets migrate ZOHO_RECOVERY_CODE` still fails with the pre-existing `zoho` item-ambiguity error (#962), not a new error; `dotf secrets verify` reports 33/33 OK overall.
+- [x] [AC2] [AC5] Live: confirm `dotf secrets migrate ZOHO_RECOVERY_CODE` now surfaces the pre-existing `zoho` item-ambiguity error (#962), previously masked by the blanket file-secret guard this PR removes; `dotf secrets verify` reports 33/33 OK overall.
 
 ## Closing
 
@@ -37,7 +37,7 @@ created: "2026-08-14"
 - [x] Lint passes
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#965)
 
 ## Machine-readable features
 

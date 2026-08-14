@@ -83,8 +83,11 @@ func TestSecretsMigrate_EndToEnd(t *testing.T) {
 
 // TestSecretsMigrate_FileSecret_ByteExact proves migrate now handles file secrets
 // (expose: { file: ... }), and does so byte-exact — no trailing-newline trim at all,
-// unlike env secrets. The fixture deliberately has NO trailing newline so a
-// regression that trims OR one that appends is equally caught (CLI-024-secrets-file-migrate AC1/AC3).
+// unlike env secrets. The fixture deliberately carries a trailing newline (what `age -d`
+// actually appends): a fixture with none would make TrimRight a no-op regardless of
+// whether isFile is respected, silently passing even if the isFile branch regressed to
+// the old hardcoded trim (CLI-024-secrets-file-migrate AC1/AC3 — this fixture shape
+// itself was caught missing the trailing newline by the adversarial review).
 func TestSecretsMigrate_FileSecret_ByteExact(t *testing.T) {
 	const fileRegistry = `
 version: 1
@@ -99,7 +102,7 @@ secrets:
 `
 	fw := newFakeWriter()
 	fw.notFound["kubelab-kubeconfig"] = true // target item absent → --yes creates it
-	kubeconfig := "apiVersion: v1\nclusters:\n- cluster:\n    server: https://kubelab\nkind: Config" // no trailing newline
+	kubeconfig := "apiVersion: v1\nclusters:\n- cluster:\n    server: https://kubelab\nkind: Config\n" // trailing newline, like age -d
 	out, err := migrateExec(t, fileRegistry, fw, kubeconfig, "KUBECONFIG", "--yes")
 	if err != nil {
 		t.Fatal(err)

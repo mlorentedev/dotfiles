@@ -1,7 +1,7 @@
 ---
 id: "CLI-024-secrets-file-migrate"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-08-14"
 issue: "mlorentedev/dotfiles#964"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -38,7 +38,7 @@ template_version: "1.0"
 ## Acceptance criteria
 
 - [x] AC1: `dotf secrets migrate KUBECONFIG --yes` (and the other four non-Zoho file secrets) succeeds: writes byte-exact age plaintext to the declared bw target, parity-gates the read-back, flips the registry to `backend: bw`.
-- [x] AC2: `dotf secrets migrate ZOHO_RECOVERY_CODE` still fails with a clear, specific error (the pre-existing `zoho` item-name ambiguity from #962), not a new/different error introduced by this change.
+- [x] AC2: `dotf secrets migrate ZOHO_RECOVERY_CODE` fails, now surfacing the pre-existing `zoho` item-name ambiguity from #962 (previously masked by the blanket file-secret guard this PR removes) — a real blocker correctly exposed, not a bug this PR introduced.
 - [x] AC3: A byte-exact end-to-end test (via `migrateExec`, multi-line fixture with no trailing newline trim) proves file-secret migration preserves content exactly — the analog of `TestSecretsMigrate_PreservesInteriorNewlines` but for the `isFile=true` no-trim contract.
 - [x] AC4: `registry_write.go`'s stale "#612 M3/M6" comment is corrected to describe the real guard, not a nonexistent milestone.
 - [x] AC5: `dotf secrets verify` reports 33/33 OK after migrating the five, with `ZOHO_RECOVERY_CODE` still correctly reporting its pre-existing failure mode.
