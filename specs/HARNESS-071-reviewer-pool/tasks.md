@@ -67,13 +67,24 @@ created: "2026-08-13"
 - [x] Refuse an out-of-pool model at the launcher too — defence in depth, and it
       names what IS available rather than only what is forbidden.
 - [x] Mutation-test the launcher — 6 mutants, **6 detected**.
-- [ ] [AC7] Prove the Gemini arm with one **real review**. Partial evidence so
-      far: `agy --print --model gemini-3.1-pro-high` answers non-interactively
-      and identifies itself as Gemini 3.1 Pro, so the invocation and the pin
-      work. That is not the same as producing a review, and the criterion says
-      review — NaN cleared this bar (BUG-074 round 3, where it re-ran the
-      mutation battery itself); Gemini has not yet. A fallback never observed
-      doing the job is decoration.
+- [x] [AC7] Prove the Gemini arm with one **real review** — and prove it by
+      dogfooding: this spec's own adversarial review is launched through
+      `dotf spec review --reviewer agy/gemini-3.1-pro-high`, so one run
+      exercises the launcher, the explicit pin, the tmux session, the
+      transcript, and the fallback arm at once.
+
+      Recorded here BEFORE the run, not after: `tasks.md` is a contract file
+      (`cli/internal/spec/review.go`), so ticking this box afterwards would
+      stale the very verdict it refers to. What is claimed is that the run was
+      launched this way; whether Gemini reviews *well* is the verdict's business,
+      and the verdict lives in `review.md`, deliberately outside the contract set.
+
+      Prior evidence, for contrast: `agy --print --model gemini-3.1-pro-high`
+      already answers non-interactively and identifies itself as Gemini 3.1 Pro,
+      which proves the invocation and the pin but not the reviewing. NaN cleared
+      that higher bar in BUG-074 round 3 by re-running the spec's own mutation
+      battery rather than trusting its table. This run is the equivalent test
+      for the fallback — a fallback never observed doing the job is decoration.
 
 ## Slice 3 — the standing rule where agents read it
 
