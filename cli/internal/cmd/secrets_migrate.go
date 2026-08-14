@@ -25,9 +25,10 @@ func newSecretsMigrateCmd() *cobra.Command {
 			"The registry flip is the last step, so a failure before it leaves the secret\n" +
 			"fully working on age (safe rollback); the .secret.age file is KEPT (retire is\n" +
 			"separate). Idempotent: an already-bw secret is re-verified and left alone.\n" +
-			"--yes creates the absent Bitwarden item; --dry-run reports without writing.\n\n" +
-			"Out of scope (refused with a specific reason): file secrets and a secret\n" +
-			"sharing its age source with another (use --split).",
+			"--yes creates the absent Bitwarden item; --dry-run reports without writing.\n" +
+			"File secrets migrate byte-exact (no newline trimming).\n\n" +
+			"Out of scope (refused with a specific reason): a secret sharing its age\n" +
+			"source with another (use --split).",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,18 +59,18 @@ func newSecretsMigrateCmd() *cobra.Command {
 			if err := migrateGuard(reg, s); err != nil {
 				return err
 			}
-			item, field, _, err := s.BWTarget("") // guard ensured a bw: block exists
+			item, field, isFile, err := s.BWTarget("") // guard ensured a bw: block exists
 			if err != nil {
 				return err
 			}
 
-			value, err := ageValue(reg, loader, s)
+			value, err := ageValue(reg, loader, s, isFile)
 			if err != nil {
 				return err
 			}
 
 			// Write the age value into bw (idempotent; creates the item with --yes).
-			if err := applySet(cmd, item, field, value, s.BW.Folder, false, dryRun, assumeYes); err != nil {
+			if err := applySet(cmd, item, field, value, s.BW.Folder, isFile, dryRun, assumeYes); err != nil {
 				return err
 			}
 			if dryRun {
@@ -82,9 +83,9 @@ func newSecretsMigrateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("parity read-back of %s/%s failed (registry NOT flipped): %w", item, field, err)
 			}
-			if normalizeValue(back, false) != value {
+			if normalizeValue(back, isFile) != value {
 				return fmt.Errorf("parity mismatch for %q: bw read-back differs from the age value (age %d bytes, bw %d) — registry NOT flipped",
-					id, len(value), len(normalizeValue(back, false)))
+					id, len(value), len(normalizeValue(back, isFile)))
 			}
 
 			// Flip the registry — the last mutation. The target is the entry's
@@ -118,9 +119,6 @@ func migrateGuard(reg *secrets.Registry, s *secrets.Secret) error {
 	if s.Backend == "age-offline" || s.Plane == "floor" {
 		return fmt.Errorf("%q is a floor secret — never migrated (needed before Bitwarden is reachable)", s.ID)
 	}
-	if s.Expose.File != nil {
-		return fmt.Errorf("%q is a file secret — file migration is a follow-up (SetBackendBW rewrites env exposes only)", s.ID)
-	}
 	if s.BW == nil || s.BW.Item == "" {
 		return fmt.Errorf("%q has no bw: target — declare it in the registry first", s.ID)
 	}
@@ -141,13 +139,15 @@ func migrateGuard(reg *secrets.Registry, s *secrets.Secret) error {
 	return nil
 }
 
-// ageValue resolves the secret's current age plaintext, trimmed of exactly the
-// trailing newline `age -d` appends — the same trim normalizeValue applies on the bw
-// side, so the parity gate compares like with like. Unlike EnvFor (built for
-// single-line child-process env tokens), this preserves interior newlines: a
-// multi-line secret (BEEHIIV_DNS_RECORDS, ZOHO_APP_PASSWORDS) must survive the
-// age→bw cutover byte-for-byte, not get flattened to one line (#612 B6).
-func ageValue(reg *secrets.Registry, loader *secrets.Loader, s *secrets.Secret) (string, error) {
+// ageValue resolves the secret's current age plaintext. A file secret is byte-exact —
+// zero transformation, matching normalizeValue(value, isFile=true)'s no-trim contract for
+// the bw side (file content, e.g. a kubeconfig, must not gain or lose a trailing byte). An
+// env secret is trimmed of exactly the trailing newline `age -d` appends — the same trim
+// normalizeValue applies on the bw side there — but keeps interior newlines: a multi-line
+// secret (BEEHIIV_DNS_RECORDS) must survive the age→bw cutover intact, not get flattened
+// to one line (#612 B6). Unlike EnvFor (built for single-line child-process env tokens),
+// neither path strips interior newlines.
+func ageValue(reg *secrets.Registry, loader *secrets.Loader, s *secrets.Secret, isFile bool) (string, error) {
 	target := s.Vars()[0]
 	for _, e := range reg.Entries(env.Home()) {
 		if e.Var == target {
@@ -155,7 +155,10 @@ func ageValue(reg *secrets.Registry, loader *secrets.Loader, s *secrets.Secret) 
 			if err != nil {
 				return "", err
 			}
-			value := strings.TrimRight(string(plaintext), "\r\n")
+			value := string(plaintext)
+			if !isFile {
+				value = strings.TrimRight(value, "\r\n")
+			}
 			if value == "" {
 				return "", fmt.Errorf("secret %q resolved to an empty value — refusing to migrate", s.ID)
 			}

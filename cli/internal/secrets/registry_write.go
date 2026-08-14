@@ -39,11 +39,13 @@ func FlipRegistryToBW(path, id string) error {
 // collapses blank lines between secrets and the alignment padding of trailing comments.
 // So this is deliberate line surgery, re-validated through ParseRegistry before return.
 //
-// Scope: the single, scalar env-var case (`expose: { env: VAR }`) the bulk of the registry
-// uses, in block form (`- id: x` then indented keys). The secret MUST carry a `bw:` target
-// to activate; multi-var / per-var (dockerhub, x-twitter) and file secrets are rejected
-// with a clear error — they need the multi-field migration path (#612 M3/M6). Idempotent:
-// an already-bw secret (backend bw, no age line) returns the input unchanged.
+// Scope: the single-var case, either the scalar env form (`expose: { env: VAR }`) or a
+// file secret (`expose: { file: {...} }`) — both resolve to exactly one Var, so the same
+// line surgery applies to either (it edits `backend:`/`age:` lines blindly and is agnostic
+// to what `expose:` contains). Block form only (`- id: x` then indented keys). The secret
+// MUST carry a `bw:` target to activate; multi-var / per-var (dockerhub, x-twitter) is
+// rejected with a clear error — it needs the multi-field migration path. Idempotent: an
+// already-bw secret (backend bw, no age line) returns the input unchanged.
 func SetBackendBW(data []byte, id string) ([]byte, error) {
 	if err := assertMigratable(data, id); err != nil {
 		return nil, err
@@ -84,10 +86,11 @@ func SetBackendBW(data []byte, id string) ([]byte, error) {
 }
 
 // assertMigratable parses the registry and confirms `id` is the shape SetBackendBW can
-// flip: exactly one env var in the simple scalar form (no per-var source override, not a
-// file) WITH a declared `bw:` target to activate. The `migrate` command guards these too,
-// but the writer fails loud on its own so a stray caller can never half-flip a secret —
-// leaving it `backend: bw` with no bw target, hence unresolvable.
+// flip: a file secret, or exactly one env var in the simple scalar form (no per-var source
+// override) — either way exactly one Var — WITH a declared `bw:` target to activate. The
+// `migrate` command guards these too, but the writer fails loud on its own so a stray
+// caller can never half-flip a secret — leaving it `backend: bw` with no bw target, hence
+// unresolvable.
 func assertMigratable(data []byte, id string) error {
 	reg, err := ParseRegistry(data)
 	if err != nil {
@@ -97,10 +100,7 @@ func assertMigratable(data []byte, id string) error {
 	if s == nil {
 		return fmt.Errorf("secret %q not found in registry", id)
 	}
-	if s.Expose.File != nil {
-		return fmt.Errorf("secret %q is a file secret; SetBackendBW handles env secrets only", id)
-	}
-	if len(s.Expose.Env.Vars) != 1 || s.Expose.Env.Vars[0].Age != "" {
+	if s.Expose.File == nil && (len(s.Expose.Env.Vars) != 1 || s.Expose.Env.Vars[0].Age != "") {
 		return fmt.Errorf("secret %q is multi-var or per-var; use the multi-field migration path", id)
 	}
 	if s.BW == nil || s.BW.Item == "" {

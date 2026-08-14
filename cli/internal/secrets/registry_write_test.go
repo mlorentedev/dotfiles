@@ -123,6 +123,37 @@ func TestSetBackendBW_Idempotent(t *testing.T) {
 	}
 }
 
+// TestSetBackendBW_FileSecret proves the line surgery is shape-agnostic: a file secret
+// flips exactly like an env secret does — backend bw, age: dropped, declared bw: kept.
+func TestSetBackendBW_FileSecret(t *testing.T) {
+	const file = `version: 1
+secrets:
+  - id: kube
+    plane: infra
+    backend: age
+    age: kube.cfg
+    bw: { item: kube, field: notes }
+    expose: { file: { var: KUBECONFIG, path: "~/.kube/c" } }
+`
+	out, err := SetBackendBW([]byte(file), "kube")
+	if err != nil {
+		t.Fatalf("SetBackendBW(file secret): %v", err)
+	}
+	got := string(out)
+	if !strings.Contains(got, "backend: bw") {
+		t.Errorf("backend not flipped:\n%s", got)
+	}
+	if strings.Contains(got, "age: kube.cfg") {
+		t.Errorf("age source not dropped:\n%s", got)
+	}
+	if !strings.Contains(got, "bw: { item: kube, field: notes }") {
+		t.Errorf("declared bw not preserved in place:\n%s", got)
+	}
+	if !strings.Contains(got, "expose: { file: { var: KUBECONFIG, path: \"~/.kube/c\" } }") {
+		t.Errorf("expose: block not preserved verbatim:\n%s", got)
+	}
+}
+
 func TestSetBackendBW_Guards(t *testing.T) {
 	multi := `version: 1
 secrets:
@@ -133,15 +164,6 @@ secrets:
       env:
         A: { age: a.k }
         B: { age: b.k }
-`
-	file := `version: 1
-secrets:
-  - id: kube
-    plane: infra
-    backend: age
-    age: kube.cfg
-    bw: { item: kube, field: notes }
-    expose: { file: { var: KUBECONFIG, path: "~/.kube/c" } }
 `
 	// Single scalar env, but no bw: target declared — nothing to activate.
 	nobw := `version: 1
@@ -157,7 +179,6 @@ secrets:
 	}{
 		"unknown id":   {writeFixture, "nope"},
 		"multi-var":    {multi, "multi"},
-		"file secret":  {file, "kube"},
 		"no bw target": {nobw, "orphan"},
 	}
 	for name, c := range cases {
