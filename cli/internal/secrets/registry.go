@@ -48,11 +48,33 @@ type Secret struct {
 // BWSource is a bw backend source: the Bitwarden item (its unique name or id) and,
 // for a single-var or file secret, the field within it. Multi-var secrets share
 // the item and set the field per-var (expose.env: { VAR: { field: ... } }). The
-// Bitwarden folder is org metadata, not a lookup key — `bw get` resolves by item
-// name/id (ADR-028 §2; folder taxonomy is the curation issue).
+// Bitwarden folder is not a lookup key — `bw get` resolves by item name/id
+// regardless of folder — but it IS placement metadata a newly created item is
+// filed under (OPS-028; ADR-028 §"Bitwarden folder taxonomy").
 type BWSource struct {
-	Item  string `yaml:"item"`
-	Field string `yaml:"field"`
+	Item   string `yaml:"item"`
+	Field  string `yaml:"field"`
+	Folder string `yaml:"folder"` // "" → unfoldered; else one of validBWFolders
+}
+
+// validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-
+// managed items. Dotfiles/floor is deliberately absent (floor secrets never carry a
+// bw: block — age-only) and so is a personal-plane folder (no taxonomy exists yet for
+// plane: personal, deferred to #586) — declaring either here would validate a
+// placement nothing can actually honour yet.
+var validBWFolders = map[string]bool{
+	"Dotfiles/apps":  true,
+	"Dotfiles/infra": true,
+}
+
+// planeFolder is the required bw.folder for a plane that has one — the ratified-set
+// check alone (validBWFolders) would let an app-plane secret declare Dotfiles/infra
+// and pass, since both strings are individually valid; this closes that gap (OPS-028
+// adversarial review, Minor finding). A plane absent here (personal, floor) has no
+// required folder and is left to the ratified-set check alone.
+var planeFolder = map[string]string{
+	"app":   "Dotfiles/apps",
+	"infra": "Dotfiles/infra",
 }
 
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
@@ -172,6 +194,24 @@ func (r *Registry) validate() error {
 		case "bw":
 			if err := s.checkBwSources(); err != nil {
 				return err
+			}
+		}
+
+		// bw.folder is pre-declared dormant metadata (ADR-028 §2 addendum): a secret's
+		// bw: block, folder included, is written up front while backend is still age
+		// and only activated on migrate. Gating this check on backend == "bw" (as
+		// checkBwSources does for item/field) would leave every dormant folder value
+		// unvalidated until the moment migrate reads it and hands it straight to
+		// ResolveFolder — which CREATES an arbitrary Bitwarden folder for a typo,
+		// exactly the drift this taxonomy exists to prevent (OPS-028 adversarial
+		// review, Major finding). So this runs for every secret carrying a bw: block,
+		// regardless of current backend.
+		if s.BW != nil && s.BW.Folder != "" {
+			if !validBWFolders[s.BW.Folder] {
+				return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
+			}
+			if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
+				return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
 			}
 		}
 

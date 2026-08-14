@@ -1,7 +1,9 @@
 package secrets
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -36,7 +38,7 @@ func TestIsNotFound(t *testing.T) {
 
 func TestNewItemBody(t *testing.T) {
 	// A custom field lands by name; the item carries the requested name.
-	body, err := newItemBody("openai", "api-key", "ak-1")
+	body, err := newItemBody("openai", "api-key", "ak-1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,11 +46,63 @@ func TestNewItemBody(t *testing.T) {
 		t.Errorf("created custom field = %q (err %v), want ak-1", v, err)
 	}
 	// A typed login field lands in the login block of the fresh template.
-	body, err = newItemBody("svc", "password", "pw-1")
+	body, err = newItemBody("svc", "password", "pw-1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if v, err := fieldFromItem(body, "password"); err != nil || v != "pw-1" {
 		t.Errorf("created login field = %q (err %v), want pw-1", v, err)
+	}
+}
+
+// TestNewItemBody_Folder proves the JSON body carries folderId exactly when a folder
+// id was resolved, and omits it (unchanged behavior) when none was — OPS-028 AC2.
+func TestNewItemBody_Folder(t *testing.T) {
+	body, err := newItemBody("openai", "api-key", "ak-1", "folder-id-123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := m["folderId"].(string); got != "folder-id-123" {
+		t.Errorf("folderId = %q, want folder-id-123 (full body: %s)", got, body)
+	}
+
+	body, err = newItemBody("openai", "api-key", "ak-1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = nil // json.Unmarshal into a map merges keys, never deletes — a fresh map per body is load-bearing here
+	if err := json.Unmarshal(body, &m); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := m["folderId"]; present {
+		t.Errorf("folderId must be absent when no folder id was resolved, got %v", m["folderId"])
+	}
+}
+
+// fakeFolderList is a BWFolderResolver test double keyed by folder name → id, so
+// ResolveFolder's caller-facing contract is testable with no bw CLI. Production
+// (BWPut.ResolveFolder) is a live shell-out, verified manually like the rest of the
+// write seam.
+type fakeFolderList map[string]string
+
+func (f fakeFolderList) ResolveFolder(name string) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+	if id, ok := f[name]; ok {
+		return id, nil
+	}
+	return "", fmt.Errorf("fake: no folder %q", name)
+}
+
+func TestBWFolderResolver_EmptyNameIsNoop(t *testing.T) {
+	var f fakeFolderList
+	id, err := f.ResolveFolder("")
+	if err != nil || id != "" {
+		t.Errorf("ResolveFolder(\"\") = (%q, %v), want (\"\", nil)", id, err)
 	}
 }

@@ -69,7 +69,7 @@ func newSecretsMigrateCmd() *cobra.Command {
 			}
 
 			// Write the age value into bw (idempotent; creates the item with --yes).
-			if err := applySet(cmd, item, field, value, false, dryRun, assumeYes); err != nil {
+			if err := applySet(cmd, item, field, value, s.BW.Folder, false, dryRun, assumeYes); err != nil {
 				return err
 			}
 			if dryRun {
