@@ -187,6 +187,19 @@ func (r *Registry) validate() error {
 			}
 		}
 
+		// bw.folder is pre-declared dormant metadata (ADR-028 §2 addendum): a secret's
+		// bw: block, folder included, is written up front while backend is still age
+		// and only activated on migrate. Gating this check on backend == "bw" (as
+		// checkBwSources does for item/field) would leave every dormant folder value
+		// unvalidated until the moment migrate reads it and hands it straight to
+		// ResolveFolder — which CREATES an arbitrary Bitwarden folder for a typo,
+		// exactly the drift this taxonomy exists to prevent (OPS-028 adversarial
+		// review, Major finding). So this runs for every secret carrying a bw: block,
+		// regardless of current backend.
+		if s.BW != nil && s.BW.Folder != "" && !validBWFolders[s.BW.Folder] {
+			return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
+		}
+
 		// Every exposed var must be a valid env identifier (B5) and unique across the
 		// whole registry (B1): a var mapped by two secrets has no single source, and
 		// render's dedup was age-only, so run/show would silently resolve last-write.
@@ -260,9 +273,6 @@ func (s *Secret) checkBwSources() error {
 	}
 	if err := checkBwName(s.ID, "field", s.BW.Field); err != nil {
 		return err
-	}
-	if s.BW.Folder != "" && !validBWFolders[s.BW.Folder] {
-		return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
 	}
 	if s.Expose.File != nil {
 		if s.BW.Field == "" {

@@ -246,6 +246,20 @@ func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
 	}
 }
 
+// TestParseRegistry_BwFolder_ValidatedWhileDormant proves an invalid bw.folder is
+// caught even while backend is still age — the dormant declaration ADR-028 §2's
+// addendum describes. Gating this on backend == "bw" (as it was before the OPS-028
+// adversarial review's Major finding) would let a typo sail through parse and only
+// surface at migrate time, when it is handed straight to ResolveFolder — which
+// CREATES an arbitrary Bitwarden folder for it.
+func TestParseRegistry_BwFolder_ValidatedWhileDormant(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: a, plane: app, backend: age, age: f, bw: {item: it, field: password, folder: Dotfiles/typo}, expose: {env: A}}\n"
+	if _, err := ParseRegistry([]byte(yml)); err == nil {
+		t.Error("dormant (backend: age) bw.folder with an unratified value must still fail validation")
+	}
+}
+
 func TestParseRegistry_Validation(t *testing.T) {
 	cases := map[string]string{
 		"bad version":        "version: 2\nsecrets: []\n",
