@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.39.0](https://github.com/mlorentedev/dotfiles/compare/v0.38.0...v0.39.0) (2026-08-14)
+
+
+### Features
+
+* **secrets:** give the registry a Bitwarden folder taxonomy (OPS-028) ([#957](https://github.com/mlorentedev/dotfiles/issues/957)) ([092cb80](https://github.com/mlorentedev/dotfiles/commit/092cb80de77e142967543733ddb0454cb7c51360))
+* **secrets:** migrate 22 dev secrets from the age store to Bitwarden ([#585](https://github.com/mlorentedev/dotfiles/issues/585)) ([#961](https://github.com/mlorentedev/dotfiles/issues/961)) ([a42cc67](https://github.com/mlorentedev/dotfiles/commit/a42cc67f11e56bb28da9ac6145d2a6db4ad3a62b))
+* **secrets:** migrate 5 file secrets from the age store to Bitwarden (CLI-024-secrets-file-migrate, [#964](https://github.com/mlorentedev/dotfiles/issues/964)) ([#965](https://github.com/mlorentedev/dotfiles/issues/965)) ([852bbaa](https://github.com/mlorentedev/dotfiles/commit/852bbaaeb76e5d5759b889f006ba179a40ebffeb))
+* **spec:** dotf spec review — launch the pooled reviewer with an explicit pin, watchably ([#959](https://github.com/mlorentedev/dotfiles/issues/959)) ([a6a1458](https://github.com/mlorentedev/dotfiles/commit/a6a1458db650656366d98f11d175c952fe0fa636)), closes [#955](https://github.com/mlorentedev/dotfiles/issues/955)
+* **spec:** enforce adversarial-review independence with a reviewer pool gate ([#958](https://github.com/mlorentedev/dotfiles/issues/958)) ([2f222dd](https://github.com/mlorentedev/dotfiles/commit/2f222ddc439c3043d78d9471904c80aa0d7f22cf)), closes [#955](https://github.com/mlorentedev/dotfiles/issues/955)
+
+
+### Bug Fixes
+
+* **doctor:** prove the live secrets SSOT by reach, not by PATH presence (BUG-074) ([#950](https://github.com/mlorentedev/dotfiles/issues/950)) ([9317a8d](https://github.com/mlorentedev/dotfiles/commit/9317a8d5c2266f8d80aaace15c175c0997d6f9b1))
+* **harness:** converge the deploy engine — prune, drift detection, all six surfaces ([#948](https://github.com/mlorentedev/dotfiles/issues/948)) ([18ccd60](https://github.com/mlorentedev/dotfiles/commit/18ccd60fb22f8bc9d7f41e1d630feca0a5a469cf))
+* **review:** land CodeRabbit findings from PR [#948](https://github.com/mlorentedev/dotfiles/issues/948) that missed the merge ([#954](https://github.com/mlorentedev/dotfiles/issues/954)) ([fcc5601](https://github.com/mlorentedev/dotfiles/commit/fcc56013b398d7fe7ca0a5a0625384ac64a6726d))
+* **spec:** land the agy reviewer fixes that missed [#959](https://github.com/mlorentedev/dotfiles/issues/959)'s merge ([#966](https://github.com/mlorentedev/dotfiles/issues/966)) ([9b2b399](https://github.com/mlorentedev/dotfiles/commit/9b2b3991c4f949610e56e660953d101278e78012)), closes [#955](https://github.com/mlorentedev/dotfiles/issues/955)
+* **tests:** repair four guards that pass without checking what they claim ([#949](https://github.com/mlorentedev/dotfiles/issues/949)) ([e5a2ecc](https://github.com/mlorentedev/dotfiles/commit/e5a2ecc7c2890342e01967da578d5945d58a1f2e))
+
 ## [0.38.0](https://github.com/mlorentedev/dotfiles/compare/v0.37.1...v0.38.0) (2026-08-12)
 
 
