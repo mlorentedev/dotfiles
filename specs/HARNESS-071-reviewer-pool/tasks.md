@@ -40,6 +40,12 @@ created: "2026-08-13"
 
 ## Slice 2 — the launcher
 
+> **Slices 2 and 3 land in a follow-up PR.** Slice 1 is the layer that enforces
+> and is complete and independently verifiable on its own; the launcher is
+> convenience on top of it. Splitting keeps both within the PR-sizing policy, and
+> the unticked boxes below are the declared remainder — not an incomplete
+> checklist for the PR that carries slice 1.
+
 - [ ] [AC4] `dotf spec review <spec-id>`: resolve the primary from the pool and
       pass `--provider`/`--model` **explicitly**. Not optional polish — BUG-074
       round 3 was pinned only because `~/.pi/agent/settings.json` on this machine

@@ -131,6 +131,20 @@ Decided explicitly, because these are the design rather than details:
 - **Windows.** tmux is Linux-only and `dotf` is cross-platform. The degrade must
   be explicit (no tmux → run in the foreground and say so), not implicit; the
   repo enforces Windows parity.
+- **Already-archived specs are signed by models the pool forbids, and that is
+  safe — verified, not assumed.** Two of the three archived `review.md` files
+  are signed `claude-sonnet-5`. They do not need a grandfather clause because
+  `checkReviewGate` has exactly one caller (`archive.go`, inside `Archive()`),
+  and nothing scans `specs/archive/` for reviews: the gate runs at archive time
+  only, so a spec that is already archived is never re-evaluated. If a future
+  change adds a sweep over archived reviews — a doctor drift check, a CI audit —
+  it must grandfather them or main goes red on history nobody can re-review.
+- **The gate is enforced by merged code, not by the binary on PATH.** Until this
+  PR merges and `dotf` redeploys, `~/.local/bin/dotf` predates the check and
+  archives a Claude-signed review cleanly (confirmed live, not inferred). This is
+  the same deployed-copy-lags-the-checkout class as ADR-030/#635, and it means
+  "a Claude-signed review cannot be archived" is true of the repo before it is
+  true of any given machine.
 - **Transcript size.** `--mode json` / `--output-format stream-json` emits an
   event stream. Committing it alongside `review.md` makes *how* a review reasoned
   auditable, which is the reusable half of observability — but it needs a size
