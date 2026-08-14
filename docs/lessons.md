@@ -2313,6 +2313,7 @@ The blast radius was also wider than the one function: because `compile-harness.
 **Rule**: a check on a remote dependency must either exercise the remote path or measure elapsed time since something did. Local status output is a cache of a past success, not evidence of a present one — and a cache that reports "locked" is indistinguishable from one reporting "locked, and also revoked three weeks ago". When the deep probe needs a credential the check cannot assume (an unlocked vault, an API key), the elapsed-time tier is not a consolation prize: it is the only tier that runs in the resting state, so it is the one that catches the silent expiry. Corollary for severity: scale it to what actually breaks today, because a red diagnostic for a harmless condition is how operators are trained to ignore red diagnostics.
 
 **Tags**: `doctor`, `secrets`, `bitwarden`, `health-checks`, `verification`
+
 ### [2026-08-13] A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging
 
 **Context**: HARNESS-070 (#843/#869/#828, PR #948). After pushing a commit addressing CodeRabbit's review findings, `gh api .../pulls/948 --jq '.head.sha'` kept returning the previous commit even though `git fetch` confirmed the remote branch ref had the new one. The first read was "GitHub API/webhook propagation lag" — plausible after a session that had already hit a real rate-limit earlier — and a background poll was armed to wait for the field to catch up.
