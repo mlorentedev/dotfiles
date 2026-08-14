@@ -89,9 +89,15 @@ func checkBitwardenReach(sys *System, rep *Report) {
 		rep.Warn("registry unreadable (" + regErr.Error() + ") — reach severity degraded to advisory")
 	}
 
-	out, err := sys.CommandOutputBounded(bwStatusTimeout, "bw", "status")
+	// stdout ONLY. bw contracts JSON on stdout and human diagnostics on stderr,
+	// and merging them means one line of chatter defeats the whole check: on a
+	// machine where bw has never run, `bw status` prints `Could not find data
+	// file, "…/data.json"; creating it instead.` to stderr, the parse below
+	// fails, and all three tiers are skipped — on precisely the fresh box
+	// setup-linux.sh has just provisioned.
+	out, errOut, err := sys.CommandOutputBounded(bwStatusTimeout, "bw", "status")
 	if err != nil {
-		rep.Warn("`bw status` did not run (" + bwFailDetail(out, err) + ") — reach unverified")
+		rep.Warn("`bw status` did not run (" + bwFailDetail(out, errOut, err) + ") — reach unverified")
 		return
 	}
 	var st bwState
@@ -107,8 +113,12 @@ func checkBitwardenReach(sys *System, rep *Report) {
 		// whole value of the check at this point.
 		msg := "Bitwarden session is gone (`bw status`: unauthenticated) — run `bw login`, not `bw unlock`: an expired refresh token cannot be unlocked"
 		if live > 0 {
-			rep.Fail(fmt.Sprintf("%s — %d registry secret(s) resolve through it and cannot be read", msg, live))
-			rep.Fix("export BW_SESSION=$(bw login --raw) && bw sync")
+			// The recovery command belongs in the message, not in rep.Fix: this
+			// check performs no repair and is not even given opts.Fix, and every
+			// other rep.Fix caller emits it after actually applying something.
+			// Emitting it here made a read-only run report "Applied 1 fix
+			// action(s)" for a repair that never happened.
+			rep.Fail(fmt.Sprintf("%s — %d registry secret(s) resolve through it and cannot be read; recover with `export BW_SESSION=$(bw login --raw) && bw sync`", msg, live))
 			return
 		}
 		rep.Warn(msg + " — no backend:bw secret depends on it yet")
@@ -146,8 +156,20 @@ func checkBitwardenReach(sys *System, rep *Report) {
 	// which needs no session: the staleness warning fires on a locked vault and
 	// names `bw sync` while the token is still renewable. Tier 3 proves reach;
 	// tier 2 is what catches the silent expiry.
-	if syncOut, syncErr := sys.CommandOutputBounded(bwSyncTimeout, "bw", "sync"); syncErr != nil {
-		rep.Fail("Bitwarden sync FAILED on an unlocked vault (" + bwFailDetail(syncOut, syncErr) + ") — the live SSOT is not reachable")
+	syncOut, syncErrOut, syncErr := sys.CommandOutputBounded(bwSyncTimeout, "bw", "sync")
+	if syncErr != nil {
+		// Severity follows exposure here too, for the same reason it does in the
+		// unauthenticated branch: an unreachable vault breaks nothing while every
+		// registry entry still resolves through age. A flat FAIL would exit doctor
+		// 1 merely because the machine is offline, a captive portal is up, or the
+		// 45s deadline fired — and doctor's own precedent for an unreachable
+		// remote is a WARN (checks_pat.go, api.github.com).
+		msg := "Bitwarden sync FAILED on an unlocked vault (" + bwFailDetail(syncOut, syncErrOut, syncErr) + ") — the live SSOT is not reachable"
+		if live > 0 {
+			rep.Fail(fmt.Sprintf("%s — %d registry secret(s) resolve through it", msg, live))
+			return
+		}
+		rep.Warn(msg + " — no backend:bw secret depends on it yet")
 		return
 	}
 	rep.Pass("Bitwarden reach verified (authenticated sync round-trip)")
@@ -201,6 +223,15 @@ func checkBWSyncAge(sys *System, rep *Report, lastSync string) {
 // source it cannot name. A machine with no checkout at all therefore reports
 // advisory: there, the check genuinely cannot tell a migrated registry from a
 // stale mirror.
+//
+// One more path lands in that same advisory branch, and it is easier to hit
+// than "no checkout": env.RepoDir falls back to a cwd walk-up for .git when
+// DOTFILES_REPO_DIR is unset, so running `dotf doctor` from inside ANY other git
+// repo reads that repo's secrets/registry.yaml, fails, and degrades a
+// post-migration FAIL to a WARN. It fails loudly and in the safe direction, and
+// .zshrc/.bashrc both export DOTFILES_REPO_DIR — but the degradation is real, so
+// a WARN naming an unexpected registry path is a clue about the caller's cwd,
+// not about the registry.
 func bwBackedSecrets() (int, error) {
 	path, err := env.RepoRegistryPath()
 	if err != nil {
@@ -224,15 +255,23 @@ func bwBackedSecrets() (int, error) {
 }
 
 // bwFailDetail renders a failed bw invocation as one report line: the CLI's own
-// first output line when it produced one, else the exec error.
+// first line of diagnostics when it produced one, else the exec error.
+//
+// stderr is preferred over stdout because that is where bw puts its errors —
+// reading a merged stream here surfaced startup chatter ("Could not find data
+// file…") as though it were the failure. stdout is still consulted as a
+// fallback, since a few bw failure modes print there instead.
 //
 // Both shapes occur. For expected states bw exits non-zero with a clean single
 // line ("You are not logged in."), but on an expired refresh token it dies with a
 // Node unhandled-promise-rejection stacktrace — reusing firstLine (the existing
 // helper in checks_vault_hooks.go) collapses either into something readable
 // instead of flooding the section with a stacktrace.
-func bwFailDetail(out string, err error) string {
-	if d := firstLine(out); d != "" {
+func bwFailDetail(stdout, stderr string, err error) string {
+	if d := firstLine(stderr); d != "" {
+		return d
+	}
+	if d := firstLine(stdout); d != "" {
 		return d
 	}
 	return err.Error()

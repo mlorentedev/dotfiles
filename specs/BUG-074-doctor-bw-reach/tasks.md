@@ -83,6 +83,47 @@ independently before being accepted; none was argued down.
       lives in `review.md`, which is excluded from the contract set for exactly
       this reason.
 
+## Round 3 — second review remediation
+
+Review 2 returned **FAIL** (0 Blockers, 3 Majors, all REAL). Every finding was
+reproduced independently before being accepted; none was argued down.
+
+- [x] [AC1-AC3] Split the streams. `CommandOutputBounded` returned
+      `CombinedOutput`, so one line of `bw` stderr chatter broke the
+      `json.Unmarshal` and the check returned early with **all three tiers
+      skipped** — on `bw`'s first invocation on a machine, i.e. exactly the fresh
+      box `setup-linux.sh` has just provisioned. Reproduced live before fixing.
+      The seam now returns `(stdout, stderr, err)`; `bw status` parses stdout.
+- [x] [AC1] Key the tier-3 sync failure to exposure, like the `unauthenticated`
+      branch already was. A flat `rep.Fail` exited doctor 1 for an offline
+      machine at zero exposure, contradicting `## What`, the check's own header
+      comment, and doctor's precedent for an unreachable remote
+      (`checks_pat.go`).
+- [x] [AC4] Prove the check is **registered**: deleting `checkBitwardenReach`
+      from `Run()` left all 13 packages green, since every test called it
+      directly. `TestRun_RegistersTheBitwardenReachSection` closes that, mirroring
+      the existing `TestRun_QuickSkipsHeavySections` assertion pattern.
+- [x] Minor: `rep.Fix` was emitted on a read-only run, making the summary report
+      `Applied 1 fix action(s)` for a repair nothing performed. The recovery
+      command moved into the FAIL message.
+- [x] Minor: `bwFailDetail` now prefers stderr, where `bw` actually writes its
+      errors — the merged read surfaced startup chatter as if it were the cause.
+- [x] Minor: document the third CI trigger in `proposal.md` risk 3 — `bw` is an
+      npm-sourced tool in `packages.json`, so adding node/npm to the integration
+      image for any unrelated reason installs it and activates this check.
+- [x] Minor: document the `RepoDir` cwd walk-up, which degrades severity when
+      doctor runs from another git repo.
+- [x] **Question answered**: the 30d threshold is an educated floor, not a
+      derived one. The incident bounds the token dead *by* 45d; it does not show
+      it alive at 30d, and no upstream lifetime is cited. `proposal.md` now says
+      "earlier than the only expiry we have observed" instead of "while the token
+      is still renewable".
+- [x] Mutation battery re-run: 5 mutants, **5 detected**, each with a guard that
+      aborts when the mutation fails to apply — the first attempt reported two
+      false SURVIVEDs because the `sed` pattern silently matched nothing.
+- [ ] Fresh adversarial review on a **non-Anthropic** model (NaN primary). Round 2
+      was Anthropic-on-Anthropic; the standing rule now forbids that.
+
 ## Machine-readable features
 
 See `features.json` alongside this file. States are left at `pending`: per the

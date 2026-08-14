@@ -52,6 +52,22 @@ full battery, including the reviewer's own mutant:
 | **bounded exec: deadline ignored** | not tested | detected |
 | **clock: no negative-skew guard** | not tested | detected |
 
+Round 3, after the second review's three Majors. Run with a harness that aborts
+when the mutation fails to apply — the first attempt reported two false
+`SURVIVED`s because the `sed` pattern anchored one tab against a line indented
+with two and silently matched nothing. That is the repo's own
+*answers-wrongly-beats-fails* class, reached through a verification harness
+rather than a shell builtin: a mutation that never applied looks exactly like a
+mutant that survived.
+
+| Mutation (round 3) | Result |
+|---|---|
+| registration dropped from `Run()` | detected |
+| tier-3 sync failure ignores exposure | detected |
+| status parsed from the MERGED streams | detected |
+| production seam back to `CombinedOutput` | detected |
+| `bwFailDetail` ignores stderr | detected |
+
 Two of those round-2 mutants describe defects the fixes introduced or exposed,
 not merely untested paths:
 

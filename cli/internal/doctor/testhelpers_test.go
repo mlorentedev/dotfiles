@@ -71,9 +71,11 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// inject their own count.
 		BWBackedSecrets: func() (int, error) { return 0, nil },
 		// Bounded exec resolves to the same fake table as CommandOutput; the
-		// deadline is production-only behaviour, exercised by its own test.
-		CommandOutputBounded: func(_ time.Duration, name string, args ...string) (string, error) {
-			return sysCommandOutput(cmdOut, name, args...)
+		// deadline and the stream split are production-only behaviour, each
+		// exercised by its own test against realSystem().
+		CommandOutputBounded: func(_ time.Duration, name string, args ...string) (string, string, error) {
+			out, err := sysCommandOutput(cmdOut, name, args...)
+			return out, "", err
 		},
 	}
 }

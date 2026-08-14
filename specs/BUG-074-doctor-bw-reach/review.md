@@ -1,113 +1,129 @@
 ---
 spec: "BUG-074-doctor-bw-reach"
 verdict: "FAIL"
-reviewed_sha: "13b3d121b40d9aaa3266e724d727a5f0caf571b3"
+reviewed_sha: "a11a459dda9443620cec3abb95a242a3872e0667"
 reviewer: "claude-opus-5"
-date: "2026-08-12"
+date: "2026-08-13"
 ---
 
 ## Adversarial review
 
-**Scope**: BUG-074-doctor-bw-reach / PR #950 (branch `fix/doctor-bw-reach`, 2 commits: `145516c`, `13b3d12`)
-**Sources**: `specs/BUG-074-doctor-bw-reach/{proposal,tasks,verification}.md` + `features.json`;
-`git diff origin/main...HEAD` (merge base `22cc7c5`); `cli/internal/doctor/checks_bw_reach.go`,
-`checks_bw_reach_test.go`, `system.go`, `doctor.go`, `testhelpers_test.go`; `cli/internal/env/env.go`,
-`cli/internal/secrets/`, `cli/internal/spec/review.go`; `secrets/registry.yaml`; `setup-linux.sh`,
-`tests/Dockerfile.integration`, `.github/workflows/ci.yml`; `gh pr view 950` + `gh run view 31663317955`.
+**Scope**: BUG-074-doctor-bw-reach / PR #950 (branch `fix/doctor-bw-reach`) — round 2, against
+`a11a459` (`145516c`, `13b3d12`, two main merges, `12b8e77`, `acc495f`, `a11a459`).
+
+**Sources**: `specs/BUG-074-doctor-bw-reach/{proposal,tasks,verification}.md` + `features.json` +
+the round-1 `review.md`; `git diff origin/main...HEAD`; `cli/internal/doctor/checks_bw_reach.go`,
+`checks_bw_reach_test.go`, `system.go`, `doctor.go`, `report.go`, `checks_secrets_tooling.go`,
+`checks_pat.go`, `checks_contract.go`, `checks_test.go`, `testhelpers_test.go`;
+`cli/internal/env/env.go`; `cli/internal/spec/review.go`; `cli/internal/tools/{catalog,install}.go`;
+`packages.json`; `secrets/registry.yaml`; `setup-linux.sh`; `tests/Dockerfile.integration`;
+`.zshrc` / `.bashrc`; `docs/lessons.md`. Live: `go build`/`go vet`/`go test ./...`,
+`golangci-lint run` (pinned 2.12.2), `check-spec-gate.sh`, a 9-mutant battery, a throwaway
+reproduction test (removed), the real `bw` binary, and a `dotf` built from this head.
 
 ### Spec and task alignment
 
-- The three tiers described in `## What` are all present and in the stated order: `bw status`
-  (`checks_bw_reach.go:82-111`), `lastSync` age (`checkBWSyncAge`, `:142-160`), authenticated
-  `bw sync` round-trip (`:132-136`). `bw list` is correctly rejected in favour of `sync` — the
-  reasoning (local cache passes on a dead token) is sound and documented in the code, not only in
-  the spec.
-- Severity keying is implemented as specified and reads the checkout-preferring
-  `env.ResolveRegistryPath()` (`env.go:176-183`), not `cfg.DotfilesDir`. Verified the schema the
-  count depends on: `Entry.Backend` with value `"bw"` is the correct predicate
-  (`cli/internal/secrets/secrets.go:21`, `registry_write.go SetBackendBW`), and all 34 current
-  registry entries are `backend: age`, so today's exposure is genuinely 0 → advisory. AC1-AC3 are
-  implemented as written.
+- **All three round-1 Majors are verifiably closed.** I re-ran the reviewer's own mutant
+  (`s.Backend == "bw"` → `"bitwarden"`): it is now caught by `TestBWBackedSecrets_CountsOnlyBWBackend`.
+  The bounded-exec seam is real — a compiling deadline-ignored variant of the production closure
+  (`_ = ctx` + `exec.Command`) makes `TestCommandOutputBounded_KillsAnOverrunningCommand` go red
+  after 10s. And risk 3's rewritten chain checks out line by line: `tests/Dockerfile.integration:55`
+  is `RUN … bash setup-linux.sh`, `setup-linux.sh:1505` is `dotf doctor || log_warning …`, and the
+  image installs no `bw`.
+- **Verification.md's round-2 mutation table is accurate.** I reproduced all eight rows
+  independently: producer predicate, producer counts-everything, producer silent fallback
+  (`RepoRegistryPath` → `ResolveRegistryPath`, caught by `TestBWBackedSecrets_MissingRegistryErrors`),
+  bounded-exec deadline, negative-skew guard, staleness never fires, reach claimed without `bw sync`,
+  severity consumer forced advisory — **8/8 detected**, tree reverted and clean after each.
+- **The `a11a459` doc-drift fix is correct.** `bwBackedSecrets` really does call
+  `env.RepoRegistryPath()` (`checks_bw_reach.go:205`), and the new wording in `system.go`,
+  `proposal.md` and `verification.md` describes `RepoRegistryPath`'s actual contract (checkout-only,
+  fails loud) rather than `ResolveRegistryPath`'s (prefers checkout, falls back). Verified against
+  `env.go:176-212`. Not a residual finding.
+- All six `features.json` verification commands re-run independently: **14 test functions (17 cases
+  counting `DegradesOnUnusableStatus`'s subtests), all pass**.
+  `go build ./...`, `go vet ./...` clean; `golangci-lint run` → `0 issues` on the pinned 2.12.2
+  (matches `versions.conf`); `check-spec-gate.sh --base-ref origin/main --head-ref HEAD` → OK.
 - No `[AGENT-DRAFT]` / `[AGENT-SUGGESTION]` tags remain in any spec file.
-- Independently re-ran every `features.json` verification command: 8/8 tests PASS. `go build ./...`,
-  `go vet ./...` clean; `golangci-lint run` → `0 issues` on the **pinned** 2.12.2 (matches
-  `versions.conf`); `check-spec-gate.sh --base-ref origin/main --head-ref HEAD` → OK (493 prod LOC,
-  spec touched). `verification.md`'s "220 production LOC" was captured at `145516c`, before the spec
-  commit — both numbers are correct at their own sha; not a finding.
-- Two `[ ]` boxes remain: `tasks.md` "PR opened referencing this spec folder" (PR #950 *is* open —
-  stale tick), and `verification.md`'s archive checklist including "Promotions above executed". The
-  `docs/lessons.md` promotion is correctly marked a *candidate*, not a completed capture, and the
-  diff touches no `docs/` file — that is consistent, but it is pre-archive work still outstanding.
-- **PR state (not a finding):** `spec-gate` is RED on #950 with "SDD archive-on-merge violation —
-  this PR closes an issue whose spec is still active". That is the designed lifecycle ordering: the
-  archive is meant to land in this same PR, and `dotf spec archive` gates on this review. All other
-  checks are green (lint, test ubuntu + windows, lint-powershell, goreleaser, CodeRabbit,
-  GitGuardian). It is process state pending this verdict, not a defect of the change.
+- **Tier 1 is not dead code** — a question round 1 left open by never observing it. Verified against
+  the real binary with a redirected `BITWARDENCLI_APPDATA_DIR`: `bw status` on a logged-out profile
+  exits 0 and prints `{"serverUrl":null,"lastSync":null,"status":"unauthenticated"}`. The
+  `unauthenticated` branch is reachable in production. That probe is also what surfaced finding 1.
+- **PR state (not a finding).** The PR head is `5168df6`, a merge of `main` carrying PR #949's test
+  work; it touches no file of this change and no contract file, so this review is not stale against
+  it. `spec-gate` is RED for the designed archive-on-merge ordering ("this PR closes an issue whose
+  spec is still active"), confirmed from the job log; lint / test (ubuntu + windows) /
+  lint-powershell / CodeRabbit / GitGuardian are green, `cli` and `CI` still in progress at review
+  time.
+- `tasks.md` and `verification.md` are honest about round 2, including recording the review request
+  *before* the review ran to avoid staling its own verdict. `docs/lessons.md` carries the promised
+  entry and its index was genuinely regenerated (195 entries; index diffs clean against the body).
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location |
 |---|---|---|---|---|---|---|
-| Major | REAL | severity source / coverage | The production `bwBackedSecrets()` producer — the seam the proposal itself calls load-bearing — has **zero** test coverage. Every test injects the `BWBackedSecrets` fake, so the `s.Backend == "bw"` predicate has never executed anywhere: not in CI (all fakes), and not in the live smoke either (34/34 registry entries are `age`, so the branch is unreachable today). A wrong predicate, a wrong path, or a parse regression silently returns 0 and pins severity at advisory for the whole #585 migration — the exact failure the risk section says the seam exists to prevent, rebuilt one level down. This is a verification gap, not a shipped defect: the predicate is correct as written. | **Reproduction:** mutated `s.Backend == "bw"` → `"bitwarden"` in `checks_bw_reach.go:183`; mutant compiles; `go test ./...` over all of `cli/` → 13 packages `ok`, **exit 0**, no failing package. The mutant survives the entire suite. (Tree reverted; `git status` clean.) Also: `verification.md`'s mutation row "severity forced to always-advisory → detected" mutated the *consumer* (`if live > 0`, `:99`), not the producer, so the table overstates what was proven. | **UNTESTED** — no test names `bwBackedSecrets`. Needs e.g. `TestBWBackedSecrets_CountsOnlyBWBackend` (temp registry fixture + `DOTFILES_REPO_DIR` override, asserting a mixed age/bw registry counts only the bw entries). | tests (+ correct the mutation row in `verification.md`) |
-| Major | THEORETICAL | reliability / timeouts | The two `bw` shell-outs are unbounded. `CommandOutput` is a bare `exec.Command(...).CombinedOutput()` (`system.go:79-82`) with no context or deadline, and `bw sync` is the **only network-bound shell-out doctor makes** — every other `CommandOutput` caller is a local `--version`/`git config` probe. Doctor's own network seam is explicitly capped (`HTTPGet`: `http.Client{Timeout: 5 * time.Second}`, `system.go:99`), so this change introduces a network call that ignores the file's own established precedent. A stalled TLS connection (captive portal, DNS blackhole, VPN half-open) hangs `dotf doctor` indefinitely — and `dotf doctor` is the final step of `setup-linux.sh` (`:1503-1505`), so it hangs a bootstrap too. | Code read of `system.go:79-82` vs `:99`; `grep` of all `CommandOutput(` callers in `internal/doctor/` confirms `bw status`/`bw sync` are the only remote ones. No hang observed — THEORETICAL. | **UNTESTED** — no timeout/hang test exists, and none can, because there is no deadline to assert on. | code (`exec.CommandContext` with a bw-appropriate bound, 30-60s, not HTTPGet's 5s) **or** spec (a documented accepted-risk line in `proposal.md`) |
-| Major | REAL | spec accuracy | `proposal.md` risk 3 states: *"Verified that no workflow and no `verify-setup.bats` case runs `dotf doctor`, so the FAIL severity cannot turn CI permanently red once secrets migrate."* The premise is false. `setup-linux.sh:1503-1505` runs `dotf doctor`, and `tests/Dockerfile.integration` ends with `RUN cd /home/testuser/dotfiles-repo && bash setup-linux.sh`, which the `integration` job builds and runs. Doctor **does** run in CI. The conclusion happens to survive, but for two reasons the spec does not record: (a) the invocation is `dotf doctor \|\| log_warning …` — non-fatal, it cannot fail the image build; (b) `bw` is not installed in the container, so the check hits `rep.Skip` before any severity is computed. Both are load-bearing and both are undocumented, so the next person to add `bw` to that image (or to make doctor fatal) will read a risk marked resolved and be wrong. | `setup-linux.sh:1497-1509`; `tests/Dockerfile.integration` final `RUN`; `.github/workflows/ci.yml:246-267`; `grep -n doctor tests/verify-setup.bats` → only a comment, so that half of the claim is true. | UNTESTED (nothing asserts doctor stays non-fatal in setup, or that bw stays absent from the image) | spec (`proposal.md` risk 3 rewritten with the real safety margin) |
-| Minor | REAL | reporting | `checks_secrets_tooling.go:37` still emits `rep.Pass("bw (Bitwarden CLI — live secrets SSOT) found")` — verbatim the green line `proposal.md` cites as the misleading artifact of the incident. Doctor now prints presence-dressed-as-SSOT-health *and* a truthful reach section in the same report. The exit code and the findings are correct; the residual is a reading hazard for anyone skimming for green. Deliberate (separate section, to leave the existing tests untouched) but worth one word: "installed" / "on PATH". | `cli/internal/doctor/checks_secrets_tooling.go:37`, unchanged in the diff; `proposal.md` lines 21-23. | `TestBWReach_AbsentBinarySkips` covers the ownership split, but nothing asserts the tooling line's wording. | code (one-line reword) |
-| Minor | THEORETICAL | clock | A `lastSync` in the future (clock skew, a restored VM, a machine crossing a DST/NTP correction) yields a negative `age`, so `checkBWSyncAge` reports `rep.Pass("Bitwarden synced -3d ago")`. It passes, which is the safe direction, but prints a nonsense figure and silently treats an impossible timestamp as healthy. | `checks_bw_reach.go:152-159` — `days := int(age.Hours() / 24)` with no lower bound. | UNTESTED (`bwSyncFresh`/`bwSyncStale` are both in the past). | code (clamp or warn on `age < 0`) + tests |
-| Minor | REAL | spec hygiene | `tasks.md` "Closing" leaves `[ ] PR opened referencing this spec folder` unticked although PR #950 is open and references the spec folder in its body. | `tasks.md:45`; `gh pr view 950`. | n/a | spec |
-| Question | — | keep-alive claim | The code and spec both argue `bw sync` inside doctor "makes a periodic `dotf doctor` the keep-alive that would have prevented this incident outright." That holds only if doctor is actually run periodically *with an unlocked vault* — the sync tier is skipped entirely on a locked vault, which the spec itself calls the normal resting state. Is there an intended cadence (cron, shell hook) that satisfies both conditions, or is the keep-alive incidental to manual operator runs? If the latter, the claim is weaker than stated and should be softened rather than relied on. | `checks_bw_reach.go:115-121` (locked → early return) vs `:128-131`. | n/a | spec (confirm or soften) |
+| Major | REAL | output parsing / exec | `bw status` is read through `CommandOutputBounded` (`CombinedOutput`, i.e. stdout **merged with stderr**) and then `json.Unmarshal`ed whole (`checks_bw_reach.go:92-101`). `bw` writes its JSON to stdout and diagnostics to stderr, so **any** stderr line from `bw` makes the parse fail, and the check returns at line 100 — all three tiers skipped, AC1/AC2/AC3 all silently unevaluated. The state I reproduced is not exotic: it is `bw`'s first-ever invocation on a machine, which is exactly what `dotf doctor` triggers as the last step of `setup-linux.sh` on a freshly provisioned box. Post-migration the same chatter downgrades the AC1 FAIL to a WARN — it defeats the escalation the severity policy exists for. | **Reproduced twice, live, on the real binary.** Stream separation: `BITWARDENCLI_APPDATA_DIR=$TD bw status 2>&1 1>/dev/null` → `Could not find data file, "…/data.json"; creating it instead.`; `… 2>/dev/null` → the clean JSON. End-to-end with `dotf` built from this head: run 1 (fresh app-data dir) → `[WARN] `bw status` returned no parseable JSON — reach unverified`; run 2 (same dir, `data.json` now present) → `[WARN] Bitwarden session is gone (`bw status`: unauthenticated) …`. Same root cause makes `bwFailDetail`'s `firstLine` (`:234-239`) return chatter instead of `bw`'s real error. | **UNTESTED** — every fake returns pure JSON (`bwStatusJSON`, `testhelpers_test.go:24-36`). `TestBWReach_DegradesOnUnusableStatus/not json` proves the degradation is *safe*, not that the check survives `bw`'s own stderr. Needs e.g. `TestBWReach_ToleratesCLIChatterOnStderr` feeding `"Could not find data file…\n{json}"`. | code (capture stdout separately, or extract the JSON object from the blob) + tests |
+| Major | REAL | severity policy / spec-vs-code | Tier 3's sync failure calls `rep.Fail` unconditionally (`checks_bw_reach.go:149-152`) — it never consults `live`. So on today's machine (34/34 registry entries `age`, exposure 0) an unlocked vault plus any sync failure — offline, captive portal, Bitwarden outage, or the new 45s deadline firing — exits `dotf doctor` 1 for a condition that breaks nothing. That contradicts `proposal.md` `## What` ("advisory while everything is still on age, FAIL from the first migrated secret") **and the check's own header comment** 80 lines above it (`:69-73`), and it is inconsistent with doctor's established handling of an unreachable remote: `checks_pat.go:86` warns when `api.github.com` cannot be reached. Round 2's bounded exec widened this: what used to hang now deterministically produces this FAIL. | **Reproduced** with a throwaway test (added, run, deleted): `live=0`, status `unlocked`, sync returns `errors.New("bw timed out after 45s")` → `Failures()==1`, report line `[FAIL] Bitwarden sync FAILED on an unlocked vault …`. Counter-reading stated honestly: AC1's wording scopes exposure-keying to the `unauthenticated` case only, so this may be intended — but then the general policy sentence and the code comment both overstate it. | **UNTESTED** — `TestBWReach_UnlockedButSyncFailsIsAFail` pins `live=2` and `TestBWReach_UnlockedVaultProvesReach` pins `live=5`; no test drives a sync failure at `live=0`. | code (key it to `live`, e.g. `Warn` at 0) **or** spec (`proposal.md`: declare the flat FAIL deliberate). Either closes it; silence does not |
+| Major | REAL | coverage / registration | Nothing proves the check is wired into the product. Deleting the registration line `checkBitwardenReach(sys, rep)` (`doctor.go:89`) leaves the **entire `cli/` suite green**: 13 packages `ok`, exit 0. Every test calls `checkBitwardenReach` directly. A refactor of `Run()` or a bad merge resolution can drop the whole reach section and CI will not notice — the same class as round 1's surviving producer mutant, one level up, and the same class as #898 (a check never observed failing is not evidence) that this spec exists to fix. | **Mutation run**, tree reverted, `git status` clean. The assertion pattern already exists in the file the new check bypassed: `TestRun_QuickSkipsHeavySections` (`checks_test.go:391`) asserts full-mode output contains `"Core tools in PATH"`; nothing analogous names `"Bitwarden reach"`. Note the section header prints even with nothing on PATH (`Section()` precedes the `has("bw")` skip), so the assertion is one line. | **UNTESTED** | tests |
+| Minor | REAL | reporting | `rep.Fix("export BW_SESSION=$(bw login --raw) && bw sync")` (`checks_bw_reach.go:111`) is emitted on a plain read-only `dotf doctor`, and `checkBitwardenReach` does not even receive `opts.Fix`. `report.go:113` then prints `Applied 1 fix action(s)` for a repair nothing applied. Every other `rep.Fix` caller emits it *after* performing a repair (`checks_automemory.go:52`, `checks_memshape.go:119`, `checks_guard.go:43`, `checks_vault_hooks.go:86`, `checks_deploy.go:427`) or gates it on `--fix` (`checks_contract.go:35-37`). | **Reproduced live**: `dotf doctor` (no `--fix`) against a temp registry with 2 `backend: bw` entries → `[FIX ] export BW_SESSION=$(bw login --raw) && bw sync` and the summary line `Applied 1 fix action(s)`. | **UNTESTED** — no test asserts the FIX line or the summary counter. | code (fold the hint into the FAIL message, or take `fix bool` and gate it) |
+| Minor | THEORETICAL | spec accuracy (CI risk) | Risk 3 names two triggers that would turn a migrated registry into red CI ("making doctor fatal in setup, or adding `bw` to the image"). It misses a third and less obvious one: `setup-linux.sh:301` runs `dotf tools install`, and `packages.json:19-25` declares `bw` as an npm-sourced tool (`@bitwarden/cli`, profile `full`). `bw` stays absent from the integration container only because the image installs no node/npm — so adding node/npm for any unrelated reason installs `bw` and activates the reach check in CI. The stated conclusion still holds on safeguard (a) alone (`dotf doctor \|\| log_warning`), but a safeguard the spec calls load-bearing rests on an undocumented precondition. | `packages.json:19-25`; `setup-linux.sh:301` vs `:1505`; `tests/Dockerfile.integration` apt list (no node/npm/bw); `cli/internal/tools/install.go:170-198` (`installNpm`). | UNTESTED (nothing asserts node/npm or `bw` stay absent from the image) | spec |
+| Minor | REAL | severity source | `bwBackedSecrets` resolves through `env.RepoDir()`, which falls back to a **cwd walk-up for `.git`** when `DOTFILES_REPO_DIR` is unset. Running `dotf doctor` from inside any other git repo therefore reads *that* repo's `secrets/registry.yaml`, fails, and degrades severity to advisory — converting a post-migration FAIL into a WARN. It says so loudly, which is the right direction, but the code comment (`:200-203`) documents only the "machine with no checkout at all" case, not this one. Mitigated in practice: `.zshrc:34` and `.bashrc:64` both export `DOTFILES_REPO_DIR`. | **Reproduced live**: `env -u DOTFILES_REPO_DIR dotf doctor` from a temp `git init` dir → `[WARN] registry unreadable (open …/otherrepo/secrets/registry.yaml: no such file or directory) — reach severity degraded to advisory`. | **UNTESTED** — `TestBWBackedSecrets_MissingRegistryErrors` sets `DOTFILES_REPO_DIR`, so it never exercises the walk-up branch. | code (or one line of spec/comment) |
+| Question | — | threshold provenance | The 30d staleness threshold is justified solely as "30d < the observed 45d, so it lands while the token is still renewable" (`proposal.md:72-75`). The incident bounds token death at **≤45d**, not at **>30d**; no upstream Bitwarden refresh-token lifetime is cited anywhere in the spec or the code. Since round 2 reassigned the whole prevention claim to tier 2, that claim now rests on an inequality nothing establishes: if the real idle lifetime is ≤30d, tier 2 warns post-mortem. | `proposal.md:36-39`, `:72-75`; `checks_bw_reach.go:15-27`. No citation present in either. | n/a | spec (cite the upstream lifetime, or soften "still renewable" to "earlier than the only expiry we have observed") |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | B | All three tiers and the severity policy behave as specified; negative paths (bad JSON, unknown status, never-synced, unparseable stamp, unreadable registry, sync failure) are genuinely covered — the gap is coverage of the producer, not incorrect shipped behaviour. |
-| Verification       | C | A producer-side mutant survives the entire `cli/` suite, and `verification.md`'s mutation table claims a stronger result than what was actually mutated. |
-| Scope              | A | Diff is exactly the check, its seam, its registration and its tests; no unrelated changes (`git diff --stat` over 5 code files, 4 spec files). |
-| Reliability        | B | Degradation paths are careful and never claim reach on unusable input; the unbounded network call is the one unhandled failure mode. |
-| Maintainability    | B | Comments explain WHY (why `sync` and not `list`, why the checkout registry, why a separate section); functions are short; `firstLine` reused rather than redeclared. Minor: the misleading legacy PASS line was left in place. |
-| Handoff-readiness  | B | Spec artifacts are complete and detailed; the `docs/lessons.md` capture is correctly declared a pending promotion rather than claimed done. |
+| Correctness        | C | Two REAL defects — a real `bw` stderr line skips all three tiers, and tier 3's FAIL ignores the exposure policy the spec and the code comment both state; not D because nothing ever claims false reach and every failure degrades to advisory. |
+| Verification       | C | Genuinely stronger than round 1 (producer and production closure now covered; I re-ran all 8 claimed mutants and all die), but three new mutants/states survive untested: the registration line, the `live=0` sync failure, and `bw`'s real stderr. |
+| Scope              | A | Diff is the check, its seam, its registration, its tests, one reworded PASS line, the spec folder and one `docs/lessons.md` entry — nothing unrelated. |
+| Reliability        | C | The network is now genuinely bounded (a real round-2 fix), but the output-parsing path drops the entire signal on a reproducible real `bw` state and the failure severity contradicts the documented policy. |
+| Maintainability    | B | Comments explain WHY at length and, after `a11a459`, accurately; functions are short; `firstLine` reused rather than redeclared. Smell: the check emits a `[FIX ]` action it cannot apply and cannot see `opts.Fix`. |
+| Handoff-readiness  | A | Spec artifacts, the round-2 remediation log, the `docs/lessons.md` promotion (index regenerated, not appended) and the archive checklist are all present, and the review request was recorded before the review ran rather than after. |
 
 ### Verdict
 
 **FAIL**
 
-Driven by the severity axis, which the skill applies mechanically: one Major → FAIL. The load-bearing
-one is the first — Major, **REAL** (a surviving mutant is a reproduction, not an argument), and
-**UNTESTED**, which the skill says cannot be closed by the implementer's assurance alone. The rubric
-path agrees independently (Verification = C → PASS-WITH-GAPS floor); the more severe path governs.
+Three Majors, all **REAL** (each reproduced, not argued) and all **UNTESTED**, which the skill says
+cannot be closed by the implementer's assurance alone. The rubric path agrees independently (three
+Cs, no D → PASS-WITH-GAPS floor); the severity path is more severe and governs.
 
-Note what this verdict is *not* saying: no shipped behaviour was found wrong, the change is
-well-scoped and unusually well-reasoned, and every acceptance criterion's *implementation* checks
-out. The gap is that the one predicate deciding whether doctor ever escalates to FAIL is proven by
-nothing — which is the same class of defect (#898: a check never observed failing is not evidence)
-that this spec exists to fix.
+The load-bearing one is the first, and it is worth stating plainly: on a freshly provisioned
+machine — the moment `setup-linux.sh` ends and doctor runs for the first time — `bw`'s own stderr
+line makes this check print `reach unverified` and skip every tier it was built for. The change
+correctly stopped believing `PATH` presence; it now believes `CombinedOutput` is JSON. Both are
+assumptions about representation rather than behaviour, which is the #852 class the spec cites.
+
+None of the three round-1 Majors regressed, and the fixes for them are real (verified by mutation,
+not by reading). Two of the new findings exist *because* of round 2 — the bounded exec turned a hang
+into a deterministic FAIL, and the producer's move to `RepoRegistryPath` made the cwd walk-up the
+new severity-loss path. That is normal for a second pass, not a criticism of it.
 
 ### Recommended next steps (before archive)
 
-`dotf spec archive BUG-074-doctor-bw-reach` is **not advisable** in the current state and will refuse
+`dotf spec archive BUG-074-doctor-bw-reach` is **not advisable** and will refuse
 (`checkReviewGate` blocks on `verdict: FAIL`). Minimum set to flip to PASS:
 
-1. **Kill the surviving mutant.** Add a named test for the production producer — e.g.
-   `TestBWBackedSecrets_CountsOnlyBWBackend`: write a temp `secrets/registry.yaml` with a mix of
-   `age`, `age-offline` and `bw` entries, point `DOTFILES_REPO_DIR` at it, assert the count equals
-   the number of `backend: bw` entries. Confirm it goes red under
-   `s.Backend == "bitwarden"` before landing it. Then correct `verification.md`'s mutation row to say
-   which side (consumer / producer) each mutation exercised.
-2. **Resolve the unbounded `bw` calls** — either bound them (`exec.CommandContext` with a
-   bw-appropriate deadline; note `bw sync` legitimately needs longer than `HTTPGet`'s 5s), or record
-   the accepted risk explicitly in `proposal.md` alongside the `bw sync`-mutates-state entry. Either
-   satisfies the gate; silently leaving it does not.
-3. **Rewrite `proposal.md` risk 3** with the true chain (`ci.yml integration` →
-   `Dockerfile.integration` → `setup-linux.sh:1505` → `dotf doctor`) and the two real safeguards
-   (non-fatal `|| log_warning`; `bw` absent from the image), so the escape hatch the risk asks for is
-   documented against the actual conditions that hold.
-4. Optional, non-gating: reword `checks_secrets_tooling.go:37` to "installed"; clamp negative sync
-   age; tick `tasks.md`'s PR box; answer the keep-alive question.
-5. Then execute the archive checklist's own pending items — write the `docs/lessons.md` entry
-   (declared a promotion candidate: *a health check that reads local state proves liveness of
-   nothing*), set `status: archived`, move the folder, close the board ticket.
+1. **Parse `bw status` from stdout, not from stdout+stderr.** Either add a stdout-only bounded exec
+   seam or extract the JSON object from the blob before unmarshalling; keep the combined output for
+   the error-detail path. Add a named test feeding `"Could not find data file…\n{json}"` and confirm
+   it goes red against today's code before landing it. Re-run the live check the same way I did
+   (`BITWARDENCLI_APPDATA_DIR=$(mktemp -d) dotf doctor`) — that is the one-command reproduction.
+2. **Decide tier 3's severity and make the artifacts agree.** Either key the sync-failure branch to
+   `live` (with `TestBWReach_UnlockedSyncFailureIsAdvisoryWhenUnexposed` or similar), or amend
+   `proposal.md` to say the flat FAIL is deliberate and why doctor's own PAT precedent does not
+   apply. Either satisfies the gate.
+3. **Prove the check is registered.** One assertion that `Run(...)` in full mode emits
+   `Bitwarden reach (live secrets SSOT)`, verified red with `doctor.go:89` removed.
+4. Non-gating: stop emitting `rep.Fix` on a read-only run (it inflates `Applied N fix action(s)`);
+   add the node/npm trigger to risk 3; note the cwd-walk-up severity loss; cite or soften the 30d
+   provenance.
+5. Then the archive checklist's remaining items — `status: archived`, move the folder, close #944
+   with the PR link. The `docs/lessons.md` promotion is already done this round.
 
-**Re-review is required, not optional:** steps 1-3 touch `proposal.md`, `tasks.md` and add tests, and
-`proposal.md`/`tasks.md` are contract files — so this review goes stale by construction the moment
-they change (`cli/internal/spec/review.go`, `contractFiles`). The path to green is fix → one fresh
-`/adversarial-review` against the new head, not patch-then-archive against this file.
+**Re-review is required, not optional.** Steps 2-4 touch `proposal.md` and/or `tasks.md`, both
+contract files (`cli/internal/spec/review.go:23`), so this verdict goes stale by construction the
+moment they change. The path to green is fix → one fresh `/adversarial-review` against the new head,
+in a session that did not write the fix.

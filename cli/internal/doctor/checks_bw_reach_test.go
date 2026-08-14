@@ -107,7 +107,7 @@ func TestCommandOutputBounded_KillsAnOverrunningCommand(t *testing.T) {
 	sys := realSystem()
 
 	start := time.Now()
-	_, err := sys.CommandOutputBounded(150*time.Millisecond, "sleep", "10")
+	_, _, err := sys.CommandOutputBounded(150*time.Millisecond, "sleep", "10")
 	elapsed := time.Since(start)
 
 	if err == nil {
@@ -128,12 +128,35 @@ func TestCommandOutputBounded_PassesThroughFastCommands(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("no portable echo binary semantics on Windows")
 	}
-	out, err := realSystem().CommandOutputBounded(10*time.Second, "echo", "alive")
+	out, _, err := realSystem().CommandOutputBounded(10*time.Second, "echo", "alive")
 	if err != nil {
 		t.Fatalf("a fast command must not error: %v", err)
 	}
 	if !strings.Contains(out, "alive") {
 		t.Fatalf("output must pass through, got %q", out)
+	}
+}
+
+// The seam must keep the two streams APART. Merging them is what let one line of
+// bw startup chatter defeat the whole reach check: `bw` contracts JSON on stdout
+// and diagnostics on stderr, and its first invocation on a fresh machine prints
+// `Could not find data file, "…/data.json"; creating it instead.` to stderr.
+// Asserted against realSystem(), because the fake cannot prove a property of the
+// production closure.
+func TestCommandOutputBounded_KeepsStreamsSeparate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell redirection")
+	}
+	stdout, stderr, err := realSystem().CommandOutputBounded(
+		10*time.Second, "sh", "-c", "echo to-stdout; echo to-stderr >&2")
+	if err != nil {
+		t.Fatalf("command must succeed: %v", err)
+	}
+	if !strings.Contains(stdout, "to-stdout") || strings.Contains(stdout, "to-stderr") {
+		t.Fatalf("stdout must carry only stdout, got %q", stdout)
+	}
+	if !strings.Contains(stderr, "to-stderr") || strings.Contains(stderr, "to-stdout") {
+		t.Fatalf("stderr must carry only stderr, got %q", stderr)
 	}
 }
 
@@ -289,6 +312,98 @@ func TestBWReach_UnlockedVaultProvesReach(t *testing.T) {
 	}
 }
 
+// Every other test in this file calls checkBitwardenReach directly, so deleting
+// its registration in Run() (doctor.go) left the entire cli/ suite green — 13
+// packages ok, exit 0. A Run() refactor or a bad merge resolution could drop the
+// whole reach section and CI would not notice: the same class as #898 (a check
+// never observed failing is not evidence) that this spec exists to fix, one
+// level up from round 1's surviving producer mutant.
+//
+// The section header is emitted before the has("bw") skip, so this holds whether
+// or not bw is installed on the machine running the tests.
+func TestRun_RegistersTheBitwardenReachSection(t *testing.T) {
+	home := t.TempDir()
+	sys := newSys(nil, nil, nil)
+	sys.Getenv = func(k string) string {
+		if k == "HOME" || k == "USERPROFILE" {
+			return home
+		}
+		return ""
+	}
+
+	var out bytes.Buffer
+	if _, err := Run(Options{Out: &out, System: sys, StartDir: home, Verbose: true}); err != nil {
+		t.Fatalf("doctor run: %v", err)
+	}
+	if !strings.Contains(out.String(), "Bitwarden reach") {
+		t.Fatal("full-mode doctor must run the Bitwarden reach section — it is unregistered in Run()")
+	}
+}
+
+// bw prints diagnostics on stderr while contracting JSON on stdout. Reading a
+// MERGED stream made one line of chatter fail the json.Unmarshal, and the check
+// then returned early — skipping all three tiers and reporting only "no
+// parseable JSON". The state is not exotic: it is bw's first invocation on a
+// machine, i.e. exactly what `dotf doctor` triggers at the end of setup-linux.sh
+// on a freshly provisioned box. Post-migration it also silently downgrades the
+// AC1 FAIL to a WARN, defeating the escalation the severity policy exists for.
+func TestBWReach_ToleratesCLIChatterOnStderr(t *testing.T) {
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	sys := newSys(nil, []string{"bw"}, nil)
+	sys.BWBackedSecrets = func() (int, error) { return 3, nil }
+	sys.CommandOutputBounded = func(_ time.Duration, _ string, _ ...string) (string, string, error) {
+		return bwStatusJSON("unauthenticated", ""),
+			`Could not find data file, "/home/u/.config/Bitwarden CLI/data.json"; creating it instead.`,
+			nil
+	}
+	checkBitwardenReach(sys, rep)
+
+	out := buf.String()
+	if strings.Contains(out, "no parseable JSON") {
+		t.Fatalf("stderr chatter must not defeat the stdout parse; got:\n%s", out)
+	}
+	// The tier must still reach its verdict: exposure is 3, so this is a FAIL.
+	if rep.Failures() != 1 {
+		t.Fatalf("tier 1 must still evaluate and FAIL at exposure 3; got %d\n%s", rep.Failures(), out)
+	}
+	if !strings.Contains(out, "bw login") {
+		t.Fatalf("the FAIL must still name the recovery verb; got:\n%s", out)
+	}
+}
+
+// Severity follows exposure on the sync tier too, not only on the
+// unauthenticated one. With every registry entry still on age, an unreachable
+// vault breaks nothing — and a flat FAIL would exit doctor 1 merely because the
+// machine is offline or the 45s deadline fired. doctor's own precedent for an
+// unreachable remote is a WARN (checks_pat.go, api.github.com).
+func TestBWReach_SyncFailureIsAdvisoryAtZeroExposure(t *testing.T) {
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	sys := newSys(nil, []string{"bw"}, nil)
+	sys.BWBackedSecrets = func() (int, error) { return 0, nil }
+	sys.CommandOutputBounded = func(_ time.Duration, _ string, args ...string) (string, string, error) {
+		if len(args) > 0 && args[0] == "status" {
+			return bwStatusJSON("unlocked", bwSyncFresh), "", nil
+		}
+		return "", "", errors.New("bw timed out after 45s")
+	}
+	checkBitwardenReach(sys, rep)
+
+	out := buf.String()
+	if rep.Failures() != 0 {
+		t.Fatalf("nothing resolves through bw yet, so an unreachable vault must not FAIL; got %d\n%s",
+			rep.Failures(), out)
+	}
+	if !strings.Contains(out, "no backend:bw secret depends on it yet") {
+		t.Fatalf("the WARN must say why it is advisory; got:\n%s", out)
+	}
+	// The reason still has to reach the operator, or the WARN is unactionable.
+	if !strings.Contains(out, "timed out") {
+		t.Fatalf("the WARN must carry the underlying failure; got:\n%s", out)
+	}
+}
+
 // The failing direction: unlocked but the server rejects the token — the exact
 // shape of the incident, which `bw list` (local cache) would have passed.
 func TestBWReach_UnlockedButSyncFailsIsAFail(t *testing.T) {
@@ -296,11 +411,11 @@ func TestBWReach_UnlockedButSyncFailsIsAFail(t *testing.T) {
 	rep := capture(&buf)
 	sys := newSys(nil, []string{"bw"}, nil)
 	sys.BWBackedSecrets = func() (int, error) { return 2, nil }
-	sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, error) {
+	sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, string, error) {
 		if len(args) > 0 && args[0] == "status" {
-			return bwStatusJSON("unlocked", bwSyncFresh), nil
+			return bwStatusJSON("unlocked", bwSyncFresh), "", nil
 		}
-		return "invalid_grant\nnode:internal/process/promises:322", errors.New("exit status 1")
+		return "", "invalid_grant\nnode:internal/process/promises:322", errors.New("exit status 1")
 	}
 	checkBitwardenReach(sys, rep)
 	rep.Summary()

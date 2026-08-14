@@ -10,6 +10,7 @@
 package doctor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -81,7 +82,16 @@ type System struct {
 	// there hangs a bootstrap. It is the exec-side analogue of the 5s cap already
 	// placed on the HTTPGet seam, and exists because that cap taught nothing to
 	// the callers that shell out instead.
-	CommandOutputBounded func(d time.Duration, name string, args ...string) (string, error)
+	//
+	// It returns the two streams SEPARATELY, unlike CommandOutput's
+	// CombinedOutput. Its callers parse machine-readable stdout (`bw status`
+	// emits JSON there and human diagnostics on stderr), and merging the two
+	// means one line of CLI chatter makes the parse fail — which is not a
+	// theoretical concern: `bw`'s first invocation on a fresh machine prints
+	// `Could not find data file, "…/data.json"; creating it instead.` to stderr,
+	// so a merged read silently skipped every tier of the reach check on exactly
+	// the freshly-provisioned box setup-linux.sh had just finished building.
+	CommandOutputBounded func(d time.Duration, name string, args ...string) (stdout, stderr string, err error)
 }
 
 // realSystem wires System to the live OS.
@@ -119,14 +129,18 @@ func realSystem() *System {
 		GOOS:            runtime.GOOS,
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
-		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, error) {
+		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)
 			defer cancel()
-			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			cmd := exec.CommandContext(ctx, name, args...)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			err := cmd.Run()
 			if ctx.Err() != nil {
-				return string(out), fmt.Errorf("%s timed out after %s", name, d)
+				return stdout.String(), stderr.String(), fmt.Errorf("%s timed out after %s", name, d)
 			}
-			return string(out), err
+			return stdout.String(), stderr.String(), err
 		},
 	}
 }

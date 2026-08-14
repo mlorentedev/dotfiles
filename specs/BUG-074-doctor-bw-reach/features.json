@@ -36,8 +36,29 @@
   },
   {
     "id": "BUG-074-doctor-bw-reach-f6",
-    "behavior": "Network-bound bw subprocesses are killed at their deadline rather than hanging the diagnostic (and, through it, setup-linux.sh)",
+    "behavior": "Network-bound bw subprocesses are killed at their deadline rather than hanging the diagnostic (and, through it, setup-linux.sh), and the two streams stay separate so CLI chatter on stderr cannot defeat a stdout parse",
     "verification": "cd cli && go test ./internal/doctor/ -run 'TestCommandOutputBounded_'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f7",
+    "behavior": "bw's own stderr diagnostics do not defeat the status parse: all three tiers still evaluate on a machine where bw has never run before",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_ToleratesCLIChatterOnStderr$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f8",
+    "behavior": "A sync failure on an unlocked vault follows exposure like every other tier — advisory while nothing resolves through Bitwarden, a failure once something does",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestBWReach_(SyncFailureIsAdvisoryAtZeroExposure|UnlockedButSyncFailsIsAFail)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-074-doctor-bw-reach-f9",
+    "behavior": "The check is wired into the product: a full doctor run emits the Bitwarden reach section, so dropping its registration from Run() fails CI",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestRun_RegistersTheBitwardenReachSection$'",
     "state": "pending",
     "evidence": ""
   }

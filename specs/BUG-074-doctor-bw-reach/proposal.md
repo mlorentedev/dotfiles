@@ -70,9 +70,18 @@ migrated secret.
   session open, and not at all otherwise.
 
   The prevention claim belongs to **tier 2**, which needs no session: on a
-  locked vault the 30d staleness warning still fires, and 30d < the observed
-  45d, so it lands while the token is still renewable. That reassignment is
-  what makes the offline tier load-bearing rather than a nicety.
+  locked vault the 30d staleness warning still fires. That reassignment is what
+  makes the offline tier load-bearing rather than a nicety.
+
+  How much prevention it buys is bounded by something not yet established. The
+  incident shows the token was dead **by** 45d; it does not show it was alive at
+  30d, and no upstream Bitwarden refresh-token lifetime is cited here or in the
+  code. So the honest claim is that 30d warns *earlier than the only expiry we
+  have observed* — not that it warns while the token is still renewable. If the
+  real idle lifetime turns out to be ≤30d, tier 2 warns post-mortem and the
+  threshold needs lowering. Pinning it down means either finding the documented
+  lifetime or observing a second expiry; until one of those happens, the number
+  is an educated floor, not a derived one.
 - **Severity source must not be the deployed registry.** Counting through
   `cfg.DotfilesDir` (`~/.dotfiles`) would read the copy that lags the checkout
   during exactly the migration this guards, holding severity at advisory as
@@ -98,9 +107,18 @@ migrated secret.
   2. `bw` is not installed in the integration image, so the reach check `Skip`s
      before it can evaluate anything.
 
-  Both are load-bearing. Removing either — making doctor fatal in setup, or
-  adding `bw` to the image — turns a migrated registry into a red CI, so
-  whichever of those changes lands first must also add a headless escape hatch.
+  Both are load-bearing, and safeguard (b) rests on a precondition worth naming
+  because it is nobody's stated intention: `packages.json` declares `bw` as an
+  npm-sourced tool (`@bitwarden/cli`, profile `full`) and `setup-linux.sh:301`
+  runs `dotf tools install`, so `bw` is absent from the integration image only
+  because that image installs no node/npm. Adding node for any unrelated reason
+  installs `bw` too, and activates this check in CI as a side effect.
+
+  So there are three triggers, not two, that turn a migrated registry into a red
+  CI: making doctor fatal in setup, adding `bw` to the image directly, or adding
+  node/npm to it for something else entirely. Whichever lands first must also
+  add a headless escape hatch. Nothing currently asserts any of the three, which
+  is why they are written down here.
 
 - **Network subprocesses must be bounded.** `bw status` and `bw sync` are the
   only network-bound `CommandOutput` callers in doctor, and plain `CommandOutput`
