@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: b6f397ec0ef53093
+generated_sha: 3829f1e301964465
 id: adversarial-review-skill
 type: skill
 status: active
@@ -16,7 +16,7 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 
 > Act as an **independent adversarial reviewer**: assume gaps, flaws, or unsafe behavior may exist until you have argued against them with evidence. Intended for the **verification window** of spec-driven development (after implementation, BEFORE running `/spec archive` or `dotf spec archive`), ideally run by a different agent/session than the one that implemented the change.
 >
-> **Do NOT** prescribe which agent, model, or IDE to use. That is the human's choice. Default to skepticism over agreement; refuse to rubber-stamp.
+> **Do not invent** which agent, model, or IDE to use — but do not treat it as open either. Where a repo declares a **reviewer pool**, the human has already made that choice and recorded it, and the pool is binding. Read it; do not re-litigate it. Where a repo declares none, the choice remains the human's and you propose rather than pick. Default to skepticism over agreement; refuse to rubber-stamp.
 >
 > **Origin:** ported from [LIDR-academy/lidr-specboot](https://github.com/LIDR-academy/lidr-specboot/blob/main/ai-specs/skills/adversarial-review/SKILL.md) (`adversarial-review`, MIT). Adapted: OpenSpec references replaced with `pattern-spec-driven-development` artifacts (`specs/<feature-id>/{proposal,tasks,verification}.md`); archive command updated to vault-rooted `/spec archive`.
 
@@ -33,12 +33,34 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 - During implementation (use `enrich-us` or `/spec fill` instead — wrong phase).
 - For trivial changes that bypassed SDD per Skip rules.
 - As a single-agent self-review (the value is *independence* — different session/agent from the implementer).
+- On a model outside the repo's reviewer pool, where one exists. Not merely discouraged: `dotf spec archive` refuses such a review, so it is wasted work.
+
+## Launching a review
+
+Where the repo declares `harness/reviewer-pool.json`, there is one entry point and it does the pinning for you:
+
+```bash
+dotf spec review <feature-id>                             # the pool's primary reviewer
+dotf spec review <feature-id> --reviewer <pool-id>        # a specific pool member
+dotf spec review <feature-id> --dry-run                   # print the command, run nothing
+dotf spec review <feature-id> --foreground                # no detached session
+```
+
+It resolves the model from the pool, passes provider and model **explicitly** to the runner, launches in a detached tmux session named `review-<feature-id>` so the run can be watched (`tmux attach -t review-<feature-id>`), and tees a machine-readable transcript beside `review.md`.
+
+Three things not to work around:
+
+- **Never fall back to a runner's default model.** A runner's configured default lives in unversioned per-machine state, so a review that "ran on the right model" on one box silently runs on another elsewhere — the pin has to be on the command line. This is a real incident, not a hypothetical: a review once counted as independent only because one machine's config happened to agree with the intent, while the tool's documented default was a different provider entirely.
+- **The tool is not the guarantee; the model id is.** A single agent CLI can serve several providers, including the one you are trying to avoid. "Run it with `<tool>`" constrains nothing on its own.
+- **Record `reviewer:` exactly as the pool spells it.** It is self-reported and matched exactly, so a different spelling of the right model is refused for a string mismatch — burning a whole review round on punctuation.
+
+Without a pool, launch it however the human directs, and keep the prompt thin: the feature-id and the repo, no design rationale, or the independence is cosmetic.
 
 ## Agent-Side Activation Rule
 
 > **Proactive mode.** This skill is otherwise *reactive* — it runs when a human types `/adversarial-review …`. This rule makes the agent *proactive*: when a spec's implementation is complete and its PR is about to be opened or merged, the agent PROPOSES the review itself. The always-on trigger that primes this lives in `AGENTS.md` ("Spec-Driven Development" → *Proactive (verification window)*); this section is the SSOT for *how* the agent decides and *how* it phrases the proposal.
 >
-> The agent proposes; it does **not** supply the verdict for a change it implemented. That is the single-agent self-review forbidden above, and it is why the proposal names the *choice* of reviewer instead of making it.
+> The agent proposes; it does **not** supply the verdict for a change it implemented. That is the single-agent self-review forbidden above. Where the repo declares a pool, the choice of reviewer was made by the human in advance and written down, so the agent may launch it without asking who — what it must never do is *be* it. Where there is no pool, the proposal names the choice instead of making it.
 
 ### Checks the agent runs
 
@@ -53,9 +75,11 @@ If 1–3 hold and 4 does not → propose.
 
 ### How to phrase the proposal
 
-State the evidence, name the consequence, leave the choice of reviewer to the human. Template:
+State the evidence, name the consequence, and name the command. Where a pool exists the reviewer is already decided, so proposing means offering to *run* it — not asking who should. Template:
 
-> `<feature-id>` is implemented and its PR is about to merge — this is the **verification window**. `dotf spec archive` will refuse without a fresh, passing `specs/<feature-id>/review.md`, and I implemented this change, so **I cannot be the reviewer**. Run `/adversarial-review <feature-id>` in a separate session? Give it a deliberately thin prompt — the feature-id and the repo, no design rationale — or the independence is cosmetic.
+> `<feature-id>` is implemented and its PR is about to merge — this is the **verification window**. `dotf spec archive` will refuse without a fresh, passing `specs/<feature-id>/review.md`, and I implemented this change, so **I cannot be the reviewer**. The pool's primary is `<pool-primary-id>`. Run `dotf spec review <feature-id>`? It launches detached, so you can watch it with `tmux attach -t review-<feature-id>`.
+
+Without a pool, the choice is still the human's, and the older phrasing applies: offer to run `/adversarial-review <feature-id>` in a separate session, with a deliberately thin prompt.
 
 - **Say which session you are.** If you implemented the change, that fact is what makes the proposal necessary; leading with it is the evidence, not a disclaimer.
 - **Name the escapes honestly.** If the review genuinely does not fit, the declared paths are `review: waived` + a reason in `proposal.md`, or `--force-without-review`. Surface them; never take one unilaterally.

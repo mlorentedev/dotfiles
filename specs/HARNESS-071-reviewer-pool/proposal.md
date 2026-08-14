@@ -42,9 +42,21 @@ sitting one field away from the check that would use it.
 
 Three layers. Only one of them enforces, and saying which is the point.
 
-1. **Pool as data** — `harness/reviewer-pool.json`, an ordered array of
-   `provider/model` ids. First entry is the launcher's primary; the whole array
-   is the gate's allow-list. One field, both jobs.
+1. **Pool as data** — `harness/reviewer-pool.json`, an ordered array of entries.
+   The first entry is the launcher's primary; the whole array is the gate's
+   allow-list.
+
+   | Field | Consumed by | Meaning |
+   |---|---|---|
+   | `id` | **gate** | The canonical string a reviewer records in `review.md`'s `reviewer:`, matched exactly. This is the only field that is a contract. |
+   | `runner` | launcher | Which CLI invokes it (`pi`, `agy`). |
+   | `provider` | launcher | Passed as `--provider`; required by `pi`, absent for `agy`, which has no such flag. |
+   | `model` | launcher | Passed as `--model`. |
+   | `role` | humans | `primary` / `fallback`, informational — order is what actually decides. |
+   | `why` | humans | Rationale; deliberately not parsed, so editing it can never break either consumer. |
+
+   `loadReviewerPool` derives the gate's id list from these entries, so the gate
+   and the launcher can never disagree about what the pool says.
 2. **Gate** — `checkReviewGate` additionally refuses a `review.md` whose
    `reviewer:` is not in the pool. This is the layer that makes the rule true
    when nobody is watching.
@@ -78,9 +90,21 @@ design quietly wrong:
 
 Decided explicitly, because these are the design rather than details:
 
-- **Pool file absent → skip the check.** `dotf` runs in repos that have no pool,
-  and requiring one everywhere would break them. Deleting the pool is a visible
-  diff, which is the same auditable-escape philosophy as `review: waived`.
+- **Never had a pool → skip the check.** `dotf` runs in repos that never opted
+  into this gate, and requiring one everywhere would break them.
+- **Had a pool, now missing → refuse.** Absence alone is ambiguous and the two
+  meanings need opposite answers. A bad merge, a stray delete or a `.gitignore`
+  mistake must not silently stop the gate checking who reviews — a safety check
+  disappearing with no signal at the moment it stops applying is the worst
+  shape available. The two cases are told apart by asking git whether the file
+  is in this repo's history, which needs no `enabled` key and follows the
+  precedent already in the package (`gitStaleness` asks history too).
+
+  This also means **deleting the file is not the way to switch the gate off**.
+  An earlier draft treated it as the escape hatch; the adversarial review on
+  #959 pointed out that this is exactly the "blank the config to hide the work"
+  shape a safety check must not have. The declared escapes stay per-spec and
+  auditable: `review: waived` with a reason, or `--force-without-review`.
 - **Pool present but malformed → refuse.** A gate fails toward refusing
   (`archive.go`'s own stated rule).
 - **Exact string match, trimmed.** The refusal prints both the found `reviewer:`

@@ -40,44 +40,92 @@ created: "2026-08-13"
 
 ## Slice 2 — the launcher
 
-> **Slices 2 and 3 land in a follow-up PR.** Slice 1 is the layer that enforces
-> and is complete and independently verifiable on its own; the launcher is
-> convenience on top of it. Splitting keeps both within the PR-sizing policy, and
-> the unticked boxes below are the declared remainder — not an incomplete
-> checklist for the PR that carries slice 1.
+> **Slice 1 shipped separately, in #958.** It is the layer that enforces, and it
+> is independently verifiable on its own; splitting kept both PRs within the
+> sizing policy. This PR (#959) carries slices 2 and 3, so the boxes below are
+> this PR's own checklist rather than a declared remainder.
 
-- [ ] [AC4] `dotf spec review <spec-id>`: resolve the primary from the pool and
-      pass `--provider`/`--model` **explicitly**. Not optional polish — BUG-074
-      round 3 was pinned only because `~/.pi/agent/settings.json` on this machine
-      happens to default to nan; pi's own default provider is `google`, and that
-      file is unversioned per-machine state.
-- [ ] [AC5] Named tmux session `review-<spec-id>` so the run is watchable while
+- [x] [AC4] `dotf spec review <spec-id>`: resolve the primary from the pool and
+      pin the model **explicitly**, per runner rather than uniformly — `pi` takes
+      `--provider` *and* `--model`, while `agy` has no `--provider` at all and
+      selects the family through `--model` alone. An entry missing what its own
+      runner needs is an error, never a fall-back to that runner's default.
+
+      Not optional polish: BUG-074 round 3 was pinned only because
+      `~/.pi/agent/settings.json` on this machine happens to default to nan, and
+      `pi --help` documents its own default provider as `google`. That file is
+      unversioned per-machine state.
+- [x] Flags verified against the installed binaries rather than assumed, twice
+      over. An earlier draft invented a `--prompt-file` that neither runner has;
+      a later one assumed both took the prompt positionally, which is true of
+      `pi` but not of `agy`, whose `--print` consumes the prompt as its value.
+- [x] [AC5] Named tmux session `review-<spec-id>` so the run is watchable while
       it happens. Windows / no-tmux degrades to foreground and says so.
-- [ ] [AC6] Machine-readable transcript beside `review.md` (`pi --mode json`,
-      `agy --output-format stream-json`). Check the size before making it a habit.
-- [ ] Raise `agy --print-timeout` — it defaults to 5m and round 3 took ~25m, so
-      the fallback dies on defaults. A concrete instance of "configured is not
-      exercised".
-- [ ] [AC7] Prove the Gemini arm with one real review. NaN's evidence already
-      exists (BUG-074 round 3); a fallback never observed working is decoration.
+- [x] [AC6] Machine-readable transcript teed beside `review.md` (`pi --mode
+      json`, `agy --output-format stream-json`).
+- [x] Raise `agy --print-timeout` to 90m — it defaults to 5m and round 3 took
+      ~25m, so the fallback dies on defaults. A concrete instance of
+      "configured is not exercised".
+- [x] Shell-quote every wrapped argument: tmux re-parses its command through a
+      shell and so does `sh -c`, and the prompt carries quotes, backticks and
+      newlines. Unquoted, a `$(…)` in a prompt would execute.
+- [x] Refuse an out-of-pool model at the launcher too — defence in depth, and it
+      names what IS available rather than only what is forbidden.
+- [x] Mutation-test the launcher — 6 mutants, **6 detected**.
+- [ ] [AC7] Prove the Gemini arm with one **real review**. STILL OPEN, and the
+      box stays unticked until a review artifact exists.
+
+      An earlier revision of this file ticked it on the grounds that the run had
+      been *launched* through `dotf spec review --reviewer
+      agy/gemini-3.1-pro-high`. That was the wrong claim to tick: the criterion
+      says review, `verification.md` said in the same breath that the fallback
+      had not cleared the bar, and a `[x]` beside "prove it with a real review"
+      reads as done no matter what the prose underneath says. The adversarial
+      review of this very spec caught it, which is the mechanism working.
+
+      What the launch attempts have established so far:
+
+      1. `agy` answers non-interactively on the pinned model and reports itself
+         as Gemini 3.1 Pro — invocation and pin work.
+      2. The first launch through the launcher produced a **greeting and nothing
+         else**, because `agy --print` consumes a value and had swallowed
+         `--model`. Fixed; the argv now passes `--print` last.
+      3. The second launch is running at the time of writing. Until it writes a
+         `review.md`, the arm is unproven.
+
+      NaN cleared this bar in BUG-074 round 3 by re-running the spec's own
+      mutation battery rather than trusting its table. A fallback never observed
+      doing the job is decoration.
 
 ## Slice 3 — the standing rule where agents read it
 
-- [ ] Amend the skill's "Do NOT prescribe which agent, model, or IDE" line: the
-      pool records the human's standing choice and the gate enforces it, so the
-      skill should point at the pool rather than imply the reviewer is free to
-      choose. **Edit the vault source** (`00_meta/skills/adversarial-review/`),
-      direct to master, then `compile-harness.sh --refresh` — the repo copy is
-      generated. Check no other session has staged vault work first.
+- [x] Amend the skill's "Do NOT prescribe which agent, model, or IDE" line: it
+      now says the pool is binding where one exists, and the no-pool case — where
+      the choice really is still the human's — is preserved unchanged. Edited in
+      the **vault source** and re-rendered with `compile-harness.sh --refresh`;
+      editing the repo record directly would have been reverted by the next
+      refresh. Vault was clean and on master before committing.
+- [x] Add a "Launching a review" section to the skill. An agent that knows it
+      must not review its own change and does not know how to hand the job off
+      simply stops, so the rule needed the command beside it.
+- [x] Carry the same statement to the two surfaces agents actually read:
+      `AGENTS.md`'s verification-window trigger and `.claude/CLAUDE.md`'s
+      workflow section.
 
 ## Closing
 
-- [ ] Every acceptance criterion covered by at least one test
-- [ ] `features.json` entries with non-vacuous verification commands
-- [ ] `go build ./...`, `go vet ./...`, `golangci-lint run` (pinned)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-- [ ] Fresh adversarial review — on a pooled model, which this spec is about
+- [x] Every acceptance criterion covered by at least one test
+- [x] `features.json` entries with non-vacuous verification commands — 10
+      criteria, each running real tests (1/2/6/2/1/5/3/3/3/1)
+- [x] `go build ./...`, `go vet ./...`, `golangci-lint run` (pinned 2.12.2) — 0 issues
+- [x] `verification.md` filled in
+- [x] PRs opened referencing this spec folder: #958 (gate, merged), #959 (launcher)
+- [x] CodeRabbit's review on #959 triaged: 2 Majors on the shell wrappers and 2
+      on the pool/AC7 applied; the table-driven-tests Major deferred with a
+      stated reason (see below)
+- [ ] Fresh adversarial review — on a pooled model, which this spec is about.
+      Blocked on AC7: the fallback arm has to produce a review before this spec
+      can credibly claim the mechanism works.
 
 ## Machine-readable features
 
