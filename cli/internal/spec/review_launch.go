@@ -8,11 +8,20 @@ import (
 	"time"
 )
 
-// Deadlines for a reviewer subprocess. An adversarial review reads a spec, runs
-// the test suite, and mutation-tests the change — BUG-074's third round took
-// roughly 25 minutes of wall clock. agy's --print-timeout defaults to 5m, so the
-// fallback would die on defaults; this is passed explicitly for that reason.
-const reviewerTimeout = 90 * time.Minute
+// DefaultReviewerTimeout bounds a reviewer subprocess.
+//
+// It has to clear a real review — BUG-074's third round took roughly 25 minutes
+// of wall clock, reading the spec, running the suite and mutation-testing the
+// change — while staying short enough that a STUCK reviewer is noticed rather
+// than waited on. An earlier draft used 90m, which is the wrong end of that
+// trade: a hung run held for an hour and a half before anyone could tell it
+// apart from a slow one, and slow-versus-hung is precisely the distinction a
+// deadline exists to make.
+//
+// agy's own --print-timeout defaults to 5m, well under a real review, so this is
+// always passed explicitly rather than inherited. Override per run with
+// `dotf spec review --timeout` when a spec genuinely warrants longer.
+const DefaultReviewerTimeout = 30 * time.Minute
 
 // TranscriptFile is where a launched review's machine-readable event stream is
 // written, beside the review.md it produces.
@@ -60,7 +69,10 @@ type ReviewerEntry struct {
 //
 // Every flag here is verified against the installed binaries. An earlier draft
 // also invented a --prompt-file that neither runner has.
-func ReviewerCommand(e ReviewerEntry, prompt string) ([]string, error) {
+func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration) ([]string, error) {
+	if timeout <= 0 {
+		timeout = DefaultReviewerTimeout
+	}
 	if strings.TrimSpace(e.Model) == "" {
 		return nil, fmt.Errorf("pool entry %q has no model to pin — the launcher must not fall back to a runner default", e.ID)
 	}
@@ -96,7 +108,7 @@ func ReviewerCommand(e ReviewerEntry, prompt string) ([]string, error) {
 			"agy",
 			"--model", e.Model,
 			"--output-format", "stream-json",
-			"--print-timeout", reviewerTimeout.String(),
+			"--print-timeout", timeout.String(),
 			"--print", prompt,
 		), nil
 

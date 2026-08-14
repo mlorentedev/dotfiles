@@ -1,8 +1,10 @@
 package spec
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // argvIndex returns the position of flag in argv, or -1.
@@ -32,7 +34,7 @@ func TestReviewerCommandPinsProviderAndModelExplicitly(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "nan/deepseek-v4-flash", Runner: "pi",
 		Provider: "nan", Model: "deepseek-v4-flash",
-	}, "review this spec")
+	}, "review this spec", 0)
 	if err != nil {
 		t.Fatalf("building the pi command: %v", err)
 	}
@@ -61,7 +63,7 @@ func TestReviewerCommandRunsThroughTheSecretsFacade(t *testing.T) {
 		{ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x"},
 		{ID: "agy/y", Runner: "agy", Model: "y"},
 	} {
-		argv, err := ReviewerCommand(e, "p")
+		argv, err := ReviewerCommand(e, "p", 0)
 		if err != nil {
 			t.Fatalf("%s: %v", e.ID, err)
 		}
@@ -77,7 +79,7 @@ func TestReviewerCommandRunsThroughTheSecretsFacade(t *testing.T) {
 func TestReviewerCommandRaisesTheAgyPrintTimeout(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
-	}, "p")
+	}, "p", 0)
 	if err != nil {
 		t.Fatalf("building the agy command: %v", err)
 	}
@@ -93,7 +95,7 @@ func TestReviewerCommandRaisesTheAgyPrintTimeout(t *testing.T) {
 // A machine-readable stream is the only record of HOW a reviewer reasoned. The
 // verdict alone is not auditable by anyone who was not watching.
 func TestReviewerCommandRequestsAMachineReadableStream(t *testing.T) {
-	pi, err := ReviewerCommand(ReviewerEntry{ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x"}, "p")
+	pi, err := ReviewerCommand(ReviewerEntry{ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x"}, "p", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +103,7 @@ func TestReviewerCommandRequestsAMachineReadableStream(t *testing.T) {
 		t.Errorf("pi must emit json, got %q", argvValue(pi, "--mode"))
 	}
 
-	agy, err := ReviewerCommand(ReviewerEntry{ID: "agy/y", Runner: "agy", Model: "y"}, "p")
+	agy, err := ReviewerCommand(ReviewerEntry{ID: "agy/y", Runner: "agy", Model: "y"}, "p", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +123,7 @@ func TestReviewerCommandRefusesRatherThanFallBackToADefault(t *testing.T) {
 	}
 	for name, e := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := ReviewerCommand(e, "p"); err == nil {
+			if _, err := ReviewerCommand(e, "p", 0); err == nil {
 				t.Fatal("an unusable pool entry must error, not silently use a default")
 			}
 		})
@@ -139,8 +141,12 @@ func TestTmuxSessionNameIsDerivedFromTheSpec(t *testing.T) {
 
 func TestTranscriptLandsBesideTheReview(t *testing.T) {
 	got := TranscriptPath("/repo", "AI-001-x")
-	if !strings.HasSuffix(got, "specs/AI-001-x/"+TranscriptFile) {
-		t.Errorf("transcript must sit in the spec folder, got %q", got)
+	// Built with filepath.Join rather than a slash-joined literal: dotf is
+	// cross-platform and Join uses \\ on Windows, so a hardcoded "specs/…"
+	// asserts the separator instead of the structure and fails there.
+	want := filepath.Join("specs", "AI-001-x", TranscriptFile)
+	if !strings.HasSuffix(got, want) {
+		t.Errorf("transcript must sit in the spec folder\n want suffix: %q\n         got: %q", want, got)
 	}
 }
 
@@ -251,10 +257,12 @@ func TestWrappersQuoteAnArgumentThatWouldOtherwiseExecute(t *testing.T) {
 // a review never loads a skill from a harness its runner does not use.
 func TestReviewerSkillPathIsPerRunner(t *testing.T) {
 	pi, agy := ReviewerSkillPath("pi"), ReviewerSkillPath("agy")
-	if !strings.Contains(pi, ".pi/agent/skills") {
+	// Same reason as the transcript test: assert the path structure, not the
+	// separator the host happens to use.
+	if !strings.Contains(pi, filepath.Join(".pi", "agent", "skills")) {
 		t.Errorf("pi must read its own skills dir, got %q", pi)
 	}
-	if !strings.Contains(agy, ".gemini/skills") {
+	if !strings.Contains(agy, filepath.Join(".gemini", "skills")) {
 		t.Errorf("agy must read its own skills dir, got %q", agy)
 	}
 }
@@ -288,7 +296,7 @@ func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.
 func TestReviewerCommandGivesAgyThePromptAsThePrintValue(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high",
-	}, "REVIEW-PROMPT")
+	}, "REVIEW-PROMPT", 0)
 	if err != nil {
 		t.Fatalf("building the agy command: %v", err)
 	}
@@ -312,7 +320,7 @@ func TestReviewerCommandGivesAgyThePromptAsThePrintValue(t *testing.T) {
 func TestReviewerCommandGivesPiThePromptAsATrailingPositional(t *testing.T) {
 	argv, err := ReviewerCommand(ReviewerEntry{
 		ID: "nan/x", Runner: "pi", Provider: "nan", Model: "x",
-	}, "REVIEW-PROMPT")
+	}, "REVIEW-PROMPT", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,5 +329,45 @@ func TestReviewerCommandGivesPiThePromptAsATrailingPositional(t *testing.T) {
 	}
 	if argvValue(argv, "--print") == "REVIEW-PROMPT" {
 		t.Fatal("pi's --print is a boolean; giving it the prompt would consume the wrong token")
+	}
+}
+
+// A deadline exists to tell "slow" apart from "hung". Too short and a real
+// review is killed mid-flight; too long and a stuck run is indistinguishable
+// from a working one for as long as it lasts.
+//
+// This bounds the default from both sides. The floor is the ~25 minutes
+// BUG-074's third round actually took; the ceiling is the mistake this replaced,
+// a 90m default under which a hung reviewer held for an hour and a half before
+// anyone could tell.
+func TestDefaultReviewerTimeoutIsBoundedFromBothSides(t *testing.T) {
+	if DefaultReviewerTimeout < 26*time.Minute {
+		t.Errorf("too short: a real review took ~25m, got %s", DefaultReviewerTimeout)
+	}
+	if DefaultReviewerTimeout > 45*time.Minute {
+		t.Errorf("too long: a stuck reviewer must be noticed, not waited on, got %s", DefaultReviewerTimeout)
+	}
+}
+
+// The caller can raise it for a spec that genuinely warrants longer, and a zero
+// value means "unset" rather than "no deadline" — the one reading that would
+// silently restore the unbounded behaviour.
+func TestReviewerCommandHonoursAnExplicitTimeoutAndTreatsZeroAsUnset(t *testing.T) {
+	e := ReviewerEntry{ID: "agy/y", Runner: "agy", Model: "y"}
+
+	custom, err := ReviewerCommand(e, "p", 90*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := argvValue(custom, "--print-timeout"); got != "1h30m0s" {
+		t.Errorf("an explicit timeout must reach the runner, got %q", got)
+	}
+
+	zero, err := ReviewerCommand(e, "p", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := argvValue(zero, "--print-timeout"); got != DefaultReviewerTimeout.String() {
+		t.Errorf("zero must mean the default, not an absent deadline, got %q", got)
 	}
 }

@@ -94,6 +94,7 @@ func newSpecReviewCmd() *cobra.Command {
 		reviewer   string
 		foreground bool
 		dryRun     bool
+		timeout    time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -151,7 +152,7 @@ is the only record of how.`,
 
 			skill := spec.ReviewerSkillPath(chosen.Runner)
 			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, skill)
-			argv, err := spec.ReviewerCommand(chosen, prompt)
+			argv, err := spec.ReviewerCommand(chosen, prompt, timeout)
 			if err != nil {
 				return err
 			}
@@ -204,6 +205,8 @@ is the only record of how.`,
 	cmd.Flags().StringVar(&reviewer, "reviewer", "", "pool member to run (default: the pool's first entry)")
 	cmd.Flags().BoolVar(&foreground, "foreground", false, "run in this terminal instead of a detached tmux session")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command that would run, and exit")
+	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
+		"how long the reviewer may run before it is killed; a stuck run should be noticed, not waited on")
 	return cmd
 }
 
