@@ -42,9 +42,21 @@ sitting one field away from the check that would use it.
 
 Three layers. Only one of them enforces, and saying which is the point.
 
-1. **Pool as data** — `harness/reviewer-pool.json`, an ordered array of
-   `provider/model` ids. First entry is the launcher's primary; the whole array
-   is the gate's allow-list. One field, both jobs.
+1. **Pool as data** — `harness/reviewer-pool.json`, an ordered array of entries.
+   The first entry is the launcher's primary; the whole array is the gate's
+   allow-list.
+
+   | Field | Consumed by | Meaning |
+   |---|---|---|
+   | `id` | **gate** | The canonical string a reviewer records in `review.md`'s `reviewer:`, matched exactly. This is the only field that is a contract. |
+   | `runner` | launcher | Which CLI invokes it (`pi`, `agy`). |
+   | `provider` | launcher | Passed as `--provider`; required by `pi`, absent for `agy`, which has no such flag. |
+   | `model` | launcher | Passed as `--model`. |
+   | `role` | humans | `primary` / `fallback`, informational — order is what actually decides. |
+   | `why` | humans | Rationale; deliberately not parsed, so editing it can never break either consumer. |
+
+   `loadReviewerPool` derives the gate's id list from these entries, so the gate
+   and the launcher can never disagree about what the pool says.
 2. **Gate** — `checkReviewGate` additionally refuses a `review.md` whose
    `reviewer:` is not in the pool. This is the layer that makes the rule true
    when nobody is watching.
