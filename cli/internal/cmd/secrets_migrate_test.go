@@ -81,6 +81,30 @@ func TestSecretsMigrate_EndToEnd(t *testing.T) {
 	}
 }
 
+// TestSecretsMigrate_UsesDeclaredFolder proves migrate threads the registry's
+// bw.folder through to the create-item write, same as `set` — OPS-028 AC2.
+func TestSecretsMigrate_UsesDeclaredFolder(t *testing.T) {
+	const foldered = `
+version: 1
+secrets:
+  - id: NAN_API_KEY
+    plane: app
+    backend: age
+    age: nan.api-key
+    bw: { item: nan-api-key, field: api-key, folder: Dotfiles/apps }
+    expose: { env: NAN_API_KEY }
+    consumers: [local]
+`
+	fw := newFakeWriter()
+	fw.notFound["nan-api-key"] = true
+	if _, err := migrateExec(t, foldered, fw, "nan-value\n", "NAN_API_KEY", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if fw.createdIn["nan-api-key"] != "new-Dotfiles/apps" {
+		t.Errorf("createdIn = %v, want nan-api-key resolved via Dotfiles/apps", fw.createdIn)
+	}
+}
+
 func TestSecretsMigrate_ParityMismatchAbortsBeforeFlip(t *testing.T) {
 	fw := newFakeWriter()
 	fw.tamper = func(v string) string { return v + "X" } // bw stores a different value

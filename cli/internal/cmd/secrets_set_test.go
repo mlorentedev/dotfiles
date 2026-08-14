@@ -15,12 +15,14 @@ import (
 // ErrBWItemNotFound (absent); locked makes every read fail with a generic (locked)
 // error; sets/created record writes so tests assert exactly what was written.
 type fakeWriter struct {
-	cur      map[string]string
-	notFound map[string]bool
-	locked   bool
-	sets     map[string]string
-	created  map[string]string
-	tamper   func(string) string // optional: corrupt the STORED value so a read-back differs (parity tests)
+	cur       map[string]string
+	notFound  map[string]bool
+	locked    bool
+	sets      map[string]string
+	created   map[string]string
+	createdIn map[string]string   // item -> folder name resolved at creation (OPS-028)
+	folders   map[string]string   // folder name -> id; absent name -> ResolveFolder creates "new-<name>"
+	tamper    func(string) string // optional: corrupt the STORED value so a read-back differs (parity tests)
 }
 
 // store reflects a write into cur so a subsequent Field read-back sees it (migrate's
@@ -34,10 +36,12 @@ func (f *fakeWriter) store(item, field, value string) {
 
 func newFakeWriter() *fakeWriter {
 	return &fakeWriter{
-		cur:      map[string]string{},
-		notFound: map[string]bool{},
-		sets:     map[string]string{},
-		created:  map[string]string{},
+		cur:       map[string]string{},
+		notFound:  map[string]bool{},
+		sets:      map[string]string{},
+		created:   map[string]string{},
+		createdIn: map[string]string{},
+		folders:   map[string]string{},
 	}
 }
 
@@ -60,11 +64,27 @@ func (f *fakeWriter) SetField(item, field, value string) error {
 	return nil
 }
 
-func (f *fakeWriter) CreateItem(item, field, value string) error {
+func (f *fakeWriter) CreateItem(item, field, value, folderID string) error {
 	f.created[item+"/"+field] = value
+	f.createdIn[item] = folderID
 	delete(f.notFound, item) // the item now exists → subsequent reads resolve
 	f.store(item, field, value)
 	return nil
+}
+
+// ResolveFolder mimics BWPut.ResolveFolder's name→id + create-if-absent contract:
+// empty name is a no-op, an unseen name is "created" (idempotent — a repeat call
+// finds it in folders and returns the same id, never a duplicate).
+func (f *fakeWriter) ResolveFolder(name string) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+	if id, ok := f.folders[name]; ok {
+		return id, nil
+	}
+	id := "new-" + name
+	f.folders[name] = id
+	return id, nil
 }
 
 func useBwWriter(t *testing.T, w bwWriteClient) {
@@ -89,6 +109,7 @@ secrets:
   - {id: bw-token, plane: app, backend: bw, bw: {item: openai, field: api-key}, expose: {env: OPENAI_API_KEY}}
   - {id: bw-multi, plane: app, backend: bw, bw: {item: x-twitter}, expose: {env: {X_API_KEY: {field: api-key}, X_SECRET: {field: api-secret}}}}
   - {id: bw-file, plane: infra, backend: bw, bw: {item: kube, field: notes}, expose: {file: {var: KUBECONFIG, path: "~/.kube/c"}}}
+  - {id: bw-foldered, plane: app, backend: bw, bw: {item: foldered-item, field: api-key, folder: Dotfiles/apps}, expose: {env: FOLDERED_KEY}}
 `
 
 func runSetOut(t *testing.T, fw *fakeWriter, stdin string, args ...string) (string, error) {
@@ -199,6 +220,47 @@ func TestSecretsSet_CreateAbsent_Gated(t *testing.T) {
 	}
 	if len(fw3.created) != 0 {
 		t.Errorf("locked vault must NEVER create (could duplicate a hidden item): %v", fw3.created)
+	}
+}
+
+// TestSecretsSet_CreateAbsent_UsesDeclaredFolder proves createAbsent resolves the
+// registry's bw.folder and threads the resolved id into CreateItem — OPS-028 AC2, the
+// end-to-end counterpart of TestNewItemBody_Folder's pure JSON-body check.
+func TestSecretsSet_CreateAbsent_UsesDeclaredFolder(t *testing.T) {
+	fw := newFakeWriter()
+	fw.notFound["foldered-item"] = true
+	if _, err := runSetOut(t, fw, "fresh", "bw-foldered", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if fw.createdIn["foldered-item"] != "new-Dotfiles/apps" {
+		t.Errorf("createdIn = %v, want foldered-item resolved via Dotfiles/apps", fw.createdIn)
+	}
+}
+
+// TestSecretsSet_CreateAbsent_NoFolderDeclared proves the unfoldered case is unchanged
+// — an empty bw.folder resolves to an empty folderID (OPS-028 AC5, no regression).
+func TestSecretsSet_CreateAbsent_NoFolderDeclared(t *testing.T) {
+	fw := newFakeWriter()
+	fw.notFound["openai"] = true
+	if _, err := runSetOut(t, fw, "fresh", "bw-token", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := fw.createdIn["openai"]; !ok || got != "" {
+		t.Errorf("createdIn[openai] = %q, want empty (no folder declared)", got)
+	}
+}
+
+// TestSecretsSet_DryRun_NeverResolvesFolder proves --dry-run never triggers folder
+// resolution — ResolveFolder can CREATE a Bitwarden folder as a side effect, so a
+// dry-run declaring intent must not touch the vault at all (OPS-028).
+func TestSecretsSet_DryRun_NeverResolvesFolder(t *testing.T) {
+	fw := newFakeWriter()
+	fw.notFound["foldered-item"] = true
+	if _, err := runSetOut(t, fw, "fresh", "bw-foldered", "--dry-run"); err != nil {
+		t.Fatal(err)
+	}
+	if len(fw.folders) != 0 {
+		t.Errorf("dry-run must never resolve/create a folder: %v", fw.folders)
 	}
 }
 
