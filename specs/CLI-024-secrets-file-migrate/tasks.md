@@ -19,7 +19,7 @@ created: "2026-08-14"
 
 ## Implementation
 
-- [x] [P] [AC3] Write failing test `TestSecretsMigrate_FileSecret_ByteExact` (`secrets_migrate_test.go`): a file-secret fixture (`expose: { file: ... }`) with a multi-line value that has NO trailing newline, migrated via `migrateExec`, asserting the bw-written value is byte-identical (no trim, no addition).
+- [x] [P] [AC3] Write failing test `TestSecretsMigrate_FileSecret_ByteExact` (`secrets_migrate_test.go`): a file-secret fixture (`expose: { file: ... }`) with a multi-line value that HAS a trailing newline (like `age -d` appends — required so the `isFile` no-trim branch is regression-detectable, not a no-op), migrated via `migrateExec`, asserting the bw-written value is byte-identical (no trim, no addition).
 - [x] [AC1] [AC3] Relax `assertMigratable` (`registry_write.go`) to permit `s.Expose.File != nil` (skip the multi-var/per-var check, which does not apply to file secrets — `Vars()` already returns exactly one for them); update its doc comment and `SetBackendBW`'s doc comment to describe both shapes.
 - [x] [AC4] Fix the stale `#612 M3/M6` comment in `registry_write.go` — that milestone numbering does not exist in #612 (A/B/C phase letters); replace with an accurate description of what's actually still rejected (multi-var/per-var env secrets).
 - [x] [AC1] Remove `migrateGuard`'s file-secret rejection block (`secrets_migrate.go`); capture `isFile` from the existing `s.BWTarget("")` third return value (already correctly computed, previously discarded via `_`).

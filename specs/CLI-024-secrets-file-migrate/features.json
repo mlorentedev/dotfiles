@@ -8,7 +8,7 @@
   },
   {
     "id": "CLI-024-secrets-file-migrate-f2",
-    "behavior": "dotf secrets migrate ZOHO_RECOVERY_CODE still fails with the pre-existing #962 item-ambiguity error, not a new error introduced by this change",
+    "behavior": "dotf secrets migrate ZOHO_RECOVERY_CODE now surfaces the pre-existing #962 zoho item-ambiguity error, previously masked by the blanket file-secret guard this change removes",
     "verification": "DOTFILES_REPO_DIR=/home/manu/Projects/dotfiles-wt-secrets dotf secrets migrate ZOHO_RECOVERY_CODE 2>&1 | grep -q 'More than one result'",
     "state": "pending",
     "evidence": ""
@@ -22,7 +22,7 @@
   },
   {
     "id": "CLI-024-secrets-file-migrate-f4",
-    "behavior": "dotf secrets verify reports 33/33 OK after migrating the 5 non-Zoho file secrets, ZOHO_RECOVERY_CODE unaffected",
+    "behavior": "dotf secrets verify reports 33/33 OK after migrating the 5 non-Zoho file secrets, ZOHO_RECOVERY_CODE still correctly resolving via age (blocked on #962, not a regression)",
     "verification": "DOTFILES_REPO_DIR=/home/manu/Projects/dotfiles-wt-secrets dotf secrets verify 2>&1 | grep -q '33 ok, 0 missing, 0 failed'",
     "state": "pending",
     "evidence": ""
