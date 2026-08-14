@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -44,6 +44,49 @@ var runCommand = func(dir string, argv []string) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
+}
+
+// runForeground runs the reviewer in this terminal, streaming its output to both
+// the screen and the transcript.
+//
+// Deliberately NOT `sh -c '… | tee …'`, for two reasons that a shell pipeline
+// cannot satisfy:
+//
+//  1. In POSIX sh the status of `cmd | tee f` is TEE's status, and tee almost
+//     always succeeds — so a reviewer that crashes or hits its --print-timeout
+//     would exit 0 and be reported as a completed review. dash has no
+//     `set -o pipefail` to fix that, and the portable workaround is a
+//     file-descriptor dance nobody should have to read.
+//  2. `sh` is not on PATH on stock Windows, and this foreground path is exactly
+//     the fallback the command documents for machines without tmux — i.e. it
+//     would have failed on the platform it names, with a bare
+//     `exec: "sh": executable file not found`.
+//
+// io.MultiWriter needs no shell, preserves the child's real exit status, and
+// behaves identically everywhere.
+var runForeground = func(dir string, argv []string, transcript string) error {
+	f, err := os.Create(transcript)
+	if err != nil {
+		return fmt.Errorf("creating the transcript: %w", err)
+	}
+
+	c := exec.Command(argv[0], argv[1:]...)
+	c.Dir = dir
+	c.Stdout = io.MultiWriter(os.Stdout, f)
+	c.Stderr = io.MultiWriter(os.Stderr, f)
+	runErr := c.Run()
+
+	// Close is checked, not deferred-and-ignored: this file is being WRITTEN,
+	// and a failed close means buffered output never reached the disk. Silently
+	// dropping that would leave a truncated transcript looking complete — the
+	// artifact whose entire job is to record what happened.
+	//
+	// The reviewer's own error wins when both fail: it is the outcome the caller
+	// asked about, and a transcript problem is secondary to a failed review.
+	if closeErr := f.Close(); closeErr != nil && runErr == nil {
+		return fmt.Errorf("the review ran but its transcript could not be written: %w", closeErr)
+	}
+	return runErr
 }
 
 func newSpecReviewCmd() *cobra.Command {
@@ -130,13 +173,16 @@ is the only record of how.`,
 			cmd.Printf("Spec:       specs/%s\n", id)
 			cmd.Printf("Transcript: %s\n", transcript)
 
-			launch := spec.TeeWrap(argv, transcript)
+			launch := argv
 			if useTmux {
 				launch = spec.TmuxWrap(session, repoRoot, argv, transcript)
 			}
 
 			if dryRun {
-				cmd.Printf("\n[DRY RUN] would run:\n  %s\n", strings.Join(launch, " "))
+				// ShellJoin, not strings.Join: the tmux form's last element is a
+				// whole pipeline, so joining raw elements prints a line that
+				// cannot be pasted back into a shell.
+				cmd.Printf("\n[DRY RUN] would run:\n  %s\n", spec.ShellJoin(launch))
 				return nil
 			}
 
@@ -151,7 +197,7 @@ is the only record of how.`,
 			}
 
 			cmd.Printf("\n")
-			return runCommand(repoRoot, launch)
+			return runForeground(repoRoot, launch, transcript)
 		},
 	}
 

@@ -219,24 +219,31 @@ func TestResolveReviewerRefusesWhenThereIsNoPool(t *testing.T) {
 	}
 }
 
-// Both wrappers hand a command STRING to something that re-parses it — tmux to
-// its shell, sh to itself. The reviewer prompt contains quotes, backticks and
-// newlines, so an unquoted argument would be executed rather than passed.
+// tmux re-parses its command through a shell, so the reviewer prompt — which
+// carries quotes, backticks and newlines — must arrive quoted or it executes.
+//
+// The first version of this test could not fail: it asserted
+// `contains("$(id)") && !contains("'")`, and ShellJoin quotes EVERY argument, so
+// the second half was always false. It passed whether or not the dangerous token
+// was quoted. Worse, the mutation battery reported it as guarding the behaviour,
+// because deleting shellQuote broke an unrelated test (stubGh) and the
+// whole-package run could not say which test killed the mutant.
+//
+// So this asserts the exact quoted form instead: the argument must appear
+// verbatim inside single quotes, with its own quotes escaped the POSIX way.
 func TestWrappersQuoteAnArgumentThatWouldOtherwiseExecute(t *testing.T) {
 	nasty := "text with 'quotes' and `backticks` and $(id)"
-	for name, argv := range map[string][]string{
-		"tee":  TeeWrap([]string{"echo", nasty}, "/tmp/t.jsonl"),
-		"tmux": TmuxWrap("s", "/repo", []string{"echo", nasty}, "/tmp/t.jsonl"),
-	} {
-		t.Run(name, func(t *testing.T) {
-			joined := argv[len(argv)-1]
-			if strings.Contains(joined, "$(id)") && !strings.Contains(joined, `'`) {
-				t.Fatalf("command substitution must be quoted, got: %s", joined)
-			}
-			if !strings.Contains(joined, "| tee ") {
-				t.Errorf("the stream must be teed to a transcript, got: %s", joined)
-			}
-		})
+	// Single quotes cannot nest, so a literal ' becomes '\'' — close, escape, reopen.
+	want := `'text with '\''quotes'\'' and ` + "`backticks`" + ` and $(id)'`
+
+	argv := TmuxWrap("s", "/repo", []string{"echo", nasty}, "/tmp/t.jsonl")
+	joined := argv[len(argv)-1]
+
+	if !strings.Contains(joined, want) {
+		t.Fatalf("argument must be single-quoted verbatim.\n want: %s\n  got: %s", want, joined)
+	}
+	if !strings.Contains(joined, "| tee '/tmp/t.jsonl'") {
+		t.Errorf("the stream must be teed to a quoted transcript path, got: %s", joined)
 	}
 }
 

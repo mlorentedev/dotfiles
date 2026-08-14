@@ -210,20 +210,16 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-func shellJoin(argv []string) string {
+// ShellJoin renders argv as a single POSIX-shell command string. Exported
+// because the dry-run output has to print exactly what would run: joining the
+// raw elements with spaces produces a line that is NOT runnable, since the last
+// element is itself a whole pipeline.
+func ShellJoin(argv []string) string {
 	quoted := make([]string, 0, len(argv))
 	for _, a := range argv {
 		quoted = append(quoted, shellQuote(a))
 	}
 	return strings.Join(quoted, " ")
-}
-
-// TeeWrap runs argv in the foreground while copying its stream to transcript.
-//
-// tee rather than a plain redirect: the operator watching a foreground run
-// should still see the output, and the transcript should still exist afterwards.
-func TeeWrap(argv []string, transcript string) []string {
-	return []string{"sh", "-c", shellJoin(argv) + " | tee " + shellQuote(transcript)}
 }
 
 // TmuxWrap starts argv detached in a named session, teeing to transcript.
@@ -238,6 +234,6 @@ func TmuxWrap(session, dir string, argv []string, transcript string) []string {
 		"tmux", "new-session", "-d",
 		"-s", session,
 		"-c", dir,
-		shellJoin(argv) + " | tee " + shellQuote(transcript),
+		ShellJoin(argv) + " | tee " + shellQuote(transcript),
 	}
 }
