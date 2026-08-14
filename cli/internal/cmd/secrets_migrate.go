@@ -141,20 +141,25 @@ func migrateGuard(reg *secrets.Registry, s *secrets.Secret) error {
 	return nil
 }
 
-// ageValue resolves the secret's current age plaintext as the consumer sees it (EnvFor
-// strips newlines; an empty value is a fail-loud error). It is the value the cutover
-// must preserve.
+// ageValue resolves the secret's current age plaintext, trimmed of exactly the
+// trailing newline `age -d` appends — the same trim normalizeValue applies on the bw
+// side, so the parity gate compares like with like. Unlike EnvFor (built for
+// single-line child-process env tokens), this preserves interior newlines: a
+// multi-line secret (BEEHIIV_DNS_RECORDS, ZOHO_APP_PASSWORDS) must survive the
+// age→bw cutover byte-for-byte, not get flattened to one line (#612 B6).
 func ageValue(reg *secrets.Registry, loader *secrets.Loader, s *secrets.Secret) (string, error) {
 	target := s.Vars()[0]
 	for _, e := range reg.Entries(env.Home()) {
 		if e.Var == target {
-			ent := e
-			kv, err := loader.EnvFor([]secrets.Entry{ent}, nil)
+			plaintext, err := loader.RawResolve(e)
 			if err != nil {
 				return "", err
 			}
-			_, val, _ := strings.Cut(kv[0], "=")
-			return val, nil
+			value := strings.TrimRight(string(plaintext), "\r\n")
+			if value == "" {
+				return "", fmt.Errorf("secret %q resolved to an empty value — refusing to migrate", s.ID)
+			}
+			return value, nil
 		}
 	}
 	return "", fmt.Errorf("no resolvable entry for %q", s.ID)

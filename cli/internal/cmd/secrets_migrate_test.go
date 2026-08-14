@@ -81,6 +81,57 @@ func TestSecretsMigrate_EndToEnd(t *testing.T) {
 	}
 }
 
+// TestSecretsMigrate_PreservesInteriorNewlines proves migrate no longer routes the
+// age plaintext through EnvFor's single-line stripNewlines: a multi-line secret
+// (BEEHIIV_DNS_RECORDS-shaped) must survive the cutover with its interior newlines
+// intact, only the trailing one trimmed — the parity gate is where a regression here
+// would actually surface, so this exercises migrateExec end-to-end, not ageValue in
+// isolation (#612 B6).
+func TestSecretsMigrate_PreservesInteriorNewlines(t *testing.T) {
+	const multilineRegistry = `
+version: 1
+secrets:
+  - id: DNS_RECORDS
+    plane: app
+    backend: age
+    age: dns.records
+    bw: { item: dns-records, field: notes }
+    expose: { env: DNS_RECORDS }
+    consumers: [local]
+`
+	fw := newFakeWriter()
+	fw.notFound["dns-records"] = true // target item absent → --yes creates it
+	multiline := "TXT record one\nTXT record two\nTXT record three\n"
+	out, err := migrateExec(t, multilineRegistry, fw, multiline, "DNS_RECORDS", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "TXT record one\nTXT record two\nTXT record three" // trailing \n trimmed, interior kept
+	if fw.created["dns-records/notes"] != want {
+		t.Errorf("created = %q, want %q (interior newlines preserved)", fw.created["dns-records/notes"], want)
+	}
+	if got := backendOfID(t, "DNS_RECORDS"); got != "bw" {
+		t.Errorf("registry backend = %q, want bw (flipped)", got)
+	}
+	if !strings.Contains(out, "migrated") {
+		t.Errorf("want 'migrated', got %q", out)
+	}
+}
+
+// TestSecretsMigrate_EmptyAgeValueRefused proves ageValue's own empty-value guard
+// (reimplemented locally now that it bypasses EnvFor) still fails loud rather than
+// migrating a blank secret (#612 A1 parity).
+func TestSecretsMigrate_EmptyAgeValueRefused(t *testing.T) {
+	fw := newFakeWriter()
+	_, err := migrateExec(t, migratableRegistry, fw, "\n", "NAN_API_KEY", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "empty value") {
+		t.Fatalf("want an empty-value error, got %v", err)
+	}
+	if len(fw.sets) != 0 || len(fw.created) != 0 {
+		t.Errorf("must write nothing on an empty age value: sets=%v created=%v", fw.sets, fw.created)
+	}
+}
+
 // TestSecretsMigrate_UsesDeclaredFolder proves migrate threads the registry's
 // bw.folder through to the create-item write, same as `set` — OPS-028 AC2.
 func TestSecretsMigrate_UsesDeclaredFolder(t *testing.T) {
