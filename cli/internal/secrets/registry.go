@@ -48,11 +48,23 @@ type Secret struct {
 // BWSource is a bw backend source: the Bitwarden item (its unique name or id) and,
 // for a single-var or file secret, the field within it. Multi-var secrets share
 // the item and set the field per-var (expose.env: { VAR: { field: ... } }). The
-// Bitwarden folder is org metadata, not a lookup key — `bw get` resolves by item
-// name/id (ADR-028 §2; folder taxonomy is the curation issue).
+// Bitwarden folder is not a lookup key — `bw get` resolves by item name/id
+// regardless of folder — but it IS placement metadata a newly created item is
+// filed under (OPS-028; ADR-028 §"Bitwarden folder taxonomy").
 type BWSource struct {
-	Item  string `yaml:"item"`
-	Field string `yaml:"field"`
+	Item   string `yaml:"item"`
+	Field  string `yaml:"field"`
+	Folder string `yaml:"folder"` // "" → unfoldered; else one of validBWFolders
+}
+
+// validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-
+// managed items. Dotfiles/floor is deliberately absent (floor secrets never carry a
+// bw: block — age-only) and so is a personal-plane folder (no taxonomy exists yet for
+// plane: personal, deferred to #586) — declaring either here would validate a
+// placement nothing can actually honour yet.
+var validBWFolders = map[string]bool{
+	"Dotfiles/apps":  true,
+	"Dotfiles/infra": true,
 }
 
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
@@ -248,6 +260,9 @@ func (s *Secret) checkBwSources() error {
 	}
 	if err := checkBwName(s.ID, "field", s.BW.Field); err != nil {
 		return err
+	}
+	if s.BW.Folder != "" && !validBWFolders[s.BW.Folder] {
+		return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
 	}
 	if s.Expose.File != nil {
 		if s.BW.Field == "" {

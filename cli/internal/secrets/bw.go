@@ -225,15 +225,79 @@ func (p BWPut) SetField(item, field, value string) error {
 // explicit confirm / --yes; an update-only caller (e.g. migrate's re-verify) needs only
 // BWWriter and must not be able to create by accident.
 type BWCreator interface {
-	CreateItem(item, field, value string) error
+	// CreateItem creates item carrying field=value. folderID is an already-resolved
+	// Bitwarden folder id (via BWFolderResolver) — "" places the item unfoldered,
+	// today's default for any secret with no bw.folder declared (OPS-028).
+	CreateItem(item, field, value, folderID string) error
 }
 
-// CreateItem creates a new login item named item carrying field=value. It applies the
-// same read-modify-write (setItemField) to a minimal login template, base64-encodes
-// it, and pipes it to `bw create item` — so a created item and an edited item place a
-// field identically. Live-verified (canary, #612 C8), not in CI, like BWPut.SetField.
-func (p BWPut) CreateItem(item, field, value string) error {
-	body, err := newItemBody(item, field, value)
+// BWFolderResolver resolves a Bitwarden folder NAME (registry bw.folder, e.g.
+// "Dotfiles/apps") to its id, creating the folder if the vault doesn't have it yet —
+// OPS-028, closing the gap where ADR-028 ratified a folder taxonomy the write path
+// couldn't place anything into. Split from BWCreator (its own interface, its own test
+// double) because folder resolution and item creation are independently testable:
+// CreateItem's JSON-body test never needs a fake folder list, and ResolveFolder's
+// name→id test never needs a fake item store.
+type BWFolderResolver interface {
+	// ResolveFolder returns "" for an empty name (no folder declared — a no-op, not
+	// an error) so callers never special-case the common unfoldered secret.
+	ResolveFolder(name string) (string, error)
+}
+
+// bwFolder is the subset of `bw list folders` / `bw create folder` JSON this package
+// reads.
+type bwFolder struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ResolveFolder lists the vault's folders, matches by exact name, and creates the
+// folder when absent — idempotent (a second call finds the just-created folder and
+// never creates a duplicate). Live-verified against an unlocked vault, not in CI, like
+// the rest of the write seam.
+func (p BWPut) ResolveFolder(name string) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+	out, err := p.run(nil, "list", "folders")
+	if err != nil {
+		return "", fmt.Errorf("bw list folders: %w", err)
+	}
+	var folders []bwFolder
+	if err := json.Unmarshal(out, &folders); err != nil {
+		return "", fmt.Errorf("parse bw list folders JSON: %w", err)
+	}
+	for _, f := range folders {
+		if f.Name == name {
+			return f.ID, nil
+		}
+	}
+	body, err := json.Marshal(map[string]string{"name": name})
+	if err != nil {
+		return "", err
+	}
+	enc := base64.StdEncoding.EncodeToString(body)
+	created, err := p.run(strings.NewReader(enc), "create", "folder")
+	if err != nil {
+		return "", fmt.Errorf("bw create folder %q: %w", name, err)
+	}
+	var f bwFolder
+	if err := json.Unmarshal(created, &f); err != nil {
+		return "", fmt.Errorf("parse bw create folder JSON: %w", err)
+	}
+	if f.ID == "" {
+		return "", fmt.Errorf("bw create folder %q: response carried no id", name)
+	}
+	return f.ID, nil
+}
+
+// CreateItem creates a new login item named item carrying field=value, filed under
+// folderID when non-empty. It applies the same read-modify-write (setItemField) to a
+// minimal login template, base64-encodes it, and pipes it to `bw create item` — so a
+// created item and an edited item place a field identically. Live-verified (canary,
+// #612 C8), not in CI, like BWPut.SetField.
+func (p BWPut) CreateItem(item, field, value, folderID string) error {
+	body, err := newItemBody(item, field, value, folderID)
 	if err != nil {
 		return err
 	}
@@ -245,14 +309,20 @@ func (p BWPut) CreateItem(item, field, value string) error {
 }
 
 // newItemBody builds the JSON for a new login item named item carrying field=value, by
-// applying setItemField to a minimal login template. The pure, unit-tested core of
-// CreateItem (CreateItem itself is the live-tested shell-out).
-func newItemBody(item, field, value string) ([]byte, error) {
-	base, err := json.Marshal(map[string]any{
+// applying setItemField to a minimal login template. folderID, when non-empty, is
+// attached as-is — this function trusts an already-resolved id, never a name (that
+// resolution is BWFolderResolver's job). The pure, unit-tested core of CreateItem
+// (CreateItem itself is the live-tested shell-out).
+func newItemBody(item, field, value, folderID string) ([]byte, error) {
+	m := map[string]any{
 		"type":  1, // login
 		"name":  item,
 		"login": map[string]any{},
-	})
+	}
+	if folderID != "" {
+		m["folderId"] = folderID
+	}
+	base, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
 	}

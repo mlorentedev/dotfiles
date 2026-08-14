@@ -200,6 +200,52 @@ func TestParseRegistry_BwValidation(t *testing.T) {
 	}
 }
 
+// TestBWSource_Folder proves the registry parses bw.folder (OPS-028: ADR-028 ratified
+// a folder taxonomy the schema couldn't express) and rejects anything outside the
+// ratified set (Dotfiles/apps, Dotfiles/infra) — floor and personal deliberately have
+// no folder yet (#586).
+func TestBWSource_Folder(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	s := reg.Lookup("a")
+	if s == nil || s.BW.Folder != "Dotfiles/apps" {
+		t.Fatalf("secret = %+v, want BW.Folder = Dotfiles/apps", s)
+	}
+}
+
+func TestBWSource_Folder_NoneDeclared(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: A}}\n"
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	if s := reg.Lookup("a"); s == nil || s.BW.Folder != "" {
+		t.Fatalf("secret = %+v, want empty Folder (unfoldered, today's default)", s)
+	}
+}
+
+func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
+	cases := map[string]string{
+		"lowercase (casing must match the ADR, not #951's own transcription typo)": "dotfiles/apps",
+		"unratified folder":   "Dotfiles/personal",
+		"arbitrary free text": "My Random Folder",
+	}
+	for name, folder := range cases {
+		t.Run(name, func(t *testing.T) {
+			yml := "version: 1\nsecrets:\n" +
+				"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: \"" + folder + "\"}, expose: {env: A}}\n"
+			if _, err := ParseRegistry([]byte(yml)); err == nil {
+				t.Errorf("folder %q: expected a validation error, got nil", folder)
+			}
+		})
+	}
+}
+
 func TestParseRegistry_Validation(t *testing.T) {
 	cases := map[string]string{
 		"bad version":        "version: 2\nsecrets: []\n",

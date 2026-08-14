@@ -1,0 +1,37 @@
+[
+  {
+    "id": "OPS-028-bw-folder-taxonomy-f1",
+    "behavior": "BWSource carries Folder (registry.yaml bw.folder); ParseRegistry validates it against the ratified set (Dotfiles/apps, Dotfiles/infra)",
+    "verification": "cd cli && go test ./internal/secrets/... -run 'TestBWSource_Folder|TestParseRegistry_BwFolder_RejectsUnratified' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-028-bw-folder-taxonomy-f2",
+    "behavior": "The writer places a newly created item in its declared folder (resolving/creating it via bw), and a test asserts the folder the registry declares is the folder the writer's request body carries",
+    "verification": "cd cli && go test ./internal/secrets/... ./internal/cmd/... -run 'Folder' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-028-bw-folder-taxonomy-f3",
+    "behavior": "Every app/infra-plane registry entry with a bw: target declares folder: matching its plane",
+    "verification": "cd /home/manu/Projects/dotfiles-wt-secrets && test \"$(grep -c 'folder: Dotfiles/apps' secrets/registry.yaml)\" -eq 21 && test \"$(grep -c 'folder: Dotfiles/infra' secrets/registry.yaml)\" -eq 5",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-028-bw-folder-taxonomy-f4",
+    "behavior": "The openai-api-key Bitwarden item is moved into Dotfiles/apps and its value is verified unchanged after the move",
+    "verification": "DOTFILES_REPO_DIR=/home/manu/Projects/dotfiles-wt-secrets dotf secrets verify OPENAI_API_KEY",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-028-bw-folder-taxonomy-f5",
+    "behavior": "An entry with no folder: declared still creates/resolves exactly as it does today — no regression",
+    "verification": "cd cli && go test ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]

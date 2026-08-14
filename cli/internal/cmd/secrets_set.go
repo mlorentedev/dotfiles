@@ -20,6 +20,7 @@ import (
 type bwWriteClient interface {
 	secrets.BWWriter
 	secrets.BWCreator
+	secrets.BWFolderResolver
 }
 
 // bwWriter is the bw write seam (BWPut in production), overridable so set's tests run
@@ -83,7 +84,7 @@ func newSecretsSetCmd() *cobra.Command {
 			if value == "" {
 				return fmt.Errorf("refusing to write an empty value for %q (a blank secret is a bug, not a clear)", args[0])
 			}
-			return applySet(cmd, item, field, value, isFile, dryRun, assumeYes)
+			return applySet(cmd, item, field, value, s.BW.Folder, isFile, dryRun, assumeYes)
 		},
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report the intended action (update/create/unchanged) without writing")
@@ -133,7 +134,7 @@ func normalizeValue(value string, isFile bool) string {
 //
 // Keeping ErrBWItemNotFound (create) apart from a generic read error (fail) is the
 // security crux of #612: a locked vault must never be mistaken for an absent item.
-func applySet(cmd *cobra.Command, item, field, value string, isFile, dryRun, assumeYes bool) error {
+func applySet(cmd *cobra.Command, item, field, value, folder string, isFile, dryRun, assumeYes bool) error {
 	out := cmd.OutOrStdout()
 	cur, err := bwReader.Field(item, field)
 	switch {
@@ -164,7 +165,7 @@ func applySet(cmd *cobra.Command, item, field, value string, isFile, dryRun, ass
 		return nil
 
 	case errors.Is(err, secrets.ErrBWItemNotFound):
-		return createAbsent(cmd, item, field, value, dryRun, assumeYes)
+		return createAbsent(cmd, item, field, value, folder, dryRun, assumeYes)
 
 	default:
 		return fmt.Errorf("read current value of %s / %s: %w", item, field, err)
@@ -174,10 +175,12 @@ func applySet(cmd *cobra.Command, item, field, value string, isFile, dryRun, ass
 // createAbsent handles a genuinely-missing item: refused under --dry-run (reported),
 // otherwise confirmed on the TTY or via --yes. Non-interactive callers MUST pass --yes
 // — stdin is already consumed by the piped value, so there is no channel to confirm on.
-func createAbsent(cmd *cobra.Command, item, field, value string, dryRun, assumeYes bool) error {
+// folder ("" → unfoldered) is resolved to an id AFTER the dry-run/confirm gate — folder
+// creation is itself a write, so --dry-run must never trigger it (OPS-028).
+func createAbsent(cmd *cobra.Command, item, field, value, folder string, dryRun, assumeYes bool) error {
 	out := cmd.OutOrStdout()
 	if dryRun {
-		_, _ = fmt.Fprintf(out, "would create item  %s (field %s)\n", item, field)
+		_, _ = fmt.Fprintf(out, "would create item  %s (field %s, folder %q)\n", item, field, folder)
 		return nil
 	}
 	if !assumeYes {
@@ -189,7 +192,11 @@ func createAbsent(cmd *cobra.Command, item, field, value string, dryRun, assumeY
 			return fmt.Errorf("aborted: item %q not created", item)
 		}
 	}
-	if err := bwWriter.CreateItem(item, field, value); err != nil {
+	folderID, err := bwWriter.ResolveFolder(folder)
+	if err != nil {
+		return fmt.Errorf("resolve bw folder %q: %w", folder, err)
+	}
+	if err := bwWriter.CreateItem(item, field, value, folderID); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(out, "created item  %s (field %s)\n", item, field)
