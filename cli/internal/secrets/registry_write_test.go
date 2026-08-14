@@ -67,7 +67,10 @@ func TestSetBackendBW_RealRegistry_OnlyTargetChanges(t *testing.T) {
 	if err != nil {
 		t.Skipf("registry.yaml not found: %v", err)
 	}
-	const id = "BITACORA_PAT"
+	// GITHUB_PERSONAL_ACCESS_TOKEN: still backend: age (blocked on migrate --split, C9 —
+	// SetBackendBW itself has no opinion on the shared-age-source guard, that lives one
+	// layer up in migrateGuard), so it stays a stable target as other entries migrate.
+	const id = "GITHUB_PERSONAL_ACCESS_TOKEN"
 	out, err := SetBackendBW(in, id)
 	if err != nil {
 		t.Fatalf("SetBackendBW(%s): %v", id, err)
@@ -98,10 +101,10 @@ func TestSetBackendBW_RealRegistry_OnlyTargetChanges(t *testing.T) {
 	if !strings.Contains(block, "backend: bw") {
 		t.Errorf("backend not flipped:\n%s", block)
 	}
-	if strings.Contains(block, "age: github.bitacora") {
+	if strings.Contains(block, "age: github.token") {
 		t.Errorf("age source not dropped:\n%s", block)
 	}
-	if !strings.Contains(block, "bw: { item: github-bitacora-pat, field: api-token, folder: Dotfiles/apps }") {
+	if !strings.Contains(block, "bw: { item: github-cli-pat, field: api-token, folder: Dotfiles/apps }") {
 		t.Errorf("declared bw block not preserved in place:\n%s", block)
 	}
 }
