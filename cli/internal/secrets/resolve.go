@@ -124,6 +124,20 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 	return env, nil
 }
 
+// RawResolve resolves one entry's backend-native plaintext with no transformation —
+// no newline stripping, no file materialization. migrate uses it instead of EnvFor so
+// a multi-line secret (e.g. BEEHIIV_DNS_RECORDS) survives the age→bw cutover intact;
+// EnvFor's stripNewlines is an env-injection convention (single-line child-process
+// tokens), not a property of the secret itself, and applying it during migration was
+// silently flattening multi-line values to one line (#612 B6).
+func (l *Loader) RawResolve(e Entry) ([]byte, error) {
+	r, ok := l.resolvers()[e.Backend]
+	if !ok {
+		return nil, fmt.Errorf("secret %q: unknown backend %q", e.Var, e.Backend)
+	}
+	return r.Resolve(e)
+}
+
 // Verify resolves one entry through its backend resolver as a read-only health check:
 // it confirms the secret produces a non-empty value, applying run's empty-value
 // rejection, but it never materializes a file secret and never returns the value
