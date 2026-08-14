@@ -136,9 +136,16 @@ func checkBitwardenReach(sys *System, rep *Report) {
 	// the local cache and passes against a dead token.
 	//
 	// It mutates local state (it advances lastSync and renews the token) inside
-	// what is otherwise a read-only diagnostic. That is deliberate, not a side
-	// effect to apologise for: it makes a periodic `dotf doctor` the keep-alive
-	// that would have prevented the 45-day expiry outright.
+	// what is otherwise a read-only diagnostic. That is deliberate — but the
+	// honest claim is narrower than "doctor is the keep-alive". This tier only
+	// runs on an UNLOCKED vault, and a locked vault is the resting state; nothing
+	// runs doctor on a timer either. So the renewal is OPPORTUNISTIC: it happens
+	// when an operator already has a session open, and not at all otherwise.
+	//
+	// The tier that would actually have prevented the 45-day expiry is tier 2,
+	// which needs no session: the staleness warning fires on a locked vault and
+	// names `bw sync` while the token is still renewable. Tier 3 proves reach;
+	// tier 2 is what catches the silent expiry.
 	if syncOut, syncErr := sys.CommandOutputBounded(bwSyncTimeout, "bw", "sync"); syncErr != nil {
 		rep.Fail("Bitwarden sync FAILED on an unlocked vault (" + bwFailDetail(syncOut, syncErr) + ") — the live SSOT is not reachable")
 		return

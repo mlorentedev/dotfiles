@@ -67,8 +67,21 @@ independently before being accepted; none was argued down.
 - [x] Minor: guard negative sync age (clock skew), with its own mutation-verified
       test.
 - [x] Correct the `verification.md` mutation table, which overstated round 1.
-- [ ] Fresh adversarial review — these edits touch `proposal.md`/`tasks.md`, which
-      stale review 1 by construction.
+- [x] Answer the review's open **Question** instead of leaving it hanging: the
+      "a periodic `dotf doctor` is the keep-alive" justification does not hold —
+      tier 3 needs an unlocked vault, the resting state is locked, and nothing
+      schedules doctor. Claim withdrawn in the code comment and in `proposal.md`;
+      the prevention claim reassigned to tier 2, which needs no session.
+- [x] Execute the promotion `verification.md` already declared: the
+      `docs/lessons.md` entry *a health check that reads local state proves the
+      liveness of nothing*. Its index was 3 entries behind the body, so it was
+      regenerated rather than appended to.
+- [x] Fresh adversarial review **requested** against this head. Recorded before
+      the review runs, not after: `tasks.md` is a contract file
+      (`cli/internal/spec/review.go:23`), so ticking this box afterwards would
+      stale the very verdict the box refers to. No verdict is claimed here — it
+      lives in `review.md`, which is excluded from the contract set for exactly
+      this reason.
 
 ## Machine-readable features
 

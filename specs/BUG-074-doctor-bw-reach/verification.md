@@ -88,8 +88,15 @@ logged out, the exact call the resolver makes returns
 - **`bw sync` as the deep probe, accepting that it mutates state.** Every
   local-cache read (`bw list`, `bw get`) passes against a dead token, so none of
   them proves reach. `sync` exercises the token refresh — the exact path that
-  failed. Its side effect is treated as a feature and documented in the code: a
-  periodic `dotf doctor` becomes the keep-alive that prevents the expiry.
+  failed.
+- **The keep-alive claim was withdrawn, not defended** (round-1 review's open
+  Question). Justifying the side effect as "a periodic `dotf doctor` is the
+  keep-alive that would have prevented this outright" required a cadence that
+  does not exist: tier 3 runs only on an unlocked vault, the resting state is
+  locked, and nothing schedules doctor. The renewal is opportunistic. The
+  prevention claim was reassigned to tier 2, which fires on a locked vault with
+  no session at all — which is also why 30d had to be chosen below the observed
+  45d rather than at some round number.
 - **Severity source is the checkout registry, not `cfg.DotfilesDir`.** The first
   draft used the existing `loadRegistry(cfg)` helper, which reads the deployed
   `~/.dotfiles` copy. That copy demonstrably lags the checkout (doctor has a

@@ -56,10 +56,23 @@ migrated secret.
 ## Risks / open questions
 
 - **`bw sync` mutates state inside a diagnostic.** Accepted deliberately and
-  documented in the code: it advances `lastSync` and renews the token, which
-  makes a periodic `dotf doctor` the keep-alive that would have prevented this
-  incident outright. The alternative probes are all local-cache reads that pass
-  on a dead token, so they prove nothing.
+  documented in the code: it advances `lastSync` and renews the token. The
+  alternative probes are all local-cache reads that pass on a dead token, so
+  they prove nothing.
+
+  An earlier draft justified the side effect by claiming it "makes a periodic
+  `dotf doctor` the keep-alive that would have prevented this incident
+  outright". The adversarial review asked whether any cadence actually
+  satisfies that, and the answer is **no** — so the claim is withdrawn rather
+  than defended. Tier 3 runs only on an *unlocked* vault, which this same
+  document calls the normal resting state, and nothing schedules doctor. The
+  renewal is therefore opportunistic: it happens when an operator already has a
+  session open, and not at all otherwise.
+
+  The prevention claim belongs to **tier 2**, which needs no session: on a
+  locked vault the 30d staleness warning still fires, and 30d < the observed
+  45d, so it lands while the token is still renewable. That reassignment is
+  what makes the offline tier load-bearing rather than a nicety.
 - **Severity source must not be the deployed registry.** Counting through
   `cfg.DotfilesDir` (`~/.dotfiles`) would read the copy that lags the checkout
   during exactly the migration this guards, holding severity at advisory as

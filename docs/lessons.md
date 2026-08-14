@@ -25,7 +25,7 @@ date order). Regenerate after adding entries with:
 awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9-]+)\] (.*)$/- [\1] \2/'
 ```
 
-<!-- Generated 2026-08-12; 191 entries at last regen. -->
+<!-- Generated 2026-08-13; 195 entries at last regen. -->
 
 - [2026-08-10] Go's exec.LookPath is blind to extensionless scripts on Windows
 - [2025-12-15] echo -e breaks in zsh
@@ -218,6 +218,10 @@ awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9
 - [2026-08-12] An apostrophe in a comment inside an open `awk '...'` block reopens bash's own parser
 - [2026-08-12] A bash `case` pattern is a glob, not a regex — `g[a-z]*` doesn't mean what it looks like it means
 - [2026-08-12] Continuing work on a branch after its PR squash-merged reopens the whole original diff
+- [2026-08-12] "Looks like a known bug class" is a hypothesis, not a finding — reproduce before you fix
+- [2026-08-12] `resolveRepoDir`'s cwd fallback silently defeats "unresolvable repo" test cases
+- [2026-08-12] A dangling citation and a missing file are different bugs — check for the first before assuming the second
+- [2026-08-13] A health check that reads local state proves the liveness of nothing
 
 ---
 
@@ -2270,3 +2274,15 @@ The blast radius was also wider than the one function: because `compile-harness.
 **Rule**: when a cited path doesn't resolve, don't stop at "confirmed missing" — grep the repo for the cited content (a distinctive phrase, a finding ID, a table row) before concluding it was never committed. A file matching the cited *name* in a different repo is not evidence either way; verify its content actually matches what's being cited, not just its filename. And once a citation-convention bug is found in one issue, search for every other issue with the same defect before fixing only the one that was pointed at — the same generation process that produced one dangling citation likely produced several.
 
 **Tags**: `github`, `audit`, `documentation`, `verification`
+
+### [2026-08-13] A health check that reads local state proves the liveness of nothing
+
+**Context**: `dotf doctor` verified the two secret tiers of ADR-028 with opposite rigour. The age floor — the *backup* — was proven by behaviour: derive the recipient, encrypt a sentinel, decrypt it back, compare bytes. Bitwarden — the tier ADR-028 designates the **live SSOT** — was proven by `sys.has("bw")`, a binary on `PATH` (BUG-074, #944).
+
+**Problem**: Bitwarden's refresh token expired server-side and doctor printed a green `bw (Bitwarden CLI — live secrets SSOT) found` for the 45 days that followed. The outage surfaced only when an operator ran `bw unlock` by hand and got `invalid_grant` (HTTP 400). Worse, the obvious "deeper" probes are no better: `bw status` is served from local state and keeps reporting a healthy-looking `locked` indefinitely after the server has revoked the grant, and `bw list` / `bw get` read the local cache, so both pass against a dead token. Every cheap observable was a local one, and every local one was a lie.
+
+**Solution**: three tiers, keyed to what can be established without an operator present. (1) `bw status` catches the definite `unauthenticated` break — and names `bw login`, explicitly ruling out `bw unlock`, whose master-password prompt makes an expired token read as a forgotten password. (2) **Elapsed time since the last successful sync** — the only observable that actually moves while the token rots, and the only one available on a locked vault. Threshold 30d, chosen strictly below the observed 45d so the warning lands while the token is still renewable. (3) `bw sync` as a real round-trip when a session exists. Severity is keyed to real exposure (count of `backend: bw` registry entries), so an unreachable vault is advisory while everything still resolves through age, and a FAIL from the first migrated secret.
+
+**Rule**: a check on a remote dependency must either exercise the remote path or measure elapsed time since something did. Local status output is a cache of a past success, not evidence of a present one — and a cache that reports "locked" is indistinguishable from one reporting "locked, and also revoked three weeks ago". When the deep probe needs a credential the check cannot assume (an unlocked vault, an API key), the elapsed-time tier is not a consolation prize: it is the only tier that runs in the resting state, so it is the one that catches the silent expiry. Corollary for severity: scale it to what actually breaks today, because a red diagnostic for a harmless condition is how operators are trained to ignore red diagnostics.
+
+**Tags**: `doctor`, `secrets`, `bitwarden`, `health-checks`, `verification`
