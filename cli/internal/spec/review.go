@@ -213,5 +213,9 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 		return fmt.Errorf("%s is stale: %s\nre-run /adversarial-review against the current head, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
 			ReviewFile, reason)
 	}
-	return nil
+
+	// Last, because it is the only check that asks WHO reviewed rather than
+	// what they concluded — a valid, fresh, passing review signed by the wrong
+	// model is still a self-review, and the earlier checks cannot see that.
+	return checkReviewerPool(repoRoot, review.Reviewer)
 }
