@@ -65,10 +65,14 @@ type System struct {
 	// (backend: bw). It exists so the reach check can key its SEVERITY to real
 	// exposure rather than to a flat policy: an unreachable vault is a WARN while
 	// nothing depends on it and a FAIL the moment something does. The real impl
-	// (bwBackedSecrets) reads the CHECKOUT-preferring registry path, never
-	// cfg.DotfilesDir — the deployed copy lags the checkout during exactly the
-	// migration this check guards (ADR-030, #635), which would hold the severity
-	// at WARN precisely as exposure begins.
+	// (bwBackedSecrets) reads env.RepoRegistryPath — the CHECKOUT-ONLY path —
+	// never cfg.DotfilesDir and never env.ResolveRegistryPath. The deployed copy
+	// lags the checkout during exactly the migration this check guards (ADR-030,
+	// #635), which would hold the severity at WARN precisely as exposure begins;
+	// ResolveRegistryPath is rejected for the same reason despite preferring the
+	// checkout, because it falls back to the deployed copy when the checkout
+	// registry is missing. Failing loud there is the point: the caller degrades
+	// severity with a stated reason rather than trusting an unattributable count.
 	BWBackedSecrets func() (int, error)
 	// CommandOutputBounded is CommandOutput with a wall-clock deadline, for
 	// subprocesses that touch the network. Plain CommandOutput has none, which is

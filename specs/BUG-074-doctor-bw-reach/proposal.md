@@ -77,7 +77,13 @@ migrated secret.
   `cfg.DotfilesDir` (`~/.dotfiles`) would read the copy that lags the checkout
   during exactly the migration this guards, holding severity at advisory as
   exposure begins — the #635 drift class rebuilt inside the fix for a drift bug.
-  Resolved: the seam reads `env.ResolveRegistryPath`, which prefers the checkout.
+  Resolved: the seam reads `env.RepoRegistryPath`, the checkout-only path. The
+  first fix used `env.ResolveRegistryPath` on the grounds that it *prefers* the
+  checkout — but writing the producer test showed it falls back to the deployed
+  copy when the checkout registry is absent, which reintroduces the stale count
+  through the back door. Failing loud is the point: the caller then degrades
+  severity with a stated reason instead of trusting a count whose source it
+  cannot name.
 - **CI must not go red for a headless container.** The first draft of this risk
   claimed "no workflow runs `dotf doctor`", from a grep of `.github/workflows`
   and `verify-setup.bats`. That claim was **false**, and the adversarial review

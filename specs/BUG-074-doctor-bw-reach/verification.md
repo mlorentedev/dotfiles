@@ -67,7 +67,7 @@ not merely untested paths:
 
 **Live smoke**, built binary against the real vault — both states observed:
 
-```
+```text
 # locked vault (no BW_SESSION):
 [Bitwarden reach (live secrets SSOT)]
   [ OK ] Bitwarden synced 0d ago
@@ -104,7 +104,10 @@ logged out, the exact call the resolver makes returns
   the checkout was actively flipping entries — pinning severity at advisory
   exactly as exposure began, i.e. rebuilding the #635 drift bug inside the fix
   for a drift-class bug. Introduced a `BWBackedSecrets` seam reading
-  `env.ResolveRegistryPath` instead.
+  `env.RepoRegistryPath` instead — checkout-only, and deliberately not
+  `env.ResolveRegistryPath`, whose deployed-copy fallback would have restored
+  the same stale count on any machine whose checkout registry is missing (see
+  the round-2 mutant "producer: silent fallback to the deployed copy").
 - **Separate section rather than extending `checkSecretsTooling`.** Keeps the
   existing check's tests untouched and lets a reader see at a glance that reach
   is a distinct claim from presence.
