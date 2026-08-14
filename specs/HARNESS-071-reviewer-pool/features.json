@@ -33,5 +33,40 @@
     "verification": "cd cli && go test ./internal/spec/ -run 'TestArchiveForceOverridesThePoolCheck$'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f6",
+    "behavior": "The launcher pins provider and model explicitly instead of inheriting a runner default, and refuses a pool entry that does not carry what its runner needs",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestReviewerCommand(PinsProviderAndModelExplicitly|RefusesRatherThanFallBackToADefault)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f7",
+    "behavior": "Every reviewer runs through the secrets facade, asks for a machine-readable stream, and gets a deadline longer than the runner's own default",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestReviewerCommand(RunsThroughTheSecretsFacade|RequestsAMachineReadableStream|RaisesTheAgyPrintTimeout)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f8",
+    "behavior": "The launcher defaults to the pool's primary, reaches any member on request so the fallback is exercisable on purpose, and refuses a model outside the pool before spending a review on it",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestResolveReviewer'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f9",
+    "behavior": "Wrapped commands are shell-quoted so a prompt containing quotes, backticks or command substitution is passed to the reviewer rather than executed by the shell that re-parses it",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestWrappersQuoteAnArgumentThatWouldOtherwiseExecute'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-071-reviewer-pool-f10",
+    "behavior": "The prompt names the exact reviewer id the gate will match and forbids editing the contract files, so a review cannot invalidate itself or be refused over a spelling",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles$'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

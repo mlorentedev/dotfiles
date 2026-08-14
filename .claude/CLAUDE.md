@@ -74,6 +74,7 @@ dotf doctor
 | `ai/claude/CLAUDE.md` | Master Claude instructions | Deployed to `~/.claude/CLAUDE.md` by setup |
 | `harness/skills/*/SKILL.md` | Committed skill records (37) | Rendered from the vault by `compile-harness.sh --refresh`; deployed to each agent by `--deploy`. **Generated — edit the vault source, not these** |
 | `harness/manifest.json` | Harness engine manifest | Which enforced regions inject where, and which agents receive skills |
+| `harness/reviewer-pool.json` | Adversarial-review allow-list (#955) | Model ids permitted to sign a `review.md`. `dotf spec archive` refuses one signed outside it, so **no adversarial review runs on an Anthropic model**. Launch with `dotf spec review <spec-id>`; edit the file to change who may review |
 | `scripts/compile-harness.sh` | Harness engine | `--refresh` (vault → records), `--deploy` (records → agent dirs), `--check` (offline drift) |
 | `scripts/vault.sh` | Vault tooling dispatcher (REFACTOR-005) | `vault {health, maintenance, check-escapes}` — single discoverable entry point; each subcommand still runnable standalone |
 | `scripts/vault-health.sh` | Obsidian vault health check | Checks plugin status, pending tasks, etc. Also runnable via `vault health`. |
@@ -150,6 +151,35 @@ Run `dotf secrets <sub> --help` for the exact flags; do not reconstruct the old
    against the live binary for tools installed elsewhere (see
    `cli/internal/doctor/checks_golangci.go` for the latter shape)
 5. Run tests: `~/.local/bin/bats tests/versions-conf.bats` and `cd cli && go test ./internal/doctor/`
+
+### Running the adversarial review before archiving a spec
+
+```bash
+dotf spec review <spec-id>                              # the pool's primary
+dotf spec review <spec-id> --reviewer <pool-id>         # a specific pool member
+dotf spec review <spec-id> --dry-run                    # print the command, run nothing
+tmux attach -t review-<spec-id>                         # watch it while it runs
+```
+
+Who may review is **not** the caller's choice. `harness/reviewer-pool.json` is
+the allow-list, `dotf spec archive` refuses a `review.md` signed outside it, and
+no adversarial review runs on an Anthropic model — the reviewer must not be the
+implementer, and Claude implements nearly everything here.
+
+Three rules the launcher encodes, each from a real failure:
+
+1. **Never let a runner pick the model.** Its default lives in unversioned
+   per-machine state, so a review that ran on the intended model on one box
+   silently runs on another elsewhere. `dotf spec review` always passes provider
+   and model explicitly.
+2. **The tool is not the guarantee, the model id is.** `agy` serves Claude models
+   too, so "run it with agy" constrains nothing.
+3. **`reviewer:` is matched exactly.** The right model spelled differently is
+   refused over punctuation, which costs a whole review round.
+
+The verdict lands in `specs/<spec-id>/review.md`; a machine-readable transcript
+lands beside it, so *how* a review reasoned is auditable and not only its
+conclusion.
 
 ### Running the health check
 ```bash

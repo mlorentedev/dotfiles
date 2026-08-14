@@ -203,9 +203,17 @@ implementation, while the PR is about to be opened or merged — propose
 evidence: `dotf spec archive` refuses without a fresh, passing `review.md`, so
 skipping the review now blocks the archive rather than merely weakening it.
 Propose, never self-serve: the value is independence, so the implementing
-session **cannot be the reviewer** — the human picks which session or agent
-supplies it. Full activation rule (checks, phrasing, when NOT to propose) is the
-SSOT in the `/adversarial-review` skill.
+session **cannot be the reviewer**.
+
+Who reviews is not an open question in this repo. `harness/reviewer-pool.json`
+is the allow-list of models permitted to sign a `review.md`, and `dotf spec
+archive` refuses one signed outside it — so an adversarial review **never runs
+on an Anthropic model here**, and running it on one is wasted work rather than
+merely discouraged. Launch it with `dotf spec review <feature-id>`, which
+resolves the model from the pool, pins provider and model explicitly rather
+than inheriting a runner's default, and runs detached in `review-<feature-id>`
+so the run can be watched. Full activation rule (checks, phrasing, when NOT to
+propose) is the SSOT in the `/adversarial-review` skill.
 
 **Banned phrases** (Standing Order #3 is **in-session, not 'later'**):
 "I'll do knowledge hygiene later", "will add the spec entry after merge",
