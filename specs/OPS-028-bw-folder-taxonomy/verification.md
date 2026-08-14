@@ -15,10 +15,19 @@ created: "2026-08-14"
 
 ## Test status
 
-- Test suite: `cd cli && go build ./... && go vet ./... && go test ./...` -> all packages `ok`, zero failures
+- Test suite: `cd cli && go build ./... && go vet ./... && go test ./... -count=1` -> all packages `ok`, zero failures. `-count=1` is load-bearing: a plain `go test ./...` gave a false all-green once during this spec (stale build-cache hit against `TestSetBackendBW_RealRegistry_OnlyTargetChanges`, which reads `registry.yaml` at runtime — a file the cache doesn't track), caught only by the adversarial review re-running with `-count=1`.
 - Lint: `golangci-lint run ./...` (pinned v2.12.2 per `versions.conf`) -> `0 issues`
-- Manual smoke test: none yet — everything exercised so far is unit-level against fakes (`fakeWriter`, `fakeFolderList`); no live `bw` CLI call has run (vault locked)
-- No regressions in existing test suite: yes — full `go test ./...` green before and after, `TestSecretsSet_CreateAbsent_NoFolderDeclared` pins the unfoldered path unchanged
+- Manual smoke test: folder created, item moved, and re-verified live against the real Bitwarden vault (see AC4 above) — no longer fake-only.
+- No regressions in existing test suite: yes — full `go test ./... -count=1` green before and after, `TestSecretsSet_CreateAbsent_NoFolderDeclared` pins the unfoldered path unchanged
+
+## Adversarial review
+
+Two passes, both `nan/deepseek-v4-flash` via `pi` (the reviewer-pool primary, HARNESS-071/#955 — Anthropic models are disqualified as reviewers in this repo per that gate, since Claude implements nearly every change including this one):
+
+1. **`reviewed_sha c13a8b0`** -> **PASS-WITH-GAPS**. Confirmed both findings from an earlier, informal same-model-as-implementer pass (discarded, not used to gate anything) were genuinely fixed: dormant `bw.folder` validation, and the stale golden-string test. Found two NEW Minor/THEORETICAL findings of its own: a TOCTOU race in `ResolveFolder` under concurrent callers, and no enforcement that a declared folder matches its secret's `plane` (an app-plane secret could declare `Dotfiles/infra` and pass).
+2. **`reviewed_sha e5973a7`** (after fixing both) -> clean **PASS**. Verified the `planeFolder` check's ordering, its handling of planes with no required folder (personal/floor), and judged the TOCTOU documentation-only fix as sufficient for a single-operator CLI. Full findings in `review.md`.
+
+## Decisions made during implementation
 
 ## Decisions made during implementation
 
@@ -31,9 +40,9 @@ created: "2026-08-14"
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons.md`? Yes — validate dormant/pre-declared config fields unconditionally, not gated on the state that activates them (the `bw.folder` gap only fired at migrate time, handing a typo straight to a folder-creating side effect).
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? No — this implements ADR-028's already-ratified taxonomy, it doesn't decide anything new.
+- [x] New pattern candidate for `00_meta/patterns/`? No — single occurrence in this repo so far; revisit if the dormant-validation gap recurs elsewhere.
 
 ## Archive checklist
 
