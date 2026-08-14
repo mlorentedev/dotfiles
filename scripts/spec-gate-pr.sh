@@ -15,9 +15,12 @@
 #
 # It lives here rather than inline in the workflow for the reason recorded in
 # tests/bitacora-reconcile.bats: logic inside a `run:` block is unreachable by
-# tests and went red-and-silent twice (BUG-063). The token still lives in the
-# workflow — check-spec-gate.sh stays offline for the pre-push hook (#854), and
-# so only this CI-only wrapper needs one.
+# tests and went red-and-silent twice (BUG-063). The token stays in the
+# workflow: this adapter needs GH_TOKEN to read a PR it does not own (CI's
+# actor). scripts/spec-gate-prepush.sh (BUG-061/#854) is the local pre-push
+# equivalent and needs none, reading a PR under the developer's own `gh auth`
+# instead — see its header for why its failure mode is deliberately the
+# opposite of this one's fail-closed behaviour below.
 #
 # Usage:
 #   spec-gate-pr.sh --pr N [args forwarded verbatim to check-spec-gate.sh]

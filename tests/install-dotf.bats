@@ -97,10 +97,25 @@ EOF
     mkdir -p "$DEST"
     # A shell script never triggers ETXTBSY (the kernel does not hold it as an
     # executable text image), so stand in a real ELF and keep it running.
-    cp "$(command -v sleep)" "$DEST/dotf"
+    # `sleep` itself does NOT work for this on every coreutils build (BUG-054):
+    # on a multi-call `coreutils` binary the applet dispatch can key off the
+    # RESOLVED EXECUTABLE PATH rather than argv[0] (observed with uutils
+    # coreutils -- `exec -a sleep` changes argv[0] but the copy still dispatches
+    # by its own path and refuses "unknown program"), so no argv[0] trick
+    # recovers it once the file has been copied to a path named "dotf". A copy
+    # of `bash` sidesteps the whole dispatch question: it is never a multi-call
+    # binary, and a builtin busy-loop (no forked/exec'd child) keeps THIS COPY's
+    # own executable text image open for the swap to contend with.
+    cp "$(command -v bash)" "$DEST/dotf"
     chmod 0755 "$DEST/dotf"
-    "$DEST/dotf" 30 &
+    "$DEST/dotf" -c 's=$SECONDS; while (( SECONDS - s < 30 )); do :; done' &
     BUSY_PID=$!
+
+    # A fixture that failed to hold the binary busy must fail loudly here, at
+    # setup, instead of silently degrading the rest of the test into a check of
+    # the ordinary replace-a-file path (BUG-054).
+    sleep 0.2
+    kill -0 "$BUSY_PID"
 
     run install_dotf "$VERSION" "$DEST" "$BASE"
     [ "$status" -eq 0 ]

@@ -138,8 +138,13 @@ _write_849_feed() {
 }
 
 @test "adjacency: with no flag the output is byte-identical to the previous version" {
-    # Characterization test (#672): the offline pre-push path (#854) must be
-    # untouched. Compares against the script as it stands on origin/main.
+    # Characterization test (#672): adding --adjacency-issues support did not
+    # silently change the script's existing offline output when the flag goes
+    # unused. #854/BUG-061 later added a documented local escape hatch
+    # (SDD_PR_BODY) to the LOC-gate failure message -- an intentional, in-scope
+    # change to this exact path, not a regression -- so that block is stripped
+    # from both sides before comparing; everything else must still match
+    # origin/main byte for byte.
     if ! git -C "$BATS_TEST_DIRNAME/.." rev-parse --verify origin/main >/dev/null 2>&1; then
         skip "origin/main not fetched in this environment"
     fi
@@ -154,7 +159,14 @@ _write_849_feed() {
     SDD_PR_BODY="Closes #850" \
         run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
     [ "$status" -eq "$baseline_status" ]
-    [ "$output" = "$baseline_output" ]
+
+    _strip_escape_hatch() {
+        sed '/^       If this already archived a spec/,/^       be set by hand for a one-off check/d' | cat -s
+    }
+    local stripped_current stripped_baseline
+    stripped_current=$(printf '%s\n' "$output" | _strip_escape_hatch)
+    stripped_baseline=$(printf '%s\n' "$baseline_output" | _strip_escape_hatch)
+    [ "$stripped_current" = "$stripped_baseline" ]
 }
 
 @test "adjacency: --help documents the flag" {
