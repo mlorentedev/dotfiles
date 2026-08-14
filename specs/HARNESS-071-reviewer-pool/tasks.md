@@ -46,20 +46,34 @@ created: "2026-08-13"
 > the unticked boxes below are the declared remainder — not an incomplete
 > checklist for the PR that carries slice 1.
 
-- [ ] [AC4] `dotf spec review <spec-id>`: resolve the primary from the pool and
+- [x] [AC4] `dotf spec review <spec-id>`: resolve the primary from the pool and
       pass `--provider`/`--model` **explicitly**. Not optional polish — BUG-074
       round 3 was pinned only because `~/.pi/agent/settings.json` on this machine
-      happens to default to nan; pi's own default provider is `google`, and that
-      file is unversioned per-machine state.
-- [ ] [AC5] Named tmux session `review-<spec-id>` so the run is watchable while
+      happens to default to nan; `pi --help` documents its own default provider
+      as `google`, and that file is unversioned per-machine state.
+- [x] Flags verified against the installed binaries rather than assumed. An
+      earlier draft of the argv builder invented a `--prompt-file` that neither
+      runner has; both take the prompt as a trailing positional.
+- [x] [AC5] Named tmux session `review-<spec-id>` so the run is watchable while
       it happens. Windows / no-tmux degrades to foreground and says so.
-- [ ] [AC6] Machine-readable transcript beside `review.md` (`pi --mode json`,
-      `agy --output-format stream-json`). Check the size before making it a habit.
-- [ ] Raise `agy --print-timeout` — it defaults to 5m and round 3 took ~25m, so
-      the fallback dies on defaults. A concrete instance of "configured is not
-      exercised".
-- [ ] [AC7] Prove the Gemini arm with one real review. NaN's evidence already
-      exists (BUG-074 round 3); a fallback never observed working is decoration.
+- [x] [AC6] Machine-readable transcript teed beside `review.md` (`pi --mode
+      json`, `agy --output-format stream-json`).
+- [x] Raise `agy --print-timeout` to 90m — it defaults to 5m and round 3 took
+      ~25m, so the fallback dies on defaults. A concrete instance of
+      "configured is not exercised".
+- [x] Shell-quote every wrapped argument: tmux re-parses its command through a
+      shell and so does `sh -c`, and the prompt carries quotes, backticks and
+      newlines. Unquoted, a `$(…)` in a prompt would execute.
+- [x] Refuse an out-of-pool model at the launcher too — defence in depth, and it
+      names what IS available rather than only what is forbidden.
+- [x] Mutation-test the launcher — 6 mutants, **6 detected**.
+- [ ] [AC7] Prove the Gemini arm with one **real review**. Partial evidence so
+      far: `agy --print --model gemini-3.1-pro-high` answers non-interactively
+      and identifies itself as Gemini 3.1 Pro, so the invocation and the pin
+      work. That is not the same as producing a review, and the criterion says
+      review — NaN cleared this bar (BUG-074 round 3, where it re-ran the
+      mutation battery itself); Gemini has not yet. A fallback never observed
+      doing the job is decoration.
 
 ## Slice 3 — the standing rule where agents read it
 
