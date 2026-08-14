@@ -20,7 +20,7 @@ created: "2026-08-14"
 - Manual smoke test (live Bitwarden vault, this operator's unlocked session):
   - `dotf secrets migrate <id> --yes` for the 5 non-Zoho file secrets — each created or updated its declared bw item/field and flipped the registry
   - SHA-256 parity spot-check (plaintext never printed) on `KUBECONFIG` (multi-line, dedicated item) and `CHATGPT_RECOVERY_CODE` (custom field on an item shared with `CHATGPT_BACKUP_CODE`): age-side hash == bw-side hash on both
-  - `dotf secrets migrate ZOHO_RECOVERY_CODE --dry-run` confirmed to still fail with the pre-existing, unchanged error
+  - `dotf secrets migrate ZOHO_RECOVERY_CODE --dry-run` confirmed to surface the pre-existing #962 zoho ambiguity error
 - No regressions in existing test suite: yes — full suite green before and after, including the pre-existing env-secret migrate tests
 
 ## Decisions made during implementation
