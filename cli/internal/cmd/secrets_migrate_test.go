@@ -81,6 +81,43 @@ func TestSecretsMigrate_EndToEnd(t *testing.T) {
 	}
 }
 
+// TestSecretsMigrate_FileSecret_ByteExact proves migrate now handles file secrets
+// (expose: { file: ... }), and does so byte-exact — no trailing-newline trim at all,
+// unlike env secrets. The fixture deliberately carries a trailing newline (what `age -d`
+// actually appends): a fixture with none would make TrimRight a no-op regardless of
+// whether isFile is respected, silently passing even if the isFile branch regressed to
+// the old hardcoded trim (CLI-024-secrets-file-migrate AC1/AC3 — this fixture shape
+// itself was caught missing the trailing newline by the adversarial review).
+func TestSecretsMigrate_FileSecret_ByteExact(t *testing.T) {
+	const fileRegistry = `
+version: 1
+secrets:
+  - id: KUBECONFIG
+    plane: infra
+    backend: age
+    age: kubelab.kubeconfig
+    bw: { item: kubelab-kubeconfig, field: notes }
+    expose: { file: { var: KUBECONFIG, path: "~/.kube/kubelab.config", mode: "0600" } }
+    consumers: [local]
+`
+	fw := newFakeWriter()
+	fw.notFound["kubelab-kubeconfig"] = true // target item absent → --yes creates it
+	kubeconfig := "apiVersion: v1\nclusters:\n- cluster:\n    server: https://kubelab\nkind: Config\n" // trailing newline, like age -d
+	out, err := migrateExec(t, fileRegistry, fw, kubeconfig, "KUBECONFIG", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fw.created["kubelab-kubeconfig/notes"] != kubeconfig {
+		t.Errorf("created = %q, want %q byte-exact (no trim, nothing appended)", fw.created["kubelab-kubeconfig/notes"], kubeconfig)
+	}
+	if got := backendOfID(t, "KUBECONFIG"); got != "bw" {
+		t.Errorf("registry backend = %q, want bw (flipped)", got)
+	}
+	if !strings.Contains(out, "migrated") {
+		t.Errorf("want 'migrated', got %q", out)
+	}
+}
+
 // TestSecretsMigrate_PreservesInteriorNewlines proves migrate no longer routes the
 // age plaintext through EnvFor's single-line stripNewlines: a multi-line secret
 // (BEEHIIV_DNS_RECORDS-shaped) must survive the cutover with its interior newlines
@@ -196,14 +233,11 @@ secrets:
 	}
 }
 
+// File secrets are no longer scope-guarded here — see TestSecretsMigrate_FileSecret_ByteExact.
 func TestSecretsMigrate_ScopeGuards(t *testing.T) {
 	cases := []struct {
 		name, registry, id, wantErr string
 	}{
-		{
-			name: "file secret", id: "KUBECONFIG", wantErr: "file secret",
-			registry: "version: 1\nsecrets:\n  - {id: KUBECONFIG, plane: infra, backend: age, age: k, bw: {item: kc, field: notes}, expose: {file: {var: KUBECONFIG, path: \"~/.k\"}}, consumers: [local]}\n",
-		},
 		{
 			name: "missing bw block", id: "NOBW", wantErr: "no bw:",
 			registry: "version: 1\nsecrets:\n  - {id: NOBW, plane: app, backend: age, age: x, expose: {env: NOBW}, consumers: [local]}\n",
