@@ -252,9 +252,16 @@ type bwFolder struct {
 }
 
 // ResolveFolder lists the vault's folders, matches by exact name, and creates the
-// folder when absent — idempotent (a second call finds the just-created folder and
-// never creates a duplicate). Live-verified against an unlocked vault, not in CI, like
-// the rest of the write seam.
+// folder when absent — idempotent for SEQUENTIAL calls (a second call finds the
+// just-created folder and never creates a duplicate). Live-verified against an
+// unlocked vault, not in CI, like the rest of the write seam.
+//
+// Not safe against CONCURRENT callers: two processes racing on the same absent name
+// can both see an empty list and both create it, since Bitwarden allows duplicate
+// folder names (OPS-028 adversarial review, Minor/THEORETICAL finding). Accepted as a
+// single-operator-CLI limitation — `dotf secrets` has no concurrent-writer story
+// anywhere else in its design either — rather than adding a re-read-after-create that
+// would only narrow, not close, the race.
 func (p BWPut) ResolveFolder(name string) (string, error) {
 	if name == "" {
 		return "", nil

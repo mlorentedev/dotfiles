@@ -252,6 +252,18 @@ func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
 // adversarial review's Major finding) would let a typo sail through parse and only
 // surface at migrate time, when it is handed straight to ResolveFolder — which
 // CREATES an arbitrary Bitwarden folder for it.
+// TestParseRegistry_BwFolder_MustMatchPlane proves a folder from the ratified set
+// still fails validation if it doesn't match the secret's plane — the ratified-set
+// check alone would let an app-plane secret declare Dotfiles/infra (both strings are
+// individually valid) and pass (OPS-028 adversarial review, Minor finding).
+func TestParseRegistry_BwFolder_MustMatchPlane(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: Dotfiles/infra}, expose: {env: A}}\n"
+	if _, err := ParseRegistry([]byte(yml)); err == nil {
+		t.Error("app-plane secret declaring Dotfiles/infra must fail validation")
+	}
+}
+
 func TestParseRegistry_BwFolder_ValidatedWhileDormant(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
 		"  - {id: a, plane: app, backend: age, age: f, bw: {item: it, field: password, folder: Dotfiles/typo}, expose: {env: A}}\n"

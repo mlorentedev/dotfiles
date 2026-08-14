@@ -67,6 +67,16 @@ var validBWFolders = map[string]bool{
 	"Dotfiles/infra": true,
 }
 
+// planeFolder is the required bw.folder for a plane that has one — the ratified-set
+// check alone (validBWFolders) would let an app-plane secret declare Dotfiles/infra
+// and pass, since both strings are individually valid; this closes that gap (OPS-028
+// adversarial review, Minor finding). A plane absent here (personal, floor) has no
+// required folder and is left to the ratified-set check alone.
+var planeFolder = map[string]string{
+	"app":   "Dotfiles/apps",
+	"infra": "Dotfiles/infra",
+}
+
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
 type Expose struct {
 	Env  EnvExpose   `yaml:"env"`
@@ -196,8 +206,13 @@ func (r *Registry) validate() error {
 		// exactly the drift this taxonomy exists to prevent (OPS-028 adversarial
 		// review, Major finding). So this runs for every secret carrying a bw: block,
 		// regardless of current backend.
-		if s.BW != nil && s.BW.Folder != "" && !validBWFolders[s.BW.Folder] {
-			return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
+		if s.BW != nil && s.BW.Folder != "" {
+			if !validBWFolders[s.BW.Folder] {
+				return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
+			}
+			if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
+				return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
+			}
 		}
 
 		// Every exposed var must be a valid env identifier (B5) and unique across the
