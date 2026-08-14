@@ -178,3 +178,94 @@ func TestPoolEntriesAreNilWhenNoPoolExists(t *testing.T) {
 		t.Errorf("expected nil entries, got %+v", entries)
 	}
 }
+
+// The default is the pool's first entry, and an explicit choice reaches any
+// member — which is what makes the fallback exercisable on purpose rather than
+// only during an outage. A fallback never chosen deliberately is never tested.
+func TestResolveReviewerDefaultsToPrimaryAndHonoursAnExplicitChoice(t *testing.T) {
+	entries := []ReviewerEntry{
+		{ID: "nan/deepseek-v4-flash", Role: "primary"},
+		{ID: "agy/gemini-3.1-pro-high", Role: "fallback"},
+	}
+
+	got, err := ResolveReviewer(entries, "")
+	if err != nil || got.ID != "nan/deepseek-v4-flash" {
+		t.Fatalf("empty want must select the first entry, got %+v (%v)", got, err)
+	}
+	got, err = ResolveReviewer(entries, "agy/gemini-3.1-pro-high")
+	if err != nil || got.Role != "fallback" {
+		t.Fatalf("explicit want must select that entry, got %+v (%v)", got, err)
+	}
+}
+
+// Refusing at the launcher as well as at the gate is defence in depth: the gate
+// catches a review that already ran on the wrong model, the launcher stops it
+// from running at all — cheaper, and it names what is available.
+func TestResolveReviewerRefusesAModelOutsideThePool(t *testing.T) {
+	_, err := ResolveReviewer([]ReviewerEntry{{ID: "nan/x"}}, "claude-opus-5")
+	if err == nil {
+		t.Fatal("a model outside the pool must not be launchable")
+	}
+	if !strings.Contains(err.Error(), "nan/x") {
+		t.Errorf("the error must list what IS available, got: %v", err)
+	}
+}
+
+// With no pool there is nothing to run, and guessing a model would defeat the
+// whole mechanism.
+func TestResolveReviewerRefusesWhenThereIsNoPool(t *testing.T) {
+	if _, err := ResolveReviewer(nil, ""); err == nil {
+		t.Fatal("an absent pool must not resolve to a guessed default")
+	}
+}
+
+// Both wrappers hand a command STRING to something that re-parses it — tmux to
+// its shell, sh to itself. The reviewer prompt contains quotes, backticks and
+// newlines, so an unquoted argument would be executed rather than passed.
+func TestWrappersQuoteAnArgumentThatWouldOtherwiseExecute(t *testing.T) {
+	nasty := "text with 'quotes' and `backticks` and $(id)"
+	for name, argv := range map[string][]string{
+		"tee":  TeeWrap([]string{"echo", nasty}, "/tmp/t.jsonl"),
+		"tmux": TmuxWrap("s", "/repo", []string{"echo", nasty}, "/tmp/t.jsonl"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			joined := argv[len(argv)-1]
+			if strings.Contains(joined, "$(id)") && !strings.Contains(joined, `'`) {
+				t.Fatalf("command substitution must be quoted, got: %s", joined)
+			}
+			if !strings.Contains(joined, "| tee ") {
+				t.Errorf("the stream must be teed to a transcript, got: %s", joined)
+			}
+		})
+	}
+}
+
+// Each runner reads its own deployed render of the same vault-sourced skill, so
+// a review never loads a skill from a harness its runner does not use.
+func TestReviewerSkillPathIsPerRunner(t *testing.T) {
+	pi, agy := ReviewerSkillPath("pi"), ReviewerSkillPath("agy")
+	if !strings.Contains(pi, ".pi/agent/skills") {
+		t.Errorf("pi must read its own skills dir, got %q", pi)
+	}
+	if !strings.Contains(agy, ".gemini/skills") {
+		t.Errorf("agy must read its own skills dir, got %q", agy)
+	}
+}
+
+// The prompt must name the canonical id, because `reviewer:` is self-reported
+// and the gate matches it exactly — a reviewer that spells its own name
+// differently is refused for a string mismatch rather than a policy breach,
+// burning a whole review round.
+func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.T) {
+	p := ReviewPrompt("AI-001-x", "/repo", "nan/deepseek-v4-flash", "/skill/SKILL.md")
+	for _, want := range []string{
+		"AI-001-x", "/repo", "/skill/SKILL.md",
+		"`nan/deepseek-v4-flash`",
+		"proposal.md", "tasks.md", "features.json",
+		"Do not rubber-stamp",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("prompt must mention %q", want)
+		}
+	}
+}

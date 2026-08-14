@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -25,7 +27,137 @@ func newSpecCmd() *cobra.Command {
 			"are embedded, so init works without the vault checked out.",
 	}
 	cmd.AddCommand(newSpecInitCmd())
+	cmd.AddCommand(newSpecReviewCmd())
 	cmd.AddCommand(newSpecArchiveCmd())
+	return cmd
+}
+
+// lookPath is a seam so tests can decide whether tmux "exists" without
+// depending on the machine running them.
+var lookPath = exec.LookPath
+
+// runCommand is a seam for the launch itself, so the command's wiring is
+// testable without spawning a reviewer that would take half an hour.
+var runCommand = func(dir string, argv []string) error {
+	c := exec.Command(argv[0], argv[1:]...)
+	c.Dir = dir
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
+}
+
+func newSpecReviewCmd() *cobra.Command {
+	var (
+		reviewer   string
+		foreground bool
+		dryRun     bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "review <feature-id>",
+		Short: "Run an adversarial review on a pooled model",
+		Long: `Launch /adversarial-review for specs/<feature-id>/ on a model from
+harness/reviewer-pool.json, and write its verdict to the spec folder.
+
+The point is that the model is not the launcher's choice, nor the caller's habit:
+it comes from the pool, and dotf spec archive refuses a review signed outside it.
+The pool's first entry is the default; --reviewer selects any other member, which
+is how the fallback gets exercised deliberately rather than only in an outage.
+
+The model is always passed to the runner explicitly. Relying on a runner's own
+default is how a review comes to be pinned by coincidence — pi defaults to the
+google provider, and its configured default lives in unversioned per-machine
+state.
+
+By default the reviewer runs in a detached tmux session named review-<feature-id>
+so the run can be watched while it happens; attach with the command printed on
+launch. Without tmux (Windows, or a machine that lacks it) the run goes to the
+foreground and says so. A machine-readable transcript is written beside the
+review, because the verdict records what a reviewer concluded and the transcript
+is the only record of how.`,
+		Example:      "  dotf spec review HARNESS-071-reviewer-pool\n  dotf spec review AI-001-ollama-public --reviewer agy/gemini-3.1-pro-high",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id := args[0]
+			if err := spec.ValidateID(id); err != nil {
+				return err
+			}
+
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := spec.RepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			specDir := filepath.Join(repoRoot, "specs", id)
+			if info, statErr := os.Stat(specDir); statErr != nil || !info.IsDir() {
+				return fmt.Errorf("spec not found: %s", specDir)
+			}
+
+			entries, err := spec.LoadReviewerPoolEntries(repoRoot)
+			if err != nil {
+				return err
+			}
+			chosen, err := spec.ResolveReviewer(entries, reviewer)
+			if err != nil {
+				return err
+			}
+
+			skill := spec.ReviewerSkillPath(chosen.Runner)
+			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, skill)
+			argv, err := spec.ReviewerCommand(chosen, prompt)
+			if err != nil {
+				return err
+			}
+
+			transcript := spec.TranscriptPath(repoRoot, id)
+			session := spec.TmuxSession(id)
+			useTmux := !foreground
+			if useTmux {
+				if _, lookErr := lookPath("tmux"); lookErr != nil {
+					// Not a failure: tmux is Linux-only and dotf is
+					// cross-platform. Degrade loudly rather than silently, so
+					// nobody waits for a session that was never created.
+					cmd.Printf("[INFO] tmux not found — running in the foreground; the session is not detachable\n")
+					useTmux = false
+				}
+			}
+
+			cmd.Printf("Reviewer:   %s (%s, %s)\n", chosen.ID, chosen.Runner, chosen.Role)
+			cmd.Printf("Spec:       specs/%s\n", id)
+			cmd.Printf("Transcript: %s\n", transcript)
+
+			launch := spec.TeeWrap(argv, transcript)
+			if useTmux {
+				launch = spec.TmuxWrap(session, repoRoot, argv, transcript)
+			}
+
+			if dryRun {
+				cmd.Printf("\n[DRY RUN] would run:\n  %s\n", strings.Join(launch, " "))
+				return nil
+			}
+
+			if useTmux {
+				cmd.Printf("Session:    %s\n\n", session)
+				if err := runCommand(repoRoot, launch); err != nil {
+					return fmt.Errorf("starting the tmux session: %w", err)
+				}
+				cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
+				cmd.Printf("When it finishes, %s carries the verdict and archive reads it.\n", spec.ReviewFile)
+				return nil
+			}
+
+			cmd.Printf("\n")
+			return runCommand(repoRoot, launch)
+		},
+	}
+
+	cmd.Flags().StringVar(&reviewer, "reviewer", "", "pool member to run (default: the pool's first entry)")
+	cmd.Flags().BoolVar(&foreground, "foreground", false, "run in this terminal instead of a detached tmux session")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command that would run, and exit")
 	return cmd
 }
 

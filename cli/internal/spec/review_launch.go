@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -96,9 +97,133 @@ func TranscriptPath(repoRoot, specID string) string {
 	return filepath.Join(repoRoot, "specs", specID, TranscriptFile)
 }
 
+// ResolveReviewer picks which pool member runs.
+//
+// Default is the pool's FIRST entry — the launcher's primary. An explicit want
+// selects any member by id, which is what makes the fallback reachable
+// deliberately rather than only when the primary breaks: a fallback that is
+// never chosen on purpose is never exercised, and an unexercised fallback is
+// decoration.
+func ResolveReviewer(entries []ReviewerEntry, want string) (ReviewerEntry, error) {
+	if len(entries) == 0 {
+		return ReviewerEntry{}, fmt.Errorf("no %s in this repo — the launcher has no model to run and will not guess one", ReviewerPoolFile)
+	}
+	want = strings.TrimSpace(want)
+	if want == "" {
+		return entries[0], nil
+	}
+	ids := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.ID == want {
+			return e, nil
+		}
+		ids = append(ids, e.ID)
+	}
+	return ReviewerEntry{}, fmt.Errorf("reviewer %q is not in %s\navailable: %s",
+		want, ReviewerPoolFile, strings.Join(ids, ", "))
+}
+
+// ReviewPrompt is the brief handed to a launched reviewer.
+//
+// Deliberately THIN. The skill file is the contract, and repeating its content
+// here would create a second source of truth that drifts. What the prompt adds
+// is only what the skill cannot know: which spec, which repo, and the mechanical
+// constraints that keep the review from invalidating itself.
+//
+// The canonical id is stated because `reviewer:` is self-reported and the gate
+// matches it exactly — a reviewer that writes its own name a different way gets
+// refused for a mismatch rather than for a policy breach, which wastes a whole
+// review round on a string.
+func ReviewPrompt(specID, repoRoot, reviewerID, skillPath string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
+	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
+	fmt.Fprintf(&b, "Read and follow the skill at %s exactly — its workflow, its severity x reality\n"+
+		"classification, its test-traceability gate, its evaluator rubric, and its output format.\n"+
+		"Read that file first; it defines the whole deliverable.\n\n", skillPath)
+	b.WriteString("Mechanical constraints:\n")
+	fmt.Fprintf(&b, "- Write your verdict to `specs/%s/%s`, overwriting what is there. The YAML\n"+
+		"  frontmatter is part of the deliverable; `dotf spec archive` parses it and refuses a\n"+
+		"  malformed one.\n", specID, ReviewFile)
+	fmt.Fprintf(&b, "- Set `reviewer:` to exactly `%s`. That string is matched against this repo's\n"+
+		"  reviewer pool, so any other spelling is refused even when the model is correct.\n", reviewerID)
+	b.WriteString("- Set `reviewed_sha` to the output of `git rev-parse HEAD`.\n")
+	b.WriteString("- Do NOT modify `proposal.md`, `tasks.md` or `features.json`. Those are the contract\n" +
+		"  files a staleness check watches, so editing one would invalidate your own review the\n" +
+		"  moment you wrote it. If you believe one needs changing, say so as a finding instead.\n")
+	b.WriteString("- Do not commit, push, or comment on the PR. Writing the review is the deliverable.\n")
+	b.WriteString("- Verify claims by running things — the build, the linters, the test suite, and\n" +
+		"  mutation edits that you revert afterwards — not by reading assertions about them.\n" +
+		"  Leave the working tree clean apart from your review.\n\n")
+	b.WriteString("You are reviewing a change you did not write. Do not rubber-stamp it. Assume gaps\n" +
+		"exist until you have argued against them with evidence.\n")
+	return b.String()
+}
+
 // TmuxSession is the session name a launched review runs under.
 //
 // Deterministic and derived from the spec id so a human can attach without being
 // told the name, and so a second launch for the same spec collides visibly
 // instead of silently starting a rival reviewer.
 func TmuxSession(specID string) string { return "review-" + specID }
+
+// ReviewerSkillPath is where a given runner reads its deployed skills from.
+//
+// Each agent gets its own render of the same vault-sourced skill
+// (harness/manifest.json's deploy targets), so the path differs per runner while
+// the content does not. Pointing at the runner's OWN copy matters: it is the one
+// that agent would load anyway, so the review is not reading a skill from a
+// harness it does not use.
+func ReviewerSkillPath(runner string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "~"
+	}
+	dir := ".pi/agent/skills"
+	if runner == "agy" {
+		dir = ".gemini/skills"
+	}
+	return filepath.Join(home, dir, "adversarial-review", "SKILL.md")
+}
+
+// shellQuote renders one argument safe for a POSIX shell.
+//
+// Needed because both wrappers below hand a COMMAND STRING to something that
+// re-parses it — tmux to its own shell, sh to itself — so an unquoted prompt
+// containing backticks, quotes or newlines would be executed rather than passed.
+// The reviewer prompt contains all three.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func shellJoin(argv []string) string {
+	quoted := make([]string, 0, len(argv))
+	for _, a := range argv {
+		quoted = append(quoted, shellQuote(a))
+	}
+	return strings.Join(quoted, " ")
+}
+
+// TeeWrap runs argv in the foreground while copying its stream to transcript.
+//
+// tee rather than a plain redirect: the operator watching a foreground run
+// should still see the output, and the transcript should still exist afterwards.
+func TeeWrap(argv []string, transcript string) []string {
+	return []string{"sh", "-c", shellJoin(argv) + " | tee " + shellQuote(transcript)}
+}
+
+// TmuxWrap starts argv detached in a named session, teeing to transcript.
+//
+// Detached-with-a-name rather than attached: the caller gets its terminal back
+// and the run is still watchable, which is the whole difference between a review
+// that can be audited while it happens and one that reports only at the end.
+// `-c dir` pins the working directory so the reviewer resolves the repo the same
+// way the launcher did.
+func TmuxWrap(session, dir string, argv []string, transcript string) []string {
+	return []string{
+		"tmux", "new-session", "-d",
+		"-s", session,
+		"-c", dir,
+		shellJoin(argv) + " | tee " + shellQuote(transcript),
+	}
+}

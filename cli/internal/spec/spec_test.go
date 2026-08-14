@@ -173,9 +173,9 @@ func stubGh(t *testing.T, stdout, stderr string, exitNonZero bool) {
 	t.Setenv("PATH", dir)
 }
 
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
+// shellQuote now lives in review_launch.go, where the launcher needs it for
+// real: this file's copy was byte-identical, so the test uses the production
+// one rather than keeping a second implementation of the same rule.
 
 func TestGateOpenIssueReturnsTitle(t *testing.T) {
 	stubGh(t, "OPEN\tMy open issue", "", false)
