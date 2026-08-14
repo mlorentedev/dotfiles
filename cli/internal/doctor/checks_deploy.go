@@ -355,10 +355,23 @@ const (
 // stripHarnessRegions removes every harness-managed marker region (both the
 // GENERATED and AGENT-PRESENCE kinds) from content, mirroring
 // compile-harness.sh's region_content in reverse (strip instead of extract).
+//
+// Also drops the single blank line immediately preceding a BEGIN marker:
+// both inject_agent_presence and replace_region's append branch write a
+// region as "\n" + BEGIN + body + END + "\n" (compile-harness.sh), so an
+// appended region always leaves that blank separator behind in the deployed
+// file with nothing to match it in the un-appended repo source. Without
+// dropping it, checkInstructionDrift reported drift on every target
+// immediately after a clean --deploy — caught in review before merge.
 func stripHarnessRegions(content string) string {
 	lines := strings.Split(content, "\n")
 	out := make([]string, 0, len(lines))
 	skip, endMarker := false, ""
+	dropPrecedingBlank := func() {
+		if n := len(out); n > 0 && out[n-1] == "" {
+			out = out[:n-1]
+		}
+	}
 	for _, l := range lines {
 		if skip {
 			if l == endMarker {
@@ -368,8 +381,10 @@ func stripHarnessRegions(content string) string {
 		}
 		switch {
 		case strings.HasPrefix(l, harnessBeginPrefix):
+			dropPrecedingBlank()
 			skip, endMarker = true, harnessEndMarker
 		case strings.HasPrefix(l, agentPresenceBeginPrefix):
+			dropPrecedingBlank()
 			skip, endMarker = true, agentPresenceEndMarker
 		default:
 			out = append(out, l)
@@ -410,6 +425,17 @@ func checkHarnessMirrorOrphans(sys *System, cfg *Config, rep *Report, fix bool) 
 			continue
 		}
 		repoDir := filepath.Join(repo, "harness", sub)
+		if !isDir(repoDir) {
+			// resolveRepoDir's DOTFILES_REPO_DIR/cwd-git-root cascade proves
+			// only "a git checkout", not "the dotfiles checkout" (no such
+			// validation exists — docs/lessons.md, the resolveRepoDir
+			// test-isolation lesson). If it resolved to an unrelated repo
+			// lacking this subtree entirely, every mirror entry would look
+			// orphaned and --fix would delete the whole harness/<sub> tree.
+			// Refuse to compare rather than risk that.
+			rep.Skip("repo has no " + filepath.Join("harness", sub) + " — orphan comparison skipped (wrong checkout resolved?)")
+			continue
+		}
 		for _, e := range entries {
 			if !e.IsDir() || isDir(filepath.Join(repoDir, e.Name())) {
 				continue

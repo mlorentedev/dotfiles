@@ -15,6 +15,7 @@ func TestCheckHarnessMirrorOrphans(t *testing.T) {
 		repo = t.TempDir()
 		mirror = t.TempDir()
 		mkdirAll(t, filepath.Join(repo, "harness", "skills", "kept"))
+		mkdirAll(t, filepath.Join(repo, "harness", "agents")) // present, possibly empty -- a real repo counterpart tree
 		mkdirAll(t, filepath.Join(mirror, "harness", "skills", "kept"))
 		return repo, mirror
 	}
@@ -115,6 +116,29 @@ func TestCheckHarnessMirrorOrphans(t *testing.T) {
 
 		if rep.Failures() != 0 || buf.Len() != 0 {
 			t.Errorf("repo==mirror should be a silent no-op\n%s", buf.String())
+		}
+	})
+
+	t.Run("repo without harness/skills must not prune the mirror", func(t *testing.T) {
+		// resolveRepoDir proves only "a git checkout", not "the dotfiles
+		// checkout" -- a repo lacking harness/<sub> entirely (wrong repo
+		// resolved, e.g. DOTFILES_REPO_DIR unset + doctor run from inside an
+		// unrelated project) must not read every mirror entry as orphaned.
+		repo := t.TempDir() // no harness/ tree at all
+		mirror := t.TempDir()
+		mkdirAll(t, filepath.Join(mirror, "harness", "skills", "kept"))
+		cfg := &Config{DotfilesDir: mirror}
+		sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, nil, nil)
+
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkHarnessMirrorOrphans(sys, cfg, rep, true)
+
+		if !isDir(filepath.Join(mirror, "harness", "skills", "kept")) {
+			t.Errorf("must not prune when the repo has no counterpart tree\n%s", buf.String())
+		}
+		if rep.Failures() != 0 {
+			t.Errorf("a missing counterpart tree is a SKIP, not a FAIL\n%s", buf.String())
 		}
 	})
 }
