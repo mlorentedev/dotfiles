@@ -34,7 +34,11 @@ func checkSecretsTooling(sys *System, rep *Report) {
 	rep.Section("Secrets tooling")
 
 	if sys.has("bw") {
-		rep.Pass("bw (Bitwarden CLI — live secrets SSOT) found")
+		// Says only what PATH presence proves. The old wording ("bw (Bitwarden
+		// CLI — live secrets SSOT) found") read as a health verdict on the SSOT
+		// itself and stayed green through a 45-day dead session (BUG-074).
+		// Reachability is a separate claim, made by checkBitwardenReach.
+		rep.Pass("bw (Bitwarden CLI) installed — reachability checked separately")
 	} else {
 		rep.Fail("bw not in PATH — run 'dotf tools install' (ADR-028 live SSOT)")
 	}
