@@ -264,6 +264,17 @@ func TestParseRegistry_BwFolder_MustMatchPlane(t *testing.T) {
 	}
 }
 
+// TestParseRegistry_BwFolder_MustMatchPlane_Symmetric is the infra-side counterpart of
+// TestParseRegistry_BwFolder_MustMatchPlane (app-side) — both directions of the
+// plane↔folder mismatch must fail, not just one.
+func TestParseRegistry_BwFolder_MustMatchPlane_Symmetric(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: a, plane: infra, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
+	if _, err := ParseRegistry([]byte(yml)); err == nil {
+		t.Error("infra-plane secret declaring Dotfiles/apps must fail validation")
+	}
+}
+
 func TestParseRegistry_BwFolder_ValidatedWhileDormant(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
 		"  - {id: a, plane: app, backend: age, age: f, bw: {item: it, field: password, folder: Dotfiles/typo}, expose: {env: A}}\n"
