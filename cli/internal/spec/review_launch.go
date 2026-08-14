@@ -69,7 +69,7 @@ type ReviewerEntry struct {
 //
 // Every flag here is verified against the installed binaries. An earlier draft
 // also invented a --prompt-file that neither runner has.
-func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration) ([]string, error) {
+func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration, repoRoot string) ([]string, error) {
 	if timeout <= 0 {
 		timeout = DefaultReviewerTimeout
 	}
@@ -104,13 +104,46 @@ func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration) ([]s
 		// --print goes LAST and carries the prompt as its value. Order matters:
 		// any flag placed between --print and the prompt is consumed as the
 		// prompt instead.
-		return append(base,
+		//
+		// --dangerously-skip-permissions is required, not optional. agy prompts
+		// for approval on every tool call, and a detached reviewer has no human
+		// to answer: each call is auto-DENIED. Observed exactly that — the run
+		// read a few files, was refused `git rev-parse HEAD`, and gave up after
+		// 14 seconds while reporting `status: SUCCESS` with an empty response.
+		// A reviewer that cannot run the test suite cannot review, so the choice
+		// is this flag or no fallback arm at all.
+		//
+		// The name is a fair warning and the posture is real: the reviewer gets
+		// unattended shell in this repo. That is inherent to adversarial review
+		// — running the suite and mutating the code IS the job, and the pi arm
+		// has the same reach without asking. What bounds it is the deadline
+		// above, the pool restricting WHICH models get here, and the fact that
+		// the reviewer's only sanctioned output is review.md.
+		//
+		// --add-dir is what makes the review possible at all. Without it agy runs
+		// its shell commands in its OWN install directory, not the repo: `pwd`
+		// answers ~/.gemini/antigravity-cli and `git rev-parse HEAD` fails with
+		// "not a git repository". A reviewer that cannot reach the tree cannot
+		// run the suite or mutate anything, so it reviews by reading and grades
+		// generously — which is exactly what the first Gemini review did.
+		//
+		// --sandbox bounds what the auto-approval above can touch. Verified not
+		// to cost anything the review needs: under it, git, `go test` and file
+		// writes all still work.
+		agyArgs := []string{
 			"agy",
 			"--model", e.Model,
 			"--output-format", "stream-json",
 			"--print-timeout", timeout.String(),
-			"--print", prompt,
-		), nil
+			"--dangerously-skip-permissions",
+			"--sandbox",
+		}
+		if strings.TrimSpace(repoRoot) != "" {
+			agyArgs = append(agyArgs, "--add-dir", repoRoot)
+		}
+		// --print goes LAST and carries the prompt as its value.
+		agyArgs = append(agyArgs, "--print", prompt)
+		return append(base, agyArgs...), nil
 
 	default:
 		return nil, fmt.Errorf("pool entry %q names runner %q, which the launcher does not know how to invoke\n"+

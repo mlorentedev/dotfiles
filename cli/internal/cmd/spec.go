@@ -152,7 +152,7 @@ is the only record of how.`,
 
 			skill := spec.ReviewerSkillPath(chosen.Runner)
 			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, skill)
-			argv, err := spec.ReviewerCommand(chosen, prompt, timeout)
+			argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
 			if err != nil {
 				return err
 			}
