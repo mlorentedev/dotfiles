@@ -12,14 +12,23 @@ import (
 // a review.md (HARNESS-071, #955).
 const ReviewerPoolFile = "harness/reviewer-pool.json"
 
-// reviewerPool is the subset of that file this gate consumes. The file carries
-// more per-entry prose (runner, role, why) for humans; only the id is a
-// contract, so parsing just that keeps the gate indifferent to editorial
-// changes in the rest.
+// reviewerPool is the file's shape. `id` is what the GATE matches on; the
+// runner/provider/model fields are what the LAUNCHER needs. The `why` prose is
+// for humans and is deliberately not parsed, so editorial changes to it can
+// never break either consumer.
 type reviewerPool struct {
-	Pool []struct {
-		ID string `json:"id"`
-	} `json:"pool"`
+	Pool []ReviewerEntry `json:"pool"`
+}
+
+// LoadReviewerPoolEntries returns the full pool, in file order, for callers that
+// need to RUN a reviewer rather than merely validate one. The first entry is the
+// launcher's primary; the rest are fallbacks, and all of them are equally valid
+// signatures as far as the gate is concerned.
+//
+// Returns (nil, nil) when the repo has no pool, on the same reasoning as
+// loadReviewerPool: absent means "no opinion", not "nobody".
+func LoadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
+	return loadReviewerPoolEntries(repoRoot)
 }
 
 // loadReviewerPool reads the allow-list.
@@ -35,6 +44,20 @@ type reviewerPool struct {
 // state where the gate cannot tell an allowed reviewer from a forbidden one, and
 // passing there would silently downgrade to no gate while looking like one.
 func loadReviewerPool(repoRoot string) ([]string, error) {
+	entries, err := loadReviewerPoolEntries(repoRoot)
+	if err != nil || entries == nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(entries))
+	for _, e := range entries {
+		ids = append(ids, strings.TrimSpace(e.ID))
+	}
+	return ids, nil
+}
+
+// loadReviewerPoolEntries is the single reader both consumers share, so the gate
+// and the launcher can never disagree about what the pool says.
+func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 	path := filepath.Join(repoRoot, ReviewerPoolFile)
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -49,18 +72,15 @@ func loadReviewerPool(repoRoot string) ([]string, error) {
 		return nil, fmt.Errorf("%s is not valid JSON: %w", ReviewerPoolFile, jErr)
 	}
 
-	ids := make([]string, 0, len(p.Pool))
 	for i, entry := range p.Pool {
-		id := strings.TrimSpace(entry.ID)
-		if id == "" {
+		if strings.TrimSpace(entry.ID) == "" {
 			return nil, fmt.Errorf("%s entry %d has a blank id", ReviewerPoolFile, i)
 		}
-		ids = append(ids, id)
 	}
-	if len(ids) == 0 {
+	if len(p.Pool) == 0 {
 		return nil, fmt.Errorf("%s declares an empty pool — remove the file to disable the check, or list the models allowed to review", ReviewerPoolFile)
 	}
-	return ids, nil
+	return p.Pool, nil
 }
 
 // checkReviewerPool refuses a review signed by a model outside the pool.
