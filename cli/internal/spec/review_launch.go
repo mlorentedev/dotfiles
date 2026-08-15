@@ -284,13 +284,20 @@ func ShellJoin(argv []string) string {
 // that can be audited while it happens and one that reports only at the end.
 // `-c dir` pins the working directory so the reviewer resolves the repo the same
 // way the launcher did.
-func TmuxWrap(session, dir string, argv []string, transcript string) []string {
+// sink is the command the reviewer's stdout is piped into; it must pass the
+// stream through and write the transcript itself. An empty sink falls back to
+// plain `tee`, which stores the raw stream — correct, just enormous (#995).
+func TmuxWrap(session, dir string, argv []string, transcript string, sink []string) []string {
+	store := "tee " + shellQuote(transcript)
+	if len(sink) > 0 {
+		store = ShellJoin(sink)
+	}
 	return []string{
 		"tmux", "new-session", "-d",
 		"-s", session,
 		"-c", dir,
 		ShellJoin(argv) +
 			" 2> " + shellQuote(StderrPath(transcript)) +
-			" | tee " + shellQuote(transcript),
+			" | " + store,
 	}
 }
