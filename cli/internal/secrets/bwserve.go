@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -35,8 +34,8 @@ func bwServeCommand(bin string, port int) *exec.Cmd {
 	cmd := exec.Command(bin, "serve", "--hostname", bwServeHostname, "--port", strconv.Itoa(port)) //nolint:gosec // bin/port are operator-controlled config, not external input
 	// Detach from this process's session so the daemon survives the CLI
 	// invocation exiting — the whole point is one unlock outliving any single
-	// `dotf` call.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// `dotf` call. Platform-specific (see bwserve_unix.go / bwserve_windows.go).
+	cmd.SysProcAttr = bwServeDetachAttr()
 	return cmd
 }
 
