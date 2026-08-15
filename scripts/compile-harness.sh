@@ -832,9 +832,56 @@ deploy_agent_presence() {
     done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)"' "$MANIFEST")
 }
 
+# --- coverage: every enforced region reaches every surface, or says why not ---
+#
+# Why this is not already covered by the region diff below: that diff renders its
+# expected side FROM the target's own `inject` list (target_inject), so an id
+# missing from the list is missing from BOTH sides and the target reports OK. It
+# verifies that injected text matches its record — a consistency check — and is
+# structurally blind to a surface being skipped entirely. That blindness is the
+# bug this function exists for (HARNESS-072); the risk had been filed against
+# the diff, which could never have caught it.
+#
+# Invariant: for every enforced id x every surface, the id is either injected or
+# carries an `opt_out` entry naming that surface with a reason. Silence is not an
+# exit — the same rule the Definition of Done applies to people.
+#
+# A surface is a `targets[].file`, plus the reserved key "doctrine" for the one
+# shared inject list feeding every doctrine payload.
+check_coverage() {
+    local id surfaces surface injected reason gap=0
+    mapfile -t surfaces < <(
+        jq -r '.targets[].file' "$MANIFEST"
+        jq -e '.doctrine' "$MANIFEST" >/dev/null 2>&1 && printf 'doctrine\n'
+    )
+    while IFS= read -r id; do
+        for surface in "${surfaces[@]}"; do
+            if [[ "$surface" == doctrine ]]; then
+                injected="$(jq -r --arg i "$id" \
+                    '[.doctrine.inject[]? | select(. == $i)] | length' "$MANIFEST")"
+            else
+                injected="$(jq -r --arg i "$id" --arg f "$surface" \
+                    '[.targets[] | select(.file == $f) | .inject[] | select(. == $i)] | length' "$MANIFEST")"
+            fi
+            [[ "$injected" != 0 ]] && continue
+            reason="$(jq -r --arg i "$id" --arg s "$surface" \
+                '.enforced[] | select(.id == $i) | .opt_out[$s] // empty' "$MANIFEST")"
+            if [[ -z "$reason" ]]; then
+                printf '[GAP] enforced region "%s" reaches neither surface "%s" nor an opt_out for it\n' "$id" "$surface" >&2
+                printf '      -> inject it there, or record enforced[id=%s].opt_out["%s"] with the reason\n' "$id" "$surface" >&2
+                gap=1
+            else
+                printf '[check] OK -> %s excluded from %s (%s)\n' "$id" "$surface" "$reason"
+            fi
+        done
+    done < <(jq -r '.enforced[].id' "$MANIFEST")
+    return "$gap"
+}
+
 do_check() {
     require_tools
     local file ids drift=0 expected actual
+    check_coverage || drift=1
     while IFS= read -r file; do
         if ! validate_markers "$REPO_ROOT/$file"; then drift=1; continue; fi
         mapfile -t ids < <(target_inject "$file")

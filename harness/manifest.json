@@ -7,20 +7,28 @@
     { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" },
     { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" },
     { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" },
-    { "id": "pr-sizing",           "source": "pattern-git-workflow.md#10-pr-sizing-policy" }
+    { "id": "pr-stewardship",      "source": "pattern-change-lifecycle.md#pr-stewardship" },
+    {
+      "id": "pr-sizing",
+      "source": "pattern-git-workflow.md#10-pr-sizing-policy",
+      "opt_out": {
+        "AGENTS.md": "the targets region counters harness defaults only; a precedence rule between two of our own rules overrides none, and #824 already states this policy in this file's hand-written prose (#830)",
+        "ai/claude/CLAUDE.md": "same as AGENTS.md — the compact doctrine payload substitutes for the constitution agy and codex never receive, and this file's reader already gets the policy from AGENTS.md (#830)"
+      }
+    }
   ],
   "targets": [
     {
       "agent": "agents",
       "kind": "native",
       "file": "AGENTS.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship"]
     },
     {
       "agent": "claude",
       "kind": "pointer",
       "file": "ai/claude/CLAUDE.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship"]
     }
   ],
   "skills": {
@@ -38,7 +46,7 @@
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   },
   "doctrine": {
-    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-sizing"],
+    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "pr-sizing"],
     "deploy": [
       {
         "agent": "agy",
