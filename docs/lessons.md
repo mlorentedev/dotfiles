@@ -231,6 +231,7 @@ awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9
 - [2026-08-14] Widening a shared return type is a change to every consumer, and Go's zero values hide the ones you missed
 - [2026-08-15] A check whose precondition the architecture forbids reports SKIP forever, and SKIP reads as nothing-to-check
 - [2026-08-15] A check that cannot fail the way you cite it
+- [2026-08-15] `bw status` answers for the CLI's session, not for the daemon your code actually uses
 
 ---
 
@@ -2401,3 +2402,15 @@ The blast radius was also wider than the one function: because `compile-harness.
 **Rule**: when a spec names a command as the mitigation for a risk, open the command and find the line that would fail. A check earns its citation by the question it actually asks, and the question is usually narrower than its name suggests — `--check` also cannot see a committed record trailing its vault source, because it is offline by design (ADR-013), which is how six stale records sat clean until someone ran `--refresh`. This is the `pattern-verification-fails-toward-unproven` family in its cheapest form: not a check that ran and lied, but a check that was never capable of the answer and was trusted for it anyway. The tell is a mitigation you can state but not demonstrate red.
 
 **Tags**: `harness`, `verification`, `spec-driven-development`, `ci`
+
+### [2026-08-15] `bw status` answers for the CLI's session, not for the daemon your code actually uses
+
+**Context**: every `bw`-backed secret was failing at once — `dotf secrets run -- true` died on `dockerhub`, and `dotf secrets verify` showed a wall of FAILED with `bw serve returned no parseable envelope: invalid character 'I'`. Looking for a single cause behind a mass failure, I ran `bw status`, got `{"status":"locked"}`, and reported the blocker as a locked vault needing the user's master password.
+
+**Problem**: the vault was not locked. ADR-028's runtime path does not go through the `bw` CLI's own session at all — `dotf secrets` resolves through the long-lived `bw serve` daemon, which holds a *separate* unlocked session. Both readings were true about different subjects, and the one I measured was not the one the failing code uses. A parallel session refuted it with the measurement I should have run: `dotf secrets run --only NAN_API_KEY -- true` exits 0 while unscoped resolution dies. The real cause was one broken item mapping killing an unscoped batch read (#985/#988), and "ask the user to unlock" would have fixed nothing while looking like progress — a plausible cause that explains the symptom is not the same as the cause.
+
+**Solution**: measure the path the failing code takes. `dotf secrets run --only <ID> -- true` exercises exactly the daemon, the mapping and the item that production uses; `bw status` exercises a CLI session nothing in ADR-028's hot path reads. When a mass failure has an obvious single explanation, prefer the probe that is *specific to one working element* over the one that reports global state — a scoped success falsifies "everything is down" in one command.
+
+**Rule**: before believing a diagnostic, name the subject it reports on and check it is the subject that is failing. Tools that front a daemon, a cache, a proxy or a pool almost always have two states — the client's and the server's — and the human-facing status command usually reports the client's, because that is the one it can see without asking. `git status` vs the remote, `docker ps` vs the daemon, `kubectl config` vs the cluster, `bw status` vs `bw serve`: same shape. The tell is a global explanation ("it's locked", "it's down") arriving before any single-element probe was tried.
+
+**Tags**: `secrets`, `bitwarden`, `diagnosis`, `verification`
