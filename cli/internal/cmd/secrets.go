@@ -56,7 +56,10 @@ var (
 	registryPath      = env.ResolveRegistryPath
 	registryWritePath = env.RepoRegistryPath
 	ageDecryptor      secrets.Decryptor
-	bwReader          secrets.BWReader = secrets.BWGet{}
+	bwReader          secrets.BWReader = secrets.BWFallbackReader{
+		Serve:    secrets.BWServeReader{Client: secrets.BWServeClient{}},
+		Shellout: secrets.BWGet{},
+	}
 )
 
 // secretLoader builds the resolution engine wired with both backend seams, over the

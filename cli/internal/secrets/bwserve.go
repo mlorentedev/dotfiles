@@ -333,3 +333,21 @@ func (d *BWServeDaemon) Status() (string, error) {
 	}
 	return st, err
 }
+
+// BWFallbackReader is the BWReader this package's callers should default to:
+// it reads through a local bw serve daemon when one is reachable and
+// unlocked, and falls back to the CLI shellout otherwise — additively, with
+// no change to any consumer (AC2, AC3). The status check runs once per
+// Field() call — ~9ms against a running daemon (OPS-021 spike measurement),
+// effectively free against an absent one (a fast connection-refused).
+type BWFallbackReader struct {
+	Serve    BWServeReader
+	Shellout BWReader // typically BWGet{}
+}
+
+func (r BWFallbackReader) Field(item, field string) (string, error) {
+	if st, err := r.Serve.Client.Status(); err == nil && st == "unlocked" {
+		return r.Serve.Field(item, field)
+	}
+	return r.Shellout.Field(item, field)
+}

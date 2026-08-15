@@ -294,6 +294,85 @@ func TestBWServeDaemon_Status_AbsentWhenUnreachable(t *testing.T) {
 	}
 }
 
+// fakeShellout is a minimal BWReader double standing in for BWGet, so
+// BWFallbackReader's tests never need a real bw binary.
+type fakeShellout struct {
+	called bool
+	value  string
+	err    error
+}
+
+func (f *fakeShellout) Field(_, _ string) (string, error) {
+	f.called = true
+	return f.value, f.err
+}
+
+// TestBWFallbackReader_UsesServe_WhenUnlocked is AC2: an unlocked, reachable
+// daemon is preferred over the shellout.
+func TestBWFallbackReader_UsesServe_WhenUnlocked(t *testing.T) {
+	f := &fakeBWServe{
+		status: "unlocked",
+		names:  map[string]string{"a": "my-item"},
+		items:  map[string]json.RawMessage{"a": json.RawMessage(`{"id":"a","name":"my-item","notes":"from-serve"}`)},
+	}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	shellout := &fakeShellout{value: "from-shellout"}
+
+	r := BWFallbackReader{
+		Serve:    BWServeReader{Client: BWServeClient{BaseURL: srv.URL}},
+		Shellout: shellout,
+	}
+	got, err := r.Field("my-item", "notes")
+	if err != nil {
+		t.Fatalf("Field: %v", err)
+	}
+	if got != "from-serve" {
+		t.Fatalf("expected the serve path, got %q", got)
+	}
+	if shellout.called {
+		t.Fatal("shellout must not be called when the daemon is unlocked")
+	}
+}
+
+// TestBWFallbackReader_FallsBackToShellout_WhenLocked is AC3: a
+// reachable-but-locked daemon still falls back — only "unlocked" opts in.
+func TestBWFallbackReader_FallsBackToShellout_WhenLocked(t *testing.T) {
+	f := &fakeBWServe{status: "locked"}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	shellout := &fakeShellout{value: "from-shellout"}
+
+	r := BWFallbackReader{
+		Serve:    BWServeReader{Client: BWServeClient{BaseURL: srv.URL}},
+		Shellout: shellout,
+	}
+	got, err := r.Field("my-item", "notes")
+	if err != nil {
+		t.Fatalf("Field: %v", err)
+	}
+	if got != "from-shellout" || !shellout.called {
+		t.Fatalf("expected the shellout fallback, got %q (called=%v)", got, shellout.called)
+	}
+}
+
+// TestBWFallbackReader_FallsBackToShellout_WhenAbsent is AC3: no daemon
+// running at all — existing behavior, unchanged.
+func TestBWFallbackReader_FallsBackToShellout_WhenAbsent(t *testing.T) {
+	shellout := &fakeShellout{value: "from-shellout"}
+	r := BWFallbackReader{
+		Serve:    BWServeReader{Client: BWServeClient{BaseURL: "http://127.0.0.1:1", HTTPClient: &http.Client{Timeout: 200 * time.Millisecond}}},
+		Shellout: shellout,
+	}
+	got, err := r.Field("my-item", "notes")
+	if err != nil {
+		t.Fatalf("Field: %v", err)
+	}
+	if got != "from-shellout" || !shellout.called {
+		t.Fatalf("expected the shellout fallback, got %q (called=%v)", got, shellout.called)
+	}
+}
+
 func isErrUnreachable(err error) bool {
 	return errors.Is(err, ErrBWServeUnreachable)
 }
