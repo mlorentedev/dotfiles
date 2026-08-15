@@ -7,6 +7,7 @@
     { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" },
     { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" },
     { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" },
+    { "id": "pr-stewardship",      "source": "pattern-change-lifecycle.md#pr-stewardship" },
     {
       "id": "pr-sizing",
       "source": "pattern-git-workflow.md#10-pr-sizing-policy",
@@ -21,13 +22,13 @@
       "agent": "agents",
       "kind": "native",
       "file": "AGENTS.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship"]
     },
     {
       "agent": "claude",
       "kind": "pointer",
       "file": "ai/claude/CLAUDE.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship"]
     }
   ],
   "skills": {
@@ -45,7 +46,7 @@
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   },
   "doctrine": {
-    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-sizing"],
+    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "pr-sizing"],
     "deploy": [
       {
         "agent": "agy",
