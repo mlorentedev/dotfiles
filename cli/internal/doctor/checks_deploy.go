@@ -111,8 +111,17 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 
 // checkSecrets reproduces healthcheck section 8 over the registry SSOT: every
 // age-backed secrets/registry.yaml entry resolves to an existing *.secret.age,
-// and no orphan .age file lacks a registry entry. (bw-backed secrets carry no
-// age blob, so Entries already skips them — they never read as orphans here.)
+// and no orphan .age file lacks a registry entry.
+//
+// Entries() returns a TAGGED UNION, not a list of age sources: #606 taught it to
+// emit bw-backed secrets too, because the Loader dispatches on Backend. Only the
+// age backends populate File. An earlier revision of this comment claimed Entries
+// skipped bw entries and the loop asserted a blob for every one of them — for a bw
+// entry that resolves to sensitive/.secret.age (empty base name), which cannot
+// exist, so every bw secret read as a missing blob AND poisoned `referenced` with
+// "", making every migrated secret's surviving DR blob read as an orphan. It stayed
+// invisible while the registry held no bw entries and became 56 FAILs the day 28
+// were migrated (#961, #965). Dispatch on the tag; do not infer it from File.
 func checkSecrets(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Secrets integrity")
 	secretsDir := filepath.Join(cfg.DotfilesDir, "sensitive")
@@ -125,12 +134,25 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 	rep.Pass("secrets/registry.yaml exists")
 
 	referenced := map[string]bool{}
+	migrated := 0
 	for _, e := range reg.Entries(sys.home()) {
-		referenced[e.File] = true
 		display := e.Var
 		if e.IsFile {
 			display = e.Var + " [file]"
 		}
+		// Only bw is exempt, and it is named explicitly rather than the age
+		// backends being whitelisted: age-offline is a backend too (the floor
+		// plane), and a whitelist would silently stop checking any backend added
+		// later. Unknown tags keep asserting — the check errs toward checking.
+		if e.Backend == "bw" {
+			migrated++
+			// Its live tier is proven by [Bitwarden reach], which exercises the
+			// token. This section is about the age store, which a bw secret has
+			// no declared entry in.
+			rep.Pass(fmt.Sprintf("%s -> bw:%s (age store not asserted)", display, e.Item))
+			continue
+		}
+		referenced[e.File] = true
 		if pathExists(filepath.Join(secretsDir, e.File+".secret.age")) {
 			rep.Pass(fmt.Sprintf("%s -> %s.secret.age", display, e.File))
 		} else {
@@ -139,12 +161,45 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 	}
 
 	ageFiles, _ := filepath.Glob(filepath.Join(secretsDir, "*.secret.age"))
+	var unreferenced []string
 	for _, f := range ageFiles {
 		base := strings.TrimSuffix(filepath.Base(f), ".secret.age")
 		if !referenced[base] {
-			rep.Fail("orphan: " + base + ".secret.age (no registry entry)")
+			unreferenced = append(unreferenced, base)
 		}
 	}
+	reportUnreferencedBlobs(rep, unreferenced, migrated)
+}
+
+// reportUnreferencedBlobs decides the severity of age blobs no registry entry
+// claims. The answer depends on whether migration has happened at all.
+//
+// With no bw-backed secrets, an unclaimed blob is unambiguously a leftover: FAIL,
+// naming it, as before. Once secrets have migrated the claim stops being decidable
+// — `migrate` drops the `age:` line (registry_write.go), so the surviving DR-floor
+// blob of a migrated secret is indistinguishable from a genuine leftover, and the
+// names cannot be correlated either (OPENAI_API_KEY's blob is chatgpt.api-key).
+// Those blobs ARE the ADR-028 floor for the live tier, so calling them orphans
+// invites deleting the recovery path for exactly the secrets that just moved.
+//
+// So it degrades to one WARN that says the set is unclassifiable, rather than N
+// FAILs asserting something it cannot know. It regains its teeth — per blob, as a
+// failure — once the registry records a DR pointer for migrated secrets (#971).
+func reportUnreferencedBlobs(rep *Report, unreferenced []string, migrated int) {
+	if len(unreferenced) == 0 {
+		return
+	}
+	if migrated == 0 {
+		for _, base := range unreferenced {
+			rep.Fail("orphan: " + base + ".secret.age (no registry entry)")
+		}
+		return
+	}
+	rep.Warn(fmt.Sprintf(
+		"%d age blob(s) claimed by no registry entry, and %d secret(s) have migrated to bw — "+
+			"migrate drops the `age:` pointer, so a surviving DR floor cannot be told from a "+
+			"leftover here. Do not bulk-delete: some are the ADR-028 floor. Tracked as #971",
+		len(unreferenced), migrated))
 }
 
 // loadRegistry reads and parses secrets/registry.yaml under the dotfiles dir.

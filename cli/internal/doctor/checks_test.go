@@ -269,6 +269,58 @@ func TestCheckSecrets(t *testing.T) {
 	}
 }
 
+// TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted is the guard for BUG-077
+// (#969). Entries() is a tagged union — bw entries carry no File — and asserting
+// an age blob for one resolves to sensitive/.secret.age, which cannot exist. The
+// registry held no bw secrets until 28 migrated at once, so the bug shipped
+// months before it was reachable; this fixture keeps one permanently reachable.
+//
+// It pins all four behaviours together, because the first fix attempt that only
+// silences the bw FAIL still leaves the orphan half asserting that a migrated
+// secret's DR floor is deletable.
+func TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted(t *testing.T) {
+	dotfiles := t.TempDir()
+	secretsDir := filepath.Join(dotfiles, "sensitive")
+	writeFile(t, filepath.Join(secretsDir, "AGEONE.secret.age"), "x")
+	// The DR floor of the migrated secret. `migrate` drops the `age:` pointer, so
+	// nothing in the registry claims it and the name does not match the bw item
+	// either — the real pair is OPENAI_API_KEY -> chatgpt.api-key.
+	writeFile(t, filepath.Join(secretsDir, "chatgpt.api-key.secret.age"), "x")
+	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"),
+		"version: 1\nsecrets:\n"+
+			"  - {id: ageone, plane: app, backend: age, age: AGEONE, expose: {env: AGEONE}}\n"+
+			"  - {id: agemiss, plane: app, backend: age, age: AGEMISS, expose: {env: AGEMISS}}\n"+
+			"  - {id: offline, plane: floor, backend: age-offline, age: OFFLINE, expose: {env: OFFLINE}}\n"+
+			"  - {id: openai, plane: app, backend: bw, bw: {item: openai-api-key, field: api-key}, expose: {env: OPENAI_API_KEY}}\n")
+
+	cfg := &Config{DotfilesDir: dotfiles}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkSecrets(newSys(map[string]string{"HOME": dotfiles}, nil, nil), cfg, rep)
+	out := buf.String()
+
+	// AGEMISS + OFFLINE have no blob. Nothing else may fail: not the bw entry,
+	// and not the unclaimed DR blob.
+	if rep.Failures() != 2 {
+		t.Fatalf("failures = %d, want 2 (AGEMISS, OFFLINE only)\n%s", rep.Failures(), out)
+	}
+	// age-offline is a backend in its own right. Exempting bw by whitelisting
+	// "age" would silently stop asserting the floor plane.
+	if !strings.Contains(out, "OFFLINE.secret.age (missing)") {
+		t.Errorf("age-offline must still be asserted, not exempted with bw\n%s", out)
+	}
+	// The shape of the original bug: an empty base name from a bw entry.
+	if strings.Contains(out, " -> .secret.age") {
+		t.Errorf("bw entry was age-asserted, producing an empty blob name\n%s", out)
+	}
+	if strings.Contains(out, "orphan: chatgpt.api-key") {
+		t.Errorf("a migrated secret's surviving DR floor must not be called an orphan\n%s", out)
+	}
+	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "1 age blob(s) claimed by no registry entry") {
+		t.Errorf("unclaimed blobs must degrade to one WARN naming the count\n%s", out)
+	}
+}
+
 func TestCheckTmux(t *testing.T) {
 	home := t.TempDir()
 	dotfiles := filepath.Join(home, ".dotfiles")
