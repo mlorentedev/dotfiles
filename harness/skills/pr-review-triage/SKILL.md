@@ -1,14 +1,14 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 97df7c925532c797
+generated_sha: fc4a81aaec806760
 id: pr-review-triage-skill
 type: skill
 status: active
 created: "2026-08-08"
 owner: manu
 name: pr-review-triage
-description: Triage an open pull request after its checks and reviewers have run — read the CI result, read every review comment, and give each one a disposition (apply / skip / defer) with a one-line reason. Triggers on /pr-review-triage, "triage the PR", "review the review", "what did the reviewer say", "revisa los comentarios de la PR", "check CI and the bot comments", and by default once a PR you opened has finished its checks. Never applies a change or merges without explicit human confirmation.
+description: Triage an open pull request after its checks and reviewers have run — read the CI result, read every review comment, and give each one a disposition (apply / skip / defer) with a one-line reason. Triggers on /pr-review-triage, "triage the PR", "review the review", "what did the reviewer say", "revisa los comentarios de la PR", "check CI and the bot comments", and by default once a PR you opened has come back — from its checks and from its reviewers, whichever lands later, because checks finishing is not the end of the window. Never applies a change or merges without explicit human confirmation.
 allowed-tools: [Bash, Read, Grep]
 ---
 

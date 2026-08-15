@@ -1,0 +1,37 @@
+[
+  {
+    "id": "REFACTOR-012-entries-tagged-union-f1",
+    "behavior": "Entry exposes a backend-qualified source identity, and render's duplicate-var guard fires for two distinct bw secrets exposing one var",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestEntrySourceID_DistinguishesBackendSources|TestEnvSourceMap_RejectsTwoBwSecretsExposingOneVar'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-entries-tagged-union-f2",
+    "behavior": "The PAT check selects on validate: github-token, so a bw-backed GitHub PAT is probed and two distinct bw PATs are not deduped into one",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckPATExpiry_SelectsBwBackedPAT|TestCheckPATExpiry_DistinctBwPATsProbedSeparately|TestCheckPATExpiry_ProbesEachSourceOnce'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-entries-tagged-union-f3",
+    "behavior": "The PAT token comes from the Loader seam, never from the ambient environment, and no message names the retired secrets_refresh command",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckPATExpiry_IgnoresAmbientEnvironment && ! grep -rq secrets_refresh .",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-entries-tagged-union-f4",
+    "behavior": "HTTP 401 remains the only FAIL: neither an absent secret nor a locked vault nor a backend error raises a failure",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckPATExpiry_Classification|TestCheckPATExpiry_BwLockedSkipsWithoutResolving'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "REFACTOR-012-entries-tagged-union-f5",
+    "behavior": "Every backend the registry accepts has a resolver, and the parser accepts exactly the canonical list",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestResolversCoverEveryValidBackend|TestParseRegistry_AcceptsExactlyValidBackends'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

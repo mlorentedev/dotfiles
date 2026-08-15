@@ -3,6 +3,8 @@ id: "testing-anti-patterns"
 type: reference
 status: active
 tags: []
+owner: manu
+created: "2026-06-10"
 ---
 
 # Testing Anti-Patterns

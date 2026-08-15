@@ -90,6 +90,66 @@ run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
     [[ "$output" == *"DRIFT"* ]]
 }
 
+# --- HARNESS-072: coverage, not just consistency -------------------------------
+# The region diff renders its expected side from the target's OWN inject list, so
+# an id missing from that list is missing from both sides and the target reports
+# OK. These tests pin the separate coverage assertion that does catch it.
+
+seed_second_surface() {
+    printf 'intro\n\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n\noutro\n' > "$REPO/TARGET2.md"
+}
+
+# A second surface that the `demo` region is NOT injected into. $1 = the JSON
+# object for the single `demo` enforced entry, so each test varies only the
+# opt_out. Nothing is injected into TARGET2.md and its inject list is empty, so
+# the region diff is genuinely consistent there — only coverage has anything to
+# say about it.
+write_two_surface_manifest() {
+    cat > "$REPO/harness/manifest.json" <<EOF
+{ "version": 1, "vault_subpath": "00_meta/patterns",
+  "enforced": [ $1 ],
+  "targets":  [ { "agent": "t",  "kind": "native", "file": "TARGET.md",  "inject": ["demo"] },
+                { "agent": "t2", "kind": "native", "file": "TARGET2.md", "inject": [] } ] }
+EOF
+}
+
+@test "HARNESS-072: --check fails when a region reaches one surface but not another" {
+    seed_second_surface
+    write_two_surface_manifest '{ "id": "demo", "source": "test-pattern.md#1-demo-rule" }'
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"GAP"* ]]
+    [[ "$output" == *"TARGET2.md"* ]]
+    # The point of the guard: the region diff is PERFECTLY HAPPY with TARGET2.md,
+    # because it renders what it expects from that target's own (empty) inject
+    # list. Consistency says OK; only coverage sees the surface was skipped.
+    [[ "$output" == *"[check] OK -> TARGET2.md"* ]]
+    # And an orphan check would miss it too — the id is in use on TARGET.md.
+    [[ "$output" == *"[check] OK -> TARGET.md"* ]]
+}
+
+@test "HARNESS-072: a declared opt_out with a reason satisfies coverage" {
+    seed_second_surface
+    write_two_surface_manifest '{ "id": "demo", "source": "test-pattern.md#1-demo-rule",
+        "opt_out": { "TARGET2.md": "this surface states the rule in hand-written prose" } }'
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"excluded from TARGET2.md"* ]]
+    [[ "$output" == *"hand-written prose"* ]]
+}
+
+@test "HARNESS-072: an opt_out with an empty reason is still a gap" {
+    seed_second_surface
+    write_two_surface_manifest '{ "id": "demo", "source": "test-pattern.md#1-demo-rule",
+        "opt_out": { "TARGET2.md": "" } }'
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"GAP"* ]]
+}
+
 @test "AC3: --check works offline (no vault) from the committed record" {
     run_refresh; [ "$status" -eq 0 ]
     run env VAULT_PATH="$TMP/nonexistent" "$SCRIPT" --check

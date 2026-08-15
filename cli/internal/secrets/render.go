@@ -126,8 +126,13 @@ func envSourceMap(reg *Registry, home string) (map[string]Entry, error) {
 		if e.IsFile {
 			continue
 		}
-		if prev, dup := bySource[e.Var]; dup && prev.File != e.File {
-			return nil, fmt.Errorf("render: registry exposes %q from two sources (%s, %s); the registry must map each var to one secret", e.Var, prev.File, e.File)
+		// Compare the union's own identity, not File: File is "" for every bw
+		// entry, so a File comparison reported all of them as one source and this
+		// guard could not fire for the backend 28 secrets now live on
+		// (REFACTOR-012). Display the sources rather than the comparison key —
+		// the pre-fix message printed "(, )" for a bw pair.
+		if prev, dup := bySource[e.Var]; dup && prev.SourceID() != e.SourceID() {
+			return nil, fmt.Errorf("render: registry exposes %q from two sources (%s, %s); the registry must map each var to one secret", e.Var, prev.SourceDisplay(), e.SourceDisplay())
 		}
 		bySource[e.Var] = e
 	}

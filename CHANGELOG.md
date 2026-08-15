@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.40.0](https://github.com/mlorentedev/dotfiles/compare/v0.39.0...v0.40.0) (2026-08-15)
+
+
+### Features
+
+* **harness:** add file-path pattern trigger resolution to dotf ([#981](https://github.com/mlorentedev/dotfiles/issues/981)) ([fc1af0c](https://github.com/mlorentedev/dotfiles/commit/fc1af0ce45bfe4d42f57395e8f314cebe5387104))
+* **secrets:** bw serve read-path backend (dotf secrets unlock, no ambient BW_SESSION) ([#975](https://github.com/mlorentedev/dotfiles/issues/975)) ([9ee5860](https://github.com/mlorentedev/dotfiles/commit/9ee58605cf5ad048ad65f03c9f6a7908784df147))
+* **spec:** close HARNESS-071's AC7 and archive it — the reviewer pool gate, reviewed by the pool ([#978](https://github.com/mlorentedev/dotfiles/issues/978)) ([a1bf0f7](https://github.com/mlorentedev/dotfiles/commit/a1bf0f78ef4756d0ccf70f538f13cc3ed11c178f)), closes [#955](https://github.com/mlorentedev/dotfiles/issues/955)
+
+
+### Bug Fixes
+
+* **doctor:** dispatch the secrets-integrity check on backend, not on File (BUG-077, [#969](https://github.com/mlorentedev/dotfiles/issues/969)) ([#973](https://github.com/mlorentedev/dotfiles/issues/973)) ([271e4ec](https://github.com/mlorentedev/dotfiles/commit/271e4ec9cb9fac0a426524e1e4f53df7427aeb0c))
+* **secrets:** parse bw serve's /status template-wrapped shape ([#979](https://github.com/mlorentedev/dotfiles/issues/979)) ([fa21694](https://github.com/mlorentedev/dotfiles/commit/fa2169471ac9069a7400fd140568af3c1af8bf6e))
+* **shell:** scope the agent secret wrappers with --only, and stop wrapping agy ([#977](https://github.com/mlorentedev/dotfiles/issues/977)) ([0f01a1e](https://github.com/mlorentedev/dotfiles/commit/0f01a1e56794f232f6d5d545f0f96bb5637a2dfd)), closes [#976](https://github.com/mlorentedev/dotfiles/issues/976)
+
 ## [0.39.0](https://github.com/mlorentedev/dotfiles/compare/v0.38.0...v0.39.0) (2026-08-14)
 
 

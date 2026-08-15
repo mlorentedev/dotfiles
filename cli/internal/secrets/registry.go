@@ -58,23 +58,23 @@ type BWSource struct {
 }
 
 // validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-
-// managed items. Dotfiles/floor is deliberately absent (floor secrets never carry a
+// managed items. floor is deliberately absent (floor secrets never carry a
 // bw: block — age-only) and so is a personal-plane folder (no taxonomy exists yet for
 // plane: personal, deferred to #586) — declaring either here would validate a
 // placement nothing can actually honour yet.
 var validBWFolders = map[string]bool{
-	"Dotfiles/apps":  true,
-	"Dotfiles/infra": true,
+	"apps":  true,
+	"infra": true,
 }
 
 // planeFolder is the required bw.folder for a plane that has one — the ratified-set
-// check alone (validBWFolders) would let an app-plane secret declare Dotfiles/infra
+// check alone (validBWFolders) would let an app-plane secret declare infra
 // and pass, since both strings are individually valid; this closes that gap (OPS-028
 // adversarial review, Minor finding). A plane absent here (personal, floor) has no
 // required folder and is left to the ratified-set check alone.
 var planeFolder = map[string]string{
-	"app":   "Dotfiles/apps",
-	"infra": "Dotfiles/infra",
+	"app":   "apps",
+	"infra": "infra",
 }
 
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
@@ -166,9 +166,9 @@ func (r *Registry) validate() error {
 		}
 		seen[s.ID] = true
 
-		switch s.Backend {
-		case "age", "age-offline", "bw":
-		default:
+		// ValidBackends is the SSOT for this list; a resolver-coverage test binds
+		// it to the Loader, so a backend accepted here always has somewhere to go.
+		if !slices.Contains(ValidBackends(), s.Backend) {
 			return fmt.Errorf("secret %q: unknown backend %q", s.ID, s.Backend)
 		}
 
@@ -187,11 +187,11 @@ func (r *Registry) validate() error {
 
 		// Each backend must resolve a source for everything it exposes.
 		switch s.Backend {
-		case "age", "age-offline":
+		case BackendAge, BackendAgeOffline:
 			if err := s.checkAgeSources(); err != nil {
 				return err
 			}
-		case "bw":
+		case BackendBW:
 			if err := s.checkBwSources(); err != nil {
 				return err
 			}
@@ -208,7 +208,7 @@ func (r *Registry) validate() error {
 		// regardless of current backend.
 		if s.BW != nil && s.BW.Folder != "" {
 			if !validBWFolders[s.BW.Folder] {
-				return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)", s.ID, s.BW.Folder)
+				return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (apps, infra)", s.ID, s.BW.Folder)
 			}
 			if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
 				return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
@@ -315,7 +315,7 @@ func (r *Registry) Entries(home string) []Entry {
 	var es []Entry
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
-		if s.Backend == "bw" {
+		if s.Backend == BackendBW {
 			es = append(es, s.bwEntries(home)...)
 			continue
 		}
@@ -344,12 +344,13 @@ func parseFileMode(s string) os.FileMode {
 func (s *Secret) ageEntries(home string) []Entry {
 	if s.Expose.File != nil {
 		return []Entry{{
-			Var:     s.Expose.File.Var,
-			Backend: s.Backend,
-			File:    s.Age,
-			IsFile:  true,
-			Dest:    expandHome(s.Expose.File.Path, home),
-			Mode:    parseFileMode(s.Expose.File.Mode),
+			Var:      s.Expose.File.Var,
+			Backend:  s.Backend,
+			File:     s.Age,
+			IsFile:   true,
+			Dest:     expandHome(s.Expose.File.Path, home),
+			Mode:     parseFileMode(s.Expose.File.Mode),
+			Validate: s.Validate,
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))
@@ -358,7 +359,7 @@ func (s *Secret) ageEntries(home string) []Entry {
 		if src == "" {
 			src = s.Age
 		}
-		es = append(es, Entry{Var: v.Name, Backend: s.Backend, File: src})
+		es = append(es, Entry{Var: v.Name, Backend: s.Backend, File: src, Validate: s.Validate})
 	}
 	return es
 }
@@ -372,13 +373,14 @@ func (s *Secret) bwEntries(home string) []Entry {
 	}
 	if s.Expose.File != nil {
 		return []Entry{{
-			Var:     s.Expose.File.Var,
-			Backend: "bw",
-			Item:    item,
-			Field:   topField,
-			IsFile:  true,
-			Dest:    expandHome(s.Expose.File.Path, home),
-			Mode:    parseFileMode(s.Expose.File.Mode),
+			Var:      s.Expose.File.Var,
+			Backend:  BackendBW,
+			Item:     item,
+			Field:    topField,
+			IsFile:   true,
+			Dest:     expandHome(s.Expose.File.Path, home),
+			Mode:     parseFileMode(s.Expose.File.Mode),
+			Validate: s.Validate,
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))
@@ -387,7 +389,7 @@ func (s *Secret) bwEntries(home string) []Entry {
 		if field == "" {
 			field = topField
 		}
-		es = append(es, Entry{Var: v.Name, Backend: "bw", Item: item, Field: field})
+		es = append(es, Entry{Var: v.Name, Backend: BackendBW, Item: item, Field: field, Validate: s.Validate})
 	}
 	return es
 }

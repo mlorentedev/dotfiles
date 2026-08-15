@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/curator/AGENT.md
-generated_sha: 94a6cfb6a212d027
+generated_sha: 669ffa7acb345ea6
 id: agent-curator
 type: agent
 status: active
@@ -12,6 +12,7 @@ kind: invocable
 model: top
 capabilities: [read, search, edit, shell]
 skills: [vault-doctor, crystallize, insights, genre-picker, context-refresh, handoff, place-knowledge, dispose-proposals]
+owner: manu
 ---
 
 # Curator

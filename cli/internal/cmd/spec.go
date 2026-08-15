@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ func newSpecCmd() *cobra.Command {
 	cmd.AddCommand(newSpecInitCmd())
 	cmd.AddCommand(newSpecReviewCmd())
 	cmd.AddCommand(newSpecArchiveCmd())
+	cmd.AddCommand(newSpecTranscriptSinkCmd())
 	return cmd
 }
 
@@ -38,6 +40,15 @@ var lookPath = exec.LookPath
 
 // runCommand is a seam for the launch itself, so the command's wiring is
 // testable without spawning a reviewer that would take half an hour.
+// sessionAlive reports whether a detached tmux session still exists, and
+// sleepFor paces the probe. Both are seams so tests can simulate a launch that
+// died without needing tmux or real time.
+var sessionAlive = func(session string) bool {
+	return exec.Command("tmux", "has-session", "-t", session).Run() == nil
+}
+
+var sleepFor = time.Sleep
+
 var runCommand = func(dir string, argv []string) error {
 	c := exec.Command(argv[0], argv[1:]...)
 	c.Dir = dir
@@ -176,7 +187,7 @@ is the only record of how.`,
 
 			launch := argv
 			if useTmux {
-				launch = spec.TmuxWrap(session, repoRoot, argv, transcript)
+				launch = spec.TmuxWrap(session, repoRoot, argv, transcript, transcriptSink(transcript))
 			}
 
 			if dryRun {
@@ -191,6 +202,9 @@ is the only record of how.`,
 				cmd.Printf("Session:    %s\n\n", session)
 				if err := runCommand(repoRoot, launch); err != nil {
 					return fmt.Errorf("starting the tmux session: %w", err)
+				}
+				if err := confirmLaunched(session, transcript); err != nil {
+					return err
 				}
 				cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
 				cmd.Printf("When it finishes, %s carries the verdict and archive reads it.\n", spec.ReviewFile)
@@ -208,6 +222,103 @@ is the only record of how.`,
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it is killed; a stuck run should be noticed, not waited on")
 	return cmd
+}
+
+// newSpecTranscriptSinkCmd is plumbing, not a user command: `spec review` pipes
+// the reviewer into it. Hidden because nobody should need to type it, exposed as
+// a subcommand because the pipeline needs something executable to name.
+func newSpecTranscriptSinkCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "transcript-sink <path>",
+		Short:  "Internal: pass a reviewer stream through, storing only its auditable events",
+		Long: `Read a reviewer's jsonl stream on stdin, write every line to stdout, and
+store only the settled events at <path>.
+
+The live tmux pane wants every frame — the incremental deltas are the visible
+progress. The transcript on disk wants the events, because its purpose is that a
+finished review can be audited. One raw file cannot serve both: a real 25-minute
+review streamed 527 MB, of which 525 MB was the same message re-emitted at every
+growing length (#995).`,
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return spec.SinkTranscript(cmd.InOrStdin(), cmd.OutOrStdout(), args[0])
+		},
+	}
+}
+
+// transcriptSink names the command the reviewer's stdout is piped into.
+//
+// It resolves THIS binary by absolute path rather than trusting `dotf` on PATH:
+// the pipeline runs detached under tmux, and a launcher built from one version
+// handing work to whatever `dotf` a $PATH happens to resolve is how a subcommand
+// that exists here goes missing there. Same binary in, same binary out.
+//
+// If the executable cannot be resolved, an empty sink tells TmuxWrap to fall
+// back to plain `tee` — a huge transcript beats a broken pipeline.
+var transcriptSink = func(transcript string) []string {
+	self, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	return []string{self, "spec", "transcript-sink", transcript}
+}
+
+// confirmLaunched turns "the session was created" into "the reviewer survived
+// startup" — two claims the launcher used to conflate (#989).
+//
+// `tmux new-session -d` exits 0 the moment the session exists; the process
+// inside it can be dead a fraction of a second later. Measured on the failure
+// that prompted this: the session lasted 0.54s and the launcher reported a
+// running review over a 0-byte transcript, so the archive gate's much later
+// "no review.md" read as "you forgot to run it" rather than "it died".
+//
+// The window is deliberately modest. It proves the reviewer got past startup,
+// which is where a bad credential, a missing binary or an unreachable model all
+// fail; it does NOT promise the run will finish. A death at minute three is
+// inherently unwatched in detached mode, and `spec archive` refusing without a
+// review.md stays the backstop for that.
+func confirmLaunched(session, transcript string) error {
+	const (
+		window = 3 * time.Second        // ~6x the slowest observed startup failure
+		step   = 250 * time.Millisecond // cheap enough to poll, coarse enough not to spin
+	)
+	for waited := time.Duration(0); waited < window; waited += step {
+		sleepFor(step)
+		if sessionAlive(session) {
+			continue
+		}
+		return fmt.Errorf("the review died on startup — tmux session %q is already gone.\n%s\n"+
+			"Nothing was reviewed and %s was not written; re-run with --foreground to watch it fail live",
+			session, reviewerLastWords(transcript), spec.ReviewFile)
+	}
+	return nil
+}
+
+// reviewerLastWords quotes what the dead reviewer actually said. An error that
+// reproduces the output it received beats one that only reports that parsing or
+// launching failed — the original defect discarded the reason entirely, which is
+// why nobody could tell a broken credential from a missing binary.
+func reviewerLastWords(transcript string) string {
+	for _, src := range []struct{ label, path string }{
+		{"stderr", spec.StderrPath(transcript)},
+		{"transcript", transcript},
+	} {
+		b, err := os.ReadFile(src.path)
+		if err != nil {
+			continue
+		}
+		out := strings.TrimSpace(string(b))
+		if out == "" {
+			continue
+		}
+		const max = 800
+		if len(out) > max {
+			out = out[:max] + fmt.Sprintf("\n… (truncated; full %s at %s)", src.label, src.path)
+		}
+		return "It wrote, on " + src.label + ":\n" + out
+	}
+	return "It wrote nothing to either the transcript or its stderr, so the failure happened before the reviewer produced output at all."
 }
 
 func newSpecInitCmd() *cobra.Command {
