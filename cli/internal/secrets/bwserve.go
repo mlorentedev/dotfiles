@@ -260,6 +260,31 @@ type bwServeListData struct {
 	Data []bwServeListItem `json:"data"`
 }
 
+// ItemNames lists every item name in the vault, for callers that need to compare
+// the registry's declared items against what the store actually holds rather than
+// resolve any of them. It is the one read here that touches no field and returns
+// no value — only names — so a health check can assert the mapping without ever
+// holding a secret.
+//
+// It deliberately does NOT use the ?search= filter: the point is the whole set,
+// and search is a fuzzy substring match (see getItemJSON), which would make an
+// absent item indistinguishable from one whose name merely failed to match.
+func (r BWServeReader) ItemNames() ([]string, error) {
+	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bw serve list items: %w", err)
+	}
+	var list bwServeListData
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, fmt.Errorf("bw serve list items: unparseable data: %w", err)
+	}
+	names := make([]string, 0, len(list.Data))
+	for _, it := range list.Data {
+		names = append(names, it.Name)
+	}
+	return names, nil
+}
+
 func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
 	data, err := r.Client.call(http.MethodGet, "/list/object/items?search="+url.QueryEscape(item), nil)
 	if err != nil {
