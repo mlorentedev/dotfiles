@@ -208,6 +208,40 @@ func TestCheckPATExpiry_BwLockedSkipsWithoutResolving(t *testing.T) {
 	}
 }
 
+// A daemon that answers neither "unlocked" nor a clean lock state is a third
+// case: the check cannot know whether the vault is usable, so it reports the
+// uncertainty as a WARN and probes nothing. Covered because "locked" and
+// "absent" being tested is not the same as the error branch being tested — the
+// gap AC4 claims to close.
+func TestCheckPATExpiry_BwStatusErrorWarnsWithoutProbing(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: BITACORA_PAT, plane: app, backend: bw, bw: {item: github-bitacora-pat, field: api-token}, validate: github-token, expose: {env: BITACORA_PAT}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.BWServeStatus = func() (string, error) { return "", errors.New("unparseable envelope") }
+
+	var resolved, probed int
+	sys.ResolveSecret = func(secrets.Entry) (string, error) { resolved++; return "tok", nil }
+	sys.HTTPGet = func(string, map[string]string) (int, http.Header, error) {
+		probed++
+		return http.StatusOK, http.Header{}, nil
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkPATExpiry(sys, patCfg(t, registry), rep)
+
+	if resolved != 0 || probed != 0 {
+		t.Errorf("an indeterminate vault state must resolve and probe nothing; got %d resolve(s), %d probe(s)", resolved, probed)
+	}
+	if rep.Failures() != 0 {
+		t.Errorf("an indeterminate vault state is not a setup failure; got %d\n%s", rep.Failures(), buf.String())
+	}
+	if !strings.Contains(buf.String(), "could not determine Bitwarden state") {
+		t.Errorf("the WARN must name the uncertainty\n%s", buf.String())
+	}
+}
+
 // The check must never read a token from the ambient environment: ADR-028
 // guarantees it is empty, which is exactly why the previous implementation
 // SKIPped every PAT on a correctly configured machine. Resolution is the only
