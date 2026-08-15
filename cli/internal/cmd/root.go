@@ -33,6 +33,7 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newMemCmd())
 	root.AddCommand(newSecretsCmd())
 	root.AddCommand(newUpdateCmd())
+	root.AddCommand(newHarnessCmd())
 	return root
 }
 
