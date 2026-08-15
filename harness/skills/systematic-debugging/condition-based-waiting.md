@@ -3,6 +3,8 @@ id: "condition-based-waiting"
 type: reference
 status: active
 tags: []
+owner: manu
+created: "2026-06-10"
 ---
 
 # Condition-Based Waiting

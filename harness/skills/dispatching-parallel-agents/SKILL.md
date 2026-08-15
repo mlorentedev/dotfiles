@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispatching-parallel-agents/SKILL.md
-generated_sha: a716db8d40dd96ce
+generated_sha: 4ef93031ee74f9c8
 id: dispatching-parallel-agents-skill
 type: skill
 status: active
@@ -81,8 +81,20 @@ Your task:
 3. Fix the issue
 4. Do NOT change unrelated code
 
-Return: Summary of root cause and changes made.
+Return: Summary of root cause and changes made, ending with the mandatory reconciliation block:
+
+```yaml:reconciliation
+agent_verdict: SUCCESS # SUCCESS | FAILURE | PARTIAL
+files_modified:
+  - path/to/file1
+tickets_created: []
+unresolved_blockers: []
+summary: "Brief 1-2 sentence human summary"
 ```
+
+## Mandatory Structured Handoff
+
+Every dispatched subagent MUST conclude with the `yaml:reconciliation` block so the orchestrator can mechanically verify changes against `git status` without ambiguous parsing.
 
 ## Common Mistakes
 

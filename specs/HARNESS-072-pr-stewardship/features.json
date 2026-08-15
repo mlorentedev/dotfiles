@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-072-pr-stewardship-f1",
+    "behavior": "AC1 — an enforced region `pr-stewardship` is declared in the manifest with a vault source, and its source-of-record exists and is non-empty.",
+    "verification": "jq -e '.enforced[] | select(.id==\"pr-stewardship\") | .source' harness/manifest.json >/dev/null && test -s harness/enforced/pr-stewardship.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f2",
+    "behavior": "AC2 — the region reaches every surface definition-of-done reaches: positive per-surface evidence in both committed targets, plus the doctrine inject list that carries it to the agy and codex payloads. Deliberately NOT `--check`, which is blind to a skipped surface (see f8).",
+    "verification": "grep -q 'the disposition, not the waiting' AGENTS.md && grep -q 'the disposition, not the waiting' ai/claude/CLAUDE.md && jq -e '.doctrine.inject | index(\"pr-stewardship\")' harness/manifest.json >/dev/null",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f3",
+    "behavior": "AC3 — the region binds a disposition rather than a mechanism: it states what binds, and that a project's own signal for when to look back wins over the default timed watch.",
+    "verification": "grep -q 'What binds is the disposition, not the waiting' harness/enforced/pr-stewardship.md && grep -q 'its instruction wins' harness/enforced/pr-stewardship.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f4",
+    "behavior": "AC4 — the adversarial-review obligation fires at the archive gate and introduces no wider trigger.",
+    "verification": "grep -q 'trigger is the archive gate and nothing wider' harness/enforced/pr-stewardship.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f5",
+    "behavior": "AC5 — a reviewer notice reporting that no review ran leaves the PR unreviewed, stated in the region itself.",
+    "verification": "grep -q 'A notice that no review ran leaves the PR unreviewed' harness/enforced/pr-stewardship.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f6",
+    "behavior": "AC6 — pr-review-triage triggers on whichever of checks and reviewers lands later, and its wait is expressed in gh commands with no agent-specific primitive.",
+    "verification": "grep -q 'whichever lands later' harness/skills/pr-review-triage/SKILL.md && grep -q 'gh pr checks' harness/skills/pr-review-triage/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f7",
+    "behavior": "AC7 — vault source and committed records agree; no harness drift.",
+    "verification": "./scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-072-pr-stewardship-f8",
+    "behavior": "AC8 — --check asserts coverage separately from its region diff: a region absent from a surface fails, a declared opt_out with a reason passes, an empty reason still fails. The first case proves the diff reports OK on the very surface coverage rejects.",
+    "verification": "bats tests/compile-harness.bats -f 'HARNESS-072'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
