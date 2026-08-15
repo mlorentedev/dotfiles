@@ -88,6 +88,9 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// default (no token in the environment ⇒ SKIP), so full-sweep tests that
 		// do not care about PATs behave as they always did. Tests exercising
 		// resolution inject their own.
+		// Default: the vault holds exactly what the registry declares, so the
+		// mapping check is quiet unless a test deliberately introduces drift.
+		BWItemNames: func() ([]string, error) { return nil, errors.New("no vault in tests") },
 		ResolveSecret: func(e secrets.Entry) (string, error) {
 			return "", fmt.Errorf("%w: %s", secrets.ErrSecretAbsent, e.Var)
 		},

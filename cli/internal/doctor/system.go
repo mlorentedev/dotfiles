@@ -113,6 +113,12 @@ type System struct {
 	// it for one Authorization header. Returns secrets.ErrSecretAbsent (wrapped)
 	// when the secret is genuinely not provisioned on this machine.
 	ResolveSecret func(e secrets.Entry) (string, error)
+	// BWItemNames lists every item name in the Bitwarden vault — names only, no
+	// fields and no values. It exists so the registry->vault mapping can be
+	// asserted without resolving a secret: a registry entry naming an item the
+	// vault does not have takes down every unscoped `dotf secrets run`, and the
+	// only symptom is whatever that run was driving (BUG-080).
+	BWItemNames func() ([]string, error)
 }
 
 // resolveSecret is the production ResolveSecret: the age store (checkout-first,
@@ -185,6 +191,9 @@ func realSystem() *System {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
 		ResolveSecret: resolveSecret,
+		BWItemNames: func() ([]string, error) {
+			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemNames()
+		},
 		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)
 			defer cancel()
