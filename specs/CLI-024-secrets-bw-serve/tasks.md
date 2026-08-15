@@ -19,20 +19,20 @@ created: "2026-08-15"
 
 ## Implementation
 
-- [ ] [P] [AC5] Write failing test: `BWServeDaemon.Start()` invokes its start command with `--hostname 127.0.0.1` (never `all`/`0.0.0.0`) — asserted on the constructed args, not a live process.
-- [ ] [AC5] Implement `BWServeDaemon` (`cli/internal/secrets/bwserve.go`): `Start()` (injectable `startCmd func() *exec.Cmd` seam, `Setsid` detach so the daemon survives the CLI process exiting, polls `/status` with a bounded timeout until reachable), `Running() bool`, `Status() (daemonState, error)` — mirrors the `BWReader`/`Decryptor` seam pattern already in this package (fakeable, no real `bw` binary needed in tests).
-- [ ] Refactor: extract the HTTP client + base URL construction shared by daemon control and the reader below.
-- [ ] [P] [AC1] Write failing test: `BWServeDaemon.Unlock(password)` POSTs `{"password": ...}` to `/unlock`, returns a typed error on a non-2xx/`success:false` response, and never logs or returns the password itself in the error.
-- [ ] [AC1] Implement `Unlock`/`Lock` against a `httptest.Server` fake replaying the real response shapes observed in the OPS-021 spike (`{"success":false,"message":"..."}` / `{"success":true,...}`).
-- [ ] [P] [AC1] Write failing test: `dotf secrets unlock` (`cli/internal/cmd/secrets_unlock.go`) reads the password via the existing hidden-input seam (`readPassword`, already used by `secrets set` — zero new dependency), starts the daemon if not running, calls `Unlock`, and the password never appears in the command's own logs/output on success or failure.
-- [ ] [AC1] [AC6] Implement `secrets unlock` + `secrets lock` (`Lock()` → `POST /lock`, idempotent: unlocking an already-unlocked daemon is a no-op success, not an error).
-- [ ] [P] [AC2] Write failing test: a serve-backed `BWServeReader.Field(item, field)` against an `httptest.Server` fake returns the same value shape `BWGet.Field` does (same `fieldFromItem` extraction: login/notes/custom field), so it is a drop-in behind the `BWReader` seam.
-- [ ] [AC2] Implement `BWServeReader` (`cli/internal/secrets/bwserve.go`), reusing `fieldFromItem` rather than duplicating field-extraction logic.
-- [ ] [AC2] [AC3] Write failing test: `resolvers()` (`resolve.go`) selects `BWServeReader` when the daemon is reachable+unlocked, and falls back to today's `BWGet` shellout otherwise — both paths covered, neither consumer (`run`/`show`/`verify`) changes.
-- [ ] [AC2] [AC3] Implement the fallback selection in `resolvers()`.
-- [ ] Refactor for clarity; re-run the full Go suite (`go test ./... -count=1`) + `golangci-lint run`.
-- [ ] [AC4] Write failing test: a new doctor check (`cli/internal/doctor/checks_bw_serve.go`) reports absent/locked/unlocked daemon state as a distinct section (not merged into `checkBitwardenReach`'s existing tiers).
-- [ ] [AC4] Implement the check.
+- [x] [P] [AC5] Write failing test: `BWServeDaemon.Start()` invokes its start command with `--hostname 127.0.0.1` (never `all`/`0.0.0.0`) — asserted on the constructed args, not a live process.
+- [x] [AC5] Implement `BWServeDaemon` (`cli/internal/secrets/bwserve.go`): `Start()` (injectable `startCmd func() *exec.Cmd` seam, `Setsid` detach so the daemon survives the CLI process exiting, polls `/status` with a bounded timeout until reachable), `Running() bool`, `Status() (daemonState, error)` — mirrors the `BWReader`/`Decryptor` seam pattern already in this package (fakeable, no real `bw` binary needed in tests).
+- [x] Refactor: extract the HTTP client + base URL construction shared by daemon control and the reader below (`BWServeClient`, one `call()` core for all four endpoints).
+- [x] [P] [AC1] Write failing test: `BWServeDaemon.Unlock(password)` POSTs `{"password": ...}` to `/unlock`, returns a typed error on a non-2xx/`success:false` response, and never logs or returns the password itself in the error.
+- [x] [AC1] Implement `Unlock`/`Lock` against a `httptest.Server` fake replaying the real response shapes observed in the OPS-021 spike (`{"success":false,"message":"..."}` / `{"success":true,...}`).
+- [x] [P] [AC1] Write failing test: `dotf secrets unlock` (`cli/internal/cmd/secrets_unlock.go`) reads the password via the existing hidden-input seam (`readPassword`, already used by `secrets set` — zero new dependency), starts the daemon if not running, calls `Unlock`, and the password never appears in the command's own logs/output on success or failure.
+- [x] [AC1] [AC6] Implement `secrets unlock` + `secrets lock` (`Lock()` → `POST /lock`, idempotent: unlocking an already-unlocked daemon is a no-op success, not an error).
+- [x] [P] [AC2] Write failing test: a serve-backed `BWServeReader.Field(item, field)` against an `httptest.Server` fake returns the same value shape `BWGet.Field` does (same `fieldFromItem` extraction: login/notes/custom field), so it is a drop-in behind the `BWReader` seam.
+- [x] [AC2] Implement `BWServeReader` (`cli/internal/secrets/bwserve.go`), reusing `fieldFromItem` rather than duplicating field-extraction logic.
+- [x] [AC2] [AC3] Write failing test: `BWFallbackReader` selects the serve daemon when reachable+unlocked, and falls back to today's `BWGet` shellout when locked or absent — both paths covered. (Landed as a new `BWFallbackReader` type wired at `cmd/secrets.go`'s `bwReader` default, not inside `resolve.go`'s `resolvers()` map itself — `resolvers()` already delegates to whatever `BWReader` the `Loader.BW` field holds, so the dispatch table needed no change; neither consumer (`run`/`show`/`verify`) changes either way.)
+- [x] [AC2] [AC3] Implement the fallback selection (`BWFallbackReader`).
+- [x] Refactor for clarity; re-run the full Go suite (`go test ./... -count=1`) + `golangci-lint run`.
+- [x] [AC4] Write failing test: a new doctor check (`cli/internal/doctor/checks_bw_serve.go`) reports absent/locked/unlocked daemon state as a distinct section (not merged into `checkBitwardenReach`'s existing tiers).
+- [x] [AC4] Implement the check. Also fixed a real nil-seam panic this surfaced in `TestRun_RegistersTheBitwardenReachSection` (the shared `newSys()` test fixture needed a default for the new `BWServeStatus` seam, same pattern as `BWBackedSecrets`/`AgeRoundTrip`).
 - [ ] [AC2] Live (this operator's unlocked session, password typed by the operator, never by the agent): benchmark `dotf secrets verify` against a running unlocked daemon; record the wall-clock against the 14-50s CLI-shellout baseline measured in the OPS-021 spike.
 - [ ] [AC1] [AC6] Live (same session): `dotf secrets unlock` end-to-end, confirm the password never appears in `ps`, shell history, or any written file; `dotf secrets lock`; re-run `unlock` twice to confirm idempotency.
 

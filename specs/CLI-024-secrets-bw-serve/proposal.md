@@ -1,7 +1,7 @@
 ---
 id: "CLI-024-secrets-bw-serve"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-08-15"
 issue: "mlorentedev/dotfiles#622"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

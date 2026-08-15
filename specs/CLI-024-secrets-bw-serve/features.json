@@ -3,42 +3,42 @@
     "id": "CLI-024-secrets-bw-serve-f1",
     "behavior": "dotf secrets unlock prompts for the master password with echo disabled, starts bw serve if needed, and unlocks via POST /unlock without the password ever appearing in shell history, process args, or disk",
     "verification": "cd cli && go test ./internal/cmd/... -run TestSecretsUnlock -v -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestSecretsUnlock_Succeeds_PasswordNeverInOutput PASS, TestSecretsUnlock_WrongPassword_ErrorsWithoutLeakingIt PASS, TestSecretsUnlock_Idempotent PASS -- ok github.com/mlorentedev/dotfiles/cli/internal/cmd 0.007s (2026-08-15)"
   },
   {
     "id": "CLI-024-secrets-bw-serve-f2",
     "behavior": "With the daemon running and unlocked, dotf secrets verify over the current registry completes in under 2 seconds",
     "verification": "cd cli && go test ./internal/secrets/... -run TestBWServeReader -v -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestBWServeReader_Field_MatchesBWGetShape PASS, TestBWServeReader_Field_NotFound PASS, TestBWServeReader_Field_AmbiguousNameErrors PASS, TestBWServeReader_Field_FuzzySearchDoesNotMatchNonExactName PASS -- ok github.com/mlorentedev/dotfiles/cli/internal/secrets 0.011s (2026-08-15). Unit-level only -- the <2s wall-clock claim needs the live task in tasks.md (real password, operator-run) before archive."
   },
   {
     "id": "CLI-024-secrets-bw-serve-f3",
     "behavior": "With no daemon running, every existing dotf secrets command behaves exactly as it does today (CLI shellout fallback)",
     "verification": "cd cli && go test ./... -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "All 13 packages ok, 0 failures (2026-08-15)"
   },
   {
     "id": "CLI-024-secrets-bw-serve-f4",
     "behavior": "dotf doctor reports the bw serve daemon's state (absent/locked/unlocked) as a distinct check",
     "verification": "cd cli && go test ./internal/doctor/... -run TestCheckBWServe -v -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestCheckBWServeDaemon_Absent PASS, TestCheckBWServeDaemon_Locked PASS, TestCheckBWServeDaemon_Unlocked PASS, TestCheckBWServeDaemon_StatusUnreadable PASS -- ok github.com/mlorentedev/dotfiles/cli/internal/doctor 0.004s (2026-08-15)"
   },
   {
     "id": "CLI-024-secrets-bw-serve-f5",
     "behavior": "The daemon binds 127.0.0.1 only",
     "verification": "cd cli && go test ./internal/secrets/... -run TestBWServeDaemon_Start_BindsLocalhostOnly -v -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "Test named TestBWServeCommand_BindsLocalhostOnly (not …Daemon_Start_…, since the bind-safety assertion lives on the pure command-construction function, not the live-only Start() path -- see tasks.md's Implementation notes). PASS -- ok github.com/mlorentedev/dotfiles/cli/internal/secrets 0.003s (2026-08-15)"
   },
   {
     "id": "CLI-024-secrets-bw-serve-f6",
     "behavior": "dotf secrets lock locks the daemon explicitly; dotf secrets unlock run twice while already unlocked is idempotent",
     "verification": "cd cli && go test ./internal/cmd/... -run TestSecretsLock -v -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestSecretsLock PASS, TestSecretsLock_NoDaemon PASS -- ok github.com/mlorentedev/dotfiles/cli/internal/cmd 0.005s (2026-08-15). Idempotency itself is TestSecretsUnlock_Idempotent under f1's command."
   }
 ]
