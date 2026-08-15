@@ -242,7 +242,7 @@ func TestWrappersQuoteAnArgumentThatWouldOtherwiseExecute(t *testing.T) {
 	// Single quotes cannot nest, so a literal ' becomes '\'' — close, escape, reopen.
 	want := `'text with '\''quotes'\'' and ` + "`backticks`" + ` and $(id)'`
 
-	argv := TmuxWrap("s", "/repo", []string{"echo", nasty}, "/tmp/t.jsonl")
+	argv := TmuxWrap("s", "/repo", []string{"echo", nasty}, "/tmp/t.jsonl", nil)
 	joined := argv[len(argv)-1]
 
 	if !strings.Contains(joined, want) {
