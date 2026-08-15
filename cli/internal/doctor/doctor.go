@@ -87,6 +87,7 @@ func Run(opts Options) (int, error) {
 		checkSecrets(sys, cfg, rep)
 		checkSecretsTooling(sys, rep)
 		checkBitwardenReach(sys, rep)
+		checkBWServeDaemon(sys, rep)
 		checkDisasterRecovery(sys, cfg, rep)
 		checkPATExpiry(sys, cfg, rep)
 		checkGuardHooks(sys, cfg, rep, opts.Fix)

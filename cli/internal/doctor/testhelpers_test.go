@@ -77,6 +77,9 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 			out, err := sysCommandOutput(cmdOut, name, args...)
 			return out, "", err
 		},
+		// Default: no daemon running — the common case (nothing has run `dotf
+		// secrets unlock`). Tests exercising the daemon states inject their own.
+		BWServeStatus: func() (string, error) { return "absent", nil },
 	}
 }
 

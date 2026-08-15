@@ -20,6 +20,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // System abstracts the non-deterministic, process-global surfaces a check
@@ -92,6 +94,12 @@ type System struct {
 	// so a merged read silently skipped every tier of the reach check on exactly
 	// the freshly-provisioned box setup-linux.sh had just finished building.
 	CommandOutputBounded func(d time.Duration, name string, args ...string) (stdout, stderr string, err error)
+	// BWServeStatus reports the dotf-managed bw serve daemon's lock state:
+	// "absent" (nothing reachable), "locked", or "unlocked". It never returns
+	// a transport error for an absent daemon — that is itself the "absent"
+	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
+	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
+	BWServeStatus func() (string, error)
 }
 
 // realSystem wires System to the live OS.
@@ -129,6 +137,9 @@ func realSystem() *System {
 		GOOS:            runtime.GOOS,
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
+		BWServeStatus: func() (string, error) {
+			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
+		},
 		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)
 			defer cancel()
