@@ -144,7 +144,7 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 		// backends being whitelisted: age-offline is a backend too (the floor
 		// plane), and a whitelist would silently stop checking any backend added
 		// later. Unknown tags keep asserting — the check errs toward checking.
-		if e.Backend == "bw" {
+		if e.Backend == secrets.BackendBW {
 			migrated++
 			// Its live tier is proven by [Bitwarden reach], which exercises the
 			// token. This section is about the age store, which a bw secret has

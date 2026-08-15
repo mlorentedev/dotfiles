@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
@@ -100,6 +101,49 @@ type System struct {
 	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
 	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
 	BWServeStatus func() (string, error)
+	// ResolveSecret resolves ONE registry entry to its plaintext value through the
+	// same Loader `dotf secrets run` uses. It exists because the PAT-expiry check
+	// used to read its token from the ambient environment, which ADR-028
+	// guarantees is empty — so on a correctly configured machine the check SKIPped
+	// every token and reported a remediation command that had been retired with
+	// the loader. There is no environment state a health check could legitimately
+	// require here; resolution is the only honest path (REFACTOR-012).
+	//
+	// It never materializes a file secret and never reports the value: callers use
+	// it for one Authorization header. Returns secrets.ErrSecretAbsent (wrapped)
+	// when the secret is genuinely not provisioned on this machine.
+	ResolveSecret func(e secrets.Entry) (string, error)
+}
+
+// resolveSecret is the production ResolveSecret: the age store (checkout-first,
+// ADR-030, same source as the registry it maps) plus a SERVE-ONLY Bitwarden
+// reader.
+//
+// Serve-only is deliberate and is not the CLI's own wiring, which falls back to
+// shelling out to `bw`. A shellout costs ~1.5s per secret against a locked vault
+// — the latency that made `pi` hang for 45 seconds (BUG-080) — and doctor's
+// callers include the last step of setup-linux.sh. Its caller gates bw entries on
+// BWServeStatus before ever arriving here, so the fallback would only ever run in
+// the case that is already known to be slow and already reported honestly.
+func resolveSecret(e secrets.Entry) (string, error) {
+	keyPath := os.Getenv("AGE_KEY_PATH")
+	if keyPath == "" {
+		keyPath = filepath.Join(env.Home(), ".config", "age", "key.txt")
+	}
+	l := &secrets.Loader{
+		SecretsDir: env.ResolveSensitiveDir(),
+		KeyPath:    keyPath,
+		BW:         secrets.BWServeReader{Client: secrets.BWServeClient{}},
+	}
+	kv, err := l.EnvFor([]secrets.Entry{e}, nil)
+	if err != nil {
+		return "", err
+	}
+	if len(kv) == 0 {
+		return "", fmt.Errorf("no value produced for %q", e.Var)
+	}
+	_, value, _ := strings.Cut(kv[0], "=")
+	return value, nil
 }
 
 // realSystem wires System to the live OS.
@@ -140,6 +184,7 @@ func realSystem() *System {
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
+		ResolveSecret: resolveSecret,
 		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)
 			defer cancel()

@@ -247,7 +247,7 @@ func bwBackedSecrets() (int, error) {
 	}
 	n := 0
 	for _, s := range reg.Secrets {
-		if s.Backend == "bw" {
+		if s.Backend == secrets.BackendBW {
 			n++
 		}
 	}

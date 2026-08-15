@@ -71,10 +71,10 @@ type Loader struct {
 func (l *Loader) resolvers() map[string]Resolver {
 	age := ageResolver{secretsDir: l.SecretsDir, keyPath: l.KeyPath, decrypt: l.Decrypt}
 	return map[string]Resolver{
-		"":            age,
-		"age":         age,
-		"age-offline": age,
-		"bw":          bwResolver{reader: l.BW},
+		BackendDefault:    age,
+		BackendAge:        age,
+		BackendAgeOffline: age,
+		BackendBW:         bwResolver{reader: l.BW},
 	}
 }
 
