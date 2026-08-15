@@ -156,6 +156,16 @@ func TranscriptPath(repoRoot, specID string) string {
 	return filepath.Join(repoRoot, "specs", specID, TranscriptFile)
 }
 
+// StderrPath is where the launched reviewer's stderr lands, beside the
+// transcript rather than inside it: the transcript is machine-readable jsonl an
+// auditor parses, and interleaving diagnostics into it would corrupt that.
+//
+// It exists because the death reason used to have nowhere to go. TmuxWrap pipes
+// the reviewer through `tee`, which carries stdout only, so a reviewer that died
+// on startup wrote its error to a pane that vanished with the session — leaving
+// a 0-byte transcript and no clue (#989).
+func StderrPath(transcript string) string { return transcript + ".stderr" }
+
 // ResolveReviewer picks which pool member runs.
 //
 // Default is the pool's FIRST entry — the launcher's primary. An explicit want
@@ -279,6 +289,8 @@ func TmuxWrap(session, dir string, argv []string, transcript string) []string {
 		"tmux", "new-session", "-d",
 		"-s", session,
 		"-c", dir,
-		ShellJoin(argv) + " | tee " + shellQuote(transcript),
+		ShellJoin(argv) +
+			" 2> " + shellQuote(StderrPath(transcript)) +
+			" | tee " + shellQuote(transcript),
 	}
 }
