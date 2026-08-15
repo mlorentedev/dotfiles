@@ -232,6 +232,7 @@ awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9
 - [2026-08-15] A check whose precondition the architecture forbids reports SKIP forever, and SKIP reads as nothing-to-check
 - [2026-08-15] Redact at the producer, because the consumer's filter is a guess about a format you have not seen
 - [2026-08-15] A check that cannot fail the way you cite it
+- [2026-08-15] `bw status` answers for the CLI's session, not for the daemon your code actually uses
 
 ---
 
@@ -2414,3 +2415,14 @@ The blast radius was also wider than the one function: because `compile-harness.
 **Rule**: never pipe a secret-bearing payload through a redaction filter and print the result. A filter is an assertion about a format you are debugging *precisely because you do not understand it*, and it fails open — the unmatched case is emitted verbatim, silently. Print only values you constructed yourself from parsed fields: a name, a length, a hash prefix, a boolean. When you genuinely need the raw bytes, write them to a 0600 file and inspect them with code that cannot reach stdout. And prefer a fingerprint to a value everywhere it will do — `sha256 | cut -c1-12` is non-reversible, is enough to prove two things differ, and turns "did the rotation work?" from a judgement into a comparison.
 
 **Tags**: `security`, `secrets`, `diagnostics`, `verification`, `incident`
+### [2026-08-15] `bw status` answers for the CLI's session, not for the daemon your code actually uses
+
+**Context**: every `bw`-backed secret was failing at once — `dotf secrets run -- true` died on `dockerhub`, and `dotf secrets verify` showed a wall of FAILED with `bw serve returned no parseable envelope: invalid character 'I'`. Looking for a single cause behind a mass failure, I ran `bw status`, got `{"status":"locked"}`, and reported the blocker as a locked vault needing the user's master password.
+
+**Problem**: the vault was not locked. ADR-028's runtime path does not go through the `bw` CLI's own session at all — `dotf secrets` resolves through the long-lived `bw serve` daemon, which holds a *separate* unlocked session. Both readings were true about different subjects, and the one I measured was not the one the failing code uses. A parallel session refuted it with the measurement I should have run: `dotf secrets run --only NAN_API_KEY -- true` exits 0 while unscoped resolution dies. The real cause was one broken item mapping killing an unscoped batch read (#985/#988), and "ask the user to unlock" would have fixed nothing while looking like progress — a plausible cause that explains the symptom is not the same as the cause.
+
+**Solution**: measure the path the failing code takes. `dotf secrets run --only <ID> -- true` exercises exactly the daemon, the mapping and the item that production uses; `bw status` exercises a CLI session nothing in ADR-028's hot path reads. When a mass failure has an obvious single explanation, prefer the probe that is *specific to one working element* over the one that reports global state — a scoped success falsifies "everything is down" in one command.
+
+**Rule**: before believing a diagnostic, name the subject it reports on and check it is the subject that is failing. Tools that front a daemon, a cache, a proxy or a pool almost always have two states — the client's and the server's — and the human-facing status command usually reports the client's, because that is the one it can see without asking. `git status` vs the remote, `docker ps` vs the daemon, `kubectl config` vs the cluster, `bw status` vs `bw serve`: same shape. The tell is a global explanation ("it's locked", "it's down") arriving before any single-element probe was tried.
+
+**Tags**: `secrets`, `bitwarden`, `diagnosis`, `verification`
