@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-071-reviewer-pool"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-13"
 issue: "mlorentedev/dotfiles#955"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
