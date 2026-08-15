@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-071-reviewer-pool"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-13"
 issue: "mlorentedev/dotfiles#955"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -92,19 +92,32 @@ Decided explicitly, because these are the design rather than details:
 
 - **Never had a pool → skip the check.** `dotf` runs in repos that never opted
   into this gate, and requiring one everywhere would break them.
-- **Had a pool, now missing → refuse.** Absence alone is ambiguous and the two
-  meanings need opposite answers. A bad merge, a stray delete or a `.gitignore`
-  mistake must not silently stop the gate checking who reviews — a safety check
-  disappearing with no signal at the moment it stops applying is the worst
-  shape available. The two cases are told apart by asking git whether the file
-  is in this repo's history, which needs no `enabled` key and follows the
-  precedent already in the package (`gitStaleness` asks history too).
+- **In HEAD but gone from the working tree → refuse.** Absence alone is
+  ambiguous and the two meanings need opposite answers. A bad merge, a stray
+  delete or a `.gitignore` mistake must not silently stop the gate checking who
+  reviews — a safety check disappearing with no signal at the moment it stops
+  applying is the worst shape available. The two cases are told apart by asking
+  `git ls-tree HEAD`, which needs no `enabled` key and follows the precedent
+  already in the package (`gitStaleness` asks git too).
 
-  This also means **deleting the file is not the way to switch the gate off**.
-  An earlier draft treated it as the escape hatch; the adversarial review on
-  #959 pointed out that this is exactly the "blank the config to hide the work"
-  shape a safety check must not have. The declared escapes stay per-spec and
-  auditable: `review: waived` with a reason, or `--force-without-review`.
+  **A committed removal, by contrast, is the sanctioned off switch.** The
+  property worth defending is not that the gate can never be turned off — a repo
+  that genuinely does not want it must be able to say so — but that turning it
+  off cannot be *silent*. A `git rm` plus a commit is the opposite of silent:
+  it is a reviewable diff with a message, which is the same auditable-escape
+  philosophy as `review: waived` needing a reason.
+
+  This boundary was drawn twice and got it wrong both times, in opposite
+  directions. An earlier draft treated any deletion as the escape hatch, and
+  #959's review correctly called that the "blank the config to hide the work"
+  shape. The correction then over-swung to refusing on *history*, via
+  `git log -- <path>` — which also matches the commit that deleted the path, so
+  the gate could never be retired at all while its own error message instructed
+  the reader to retire it exactly that way. The 2026-08-14 review of this spec
+  found that; `git ls-tree HEAD` is the predicate that separates the two.
+
+  The per-spec escapes are unchanged and remain the normal route: `review:
+  waived` with a reason, or `--force-without-review`.
 - **Pool present but malformed → refuse.** A gate fails toward refusing
   (`archive.go`'s own stated rule).
 - **Exact string match, trimmed.** The refusal prints both the found `reviewer:`

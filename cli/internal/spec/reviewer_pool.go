@@ -32,8 +32,8 @@ func LoadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 	return loadReviewerPoolEntries(repoRoot)
 }
 
-// poolWasTracked reports whether the pool file exists in this repo's git
-// history. It is how "never enabled" is told apart from "enabled, then lost".
+// poolWasTracked reports whether the pool file is part of this repo's committed
+// state. It is how "never enabled" is told apart from "enabled, then lost".
 //
 // The distinction matters because absence alone is ambiguous, and the two
 // meanings need opposite answers: a repo that never had a pool must keep
@@ -42,11 +42,25 @@ func LoadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 // rather than adding an "enabled" key keeps the pool one file with one job, and
 // follows the precedent already in this package: gitStaleness answers its own
 // question from the repository's history too.
+//
+// It asks HEAD's tree, not the log. `git log -- <path>` also returns the commit
+// that DELETED the path, so the original implementation answered true forever
+// once the file had ever existed — including after a deliberate, committed
+// removal. The error message told the reader to retire the gate "in a commit
+// that says so", and doing exactly that left every future archive blocked with
+// no way out but --force-without-review. An independent review of this spec
+// found it and it reproduces in four git commands.
+//
+// So the boundary is now: present in HEAD but missing from the working tree →
+// lost, fail closed. Absent from HEAD → either never added or deliberately
+// removed, and both are recorded in history where a reader can see them. That
+// makes a committed deletion the sanctioned off switch; the case this guards
+// against was never a documented removal but a silent one.
 func poolWasTracked(repoRoot string) bool {
 	if err := exec.Command("git", "-C", repoRoot, "rev-parse", "--git-dir").Run(); err != nil {
 		return false // not a work tree: no history to ask
 	}
-	out, err := exec.Command("git", "-C", repoRoot, "log", "-1", "--format=%H", "--", ReviewerPoolFile).Output()
+	out, err := exec.Command("git", "-C", repoRoot, "ls-tree", "HEAD", "--", ReviewerPoolFile).Output()
 	return err == nil && len(strings.TrimSpace(string(out))) > 0
 }
 
@@ -86,9 +100,9 @@ func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		if poolWasTracked(repoRoot) {
-			return nil, fmt.Errorf("%s is missing, but this repo's history has it — the reviewer gate was enabled and the file is gone\n"+
-				"restore it (`git checkout -- %s`), or if the gate is genuinely being retired, remove it in a commit that says so",
-				ReviewerPoolFile, ReviewerPoolFile)
+			return nil, fmt.Errorf("%s is in HEAD but missing from the working tree — the reviewer gate was enabled and the file is gone\n"+
+				"restore it (`git checkout -- %s`), or, if the gate is genuinely being retired, record that: `git rm %s` and commit the removal",
+				ReviewerPoolFile, ReviewerPoolFile, ReviewerPoolFile)
 		}
 		return nil, nil // never enabled here
 	}
