@@ -34,18 +34,26 @@ Two changes, one obligation and one procedure.
 **1. A new `enforced` harness region.** Sourced from a section in
 `pattern-change-lifecycle.md` beside `definition-of-done`, whose Review item this
 elaborates, and injected verbatim into every agent surface that region reaches.
-It states two rules:
+It states three rules:
 
-- *A PR you open is watched, not abandoned.* The window closes at the first of:
-  an actionable reviewer comment (attend to it), or N minutes after checks
-  settle. Pushing a fix reopens it, because the reviewer re-reviews.
-- *A PR that touches a `specs/<id>/` folder gets an adversarial review by
-  default.* This names an obligation that already binds mechanically — spec-gate
-  refuses to merge a PR closing a spec's issue without archiving it,
-  `dotf spec archive` refuses without a passing `review.md`, and since #958 the
-  pool refuses one signed by the wrong model. Stating it converts three
-  mechanical refusals into one intention an agent can act on *before* being
-  refused by any of them.
+- *What binds is the disposition, not the waiting.* Checks and reviewer output
+  are dispositioned before the change is called done — applied, ticketed, or
+  declined with a reason. **How** an agent learns they arrived is not
+  prescribed: a project with its own signal (the human notifies, a hook fires)
+  has already met the obligation, and its instruction wins. Absent such a
+  signal, the default mechanism is to stay — the window closes at the first of
+  an actionable reviewer comment or N minutes after checks settle, and pushing a
+  fix reopens it, because the reviewer re-reviews.
+- *A comment is not a review.* A reviewer notice reporting that no review ran
+  leaves the PR unreviewed. Proceeding anyway is allowed; proceeding silently is
+  not.
+- *A change that closes a spec gets an independent adversarial review before it
+  archives.* The trigger is the archive gate and nothing broader. It names an
+  obligation that already binds mechanically — spec-gate refuses to merge a PR
+  closing a spec's issue without archiving it, `dotf spec archive` refuses
+  without a passing `review.md`, and since #958 the pool refuses one signed by
+  the wrong model. Stating it converts three mechanical refusals into one
+  intention an agent can act on *before* being refused by any of them.
 
 **2. `pr-review-triage` amended** in its vault source: the end condition covers
 the reviewer bot rather than only CI, and the wait is expressed as a *contract*
@@ -82,10 +90,25 @@ optional skill.
 - **A rule injected everywhere is expensive to get wrong.** It lands verbatim in
   every agent's instructions, so it must be terse and free of Claude-specific
   vocabulary. The mitigation is the same one `definition-of-done` uses: bind
-  existing obligations, do not restate them.
+  existing obligations, do not restate them. Two objections raised from the
+  kubelab side, both accepted, are the reason AC3 and AC4 read as they do — and
+  both are the *same* failure in different clothes: a region that reaches every
+  project must not encode anything a project may legitimately do differently.
+  - *A mechanism is not an obligation.* The first draft made the timed watch
+    itself the rule. kubelab carries a standing instruction from the same user
+    not to poll CI — they notify — so the region would have overridden a user
+    preference by a route the user never chose. The obligation is the
+    disposition; the watch is the fallback when nothing better exists (AC3).
+  - *A trigger belongs where it was designed.* "Touches `specs/<id>/`" catches
+    nearly every docs PR in a repo where `tasks.md` is ticked as work proceeds —
+    including one whose whole content was adding `text` to three fenced code
+    blocks — and relocates a trigger `adversarial-review` already owns at the
+    archive gate to a far higher frequency than it was built for (AC4).
 - **N is a guess.** 10 minutes fits CodeRabbit's observed latency on this repo
   and is short enough not to park an agent. It is a number in prose, not a
-  constant, so it costs nothing to revise.
+  constant, so it costs nothing to revise. Demoting it to a default mechanism
+  lowers the cost of the guess further: a project it does not suit overrides it
+  without touching the region.
 - **A region added to `enforced` but missing from a target's `inject` list
   silently misses that surface.** Exactly the producer-updated /
   consumer-forgotten class that BUG-077 (#969) was. Mitigated by AC5 below:
@@ -96,17 +119,29 @@ optional skill.
 - [ ] **AC1** An `enforced` region exists, sourced from a vault pattern section,
       and is listed in `harness/manifest.json` with an `id` and a `source`.
 - [ ] **AC2** The region is injected into every surface `definition-of-done`
-      reaches — both `targets` entries — verified by `compile-harness.sh --check`
-      passing, not by counting files by hand.
-- [ ] **AC3** The region's text states that a reviewer-bot notice reporting that
+      reaches — both `targets` entries **and `doctrine.inject`**, which carries
+      that region to the agy and codex payloads — verified by
+      `compile-harness.sh --check` passing, not by counting files by hand. If a
+      surface is deliberately excluded, the exclusion is recorded with its
+      reason; `pr-sizing` is the precedent that selective injection is legitimate.
+      The `char_cap` of each doctrine target still holds after the addition.
+- [ ] **AC3** The region binds a **disposition**, not a mechanism: its text
+      obliges checks and reviewer output to be dispositioned before the change is
+      called done, *however the agent learns of them*, and names the timed watch
+      only as the default when a project offers no signal of its own. A project
+      instruction covering the same ground overrides the mechanism without
+      contradicting the region.
+- [ ] **AC4** The adversarial-review obligation fires at the **archive gate** —
+      the trigger `adversarial-review` already owns — and the region introduces
+      no broader one. Concretely: the text must not make "the PR touches
+      `specs/<id>/`" a trigger.
+- [ ] **AC5** The region's text states that a reviewer-bot notice reporting that
       no review ran (rate limit, quota) leaves the PR **unreviewed**, and that
-      the agent must say so rather than close the window on it.
-- [ ] **AC4** "Important PR" resolves to a test an agent applies without
-      judgement: the PR touches a `specs/<id>/` folder.
-- [ ] **AC5** `pr-review-triage`'s trigger and end condition cover the reviewer
+      proceeding requires saying so out loud.
+- [ ] **AC6** `pr-review-triage`'s trigger and end condition cover the reviewer
       bot, not only CI, and the wait is expressed with `gh` commands runnable by
       an agent with no Claude-specific primitives.
-- [ ] **AC6** The vault source and the committed harness records agree —
+- [ ] **AC7** The vault source and the committed harness records agree —
       `compile-harness.sh --check` reports no drift after `--refresh`.
 
 ## References
