@@ -315,6 +315,17 @@ func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
 	return itemData, nil
 }
 
+// Sync makes the daemon pull the current vault state from the server. It matters
+// because the daemon answers reads from its OWN local cache: a write made through
+// any other client — the `bw` CLI, the desktop app, the web vault — is invisible
+// to `dotf secrets` until this runs. Skipping it produces a correct write and a
+// stale read with no signal that a step is missing, which is the single most
+// confusing state this package can be in (CLI-037).
+func (c BWServeClient) Sync() error {
+	_, err := c.call(http.MethodPost, "/sync", nil)
+	return err
+}
+
 // BWServeDaemon owns the lifecycle of a dotf-managed bw serve process: start
 // it (detached, localhost-only), poll until reachable, and delegate lock
 // state to BWServeClient. The process-spawn half is live-verified only (like
@@ -380,6 +391,9 @@ func (d *BWServeDaemon) Unlock(password string) error { return d.Client.Unlock(p
 
 // Lock delegates to the client — see BWServeClient.Lock.
 func (d *BWServeDaemon) Lock() error { return d.Client.Lock() }
+
+// Sync delegates to the client; see BWServeClient.Sync for why it is load-bearing.
+func (d *BWServeDaemon) Sync() error { return d.Client.Sync() }
 
 // Status delegates to the client, mapping an unreachable daemon to the
 // explicit "absent" state rather than surfacing a raw connection error —
