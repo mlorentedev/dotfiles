@@ -104,7 +104,7 @@ func TestSetBackendBW_RealRegistry_OnlyTargetChanges(t *testing.T) {
 	if strings.Contains(block, "age: github.token") {
 		t.Errorf("age source not dropped:\n%s", block)
 	}
-	if !strings.Contains(block, "bw: { item: github-cli-pat, field: api-token, folder: Dotfiles/apps }") {
+	if !strings.Contains(block, "bw: { item: github-cli-pat, field: api-token, folder: apps }") {
 		t.Errorf("declared bw block not preserved in place:\n%s", block)
 	}
 }
