@@ -237,14 +237,25 @@ $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 
 # Secrets are NOT auto-loaded into the ambient session (ADR-028 "not always
 # exposed"). On demand: `dotf secrets run -- <cmd>` injects the decrypted secrets
-# into that child process only. The AI CLIs that read their keys from the
-# environment are wrapped to launch through it, so the secret lives only in their
-# process, never this session. Recursion-safe: dotf resolves the real binary on
-# PATH, not this function.
+# into that child process only, so a key lives in the agent's process and never
+# in this session. Recursion-safe: dotf resolves the real binary on PATH, not
+# this function.
+#
+# Each wrapper is scoped with `--only`, and the scope is load-bearing. The
+# unscoped form resolved the WHOLE registry on every launch: deliberate parity
+# with the old ambient export, and free while every secret was age-backed, which
+# is a local decrypt in milliseconds. After the Bitwarden migration (#961) each
+# resolution is a `bw` shell-out at ~1.5s, so an unscoped launch paid ~45s of
+# latency before the agent started, and died on the first locked entry even when
+# the agent had no use for it (#976). Scoping is least privilege and startup
+# time at once.
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    function opencode { dotf secrets run -- opencode @args }
-    function pi { dotf secrets run -- pi @args }
-    function agy { dotf secrets run -- agy @args }
+    function opencode { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode @args }
+    function pi { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi @args }
+    # agy is deliberately NOT wrapped. It authenticates with its own stored
+    # credentials and reads no variable this registry exposes, verified against
+    # both its settings files and the strings of the binary itself. Wrapping it
+    # injected nothing and cost a full registry resolution per launch.
 }
 
 # ============================================================================
