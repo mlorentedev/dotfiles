@@ -1,7 +1,7 @@
 ---
 id: "CLI-024-secrets-file-migrate"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-14"
 issue: "mlorentedev/dotfiles#964"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -9,6 +9,16 @@ template_version: "1.0"
 ---
 
 # CLI-024-secrets-file-migrate
+
+> **Archive note:** `dotf spec archive` refused with `--force-without-review` on the
+> first attempt — `review.md`'s `reviewed_sha` (`7ff616f`, round-3 PASS) is not an
+> ancestor of `origin/main`. Not a missed review: PR #965's branch was rebuilt via
+> `cherry-pick` after a squash-merge conflict (documented pattern, `docs/lessons.md`
+> 2026-08-12), which gives the cherry-picked commits new SHAs. Content identity
+> between the reviewed commit and what merged as `852bbaa` was verified with an
+> empty `diff` before the rebuild. `review.md` (round 3, PASS) is preserved as-is
+> below — it reviewed this exact content, just under a SHA main's history no longer
+> contains.
 
 > **Naming**: file lives at `<repo>/specs/CLI-024-secrets-file-migrate/proposal.md`. `CLI-024-secrets-file-migrate` is `AREA-NNN-slug` (e.g. `TOOL-001-secret-drift`).
 
@@ -48,3 +58,5 @@ template_version: "1.0"
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - Related ADR: `<repo>/docs/adr/adr-XXX.md` (if any)
 - Related patterns: `00_meta/patterns/<pattern>.md` (if any)
+
+<!-- archived 2026-08-15 — PR: https://github.com/mlorentedev/dotfiles/pull/965 -->
