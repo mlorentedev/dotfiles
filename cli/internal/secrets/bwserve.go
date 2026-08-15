@@ -51,8 +51,38 @@ type bwServeEnvelope struct {
 }
 
 // bwServeStatusData is the payload bw serve's /status returns inside data.
+//
+// The real shape, captured live against bw 2026.5.0 (2026-08-15, first live
+// unlock of the daemon this PR added — the OPS-021 spike's earlier probe of
+// this same endpoint was apparently misread, since it never actually drove
+// BWFallbackReader against a live daemon): the status fields are wrapped one
+// level deeper than assumed, under "template":
+//
+//	{"success":true,"data":{"object":"template","template":{"status":"locked",...}}}
+//
+// Parsing only the flat shape silently returned an empty Status with a nil
+// error (valid JSON, just no top-level "status" key) — BWFallbackReader's
+// `st == "unlocked"` check then never matched, so it silently fell back to
+// the CLI shellout on every call, defeating the daemon read path entirely
+// while reporting no error at all. Handling both shapes here, preferring the
+// nested one when present, is the fix — and the reason it stays defensive
+// rather than dropping the flat fallback is that this response shape is
+// undocumented behavior of a third-party CLI, not a contract this package
+// controls.
 type bwServeStatusData struct {
-	Status string `json:"status"` // unauthenticated | locked | unlocked
+	Status   string `json:"status"` // unauthenticated | locked | unlocked
+	Template *struct {
+		Status string `json:"status"`
+	} `json:"template"`
+}
+
+// status returns the actual status value, preferring the "template"-nested
+// shape when present (see bwServeStatusData's doc comment).
+func (d bwServeStatusData) status() string {
+	if d.Template != nil && d.Template.Status != "" {
+		return d.Template.Status
+	}
+	return d.Status
 }
 
 // ErrBWServeUnreachable marks a daemon that did not answer at all (not
@@ -142,7 +172,7 @@ func (c BWServeClient) Status() (string, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return "", fmt.Errorf("GET /status: unparseable data: %w", err)
 	}
-	return st.Status, nil
+	return st.status(), nil
 }
 
 // Unlock POSTs password to the daemon's /unlock endpoint. The password is
@@ -219,23 +249,28 @@ func (r BWServeReader) Field(item, field string) (string, error) {
 // filters to an EXACT name or id match before accepting a result — a fuzzy
 // hit would silently read the wrong secret.
 //
-// NOTE on the list-endpoint envelope shape: /status, /unlock and /lock were
-// verified empirically against a live bw serve 2026.5.0 (OPS-021 spike,
-// #675). /list/object/items was NOT — no unlocked vault was used in that
-// spike. This assumes bw's envelope wraps the array directly under `data`
-// (call() already unwraps one envelope level); the live verification task in
-// tasks.md confirms or corrects this against a real daemon before archive.
+// The list endpoint wraps its array the same way /status wraps its fields
+// (see bwServeStatusData's doc comment): one extra level, tagged by an
+// "object" field naming the payload shape. Captured live against bw
+// 2026.5.0, 2026-08-15 (the live verification task in tasks.md, second
+// round — /status was the first shape this package got wrong the same way):
+//
+//	{"success":true,"data":{"object":"list","data":[{"id":...,"name":...},...]}}
+type bwServeListData struct {
+	Data []bwServeListItem `json:"data"`
+}
+
 func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
 	data, err := r.Client.call(http.MethodGet, "/list/object/items?search="+url.QueryEscape(item), nil)
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: %w", item, err)
 	}
-	var items []bwServeListItem
-	if err := json.Unmarshal(data, &items); err != nil {
+	var list bwServeListData
+	if err := json.Unmarshal(data, &list); err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: unparseable data: %w", item, err)
 	}
 	var matches []bwServeListItem
-	for _, it := range items {
+	for _, it := range list.Data {
 		if it.Name == item || it.ID == item {
 			matches = append(matches, it)
 		}
