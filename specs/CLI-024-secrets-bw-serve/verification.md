@@ -18,14 +18,21 @@ created: "2026-08-15"
 
 - Test suite: `cd cli && go build ./... && go vet ./... && go test ./... -count=1` -> all 13 packages `ok`, 0 failures
 - Lint: `golangci-lint run ./...` -> `0 issues`
-- Manual smoke test: **not yet run.** The two remaining `tasks.md` items (live daemon benchmark against a real `dotf secrets verify`, live end-to-end `unlock`/`lock` with the operator's own master password) require the operator's own terminal — the agent implementing this spec does not type, source, or hold the Bitwarden master password, by the same ADR-028 boundary this spec exists to enforce. Run:
+- Manual smoke test: **not yet run.** The remaining `tasks.md` items (live daemon benchmark, live end-to-end `unlock`/`lock`, and now an unattended-path check — see below) require the operator's own terminal — the agent implementing this spec does not type, source, or hold the Bitwarden master password, by the same ADR-028 boundary this spec exists to enforce. Run:
   ```
   dotf secrets unlock            # types the real master password, interactively, yourself
   time dotf secrets verify       # compare against the 14-50s CLI-shellout baseline (OPS-021 spike, #675/#585)
   dotf secrets lock
   dotf secrets unlock            # again, confirms idempotent (should say "already unlocked" only if run before Start()'s daemon exits — otherwise re-prompts, which is also correct)
   ```
-  then paste the wall-clock and a confirmation the password never showed up in `ps`/history back into this file before archiving.
+  then, **with the daemon left unlocked**, the scenario this PR actually exists to fix (#976: `pi`/`opencode`/`pollex` broken since #961 flipped `NAN_API_KEY` age→bw — every unattended `dotf secrets run` now dies on `Vault is locked`, and `pi` IS the adversarial-review primary reviewer, so a locked vault takes the review mechanism down too):
+  ```
+  tmux new -d -s bw-serve-smoke 'dotf secrets run -- pi --version > /tmp/bw-serve-smoke.log 2>&1; touch /tmp/bw-serve-smoke.done'
+  # wait for the .done marker, then:
+  cat /tmp/bw-serve-smoke.log     # must succeed with NO password prompt (no TTY in this session at all)
+  ```
+  A detached tmux pane has no TTY — exactly the shape that broke, and exactly where `bw unlock --raw`'s documented non-interactive stdin bug would have lived had we routed through the CLI shellout instead of the daemon. This is the acceptance evidence that actually matters for #976, not just the wall-clock number.
+  Paste the wall-clock, the unattended-launch confirmation, and a confirmation the password never showed up in `ps`/history back into this file before archiving.
 - No regressions in existing test suite: yes — full suite green before and after every commit in this branch
 
 ## Decisions made during implementation

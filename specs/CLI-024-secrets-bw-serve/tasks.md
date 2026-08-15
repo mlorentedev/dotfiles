@@ -35,6 +35,7 @@ created: "2026-08-15"
 - [x] [AC4] Implement the check. Also fixed a real nil-seam panic this surfaced in `TestRun_RegistersTheBitwardenReachSection` (the shared `newSys()` test fixture needed a default for the new `BWServeStatus` seam, same pattern as `BWBackedSecrets`/`AgeRoundTrip`).
 - [ ] [AC2] Live (this operator's unlocked session, password typed by the operator, never by the agent): benchmark `dotf secrets verify` against a running unlocked daemon; record the wall-clock against the 14-50s CLI-shellout baseline measured in the OPS-021 spike.
 - [ ] [AC1] [AC6] Live (same session): `dotf secrets unlock` end-to-end, confirm the password never appears in `ps`, shell history, or any written file; `dotf secrets lock`; re-run `unlock` twice to confirm idempotency.
+- [ ] [AC2] [AC3] Live (same session): with the daemon left unlocked, confirm an UNATTENDED `dotf secrets run` (detached tmux, no TTY) succeeds with no prompt — the actual failure mode reported in #976 (`pi`/`opencode`/`pollex` broken since #961 flipped `NAN_API_KEY` age→bw, and `pi` is the adversarial-review primary). See `verification.md` for the exact repro command.
 
 ## Closing
 

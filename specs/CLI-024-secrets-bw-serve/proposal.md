@@ -117,6 +117,9 @@ once, and never becomes an ambient shell variable or an agent-held secret again.
 
 - Bitácora board: #622 (this spec's gate), #585 (original bw backend, spike decision
   comment), #675 (OPS-021 spike, closed with the decision), #612 (secrets lifecycle
-  epic).
+  epic), #976 (live incident this PR fixes — `pi`/`opencode`/`pollex` broken since #961
+  flipped `NAN_API_KEY` age→bw, every unattended `dotf secrets run` now dies on a locked
+  vault; `pi` is the adversarial-review primary, so this is load-bearing for the review
+  mechanism itself, not only convenience).
 - Related ADR: `docs/adr/adr-028-secrets-two-tier-bitwarden-age.md`.
 - Seam + deferral note: `cli/internal/secrets/bw.go` (`BWGet`, `BWPut`).
