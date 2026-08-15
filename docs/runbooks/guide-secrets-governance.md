@@ -19,7 +19,7 @@ flowchart LR
     classDef cmd fill:#dbeafe,stroke:#1e40af,color:#000
     classDef target fill:#dcfce7,stroke:#15803d,color:#000
 
-    BW[("Bitwarden<br/>live SSOT<br/>Dotfiles/{apps,infra,personal,floor}")]:::store
+    BW[("Bitwarden<br/>live SSOT<br/>{apps,infra,personal,floor}")]:::store
     AGE[("age floor<br/>sensitive/*.secret.age<br/>+ offline key")]:::store
     REG["secrets/registry.yaml<br/>mapping SSOT<br/>id → backend → expose → consumers"]:::store
 
@@ -43,7 +43,7 @@ flowchart LR
 
 ## Conventions (from ADR-028)
 
-- Managed secrets live under **`Dotfiles/{apps,infra,floor}`** in Bitwarden; the ~125 personal items are a separate tree, out of `dotf secrets`' bounds.
+- Managed secrets live under **`{apps,infra,floor}`** in Bitwarden; the ~125 personal items are a separate tree, out of `dotf secrets`' bounds.
 - The **registry** `secrets/registry.yaml` is the SSOT: `id → bw item/field → env|file → consumers → rotate`.
 - **Values never render into an unintended channel** — a log, a chat/AI conversation, a shared terminal, CI output; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`). `dotf secrets show`/`run` are the deliberate, interactive-terminal-only exceptions this convention doesn't forbid — the rule is against accidental exposure, not against the primitives that exist specifically to show or use a value.
 
@@ -52,7 +52,7 @@ flowchart LR
 When a new API key/token/credential enters the system:
 
 1. Decide the **plane**: `app` (service key) / `infra` (access) / `personal` / `floor` (needed before bw — rare).
-2. Create the Bitwarden item under `Dotfiles/<plane>`, named `<service>-<purpose>` (kebab):
+2. Create the Bitwarden item under `<plane>`, named `<service>-<purpose>` (kebab):
    - single value → item password; multi-value → custom fields (kebab names).
    - _manual today:_ `bw get template item | jq '.name="…" | .folderId="…" | …' | bw encode | bw create item`.
 3. Add a **registry** entry: `{id, plane, backend: bw, bw:{folder,item,field}, expose:{env|file}, consumers, rotate}`.
@@ -121,7 +121,7 @@ restore from it.
 
 ## Maintainability (what keeps it from drifting)
 
-- `dotf doctor` checks (target): `bw`/`age` present (#577); DR-export freshness; **registry ↔ vault consistency** (flag `Dotfiles/**` items that break the naming/registry convention).
+- `dotf doctor` checks (target): `bw`/`age` present (#577); DR-export freshness; **registry ↔ vault consistency** (flag managed items — those in `apps`/`infra` — that break the naming/registry convention).
 - All adds/rotations go through the **registry** — the single map. No ad-hoc env edits, no second authoritative copy.
 
 ## References

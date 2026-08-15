@@ -296,7 +296,7 @@ flowchart LR
     classDef cmd fill:#dbeafe,stroke:#1e40af,color:#000
     classDef target fill:#dcfce7,stroke:#15803d,color:#000
 
-    BW[("Bitwarden\nlive SSOT\nDotfiles/{apps,infra,personal,floor}")]:::store
+    BW[("Bitwarden\nlive SSOT\n{apps,infra,personal,floor}")]:::store
     AGE[("age floor\nsensitive/*.secret.age\n+ offline key")]:::store
     REG["secrets/registry.yaml\nmapping SSOT\nid → backend → expose → consumers"]:::store
 

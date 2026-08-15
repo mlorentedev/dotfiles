@@ -232,7 +232,7 @@ type BWCreator interface {
 }
 
 // BWFolderResolver resolves a Bitwarden folder NAME (registry bw.folder, e.g.
-// "Dotfiles/apps") to its id, creating the folder if the vault doesn't have it yet —
+// "apps") to its id, creating the folder if the vault doesn't have it yet —
 // OPS-028, closing the gap where ADR-028 ratified a folder taxonomy the write path
 // couldn't place anything into. Split from BWCreator (its own interface, its own test
 // double) because folder resolution and item creation are independently testable:

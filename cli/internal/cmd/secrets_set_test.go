@@ -109,7 +109,7 @@ secrets:
   - {id: bw-token, plane: app, backend: bw, bw: {item: openai, field: api-key}, expose: {env: OPENAI_API_KEY}}
   - {id: bw-multi, plane: app, backend: bw, bw: {item: x-twitter}, expose: {env: {X_API_KEY: {field: api-key}, X_SECRET: {field: api-secret}}}}
   - {id: bw-file, plane: infra, backend: bw, bw: {item: kube, field: notes}, expose: {file: {var: KUBECONFIG, path: "~/.kube/c"}}}
-  - {id: bw-foldered, plane: app, backend: bw, bw: {item: foldered-item, field: api-key, folder: Dotfiles/apps}, expose: {env: FOLDERED_KEY}}
+  - {id: bw-foldered, plane: app, backend: bw, bw: {item: foldered-item, field: api-key, folder: apps}, expose: {env: FOLDERED_KEY}}
 `
 
 func runSetOut(t *testing.T, fw *fakeWriter, stdin string, args ...string) (string, error) {
@@ -232,8 +232,8 @@ func TestSecretsSet_CreateAbsent_UsesDeclaredFolder(t *testing.T) {
 	if _, err := runSetOut(t, fw, "fresh", "bw-foldered", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if fw.createdIn["foldered-item"] != "new-Dotfiles/apps" {
-		t.Errorf("createdIn = %v, want foldered-item resolved via Dotfiles/apps", fw.createdIn)
+	if fw.createdIn["foldered-item"] != "new-apps" {
+		t.Errorf("createdIn = %v, want foldered-item resolved via apps", fw.createdIn)
 	}
 }
 

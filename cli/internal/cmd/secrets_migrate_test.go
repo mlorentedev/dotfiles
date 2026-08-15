@@ -179,7 +179,7 @@ secrets:
     plane: app
     backend: age
     age: nan.api-key
-    bw: { item: nan-api-key, field: api-key, folder: Dotfiles/apps }
+    bw: { item: nan-api-key, field: api-key, folder: apps }
     expose: { env: NAN_API_KEY }
     consumers: [local]
 `
@@ -188,8 +188,8 @@ secrets:
 	if _, err := migrateExec(t, foldered, fw, "nan-value\n", "NAN_API_KEY", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if fw.createdIn["nan-api-key"] != "new-Dotfiles/apps" {
-		t.Errorf("createdIn = %v, want nan-api-key resolved via Dotfiles/apps", fw.createdIn)
+	if fw.createdIn["nan-api-key"] != "new-apps" {
+		t.Errorf("createdIn = %v, want nan-api-key resolved via apps", fw.createdIn)
 	}
 }
 
