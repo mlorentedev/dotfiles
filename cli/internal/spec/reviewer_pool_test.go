@@ -216,8 +216,41 @@ func TestArchiveFailsClosedWhenATrackedPoolGoesMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("deleting a tracked pool must not silently disable the gate")
 	}
-	if !strings.Contains(err.Error(), "history") {
-		t.Errorf("the error must explain that the gate was enabled and the file is gone, got: %v", err)
+	if !strings.Contains(err.Error(), "HEAD") || !strings.Contains(err.Error(), "working tree") {
+		t.Errorf("the error must explain that the gate is in HEAD and the file is gone, got: %v", err)
+	}
+}
+
+// The third case, and the one an independent review of this spec found missing:
+// a pool removed ON PURPOSE, in a commit.
+//
+// The original poolWasTracked asked `git log -- <path>`, which also returns the
+// commit that DELETED the path. So once the file had ever existed the answer was
+// true forever, and a deliberate removal left every future archive blocked —
+// while the error message told the reader to retire the gate by committing
+// exactly that removal. The instruction and the code disagreed, and the code won.
+//
+// Asking HEAD's tree instead splits the two absences the way the rule intends:
+// gone from the tree but present in HEAD is a loss (fail closed, above), absent
+// from HEAD is a decision someone recorded. Silent disabling is what this gate
+// exists to prevent, and a committed `git rm` is the opposite of silent.
+func TestArchiveAllowsAPoolRetiredInACommit(t *testing.T) {
+	root := t.TempDir()
+	gitInit(t, root)
+	writePool(t, root, testPool)
+	archivableSpec(t, root, "AI-001-x", reviewBy("AI-001-x", "claude-opus-5"))
+	gitCommitAll(t, root, "add the pool")
+
+	// Retire it the way the error message prescribes: remove AND commit.
+	if err := os.Remove(filepath.Join(root, "harness", "reviewer-pool.json")); err != nil {
+		t.Fatal(err)
+	}
+	gitCommitAll(t, root, "retire the reviewer pool gate")
+
+	// claude-opus-5 was refused by the pool while it existed; with the pool
+	// formally retired there is no pool to have an opinion, so this archives.
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{Staleness: fakeStaleness{}}); err != nil {
+		t.Fatalf("a pool retired in a commit must not block archives forever: %v", err)
 	}
 }
 

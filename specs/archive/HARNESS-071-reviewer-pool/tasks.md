@@ -72,30 +72,37 @@ created: "2026-08-13"
 - [x] Refuse an out-of-pool model at the launcher too — defence in depth, and it
       names what IS available rather than only what is forbidden.
 - [x] Mutation-test the launcher — 6 mutants, **6 detected**.
-- [ ] [AC7] Prove the Gemini arm with one **real review**. STILL OPEN, and the
-      box stays unticked until a review artifact exists.
+- [x] [AC7] Prove the Gemini arm with one **real review**. CLEARED on 2026-08-14
+      by a run with verdict FAIL at `reviewed_sha b24e105`, recorded in commit
+      **`a561342`** — cite the sha, because the review of record that gates this
+      archive overwrites `review.md` and the transcript on disk, so the FAIL that
+      cleared AC7 lives in history rather than in the working tree.
 
-      An earlier revision of this file ticked it on the grounds that the run had
-      been *launched* through `dotf spec review --reviewer
-      agy/gemini-3.1-pro-high`. That was the wrong claim to tick: the criterion
-      says review, `verification.md` said in the same breath that the fallback
-      had not cleared the bar, and a `[x]` beside "prove it with a real review"
-      reads as done no matter what the prose underneath says. The adversarial
-      review of this very spec caught it, which is the mechanism working.
+      An earlier revision ticked this on the grounds that a run had been
+      *launched*. That was the wrong claim: the criterion says review, and a
+      `[x]` beside "prove it with a real review" reads as done no matter what
+      the prose underneath says. So the bar for ticking it now is **reach**, not
+      the existence of an artifact — the third blind attempt produced a
+      well-formed all-A PASS having executed nothing, which is precisely the
+      artifact a naive reading of this box would have accepted.
 
-      What the launch attempts have established so far:
+      Reach verified three ways, not assumed:
 
-      1. `agy` answers non-interactively on the pinned model and reports itself
-         as Gemini 3.1 Pro — invocation and pin work.
-      2. The first launch through the launcher produced a **greeting and nothing
-         else**, because `agy --print` consumes a value and had swallowed
-         `--model`. Fixed; the argv now passes `--print` last.
-      3. The second launch is running at the time of writing. Until it writes a
-         `review.md`, the arm is unproven.
+      1. The transcript carries this worktree's actual HEAD
+         (`b24e105e78429b23d82a49f5dca5c0c08c2b4119`), so `git rev-parse` ran
+         inside the repo under review rather than in agy's install dir.
+      2. It runs `go test` eight times with real pass/fail output across 147
+         recorded steps — the suite was reachable and was used.
+      3. None of the three blind-run signatures appear: no "not a git
+         repository", no `antigravity-cli` cwd, no empty response at exit 0.
 
-      NaN cleared this bar in BUG-074 round 3 by re-running the spec's own
-      mutation battery rather than trusting its table. A fallback never observed
-      doing the job is decoration.
+      The verdict being FAIL is *stronger* evidence than a PASS would have been.
+      A reviewer that cannot act produces agreeable output; this one produced a
+      Blocker that reproduces in four git commands (see the dispositions in
+      `verification.md`). NaN cleared the same bar in BUG-074 round 3 by
+      re-running the spec's own mutation battery rather than trusting its table.
+      A fallback never observed doing the job is decoration — this one has now
+      been observed doing it, and finding something.
 
 ## Slice 3 — the standing rule where agents read it
 
@@ -123,9 +130,18 @@ created: "2026-08-13"
 - [x] CodeRabbit's review on #959 triaged: 2 Majors on the shell wrappers and 2
       on the pool/AC7 applied; the table-driven-tests Major deferred with a
       stated reason (see below)
-- [ ] Fresh adversarial review — on a pooled model, which this spec is about.
-      Blocked on AC7: the fallback arm has to produce a review before this spec
-      can credibly claim the mechanism works.
+- [x] Fresh adversarial review — on a pooled model, which this spec is about.
+      No longer blocked on AC7: `agy/gemini-3.1-pro-high` reviewed this spec on
+      2026-08-14 and returned FAIL with a reproducible Blocker plus a Major, both
+      fixed above with guards. That review is the mechanism reviewing itself and
+      finding a real defect in its own gate.
+
+      Freshness and verdict are not claimed by this box, because a box cannot
+      enforce them. `dotf spec archive` refuses this folder unless `review.md`
+      carries a passing verdict, a `reviewed_sha` no contract file postdates,
+      and a `reviewer:` inside `harness/reviewer-pool.json`. The archive commit
+      landing at all is the evidence; the box only records that the review
+      happened rather than being waived.
 
 ## Machine-readable features
 

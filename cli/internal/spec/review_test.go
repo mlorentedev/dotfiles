@@ -277,6 +277,54 @@ func gitSpecRepo(t *testing.T, id string) (root, sha string) {
 	return root, gitRun(t, root, "rev-parse", "HEAD")
 }
 
+// An independent review of HARNESS-071 found this hole: the checker read
+// committed history only, so editing a contract file and NOT committing it left
+// the review looking fresh. That is the cheapest possible bypass of the whole
+// gate — get a passing review, rewrite the acceptance criteria in the working
+// tree, archive. Uncommitted is exactly the state a spec is in while someone is
+// editing it, so this was not an exotic path.
+//
+// Scoped to the three contract files on purpose: a review in flight writes
+// review.md and review-transcript.jsonl into the same folder, and a check over
+// the whole spec dir would call every review stale the moment it produced its
+// own artifacts.
+func TestGitStalenessDetectsUncommittedContractChange(t *testing.T) {
+	root, sha := gitSpecRepo(t, "AI-001-x")
+	if err := os.WriteFile(filepath.Join(root, "specs", "AI-001-x", "proposal.md"),
+		[]byte("---\nstatus: verifying\n---\nedited but never committed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stale, known, reason := gitStaleness{}.Stale(root, "AI-001-x", sha)
+	if !known || !stale {
+		t.Fatalf("an uncommitted contract edit must be stale (known=%v stale=%v)", known, stale)
+	}
+	if !strings.Contains(reason, "uncommitted") {
+		t.Errorf("reason should say the change is uncommitted, got %q", reason)
+	}
+}
+
+// The other side of the scoping: a review writing its own artifacts into the
+// spec folder must not make itself stale. Without this, fixing the hole above
+// would break every archive instead.
+func TestGitStalenessIgnoresUncommittedNonContractFiles(t *testing.T) {
+	root, sha := gitSpecRepo(t, "AI-001-x")
+	for _, name := range []string{"review.md", "review-transcript.jsonl", "verification.md"} {
+		if err := os.WriteFile(filepath.Join(root, "specs", "AI-001-x", name),
+			[]byte("written by the reviewer mid-run\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stale, known, _ := gitStaleness{}.Stale(root, "AI-001-x", sha)
+	if !known {
+		t.Fatal("a real repo must give a known answer")
+	}
+	if stale {
+		t.Error("a review's own uncommitted artifacts must not make it stale")
+	}
+}
+
 func TestGitStalenessDetectsContractChange(t *testing.T) {
 	root, sha := gitSpecRepo(t, "AI-001-x")
 	if err := os.WriteFile(filepath.Join(root, "specs", "AI-001-x", "proposal.md"),
