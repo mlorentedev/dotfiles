@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-024-secrets-bw-serve-f1",
+    "behavior": "dotf secrets unlock prompts for the master password with echo disabled, starts bw serve if needed, and unlocks via POST /unlock without the password ever appearing in shell history, process args, or disk",
+    "verification": "cd cli && go test ./internal/cmd/... -run TestSecretsUnlock -v -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-serve-f2",
+    "behavior": "With the daemon running and unlocked, dotf secrets verify over the current registry completes in under 2 seconds",
+    "verification": "cd cli && go test ./internal/secrets/... -run TestBWServeReader -v -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-serve-f3",
+    "behavior": "With no daemon running, every existing dotf secrets command behaves exactly as it does today (CLI shellout fallback)",
+    "verification": "cd cli && go test ./... -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-serve-f4",
+    "behavior": "dotf doctor reports the bw serve daemon's state (absent/locked/unlocked) as a distinct check",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestCheckBWServe -v -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-serve-f5",
+    "behavior": "The daemon binds 127.0.0.1 only",
+    "verification": "cd cli && go test ./internal/secrets/... -run TestBWServeDaemon_Start_BindsLocalhostOnly -v -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-024-secrets-bw-serve-f6",
+    "behavior": "dotf secrets lock locks the daemon explicitly; dotf secrets unlock run twice while already unlocked is idempotent",
+    "verification": "cd cli && go test ./internal/cmd/... -run TestSecretsLock -v -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
