@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-073-pattern-triggers-tasks"
 type: spec
-status: draft
+status: archived
 created: "2026-08-14"
 issue: "mlorentedev/dotfiles#980"
 tags: [spec, tasks, harness, triggers]
