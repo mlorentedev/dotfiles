@@ -111,8 +111,42 @@ optional skill.
   without touching the region.
 - **A region added to `enforced` but missing from a target's `inject` list
   silently misses that surface.** Exactly the producer-updated /
-  consumer-forgotten class that BUG-077 (#969) was. Mitigated by AC5 below:
-  `compile-harness.sh --check` is the test, not a hand count.
+  consumer-forgotten class that BUG-077 (#969) was. The first draft of this
+  section named `compile-harness.sh --check` as the mitigation. **It is not one**
+  — `do_check` renders its `expected` from the target's own `inject` list
+  (`mapfile -t ids < <(target_inject "$file")`), so an id absent from that list
+  is absent from both sides of the diff and the surface reports `OK`. The check
+  is a consistency check, not a coverage check, and this spec's own risk is in
+  its blind spot. AC2 therefore takes positive per-surface evidence instead.
+  That leaves the *class* unguarded for the next region, which is a repo rule
+  violation (`feedback_incident_to_guard`: a bug class encountered emits a CI
+  assertion in the same PR) — resolved as a decision, not silence: see
+  "Coverage guard" below.
+
+### Coverage guard — open decision
+
+Positive per-surface evidence (AC2) proves *this* region reached every surface.
+It does nothing for the next one, and the repo's own rule is that a bug class
+encountered emits an assertion in the same PR. The class here is precise: **the
+harness can verify that an injected region matches its record, and cannot verify
+that a region reached the surfaces it should.** Two ways to close it:
+
+- **(a) Orphan check.** `--check` fails when an `enforced[].id` appears in no
+  `targets[].inject` and not in `doctrine.inject`. ~10 lines, no schema change.
+  Catches a region wired nowhere; misses a region wired to one surface of two —
+  which is the likelier mistake and the one this spec risks.
+- **(b) Declared coverage.** Every `enforced` id must appear in every surface's
+  inject list *unless* the manifest records an explicit opt-out with a reason,
+  which `--check` then reports. Silent omission stops being expressible: you
+  inject, or you write down why not. `pr-sizing` — deliberately doctrine-only —
+  becomes a declared exclusion instead of a convention someone has to know.
+
+**(b) is the right shape**: it converts a coverage question into a schema the
+engine can answer, and it is the only one that catches the partial case. Its
+cost is a manifest-schema change touching all six regions plus a bats case, so
+it is a separate change from "add a region" and is **not** slipped into this PR.
+Pending the user's call: ticket it, or take it here as an agreed scope
+extension.
 
 ## Acceptance criteria
 
@@ -120,11 +154,17 @@ optional skill.
       and is listed in `harness/manifest.json` with an `id` and a `source`.
 - [ ] **AC2** The region is injected into every surface `definition-of-done`
       reaches — both `targets` entries **and `doctrine.inject`**, which carries
-      that region to the agy and codex payloads — verified by
-      `compile-harness.sh --check` passing, not by counting files by hand. If a
-      surface is deliberately excluded, the exclusion is recorded with its
-      reason; `pr-sizing` is the precedent that selective injection is legitimate.
-      The `char_cap` of each doctrine target still holds after the addition.
+      that region to the agy and codex payloads. Evidence is a **positive
+      per-surface grep** for a sentence of the region in each rendered surface,
+      including the two `$HOME` doctrine payloads after `--deploy`. It is **not**
+      `compile-harness.sh --check`: that renders its `expected` from the target's
+      own `inject` list, so a region missing from that list is missing from both
+      sides of the diff and reports `OK`. The check proves the injected text
+      matches its record; it is structurally blind to a surface being skipped —
+      which is the exact risk named below. If a surface is deliberately excluded,
+      the exclusion is recorded with its reason; `pr-sizing` is the precedent
+      that selective injection is legitimate. The `char_cap` of each doctrine
+      target still holds after the addition.
 - [ ] **AC3** The region binds a **disposition**, not a mechanism: its text
       obliges checks and reviewer output to be dispositioned before the change is
       called done, *however the agent learns of them*, and names the timed watch
