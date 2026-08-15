@@ -249,23 +249,28 @@ func (r BWServeReader) Field(item, field string) (string, error) {
 // filters to an EXACT name or id match before accepting a result — a fuzzy
 // hit would silently read the wrong secret.
 //
-// NOTE on the list-endpoint envelope shape: /status, /unlock and /lock were
-// verified empirically against a live bw serve 2026.5.0 (OPS-021 spike,
-// #675). /list/object/items was NOT — no unlocked vault was used in that
-// spike. This assumes bw's envelope wraps the array directly under `data`
-// (call() already unwraps one envelope level); the live verification task in
-// tasks.md confirms or corrects this against a real daemon before archive.
+// The list endpoint wraps its array the same way /status wraps its fields
+// (see bwServeStatusData's doc comment): one extra level, tagged by an
+// "object" field naming the payload shape. Captured live against bw
+// 2026.5.0, 2026-08-15 (the live verification task in tasks.md, second
+// round — /status was the first shape this package got wrong the same way):
+//
+//	{"success":true,"data":{"object":"list","data":[{"id":...,"name":...},...]}}
+type bwServeListData struct {
+	Data []bwServeListItem `json:"data"`
+}
+
 func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
 	data, err := r.Client.call(http.MethodGet, "/list/object/items?search="+url.QueryEscape(item), nil)
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: %w", item, err)
 	}
-	var items []bwServeListItem
-	if err := json.Unmarshal(data, &items); err != nil {
+	var list bwServeListData
+	if err := json.Unmarshal(data, &list); err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: unparseable data: %w", item, err)
 	}
 	var matches []bwServeListItem
-	for _, it := range items {
+	for _, it := range list.Data {
 		if it.Name == item || it.ID == item {
 			matches = append(matches, it)
 		}

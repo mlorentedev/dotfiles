@@ -80,7 +80,9 @@ func (f *fakeBWServe) handler() http.HandlerFunc {
 					out = append(out, map[string]string{"id": id, "name": name})
 				}
 			}
-			writeEnvelope(w, true, "", out)
+			// Real bw serve wraps this under {"object":"list","data":[...]}
+			// (captured live, 2026-08-15) -- same wrapping pattern as /status.
+			writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/object/item/"):
 			id := strings.TrimPrefix(r.URL.Path, "/object/item/")
 			item, ok := f.items[id]
@@ -211,6 +213,38 @@ func TestBWServeClient_Lock(t *testing.T) {
 	st, _ := c.Status()
 	if st != "locked" {
 		t.Fatalf("expected locked after Lock, got %q", st)
+	}
+}
+
+// TestBWServeReader_Field_RealCapturedListResponseShape is a regression test
+// for the second live smoke-test bug (2026-08-15): the raw bytes captured
+// via `curl http://127.0.0.1:8087/list/object/items?search=...` against a
+// real bw 2026.5.0 daemon, wired through an httptest.Server verbatim. The
+// token value is replaced with an obvious placeholder; only the envelope
+// shape matters here, never the captured secret.
+func TestBWServeReader_Field_RealCapturedListResponseShape(t *testing.T) {
+	const listResponse = `{"success":true,"data":{"object":"list","data":[{"type":1,"name":"github-bitacora-pat","favorite":false,"reprompt":0,"id":"07f4de3b-d74a-48f7-a111-b4a6006a2f20","collectionIds":[],"object":"item","folderId":"5f1985f7-9d84-45c1-bd18-b4a60012a18f","fields":[{"type":1,"name":"api-token","value":"REDACTED-not-a-real-token"}],"login":{"uris":[],"fido2Credentials":[],"passwordRevisionDate":null},"passwordHistory":[],"creationDate":"2026-08-14T06:26:36.260Z","revisionDate":"2026-08-14T06:26:36.260Z","attachments":[]}]}}`
+	const itemResponse = `{"success":true,"data":{"type":1,"name":"github-bitacora-pat","id":"07f4de3b-d74a-48f7-a111-b4a6006a2f20","fields":[{"type":1,"name":"api-token","value":"REDACTED-not-a-real-token"}]}}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/list/object/items"):
+			_, _ = w.Write([]byte(listResponse))
+		case strings.HasPrefix(r.URL.Path, "/object/item/"):
+			_, _ = w.Write([]byte(itemResponse))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	r := BWServeReader{Client: BWServeClient{BaseURL: srv.URL}}
+
+	got, err := r.Field("github-bitacora-pat", "api-token")
+	if err != nil {
+		t.Fatalf("Field: %v — the list-endpoint parser regressed to the flat-array-only assumption", err)
+	}
+	if got != "REDACTED-not-a-real-token" {
+		t.Fatalf("got %q, want the placeholder token", got)
 	}
 }
 
