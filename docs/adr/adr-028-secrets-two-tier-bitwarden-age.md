@@ -68,7 +68,7 @@ The authoritative copy of the age private key lives **OFFLINE** (encrypted USB v
 
 Bitwarden personal folders nest by `/` in the name. `dotf secrets`-managed items live in a flat set of purpose folders, kept distinct from the ~125 personal items (which stay where they are) by name rather than by a shared parent:
 
-```
+```text
 apps              # service API keys/tokens the projects consume
 infra             # infrastructure access (servers, k8s, VPN, registries, DNS, CI runners)
 floor             # DR/bootstrap roots — age-key convenience copy, master-pw backup (offline-authoritative)
@@ -93,6 +93,8 @@ Entertainment
 > The planned personal tree (`Finance`, `Travel`, …) becomes a sibling of `apps`/`infra` rather than a peer of the `Dotfiles/` root. That is the real trade accepted here: one flat namespace where names must not collide, instead of two trees that cannot.
 >
 > Migration is not automatic. Renaming the folders in Bitwarden moves the items with them; until that is done, a vault still holding `Dotfiles/apps` keeps resolving every secret correctly and only new items land in the new folders.
+>
+> **Two different sets, easy to conflate — and easier now that the prefix is gone.** The folders that *exist in the vault* are `apps`, `infra`, `floor` (above). The folders a *registry entry may declare* in `bw.folder` are only `apps` and `infra` — `validBWFolders` in `cli/internal/secrets/registry.go` rejects anything else. `floor` is absent because floor secrets are age-only and carry no `bw:` block at all; a personal-plane folder is absent because none is ratified yet (deferred to #586). So "`<plane>` names a vault folder" holds for organizing the vault by hand, and does **not** mean every plane is a legal `bw.folder` value. Before the flattening, `Dotfiles/<plane>` read unmistakably as a vault path; `<plane>` alone reads like a registry value, which is why the distinction is now written down rather than left to a code comment.
 
 ### Item & field naming
 
