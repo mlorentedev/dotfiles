@@ -3,6 +3,8 @@ id: "defense-in-depth"
 type: reference
 status: active
 tags: []
+owner: manu
+created: "2026-06-10"
 ---
 
 # Defense-in-Depth Validation
