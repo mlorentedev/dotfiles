@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.41.0](https://github.com/mlorentedev/dotfiles/compare/v0.40.0...v0.41.0) (2026-08-15)
+
+
+### Features
+
+* **harness:** a PR you open is watched, not abandoned (HARNESS-072-pr-stewardship, [#963](https://github.com/mlorentedev/dotfiles/issues/963)) ([#986](https://github.com/mlorentedev/dotfiles/issues/986)) ([62d2e84](https://github.com/mlorentedev/dotfiles/commit/62d2e84efefbfcdb5fb36bd57f77479a9111dffe))
+* **secrets:** add `dotf secrets rotate` — replace a credential and prove the replacement took ([#1003](https://github.com/mlorentedev/dotfiles/issues/1003)) ([3644847](https://github.com/mlorentedev/dotfiles/commit/36448473dde9b04dc8c8aba439aeedb1ec1b0fab)), closes [#988](https://github.com/mlorentedev/dotfiles/issues/988)
+
+
+### Bug Fixes
+
+* **doctor:** repair the PAT-expiry check and the tagged-union consumers behind it ([#984](https://github.com/mlorentedev/dotfiles/issues/984)) ([6252eba](https://github.com/mlorentedev/dotfiles/commit/6252eba356d8c4c5341e85d24cc4560eefc7417a)), closes [#972](https://github.com/mlorentedev/dotfiles/issues/972)
+* **secrets:** map DOCKERHUB_TOKEN to the scoped PAT, and detect registry/vault drift ([#990](https://github.com/mlorentedev/dotfiles/issues/990)) ([4e559a7](https://github.com/mlorentedev/dotfiles/commit/4e559a7fd592129c98da6822f177b6f05d2b1c8f)), closes [#985](https://github.com/mlorentedev/dotfiles/issues/985)
+* **spec:** stop announcing a review that never started ([#994](https://github.com/mlorentedev/dotfiles/issues/994)) ([6991425](https://github.com/mlorentedev/dotfiles/commit/69914254d31996e58812e6684aee6a92a568dee5)), closes [#989](https://github.com/mlorentedev/dotfiles/issues/989)
+* **spec:** store the review transcript's events, not its streaming frames ([#999](https://github.com/mlorentedev/dotfiles/issues/999)) ([77d7b7e](https://github.com/mlorentedev/dotfiles/commit/77d7b7e44b0bd9c739ed2836d4d5ab3db866f652)), closes [#995](https://github.com/mlorentedev/dotfiles/issues/995)
+
 ## [0.40.0](https://github.com/mlorentedev/dotfiles/compare/v0.39.0...v0.40.0) (2026-08-15)
 
 
