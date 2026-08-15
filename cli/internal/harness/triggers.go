@@ -124,46 +124,72 @@ func MatchGlob(glob, path string) bool {
 	if g == "" || p == "" {
 		return false
 	}
-	if g == p || g == filepath.Base(p) {
+	if g == p {
 		return true
 	}
+
+	// 1. Regex match for full path
 	re, err := globToRegex(g)
-	if err != nil {
-		return false
+	if err == nil && re.MatchString(p) {
+		return true
 	}
-	return re.MatchString(p)
+
+	// 2. If glob has no slash, test against basename and path segments
+	if !strings.Contains(g, "/") {
+		base := filepath.Base(p)
+		if m, _ := filepath.Match(g, base); m {
+			return true
+		}
+		for _, seg := range strings.Split(p, "/") {
+			if m, _ := filepath.Match(g, seg); m {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func globToRegex(glob string) (*regexp.Regexp, error) {
 	var b strings.Builder
 	b.WriteString("^")
-	if !strings.Contains(glob, "/") {
+
+	g := glob
+	if strings.HasPrefix(g, "**/") {
 		b.WriteString("(?:.*/)?")
+		g = strings.TrimPrefix(g, "**/")
 	}
 
-	for i := 0; i < len(glob); i++ {
-		switch c := glob[i]; c {
-		case '*':
-			if i+1 < len(glob) && glob[i+1] == '*' {
-				i++
-				if i+1 < len(glob) && glob[i+1] == '/' {
-					i++
-					b.WriteString("(?:.+/)?")
-				} else {
-					b.WriteString(".*")
+	parts := strings.Split(g, "/")
+	for i, part := range parts {
+		if i > 0 {
+			b.WriteString("/")
+		}
+		if part == "**" {
+			b.WriteString(".*")
+		} else {
+			for j := 0; j < len(part); j++ {
+				switch c := part[j]; c {
+				case '*':
+					b.WriteString("[^/]*")
+				case '?':
+					b.WriteString("[^/]")
+				default:
+					if strings.ContainsRune(`.+()|[]{}^$\\`, rune(c)) {
+						b.WriteByte('\\')
+					}
+					b.WriteByte(c)
 				}
-			} else {
-				b.WriteString("[^/]*")
 			}
-		case '?':
-			b.WriteString("[^/]")
-		default:
-			if strings.ContainsRune(`.+()|[]{}^$\\`, rune(c)) {
-				b.WriteByte('\\')
-			}
-			b.WriteByte(c)
 		}
 	}
 	b.WriteString("$")
-	return regexp.Compile(b.String())
+
+	pattern := b.String()
+	if strings.HasSuffix(pattern, "/.*$") {
+		prefix := strings.TrimSuffix(pattern, "/.*$")
+		pattern = prefix + "(?:/.*)?$"
+	}
+
+	return regexp.Compile(pattern)
 }
