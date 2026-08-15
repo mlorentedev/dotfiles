@@ -66,12 +66,12 @@ The authoritative copy of the age private key lives **OFFLINE** (encrypted USB v
 
 ### Bitwarden folder taxonomy
 
-Bitwarden personal folders nest by `/` in the name. All `dotf secrets`-managed items live under a single `dotfiles/` tree, isolating them from the ~125 personal items (which stay where they are):
+Bitwarden personal folders nest by `/` in the name. `dotf secrets`-managed items live in a flat set of purpose folders, kept distinct from the ~125 personal items (which stay where they are) by name rather than by a shared parent:
 
 ```
-Dotfiles/apps     # service API keys/tokens the projects consume
-Dotfiles/infra    # infrastructure access (servers, k8s, VPN, registries, DNS, CI runners)
-Dotfiles/floor    # DR/bootstrap roots — age-key convenience copy, master-pw backup (offline-authoritative)
+apps              # service API keys/tokens the projects consume
+infra             # infrastructure access (servers, k8s, VPN, registries, DNS, CI runners)
+floor             # DR/bootstrap roots — age-key convenience copy, master-pw backup (offline-authoritative)
 
 # Personal tree (SEPARATE, incremental track — NOT on the dotfiles critical path):
 Finance           # banks, brokers, crypto
@@ -84,7 +84,15 @@ Government & Taxes
 Entertainment
 ```
 
-`dotf secrets` only ever reads/writes under `Dotfiles/**`. The personal tree is curated as a separate, optional, incremental pass and is out of `dotf secrets`' bounds. The whole vault gets a domain taxonomy because a 125-item flat vault is neither auditable nor maintainable — but organizing the personal tree never blocks the dotfiles security work. **Decided:** keep the `Dotfiles/` namespace; **split** the GitHub 8-in-1 item per purpose (#321). Future scale ceiling: move shared secrets to a Bitwarden **Organization + Collections** (ACL + Secrets Manager) if/when agents/CI/team consume them.
+`dotf secrets` only ever reads/writes the folders named above. The personal tree is curated as a separate, optional, incremental pass and is out of `dotf secrets`' bounds. The whole vault gets a domain taxonomy because a 125-item flat vault is neither auditable nor maintainable — but organizing the personal tree never blocks the dotfiles security work. **Decided:** keep the `Dotfiles/` namespace; **split** the GitHub 8-in-1 item per purpose (#321). Future scale ceiling: move shared secrets to a Bitwarden **Organization + Collections** (ACL + Secrets Manager) if/when agents/CI/team consume them.
+
+> **Amendment (2026-08-15): the `Dotfiles/` prefix is dropped — folders are `apps`, `infra`, `floor`.**
+>
+> The namespace half of the decision above is reversed; the GitHub-item split (#321) stands. The prefix bought isolation from the personal items, but that isolation was never load-bearing: `bw.folder` is placement metadata only — item lookup is by unique name and ignores folders entirely — so nothing resolves differently with or without it. What it cost was paid on every read of the registry and every folder name typed by hand, for a distinction the folder names already make on their own.
+>
+> The planned personal tree (`Finance`, `Travel`, …) becomes a sibling of `apps`/`infra` rather than a peer of the `Dotfiles/` root. That is the real trade accepted here: one flat namespace where names must not collide, instead of two trees that cannot.
+>
+> Migration is not automatic. Renaming the folders in Bitwarden moves the items with them; until that is done, a vault still holding `Dotfiles/apps` keeps resolving every secret correctly and only new items land in the new folders.
 
 ### Item & field naming
 
@@ -251,8 +259,8 @@ former M3/M6 blocker dissolves). Global env-var uniqueness falls out for free, s
 The shipped `BWSource` is `{ item, field }` — **no `folder` key** (the §"Registry
 schema" example showed one). Bitwarden resolves an item by **name or id**; the folder is
 organizational metadata, not a lookup key. Items are organized under
-`Dotfiles/{apps,infra,personal,floor}` separately (matching `plane`) — and the taxonomy
-gains **`Dotfiles/personal`** for the personal-plane recovery codes / app-passwords the
+`{apps,infra,personal,floor}` separately (matching `plane`) — and the taxonomy
+gains **`personal`** for the personal-plane recovery codes / app-passwords the
 registry manages (§"folder taxonomy" listed only apps/infra/floor). The implemented
 `expose.env` accepts scalar / list / `{age|field}`-map forms, matching §6's intent.
 

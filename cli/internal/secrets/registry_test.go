@@ -202,18 +202,18 @@ func TestParseRegistry_BwValidation(t *testing.T) {
 
 // TestBWSource_Folder proves the registry parses bw.folder (OPS-028: ADR-028 ratified
 // a folder taxonomy the schema couldn't express) and rejects anything outside the
-// ratified set (Dotfiles/apps, Dotfiles/infra) — floor and personal deliberately have
+// ratified set (apps, infra) — floor and personal deliberately have
 // no folder yet (#586).
 func TestBWSource_Folder(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: apps}, expose: {env: A}}\n"
 	reg, err := ParseRegistry([]byte(yml))
 	if err != nil {
 		t.Fatalf("ParseRegistry: %v", err)
 	}
 	s := reg.Lookup("a")
-	if s == nil || s.BW.Folder != "Dotfiles/apps" {
-		t.Fatalf("secret = %+v, want BW.Folder = Dotfiles/apps", s)
+	if s == nil || s.BW.Folder != "apps" {
+		t.Fatalf("secret = %+v, want BW.Folder = apps", s)
 	}
 }
 
@@ -232,7 +232,7 @@ func TestBWSource_Folder_NoneDeclared(t *testing.T) {
 func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
 	cases := map[string]string{
 		"lowercase (casing must match the ADR, not #951's own transcription typo)": "dotfiles/apps",
-		"unratified folder":   "Dotfiles/personal",
+		"unratified folder":   "personal",
 		"arbitrary free text": "My Random Folder",
 	}
 	for name, folder := range cases {
@@ -254,13 +254,13 @@ func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
 // CREATES an arbitrary Bitwarden folder for it.
 // TestParseRegistry_BwFolder_MustMatchPlane proves a folder from the ratified set
 // still fails validation if it doesn't match the secret's plane — the ratified-set
-// check alone would let an app-plane secret declare Dotfiles/infra (both strings are
+// check alone would let an app-plane secret declare infra (both strings are
 // individually valid) and pass (OPS-028 adversarial review, Minor finding).
 func TestParseRegistry_BwFolder_MustMatchPlane(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: Dotfiles/infra}, expose: {env: A}}\n"
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: infra}, expose: {env: A}}\n"
 	if _, err := ParseRegistry([]byte(yml)); err == nil {
-		t.Error("app-plane secret declaring Dotfiles/infra must fail validation")
+		t.Error("app-plane secret declaring infra must fail validation")
 	}
 }
 
@@ -269,15 +269,15 @@ func TestParseRegistry_BwFolder_MustMatchPlane(t *testing.T) {
 // plane↔folder mismatch must fail, not just one.
 func TestParseRegistry_BwFolder_MustMatchPlane_Symmetric(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: infra, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
+		"  - {id: a, plane: infra, backend: bw, bw: {item: it, field: password, folder: apps}, expose: {env: A}}\n"
 	if _, err := ParseRegistry([]byte(yml)); err == nil {
-		t.Error("infra-plane secret declaring Dotfiles/apps must fail validation")
+		t.Error("infra-plane secret declaring apps must fail validation")
 	}
 }
 
 func TestParseRegistry_BwFolder_ValidatedWhileDormant(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: app, backend: age, age: f, bw: {item: it, field: password, folder: Dotfiles/typo}, expose: {env: A}}\n"
+		"  - {id: a, plane: app, backend: age, age: f, bw: {item: it, field: password, folder: typo}, expose: {env: A}}\n"
 	if _, err := ParseRegistry([]byte(yml)); err == nil {
 		t.Error("dormant (backend: age) bw.folder with an unratified value must still fail validation")
 	}
