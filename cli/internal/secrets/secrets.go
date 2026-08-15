@@ -7,6 +7,8 @@
 package secrets
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"strings"
 )
@@ -85,6 +87,24 @@ func (e Entry) SourceDisplay() string {
 		return e.Item + "/" + e.Field
 	}
 	return e.File
+}
+
+// Fingerprint is a non-reversible short identity for a secret value: the first 12
+// hex characters of its SHA-256. It exists so a caller can prove a value CHANGED
+// without ever printing it — the difference between "the new credential works" and
+// "the credential was actually replaced", which a liveness probe alone cannot tell
+// apart (an unrevoked old credential authenticates just as well).
+//
+// 12 hex characters is 48 bits: far too little to attack a real secret, and far
+// more than enough to distinguish two of them. An empty value fingerprints as
+// "(empty)" rather than the hash of the empty string, so a cleared field is
+// legible instead of looking like just another value.
+func Fingerprint(value string) string {
+	if value == "" {
+		return "(empty)"
+	}
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])[:12]
 }
 
 // expandHome rewrites a leading ~ (or ~/...) to home, leaving other paths intact.

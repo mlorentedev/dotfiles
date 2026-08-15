@@ -230,6 +230,7 @@ awk '/^## Entries$/,0' docs/lessons.md | grep '^### \[' | sed -E 's/^### \[([0-9
 - [2026-08-14] An agent that cannot reach the repo still writes a confident review
 - [2026-08-14] Widening a shared return type is a change to every consumer, and Go's zero values hide the ones you missed
 - [2026-08-15] A check whose precondition the architecture forbids reports SKIP forever, and SKIP reads as nothing-to-check
+- [2026-08-15] Redact at the producer, because the consumer's filter is a guess about a format you have not seen
 - [2026-08-15] A check that cannot fail the way you cite it
 - [2026-08-15] `bw status` answers for the CLI's session, not for the daemon your code actually uses
 
@@ -2403,6 +2404,17 @@ The blast radius was also wider than the one function: because `compile-harness.
 
 **Tags**: `harness`, `verification`, `spec-driven-development`, `ci`
 
+### [2026-08-15] Redact at the producer, because the consumer's filter is a guess about a format you have not seen
+
+**Context**: diagnosing BUG-082 (`bw serve` returning a non-JSON envelope under batch reads) required seeing what the daemon actually replies with, because the client discards the body it fails to parse and reports only the offending character. Earlier probes in the same session had been careful — printing value *lengths*, HTTP status codes, and sha256 fingerprints, never the values themselves — and each of those answered its question without exposing anything.
+
+**Problem**: the diagnostic step dumped raw response bodies through a `sed` redaction filter written against the *expected* shape. The real payload did not match that shape, the filter passed it through unchanged, and twelve full vault item bodies landed in the session transcript: a live DockerHub PAT, a second PAT stored in the `password` field, two plaintext entries from `passwordHistory`, and the item's encryption key. The local files were shredded immediately; the transcript could not be. The credentials had to be revoked and rotated, which is how the rest of the session's work on rotation came to be exercised for real. The redaction was not skipped — it was *present and ineffective*, which is worse, because it produced the confidence of having handled the problem.
+
+**Solution**: extract structure at the producer instead of filtering at the consumer. Every subsequent probe parsed the JSON and emitted only derived facts — field *names*, value *lengths*, 12-hex-character sha256 prefixes — so no code path could emit a secret even if the payload had an unexpected shape. That is also what made the later verification possible at all: comparing fingerprints proved a credential had actually been replaced, which a liveness probe cannot do (an unrevoked old credential authenticates exactly as well as a new one).
+
+**Rule**: never pipe a secret-bearing payload through a redaction filter and print the result. A filter is an assertion about a format you are debugging *precisely because you do not understand it*, and it fails open — the unmatched case is emitted verbatim, silently. Print only values you constructed yourself from parsed fields: a name, a length, a hash prefix, a boolean. When you genuinely need the raw bytes, write them to a 0600 file and inspect them with code that cannot reach stdout. And prefer a fingerprint to a value everywhere it will do — `sha256 | cut -c1-12` is non-reversible, is enough to prove two things differ, and turns "did the rotation work?" from a judgement into a comparison.
+
+**Tags**: `security`, `secrets`, `diagnostics`, `verification`, `incident`
 ### [2026-08-15] `bw status` answers for the CLI's session, not for the daemon your code actually uses
 
 **Context**: every `bw`-backed secret was failing at once — `dotf secrets run -- true` died on `dockerhub`, and `dotf secrets verify` showed a wall of FAILED with `bw serve returned no parseable envelope: invalid character 'I'`. Looking for a single cause behind a mass failure, I ran `bw status`, got `{"status":"locked"}`, and reported the blocker as a locked vault needing the user's master password.
