@@ -3,12 +3,15 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // fixedTestNow is the deterministic clock the default test System reports, so
@@ -80,6 +83,14 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// Default: no daemon running — the common case (nothing has run `dotf
 		// secrets unlock`). Tests exercising the daemon states inject their own.
 		BWServeStatus: func() (string, error) { return "absent", nil },
+		// Default: nothing is provisioned on this box, so PAT resolution reports
+		// the secret absent and the check SKIPs. It mirrors the pre-REFACTOR-012
+		// default (no token in the environment ⇒ SKIP), so full-sweep tests that
+		// do not care about PATs behave as they always did. Tests exercising
+		// resolution inject their own.
+		ResolveSecret: func(e secrets.Entry) (string, error) {
+			return "", fmt.Errorf("%w: %s", secrets.ErrSecretAbsent, e.Var)
+		},
 	}
 }
 
