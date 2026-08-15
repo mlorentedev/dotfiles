@@ -81,9 +81,35 @@ because a fallback never observed doing the job is decoration (#898).
 | Path | Evidence | Clears the bar? |
 |---|---|---|
 | `nan/deepseek-v4-flash` via pi | BUG-074 round 3: a full adversarial review that re-ran the spec's own mutation battery rather than trusting its table, closed six prior Majors, and raised four new Minors (#956) | **yes** |
-| `agy/gemini-3.1-pro-high` via agy | `agy --print --model gemini-3.1-pro-high` answers non-interactively and identifies itself as Gemini 3.1 Pro — the invocation and the pin work | **not yet** — responding is not reviewing |
+| `agy/gemini-3.1-pro-high` via agy | 2026-08-14: a full adversarial review of this spec — `review.md` (verdict FAIL, `reviewed_sha b24e105`) and a 58 KB transcript over 147 steps, running `go test` eight times, carrying the worktree's real HEAD | **yes** |
 
-The second row is deliberately not rounded up. AC7 remains open.
+Both rows now clear the bar, and the second one took four attempts to get there.
+That history is the useful part, because every failure looked like a success:
+
+1. `--print` swallowed `--model` — a session greeting at exit 0.
+2. Detached, agy auto-**denied** every tool call — `{"status":"SUCCESS","response":""}` after 14s.
+3. With permissions granted it ran commands in its own install dir — `git rev-parse`
+   failed, the suite was unreachable, and it wrote a **well-formed all-A PASS**
+   having executed nothing. That artifact would have satisfied a naive reading of
+   AC7, which is why the bar for ticking it is reach rather than existence.
+4. With `--add-dir`, real reach — and a FAIL with findings that reproduce.
+
+A PASS from attempt 3 and a FAIL from attempt 4 are the same shape on disk. Only
+the transcript tells them apart, which is why AC6's transcript is not a nicety.
+
+## Findings from the 2026-08-14 review, and their dispositions
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 1 | Blocker | `poolWasTracked` used `git log -1 -- <file>`, which returns the commit that *deleted* the file, so a formally retired gate blocked every future archive — while the error message instructed exactly that retirement | **Fixed.** Now asks `git ls-tree HEAD`. Reproduced first in a scratch repo (4 commands); guarded by `TestArchiveAllowsAPoolRetiredInACommit`, observed red against the old implementation in isolation |
+| 2 | Major | `gitStaleness` read committed history only, so uncommitted edits to a contract file passed as fresh — the cheapest possible bypass of the gate | **Fixed.** Adds a `git status --porcelain` check scoped to the three contract files. Test written red first; `TestGitStalenessIgnoresUncommittedNonContractFiles` pins the scope so a review's own in-flight artifacts never self-stale |
+| 3 | Minor | `agy`'s `--print` ordering is positionally fragile | **Declined**, with the reviewer's own reasoning: `TestReviewerCommandGivesAgyThePromptAsThePrintValue` already pins the shape, and the reviewer graded it TESTED |
+
+Finding 1 also resolved a contradiction this document carried: the decision below
+says deleting the file disables the check deliberately, while the fail-closed
+branch added later (from CodeRabbit on #959) made deletion permanent breakage.
+Both are now true of different things — absent from HEAD is a recorded decision,
+present in HEAD but gone from the tree is a loss.
 
 ## Decisions made during implementation
 

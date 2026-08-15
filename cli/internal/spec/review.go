@@ -153,6 +153,29 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 		return true, true, fmt.Sprintf("a contract file (%s) changed after reviewed_sha %s",
 			strings.Join(contractFiles, ", "), reviewedSHA)
 	}
+
+	// Committed history is not the whole answer. An uncommitted edit to a
+	// contract file is the same defect — the review no longer describes what is
+	// on disk — and it is the cheaper bypass of the two: get a passing review,
+	// rewrite the acceptance criteria in the working tree, archive. `git log`
+	// cannot see it, and "uncommitted" is exactly the state a spec sits in while
+	// someone edits it.
+	//
+	// Scoped to the contract files, not the spec folder: a review in flight
+	// writes review.md and its transcript into that same folder, so a directory
+	// -wide check would make every review stale by producing its own output.
+	dirty := []string{"-C", repoRoot, "status", "--porcelain", "--"}
+	for _, name := range contractFiles {
+		dirty = append(dirty, filepath.Join("specs", specID, name))
+	}
+	out, err = exec.Command("git", dirty...).Output()
+	if err != nil {
+		return true, true, "could not check the working tree for uncommitted contract changes"
+	}
+	if len(strings.TrimSpace(string(out))) > 0 {
+		return true, true, fmt.Sprintf("a contract file (%s) has uncommitted changes, so the review does not describe what is on disk",
+			strings.Join(contractFiles, ", "))
+	}
 	return false, true, ""
 }
 
