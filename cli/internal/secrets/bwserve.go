@@ -51,8 +51,38 @@ type bwServeEnvelope struct {
 }
 
 // bwServeStatusData is the payload bw serve's /status returns inside data.
+//
+// The real shape, captured live against bw 2026.5.0 (2026-08-15, first live
+// unlock of the daemon this PR added — the OPS-021 spike's earlier probe of
+// this same endpoint was apparently misread, since it never actually drove
+// BWFallbackReader against a live daemon): the status fields are wrapped one
+// level deeper than assumed, under "template":
+//
+//	{"success":true,"data":{"object":"template","template":{"status":"locked",...}}}
+//
+// Parsing only the flat shape silently returned an empty Status with a nil
+// error (valid JSON, just no top-level "status" key) — BWFallbackReader's
+// `st == "unlocked"` check then never matched, so it silently fell back to
+// the CLI shellout on every call, defeating the daemon read path entirely
+// while reporting no error at all. Handling both shapes here, preferring the
+// nested one when present, is the fix — and the reason it stays defensive
+// rather than dropping the flat fallback is that this response shape is
+// undocumented behavior of a third-party CLI, not a contract this package
+// controls.
 type bwServeStatusData struct {
-	Status string `json:"status"` // unauthenticated | locked | unlocked
+	Status   string `json:"status"` // unauthenticated | locked | unlocked
+	Template *struct {
+		Status string `json:"status"`
+	} `json:"template"`
+}
+
+// status returns the actual status value, preferring the "template"-nested
+// shape when present (see bwServeStatusData's doc comment).
+func (d bwServeStatusData) status() string {
+	if d.Template != nil && d.Template.Status != "" {
+		return d.Template.Status
+	}
+	return d.Status
 }
 
 // ErrBWServeUnreachable marks a daemon that did not answer at all (not
@@ -142,7 +172,7 @@ func (c BWServeClient) Status() (string, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return "", fmt.Errorf("GET /status: unparseable data: %w", err)
 	}
-	return st.Status, nil
+	return st.status(), nil
 }
 
 // Unlock POSTs password to the daemon's /unlock endpoint. The password is
