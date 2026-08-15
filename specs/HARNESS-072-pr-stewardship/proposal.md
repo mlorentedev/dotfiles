@@ -123,7 +123,13 @@ optional skill.
   assertion in the same PR) — resolved as a decision, not silence: see
   "Coverage guard" below.
 
-### Coverage guard — open decision
+### Coverage guard — decided: (b), in this PR
+
+Taken here rather than ticketed. `feedback_incident_to_guard` is a recorded MUST
+— a bug class encountered emits its assertion in the *same* PR — and the
+fix-or-ticket escape ("it would break the current change's scope") does not
+apply to a spec still in `draft`, whose own Risks section names the class. See
+AC8. The options weighed were:
 
 Positive per-surface evidence (AC2) proves *this* region reached every surface.
 It does nothing for the next one, and the repo's own rule is that a bug class
@@ -141,12 +147,11 @@ that a region reached the surfaces it should.** Two ways to close it:
   inject, or you write down why not. `pr-sizing` — deliberately doctrine-only —
   becomes a declared exclusion instead of a convention someone has to know.
 
-**(b) is the right shape**: it converts a coverage question into a schema the
-engine can answer, and it is the only one that catches the partial case. Its
-cost is a manifest-schema change touching all six regions plus a bats case, so
-it is a separate change from "add a region" and is **not** slipped into this PR.
-Pending the user's call: ticket it, or take it here as an agreed scope
-extension.
+**(b) shipped.** It converts a coverage question into a schema the engine can
+answer, and it is the only one that catches the partial case. Run against the
+tree as it stood it failed immediately on `pr-sizing` — doctrine-only by a
+deliberate decision argued in #830 and recorded nowhere machine-readable — so
+the guard's first act was to turn a convention into a declaration.
 
 ## Acceptance criteria
 
@@ -183,6 +188,12 @@ extension.
       an agent with no Claude-specific primitives.
 - [ ] **AC7** The vault source and the committed harness records agree —
       `compile-harness.sh --check` reports no drift after `--refresh`.
+- [ ] **AC8** `--check` gains a **coverage** assertion distinct from its region
+      diff: an enforced id absent from a surface fails unless the manifest
+      records an `opt_out` for that surface **with a reason** (an empty reason is
+      still a gap). Proved by a test in which the region diff reports
+      `OK -> TARGET2.md` and coverage reports `GAP` on the same run — the
+      partial case, which an orphan check would pass.
 
 ## References
 
