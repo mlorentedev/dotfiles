@@ -30,6 +30,7 @@ func newSpecCmd() *cobra.Command {
 	cmd.AddCommand(newSpecInitCmd())
 	cmd.AddCommand(newSpecReviewCmd())
 	cmd.AddCommand(newSpecArchiveCmd())
+	cmd.AddCommand(newSpecTranscriptSinkCmd())
 	return cmd
 }
 
@@ -186,7 +187,7 @@ is the only record of how.`,
 
 			launch := argv
 			if useTmux {
-				launch = spec.TmuxWrap(session, repoRoot, argv, transcript)
+				launch = spec.TmuxWrap(session, repoRoot, argv, transcript, transcriptSink(transcript))
 			}
 
 			if dryRun {
@@ -221,6 +222,46 @@ is the only record of how.`,
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it is killed; a stuck run should be noticed, not waited on")
 	return cmd
+}
+
+// newSpecTranscriptSinkCmd is plumbing, not a user command: `spec review` pipes
+// the reviewer into it. Hidden because nobody should need to type it, exposed as
+// a subcommand because the pipeline needs something executable to name.
+func newSpecTranscriptSinkCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "transcript-sink <path>",
+		Short:  "Internal: pass a reviewer stream through, storing only its auditable events",
+		Long: `Read a reviewer's jsonl stream on stdin, write every line to stdout, and
+store only the settled events at <path>.
+
+The live tmux pane wants every frame — the incremental deltas are the visible
+progress. The transcript on disk wants the events, because its purpose is that a
+finished review can be audited. One raw file cannot serve both: a real 25-minute
+review streamed 527 MB, of which 525 MB was the same message re-emitted at every
+growing length (#995).`,
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return spec.SinkTranscript(cmd.InOrStdin(), cmd.OutOrStdout(), args[0])
+		},
+	}
+}
+
+// transcriptSink names the command the reviewer's stdout is piped into.
+//
+// It resolves THIS binary by absolute path rather than trusting `dotf` on PATH:
+// the pipeline runs detached under tmux, and a launcher built from one version
+// handing work to whatever `dotf` a $PATH happens to resolve is how a subcommand
+// that exists here goes missing there. Same binary in, same binary out.
+//
+// If the executable cannot be resolved, an empty sink tells TmuxWrap to fall
+// back to plain `tee` — a huge transcript beats a broken pipeline.
+var transcriptSink = func(transcript string) []string {
+	self, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	return []string{self, "spec", "transcript-sink", transcript}
 }
 
 // confirmLaunched turns "the session was created" into "the reviewer survived
