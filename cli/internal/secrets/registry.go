@@ -166,9 +166,9 @@ func (r *Registry) validate() error {
 		}
 		seen[s.ID] = true
 
-		switch s.Backend {
-		case "age", "age-offline", "bw":
-		default:
+		// ValidBackends is the SSOT for this list; a resolver-coverage test binds
+		// it to the Loader, so a backend accepted here always has somewhere to go.
+		if !slices.Contains(ValidBackends(), s.Backend) {
 			return fmt.Errorf("secret %q: unknown backend %q", s.ID, s.Backend)
 		}
 
@@ -187,11 +187,11 @@ func (r *Registry) validate() error {
 
 		// Each backend must resolve a source for everything it exposes.
 		switch s.Backend {
-		case "age", "age-offline":
+		case BackendAge, BackendAgeOffline:
 			if err := s.checkAgeSources(); err != nil {
 				return err
 			}
-		case "bw":
+		case BackendBW:
 			if err := s.checkBwSources(); err != nil {
 				return err
 			}
@@ -315,7 +315,7 @@ func (r *Registry) Entries(home string) []Entry {
 	var es []Entry
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
-		if s.Backend == "bw" {
+		if s.Backend == BackendBW {
 			es = append(es, s.bwEntries(home)...)
 			continue
 		}
@@ -344,12 +344,13 @@ func parseFileMode(s string) os.FileMode {
 func (s *Secret) ageEntries(home string) []Entry {
 	if s.Expose.File != nil {
 		return []Entry{{
-			Var:     s.Expose.File.Var,
-			Backend: s.Backend,
-			File:    s.Age,
-			IsFile:  true,
-			Dest:    expandHome(s.Expose.File.Path, home),
-			Mode:    parseFileMode(s.Expose.File.Mode),
+			Var:      s.Expose.File.Var,
+			Backend:  s.Backend,
+			File:     s.Age,
+			IsFile:   true,
+			Dest:     expandHome(s.Expose.File.Path, home),
+			Mode:     parseFileMode(s.Expose.File.Mode),
+			Validate: s.Validate,
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))
@@ -358,7 +359,7 @@ func (s *Secret) ageEntries(home string) []Entry {
 		if src == "" {
 			src = s.Age
 		}
-		es = append(es, Entry{Var: v.Name, Backend: s.Backend, File: src})
+		es = append(es, Entry{Var: v.Name, Backend: s.Backend, File: src, Validate: s.Validate})
 	}
 	return es
 }
@@ -372,13 +373,14 @@ func (s *Secret) bwEntries(home string) []Entry {
 	}
 	if s.Expose.File != nil {
 		return []Entry{{
-			Var:     s.Expose.File.Var,
-			Backend: "bw",
-			Item:    item,
-			Field:   topField,
-			IsFile:  true,
-			Dest:    expandHome(s.Expose.File.Path, home),
-			Mode:    parseFileMode(s.Expose.File.Mode),
+			Var:      s.Expose.File.Var,
+			Backend:  BackendBW,
+			Item:     item,
+			Field:    topField,
+			IsFile:   true,
+			Dest:     expandHome(s.Expose.File.Path, home),
+			Mode:     parseFileMode(s.Expose.File.Mode),
+			Validate: s.Validate,
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))
@@ -387,7 +389,7 @@ func (s *Secret) bwEntries(home string) []Entry {
 		if field == "" {
 			field = topField
 		}
-		es = append(es, Entry{Var: v.Name, Backend: "bw", Item: item, Field: field})
+		es = append(es, Entry{Var: v.Name, Backend: BackendBW, Item: item, Field: field, Validate: s.Validate})
 	}
 	return es
 }

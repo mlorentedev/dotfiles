@@ -76,7 +76,7 @@ func (r *Registry) SelectCI(repo string) CISelection {
 			continue
 		}
 		switch {
-		case s.Plane == "floor" || s.Backend == "age-offline":
+		case s.Plane == "floor" || s.Backend == BackendAgeOffline:
 			sel.Skipped = append(sel.Skipped, CISkip{s.ID, "floor/offline secret — never pushed to CI"})
 			continue
 		case s.Expose.File != nil:
@@ -88,7 +88,9 @@ func (r *Registry) SelectCI(repo string) CISelection {
 				sel.Skipped = append(sel.Skipped, CISkip{e.Var, "GITHUB_* prefix is reserved by Actions — rename the var at the workflow"})
 				continue
 			}
-			e.Validate = s.Validate // carry the opt-in liveness-check key to the uploader
+			// Validate arrives on the entry from the flattening itself — it used
+			// to be re-applied here, the only place that carried it, which is why
+			// every other Entries() consumer saw an empty Validate (REFACTOR-012).
 			sel.Upload = append(sel.Upload, e)
 		}
 	}
@@ -98,7 +100,7 @@ func (r *Registry) SelectCI(repo string) CISelection {
 // envEntries flattens a non-file secret to its env entries, dispatching on backend like
 // Registry.Entries (home is irrelevant — env vars never materialize a file).
 func (s *Secret) envEntries() []Entry {
-	if s.Backend == "bw" {
+	if s.Backend == BackendBW {
 		return s.bwEntries("")
 	}
 	return s.ageEntries("")
