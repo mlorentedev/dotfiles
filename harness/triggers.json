@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "triggers": [
+    {
+      "id": "spec-driven-development",
+      "pattern": "pattern-spec-driven-development",
+      "globs": [
+        "specs/**",
+        "**/specs/**"
+      ],
+      "description": "Triggered when modifying specification documents"
+    },
+    {
+      "id": "container-workflow",
+      "pattern": "pattern-container-workflow",
+      "globs": [
+        "Dockerfile*",
+        "**/Dockerfile*",
+        "Containerfile*",
+        "**/Containerfile*",
+        "docker-compose*.yml",
+        "**/docker-compose*.yml",
+        "docker-compose*.yaml",
+        "**/docker-compose*.yaml",
+        "compose.yaml",
+        "**/compose.yaml",
+        "compose.yml",
+        "**/compose.yml"
+      ],
+      "description": "Triggered when modifying container definitions or Dockerfiles"
+    },
+    {
+      "id": "testing-standards",
+      "pattern": "pattern-testing-standards",
+      "globs": [
+        "*test*",
+        "**/*test*",
+        "tests/**",
+        "**/tests/**"
+      ],
+      "description": "Triggered when modifying test files or test suites"
+    },
+    {
+      "id": "git-workflow",
+      "pattern": "pattern-git-workflow",
+      "globs": [
+        ".github/**",
+        ".gitmodules",
+        ".gitattributes",
+        ".gitignore"
+      ],
+      "description": "Triggered when modifying git workflows and configurations"
+    },
+    {
+      "id": "python-cli",
+      "pattern": "pattern-python-cli",
+      "globs": [
+        "pyproject.toml",
+        "setup.py",
+        "requirements*.txt",
+        "uv.lock"
+      ],
+      "description": "Triggered when modifying Python packaging or dependencies"
+    },
+    {
+      "id": "shell-standards",
+      "pattern": "pattern-shell-standards",
+      "globs": [
+        "*.sh",
+        "**/*.sh",
+        "*.bash",
+        "**/*.bash"
+      ],
+      "description": "Triggered when modifying shell scripts"
+    },
+    {
+      "id": "powershell-ascii-only",
+      "pattern": "pattern-powershell-ascii-only",
+      "globs": [
+        "*.ps1",
+        "**/*.ps1",
+        "*.psm1",
+        "**/*.psm1",
+        "*.psd1",
+        "**/*.psd1"
+      ],
+      "description": "Triggered when modifying PowerShell scripts"
+    },
+    {
+      "id": "mcp-tool-design",
+      "pattern": "pattern-mcp-tool-design",
+      "globs": [
+        "mcp-servers.json",
+        "**/mcp/**",
+        "**/mcp_*.py",
+        "**/mcp_*.go"
+      ],
+      "description": "Triggered when modifying MCP server configurations or tools"
+    }
+  ]
+}
