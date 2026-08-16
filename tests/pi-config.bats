@@ -18,8 +18,20 @@ setup() {
     ! grep -qE '"apiKey"[[:space:]]*:[[:space:]]*"sk-' "$PI_MODELS"
 }
 
-@test "ai/pi/models.json uses the {env:NAN_API_KEY} placeholder" {
-    grep -qF '{env:NAN_API_KEY}' "$PI_MODELS"
+@test "ai/pi/models.json uses the \${NAN_API_KEY} placeholder, resolved at runtime" {
+    grep -qF '${NAN_API_KEY}' "$PI_MODELS"
+}
+
+# The regression guard for BUG-081b itself (ADR-034). pi does NOT implement its own
+# {env:...} syntax, so a config carrying that placeholder ships a literal, unresolvable
+# string as the API key -- and pi's preflight reported it as "configured", which is why
+# this shipped broken and looked fine. The value is resolved before pi ever sees it
+# (`dotf secrets run`), so the only correct placeholder is the shell form.
+#
+# This assertion is the inverse of the one it replaced: that test required the broken
+# form and passed for as long as the bug existed.
+@test "ai/pi/models.json carries no {env:...} placeholder pi cannot resolve [BUG-081b]" {
+    ! grep -qF '{env:' "$PI_MODELS"
 }
 
 @test "ai/pi/models.json is valid JSON" {

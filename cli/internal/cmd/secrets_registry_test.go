@@ -533,3 +533,32 @@ func TestSecretsVerify_SeveralDefectsOnOneId(t *testing.T) {
 		t.Errorf("the one valid definition must still resolve:\n%s", out)
 	}
 }
+
+// TestSecretsVerify_TokenThatIsBothADefectIdAndAValidVar is the adversarial review's
+// second Minor (THEORETICAL) on BUG-086, pinned as behaviour rather than left implicit.
+//
+// One token can name two different secrets: a malformed entry whose ID is `SHARED`, and
+// a well-formed entry that EXPOSES a var called `SHARED`. `scopeVerify` matches the
+// first against the defect table and the second through reg.Selector, so both report.
+//
+// That is correct — they are genuinely two secrets and the caller named both — but it
+// was undocumented and untested, which is the reviewer's point. Reporting only one of
+// them would hide a real answer behind a name collision.
+func TestSecretsVerify_TokenThatIsBothADefectIdAndAValidVar(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: SHARED, plane: app, backend: nonsense, age: a, expose: {env: OTHER}}\n"+
+		"  - {id: exposer, plane: app, backend: age, age: b, expose: {env: SHARED}}\n")
+	alwaysResolves(t)
+
+	out, err := runVerify(t, "SHARED")
+
+	if !strings.Contains(out, "registry:") {
+		t.Errorf("the defect whose id is SHARED must be reported:\n%s", out)
+	}
+	if !strings.Contains(out, "OK") || !strings.Contains(out, "SHARED") {
+		t.Errorf("the well-formed secret exposing a var named SHARED must resolve:\n%s", out)
+	}
+	if err == nil {
+		t.Errorf("a defect in scope must still exit non-zero:\n%s", out)
+	}
+}

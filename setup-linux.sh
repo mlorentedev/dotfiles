@@ -829,26 +829,14 @@ fi
 
 ensure_directory "$PI_AGENT_DIR"
 
-PI_MODELS_SRC="$CURRENT_DIR/ai/pi/models.json"
-PI_MODELS_DST="$PI_AGENT_DIR/models.json"
-if [ -f "$PI_MODELS_SRC" ]; then
-    PI_MODELS_TMP=$(mktemp)
-    cp "$PI_MODELS_SRC" "$PI_MODELS_TMP"
-    # Gate on `secrets render` succeeding, not just dotf presence (see opencode block).
-    if command -v dotf >/dev/null 2>&1 && dotf secrets render "$PI_MODELS_TMP"; then
-        : # materialized via dotf secrets render
-    else
-        log_warning "dotf secrets render unavailable; pi models.json deployed with literal {env:VAR} placeholders (resolved at runtime)"
-    fi
-    if [ -f "$PI_MODELS_DST" ] && cmp -s "$PI_MODELS_TMP" "$PI_MODELS_DST"; then
-        log_info "pi models.json already in sync"
-        rm -f "$PI_MODELS_TMP"
-    else
-        mv "$PI_MODELS_TMP" "$PI_MODELS_DST"
-        log_success "Deployed pi models.json (deploy-time secrets) to $PI_MODELS_DST"
-    fi
+# pi's models.json is deployed by `dotf deploy` (CLI-039): one implementation for
+# every OS, replacing the copy that lived here and its twin in setup-windows.ps1.
+# ADR-020 C7 keeps this script on the thin bootstrap; staging, rendering,
+# comparing and installing a config is tooling logic and belongs in the CLI.
+if command -v dotf >/dev/null 2>&1; then
+    dotf deploy pi || log_warning "dotf deploy pi failed -- run it again after setup, or see 'dotf doctor'"
 else
-    log_warning "pi models.json source missing: $PI_MODELS_SRC"
+    log_warning "dotf not on PATH -- skipping pi config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy pi')"
 fi
 
 PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"

@@ -437,3 +437,59 @@ func TestGitStalenessOutsideRepoIsUnknown(t *testing.T) {
 		t.Errorf("outside a work tree the staleness question must be unanswerable")
 	}
 }
+
+// The verdict a reviewer WRITES and the enum the gate MATCHES differ only in
+// case and word separators. HARNESS-072's review recorded "PASS WITH GAPS" with
+// spaces; the gate wanted "PASS-WITH-GAPS", so Blocks() refused the archive over
+// two characters, discarding a six-minute review and a passing verdict.
+//
+// The repo already carries this lesson about the `reviewer:` field. This pins it
+// one field across — and pins the limit too: normalization must not start
+// guessing at intent.
+func TestNormalizeVerdictAcceptsSpellingsNotGuesses(t *testing.T) {
+	accepted := map[string]Verdict{
+		"PASS-WITH-GAPS": VerdictPassWithGaps,
+		"PASS WITH GAPS": VerdictPassWithGaps, // the observed case
+		"pass with gaps": VerdictPassWithGaps,
+		"pass_with_gaps": VerdictPassWithGaps,
+		"  PASS  ":       VerdictPass,
+		"pass":           VerdictPass,
+		"FAIL":           VerdictFail,
+		"fail":           VerdictFail,
+	}
+	for raw, want := range accepted {
+		if got := normalizeVerdict(raw); got != want {
+			t.Errorf("normalizeVerdict(%q) = %q, want %q", raw, got, want)
+		}
+	}
+
+	// Still rejected: these are not the same words differently punctuated, and a
+	// gate that guesses is worse than one that refuses.
+	for _, raw := range []string{"PASSWITHGAPS", "PASSED", "OK", "APPROVED", "PASS WITH GAP"} {
+		v := normalizeVerdict(raw)
+		if !v.Blocks() {
+			t.Errorf("normalizeVerdict(%q) = %q, which does not block — normalization is guessing", raw, v)
+		}
+	}
+}
+
+func TestParseReviewAcceptsASpacedVerdict(t *testing.T) {
+	// End to end through the real parser, on the exact frontmatter the reviewer
+	// produced for HARNESS-072.
+	content := "---\n" +
+		"spec: \"HARNESS-072-pr-stewardship\"\n" +
+		"verdict: \"PASS WITH GAPS\"\n" +
+		"reviewed_sha: \"a9b2063d7440c152a1997c20f5d78ee4b5261998\"\n" +
+		"reviewer: \"nan/deepseek-v4-flash\"\n" +
+		"---\n"
+	r, err := ParseReview(content)
+	if err != nil {
+		t.Fatalf("ParseReview: %v", err)
+	}
+	if r.Verdict != VerdictPassWithGaps {
+		t.Errorf("verdict = %q, want %q", r.Verdict, VerdictPassWithGaps)
+	}
+	if r.Verdict.Blocks() {
+		t.Error("a passing verdict must not block the archive over punctuation")
+	}
+}
