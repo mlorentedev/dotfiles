@@ -343,3 +343,17 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     # refute_grep is the replacement; this keeps the pattern from creeping back.
     refute_grep '^[[:space:]]*![[:space:]]*grep' "$BATS_TEST_FILENAME"
 }
+
+@test "AC7: the workflow tolerates the gate not yet existing on the base branch" {
+    # Chicken-and-egg found in production on #1019: pinning checkout to the base
+    # branch (the fix for a PR being able to edit the gate that judges it) means
+    # the PR which first INTRODUCES the gate checks out a base that lacks it.
+    # The job then died with "No such file or directory" and reported failure
+    # for a gate that simply was not deployed yet.
+    #
+    # Not a hole: a PR cannot remove a file from its own base, so this branch is
+    # only reachable before the first merge.
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    grep -q 'not active on' "$wf"
+    grep -qE 'if \[ ! -x scripts/check-review-attestation.sh \]' "$wf"
+}
