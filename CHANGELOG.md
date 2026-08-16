@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.42.0](https://github.com/mlorentedev/dotfiles/compare/v0.41.0...v0.42.0) (2026-08-16)
+
+
+### Features
+
+* **secrets:** add `dotf secrets probe`, an instrument that cannot print a credential ([#1022](https://github.com/mlorentedev/dotfiles/issues/1022)) ([a2a5760](https://github.com/mlorentedev/dotfiles/commit/a2a57605a9f862fbf17c4a908d9ee10dd413193c)), closes [#1012](https://github.com/mlorentedev/dotfiles/issues/1012)
+* **secrets:** put the DR escrow on the USB, and write down what the backup policy is ([#1000](https://github.com/mlorentedev/dotfiles/issues/1000)) ([#1017](https://github.com/mlorentedev/dotfiles/issues/1017)) ([a8d7eb2](https://github.com/mlorentedev/dotfiles/commit/a8d7eb28c8ab5ce9ef022320c5e4703c3f08ed06))
+
+
+### Bug Fixes
+
+* **doctor:** key DR escrow severity to real exposure, not a flat policy ([#1006](https://github.com/mlorentedev/dotfiles/issues/1006)) ([8053396](https://github.com/mlorentedev/dotfiles/commit/8053396b0c7c7c6c09eb2e48abd51d7200d12cc7)), closes [#997](https://github.com/mlorentedev/dotfiles/issues/997)
+* **secrets:** give the write path the bw serve seam the read path already had ([#1007](https://github.com/mlorentedev/dotfiles/issues/1007)) ([fe2f191](https://github.com/mlorentedev/dotfiles/commit/fe2f19136dc91e90dc2bab88bf8c7f04467fc7c1)), closes [#993](https://github.com/mlorentedev/dotfiles/issues/993)
+* **secrets:** let verify report a broken registry instead of dying on it ([#1020](https://github.com/mlorentedev/dotfiles/issues/1020)) ([718c895](https://github.com/mlorentedev/dotfiles/commit/718c8958b7626763b8999d1d1a3e8f467098fc67)), closes [#1004](https://github.com/mlorentedev/dotfiles/issues/1004)
+* **secrets:** stop probing /status, which poisons the daemon's item reads ([#1018](https://github.com/mlorentedev/dotfiles/issues/1018)) ([e66120f](https://github.com/mlorentedev/dotfiles/commit/e66120f17e34084c02e3a44c9c7b4ce73c575e1a)), closes [#988](https://github.com/mlorentedev/dotfiles/issues/988)
+* **spec:** stop the archive gate from refusing its own review's output ([#1009](https://github.com/mlorentedev/dotfiles/issues/1009)) ([bb3b75d](https://github.com/mlorentedev/dotfiles/commit/bb3b75dc37e746f664849bb9acad12434c7cdf10))
+
 ## [0.41.0](https://github.com/mlorentedev/dotfiles/compare/v0.40.0...v0.41.0) (2026-08-15)
 
 
