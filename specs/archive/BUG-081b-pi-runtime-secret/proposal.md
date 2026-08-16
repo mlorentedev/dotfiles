@@ -1,7 +1,7 @@
 ---
 id: "BUG-081b-pi-runtime-secret"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-16"
 issue: "mlorentedev/dotfiles#987"
 tags: [spec, proposal, secrets, pi, security]
