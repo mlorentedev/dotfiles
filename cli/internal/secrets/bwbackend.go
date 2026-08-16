@@ -3,6 +3,7 @@ package secrets
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -43,18 +44,6 @@ type BWBackend struct {
 	Daemon bool
 }
 
-// SelectBWBackend probes the daemon ONCE and returns a matched pair.
-//
-// The daemon is chosen only when it is both reachable and unlocked. Anything else —
-// not running, running but locked, unreachable — selects the CLI shellout, which is
-// still the correct choice: an operator with an ambient BW_SESSION can work that way,
-// and it is the only backend that can export (see BWExport).
-//
-// When the shellout is selected, its errors are decorated with the remediation implied
-// by the daemon state observed HERE, at selection time. That is the difference between
-// "Vault is locked." — which sends the operator to `bw unlock`, a command that prints a
-// session key to a shell nobody is reading and does not fix the failure — and an error
-// naming `dotf secrets unlock`, which does.
 // BWSyncer refreshes the local cache a backend answers reads from. Both backends have
 // one and they are NOT interchangeable: the daemon caches independently of the `bw`
 // CLI, so syncing one leaves the other stale. Which is why it is pinned alongside the
@@ -80,10 +69,21 @@ func (s BWCLISync) Sync() error {
 	return nil
 }
 
+// SelectBWBackend probes the daemon ONCE and returns a matched pair.
+//
+// The daemon is chosen only when it is reachable AND willing to serve a read. Anything
+// else — not running, locked, refusing — selects the CLI shellout, which is still the
+// correct choice: an operator with an ambient BW_SESSION can work that way, and it is
+// the only backend that can export (see BWExport).
+//
+// When the shellout is selected, its errors are decorated with the remediation implied
+// by the daemon state observed HERE, at selection time. That is the difference between
+// "Vault is locked." — which sends the operator to `bw unlock`, a command that prints a
+// session key to a shell nobody is reading and does not fix the failure — and an error
+// naming `dotf secrets unlock`, which does.
 func SelectBWBackend(c BWServeClient) BWBackend {
-	st, err := c.Status()
-	switch {
-	case err == nil && st == "unlocked":
+	switch state, err := c.probeReadable(); state {
+	case bwServeReady:
 		return BWBackend{
 			Reader: BWServeReader{Client: c},
 			Writer: BWServeWriter{Client: c},
@@ -91,13 +91,57 @@ func SelectBWBackend(c BWServeClient) BWBackend {
 			Name:   "bw serve daemon",
 			Daemon: true,
 		}
-	case err == nil:
-		// Reachable but not unlocked ("locked", "unauthenticated", ...). The daemon
-		// exists, so the remediation is to unlock the one already running.
-		return shelloutBackend(fmt.Sprintf("the bw serve daemon is running but %s", st))
+	case bwServeRefused:
+		// Reachable but it will not serve reads — locked, or not authenticated. The
+		// daemon exists, so the remediation is to unlock the one already running.
+		_ = err
+		return shelloutBackend("the bw serve daemon is running but will not serve reads (locked?)")
 	default:
 		return shelloutBackend("no bw serve daemon is running")
 	}
+}
+
+// bwServeReadable is what selection actually needs to know: not the daemon's declared
+// lock state, but whether it will serve a read.
+type bwServeReadable int
+
+const (
+	bwServeUnreachable bwServeReadable = iota // nothing listening
+	bwServeRefused                            // answered, but refused to serve
+	bwServeReady                              // answered and served
+)
+
+// probeReadable reports whether the daemon will serve reads, deliberately WITHOUT
+// calling GET /status.
+//
+// `GET /status` poisons this daemon (BUG-082, #988): for roughly half a second after
+// one, every `GET /object/item/<id>` returns HTTP 500. Measured deterministically —
+// 0/10 item reads fail before a status call, 10/10 immediately after — and it is the
+// upstream `switchMap`/`ReplaySubject` disposal race in bitwarden/clients#20951, for
+// which `/status` turns out to be a reliable trigger rather than the "load" the
+// upstream report describes. Confirmed against CLI 2026.5.0, which that issue does not
+// yet list as affected.
+//
+// This is why the old code could not work: the status probe was the last thing to run
+// before the read it was authorising, so it broke exactly the call it was clearing.
+//
+// `GET /list/object/folders` was measured clean (0/10 after, same as `/sync` and
+// `/list/object/items?search=`). It is also a better question to ask: "will you serve a
+// read?" is what the caller needs, where a status string is a claim about a different
+// subject. And it carries no secret material — folder ids and names only, never an
+// item body — so it is safe as a routine probe in a way `/object/item/<id>` is not.
+//
+// Any answer other than a clean success selects the shellout, which is the safe
+// default: it is the backend that works with an ambient BW_SESSION and the only one
+// that can export.
+func (c BWServeClient) probeReadable() (bwServeReadable, error) {
+	if _, err := c.call(http.MethodGet, "/list/object/folders", nil); err != nil {
+		if errors.Is(err, ErrBWServeUnreachable) {
+			return bwServeUnreachable, err
+		}
+		return bwServeRefused, err
+	}
+	return bwServeReady, nil
 }
 
 // shelloutBackend builds the CLI-backed pair, decorating both halves with why the
