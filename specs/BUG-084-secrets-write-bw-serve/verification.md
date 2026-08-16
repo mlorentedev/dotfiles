@@ -9,8 +9,8 @@ created: "2026-08-15"
 
 | AC | Claim | Proof |
 |---|---|---|
-| AC1 | `set` succeeds against an unlocked daemon with no `BW_SESSION`, existing item | `TestBWServeWriter_SetField_UpdatesAndPreserves`, `TestBWServeWriter_SetField_MatchesBWPutShape` — **live canary write still pending** (see Gaps) |
-| AC2 | same for a new item, incl. folder resolution | `TestBWServeWriter_CreateItem_SendsRawJSON`, `TestBWServeWriter_ResolveFolder` — **live canary write still pending** |
+| AC1 | `set` succeeds against an unlocked daemon with no `BW_SESSION`, existing item | `TestBWServeWriter_SetField_UpdatesAndPreserves`, `..._MatchesBWPutShape`, **+ live: `TestLiveBWServeWriter_CanaryRoundTrip`** |
+| AC2 | same for a new item, incl. folder resolution | `TestBWServeWriter_CreateItem_SendsRawJSON`, `..._ResolveFolder`, **+ live (same test)** |
 | AC3 | no daemon + no session names `dotf secrets unlock` | `TestSelectBWBackend_ShelloutNamesTheRealRemediation`, `TestSelectBWBackend_ShelloutHalvesBothDecorate` |
 | AC4 | `backup` names the `BW_SESSION` form and says why | `TestExportLockHint_NamesTheOnlyInvocationThatWorks` + live capture below |
 | AC5 | read, write **and sync** agree on backend | `TestSelectBWBackend_ReadAndWriteAlwaysAgree`, `TestSelectBWBackend_ProbesOnce`, mutation-checked |
@@ -78,13 +78,52 @@ Restored, suite green again.
 - No regressions: the existing `internal/cmd` suite passes unchanged, including the
   tests that inject `bwReader` / `bwWriter` directly — both remain test seams.
 
+### AC1/AC2 closed by a live canary — which found a defect no fake had
+
+Operator-authorized, run against the real unlocked daemon with `BW_SESSION` unset. The
+test creates its own throwaway item, compares only fingerprints, and deletes it:
+
+```
+$ env -u BW_SESSION DOTF_LIVE_BW=1 go test ./internal/secrets/ -run TestLiveBWServeWriter -v
+    resolved folder apps -> id present: true
+    AC2 create: fingerprint 189dea85d0fc
+    AC1 update: 189dea85d0fc -> 41021d0caee6
+    sibling preserved: password still 41021d0caee6 after writing CANARY_FIELD
+    cleaned up canary item dotf-canary-bug084-1786839835
+--- PASS
+```
+
+**Its first run FAILED**, and that is the point of having run it:
+
+```
+    AC2 create: fingerprint 7060b0a2a2c3
+    updated value fingerprint mismatch: got 7060b0a2a2c3, want 67c2cd6b084e
+```
+
+The read-back returned the value from *before* the write. A daemon `PUT` updates the
+server but the daemon keeps answering reads from its own cache, so the written value was
+invisible — and the stale cache lives in the daemon, not the client, so every later
+process saw the old value too.
+
+The sharpest consequence is not a stale read. `dotf secrets set` reads *before* writing
+to choose unchanged-vs-update-vs-create; against a stale cache an item that exists can
+look absent, and the create path would then add a **duplicate** — the same class of
+mistake #612 guards against when it refuses to treat a locked vault as an absent item.
+
+Fixed by `syncAfterWrite` on both `SetField` and `CreateItem`, and the live test now
+passes with **no explicit sync of its own**. A failed sync is reported as "written
+successfully, but…" rather than as a failed write, because re-running a write that
+already landed is exactly how the duplicate gets created.
+
+This is the entry that justifies AC6's insistence on live verification: three fakes and
+a full unit suite were green while the write was invisible in production.
+
 ## Gaps (stated, not hidden)
 
-- **AC1/AC2 have no live write yet.** They are proven against an httptest double of the
-  daemon, not against Bitwarden. Closing them means writing to a real vault item, which
-  is an operator decision, not an agent's — deliberately left for explicit authorization
-  rather than performed unilaterally. The repo convention for this is the canary item
-  (#612 C8).
+- **Windows daemon lifecycle is unverified**, per the precedent set by
+  CLI-024-secrets-bw-serve. Cross-platform by construction, exercised on Linux only.
+- **The live canary is opt-in and not in CI** (`DOTF_LIVE_BW=1`), because CI has no
+  unlocked vault. It is a smoke test an operator runs, not a gate.
 
 ## Decisions made during implementation
 

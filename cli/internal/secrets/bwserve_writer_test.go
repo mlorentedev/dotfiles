@@ -203,3 +203,63 @@ func TestBWServeWriter_SatisfiesWriteClient(t *testing.T) {
 	var _ BWWriteClient = BWServeWriter{}
 	var _ BWWriteClient = BWPut{}
 }
+
+// TestBWServeWriter_SyncsAfterWrite is the guard for the defect the live canary found,
+// which no fake had caught: a daemon PUT/POST updates the server, but the daemon keeps
+// answering reads from its own cache. Without a follow-up sync the value just written is
+// invisible — to this process and to every later one, because the stale cache lives in
+// the daemon, not the client.
+//
+// The sharpest consequence is not a stale read: `set` reads BEFORE writing to choose
+// unchanged-vs-update-vs-create, so against a stale cache an existing item can look
+// absent and the create path adds a DUPLICATE.
+func TestBWServeWriter_SyncsAfterWrite(t *testing.T) {
+	t.Run("SetField syncs", func(t *testing.T) {
+		f, w, closeSrv := newWriterFake(t)
+		defer closeSrv()
+		if err := w.SetField("dockerhub", "password", "v"); err != nil {
+			t.Fatalf("SetField: %v", err)
+		}
+		if f.syncs != 1 {
+			t.Fatalf("syncs = %d, want 1 — an unsynced write is invisible to reads", f.syncs)
+		}
+	})
+
+	t.Run("CreateItem syncs", func(t *testing.T) {
+		f, w, closeSrv := newWriterFake(t)
+		defer closeSrv()
+		if err := w.CreateItem("brand-new", "password", "v", ""); err != nil {
+			t.Fatalf("CreateItem: %v", err)
+		}
+		if f.syncs != 1 {
+			t.Fatalf("syncs = %d, want 1 — an unsynced create is invisible, so a retry duplicates it", f.syncs)
+		}
+	})
+
+	// A failed sync must not read as a failed write. The operator's next move differs
+	// completely: re-running a write that already landed is how duplicates happen.
+	t.Run("a failed sync reports that the write DID land", func(t *testing.T) {
+		f, w, closeSrv := newWriterFake(t)
+		defer closeSrv()
+		f.failSync = true
+
+		err := w.SetField("dockerhub", "password", "v")
+		if err == nil {
+			t.Fatal("a failed sync must be reported, not swallowed")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "WRITTEN successfully") {
+			t.Fatalf("error must state the write landed, got: %s", msg)
+		}
+		if !strings.Contains(msg, "do NOT re-run") {
+			t.Fatalf("error must warn against re-running the write, got: %s", msg)
+		}
+		// The write really did land, despite the error.
+		var got map[string]any
+		_ = json.Unmarshal(f.items["item-id-1"], &got)
+		login, _ := got["login"].(map[string]any)
+		if login["password"] != "v" {
+			t.Fatalf("the write should have landed before the sync failed, got %v", login["password"])
+		}
+	})
+}

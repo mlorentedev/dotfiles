@@ -53,6 +53,12 @@ type fakeBWServe struct {
 	// nextID is the id handed to the next created item/folder; "" -> "generated".
 	nextID string
 
+	// syncs counts POST /sync, so a test can assert a write made itself visible.
+	syncs int
+
+	// failSync makes POST /sync report failure, exercising the written-but-stale path.
+	failSync bool
+
 	unlockPassword string // "" -> any password succeeds
 	failUnlock     bool
 }
@@ -80,6 +86,13 @@ func (f *fakeBWServe) handler() http.HandlerFunc {
 				return
 			}
 			f.status = "unlocked"
+			writeEnvelope(w, true, "", nil)
+		case r.Method == http.MethodPost && r.URL.Path == "/sync":
+			f.syncs++
+			if f.failSync {
+				writeEnvelope(w, false, "Failed to sync.", nil)
+				return
+			}
 			writeEnvelope(w, true, "", nil)
 		case r.Method == http.MethodPost && r.URL.Path == "/lock":
 			f.status = "locked"

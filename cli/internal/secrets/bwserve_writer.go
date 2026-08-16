@@ -85,6 +85,32 @@ func (w BWServeWriter) SetField(item, field, value string) error {
 	if _, err := w.Client.call(http.MethodPut, "/object/item/"+url.PathEscape(id), json.RawMessage(updated)); err != nil {
 		return fmt.Errorf("bw serve edit item %q: %w", item, err)
 	}
+	return w.syncAfterWrite(item)
+}
+
+// syncAfterWrite makes a completed write visible to reads.
+//
+// This is not an optimisation, it is a correctness requirement, and it was found by the
+// live canary rather than by any fake: a daemon PUT updates the server, but the daemon
+// keeps answering reads from its own cache, so without this the value written is
+// invisible — to this process and to every later one, since the stale cache lives in the
+// daemon, not in the client. The canary caught it as a read-back returning the previous
+// fingerprint.
+//
+// The consequence is worse than a stale read. `dotf secrets set` reads BEFORE writing to
+// decide unchanged-vs-update-vs-create; against a stale cache an item that exists can
+// look absent, and the create path would then add a DUPLICATE item — the same class of
+// mistake #612 guards against when it refuses to treat a locked vault as an absent one.
+//
+// A sync failure is reported rather than swallowed, and the message states plainly that
+// the write itself succeeded: the operator must not re-run a write that already landed,
+// and must know that reads are stale until the vault syncs.
+func (w BWServeWriter) syncAfterWrite(item string) error {
+	if err := w.Client.Sync(); err != nil {
+		return fmt.Errorf("%q was WRITTEN successfully, but the follow-up sync failed, so "+
+			"reads will keep serving the previous value until the daemon syncs "+
+			"(do NOT re-run the write; run `dotf secrets unlock` or retry the sync): %w", item, err)
+	}
 	return nil
 }
 
@@ -99,7 +125,10 @@ func (w BWServeWriter) CreateItem(item, field, value, folderID string) error {
 	if _, err := w.Client.call(http.MethodPost, "/object/item", json.RawMessage(body)); err != nil {
 		return fmt.Errorf("bw serve create item %q: %w", item, err)
 	}
-	return nil
+	// Same staleness rule as SetField, and it bites harder here: an unsynced create
+	// leaves the new item invisible to the very next lookup, so a retry would create
+	// it a SECOND time.
+	return w.syncAfterWrite(item)
 }
 
 // ResolveFolder returns the id of the folder named name, creating it when absent.
