@@ -155,9 +155,9 @@ the guard's first act was to turn a convention into a declaration.
 
 ## Acceptance criteria
 
-- [ ] **AC1** An `enforced` region exists, sourced from a vault pattern section,
+- [x] **AC1** An `enforced` region exists, sourced from a vault pattern section,
       and is listed in `harness/manifest.json` with an `id` and a `source`.
-- [ ] **AC2** The region is injected into every surface `definition-of-done`
+- [x] **AC2** The region is injected into every surface `definition-of-done`
       reaches — both `targets` entries **and `doctrine.inject`**, which carries
       that region to the agy and codex payloads. Evidence is a **positive
       per-surface grep** for a sentence of the region in each rendered surface,
@@ -170,25 +170,25 @@ the guard's first act was to turn a convention into a declaration.
       the exclusion is recorded with its reason; `pr-sizing` is the precedent
       that selective injection is legitimate. The `char_cap` of each doctrine
       target still holds after the addition.
-- [ ] **AC3** The region binds a **disposition**, not a mechanism: its text
+- [x] **AC3** The region binds a **disposition**, not a mechanism: its text
       obliges checks and reviewer output to be dispositioned before the change is
       called done, *however the agent learns of them*, and names the timed watch
       only as the default when a project offers no signal of its own. A project
       instruction covering the same ground overrides the mechanism without
       contradicting the region.
-- [ ] **AC4** The adversarial-review obligation fires at the **archive gate** —
+- [x] **AC4** The adversarial-review obligation fires at the **archive gate** —
       the trigger `adversarial-review` already owns — and the region introduces
       no broader one. Concretely: the text must not make "the PR touches
       `specs/<id>/`" a trigger.
-- [ ] **AC5** The region's text states that a reviewer-bot notice reporting that
+- [x] **AC5** The region's text states that a reviewer-bot notice reporting that
       no review ran (rate limit, quota) leaves the PR **unreviewed**, and that
       proceeding requires saying so out loud.
-- [ ] **AC6** `pr-review-triage`'s trigger and end condition cover the reviewer
+- [x] **AC6** `pr-review-triage`'s trigger and end condition cover the reviewer
       bot, not only CI, and the wait is expressed with `gh` commands runnable by
       an agent with no Claude-specific primitives.
-- [ ] **AC7** The vault source and the committed harness records agree —
+- [x] **AC7** The vault source and the committed harness records agree —
       `compile-harness.sh --check` reports no drift after `--refresh`.
-- [ ] **AC8** `--check` gains a **coverage** assertion distinct from its region
+- [x] **AC8** `--check` gains a **coverage** assertion distinct from its region
       diff: an enforced id absent from a surface fails unless the manifest
       records an `opt_out` for that surface **with a reason** (an empty reason is
       still a gap). Proved by a test in which the region diff reports
