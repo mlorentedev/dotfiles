@@ -1,0 +1,3 @@
+{"number":10,"state":"OPEN","author":{"login":"mlorentedev"},"labels":[],"body":"body",
+ "comments":[{"author":{"login":"pr-agent"},"body":"<!-- pr-agent: provider unavailable, review not performed -->"}],
+ "reviews":[]}

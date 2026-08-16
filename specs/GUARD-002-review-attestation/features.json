@@ -43,8 +43,8 @@
   },
   {
     "id": "GUARD-002-review-attestation-f7",
-    "behavior": "AC7 — the gate runs on pull_request AND issue_comment, so a review landing after the checks settled re-runs it with no push. Without the issue_comment trigger the gate would answer at the one moment the answer is always 'pending', which is the timing half of the same bug.",
-    "verification": "yq -e '.on | has(\"pull_request\") and has(\"issue_comment\")' .github/workflows/review-attestation.yml >/dev/null 2>&1 || python3 -c \"import sys,yaml; d=yaml.safe_load(open('.github/workflows/review-attestation.yml'))['on']; sys.exit(0 if 'pull_request' in d and 'issue_comment' in d else 1)\"",
+    "behavior": "AC7 — the gate runs on pull_request AND issue_comment, so a review landing after the checks settled re-runs it with no push. Without issue_comment the gate would only ever answer at the one moment the answer is always 'pending', which is the timing half of the same bug. Paired with an assertion that the step is not continue-on-error, since a gate that decides 'not reviewed' and then reports green would rebuild the defect. The bats case also survives a parser trap worth recording: YAML 1.1 reads the bare key 'on:' as the BOOLEAN true, so a naive d['on'] raises KeyError against every GitHub workflow ever written.",
+    "verification": "bats tests/check-review-attestation.bats -f 'AC7'",
     "state": "pending",
     "evidence": ""
   }

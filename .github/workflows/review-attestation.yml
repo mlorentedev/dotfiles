@@ -1,0 +1,62 @@
+name: review-attestation
+
+# GUARD-002 (#906): make a green check mean *reviewed*.
+#
+# On 2026-08-16 three PRs (#1007, #1009, #1013) each carried a CodeRabbit
+# comment saying no review had started, zero entries in reviews[], and a
+# `CodeRabbit  pass` line in `gh pr checks`. The only mechanical signal
+# available asserted the opposite of the truth. This job adds an honest one
+# beside it — it cannot change the vendor's own check status.
+#
+# NOT `required` in branch protection, deliberately and for now: landing it as
+# required would block every open PR the moment it merges. Adopt, observe,
+# promote separately.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+    branches: [main]
+  # The load-bearing trigger. A reviewer usually lands AFTER the checks have
+  # settled, which is the one moment the answer is always "pending" — asking
+  # only at `pull_request` time would guarantee the least useful answer. A new
+  # comment is exactly the event that can flip the verdict, so the gate settles
+  # by itself without anyone pushing.
+  issue_comment:
+    types: [created, edited]
+
+concurrency:
+  # Same reasoning as spec-gate.yml (BUG-066): metadata-only events must not
+  # cancel a run in flight. Applying this gate's escape takes TWO changes — the
+  # label and the body section — which fire `labeled` and `edited` within the
+  # same second, and under an unconditional cancel they raced into cancelling
+  # each other, leaving a stale failure as the visible check.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: ${{ !contains(fromJSON('["labeled", "unlabeled", "edited", "created"]'), github.event.action) }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  attestation:
+    # issue_comment fires on issues too; only pull requests have a review state
+    # to attest to.
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check review attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Through `env:` and quoted at the use site, never interpolated into
+          # the run: body. Both fields are integers minted by GitHub rather than
+          # attacker-supplied text, so this is belt-and-braces — but the habit is
+          # what keeps a future edit from reaching for `.title` or `.body` the
+          # same way and meaning it.
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        # No `continue-on-error`: a red check here is the entire product. The
+        # script itself distinguishes 1 (not reviewed, and not declared) from 2
+        # (could not determine), and both are failures — "could not determine"
+        # rendering as green is the bug this exists to end.
+        run: scripts/check-review-attestation.sh --pr "$PR_NUMBER"

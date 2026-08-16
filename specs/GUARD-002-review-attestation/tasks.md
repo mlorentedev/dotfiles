@@ -11,7 +11,7 @@ created: "2026-08-16"
 
 - [x] Branch created from main: `feat/review-attestation-gate`
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions" — the
+- [x] No open questions left in `proposal.md` "Risks / open questions" — the
       `pending` exit-code question is explicitly **deferred**, not open: the
       message names the state and no caller branches on it in v1
 
@@ -28,33 +28,33 @@ artifact nobody can reproduce on demand once the quota resets.
       Banked rather than re-fetched on demand: the comments do persist on closed
       PRs, but a fixture is the only form of this evidence that survives the
       vendor changing its output
-- [ ] [AC1] Derive minimal, hand-checkable fixtures from the raw captures (one
+- [x] [AC1] Derive minimal, hand-checkable fixtures from the raw captures (one
       per state), plus a real-review and a human-review payload
-- [ ] [AC5] Declare reviewers in a config file (login + the marker identifying its
+- [x] [AC5] Declare reviewers in a config file (login + the marker identifying its
       "could not review" notice), CodeRabbit as the first entry, with a comment
       naming #786 as the intended second
-- [ ] [AC1] [AC2] [AC3] `scripts/check-review-attestation.sh`: classify
+- [x] [AC1] [AC2] [AC3] `scripts/check-review-attestation.sh`: classify
       `attested | declined | pending` from a PR JSON payload, offline, reading the
       reviewer list from config. Observe each state red before making it green
-- [ ] [AC6] Fail closed on unreadable input — no `gh`, unauthenticated, malformed
+- [x] [AC6] Fail closed on unreadable input — no `gh`, unauthenticated, malformed
       JSON, empty response. Assert with a test that feeds each shape
-- [ ] [AC4] The declared escape: `merged-unreviewed` label **and** a non-empty
+- [x] [AC4] The declared escape: `merged-unreviewed` label **and** a non-empty
       `## Unreviewed merge rationale` body section. Three negative tests (label
       only, section only, empty section) before the positive one
-- [ ] [AC7] Thin CI caller on `pull_request` + `issue_comment`, mirroring
+- [x] [AC7] Thin CI caller on `pull_request` + `issue_comment`, mirroring
       `spec-gate.yml`'s shape, non-required in branch protection
 - [ ] Report the gate's own state on this PR, as the first real exercise
 
 ## Closing
 
-- [ ] Every acceptance criterion is covered by at least one feature with a
+- [x] Every acceptance criterion is covered by at least one feature with a
       non-vacuous verification command
-- [ ] Every acceptance criterion has a matching entry in `features.json`
-- [ ] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
-- [ ] Tests pass (`bats tests/check-review-attestation.bats`)
-- [ ] Non-vacuity measured, not assumed: each classifier branch observed failing
+- [x] Every acceptance criterion has a matching entry in `features.json`
+- [x] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
+- [x] Tests pass (`bats tests/check-review-attestation.bats`)
+- [x] Non-vacuity measured, not assumed: each classifier branch observed failing
       under a mutation before it was made to pass
-- [ ] `verification.md` filled in
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review GUARD-002-review-attestation`)
 

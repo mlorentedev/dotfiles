@@ -1,0 +1,46 @@
+{
+  "$comment": [
+    "Reviewer registry for the review-attestation gate (GUARD-002, #906).",
+    "",
+    "The gate asks ONE question: did a review actually happen? It never asks who",
+    "performed it or how good it was. A human review attests exactly as well as a",
+    "bot's.",
+    "",
+    "This file exists so that answering that question does not require a code",
+    "change when the reviewer changes. #786 (TOOL-013) replaces CodeRabbit with",
+    "PR-Agent on NaN inference; that migration should be an entry below, not a",
+    "rewrite of the classifier. Building the gate BEFORE #786 is deliberate:",
+    "#786's own acceptance criterion is 'a provider failure degrading the review",
+    "rather than blocking the PR', which is the same silent green this gate",
+    "exists to end — a replacement reviewer inherits the blind spot otherwise.",
+    "",
+    "`declined_markers` are the strings identifying a reviewer's 'I could not",
+    "review' notice. Matched as HTML comment markers rather than prose because",
+    "prose is translated, reworded and A/B tested, while the marker is machine",
+    "output. If a vendor changes it, the affected PR reads `pending` instead of",
+    "`declined` — still red, so marker drift degrades the MESSAGE and never the",
+    "verdict.",
+    "",
+    "Note what is NOT here: any notion of which models may review. That policy",
+    "lives in harness/reviewer-pool.json and governs the SPEC-level adversarial",
+    "review, a different gate with a different purpose. The two are deliberately",
+    "not merged here — but see #786, which currently proposes qwen3.6 as a",
+    "fallback reviewer while reviewer-pool.json excludes it by name, on the",
+    "grounds that 'a reviewer that PASSes cheaply is worse than no gate'. That",
+    "contradiction needs one owner; it is flagged on #786, not decided here."
+  ],
+  "reviewers": [
+    {
+      "login": "coderabbitai",
+      "declined_markers": [
+        "rate limited by coderabbit.ai"
+      ],
+      "why": "Free tier, ~1 review/hour account-wide. On 2026-08-16 PRs #1007, #1009 and #1013 each carried this notice simultaneously, with zero reviews between them, while `gh pr checks` reported `CodeRabbit  pass`. Neither pushing new commits nor an explicit `@coderabbitai review` reclaims a slot while the quota is spent — measured, both."
+    }
+  ],
+  "escape": {
+    "label": "merged-unreviewed",
+    "section": "## Unreviewed merge rationale",
+    "why": "Both are required, never one. Same shape as spec-gate's skip-sdd escape, chosen because it is already understood here and because it forces the disclosure into the durable record instead of a chat message. Proceeding on an unreviewed PR is allowed; proceeding SILENTLY is not."
+  }
+}
