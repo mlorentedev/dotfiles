@@ -1198,30 +1198,17 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 }
 Ensure-Directory $piAgentDir
 
-$piModelsSrc = Join-Path $DotfilesDir 'ai\pi\models.json'
-$piModelsDst = Join-Path $piAgentDir 'models.json'
-if (Test-Path -LiteralPath $piModelsSrc -PathType Leaf) {
-    $piModelsTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "pi-models-$PID.json")
-    Copy-Item -LiteralPath $piModelsSrc -Destination $piModelsTmp -Force
-    # Gate on $LASTEXITCODE, not just dotf presence (see opencode block).
-    $piRendered = $false
-    if (Get-Command dotf -ErrorAction SilentlyContinue) {
-        & dotf secrets render $piModelsTmp
-        $piRendered = ($LASTEXITCODE -eq 0)
+# pi's models.json is deployed by `dotf deploy` (CLI-039): one implementation for
+# every OS, replacing the copy that lived here and its twin in setup-linux.sh.
+# ADR-020 C7 keeps this script on the thin bootstrap; staging, rendering,
+# comparing and installing a config is tooling logic and belongs in the CLI.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    & dotf deploy pi
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf deploy pi failed -- run it again after setup, or see 'dotf doctor'"
     }
-    if (-not $piRendered) {
-        Write-Warn "dotf secrets render unavailable/failed; deploying pi models.json with literal {env:VAR} placeholders (resolved at runtime)"
-    }
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $piModelsTmp -Destination $piModelsDst)
-    } else {
-        Ensure-Directory (Split-Path $piModelsDst -Parent)
-        Copy-Item -LiteralPath $piModelsTmp -Destination $piModelsDst -Force
-        Write-Success "Deployed pi models.json to $piModelsDst (fallback)"
-    }
-    Remove-Item -LiteralPath $piModelsTmp -Force -ErrorAction SilentlyContinue
 } else {
-    Write-Warn "pi models.json source missing: $piModelsSrc"
+    Write-Warn "dotf not on PATH -- skipping pi config deploy (run install-dotf.ps1, then 'dotf deploy pi')"
 }
 
 $piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'
