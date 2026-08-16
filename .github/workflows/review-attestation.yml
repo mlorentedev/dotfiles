@@ -133,4 +133,29 @@ jobs:
       - name: Fail the run when the PR is not attested
         env:
           CODE: ${{ steps.attest.outputs.code }}
-        run: exit "$CODE"
+          SUMMARY: ${{ steps.attest.outputs.summary }}
+        # The verdict is repeated here, not just in the step that computed it.
+        # A bare `exit "$CODE"` made the RED step say nothing: the diagnostic sat
+        # in an earlier, green step, so anyone opening the failure saw an exit
+        # code and no reason. Reported by a parallel session whose PRs this gate
+        # began failing.
+        #
+        # That is this gate's own fourth constraint — a check that fails closed
+        # must still say why — violated one layer up, inside the check built to
+        # enforce it. Collapsing "why" into an exit code is the same defect as
+        # #988's error path discarding HTTP 500 and surfacing `invalid character
+        # 'I'`: the diagnostic threw away the diagnosis.
+        run: |
+          if [ "$CODE" != "0" ]; then
+            echo "::error title=Review attestation::$SUMMARY"
+            echo "$SUMMARY"
+            echo
+            echo "Options:"
+            echo "  (a) Get the PR reviewed. This gate re-runs on new comments — no push needed."
+            echo "  (b) Declare the unreviewed merge: add the 'merged-unreviewed' label AND a"
+            echo "      non-empty '## Unreviewed merge rationale' section to the PR body."
+            echo
+            echo "This check is NOT required in branch protection: it reports, it does not veto."
+            echo "Proceeding on an unreviewed PR is allowed. Proceeding silently is not."
+          fi
+          exit "$CODE"
