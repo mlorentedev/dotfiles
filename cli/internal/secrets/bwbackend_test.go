@@ -90,18 +90,18 @@ func TestSelectBWBackend_ReadAndWriteAlwaysAgree(t *testing.T) {
 func TestSelectBWBackend_ProbesOnce(t *testing.T) {
 	f := &fakeBWServe{status: "unlocked"}
 	var probes int
-	srv := httptest.NewServer(countingHandler(&probes, "/status", f))
+	srv := httptest.NewServer(countingHandler(&probes, "/list/object/folders", f))
 	defer srv.Close()
 
 	b := SelectBWBackend(BWServeClient{BaseURL: srv.URL})
 	if probes != 1 {
-		t.Fatalf("status probes during selection = %d, want exactly 1", probes)
+		t.Fatalf("readability probes during selection = %d, want exactly 1", probes)
 	}
 
 	// Using the pinned backend must not re-probe: the decision is already made.
 	_, _ = b.Reader.Field("nope", "password")
 	if probes != 1 {
-		t.Fatalf("status probes after use = %d, want 1 — the backend must be pinned, not re-chosen", probes)
+		t.Fatalf("readability probes after use = %d, want 1 — the backend must be pinned, not re-chosen", probes)
 	}
 }
 
@@ -176,5 +176,37 @@ func TestSelectBWBackend_ShelloutHalvesBothDecorate(t *testing.T) {
 	}
 	if _, ok := b.Writer.(lockHintWriter); !ok {
 		t.Fatalf("shellout writer must carry the lock hint, got %T", b.Writer)
+	}
+}
+
+// TestSelectBWBackend_NeverCallsStatus is the guard for BUG-082 (#988), and it is the
+// whole fix expressed as an assertion.
+//
+// `GET /status` poisons this daemon: for ~0.5s afterwards every `GET /object/item/<id>`
+// returns HTTP 500 (measured 0/10 failures before a status call, 10/10 immediately
+// after; upstream bitwarden/clients#20951). The old selection probed `/status` and then
+// immediately read an item — so the probe broke the very call it was authorising, and
+// `dotf secrets run` failed most of the time.
+//
+// Selection must therefore never touch `/status`. This asserts the mechanism, not the
+// symptom, because the symptom needs a live daemon and half a second of timing.
+func TestSelectBWBackend_NeverCallsStatus(t *testing.T) {
+	for _, st := range []string{"unlocked", "locked", "unauthenticated"} {
+		t.Run(st, func(t *testing.T) {
+			var statusCalls int
+			f := &fakeBWServe{status: st}
+			srv := httptest.NewServer(countingHandler(&statusCalls, "/status", f))
+			defer srv.Close()
+
+			b := SelectBWBackend(BWServeClient{BaseURL: srv.URL})
+
+			if statusCalls != 0 {
+				t.Fatalf("selection called GET /status %d times — that poisons item reads for ~0.5s (BUG-082)", statusCalls)
+			}
+			// And it still reaches the right decision without it.
+			if wantDaemon := st == "unlocked"; b.Daemon != wantDaemon {
+				t.Fatalf("status=%s: Daemon = %v, want %v", st, b.Daemon, wantDaemon)
+			}
+		})
 	}
 }
