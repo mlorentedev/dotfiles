@@ -528,3 +528,33 @@ func isErrUnreachable(err error) bool {
 func isErrItemNotFound(err error) bool {
 	return errors.Is(err, ErrBWItemNotFound)
 }
+
+// TestBWServeClient_UnparseableResponseNamesStatusAndSize is the guard for the
+// diagnostic gap that let #988 stay uncharacterised: `bw serve` answers some
+// /object/item GETs with an HTTP 500 carrying the plain text "Internal Server Error",
+// and the old error reported only `invalid character 'I'` — true, and useless.
+//
+// The error must name the status code and the byte count, and must NOT echo the body:
+// a 200 whose body merely failed to parse can still carry vault material.
+func TestBWServeClient_UnparseableResponseNamesStatusAndSize(t *testing.T) {
+	const body = "Internal Server Error"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	_, err := BWServeClient{BaseURL: srv.URL}.Status()
+	if err == nil {
+		t.Fatal("expected an error for a non-JSON response")
+	}
+	msg := err.Error()
+	for _, want := range []string{"HTTP 500", "21 bytes"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("error must name %q so the failure is identifiable, got: %s", want, msg)
+		}
+	}
+	if strings.Contains(msg, body) {
+		t.Fatalf("error must NOT echo the response body (it may carry vault material): %s", msg)
+	}
+}

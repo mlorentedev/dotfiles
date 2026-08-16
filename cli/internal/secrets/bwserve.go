@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os/exec"
@@ -145,9 +146,25 @@ func (c BWServeClient) call(method, path string, body any) (json.RawMessage, err
 		return nil, fmt.Errorf("%w: %s %s: %v", ErrBWServeUnreachable, method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// Read the body before decoding so an unparseable response can be DESCRIBED.
+	// The previous form decoded straight off the wire and reported only "no
+	// parseable envelope", which threw away the two facts that identify the
+	// failure — and that omission is why #988 sat uncharacterised for weeks: the
+	// response is an HTTP 500 carrying the 21 plain-text bytes "Internal Server
+	// Error", which the old message rendered as `invalid character 'I'`.
+	//
+	// Status code and byte count ONLY, never the body itself: a 200 whose body
+	// merely failed to parse can still carry vault material, and an error string
+	// travels into logs and transcripts (docs/lessons.md, "Redact at the producer").
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: reading bw serve response (HTTP %d): %w", method, path, resp.StatusCode, err)
+	}
 	var env bwServeEnvelope
-	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
-		return nil, fmt.Errorf("%s %s: bw serve returned no parseable envelope: %w", method, path, err)
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil, fmt.Errorf("%s %s: bw serve returned no parseable envelope (HTTP %d, %d bytes): %w",
+			method, path, resp.StatusCode, len(raw), err)
 	}
 	if !env.Success {
 		msg := env.Message
