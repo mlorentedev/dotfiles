@@ -98,6 +98,52 @@ Worth recording, since it cost a test: **YAML 1.1 parses the bare key `on:` as
 the boolean `true`**, so `yaml.safe_load(wf)['on']` raises `KeyError` on every
 GitHub workflow ever written. The check reads `d[True]` first.
 
+### The gate ran on its own PR, and the first run found a hole in AC7
+
+First live execution, PR #1019, `pull_request` event:
+
+```
+[FAIL] pending — no reviewer output on this PR yet
+       Proceeding on an unreviewed PR is allowed. Proceeding silently is not.
+```
+
+Correct: at 00:58:51 no reviewer had posted. CodeRabbit's rate-limit notice
+landed at **00:59:05**, 14 seconds later — and **no second run followed**:
+
+```
+$ gh run list --workflow=review-attestation.yml
+00:58:45  event=pull_request  completed/failure     <- the only run
+```
+
+Two facts behind that, both verified rather than assumed:
+
+1. GitHub reads the `issue_comment` trigger from the **default branch's** copy
+   of a workflow. `review-attestation.yml` is not on `main` yet, so no
+   `issue_comment` run for this PR was ever possible.
+2. More seriously, and true even after merge: a run triggered by
+   `issue_comment` is associated with the default branch, **not** with the PR's
+   head commit. Confirmed on the head SHA — the `pull_request` run attached as
+   a check-run, and an `issue_comment` run would not.
+
+So AC7 as originally written would have shipped **decorative**: the trigger
+fires, the classifier runs, and the PR's visible verdict never changes. A
+re-run that only appears to re-run — this spec's own defect class, committed
+inside the fix for it, and caught only because the gate was pointed at itself.
+
+**Fix:** the job now publishes an explicit commit status (`review-attestation`)
+onto the PR's head SHA on both events, with `statuses: write`. The exit code is
+captured so the status is always published, and restored in a final step so the
+run still fails when the PR is not attested — otherwise capturing the code to
+publish it would have turned every verdict green, which would have been the
+same bug a third time.
+
+Two assertions added: `statuses: write` plus a `statuses/` API call are present,
+and the final `exit "$CODE"` is present.
+
+**Not verified until merge:** the live `issue_comment` re-run. It cannot be,
+for reason (1) above. Structural until then, and the honest first proof is the
+next PR opened after this one merges.
+
 ## Non-vacuity — measured, not assumed
 
 Four mutations, each with valid syntax and a wrong answer. Every one is caught,

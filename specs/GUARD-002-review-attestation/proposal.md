@@ -155,7 +155,22 @@ whether a bot performed it.
       response) results in a non-zero exit, never a pass. Proven by a test that feeds
       the classifier unreadable input.
 - [ ] **AC7** The gate runs in CI on `pull_request` and `issue_comment`, so a review
-      arriving after the checks settled re-runs it without a push.
+      arriving after the checks settled re-runs it without a push — **and the verdict
+      lands on the PR's head commit as a status**, not merely in a workflow run.
+
+      The second clause is not decoration. Measured on this spec's own first PR
+      (#1019): the `pull_request` run attached to the head SHA correctly, CodeRabbit's
+      notice arrived 14 seconds later, and no `issue_comment` run followed. A run
+      triggered by `issue_comment` is associated with the **default branch**, not with
+      the PR's head, so its check-run never appears on the PR at all. Without an
+      explicit commit status the trigger would execute and change nothing visible — a
+      re-run that only appears to re-run, which is this spec's own defect class wearing
+      a different hat.
+
+      Consequence worth stating: the `issue_comment` half cannot be exercised until the
+      workflow is on `main`, because GitHub reads that trigger from the default branch.
+      Until then AC7 is verified structurally, and the first live proof comes after
+      merge.
 
 ## References
 

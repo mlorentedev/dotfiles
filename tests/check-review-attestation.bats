@@ -208,3 +208,22 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     # spans to avoid, and the same one that made #998's archive gate unpassable.
     ! grep -qE '^[[:space:]]*continue-on-error[[:space:]]*:' "$REPO/.github/workflows/review-attestation.yml"
 }
+
+@test "AC7: the issue_comment path publishes a status onto the PR head" {
+    # Found by running this workflow on its own first PR (#1019). A run
+    # triggered by issue_comment is associated with the DEFAULT BRANCH, not the
+    # PR's head commit, so its check-run never appears on the PR. Without an
+    # explicit commit status the trigger executes and changes nothing visible —
+    # a re-run that only appears to re-run, which is this spec's own defect
+    # class wearing a different hat.
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    grep -qE '^[[:space:]]*statuses:[[:space:]]*write' "$wf"
+    grep -q 'statuses/' "$wf"
+}
+
+@test "AC7: the run still fails when the PR is not attested" {
+    # The status publish captures the exit code, so the final step must restore
+    # it. Otherwise capturing it to publish the status would silently convert
+    # every verdict into a green run — the bug, rebuilt inside the fix for it.
+    grep -qE 'exit "\$CODE"' "$REPO/.github/workflows/review-attestation.yml"
+}
