@@ -44,6 +44,33 @@ $ dotf secrets verify        # real registry, built from this branch
 That is the point: this changes what happens when the registry is broken, and nothing
 about what happens when it is not.
 
+## Adversarial review — PASS, and what was done with its findings
+
+`nan/deepseek-v4-flash` against `e033302`, **4m 48s**, verdict **PASS**, 0 blockers,
+0 majors, 3 minors. Verdict in `review.md`.
+
+| # | Class | Finding | Disposition |
+|---|---|---|---|
+| 1 | Minor / REAL | `validateSecret` was 72 lines against AGENTS.md's `< 40` guideline; `scopeVerify` at 41 | **APPLIED** — extracted `checkExpose`, `checkBWFolder` and `checkVarNames`. 72 → **31 lines**, no behaviour change |
+| 2 | Minor / THEORETICAL | a token that is both a defect id and a valid var name produces two rows; correct but undocumented and untested | **APPLIED** — pinned by `TestSecretsVerify_TokenThatIsBothADefectIdAndAValidVar` and documented at the branch |
+| 3 | Minor / SPECULATIVE | `kept` copies each validated secret; O(n) beyond the YAML decode for very large registries | **DECLINED** — the registry holds 33 secrets and the reviewer scoped it to "~500+". Optimising an unmeasured path would trade a clear implementation for a guess |
+
+Finding 1 was a real violation of this repo's own Code Quality Rules, found by reading
+the code against the stated threshold rather than by running anything — the kind a test
+suite structurally cannot produce.
+
+Finding 2 is the sharper one. Two *different* secrets can be named by one token — a
+malformed entry with `id: FOO` and a well-formed entry exposing a var called `FOO` — and
+answering for only one of them would hide a real result behind a name collision. The
+behaviour was already correct; what was missing was anything asserting it stays correct.
+
+**Both applied without touching `proposal.md`, `tasks.md` or `features.json`.** The
+review's suggested remedy for finding 2 was to document it in AC8, but those are the
+contract files the staleness check watches: editing one after `reviewed_sha` invalidates
+the review that asked for the edit, and buys another round (#998, HARNESS-072). The same
+information lives in a test and a code comment, which carry it better anyway — a test
+cannot go stale silently.
+
 ## Test status
 
 - `go build ./... && go vet ./... && go test ./...` — every package ok

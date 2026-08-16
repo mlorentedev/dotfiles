@@ -137,8 +137,6 @@ func (e *EnvExpose) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// ParseRegistry parses and validates registry.yaml. Validation is fail-fast: a
-// malformed registry is a configuration error, never silently tolerated.
 // SecretDefect is one secret that failed validation, kept apart from the registry so a
 // caller can report it instead of being stopped by it.
 type SecretDefect struct {
@@ -229,73 +227,89 @@ func secretLabel(s *Secret, i int) string {
 // uniqueness state; this function only READS them — registration is the caller's, so
 // that a rejected secret never reserves anything.
 func validateSecret(s *Secret, i int, seen map[string]bool, seenVar map[string]string) error {
-	{
-		if s.ID == "" {
-			return fmt.Errorf("secret #%d: empty id", i)
+	if s.ID == "" {
+		return fmt.Errorf("secret #%d: empty id", i)
+	}
+	if seen[s.ID] {
+		return fmt.Errorf("duplicate secret id %q", s.ID)
+	}
+	// ValidBackends is the SSOT for this list; a resolver-coverage test binds
+	// it to the Loader, so a backend accepted here always has somewhere to go.
+	if !slices.Contains(ValidBackends(), s.Backend) {
+		return fmt.Errorf("secret %q: unknown backend %q", s.ID, s.Backend)
+	}
+	if err := checkExpose(s); err != nil {
+		return err
+	}
+	// Each backend must resolve a source for everything it exposes.
+	switch s.Backend {
+	case BackendAge, BackendAgeOffline:
+		if err := s.checkAgeSources(); err != nil {
+			return err
 		}
-		if seen[s.ID] {
-			return fmt.Errorf("duplicate secret id %q", s.ID)
+	case BackendBW:
+		if err := s.checkBwSources(); err != nil {
+			return err
 		}
+	}
+	if err := checkBWFolder(s); err != nil {
+		return err
+	}
+	return checkVarNames(s, seenVar)
+}
 
-		// ValidBackends is the SSOT for this list; a resolver-coverage test binds
-		// it to the Loader, so a backend accepted here always has somewhere to go.
-		if !slices.Contains(ValidBackends(), s.Backend) {
-			return fmt.Errorf("secret %q: unknown backend %q", s.ID, s.Backend)
+// checkExpose enforces that a secret exposes exactly one of env|file, and that a file
+// expose's mode is octal. The mode is applied at materialization (#612 B2), so it is
+// rejected here rather than degrading to a silent 0600 much later.
+func checkExpose(s *Secret) error {
+	hasEnv, hasFile := len(s.Expose.Env.Vars) > 0, s.Expose.File != nil
+	if hasEnv == hasFile { // both, or neither
+		return fmt.Errorf("secret %q: expose must have exactly one of env|file", s.ID)
+	}
+	if hasFile && s.Expose.File.Mode != "" {
+		if _, err := strconv.ParseUint(s.Expose.File.Mode, 8, 32); err != nil {
+			return fmt.Errorf("secret %q: invalid file mode %q (want octal, e.g. 0600)", s.ID, s.Expose.File.Mode)
 		}
+	}
+	return nil
+}
 
-		hasEnv, hasFile := len(s.Expose.Env.Vars) > 0, s.Expose.File != nil
-		if hasEnv == hasFile { // both, or neither
-			return fmt.Errorf("secret %q: expose must have exactly one of env|file", s.ID)
+// checkBWFolder validates bw.folder against the ratified taxonomy and the secret's plane.
+//
+// bw.folder is pre-declared dormant metadata (ADR-028 §2 addendum): a secret's bw: block,
+// folder included, is written up front while backend is still age and only activated on
+// migrate. Gating this on backend == "bw" (as checkBwSources does for item/field) would
+// leave every dormant folder value unvalidated until the moment migrate reads it and
+// hands it straight to ResolveFolder — which CREATES an arbitrary Bitwarden folder for a
+// typo, exactly the drift this taxonomy exists to prevent (OPS-028 adversarial review,
+// Major finding). So this runs for every secret carrying a bw: block, whatever its
+// current backend.
+func checkBWFolder(s *Secret) error {
+	if s.BW == nil || s.BW.Folder == "" {
+		return nil
+	}
+	if !validBWFolders[s.BW.Folder] {
+		return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (apps, infra)", s.ID, s.BW.Folder)
+	}
+	if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
+		return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
+	}
+	return nil
+}
+
+// checkVarNames enforces that every exposed var is a valid env identifier (B5) and unique
+// across the whole registry (B1): a var mapped by two secrets has no single source, and
+// render's dedup was age-only, so run/show would silently resolve last-write.
+//
+// It only READS seenVar — registration is the caller's, so a rejected secret never
+// reserves a name and cannot make the next valid secret look like the duplicate.
+func checkVarNames(s *Secret, seenVar map[string]string) error {
+	for _, v := range s.Vars() {
+		if !validVarName.MatchString(v) {
+			return fmt.Errorf("secret %q: invalid var name %q (want an env identifier [A-Za-z_][A-Za-z0-9_]*)", s.ID, v)
 		}
-
-		// A file expose's mode is applied at materialization (#612 B2); reject a
-		// non-octal here so the failure surfaces at parse, not as a silent 0600.
-		if hasFile && s.Expose.File.Mode != "" {
-			if _, err := strconv.ParseUint(s.Expose.File.Mode, 8, 32); err != nil {
-				return fmt.Errorf("secret %q: invalid file mode %q (want octal, e.g. 0600)", s.ID, s.Expose.File.Mode)
-			}
-		}
-
-		// Each backend must resolve a source for everything it exposes.
-		switch s.Backend {
-		case BackendAge, BackendAgeOffline:
-			if err := s.checkAgeSources(); err != nil {
-				return err
-			}
-		case BackendBW:
-			if err := s.checkBwSources(); err != nil {
-				return err
-			}
-		}
-
-		// bw.folder is pre-declared dormant metadata (ADR-028 §2 addendum): a secret's
-		// bw: block, folder included, is written up front while backend is still age
-		// and only activated on migrate. Gating this check on backend == "bw" (as
-		// checkBwSources does for item/field) would leave every dormant folder value
-		// unvalidated until the moment migrate reads it and hands it straight to
-		// ResolveFolder — which CREATES an arbitrary Bitwarden folder for a typo,
-		// exactly the drift this taxonomy exists to prevent (OPS-028 adversarial
-		// review, Major finding). So this runs for every secret carrying a bw: block,
-		// regardless of current backend.
-		if s.BW != nil && s.BW.Folder != "" {
-			if !validBWFolders[s.BW.Folder] {
-				return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (apps, infra)", s.ID, s.BW.Folder)
-			}
-			if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
-				return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
-			}
-		}
-
-		// Every exposed var must be a valid env identifier (B5) and unique across the
-		// whole registry (B1): a var mapped by two secrets has no single source, and
-		// render's dedup was age-only, so run/show would silently resolve last-write.
-		for _, v := range s.Vars() {
-			if !validVarName.MatchString(v) {
-				return fmt.Errorf("secret %q: invalid var name %q (want an env identifier [A-Za-z_][A-Za-z0-9_]*)", s.ID, v)
-			}
-			if first, dup := seenVar[v]; dup {
-				return fmt.Errorf("var %q is exposed by both %q and %q — each var must map to exactly one secret", v, first, s.ID)
-			}
+		if first, dup := seenVar[v]; dup {
+			return fmt.Errorf("var %q is exposed by both %q and %q — each var must map to exactly one secret", v, first, s.ID)
 		}
 	}
 	return nil
