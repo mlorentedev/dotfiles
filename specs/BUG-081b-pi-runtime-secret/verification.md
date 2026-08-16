@@ -121,3 +121,22 @@ redeployed. That is the point of the guard: the deployed copy still holds the
 credential that leaked, and the reminder is mechanical rather than a note
 someone has to remember. Redeploying is what clears it, and it is also what
 removes the second copy from the pending `NAN_API_KEY` rotation.
+
+## Adversarial review disposition
+
+**PASS** — `nan/deepseek-v4-flash`, `reviewed_sha 6ffee6e`, 3 findings, all Minor
+and all THEORETICAL. Code and tests changed; the spec contract files did not, so
+the review still describes what is on disk.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `piConfigRel` hardcoded, ignoring pi's `PI_CODING_AGENT_DIR` override — a machine that overrides it reports SKIP even when its config is broken | **Applied.** Verified the variable is real by grepping pi's shipped bundle before acting on the claim. The check now honours it and names the path it actually read. This is the guard's own recurrence of the class it exists to stop: SKIP meaning "nothing to check" where nothing was checked. |
+| 2 | The `{env:` scan reads raw bytes, so a placeholder inside a non-credential field would be reported | **Declined, with reason.** A `{env:` anywhere in a pi config is unresolvable by the same argument, whichever field holds it, and a false positive here costs a redeploy while a false negative costs a 401 nobody can diagnose. Revisit if a legitimate `{env:` ever needs to live in one of these files. |
+| 3 | `piResolvable("$")` accepts a bare `$` | **No change needed** — the reviewer reached the same conclusion. A lone `$` may not resolve, but it is not a materialised credential, and this guard's job is not to validate pi's syntax. |
+
+Applying finding 1 surfaced a defect the review did not: a `{env:VAR}` value
+triggered **both** branches, so one broken config produced two FAILs saying
+different things about the same string — one calling it an unresolvable
+placeholder, the other a materialised credential. It is the former. Fixed, and
+pinned by `TestAgentConfig_HonoursPiDirOverride`, which asserts exactly one
+failure.

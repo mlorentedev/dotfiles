@@ -123,3 +123,32 @@ func TestAgentConfig_UnparseableIsWarnedNotPassed(t *testing.T) {
 		t.Errorf("want WARN for an unparseable config, got:\n%s", out)
 	}
 }
+
+// Review finding 1: the check looked only at the default location, so with pi's
+// own PI_CODING_AGENT_DIR override set, a genuinely broken config reported SKIP
+// — "nothing to check here", which is the sentence this guard exists to stop
+// being wrong.
+func TestAgentConfig_HonoursPiDirOverride(t *testing.T) {
+	home, custom := t.TempDir(), t.TempDir()
+	// A healthy config at the DEFAULT location, a broken one where pi actually
+	// looks. Checking the default would report OK for a broken machine.
+	writePiConfig(t, home, piConfig("${NAN_API_KEY}"))
+	if err := os.WriteFile(filepath.Join(custom, piConfigName), []byte(piConfig("{env:NAN_API_KEY}")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sys := piSys(home)
+	sys.Getenv = func(k string) string {
+		return map[string]string{"HOME": home, piConfigDirEnv: custom}[k]
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkAgentConfigSecrets(sys, rep)
+
+	if rep.Failures() != 1 {
+		t.Fatalf("the override'd config is broken; want FAIL, got:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), custom) {
+		t.Errorf("the report must name the path it actually checked, got:\n%s", buf.String())
+	}
+}

@@ -32,9 +32,19 @@ import (
 // So this check asks two questions of a deployed agent config: can the tool
 // that reads it actually resolve what it says, and is there a credential in it.
 
-// piConfigRel is the deployed pi model registry, relative to $HOME. pi reads
-// this path itself; it is not configurable from here.
-const piConfigRel = ".pi/agent/models.json"
+// piConfigRel is the deployed pi model registry, relative to $HOME, and
+// piConfigDirEnv is pi's own override for the directory holding it.
+//
+// The override is honoured rather than assumed away: with it set and this check
+// looking only at the default, a machine whose config IS broken reports SKIP —
+// "nothing to check here" — which is the exact sentence this guard exists to
+// stop being wrong. Verified against pi's shipped bundle, which reads
+// PI_CODING_AGENT_DIR.
+const (
+	piConfigRel    = ".pi/agent/models.json"
+	piConfigDirEnv = "PI_CODING_AGENT_DIR"
+	piConfigName   = "models.json"
+)
 
 // piResolvable reports whether pi's own resolver can interpolate this value.
 //
@@ -49,6 +59,9 @@ func checkAgentConfigSecrets(sys *System, rep *Report) {
 	rep.Section("Agent config secrets")
 
 	path := filepath.Join(sys.home(), piConfigRel)
+	if dir := sys.env(piConfigDirEnv, ""); dir != "" {
+		path = filepath.Join(dir, piConfigName)
+	}
 	raw, err := os.ReadFile(path) //nolint:gosec // a fixed path under the user's own home
 	if err != nil {
 		// No deployed pi config is not a defect: pi may simply not be installed
@@ -84,6 +97,14 @@ func checkAgentConfigSecrets(sys *System, rep *Report) {
 	var materialised []string
 	for name, p := range cfg.Providers {
 		if p.APIKey == "" || piResolvable(p.APIKey) {
+			continue
+		}
+		// A {env:VAR} placeholder is unresolvable, but it is NOT a credential —
+		// and the branch above already reported it. Without this, one broken
+		// config produced two FAILs saying different things about the same
+		// string, leaving an operator to work out whether the file holds a
+		// secret or a placeholder. It holds a placeholder.
+		if strings.HasPrefix(p.APIKey, "{env:") {
 			continue
 		}
 		materialised = append(materialised, name)
