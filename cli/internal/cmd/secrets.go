@@ -105,6 +105,16 @@ func bwWrite() bwWriteClient {
 	return bwBackend().Writer
 }
 
+// bwSync returns the cache-refresh half of the SAME pinned backend. Sync is pinned with
+// the other two because the daemon and the CLI cache independently: syncing one leaves
+// the other stale, so a rotation that syncs the wrong subject cannot prove its own write.
+func bwSync() daemonSyncer {
+	if bwSyncer != nil {
+		return bwSyncer
+	}
+	return bwBackend().Syncer
+}
+
 // secretLoader builds the resolution engine wired with both backend seams, over the
 // age store in sensitive/ (checkout-first, ADR-030 — same source as the registry it
 // maps, so a repo-side rotation is seen without a redeploy) and Bitwarden via bwReader.
@@ -113,7 +123,7 @@ func secretLoader() *secrets.Loader {
 		SecretsDir: env.ResolveSensitiveDir(),
 		KeyPath:    ageKeyPath(),
 		Decrypt:    ageDecryptor,
-		BW:         bwReader,
+		BW:         bwRead(),
 	}
 }
 

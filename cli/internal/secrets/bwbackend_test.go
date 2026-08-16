@@ -64,15 +64,21 @@ func TestSelectBWBackend_ReadAndWriteAlwaysAgree(t *testing.T) {
 			}
 			_, readerIsDaemon := b.Reader.(BWServeReader)
 			_, writerIsDaemon := b.Writer.(BWServeWriter)
-			if readerIsDaemon != writerIsDaemon {
-				t.Fatalf("SPLIT BRAIN: reader daemon=%v but writer daemon=%v — this is exactly BUG-084",
-					readerIsDaemon, writerIsDaemon)
+			_, syncerIsDaemon := b.Syncer.(BWServeClient)
+
+			// All three, not just read/write: sync is the third path, and a third
+			// path that moves alone reproduces this bug. `rotate` writes, syncs,
+			// then reads back to prove the write took — sync the wrong cache and
+			// that proof is worthless.
+			if readerIsDaemon != writerIsDaemon || readerIsDaemon != syncerIsDaemon {
+				t.Fatalf("SPLIT BRAIN: reader daemon=%v, writer daemon=%v, syncer daemon=%v — this is exactly BUG-084",
+					readerIsDaemon, writerIsDaemon, syncerIsDaemon)
 			}
 			if readerIsDaemon != tt.wantDaemon {
 				t.Fatalf("backend halves = daemon:%v, want daemon:%v", readerIsDaemon, tt.wantDaemon)
 			}
-			if b.Reader == nil || b.Writer == nil {
-				t.Fatal("a selected backend must have both halves non-nil")
+			if b.Reader == nil || b.Writer == nil || b.Syncer == nil {
+				t.Fatal("a selected backend must have all three halves non-nil")
 			}
 		})
 	}

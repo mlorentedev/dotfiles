@@ -24,9 +24,16 @@ import (
 // back), a consistent subject matters more than self-healing: a rotation that half
 // applies is worse than one that fails whole.
 type BWBackend struct {
-	// Reader and Writer are always both daemon-backed or both shellout-backed.
+	// Reader, Writer and Syncer are always ALL daemon-backed or ALL shellout-backed.
+	//
+	// Syncer is here, and not left as its own var, for the reason this whole type
+	// exists: sync is the third path, and a third path that moves alone reproduces the
+	// bug. `rotate` writes, syncs, then reads back to prove the write took — if the
+	// sync addresses a different cache than the read, that proof is meaningless and
+	// the command reports a stale value as a failed rotation.
 	Reader BWReader
 	Writer BWWriteClient
+	Syncer BWSyncer
 
 	// Name labels the chosen subject for diagnostics ("bw serve daemon" / "bw CLI").
 	Name string
@@ -48,6 +55,31 @@ type BWBackend struct {
 // "Vault is locked." — which sends the operator to `bw unlock`, a command that prints a
 // session key to a shell nobody is reading and does not fix the failure — and an error
 // naming `dotf secrets unlock`, which does.
+// BWSyncer refreshes the local cache a backend answers reads from. Both backends have
+// one and they are NOT interchangeable: the daemon caches independently of the `bw`
+// CLI, so syncing one leaves the other stale. Which is why it is pinned alongside the
+// reader and writer rather than chosen separately.
+type BWSyncer interface {
+	Sync() error
+}
+
+// BWCLISync is the shellout BWSyncer: `bw sync`, refreshing the CLI's own cache — the
+// one the shellout reader and writer actually consult.
+type BWCLISync struct {
+	Bin string // bw binary name/path; "" → "bw"
+}
+
+func (s BWCLISync) Sync() error {
+	bin := s.Bin
+	if bin == "" {
+		bin = "bw"
+	}
+	if _, err := bwRun(bin, "sync"); err != nil {
+		return fmt.Errorf("bw sync: %w", err)
+	}
+	return nil
+}
+
 func SelectBWBackend(c BWServeClient) BWBackend {
 	st, err := c.Status()
 	switch {
@@ -55,6 +87,7 @@ func SelectBWBackend(c BWServeClient) BWBackend {
 		return BWBackend{
 			Reader: BWServeReader{Client: c},
 			Writer: BWServeWriter{Client: c},
+			Syncer: c,
 			Name:   "bw serve daemon",
 			Daemon: true,
 		}
@@ -73,6 +106,7 @@ func shelloutBackend(daemonState string) BWBackend {
 	return BWBackend{
 		Reader: lockHintReader{Reader: BWGet{}, daemonState: daemonState},
 		Writer: lockHintWriter{Writer: BWPut{}, daemonState: daemonState},
+		Syncer: BWCLISync{},
 		Name:   "bw CLI",
 		Daemon: false,
 	}

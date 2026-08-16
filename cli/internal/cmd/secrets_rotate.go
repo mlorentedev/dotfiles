@@ -7,13 +7,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// daemonSyncer is what rotate needs from the bw serve daemon: make it pull the
-// current vault state so the read path stops answering from a stale cache. A seam
-// so rotate's tests run with no daemon.
-type daemonSyncer interface{ Sync() error }
+// daemonSyncer is what rotate needs from a backend: make it pull the current vault
+// state so the read path stops answering from a stale cache.
+type daemonSyncer = secrets.BWSyncer
 
-// bwSyncer is the production daemon-sync seam.
-var bwSyncer daemonSyncer = &secrets.BWServeDaemon{Client: secrets.BWServeClient{}}
+// bwSyncer is a TEST SEAM ONLY: nil in production, where sync comes from the pinned
+// backend alongside the reader and writer (see bwSync). It used to default to the
+// daemon unconditionally, which meant a shellout-backed command synced the daemon's
+// cache while reading the CLI's — the same split this bug is about, one path over.
+var bwSyncer daemonSyncer
 
 // newSecretsRotateCmd is C7: replace a live credential and prove the replacement
 // took, in one command.
@@ -121,12 +123,16 @@ func runRotate(cmd *cobra.Command, s *secrets.Secret, item, field string, isFile
 func confirmRotation(cmd *cobra.Command, s *secrets.Secret, item, field string, isFile bool, beforeFP string) error {
 	out := cmd.OutOrStdout()
 
-	// The daemon answers from its own cache; without this the write is correct and
+	// The backend answers from its own cache; without this the write is correct and
 	// every read still returns the old value, with nothing to indicate a missing
 	// step. A sync failure is reported, not fatal — the write did happen, and
 	// hiding that would be worse than a noisy success.
-	if err := bwSyncer.Sync(); err != nil {
-		_, _ = fmt.Fprintf(out, "WARNING  daemon sync failed (%v) — the value was written but reads may still serve the old one until `dotf secrets unlock` or a manual sync\n", err)
+	//
+	// This syncs the SAME backend that just took the write and is about to serve the
+	// read-back, which is what makes the confirmation below meaningful.
+	if err := bwSync().Sync(); err != nil {
+		_, _ = fmt.Fprintf(out, "WARNING  %s sync failed (%v) — the value was written but reads may still serve the old one until it is synced\n",
+			bwBackend().Name, err)
 	}
 
 	after, err := bwRead().Field(item, field)

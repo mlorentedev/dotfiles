@@ -13,7 +13,7 @@ created: "2026-08-15"
 | AC2 | same for a new item, incl. folder resolution | `TestBWServeWriter_CreateItem_SendsRawJSON`, `TestBWServeWriter_ResolveFolder` — **live canary write still pending** |
 | AC3 | no daemon + no session names `dotf secrets unlock` | `TestSelectBWBackend_ShelloutNamesTheRealRemediation`, `TestSelectBWBackend_ShelloutHalvesBothDecorate` |
 | AC4 | `backup` names the `BW_SESSION` form and says why | `TestExportLockHint_NamesTheOnlyInvocationThatWorks` + live capture below |
-| AC5 | read and write agree on backend | `TestSelectBWBackend_ReadAndWriteAlwaysAgree`, `TestSelectBWBackend_ProbesOnce`, mutation-checked |
+| AC5 | read, write **and sync** agree on backend | `TestSelectBWBackend_ReadAndWriteAlwaysAgree`, `TestSelectBWBackend_ProbesOnce`, mutation-checked |
 | AC6 | observed red before, green after | live capture below |
 
 ### AC4 observed live (the headline evidence)
@@ -37,6 +37,26 @@ which confines the session to that one process rather than exporting it: Vault i
 
 The "before" line is the message under which the DR escrow silently never existed
 (#997): true, useless, and pointing nowhere.
+
+### Read path re-verified live (regression caught in review)
+
+The first implementation changed `bwReader`'s production default to nil but left one
+bare-var use in `secretLoader()` (`BW: bwReader`), which the call-site rewrite did not
+match. Every unit test still passed, because they all inject `bwReader`; the live smoke
+had only exercised `backup`, which does not go through the Loader. The one production
+path not run was the one that broke — a read path that worked *before* this change.
+
+Fixed to `BW: bwRead()`, and the gap that hid it closed by actually running it:
+
+```
+$ env -u BW_SESSION dotf secrets verify     # no ambient session; daemon unlocked
+...
+33 ok, 0 missing, 0 failed
+exit=0
+```
+
+That is also the AC1 read-half evidence: 33 secrets resolved through the pinned daemon
+backend with no `BW_SESSION` anywhere.
 
 ### AC5 mutation-checked
 
@@ -81,6 +101,11 @@ Restored, suite green again.
 - **The escrow is NOT assembled from `/list/object/items`.** It would probably produce an
   importable document; *probably* is not a property a DR escrow may have. Filed
   separately with a `bw import` round-trip as its acceptance criterion.
+- **Sync was folded into the pinned backend too.** `bwSyncer` defaulted to the daemon
+  unconditionally, so a shellout-backed command synced the daemon's cache while reading
+  the CLI's — the same split, one path over, inside the very PR fixing it. `rotate`
+  writes, syncs, then reads back to prove the write took; syncing the wrong cache makes
+  that proof worthless. The AC5 guard now asserts all three halves, not two.
 - **Lock hints decorate both halves**, not just the writer: `set` reads before it writes,
   so a locked vault surfaces on the read first.
 
