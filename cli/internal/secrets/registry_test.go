@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -302,5 +303,68 @@ func TestParseRegistry_Validation(t *testing.T) {
 				t.Errorf("expected error for %q, got nil", name)
 			}
 		})
+	}
+}
+
+// TestParseRegistryPartial_DefectiveSecretsNeverReachEntries is the structural guard
+// behind BUG-086's design.
+//
+// The partial door EXCLUDES defective secrets rather than flagging them in place,
+// because the rest of this package treats validation as already done: parseFileMode's
+// own comment says a bad mode "is impossible in practice" since validate() rejected it.
+// Letting an invalid secret through would trade a clear failure for an undefined one.
+func TestParseRegistryPartial_DefectiveSecretsNeverReachEntries(t *testing.T) {
+	reg, defects, err := ParseRegistryPartial([]byte("version: 1\nsecrets:\n" +
+		"  - {id: fine, plane: app, backend: age, age: a, expose: {env: FINE}}\n" +
+		"  - {id: bad-backend, plane: app, backend: nonsense, age: b, expose: {env: BAD1}}\n" +
+		"  - {id: bad-expose, plane: app, backend: age, age: c, expose: {}}\n" +
+		"  - {id: bad-mode, plane: app, backend: age, age: d, expose: {file: {path: p, mode: \"99z\"}}}\n"))
+	if err != nil {
+		t.Fatalf("a document with bad ENTRIES must still parse: %v", err)
+	}
+	if len(defects) != 3 {
+		t.Fatalf("defects = %d, want 3: %v", len(defects), defects)
+	}
+	if len(reg.Secrets) != 1 || reg.Secrets[0].ID != "fine" {
+		t.Fatalf("only the well-formed secret may survive, got %+v", reg.Secrets)
+	}
+	for _, e := range reg.Entries("/home/nobody") {
+		if e.Var != "FINE" {
+			t.Fatalf("a defective secret reached Entries(): %q", e.Var)
+		}
+	}
+	// Each defect must name its own secret, or a report cannot say what to fix.
+	for _, d := range defects {
+		if d.ID == "" || d.Err == nil {
+			t.Fatalf("defect is unusable: %+v", d)
+		}
+	}
+}
+
+// TestParseRegistry_StrictStillFailsOnFirstDefect: the strict door is unchanged for
+// every write path. `set`/`migrate`/`render` against a half-valid registry is the
+// dangerous case, and it must keep failing loudly.
+func TestParseRegistry_StrictStillFailsOnFirstDefect(t *testing.T) {
+	_, err := ParseRegistry([]byte("version: 1\nsecrets:\n" +
+		"  - {id: fine, plane: app, backend: age, age: a, expose: {env: FINE}}\n" +
+		"  - {id: bad, plane: app, backend: nonsense, age: b, expose: {env: BAD}}\n"))
+	if err == nil {
+		t.Fatal("the strict parser must still reject a registry containing a bad secret")
+	}
+	if !strings.Contains(err.Error(), "bad") {
+		t.Fatalf("the error should name the offending secret, got: %v", err)
+	}
+}
+
+// TestParseRegistryPartial_EmptyIdIsLabelledByPosition: a defect must be nameable even
+// when the missing field is the name.
+func TestParseRegistryPartial_EmptyIdIsLabelledByPosition(t *testing.T) {
+	_, defects, err := ParseRegistryPartial([]byte("version: 1\nsecrets:\n" +
+		"  - {id: \"\", plane: app, backend: age, age: a, expose: {env: X}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(defects) != 1 || defects[0].ID != "#0" {
+		t.Fatalf("want a positional label for an id-less secret, got %+v", defects)
 	}
 }
