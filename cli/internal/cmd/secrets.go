@@ -250,10 +250,17 @@ func scopeVerify(reg *secrets.Registry, defects []secrets.SecretDefect, args []s
 		ds, isDefect := byID[tok]
 		inScope = append(inScope, ds...)
 
-		// One token can name BOTH a defect and a valid entry — a duplicate id whose
-		// first definition validated and whose second did not. Reporting only the
-		// defect would hide the entry that actually resolves, which is the half the
-		// caller most needs. So a defect match does not short-circuit the lookup.
+		// One token can name BOTH a defect and a valid entry, in two distinct ways,
+		// and neither may short-circuit the other:
+		//
+		//   1. a duplicate id whose first definition validated and whose second did
+		//      not — reporting only the defect hides the half that resolves;
+		//   2. a NAME COLLISION: a malformed secret whose id is "FOO" alongside a
+		//      well-formed secret exposing a var called "FOO". Two genuinely
+		//      different secrets, both named by one token, both owed an answer.
+		//
+		// Case 2 was surfaced by the adversarial review as undocumented; it is pinned
+		// by TestSecretsVerify_TokenThatIsBothADefectIdAndAValidVar.
 		_, known := reg.Selector(tok)
 		if known || !isDefect {
 			// Unknown-and-not-a-defect falls through deliberately, so resolveOnly

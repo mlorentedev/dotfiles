@@ -1,0 +1,35 @@
+{
+  "$comment": [
+    "Declarative table of agent configs `dotf deploy` installs (CLI-039, #1023).",
+    "",
+    "One entry per config. The behaviour — stage, render, compare, install — is",
+    "the same for all of them, which is why it stopped being duplicated across",
+    "setup-linux.sh and setup-windows.ps1 (ADR-020 C7: shell keeps the thin",
+    "bootstrap, Go owns tooling logic).",
+    "",
+    "Fields:",
+    "  name   the argument to `dotf deploy <name>`",
+    "  src    repo-relative source",
+    "  dst    destination; {VAR} resolves through `dotf env` (ADR-025), {HOME} is",
+    "         the user's home. An unresolvable token is an error, never an empty",
+    "         path segment.",
+    "  render run `dotf secrets render` on the staged copy before installing",
+    "  mode   octal permissions. DECLARED, never inferred: guessing which configs",
+    "         hold credentials is the guess that already went wrong in #987.",
+    "",
+    "opencode and the MCP registration blocks are deliberately absent — they are",
+    "slices 2 and 3, and opencode's is gated on testing whether it resolves",
+    "{env:VAR} itself rather than assuming it, which is the assumption that made",
+    "#987 expensive."
+  ],
+  "version": 1,
+  "configs": [
+    {
+      "name": "pi",
+      "src": "ai/pi/models.json",
+      "dst": "{HOME}/.pi/agent/models.json",
+      "render": true,
+      "mode": "0600"
+    }
+  ]
+}
