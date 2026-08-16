@@ -1,7 +1,7 @@
 ---
 id: "BUG-082-status-poisons-item-reads"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-08-16"
 issue: "mlorentedev/dotfiles#988"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

@@ -42,5 +42,8 @@ created: "2026-08-15"
 - [x] `golangci-lint run` at the pinned 2.12.2 — 0 issues
 - [x] AC5 guard mutation-checked: reintroducing the split-brain makes it fail red
 - [x] AC4 observed live, before and after, against a real unlocked daemon
-- [ ] AC1/AC2 live write against a canary item — **pending operator authorization**
-      (a real vault mutation; not done unilaterally)
+- [x] AC1/AC2 live write against a canary item — authorised by the operator and run.
+      It FAILED on its first pass, which is why it was worth insisting on: the write
+      landed on the server while the daemon kept serving its cached value, so the
+      read-back returned the previous fingerprint. Fixed by syncing after every write
+      (`syncAfterWrite`); the canary now passes with no explicit sync of its own.

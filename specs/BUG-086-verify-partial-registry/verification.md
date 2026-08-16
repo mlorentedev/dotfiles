@@ -16,6 +16,7 @@ created: "2026-08-16"
 | AC5 | `TestParseRegistryPartial_DefectiveSecretsNeverReachEntries` |
 | AC6 | `TestParseRegistry_StrictStillFailsOnFirstDefect` + the whole pre-existing suite |
 | AC7 | `TestSecretsVerify_StructuralFailureStillAborts` |
+| AC8 | `TestSecretsVerify_ScopedToDuplicateIdReportsBothHalves`, `TestSecretsVerify_SeveralDefectsOnOneId` — both observed failing with the short-circuit reintroduced |
 
 ### Mutation check — the guards were observed failing
 
