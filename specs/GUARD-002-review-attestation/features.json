@@ -1,0 +1,51 @@
+[
+  {
+    "id": "GUARD-002-review-attestation-f1",
+    "behavior": "AC1 — the classifier decides attested|declined|pending offline from committed JSON fixtures, including one captured verbatim from the real 2026-08-16 CodeRabbit rate-limit comment on #1009. Offline is load-bearing: the notice is only observable while the quota is exhausted, so the fixture is the only reproducible form of the evidence.",
+    "verification": "bats tests/check-review-attestation.bats -f 'classifies' && test -s tests/fixtures/review-attestation/coderabbit-rate-limited.json && grep -q 'rate limited by coderabbit.ai' tests/fixtures/review-attestation/coderabbit-rate-limited.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f2",
+    "behavior": "AC2 — a real review yields attested and exit 0, whether it came from a recognized bot reviewer or from a human. The gate asks whether a review happened, never who performed it.",
+    "verification": "scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/bot-reviewed.json && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/human-reviewed.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f3",
+    "behavior": "AC3 — a notice that no review ran yields `declined` and a non-zero exit naming the reviewer and reason; a PR with no reviewer output yields `pending` and a non-zero exit. This is the inversion the whole spec exists for: today both of these render as `CodeRabbit pass`.",
+    "verification": "! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json 2>&1 | grep -q 'declined' && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json 2>&1 | grep -q 'pending'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f4",
+    "behavior": "AC4 — the declared escape needs BOTH the merged-unreviewed label and a non-empty '## Unreviewed merge rationale' section. All three negative shapes are asserted, not just the positive one: label alone, section alone, and an empty section each still fail. Same shape as spec-gate's skip-sdd escape.",
+    "verification": "scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/disclosed.json && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/label-only.json && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/section-only.json && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/empty-rationale.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f5",
+    "behavior": "AC5 — reviewers are declared in config, so adding one is an edit to a file rather than to the script. Proven by a fixture whose reviewer is NOT CodeRabbit being classified correctly with no code change, which is what makes PR-Agent (#786) a config entry instead of a rewrite.",
+    "verification": "grep -qv 'coderabbitai' scripts/check-review-attestation.sh; jq -e '.reviewers | length >= 1' harness/review-attestation.json >/dev/null && bats tests/check-review-attestation.bats -f 'second reviewer'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f6",
+    "behavior": "AC6 — unreadable input fails closed. No gh, unauthenticated, malformed JSON and an empty response each exit non-zero rather than passing. pattern-verification-fails-toward-unproven: for a gate, refusing to decide must never render as a pass.",
+    "verification": "! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/malformed.json && ! scripts/check-review-attestation.sh --payload /dev/null && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/does-not-exist.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f7",
+    "behavior": "AC7 — the gate runs on pull_request AND issue_comment, so a review landing after the checks settled re-runs it with no push. Without the issue_comment trigger the gate would answer at the one moment the answer is always 'pending', which is the timing half of the same bug.",
+    "verification": "yq -e '.on | has(\"pull_request\") and has(\"issue_comment\")' .github/workflows/review-attestation.yml >/dev/null 2>&1 || python3 -c \"import sys,yaml; d=yaml.safe_load(open('.github/workflows/review-attestation.yml'))['on']; sys.exit(0 if 'pull_request' in d and 'issue_comment' in d else 1)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
