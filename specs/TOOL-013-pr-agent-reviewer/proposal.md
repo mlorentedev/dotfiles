@@ -35,6 +35,19 @@ path exclusions demonstrably keep excluded files out of the model call, and a pr
 failure degrades the review into a **visible** absence rather than a silent pass —
 because GUARD-002 classifies a missing review as `declined` and turns the PR red.
 
+## How this spec was produced
+
+Disclosed rather than left for a reviewer to infer from commit timestamps: the
+config and workflow were **drafted before this spec existed**. The spec-gate
+refused the push at 165 production LOC, which is when the spec was written — and
+it was written before the PR opened, not after.
+
+That ordering is not the intended one, and the record should say so plainly. What
+it cost is visible in the criteria: AC5 exists *because* the first draft pinned a
+tag that does not exist and a repository name that has since been renamed, both
+found only when the work was checked against reality. A proposal written first
+would have asked "does this action exist at this tag?" before the answer mattered.
+
 ## Out of scope
 
 - **Rollout to other repos.** #786's full scope is uniform delivery across every personal
