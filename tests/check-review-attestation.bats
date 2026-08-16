@@ -227,3 +227,34 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     # every verdict into a green run — the bug, rebuilt inside the fix for it.
     grep -qE 'exit "\$CODE"' "$REPO/.github/workflows/review-attestation.yml"
 }
+
+# --- AC4 (cont.): line-ending and whitespace robustness ---
+
+@test "AC4: a CRLF body still satisfies the escape" {
+    # GitHub's web editor produces CRLF. Before the fix, every line arrived as
+    # "## Unreviewed merge rationale\r", the exact-match index missed, and a PR
+    # carrying BOTH halves of the escape was refused — and told to add the
+    # section it already had. Identical payloads: LF exited 0, CRLF exited 1.
+    #
+    # This is the case the hand-written fixtures could not catch, because they
+    # were all written here with LF heredocs. Same class as the repo's
+    # `Set-Content`/`.gitattributes eol=lf` lesson: it reappears wherever text
+    # crosses from a Windows-flavoured producer.
+    run "$SCRIPT" --payload "$F/disclosed-crlf.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"disclosed"* ]]
+}
+
+@test "AC4: trailing whitespace on the heading still satisfies the escape" {
+    run "$SCRIPT" --payload "$F/disclosed-trailing-ws.json"
+    [ "$status" -eq 0 ]
+}
+
+@test "AC4: line-ending tolerance does not weaken the negatives" {
+    # The risk of normalising input is over-accepting. Re-assert the three
+    # refusals after the fix, so tolerance never quietly becomes permissiveness.
+    for f in label-only section-only empty-rationale; do
+        run "$SCRIPT" --payload "$F/$f.json"
+        [ "$status" -eq 1 ]
+    done
+}

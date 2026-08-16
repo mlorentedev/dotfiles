@@ -167,9 +167,19 @@ HAS_LABEL="$(printf '%s' "$PR_JSON" | jq -r --arg l "$ESCAPE_LABEL" \
 # Non-empty means non-empty: a heading with nothing under it is the same
 # disclosure as no heading at all, and is the likelier way to satisfy this by
 # accident.
+# `\r` is stripped and trailing whitespace trimmed BEFORE the heading is matched.
+# A PR body edited in GitHub's web UI arrives CRLF-terminated, which left every
+# line as "## Unreviewed merge rationale\r" and made the exact-match index fail —
+# so a PR carrying both halves of the escape was refused, and told to add a
+# section it already had. Measured: identical payloads, LF exits 0 and CRLF
+# exits 1. The repo has met this class before (`Set-Content` writing CRLF into
+# `.sh` files, `.gitattributes eol=lf`); it reappears at every boundary where
+# text crosses from a Windows-flavoured producer.
 RATIONALE="$(printf '%s' "$PR_JSON" | jq -r --arg s "$ESCAPE_SECTION" '
     (.body // "")
+    | gsub("\r"; "")
     | split("\n")
+    | map(sub("[ \t]+$"; ""))
     | (index($s)) as $i
     | if $i == null then ""
       else .[$i+1:]
