@@ -1,7 +1,7 @@
 ---
 id: "BUG-086-verify-partial-registry"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-08-16"
 issue: "mlorentedev/dotfiles#1004"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -77,6 +77,11 @@ non-zero.
       secret, so every write path keeps failing loudly.
 - [ ] AC7 — a structural failure (unparseable YAML, unsupported version) still aborts
       rather than degrading into a report.
+- [ ] AC8 — a duplicate id reports BOTH halves: the definition that validated resolves
+      normally, and every defect sharing that id is reported. Added after review (#1020):
+      because a rejected secret does not reserve its id (AC4), one id can name a valid
+      entry AND one or more defects, and reporting only the defect hides the half that
+      actually resolves.
 
 ## References
 
