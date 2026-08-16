@@ -127,3 +127,23 @@ Fixed and pinned by `TestProbeCmd_NonPositiveCountIsRefused` and the multi-probe
 reporting path. Worth recording as a pattern: the happy path gets written and
 tested first, and the branches where nothing happens are the ones nobody looks
 at.
+
+## Adversarial review disposition
+
+**PASS** — `nan/deepseek-v4-flash`, `reviewed_sha 39689e1`, 5 findings, all Minor,
+none blocking. Every one applied rather than deferred; the code and tests changed,
+the spec contract files did not, so the review is not invalidated (staleness is
+scoped to `proposal.md`, `tasks.md`, `features.json`).
+
+| # | Reality | Finding | Disposition |
+|---|---|---|---|
+| 1 | REAL | `is2xx`/`isSuccess` duplicated across packages | **Applied** — exported `secrets.Is2xx`, deleted the cmd copy. Two callers must not drift about which bodies are safe. |
+| 2 | REAL | `ProbeItemID` holds a credential-bearing search body; safe by scoping, not structurally | **Applied** — `TestProbeItemID_ReturnsOnlyTheIDNeverBodyBytes` pins that only the id leaves, on the success, not-found and ambiguity paths. |
+| 3 | THEORETICAL | non-string `value` in the field-label path matched no case and vanished | **Applied, and it was a real gap.** A `{"name":"enabled","value":true}` field disappeared from a report whose job is to describe shape. `nil` and default branches added, reporting the TYPE and never the value. |
+| 4 | THEORETICAL | field labels are printed verbatim on domain knowledge, not validation | **Applied as documentation, in the code rather than the spec.** The assumption now sits at the exception it governs. Deliberately not heuristically validated: guessing what "looks secret" would trade certain diagnostic power for an unreliable filter. |
+| 5 | SPECULATIVE | cmd tests covered only refusals, so a wiring regression would pass | **Applied** — added a `probeClient` seam (matching this package's existing seam idiom) and a positive test driving `--raw --count 4` against an httptest server that alternates 200/500, asserting the distribution, the non-2xx body under `--raw`, and that the sentinel never appears. |
+
+Finding 3 is the one worth keeping: it is the same shape as the two defects found
+earlier in this command — the branches where nothing happens are the ones nobody
+looks at. Here the walker had a case for every type it expected and no case at
+all for the rest, so the unexpected input produced silence instead of a report.

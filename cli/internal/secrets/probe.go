@@ -61,7 +61,7 @@ func ShapeProbe(res ProbeResult, raw bool) ProbeReport {
 		ValidJSON:   json.Valid(res.Body),
 	}
 
-	if raw && !is2xx(res.Status) {
+	if raw && !Is2xx(res.Status) {
 		body := string(res.Body)
 		if len(body) > rawBodyCap {
 			body, rep.Truncated = body[:rawBodyCap], true
@@ -106,7 +106,7 @@ func (c BWServeClient) ProbeItemID(item string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !is2xx(res.Status) {
+	if !Is2xx(res.Status) {
 		return "", fmt.Errorf("listing items for %q: HTTP %d (%d bytes)", item, res.Status, res.Size)
 	}
 	var env struct {
@@ -159,6 +159,14 @@ func collectValues(path string, v any, out *[]ValueFact) {
 		// when the same object also carries a "value", and only to LABEL that
 		// object. The label is a user-chosen identifier, not a credential; the
 		// value beside it is still fingerprinted like everything else.
+		//
+		// The assumption, stated because it is domain knowledge rather than
+		// something this code verifies: a Bitwarden custom-field NAME is a
+		// user-chosen label, not credential material. It is printed verbatim, so
+		// an operator who names a field "gitlab-token-2026-08" sees that string.
+		// That is a label leak at worst, never a value leak — and validating
+		// labels heuristically would trade a certain loss of diagnostic power for
+		// a guess about what looks secret.
 		if label, ok := fieldLabel(t); ok {
 			collectValues(fmt.Sprintf("%s[%s]", path, label), t["value"], out)
 			for k, child := range t {
@@ -176,6 +184,20 @@ func collectValues(path string, v any, out *[]ValueFact) {
 		for i, child := range t {
 			collectValues(fmt.Sprintf("%s[%d]", path, i), child, out)
 		}
+	case nil:
+		// An explicit null is a real state — a cleared field — and reads
+		// differently from an absent key. Named so it is not mistaken for either.
+		*out = append(*out, ValueFact{Path: path, Length: 0, Fingerprint: "(null)"})
+	default:
+		// Numbers and booleans. They cannot be credentials, but silently dropping
+		// them makes the field INVISIBLE, which is a diagnostic gap rather than a
+		// safety one: a custom field {"name":"enabled","value":true} would vanish
+		// from a report whose whole job is to describe the payload's shape. The
+		// type is reported, never the value, so the rule "no content leaves here"
+		// still holds without exception.
+		*out = append(*out, ValueFact{
+			Path: path, Length: 0, Fingerprint: fmt.Sprintf("(%T)", t),
+		})
 	}
 }
 
@@ -194,7 +216,10 @@ func fieldLabel(m map[string]any) (string, bool) {
 	return name, true
 }
 
-func is2xx(status int) bool { return status >= 200 && status < 300 }
+// Is2xx reports whether a status is a success. Exported so the command layer
+// asks the SAME question the reporting layer answers with — a second private
+// copy is how two callers drift into disagreeing about which bodies are safe.
+func Is2xx(status int) bool { return status >= 200 && status < 300 }
 
 // String renders the report for a terminal.
 func (r ProbeReport) String() string {

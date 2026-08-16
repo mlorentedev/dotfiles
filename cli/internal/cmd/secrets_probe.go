@@ -21,6 +21,13 @@ import (
 //
 // It is read-only by construction: no unlock, no sync, no write. A probe that
 // mutated state could not be run freely while diagnosing, which would defeat it.
+// probeClient is the daemon seam for probe, in the same shape as this package's
+// other test seams (bwReader, registryPath). Production returns a client on the
+// default loopback port; a test points it at an httptest server, which is what
+// makes the wiring — flags reaching ShapeProbe, the success predicate, the
+// distribution — assertable at all rather than only its refusals.
+var probeClient = func() secrets.BWServeClient { return secrets.BWServeClient{} }
+
 func newSecretsProbeCmd() *cobra.Command {
 	var raw bool
 	var count int
@@ -79,7 +86,7 @@ func newSecretsProbeCmd() *cobra.Command {
 			// read. That is exactly why a probe with a stable, declared request
 			// sequence is worth having: an ad-hoc curl loop cannot tell you which
 			// of its own steps moved the result.
-			client := secrets.BWServeClient{}
+			client := probeClient()
 
 			itemID, err := client.ProbeItemID(s.BW.Item)
 			if err != nil {
@@ -106,7 +113,7 @@ func newSecretsProbeCmd() *cobra.Command {
 				// catch an intermittent fault's body without staring at a terminal
 				// waiting to get lucky. A flag that quietly does nothing is worse
 				// than one that refuses.
-				if count == 1 || (raw && !isSuccess(res.Status)) {
+				if count == 1 || (raw && !secrets.Is2xx(res.Status)) {
 					if count > 1 {
 						_, _ = fmt.Fprintf(cmd.OutOrStdout(), "attempt %d:\n", i+1)
 					}
@@ -147,9 +154,3 @@ func printDistribution(cmd *cobra.Command, statuses map[int]int, total int) {
 			"mixed outcomes for identical requests — the backend is not deterministic here")
 	}
 }
-
-// isSuccess mirrors the 2xx rule the reporting code enforces. Duplicated as a
-// tiny predicate rather than exported from secrets, because the two uses answer
-// different questions: there it decides whether a body may be shown, here it
-// decides whether an attempt is worth reporting at all.
-func isSuccess(status int) bool { return status >= 200 && status < 300 }

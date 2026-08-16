@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -149,5 +150,63 @@ func TestShapeProbe_EmptyValueIsLegible(t *testing.T) {
 
 	if !strings.Contains(got, "(empty)") {
 		t.Errorf("an empty value must be legible as empty, not as just another value:\n%s", got)
+	}
+}
+
+// Finding 3 from the adversarial review: the field-label path handed a
+// non-string `value` straight back into the walk, where it matched no case and
+// vanished. No leak, but the field became invisible in a report whose whole job
+// is to describe the payload's shape.
+func TestShapeProbe_NonStringValuesStayVisible(t *testing.T) {
+	body := `{"success":true,"data":{"fields":[` +
+		`{"name":"enabled","value":true},` +
+		`{"name":"retries","value":3},` +
+		`{"name":"cleared","value":null}]}}`
+
+	got := ShapeProbe(ProbeResult{Status: 200, Size: len(body), Body: []byte(body)}, false).String()
+
+	for _, want := range []string{"enabled", "retries", "cleared", "(bool)", "(float64)", "(null)"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want %q in the report, got:\n%s", want, got)
+		}
+	}
+	// The type is reported; the value never is. Scoped to the values block --
+	// "true" also appears in the envelope's own success flag, which is
+	// daemon-authored control data rather than payload content.
+	for _, line := range strings.Split(got, "\n") {
+		if !strings.Contains(line, "data.fields") {
+			continue
+		}
+		if strings.Contains(line, "true") || strings.Contains(line, " 3 ") {
+			t.Errorf("a non-string value must be described by type, never printed: %s", line)
+		}
+	}
+}
+
+// Finding 2: ProbeItemID holds a credential-bearing search response in memory.
+// It is safe by scoping today; this pins that only the id ever leaves, so a
+// future edit that renders or wraps the body fails here rather than in a log.
+func TestProbeItemID_ReturnsOnlyTheIDNeverBodyBytes(t *testing.T) {
+	const secret = "SUPER-SECRET-CANARY-VALUE"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"success":true,"data":{"data":[{"id":"abc-123","name":"nan-api-key",` +
+			`"fields":[{"name":"api-key","value":"` + secret + `"}]}]}}`))
+	}))
+	defer srv.Close()
+
+	id, err := (BWServeClient{BaseURL: srv.URL}).ProbeItemID("nan-api-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != "abc-123" {
+		t.Errorf("want the resolved id, got %q", id)
+	}
+	if strings.Contains(id, secret) {
+		t.Error("the item body escaped through the returned id")
+	}
+	// The ambiguity and not-found paths must not carry it either.
+	_, err = (BWServeClient{BaseURL: srv.URL}).ProbeItemID("no-such-item")
+	if err != nil && strings.Contains(err.Error(), secret) {
+		t.Errorf("the not-found error carried body bytes: %v", err)
 	}
 }
