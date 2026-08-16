@@ -55,6 +55,16 @@ that reports well but leaks once has failed completely, so the tests that pin
 - [ ] `--raw`, `--count N` flags.
 - [ ] `--count N`: report the outcome distribution (status → occurrences); no
       value output regardless of N.
+- [ ] **`--count` MUST reuse one client across all N iterations.** Not a
+      performance choice — it decides whether the flag works at all. Measured in
+      the `cli/internal/secrets/` lane (2026-08-15): 24 requests at each of
+      1/2/4/8-way parallelism gave 96/96 clean, while the *same* 6-request
+      keep-alive chain gave 2, then 1, then 0 × HTTP 500 across three consecutive
+      runs. So the failure tracks connection reuse, and a fresh client per
+      iteration would sample only the always-clean case — `--count` would then
+      report the bug as ABSENT, which is worse than not having the flag: it would
+      be evidence for the wrong conclusion. A test pins that N iterations issue
+      through one client.
 - [ ] Read-only: assert no unlock/sync/set/rotate call exists on this path.
 
 ## 4. Verification
