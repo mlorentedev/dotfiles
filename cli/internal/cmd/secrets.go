@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -59,11 +60,60 @@ var (
 	registryPath      = env.ResolveRegistryPath
 	registryWritePath = env.RepoRegistryPath
 	ageDecryptor      secrets.Decryptor
-	bwReader          secrets.BWReader = secrets.BWFallbackReader{
-		Serve:    secrets.BWServeReader{Client: secrets.BWServeClient{}},
-		Shellout: secrets.BWGet{},
-	}
+
+	// bwReader / bwWriter are TEST SEAMS ONLY: nil in production, where both halves
+	// come from the pinned backend below. A test assigns one (or both) to inject a
+	// fake with no age key and no unlocked Bitwarden.
+	bwReader secrets.BWReader
+	bwWriter bwWriteClient
+
+	// bwBackendOnce / bwBackendPin implement BUG-084's pinning decision: the
+	// daemon-vs-shellout choice is made ONCE per process — a `dotf` invocation is one
+	// command — and both the read and write halves come from that single decision, so
+	// a command cannot read through the daemon and write through the CLI. That split
+	// is what BUG-084 was.
+	//
+	// Lazy (sync.Once, not a package initialiser) so commands that touch no secret —
+	// `dotf env`, `dotf doctor`, `dotf spec` — never pay the daemon probe.
+	bwBackendOnce sync.Once
+	bwBackendPin  secrets.BWBackend
 )
+
+// bwBackend returns the process-wide pinned Bitwarden backend, probing the daemon on
+// first use only.
+func bwBackend() secrets.BWBackend {
+	bwBackendOnce.Do(func() {
+		bwBackendPin = secrets.SelectBWBackend(secrets.BWServeClient{})
+	})
+	return bwBackendPin
+}
+
+// bwRead / bwWrite are how every command reaches Bitwarden. They prefer an injected
+// test seam and otherwise take the matched half of the pinned backend — so production
+// code has no way to mix the two subjects even by accident.
+func bwRead() secrets.BWReader {
+	if bwReader != nil {
+		return bwReader
+	}
+	return bwBackend().Reader
+}
+
+func bwWrite() bwWriteClient {
+	if bwWriter != nil {
+		return bwWriter
+	}
+	return bwBackend().Writer
+}
+
+// bwSync returns the cache-refresh half of the SAME pinned backend. Sync is pinned with
+// the other two because the daemon and the CLI cache independently: syncing one leaves
+// the other stale, so a rotation that syncs the wrong subject cannot prove its own write.
+func bwSync() daemonSyncer {
+	if bwSyncer != nil {
+		return bwSyncer
+	}
+	return bwBackend().Syncer
+}
 
 // secretLoader builds the resolution engine wired with both backend seams, over the
 // age store in sensitive/ (checkout-first, ADR-030 — same source as the registry it
@@ -73,7 +123,7 @@ func secretLoader() *secrets.Loader {
 		SecretsDir: env.ResolveSensitiveDir(),
 		KeyPath:    ageKeyPath(),
 		Decrypt:    ageDecryptor,
-		BW:         bwReader,
+		BW:         bwRead(),
 	}
 }
 
