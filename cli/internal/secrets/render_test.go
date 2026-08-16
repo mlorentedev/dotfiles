@@ -224,3 +224,33 @@ secrets:
 		t.Fatal("expected ParseRegistry to reject a var exposed by two secrets")
 	}
 }
+
+// The claim the whole BUG-081b argument rests on: render substitutes {env:VAR}
+// and nothing else, so a config written in pi's own `${VAR}` syntax passes
+// through byte-identical.
+//
+// If this were false, flipping ai/pi/models.json to pi's syntax would require
+// changing the deploy blocks in BOTH setup scripts — the growth the CLI
+// convergence epic exists to reverse. It is asserted rather than assumed
+// because the entire "no setup edits" scope decision depends on it.
+func TestRender_LeavesShellStyleVariablesUntouched(t *testing.T) {
+	const src = `{"providers":{"nan":{"apiKey":"${NAN_API_KEY}","alt":"$NAN_API_KEY"}}}`
+	path := renderFixture(t, src)
+	reg := parseRenderReg(t, renderRegistry)
+
+	res, err := Render(path, reg, loaderFor(t), "/h")
+	if err != nil {
+		t.Fatalf("render must not fail on a config it has nothing to do in: %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != src {
+		t.Errorf("render rewrote a config it should have passed through:\nwant %s\ngot  %s", src, got)
+	}
+	if res.Substituted != 0 {
+		t.Errorf("render reported %d substitution(s) in a file with no {env:} placeholders", res.Substituted)
+	}
+}
