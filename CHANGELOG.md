@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.43.0](https://github.com/mlorentedev/dotfiles/compare/v0.42.0...v0.43.0) (2026-08-16)
+
+
+### Features
+
+* **ci:** add PR-Agent on NaN inference, so review capacity stops gating throughput ([#1032](https://github.com/mlorentedev/dotfiles/issues/1032)) ([23c5716](https://github.com/mlorentedev/dotfiles/commit/23c57169af3c8ae019321f3f1e88f71e4e537ee2))
+* **ci:** make a green check mean reviewed, not merely un-failed ([#1019](https://github.com/mlorentedev/dotfiles/issues/1019)) ([e033302](https://github.com/mlorentedev/dotfiles/commit/e033302489a9e446efa8e38253cb7aa5a7b8a590))
+* **cli:** add `dotf deploy`, one implementation of agent-config deployment ([#1027](https://github.com/mlorentedev/dotfiles/issues/1027)) ([bf7d33e](https://github.com/mlorentedev/dotfiles/commit/bf7d33e5d9f132cf556bb0cea6d083b898c5890f)), closes [#1023](https://github.com/mlorentedev/dotfiles/issues/1023)
+
+
+### Bug Fixes
+
+* **ci:** make the failing attestation step say why, not just exit 1 ([#906](https://github.com/mlorentedev/dotfiles/issues/906)) ([#1029](https://github.com/mlorentedev/dotfiles/issues/1029)) ([a724086](https://github.com/mlorentedev/dotfiles/commit/a724086b6e747c7119cb59b49ed2d2b914f11932))
+* **pi:** resolve the API key at runtime, so no config carries a credential ([#1026](https://github.com/mlorentedev/dotfiles/issues/1026)) ([db5b314](https://github.com/mlorentedev/dotfiles/commit/db5b314d1b2f33ddf681b29c0211fe52db77decb)), closes [#987](https://github.com/mlorentedev/dotfiles/issues/987)
+* **spec:** stop refusing a passing review over punctuation ([#963](https://github.com/mlorentedev/dotfiles/issues/963)) ([#1031](https://github.com/mlorentedev/dotfiles/issues/1031)) ([2f7bfd5](https://github.com/mlorentedev/dotfiles/commit/2f7bfd5b61db9fd1fc90c6b5b541a1954e7414a5))
+
 ## [0.42.0](https://github.com/mlorentedev/dotfiles/compare/v0.41.0...v0.42.0) (2026-08-16)
 
 
