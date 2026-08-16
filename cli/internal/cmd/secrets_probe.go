@@ -41,6 +41,12 @@ func newSecretsProbeCmd() *cobra.Command {
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// A non-positive count would run the loop zero times and exit 0,
+			// reporting success for work never done — the failure class this whole
+			// ticket is about, reproduced in its own tool. Refused explicitly.
+			if count < 1 {
+				return fmt.Errorf("--count must be at least 1, got %d", count)
+			}
 			reg, err := loadRegistry()
 			if err != nil {
 				return err
@@ -91,7 +97,19 @@ func newSecretsProbeCmd() *cobra.Command {
 					return probeErr
 				}
 				statuses[res.Status]++
-				if count == 1 {
+				// Print the full report for a single probe, and — when --raw is
+				// set — for every FAILING attempt of a multi-probe run.
+				//
+				// The earlier shape printed nothing but the distribution once
+				// count > 1, which silently made --raw a no-op in the exact
+				// combination where it earns its keep: --raw --count N is how you
+				// catch an intermittent fault's body without staring at a terminal
+				// waiting to get lucky. A flag that quietly does nothing is worse
+				// than one that refuses.
+				if count == 1 || (raw && !isSuccess(res.Status)) {
+					if count > 1 {
+						_, _ = fmt.Fprintf(cmd.OutOrStdout(), "attempt %d:\n", i+1)
+					}
 					_, _ = fmt.Fprint(cmd.OutOrStdout(), secrets.ShapeProbe(res, raw).String())
 				}
 				if probeErr != nil {
@@ -129,3 +147,9 @@ func printDistribution(cmd *cobra.Command, statuses map[int]int, total int) {
 			"mixed outcomes for identical requests — the backend is not deterministic here")
 	}
 }
+
+// isSuccess mirrors the 2xx rule the reporting code enforces. Duplicated as a
+// tiny predicate rather than exported from secrets, because the two uses answer
+// different questions: there it decides whether a body may be shown, here it
+// decides whether an attempt is worth reporting at all.
+func isSuccess(status int) bool { return status >= 200 && status < 300 }
