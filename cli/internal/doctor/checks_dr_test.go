@@ -9,11 +9,20 @@ import (
 	"time"
 )
 
-func drSys(now time.Time) *System {
+// drSys builds a System for the DR check with NO bw-backed secrets, i.e. the
+// pre-migration machine where an absent escrow costs nothing. Severity is keyed
+// to that count (#997), so most tests need to state it; this is the neutral one.
+func drSys(now time.Time) *System { return drSysExposed(now, 0, nil) }
+
+// drSysExposed states the exposure explicitly: how many registry entries resolve
+// through Bitwarden, and whether the registry could be read at all. Those two
+// are the only inputs that move this check's severity.
+func drSysExposed(now time.Time, bwBacked int, regErr error) *System {
 	return &System{
-		Getenv:   func(string) string { return "" },
-		LookPath: func(n string) (string, error) { return "/usr/bin/" + n, nil },
-		Now:      func() time.Time { return now },
+		Getenv:          func(string) string { return "" },
+		LookPath:        func(n string) (string, error) { return "/usr/bin/" + n, nil },
+		Now:             func() time.Time { return now },
+		BWBackedSecrets: func() (int, error) { return bwBacked, regErr },
 	}
 }
 
@@ -84,20 +93,74 @@ func TestDR_StaleDrillWarns(t *testing.T) {
 	}
 }
 
-// An absent escrow is a known state (#586 item 5 has not shipped), not a
-// regression -- SKIP, so it does not train anyone to ignore this section.
-func TestDR_AbsentEscrowSkipsNotFails(t *testing.T) {
+// With nothing resolving through Bitwarden, an absent escrow costs nothing --
+// every secret still has its age copy on disk. SKIP, because a red doctor for a
+// harmless condition is how operators are trained to ignore red doctors.
+func TestDR_AbsentEscrowNoExposure_Skips(t *testing.T) {
 	cfg := &Config{DotfilesDir: t.TempDir()}
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(time.Now()), cfg, rep)
+	checkDisasterRecovery(drSysExposed(time.Now(), 0, nil), cfg, rep)
 
 	if rep.Failures() != 0 {
-		t.Fatalf("absent escrow must not FAIL, got %d", rep.Failures())
+		t.Fatalf("absent escrow with no bw-backed secrets must not FAIL, got %d:\n%s", rep.Failures(), buf.String())
 	}
 	if !strings.Contains(buf.String(), "no DR escrow") {
 		t.Errorf("want the escrow SKIP, got: %s", buf.String())
+	}
+}
+
+// The defect this issue exists for (#997). Once a secret resolves through
+// Bitwarden, `migrate` has dropped its age: pointer (#971) -- so the remote
+// account is the ONLY copy, and an absent escrow is a single point of total
+// loss. Reported for months as "nothing to check here".
+func TestDR_AbsentEscrowWithExposure_Fails(t *testing.T) {
+	cfg := &Config{DotfilesDir: t.TempDir()}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(drSysExposed(time.Now(), 26, nil), cfg, rep)
+
+	if rep.Failures() != 1 {
+		t.Fatalf("absent escrow with bw-backed secrets must FAIL, got %d failure(s):\n%s", rep.Failures(), buf.String())
+	}
+	out := buf.String()
+	// The count is the whole argument: "no backup" is abstract, "26 secrets
+	// exist only on a remote server" is what makes an operator act.
+	if !strings.Contains(out, "26") {
+		t.Errorf("the FAIL must name how many secrets have no local copy, got: %s", out)
+	}
+	// The remedy must be the invocation that actually works. A bare
+	// `dotf secrets backup` fails with "Vault is locked": its export path has no
+	// bw serve endpoint (verified against the shipped @bitwarden/cli bundle --
+	// the serve router has no export route), so it needs a CLI session. This is
+	// permanent, not pending #993, which is why the message names it plainly.
+	if !strings.Contains(out, "BW_SESSION") {
+		t.Errorf("the FAIL must name the invocation that actually creates an escrow, got: %s", out)
+	}
+	if strings.Contains(out, "#993") {
+		t.Errorf("the remedy is permanent, not blocked on #993; citing it dates the message: %s", out)
+	}
+}
+
+// A stale escrow stays a WARN even under exposure: a 120-day-old copy is a
+// degraded backup, not an absent one, and the two must not read alike.
+func TestDR_StaleEscrowWithExposure_StillWarns(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{DotfilesDir: dir}
+	now := time.Now()
+	touchAt(t, filepath.Join(dir, "sensitive", "dr", "bitwarden-export.age"), now.Add(-120*24*time.Hour))
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(drSysExposed(now, 26, nil), cfg, rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("a stale escrow is degraded, not absent; want WARN not FAIL:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "DR escrow is 120 days old") {
+		t.Errorf("want the escrow staleness warning, got: %s", buf.String())
 	}
 }
 
