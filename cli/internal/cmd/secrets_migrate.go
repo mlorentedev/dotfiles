@@ -79,7 +79,7 @@ func newSecretsMigrateCmd() *cobra.Command {
 			}
 
 			// Parity gate — re-read bw and compare; abort BEFORE the registry flip.
-			back, err := bwReader.Field(item, field)
+			back, err := bwRead().Field(item, field)
 			if err != nil {
 				return fmt.Errorf("parity read-back of %s/%s failed (registry NOT flipped): %w", item, field, err)
 			}

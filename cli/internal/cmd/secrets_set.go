@@ -14,18 +14,14 @@ import (
 )
 
 // bwWriteClient is what `set` needs from the bw write seam: update an existing field
-// (BWWriter) and create an absent item (BWCreator). Two small interfaces, one prod
-// impl (BWPut) — keeping create separate from update so update-only callers cannot
-// create by accident.
-type bwWriteClient interface {
-	secrets.BWWriter
-	secrets.BWCreator
-	secrets.BWFolderResolver
-}
-
-// bwWriter is the bw write seam (BWPut in production), overridable so set's tests run
-// with no unlocked Bitwarden — the write analog of bwReader.
-var bwWriter bwWriteClient = secrets.BWPut{}
+// (BWWriter), create an absent item (BWCreator), and resolve the taxonomy folder
+// (BWFolderResolver). Kept as three small interfaces so an update-only caller cannot
+// create by accident; this is an alias of the package-level composition in `secrets`,
+// which both backends (BWPut, BWServeWriter) satisfy.
+//
+// The `bwWriter` var it types now lives in secrets.go beside `bwReader`, because the
+// two are chosen together — see bwBackend().
+type bwWriteClient = secrets.BWWriteClient
 
 // stdinIsTerminal reports whether stdin is an interactive terminal; a var so tests
 // force the non-interactive (piped) path.
@@ -136,7 +132,7 @@ func normalizeValue(value string, isFile bool) string {
 // security crux of #612: a locked vault must never be mistaken for an absent item.
 func applySet(cmd *cobra.Command, item, field, value, folder string, isFile, dryRun, assumeYes bool) error {
 	out := cmd.OutOrStdout()
-	cur, err := bwReader.Field(item, field)
+	cur, err := bwRead().Field(item, field)
 	switch {
 	case err == nil:
 		if normalizeValue(cur, isFile) == value {
@@ -147,7 +143,7 @@ func applySet(cmd *cobra.Command, item, field, value, folder string, isFile, dry
 			_, _ = fmt.Fprintf(out, "would update  %s / %s\n", item, field)
 			return nil
 		}
-		if err := bwWriter.SetField(item, field, value); err != nil {
+		if err := bwWrite().SetField(item, field, value); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintf(out, "updated  %s / %s\n", item, field)
@@ -158,7 +154,7 @@ func applySet(cmd *cobra.Command, item, field, value, folder string, isFile, dry
 			_, _ = fmt.Fprintf(out, "would add field  %s / %s\n", item, field)
 			return nil
 		}
-		if err := bwWriter.SetField(item, field, value); err != nil {
+		if err := bwWrite().SetField(item, field, value); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintf(out, "added field  %s / %s\n", item, field)
@@ -192,11 +188,11 @@ func createAbsent(cmd *cobra.Command, item, field, value, folder string, dryRun,
 			return fmt.Errorf("aborted: item %q not created", item)
 		}
 	}
-	folderID, err := bwWriter.ResolveFolder(folder)
+	folderID, err := bwWrite().ResolveFolder(folder)
 	if err != nil {
 		return fmt.Errorf("resolve bw folder %q: %w", folder, err)
 	}
-	if err := bwWriter.CreateItem(item, field, value, folderID); err != nil {
+	if err := bwWrite().CreateItem(item, field, value, folderID); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(out, "created item  %s (field %s)\n", item, field)
