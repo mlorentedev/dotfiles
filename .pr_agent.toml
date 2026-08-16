@@ -1,0 +1,98 @@
+# PR-Agent (qodo-ai/pr-agent, MIT) backed by NaN cluster inference — TOOL-013 (#786).
+#
+# Why this exists: CodeRabbit's free tier gives ~1 review per hour, account-wide.
+# On 2026-08-16 three PRs from three parallel sessions each carried a "Review
+# limit reached" notice, zero reviews between them, and a green `CodeRabbit pass`
+# check. Review capacity, not review quality, became the binding constraint on
+# throughput. A reviewer without a per-hour account quota removes the queue
+# rather than scheduling around it.
+
+[config]
+# `openai/` prefix selects LiteLLM's OpenAI-compatible transport; the endpoint
+# is NaN's, set as OPENAI.API_BASE in the workflow. The model itself is not the
+# hosted OpenAI one.
+#
+# deepseek-v4-flash is not a guess. #786's body argued from a 2026-06-11 research
+# note that REJECTED PR-Agent because "local-model quality drops below the bar",
+# then reasoned that cluster inference should be a different tier. That was a
+# projection. It is now measured: three adversarial reviews ran on this model on
+# 2026-08-16 and each produced findings a rubber stamp would not — including a
+# security hole in GUARD-002 (the gate ran its own classifier from the PR under
+# review, so a PR could edit it to attest itself) and a vacuous test predicate.
+model = "openai/deepseek-v4-flash"
+
+# NO cheap fallback, and this deliberately departs from #786's draft, which
+# proposed `fallback_models = ["qwen3.6"]`.
+#
+# harness/reviewer-pool.json excludes qwen3.6 from the adversarial-review pool by
+# name, on the grounds that "a reviewer that PASSes cheaply is worse than no
+# gate, because it converts the gate into a green checkmark". Adopting it as a
+# fallback here would put two files in the repo holding opposite policies on who
+# may review.
+#
+# The safe direction is available precisely because GUARD-002 exists: if this
+# reviewer fails, the review-attestation gate reports `declined` and the PR goes
+# red. A failure is therefore VISIBLE, which makes "no review" strictly better
+# than "a cheap review that passes everything". Falling back to a
+# latency-optimised model would trade a loud absence for a quiet rubber stamp.
+fallback_models = []
+
+# Cheap passes only — descriptions and commit summaries, never the review.
+model_weak = "openai/qwen3.6"
+
+# NaN models are absent from LiteLLM's registry, so the token budget must be
+# stated explicitly or LiteLLM assumes a small default and truncates the diff.
+# deepseek-v4-flash advertises 1M context; 200k is a deliberate floor well inside
+# it, raised only against measured need.
+custom_model_max_tokens = 200000
+max_model_tokens = 200000
+
+response_language = "en-US"
+
+# AGENTS.md is this repo's behavioural SSOT, so the standing orders, the
+# English-only rule, the no-auto-merge rule and the shell-compatibility table all
+# enter the review prompt with no extra wiring. This is the single highest-value
+# line in the file.
+repo_context_files = ["AGENTS.md"]
+
+[pr_reviewer]
+# Inline comments on the diff, which is the half CodeRabbit's free tier withholds
+# on private repos and the reason this work exists.
+require_score_review = false
+require_tests_review = true
+require_security_review = true
+persistent_comment = true
+final_update_message = false
+
+extra_instructions = """
+This repository already runs shellcheck, bats, golangci-lint, go vet and gitleaks
+in CI. Do not restate what a linter reports; that is covered and it is noise here.
+
+Spend the budget on what static analysis cannot see:
+- a guard that cannot fail the way its comment claims, or that reports on a
+  system it perturbs;
+- a test that passes vacuously — a negated assertion in the middle of a bats
+  @test is exempt from set -e and is silently ignored;
+- a check whose only reachable branch is the no-op one;
+- cross-file consequences a single-hunk reader would miss.
+
+Shell must run under bash AND zsh; see the prohibited-pattern table in
+.claude/CLAUDE.md before flagging or accepting shell constructs.
+
+Classify each finding by whether it is REAL, THEORETICAL or SPECULATIVE, and say
+which. A finding without that gradation is hard to action.
+"""
+
+[ignore]
+# Path-based exclusion, so the rule lives in a file rather than in memory. The
+# diff leaves this infrastructure only at the model call, and these filters run
+# before it.
+#
+# sensitive/** is the load-bearing entry: it holds age ciphertext and the DR
+# escrow. Encrypted or not, credential material is not sent to an inference
+# endpoint to be reviewed.
+glob = [
+  "sensitive/**",
+  "!sensitive/registry-example.yaml",
+  "specs/**/review-transcript.jsonl*",
+]
