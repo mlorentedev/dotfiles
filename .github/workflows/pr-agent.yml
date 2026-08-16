@@ -1,0 +1,62 @@
+name: pr-agent
+
+# TOOL-013 (#786): an inline PR reviewer backed by NaN cluster inference, so
+# review capacity stops being the constraint on throughput.
+#
+# The problem it removes, measured 2026-08-16: CodeRabbit's free tier allows
+# roughly one review per hour ACCOUNT-WIDE. Three PRs opened by three parallel
+# sessions each received "Review limit reached" instead of a review, while
+# `gh pr checks` reported `CodeRabbit  pass` for all three. Two were merged
+# unreviewed. GUARD-002 made that visible; this makes it stop happening.
+#
+# Runs ALONGSIDE CodeRabbit deliberately, for a bounded window. #786 requires
+# recording which tool found what before either is retired, and the standing rule
+# caps autonomous reviewers at two.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Slash commands (/review, /describe, /improve) on an existing PR.
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # the review comments are the product
+  issues: write          # slash-command replies land as issue comments
+
+jobs:
+  review:
+    # issue_comment fires on issues too; and skip draft PRs, which are by
+    # definition not asking to be read yet.
+    if: >
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request)
+    runs-on: ubuntu-latest
+    steps:
+      # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
+      # project has been renamed and the old path now redirects. Pinned to a tag
+      # that was verified to exist and to carry an `action.yaml` (a Docker
+      # action) — the first draft of this file pinned `@v0.30`, which does not
+      # exist at all.
+      - name: PR-Agent
+        uses: The-PR-Agent/pr-agent@v0.42.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
+          # transport with the base URL swapped. The model id in .pr_agent.toml
+          # carries the `openai/` prefix for the same reason; nothing here talks
+          # to OpenAI.
+          OPENAI__KEY: ${{ secrets.NAN_API_KEY }}
+          OPENAI__API_BASE: https://api.nan.builders/v1
+          # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
+          # the entries whose `consumers` list this repo, so the reviewer holds
+          # one credential rather than an ambient set — the failure surface stays
+          # one key wide. #1025 is the same concern on the spec-review path,
+          # where whole-registry injection means one broken item mapping can take
+          # down authentication for everything.
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: false
