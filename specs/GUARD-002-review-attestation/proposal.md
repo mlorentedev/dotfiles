@@ -98,6 +98,32 @@ whether a bot performed it.
   from "declined" in the exit status would let a caller wait rather than fail. Deferred:
   the message names which state it is, and no caller needs to branch on it in v1.
 
+- **This gate must not become an instance of the class it belongs to.** A parallel
+  session named the shape while debugging #988, and it is sharper than "the check was
+  wrong": **the check was the cause.** Three instances observed in this repo within one
+  day —
+  1. `bw serve`'s `GET /status` probe *poisoned the item reads it was verifying*: one
+     status call made 10/10 subsequent item reads return HTTP 500, and `dotf secrets run`
+     issued one before each of 33 secrets, so every `dotf spec review` launch poisoned
+     itself (#988, fixed in #1018);
+  2. a rate-limit notice renders as a green `pass` — this spec;
+  3. a DR check whose only reachable branch was the no-op one, so an escrow that had
+     never existed reported as SKIP (#997).
+
+  One shape: **a signal that reports on a system it is simultaneously perturbing or
+  misrepresenting.** GUARD-002 cannot fix that class — it is a property of checks in
+  general, not of review checks. What it *must* do is not join it, which constrains this
+  design in three concrete ways, each already reflected above:
+  - it **observes** rather than acts, so it cannot perturb what it measures — this is the
+    real reason auto-retriggering `@coderabbitai review` is out of scope, beyond the
+    quota-policy argument. (Empirically moot as well: a parallel session confirmed the
+    explicit command does *not* reclaim a slot while the quota is spent, so an
+    auto-retrigger would spend attempts and change nothing.)
+  - every classifier branch must be **observed failing** before it is made to pass, so no
+    state is decided by a branch that cannot be reached (instance 3's defect);
+  - it must **fail closed** (AC6), so "could not determine" never renders as "fine" —
+    which is instance 2's defect, and the one this spec exists for.
+
 ## Acceptance criteria
 
 - [ ] **AC1** A classifier decides `attested | declined | pending` from a PR's reviews
