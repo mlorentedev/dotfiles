@@ -87,3 +87,35 @@ teardown() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"key.txt not found in USB"* ]]
 }
+
+# --- DR escrow coverage (#1000, ADR-033) ---
+#
+# Structural rather than behavioural, deliberately: a full run copies the real
+# sensitive/ tree (PROJECT_ROOT is derived from the script's own location), and
+# that directory holds plaintext `*.secret` files. Asserting the shape is worth
+# far less than exercising the copy, and it is worth much more than a test that
+# reads real secrets to prove a three-line change. The same trade is already
+# made in tests/compile-harness.bats for setup-linux.sh's deploy calls.
+
+@test "backup-secrets-to-usb.sh copies the DR escrow from sensitive/dr/" {
+    # The gap this closes: the copy loop globs the FLAT top level of sensitive/,
+    # so sensitive/dr/bitwarden-export.age — the full-vault export — was never
+    # on the USB, leaving GitHub as its only off-machine home.
+    grep -q 'SECRETS_DIR/dr/bitwarden-export.age' "$BACKUP_SCRIPT"
+    grep -q 'USB_SECRETS/dr' "$BACKUP_SCRIPT"
+}
+
+@test "backup-secrets-to-usb.sh warns loudly when no DR escrow exists" {
+    # A USB that looks complete and silently lacks the escrow is the exact
+    # failure mode being ended, so absence must not be quiet.
+    grep -q 'log_warning "No DR escrow' "$BACKUP_SCRIPT"
+    grep -q "dotf secrets backup" "$BACKUP_SCRIPT"
+}
+
+@test "backup-secrets-to-usb.sh keeps the USB payload a declared list, not a recursive sweep" {
+    # ADR-033 D1: what lands on the USB is enumerated. A recursive glob over
+    # sensitive/ would silently start shipping whatever else ever appears there
+    # — including plaintext — which is the opposite of the intent.
+    ! grep -qE 'SECRETS_DIR"?/\*\*' "$BACKUP_SCRIPT"
+    ! grep -qE 'cp -r .*SECRETS_DIR' "$BACKUP_SCRIPT"
+}

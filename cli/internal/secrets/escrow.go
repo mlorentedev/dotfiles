@@ -41,13 +41,38 @@ func (e BWExport) Export() ([]byte, error) {
 		bin = "bw"
 	}
 	if _, err := bwRun(bin, "sync"); err != nil {
-		return nil, fmt.Errorf("bw sync: %w", err)
+		return nil, fmt.Errorf("bw sync: %w", exportLockHint(err))
 	}
 	out, err := bwRun(bin, "export", "--format", "json", "--raw")
 	if err != nil {
-		return nil, fmt.Errorf("bw export: %w", err)
+		return nil, fmt.Errorf("bw export: %w", exportLockHint(err))
 	}
 	return out, nil
+}
+
+// exportLockHint explains the one asymmetry BUG-084 could not remove.
+//
+// `set`, `rotate` and `migrate` moved to the bw serve daemon, so their locked-vault
+// errors now say "run `dotf secrets unlock`". Export cannot follow them: `bw serve`
+// exposes NO export route — verified by enumerating the shipped @bitwarden/cli 2026.5.0
+// router table, where the sole "/export" string is an *organization* export against the
+// cloud API, not personal-vault export. So the escrow is permanently CLI-backed and
+// permanently needs that binary's own session.
+//
+// Telling an operator to run `dotf secrets unlock` here would be actively wrong: it
+// unlocks the daemon, the escrow still fails, and the message has taught them a fix that
+// cannot work. This is why the DR escrow silently never existed until 2026-08-15 (#997):
+// the failure was real, but nothing it printed pointed anywhere useful.
+func exportLockHint(err error) error {
+	if !isVaultLocked(err) {
+		return err
+	}
+	return fmt.Errorf("%w: the escrow cannot go through the bw serve daemon — `bw serve` "+
+		"exposes no export endpoint, so this is the one `dotf secrets` operation that needs "+
+		"the bw CLI's own session. `dotf secrets unlock` will NOT fix it. Run:\n"+
+		"    BW_SESSION=\"$(bw unlock --raw)\" dotf secrets backup\n"+
+		"which confines the session to that one process rather than exporting it: %w",
+		ErrBWVaultLocked, err)
 }
 
 // bwRun executes `bw <args...> --nointeraction`, returning stdout or an error carrying

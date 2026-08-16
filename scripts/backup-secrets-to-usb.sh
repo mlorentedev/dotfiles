@@ -51,6 +51,33 @@ for file in "$SECRETS_DIR"/*.secret "$SECRETS_DIR"/*.secret.age; do
     increment_counter "count"
 done
 
+# Copy the disaster-recovery escrow — the full Bitwarden export, age-encrypted.
+#
+# The loop above matches only the FLAT top level of sensitive/, while
+# `dotf secrets backup` writes into sensitive/dr/. So the USB carried the
+# per-secret age floor and never the full-vault escrow, leaving the escrow's
+# only off-machine copy in the GitHub repo: lose that account and the key
+# survives on this USB while the ciphertext it decrypts does not (#1000).
+#
+# That gap matters more than it used to, not less: per #971 `migrate` drops the
+# `age:` pointer, so the per-secret floor no longer exists for the 28 migrated
+# secrets and the escrow is the only thing standing behind them.
+#
+# An explicit path rather than a widened glob, so what lands on the USB stays a
+# declared list — a `**` here would silently start shipping whatever else ever
+# appears under sensitive/.
+DR_ESCROW="$SECRETS_DIR/dr/bitwarden-export.age"
+if file_exists "$DR_ESCROW"; then
+    mkdir -p "$USB_SECRETS/dr"
+    cp "$DR_ESCROW" "$USB_SECRETS/dr/"
+    log_info "Copied: dr/$(basename "$DR_ESCROW")"
+    increment_counter "count"
+else
+    # Loud, because a USB that looks complete and silently lacks the escrow is
+    # the failure this block exists to end.
+    log_warning "No DR escrow at $DR_ESCROW — run 'dotf secrets backup' first; this USB will NOT carry the full-vault export"
+fi
+
 # Copy standalone age script
 cp "$SCRIPT_DIR/age-standalone.sh" "$USB_PATH/"
 chmod +x "$USB_PATH/age-standalone.sh"
