@@ -3,6 +3,8 @@ package secrets
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -88,6 +90,49 @@ func ShapeProbe(res ProbeResult, raw bool) ProbeReport {
 	collectValues("data", data, &rep.Values)
 	sort.Slice(rep.Values, func(i, j int) bool { return rep.Values[i].Path < rep.Values[j].Path })
 	return rep
+}
+
+// ProbeItemID resolves a vault item NAME to the id the item endpoint takes,
+// using the same search the read path uses so a probe addresses exactly the item
+// the resolver would.
+//
+// It goes through Probe rather than call for one reason: the search step can fail
+// the same way the item read does, and routing it through the safe path means a
+// failure there is reported as a status rather than as a parser error. The list
+// reply carries full items — values included — so it is parsed in memory and
+// never rendered; only the id leaves this function.
+func (c BWServeClient) ProbeItemID(item string) (string, error) {
+	res, err := c.Probe(http.MethodGet, "/list/object/items?search="+url.QueryEscape(item))
+	if err != nil {
+		return "", err
+	}
+	if !is2xx(res.Status) {
+		return "", fmt.Errorf("listing items for %q: HTTP %d (%d bytes)", item, res.Status, res.Size)
+	}
+	var env struct {
+		Data bwServeListData `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		return "", fmt.Errorf("listing items for %q: HTTP %d returned no parseable list (%d bytes)",
+			item, res.Status, res.Size)
+	}
+	var ids []string
+	for _, it := range env.Data.Data {
+		if it.Name == item || it.ID == item {
+			ids = append(ids, it.ID)
+		}
+	}
+	switch len(ids) {
+	case 1:
+		return ids[0], nil
+	case 0:
+		return "", fmt.Errorf("%w: bw serve item %q: not found", ErrBWItemNotFound, item)
+	default:
+		// Same ambiguity the read path refuses, refused here for the same reason:
+		// probing an arbitrary one of them would report on an item the resolver
+		// might not pick.
+		return "", fmt.Errorf("bw serve item %q: More than one result was found", item)
+	}
 }
 
 // collectValues walks the decoded payload and records every string leaf.

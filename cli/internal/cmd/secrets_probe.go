@@ -1,0 +1,122 @@
+package cmd
+
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+	"sort"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/spf13/cobra"
+)
+
+// newSecretsProbeCmd is the sanctioned way to ask what the secrets backend
+// actually replied.
+//
+// It exists because the honest answer to that question used to require `curl`,
+// which prints the credential by default. Three credential exposures in this repo
+// in one day came from exactly that, each while investigating the previous one,
+// and each by someone who had already written the rule against it. The control
+// had to stop being prose (CLI-038, #1012).
+//
+// It is read-only by construction: no unlock, no sync, no write. A probe that
+// mutated state could not be run freely while diagnosing, which would defeat it.
+func newSecretsProbeCmd() *cobra.Command {
+	var raw bool
+	var count int
+	c := &cobra.Command{
+		Use:   "probe <id>",
+		Short: "Report what bw serve answered for a secret, without ever printing its value",
+		Long: "probe issues the same request the read path issues, through the same client,\n" +
+			"and reports what came back:\n\n" +
+			"  HTTP status, content-type, byte count\n" +
+			"  whether the reply was JSON at all, and the envelope's success/message\n" +
+			"  each value's location, length and sha256[:12] fingerprint — never its value\n\n" +
+			"It cannot print a secret. --raw echoes a body only for a NON-2xx response,\n" +
+			"because a 200 from the item endpoint is the credential itself; that bound is\n" +
+			"enforced in the reporting code, not here, so no caller can opt out of it.\n\n" +
+			"  dotf secrets probe NAN_API_KEY\n" +
+			"  dotf secrets probe NAN_API_KEY --raw       # show a non-2xx body, capped\n" +
+			"  dotf secrets probe NAN_API_KEY --count 10  # characterise an intermittent fault",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			reg, err := loadRegistry()
+			if err != nil {
+				return err
+			}
+			s := reg.Lookup(args[0])
+			if s == nil {
+				return fmt.Errorf("secret %q is not in the registry", args[0])
+			}
+			if s.Backend != secrets.BackendBW || s.BW == nil || s.BW.Item == "" {
+				return fmt.Errorf("secret %q does not resolve through bw serve (backend %q) — nothing to probe",
+					s.ID, s.Backend)
+			}
+
+			// ONE client for every iteration, deliberately.
+			//
+			// This is a correctness requirement, not a performance nicety. The
+			// fault this flag exists to characterise tracks connection reuse: 24
+			// requests at each of 1/2/4/8-way parallelism came back 96/96 clean,
+			// while the same 6-request keep-alive chain produced 2, then 1, then 0
+			// failures across three consecutive runs. A fresh client per iteration
+			// samples only the always-clean case, so --count would report the fault
+			// as ABSENT — worse than not having the flag, because it manufactures
+			// evidence for the wrong conclusion.
+			client := secrets.BWServeClient{}
+
+			itemID, err := client.ProbeItemID(s.BW.Item)
+			if err != nil {
+				return err
+			}
+			path := "/object/item/" + url.PathEscape(itemID)
+
+			statuses := map[int]int{}
+			for i := 0; i < count; i++ {
+				res, probeErr := client.Probe(http.MethodGet, path)
+				if probeErr != nil && res.Status == 0 {
+					// Transport failure: nothing was answered, so there is no report
+					// to shape. Surfaced immediately rather than counted, because a
+					// dead daemon is not a data point about the daemon's replies.
+					return probeErr
+				}
+				statuses[res.Status]++
+				if count == 1 {
+					_, _ = fmt.Fprint(cmd.OutOrStdout(), secrets.ShapeProbe(res, raw).String())
+				}
+				if probeErr != nil {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "attempt %d: %v\n", i+1, probeErr)
+				}
+			}
+
+			if count > 1 {
+				printDistribution(cmd, statuses, count)
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&raw, "raw", false, "echo the response body for NON-2xx replies only, capped")
+	c.Flags().IntVar(&count, "count", 1, "probe N times and report the distribution of outcomes")
+	return c
+}
+
+// printDistribution renders the outcome spread for --count. Statuses only: this
+// is the artifact an intermittent backend fault needs and nobody could produce
+// safely before.
+func printDistribution(cmd *cobra.Command, statuses map[int]int, total int) {
+	codes := make([]int, 0, len(statuses))
+	for code := range statuses {
+		codes = append(codes, code)
+	}
+	sort.Ints(codes)
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d probes over one reused connection:\n", total)
+	for _, code := range codes {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  HTTP %d  %d/%d\n", code, statuses[code], total)
+	}
+	if len(codes) > 1 {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(),
+			"mixed outcomes for identical requests — the backend is not deterministic here")
+	}
+}
