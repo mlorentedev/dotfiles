@@ -358,3 +358,178 @@ func TestSecretsVerify_UnknownId_Errors(t *testing.T) {
 		t.Error("verify with an unknown id must error")
 	}
 }
+
+// --- BUG-086 (#1004): a malformed entry must not take down the whole report ---------
+
+// malformedRegistry has one bad secret ("broken": an unknown backend) between two good
+// ones, so a test can prove the good ones still report.
+const malformedRegistry = "version: 1\nsecrets:\n" +
+	"  - {id: good-one, plane: app, backend: age, age: a, expose: {env: GOOD_ONE}}\n" +
+	"  - {id: broken, plane: app, backend: nonsense, age: b, expose: {env: BROKEN}}\n" +
+	"  - {id: good-two, plane: app, backend: age, age: c, expose: {env: GOOD_TWO}}\n"
+
+// alwaysResolves points the age seam at a value so the well-formed entries report OK,
+// isolating the registry-defect behaviour from resolution behaviour.
+func alwaysResolves(t *testing.T) {
+	t.Helper()
+	old := ageDecryptor
+	ageDecryptor = func(string, string) ([]byte, error) { return []byte("v\n"), nil }
+	t.Cleanup(func() { ageDecryptor = old })
+}
+
+func runVerify(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	cmd := newSecretsVerifyCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs(args)
+	// Explicit, because Go evaluates return operands left to right: `return
+	// out.String(), cmd.Execute()` would read the buffer before the command wrote it.
+	err := cmd.Execute()
+	return out.String(), err
+}
+
+// TestSecretsVerify_MalformedEntryDoesNotHideTheRest is BUG-086's AC1.
+//
+// Before this, ParseRegistry failed on the first bad secret, so ONE typo made
+// `dotf secrets verify` unable to report anything at all — a health check taken down by
+// the class of breakage it exists to find, and by an entry the caller never asked about.
+func TestSecretsVerify_MalformedEntryDoesNotHideTheRest(t *testing.T) {
+	useTempRegistry(t, malformedRegistry)
+	alwaysResolves(t)
+
+	out, err := runVerify(t)
+
+	for _, want := range []string{"OK", "GOOD_ONE", "GOOD_TWO", "FAILED", "broken"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("verify output missing %q:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(out, "registry:") {
+		t.Errorf("a malformed entry should be reported as a registry defect:\n%s", out)
+	}
+	if err == nil {
+		t.Error("verify must exit non-zero when an entry is malformed")
+	}
+}
+
+// TestSecretsVerify_ScopedAwayFromDefect is AC2: an entry the caller did not name is
+// neither validated nor resolved, so a defect elsewhere cannot fail a scoped check.
+func TestSecretsVerify_ScopedAwayFromDefect(t *testing.T) {
+	useTempRegistry(t, malformedRegistry)
+	alwaysResolves(t)
+
+	out, err := runVerify(t, "good-one")
+
+	if err != nil {
+		t.Errorf("a scoped verify must not fail on an out-of-scope defect: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "broken") {
+		t.Errorf("an out-of-scope defect must not be reported:\n%s", out)
+	}
+	if !strings.Contains(out, "GOOD_ONE") {
+		t.Errorf("the named secret should still be reported:\n%s", out)
+	}
+	if strings.Contains(out, "GOOD_TWO") {
+		t.Errorf("scoping must exclude unnamed secrets:\n%s", out)
+	}
+}
+
+// TestSecretsVerify_ScopedToTheDefect: naming the malformed entry must report it, not
+// claim it is unknown. It was excluded from the registry precisely because it is the
+// thing being asked about, so the lookup has to consult the defects too.
+func TestSecretsVerify_ScopedToTheDefect(t *testing.T) {
+	useTempRegistry(t, malformedRegistry)
+	alwaysResolves(t)
+
+	out, err := runVerify(t, "broken")
+
+	if err == nil {
+		t.Errorf("verify must exit non-zero when the named entry is malformed:\n%s", out)
+	}
+	if strings.Contains(out, "unknown id") {
+		t.Errorf("a malformed entry must be reported as FAILED, not as unknown:\n%s", out)
+	}
+	if !strings.Contains(out, "FAILED") || !strings.Contains(out, "broken") {
+		t.Errorf("the named defect should be a FAILED row:\n%s", out)
+	}
+}
+
+// TestSecretsVerify_DuplicateIdBlamesTheSecondOne: the FIRST definition is valid and
+// must still verify; only the later one is the defect. A rejected secret must not
+// reserve its id, or it would make the valid one look like the duplicate.
+func TestSecretsVerify_DuplicateIdBlamesTheSecondOne(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: dup, plane: app, backend: age, age: a, expose: {env: FIRST}}\n"+
+		"  - {id: dup, plane: app, backend: age, age: b, expose: {env: SECOND}}\n")
+	alwaysResolves(t)
+
+	out, err := runVerify(t)
+
+	if err == nil {
+		t.Errorf("a duplicate id must fail verify:\n%s", out)
+	}
+	if !strings.Contains(out, "FIRST") {
+		t.Errorf("the first definition is valid and must still be verified:\n%s", out)
+	}
+	if !strings.Contains(out, "duplicate secret id") {
+		t.Errorf("the defect should name the duplication:\n%s", out)
+	}
+}
+
+// TestSecretsVerify_StructuralFailureStillAborts: the partial door is for "this ENTRY is
+// wrong", not for "the document is unreadable". With no parseable version there is
+// nothing to report per-secret, so failing loudly is correct.
+func TestSecretsVerify_StructuralFailureStillAborts(t *testing.T) {
+	useTempRegistry(t, "version: 99\nsecrets: []\n")
+	if _, err := runVerify(t); err == nil {
+		t.Error("an unsupported registry version must still abort, not degrade to a report")
+	}
+}
+
+// TestSecretsVerify_ScopedToDuplicateIdReportsBothHalves is CodeRabbit's Major finding
+// on #1020, and it was right.
+//
+// A rejected secret does not reserve its id, so a duplicate id leaves TWO things sharing
+// one name: the first definition, which validated and is in the registry, and the second,
+// which is a defect. Scoping to that id must report both — the original code matched the
+// defect and short-circuited, so `verify dup` reported the defect and silently skipped
+// the entry that actually resolves, which is the half the caller most needs.
+func TestSecretsVerify_ScopedToDuplicateIdReportsBothHalves(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: dup, plane: app, backend: age, age: a, expose: {env: VALID_HALF}}\n"+
+		"  - {id: dup, plane: app, backend: age, age: b, expose: {env: DEFECT_HALF}}\n")
+	alwaysResolves(t)
+
+	out, err := runVerify(t, "dup")
+
+	if !strings.Contains(out, "VALID_HALF") {
+		t.Errorf("the valid definition sharing the id must still be resolved:\n%s", out)
+	}
+	if !strings.Contains(out, "duplicate secret id") {
+		t.Errorf("the defect sharing the id must still be reported:\n%s", out)
+	}
+	if err == nil {
+		t.Errorf("a defect in scope must still exit non-zero:\n%s", out)
+	}
+}
+
+// TestSecretsVerify_SeveralDefectsOnOneId: defects are keyed to a slice, so two bad
+// definitions of one id are both reported rather than one overwriting the other.
+func TestSecretsVerify_SeveralDefectsOnOneId(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: trip, plane: app, backend: age, age: a, expose: {env: FIRST_OK}}\n"+
+		"  - {id: trip, plane: app, backend: age, age: b, expose: {env: SECOND}}\n"+
+		"  - {id: trip, plane: app, backend: age, age: c, expose: {env: THIRD}}\n")
+	alwaysResolves(t)
+
+	out, _ := runVerify(t, "trip")
+
+	if n := strings.Count(out, "duplicate secret id"); n != 2 {
+		t.Errorf("want both duplicate definitions reported, got %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, "FIRST_OK") {
+		t.Errorf("the one valid definition must still resolve:\n%s", out)
+	}
+}
