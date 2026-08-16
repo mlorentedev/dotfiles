@@ -3,10 +3,12 @@ package secrets
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -184,5 +186,39 @@ func TestBackup_EmptyExport_Refused(t *testing.T) {
 func TestBackup_NilExporter_Errors(t *testing.T) {
 	if _, err := Backup(BackupConfig{}); err == nil {
 		t.Fatal("expected an error when no exporter is configured")
+	}
+}
+
+// TestExportLockHint_NamesTheOnlyInvocationThatWorks is AC4 of BUG-084.
+//
+// Export is the one write-side operation with no daemon equivalent, so its locked-vault
+// error must NOT send the operator to `dotf secrets unlock` (which unlocks the daemon and
+// leaves the escrow failing). It must name the BW_SESSION form, and say why.
+func TestExportLockHint_NamesTheOnlyInvocationThatWorks(t *testing.T) {
+	got := exportLockHint(errors.New("Vault is locked."))
+	if !errors.Is(got, ErrBWVaultLocked) {
+		t.Fatalf("must wrap ErrBWVaultLocked, got %v", got)
+	}
+	msg := got.Error()
+	for _, want := range []string{
+		`BW_SESSION="$(bw unlock --raw)" dotf secrets backup`,
+		"no export endpoint",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("export lock error must contain %q, got: %s", want, msg)
+		}
+	}
+	// The critical negative: it must not teach the fix that cannot work here.
+	if strings.Contains(msg, "run `dotf secrets unlock`") {
+		t.Fatalf("export error must not prescribe `dotf secrets unlock` — it does not fix export: %s", msg)
+	}
+}
+
+// TestExportLockHint_PassesThroughUnrelatedErrors: an offline sync failure must not be
+// reported as a lock problem.
+func TestExportLockHint_PassesThroughUnrelatedErrors(t *testing.T) {
+	orig := errors.New("Failed to fetch: getaddrinfo ENOTFOUND")
+	if got := exportLockHint(orig); got != orig { //nolint:errorlint // identity is the assertion
+		t.Fatalf("unrelated error was rewritten: %v", got)
 	}
 }
