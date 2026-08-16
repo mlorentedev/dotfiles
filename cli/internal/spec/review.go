@@ -141,7 +141,7 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 		return true, true, fmt.Sprintf("reviewed_sha %s is not a commit in this history (rewritten by a rebase?)", reviewedSHA)
 	}
 
-	args := []string{"-C", repoRoot, "log", "--format=%H", reviewedSHA + "..HEAD", "--"}
+	args := []string{"-C", repoRoot, "log", "--format=", "--name-only", reviewedSHA + "..HEAD", "--"}
 	for _, name := range contractFiles {
 		args = append(args, filepath.Join("specs", specID, name))
 	}
@@ -149,9 +149,9 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 	if err != nil {
 		return true, true, "could not compare the review against the current history"
 	}
-	if len(strings.TrimSpace(string(out))) > 0 {
-		return true, true, fmt.Sprintf("a contract file (%s) changed after reviewed_sha %s",
-			strings.Join(contractFiles, ", "), reviewedSHA)
+	if moved := namesIn(string(out)); len(moved) > 0 {
+		return true, true, fmt.Sprintf("%s changed after reviewed_sha %s",
+			strings.Join(moved, ", "), reviewedSHA)
 	}
 
 	// Committed history is not the whole answer. An uncommitted edit to a
@@ -172,11 +172,61 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 	if err != nil {
 		return true, true, "could not check the working tree for uncommitted contract changes"
 	}
-	if len(strings.TrimSpace(string(out))) > 0 {
-		return true, true, fmt.Sprintf("a contract file (%s) has uncommitted changes, so the review does not describe what is on disk",
-			strings.Join(contractFiles, ", "))
+	if dirtyNames := porcelainNames(string(out)); len(dirtyNames) > 0 {
+		return true, true, fmt.Sprintf("%s %s uncommitted changes, so the review does not describe what is on disk",
+			strings.Join(dirtyNames, ", "), plural(len(dirtyNames), "has", "have"))
 	}
 	return false, true, ""
+}
+
+// namesIn reduces `git log --name-only` output to the distinct base names it
+// mentions, in first-seen order.
+//
+// Naming the files that actually moved is the point (#998): the refusal used
+// to recite all of contractFiles whether or not they changed, so an operator
+// reading it could not tell a rewritten acceptance criterion from a ticked
+// checkbox, and had to reconstruct the diff by hand to find out.
+func namesIn(out string) []string {
+	var names []string
+	seen := map[string]bool{}
+	for line := range strings.SplitSeq(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		base := filepath.Base(line)
+		if !seen[base] {
+			seen[base] = true
+			names = append(names, base)
+		}
+	}
+	return names
+}
+
+// porcelainNames reduces `git status --porcelain` output to the distinct base
+// names it mentions. Each line is "XY <path>", and a rename is "XY <old> -> <new>";
+// the path after the arrow is the one on disk now, so that is the one reported.
+func porcelainNames(out string) []string {
+	var paths []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if len(line) < 4 {
+			continue
+		}
+		path := strings.TrimSpace(line[3:])
+		if _, after, found := strings.Cut(path, " -> "); found {
+			path = after
+		}
+		paths = append(paths, path)
+	}
+	return namesIn(strings.Join(paths, "\n"))
+}
+
+// plural picks the verb form for n subjects.
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 // reviewWaiver reads the declared waiver from proposal.md frontmatter. A waiver
