@@ -81,7 +81,7 @@ func newSecretsRotateCmd() *cobra.Command {
 func runRotate(cmd *cobra.Command, s *secrets.Secret, item, field string, isFile, dryRun bool) error {
 	out := cmd.OutOrStdout()
 
-	before, err := bwReader.Field(item, field)
+	before, err := bwRead().Field(item, field)
 	if err != nil {
 		// Unlike `set`, rotate never creates: rotating something that does not
 		// exist is a provisioning action, and conflating the two is how a locked
@@ -108,7 +108,7 @@ func runRotate(cmd *cobra.Command, s *secrets.Secret, item, field string, isFile
 		return fmt.Errorf("the new value is identical to the current one — that is not a rotation. Nothing was written")
 	}
 
-	if err := bwWriter.SetField(item, field, value); err != nil {
+	if err := bwWrite().SetField(item, field, value); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(out, "written  %s / %s\n", item, field)
@@ -129,7 +129,7 @@ func confirmRotation(cmd *cobra.Command, s *secrets.Secret, item, field string, 
 		_, _ = fmt.Fprintf(out, "WARNING  daemon sync failed (%v) — the value was written but reads may still serve the old one until `dotf secrets unlock` or a manual sync\n", err)
 	}
 
-	after, err := bwReader.Field(item, field)
+	after, err := bwRead().Field(item, field)
 	if err != nil {
 		return fmt.Errorf("wrote the new value but could not read it back through the normal path: %w", err)
 	}

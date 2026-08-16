@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -40,6 +41,17 @@ type fakeBWServe struct {
 	status string // unauthenticated | locked | unlocked
 	items  map[string]json.RawMessage // id -> full item JSON
 	names  map[string]string          // id -> name, for /list/object/items
+
+	// folders backs /list/object/folders and POST /object/folder (id -> name),
+	// the taxonomy half of the write path (BUG-084 / OPS-028).
+	folders map[string]string
+
+	// created records POST /object/item bodies in arrival order, so a test can
+	// assert what CreateItem actually put on the wire, not merely that it 200'd.
+	created []json.RawMessage
+
+	// nextID is the id handed to the next created item/folder; "" -> "generated".
+	nextID string
 
 	unlockPassword string // "" -> any password succeeds
 	failUnlock     bool
@@ -92,10 +104,80 @@ func (f *fakeBWServe) handler() http.HandlerFunc {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = fmt.Fprintf(w, `{"success":true,"data":%s}`, item)
+
+		// --- write path (BUG-084) ---------------------------------------
+		// bw serve takes a RAW JSON body on these, where the `bw` CLI needs
+		// base64 on stdin. That asymmetry is the only real difference between
+		// BWServeWriter and BWPut, so the fake reads raw JSON deliberately: a
+		// regression to base64 fails to decode here.
+		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/object/item/"):
+			id := strings.TrimPrefix(r.URL.Path, "/object/item/")
+			if _, ok := f.items[id]; !ok {
+				writeEnvelope(w, false, "Not found.", nil)
+				return
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || !json.Valid(body) {
+				writeEnvelope(w, false, "malformed request body", nil)
+				return
+			}
+			f.items[id] = json.RawMessage(body)
+			writeEnvelope(w, true, "", json.RawMessage(body))
+
+		case r.Method == http.MethodPost && r.URL.Path == "/object/item":
+			body, err := io.ReadAll(r.Body)
+			if err != nil || !json.Valid(body) {
+				writeEnvelope(w, false, "malformed request body", nil)
+				return
+			}
+			id := f.newID()
+			if f.items == nil {
+				f.items = map[string]json.RawMessage{}
+			}
+			if f.names == nil {
+				f.names = map[string]string{}
+			}
+			f.items[id] = json.RawMessage(body)
+			var named struct {
+				Name string `json:"name"`
+			}
+			_ = json.Unmarshal(body, &named)
+			f.names[id] = named.Name
+			f.created = append(f.created, json.RawMessage(body))
+			writeEnvelope(w, true, "", json.RawMessage(body))
+
+		case r.Method == http.MethodGet && r.URL.Path == "/list/object/folders":
+			out := []map[string]string{}
+			for id, name := range f.folders {
+				out = append(out, map[string]string{"id": id, "name": name})
+			}
+			writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
+
+		case r.Method == http.MethodPost && r.URL.Path == "/object/folder":
+			var body struct {
+				Name string `json:"name"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			id := f.newID()
+			if f.folders == nil {
+				f.folders = map[string]string{}
+			}
+			f.folders[id] = body.Name
+			writeEnvelope(w, true, "", map[string]string{"id": id, "name": body.Name})
+
 		default:
 			http.NotFound(w, r)
 		}
 	}
+}
+
+// newID hands out the id for a created item/folder, defaulting to a fixed value so
+// assertions stay deterministic.
+func (f *fakeBWServe) newID() string {
+	if f.nextID != "" {
+		return f.nextID
+	}
+	return "generated-id"
 }
 
 func writeEnvelope(w http.ResponseWriter, success bool, message string, data any) {
