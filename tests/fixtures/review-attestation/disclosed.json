@@ -1,0 +1,3 @@
+{"number":6,"state":"OPEN","author":{"login":"mlorentedev"},"labels":[{"name":"merged-unreviewed"}],
+ "body":"Intro paragraph.\n\n## Unreviewed merge rationale\n\nCodeRabbit's quota was exhausted account-wide; three PRs carried the same notice. Merging on CI evidence plus a mutation-tested guard.\n\n## Evidence\n\nbats 11/11.",
+ "comments":[],"reviews":[]}

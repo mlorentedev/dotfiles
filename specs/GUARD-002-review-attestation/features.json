@@ -1,0 +1,51 @@
+[
+  {
+    "id": "GUARD-002-review-attestation-f1",
+    "behavior": "AC1 — the classifier decides attested|declined|pending offline from committed JSON fixtures, including one captured verbatim from the real 2026-08-16 CodeRabbit rate-limit comment on #1009. Offline is load-bearing: the notice is only observable while the quota is exhausted, so the fixture is the only reproducible form of the evidence.",
+    "verification": "bats tests/check-review-attestation.bats -f 'classifies' && test -s tests/fixtures/review-attestation/coderabbit-rate-limited.json && grep -q 'rate limited by coderabbit.ai' tests/fixtures/review-attestation/coderabbit-rate-limited.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f2",
+    "behavior": "AC2 — a real review yields attested and exit 0, whether it came from a recognized bot reviewer or from a human. The gate asks whether a review happened, never who performed it.",
+    "verification": "scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/bot-reviewed.json && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/human-reviewed.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f3",
+    "behavior": "AC3 — a notice that no review ran yields `declined` and a non-zero exit naming the reviewer and reason; a PR with no reviewer output yields `pending` and a non-zero exit. This is the inversion the whole spec exists for: today both of these render as `CodeRabbit pass`.",
+    "verification": "scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json 2>&1 | grep -q 'declined' && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json 2>&1 | grep -q 'rate limited by coderabbit.ai' && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json 2>&1 | grep -q 'pending'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f4",
+    "behavior": "AC4 — the declared escape needs BOTH the merged-unreviewed label and a non-empty '## Unreviewed merge rationale' section. All three negative shapes are asserted, not just the positive one: label alone, section alone, and an empty section each still fail. Same shape as spec-gate's skip-sdd escape.",
+    "verification": "scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/disclosed.json && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/label-only.json && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/section-only.json && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/empty-rationale.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f5",
+    "behavior": "AC5 — reviewers are config, not code, which is what makes #786 (PR-Agent) an entry rather than a rewrite. The negative half (the script names no reviewer of its own) is asserted by the AC5 bats cases via refute_grep, NOT inline here: the original predicate was 'grep -qv coderabbitai script', which is vacuous — grep -qv exits 0 when ANY line lacks the pattern, i.e. almost always, so it passed on a file that did contain it. Its status was also discarded by a trailing semicolon. Both defects are why this now delegates to a test that fails loudly and prints the offending line.",
+    "verification": "bats tests/check-review-attestation.bats -f 'AC5' && jq -e '.reviewers | length >= 1 and all(.[]; .login | type == \"string\")' harness/review-attestation.json >/dev/null",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f6",
+    "behavior": "AC6 — unreadable input fails closed, across every shape: malformed JSON, an empty payload, a missing payload, a missing registry, a registry that is valid JSON of the wrong shape, a flag given without a value, and an absent gh on the live path. Delegated to the bats cases so each shape is asserted in isolation and named in its failure.",
+    "verification": "bats tests/check-review-attestation.bats -f 'AC6'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f7",
+    "behavior": "AC7 — the gate runs on pull_request AND issue_comment, so a review landing after the checks settled re-runs it with no push. Without issue_comment the gate would only ever answer at the one moment the answer is always 'pending', which is the timing half of the same bug. Paired with an assertion that the step is not continue-on-error, since a gate that decides 'not reviewed' and then reports green would rebuild the defect. The bats case also survives a parser trap worth recording: YAML 1.1 reads the bare key 'on:' as the BOOLEAN true, so a naive d['on'] raises KeyError against every GitHub workflow ever written.",
+    "verification": "bats tests/check-review-attestation.bats -f 'AC7'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
