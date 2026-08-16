@@ -140,9 +140,34 @@ same bug a third time.
 Two assertions added: `statuses: write` plus a `statuses/` API call are present,
 and the final `exit "$CODE"` is present.
 
+### The fix, verified in production — two statuses on one commit
+
+After the fix, both signals sit on the same head commit of #1019 and say
+opposite things:
+
+```
+$ gh api repos/mlorentedev/dotfiles/commits/<head>/status --jq '.statuses[]'
+CodeRabbit:          success — Review rate limited
+review-attestation:  failure — [FAIL] declined — coderabbitai posted a notice
+                               that no review ran (marker: "rate limited by
+                               coderabbit.ai")
+```
+
+This is the entire spec in four lines. A vendor check reporting **success** for
+a review that never started, beside an honest one reporting **failure** with the
+reason. The gate cannot change the first — it can only refuse to let it stand
+alone.
+
+Note also that the verdict **upgraded across runs**: `pending` at 00:58 when no
+reviewer had posted, `declined` at 01:13 once the notice existed. Same PR, same
+classifier, more evidence — which is the `declined`/`pending` distinction doing
+exactly the work the fourth constraint asks of it, rather than collapsing both
+into an undifferentiated red.
+
 **Not verified until merge:** the live `issue_comment` re-run. It cannot be,
-for reason (1) above. Structural until then, and the honest first proof is the
-next PR opened after this one merges.
+for reason (1) above — the re-runs above were triggered by pushes, not by the
+comment. Structural until then, and the honest first proof is the next PR
+opened after this one merges.
 
 ## Non-vacuity — measured, not assumed
 
