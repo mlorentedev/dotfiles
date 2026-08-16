@@ -43,6 +43,31 @@ half-second — i.e. **the observation was causing the failure.** Three sessions
 this bug the same day and got 1/5, 3/10 and 12/12-clean; all three were correct, and all
 three were sampling one window from different distances.
 
+### Precision: reliable, not invariant
+
+The claim needs stating carefully, because counter-evidence exists and a future reader
+will find it. The 2026-08-15 handoff records an adversarial review that completed cleanly
+at 02:22 against this same poisoned code, with no change on `main`.
+
+The measurements already carried the nuance:
+
+| measurement | failure rate |
+|---|---|
+| one `/status`, then 10 item GETs, isolated | **10/10** |
+| `/status` before *each* of 100 item GETs | **58/100** |
+| item GETs with no `/status` at all | **0/360** |
+
+So: a `/status` call **very reliably** poisons the reads that immediately follow, but not
+invariably. With 33 secrets to resolve and a `Status()` before each, even the 58% floor
+makes a successful `dotf secrets run` vanishingly unlikely — which is what was observed —
+while leaving a lucky run possible, which is what the 02:22 review was.
+
+What IS invariant across every measurement: **no failure was ever observed without a
+preceding `/status`** (0/360, at four spacings). That is the property the fix relies on
+and the one the guard asserts. Stating it as "deterministic" would have been an
+overstatement that the next reader could have falsified in one counter-example, and
+discarded a correct diagnosis along with it.
+
 ### Live before/after
 
 ```
