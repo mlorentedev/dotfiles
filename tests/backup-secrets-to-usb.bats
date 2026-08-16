@@ -112,10 +112,23 @@ teardown() {
     grep -q "dotf secrets backup" "$BACKUP_SCRIPT"
 }
 
+# `! cmd` is EXEMPT from `set -e`, so a bare `! grep` anywhere but the final line
+# of a @test is silently ignored and the case passes on its last assertion alone.
+# The first assertion below was dead for exactly that reason. Same defect found
+# in tests/check-review-attestation.bats, where it was hiding a real violation.
+refute_grep() {
+    local pattern="$1" file="$2"
+    if grep -qE "$pattern" "$file"; then
+        printf 'expected NOT to find /%s/ in %s, but it is there:\n' "$pattern" "$file" >&2
+        grep -nE "$pattern" "$file" >&2
+        return 1
+    fi
+}
+
 @test "backup-secrets-to-usb.sh keeps the USB payload a declared list, not a recursive sweep" {
     # ADR-033 D1: what lands on the USB is enumerated. A recursive glob over
     # sensitive/ would silently start shipping whatever else ever appears there
     # — including plaintext — which is the opposite of the intent.
-    ! grep -qE 'SECRETS_DIR"?/\*\*' "$BACKUP_SCRIPT"
-    ! grep -qE 'cp -r .*SECRETS_DIR' "$BACKUP_SCRIPT"
+    refute_grep 'SECRETS_DIR"?/\*\*' "$BACKUP_SCRIPT"
+    refute_grep 'cp -r .*SECRETS_DIR' "$BACKUP_SCRIPT"
 }
