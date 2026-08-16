@@ -8,8 +8,8 @@
   },
   {
     "id": "HARNESS-072-pr-stewardship-f2",
-    "behavior": "AC2 — the region reaches every surface definition-of-done reaches: positive per-surface evidence in both committed targets, plus the doctrine inject list that carries it to the agy and codex payloads. Deliberately NOT `--check`, which is blind to a skipped surface (see f8).",
-    "verification": "grep -q 'the disposition, not the waiting' AGENTS.md && grep -q 'the disposition, not the waiting' ai/claude/CLAUDE.md && jq -e '.doctrine.inject | index(\"pr-stewardship\")' harness/manifest.json >/dev/null",
+    "behavior": "AC2 — the region reaches every surface definition-of-done reaches. Verified by DERIVING that surface set from definition-of-done in harness/manifest.json rather than naming surfaces literally, so the check cannot drift as surfaces are added: any targets[] entry, or the doctrine inject list, that carries definition-of-done and NOT pr-stewardship is reported. Plus a positive per-surface grep on both committed targets. Deliberately NOT `--check`, which is blind to a skipped surface (see f8). The two $HOME doctrine payloads are covered TRANSITIVELY, via doctrine.inject: a command grepping ~/.gemini/GEMINI.md would only pass on a machine where --deploy has already run, making this spec unverifiable in CI or on a fresh clone. The direct per-payload greps are session evidence and live in verification.md; this is the machine-independent proxy for them, stated rather than assumed.",
+    "verification": "jq -e '[ (.targets[] | select(.inject|index(\"definition-of-done\")) | select((.inject|index(\"pr-stewardship\"))|not) | .file), (if (.doctrine.inject|index(\"definition-of-done\")) and ((.doctrine.inject|index(\"pr-stewardship\"))|not) then \"doctrine\" else empty end) ] | length == 0' harness/manifest.json >/dev/null && grep -q 'the disposition, not the waiting' AGENTS.md && grep -q 'the disposition, not the waiting' ai/claude/CLAUDE.md",
     "state": "pending",
     "evidence": ""
   },
