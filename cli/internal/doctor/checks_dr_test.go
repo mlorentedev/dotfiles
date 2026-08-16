@@ -2,12 +2,28 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
+
+// lineContaining returns the first report line mentioning substr, so a case can
+// assert the status tag of the line it cares about. The DR section emits two
+// independent lines (escrow, drill) and a bare Contains over the whole buffer
+// would happily match the drill's WARN while the escrow line said something
+// else entirely.
+func lineContaining(out, substr string) string {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, substr) {
+			return line
+		}
+	}
+	return ""
+}
 
 // drSys builds a System for the DR check with NO bw-backed secrets, i.e. the
 // pre-migration machine where an absent escrow costs nothing. Severity is keyed
@@ -93,54 +109,73 @@ func TestDR_StaleDrillWarns(t *testing.T) {
 	}
 }
 
-// With nothing resolving through Bitwarden, an absent escrow costs nothing --
-// every secret still has its age copy on disk. SKIP, because a red doctor for a
-// harmless condition is how operators are trained to ignore red doctors.
-func TestDR_AbsentEscrowNoExposure_Skips(t *testing.T) {
-	cfg := &Config{DotfilesDir: t.TempDir()}
-	var buf bytes.Buffer
-	rep := capture(&buf)
+// The escrow severity rule (#997), one case per branch.
+//
+// Asserted on the STATUS TAG rather than on prose: the tag is the contract
+// (it decides doctor's exit code), the wording is not. Remediation text is
+// pinned only for the FAIL case, where the message is the deliverable -- an
+// operator who cannot act on it has been told nothing.
+func TestDR_EscrowSeverityFollowsExposure(t *testing.T) {
+	now := time.Now()
+	for _, tt := range []struct {
+		name     string
+		bwBacked int
+		regErr   error
+		wantTag  string
+		wantFail int
+	}{
+		{
+			// Every secret still has its age copy on disk, so an absent escrow
+			// costs nothing. Staying quiet here is what keeps the FAIL credible.
+			name: "no exposure: absence costs nothing", bwBacked: 0, wantTag: "[SKIP]",
+		},
+		{
+			// The defect #997 exists for: `migrate` drops the age: pointer (#971),
+			// so for these the remote account is the only copy in existence.
+			name: "exposed: the only copy is remote", bwBacked: 28, wantTag: "[FAIL]", wantFail: 1,
+		},
+		{
+			// Exposure unknown. Must not claim "nothing depends on it" (it was
+			// never checked) and must not go red on a healthy machine -- doctor
+			// run from any other git repo lands here via env.RepoDir's walk-up.
+			name: "registry unreadable: exposure unknown", regErr: errors.New("open registry.yaml: no such file"), wantTag: "[WARN]",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{DotfilesDir: t.TempDir()}
+			var buf bytes.Buffer
+			rep := capture(&buf)
 
-	checkDisasterRecovery(drSysExposed(time.Now(), 0, nil), cfg, rep)
+			checkDisasterRecovery(drSysExposed(now, tt.bwBacked, tt.regErr), cfg, rep)
 
-	if rep.Failures() != 0 {
-		t.Fatalf("absent escrow with no bw-backed secrets must not FAIL, got %d:\n%s", rep.Failures(), buf.String())
-	}
-	if !strings.Contains(buf.String(), "no DR escrow") {
-		t.Errorf("want the escrow SKIP, got: %s", buf.String())
-	}
-}
-
-// The defect this issue exists for (#997). Once a secret resolves through
-// Bitwarden, `migrate` has dropped its age: pointer (#971) -- so the remote
-// account is the ONLY copy, and an absent escrow is a single point of total
-// loss. Reported for months as "nothing to check here".
-func TestDR_AbsentEscrowWithExposure_Fails(t *testing.T) {
-	cfg := &Config{DotfilesDir: t.TempDir()}
-	var buf bytes.Buffer
-	rep := capture(&buf)
-
-	checkDisasterRecovery(drSysExposed(time.Now(), 26, nil), cfg, rep)
-
-	if rep.Failures() != 1 {
-		t.Fatalf("absent escrow with bw-backed secrets must FAIL, got %d failure(s):\n%s", rep.Failures(), buf.String())
-	}
-	out := buf.String()
-	// The count is the whole argument: "no backup" is abstract, "26 secrets
-	// exist only on a remote server" is what makes an operator act.
-	if !strings.Contains(out, "26") {
-		t.Errorf("the FAIL must name how many secrets have no local copy, got: %s", out)
-	}
-	// The remedy must be the invocation that actually works. A bare
-	// `dotf secrets backup` fails with "Vault is locked": its export path has no
-	// bw serve endpoint (verified against the shipped @bitwarden/cli bundle --
-	// the serve router has no export route), so it needs a CLI session. This is
-	// permanent, not pending #993, which is why the message names it plainly.
-	if !strings.Contains(out, "BW_SESSION") {
-		t.Errorf("the FAIL must name the invocation that actually creates an escrow, got: %s", out)
-	}
-	if strings.Contains(out, "#993") {
-		t.Errorf("the remedy is permanent, not blocked on #993; citing it dates the message: %s", out)
+			out := buf.String()
+			escrowLine := lineContaining(out, "DR escrow")
+			if !strings.Contains(escrowLine, tt.wantTag) {
+				t.Errorf("want %s on the escrow line, got: %s", tt.wantTag, escrowLine)
+			}
+			if rep.Failures() != tt.wantFail {
+				t.Errorf("want %d failure(s), got %d:\n%s", tt.wantFail, rep.Failures(), out)
+			}
+			if tt.wantTag != "[FAIL]" {
+				return
+			}
+			// The count is the whole argument: "no backup" is abstract, "28
+			// secrets exist only on a remote server" is what makes someone act.
+			if !strings.Contains(escrowLine, "28") {
+				t.Errorf("the FAIL must name how many secrets have no local copy, got: %s", escrowLine)
+			}
+			// A bare `dotf secrets backup` fails with "Vault is locked": its
+			// export path has no bw serve endpoint (verified against the shipped
+			// @bitwarden/cli bundle -- the serve router has no export route), so
+			// it needs a CLI session. Permanent, not pending #993, which is why
+			// the message names it plainly and must not cite that issue.
+			if !strings.Contains(escrowLine, "BW_SESSION") {
+				t.Errorf("the FAIL must name the invocation that actually creates an escrow, got: %s", escrowLine)
+			}
+			if strings.Contains(escrowLine, "#993") {
+				t.Errorf("the remedy is permanent, not blocked on #993; citing it dates the message: %s", escrowLine)
+			}
+		})
 	}
 }
 
@@ -154,13 +189,51 @@ func TestDR_StaleEscrowWithExposure_StillWarns(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSysExposed(now, 26, nil), cfg, rep)
+	checkDisasterRecovery(drSysExposed(now, 28, nil), cfg, rep)
 
 	if rep.Failures() != 0 {
 		t.Fatalf("a stale escrow is degraded, not absent; want WARN not FAIL:\n%s", buf.String())
 	}
 	if !strings.Contains(buf.String(), "DR escrow is 120 days old") {
 		t.Errorf("want the escrow staleness warning, got: %s", buf.String())
+	}
+}
+
+// A stat error is not proof of absence. Under exposure the absent branch FAILs
+// with "these N secrets have no local copy" -- a claim the check has not earned
+// when the escrow may be sitting there behind a permission error. Asserting the
+// unverified is the exact failure #997 is about, so it must not appear in its fix.
+func TestDR_UnreadableEscrowWarnsRatherThanClaimingAbsence(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// chmod(0) does not deny the owner on Windows, so the parent stays
+		// readable and this exercises nothing. Gated rather than reshaped: the
+		// alternatives (a file as the parent dir) map to path-not-found there
+		// and would silently test the ABSENT branch instead of this one.
+		t.Skip("directory permissions do not gate stat on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory permissions, so the escrow stays readable")
+	}
+	dir := t.TempDir()
+	cfg := &Config{DotfilesDir: dir}
+	drDir := filepath.Join(dir, "sensitive", "dr")
+	touchAt(t, filepath.Join(drDir, "bitwarden-export.age"), time.Now())
+	if err := os.Chmod(drDir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(drDir, 0o755) }) // else TempDir cleanup fails
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(drSysExposed(time.Now(), 28, nil), cfg, rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("an unreadable escrow is not a proven-absent one; want WARN not FAIL:\n%s", buf.String())
+	}
+	line := lineContaining(buf.String(), "DR escrow")
+	if !strings.Contains(line, "[WARN]") || !strings.Contains(line, "cannot inspect") {
+		t.Errorf("want the inspection WARN, got: %s", line)
 	}
 }
 

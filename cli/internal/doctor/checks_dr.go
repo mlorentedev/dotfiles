@@ -66,7 +66,7 @@ func reportAbsentEscrow(rep *Report, escrow string, live int, regErr error) {
 		return
 	}
 	if live > 0 {
-		// The count carries the argument. "No backup" is abstract; "26 secrets
+		// The count carries the argument. "No backup" is abstract; "28 secrets
 		// exist only on a remote server you do not control" is what makes an
 		// operator act.
 		//
@@ -122,8 +122,19 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 
 	escrow := filepath.Join(cfg.DotfilesDir, "sensitive", "dr", "bitwarden-export.age")
 	switch info, err := os.Stat(escrow); {
-	case err != nil:
+	case os.IsNotExist(err):
 		reportAbsentEscrow(rep, escrow, live, regErr)
+	case err != nil:
+		// A stat error is NOT proof of absence, and the distinction only started
+		// to matter with this change: as a SKIP, treating "cannot read" as
+		// "not there" was harmless, but as a FAIL it asserts something the check
+		// never established — "these 28 secrets have no local copy" — when the
+		// escrow may be sitting right there behind a permission or I/O error.
+		// Claiming an unverified fact is the exact failure this whole check
+		// exists to stop, so it must not be committed in the fix for it.
+		rep.Warn(fmt.Sprintf(
+			"cannot inspect DR escrow at %s (%v) — neither its presence nor its freshness was established",
+			escrow, err))
 	case sys.Now().Sub(info.ModTime()) > escrowMaxAge:
 		rep.Warn(fmt.Sprintf("DR escrow is %d days old — re-run `dotf secrets backup`; secrets added since are not in it",
 			int(sys.Now().Sub(info.ModTime()).Hours()/24)))
