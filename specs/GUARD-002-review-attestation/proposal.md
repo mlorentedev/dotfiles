@@ -123,6 +123,17 @@ whether a bot performed it.
     state is decided by a branch that cannot be reached (instance 3's defect);
   - it must **fail closed** (AC6), so "could not determine" never renders as "fine" —
     which is instance 2's defect, and the one this spec exists for.
+  - it must **preserve why**, not collapse every non-attested case into one opaque
+    refusal. This is the fourth constraint and it comes from a second defect inside
+    instance 1: `/status` perturbed its subject *and* the error path discarded the HTTP
+    status, so the operator was shown `invalid character 'I'` instead of `HTTP 500`. The
+    diagnostic threw away the diagnosis, and that — not the perturbation — is why the
+    bug survived weeks of being looked at. Failing closed without saying why would
+    reproduce it here: `declined` and `pending` are the same refusal to a caller
+    branching on the exit code, and completely different facts to the human deciding
+    what to do. Hence AC3 requires the message to name the reviewer and the reason, and
+    hence the deferred exit-code question above is deliberately a question about
+    *callers*, never about what the operator is told.
 
 ## Acceptance criteria
 
