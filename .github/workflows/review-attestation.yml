@@ -52,10 +52,20 @@ jobs:
     if: github.event_name == 'pull_request' || github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
-      # No `ref:` on purpose. For issue_comment this checks out the default
-      # branch, which is what a gate wants: the classifier and the reviewer
-      # registry come from main, so a PR cannot edit the gate that judges it.
+      # Pinned to the BASE branch, never the PR's head. Without this the job
+      # checked out the pull request and ran the classifier and registry from
+      # it — so a PR could edit `scripts/check-review-attestation.sh` to exit 0
+      # unconditionally, or add its own login to the reviewer registry, and
+      # attest itself. The gate was disableable by the thing it judges.
+      #
+      # `pull_request_target` would also fix that and is the usual advice, but
+      # it is the bigger hammer: it runs with a writable token in the base
+      # repo's context, which is the standard privilege-escalation footgun. It
+      # is not needed here because this job reads the PR only through the API —
+      # it never builds, executes or even reads the PR's tree.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
 
       - name: Check review attestation
         id: attest

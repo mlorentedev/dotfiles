@@ -27,8 +27,13 @@
 # This check OBSERVES and never acts. It will not retrigger a rate-limited
 # reviewer: a gate that spent the quota it measures would perturb its own
 # subject, which is the exact shape of #988's `/status` probe poisoning the
-# reads it was verifying. (It would also not work — an explicit
-# `@coderabbitai review` does not reclaim a slot while the quota is spent.)
+# reads it was verifying. (Measured moot as well — an explicit re-review command
+# does not reclaim a slot while the quota is spent.)
+#
+# No reviewer is named anywhere in this file, deliberately and under test. Every
+# vendor-specific string lives in the registry, including the prose explaining
+# each one; a comment naming a vendor here is how "the config is authoritative"
+# quietly stops being true.
 #
 # Usage:
 #   check-review-attestation.sh [--pr N] [--payload FILE] [--config FILE] [--quiet]
@@ -69,11 +74,18 @@ Exit: 0 attested|disclosed, 1 declined|pending, 2 setup error / unreadable.
 EOF
 }
 
+# `shift 2` on a flag given without a value fails under `set -e`, and the shell
+# exits 1 — which this script's own contract defines as "not reviewed" rather
+# than "setup error". A typo would therefore have been reported as a verdict.
+need_value() {
+    [ -n "${2:-}" ] || { printf '[ERROR] %s requires a value\n' "$1" >&2; usage >&2; exit 2; }
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
-        --pr)      PR="${2:-}"; shift 2 ;;
-        --payload) PAYLOAD="${2:-}"; shift 2 ;;
-        --config)  CONFIG="${2:-}"; shift 2 ;;
+        --pr)      need_value "$1" "${2:-}"; PR="$2"; shift 2 ;;
+        --payload) need_value "$1" "${2:-}"; PAYLOAD="$2"; shift 2 ;;
+        --config)  need_value "$1" "${2:-}"; CONFIG="$2"; shift 2 ;;
         --quiet)   QUIET=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) printf '[ERROR] Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -95,6 +107,27 @@ die_unreadable() {
 command -v jq >/dev/null 2>&1 || die_unreadable "jq is not installed"
 [ -f "$CONFIG" ] || die_unreadable "reviewer registry not found: $CONFIG"
 jq -e . "$CONFIG" >/dev/null 2>&1 || die_unreadable "reviewer registry is not valid JSON: $CONFIG"
+
+# Shape, not just syntax. Valid JSON that is the wrong shape — a bare array, a
+# reviewers entry with no login, an escape with no section — parsed fine and
+# then silently produced empty strings downstream, which classify as "no
+# reviewer declined" and "no escape configured". A malformed registry would
+# have made the gate quietly more permissive, which is the direction it must
+# never fail in.
+jq -e '
+    type == "object"
+    and (.reviewers | type == "array")
+    and (.reviewers | length > 0)
+    and (.reviewers | all(
+            (.login | type == "string" and length > 0)
+        and (.declined_markers | type == "array")
+        and (.declined_markers | all(type == "string" and length > 0))
+    ))
+    and (.escape | type == "object")
+    and (.escape.label   | type == "string" and length > 0)
+    and (.escape.section | type == "string" and length > 0)
+' "$CONFIG" >/dev/null 2>&1 \
+    || die_unreadable "reviewer registry is valid JSON but the wrong shape (needs reviewers[].login, reviewers[].declined_markers[], escape.label, escape.section): $CONFIG"
 
 # --- acquire the payload -------------------------------------------------------
 # One shape either way, so the offline fixture path and the live path exercise

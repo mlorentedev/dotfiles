@@ -121,11 +121,30 @@ EOF
     [[ "$output" == *"pr-agent"* ]]
 }
 
+# refute_grep exists because `! cmd` is EXEMPT from `set -e` in bash. A bare
+# `! grep -q X file` anywhere except the final line of a @test is silently
+# ignored, so the test passes on the strength of its last assertion alone.
+#
+# That is not hypothetical here: this file's AC5 case asserted the script names
+# no reviewer, the script DID name one in a comment, and the suite reported
+# green for as long as the violated assertion was not the last line. Found via a
+# reviewer comment about a different defect in the same predicate.
+refute_grep() {
+    local pattern="$1" file="$2"
+    if grep -qE "$pattern" "$file"; then
+        printf 'expected NOT to find /%s/ in %s, but it is there:\n' "$pattern" "$file" >&2
+        grep -nE "$pattern" "$file" >&2
+        return 1
+    fi
+}
+
 @test "AC5: the script names no reviewer of its own" {
-    # If a login is hardcoded here, the config is decorative and the next
-    # reviewer migration is a code change again.
-    ! grep -q 'coderabbitai' "$SCRIPT"
-    ! grep -q 'pr-agent' "$SCRIPT"
+    # If a login appears here at all — even in prose — the registry has stopped
+    # being the single place a reviewer is declared, and the next migration is a
+    # code change again.
+    refute_grep 'coderabbitai' "$SCRIPT"
+    refute_grep 'pr-agent' "$SCRIPT"
+    refute_grep 'rate limited by' "$SCRIPT"
 }
 
 @test "AC5: the shipped registry declares at least one reviewer and the escape" {
@@ -206,7 +225,7 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     # absent — a guard tripping on documentation *about* the thing rather than
     # the thing, which is the same false positive ScanUnresolvedTags strips code
     # spans to avoid, and the same one that made #998's archive gate unpassable.
-    ! grep -qE '^[[:space:]]*continue-on-error[[:space:]]*:' "$REPO/.github/workflows/review-attestation.yml"
+    refute_grep '^[[:space:]]*continue-on-error[[:space:]]*:' "$REPO/.github/workflows/review-attestation.yml"
 }
 
 @test "AC7: the issue_comment path publishes a status onto the PR head" {
@@ -257,4 +276,70 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
         run "$SCRIPT" --payload "$F/$f.json"
         [ "$status" -eq 1 ]
     done
+}
+
+# --- review findings on #1019 ---
+
+@test "AC6: a flag given without a value exits 2, not 1" {
+    # `shift 2` on a valueless flag fails under set -e and the shell exits 1 —
+    # which this script's contract defines as "not reviewed" rather than "setup
+    # error". A typo would have been reported as a verdict.
+    for flag in --pr --payload --config; do
+        run "$SCRIPT" "$flag"
+        [ "$status" -eq 2 ]
+    done
+}
+
+@test "AC6: a registry that is valid JSON but the wrong shape exits 2" {
+    # Valid JSON of the wrong shape parsed fine and produced empty strings
+    # downstream, which classify as "nobody declined" and "no escape
+    # configured" — a malformed registry made the gate quietly MORE permissive.
+    printf '[]' > "$TMP/array.json"
+    run "$SCRIPT" --config "$TMP/array.json" --payload "$F/no-output.json"
+    [ "$status" -eq 2 ]
+
+    printf '{"reviewers":[{"declined_markers":["x"]}],"escape":{"label":"l","section":"s"}}' > "$TMP/nologin.json"
+    run "$SCRIPT" --config "$TMP/nologin.json" --payload "$F/no-output.json"
+    [ "$status" -eq 2 ]
+
+    printf '{"reviewers":[{"login":"x","declined_markers":["m"]}],"escape":{"label":"l"}}' > "$TMP/nosection.json"
+    run "$SCRIPT" --config "$TMP/nosection.json" --payload "$F/no-output.json"
+    [ "$status" -eq 2 ]
+}
+
+@test "AC6: an absent gh with no payload exits 2, never 0" {
+    # The live path with no way to read the PR must fail closed like every other
+    # unreadable case.
+    #
+    # A hermetic PATH rather than an empty one: emptying PATH also removes bash
+    # and jq, so the script dies 127 before reaching the branch under test and
+    # the case passes for the wrong reason. gh, jq and bash all live in /usr/bin
+    # here, so the only honest way to remove one is to build a PATH containing
+    # exactly the others. Everything else this path touches is a shell builtin.
+    mkdir -p "$TMP/bin"
+    local b
+    for b in bash jq dirname cat; do
+        ln -s "$(command -v "$b")" "$TMP/bin/$b"
+    done
+    [ ! -e "$TMP/bin/gh" ]
+
+    run env PATH="$TMP/bin" "$SCRIPT" --pr 1
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"gh is not installed"* ]]
+}
+
+@test "AC3: the declined message names both the reviewer and the marker" {
+    # Preserve-why, asserted rather than assumed: an operator must be able to
+    # tell WHICH reviewer declined and on what evidence.
+    run "$SCRIPT" --payload "$F/coderabbit-rate-limited.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"coderabbitai"* ]]
+    [[ "$output" == *"rate limited by coderabbit.ai"* ]]
+}
+
+@test "meta: no bare negated assertion survives in this suite" {
+    # The pitfall that hid a real violation here: `! cmd` is exempt from set -e,
+    # so a failing negation anywhere but the last line of a @test is ignored.
+    # refute_grep is the replacement; this keeps the pattern from creeping back.
+    refute_grep '^[[:space:]]*![[:space:]]*grep' "$BATS_TEST_FILENAME"
 }

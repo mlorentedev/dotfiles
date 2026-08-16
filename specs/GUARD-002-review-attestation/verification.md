@@ -32,7 +32,7 @@ work, *and* it would make the gate perturb the thing it measures.
 
 ```
 $ bats tests/check-review-attestation.bats
-25 tests, 0 failures
+35 tests, 0 failures
 ```
 
 ```
@@ -205,8 +205,10 @@ OK
 
 ## Not verified here
 
-- **Live CI behaviour.** The workflow has not yet run on a real PR; the first
-  exercise is this spec's own PR. Fixtures prove the classifier, not the wiring.
+- **The live `issue_comment` re-run.** It cannot be exercised until this merges:
+  GitHub reads that trigger from the default branch's copy of the workflow. The
+  `pull_request` path HAS run on a real PR (#1019) and published statuses onto
+  the head commit — see above. Only the comment-driven re-run is unproven.
 - **Marker durability.** If CodeRabbit changes its HTML marker the gate reports
   `pending` rather than `declined` — still red, so the verdict survives and the
   message degrades. Not something a test can pin.

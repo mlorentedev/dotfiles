@@ -16,7 +16,7 @@
   {
     "id": "GUARD-002-review-attestation-f3",
     "behavior": "AC3 — a notice that no review ran yields `declined` and a non-zero exit naming the reviewer and reason; a PR with no reviewer output yields `pending` and a non-zero exit. This is the inversion the whole spec exists for: today both of these render as `CodeRabbit pass`.",
-    "verification": "! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json 2>&1 | grep -q 'declined' && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json 2>&1 | grep -q 'pending'",
+    "verification": "scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json 2>&1 | grep -q 'declined' && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/coderabbit-rate-limited.json 2>&1 | grep -q 'rate limited by coderabbit.ai' && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json 2>&1 | grep -q 'pending'",
     "state": "pending",
     "evidence": ""
   },
@@ -29,15 +29,15 @@
   },
   {
     "id": "GUARD-002-review-attestation-f5",
-    "behavior": "AC5 — reviewers are declared in config, so adding one is an edit to a file rather than to the script. Proven by a fixture whose reviewer is NOT CodeRabbit being classified correctly with no code change, which is what makes PR-Agent (#786) a config entry instead of a rewrite.",
-    "verification": "grep -qv 'coderabbitai' scripts/check-review-attestation.sh; jq -e '.reviewers | length >= 1' harness/review-attestation.json >/dev/null && bats tests/check-review-attestation.bats -f 'second reviewer'",
+    "behavior": "AC5 — reviewers are config, not code, which is what makes #786 (PR-Agent) an entry rather than a rewrite. The negative half (the script names no reviewer of its own) is asserted by the AC5 bats cases via refute_grep, NOT inline here: the original predicate was 'grep -qv coderabbitai script', which is vacuous — grep -qv exits 0 when ANY line lacks the pattern, i.e. almost always, so it passed on a file that did contain it. Its status was also discarded by a trailing semicolon. Both defects are why this now delegates to a test that fails loudly and prints the offending line.",
+    "verification": "bats tests/check-review-attestation.bats -f 'AC5' && jq -e '.reviewers | length >= 1 and all(.[]; .login | type == \"string\")' harness/review-attestation.json >/dev/null",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "GUARD-002-review-attestation-f6",
-    "behavior": "AC6 — unreadable input fails closed. No gh, unauthenticated, malformed JSON and an empty response each exit non-zero rather than passing. pattern-verification-fails-toward-unproven: for a gate, refusing to decide must never render as a pass.",
-    "verification": "! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/malformed.json && ! scripts/check-review-attestation.sh --payload /dev/null && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/does-not-exist.json",
+    "behavior": "AC6 — unreadable input fails closed, across every shape: malformed JSON, an empty payload, a missing payload, a missing registry, a registry that is valid JSON of the wrong shape, a flag given without a value, and an absent gh on the live path. Delegated to the bats cases so each shape is asserted in isolation and named in its failure.",
+    "verification": "bats tests/check-review-attestation.bats -f 'AC6'",
     "state": "pending",
     "evidence": ""
   },

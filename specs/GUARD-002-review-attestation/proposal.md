@@ -37,11 +37,19 @@ After this change, every PR resolves into exactly one of three states, decided b
 | `declined` | a reviewer said it could not review (quota, outage, error) | **fail**, naming which reviewer and why |
 | `pending` | no reviewer output yet | **fail**, "not reviewed yet" |
 
-plus a declared escape: `disclosed` — the `merged-unreviewed` label **and** a non-empty
-`## Unreviewed merge rationale` section in the PR body. Both, never one. That is the
-same shape as `spec-gate`'s `skip-sdd` escape, chosen because it is already understood
-here and because it forces the disclosure into the durable record instead of a chat
-message.
+**`disclosed` is a fourth state, not a modifier on the other three.** It is evaluated
+after them and overrides a refusal, so a consumer switching on the outcome must handle
+four values, not three-plus-a-flag. Concretely: a PR whose reviewer declined *and* which
+carries the escape reports `disclosed`, and the fact that a reviewer declined is kept in
+the message rather than in the state.
+
+| State | Meaning | Gate |
+|---|---|---|
+| `disclosed` | no review, and the merge is declared: the `merged-unreviewed` label **and** a non-empty `## Unreviewed merge rationale` section in the PR body — both, never one | pass |
+
+That is the same shape as `spec-gate`'s `skip-sdd` escape, chosen because it is already
+understood here and because it forces the disclosure into the durable record instead of
+a chat message.
 
 The gate is **reviewer-agnostic**. Reviewers are declared in a config file — login,
 plus the marker that identifies its "I could not review" notice. CodeRabbit is the
