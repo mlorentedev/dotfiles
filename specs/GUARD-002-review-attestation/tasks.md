@@ -22,10 +22,14 @@ workflow depends on it. The fixtures come first because the entire value of this
 gate is telling two shapes apart, and one of those shapes is a real vendor
 artifact nobody can reproduce on demand once the quota resets.
 
-- [ ] [AC1] [P] Capture the three live rate-limit comments (#1007, #1009, #1013)
-      and one real review into `tests/fixtures/review-attestation/*.json`,
-      verbatim. **This is time-sensitive** — the notices are only observable
-      while the quota is exhausted
+- [x] [AC1] [P] Capture the three live rate-limit payloads (#1007, #1009, #1013)
+      verbatim into `tests/fixtures/review-attestation/pr-*.raw.json` — captured
+      2026-08-16, all three carrying the `rate limited by coderabbit.ai` marker.
+      Banked rather than re-fetched on demand: the comments do persist on closed
+      PRs, but a fixture is the only form of this evidence that survives the
+      vendor changing its output
+- [ ] [AC1] Derive minimal, hand-checkable fixtures from the raw captures (one
+      per state), plus a real-review and a human-review payload
 - [ ] [AC5] Declare reviewers in a config file (login + the marker identifying its
       "could not review" notice), CodeRabbit as the first entry, with a comment
       naming #786 as the intended second
