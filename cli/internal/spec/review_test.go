@@ -302,6 +302,9 @@ func TestGitStalenessDetectsUncommittedContractChange(t *testing.T) {
 	if !strings.Contains(reason, "uncommitted") {
 		t.Errorf("reason should say the change is uncommitted, got %q", reason)
 	}
+	if !strings.Contains(reason, "proposal.md") {
+		t.Errorf("reason should name the file that actually changed, got %q", reason)
+	}
 }
 
 // The other side of the scoping: a review writing its own artifacts into the
@@ -337,8 +340,39 @@ func TestGitStalenessDetectsContractChange(t *testing.T) {
 	if !known || !stale {
 		t.Fatalf("a contract change after reviewed_sha must be stale (known=%v stale=%v)", known, stale)
 	}
-	if !strings.Contains(reason, "contract file") {
-		t.Errorf("reason should name the contract files, got %q", reason)
+	if !strings.Contains(reason, "proposal.md") {
+		t.Errorf("reason should name the file that actually changed, got %q", reason)
+	}
+	for _, unmoved := range []string{"tasks.md", "features.json"} {
+		if strings.Contains(reason, unmoved) {
+			t.Errorf("reason names %s, which did not change: %q", unmoved, reason)
+		}
+	}
+}
+
+// #998. The refusal used to recite every contract file whether or not it had
+// changed, so an operator could not tell a rewritten acceptance criterion from a
+// ticked checkbox without reconstructing the diff by hand. Naming only what moved
+// is what makes the two distinguishable at the point of refusal.
+func TestGitStalenessNamesOnlyTheFileThatMoved(t *testing.T) {
+	root, sha := gitSpecRepo(t, "AI-001-x")
+	if err := os.WriteFile(filepath.Join(root, "specs", "AI-001-x", "tasks.md"),
+		[]byte("- [x] ticked after the review\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, root, "commit", "-qam", "tick a box")
+
+	stale, known, reason := gitStaleness{}.Stale(root, "AI-001-x", sha)
+	if !known || !stale {
+		t.Fatalf("a contract change after reviewed_sha must be stale (known=%v stale=%v)", known, stale)
+	}
+	if !strings.Contains(reason, "tasks.md") {
+		t.Errorf("reason should name tasks.md, got %q", reason)
+	}
+	for _, unmoved := range []string{"proposal.md", "features.json"} {
+		if strings.Contains(reason, unmoved) {
+			t.Errorf("reason names %s, which did not change: %q", unmoved, reason)
+		}
 	}
 }
 

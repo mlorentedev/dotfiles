@@ -69,5 +69,15 @@ CLAUDE.md
 
 # Added by ggshield
 .cache_ggshield
-specs/*/review-transcript.jsonl
-specs/*/review-transcript.jsonl.stderr
+
+# Adversarial-review machine logs. Not artifacts: `dotf spec review` writes the
+# reviewer's raw event stream beside the verdict, and it is large and churning
+# while a review runs.
+#
+# `**` rather than `*` because `*` does not cross a `/`, so `specs/*/` stopped
+# matching the moment `spec archive` renamed a spec into `specs/archive/<id>/` —
+# and archiving is exactly when the file is at its largest. HARNESS-072's was
+# 552 MB, over GitHub's 100 MB hard limit, so the archive commit could not have
+# been pushed at all (#998).
+specs/**/review-transcript.jsonl
+specs/**/review-transcript.jsonl.stderr

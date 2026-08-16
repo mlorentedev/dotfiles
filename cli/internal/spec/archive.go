@@ -141,9 +141,42 @@ type ArchiveOptions struct {
 	Staleness StalenessChecker
 }
 
+// isReviewOutput reports whether name is a file the REVIEW machinery writes
+// into a spec folder, rather than an artifact the spec's author wrote.
+//
+// The tag scan must skip these, because scanning them makes the gate unpassable
+// by construction (#998). The adversarial-review skill instructs the reviewer
+// to check the spec for these very markers, so:
+//
+//   - review.md carries the literal in its own verdict table — a review that
+//     certifies the spec is CLEAN is what makes the scan call it dirty.
+//     Observed on HARNESS-072: one hit, on the row reading "No [AGENT-DRAFT]
+//     tags | OK".
+//   - the transcript, and its .stderr sibling, carry it throughout the
+//     reviewer's raw event stream: 3593 hits in HARNESS-072's, inside 552 MB
+//     that this function would otherwise also read into memory whole.
+//
+// So the gate demanded a review, and the review's own output then failed the
+// gate. Every spec reviewed by this tool refused to archive, and the only exit
+// was --force-with-drafts, which disables the real check too.
+//
+// Matched by exact name, never by shape or extension: everything else in the
+// folder is still scanned, so an artifact added later (design.md, notes.md) is
+// guarded with no code change. That direction is deliberate and matches
+// ScanUnresolvedTags above — a deny-list errs toward refusing an archive, an
+// allow-list would silently stop guarding a file someone adds.
+func isReviewOutput(name string) bool {
+	switch name {
+	case ReviewFile, TranscriptFile, StderrPath(TranscriptFile):
+		return true
+	}
+	return false
+}
+
 // FindUnresolvedTags walks specDir and returns "relpath:line: text" for every
 // line carrying an [AGENT-DRAFT] or [AGENT-SUGGESTION] marker, in walk order.
-// An empty slice means the spec is clean.
+// An empty slice means the spec is clean. Files written by the review machinery
+// are skipped — see isReviewOutput.
 func FindUnresolvedTags(specDir string) ([]string, error) {
 	var hits []string
 	err := filepath.WalkDir(specDir, func(path string, d fs.DirEntry, err error) error {
@@ -151,6 +184,9 @@ func FindUnresolvedTags(specDir string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
+			return nil
+		}
+		if isReviewOutput(d.Name()) {
 			return nil
 		}
 		data, err := os.ReadFile(path)
