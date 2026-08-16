@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -41,6 +42,23 @@ type fakeBWServe struct {
 	items  map[string]json.RawMessage // id -> full item JSON
 	names  map[string]string          // id -> name, for /list/object/items
 
+	// folders backs /list/object/folders and POST /object/folder (id -> name),
+	// the taxonomy half of the write path (BUG-084 / OPS-028).
+	folders map[string]string
+
+	// created records POST /object/item bodies in arrival order, so a test can
+	// assert what CreateItem actually put on the wire, not merely that it 200'd.
+	created []json.RawMessage
+
+	// nextID is the id handed to the next created item/folder; "" -> "generated".
+	nextID string
+
+	// syncs counts POST /sync, so a test can assert a write made itself visible.
+	syncs int
+
+	// failSync makes POST /sync report failure, exercising the written-but-stale path.
+	failSync bool
+
 	unlockPassword string // "" -> any password succeeds
 	failUnlock     bool
 }
@@ -69,6 +87,13 @@ func (f *fakeBWServe) handler() http.HandlerFunc {
 			}
 			f.status = "unlocked"
 			writeEnvelope(w, true, "", nil)
+		case r.Method == http.MethodPost && r.URL.Path == "/sync":
+			f.syncs++
+			if f.failSync {
+				writeEnvelope(w, false, "Failed to sync.", nil)
+				return
+			}
+			writeEnvelope(w, true, "", nil)
 		case r.Method == http.MethodPost && r.URL.Path == "/lock":
 			f.status = "locked"
 			writeEnvelope(w, true, "", map[string]string{"title": "Your vault is locked."})
@@ -92,10 +117,80 @@ func (f *fakeBWServe) handler() http.HandlerFunc {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = fmt.Fprintf(w, `{"success":true,"data":%s}`, item)
+
+		// --- write path (BUG-084) ---------------------------------------
+		// bw serve takes a RAW JSON body on these, where the `bw` CLI needs
+		// base64 on stdin. That asymmetry is the only real difference between
+		// BWServeWriter and BWPut, so the fake reads raw JSON deliberately: a
+		// regression to base64 fails to decode here.
+		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/object/item/"):
+			id := strings.TrimPrefix(r.URL.Path, "/object/item/")
+			if _, ok := f.items[id]; !ok {
+				writeEnvelope(w, false, "Not found.", nil)
+				return
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || !json.Valid(body) {
+				writeEnvelope(w, false, "malformed request body", nil)
+				return
+			}
+			f.items[id] = json.RawMessage(body)
+			writeEnvelope(w, true, "", json.RawMessage(body))
+
+		case r.Method == http.MethodPost && r.URL.Path == "/object/item":
+			body, err := io.ReadAll(r.Body)
+			if err != nil || !json.Valid(body) {
+				writeEnvelope(w, false, "malformed request body", nil)
+				return
+			}
+			id := f.newID()
+			if f.items == nil {
+				f.items = map[string]json.RawMessage{}
+			}
+			if f.names == nil {
+				f.names = map[string]string{}
+			}
+			f.items[id] = json.RawMessage(body)
+			var named struct {
+				Name string `json:"name"`
+			}
+			_ = json.Unmarshal(body, &named)
+			f.names[id] = named.Name
+			f.created = append(f.created, json.RawMessage(body))
+			writeEnvelope(w, true, "", json.RawMessage(body))
+
+		case r.Method == http.MethodGet && r.URL.Path == "/list/object/folders":
+			out := []map[string]string{}
+			for id, name := range f.folders {
+				out = append(out, map[string]string{"id": id, "name": name})
+			}
+			writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
+
+		case r.Method == http.MethodPost && r.URL.Path == "/object/folder":
+			var body struct {
+				Name string `json:"name"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			id := f.newID()
+			if f.folders == nil {
+				f.folders = map[string]string{}
+			}
+			f.folders[id] = body.Name
+			writeEnvelope(w, true, "", map[string]string{"id": id, "name": body.Name})
+
 		default:
 			http.NotFound(w, r)
 		}
 	}
+}
+
+// newID hands out the id for a created item/folder, defaulting to a fixed value so
+// assertions stay deterministic.
+func (f *fakeBWServe) newID() string {
+	if f.nextID != "" {
+		return f.nextID
+	}
+	return "generated-id"
 }
 
 func writeEnvelope(w http.ResponseWriter, success bool, message string, data any) {
@@ -445,4 +540,34 @@ func isErrUnreachable(err error) bool {
 
 func isErrItemNotFound(err error) bool {
 	return errors.Is(err, ErrBWItemNotFound)
+}
+
+// TestBWServeClient_UnparseableResponseNamesStatusAndSize is the guard for the
+// diagnostic gap that let #988 stay uncharacterised: `bw serve` answers some
+// /object/item GETs with an HTTP 500 carrying the plain text "Internal Server Error",
+// and the old error reported only `invalid character 'I'` — true, and useless.
+//
+// The error must name the status code and the byte count, and must NOT echo the body:
+// a 200 whose body merely failed to parse can still carry vault material.
+func TestBWServeClient_UnparseableResponseNamesStatusAndSize(t *testing.T) {
+	const body = "Internal Server Error"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	_, err := BWServeClient{BaseURL: srv.URL}.Status()
+	if err == nil {
+		t.Fatal("expected an error for a non-JSON response")
+	}
+	msg := err.Error()
+	for _, want := range []string{"HTTP 500", "21 bytes"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("error must name %q so the failure is identifiable, got: %s", want, msg)
+		}
+	}
+	if strings.Contains(msg, body) {
+		t.Fatalf("error must NOT echo the response body (it may carry vault material): %s", msg)
+	}
 }

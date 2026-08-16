@@ -54,6 +54,71 @@ func TestFindUnresolvedTags(t *testing.T) {
 	}
 }
 
+// #998. The gate demanded a review, and the review's own output then failed
+// the gate: the adversarial-review skill tells the reviewer to check the spec
+// for these markers, so checking writes the literals into review.md and into the
+// transcript, both of which sit in the scanned folder. Observed on HARNESS-072:
+// 1 hit in review.md (the row certifying the spec was clean) and 3593 in the
+// transcript, while every authored artifact was genuinely clean.
+func TestFindUnresolvedTagsSkipsReviewMachineryOutput(t *testing.T) {
+	root := t.TempDir()
+	dir := writeSpec(t, root, "AI-001-x", map[string]string{
+		"proposal.md": "---\nstatus: implementing\n---\nno tags here\n",
+		"tasks.md":    "- [x] done\n",
+		// The reviewer certifying the spec is clean is what used to make the
+		// scan call it dirty.
+		ReviewFile: "---\nverdict: \"PASS\"\n---\n| No [AGENT-DRAFT] tags | OK | none found |\n",
+		// The reviewer's raw event stream, carrying the literal mid-thought.
+		TranscriptFile: `{"type":"message_update","delta":"look for [AGENT-DRAFT] or [AGENT-SUGGESTION] tags"}` + "\n",
+	})
+	if err := os.WriteFile(filepath.Join(dir, StderrPath(TranscriptFile)),
+		[]byte("warn: [AGENT-DRAFT]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	tags, err := FindUnresolvedTags(dir)
+	if err != nil {
+		t.Fatalf("FindUnresolvedTags: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("review machinery output must not block an archive, got %d hits: %v", len(tags), tags)
+	}
+}
+
+// The exemption is by exact name, not by shape: a live marker in an artifact the
+// author added later must still refuse. Without this, "skip the review's files"
+// could quietly widen into "skip files that look machine-generated".
+func TestFindUnresolvedTagsStillScansOtherFiles(t *testing.T) {
+	root := t.TempDir()
+	dir := writeSpec(t, root, "AI-001-x", map[string]string{
+		"proposal.md":   "clean\n",
+		ReviewFile:      "| No [AGENT-DRAFT] tags | OK |\n",
+		TranscriptFile:  `{"delta":"[AGENT-DRAFT]"}` + "\n",
+		"design.md":     "<!-- [AGENT-DRAFT] pick the storage engine -->\n",
+		"notes.jsonl":   `{"note":"[AGENT-SUGGESTION] rename this"}` + "\n",
+		"review-old.md": "<!-- [AGENT-SUGGESTION] stale copy -->\n",
+	})
+
+	tags, err := FindUnresolvedTags(dir)
+	if err != nil {
+		t.Fatalf("FindUnresolvedTags: %v", err)
+	}
+	if len(tags) != 3 {
+		t.Fatalf("want 3 hits (design.md, notes.jsonl, review-old.md), got %d: %v", len(tags), tags)
+	}
+	joined := strings.Join(tags, "\n")
+	for _, want := range []string{"design.md", "notes.jsonl", "review-old.md"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("tags output missing %q:\n%s", want, joined)
+		}
+	}
+	for _, unwanted := range []string{ReviewFile, TranscriptFile} {
+		if strings.Contains(joined, unwanted) {
+			t.Errorf("%s must be skipped, but appears in:\n%s", unwanted, joined)
+		}
+	}
+}
+
 func TestFindUnresolvedTagsCleanDir(t *testing.T) {
 	root := t.TempDir()
 	dir := writeSpec(t, root, "AI-001-x", map[string]string{
