@@ -55,16 +55,23 @@ that reports well but leaks once has failed completely, so the tests that pin
 - [ ] `--raw`, `--count N` flags.
 - [ ] `--count N`: report the outcome distribution (status → occurrences); no
       value output regardless of N.
-- [ ] **`--count` MUST reuse one client across all N iterations.** Not a
-      performance choice — it decides whether the flag works at all. Measured in
-      the `cli/internal/secrets/` lane (2026-08-15): 24 requests at each of
-      1/2/4/8-way parallelism gave 96/96 clean, while the *same* 6-request
-      keep-alive chain gave 2, then 1, then 0 × HTTP 500 across three consecutive
-      runs. So the failure tracks connection reuse, and a fresh client per
-      iteration would sample only the always-clean case — `--count` would then
-      report the bug as ABSENT, which is worse than not having the flag: it would
-      be evidence for the wrong conclusion. A test pins that N iterations issue
-      through one client.
+- [ ] **`--count` must be able to issue a `/status` and then item reads**, because
+      that is the actual reproducer. `GET /status` poisons the daemon's item-read
+      path for roughly half a second: 10 item reads before it returned 200×10, and
+      10 immediately after returned 500×10 (measured twice, independently, on
+      2026-08-15). Upstream bitwarden/clients#20951, a switchMap/ReplaySubject
+      disposal race.
+- [ ] **Superseded rationale, kept deliberately.** An earlier draft of this task
+      required reusing one client across iterations, on the theory that the fault
+      tracked connection reuse. That was **falsified**: `DisableKeepAlives` over
+      360 requests moved failures 35.0% → 32.8%, i.e. not at all. A rival theory
+      of mine — concurrency — was falsified too (24 requests at each of 1/2/4/8-way
+      parallelism: 96/96 clean). Both survived a first test and died on a second.
+      The note stays because the shape of the error is the reusable lesson: **the
+      measurement was the cause.** Every attempt to observe the daemon's health
+      called `/status` first and damaged the next read, so three sessions'
+      contradictory numbers were all correct and all sampling one half-second
+      window from different distances.
 - [ ] Read-only: assert no unlock/sync/set/rotate call exists on this path.
 
 ## 4. Verification

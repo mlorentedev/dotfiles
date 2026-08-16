@@ -54,16 +54,25 @@ func newSecretsProbeCmd() *cobra.Command {
 					s.ID, s.Backend)
 			}
 
-			// ONE client for every iteration, deliberately.
+			// One client for every iteration. Not a performance choice: --count
+			// exists to characterise a fault whose trigger is ORDER, so the
+			// sequence of requests has to be a real sequence against one daemon.
 			//
-			// This is a correctness requirement, not a performance nicety. The
-			// fault this flag exists to characterise tracks connection reuse: 24
-			// requests at each of 1/2/4/8-way parallelism came back 96/96 clean,
-			// while the same 6-request keep-alive chain produced 2, then 1, then 0
-			// failures across three consecutive runs. A fresh client per iteration
-			// samples only the always-clean case, so --count would report the fault
-			// as ABSENT — worse than not having the flag, because it manufactures
-			// evidence for the wrong conclusion.
+			// The trigger is `GET /status`, which poisons this daemon's item-read
+			// path for about half a second: 10 item reads before one returned
+			// 200x10, and 10 immediately after returned 500x10 (bitwarden/clients
+			// #20951, a switchMap/ReplaySubject disposal race).
+			//
+			// Two earlier explanations of this fault are recorded here because
+			// both were wrong and both looked right first. Connection reuse was
+			// falsified by DisableKeepAlives over 360 requests (35.0% -> 32.8%
+			// failures, i.e. unchanged); concurrency was falsified by 24 requests
+			// at each of 1/2/4/8-way parallelism (96/96 clean). What made the fault
+			// so hard to see is that THE MEASUREMENT WAS THE CAUSE — every attempt
+			// to check the daemon's health called /status and damaged the next
+			// read. That is exactly why a probe with a stable, declared request
+			// sequence is worth having: an ad-hoc curl loop cannot tell you which
+			// of its own steps moved the result.
 			client := secrets.BWServeClient{}
 
 			itemID, err := client.ProbeItemID(s.BW.Item)
@@ -111,7 +120,7 @@ func printDistribution(cmd *cobra.Command, statuses map[int]int, total int) {
 	}
 	sort.Ints(codes)
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d probes over one reused connection:\n", total)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d probes, one client, in order:\n", total)
 	for _, code := range codes {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  HTTP %d  %d/%d\n", code, statuses[code], total)
 	}
