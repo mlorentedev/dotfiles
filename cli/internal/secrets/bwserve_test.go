@@ -65,6 +65,16 @@ type fakeBWServe struct {
 
 func (f *fakeBWServe) handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// A locked daemon refuses DATA endpoints — items, folders, sync — while
+		// still answering /status, /unlock and /lock. The fake models that because
+		// backend selection now probes a data endpoint rather than /status (BUG-082:
+		// a /status call poisons item reads for ~0.5s), so "locked" has to be
+		// observable the way the real daemon makes it observable.
+		if f.status != "unlocked" && (strings.HasPrefix(r.URL.Path, "/object/") ||
+			strings.HasPrefix(r.URL.Path, "/list/object/") || r.URL.Path == "/sync") {
+			writeEnvelope(w, false, "Vault is locked.", nil)
+			return
+		}
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/status":
 			// Real bw serve wraps this under "template" (captured live against
