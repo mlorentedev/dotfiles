@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -83,11 +84,40 @@ func frontmatterFields(content string) map[string]string {
 // ParseReview reads review.md content into a Review. A missing or unrecognized
 // verdict is an error: the artifact exists but does not say anything the gate
 // can act on, which is worse than absent and must not pass silently.
+// verdictSeparators matches any run of the characters a reviewer might use
+// between the words of a multi-word verdict.
+var verdictSeparators = regexp.MustCompile(`[\s_-]+`)
+
+// normalizeVerdict maps what a reviewer WROTE onto the enum the gate matches,
+// differing only in case and word separators.
+//
+// Observed: an otherwise complete review of HARNESS-072 recorded
+// `verdict: "PASS WITH GAPS"`, with spaces. The gate matches `PASS-WITH-GAPS`
+// exactly, so `Blocks()` refused the archive over punctuation — a six-minute
+// review and a passing verdict, discarded on two characters. The repo already
+// carries this lesson about the `reviewer:` field ("the right model spelled
+// differently is refused over punctuation, which costs a whole review round");
+// this is the same defect one field across.
+//
+// Deliberately narrow. Only case and the separators between words are
+// normalized, so `PASS WITH GAPS`, `pass_with_gaps` and `PASS-WITH-GAPS` are one
+// verdict, while `PASSWITHGAPS`, `PASSED` or anything else is still rejected as
+// unrecognized. Widening it further would start guessing at intent, and a gate
+// that guesses is worse than one that refuses: the safe direction here is to
+// accept only spellings that are unambiguously the same words.
+func normalizeVerdict(raw string) Verdict {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	return Verdict(strings.ToUpper(verdictSeparators.ReplaceAllString(s, "-")))
+}
+
 func ParseReview(content string) (Review, error) {
 	f := frontmatterFields(content)
 	r := Review{
 		Spec:        f["spec"],
-		Verdict:     Verdict(strings.ToUpper(f["verdict"])),
+		Verdict:     normalizeVerdict(f["verdict"]),
 		ReviewedSHA: f["reviewed_sha"],
 		Reviewer:    f["reviewer"],
 		Date:        f["date"],
