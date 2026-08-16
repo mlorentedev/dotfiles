@@ -234,9 +234,11 @@ func scopeVerify(reg *secrets.Registry, defects []secrets.SecretDefect, args []s
 	if len(args) == 0 {
 		return defects, nil, nil
 	}
-	byID := make(map[string]secrets.SecretDefect, len(defects))
+	// Keyed to a SLICE, not a single defect: one id can carry several. A duplicate id
+	// is itself a defect, so "one defect per id" is the assumption the data disproves.
+	byID := make(map[string][]secrets.SecretDefect, len(defects))
 	for _, d := range defects {
-		byID[d.ID] = d
+		byID[d.ID] = append(byID[d.ID], d)
 	}
 	var inScope []secrets.SecretDefect
 	var healthy []string
@@ -244,11 +246,19 @@ func scopeVerify(reg *secrets.Registry, defects []secrets.SecretDefect, args []s
 		if tok = strings.TrimSpace(tok); tok == "" {
 			continue
 		}
-		if d, ok := byID[tok]; ok {
-			inScope = append(inScope, d)
-			continue
+		ds, isDefect := byID[tok]
+		inScope = append(inScope, ds...)
+
+		// One token can name BOTH a defect and a valid entry — a duplicate id whose
+		// first definition validated and whose second did not. Reporting only the
+		// defect would hide the entry that actually resolves, which is the half the
+		// caller most needs. So a defect match does not short-circuit the lookup.
+		_, known := reg.Selector(tok)
+		if known || !isDefect {
+			// Unknown-and-not-a-defect falls through deliberately, so resolveOnly
+			// produces the "unknown id" error rather than this silently accepting it.
+			healthy = append(healthy, tok)
 		}
-		healthy = append(healthy, tok)
 	}
 	if len(healthy) == 0 {
 		// Every named id is defective: select no healthy entries, but still report.

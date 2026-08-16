@@ -487,3 +487,49 @@ func TestSecretsVerify_StructuralFailureStillAborts(t *testing.T) {
 		t.Error("an unsupported registry version must still abort, not degrade to a report")
 	}
 }
+
+// TestSecretsVerify_ScopedToDuplicateIdReportsBothHalves is CodeRabbit's Major finding
+// on #1020, and it was right.
+//
+// A rejected secret does not reserve its id, so a duplicate id leaves TWO things sharing
+// one name: the first definition, which validated and is in the registry, and the second,
+// which is a defect. Scoping to that id must report both — the original code matched the
+// defect and short-circuited, so `verify dup` reported the defect and silently skipped
+// the entry that actually resolves, which is the half the caller most needs.
+func TestSecretsVerify_ScopedToDuplicateIdReportsBothHalves(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: dup, plane: app, backend: age, age: a, expose: {env: VALID_HALF}}\n"+
+		"  - {id: dup, plane: app, backend: age, age: b, expose: {env: DEFECT_HALF}}\n")
+	alwaysResolves(t)
+
+	out, err := runVerify(t, "dup")
+
+	if !strings.Contains(out, "VALID_HALF") {
+		t.Errorf("the valid definition sharing the id must still be resolved:\n%s", out)
+	}
+	if !strings.Contains(out, "duplicate secret id") {
+		t.Errorf("the defect sharing the id must still be reported:\n%s", out)
+	}
+	if err == nil {
+		t.Errorf("a defect in scope must still exit non-zero:\n%s", out)
+	}
+}
+
+// TestSecretsVerify_SeveralDefectsOnOneId: defects are keyed to a slice, so two bad
+// definitions of one id are both reported rather than one overwriting the other.
+func TestSecretsVerify_SeveralDefectsOnOneId(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n"+
+		"  - {id: trip, plane: app, backend: age, age: a, expose: {env: FIRST_OK}}\n"+
+		"  - {id: trip, plane: app, backend: age, age: b, expose: {env: SECOND}}\n"+
+		"  - {id: trip, plane: app, backend: age, age: c, expose: {env: THIRD}}\n")
+	alwaysResolves(t)
+
+	out, _ := runVerify(t, "trip")
+
+	if n := strings.Count(out, "duplicate secret id"); n != 2 {
+		t.Errorf("want both duplicate definitions reported, got %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, "FIRST_OK") {
+		t.Errorf("the one valid definition must still resolve:\n%s", out)
+	}
+}
