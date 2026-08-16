@@ -1,0 +1,51 @@
+[
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f1",
+    "behavior": "AC1 — a PR receives inline review comments generated through NaN. NOT verifiable before merge: the workflow must be on the default branch, and the real test is opening a PR with a known defect. This entry checks the wiring that makes it possible; the acceptance evidence goes in verification.md after the first live run.",
+    "verification": "bats tests/pr-agent-config.bats -f 'the config and workflow both exist' && python3 -c \"import yaml,sys; d=yaml.safe_load(open('.github/workflows/pr-agent.yml')); on=d[True] if True in d else d['on']; sys.exit(0 if 'pull_request' in on else 1)\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f2",
+    "behavior": "AC2 — a reasoning-class reviewer with NO cheap fallback. harness/reviewer-pool.json excludes qwen3.6 from the adversarial-review pool by name ('a reviewer that PASSes cheaply is worse than no gate'), and #786's draft proposed exactly that model as a fallback here. Two files holding opposite policies on who may review is the defect this asserts against.",
+    "verification": "bats tests/pr-agent-config.bats -f 'does not fall back' && bats tests/pr-agent-config.bats -f 'the reviewing model is the one measured'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f3",
+    "behavior": "AC3 — sensitive/ never enters the model call. The load-bearing exclusion: that directory holds age ciphertext and the DR escrow, and the path filter runs before the only point at which a diff leaves this infrastructure.",
+    "verification": "bats tests/pr-agent-config.bats -f 'never sends sensitive'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f4",
+    "behavior": "AC4 — exactly one inference credential, delivered by declaration rather than ambiently. #1025 is the counter-example on the spec-review path: whole-registry injection to authenticate one model means one broken item mapping takes down authentication for everything.",
+    "verification": "bats tests/pr-agent-config.bats -f 'exactly one secret' && bats tests/pr-agent-config.bats -f 'declared as a CI consumer'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f5",
+    "behavior": "AC5 — the action is pinned to a release tag that exists, at the project's current name. Both were wrong in the first draft, which is why this is a criterion rather than an assumption: qodo-ai/pr-agent now redirects to The-PR-Agent/pr-agent, and @v0.30 does not exist at all.",
+    "verification": "bats tests/pr-agent-config.bats -f 'pins the action to a tag' && gh api repos/The-PR-Agent/pr-agent/contents/action.yaml?ref=$(grep -oE 'pr-agent@v[0-9.]+' .github/workflows/pr-agent.yml | head -1 | cut -d@ -f2) --jq '.name' >/dev/null",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f6",
+    "behavior": "AC6 — a provider failure degrades the review AND the absence is visible. The second clause is what distinguishes this from #786's original wording, which as written describes a silent green: GUARD-002 classifies a missing review as `declined` and turns the PR red, so 'degraded' cannot mean 'unnoticed'.",
+    "verification": "test -f scripts/check-review-attestation.sh && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json 2>&1 | grep -q 'pending' && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f7",
+    "behavior": "AC7 — AGENTS.md enters the review prompt, so the repo's standing orders, the English-only rule, the no-auto-merge rule and the shell-compatibility table become review criteria with no additional wiring. #786 calls this the free win and it is the single highest-value line in the config.",
+    "verification": "bats tests/pr-agent-config.bats -f 'AGENTS.md enters the review prompt' && test -f AGENTS.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
