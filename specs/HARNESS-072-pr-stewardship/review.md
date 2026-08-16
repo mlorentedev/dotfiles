@@ -1,75 +1,50 @@
 ---
 spec: "HARNESS-072-pr-stewardship"
-verdict: "PASS"
-reviewed_sha: "1320efa1b384c2d90023cf9b3e08bcada76bef73"
+verdict: "PASS WITH GAPS"
+reviewed_sha: "a9b2063d7440c152a1997c20f5d78ee4b5261998"
 reviewer: "nan/deepseek-v4-flash"
 date: "2026-08-15"
 ---
 
 ## Adversarial review
 
-**Scope**: HARNESS-072-pr-stewardship (PR #986, merged at 62d2e84)
-**Sources**: `specs/HARNESS-072-pr-stewardship/{proposal,tasks,verification}.md`, `features.json`, `harness/enforced/pr-stewardship.md`, `harness/manifest.json`, `scripts/compile-harness.sh`, `tests/compile-harness.bats`, `harness/skills/pr-review-triage/SKILL.md`, `AGENTS.md`, `ai/claude/CLAUDE.md`, `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, `~/.codex/AGENTS.md`, vault `00_meta/patterns/pattern-change-lifecycle.md` (HEAD at 2e351f1a)
+**Scope**: HARNESS-072-pr-stewardship
+**Sources**: `specs/HARNESS-072-pr-stewardship/{proposal,tasks,verification}.md`, `harness/manifest.json`, `harness/enforced/pr-stewardship.md`, `AGENTS.md`, `ai/claude/CLAUDE.md`, `scripts/compile-harness.sh`, `harness/skills/pr-review-triage/SKILL.md`, `tests/compile-harness.bats`
 
 ### Spec and task alignment
 
-All 8 acceptance criteria are addressed by the implementation. The proposal, tasks, and verification form a coherent chain. Two tasks claim a scope discipline that does not fully hold (see Findings).
-
-### Verified evidence
-
-Run against the current tree at `1320efa` (a descendant of the merged PR commit `62d2e84`; spec contract files unchanged since `62d2e84`):
-
-| Check | Result | Command |
-|---|---|---|
-| 47/47 bats tests | ✅ | `bats tests/compile-harness.bats` |
-| shellcheck | ✅ | `shellcheck scripts/compile-harness.sh` |
-| `bash -n` | ✅ | `bash -n scripts/compile-harness.sh` |
-| `--check` no drift | ✅ exit 0 | `./scripts/compile-harness.sh --check` |
-| All 8 features pass | ✅ | `for i in 1..8; jq .verification features.json; bash -c "$cmd"` |
-| Vault section matches record | ✅ byte-identical | `diff /tmp/vault-section.md harness/enforced/pr-stewardship.md` |
-| AC2: 5 surfaces, 1 hit each | ✅ | `grep -c 'the disposition, not the waiting'` on AGENTS.md, ai/claude/CLAUDE.md, ~/.claude/CLAUDE.md, ~/.gemini/GEMINI.md, ~/.codex/AGENTS.md |
-| AC2: caps hold | ✅ | GEMINI 6503/12000, codex 6503/32768 (`wc -c`) |
-| Mutation: remove from inject → GAP | ✅ | `jq` removed pr-stewardship from ai/claude/CLAUDE.md inject, `--check` → `[GAP]` + exit 1; reverted clean |
-| No [AGENT-DRAFT] tags | ✅ | g[r]ep -rn AGENT-DRAFT specs/HARNESS-072/ → none |
-| Vault pattern present | ✅ | `grep -c "## PR Stewardship"` at vault HEAD (contains 2e351f1a) |
-| pr-review-triage body gh-only | ✅ | uses `gh pr checks`, `gh pr view`, `gh api`, `gh run view` — no Claude-specific primitives |
-| Reviewer-pool claim verified | ✅ | `harness/reviewer-pool.json` exists; `archive.go` calls `checkReviewGate`; spec-gate.yml enforces archive-on-merge |
-| Working tree clean | ✅ | `git status --short` → empty |
+- All eight acceptance criteria have corresponding features (f1–f8) and implemented tasks.
+- Every task is ticked `[x]`. The diff evidence is consistent with the task claims.
+- No `[AGENT-DRAFT]` or `[AGENT-SUGGESTION]` tags remain in any spec file.
+- The spec's Risks section names the coverage-class bug (the partial-injection case), and the implementation ships the fix (`check_coverage` + AC8) in the same PR — this satisfies `feedback_incident_to_guard`.
 
 ### Findings
 
-| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location |
-|----------|---------|------|---------|----------|---------------------------|-------------|
-| Minor | REAL | .gitignore completeness | PR adds `specs/*/review-transcript.jsonl` but `review_launch.go`'s `StderrPath` also writes `.jsonl.stderr` | `git show 62d2e84:.gitignore` shows only the `.jsonl` line; `.stderr` file appeared untracked at session start. Fixed by a concurrent session in 1320efa (not yet on origin/main) | UNTESTED | code (already fixed as 1320efa; note that the fix is not yet on origin/main) |
-| Minor | REAL | Scope claim | tasks.md closing checklist: "[x] No unrelated changes in the diff — the record sync is its own commit". The diff (6252eba..62d2e84) includes `harness/skills/dispatching-parallel-agents/SKILL.md` (16 lines, reconciliation block — substantive unrelated content), `harness/agents/curator/AGENT.md` (owner field), `harness/skills/systematic-debugging/defense-in-depth.md` + `root-cause-tracing.md` (frontmatter). These are unavoidable vault-drift syncs (the PR author kept six others out at b678103), but the claim is inaccurate. | `git diff 6252eba..62d2e84 --stat` shows these files changed; the dispatching-parallel-agents change is a real feature addition (mandatory reconciliation block) unrelated to PR stewardship | UNTESTED | spec artifacts (correct the tasks.md claim to acknowledge the drift sync) |
-| Minor | THEORETICAL | Verification | features.json f2 checks only the 2 committed surfaces + doctrine.inject, not the 3 $HOME deployed surfaces that AC2 requires. The verification.md supplies session evidence for those, but the machine-readable check is weaker than the AC. | `jq '.[1].verification'` shows f2 checks AGENTS.md, ai/claude/CLAUDE.md, and doctrine.inject — not the agy/codex payloads. The grep on $HOME payloads confirms the sentence is present, but the f2 command would not fail if a deploy regressed | UNTESTED | tests (extend f2 to also check deployed surfaces, or document the proxy) |
-| Minor | THEORETICAL | Tests | `check_coverage`'s doctrine branch is untested by fixtures. The 3 bats tests use a manifest without a `doctrine` section. The real tree passes (pr-sizing is in doctrine.inject, coverage OK), but a regression wouldn't be caught. | `sed -n '851,880p' scripts/compile-harness.sh` shows the doctrine surface handling; the 3 bats tests use `write_two_surface_manifest` which has no doctrine section | UNTESTED | tests (add a 4th bats test with a doctrine surface) |
+| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
+|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
+| Minor | REAL | Verification gap | `features.json` f2 verifies AC2 ("positive per-surface grep") by checking only the **committed** targets (AGENTS.md, CLAUDE.md) and the manifest doctrine.inject list. It does **not** grep the rendered doctrine payloads at `~/.gemini/GEMINI.md` and `~/.codex/AGENTS.md`, which AC2 specifically requires. The current state is correct (manually confirmed in-session), but no automated gate prevents a regression if `--deploy` silently fails or a future change drops pr-stewardship from the doctrine payload. | UNTESTED (no automated check on the rendered doctrine files) | spec: update features.json f2 to also grep the doctrine payloads after deploy, or document this as an accepted design limit of the offline-check model |
+| Minor | THEORETICAL | Coherence | The PR Stewardship region and the existing "Hand the PR over; don't watch CI" rule (AGENTS.md lines 263 vs 273 — 10 lines apart) express different timing expectations for the same transition. The region says "the default mechanism is to stay" and sets a 10-minute window; the existing rule says "move to the next piece of work — never sit in a watch loop." The region does provide an escape ("a project that already tells you when to look back — the human notifies, a hook fires — has met this, and its instruction wins"), and the existing rule qualifies here. But an agent reading both without careful synthesis could conclude they contradict, especially since the phrase "default mechanism is to **stay**" directly opposes "**move** to the next piece of work." | UNTESTED (no behavioural test exists for agent instruction comprehension) | spec: add a bridging sentence in the region connecting the two rules ("This does not contradict 'Hand the PR over; don't watch CI' because…") or relocate the "Hand the PR over" rule into the region itself so the reader sees them as one unit |
+| Minor | THEORETICAL | Timing ambiguity | The region uses "ten minutes after the checks settle" as its default window. The `pr-review-triage` skill (which this spec amends) says "wait a couple of minutes" / "two minutes" before reading comments. These describe different timers for different phases (window-close vs first-read), but nothing in either document explains how they compose: the agent reads comments at t+2 min, then has until t+10 min to produce a disposition. A reader could conflate them or wait the wrong amount of time. | UNTESTED | spec: add a note in either document clarifying that "two minutes" (first look) is a sub-phase of the "ten minutes" (window close) |
+| Minor | SPECULATIVE | Default trigger | The `pr-review-triage` skill says it triggers "by default once a PR you opened has come back." But no automated mechanism calls it — the trigger relies on agent self-invocation. The enforced region is the binding mechanism; the "by default" trigger language is aspirational and could cause an agent to expect an automatic call that never fires. Not a blocker — the region's obligation is the fix — but it creates a false expectation. | UNTESTED | spec: clarify in the skill's preamble that "by default" means "when the agent judges it is time," not "automatically" |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness | B | All acceptance criteria verified; negative paths covered (AC8's partial-injection case proven by 3 bats tests + real-tree mutation). Minor gap: middle-ground opt_out interpretations (e.g., a truthful but misleading opt_out reason) are not tested — but that's a human judgement, not a mechanical gap. |
-| Verification | B | Evidence is thorough and mostly reproducible (commands + outputs). AC2's $HOME payload evidence is session-dependent but verifiable. Features.json f2 is a proxy for the full AC2. One lesson captured in docs/lessons.md. |
-| Scope | B | Diff is focused on the spec. The vault-drift sync (dispatching-parallel-agents reconciliation block, curator owner field, sysdebug frontmatter) is unavoidable generated-file drift, but the tasks.md claim contradicts the diff. |
-| Reliability | B | Error paths handled (GAP messages, DRIFT detection, exit codes). The coverage guard is idempotent. The "ten minutes" default is acknowledged as a guess — the mitigation (demotion to default mechanism) is sound. |
-| Maintainability | A | `check_coverage` is a clean 30-line function with a WHY comment explaining the blind spot it exists for. 3 bats tests are clear with comments. Region text is terse. The lesson in `docs/lessons.md` is comprehensive. |
-| Handoff-readiness | B | Spec updates included (tasks.md, verification.md, archive checklist). Lesson captured in docs/lessons.md. The "six stale records" finding is documented. Minor: the scope claim in tasks.md is inaccurate. |
+| Correctness | B | All acceptance criteria verified and passing; one verified-but-unguarded gap in automated coverage of doctrine payloads (Minor/REAL). |
+| Verification | B | Evidence in `verification.md` is thorough and reproducible. The automated `features.json` gate has a gap (f2 doesn't check rendered doctrine), keeping this at B rather than A. |
+| Scope | A | Diff matches the proposal exactly. The GUARD-002-review-attestation work is a separate commit on the branch, not merged into this spec's diff. The six unrelated drifted records are a committed sync, declared in tasks.md. |
+| Reliability | B | The coverage guard (AC8) and region diff work correctly. Mutation tests confirmed both `check_coverage` and region-diff catch the cases they're designed for. No error-path gaps found in compile-harness.sh changes. |
+| Maintainability | A | Code is clean, functions short, tests have readable names with descriptive comments explaining *why* they exist. The `check_coverage` function has a prose explanation of why region-diff alone is blind to its gap. |
+| Handoff-readiness | A | Spec artifacts are complete. Verification.md records decisions, promotion candidates, and evidence. No stale tags remain. Only the findings above would benefit from resolution before archive. |
 
 ### Verdict
-
-**PASS**
-
-- No **Blocker** or **Major** findings. All findings are **Minor**.
-- **No C or D** in any rubric dimension. All grades are B or above.
-- The coverage guard (`check_coverage`) is the spec's most important contribution and works correctly on the real tree (verified by mutation test).
-- The region text is injected into all 5 surfaces, satisfies all acceptance criteria, and matches the vault source byte-for-byte.
-- The pr-review-triage skill is correctly updated to cover the reviewer bot.
-- The `dotf spec archive` gate is `advisable` in the current state — the spec meets the mechanical requirements for archiving.
+PASS WITH GAPS
 
 ### Recommended next steps (before archive)
 
-1. **Correct the tasks.md scope claim** — the diff does contain unrelated generated-record syncs (dispatching-parallel-agents reconciliation block, curator owner field, sysdebug frontmatter). Acknowledge them as unavoidable vault-drift syncs rather than claiming "no unrelated changes".
-2. **(Optional) Add a 4th bats test** — exercise `check_coverage`'s doctrine surface branch with a fixture manifest that includes a `doctrine` section.
-3. **(Optional) Extend f2** — have the features.json verification command also confirm the $HOME doctrine payloads are grep-positive, or document that f2 is a proxy for the committed-world subset.
-4. **Note the .gitignore .stderr gap** — the `.stderr` companion is not yet ignored on `origin/main` (the fix at 1320efa is on a fix branch, not merged). If the spec is archived before that fix lands, the next `dotf spec review` run will leave an untracked `.stderr` file.
+1. **Address the verification gap (Minor/REAL):** Update `features.json` f2 to also grep the rendered doctrine payloads at `~/.gemini/GEMINI.md` and `~/.codex/AGENTS.md` for "the disposition, not the waiting." Alternatively, document this as an accepted limit of ADR-013's offline-check model (committed-only verification) and close the gap in a follow-up.
+2. **Resolve the coherence tension (Minor/THEORETICAL):** Either add a bridging sentence in the PR Stewardship region or relocate the "Hand the PR over; don't watch CI" rule into the region itself, so an agent reading both sees them as one consistent instruction rather than two contradicting ones.
+3. **Clarify the two timers (Minor/THEORETICAL):** Add a short note in either the region or the skill stating that the "two minutes" (first comment read) is a sub-phase of the "ten minutes" (window close), so the two don't appear to conflict.
+
+None of these are blockers. `dotf spec archive` is **advisable** once item 1 (the automated verification gap) has a resolution path recorded — either as a fix to `features.json` or as a documented acceptance in the spec artifacts. The change is correct and the guard works; the gaps are in documentation completeness and automated verification breadth, not in the implementation logic.
