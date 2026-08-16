@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -60,11 +61,60 @@ var (
 	registryPath      = env.ResolveRegistryPath
 	registryWritePath = env.RepoRegistryPath
 	ageDecryptor      secrets.Decryptor
-	bwReader          secrets.BWReader = secrets.BWFallbackReader{
-		Serve:    secrets.BWServeReader{Client: secrets.BWServeClient{}},
-		Shellout: secrets.BWGet{},
-	}
+
+	// bwReader / bwWriter are TEST SEAMS ONLY: nil in production, where both halves
+	// come from the pinned backend below. A test assigns one (or both) to inject a
+	// fake with no age key and no unlocked Bitwarden.
+	bwReader secrets.BWReader
+	bwWriter bwWriteClient
+
+	// bwBackendOnce / bwBackendPin implement BUG-084's pinning decision: the
+	// daemon-vs-shellout choice is made ONCE per process — a `dotf` invocation is one
+	// command — and both the read and write halves come from that single decision, so
+	// a command cannot read through the daemon and write through the CLI. That split
+	// is what BUG-084 was.
+	//
+	// Lazy (sync.Once, not a package initialiser) so commands that touch no secret —
+	// `dotf env`, `dotf doctor`, `dotf spec` — never pay the daemon probe.
+	bwBackendOnce sync.Once
+	bwBackendPin  secrets.BWBackend
 )
+
+// bwBackend returns the process-wide pinned Bitwarden backend, probing the daemon on
+// first use only.
+func bwBackend() secrets.BWBackend {
+	bwBackendOnce.Do(func() {
+		bwBackendPin = secrets.SelectBWBackend(secrets.BWServeClient{})
+	})
+	return bwBackendPin
+}
+
+// bwRead / bwWrite are how every command reaches Bitwarden. They prefer an injected
+// test seam and otherwise take the matched half of the pinned backend — so production
+// code has no way to mix the two subjects even by accident.
+func bwRead() secrets.BWReader {
+	if bwReader != nil {
+		return bwReader
+	}
+	return bwBackend().Reader
+}
+
+func bwWrite() bwWriteClient {
+	if bwWriter != nil {
+		return bwWriter
+	}
+	return bwBackend().Writer
+}
+
+// bwSync returns the cache-refresh half of the SAME pinned backend. Sync is pinned with
+// the other two because the daemon and the CLI cache independently: syncing one leaves
+// the other stale, so a rotation that syncs the wrong subject cannot prove its own write.
+func bwSync() daemonSyncer {
+	if bwSyncer != nil {
+		return bwSyncer
+	}
+	return bwBackend().Syncer
+}
 
 // secretLoader builds the resolution engine wired with both backend seams, over the
 // age store in sensitive/ (checkout-first, ADR-030 — same source as the registry it
@@ -74,7 +124,7 @@ func secretLoader() *secrets.Loader {
 		SecretsDir: env.ResolveSensitiveDir(),
 		KeyPath:    ageKeyPath(),
 		Decrypt:    ageDecryptor,
-		BW:         bwReader,
+		BW:         bwRead(),
 	}
 }
 
@@ -104,17 +154,26 @@ func newSecretsVerifyCmd() *cobra.Command {
 			"(--require-all also fails on MISSING).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			reg, err := loadRegistry()
+			// The partial door, deliberately: a health check must not be stopped by
+			// the very kind of breakage it exists to report (BUG-086, #1004).
+			reg, defects, err := loadRegistryPartial()
 			if err != nil {
 				return err
 			}
-			only, err := resolveOnly(reg, strings.Join(args, ","))
+			defects, only, err := scopeVerify(reg, defects, args)
 			if err != nil {
 				return err
 			}
 			loader := secretLoader()
 			w := cmd.OutOrStdout()
 			var ok, missing, failed int
+			// A malformed entry is a FAILED row for that secret, not an abort. Its
+			// vars are not expanded — the entry is exactly what could not be read, so
+			// naming them would be guesswork.
+			for _, d := range defects {
+				failed++
+				_, _ = fmt.Fprintf(w, "FAILED   %-30s registry: %v\n", d.ID, d.Err)
+			}
 			for _, e := range reg.Entries(env.Home()) {
 				if only != nil && !only[e.Var] {
 					continue
@@ -148,6 +207,70 @@ func loadRegistry() (*secrets.Registry, error) {
 		return nil, fmt.Errorf("read registry: %w", err)
 	}
 	return secrets.ParseRegistry(data)
+}
+
+// loadRegistryPartial is the health-check door: it returns the well-formed secrets plus
+// a defect per malformed one, instead of failing on the first. ONLY `verify` uses it —
+// every write path stays on loadRegistry's fail-loud behaviour, because a half-valid
+// registry is precisely the state in which `set`/`migrate`/`render` must not run.
+func loadRegistryPartial() (*secrets.Registry, []secrets.SecretDefect, error) {
+	data, err := os.ReadFile(registryPath())
+	if err != nil {
+		return nil, nil, fmt.Errorf("read registry: %w", err)
+	}
+	return secrets.ParseRegistryPartial(data)
+}
+
+// scopeVerify splits verify's arguments across the two populations a partial load
+// produces: defective secrets (which exist only as defects) and well-formed ones (which
+// exist only in the registry).
+//
+// Without this, a scoped `verify <malformed-id>` would report "unknown id" — the entry
+// was excluded from the registry precisely because it is the one being asked about.
+//
+// With no args, everything is in scope. With args, an entry the caller did not name is
+// neither validated nor resolved (BUG-086 AC2): a defect elsewhere in the file must not
+// make a scoped check fail.
+func scopeVerify(reg *secrets.Registry, defects []secrets.SecretDefect, args []string) ([]secrets.SecretDefect, map[string]bool, error) {
+	if len(args) == 0 {
+		return defects, nil, nil
+	}
+	// Keyed to a SLICE, not a single defect: one id can carry several. A duplicate id
+	// is itself a defect, so "one defect per id" is the assumption the data disproves.
+	byID := make(map[string][]secrets.SecretDefect, len(defects))
+	for _, d := range defects {
+		byID[d.ID] = append(byID[d.ID], d)
+	}
+	var inScope []secrets.SecretDefect
+	var healthy []string
+	for _, tok := range args {
+		if tok = strings.TrimSpace(tok); tok == "" {
+			continue
+		}
+		ds, isDefect := byID[tok]
+		inScope = append(inScope, ds...)
+
+		// One token can name BOTH a defect and a valid entry — a duplicate id whose
+		// first definition validated and whose second did not. Reporting only the
+		// defect would hide the entry that actually resolves, which is the half the
+		// caller most needs. So a defect match does not short-circuit the lookup.
+		_, known := reg.Selector(tok)
+		if known || !isDefect {
+			// Unknown-and-not-a-defect falls through deliberately, so resolveOnly
+			// produces the "unknown id" error rather than this silently accepting it.
+			healthy = append(healthy, tok)
+		}
+	}
+	if len(healthy) == 0 {
+		// Every named id is defective: select no healthy entries, but still report.
+		// A non-nil empty map means "filter to nothing", where nil would mean "all".
+		return inScope, map[string]bool{}, nil
+	}
+	only, err := resolveOnly(reg, strings.Join(healthy, ","))
+	if err != nil {
+		return nil, nil, err
+	}
+	return inScope, only, nil
 }
 
 // newSecretsLsCmd lists registry ids with plane + exposed vars — never values. The CI

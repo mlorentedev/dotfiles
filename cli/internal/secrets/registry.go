@@ -139,32 +139,103 @@ func (e *EnvExpose) UnmarshalYAML(node *yaml.Node) error {
 
 // ParseRegistry parses and validates registry.yaml. Validation is fail-fast: a
 // malformed registry is a configuration error, never silently tolerated.
-func ParseRegistry(data []byte) (*Registry, error) {
-	var reg Registry
-	if err := yaml.Unmarshal(data, &reg); err != nil {
-		return nil, fmt.Errorf("parse registry: %w", err)
-	}
-	if err := reg.validate(); err != nil {
-		return nil, err
-	}
-	return &reg, nil
+// SecretDefect is one secret that failed validation, kept apart from the registry so a
+// caller can report it instead of being stopped by it.
+type SecretDefect struct {
+	ID  string // the secret's id, or "#<index>" when the id itself is missing
+	Err error
 }
 
-func (r *Registry) validate() error {
-	if r.Version != 1 {
-		return fmt.Errorf("registry version %d unsupported (want 1)", r.Version)
+// ParseRegistry parses and validates the registry, failing on the FIRST bad secret.
+//
+// This is the strict door, and it stays the default for every caller: a half-valid
+// registry is exactly the state in which `set`, `migrate` and `render` must not run,
+// because they write. Only `dotf secrets verify` uses the partial door below.
+//
+// It is implemented ON TOP of ParseRegistryPartial rather than beside it — one set of
+// per-secret checks, two policies over the result. Two independent validation paths is
+// the shape that produced BUG-084 (#993): the moment one moves, they disagree, and the
+// disagreement is silent.
+func ParseRegistry(data []byte) (*Registry, error) {
+	reg, defects, err := ParseRegistryPartial(data)
+	if err != nil {
+		return nil, err
 	}
-	seen := make(map[string]bool, len(r.Secrets))
+	if len(defects) > 0 {
+		return nil, defects[0].Err
+	}
+	return reg, nil
+}
+
+// ParseRegistryPartial parses the registry and validates each secret INDEPENDENTLY,
+// returning the well-formed ones plus a defect per secret that failed.
+//
+// It exists for BUG-086 (#1004): `verify` is a health check, and a health check whose
+// job is to tell you what is broken must not be the first thing to break. Before this,
+// one malformed entry made the whole registry unloadable, so a typo in a secret the
+// caller never asked about hid the health of all the others.
+//
+// Structural failures are still fatal, and returned as an error rather than a defect:
+// unparseable YAML or an unsupported version leave nothing to report per-secret. The
+// distinction is "cannot read the document" versus "read it, and this entry is wrong".
+//
+// Defective secrets are EXCLUDED from the returned registry. They are not merely
+// flagged, because the rest of this package treats validation as having happened —
+// parseFileMode, for one, documents that a bad mode "is impossible in practice" because
+// validate() rejected it. Letting an invalid secret reach Entries() would trade a clear
+// failure for an undefined one.
+func ParseRegistryPartial(data []byte) (*Registry, []SecretDefect, error) {
+	var reg Registry
+	if err := yaml.Unmarshal(data, &reg); err != nil {
+		return nil, nil, fmt.Errorf("parse registry: %w", err)
+	}
+	if reg.Version != 1 {
+		return nil, nil, fmt.Errorf("registry version %d unsupported (want 1)", reg.Version)
+	}
+
+	seen := make(map[string]bool, len(reg.Secrets))
 	seenVar := make(map[string]string) // var name -> first secret id that exposed it
-	for i := range r.Secrets {
-		s := &r.Secrets[i]
+	kept := make([]Secret, 0, len(reg.Secrets))
+	var defects []SecretDefect
+
+	for i := range reg.Secrets {
+		s := &reg.Secrets[i]
+		if err := validateSecret(s, i, seen, seenVar); err != nil {
+			defects = append(defects, SecretDefect{ID: secretLabel(s, i), Err: err})
+			continue
+		}
+		// Registered only on success, so a defective secret cannot claim an id or a
+		// var name and make the NEXT valid secret look like the duplicate.
+		seen[s.ID] = true
+		for _, v := range s.Vars() {
+			seenVar[v] = s.ID
+		}
+		kept = append(kept, *s)
+	}
+	reg.Secrets = kept
+	return &reg, defects, nil
+}
+
+// secretLabel names a secret for a defect message, falling back to its position when
+// the id is the very thing that is missing.
+func secretLabel(s *Secret, i int) string {
+	if s.ID == "" {
+		return fmt.Sprintf("#%d", i)
+	}
+	return s.ID
+}
+
+// validateSecret runs every per-secret rule. seen/seenVar carry the cross-secret
+// uniqueness state; this function only READS them — registration is the caller's, so
+// that a rejected secret never reserves anything.
+func validateSecret(s *Secret, i int, seen map[string]bool, seenVar map[string]string) error {
+	{
 		if s.ID == "" {
 			return fmt.Errorf("secret #%d: empty id", i)
 		}
 		if seen[s.ID] {
 			return fmt.Errorf("duplicate secret id %q", s.ID)
 		}
-		seen[s.ID] = true
 
 		// ValidBackends is the SSOT for this list; a resolver-coverage test binds
 		// it to the Loader, so a backend accepted here always has somewhere to go.
@@ -225,7 +296,6 @@ func (r *Registry) validate() error {
 			if first, dup := seenVar[v]; dup {
 				return fmt.Errorf("var %q is exposed by both %q and %q — each var must map to exactly one secret", v, first, s.ID)
 			}
-			seenVar[v] = s.ID
 		}
 	}
 	return nil
