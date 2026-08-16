@@ -357,3 +357,14 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     grep -q 'not active on' "$wf"
     grep -qE 'if \[ ! -x scripts/check-review-attestation.sh \]' "$wf"
 }
+
+@test "AC7: the failing step states the verdict, not just an exit code" {
+    # A bare `exit "$CODE"` made the RED step say nothing — the diagnostic was
+    # in an earlier, green step, so anyone opening the failure saw a code and no
+    # reason. This gate's own fourth constraint (fail closed, but say why),
+    # violated at the job level inside the check that enforces it.
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    grep -q '::error title=Review attestation::' "$wf"
+    grep -q 'merged-unreviewed' "$wf"
+    grep -q 'does not veto' "$wf"
+}
