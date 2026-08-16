@@ -3,7 +3,7 @@
     "nan": {
       "baseUrl": "https://api.nan.builders/v1",
       "api": "openai-completions",
-      "apiKey": "{env:NAN_API_KEY}",
+      "apiKey": "${NAN_API_KEY}",
       "compat": {
         "supportsDeveloperRole": true
       },
