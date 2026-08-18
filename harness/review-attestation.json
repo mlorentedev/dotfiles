@@ -41,7 +41,20 @@
     "not merged here — but see #786, which currently proposes qwen3.6 as a",
     "fallback reviewer while reviewer-pool.json excludes it by name, on the",
     "grounds that 'a reviewer that PASSes cheaply is worse than no gate'. That",
-    "contradiction needs one owner; it is flagged on #786, not decided here."
+    "contradiction needs one owner; it is flagged on #786, not decided here.",
+    "",
+    "`exempt` names changes that carry nothing a review could act on. Matched by",
+    "DIFF SIGNATURE — every changed file must appear in `files` — never by author",
+    "or branch. release-please runs under a human PAT, so an author rule would not",
+    "fire; a branch rule would let any branch named to match walk past the gate.",
+    "The signature cannot be borrowed: the moment a change touches one other file",
+    "the exemption stops applying, so there is nothing to game.",
+    "",
+    "This is narrow on purpose. It is not 'small PRs need no review' — it is that a",
+    "release commit is a mechanical derivation of commits that were each reviewed",
+    "when they landed, and the gate reporting `declined` on it says something",
+    "false. A gate that is wrong on a whole class of change teaches its readers to",
+    "discount it, which is the failure GUARD-002 exists to prevent."
   ],
   "reviewers": [
     {
@@ -65,5 +78,18 @@
     "label": "merged-unreviewed",
     "section": "## Unreviewed merge rationale",
     "why": "Both are required, never one. Same shape as spec-gate's skip-sdd escape, chosen because it is already understood here and because it forces the disclosure into the durable record instead of a chat message. Proceeding on an unreviewed PR is allowed; proceeding SILENTLY is not."
+  },
+  "exempt": {
+    "signatures": [
+      {
+        "name": "release-please",
+        "files": [
+          ".release-please-manifest.json",
+          "CHANGELOG.md",
+          "versions.conf"
+        ],
+        "why": "The release PR restates commits already on main, each reviewed when it merged. Measured on #1049: exactly these three paths. Verified NOT author-matchable — its author reads `mlorentedev`, a human, because release-please runs under a PAT."
+      }
+    ]
   }
 }

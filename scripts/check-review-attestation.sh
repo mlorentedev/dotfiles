@@ -14,6 +14,7 @@
 # States, decided by CONTENT rather than by check status:
 #
 #   attested  a review happened (bot or human, not the author)   -> exit 0
+#   exempt    the diff carries nothing a review could act on     -> exit 0
 #   disclosed no review, but the escape is declared in full      -> exit 0
 #   declined  a reviewer said it could not review                -> exit 1
 #   pending   no reviewer output yet                             -> exit 1
@@ -135,7 +136,7 @@ jq -e '
 # One shape either way, so the offline fixture path and the live path exercise
 # exactly the same classifier. A test that drove a different code path than
 # production would be evidence about the test.
-FIELDS="number,state,labels,body,comments,reviews,author"
+FIELDS="number,state,labels,body,comments,reviews,author,files"
 
 if [ -n "$PAYLOAD" ]; then
     [ -f "$PAYLOAD" ] || die_unreadable "payload file not found: $PAYLOAD"
@@ -208,6 +209,40 @@ done < <(jq -r '.reviewers[]? | . as $r | ($r.review_markers[]? | [$r.login, .] 
 
 if [ -n "$ATTESTED_BY" ]; then
     say "[OK] attested — reviewed by: $ATTESTED_BY (comment-shaped review: \"$ATTESTED_MARKER\")"
+    exit 0
+fi
+
+# --- exempt? -------------------------------------------------------------------
+# Some changes carry nothing a review could act on. A release commit restates
+# commits that were each reviewed when they landed; reporting `declined` on it
+# is not strictness, it is a false statement, and a gate that is wrong about a
+# whole class of change teaches its readers to discount it — the failure this
+# gate exists to prevent, arrived at from the other side.
+#
+# Matched by DIFF SIGNATURE and nothing else. Not by author: the tools that open
+# such changes run under a human token, so an author rule never fires (verified
+# on a live one, whose author reads as a person). Not by branch: any branch can
+# be named to match. Every changed file must appear in the declared set, so
+# touching one other file ends the exemption — nothing to borrow, nothing to
+# game.
+#
+# The signature itself, and the name of whatever produces it, live in the
+# registry. This file names no tool and no path, which is a rule it already had
+# and which the first draft of this very comment broke — caught by the test that
+# enforces it, not by me.
+#
+# Checked AFTER both attestation paths: a real review is better evidence than an
+# exemption, and a release that did get reviewed should say so.
+EXEMPT_NAME="$(printf '%s' "$PR_JSON" | jq -r --slurpfile cfg "$CONFIG" '
+    ($cfg[0].exempt.signatures // []) as $sigs
+    | [.files[]?.path] as $changed
+    | if ($changed | length) == 0 then ""
+      else
+        [ $sigs[] | select( ($changed - .files) | length == 0 ) | .name ] | first // ""
+      end')"
+
+if [ -n "$EXEMPT_NAME" ]; then
+    say "[OK] exempt — every changed file is in the \"$EXEMPT_NAME\" signature; nothing here is reviewable"
     exit 0
 fi
 

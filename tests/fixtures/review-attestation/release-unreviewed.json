@@ -1,0 +1,25 @@
+{
+  "number": 1049,
+  "state": "OPEN",
+  "labels": [],
+  "body": "",
+  "comments": [],
+  "reviews": [],
+  "author": {
+    "id": "MDQ6VXNlcjEzNTYyMTUw",
+    "is_bot": false,
+    "login": "mlorentedev",
+    "name": "Manu Lorente"
+  },
+  "files": [
+    {
+      "path": ".release-please-manifest.json"
+    },
+    {
+      "path": "CHANGELOG.md"
+    },
+    {
+      "path": "versions.conf"
+    }
+  ]
+}

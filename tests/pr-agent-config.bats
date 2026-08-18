@@ -254,3 +254,36 @@ sys.exit(0 if 1 <= t <= 8 else 1)
 "
     [ "$status" -eq 0 ]
 }
+
+# The two halves must move together or the change makes things worse: excluding
+# release PRs from the reviewer WITHOUT exempting them from the attestation gate
+# produces a PR with no reviewer output that nothing can ever clear — #1061's
+# unreachable state, manufactured deliberately.
+#
+# This guard spans two files because the coupling does. Neither file can express
+# it alone, and a guard that lived in either would pass while the other half was
+# removed — which is exactly what happened when this was first written: deleting
+# the reviewer exclusion broke nothing.
+@test "pr-agent: excluding release PRs from review is paired with a gate exemption" {
+    run python3 -c "
+import json, sys, tomllib
+cfg = tomllib.load(open('$CFG', 'rb'))['config']
+ignored = cfg.get('ignore_pr_source_branches', [])
+reg = json.load(open('$REPO/harness/review-attestation.json'))
+exempt = reg.get('exempt', {}).get('signatures', [])
+
+reviewer_skips = bool(ignored)
+gate_exempts = bool(exempt)
+if reviewer_skips != gate_exempts:
+    if reviewer_skips:
+        print('the reviewer skips PRs the gate still demands a review for:')
+        print('  ignore_pr_source_branches = ' + repr(ignored))
+        print('  no exempt.signatures in the registry -> those PRs can never go green')
+    else:
+        print('the gate exempts PRs the reviewer still reviews:')
+        print('  exempt.signatures = ' + repr([s.get('name') for s in exempt]))
+        print('  ignore_pr_source_branches is empty -> the exemption is unreachable noise')
+    sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}

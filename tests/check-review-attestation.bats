@@ -447,3 +447,51 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     [ "$status" -eq 2 ]
     [[ "$output" == *"wrong shape"* ]]
 }
+
+# --- exempt: changes carrying nothing a review could act on --------------------
+#
+# The pairing is the point. Excluding release PRs from the reviewer WITHOUT this
+# exemption manufactures a PR with no reviewer output that nothing can ever
+# clear — #1061's unreachable state, created on purpose. These cases pin both
+# halves of the behaviour, including the two ways it must NOT fire.
+
+@test "exempt: a release-shaped diff with no review passes" {
+    run "$SCRIPT" --payload "$F/release-unreviewed.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"exempt"* ]]
+    [[ "$output" == *"release-please"* ]]
+}
+
+@test "exempt: one extra file ends the exemption" {
+    # The signature cannot be borrowed. A change that touches the three release
+    # paths AND anything else is an ordinary change wearing a release's clothes,
+    # and this is what makes the exemption unavailable to game.
+    run "$SCRIPT" --payload "$F/release-plus-one-file.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" != *"exempt"* ]]
+}
+
+@test "exempt: an empty file list does not exempt everything" {
+    # Set subtraction says every element of an empty list is present in any set,
+    # so a payload with no files matches EVERY signature. That would turn an
+    # unreadable or truncated payload into a blanket pass — the failure this gate
+    # exists to prevent, reached through a set-theory identity rather than a bug.
+    run "$SCRIPT" --payload "$F/no-files-at-all.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" != *"exempt"* ]]
+}
+
+@test "exempt: a real review outranks the exemption in the report" {
+    # Both exit 0, so this is about what the record says. A release that WAS
+    # reviewed should say attested, because that is the stronger fact and the
+    # one a later reader wants.
+    run "$SCRIPT" --payload "$F/release-reviewed.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+}
+
+@test "exempt: the signature is declared in the registry, not in the script" {
+    # This file names no vendor and no path, under test, and the exemption must
+    # not be where that rule finally breaks.
+    refute_grep 'release-please|CHANGELOG\.md|\.release-please-manifest' "$SCRIPT"
+}
