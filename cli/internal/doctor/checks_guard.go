@@ -100,7 +100,14 @@ func guardProbeRepos(sys *System, cfg *Config) []string {
 		sys.Getenv("DOTFILES_REPO_DIR"),
 		sys.Getenv("VAULT_PATH"),
 	} {
-		if r == "" || seen[r] || !isDir(filepath.Join(r, ".git")) {
+		// isGitCheckout, not isDir(r/".git"): in a linked worktree (and under
+		// --separate-git-dir) that path is a `gitdir:` pointer FILE, so isDir
+		// answers "is this a REGULAR checkout" and skips a repo that is present
+		// and whose guard is genuinely unverified. isGitCheckout's own docstring
+		// names this trap for the vault gate (#806); this call site was still
+		// asking the older question, so the two checks disagreed about the same
+		// worktree. Found by HARNESS-061's adversarial review.
+		if r == "" || seen[r] || !isGitCheckout(sys, r) {
 			continue
 		}
 		seen[r] = true

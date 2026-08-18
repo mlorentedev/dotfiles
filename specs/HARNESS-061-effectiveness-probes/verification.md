@@ -92,3 +92,46 @@ AC6 confirmed behaviourally: the check reports, and warns rather than fails, on 
 machine where the drill has never run. **That WARN is accurate** — the DR drill
 is still unexecuted, which this spec deliberately scopes out (surfacing staleness
 is code; performing the drill is a calendar commitment).
+
+## Adversarial review disposition (2026-08-18)
+
+`nan/deepseek-v4-flash`, verdict **PASS**, `reviewed_sha: 4d153a0`. No blockers,
+no majors. Three Minor findings, all THEORETICAL/UNTESTED. Each dispositioned:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | AC1's coverage scope (2 probed repos) is documented in code but not in the spec | **Ticketed, deliberately not applied** — see below |
+| 2 | `guardProbeRepos` filters with `isDir(r/".git")` while `checkVaultHooks` uses `isGitCheckout`, so a linked worktree is silently skipped | **Applied** + regression test |
+| 3 | `hookForStage`'s green direction has no standalone test | **Applied** |
+
+### Why finding 1 is ticketed rather than applied
+
+It asks for a sentence in `proposal.md`. That file is a **contract file** —
+`contractFiles = {proposal.md, tasks.md, features.json}` in `cli/internal/spec/review.go`
+— so editing it moves the spec past `reviewed_sha` and the archive gate refuses
+the review that demanded the edit. That is #998, and applying the finding here
+would reproduce it deliberately.
+
+Findings 2 and 3 touch `checks_guard.go`, `hookprobe_test.go` and
+`checks_guard_test.go`; none is a contract file, so the review stands.
+
+### Finding 2 was real, and it is this spec's own thesis
+
+`isGitCheckout` exists specifically to avoid this trap and its docstring names
+it: in a linked worktree `<path>/.git` is a `gitdir:` pointer **file**, so
+`isDir` answers *"is this a REGULAR checkout"* and the repo is skipped — *"a SKIP
+that reads as healthy is worse than a FAIL"*. One call site was still asking the
+older question, so two checks in the same package disagreed about the same
+worktree.
+
+Mutations, both observed failing before the fixes were trusted:
+
+| mutation | observed |
+|---|---|
+| restore `isDir(r/".git")` in `guardProbeRepos` | `--- FAIL: TestGuardProbeRepos_LinkedWorktreeIsProbed … got []` |
+| make `hookForStage` skip the exec-bit check | `--- FAIL: TestHookForStage_NonExecutableIsNotAHook` |
+
+```
+$ go build ./... && go vet ./... && go test ./...
+ok  github.com/mlorentedev/dotfiles/cli/internal/doctor  0.479s   (all packages green)
+```
