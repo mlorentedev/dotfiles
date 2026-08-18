@@ -62,7 +62,19 @@ refute_grep() {
 @test "pr-agent: AGENTS.md enters the review prompt" {
     # The repo's behavioural SSOT becomes review criteria for free: standing
     # orders, English-only, no-auto-merge, the shell compatibility table.
-    grep -q 'repo_context_files = \["AGENTS.md"\]' "$CFG"
+    #
+    # Asserted as membership, not as the exact literal. The original form was
+    # `grep -q 'repo_context_files = ["AGENTS.md"]'`, which pinned the whole list
+    # rather than the property it names, so ADDING a second context file broke a
+    # guard whose subject had not changed. A guard that fails when its property
+    # still holds trains people to edit the guard, which is how a real one gets
+    # weakened later.
+    run python3 -c "
+import sys, tomllib
+files = tomllib.load(open('$CFG', 'rb'))['config']['repo_context_files']
+sys.exit(0 if 'AGENTS.md' in files else 1)
+"
+    [ "$status" -eq 0 ]
 }
 
 @test "pr-agent: the workflow pins the action to a tag, not a moving ref" {
