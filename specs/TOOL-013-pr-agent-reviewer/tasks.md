@@ -57,6 +57,26 @@ created: "2026-08-16"
 - [ ] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
 
+## Review on push, after the doctrine and the machinery disagreed
+
+- [x] Every push is reviewed again. `harness/enforced/pr-stewardship.md` — in
+      every agent's instructions — says *"pushing a fix reopens it, because the
+      reviewer re-reviews"*, and #1053 had made that false, leaving the second
+      half of every PR unread while the doctrine claimed otherwise.
+- [x] Routed through `handle_push_trigger`, **not** through `pr_actions`. Adding
+      `synchronize` to `pr_actions` does nothing: upstream handles synchronize on
+      a separate path. That dead setting was one commit from being written, and
+      was caught by reading upstream's own `configuration.toml` rather than
+      reasoning about the field name.
+- [x] `push_commands` names `/review` alone. Upstream's default is
+      `['/describe', '/review']`, so enabling the push path without saying so
+      would have silently reinstated the body-rewriting that was turned off
+      deliberately.
+- [x] #1053's guard widened rather than reverted: it now asserts that nothing in
+      the trigger list goes unhandled, in both directions, instead of set
+      equality — which had made a correct configuration unrepresentable and
+      invited the dead setting as its repair.
+
 ## Deliberately not done here
 
 Rollout to other repos, retiring CodeRabbit, the parallel-measurement window,
