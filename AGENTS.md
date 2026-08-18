@@ -164,9 +164,10 @@ Native `Read`/`Edit`/`Write`/`grep` stay correct for code repos and configs outs
 The repo follows **Spec-Driven Development per feature** (canonical SKILL.md at
 `$VAULT_PATH/00_meta/skills/spec/SKILL.md`; pattern
 `pattern-spec-driven-development.md`). Read the SKILL when asked to create/fill/
-archive a spec. Subcommands via `dotf spec …` (Go CLI, works in CI/Windows):
-`init` ("create/scaffold spec X"), `fill` ("write the proposal"), `archive`
-("close spec X"). Specs live at `specs/<feature-id>/`, archived at
+archive a spec. CLI subcommands via `dotf spec …` (Go CLI, works in CI/Windows):
+`init` ("scaffold spec X"), `review` ("run pooled adversarial review"), `archive`
+("close spec X"). Conversational workflow steps (`/spec fill`, `/spec check`,
+`/spec bootstrap`) are driven via the `/spec` skill. Specs live at `specs/<feature-id>/`, archived at
 `specs/archive/` (never deleted — audit trail). `<feature-id>`:
 `^([A-Z]+[0-9]*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`
 — the AREA may carry digits (`ADR028-004`), the number an optional sub-id letter

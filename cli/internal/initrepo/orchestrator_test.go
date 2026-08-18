@@ -26,7 +26,7 @@ func TestInitOrchestratesFullScaffold(t *testing.T) {
 
 	wantFiles := []string{
 		"AGENTS.md", "CLAUDE.md", ".gitignore", ".pre-commit-config.yaml",
-		"env-contract.json", filepath.Join("docs", "lessons.md"),
+		"env-contract.json", filepath.Join("docs", "lessons", "_index.md"),
 		filepath.Join(".github", "workflows", "ci.yml"),
 		"go.mod", "Makefile", ".git",
 	}
