@@ -176,3 +176,36 @@ print('\n'.join(sorted(json.loads(env['github_action_config.pr_actions']))))
     # Off as a decision; pinned so it cannot drift back on a default.
     grep -q 'github_action_config.auto_describe: "false"' "$WF"
 }
+
+# The reviewer cannot read a file that is not in repo_context_files, so an
+# instruction naming one asserts nothing. This was real: extra_instructions told
+# the reviewer to consult the prohibited-pattern table in .claude/CLAUDE.md while
+# only AGENTS.md was in context. The guard is mechanical — every repo-relative
+# path mentioned in extra_instructions must also be loaded.
+@test "pr-agent: every file the instructions name is a file the reviewer can read" {
+    run python3 - "$CFG" <<'PY'
+import re, sys, tomllib
+
+cfg = tomllib.load(open(sys.argv[1], "rb"))
+loaded = set(cfg["config"]["repo_context_files"])
+instructions = cfg["pr_reviewer"]["extra_instructions"]
+
+# Repo-relative paths: a dotted name containing a '/' or a leading '.', which is
+# how this repo writes them (AGENTS.md, .claude/CLAUDE.md, specs/<id>/).
+named = set(re.findall(r"(?:^|\s)((?:\.[\w.-]+/)?[\w.-]+\.(?:md|json|toml|sh|yml))", instructions))
+missing = sorted(n for n in named if n not in loaded)
+if missing:
+    print("named but not loaded: " + ", ".join(missing))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# The point of the harness pass is that it runs on EVERY PR without being asked.
+# An edit that turns it into an opt-in ("when relevant", "if applicable") would
+# leave the section looking present while it silently stops firing.
+@test "pr-agent: the harness compliance pass is unconditional" {
+    grep -q 'HARNESS COMPLIANCE' "$CFG"
+    grep -q 'Report it even when everything passes' "$CFG"
+    refute_grep 'HARNESS COMPLIANCE.*(if |when relevant|where applicable)' "$CFG"
+}

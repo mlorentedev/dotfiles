@@ -47,13 +47,28 @@ model_weak = "openai/qwen3.6"
 custom_model_max_tokens = 200000
 max_model_tokens = 200000
 
-response_language = "en-US"
+# The reviewer answers in Spanish because Manu reads it, and a review comment is
+# conversation about the change rather than part of the durable record. The
+# English-only standing order still binds everything it names — commit messages,
+# branch names, PR titles and bodies, code comments — and it binds this file too:
+# the instructions below stay in English, only the output is translated. If that
+# reading of "durable record" is wrong, this is the one line to change back.
+response_language = "es-ES"
 
 # AGENTS.md is this repo's behavioural SSOT, so the standing orders, the
 # English-only rule, the no-auto-merge rule and the shell-compatibility table all
 # enter the review prompt with no extra wiring. This is the single highest-value
 # line in the file.
-repo_context_files = ["AGENTS.md"]
+repo_context_files = ["AGENTS.md", ".claude/CLAUDE.md"]
+
+# .claude/CLAUDE.md was NOT here originally, and its absence made the
+# extra_instructions below refer to a file the reviewer could not read: they say
+# "see the prohibited-pattern table in .claude/CLAUDE.md", which is where the
+# bash/zsh rules actually live. An instruction naming a source that is not in
+# context is the same shape as a guard citing a check it cannot run — it reads as
+# rigour and asserts nothing. The two files together are the harness as a
+# reviewer can see it: AGENTS.md carries the standing orders and the enforced
+# regions, CLAUDE.md the repo-specific tables and verification commands.
 
 [pr_reviewer]
 # Inline comments on the diff, which is the half CodeRabbit's free tier withholds
@@ -65,6 +80,31 @@ persistent_comment = true
 final_update_message = false
 
 extra_instructions = """
+Open every review with a HARNESS COMPLIANCE pass over the two context files
+(AGENTS.md and .claude/CLAUDE.md), stating PASS or FAIL per item with the
+offending file and line. Report it even when everything passes — a silent
+section is indistinguishable from a section that was skipped. Check at least:
+
+- English only in the durable record: commit messages, branch name, PR title and
+  body, code comments. Conversation may be any language; artifacts may not.
+- No AI attribution anywhere in git or GitHub artifacts: no Co-Authored-By
+  naming an agent, no "Generated with" footer, no bot emoji signature.
+- No internal phase or milestone reference in the branch name, commit messages
+  or PR title.
+- Shell that must run under BOTH bash and zsh: check the changed lines against
+  the prohibited-pattern table in .claude/CLAUDE.md, including the three rows
+  that fail SILENTLY (unmatched glob in a for, unquoted word-splitting, and a
+  slashless argument to the source builtin).
+- Definition of Done, on the PR as submitted: debt fixed or ticketed, knowledge
+  written where it belongs, the ticket moved, review output dispositioned,
+  and a completion claim backed by command output rather than assertion.
+- Spec-Driven Development: a change of this size either touches a specs/<id>/
+  folder or carries the skip-sdd label with a written rationale.
+- No auto-merge: nothing in the diff enables it, and no workflow merges a PR
+  without a human.
+
+Then continue with the substance.
+
 This repository already runs shellcheck, bats, golangci-lint, go vet and gitleaks
 in CI. Do not restate what a linter reports; that is covered and it is noise here.
 
