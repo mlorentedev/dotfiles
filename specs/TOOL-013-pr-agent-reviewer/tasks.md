@@ -57,6 +57,29 @@ created: "2026-08-16"
 - [ ] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
 
+## Follow-on, after the first production runs (#1044)
+
+The first live executions exposed two things inspection had not, both fixed in
+the same PR:
+
+- [x] The reviewer is told what the harness requires, not merely handed it. Every
+      review opens with a HARNESS COMPLIANCE pass over `AGENTS.md` and
+      `.claude/CLAUDE.md`, reported per item even when everything passes. The
+      config already loaded `AGENTS.md` but nothing asked the reviewer to use it,
+      so compliance was checked when the model happened to notice.
+- [x] `.claude/CLAUDE.md` joins `repo_context_files`. `extra_instructions` sent
+      the reviewer to the prohibited-pattern table in a file that was not in
+      context — an instruction naming a source it could not read.
+- [x] Inline suggestions actually enabled. The `[pr_reviewer]` comment has
+      claimed since this shipped that inline comments are "the reason this work
+      exists"; `review` does not post inline, `improve` does, and there was no
+      `[pr_code_suggestions]` section, so dual publishing sat at its default of
+      -1. Measured across #1042, #1047 and #1051: 0 inline comments.
+- [x] Four guards pin these as decisions, each observed failing on its own
+      mutation, with the mutation's arrival verified by checksum rather than
+      against HEAD — a dirty tree makes the latter report an invalid mutation as
+      applied.
+
 ## Deliberately not done here
 
 Rollout to other repos, retiring CodeRabbit, the parallel-measurement window,

@@ -62,7 +62,19 @@ refute_grep() {
 @test "pr-agent: AGENTS.md enters the review prompt" {
     # The repo's behavioural SSOT becomes review criteria for free: standing
     # orders, English-only, no-auto-merge, the shell compatibility table.
-    grep -q 'repo_context_files = \["AGENTS.md"\]' "$CFG"
+    #
+    # Asserted as membership, not as the exact literal. The original form was
+    # `grep -q 'repo_context_files = ["AGENTS.md"]'`, which pinned the whole list
+    # rather than the property it names, so ADDING a second context file broke a
+    # guard whose subject had not changed. A guard that fails when its property
+    # still holds trains people to edit the guard, which is how a real one gets
+    # weakened later.
+    run python3 -c "
+import sys, tomllib
+files = tomllib.load(open('$CFG', 'rb'))['config']['repo_context_files']
+sys.exit(0 if 'AGENTS.md' in files else 1)
+"
+    [ "$status" -eq 0 ]
 }
 
 @test "pr-agent: the workflow pins the action to a tag, not a moving ref" {
@@ -175,4 +187,70 @@ print('\n'.join(sorted(json.loads(env['github_action_config.pr_actions']))))
     # merge orders and before/after evidence destroys the part worth reading.
     # Off as a decision; pinned so it cannot drift back on a default.
     grep -q 'github_action_config.auto_describe: "false"' "$WF"
+}
+
+# The reviewer cannot read a file that is not in repo_context_files, so an
+# instruction naming one asserts nothing. This was real: extra_instructions told
+# the reviewer to consult the prohibited-pattern table in .claude/CLAUDE.md while
+# only AGENTS.md was in context. The guard is mechanical — every repo-relative
+# path mentioned in extra_instructions must also be loaded.
+@test "pr-agent: every file the instructions name is a file the reviewer can read" {
+    run python3 - "$CFG" <<'PY'
+import re, sys, tomllib
+
+cfg = tomllib.load(open(sys.argv[1], "rb"))
+loaded = set(cfg["config"]["repo_context_files"])
+instructions = cfg["pr_reviewer"]["extra_instructions"]
+
+# Repo-relative paths: a dotted name containing a '/' or a leading '.', which is
+# how this repo writes them (AGENTS.md, .claude/CLAUDE.md, specs/<id>/).
+named = set(re.findall(r"(?:^|\s)((?:\.[\w.-]+/)?[\w.-]+\.(?:md|json|toml|sh|yml))", instructions))
+missing = sorted(n for n in named if n not in loaded)
+if missing:
+    print("named but not loaded: " + ", ".join(missing))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# The point of the harness pass is that it runs on EVERY PR without being asked.
+# An edit that turns it into an opt-in ("when relevant", "if applicable") would
+# leave the section looking present while it silently stops firing.
+@test "pr-agent: the harness compliance pass is unconditional" {
+    grep -q 'HARNESS COMPLIANCE' "$CFG"
+    grep -q 'Report it even when everything passes' "$CFG"
+    refute_grep 'HARNESS COMPLIANCE.*(if |when relevant|where applicable)' "$CFG"
+}
+
+# The reason this tool was adopted is inline comments on the diff — the half
+# CodeRabbit's free tier withholds on private repos. That claim sat in a
+# `[pr_reviewer]` comment for the tool's whole life while dual publishing was at
+# its default of -1 (disabled), and 0 inline comments were posted across #1042,
+# #1047 and #1051. Pinned as a decision, not a value: any threshold in [0-10]
+# publishes inline; -1 or a missing section silently stops.
+@test "pr-agent: inline suggestions are actually enabled, not merely claimed" {
+    run python3 -c "
+import sys, tomllib
+cfg = tomllib.load(open('$CFG', 'rb'))
+s = cfg.get('pr_code_suggestions')
+if s is None:
+    print('no [pr_code_suggestions] section: improve runs on defaults, inline disabled'); sys.exit(1)
+t = s.get('dual_publishing_score_threshold', -1)
+if not (0 <= t <= 10):
+    print(f'dual_publishing_score_threshold={t} does not publish inline'); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# The linters own style in this repo and extra_instructions forbids restating
+# them. A score floor of 0 (the upstream default) publishes everything, which
+# reintroduces exactly that noise through a different door.
+@test "pr-agent: suggestions below the style line are not published" {
+    run python3 -c "
+import sys, tomllib
+s = tomllib.load(open('$CFG', 'rb')).get('pr_code_suggestions', {})
+t = s.get('suggestions_score_threshold', 0)
+sys.exit(0 if 1 <= t <= 8 else 1)
+"
+    [ "$status" -eq 0 ]
 }
