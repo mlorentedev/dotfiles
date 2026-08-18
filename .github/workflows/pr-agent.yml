@@ -15,13 +15,37 @@ name: pr-agent
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `synchronize` is deliberately ABSENT, and the omission must stay aligned
+    # with github_action_config.pr_actions below — see #1053. PR-Agent applies
+    # its own event gate whose default excludes synchronize, so listing it here
+    # started a runner and a Docker build on every push and then reviewed
+    # nothing. Measured on #1048: 4 pull_request runs, 1 artifact published.
+    #
+    # The cost was never inference — pushes are free of model calls. It was a
+    # `review: SUCCESS` on a push-triggered run, which reads as "the reviewer
+    # looked at your new commits" and means "the action started and declined to
+    # act". GUARD-002 exists because that kind of green is worse than a red.
+    #
+    # Reviewing every push is a defensible choice, but it is a different one:
+    # it re-reads the whole diff each time, so it belongs behind
+    # handle_push_trigger with push_commands naming only the cheap tools.
+    types: [opened, reopened, ready_for_review]
   # Slash commands (/review, /describe, /improve) on an existing PR.
   issue_comment:
     types: [created]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  # The event name is part of the key, and it is load-bearing. A PR comment is an
+  # issue_comment whose `issue.number` IS the PR number, so without it a
+  # comment-triggered run shares this group with the in-flight pull_request run and
+  # `cancel-in-progress` kills the review. PR-Agent is a Docker action that spends
+  # its first ~20s in `Build The-PR-Agent/pr-agent`, and CodeRabbit's auto-summary
+  # comment reliably lands inside that window.
+  #
+  # Measured on #1037 and #1038 (2026-08-18): both reviews cancelled mid-build,
+  # both workflows reporting green, zero reviews produced — on every PR since this
+  # shipped. Pushes still supersede pushes; a comment no longer cancels a review.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -60,3 +84,16 @@ jobs:
           # where whole-registry injection means one broken item mapping can take
           # down authentication for everything.
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          # Stated rather than defaulted, so the two event lists that must agree
+          # are both visible. The default already excludes synchronize; leaving
+          # that implicit is what let the workflow's own trigger list drift away
+          # from it unnoticed (#1053).
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          # `describe` REWRITES the PR body. The bodies in this repo carry
+          # hand-written measurement tables, merge orders and before/after
+          # evidence — the part worth reading — and a model rewriting them
+          # destroys exactly that. Also removes one of the three inference calls
+          # per PR. Turned off as a decision, not left off by accident.
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_improve: "true"

@@ -220,3 +220,50 @@ func TestCheckGuardHooks_UnrelatedIsPreservedNotClobbered(t *testing.T) {
 		t.Errorf("want a preserve WARN, got: %s", buf.String())
 	}
 }
+
+// TestGuardProbeRepos_LinkedWorktreeIsProbed pins the fix for HARNESS-061's
+// adversarial-review finding 2.
+//
+// guardProbeRepos filtered candidates with isDir(r/".git"), which answers "is
+// this a REGULAR checkout". In a linked worktree (and under --separate-git-dir)
+// that path is a `gitdir:` pointer FILE, so the filter dropped the repo and the
+// guard's effectiveness there went unverified — silently, as a SKIP that reads
+// as healthy. isGitCheckout exists precisely to avoid this and its docstring
+// names the trap (#806); this call site was still asking the older question, so
+// two checks disagreed about the same worktree.
+//
+// Asserted through the pointer-FILE shape rather than a real `git worktree add`
+// so the case stays a unit test: the seam answers what git would answer, and
+// the filesystem carries the layout that broke the old filter.
+func TestGuardProbeRepos_LinkedWorktreeIsProbed(t *testing.T) {
+	root := t.TempDir()
+	wt := filepath.Join(root, "linked-worktree")
+	mkdirAll(t, wt)
+	// The shape git actually writes for a linked worktree: .git is a FILE.
+	writeFile(t, filepath.Join(wt, ".git"), "gitdir: "+filepath.Join(root, "main", ".git", "worktrees", "linked-worktree")+"\n")
+
+	sys := &System{
+		Getenv: func(k string) string {
+			if k == "DOTFILES_REPO_DIR" {
+				return wt
+			}
+			return ""
+		},
+		LookPath: func(n string) (string, error) { return "/usr/bin/" + n, nil },
+		CommandOutput: func(name string, args ...string) (string, error) {
+			// what git answers inside a linked worktree
+			if name == "git" && len(args) >= 3 && args[2] == "rev-parse" {
+				return "true\n", nil
+			}
+			return "", nil
+		},
+	}
+
+	got := guardProbeRepos(sys, &Config{})
+	for _, r := range got {
+		if r == wt {
+			return // probed, as it must be
+		}
+	}
+	t.Errorf("guardProbeRepos skipped the linked worktree %q; got %v", wt, got)
+}
