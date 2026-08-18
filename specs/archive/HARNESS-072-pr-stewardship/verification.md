@@ -21,6 +21,9 @@ created: "2026-08-15"
 ## Test status
 
 - `~/.local/bin/bats tests/compile-harness.bats` → **47/47 ok**, 0 failures.
+  That number is the count at the time this spec's work was verified, and it is
+  left as measured rather than restated: the file has since reached 50 because a
+  parallel session added three unrelated cases. Re-run at archive time: **50/50**.
 - `~/.local/bin/shellcheck scripts/compile-harness.sh` → clean. `bash -n` → clean.
 - `./scripts/compile-harness.sh --check` → exit 0.
 - All eight `features.json` verification commands executed this session → 8/8 exit 0.
@@ -76,12 +79,36 @@ have passed it, because `pr-stewardship` was in use on another surface.
       already exists as `pattern-verification-fails-toward-unproven`; this is one
       more instance of it, not a new pattern.
 
+## Round-3 review findings — disposition
+
+Verdict `PASS WITH GAPS`: 0 blockers, 0 majors, 4 minors. Each one is applied or
+ticketed; none is left floating.
+
+| # | Reality | Finding | Disposition |
+|---|---------|---------|-------------|
+| 1 | REAL | `features.json` f2 verifies AC2 only on the committed targets, never on the rendered doctrine payloads at the per-machine `.gemini` / `.codex` homes | **Ticketed, #1035.** Deliberately not fixed here: the fix edits `features.json`, a contract file, which would invalidate the `reviewed_sha` of the review that asked for it. It is also the wrong home — those payloads are per-machine state that CI cannot see (ADR-013's offline model), so the check belongs in `dotf doctor`. Current state re-verified by hand: 1 hit on all five surfaces |
+| 2 | THEORETICAL | The region's "the default mechanism is to stay" reads as a contradiction of the standing "Hand the PR over; don't watch CI" rule | **Applied.** A bridging paragraph in the region names the second rule as the *escape being exercised*, not a counterexample: it makes the human the one who reports a red build, which is the signal that keeps the timed window from opening. Vault edit + `--refresh` |
+| 3 | THEORETICAL | The skill's "two minutes" and the region's "ten minutes" look like rival timers | **Applied.** The skill now states the two minutes sit inside the ten-minute window — first look vs. window close, one phase and its deadline |
+| 4 | SPECULATIVE | The skill's "by default once a PR has come back" implies an automatic invocation that does not exist | **Applied.** The skill's preamble now says it is a judgement the agent makes, and points at the `pr-stewardship` obligation as what actually binds |
+
+Findings 2-4 land in the vault and its generated records, none of which is a
+contract file, so the review's `reviewed_sha` still describes what it reviewed.
+
+A note on how that was nearly lost. Rebasing this branch onto main to pick up
+0.43.0 made the staleness gate report all three contract files as changed, while
+`git diff` against the same sha showed them byte-identical: the gate asks an
+ancestry question about content, so a rewrite that changes no bytes reads as
+tampering. Unblocked by restoring the pre-rebase ancestry, and ticketed as
+**#1036** — the same failure direction as the squash-merge lesson written this
+session, and not a defect of this spec.
+
 ## Archive checklist
 
-- [ ] Adversarial review passes (`dotf spec review HARNESS-072-pr-stewardship`)
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to specs/archive/HARNESS-072-pr-stewardship/ (plain text: the
-      path does not exist yet, and a backticked one is a live claim the doc-path
-      guard checks)
+- [x] Adversarial review passes (`dotf spec review HARNESS-072-pr-stewardship`)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to specs/archive/HARNESS-072-pr-stewardship/ (left in plain
+      text: it was written before the move, when a backticked path would have
+      been a live claim the doc-path guard rejects)
 - [ ] Bitácora #963 closed with the PR link (ADR-018)
-- [ ] Promotion above executed
+- [x] Promotion above executed (the lesson landed as *"A check that
+      cannot fail the way you cite it"*)
