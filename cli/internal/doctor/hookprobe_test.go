@@ -223,3 +223,23 @@ func TestEffectiveHooksPath_NilSeamIsUnsetNotPanic(t *testing.T) {
 		t.Errorf("a nil command seam must read as unset, got %q", got)
 	}
 }
+
+
+// TestHookForStage_ExecutableIsAHook is the green direction of
+// TestHookForStage_NonExecutableIsNotAHook. The red case alone cannot tell a
+// correct executable-bit check from a function that returns "" for everything —
+// both make the negative pass, so the pair is the assertion, not either half.
+// Found by HARNESS-061's adversarial review.
+func TestHookForStage_ExecutableIsAHook(t *testing.T) {
+	root := t.TempDir()
+	repo := gitRepo(t, filepath.Join(root, "repo"))
+	p := filepath.Join(repo, ".git", "hooks", "pre-commit")
+	if err := os.WriteFile(p, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := &probeGit{}
+
+	if got := hookForStage(g.system(""), repo, "pre-commit"); got != p {
+		t.Errorf("hookForStage = %q, want %q", got, p)
+	}
+}
