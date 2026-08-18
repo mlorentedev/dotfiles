@@ -256,3 +256,88 @@ func TestMatchPrompt(t *testing.T) {
 	}
 }
 
+func TestResolveDependencies(t *testing.T) {
+	deps := map[string][]string{
+		"spec":            {"adversarial-review", "verification-before-completion"},
+		"writing-plans":   {"executing-plans"},
+		"executing-plans": {"systematic-debugging", "test-driven-development"},
+		"cycle-a":         {"cycle-b"},
+		"cycle-b":         {"cycle-a"},
+	}
+
+	tests := []struct {
+		name     string
+		initial  []string
+		expected []string
+	}{
+		{
+			name:     "single skill with direct dependencies",
+			initial:  []string{"spec"},
+			expected: []string{"adversarial-review", "spec", "verification-before-completion"},
+		},
+		{
+			name:     "multi-level transitive dependencies",
+			initial:  []string{"writing-plans"},
+			expected: []string{"executing-plans", "systematic-debugging", "test-driven-development", "writing-plans"},
+		},
+		{
+			name:     "cycle protection",
+			initial:  []string{"cycle-a"},
+			expected: []string{"cycle-a", "cycle-b"},
+		},
+		{
+			name:     "no dependencies",
+			initial:  []string{"docker"},
+			expected: []string{"docker"},
+		},
+		{
+			name:     "empty input",
+			initial:  []string{},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ResolveDependencies(tt.initial, deps)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("ResolveDependencies(%v) = %v; want %v", tt.initial, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLoadSkillDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	skill1Dir := filepath.Join(tmpDir, "skill1")
+	skill2Dir := filepath.Join(tmpDir, "skill2")
+	_ = os.MkdirAll(skill1Dir, 0755)
+	_ = os.MkdirAll(skill2Dir, 0755)
+
+	skill1Content := `---
+name: skill1
+requires: [skill2, skill3]
+---
+# Skill 1`
+	skill2Content := `---
+name: skill2
+---
+# Skill 2`
+
+	_ = os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), []byte(skill1Content), 0644)
+	_ = os.WriteFile(filepath.Join(skill2Dir, "SKILL.md"), []byte(skill2Content), 0644)
+
+	deps, err := LoadSkillDependencies(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadSkillDependencies error: %v", err)
+	}
+
+	if len(deps) != 1 {
+		t.Fatalf("expected 1 skill with dependencies, got %d: %+v", len(deps), deps)
+	}
+	expected := []string{"skill2", "skill3"}
+	if !reflect.DeepEqual(deps["skill1"], expected) {
+		t.Fatalf("deps[skill1] = %v; want %v", deps["skill1"], expected)
+	}
+}
+

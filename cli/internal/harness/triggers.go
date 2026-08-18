@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	yaml "go.yaml.in/yaml/v3"
 )
 
 //go:embed triggers.json
@@ -33,7 +35,7 @@ type TriggerConfig struct {
 	Triggers []TriggerRule `json:"triggers"`
 }
 
-// LoadTriggers loads triggers from repoRoot/harness/triggers.json or embedded defaults.
+// LoadTriggers loads triggers from explicit repoRoot, local worktree/repo walk-up, or embedded defaults.
 func LoadTriggers(repoRoot string) (*TriggerConfig, error) {
 	if repoRoot != "" {
 		if data, err := os.ReadFile(filepath.Join(repoRoot, TriggersFile)); err == nil {
@@ -42,6 +44,22 @@ func LoadTriggers(repoRoot string) (*TriggerConfig, error) {
 			return nil, fmt.Errorf("read %s: %w", TriggersFile, err)
 		}
 	}
+
+	// Walk up from current working directory to discover local harness/triggers.json (e.g. in worktrees)
+	if cwd, err := os.Getwd(); err == nil {
+		for d := cwd; d != "" && d != "/" && d != "."; {
+			p := filepath.Join(d, TriggersFile)
+			if data, err := os.ReadFile(p); err == nil {
+				return ParseTriggers(data)
+			}
+			parent := filepath.Dir(d)
+			if parent == d {
+				break
+			}
+			d = parent
+		}
+	}
+
 	return ParseTriggers(defaultTriggersJSON)
 }
 
@@ -130,8 +148,122 @@ type Suggestion struct {
 	Skills   []string `json:"skills"`
 }
 
-// Suggest evaluates prompt text and modified paths against trigger rules.
+// DefaultSkillDependencies maps composite skills to their declared prerequisite skills.
+var DefaultSkillDependencies = map[string][]string{
+	"spec":                    {"adversarial-review", "verification-before-completion"},
+	"adversarial-review":      {"verification-before-completion"},
+	"executing-plans":         {"systematic-debugging", "test-driven-development", "verification-before-completion"},
+	"writing-plans":           {"executing-plans"},
+	"architecture-session":    {"read-all-adrs", "spec"},
+	"project-maturation":      {"audit", "test", "verification-before-completion"},
+	"vault-doctor":            {"insights"},
+	"test-driven-development": {"test"},
+	"handoff":                 {"verification-before-completion"},
+	"pr-review-triage":        {"verification-before-completion"},
+}
+
+// ResolveDependencies computes the transitive closure of required skills,
+// protecting against cycles and returning a sorted list of unique skills.
+func ResolveDependencies(initialSkills []string, depsMap map[string][]string) []string {
+	if len(initialSkills) == 0 {
+		return nil
+	}
+	result := make(map[string]struct{})
+	queue := make([]string, 0, len(initialSkills))
+
+	for _, s := range initialSkills {
+		if s != "" {
+			if _, exists := result[s]; !exists {
+				result[s] = struct{}{}
+				queue = append(queue, s)
+			}
+		}
+	}
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+
+		for _, dep := range depsMap[curr] {
+			if dep != "" {
+				if _, seen := result[dep]; !seen {
+					result[dep] = struct{}{}
+					queue = append(queue, dep)
+				}
+			}
+		}
+	}
+
+	res := make([]string, 0, len(result))
+	for s := range result {
+		res = append(res, s)
+	}
+	sort.Strings(res)
+	return res
+}
+
+// LoadSkillDependencies walks a skills directory and parses YAML frontmatter to build a dependency map.
+func LoadSkillDependencies(skillsDir string) (map[string][]string, error) {
+	deps := make(map[string][]string)
+	if skillsDir == "" {
+		return deps, nil
+	}
+
+	err := filepath.WalkDir(skillsDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if d.Name() != "SKILL.md" {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		content := string(data)
+		if !strings.HasPrefix(content, "---\n") && !strings.HasPrefix(content, "---\r\n") {
+			return nil
+		}
+
+		parts := strings.SplitN(content, "---", 3)
+		if len(parts) < 3 {
+			return nil
+		}
+
+		var meta struct {
+			Name     string   `yaml:"name"`
+			Requires []string `yaml:"requires"`
+		}
+		if err := yaml.Unmarshal([]byte(parts[1]), &meta); err != nil {
+			return nil
+		}
+
+		if meta.Name == "" {
+			meta.Name = filepath.Base(filepath.Dir(path))
+		}
+		if len(meta.Requires) > 0 {
+			deps[meta.Name] = meta.Requires
+		}
+		return nil
+	})
+
+	return deps, err
+}
+
+// Suggest evaluates prompt text and modified paths against trigger rules,
+// automatically resolving transitive skill dependencies.
 func Suggest(triggers []TriggerRule, prompt string, paths []string) Suggestion {
+	return SuggestWithDeps(triggers, prompt, paths, DefaultSkillDependencies)
+}
+
+// SuggestWithDeps evaluates prompt text and modified paths against trigger rules
+// using a provided skill dependency map for transitive resolution.
+func SuggestWithDeps(triggers []TriggerRule, prompt string, paths []string, depsMap map[string][]string) Suggestion {
 	patsPrompt, skillsPrompt := MatchPrompt(triggers, prompt)
 	patsPaths := MatchPaths(triggers, paths)
 
@@ -165,15 +297,16 @@ func Suggest(triggers []TriggerRule, prompt string, paths []string) Suggestion {
 	}
 	sort.Strings(pats)
 
-	skills := make([]string, 0, len(skillMap))
+	initialSkills := make([]string, 0, len(skillMap))
 	for s := range skillMap {
-		skills = append(skills, s)
+		initialSkills = append(initialSkills, s)
 	}
-	sort.Strings(skills)
+
+	resolvedSkills := ResolveDependencies(initialSkills, depsMap)
 
 	return Suggestion{
 		Patterns: pats,
-		Skills:   skills,
+		Skills:   resolvedSkills,
 	}
 }
 

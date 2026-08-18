@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/writing-plans/SKILL.md
-generated_sha: c87ac708f64a46af
+generated_sha: 567b876a66ae305f
 id: writing-plans-skill
 type: skill
 status: active
@@ -14,6 +14,7 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 keywords: [writing plans, implementation plan, plan implementation, crear plan, redactar
     plan]
 paths: ['**/plan*.md']
+requires: [executing-plans]
 ---
 # Writing Plans
 

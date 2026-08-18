@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: e7f3c9fcaf6f5222
+generated_sha: aa1087f44d2d30af
 id: adversarial-review-skill
 type: skill
 status: active
@@ -18,6 +18,7 @@ allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_searc
 keywords: [adversarial review, red team, devils advocate, review spec, independent
     verification, review gate, revisar spec]
 paths: [specs/**/review.md, specs/**/verification.md]
+requires: [verification-before-completion]
 ---
 # Adversarial Review (Red-Team Gate)
 

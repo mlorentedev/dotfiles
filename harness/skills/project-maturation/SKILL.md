@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/project-maturation/SKILL.md
-generated_sha: 7b5880a3ebccf31d
+generated_sha: 458bd2d08eaf86e1
 id: project-maturation-skill
 type: skill
 status: active
@@ -15,6 +15,7 @@ description: Use when a project needs a structured quality audit and improvement
 keywords: [project maturation, hardening, codebase audit, quality audit, remediar
     deuda]
 paths: []
+requires: [audit, test, verification-before-completion]
 ---
 # Project Maturation
 

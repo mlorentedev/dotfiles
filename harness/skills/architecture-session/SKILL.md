@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: 5cb7fdff7d61b017
+generated_sha: a4c1087e5315ac0b
 id: architecture-session-skill
 type: skill
 status: active
@@ -21,6 +21,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
 keywords: [architecture session, sesion de arquitectura, definir arquitectura, arch
     session, adr decision, evaluar opciones]
 paths: [docs/adr/**, '**/30-architecture/**']
+requires: [read-all-adrs, spec]
 ---
 # Architecture Session
 
