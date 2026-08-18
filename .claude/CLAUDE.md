@@ -218,8 +218,7 @@ Alias to `scripts/shell-profile.sh`. Diagnostic tool — use when interactive sh
 ./scripts/knowledge-crystallize.sh ~/Projects/kubelab
 ```
 
-See vault runbook: `$VAULT_PATH/10_projects/dotfiles/40-runbooks/guide-knowledge-distillation.md`
-(resolve `$VAULT_PATH` via `dotf env path VAULT_PATH` — never hardcode the literal, per ADR-025)
+See runbook: `docs/runbooks/guide-knowledge-distillation.md`
 
 ### Using opencode (AI coding agent — primary daily after PR2)
 ```bash
@@ -230,7 +229,7 @@ qq "tu pregunta"      # one-shot quick-question via opencode-go/qwen3.6-plus (ba
 - `qq` wrapper pinned to `opencode-go/qwen3.6-plus` (multilingual, fast, never-rate-limited). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`. Cross-platform name is `qq` (not `??`) because PowerShell 7+ reserves `??` as null-coalescing operator.
 - Frontier on-demand: provider `openrouter` (consumes existing `OPENROUTER_API_KEY` $5 credit).
 - First-time setup: launch `oc`, run `/connect` → select **OpenCode Go**, paste API key from opencode.ai/zen.
-- 3-layer PAYG guardrail: (1) `opencode.jsonc` lists only Go models, (2) Zen workspace cap $0, (3) no payment method for PAYG. Runbook: `$VAULT_PATH/10_projects/dotfiles/40-runbooks/guide-opencode-go-setup.md`.
+- 3-layer PAYG guardrail: (1) `opencode.jsonc` lists only Go models, (2) Zen workspace cap $0, (3) no payment method for PAYG. Runbook: `docs/runbooks/guide-opencode-go-setup.md`.
 - Config: `ai/opencode/opencode.jsonc` → `~/.config/opencode/opencode.jsonc` (deployed by `setup-linux.sh`).
 - ⚠ Coexistence constraint: don't run `oc` and `claude` in parallel on the same repo until hive MCP adds a lock-file to its auto-commit.
 
