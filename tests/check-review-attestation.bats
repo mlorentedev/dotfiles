@@ -110,9 +110,15 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 
 @test "AC5: a second reviewer declared in config is recognized, with no code change" {
     # This is what makes #786 (PR-Agent) an entry rather than a rewrite.
+    # `review_markers` is required (#1045), empty here because this reviewer is
+    # declared only to test the declined path. Required rather than optional
+    # because an absent field would silently mean "never attests", which is the
+    # exact shape of the bug #1045 fixed — a reviewer reviewing and the gate not
+    # seeing it. Adding a reviewer is still config-only, which is the claim.
     cat > "$TMP/config.json" <<'EOF'
 { "reviewers": [ { "login": "pr-agent",
-                   "declined_markers": ["pr-agent: provider unavailable"] } ],
+                   "declined_markers": ["pr-agent: provider unavailable"],
+                   "review_markers": [] } ],
   "escape": { "label": "merged-unreviewed", "section": "## Unreviewed merge rationale" } }
 EOF
     run "$SCRIPT" --config "$TMP/config.json" --payload "$F/second-reviewer.json"
@@ -367,4 +373,77 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     grep -q '::error title=Review attestation::' "$wf"
     grep -q 'merged-unreviewed' "$wf"
     grep -q 'does not veto' "$wf"
+}
+
+# --- #1045: a reviewer that posts comments instead of reviews ---
+#
+# PR-Agent (TOOL-013) runs under GITHUB_TOKEN as github-actions and publishes
+# through the comments API, so reviews[] is empty on a PR it genuinely reviewed.
+# The gate built to make green mean "reviewed" was calling this repo's own
+# reviewer unreviewed — #906's failure with the sign flipped. Measured on #1037
+# and #1042, both carrying a real Guide and both classified `declined`.
+
+@test "AC: a declared reviewer's comment-shaped review attests" {
+    run "$SCRIPT" --payload "$F/pr-agent-reviewed.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"github-actions"* ]]
+}
+
+@test "AC: the [bot] login suffix does not change the verdict" {
+    # The two GitHub APIs disagree: `gh pr view --json comments` (GraphQL) returns
+    # `github-actions`, `/issues/N/comments` (REST) returns `github-actions[bot]`.
+    # Matching the raw string made the verdict depend on which API produced the
+    # payload — half of #1033. Both spellings must attest identically.
+    run "$SCRIPT" --payload "$F/pr-agent-reviewed-bot-suffix.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+}
+
+@test "AC: suggestions are not a review" {
+    # `## PR Code Suggestions` is the improve command's output and is deliberately
+    # absent from review_markers. Attesting on it would make the gate mean "the
+    # reviewer ran" rather than "the reviewer reviewed".
+    run "$SCRIPT" --payload "$F/pr-agent-suggestions-only.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pending"* ]]
+}
+
+@test "AC: an undeclared bot cannot attest by posting the same marker" {
+    # The failure mode this guards is #1033 arriving through the comments door.
+    # Matching "a bot commented" would let a labeler or release bot attest; the
+    # pair (login, marker) must both be declared in the registry.
+    run "$SCRIPT" --payload "$F/undeclared-bot-guide.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pending"* ]]
+}
+
+@test "AC: a reviewer cannot attest its own PR by commenting on it" {
+    # Self-review is the one case where reviewer output does not mean anyone
+    # independent looked. The reviews[] path already excludes the author; the
+    # comment path must exclude it identically or it becomes the way around.
+    run "$SCRIPT" --payload "$F/pr-agent-self-authored.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pending"* ]]
+}
+
+@test "AC: a real review outranks another reviewer's declined notice" {
+    # Both are true at once whenever PR-Agent reviews while CodeRabbit's quota is
+    # spent — which is the normal state of this repo, and was the exact state of
+    # #1042. The gate asks whether a review happened, so the one that did wins.
+    run "$SCRIPT" --payload "$F/pr-agent-reviewed-coderabbit-declined.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"github-actions"* ]]
+}
+
+@test "AC: the registry must declare review_markers for every reviewer" {
+    # Shape, not syntax. A registry entry missing review_markers parsed fine and
+    # produced an empty marker list downstream, which classifies as "this reviewer
+    # never attests" — the gate failing toward MORE refusals, but silently.
+    printf '%s' '{"reviewers":[{"login":"x","declined_markers":[]}],
+                  "escape":{"label":"l","section":"## s"}}' > "$TMP/bad.json"
+    run "$SCRIPT" --config "$TMP/bad.json" --payload "$F/pr-agent-reviewed.json"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"wrong shape"* ]]
 }
