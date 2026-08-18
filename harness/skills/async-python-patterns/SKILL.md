@@ -1,18 +1,21 @@
 ---
 generated: true
 generated_from: 00_meta/skills/async-python-patterns/SKILL.md
-generated_sha: 213441fb6cd3a963
+generated_sha: 6ef977fdc34776d1
 id: async-python-patterns-skill
 type: skill
 status: active
-created: "2026-06-02"
+created: '2026-06-02'
 owner: manu
 name: async-python-patterns
-description: Master Python asyncio, concurrent programming, and async/await patterns for high-performance applications. Use when building async APIs, concurrent systems, or I/O-bound applications requiring non-blocking operations.
+description: Master Python asyncio, concurrent programming, and async/await patterns
+  for high-performance applications. Use when building async APIs, concurrent systems,
+  or I/O-bound applications requiring non-blocking operations.
 source: https://github.com/wshobson/agents (async-python-patterns)
 license: MIT
+keywords: [asyncio, async python, coroutine, event loop, non-blocking, aiohttp, anyio]
+paths: ['**/*async*.py', '**/concurrency*.py']
 ---
-
 # Async Python Patterns
 
 Implementing asynchronous Python with asyncio and async/await for high-performance, non-blocking systems.

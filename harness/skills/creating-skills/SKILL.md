@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/creating-skills/SKILL.md
-generated_sha: 692db94f0a6fbe39
+generated_sha: b612568284c4718c
 id: creating-skills-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: creating-skills
-description: Use when creating a new skill, updating an existing skill, or verifying a skill works before deployment. Covers skill anatomy, TDD testing methodology, and Claude Search Optimization for trigger descriptions.
+description: Use when creating a new skill, updating an existing skill, or verifying
+  a skill works before deployment. Covers skill anatomy, TDD testing methodology,
+  and Claude Search Optimization for trigger descriptions.
+keywords: [create skill, crear skill, new skill, update skill, tdd skill]
+paths: [00_meta/skills/**, harness/skills/**]
 ---
-
 # Creating Skills
 
 ## Core Principle
@@ -53,16 +56,23 @@ Split to reference files when approaching the 500-line limit. Reference from SKI
 
 ### Frontmatter (YAML) — CRITICAL
 
-Only two fields: `name` and `description` (max 1024 chars total).
+Must satisfy the **Frontmatter Law** and the **Harness Trigger Router** (`keywords` and `paths`):
 
 ```yaml
 ---
+id: skill-name-skill
+type: skill
+status: active
+created: 'YYYY-MM-DD'
+owner: manu
 name: skill-name-with-hyphens
-description: Use when [specific triggering conditions and symptoms]
+description: Use when [specific triggering conditions, symptoms, and slash commands]
+keywords: [keyword1, keyword2, trigger phrase]
+paths: ['**/pattern/**', 'src/**']
 ---
 ```
 
-The **description is the primary trigger mechanism.** Claude reads it to decide whether to load the skill. The body is only loaded AFTER triggering. All "when to use" information MUST be in the description, not in the body.
+The **description, keywords, and paths are the primary trigger mechanisms.** The harness router uses them to match prompts and file contexts dynamically. The body is loaded on demand when the skill triggers. All "when to use" trigger conditions MUST be captured in metadata.
 
 See **Claude Search Optimization** section below.
 

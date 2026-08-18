@@ -1,16 +1,18 @@
 ---
 generated: true
 generated_from: 00_meta/skills/executing-plans/SKILL.md
-generated_sha: fa518485c25a7685
+generated_sha: 3556db7bdaa98026
 id: executing-plans-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: executing-plans
-description: Use when you have a written implementation plan to execute, typically after /writing-plans produces a plan file.
+description: Use when you have a written implementation plan to execute, typically
+  after /writing-plans produces a plan file.
+keywords: [execute plan, ejecutar plan, run plan, plan execution]
+paths: ['**/plan*.md', '**/implementation-plan*.md']
 ---
-
 # Executing Plans
 
 Load plan, review critically, execute in batches, report for review.

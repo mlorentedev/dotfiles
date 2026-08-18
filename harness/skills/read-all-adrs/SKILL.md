@@ -1,17 +1,24 @@
 ---
 generated: true
 generated_from: 00_meta/skills/read-all-adrs/SKILL.md
-generated_sha: 9047ab3da31641f7
+generated_sha: 7bebe71737d3d4ae
 id: read-all-adrs-skill
 type: skill
 status: active
-created: "2026-07-07"
+created: '2026-07-07'
 owner: manu
 name: read-all-adrs
-description: Force a full read of every ADR in a repo before starting architecture-affecting work, producing a short decision inventory as an explicit completion artifact. Triggers on /read-all-adrs, "read all the ADRs", "give me the ADR map for this repo", "what decisions have already been made here", and as a mandatory pre-step before architecture-session, large refactors, or any change the Discipline Gate flags as warranting a Socratic Guardrail pause. Adapted from davidondrej/skills' read-all-adrs, rewritten with a real completion artifact instead of a bare "read them" instruction.
+description: Force a full read of every ADR in a repo before starting architecture-affecting
+  work, producing a short decision inventory as an explicit completion artifact. Triggers
+  on /read-all-adrs, "read all the ADRs", "give me the ADR map for this repo", "what
+  decisions have already been made here", and as a mandatory pre-step before architecture-session,
+  large refactors, or any change the Discipline Gate flags as warranting a Socratic
+  Guardrail pause. Adapted from davidondrej/skills' read-all-adrs, rewritten with
+  a real completion artifact instead of a bare "read them" instruction.
 allowed-tools: [Read, Grep, Glob]
+keywords: [read all adrs, adr map, decision inventory, todas las adrs]
+paths: [docs/adr/**]
 ---
-
 # Read All ADRs — full ingestion before architecture work
 
 > Agents under time pressure sample ADRs (grep for a keyword, read the top hit) instead of reading the corpus, and re-propose something already decided-and-rejected, or miss a supersession banner and build on a dead decision. This skill forces full ingestion and produces a durable inventory so the reading actually happened — a bare "I read them" claim is not verifiable; a decision-map table is.

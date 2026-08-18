@@ -1,18 +1,21 @@
 ---
 generated: true
 generated_from: 00_meta/skills/helm/SKILL.md
-generated_sha: ec76c09971d4fa6e
+generated_sha: 8e1fc6e8ab152541
 id: helm-skill
 type: skill
 status: active
-created: "2026-06-02"
+created: '2026-06-02'
 owner: manu
 name: helm
-description: Create, test, and package Helm charts — Chart.yaml, templates, _helpers.tpl, dependencies/subcharts, lint/template/dry-run, and repo/OCI publishing. Use when the user mentions Helm charts, helm lint/template/package, or Kubernetes packaging.
+description: Create, test, and package Helm charts — Chart.yaml, templates, _helpers.tpl,
+  dependencies/subcharts, lint/template/dry-run, and repo/OCI publishing. Use when
+  the user mentions Helm charts, helm lint/template/package, or Kubernetes packaging.
 source: https://github.com/laurigates/claude-plugins (helm-chart-development)
 license: MIT
+keywords: [helm, chart, helm lint, helm template, helm package, values.yaml]
+paths: ['**/Chart.yaml', '**/templates/*.yaml', '**/values*.yaml']
 ---
-
 # Helm Chart Development
 
 Create, test, and package custom Helm charts with best practices for maintainability and reusability. (This skill covers chart *authoring*; release install/upgrade, multi-env values overrides, and deployment debugging are separate concerns.)

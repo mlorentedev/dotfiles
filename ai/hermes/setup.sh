@@ -133,9 +133,9 @@ ensure_vault_clone() {
 
 # --- 5. Vault SSOT bootstrap (ensure the agent workspace context exists) ---
 ensure_agent_workspace() {
-    ctx="$HERMES_VAULT_PATH/$AGENT_DIR_REL/00-context.md"
+    ctx="$HERMES_VAULT_PATH/$AGENT_DIR_REL/context.md"
     if [ -d "$HERMES_VAULT_PATH/.git" ] && [ ! -f "$ctx" ]; then
-        log "warning: $AGENT_DIR_REL/00-context.md missing in vault (agent will bootstrap it)"
+        log "warning: $AGENT_DIR_REL/context.md missing in vault (agent will bootstrap it)"
     fi
     # Ensure-local only: we do NOT commit here. The agent commits in its own flow
     # (write-only 80_agents/ per the commit policy).

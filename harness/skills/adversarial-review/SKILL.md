@@ -1,17 +1,24 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: 3829f1e301964465
+generated_sha: e7f3c9fcaf6f5222
 id: adversarial-review-skill
 type: skill
 status: active
-created: "2026-05-14"
+created: '2026-05-14'
 owner: manu
 name: adversarial-review
-description: Independent red-team verification pass on a spec-driven change BEFORE archiving. Triggers on /adversarial-review, "red-team this", "devil's advocate AI-001", "independent verification before archive". Reads `specs/<feature-id>/{proposal,tasks,verification}.md` + diff/PR, refutes acceptance criteria, classifies findings Blocker/Major/Minor, issues PASS/PASS-WITH-GAPS/FAIL verdict. Pairs with /spec archive lock. Ported and adapted from LIDR-academy/lidr-specboot.
+description: Independent red-team verification pass on a spec-driven change BEFORE
+  archiving. Triggers on /adversarial-review, "red-team this", "devil's advocate AI-001",
+  "independent verification before archive". Reads `specs/<feature-id>/{proposal,tasks,verification}.md`
+  + diff/PR, refutes acceptance criteria, classifies findings Blocker/Major/Minor,
+  issues PASS/PASS-WITH-GAPS/FAIL verdict. Pairs with /spec archive lock. Ported and
+  adapted from LIDR-academy/lidr-specboot.
 allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_search]
+keywords: [adversarial review, red team, devils advocate, review spec, independent
+    verification, review gate, revisar spec]
+paths: [specs/**/review.md, specs/**/verification.md]
 ---
-
 # Adversarial Review (Red-Team Gate)
 
 > Act as an **independent adversarial reviewer**: assume gaps, flaws, or unsafe behavior may exist until you have argued against them with evidence. Intended for the **verification window** of spec-driven development (after implementation, BEFORE running `/spec archive` or `dotf spec archive`), ideally run by a different agent/session than the one that implemented the change.

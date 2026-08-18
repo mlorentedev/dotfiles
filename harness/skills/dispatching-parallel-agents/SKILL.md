@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispatching-parallel-agents/SKILL.md
-generated_sha: 4ef93031ee74f9c8
+generated_sha: 48910b6387cc1d47
 id: dispatching-parallel-agents-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: dispatching-parallel-agents
-description: Use when facing 2+ independent tasks that can run concurrently without shared state or sequential dependencies.
+description: Use when facing 2+ independent tasks that can run concurrently without
+  shared state or sequential dependencies.
+keywords: [parallel agents, dispatch agents, parallel dispatch, subagent fan out,
+  concurrent tasks]
+paths: []
 ---
-
 # Dispatching Parallel Agents
 
 Multiple independent problems → dispatch one agent per domain → work concurrently.

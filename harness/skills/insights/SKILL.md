@@ -1,17 +1,21 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 3dacc3046a58a23c
+generated_sha: 4a7575f442b00665
 id: insights-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: insights
 targets: [claude]
-description: Use when checking AI workflow health, vault structural integrity, or knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale MEMORY.md, unvaulted observations, vault structural issues, or before starting a major sprint.
+description: Use when checking AI workflow health, vault structural integrity, or
+  knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale
+  MEMORY.md, unvaulted observations, vault structural issues, or before starting a
+  major sprint.
+keywords: [insights, vault insights, graph insights, knowledge stats]
+paths: [00_meta/**]
 ---
-
 # /insights -- AI Workflow Health Audit
 
 Quick, read-only audit of the Neural Hive knowledge loop and vault structural health. No files modified.
@@ -65,7 +69,7 @@ If failures detected -> recommend `/vault-doctor`.
 
 ### Step 5 -- Vault Gap Analysis (full mode)
 
-- Read the repo's `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
+- Read the repo's `docs/lessons/` (and `docs/lessons/_index.md`) (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
 - Identify bugfix and decision observations NOT documented in the repo's lessons
 - List each gap: ID, type, title
 
@@ -84,7 +88,7 @@ Decision persistence:
 
 ### Step 7 -- Pattern Opportunities (full mode)
 
-- For lessons in the repo's `docs/lessons.md` that appear relevant to multiple projects:
+- For lessons in the repo's `docs/lessons/` that appear relevant to multiple projects:
   - Check `$VAULT_PATH/00_meta/patterns/` for existing patterns
   - Identify lessons that warrant a new global pattern
 - For existing patterns: check if recent lessons should be added to them
@@ -109,7 +113,7 @@ Backlog: X active items (Progress: [====......] 40%)
 Observation inventory (last 14 days):
   Discoveries: N | Changes: N | Bugfixes: N (X unvaulted) | Decisions: N (X unvaulted) | Features: N
 
-Project-lesson gaps (not in the repo's docs/lessons.md):
+Project-lesson gaps (not in the repo's docs/lessons/):
   - #ID: <title>
 
 Decision persistence:

@@ -1,17 +1,26 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: e9bbe0b2e1507f74
+generated_sha: f23aedf75e7691b0
 id: spec-skill
 type: skill
 status: active
-created: "2026-05-13"
+created: '2026-05-13'
 owner: manu
 name: spec
-description: "Manage Spec-Driven Development per-feature artifacts. Triggers on /spec, \"create a spec for\", \"scaffold spec X\", \"bootstrap substrate for X\", \"fill proposal for X\", \"check/lint spec X\", \"archive spec X\". Five subcommands: init (scaffold, gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate contract), fill (Socratic 5-question proposal), check (pre-implementation consistency lint), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent Claude/Copilot via AGENTS.md indirection."
-allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch]
+description: 'Manage Spec-Driven Development per-feature artifacts. Triggers on /spec,
+  "create a spec for", "scaffold spec X", "bootstrap substrate for X", "fill proposal
+  for X", "check/lint spec X", "archive spec X". Five subcommands: init (scaffold,
+  gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate
+  contract), fill (Socratic 5-question proposal), check (pre-implementation consistency
+  lint), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent
+  Claude/Copilot via AGENTS.md indirection.'
+allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search,
+  mcp__hive__vault_write, mcp__hive__vault_patch]
+keywords: [spec, sdd, rdd, spec init, spec fill, spec check, spec archive, scaffold
+    spec]
+paths: [specs/**]
 ---
-
 # Spec Workflow
 
 > Implements `pattern-spec-driven-development`. Five subcommands: `init`, `bootstrap` (optional), `fill`, `check`, `archive`.
@@ -265,8 +274,8 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 2. **Promotion candidates (always interactive — never autoparse):**
    For each of the three promotion types, ASK the user regardless of `verification.md` marker (the marker is a hint, not authoritative):
-   - **Lesson?** "Any non-obvious lesson worth recording? 2-sentence summary, or `no`."
-     - If non-`no`: compose lesson entry -> append to the **repo's** `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
+    - **Lesson?** "Any non-obvious lesson worth recording? 2-sentence summary, or `no`."
+      - If non-`no`: compose lesson entry -> save as the **repo's** `docs/lessons/lesson-NNN-<slug>.md` and register in `docs/lessons/_index.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]; fallback: `docs/lessons/`). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
    - **ADR-worthy?** "Any architectural decision that future-you needs to remember? ADR title, or `no`."
      - If non-`no`: ask for ADR number (query existing ADRs in the **repo's** `docs/adr/` first to suggest next sequential) and 1-line decision summary. Create skeleton at the **repo's** `docs/adr/adr-XXX-<slug>.md` (ADRs live in the repo — see [[pattern-knowledge-placement]]; the vault keeps only cross-project decisions in `00_meta/`).
    - **Pattern candidate?** "Does this approach recur in >1 project? Pattern name, or `no`."
@@ -313,7 +322,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 | `bootstrap` (template) | `00_meta/templates/bootstrap-contract.md`, sister contracts in `specs/archive/` | (filesystem only — repo specs/<id>/bootstrap-contract.md) |
 | `fill` (grounding) | GitHub issue, `roadmap.md`, referenced ADRs, sister specs | nothing |
 | `check` (lint) | `proposal.md`, `tasks.md`, optional `features.json` | nothing |
-| `archive` (promotion) | `verification.md` flags | repo `docs/lessons.md`, repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
+| `archive` (promotion) | `verification.md` flags | repo `docs/lessons/lesson-NNN-*.md` + `_index.md`, repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
 | `archive` (backlog tick) | GitHub issue | GitHub issue closed |
 
 ## References
