@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.44.0](https://github.com/mlorentedev/dotfiles/compare/v0.43.0...v0.44.0) (2026-08-18)
+
+
+### Features
+
+* **ci:** make the reviewer check harness compliance by default ([#786](https://github.com/mlorentedev/dotfiles/issues/786)) ([#1044](https://github.com/mlorentedev/dotfiles/issues/1044)) ([a863730](https://github.com/mlorentedev/dotfiles/commit/a863730cf70c365b982a6b60f0155da55ebdcb27))
+* **ci:** review every push, because the doctrine already says we do ([#786](https://github.com/mlorentedev/dotfiles/issues/786)) ([#1058](https://github.com/mlorentedev/dotfiles/issues/1058)) ([bb2fa23](https://github.com/mlorentedev/dotfiles/commit/bb2fa2383a2990c741a1a0148790f4973f40da8f))
+* **ci:** stop reviewing release PRs, and stop demanding a review of them ([#786](https://github.com/mlorentedev/dotfiles/issues/786)) ([#1065](https://github.com/mlorentedev/dotfiles/issues/1065)) ([a889bd6](https://github.com/mlorentedev/dotfiles/commit/a889bd6c2c3831bc0ee286c703d52ae15951b782))
+* **cli:** dotf pr triage-queue — the wake-up the review loop never had ([#1052](https://github.com/mlorentedev/dotfiles/issues/1052)) ([#1057](https://github.com/mlorentedev/dotfiles/issues/1057)) ([1a29340](https://github.com/mlorentedev/dotfiles/commit/1a29340f8696d0aa51a51752a3dd0bd29d7ab37a))
+* **harness:** reconcile spec subcommands, add deployed doctrine probes, and enhance router ([#1046](https://github.com/mlorentedev/dotfiles/issues/1046)) ([ab4f303](https://github.com/mlorentedev/dotfiles/commit/ab4f303eb88d1800ec1dfd35979582776ed76ebf))
+
+
+### Bug Fixes
+
+* **ci:** align the pr-agent trigger list with PR-Agent's own event gate ([#1054](https://github.com/mlorentedev/dotfiles/issues/1054)) ([e608989](https://github.com/mlorentedev/dotfiles/commit/e608989e5437f6e465279c83ee09aa34b9aba8e5)), closes [#1053](https://github.com/mlorentedev/dotfiles/issues/1053)
+* **ci:** install age from the pinned release on Linux, and verify what it got ([#1059](https://github.com/mlorentedev/dotfiles/issues/1059)) ([e63a35b](https://github.com/mlorentedev/dotfiles/commit/e63a35b5c84aa75eb86ac25ee221da3aebf0f5df))
+* **ci:** let a declared reviewer attest with comment-shaped output ([#1047](https://github.com/mlorentedev/dotfiles/issues/1047)) ([7d33378](https://github.com/mlorentedev/dotfiles/commit/7d33378fed6593669095d8aead28f9b43bea085a))
+* **ci:** re-evaluate the review gate when our own reviewer finishes ([#1052](https://github.com/mlorentedev/dotfiles/issues/1052), [#1041](https://github.com/mlorentedev/dotfiles/issues/1041)) ([#1056](https://github.com/mlorentedev/dotfiles/issues/1056)) ([1a5f3cf](https://github.com/mlorentedev/dotfiles/commit/1a5f3cf4cf77805977066b337f94f3ee2176a366))
+* **ci:** stop PR-Agent cancelling its own review when a bot comments ([#1042](https://github.com/mlorentedev/dotfiles/issues/1042)) ([1cf1f56](https://github.com/mlorentedev/dotfiles/commit/1cf1f56f69eb53e6649be341205a30648eeaf286))
+
 ## [0.43.0](https://github.com/mlorentedev/dotfiles/compare/v0.42.0...v0.43.0) (2026-08-16)
 
 
