@@ -61,212 +61,37 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(. ./version
 dotf doctor
 ```
 
-## Key Files
+## Key Infrastructure
 
-| File | Role | Notes |
+| Area | Primary Entrypoint | Description |
 |---|---|---|
-| `versions.conf` | Central version manifest | Single source of truth for tool versions |
-| `scripts/utils.sh` | Foundation library | Sourced by ALL other scripts |
-| `cli/` | `dotf` Go CLI — the primary user-facing tool | `doctor`, `env`, `secrets`, `spec`, `init`, `mem`, `tools`, `vault`. Absorbs `.sh`/`.ps1` twins on contact (ADR-020) |
-| `secrets/registry.yaml` | Secret mapping SSOT (ADR-028) | Replaced the retired sensitive/env-mapping.conf |
-| `setup-linux.sh` | Linux bootstrap | Installs tools, deploys configs, registers MCP servers |
-| `setup-windows.ps1` | Windows bootstrap | PowerShell equivalent (copies instead of symlinks) |
-| `ai/claude/CLAUDE.md` | Master Claude instructions | Deployed to `~/.claude/CLAUDE.md` by setup |
-| `harness/skills/*/SKILL.md` | Committed skill records (37) | Rendered from the vault by `compile-harness.sh --refresh`; deployed to each agent by `--deploy`. **Generated — edit the vault source, not these** |
-| `harness/manifest.json` | Harness engine manifest | Which enforced regions inject where, and which agents receive skills |
-| `harness/reviewer-pool.json` | Adversarial-review allow-list (#955) | Model ids permitted to sign a `review.md`. `dotf spec archive` refuses one signed outside it, so **no adversarial review runs on an Anthropic model**. Launch with `dotf spec review <spec-id>`; edit the file to change who may review |
-| `scripts/compile-harness.sh` | Harness engine | `--refresh` (vault → records), `--deploy` (records → agent dirs), `--check` (offline drift) |
-| `scripts/vault.sh` | Vault tooling dispatcher (REFACTOR-005) | `vault {health, maintenance, check-escapes}` — single discoverable entry point; each subcommand still runnable standalone |
-| `scripts/vault-health.sh` | Obsidian vault health check | Checks plugin status, pending tasks, etc. Also runnable via `vault health`. |
-| `scripts/obs-cli.sh` | Obsidian CLI wrapper (Linux) | --no-sandbox, default vault, GUI check |
-| `scripts/obs-cli.ps1` | Obsidian CLI wrapper (Windows) | Default vault, GUI check |
-| `scripts/knowledge-crystallize.sh` | AI knowledge maintenance | Updates MEMORY.md dates, checks health, prints crystallization checklist |
-| `scripts/check-doc-paths.sh` | Doc-path guard (#916) | Fails when an instruction file names a repo path that no longer exists |
-| `.zsh/aliases.zsh` | Shell aliases | Includes `oc` for opencode, `qq` for one-shot questions, `tx`/`txl`/`txa`/`txk` for tmux |
-| `ai/opencode/opencode.jsonc` | OpenCode config | Provider `opencode-go` (Go subscription, catalog-restricted) + `openrouter` + MCP mirror. Deployed to `~/.config/opencode/`. |
-| `AGENTS.md` (root) | Cross-agent SSOT | Canonical system prompt read by OpenCode (natively) and Claude (via this file's pointer). Per-agent files in `ai/<agent>/` and `.github/` delegate here. |
-| `tmux.conf` | tmux configuration (Linux only) | Deployed via symlink to `~/.tmux.conf` by `setup-linux.sh` |
+| **Tooling & CLI** | `cli/` (`dotf`) | Go CLI for doctor, spec, secrets, init, mem, tools |
+| **Shell Foundation** | `scripts/utils.sh` | Portable bash/zsh functions and bootstrap |
+| **Versions SSOT** | `versions.conf` | Version pins for languages and CLI tools |
+| **Secrets SSOT** | `secrets/registry.yaml` | Secret mappings (managed via `dotf secrets`) |
+| **Harness & Skills** | `harness/skills/` | Agent skills deployed by `scripts/compile-harness.sh` |
 
-> **Editing this file: a backticked repo path *containing a slash* is a live claim.**
-> `scripts/check-doc-paths.sh` fails CI when one does not resolve — that is how
-> this file came to name seven files that no longer existed (#916). To mention a
-> path that is gone ("the old loader lived at scripts/load-secrets.sh"), write it
-> in plain text, not backticks.
->
-> The slash qualifier is not a detail: bare filenames are **not** checked, by
-> design — resolving them by basename flagged vault patterns and `machine.json`
-> on `AGENTS.md`. So a backticked bare name like `env-mapping.conf` passes the
-> guard whether or not it exists. Prefer the rooted form when you want the
-> guard's protection.
-
-## Secrets System (ADR-028)
-
-Two tiers, and the shape matters: **secrets are never exported into the ambient
-shell.** They are injected into one child process on demand. The older model —
-a login-time loader that decrypted everything into the environment — is retired,
-along with the scripts/load-secrets.sh loader and the sensitive/env-mapping.conf
-mapping file.
-
-- **SSOT:** Bitwarden. **DR floor:** [age](https://github.com/FiloSottile/age)-encrypted copies under `sensitive/*.secret.age`, key at `~/.config/age/key.txt`.
-- **Mapping SSOT:** `secrets/registry.yaml`.
-- **Facade:** `dotf secrets` — `run` (inject into a child process only), `show`,
-  `ls`, `verify`, `set`, `render`, `migrate`, `sync`, `backup`.
+## Core Workflows & Commands
 
 ```bash
+# Secrets Management (ADR-028)
 dotf secrets ls                     # inventory: ids, plane, exposed vars (no values)
 dotf secrets verify                 # resolve everything, report OK/MISSING/FAILED
-dotf secrets run -- ./deploy.sh     # the only sanctioned way to hand a secret to a process
+dotf secrets run -- <cmd>           # the only sanctioned way to hand a secret to a process
+
+# Diagnostics & Health
+dotf doctor                         # Full post-setup verification (Go + Shell + Doctrines)
+dotf doctor --fix                   # Safely repair auto-fixable drift
+
+# Spec-Driven Development & Review
+dotf spec init <spec-id> --issue <N> # scaffold a feature spec gated on an open issue
+dotf spec review <spec-id>          # launch detached adversarial review in tmux
+dotf spec archive <spec-id>         # archive spec upon successful independent review
 ```
-
-## Common Workflows
-
-### Adding a new shell script
-1. Create in `scripts/`, use `#!/usr/bin/env bash` shebang
-2. Source `utils.sh` if you need shared functions
-3. Follow the prohibited patterns table above
-4. Run `shellcheck` and `bats` before committing
-
-### Adding a new secret (ADR-028)
-1. Add its entry to `secrets/registry.yaml` (the mapping SSOT — id, plane, exposed vars)
-2. Write the value: `dotf secrets set <id>` (reads stdin or prompts hidden; idempotent)
-3. Verify without printing it: `dotf secrets verify`
-4. Consume it: `dotf secrets run -- <cmd>` — never by exporting into your shell
-
-Run `dotf secrets <sub> --help` for the exact flags; do not reconstruct the old
-`env-mapping.conf` syntax, which no longer exists.
-
-### Updating a tool version
-1. Edit `versions.conf` at repo root — change `TOOL_VERSION=X.Y.Z`
-2. Verify syntax: `bash -n versions.conf && zsh -n versions.conf`
-3. Run `~/.local/bin/bats tests/versions-conf.bats` to validate format
-4. The new version propagates automatically to `.zshrc`/`.bashrc` via `${VAR:-fallback}` on next shell reload
-5. Run `dotf doctor` to verify the versioned directory exists at `~/Applications/tool-X.Y.Z`
-
-### Adding a new versioned tool
-1. Add `NEWTOOL_VERSION=X.Y.Z` to `versions.conf`
-2. Add `export NEWTOOL_HOME="$APPS_HOME/newtool-${NEWTOOL_VERSION:-X.Y.Z}"` to both `.zshrc` and `.bashrc`
-3. Add `export PATH="$NEWTOOL_HOME/bin:$PATH"` in both RC files (if the tool has binaries)
-4. Add the version check to `cli/internal/doctor/` — append an entry to the
-   `versionMatches` table for a versioned `$APPS_HOME` dir, or call `matchPin`
-   against the live binary for tools installed elsewhere (see
-   `cli/internal/doctor/checks_golangci.go` for the latter shape)
-5. Run tests: `~/.local/bin/bats tests/versions-conf.bats` and `cd cli && go test ./internal/doctor/`
-
-### Running the adversarial review before archiving a spec
-
-```bash
-dotf spec review <spec-id>                              # the pool's primary
-dotf spec review <spec-id> --reviewer <pool-id>         # a specific pool member
-dotf spec review <spec-id> --dry-run                    # print the command, run nothing
-tmux attach -t review-<spec-id>                         # watch it while it runs
-```
-
-Who may review is **not** the caller's choice. `harness/reviewer-pool.json` is
-the allow-list, `dotf spec archive` refuses a `review.md` signed outside it, and
-no adversarial review runs on an Anthropic model — the reviewer must not be the
-implementer, and Claude implements nearly everything here.
-
-Three rules the launcher encodes, each from a real failure:
-
-1. **Never let a runner pick the model.** Its default lives in unversioned
-   per-machine state, so a review that ran on the intended model on one box
-   silently runs on another elsewhere. `dotf spec review` always passes provider
-   and model explicitly.
-2. **The tool is not the guarantee, the model id is.** `agy` serves Claude models
-   too, so "run it with agy" constrains nothing.
-3. **`reviewer:` is matched exactly.** The right model spelled differently is
-   refused over punctuation, which costs a whole review round.
-
-The verdict lands in `specs/<spec-id>/review.md`; a machine-readable transcript
-lands beside it, so *how* a review reasoned is auditable and not only its
-conclusion.
-
-### Running the health check
-```bash
-dotf doctor          # Full post-setup verification
-dotf doctor --fix    # Repair what is safely repairable (junctions, hooks paths)
-# Exit 0 = all pass, Exit 1 = failures detected
-```
-
-> The `healthcheck.sh` / `doctor.sh` twins were retired into this command
-> (ADR-020 strangler-fig). If something tells you to run them, it is stale.
-
-### Diagnosing shell startup time (when zsh/bash feels slow)
-```bash
-profile-shell                              # time-only, 5 runs of zsh, min/median/mean/max
-profile-shell --shell bash                 # same for bash
-profile-shell --detail                     # per-function breakdown via zprof (zsh) or xtrace (bash)
-```
-Alias to `scripts/shell-profile.sh`. Diagnostic tool — use when interactive shell startup feels >300ms (Linux baseline ~100-150ms with current `.zshrc` + plugins).
-
-### Running knowledge crystallization
-
-```bash
-# Weekly: read-only audit — what needs attention?
-/insights
-
-# When insights shows unvaulted observations or stale MEMORY.md:
-/crystallize
-
-# Automated MEMORY.md date maintenance (post-sprint or in CI):
-./scripts/knowledge-crystallize.sh
-
-# All projects at once (auto-discovers from ~/.claude/projects/):
-./scripts/knowledge-crystallize.sh --all
-
-# For a specific project:
-./scripts/knowledge-crystallize.sh ~/Projects/kubelab
-```
-
-See vault runbook: `$VAULT_PATH/10_projects/dotfiles/40-runbooks/guide-knowledge-distillation.md`
-(resolve `$VAULT_PATH` via `dotf env path VAULT_PATH` — never hardcode the literal, per ADR-025)
-
-### Using opencode (AI coding agent — primary daily after PR2)
-```bash
-oc                    # TUI launcher (opencode Go subscription, $10/mo fixed)
-qq "tu pregunta"      # one-shot quick-question via opencode-go/qwen3.6-plus (bash/zsh/pwsh)
-```
-- Default TUI model: DeepSeek V4 Pro (Go catalog). A/B candidate: Kimi K2.6 — selectable via `/models` in TUI.
-- `qq` wrapper pinned to `opencode-go/qwen3.6-plus` (multilingual, fast, never-rate-limited). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`. Cross-platform name is `qq` (not `??`) because PowerShell 7+ reserves `??` as null-coalescing operator.
-- Frontier on-demand: provider `openrouter` (consumes existing `OPENROUTER_API_KEY` $5 credit).
-- First-time setup: launch `oc`, run `/connect` → select **OpenCode Go**, paste API key from opencode.ai/zen.
-- 3-layer PAYG guardrail: (1) `opencode.jsonc` lists only Go models, (2) Zen workspace cap $0, (3) no payment method for PAYG. Runbook: `$VAULT_PATH/10_projects/dotfiles/40-runbooks/guide-opencode-go-setup.md`.
-- Config: `ai/opencode/opencode.jsonc` → `~/.config/opencode/opencode.jsonc` (deployed by `setup-linux.sh`).
-- ⚠ Coexistence constraint: don't run `oc` and `claude` in parallel on the same repo until hive MCP adds a lock-file to its auto-commit.
-
-### Modifying setup scripts
-1. Edit both `setup-linux.sh` AND `setup-windows.ps1` if the change is cross-platform
-2. Test Linux changes by running relevant sections (MCP registration, config deployment)
-3. Verify Windows parity: same MCP servers, same configs deployed
 
 ## Self-Verification Loop
 
 After modifying ANY shell script:
-1. Run `~/.local/bin/shellcheck` on the changed file
-2. Run `~/.local/bin/bats tests/*.bats` to catch regressions
-3. Only then claim the change is complete
-
-After completing a session:
-- If new patterns were learned, suggest updating this CLAUDE.md
-- If mistakes were corrected, write the lesson to this repo's `docs/lessons.md`.
-  **Not the vault** — project lessons are build/operate knowledge and live in
-  the repo (Standing Order #2, `pattern-knowledge-placement`). Only
-  cross-project insight goes to `00_meta/` in the store.
-
-<claude-mem-context>
-# Recent Activity
-
-<!-- This section is auto-generated by claude-mem. Edit content outside the tags. -->
-
-### Feb 10, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #1016 | 6:47 PM | ○ | Project-specific permissions override allowing WebSearch tool | ~284 |
-
-### Feb 16, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #2360 | 5:33 PM | ○ | Claude Permission Settings Configured | ~354 |
-</claude-mem-context>
+1. `~/.local/bin/shellcheck <changed-file>`
+2. `~/.local/bin/bats tests/*.bats`
+3. If new lessons were learned, write them to `docs/lessons.md`.
