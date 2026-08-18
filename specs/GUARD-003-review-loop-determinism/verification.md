@@ -130,3 +130,52 @@ unverifiable turned into the vehicle that verifies it.
 
 Evidence to capture on this PR: a `review-attestation` run whose event is
 `workflow_run`, with no human comment preceding it.
+
+
+## A decision recorded with its measurement: the check-run stays as it is
+
+Raised by a parallel session as a measurement rather than a ticket, which is the
+right shape — this is the spec's own surface. The argument: #1056 exempted
+`pending` because a check-run frozen red on every correct PR teaches its readers
+to scroll past it, and `declined` should now get the same treatment, because
+*"CodeRabbit declines, PR-Agent attests five minutes later"* has become the
+standard sequence rather than an edge case.
+
+The argument is good and the measurement does not support it.
+
+**All five open PRs agree between the two signals**, taken at one moment:
+
+```
+#1046  check-run=fail   status=fail     (genuinely unreviewed — correct)
+#1048  check-run=pass   status=pass
+#1049  check-run=pass   status=pass
+#1057  check-run=pass   status=pass
+#1058  check-run=pass   status=pass
+```
+
+**And the case the argument was built on did not stay frozen.** #1059's head sha
+carries two attestation check-runs:
+
+```
+attestation: failure  @02:24:43
+attestation: success  @02:34:38
+```
+
+A later `pull_request` run created a fresh one, and GitHub displays the newest
+per name. The original measurement was taken in the window between the two —
+a real window, and not a permanent state.
+
+So the mechanism exists and its blast radius is narrower than the argument
+requires: it bites only when a review lands and no further push follows. #1058
+narrows even that, since every push now creates a run and therefore a check-run.
+
+**The decision is to leave `declined` failing, and the reason is not the size of
+the window.** It is that the check-run is not the verdict. #1041 established
+that and #1056 shipped it: the commit status is the revisable signal, it is what
+later runs correct, and it is what branch protection will require (AC6). Making
+the check-run track the truth more closely is polishing the signal this spec
+deliberately decided not to trust — and every hour spent on it argues, by
+implication, that it should be trusted.
+
+Revisit if a PR is ever observed merging with the two signals disagreeing at
+merge time. That is the failure that would matter, and it has not been seen.
