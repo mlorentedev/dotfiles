@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/verification-before-completion/SKILL.md
-generated_sha: da15afc3f14995da
+generated_sha: 6cb4d2efe48a0956
 id: verification-before-completion-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: verification-before-completion
-description: Use when about to claim work is complete, fixed, or passing -- before committing, creating PRs, or closing tasks. Evidence before assertions.
+description: Use when about to claim work is complete, fixed, or passing -- before
+  committing, creating PRs, or closing tasks. Evidence before assertions.
+keywords: [verification, definition of done, verify completion, evidence before assertions,
+  comprobar antes de cerrar]
+paths: [specs/**/verification.md]
 ---
-
 # Verification Before Completion
 
 ## Overview

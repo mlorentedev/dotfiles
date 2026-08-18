@@ -20,6 +20,11 @@ var ciTemplates = map[string]string{
 // skip-if-present. It returns the action taken: "created", "skipped" (a ci.yml
 // already exists), or "none" (no CI template applies to this stack).
 func WriteCI(root, stack string) (string, error) {
+	return WriteCIOpts(root, stack, false)
+}
+
+// WriteCIOpts is the parameterised form of WriteCI, with dry-run support.
+func WriteCIOpts(root, stack string, dryRun bool) (string, error) {
 	tmpl, ok := ciTemplates[stack]
 	if !ok {
 		return "none", nil
@@ -27,6 +32,9 @@ func WriteCI(root, stack string) (string, error) {
 	dest := filepath.Join(root, ".github", "workflows", "ci.yml")
 	if _, err := os.Stat(dest); err == nil {
 		return "skipped", nil
+	}
+	if dryRun {
+		return "created", nil
 	}
 	raw, err := ReadTemplate(tmpl)
 	if err != nil {

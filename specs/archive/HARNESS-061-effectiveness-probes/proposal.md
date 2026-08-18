@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-061-effectiveness-probes"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-08"
 issue: "mlorentedev/dotfiles#852"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

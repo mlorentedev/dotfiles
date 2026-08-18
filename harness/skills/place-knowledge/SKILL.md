@@ -1,16 +1,25 @@
 ---
 generated: true
 generated_from: 00_meta/skills/place-knowledge/SKILL.md
-generated_sha: 7299c70be6094932
+generated_sha: ec4a866476f0a6ee
 id: place-knowledge-skill
 type: skill
 status: active
-created: "2026-05-28"
+created: '2026-05-28'
 owner: manu
 name: place-knowledge
-description: Onboard a repository to the knowledge-placement model — move its build/operate docs (ADRs, runbooks, troubleshooting, lessons) out of a personal knowledge store into the repo's `docs/`, leaving the store with only the cross-project brain. Triggers on "/place-knowledge", "onboard <repo> to the placement model", "migrate knowledge to repo docs", "move ADRs/lessons/runbooks out of the vault", "make this repo's docs self-contained / share-ready". Implements pattern-knowledge-placement; runs the onboard-project-to-placement-model runbook. Validated on 11 repos (KPM-001, 2026-05-28).
+description: Onboard a repository to the knowledge-placement model — move its build/operate
+  docs (ADRs, runbooks, troubleshooting, lessons) out of a personal knowledge store
+  into the repo's `docs/`, leaving the store with only the cross-project brain. Triggers
+  on "/place-knowledge", "onboard <repo> to the placement model", "migrate knowledge
+  to repo docs", "move ADRs/lessons/runbooks out of the vault", "make this repo's
+  docs self-contained / share-ready". Implements pattern-knowledge-placement; runs
+  the onboard-project-to-placement-model runbook. Validated on 11 repos (KPM-001,
+  2026-05-28).
+keywords: [place knowledge, knowledge placement, onboard placement model, migrate
+    docs, mover adrs]
+paths: [docs/**, 00_meta/**]
 ---
-
 # Skill: place-knowledge
 
 > Operationalizes [[pattern-knowledge-placement]] via the runbook [[onboard-project-to-placement-model]]. One repo per invocation.
@@ -34,8 +43,8 @@ description: Onboard a repository to the knowledge-placement model — move its 
 Follow [[onboard-project-to-placement-model]] exactly. Summary:
 
 1. **Branch from fresh `origin/<default>`** (never current HEAD — avoids sweeping another session's WIP). Verify `git log origin/<default>..HEAD` is empty before starting.
-2. Create `docs/{adr,architecture,runbooks,troubleshooting}` (only buckets with content).
-3. Copy per the placement map: ADRs (`30-architecture/**/adr-*.md` or numbered `NNN-*.md`) -> `docs/adr/`; non-ADR architecture -> `docs/architecture/` (preserve subdirs); `40-resources/` or legacy `40-runbooks/` -> `docs/runbooks/`; `50-*` -> `docs/troubleshooting/`; `60-resources/` -> `docs/`; images -> `docs/architecture/<subdir>/`. **Do NOT carry `_index.md` mirrors across** (the repo `docs/` self-indexes). Collapse any legacy per-subfolder `30/40/50` `_index.md` into ONE thin project `_index.md` pointing at `docs/` — see runbook § Store-side index.
+2. Create `docs/{adr,architecture,lessons,runbooks,troubleshooting}` (only buckets with content, with modular `_index.md` index files).
+3. Copy per the placement map: ADRs (`30-architecture/**/adr-*.md` or numbered `NNN-*.md`) -> `docs/adr/`; non-ADR architecture -> `docs/architecture/` (preserve subdirs); lessons -> `docs/lessons/lesson-NNN-<slug>.md` + `docs/lessons/_index.md` (legacy fallback: `docs/lessons.md`); `40-resources/` or legacy `40-runbooks/` -> `docs/runbooks/`; `50-*` -> `docs/troubleshooting/`; `60-resources/` -> `docs/`; images -> `docs/architecture/<subdir>/`. **Do NOT carry `_index.md` mirrors across** (the repo `docs/` self-indexes). Collapse any legacy per-subfolder `30/40/50` `_index.md` into ONE thin project `_index.md` pointing at `docs/` — see runbook § Store-side index.
 4. **Rewrite cross-refs** (the crux): to an artifact that ALSO moved -> relative repo path; to one that STAYS in the store -> plain-text provenance, **NO live link** (directionality invariant). Skip code fences/inline code (don't corrupt bash `[[ ]]` / TOML `[[x]]`).
 5. Add `docs/README.md` index. Re-point the repo README + agent file (`AGENTS.md`/`CLAUDE.md`) to `docs/`; delete repo->store paths.
 6. **Stub the store side**: overwrite each moved `.md` in place with a pointer stub (same basename) so inbound `[[wikilinks]]` resolve. Update the project `context` to state docs moved to the repo.

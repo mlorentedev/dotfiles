@@ -1,16 +1,20 @@
 ---
 generated: true
 generated_from: 00_meta/skills/writing-plans/SKILL.md
-generated_sha: 9fc966e27f0395f7
+generated_sha: c87ac708f64a46af
 id: writing-plans-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code. Use after brainstorming or requirements gathering to create an actionable implementation plan.
+description: Use when you have a spec or requirements for a multi-step task, before
+  touching code. Use after brainstorming or requirements gathering to create an actionable
+  implementation plan.
+keywords: [writing plans, implementation plan, plan implementation, crear plan, redactar
+    plan]
+paths: ['**/plan*.md']
 ---
-
 # Writing Plans
 
 Create implementation plans assuming the engineer has zero codebase context. Document everything needed: files to touch, code, testing, verification steps.

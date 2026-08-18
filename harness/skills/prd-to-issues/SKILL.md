@@ -1,16 +1,18 @@
 ---
 generated: true
 generated_from: 00_meta/skills/prd-to-issues/SKILL.md
-generated_sha: d2e5d93b7c0cfa45
+generated_sha: fbd3a700210d814a
 id: prd-to-issues-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: prd-to-issues
-description: Use when creating GitHub issues from a PRD, syncing an existing PRD to GitHub, or converting requirements documents into tracked issues.
+description: Use when creating GitHub issues from a PRD, syncing an existing PRD to
+  GitHub, or converting requirements documents into tracked issues.
+keywords: [prd to issues, convert prd, requirements to tickets, sync prd]
+paths: ['**/prd*.md', '**/requirements*.md']
 ---
-
 # PRD to GitHub Issues
 
 Convert a PRD into GitHub issues (epics + stories/tasks) using the `gh` CLI. Supports initial creation and re-sync when the PRD changes.

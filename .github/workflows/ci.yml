@@ -78,10 +78,50 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install age
+      # age comes from the pinned release, not apt — the same reasoning the
+      # Windows job below already applies (BUG-025), arrived at here for a second
+      # reason as well.
+      #
+      # 1. It did not honour the pin. versions.conf says AGE_VERSION=1.3.1;
+      #    `apt-get install age` on ubuntu-24.04 gives 1.1.1, so the Linux suite
+      #    had never once exercised the version this repo declares — for the tool
+      #    that decrypts every secret. Windows tested 1.3.1 and Linux tested
+      #    1.1.1, from one line of the same manifest.
+      # 2. It was slow and getting slower, because it depends on an Ubuntu
+      #    mirror's throughput on the day. Measured 2026-08-18 on one PR: the
+      #    step took 10s, then 66s, then over three minutes on consecutive runs.
+      #    `Fetched 6615 kB in 39s (168 kB/s)` — the packages, not the work.
+      #    GitHub's release CDN is not that mirror.
+      #
+      # zsh still needs apt (not present on the runner image), so `update` stays
+      # for it — but it no longer gates the tool the secrets tests depend on.
+      - name: Install age (pinned release — honours AGE_VERSION, as Windows does)
+        run: |
+          # `. ./versions.conf`, never `. versions.conf`: a slashless argument to
+          # the source builtin is searched on $PATH only. bash falls back to the
+          # cwd and zsh does not, so the bare form silently yields an empty
+          # version and installs `@v`. Prohibited-pattern table, .claude/CLAUDE.md.
+          . ./versions.conf
+          [ -n "${AGE_VERSION:-}" ] || { echo "AGE_VERSION missing from versions.conf" >&2; exit 1; }
+          url="https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
+          curl -fsSL "$url" | tar xz
+          sudo install -m0755 age/age age/age-keygen /usr/local/bin/
+          rm -rf age
+          # Fail loudly here if the pin and the binary disagree, rather than
+          # letting the suite report on a version nobody asked for. This is the
+          # assertion whose absence let 1.1.1 run for months.
+          # Compare with a leading `v` stripped from BOTH sides: age prints
+          # `v1.3.1` but 1.2.1 printed `1.2.1`, so pinning the prefix would turn
+          # a correct install red the next time upstream changes its mind about
+          # it. The version is the claim; the `v` is punctuation.
+          got="$(age --version | sed 's/^v//')"
+          [ "$got" = "${AGE_VERSION#v}" ] || { echo "age is $got, expected ${AGE_VERSION#v}" >&2; exit 1; }
+          age-keygen --version >/dev/null
+
+      - name: Install zsh
         run: |
           sudo apt-get update
-          sudo apt-get install -y age zsh
+          sudo apt-get install -y --no-install-recommends zsh
 
       # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
       # is byte-identical to the shell oracle on the golden corpus (CLI-021). It

@@ -1,16 +1,20 @@
 ---
 generated: true
 generated_from: 00_meta/skills/test/SKILL.md
-generated_sha: 5226964b1b09c4b8
+generated_sha: 93e751f3e151daa9
 id: test-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: test
-description: Use when creating tests for functions, classes, or modules. Covers edge cases, failure modes, boundary conditions, and proper mocking. Supports pytest (Python), testing package (Go), vitest/jest (JS/TS), and built-in test (Rust).
+description: Use when creating tests for functions, classes, or modules. Covers edge
+  cases, failure modes, boundary conditions, and proper mocking. Supports pytest (Python),
+  testing package (Go), vitest/jest (JS/TS), and built-in test (Rust).
+keywords: [write test, unit test, integration test, pytest, go test, vitest, crear
+    test]
+paths: ['**/*test*', tests/**]
 ---
-
 # Test Generation
 
 Generate complete test file ready to run.

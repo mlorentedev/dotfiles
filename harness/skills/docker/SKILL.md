@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/docker/SKILL.md
-generated_sha: 2a019c5021743efd
+generated_sha: a0a7fc54d370f7b3
 id: docker-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: docker
-description: Use when containerizing applications, setting up local development environments, or creating multi-service Docker deployments.
+description: Use when containerizing applications, setting up local development environments,
+  or creating multi-service Docker deployments.
+keywords: [docker, dockerfile, container, compose, containerize, containerfile]
+paths: ['**/Dockerfile*', '**/Containerfile*', '**/docker-compose*.yml', '**/docker-compose*.yaml',
+  '**/compose.yaml']
 ---
-
 # Docker Configuration
 
 Generate `Dockerfile` and `docker-compose.yml`.

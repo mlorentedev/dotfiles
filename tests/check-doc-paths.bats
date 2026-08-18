@@ -119,7 +119,7 @@ governed_files() {
         printf 'Per-agent files live in `ai/<agent>/` directories.\n'
         printf 'Encrypt to `sensitive/KEYNAME.secret.age`.\n'
         printf 'Deployed to `~/.claude/skills/` at setup.\n'
-        printf 'Resolve via `$VAULT_PATH/00_meta/patterns/x.md`.\n'
+        printf 'Resolve via `$SOME_VAR/00_meta/patterns/x.md`.\n'
         printf 'Any `.sh` file must run under both shells.\n'
         printf 'The store index is `_index.md` over there.\n'
         printf 'See `https://example.com/a/b.md` for context.\n'
@@ -259,3 +259,40 @@ governed_files() {
     fi
     [ -z "$hits" ]
 }
+
+@test "check-doc-paths: catches a missing \$VAULT_PATH path when vault is present [#1043]" {
+    local fake_vault="$SCRATCH/vault"
+    mkdir -p "$fake_vault/00_meta/skills"
+    echo "content" > "$fake_vault/00_meta/skills/real.md"
+
+    cat <<'EOF' > "$SCRATCH/doc.md"
+Read `$VAULT_PATH/00_meta/skills/missing.md` for details.
+EOF
+
+    run env VAULT_PATH="$fake_vault" "$GUARD" "$SCRATCH/doc.md"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "referenced vault path does not exist" ]]
+}
+
+@test "check-doc-paths: accepts an existing \$VAULT_PATH path when vault is present [#1043]" {
+    local fake_vault="$SCRATCH/vault"
+    mkdir -p "$fake_vault/00_meta/skills"
+    echo "content" > "$fake_vault/00_meta/skills/real.md"
+
+    cat <<'EOF' > "$SCRATCH/doc.md"
+Read `$VAULT_PATH/00_meta/skills/real.md` for details.
+EOF
+
+    run env VAULT_PATH="$fake_vault" "$GUARD" "$SCRATCH/doc.md"
+    [ "$status" -eq 0 ]
+}
+
+@test "check-doc-paths: skips vault checks cleanly when VAULT_PATH is unset or non-existent [#1043]" {
+    cat <<'EOF' > "$SCRATCH/doc.md"
+Read `$VAULT_PATH/00_meta/skills/missing.md` for details.
+EOF
+
+    run env -u VAULT_PATH PATH="/usr/bin:/bin" "$GUARD" "$SCRATCH/doc.md"
+    [ "$status" -eq 0 ]
+}
+

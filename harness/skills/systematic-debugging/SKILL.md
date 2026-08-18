@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/systematic-debugging/SKILL.md
-generated_sha: 4073a48a21a67880
+generated_sha: cc1a04bb89eb2d75
 id: systematic-debugging-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: systematic-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
+description: Use when encountering any bug, test failure, or unexpected behavior,
+  before proposing fixes
+keywords: [debug, debugging, root cause, troubleshoot, investigate bug, diagnosticar
+    fallo]
+paths: [docs/troubleshooting/**]
 ---
-
 # Systematic Debugging
 
 ## Overview
@@ -150,30 +153,36 @@ You MUST complete each phase before proceeding to the next.
    - What settings, config, environment?
    - What assumptions does it make?
 
-### Phase 3: Hypothesis and Testing
+### Phase 3: Hypothesis and Falsification Tree (ASmartBear Framework)
 
-**Scientific method:**
+**Scientific method & Diagnostic Trees ([[pattern-socratic-diagnostic-trees]]):**
 
-1. **Form Single Hypothesis**
-   - State clearly: "I think X is the root cause because Y"
-   - Write it down
-   - Be specific, not vague
+1. **Construct a Falsifiable Hypothesis Tree**
+   - Formulate 2-4 mutually-exclusive hypotheses:
+     - $H_1$: Environmental / Config / Permissions failure.
+     - $H_2$: Logic / State / Edge-case mutation failure.
+     - $H_3$: Concurrency / Race / Timeout / Transport failure.
+   - State clearly: *"Hypothesis $H_i$: Root cause is X, which predicts observation Y."*
 
-2. **Test Minimally**
-   - Make the SMALLEST possible change to test hypothesis
-   - One variable at a time
-   - Don't fix multiple things at once
+2. **The 60-Second Discriminator Test**
+   - Design a lightweight discriminator command for each hypothesis (a specific `pytest -k`, `lsof`, `curl`, `sqlite3` query, or `grep`).
+   - Run the test **WITHOUT modifying application code**.
+   - *Rule:* **Refutation over confirmation.** A hypothesis is proven only when competing branches have been refuted by evidence.
 
-3. **Verify Before Continuing**
-   - Did it work? Yes → Phase 4
-   - Didn't work? Form NEW hypothesis
-   - DON'T add more fixes on top
+3. **Render the Evidence Matrix**
+   
+   | Hypothesis | Discriminator Command | Observed Output | Status |
+   |---|---|---|---|
+   | $H_1$: ... | `...` | `...` | **REFUTED** / **CONFIRMED** |
+   | $H_2$: ... | `...` | `...` | **REFUTED** / **CONFIRMED** |
 
-4. **When You Don't Know**
-   - Say "I don't understand X"
-   - Don't pretend to know
-   - Ask for help
-   - Research more
+4. **Verify Single Isolated Cause Before Proceeding**
+   - Once a single hypothesis is uniquely confirmed and all alternatives refuted, advance to Phase 4.
+   - If all hypotheses are refuted, step back to Phase 1 and instrument deeper boundaries.
+
+5. **When You Don't Know**
+   - Say: *"I don't understand X yet; running diagnostic probe Y to isolate it."*
+   - Never guess or apply speculative code edits.
 
 ### Phase 4: Implementation
 

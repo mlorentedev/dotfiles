@@ -1,16 +1,21 @@
 ---
 generated: true
 generated_from: 00_meta/skills/project-maturation/SKILL.md
-generated_sha: 47a4c382676c322e
+generated_sha: 7b5880a3ebccf31d
 id: project-maturation-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: project-maturation
-description: Use when a project needs a structured quality audit and improvement plan. Triggers include new projects needing hardening, repos with missing tests or CI, codebases before first release, or when technical debt has accumulated across multiple dimensions.
+description: Use when a project needs a structured quality audit and improvement plan.
+  Triggers include new projects needing hardening, repos with missing tests or CI,
+  codebases before first release, or when technical debt has accumulated across multiple
+  dimensions.
+keywords: [project maturation, hardening, codebase audit, quality audit, remediar
+    deuda]
+paths: []
 ---
-
 # Project Maturation
 
 Structured audit and improvement cycle for codebases. Detects stack, scores maturity across dimensions, generates a prioritized plan, and executes phase by phase.
@@ -126,7 +131,7 @@ Use `executing-plans` skill to implement phase by phase with checkpoints.
 ### Step 6 — Crystallize
 
 After completing all phases:
-- Log lessons learned to the repo's `docs/lessons.md` (project lessons live in the repo — see [[pattern-knowledge-placement]])
+- Log lessons learned to the repo's `docs/lessons/` (+ update `_index.md`) (project lessons live in the repo — see [[pattern-knowledge-placement]])
 - If new patterns emerged, propose for `00_meta/patterns/`
 
 ## Rules
