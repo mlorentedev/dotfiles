@@ -133,3 +133,15 @@ if 'workflow_run.head_sha' not in group:
           | sed -n 's/^\[[A-Z]*\] \([a-z]*\).*/\1/p' | head -1)
     [ "$got" = "declined" ] || { printf 'extractor produced "%s"\n' "$got" >&2; return 1; }
 }
+
+# AC6: promoting this gate to a required check has an order, and getting it
+# wrong blocks the repository. The order lives beside the thing it constrains
+# rather than in a ticket nobody reads at the moment of enabling it — and it
+# must name the STATUS, because requiring the check-run pins every PR to the
+# verdict computed seconds after it opened.
+@test "review-attestation: the required-check adoption order is documented here [AC6]" {
+    grep -q 'Require the commit status `review-attestation`, never the `attestation`' "$WF"
+    for step in 1047 1041 1052; do
+        grep -q "#$step" "$WF" || { printf 'adoption order does not name #%s\n' "$step" >&2; return 1; }
+    done
+}
