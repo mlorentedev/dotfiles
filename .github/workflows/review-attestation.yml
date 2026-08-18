@@ -8,9 +8,28 @@ name: review-attestation
 # available asserted the opposite of the truth. This job adds an honest one
 # beside it — it cannot change the vendor's own check status.
 #
-# NOT `required` in branch protection, deliberately and for now: landing it as
-# required would block every open PR the moment it merges. Adopt, observe,
-# promote separately.
+# NOT `required` in branch protection yet. Promoting it is a real step with a
+# real order, and getting the order wrong blocks the repository — so the order
+# lives here, next to the thing it constrains, rather than in a ticket nobody
+# reads at the moment of enabling it.
+#
+#   1. #1047  the classifier counts comment-shaped review output.        DONE
+#   2. #1041  a `pending` verdict stops freezing the check-run red.      DONE
+#   3. #1052  a `workflow_run` re-evaluates when the reviewer finishes.  DONE
+#   4. promote — and promote the STATUS, never the check-run.
+#
+# Require the commit status `review-attestation`, never the `attestation`
+# check-run. A check-run belongs to the run that created it and can never be
+# revised; requiring one would pin every PR to the verdict computed seconds
+# after it opened. The status is the revisable signal and the only one later
+# runs can correct.
+#
+# Steps 1-3 had to land first for a reason that is not sequencing hygiene: with
+# any of them missing, requiring this gate blocks correct PRs. Without 1 the
+# gate cannot see this repo's own reviewer; without 2 `attestation` is red on
+# every PR; without 3 the verdict never updates after the review lands. All
+# three are now on main, so step 4 is available — it is a repository setting,
+# not a code change, and it is the owner's to make.
 
 on:
   pull_request:
