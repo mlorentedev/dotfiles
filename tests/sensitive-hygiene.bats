@@ -16,7 +16,7 @@ setup() {
     # discusses the incident in prose -- a historical mention is not a live
     # dead reference, and the guard's job is to catch the latter.
     run git -C "$DOTFILES_DIR" grep -l "docs/SECRETS.md" -- . \
-        ':!tests/sensitive-hygiene.bats' ':!docs/lessons.md'
+        ':!tests/sensitive-hygiene.bats' ':!docs/lessons*'
     [ "$status" -ne 0 ]
 }
 

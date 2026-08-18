@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -122,6 +123,66 @@ func TestIDPatternProseMatchesCode(t *testing.T) {
 		filepath.Join("templates", "agents-spec-section.md"),
 	} {
 		check("vault 00_meta/"+filepath.ToSlash(rel), filepath.Join(metaDir, rel))
+	}
+}
+
+// TestSpecSubcommandsProseMatchesCode asserts that every `dotf spec <cmd>`
+// subcommand referenced in AGENTS.md actually exists in the CLI command tree (DOCS-013).
+func TestSpecSubcommandsProseMatchesCode(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root, err := RepoRoot(wd)
+	if err != nil {
+		t.Fatalf("locate repo root: %v", err)
+	}
+
+	agentsMD, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+
+	// Canonical subcommands supported by `dotf spec`
+	knownSubcommands := map[string]bool{
+		"init":    true,
+		"review":  true,
+		"archive": true,
+	}
+
+	content := string(agentsMD)
+
+	// 1. Check direct invocations like `dotf spec <cmd>`
+	reDirect := regexp.MustCompile(`dotf spec\s+([a-z0-9-]+)`)
+	matchesDirect := reDirect.FindAllStringSubmatch(content, -1)
+	if len(matchesDirect) == 0 {
+		t.Fatalf("no `dotf spec <cmd>` invocations found in AGENTS.md — section may be missing")
+	}
+	for _, m := range matchesDirect {
+		subcmd := m[1]
+		if !knownSubcommands[subcmd] {
+			t.Errorf("AGENTS.md direct invocation references non-existent CLI subcommand `dotf spec %s`.\n"+
+				"Known subcommands: init, review, archive.\n"+
+				"If `%s` is a conversational skill step, document it as `/spec %s`, not `dotf spec %s`.",
+				subcmd, subcmd, subcmd, subcmd)
+		}
+	}
+
+	// 2. Check introductory list: "[CLI] [sS]ubcommands via `dotf spec …` ...: `init` ..., `review` ..., `archive` ..."
+	reIntro := regexp.MustCompile(`(?i)(?:CLI\s+)?subcommands via ` + "`" + `dotf spec [^` + "`" + `]+` + "`" + `[^:]*:\s*([^.\n]+)`)
+	if introMatch := reIntro.FindStringSubmatch(content); len(introMatch) > 1 {
+		reSub := regexp.MustCompile("`([a-z0-9-]+)`")
+		for _, sm := range reSub.FindAllStringSubmatch(introMatch[1], -1) {
+			subcmd := sm[1]
+			if !knownSubcommands[subcmd] {
+				t.Errorf("AGENTS.md introductory list claims `dotf spec %s` exists, but `%s` is not a binary subcommand.\n"+
+					"Known binary subcommands: init, review, archive.\n"+
+					"If `%s` is a conversational skill step, document it as `/spec %s`.",
+					subcmd, subcmd, subcmd, subcmd)
+			}
+		}
+	} else {
+		t.Errorf("AGENTS.md missing introductory `[CLI] subcommands via \\`dotf spec …\\`:` sentence")
 	}
 }
 

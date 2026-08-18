@@ -19,14 +19,14 @@ func TestScaffoldCreatesStructureAndFiles(t *testing.T) {
 		t.Fatalf("Scaffold: %v", err)
 	}
 
-	wantDirs := []string{"src", "tests", "scripts", "specs", "docs/adr", "docs/runbooks", "docs/troubleshooting", ".claude"}
+	wantDirs := []string{"src", "tests", "scripts", "specs", "docs/adr", "docs/lessons", "docs/runbooks", "docs/troubleshooting", ".claude"}
 	for _, d := range wantDirs {
 		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(d))); err != nil || !info.IsDir() {
 			t.Errorf("expected directory %s: %v", d, err)
 		}
 	}
 
-	wantFiles := []string{".gitignore", ".pre-commit-config.yaml", "CLAUDE.md", "env-contract.json", "docs/lessons.md"}
+	wantFiles := []string{".gitignore", ".pre-commit-config.yaml", "CLAUDE.md", "env-contract.json", "docs/lessons/_index.md"}
 	for _, f := range wantFiles {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(f))); err != nil {
 			t.Errorf("expected file %s: %v", f, err)
@@ -42,13 +42,13 @@ func TestScaffoldCreatesStructureAndFiles(t *testing.T) {
 		t.Errorf("CLAUDE.md should point at AGENTS.md:\n%s", claude)
 	}
 
-	// {{repo}} is substituted with the repo basename in lessons.md.
-	lessons := readFile(t, filepath.Join(root, "docs", "lessons.md"))
+	// {{repo}} is substituted with the repo basename in lessons index.
+	lessons := readFile(t, filepath.Join(root, "docs", "lessons", "_index.md"))
 	if strings.Contains(lessons, "{{repo}}") {
-		t.Errorf("lessons.md still contains the {{repo}} placeholder:\n%s", lessons)
+		t.Errorf("lessons _index.md still contains the {{repo}} placeholder:\n%s", lessons)
 	}
 	if !strings.Contains(lessons, "myproj") {
-		t.Errorf("lessons.md should mention the repo name 'myproj':\n%s", lessons)
+		t.Errorf("lessons _index.md should mention the repo name 'myproj':\n%s", lessons)
 	}
 }
 

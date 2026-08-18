@@ -1,0 +1,20 @@
+---
+id: lesson-202-widening-a-shared-return-type-is-a-change-to-every
+type: lesson
+status: active
+created: "2026-08-14"
+owner: manu
+tags: [lesson, dotfiles]
+---
+
+# Lesson 202: Widening a shared return type is a change to every consumer, and Go's zero values hide the ones you missed
+
+**Context**: `Registry.Entries()` flattens `secrets/registry.yaml` into the `[]Entry` list that `run`, `show`, `render`, `migrate` and two `dotf doctor` sections all consume. It began life age-only, so every entry had a `File` (the `sensitive/<base>.secret.age` name). #606 added the Bitwarden backend and widened it into a tagged union: each entry now carries `Backend`, the Loader dispatches on it, and only the age variants populate `File`. A test, `TestRegistry_Entries_IncludesBwBackend`, pinned the new behaviour deliberately.
+
+**Problem**: nothing pinned the *consumers'* old assumption. `checkSecrets` had been written in #601 against the narrow type and asserted `sensitive/<e.File>.secret.age` for every entry; for a bw entry `File` is `""`, so it looked for `sensitive/.secret.age` — a path that cannot exist — and reported the secret as missing. Worse, it built its orphan index as `referenced[e.File]`, so bw entries registered the empty string instead of a name and every age blob belonging to a migrated secret read as unreferenced. Both halves were invisible for months because the registry contained no bw entries; the day #961 and #965 migrated 28, `dotf doctor` went from clean to **56 FAILs** at once, and the second half printed `orphan: … (no registry entry)` against the 28 age blobs that are the ADR-028 disaster-recovery floor for exactly the secrets that had just moved — a health check instructing its reader to delete the recovery path. The function's own comment asserted the opposite (*"bw-backed secrets carry no age blob, so Entries already skips them"*), true when written and false ever since. Sweeping the other callers found two more: the PAT-expiry check filters on `HasPrefix(e.File, "github.")`, so migrated PATs silently drop out of monitoring, and `render`'s duplicate-var fail-fast compares `prev.File != e.File`, which is `"" != ""` for any two bw entries and never fires.
+
+**Solution**: dispatch on the tag — `bw` exempted **by name**, rather than the age backends whitelisted, so `age-offline` keeps being asserted and a backend added later does not silently go unchecked. The orphan half could not simply be inverted: `migrate` deletes the `age:` line, so nothing records which blob belongs to which secret and the names do not correlate (`OPENAI_API_KEY` is backed by `chatgpt.api-key.secret.age`). Rather than guess with a basename heuristic, it degrades to one WARN that states it cannot classify the set and says why — regaining per-blob FAIL severity once the registry records a DR pointer (#971). The guard is a fixture mixing `age`, `age-offline` and `bw` plus an unclaimed blob; three mutants — removing the dispatch, whitelisting `age`, reverting the orphan severity — each turn it red when run against that test alone.
+
+**Rule**: when you widen a shared type — a new enum variant, a nullable field, a union tag — the change is not done when the producer and its own test are green. Grep every consumer and ask what each does with the fields the new variant leaves empty. In Go there is no exhaustiveness check and no non-null type, so a missed consumer does not fail to compile and does not panic: it reads a zero value and behaves plausibly, which is why this shipped months before it was reachable. Two corollaries. A comment describing a collaborator's behaviour is a claim with no test behind it — when it says "X already handles this", verify X still does, because the comment does not move when X does. And a bug that requires data the system does not yet hold is not dormant but harmless; it is scheduled, and it lands in a batch on the day the data arrives, which is the worst day to be reading a health check that has never been wrong before.
+
+**Tags**: `go`, `secrets`, `verification`, `refactoring`, `type-safety`

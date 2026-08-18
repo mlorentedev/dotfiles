@@ -127,6 +127,30 @@ stubs_a_binary() {
     fi
 }
 
+@test "the documented exemption table matches the list the code reads" {
+    # The comment table above EXEMPT_SUITES is a THIRD copy of this fact. The
+    # header narrates a drift between the first two (exempt() and the stale-entries
+    # loop) and fixed it by single-sourcing them to EXEMPT_SUITES — but the
+    # human-readable table stayed a parallel copy with nothing comparing them.
+    #
+    # It is the only copy a reader consults, so a drift here does not disable the
+    # guard, it misinforms the person deciding whether to add a row. Measured in
+    # sync when this was written; that is exactly when to pin it.
+    local documented authoritative
+    documented=$(sed -n '/^#   bitacora-reconcile/,/^EXEMPT_SUITES=/p' "$TESTS/stub-real-pairing.bats" \
+        | grep -oE '^#   [a-z][a-z0-9-]+' | awk '{print $2}' | sort -u)
+    # Split explicitly, never by unquoted expansion: zsh does not word-split an
+    # unquoted parameter, so `for x in $VAR` yields ONE field there and N in bash.
+    # That is a row in this repo's prohibited-pattern table, and it fails silently
+    # — an empty or single-element result reads as agreement.
+    authoritative=$(printf '%s' "$EXEMPT_SUITES" | tr ' \n' '\n\n' | grep -v '^$' | sort -u)
+    if [ "$documented" != "$authoritative" ]; then
+        printf 'The documented table and EXEMPT_SUITES disagree:\n' >&2
+        diff <(printf '%s\n' "$documented") <(printf '%s\n' "$authoritative") >&2
+        return 1
+    fi
+}
+
 @test "the exemption list has no stale entries" {
     # An exemption that no longer applies is worse than none: it silently grants
     # cover to a suite that has since grown a real sibling, or to one that no

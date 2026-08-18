@@ -88,6 +88,46 @@ dotf spec init <spec-id> --issue <N> # scaffold a feature spec gated on an open 
 dotf spec review <spec-id>          # launch detached adversarial review in tmux
 dotf spec archive <spec-id>         # archive spec upon successful independent review
 ```
+Alias to `scripts/shell-profile.sh`. Diagnostic tool — use when interactive shell startup feels >300ms (Linux baseline ~100-150ms with current `.zshrc` + plugins).
+
+### Running knowledge crystallization
+
+```bash
+# Weekly: read-only audit — what needs attention?
+/insights
+
+# When insights shows unvaulted observations or stale MEMORY.md:
+/crystallize
+
+# Automated MEMORY.md date maintenance (post-sprint or in CI):
+./scripts/knowledge-crystallize.sh
+
+# All projects at once (auto-discovers from ~/.claude/projects/):
+./scripts/knowledge-crystallize.sh --all
+
+# For a specific project:
+./scripts/knowledge-crystallize.sh ~/Projects/kubelab
+```
+
+See runbook: `docs/runbooks/guide-knowledge-distillation.md`
+
+### Using opencode (AI coding agent — primary daily after PR2)
+```bash
+oc                    # TUI launcher (opencode Go subscription, $10/mo fixed)
+qq "tu pregunta"      # one-shot quick-question via opencode-go/qwen3.6-plus (bash/zsh/pwsh)
+```
+- Default TUI model: DeepSeek V4 Pro (Go catalog). A/B candidate: Kimi K2.6 — selectable via `/models` in TUI.
+- `qq` wrapper pinned to `opencode-go/qwen3.6-plus` (multilingual, fast, never-rate-limited). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`. Cross-platform name is `qq` (not `??`) because PowerShell 7+ reserves `??` as null-coalescing operator.
+- Frontier on-demand: provider `openrouter` (consumes existing `OPENROUTER_API_KEY` $5 credit).
+- First-time setup: launch `oc`, run `/connect` → select **OpenCode Go**, paste API key from opencode.ai/zen.
+- 3-layer PAYG guardrail: (1) `opencode.jsonc` lists only Go models, (2) Zen workspace cap $0, (3) no payment method for PAYG. Runbook: `docs/runbooks/guide-opencode-go-setup.md`.
+- Config: `ai/opencode/opencode.jsonc` → `~/.config/opencode/opencode.jsonc` (deployed by `setup-linux.sh`).
+- ⚠ Coexistence constraint: don't run `oc` and `claude` in parallel on the same repo until hive MCP adds a lock-file to its auto-commit.
+
+### Modifying setup scripts
+1. Edit both `setup-linux.sh` AND `setup-windows.ps1` if the change is cross-platform
+2. Test Linux changes by running relevant sections (MCP registration, config deployment)
+3. Verify Windows parity: same MCP servers, same configs deployed
 
 ## Self-Verification Loop
 

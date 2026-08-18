@@ -21,6 +21,20 @@
     "`declined` — still red, so marker drift degrades the MESSAGE and never the",
     "verdict.",
     "",
+    "`review_markers` are the strings identifying a reviewer's comment-shaped",
+    "review output, for a reviewer that does not use the reviews API. PR-Agent",
+    "(#786) runs under GITHUB_TOKEN as github-actions and publishes through the",
+    "COMMENTS api, so its reviews never enter reviews[] and the gate read every",
+    "PR-Agent-reviewed PR as unattested (#1045). Empty for a reviewer that files",
+    "proper reviews: CodeRabbit's auto-summary comment is not a review, and must",
+    "not attest.",
+    "",
+    "Logins are matched with a trailing `[bot]` stripped and case folded, because",
+    "the two GitHub APIs disagree: `gh pr view --json comments` (GraphQL) returns",
+    "`github-actions`, `/issues/N/comments` (REST) returns `github-actions[bot]`.",
+    "The classifier reads GraphQL; fixtures have been written both ways. Matching",
+    "the raw string made the gate depend on which API produced the payload (#1033).",
+    "",
     "Note what is NOT here: any notion of which models may review. That policy",
     "lives in harness/reviewer-pool.json and governs the SPEC-level adversarial",
     "review, a different gate with a different purpose. The two are deliberately",
@@ -35,7 +49,16 @@
       "declined_markers": [
         "rate limited by coderabbit.ai"
       ],
-      "why": "Free tier, ~1 review/hour account-wide. On 2026-08-16 PRs #1007, #1009 and #1013 each carried this notice simultaneously, with zero reviews between them, while `gh pr checks` reported `CodeRabbit  pass`. Neither pushing new commits nor an explicit `@coderabbitai review` reclaims a slot while the quota is spent — measured, both."
+      "why": "Free tier, ~1 review/hour account-wide. On 2026-08-16 PRs #1007, #1009 and #1013 each carried this notice simultaneously, with zero reviews between them, while `gh pr checks` reported `CodeRabbit  pass`. Neither pushing new commits nor an explicit `@coderabbitai review` reclaims a slot while the quota is spent — measured, both.",
+      "review_markers": []
+    },
+    {
+      "login": "github-actions",
+      "declined_markers": [],
+      "review_markers": [
+        "## PR Reviewer Guide"
+      ],
+      "why": "PR-Agent (TOOL-013, #786/#1032) posts as github-actions via GITHUB_TOKEN and publishes through the comments API, not the reviews API — so reviews[] is empty on a PR it genuinely reviewed. Measured on #1037 (Guide at 00:05:21) and #1042 (00:16:58), both reading `reviews[]: 0`. The marker is the `review` command's own heading; `## PR Code Suggestions` (the `improve` command) is deliberately NOT here — suggestions are not a review."
     }
   ],
   "escape": {

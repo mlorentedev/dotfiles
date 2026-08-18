@@ -1,0 +1,16 @@
+[
+  {
+    "id": "HARNESS-074-f1-doctrine-probe-exists",
+    "behavior": "doctor runs checkDeployedDoctrine to verify enforced regions reached deployed targets",
+    "verification": "cd cli && go test -count=1 -run TestCheckDeployedDoctrine ./internal/doctor/...",
+    "state": "passing",
+    "evidence": "Exit code 0: TestCheckDeployedDoctrine passes, verifying all deployed doctrine payloads contain declared enforced regions"
+  },
+  {
+    "id": "HARNESS-074-f2-doctrine-mutation",
+    "behavior": "doctor fails when an enforced region is omitted from a deployed surface",
+    "verification": "cd cli && go test -count=1 -run TestCheckDeployedDoctrine_MissingRegion ./internal/doctor/...",
+    "state": "passing",
+    "evidence": "Exit code 0: TestCheckDeployedDoctrine_MissingRegion passes, asserting doctor fails and cites missing region and surface"
+  }
+]

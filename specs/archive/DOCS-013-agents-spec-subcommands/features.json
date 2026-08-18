@@ -1,0 +1,16 @@
+[
+  {
+    "id": "DOCS-013-f1-prose-accuracy",
+    "behavior": "AGENTS.md documents dotf spec init, review, archive without claiming nonexistent subcommands like fill",
+    "verification": "grep -q 'dotf spec init' AGENTS.md && grep -q 'dotf spec review' AGENTS.md && grep -q 'dotf spec archive' AGENTS.md && ! grep -q 'dotf spec fill' AGENTS.md",
+    "state": "passing",
+    "evidence": "Exit code 0: AGENTS.md contains dotf spec init, review, archive and does not contain dotf spec fill"
+  },
+  {
+    "id": "DOCS-013-f2-drift-test",
+    "behavior": "TestSpecSubcommandsProseMatchesCode asserts every dotf spec subcommand in AGENTS.md exists in the binary",
+    "verification": "cd cli && go test -count=1 -run TestSpecSubcommandsProseMatchesCode ./internal/spec/...",
+    "state": "passing",
+    "evidence": "Exit code 0: TestSpecSubcommandsProseMatchesCode passed, asserting all documented CLI subcommands exist in Go Cobra tree"
+  }
+]

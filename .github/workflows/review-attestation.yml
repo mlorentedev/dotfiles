@@ -23,6 +23,22 @@ on:
   # by itself without anyone pushing.
   issue_comment:
     types: [created, edited]
+  # The trigger `issue_comment` cannot be. GitHub suppresses workflow events for
+  # comments created with GITHUB_TOKEN, to stop workflows retriggering
+  # themselves — and PR-Agent, the reviewer this repo shipped so CodeRabbit's
+  # quota would stop gating throughput, publishes with GITHUB_TOKEN. Measured
+  # 2026-08-18: its two comments on #1047 triggered ZERO runs here, while two
+  # human comments on other PRs each triggered one within three seconds. So on
+  # a PR where PR-Agent is the only reviewer — CodeRabbit rate-limited, this
+  # repo's ordinary state — the verdict is computed seconds after the PR opens,
+  # the review lands about ninety seconds later, and nothing ever re-asks.
+  #
+  # `workflow_run` is not a comment event and is outside that suppression.
+  # Note it only fires for the copy of this file on the DEFAULT BRANCH, so it
+  # cannot be exercised by the pull request that introduces it (#1052 AC1).
+  workflow_run:
+    workflows: [pr-agent]
+    types: [completed]
 
 concurrency:
   # Same reasoning as spec-gate.yml (BUG-066): metadata-only events must not
@@ -30,7 +46,12 @@ concurrency:
   # label and the body section — which fire `labeled` and `edited` within the
   # same second, and under an unconditional cancel they raced into cancelling
   # each other, leaving a stale failure as the visible check.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  # The workflow_run fallback is load-bearing, not defensive. A workflow_run
+  # payload carries neither number, so without it every such run collapses
+  # into ONE group keyed on the empty string, and `completed` is not in the
+  # exempt list below — so a reviewer finishing on one PR would cancel the
+  # re-evaluation of another. That is the defect #1040 was, one workflow over.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.head_sha }}
   cancel-in-progress: ${{ !contains(fromJSON('["labeled", "unlabeled", "edited", "created"]'), github.event.action) }}
 
 permissions:
@@ -49,7 +70,7 @@ jobs:
   attestation:
     # issue_comment fires on issues too; only pull requests have a review state
     # to attest to.
-    if: github.event_name == 'pull_request' || github.event.issue.pull_request
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request || github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     steps:
       # Pinned to the BASE branch, never the PR's head. Without this the job
@@ -67,8 +88,42 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
 
+      # A workflow_run payload carries neither `pull_request.number` nor
+      # `issue.number`, so the expression the other two triggers use evaluates to
+      # the empty string. Resolving the pull request from the run's head SHA is
+      # the substance of that trigger, not a detail: a gate that re-evaluates the
+      # WRONG pull request is worse than one that does not re-evaluate at all,
+      # because it publishes a confident verdict about a change nobody reviewed.
+      #
+      # Filtered to OPEN pull requests. A head SHA can belong to several — a
+      # merged one and a later branch reusing it — and attesting a closed PR is
+      # noise at best. When none is open there is nothing to attest, which is a
+      # normal outcome (pr-agent also runs on pushes to branches without a PR)
+      # and is reported rather than failed.
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIRECT: ${{ github.event.pull_request.number || github.event.issue.number }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -n "$DIRECT" ]; then
+            echo "number=$DIRECT" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          number=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RUN_SHA}/pulls" \
+                     --jq 'map(select(.state == "open")) | .[0].number // empty')
+          if [ -z "$number" ]; then
+            echo "no open pull request for ${RUN_SHA} — nothing to attest"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "re-evaluating PR #${number} because the reviewer finished"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
       - name: Check review attestation
         id: attest
+        if: steps.pr.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           # Through `env:` and quoted at the use site, never interpolated into
@@ -76,7 +131,7 @@ jobs:
           # attacker-supplied text, so this is belt-and-braces — but the habit is
           # what keeps a future edit from reaching for `.title` or `.body` the
           # same way and meaning it.
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         # No `continue-on-error`: a red check here is the entire product. The
         # script itself distinguishes 1 (not reviewed, and not declared) from 2
         # (could not determine), and both are failures — "could not determine"
@@ -109,10 +164,17 @@ jobs:
             echo "code=$code"
             echo "sha=$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)"
             echo "summary=$(head -1 /tmp/attest.out | cut -c1-130)"
+            # The verdict KIND, from the script's own structured prefix rather
+            # than from prose. `[FAIL] pending` and `[FAIL] declined` both exit
+            # 1, and the next step needs to tell them apart. Guarded: a test
+            # asserts the script still emits these tokens, so the coupling
+            # cannot rot silently into a matcher that matches nothing.
+            echo "kind=$(sed -n 's/^\[[A-Z]*\] \([a-z]*\).*/\1/p' /tmp/attest.out | head -1)"
           } >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Publish the verdict onto the PR head
+        if: steps.pr.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.attest.outputs.sha }}
@@ -131,9 +193,12 @@ jobs:
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >/dev/null
 
       - name: Fail the run when the PR is not attested
+        if: steps.pr.outputs.skip != 'true'
         env:
           CODE: ${{ steps.attest.outputs.code }}
           SUMMARY: ${{ steps.attest.outputs.summary }}
+          KIND: ${{ steps.attest.outputs.kind }}
+          EVENT: ${{ github.event_name }}
         # The verdict is repeated here, not just in the step that computed it.
         # A bare `exit "$CODE"` made the RED step say nothing: the diagnostic sat
         # in an earlier, green step, so anyone opening the failure saw an exit
@@ -146,6 +211,29 @@ jobs:
         # #988's error path discarding HTTP 500 and surfacing `invalid character
         # 'I'`: the diagnostic threw away the diagnosis.
         run: |
+          # `pending` on the pull_request path is not a finding, and treating it
+          # as one is #1041. A check-run belongs to the run that created it and
+          # can never be updated; runs from issue_comment and workflow_run attach
+          # to the DEFAULT BRANCH, so they cannot revise it either. The
+          # pull_request run fires seconds after the PR opens, when no reviewer
+          # has posted and the only possible verdict is `pending` — so this
+          # check-run froze red on every correct PR, permanently, and taught its
+          # readers to scroll past the attestation line. A gate whose normal
+          # state is red has stopped being a gate.
+          #
+          # The verdict itself is not softened: it is published to the
+          # `review-attestation` COMMIT STATUS above, which any later run can
+          # revise and which is the signal branch protection must require.
+          # `declined` still fails here and immediately, because a reviewer
+          # saying it could not review is actionable the moment it is said.
+          if [ "$CODE" != "0" ] && [ "$KIND" = "pending" ] && [ "$EVENT" = "pull_request" ]; then
+            echo "$SUMMARY"
+            echo
+            echo "Not failed here: no reviewer has posted yet, which is the expected"
+            echo "state this early. The verdict lives on the 'review-attestation'"
+            echo "commit status, which later runs revise as reviewers arrive."
+            exit 0
+          fi
           if [ "$CODE" != "0" ]; then
             echo "::error title=Review attestation::$SUMMARY"
             echo "$SUMMARY"
