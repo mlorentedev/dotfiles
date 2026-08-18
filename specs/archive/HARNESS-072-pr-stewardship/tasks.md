@@ -42,10 +42,21 @@ under an assertion that would have caught a partial injection, not after one.
 - [x] Every acceptance criterion has a matching entry in `features.json`
 - [x] Lint passes (`shellcheck scripts/compile-harness.sh`, `bash -n`)
 - [x] Tests pass (`bats tests/compile-harness.bats` — 47/47)
-- [x] No unrelated changes in the diff — the record sync is its own commit
+- [x] No unrelated *feature* changes in the diff — the record sync is its own
+      commit, and six unrelated drifted records were kept out at `b678103`.
+      Corrected after round-2 review, which showed the original wording ("no
+      unrelated changes") was not true of the diff: four generated records rode
+      along as unavoidable vault-drift syncs —
+      `harness/skills/dispatching-parallel-agents/SKILL.md` (a 16-line
+      reconciliation block, substantive content unrelated to PR stewardship),
+      `harness/agents/curator/AGENT.md` (owner field), and frontmatter on
+      `harness/skills/systematic-debugging/{defense-in-depth,root-cause-tracing}.md`.
+      They are generated files whose vault sources had drifted, so `--refresh`
+      emits them whether or not this change wants them; the claim was inaccurate,
+      not the diff.
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-- [ ] Adversarial review passes before archive (`dotf spec review HARNESS-072-pr-stewardship`)
+- [x] PR opened referencing this spec folder (#986, merged at `62d2e84`)
+- [x] Adversarial review passes before archive (`dotf spec review HARNESS-072-pr-stewardship`)
 
 ## Machine-readable features
 
