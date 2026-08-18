@@ -206,3 +206,53 @@ func TestLoadTriggers(t *testing.T) {
 		t.Fatalf("unexpected custom config: %+v", customCfg)
 	}
 }
+
+func TestMatchPrompt(t *testing.T) {
+	rules := []TriggerRule{
+		{
+			ID:       "spec",
+			Pattern:  "pattern-spec-driven-development",
+			Skills:   []string{"spec", "adversarial-review"},
+			Keywords: []string{"spec", "sdd", "proposal", "criterio de aceptacion"},
+		},
+		{
+			ID:       "docker",
+			Pattern:  "pattern-container-workflow",
+			Skills:   []string{"docker"},
+			Keywords: []string{"docker", "container", "compose", "contenedor"},
+		},
+	}
+
+	tests := []struct {
+		prompt   string
+		wantPats []string
+		wantSk   []string
+	}{
+		{
+			prompt:   "ayudame a redactar una proposal para el nuevo endpoint",
+			wantPats: []string{"pattern-spec-driven-development"},
+			wantSk:   []string{"adversarial-review", "spec"},
+		},
+		{
+			prompt:   "crea un contenedor docker con go y redis",
+			wantPats: []string{"pattern-container-workflow"},
+			wantSk:   []string{"docker"},
+		},
+		{
+			prompt:   "una consulta general sobre la base de datos",
+			wantPats: []string{},
+			wantSk:   []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		gotPats, gotSk := MatchPrompt(rules, tt.prompt)
+		if !reflect.DeepEqual(gotPats, tt.wantPats) {
+			t.Errorf("MatchPrompt(%q) patterns = %v; want %v", tt.prompt, gotPats, tt.wantPats)
+		}
+		if !reflect.DeepEqual(gotSk, tt.wantSk) {
+			t.Errorf("MatchPrompt(%q) skills = %v; want %v", tt.prompt, gotSk, tt.wantSk)
+		}
+	}
+}
+

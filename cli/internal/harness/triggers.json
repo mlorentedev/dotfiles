@@ -8,7 +8,19 @@
         "specs/**",
         "**/specs/**"
       ],
-      "description": "Triggered when modifying specification documents"
+      "description": "Triggered when modifying specification documents",
+      "skills": [
+        "spec",
+        "adversarial-review"
+      ],
+      "keywords": [
+        "spec",
+        "sdd",
+        "rdd",
+        "proposal",
+        "criterios de aceptacion",
+        "acceptance criteria"
+      ]
     },
     {
       "id": "container-workflow",
@@ -27,7 +39,17 @@
         "compose.yml",
         "**/compose.yml"
       ],
-      "description": "Triggered when modifying container definitions or Dockerfiles"
+      "description": "Triggered when modifying container definitions or Dockerfiles",
+      "skills": [
+        "docker"
+      ],
+      "keywords": [
+        "docker",
+        "container",
+        "compose",
+        "contenedor",
+        "dockerfile"
+      ]
     },
     {
       "id": "testing-standards",
@@ -38,7 +60,19 @@
         "tests/**",
         "**/tests/**"
       ],
-      "description": "Triggered when modifying test files or test suites"
+      "description": "Triggered when modifying test files or test suites",
+      "skills": [
+        "test",
+        "test-driven-development"
+      ],
+      "keywords": [
+        "test",
+        "tdd",
+        "unit test",
+        "integration test",
+        "pytest",
+        "go test"
+      ]
     },
     {
       "id": "git-workflow",
@@ -49,7 +83,19 @@
         ".gitattributes",
         ".gitignore"
       ],
-      "description": "Triggered when modifying git workflows and configurations"
+      "description": "Triggered when modifying git workflows and configurations",
+      "skills": [
+        "using-git-worktrees",
+        "pr-review-triage"
+      ],
+      "keywords": [
+        "git",
+        "github",
+        "worktree",
+        "branch",
+        "pull request",
+        "pr"
+      ]
     },
     {
       "id": "python-cli",
@@ -60,7 +106,17 @@
         "requirements*.txt",
         "uv.lock"
       ],
-      "description": "Triggered when modifying Python packaging or dependencies"
+      "description": "Triggered when modifying Python packaging or dependencies",
+      "skills": [
+        "async-python-patterns"
+      ],
+      "keywords": [
+        "python",
+        "typer",
+        "rich",
+        "fastapi",
+        "asyncio"
+      ]
     },
     {
       "id": "shell-standards",
@@ -71,7 +127,16 @@
         "*.bash",
         "**/*.bash"
       ],
-      "description": "Triggered when modifying shell scripts"
+      "description": "Triggered when modifying shell scripts",
+      "skills": [],
+      "keywords": [
+        "bash",
+        "sh",
+        "posix",
+        "shell",
+        "powershell",
+        "pwsh"
+      ]
     },
     {
       "id": "powershell-ascii-only",

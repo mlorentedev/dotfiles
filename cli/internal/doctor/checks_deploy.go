@@ -328,6 +328,75 @@ func checkHarnessDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	checkHarnessMirrorOrphans(sys, cfg, rep, fix)
 	checkDeployedSkillSymlinks(sys, cfg, rep)
 	checkInstructionDrift(sys, rep)
+	checkDeployedDoctrine(sys, cfg, rep)
+}
+
+var enforcedRegionMarkers = map[string]string{
+	"no-attribution":      "No AI attribution",
+	"english-only":        "English only",
+	"no-phase-references": "No internal phase/milestone references",
+	"no-auto-merge":       "Auto-merge is forbidden",
+	"definition-of-done":  "Definition of Done",
+	"pr-stewardship":      "What binds is the disposition",
+	"pr-sizing":           "Atomic PRs, ~300 LOC hard cap",
+}
+
+var deployedDoctrineTargets = []struct {
+	homeRel string
+	regions []string
+}{
+	{
+		homeRel: ".gemini/GEMINI.md",
+		regions: []string{"no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "pr-sizing"},
+	},
+	{
+		homeRel: ".codex/AGENTS.md",
+		regions: []string{"no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "pr-sizing"},
+	},
+	{
+		homeRel: ".claude/CLAUDE.md",
+		regions: []string{"no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship"},
+	},
+}
+
+// checkDeployedDoctrine asserts that every enforced doctrine region declared in the
+// harness manifest actually survived deployment to runtime files in $HOME (HARNESS-074/#1035).
+func checkDeployedDoctrine(sys *System, cfg *Config, rep *Report) {
+	home := sys.home()
+	checked, failures := 0, 0
+
+	for _, tgt := range deployedDoctrineTargets {
+		deployedPath := filepath.Join(home, filepath.FromSlash(tgt.homeRel))
+		if !pathExists(deployedPath) {
+			continue
+		}
+
+		contentBytes, err := os.ReadFile(deployedPath)
+		if err != nil {
+			continue
+		}
+		content := string(contentBytes)
+		checked++
+
+		for _, regionID := range tgt.regions {
+			marker, ok := enforcedRegionMarkers[regionID]
+			if !ok {
+				continue
+			}
+			if !strings.Contains(content, marker) {
+				rep.Fail(fmt.Sprintf("enforced region %q missing from deployed %s (run: compile-harness.sh --deploy)", regionID, tgt.homeRel))
+				failures++
+			}
+		}
+	}
+
+	if checked == 0 {
+		rep.Skip("no deployed doctrine payloads found to verify")
+		return
+	}
+	if failures == 0 {
+		rep.Pass(fmt.Sprintf("deployed doctrine payloads contain all enforced regions (%d surfaces verified)", checked))
+	}
 }
 
 // deployedInstructionTargets mirrors harness/manifest.json's agents.presence[]

@@ -13,6 +13,7 @@ var scaffoldDirs = []string{
 	"src", "tests", "scripts", "specs",
 	"docs",
 	filepath.Join("docs", "adr"),
+	filepath.Join("docs", "lessons"),
 	filepath.Join("docs", "runbooks"),
 	filepath.Join("docs", "troubleshooting"),
 	".claude",
@@ -29,7 +30,7 @@ var staticFiles = []struct{ template, dest string }{
 	{"pre-commit-config.yaml", ".pre-commit-config.yaml"},
 	{"claude-md", "CLAUDE.md"},
 	{"env-contract.json", "env-contract.json"},
-	{"lessons.md", filepath.Join("docs", "lessons.md")},
+	{"lessons-index.md", filepath.Join("docs", "lessons", "_index.md")},
 }
 
 // ScaffoldResult reports what Scaffold wrote, in repo-relative paths.
