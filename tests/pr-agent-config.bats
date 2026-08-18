@@ -109,3 +109,31 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
     # inference on a change the author has not finished making.
     grep -q 'draft == false' "$WF"
 }
+
+@test "pr-agent: a comment cannot cancel an in-flight review" {
+    # The defect this encodes (#1040): a PR comment is an issue_comment whose
+    # issue.number IS the PR number. With the group keyed on the number alone, a
+    # comment-triggered run landed in the same concurrency group as the running
+    # pull_request run and cancel-in-progress killed it. PR-Agent is a Docker
+    # action; CodeRabbit's auto-summary comment reliably arrives during the build.
+    #
+    # Measured before the fix on #1037 and #1038: both cancelled mid-build, both
+    # workflows green, zero reviews. It had been broken since the hour it merged
+    # and nothing noticed, because the only symptom is a cancelled run.
+    #
+    # Asserted on the group EXPRESSION rather than on behaviour, because nothing
+    # here can run GitHub's scheduler. What it protects is the discriminator:
+    # remove github.event_name from the key and the two event types collide again.
+    grep -qE '^\s*group:.*github\.event_name' "$WF"
+}
+
+@test "pr-agent: both PR-number sources stay in the concurrency key" {
+    # The event_name suffix above only helps while the key still identifies the
+    # PR. A "simplification" that drops either source re-breaks it differently:
+    # without issue.number every slash-command run shares one group, without
+    # pull_request.number every push does.
+    local group
+    group=$(grep -E '^\s*group:' "$WF")
+    printf '%s\n' "$group" | grep -q 'github.event.pull_request.number'
+    printf '%s\n' "$group" | grep -q 'github.event.issue.number'
+}
