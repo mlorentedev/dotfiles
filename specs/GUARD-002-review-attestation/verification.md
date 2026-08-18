@@ -212,3 +212,77 @@ OK
 - **Marker durability.** If CodeRabbit changes its HTML marker the gate reports
   `pending` rather than `declined` — still red, so the verdict survives and the
   message degrades. Not something a test can pin.
+
+---
+
+## Post-ship defect: the gate could not see this repo's own reviewer (#1045)
+
+Found 2026-08-18, after #1019 merged. **GUARD-002 and PR-Agent (#1032) did not
+compose.** The classifier counted formal review objects only; PR-Agent runs under
+`GITHUB_TOKEN` as `github-actions` and publishes through the *comments* API, so
+its output never entered `reviews[]`.
+
+Two PRs carried a real, substantive Guide and were classified `declined`:
+
+```
+#1037  Guide at 2026-08-18T00:05:21Z   reviews[]: 0
+#1042  Guide at 2026-08-18T00:16:58Z   reviews[]: 0
+```
+
+#1037 passed the gate on **CodeRabbit's** review, not PR-Agent's — remove
+CodeRabbit and it fails too. So the gate built to end silent-green was reporting
+this repo's own reviewer as no reviewer, permanently. A check that is always red
+teaches its reader to wave it through, which is the habit #906 was filed about.
+
+This is the failure mode named in `pattern-verification-fails-toward-unproven`:
+`reviews[]` was an honest proxy for "someone independent looked" until this repo
+shipped a reviewer that does not use the reviews API. The proxy did not drift —
+**the system moved out from under it**, and nothing re-asked whether it still
+answered the question.
+
+### Fix
+
+Reviewers gain `review_markers[]`, matched on a declared `(login, marker)` pair.
+Never "a bot commented": that would let a labeler or release bot attest through
+the comments door, which is #1033 arriving by another route.
+
+Checked **before** the declined path — both are true whenever PR-Agent reviews
+while CodeRabbit's quota is spent, which was #1042's exact state.
+
+Logins are matched case-folded with a trailing `[bot]` stripped, because the two
+APIs disagree (`gh pr view --json comments` → `github-actions`,
+`/issues/N/comments` → `github-actions[bot]`). Matching the raw string made the
+verdict depend on which API produced the payload.
+
+### Evidence
+
+Live payloads, same classifier, before and after:
+
+```
+#1042  before: [FAIL] declined — coderabbitai ...
+       after:  [OK] attested — reviewed by: github-actions (comment-shaped review: "## PR Reviewer Guide")
+
+#1038  before: [FAIL] declined      after: [FAIL] declined     (genuinely unreviewed — correct)
+```
+
+Seven cases added, each **observed failing** on its own mutation before being
+trusted — the obligation this pattern names, applied to its own fix:
+
+| mutation | fails |
+|---|---|
+| revert the classifier | 38, 39, 43, 44 |
+| drop the `[bot]` normaliser | 39 |
+| widen the marker to `## PR` | 40 |
+
+```
+$ bats tests/*.bats
+1305 tests, no failures
+```
+
+### Not verified here
+
+- **`review_markers` durability.** PR-Agent's `## PR Reviewer Guide` heading comes
+  from a Python enum inside the Docker image. If it changes, the gate reports
+  `pending` rather than attesting — red, so the verdict fails safe, and the
+  failure is loud rather than silent. Same trade already accepted for
+  `declined_markers`.
