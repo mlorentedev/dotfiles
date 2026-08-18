@@ -19,7 +19,28 @@ setup() {
 @test "ci: no job installs age from a distro package manager" {
     # The failure is silent by construction — apt succeeds, the suite is green,
     # and it exercised a different binary than the one declared.
-    if grep -nE 'apt-get install[^\n]*[^-a-z]age([ "'"'"']|$)' "$CI"; then
+    #
+    # Line continuations are JOINED first, because grep is line-based and the
+    # multi-line form is the idiomatic one for a multi-package apt install:
+    #
+    #     apt-get install -y --no-install-recommends \
+    #         age \
+    #         zsh
+    #
+    # A per-line matcher never sees `install` and `age` together there and
+    # reports clean. tests/Dockerfile.integration is written in exactly that
+    # shape, so it is the likely form of any regression. Found while checking a
+    # reviewer's claim on #1059: the claim itself (that a flagless `apt-get
+    # install age` escapes) was wrong — the regex backtracks and catches it —
+    # but testing the claim surfaced this, which is real.
+    # Comments are dropped BEFORE matching. The step this guard protects carries
+    # a comment explaining the defect, which names `apt-get install age` in prose
+    # — and the first version of this test tripped on it. A guard that fires on
+    # documentation ABOUT the thing rather than the thing is the same false
+    # positive GUARD-002 hit, and it trains people to weaken the guard.
+    local joined
+    joined=$(grep -vE '^[[:space:]]*#' "$CI" | sed -e :a -e '/\\$/N; s/\\\n//; ta')
+    if printf '%s\n' "$joined" | grep -nE 'apt-get[[:space:]]+install\b[^|;&]*\bage\b'; then
         printf 'age must come from the pinned release, not apt — see AGE_VERSION.\n' >&2
         return 1
     fi
