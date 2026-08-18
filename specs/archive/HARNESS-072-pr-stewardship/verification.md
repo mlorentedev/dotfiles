@@ -101,10 +101,11 @@ session, and not a defect of this spec.
 
 ## Archive checklist
 
-- [ ] Adversarial review passes (`dotf spec review HARNESS-072-pr-stewardship`)
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to specs/archive/HARNESS-072-pr-stewardship/ (plain text: the
-      path does not exist yet, and a backticked one is a live claim the doc-path
-      guard checks)
+- [x] Adversarial review passes (`dotf spec review HARNESS-072-pr-stewardship`)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to specs/archive/HARNESS-072-pr-stewardship/ (left in plain
+      text: it was written before the move, when a backticked path would have
+      been a live claim the doc-path guard rejects)
 - [ ] Bitácora #963 closed with the PR link (ADR-018)
-- [ ] Promotion above executed
+- [x] Promotion above executed (the lesson landed as *"A check that
+      cannot fail the way you cite it"*)
