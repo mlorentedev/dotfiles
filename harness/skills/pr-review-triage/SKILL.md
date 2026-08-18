@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: fc4a81aaec806760
+generated_sha: 73db5d5501d55752
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -18,6 +18,8 @@ Opening a pull request is not the end of a change. Its checks report, its review
 
 It is the **Review** item of the Definition of Done (`pattern-change-lifecycle.md`) made executable, and it applies the two-exits rule from [[pattern-track-or-fix]] to a reviewer's comments rather than to your own findings.
 
+The "by default" in the trigger list is a judgement you make, not a call something makes for you: nothing invokes this skill automatically. What binds is the `pr-stewardship` obligation to disposition what came back; this skill is how you meet it, and you are the one who decides the moment has arrived.
+
 ## Preconditions
 
 - An open PR, and `gh` authenticated. Everything here is `gh` plus shell — no agent-specific primitive, so every harness runs it identically.
@@ -25,7 +27,17 @@ It is the **Review** item of the Definition of Done (`pattern-change-lifecycle.m
 
 ## Protocol
 
-### 1. Wait for the run to finish, once
+### 1. Wait for the run to finish, once — unless the repository says not to
+
+**Check the repository's own rule first, and let it win.** Some projects forbid
+the watch loop outright and make the human the one who reports a red build (this
+repo does, in `AGENTS.md`). Where such a rule exists, do not run the command
+below: hand the PR over, and come back when the human or a hook tells you the
+result is in. That is not a shortcut past the obligation — the `pr-stewardship`
+region still requires every check and comment to be dispositioned; it only says
+who watches in the meantime, and the answer there is nobody.
+
+Absent such a rule:
 
 ```bash
 gh pr checks <N> --repo <owner>/<repo> --watch --interval 30
@@ -54,7 +66,7 @@ A failing check is a finding about the change, not an obstacle to the triage. Tw
 
 Review comments arrive **asynchronously**, from whoever is configured to produce them — a review service today, a different one tomorrow, a scanner, a human, one of your own automations. **The author does not matter and must not drive the triage**: a finding is judged by whether the claim is true, not by who signed it. Automated and human comments get the same three exits; the only thing an author's identity earns is a reply address.
 
-**Wait a couple of minutes before reading.** Reading the instant the PR opens gets you a partial review and a disposition table you will redo. Two minutes is the working default, or let the CI watch in step 1 absorb the wait — the checks usually outlast the reviewers.
+**Wait a couple of minutes before reading.** Reading the instant the PR opens gets you a partial review and a disposition table you will redo. Two minutes is the working default, or let the CI watch in step 1 absorb the wait — the checks usually outlast the reviewers. Those two minutes sit *inside* the ten-minute window the `pr-stewardship` region sets, they do not compete with it: two minutes is when you first look, ten is when the obligation to keep looking expires.
 
 **Then confirm the review ran at all.** A comment that lands seconds after the PR opens is almost never a review; it is a status notice, and it reads exactly like a pass. Measured on this repo: a reviewer posted **9 seconds** after PR creation with the body *"Review limit reached — next review available in 11 minutes"*. Quota, queue, error and skip all produce that shape.
 

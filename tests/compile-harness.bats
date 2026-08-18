@@ -150,6 +150,56 @@ EOF
     [[ "$output" == *"GAP"* ]]
 }
 
+# A manifest carrying a `doctrine` section, so check_coverage's surface list
+# includes the reserved "doctrine" key alongside the targets[] files. $1 = the
+# JSON for the single `demo` enforced entry, $2 = the doctrine inject array.
+#
+# Round-2 review finding: the three cases above all use write_two_surface_manifest,
+# whose manifest has no doctrine section — so check_coverage's doctrine branch
+# (it reads .doctrine.inject rather than a targets[] entry) had no fixture at all.
+# The real tree passes because pr-sizing happens to be in doctrine.inject, which
+# is precisely the kind of accident that hides a broken branch.
+write_doctrine_manifest() {
+    cat > "$REPO/harness/manifest.json" <<EOF
+{ "version": 1, "vault_subpath": "00_meta/patterns",
+  "enforced": [ $1 ],
+  "targets":  [ { "agent": "t", "kind": "native", "file": "TARGET.md", "inject": ["demo"] } ],
+  "doctrine": { "inject": $2,
+                "deploy": [ { "agent": "d", "file": ".d/D.md", "char_cap": 12000 } ] } }
+EOF
+}
+
+@test "HARNESS-072: a region missing from doctrine.inject is a coverage gap" {
+    write_doctrine_manifest '{ "id": "demo", "source": "test-pattern.md#1-demo-rule" }' '[]'
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"GAP"* ]]
+    [[ "$output" == *"doctrine"* ]]
+    # Same shape as the targets[] case: the region diff is happy, because
+    # TARGET.md does inject `demo` and renders consistently. Only coverage can
+    # see that the doctrine payloads were skipped.
+    [[ "$output" == *"[check] OK -> TARGET.md"* ]]
+}
+
+@test "HARNESS-072: a region present in doctrine.inject satisfies coverage" {
+    write_doctrine_manifest '{ "id": "demo", "source": "test-pattern.md#1-demo-rule" }' '["demo"]'
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"GAP"* ]]
+}
+
+@test "HARNESS-072: an opt_out naming the doctrine surface satisfies coverage" {
+    write_doctrine_manifest '{ "id": "demo", "source": "test-pattern.md#1-demo-rule",
+        "opt_out": { "doctrine": "the compact payload cannot carry the full prose" } }' '[]'
+    run_refresh; [ "$status" -eq 0 ]
+    run "$SCRIPT" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"excluded from doctrine"* ]]
+    [[ "$output" == *"cannot carry the full prose"* ]]
+}
+
 @test "AC3: --check works offline (no vault) from the committed record" {
     run_refresh; [ "$status" -eq 0 ]
     run env VAULT_PATH="$TMP/nonexistent" "$SCRIPT" --check
