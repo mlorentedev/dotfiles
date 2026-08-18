@@ -21,6 +21,9 @@ created: "2026-08-15"
 ## Test status
 
 - `~/.local/bin/bats tests/compile-harness.bats` → **47/47 ok**, 0 failures.
+  That number is the count at the time this spec's work was verified, and it is
+  left as measured rather than restated: the file has since reached 50 because a
+  parallel session added three unrelated cases. Re-run at archive time: **50/50**.
 - `~/.local/bin/shellcheck scripts/compile-harness.sh` → clean. `bash -n` → clean.
 - `./scripts/compile-harness.sh --check` → exit 0.
 - All eight `features.json` verification commands executed this session → 8/8 exit 0.

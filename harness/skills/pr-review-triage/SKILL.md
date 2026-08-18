@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 7c95417fd03b32b1
+generated_sha: 73db5d5501d55752
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -27,7 +27,17 @@ The "by default" in the trigger list is a judgement you make, not a call somethi
 
 ## Protocol
 
-### 1. Wait for the run to finish, once
+### 1. Wait for the run to finish, once — unless the repository says not to
+
+**Check the repository's own rule first, and let it win.** Some projects forbid
+the watch loop outright and make the human the one who reports a red build (this
+repo does, in `AGENTS.md`). Where such a rule exists, do not run the command
+below: hand the PR over, and come back when the human or a hook tells you the
+result is in. That is not a shortcut past the obligation — the `pr-stewardship`
+region still requires every check and comment to be dispositioned; it only says
+who watches in the meantime, and the answer there is nobody.
+
+Absent such a rule:
 
 ```bash
 gh pr checks <N> --repo <owner>/<repo> --watch --interval 30
