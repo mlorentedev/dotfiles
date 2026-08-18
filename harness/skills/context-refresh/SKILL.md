@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/context-refresh/SKILL.md
-generated_sha: 5adcf3f04b77865f
+generated_sha: 2082b682ed027c32
 id: context-refresh-skill
 type: skill
 status: active
@@ -16,7 +16,7 @@ description: Use after a brainstorm / ADR / phase-closing session to refresh a p
   or a phase milestone closed this session. Do NOT use for backlog/task changes —
   that state lives in the GitHub Project "bitácora", not here.
 keywords: [context refresh, actualiza contexto, refresh context, context.md update]
-paths: ['**/00-context.md', '**/context.md']
+paths: ['**/context.md']
 ---
 # /context-refresh — Project Context Patcher
 

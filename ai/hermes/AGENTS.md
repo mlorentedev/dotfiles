@@ -20,7 +20,7 @@ ADR-009 parity with `ai/agy/AGY.md`); Hermes's live constitution and SSOT are:
 
 - **Constitution:** `80_agents/hermes-nan/AGENTS.md` (operating law: write-zone,
   sync discipline, bootstrap protocol).
-- **Identity + structure map:** `80_agents/hermes-nan/00-context.md`.
+- **Identity + structure map:** `80_agents/hermes-nan/context.md`.
 - **Shared patterns:** `00_meta/patterns/` — loaded on demand via the
   `pattern-loader` skill.
 

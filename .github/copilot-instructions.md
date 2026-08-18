@@ -24,7 +24,7 @@
 ## Quick Reference (paths)
 
 * **Vault root:** `$VAULT_PATH` (resolved via `machine.json` per ADR-025; default `~/Projects/Workspace/knowledge/`).
-* **Project context:** `10_projects/<repo>/00-context.md`.
+* **Project context:** `10_projects/<repo>/context.md`.
 * **Active backlog:** bitácora GitHub Project (per ADR-018).
 * **Global patterns:** `00_meta/patterns/*.md`.
 * **Templates:** `00_meta/templates/*.md`.
