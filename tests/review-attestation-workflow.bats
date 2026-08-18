@@ -91,3 +91,45 @@ if 'workflow_run.head_sha' not in group:
     grep -q 'statuses: write' "$WF"
     grep -qE 'statuses/\$\{SHA\}' "$WF"
 }
+
+# #1041: a check-run belongs to the run that created it and can never be updated.
+# The pull_request run fires seconds after the PR opens, when no reviewer has
+# posted and the only possible verdict is `pending` — so it froze red on every
+# correct PR, permanently, while the commit status beside it went green. A gate
+# whose normal state is red teaches its readers to scroll past it.
+@test "review-attestation: pending does not freeze the check-run red [#1041]" {
+    grep -q 'KIND" = "pending" \] && \[ "$EVENT" = "pull_request"' "$WF"
+}
+
+# ...and the softening is exactly that narrow. A reviewer saying it could not
+# review is actionable the moment it is said, on any path.
+@test "review-attestation: declined still fails immediately, on every path [#1041]" {
+    run bash -c '
+      body=$(sed -n "/Fail the run when the PR is not attested/,\$p" "'"$WF"'")
+      # the exemption must name pending; if it ever names declined, or drops the
+      # event guard, the gate has been widened into silence
+      echo "$body" | grep -q "KIND\" = \"pending\"" || exit 1
+      echo "$body" | grep -q "KIND\" = \"declined\"" && exit 1
+      exit 0
+    '
+    [ "$status" -eq 0 ]
+}
+
+# The workflow extracts the verdict KIND from the classifier's own structured
+# prefix. That is a coupling between two files, so it is tested against the real
+# strings rather than assumed: a sed that silently matches nothing would make
+# every verdict read as an empty kind, and the exemption above would stop firing.
+@test "review-attestation: the kind extractor matches what the classifier emits [#1041]" {
+    local script="$REPO/scripts/check-review-attestation.sh"
+    for kind in pending declined; do
+        grep -q "\[FAIL\] $kind" "$script" || {
+            printf 'classifier no longer emits "[FAIL] %s"\n' "$kind" >&2; return 1; }
+    done
+    # the extractor itself, run over the real emitted shapes
+    got=$(printf '[FAIL] pending — no reviewer output on this PR yet\n' \
+          | sed -n 's/^\[[A-Z]*\] \([a-z]*\).*/\1/p' | head -1)
+    [ "$got" = "pending" ] || { printf 'extractor produced "%s"\n' "$got" >&2; return 1; }
+    got=$(printf '[FAIL] declined — coderabbitai posted a notice\n' \
+          | sed -n 's/^\[[A-Z]*\] \([a-z]*\).*/\1/p' | head -1)
+    [ "$got" = "declined" ] || { printf 'extractor produced "%s"\n' "$got" >&2; return 1; }
+}

@@ -164,6 +164,12 @@ jobs:
             echo "code=$code"
             echo "sha=$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)"
             echo "summary=$(head -1 /tmp/attest.out | cut -c1-130)"
+            # The verdict KIND, from the script's own structured prefix rather
+            # than from prose. `[FAIL] pending` and `[FAIL] declined` both exit
+            # 1, and the next step needs to tell them apart. Guarded: a test
+            # asserts the script still emits these tokens, so the coupling
+            # cannot rot silently into a matcher that matches nothing.
+            echo "kind=$(sed -n 's/^\[[A-Z]*\] \([a-z]*\).*/\1/p' /tmp/attest.out | head -1)"
           } >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -191,6 +197,8 @@ jobs:
         env:
           CODE: ${{ steps.attest.outputs.code }}
           SUMMARY: ${{ steps.attest.outputs.summary }}
+          KIND: ${{ steps.attest.outputs.kind }}
+          EVENT: ${{ github.event_name }}
         # The verdict is repeated here, not just in the step that computed it.
         # A bare `exit "$CODE"` made the RED step say nothing: the diagnostic sat
         # in an earlier, green step, so anyone opening the failure saw an exit
@@ -203,6 +211,29 @@ jobs:
         # #988's error path discarding HTTP 500 and surfacing `invalid character
         # 'I'`: the diagnostic threw away the diagnosis.
         run: |
+          # `pending` on the pull_request path is not a finding, and treating it
+          # as one is #1041. A check-run belongs to the run that created it and
+          # can never be updated; runs from issue_comment and workflow_run attach
+          # to the DEFAULT BRANCH, so they cannot revise it either. The
+          # pull_request run fires seconds after the PR opens, when no reviewer
+          # has posted and the only possible verdict is `pending` — so this
+          # check-run froze red on every correct PR, permanently, and taught its
+          # readers to scroll past the attestation line. A gate whose normal
+          # state is red has stopped being a gate.
+          #
+          # The verdict itself is not softened: it is published to the
+          # `review-attestation` COMMIT STATUS above, which any later run can
+          # revise and which is the signal branch protection must require.
+          # `declined` still fails here and immediately, because a reviewer
+          # saying it could not review is actionable the moment it is said.
+          if [ "$CODE" != "0" ] && [ "$KIND" = "pending" ] && [ "$EVENT" = "pull_request" ]; then
+            echo "$SUMMARY"
+            echo
+            echo "Not failed here: no reviewer has posted yet, which is the expected"
+            echo "state this early. The verdict lives on the 'review-attestation'"
+            echo "commit status, which later runs revise as reviewers arrive."
+            exit 0
+          fi
           if [ "$CODE" != "0" ]; then
             echo "::error title=Review attestation::$SUMMARY"
             echo "$SUMMARY"
