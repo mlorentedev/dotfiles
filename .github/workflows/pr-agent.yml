@@ -15,21 +15,24 @@ name: pr-agent
 
 on:
   pull_request:
-    # `synchronize` is deliberately ABSENT, and the omission must stay aligned
-    # with github_action_config.pr_actions below — see #1053. PR-Agent applies
-    # its own event gate whose default excludes synchronize, so listing it here
-    # started a runner and a Docker build on every push and then reviewed
-    # nothing. Measured on #1048: 4 pull_request runs, 1 artifact published.
+    # `synchronize` is here so a push is reviewed, and it is NOT handled by
+    # pr_actions — see handle_push_trigger below. #1053 removed it because the
+    # workflow fired and PR-Agent declined to act, publishing a `review: SUCCESS`
+    # that read as "the reviewer looked at your new commits" and meant "the
+    # action started and did nothing". That finding stands; what changes is which
+    # side of it moves.
     #
-    # The cost was never inference — pushes are free of model calls. It was a
-    # `review: SUCCESS` on a push-triggered run, which reads as "the reviewer
-    # looked at your new commits" and means "the action started and declined to
-    # act". GUARD-002 exists because that kind of green is worse than a red.
+    # It moves because an enforced doctrine line depended on the behaviour that
+    # was removed. `harness/enforced/pr-stewardship.md`, injected into every
+    # agent's instructions, says *"pushing a fix reopens it, because the reviewer
+    # re-reviews"* — and after #1053 that was false. A reviewer that does not
+    # re-review a fix leaves the second half of every PR unread, so the machinery
+    # matches the doctrine rather than the doctrine being softened.
     #
-    # Reviewing every push is a defensible choice, but it is a different one:
-    # it re-reads the whole diff each time, so it belongs behind
-    # handle_push_trigger with push_commands naming only the cheap tools.
-    types: [opened, reopened, ready_for_review]
+    # The rebase burst is already paid for: #1042's concurrency group is keyed on
+    # the event name with cancel-in-progress, so push-vs-push still cancels and a
+    # burst of three pushes collapses to ONE review of the settled state.
+    types: [opened, synchronize, reopened, ready_for_review]
   # Slash commands (/review, /describe, /improve) on an existing PR.
   issue_comment:
     types: [created]
@@ -84,11 +87,28 @@ jobs:
           # where whole-registry injection means one broken item mapping can take
           # down authentication for everything.
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
-          # Stated rather than defaulted, so the two event lists that must agree
-          # are both visible. The default already excludes synchronize; leaving
-          # that implicit is what let the workflow's own trigger list drift away
-          # from it unnoticed (#1053).
+          # Stated rather than defaulted, so the event lists are visible rather
+          # than implied — leaving that implicit is what let the workflow's own
+          # trigger list drift away unnoticed (#1053).
+          #
+          # `synchronize` is deliberately NOT in this list, and adding it would
+          # do nothing at all. Upstream routes synchronize down a separate path:
+          # "handle_push_trigger = false # when true, handle synchronize events
+          # using push_commands". A synchronize in pr_actions is a setting that
+          # looks right and asserts nothing — the exact shape this repo has spent
+          # two days cataloguing, and it was nearly committed here by hand.
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          # The push path, which is what actually reviews a new commit.
+          github_action_config.handle_push_trigger: "true"
+          # `/review` ONLY, and the omission is the point: upstream's default is
+          # ['/describe', '/review'], so enabling the push trigger without saying
+          # this would silently reinstate describe on every push and undo the
+          # decision recorded below. A default that quietly re-enables a thing
+          # you turned off elsewhere is the same defect one layer down.
+          github_action_config.push_commands: '["/review"]'
+          # Merge commits and bot pushes are not a human asking for another look.
+          github_action_config.push_trigger_ignore_bot_commits: "true"
+          github_action_config.push_trigger_ignore_merge_commits: "true"
           # `describe` REWRITES the PR body. The bodies in this repo carry
           # hand-written measurement tables, merge orders and before/after
           # evidence — the part worth reading — and a model rewriting them

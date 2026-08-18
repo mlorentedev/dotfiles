@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/test-driven-development/SKILL.md
-generated_sha: acf05932e955f864
+generated_sha: 493cfbbeeaeadcac
 id: test-driven-development-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: test-driven-development
-description: Use when implementing any feature or bugfix, before writing implementation code
+description: Use when implementing any feature or bugfix, before writing implementation
+  code
+keywords: [tdd, test driven development, red green refactor, failing test first, escribir
+    test primero]
+paths: ['**/*test*', tests/**]
 ---
-
 # Test-Driven Development (TDD)
 
 ## Overview

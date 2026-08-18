@@ -1,34 +1,19 @@
 # CLAUDE.md
 
-> **First, read `AGENTS.md` at the repo root** — it is the canonical SSOT for behaviour rules across all agents (Standing Orders, Decision Hierarchy, Neural Hive, MCP usage, Operational Rules). This file (`~/.claude/CLAUDE.md` after deploy) contains only Claude Code-specific extensions on top of `AGENTS.md`.
+> **First, read `AGENTS.md` at the repo root** — canonical SSOT for all agents (Standing Orders, Decision Hierarchy, Neural Hive, MCP, Operational Rules). This file (`~/.claude/CLAUDE.md` after deploy) holds only Claude Code-specific tooling extensions.
 >
-> If `AGENTS.md` is missing from the current repo, default to the canonical version at `$DOTFILES_REPO_DIR/AGENTS.md` (resolved via `machine.json` per ADR-025; falls back to `~/Projects/Workspace/dotfiles/AGENTS.md`).
+> If `AGENTS.md` is missing from the current repo, default to canonical version at `$DOTFILES_REPO_DIR/AGENTS.md` (resolved via `machine.json` per ADR-025).
 
 ## Auto-Maintenance Rules
 
-Self-maintaining knowledge across sessions. Zero manual intervention required.
-
-### Session Handoff
-
-Session handoff is a **cross-agent `/handoff` skill** — SSOT at `00_meta/skills/handoff/SKILL.md`, with an always-on trigger in `AGENTS.md`. At the END of any non-trivial session, run it. For Claude, the continuity block it replaces in place (`## Session Handoff`, the **last** section — after the stable index, for KV-cache prefix stability) lives in this project's auto-memory `MEMORY.md`. The skill is the source of truth for the full checklist (continuity block + vault hygiene + repo/worktree state + artifact summary + next action) — don't duplicate it here.
-
-### Auto-Crystallize
-
-If session start context includes `CRYSTALLIZE NEEDED`, run `/crystallize` BEFORE any user task. Inform briefly: "Auto-crystallizing (N days stale)."
-
-### Auto-Archive Cold Memories
-
-If session start context reports memory files needing archive (>60 days cold):
-
-1. Create `memory/archive/` if needed.
-2. Move flagged files there.
-3. Remove their entries from `MEMORY.md`.
-4. Inform briefly: "Archived N cold memory files."
+- **Session Handoff:** Run `/handoff` (`00_meta/skills/handoff/SKILL.md`) at the end of non-trivial sessions. Replaces `## Session Handoff` continuity block in `MEMORY.md`.
+- **Auto-Crystallize:** If context includes `CRYSTALLIZE NEEDED`, run `/crystallize` before user tasks.
+- **Auto-Archive:** If context reports >60d cold memory files, move to `memory/archive/` and update `MEMORY.md`.
 
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:1bd63b5487870d9e) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:ea171c3de1a715ff) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -46,7 +31,7 @@ If session start context reports memory files needing archive (>60 days cold):
 Working code is not a finished change. Before saying done, each of these is true:
 
 1. **Debt** — every defect noticed along the way is fixed in scope or filed as a ticket with its root cause. A mention in conversation is not an exit.
-2. **Knowledge** — what was learned is written where it belongs, this session: build/operate detail in the repo (`docs/lessons.md`, `docs/adr/`), cross-project insight in the store.
+2. **Knowledge** — what was learned is written where it belongs, this session: build/operate detail in the repo (docs/lessons/, docs/adr/), cross-project insight in the store.
 3. **Board** — the ticket matches reality: picked up when you start, blocked when blocked, closed with the change that closed it.
 4. **Review** — an open PR is not finished work. Its checks and its reviewer comments are triaged, and each comment is applied, ticketed, or declined with a reason.
 5. **Evidence** — no completion claim without the command output that proves it, produced in this session.
@@ -63,26 +48,13 @@ Any of the five may be skipped, but only as a stated decision naming which one a
 
 **A change that closes a spec gets an independent adversarial review before it archives.** The trigger is the archive gate and nothing wider — not every PR that touches a spec folder. It names an obligation that already binds mechanically, so the only question is whether you meet it deliberately or discover it as a refusal: the spec gate declines to merge a PR closing a spec's issue without archiving it, `spec archive` declines without a passing review, and the reviewer pool declines one signed by the wrong model. The reviewer must not be the implementer; that independence is the entire value.
 <!-- END HARNESS GENERATED -->
-* **Skills.** `~/.claude/skills/<skill>/SKILL.md` auto-load via slash commands. Skill auto-loading is a Claude Code feature, not portable. Skill **content** is portable: the harness render path (`harness/skills/<name>/` with `targets[]`, deployed offline by `compile-harness.sh --deploy` — ADR-021) emits each skill as an OpenCode command at `~/.config/opencode/commands/<name>.md`. (AI-012 shipped the original transform in PR #43; the standalone `skills-to-opencode.sh` was since retired.)
-* **TaskCreate / TaskUpdate / TaskList.** Use for non-trivial multi-step work (≥3 distinct steps). Mark `in_progress` BEFORE starting; mark `completed` immediately on finish. Don't batch updates.
-* **AskUserQuestion.** Use for branching decisions with 2-4 mutually exclusive options. Always include "(Recommended)" on the preferred option.
-* **MEMORY.md.** Auto-loads at session start (capped at 200 lines). Index-only — never write memory content directly here; use linked memory files.
+* **Skills:** Auto-loaded via slash commands from `~/.claude/skills/<skill>/SKILL.md` (deployed by `compile-harness.sh --deploy`).
+* **TaskCreate / TaskUpdate / TaskList:** Use for non-trivial work (≥3 steps). Mark `in_progress` before start, `completed` on finish.
+* **AskUserQuestion:** Use for branching decisions (2-4 options), marking "(Recommended)" on preferred.
+* **MEMORY.md:** Auto-loads at session start (capped at 200 lines). Index-only; link to topic files.
 
-## Project Memory Hierarchy
+## Project Memory Hierarchy & Models
 
-Claude reads memory in this order at session start:
+1. **Resolution Order:** `~/.claude/CLAUDE.md` $\rightarrow$ `<repo>/AGENTS.md` (authoritative SSOT) $\rightarrow$ `<repo>/.claude/CLAUDE.md` $\rightarrow$ `<project-hash>/memory/MEMORY.md`.
+2. **Model Tier:** Top: `claude-opus-4-7` (architecture/debug) | Mid: `claude-sonnet-4-6` (default/refactor) | Low: `claude-haiku-4-5-20251001` (lookups).
 
-1. **Global:** `~/.claude/CLAUDE.md` (this file — deployed from `ai/claude/CLAUDE.md` in dotfiles).
-2. **Project root:** `<repo>/AGENTS.md` (canonical SSOT — read FIRST per the pointer at the top).
-3. **Project-specific:** `<repo>/.claude/CLAUDE.md` (optional, repo-specific overrides).
-4. **Auto memory:** `~/.claude/projects/<project-hash>/memory/MEMORY.md` (cross-session continuity).
-
-If both `CLAUDE.md` and `AGENTS.md` exist in a repo, `AGENTS.md` is authoritative for behavioural rules; `CLAUDE.md` overlays Claude-specific tooling notes on top.
-
-## Model Tier (per AGENTS.md "Model Selection")
-
-- **Top:** `claude-opus-4-7` — hard debug / architecture / root-cause / Socratic Guardrail triggers
-- **Mid:** `claude-sonnet-4-6` — mechanical refactor / docs / single-file fixes / test scaffolding
-- **Low:** `claude-haiku-4-5-20251001` — syntax lookups / quick questions
-
-Subagent declaration: `model: opus|sonnet|haiku` in frontmatter. Main session: `/model` slash command.

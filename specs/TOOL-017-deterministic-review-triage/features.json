@@ -1,0 +1,70 @@
+{
+  "spec": "TOOL-017-deterministic-review-triage",
+  "issue": "mlorentedev/dotfiles#1062",
+  "features": [
+    {
+      "id": "f1",
+      "ac": 1,
+      "behavior": "Triage starts from the reviewer-finished signal, not from an agent electing to look.",
+      "verification": "bats tests/triage-trigger.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f2",
+      "ac": 2,
+      "behavior": "Review-vs-notice is read from harness/review-attestation.json; adding a reviewer changes behaviour with no code edit.",
+      "verification": "bats tests/triage-registry.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f3",
+      "ac": 3,
+      "behavior": "A finding's class comes from a declared marker; absent marker yields unclassified, never a prose parse.",
+      "verification": "bats tests/triage-classification.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f4",
+      "ac": 4,
+      "behavior": "A REAL finding is not applied until its claimed defect reproduces.",
+      "verification": "bats tests/triage-reproduction-gate.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f5",
+      "ac": 5,
+      "behavior": "A mutation that does not land reports did-not-land, distinct from did-not-reproduce.",
+      "verification": "bats tests/triage-harness-selfcheck.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f6",
+      "ac": 6,
+      "behavior": "A refuted REAL finding is recorded as refuted with evidence, not silently skipped.",
+      "verification": "bats tests/triage-refutation-record.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f7",
+      "ac": 7,
+      "behavior": "A PR carrying an undispositioned reviewer comment cannot close or merge.",
+      "verification": "bats tests/triage-closing-guard.bats",
+      "state": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "f8",
+      "ac": 8,
+      "behavior": "Every check has a red-direction test observed failing.",
+      "verification": "bats tests/triage-red-direction.bats",
+      "state": "pending",
+      "evidence": ""
+    }
+  ]
+}

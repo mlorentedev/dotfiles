@@ -1,16 +1,24 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispose-proposals/SKILL.md
-generated_sha: d8262f03155bdd46
+generated_sha: 180bb72686ae728a
 id: dispose-proposals-skill
 type: skill
 status: active
-created: "2026-06-27"
+created: '2026-06-27'
 owner: manu
 name: dispose-proposals
-description: Triage the CURATOR recurrence-proposal inbox — the weekly human gate that turns emitted proposal drafts into bitácora issues. Triggers on "/curator dispose", "dispose the proposal inbox", "triage curator proposals", "process recurrence proposals", "review the proposals queue", and as a step of the weekly curator session. Reads 80_agents/hermes-nan/proposals/*.md (status pending), applies the curation SOP (promote / keep / merge / wontfix), and on accept files a proposal-labelled issue and marks the draft disposed.
+description: Triage the CURATOR recurrence-proposal inbox — the weekly human gate
+  that turns emitted proposal drafts into bitácora issues. Triggers on "/curator dispose",
+  "dispose the proposal inbox", "triage curator proposals", "process recurrence proposals",
+  "review the proposals queue", and as a step of the weekly curator session. Reads
+  80_agents/hermes-nan/proposals/*.md (status pending), applies the curation SOP (promote
+  / keep / merge / wontfix), and on accept files a proposal-labelled issue and marks
+  the draft disposed.
+keywords: [dispose proposals, curator dispose, triage proposals, proposal queue, recurrence
+    proposal]
+paths: [80_agents/**/proposals/**]
 ---
-
 # /curator dispose — recurrence-proposal disposition (S3 human gate)
 
 The **disposer** arm of the curation loop (`00_meta/agents/runbooks/curation.md`). The producer

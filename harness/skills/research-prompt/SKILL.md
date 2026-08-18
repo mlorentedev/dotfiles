@@ -1,17 +1,25 @@
 ---
 generated: true
 generated_from: 00_meta/skills/research-prompt/SKILL.md
-generated_sha: 730d271a0d4061d0
+generated_sha: f4bbe9b20654b38f
 id: research-prompt-skill
 type: skill
 status: active
-created: "2026-07-07"
+created: '2026-07-07'
 owner: manu
 name: research-prompt
-description: Turn a vague research ask ("look into X", "what's the state of Y", "is there a better way to do Z") into one tight, sourceable research brief BEFORE dispatching it to a research agent or subagent. Triggers on /research-prompt, "help me phrase this research question", "what should the researcher look for", "turn this into a research brief", "tighten this research ask", and whenever a research/explore/task subagent is about to be launched from an under-specified request. Adapted from davidondrej/skills' research-prompt, re-targeted at this system's research subagent + web_fetch instead of a third-party research API.
+description: Turn a vague research ask ("look into X", "what's the state of Y", "is
+  there a better way to do Z") into one tight, sourceable research brief BEFORE dispatching
+  it to a research agent or subagent. Triggers on /research-prompt, "help me phrase
+  this research question", "what should the researcher look for", "turn this into
+  a research brief", "tighten this research ask", and whenever a research/explore/task
+  subagent is about to be launched from an under-specified request. Adapted from davidondrej/skills'
+  research-prompt, re-targeted at this system's research subagent + web_fetch instead
+  of a third-party research API.
 allowed-tools: [Read, Grep, Glob]
+keywords: [research prompt, research brief, tighten research, pregunta de investigacion]
+paths: ['**/research/**', '**/prestudy/**']
 ---
-
 # Research Prompt — sharpen the ask before you dispatch it
 
 > A fuzzy research request ("look into X") produces a fuzzy report — the agent has to guess scope, sources, and what "done" means, and usually guesses wrong at least one of the three. This skill is a five-minute sharpening pass run BEFORE launching a `research` (or `explore`/`task`) subagent, not a replacement for one.

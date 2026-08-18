@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: 7eeccf01a1d29bee
+generated_sha: c138ea5fd9f93613
 id: using-git-worktrees-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace, or before executing implementation plans that should not affect the main working directory.
+description: Use when starting feature work that needs isolation from current workspace,
+  or before executing implementation plans that should not affect the main working
+  directory.
+keywords: [git worktree, external worktree, isolated worktree, worktree safety]
+paths: []
 ---
-
 # Using Git Worktrees
 
 > **Locally hardened (diverged from the superpowers upstream).** The directory-selection

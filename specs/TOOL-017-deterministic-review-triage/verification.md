@@ -1,9 +1,9 @@
 ---
 tags: [spec, verification, templates]
-created: "{{date:YYYY-MM-DD}}"
+created: "2026-08-18"
 ---
 
-# Verification - <feature-id>
+# Verification - TOOL-017-deterministic-review-triage
 
 ## Evidence
 
@@ -30,13 +30,13 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
+- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
 - [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
 
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/<feature-id>/` -> `specs/archive/<feature-id>/`
+- [ ] Folder moved: `specs/TOOL-017-deterministic-review-triage/` -> `specs/archive/TOOL-017-deterministic-review-triage/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
