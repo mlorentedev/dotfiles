@@ -224,3 +224,5 @@ tags: [lessons, index, dotfiles]
 | [208 - The health probe was the illness: a liveness check that breaks the operation it authorises](lesson-208-the-health-probe-was-the-illness-a-liveness-check-.md) | 2026-08-15 |  |
 | [209 - Every layer reported a health none of them had established](lesson-209-every-layer-reported-a-health-none-of-them-had-est.md) | 2026-08-16 |  |
 | [210 - Under squash-merge, `git branch --merged` says no about every branch that landed](lesson-210-under-squash-merge-git-branch-merged-says-no-about.md) | 2026-08-16 |  |
+| [211 - Worktree config discovery must prefer CWD walk-up over global repo env](lesson-211-worktree-config-discovery-must-prefer-cwd-walk-up-over-global-repo-env.md) | 2026-08-18 |  |
+
