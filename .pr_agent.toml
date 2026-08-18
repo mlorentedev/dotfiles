@@ -140,6 +140,11 @@ Shell must run under bash AND zsh; see the prohibited-pattern table in
 
 Classify each finding by whether it is REAL, THEORETICAL or SPECULATIVE, and say
 which. A finding without that gradation is hard to action.
+
+Rules to avoid false positives and ensure high-precision determinism:
+- Do NOT flag import paths or package names as broken or non-existent if CI compilation/tests pass; trust the project manifests (e.g. go.mod).
+- Every finding classified as REAL must describe a concrete execution trace, failing input scenario, or demonstrable defect, rather than a generic stylistic preference.
+- All review outputs, tables, findings, and suggestions must be authored strictly in English.
 """
 
 [pr_code_suggestions]
