@@ -1,22 +1,27 @@
 ---
 generated: true
 generated_from: 00_meta/skills/agent-lifecycle/SKILL.md
-generated_sha: 68d4aea1064e8033
+generated_sha: d432cf76b1f0e8d0
 id: agent-lifecycle-skill
 type: skill
 status: active
-created: "2026-06-09"
+created: '2026-06-09'
 owner: manu
 name: agent-lifecycle
-description: "Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery, vault integration, config optimization, cronjob scheduling, and container deployment. Absorbs agent-bootstrap, agent-config-optimization, cronjob-management, and vault-integration (the standalone agent-config-optimization skill is retired into this skill's Section 3)."
+description: Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery,
+  vault integration, config optimization, cronjob scheduling, and container deployment.
+  Absorbs agent-bootstrap, agent-config-optimization, cronjob-management, and vault-integration
+  (the standalone agent-config-optimization skill is retired into this skill's Section
+  3).
 version: 1.0.0
 platforms: [linux]
 metadata:
   hermes:
     tags: [bootstrap, recovery, config, cron, vault, container, ops, lifecycle]
     related_skills: [vault-sync, mcp-integration, hermes-agent]
+keywords: [agent bootstrap, agent recovery, agent cronjob, agent deploy, hermes, steward]
+paths: [80_agents/**, '**/agents/*.yaml']
 ---
-
 # Agent Lifecycle — Setup, Config, Scheduling & Recovery
 
 Complete operational lifecycle of a Hermes Agent instance. This is the umbrella skill for everything that keeps an agent running, recoverable, and properly configured.
@@ -443,7 +448,7 @@ Every time you install, configure, or enable a system service:
 1. **Install** the package
 2. **Verify** the service is running
 3. **Check runtime config**
-4. **Record in vault** — update `80_agents/hermes-nan/20-servers.md`
+4. **Record in vault** — update `80_agents/hermes-nan/servers.md`
 5. **Git commit + push**
 
 **Pitfall — patch tool + markdown tables:** The `patch` tool may add `||` (double pipe) prefixes instead of preserving single `|` pipes in markdown tables. **Workaround:** After patching a table, always `read_file` the full file to verify formatting. If the table broke, rewrite the entire file with `write_file` instead.

@@ -47,13 +47,28 @@ model_weak = "openai/qwen3.6"
 custom_model_max_tokens = 200000
 max_model_tokens = 200000
 
-response_language = "en-US"
+# The reviewer answers in Spanish because Manu reads it, and a review comment is
+# conversation about the change rather than part of the durable record. The
+# English-only standing order still binds everything it names — commit messages,
+# branch names, PR titles and bodies, code comments — and it binds this file too:
+# the instructions below stay in English, only the output is translated. If that
+# reading of "durable record" is wrong, this is the one line to change back.
+response_language = "es-ES"
 
 # AGENTS.md is this repo's behavioural SSOT, so the standing orders, the
 # English-only rule, the no-auto-merge rule and the shell-compatibility table all
 # enter the review prompt with no extra wiring. This is the single highest-value
 # line in the file.
-repo_context_files = ["AGENTS.md"]
+repo_context_files = ["AGENTS.md", ".claude/CLAUDE.md"]
+
+# .claude/CLAUDE.md was NOT here originally, and its absence made the
+# extra_instructions below refer to a file the reviewer could not read: they say
+# "see the prohibited-pattern table in .claude/CLAUDE.md", which is where the
+# bash/zsh rules actually live. An instruction naming a source that is not in
+# context is the same shape as a guard citing a check it cannot run — it reads as
+# rigour and asserts nothing. The two files together are the harness as a
+# reviewer can see it: AGENTS.md carries the standing orders and the enforced
+# regions, CLAUDE.md the repo-specific tables and verification commands.
 
 [pr_reviewer]
 # Inline comments on the diff, which is the half CodeRabbit's free tier withholds
@@ -65,6 +80,31 @@ persistent_comment = true
 final_update_message = false
 
 extra_instructions = """
+Open every review with a HARNESS COMPLIANCE pass over the two context files
+(AGENTS.md and .claude/CLAUDE.md), stating PASS or FAIL per item with the
+offending file and line. Report it even when everything passes — a silent
+section is indistinguishable from a section that was skipped. Check at least:
+
+- English only in the durable record: commit messages, branch name, PR title and
+  body, code comments. Conversation may be any language; artifacts may not.
+- No AI attribution anywhere in git or GitHub artifacts: no Co-Authored-By
+  naming an agent, no "Generated with" footer, no bot emoji signature.
+- No internal phase or milestone reference in the branch name, commit messages
+  or PR title.
+- Shell that must run under BOTH bash and zsh: check the changed lines against
+  the prohibited-pattern table in .claude/CLAUDE.md, including the three rows
+  that fail SILENTLY (unmatched glob in a for, unquoted word-splitting, and a
+  slashless argument to the source builtin).
+- Definition of Done, on the PR as submitted: debt fixed or ticketed, knowledge
+  written where it belongs, the ticket moved, review output dispositioned,
+  and a completion claim backed by command output rather than assertion.
+- Spec-Driven Development: a change of this size either touches a specs/<id>/
+  folder or carries the skip-sdd label with a written rationale.
+- No auto-merge: nothing in the diff enables it, and no workflow merges a PR
+  without a human.
+
+Then continue with the substance.
+
 This repository already runs shellcheck, bats, golangci-lint, go vet and gitleaks
 in CI. Do not restate what a linter reports; that is covered and it is noise here.
 
@@ -82,6 +122,40 @@ Shell must run under bash AND zsh; see the prohibited-pattern table in
 Classify each finding by whether it is REAL, THEORETICAL or SPECULATIVE, and say
 which. A finding without that gradation is hard to action.
 """
+
+[pr_code_suggestions]
+# This section did not exist, and its absence made the `[pr_reviewer]` comment
+# above false. That comment says inline comments on the diff are "the reason this
+# work exists" — but `review` never posts inline by design; `improve` does, and
+# without this section `improve` ran on defaults with dual publishing DISABLED.
+# Measured across #1042, #1047 and #1051: 2 PR-Agent comments each, **0 inline**.
+# The stated reason for the tool being here had never been configured.
+#
+# Only the settings that actually change behaviour are listed. Three more were
+# proposed — commitable_code_suggestions, focus_only_on_problems and
+# persistent_comment — and all three are already the upstream default at the
+# pinned tag, so declaring them would assert a change that does not happen. The
+# action is pinned by tag, so those defaults cannot drift under us without a
+# deliberate bump.
+
+# Default is -1, which DISABLES inline publishing entirely. This is the line that
+# makes the [pr_reviewer] claim true. 7 is the score upstream's own scoring
+# mechanism calls "medium" (new_score_mechanism_th_medium), so it is the
+# documented boundary above which a suggestion is more than stylistic — not a
+# recommendation for this setting specifically, which upstream does not give.
+dual_publishing_score_threshold = 7
+
+# Default is 0, i.e. publish everything. The scale is 0-10 and upstream warns
+# against going above 8 because it clips relevant suggestions. 5 is the midpoint:
+# below it is style, which shellcheck, golangci-lint and PSScriptAnalyzer already
+# own in this repo, and restating them is the noise extra_instructions forbids.
+suggestions_score_threshold = 5
+
+# Default is true, which posts "No code suggestions found for the PR" as a second
+# bot comment carrying no information. Suppressed for noise alone — note it is
+# NOT to avoid re-triggering workflows: comments authored with GITHUB_TOKEN emit
+# no events at all, which is the defect #1052 exists to fix.
+publish_output_no_suggestions = false
 
 [ignore]
 # Path-based exclusion, so the rule lives in a file rather than in memory. The

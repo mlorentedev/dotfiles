@@ -90,3 +90,33 @@ func TestInitGithubSkipsGracefullyWithoutGh(t *testing.T) {
 		t.Errorf("expected a [WARN] skip, got:\n%s", stdout+stderr)
 	}
 }
+
+// TestInitDryRunCmd asserts `dotf init <dir> --dry-run` reports actions without writing to disk.
+func TestInitDryRunCmd(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "target")
+	stdout, stderr, err := execute(t, "init", dir, "--dry-run", "--skip-github", "--skip-vault")
+	if err != nil {
+		t.Fatalf("`dotf init --dry-run` errored: %v\n%s", err, stdout+stderr)
+	}
+	if !strings.Contains(stdout+stderr, "[DRY-RUN]") {
+		t.Errorf("expected [DRY-RUN] in output, got:\n%s", stdout+stderr)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err == nil {
+		t.Errorf("dry-run wrote AGENTS.md to %s", dir)
+	}
+}
+
+// TestInitAgentsDryRunCmd asserts `dotf init agents --dry-run` reports intent without modifying AGENTS.md.
+func TestInitAgentsDryRunCmd(t *testing.T) {
+	dir := t.TempDir()
+	stdout, stderr, err := execute(t, "init", "agents", "--repo", dir, "--dry-run")
+	if err != nil {
+		t.Fatalf("`dotf init agents --dry-run` errored: %v\n%s", err, stdout+stderr)
+	}
+	if !strings.Contains(stdout+stderr, "[DRY-RUN]") {
+		t.Errorf("expected [DRY-RUN] in output, got:\n%s", stdout+stderr)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err == nil {
+		t.Errorf("dry-run wrote AGENTS.md to %s", dir)
+	}
+}

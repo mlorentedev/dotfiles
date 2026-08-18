@@ -1,18 +1,22 @@
 ---
 generated: true
 generated_from: 00_meta/skills/mcp-builder/SKILL.md
-generated_sha: b0f680afca0b0f55
+generated_sha: 7deb76d611d9a7f5
 id: mcp-builder-skill
 type: skill
 status: active
-created: "2026-06-02"
+created: '2026-06-02'
 owner: manu
 name: mcp-builder
-description: Guide for creating high-quality MCP (Model Context Protocol) servers that let LLMs interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, in Python (FastMCP) or Node/TypeScript (MCP SDK).
+description: Guide for creating high-quality MCP (Model Context Protocol) servers
+  that let LLMs interact with external services through well-designed tools. Use when
+  building MCP servers to integrate external APIs or services, in Python (FastMCP)
+  or Node/TypeScript (MCP SDK).
 source: https://github.com/anthropics/skills (mcp-builder)
 license: Apache-2.0
+keywords: [mcp server, fastmcp, mcp tool, model context protocol, crear mcp]
+paths: ['**/mcp/**', '**/mcp_*.py', '**/mcp_*.go', mcp-servers.json]
 ---
-
 # MCP Server Development Guide
 
 Create MCP servers that enable LLMs to interact with external services through well-designed tools. Quality is measured by how well the server enables LLMs to accomplish real-world tasks.

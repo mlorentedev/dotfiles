@@ -17,11 +17,13 @@ var defaultTriggersJSON []byte
 // TriggersFile is the repo-relative path to the triggers definition.
 const TriggersFile = "harness/triggers.json"
 
-// TriggerRule defines a path-to-pattern mapping.
+// TriggerRule defines a path-and-prompt-to-pattern mapping.
 type TriggerRule struct {
 	ID          string   `json:"id"`
 	Pattern     string   `json:"pattern"`
 	Globs       []string `json:"globs"`
+	Skills      []string `json:"skills,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
 	Description string   `json:"description,omitempty"`
 }
 
@@ -82,6 +84,44 @@ func MatchPaths(triggers []TriggerRule, paths []string) []string {
 // MatchDiff extracts modified file paths from a unified diff and returns matching pattern IDs.
 func MatchDiff(triggers []TriggerRule, diffContent string) []string {
 	return MatchPaths(triggers, ExtractPathsFromDiff(diffContent))
+}
+
+// MatchPrompt evaluates prompt text against keywords in trigger rules and returns sorted unique pattern IDs and skill names.
+func MatchPrompt(triggers []TriggerRule, prompt string) ([]string, []string) {
+	promptLower := strings.ToLower(prompt)
+	matchedPats := make(map[string]struct{})
+	matchedSkills := make(map[string]struct{})
+
+	for _, rule := range triggers {
+		for _, kw := range rule.Keywords {
+			kwLower := strings.ToLower(strings.TrimSpace(kw))
+			if kwLower != "" && strings.Contains(promptLower, kwLower) {
+				if rule.Pattern != "" {
+					matchedPats[rule.Pattern] = struct{}{}
+				}
+				for _, sk := range rule.Skills {
+					if sk != "" {
+						matchedSkills[sk] = struct{}{}
+					}
+				}
+				break
+			}
+		}
+	}
+
+	pats := make([]string, 0, len(matchedPats))
+	for p := range matchedPats {
+		pats = append(pats, p)
+	}
+	sort.Strings(pats)
+
+	skills := make([]string, 0, len(matchedSkills))
+	for s := range matchedSkills {
+		skills = append(skills, s)
+	}
+	sort.Strings(skills)
+
+	return pats, skills
 }
 
 // ExtractPathsFromDiff parses touched file paths from unified diff headers.

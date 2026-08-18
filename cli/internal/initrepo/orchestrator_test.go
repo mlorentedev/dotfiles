@@ -26,7 +26,7 @@ func TestInitOrchestratesFullScaffold(t *testing.T) {
 
 	wantFiles := []string{
 		"AGENTS.md", "CLAUDE.md", ".gitignore", ".pre-commit-config.yaml",
-		"env-contract.json", filepath.Join("docs", "lessons.md"),
+		"env-contract.json", filepath.Join("docs", "lessons", "_index.md"),
 		filepath.Join(".github", "workflows", "ci.yml"),
 		"go.mod", "Makefile", ".git",
 	}
@@ -98,6 +98,37 @@ func TestInitWritesVaultEntryWhenVaultPresent(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(entry, f)); err != nil {
 			t.Errorf("expected vault entry file %s after Init: %v", f, err)
 		}
+	}
+}
+
+func TestInitDryRun(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "myproj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Init(InitOptions{
+		Root:       root,
+		Stack:      "go",
+		Date:       "2026-06-14",
+		DryRun:     true,
+		SkipGithub: true,
+	})
+	if err != nil {
+		t.Fatalf("Init with DryRun: %v", err)
+	}
+
+	if len(report.Steps) == 0 {
+		t.Error("report should list preview steps")
+	}
+
+	// DryRun must not write any files to disk.
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) > 0 {
+		t.Errorf("DryRun wrote files to root: %v", entries)
 	}
 }
 

@@ -89,6 +89,11 @@ is_repo_rooted() {
     printf '%s\n' "$TOP_LEVEL" | grep -qxF "$_first"
 }
 
+VAULT_ROOT="${VAULT_PATH:-}"
+if [ -z "$VAULT_ROOT" ] && command -v dotf >/dev/null 2>&1; then
+    VAULT_ROOT="$(dotf env path VAULT_PATH 2>/dev/null || true)"
+fi
+
 missing_total=0
 
 for target in "$@"; do
@@ -104,15 +109,22 @@ for target in "$@"; do
     while IFS= read -r token; do
         [ -n "$token" ] || continue
 
-        # Absolute, home-relative, variable-rooted, flag-like, or a URL.
-        #
-        # Defense-in-depth, not uniquely load-bearing: mutation-testing this
-        # branch away leaves the suite green, because is_repo_rooted rejects
-        # these shapes anyway (`~`, `$VAULT_PATH`, `https:` are never top-level
-        # repo entries). Kept because it states the intent at the point of
-        # reading and does not depend on that ordering holding forever — but
-        # do not mistake the tests for proof that it fires.
+        # Vault paths ($VAULT_PATH/...) are checked when VAULT_ROOT resolves.
         case "$token" in
+            '$VAULT_PATH/'*|'${VAULT_PATH}/'*)
+                case "$token" in
+                    *'<'*|*'>'*|*'&'*|*'|'*|*';'*|*'='*|*'@'*|*'('*|*')'*|*'*'*) continue ;;
+                esac
+                if [ -n "$VAULT_ROOT" ] && [ -d "$VAULT_ROOT" ]; then
+                    subpath="${token#\$VAULT_PATH/}"
+                    subpath="${subpath#\$\{VAULT_PATH\}/}"
+                    if [ ! -e "$VAULT_ROOT/$subpath" ]; then
+                        printf '%s: referenced vault path does not exist: %s\n' "$target" "$token" >&2
+                        missing_in_file=$((missing_in_file + 1))
+                    fi
+                fi
+                continue
+                ;;
             /*|'~'*|'$'*|-*|*://*) continue ;;
         esac
 

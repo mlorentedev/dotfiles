@@ -220,16 +220,22 @@ func dirHasDraftTag(dir string) bool {
 	return found
 }
 
-// lessonsStaleness flags a stale docs/lessons.md in the current repo (HARNESS-024):
+// lessonsStaleness flags a stale docs/lessons/_index.md or docs/lessons.md in the current repo (HARNESS-024):
 // leading newline when older than staleDays, nothing when absent or fresh.
 func lessonsStaleness(cwd string, staleDays int, now time.Time) string {
-	lessons := filepath.Join(cwd, "docs", "lessons.md")
+	lessons := filepath.Join(cwd, "docs", "lessons", "_index.md")
+	targetName := "docs/lessons/"
 	info, err := os.Stat(lessons)
-	if err != nil || info.IsDir() {
-		return ""
+	if err != nil {
+		lessons = filepath.Join(cwd, "docs", "lessons.md")
+		targetName = "docs/lessons.md"
+		info, err = os.Stat(lessons)
+		if err != nil || info.IsDir() {
+			return ""
+		}
 	}
 	if now.Sub(info.ModTime()) > time.Duration(staleDays)*24*time.Hour {
-		return fmt.Sprintf("\n[lessons] docs/lessons.md not updated in >%d days — capture fixes/discoveries from this session (handoff Step 2) or note the gap (HARNESS-024).", staleDays)
+		return fmt.Sprintf("\n[lessons] %s not updated in >%d days — capture fixes/discoveries from this session (handoff Step 2) or note the gap (HARNESS-024).", targetName, staleDays)
 	}
 	return ""
 }
