@@ -471,6 +471,13 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     [[ "$output" != *"exempt"* ]]
 }
 
+@test "exempt: a strict subset of the signature is NOT exempt" {
+    # Exact set equality: changing only CHANGELOG.md requires review.
+    run "$SCRIPT" --payload "$F/release-strict-subset.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" != *"exempt"* ]]
+}
+
 @test "exempt: an empty file list does not exempt everything" {
     # Set subtraction says every element of an empty list is present in any set,
     # so a payload with no files matches EVERY signature. That would turn an

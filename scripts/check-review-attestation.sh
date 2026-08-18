@@ -238,7 +238,13 @@ EXEMPT_NAME="$(printf '%s' "$PR_JSON" | jq -r --slurpfile cfg "$CONFIG" '
     | [.files[]?.path] as $changed
     | if ($changed | length) == 0 then ""
       else
-        [ $sigs[] | select( ($changed - .files) | length == 0 ) | .name ] | first // ""
+        [ $sigs[]
+          | select(
+              (($changed - .files) | length == 0)
+              and ((.files - $changed) | length == 0)
+            )
+          | .name
+        ] | first // ""
       end')"
 
 if [ -n "$EXEMPT_NAME" ]; then

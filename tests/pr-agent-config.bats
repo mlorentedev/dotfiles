@@ -328,17 +328,23 @@ ignored = cfg.get('ignore_pr_source_branches', [])
 reg = json.load(open('$REPO/harness/review-attestation.json'))
 exempt = reg.get('exempt', {}).get('signatures', [])
 
-reviewer_skips = bool(ignored)
-gate_exempts = bool(exempt)
-if reviewer_skips != gate_exempts:
-    if reviewer_skips:
-        print('the reviewer skips PRs the gate still demands a review for:')
+has_ignored = '^release-please--' in ignored
+rp_sig = next((s for s in exempt if s.get('name') == 'release-please'), None)
+expected_files = {'.release-please-manifest.json', 'CHANGELOG.md', 'versions.conf'}
+has_sig = rp_sig is not None and set(rp_sig.get('files', [])) == expected_files
+
+if has_ignored != has_sig:
+    if has_ignored:
+        print('the reviewer skips release PRs the gate still demands a review for:')
         print('  ignore_pr_source_branches = ' + repr(ignored))
-        print('  no exempt.signatures in the registry -> those PRs can never go green')
+        print('  no release-please signature in the registry -> those PRs can never go green')
     else:
-        print('the gate exempts PRs the reviewer still reviews:')
+        print('the gate exempts release PRs the reviewer still reviews:')
         print('  exempt.signatures = ' + repr([s.get('name') for s in exempt]))
-        print('  ignore_pr_source_branches is empty -> the exemption is unreachable noise')
+        print('  ignore_pr_source_branches missing ^release-please--')
+    sys.exit(1)
+if not has_ignored or not has_sig:
+    print('expected release-please branch pattern and 3-file signature to be declared')
     sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
