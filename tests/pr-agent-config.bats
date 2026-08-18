@@ -221,3 +221,36 @@ PY
     grep -q 'Report it even when everything passes' "$CFG"
     refute_grep 'HARNESS COMPLIANCE.*(if |when relevant|where applicable)' "$CFG"
 }
+
+# The reason this tool was adopted is inline comments on the diff — the half
+# CodeRabbit's free tier withholds on private repos. That claim sat in a
+# `[pr_reviewer]` comment for the tool's whole life while dual publishing was at
+# its default of -1 (disabled), and 0 inline comments were posted across #1042,
+# #1047 and #1051. Pinned as a decision, not a value: any threshold in [0-10]
+# publishes inline; -1 or a missing section silently stops.
+@test "pr-agent: inline suggestions are actually enabled, not merely claimed" {
+    run python3 -c "
+import sys, tomllib
+cfg = tomllib.load(open('$CFG', 'rb'))
+s = cfg.get('pr_code_suggestions')
+if s is None:
+    print('no [pr_code_suggestions] section: improve runs on defaults, inline disabled'); sys.exit(1)
+t = s.get('dual_publishing_score_threshold', -1)
+if not (0 <= t <= 10):
+    print(f'dual_publishing_score_threshold={t} does not publish inline'); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# The linters own style in this repo and extra_instructions forbids restating
+# them. A score floor of 0 (the upstream default) publishes everything, which
+# reintroduces exactly that noise through a different door.
+@test "pr-agent: suggestions below the style line are not published" {
+    run python3 -c "
+import sys, tomllib
+s = tomllib.load(open('$CFG', 'rb')).get('pr_code_suggestions', {})
+t = s.get('suggestions_score_threshold', 0)
+sys.exit(0 if 1 <= t <= 8 else 1)
+"
+    [ "$status" -eq 0 ]
+}
