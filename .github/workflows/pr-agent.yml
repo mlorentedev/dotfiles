@@ -21,7 +21,17 @@ on:
     types: [created]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  # The event name is part of the key, and it is load-bearing. A PR comment is an
+  # issue_comment whose `issue.number` IS the PR number, so without it a
+  # comment-triggered run shares this group with the in-flight pull_request run and
+  # `cancel-in-progress` kills the review. PR-Agent is a Docker action that spends
+  # its first ~20s in `Build The-PR-Agent/pr-agent`, and CodeRabbit's auto-summary
+  # comment reliably lands inside that window.
+  #
+  # Measured on #1037 and #1038 (2026-08-18): both reviews cancelled mid-build,
+  # both workflows reporting green, zero reviews produced — on every PR since this
+  # shipped. Pushes still supersede pushes; a comment no longer cancels a review.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
