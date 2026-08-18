@@ -53,6 +53,29 @@ max_model_tokens = 200000
 # branch names, PR titles and bodies, code comments — and it binds this file too:
 # the instructions below stay in English, only the output is translated. If that
 # reading of "durable record" is wrong, this is the one line to change back.
+# Release PRs are not reviewed, and this pairs with an exemption in
+# harness/review-attestation.json — the two must move together or the change
+# makes things worse.
+#
+# Why not review them: a release PR restates commits already on main, each
+# reviewed when it merged. PR-Agent's ticket-compliance analysis reads the
+# CHANGELOG's issue references, looks for their code in the diff, and reports
+# "none of the above requirements are fulfilled" — structurally, on every
+# release. Measured on #1049. That is noise guaranteed to recur, and noise from
+# a reviewer is how a reviewer stops being read.
+#
+# Why the pairing is load-bearing: excluding them here WITHOUT the gate
+# exemption produces a release PR with no reviewer output at all, which the
+# attestation gate correctly calls `pending` and which nothing can ever clear —
+# the unreachable state filed as #1061. One half alone is worse than neither.
+#
+# Source branch rather than title or author: the title is free text, and the
+# author is a human (release-please runs under a PAT), so an author rule would
+# never fire. The gate's half matches on diff signature instead, deliberately
+# not on this branch name — two independent conditions, so neither is a single
+# string that lets a change past both.
+ignore_pr_source_branches = ["^release-please--"]
+
 response_language = "es-ES"
 
 # AGENTS.md is this repo's behavioural SSOT, so the standing orders, the

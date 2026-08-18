@@ -77,3 +77,23 @@ signal beside it.
 **Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the
 harness, after running `verification` and capturing exit code 0, may set that
 terminal state. Every entry starts `pending` with empty `evidence`.
+
+## A fifth state, after the reviewer changed underneath the gate (#1061)
+
+- [x] `exempt` — a change whose diff carries nothing a review could act on. Added
+      because the second reviewer's ticket-compliance analysis is structurally
+      wrong on release PRs (it looks for the CHANGELOG's referenced code in a
+      diff that cannot contain it), so those PRs were about to be excluded from
+      review — and excluding them without this would have manufactured the
+      unreachable state of #1061.
+- [x] Matched by **diff signature**, never by author or branch. The author of a
+      release PR reads as a human because the tool runs under a PAT; a branch
+      rule would let any branch named to match walk past. The reviewer's half
+      matches on branch and the gate's on file set — two independent conditions,
+      so no single string gets a change past both.
+- [x] Fails closed on the set-theory identity: an empty file list matches every
+      signature under subtraction, which would turn a truncated payload into a
+      blanket pass. Guarded by name.
+- [x] The pairing itself is guarded, across both files. The first version was not
+      — removing the reviewer exclusion broke no test, which is the half-applied
+      state the design exists to prevent, present in the change that designed it.

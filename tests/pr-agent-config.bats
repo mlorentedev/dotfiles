@@ -175,7 +175,8 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
 import json, sys, yaml
 d = yaml.safe_load(open('$WF'))
 types = set(d[True]['pull_request']['types'])
-env = d['jobs']['review']['steps'][-1]['env']
+step = next(s for s in d['jobs']['review']['steps'] if 'pr-agent' in s.get('uses', ''))
+env = step['env']
 actions = set(json.loads(env['github_action_config.pr_actions']))
 push_on = str(env.get('github_action_config.handle_push_trigger', 'false')).lower() == 'true'
 
@@ -219,7 +220,9 @@ if 'synchronize' in types and not push_on:
 @test "pr-agent: the push path runs exactly /review, no more and no less" {
     run python3 -c "
 import json, sys, yaml
-env = yaml.safe_load(open('$WF'))['jobs']['review']['steps'][-1]['env']
+d = yaml.safe_load(open('$WF'))
+step = next(s for s in d['jobs']['review']['steps'] if 'pr-agent' in s.get('uses', ''))
+env = step['env']
 if str(env.get('github_action_config.handle_push_trigger', 'false')).lower() != 'true':
     sys.exit(0)
 raw = env.get('github_action_config.push_commands')
@@ -309,4 +312,43 @@ t = s.get('suggestions_score_threshold', 0)
 sys.exit(0 if 1 <= t <= 8 else 1)
 "
     [ "$status" -eq 0 ]
+}
+
+# The two halves must move together or the change makes things worse: excluding
+# release PRs from the reviewer WITHOUT exempting them from the attestation gate
+# produces a PR with no reviewer output that nothing can ever clear — #1061's
+# unreachable state, manufactured deliberately.
+#
+# This guard spans two files because the coupling does. Neither file can express
+# it alone, and a guard that lived in either would pass while the other half was
+# removed — which is exactly what happened when this was first written: deleting
+# the reviewer exclusion broke nothing.
+@test "pr-agent: excluding release PRs from review is paired with a gate exemption" {
+    run python3 -c "
+import json, sys, tomllib
+cfg = tomllib.load(open('$CFG', 'rb'))['config']
+ignored = cfg.get('ignore_pr_source_branches', [])
+reg = json.load(open('$REPO/harness/review-attestation.json'))
+exempt = reg.get('exempt', {}).get('signatures', [])
+
+has_ignored = '^release-please--' in ignored
+rp_sig = next((s for s in exempt if s.get('name') == 'release-please'), None)
+expected_files = {'.release-please-manifest.json', 'CHANGELOG.md', 'versions.conf'}
+has_sig = rp_sig is not None and set(rp_sig.get('files', [])) == expected_files
+
+if has_ignored != has_sig:
+    if has_ignored:
+        print('the reviewer skips release PRs the gate still demands a review for:')
+        print('  ignore_pr_source_branches = ' + repr(ignored))
+        print('  no release-please signature in the registry -> those PRs can never go green')
+    else:
+        print('the gate exempts release PRs the reviewer still reviews:')
+        print('  exempt.signatures = ' + repr([s.get('name') for s in exempt]))
+        print('  ignore_pr_source_branches missing ^release-please--')
+    sys.exit(1)
+if not has_ignored or not has_sig:
+    print('expected release-please branch pattern and 3-file signature to be declared')
+    sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }

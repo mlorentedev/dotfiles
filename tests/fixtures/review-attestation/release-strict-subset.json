@@ -1,0 +1,16 @@
+{
+  "number": 1050,
+  "state": "OPEN",
+  "labels": [],
+  "body": "",
+  "comments": [],
+  "reviews": [],
+  "author": {
+    "login": "manu"
+  },
+  "files": [
+    {
+      "path": "CHANGELOG.md"
+    }
+  ]
+}
