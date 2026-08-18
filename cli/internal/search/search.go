@@ -175,6 +175,9 @@ func IndexVault(root string) ([]Document, error) {
 			return nil
 		}
 		if d.IsDir() {
+			if path == root {
+				return nil
+			}
 			name := d.Name()
 			if strings.HasPrefix(name, ".") && name != "." {
 				return filepath.SkipDir
