@@ -124,6 +124,59 @@ func MatchPrompt(triggers []TriggerRule, prompt string) ([]string, []string) {
 	return pats, skills
 }
 
+// Suggestion aggregates matched patterns and skills from prompts and paths.
+type Suggestion struct {
+	Patterns []string `json:"patterns"`
+	Skills   []string `json:"skills"`
+}
+
+// Suggest evaluates prompt text and modified paths against trigger rules.
+func Suggest(triggers []TriggerRule, prompt string, paths []string) Suggestion {
+	patsPrompt, skillsPrompt := MatchPrompt(triggers, prompt)
+	patsPaths := MatchPaths(triggers, paths)
+
+	patMap := make(map[string]struct{})
+	for _, p := range patsPrompt {
+		patMap[p] = struct{}{}
+	}
+	for _, p := range patsPaths {
+		patMap[p] = struct{}{}
+	}
+
+	skillMap := make(map[string]struct{})
+	for _, s := range skillsPrompt {
+		skillMap[s] = struct{}{}
+	}
+
+	// Also link skills mapped to triggered patterns
+	for _, rule := range triggers {
+		if _, ok := patMap[rule.Pattern]; ok {
+			for _, sk := range rule.Skills {
+				if sk != "" {
+					skillMap[sk] = struct{}{}
+				}
+			}
+		}
+	}
+
+	pats := make([]string, 0, len(patMap))
+	for p := range patMap {
+		pats = append(pats, p)
+	}
+	sort.Strings(pats)
+
+	skills := make([]string, 0, len(skillMap))
+	for s := range skillMap {
+		skills = append(skills, s)
+	}
+	sort.Strings(skills)
+
+	return Suggestion{
+		Patterns: pats,
+		Skills:   skills,
+	}
+}
+
 // ExtractPathsFromDiff parses touched file paths from unified diff headers.
 func ExtractPathsFromDiff(diff string) []string {
 	seen := make(map[string]struct{})
