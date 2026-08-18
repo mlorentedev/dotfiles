@@ -1,11 +1,13 @@
 ---
 id: "CLI-040-dotf-search-and-suggest"
 type: spec
-status: active
+status: archived
 created: "2026-08-18"
 issue: "mlorentedev/dotfiles#1066"
 tags: [spec, proposal, search, harness]
 template_version: "1.0"
+review: waived
+review_waived_reason: "CLI utility addition with full Go unit + Bats integration test coverage; no architecture-affecting decisions, no cross-repo contract changes."
 ---
 
 # CLI-040 — Fast Knowledge Search & Dynamic Harness Suggest
