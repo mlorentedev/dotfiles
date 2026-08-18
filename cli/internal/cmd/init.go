@@ -27,6 +27,7 @@ func newInitCmd() *cobra.Command {
 		skipVault  bool
 		skipGithub bool
 		skipAgents bool
+		dryRun     bool
 	)
 
 	cmd := &cobra.Command{
@@ -46,7 +47,7 @@ their dependency is absent — never fatal.
 
 Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 (AGENTS.md + SDD) and 'dotf init github' (repo defaults).`,
-		Example:      "  dotf init\n  dotf init my-new-repo --stack go\n  dotf init . --skip-vault --skip-github",
+		Example:      "  dotf init\n  dotf init my-new-repo --stack go\n  dotf init . --dry-run\n  dotf init . --skip-vault --skip-github",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,8 +55,10 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 			if len(args) == 1 {
 				target = args[0]
 			}
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return err
+			if !dryRun {
+				if err := os.MkdirAll(target, 0o755); err != nil {
+					return err
+				}
 			}
 			root, err := filepath.Abs(target)
 			if err != nil {
@@ -75,6 +78,7 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 				Root:              root,
 				Stack:             stack,
 				Date:              now().Format("2006-01-02"),
+				DryRun:            dryRun,
 				SkipAgents:        skipAgents,
 				SkipGithub:        skipGithub,
 				VaultPath:         vaultPath,
@@ -84,7 +88,11 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 				return err
 			}
 
-			cmd.Printf("\n[OK] Initialized %s\n", report.Root)
+			if dryRun {
+				cmd.Printf("\n[DRY-RUN] Would initialize %s\n", report.Root)
+			} else {
+				cmd.Printf("\n[OK] Initialized %s\n", report.Root)
+			}
 			for _, s := range report.Steps {
 				cmd.Printf("  %-10s [%s] %s\n", s.Name, s.Status, s.Detail)
 			}
@@ -93,6 +101,7 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 	}
 
 	cmd.Flags().StringVar(&stack, "stack", "none", "project stack to initialize: go|python|node|none")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without modifying disk")
 	cmd.Flags().BoolVar(&skipVault, "skip-vault", false, "skip the vault project entry")
 	cmd.Flags().BoolVar(&skipGithub, "skip-github", false, "skip applying GitHub repo defaults")
 	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "skip writing AGENTS.md + the SDD section")
@@ -108,8 +117,9 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 // target for the fleet-wide AGENTS.md backfill (HARNESS-013).
 func newInitAgentsCmd() *cobra.Command {
 	var (
-		repo  string
-		force bool
+		repo   string
+		force  bool
+		dryRun bool
 	)
 
 	cmd := &cobra.Command{
@@ -122,7 +132,7 @@ vault required and no $VAULT_PATH leak (#248).
 Idempotent: a re-run is a safe no-op when the section is already present. Pass
 --force to replace an existing section in place. Without --repo it operates on
 the current git repo.`,
-		Example:      "  dotf init agents\n  dotf init agents --repo ../other-repo --force",
+		Example:      "  dotf init agents\n  dotf init agents --repo ../other-repo --dry-run\n  dotf init agents --repo ../other-repo --force",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -139,25 +149,42 @@ the current git repo.`,
 				return fmt.Errorf("--repo is not a directory: %s", root)
 			}
 
-			res, err := initrepo.BootstrapAgents(root, force)
+			res, err := initrepo.BootstrapAgentsOpts(root, force, dryRun)
 			if err != nil {
 				return err
 			}
+			prefix := "[OK]"
+			if dryRun {
+				prefix = "[DRY-RUN]"
+			}
 			switch res.Action {
 			case "unchanged":
-				cmd.Printf("[OK] SDD section already present in %s (use --force to refresh)\n", res.Path)
+				cmd.Printf("%s SDD section already present in %s (use --force to refresh)\n", prefix, res.Path)
 			case "created":
-				cmd.Printf("[OK] Created %s with the Spec-Driven Development section\n", res.Path)
+				if dryRun {
+					cmd.Printf("%s Would create %s with the Spec-Driven Development section\n", prefix, res.Path)
+				} else {
+					cmd.Printf("%s Created %s with the Spec-Driven Development section\n", prefix, res.Path)
+				}
 			case "appended":
-				cmd.Printf("[OK] Appended the Spec-Driven Development section to %s\n", res.Path)
+				if dryRun {
+					cmd.Printf("%s Would append the Spec-Driven Development section to %s\n", prefix, res.Path)
+				} else {
+					cmd.Printf("%s Appended the Spec-Driven Development section to %s\n", prefix, res.Path)
+				}
 			case "replaced":
-				cmd.Printf("[OK] Replaced the Spec-Driven Development section in %s\n", res.Path)
+				if dryRun {
+					cmd.Printf("%s Would replace the Spec-Driven Development section in %s\n", prefix, res.Path)
+				} else {
+					cmd.Printf("%s Replaced the Spec-Driven Development section in %s\n", prefix, res.Path)
+				}
 			}
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&repo, "repo", "", "target repo root (default: the current git repo)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report intended changes without modifying disk")
 	cmd.Flags().BoolVar(&force, "force", false, "replace an existing SDD section in place")
 	return cmd
 }

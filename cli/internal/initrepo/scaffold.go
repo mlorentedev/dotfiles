@@ -40,16 +40,20 @@ type ScaffoldResult struct {
 
 // Scaffold lays down the placement-model directory structure and the static
 // practice-stack files under root (which should be an absolute path),
-// substituting {{repo}} with the repo basename. Directories are created
-// idempotently (mkdir -p); files are skip-if-present so a re-run never clobbers
-// project content. AGENTS.md/SDD wiring, stack init, git, and the vault entry are
-// layered on top by the orchestrator.
+// substituting {{repo}} with the repo basename.
 func Scaffold(root string) (ScaffoldResult, error) {
+	return ScaffoldOpts(root, false)
+}
+
+// ScaffoldOpts is the parameterised form of Scaffold, with dry-run support.
+func ScaffoldOpts(root string, dryRun bool) (ScaffoldResult, error) {
 	var res ScaffoldResult
 
-	for _, d := range scaffoldDirs {
-		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
-			return res, err
+	if !dryRun {
+		for _, d := range scaffoldDirs {
+			if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+				return res, err
+			}
 		}
 	}
 
@@ -58,6 +62,10 @@ func Scaffold(root string) (ScaffoldResult, error) {
 		dest := filepath.Join(root, f.dest)
 		if _, err := os.Stat(dest); err == nil {
 			res.Skipped = append(res.Skipped, f.dest)
+			continue
+		}
+		if dryRun {
+			res.Created = append(res.Created, f.dest)
 			continue
 		}
 		raw, err := ReadTemplate(f.template)
