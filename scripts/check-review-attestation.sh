@@ -122,12 +122,14 @@ jq -e '
             (.login | type == "string" and length > 0)
         and (.declined_markers | type == "array")
         and (.declined_markers | all(type == "string" and length > 0))
+        and (.review_markers   | type == "array")
+        and (.review_markers   | all(type == "string" and length > 0))
     ))
     and (.escape | type == "object")
     and (.escape.label   | type == "string" and length > 0)
     and (.escape.section | type == "string" and length > 0)
 ' "$CONFIG" >/dev/null 2>&1 \
-    || die_unreadable "reviewer registry is valid JSON but the wrong shape (needs reviewers[].login, reviewers[].declined_markers[], escape.label, escape.section): $CONFIG"
+    || die_unreadable "reviewer registry is valid JSON but the wrong shape (needs reviewers[].login, reviewers[].declined_markers[], reviewers[].review_markers[], escape.label, escape.section): $CONFIG"
 
 # --- acquire the payload -------------------------------------------------------
 # One shape either way, so the offline fixture path and the live path exercise
@@ -171,6 +173,44 @@ if [ "$INDEPENDENT" -gt 0 ]; then
     exit 0
 fi
 
+# --- attested by a comment-shaped review? --------------------------------------
+# A reviewer that does not use the reviews API. PR-Agent (#786) runs under
+# GITHUB_TOKEN as github-actions and publishes through the COMMENTS api, so
+# reviews[] is empty on a PR it genuinely reviewed — measured on #1037 and #1042,
+# both carrying a real Guide and both reading as unattested (#1045). The gate
+# built to make green mean "reviewed" was calling the repo's own reviewer
+# unreviewed, which is #906's failure with the sign flipped.
+#
+# Matched on a DECLARED (login, marker) pair, never on "a bot commented": the
+# latter would let a labeler or release bot attest through the comments door,
+# which is exactly #1033's defect arriving by another route.
+#
+# Runs BEFORE the declined check on purpose. Both can be true at once — PR-Agent
+# reviews while CodeRabbit's quota is spent — and the gate asks whether a review
+# happened, so one that did outranks one that did not.
+ATTESTED_BY=""
+ATTESTED_MARKER=""
+while IFS=$'\t' read -r login marker; do
+    [ -n "$login" ] || continue
+    hit="$(printf '%s' "$PR_JSON" | jq -r --arg l "$login" --arg m "$marker" --arg a "$PR_AUTHOR" '
+        def norm: (. // "") | ascii_downcase | sub("\\[bot\\]$"; "");
+        [ .comments[]?
+          | select((.author.login | norm) == ($l | norm))
+          | select((.author.login | norm) != ($a | norm))
+          | select((.body // "") | contains($m))
+        ] | length')"
+    if [ "$hit" -gt 0 ]; then
+        ATTESTED_BY="$login"
+        ATTESTED_MARKER="$marker"
+        break
+    fi
+done < <(jq -r '.reviewers[]? | . as $r | ($r.review_markers[]? | [$r.login, .] | @tsv)' "$CONFIG")
+
+if [ -n "$ATTESTED_BY" ]; then
+    say "[OK] attested — reviewed by: $ATTESTED_BY (comment-shaped review: \"$ATTESTED_MARKER\")"
+    exit 0
+fi
+
 # --- declined? -----------------------------------------------------------------
 # A reviewer posted, but what it posted says no review ran. Told apart by the
 # vendor's own machine marker, never by prose: a review names files, lines or
@@ -179,8 +219,9 @@ DECLINED_BY=""
 DECLINED_MARKER=""
 while IFS=$'\t' read -r login marker; do
     [ -n "$login" ] || continue
-    hit="$(printf '%s' "$PR_JSON" | jq -r --arg l "$login" --arg m "$marker" \
-        '[.comments[]? | select((.author.login // "") == $l) | select((.body // "") | contains($m))] | length')"
+    hit="$(printf '%s' "$PR_JSON" | jq -r --arg l "$login" --arg m "$marker" '
+        def norm: (. // "") | ascii_downcase | sub("\\[bot\\]$"; "");
+        [.comments[]? | select((.author.login | norm) == ($l | norm)) | select((.body // "") | contains($m))] | length')"
     if [ "$hit" -gt 0 ]; then
         DECLINED_BY="$login"
         DECLINED_MARKER="$marker"
