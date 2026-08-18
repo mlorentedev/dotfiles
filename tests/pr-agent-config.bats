@@ -192,7 +192,19 @@ if 'synchronize' in types and not push_on:
 # the PR body, which this repo turned OFF as a decision twelve lines above. A
 # default that quietly re-enables what you disabled elsewhere is the same defect
 # one layer down.
-@test "pr-agent: the push path does not smuggle describe back in" {
+#
+# Asserted as EXACT equality with ["/review"], after a reviewer pointed out that
+# the first version only rejected /describe — so it passed on `[]` and on
+# ["/improve"]. `[]` is the dangerous one: the push trigger would fire, run
+# nothing, and this guard would stay green while the feature it protects was
+# entirely inert. A guard whose green survives the death of its subject is the
+# defect this whole file exists to catch, written into the file itself.
+#
+# Exact rather than "contains /review" on purpose: adding a command to the push
+# path costs a second inference call on every push, which is a decision worth
+# forcing through this line rather than letting it arrive as an edit nobody
+# weighs.
+@test "pr-agent: the push path runs exactly /review, no more and no less" {
     run python3 -c "
 import json, sys, yaml
 env = yaml.safe_load(open('$WF'))['jobs']['review']['steps'][-1]['env']
@@ -203,8 +215,12 @@ if raw is None:
     print('handle_push_trigger is on with no push_commands: describe returns by default')
     sys.exit(1)
 cmds = [c.strip() for c in json.loads(raw)]
-if '/describe' in cmds:
-    print('push_commands reinstates /describe, which rewrites the PR body')
+if cmds != ['/review']:
+    print(f'push_commands is {cmds!r}, want exactly [\'/review\']')
+    if '/describe' in cmds:
+        print('  /describe rewrites the PR body, turned off deliberately')
+    if not cmds:
+        print('  an empty list makes the push trigger fire and do nothing')
     sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }

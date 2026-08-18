@@ -59,10 +59,14 @@ created: "2026-08-16"
 
 ## Review on push, after the doctrine and the machinery disagreed
 
-- [x] Every push is reviewed again. `harness/enforced/pr-stewardship.md` — in
-      every agent's instructions — says *"pushing a fix reopens it, because the
-      reviewer re-reviews"*, and #1053 had made that false, leaving the second
-      half of every PR unread while the doctrine claimed otherwise.
+- [x] A push by a human is reviewed again — **not** every push: bot commits and
+      merge commits are excluded, because neither is somebody asking for another
+      look. `harness/enforced/pr-stewardship.md` — in every agent's instructions
+      — says *"pushing a fix reopens it, because the reviewer re-reviews"*, and
+      #1053 had made that false, leaving the second half of every PR unread while
+      the doctrine claimed otherwise. (Wording corrected on review: the first
+      draft said "every push", which overstated what the config does — the same
+      gap between a claim and its implementation this change exists to close.)
 - [x] Routed through `handle_push_trigger`, **not** through `pr_actions`. Adding
       `synchronize` to `pr_actions` does nothing: upstream handles synchronize on
       a separate path. That dead setting was one commit from being written, and
