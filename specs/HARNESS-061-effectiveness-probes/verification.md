@@ -22,3 +22,73 @@ created: "2026-08-08"
 - Lint: `shellcheck scripts/*.sh setup-linux.sh` -> clean
 - Manual smoke: the two live defects this replaces were both reproduced on this machine before the change and confirmed correctly reported after — the guard's inertness under a repo-local override, and the vault gate running through the dispatcher fallback while the old check called it INACTIVE
 - No regressions: yes. Two existing fixtures needed updating rather than the code — `vaultTree` now writes hooks executable (a non-executable hook is one git ignores, so the old fixture modelled a gate that does not fire), and the git fake now reports `config --get` the way git does, effective rather than local-only
+
+---
+
+## Re-verification 2026-08-18, by mutation
+
+This spec's thesis is that a passing report is not evidence, so the inherited
+guards were re-checked by breaking what each claims to catch, rather than by
+re-reading the ticks above.
+
+### The mitigations the proposal asserts
+
+| asserted in "Risks / open questions" | check | result |
+|---|---|---|
+| dispatcher-as-gate is safe *because* the fallback has a real-dependency test | `bats tests/precommit-fallback-real.bats` | 3/3 pass — the mitigation exists and runs |
+| the exemption table cannot go stale silently | mutation, below | holds |
+
+### Mutations
+
+| mutation | expected | observed |
+|---|---|---|
+| exempt a suite that HAS a real sibling (`precommit-fallback`) | stale-entry test fails | `not ok 2 … no stale entries` |
+| exempt a suite that does not exist (`ghost-suite`) | stale-entry test fails | `not ok 2 … no stale entries` |
+| add a new stub suite, unpaired and unexempted | pairing test fails, naming it | `not ok 1 … throwaway-canary` |
+| drop one row from the documented table | new drift guard fails | `not ok 2 … board-pickup` |
+| add to `EXEMPT_SUITES` without documenting it | new drift guard fails | `not ok 2` |
+
+**A false positive worth recording**, because it is the failure this spec names.
+The first attempt mutated the *comment table* and nothing failed — which reads as
+"AC5 is a claim". It was not: the table is documentation and `EXEMPT_SUITES` is
+what the code reads, so the mutation never reached the guard. **An invalid
+mutation and an absent guard produce the same green.** Verifying that the
+mutation lands is part of the mutation, not a preliminary to it.
+
+### Defect found and fixed: a third copy
+
+Chasing that false positive surfaced a real gap. The file's own header narrates a
+drift between two copies of the exemption list and fixes it by single-sourcing
+`exempt()` and the stale-entries loop to `EXEMPT_SUITES` — but the
+human-readable table above them stayed a **third** copy with nothing comparing
+it. Measured in sync (11 entries each) on 2026-08-18.
+
+It does not disable the guard; `EXEMPT_SUITES` remains authoritative. It
+misinforms the only reader who consults it — the person deciding whether to add a
+row. `pattern-derived-fact-drift`, inside the file that exists to catch this
+class.
+
+Closed by a fifth case in `tests/stub-real-pairing.bats`, mutation-tested in both
+directions (rows 4 and 5 above).
+
+### Current state
+
+```
+$ go build ./... && go vet ./... && go test ./...     # cli/
+15 packages ok, 0 failures
+
+$ bats tests/stub-real-pairing.bats
+5 tests, 0 failures
+
+$ bats tests/precommit-fallback-real.bats
+3 tests, 0 failures
+
+$ dotf doctor | grep -A1 'Disaster recovery'
+[Disaster recovery]
+  [WARN] no recovery drill recorded — run the chain … then `touch ~/.dotfiles/.dr-drill`
+```
+
+AC6 confirmed behaviourally: the check reports, and warns rather than fails, on a
+machine where the drill has never run. **That WARN is accurate** — the DR drill
+is still unexecuted, which this spec deliberately scopes out (surfacing staleness
+is code; performing the drill is a calendar commitment).
