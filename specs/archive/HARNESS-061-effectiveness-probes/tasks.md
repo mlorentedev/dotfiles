@@ -13,9 +13,16 @@ created: "2026-08-08"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/HARNESS-061-effectiveness-probes`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [n/a] Branch `feat/HARNESS-061-effectiveness-probes` — never existed. The work
+  landed across several PRs rather than one feature branch; recorded as `n/a`
+  instead of ticked, because a ticked box asserting a branch nobody created is
+  the representation-over-behaviour failure this spec is about.
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions" — both
+  were resolved in the body (execution-vs-resolution probe split; dispatcher
+  fallback covered by its own real-dependency test) and the third (exemption
+  table becoming permanent) is mitigated by the staleness test, re-verified by
+  mutation 2026-08-18
 
 ## Implementation
 
@@ -29,6 +36,8 @@ created: "2026-08-08"
 - [x] `[AC5]` `[P]` staleness test for the exemption table
 - [x] `[AC6]` `[P]` `checks_dr.go`: escrow freshness + drill marker, WARN not FAIL
 - [x] `[AC7]` red-direction tests for every new check
+- [x] `[AC5]` doc-table drift guard: the human-readable exemption table is a third
+      copy of `EXEMPT_SUITES` and nothing compared them (found 2026-08-18)
 
 ## Verification
 
