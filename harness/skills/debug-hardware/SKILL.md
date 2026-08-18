@@ -1,16 +1,18 @@
 ---
 generated: true
 generated_from: 00_meta/skills/debug-hardware/SKILL.md
-generated_sha: feef6f988e415a5c
+generated_sha: 5e6679e8127538cb
 id: debug-hardware-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: debug-hardware
-description: Use when troubleshooting hardware or firmware issues -- device communication, register configuration, signal processing, camera/sensor behavior, or embedded systems.
+description: Use when troubleshooting hardware or firmware issues -- device communication,
+  register configuration, signal processing, camera/sensor behavior, or embedded systems.
+keywords: [debug hardware, firmware, sensor, camera register, embedded, signal processing]
+paths: ['**/firmware/**', '**/hardware/**', '**/embedded/**']
 ---
-
 # Hardware Debugging
 
 The evidence-first debugging **method** lives in one skill: `systematic-debugging` (the Iron Rule — no guessing, a single hypothesis formed from evidence, the minimal fix, verify after every change). This skill is the **hardware/firmware specialization** of it: same method, plus the domain-specific evidence sources and pitfalls below. Reach for `systematic-debugging` for the process; reach for this for what "evidence" means in hardware.

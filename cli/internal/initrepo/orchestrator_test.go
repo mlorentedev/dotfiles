@@ -101,6 +101,37 @@ func TestInitWritesVaultEntryWhenVaultPresent(t *testing.T) {
 	}
 }
 
+func TestInitDryRun(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "myproj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Init(InitOptions{
+		Root:       root,
+		Stack:      "go",
+		Date:       "2026-06-14",
+		DryRun:     true,
+		SkipGithub: true,
+	})
+	if err != nil {
+		t.Fatalf("Init with DryRun: %v", err)
+	}
+
+	if len(report.Steps) == 0 {
+		t.Error("report should list preview steps")
+	}
+
+	// DryRun must not write any files to disk.
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) > 0 {
+		t.Errorf("DryRun wrote files to root: %v", entries)
+	}
+}
+
 func stepStatus(r InitReport, name string) string {
 	for _, s := range r.Steps {
 		if s.Name == name {

@@ -75,6 +75,11 @@ type AgentsResult struct {
 //
 // It is idempotent: a re-run without force is a safe no-op.
 func BootstrapAgents(repoRoot string, force bool) (AgentsResult, error) {
+	return BootstrapAgentsOpts(repoRoot, force, false)
+}
+
+// BootstrapAgentsOpts is the parameterised form of BootstrapAgents, with dry-run support.
+func BootstrapAgentsOpts(repoRoot string, force bool, dryRun bool) (AgentsResult, error) {
 	snippet, err := AgentsSnippet()
 	if err != nil {
 		return AgentsResult{}, err
@@ -85,8 +90,10 @@ func BootstrapAgents(repoRoot string, force bool) (AgentsResult, error) {
 	existing, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		if err := os.WriteFile(path, []byte(agentsHeader+"\n"+snippet+"\n"), 0o644); err != nil {
-			return res, err
+		if !dryRun {
+			if err := os.WriteFile(path, []byte(agentsHeader+"\n"+snippet+"\n"), 0o644); err != nil {
+				return res, err
+			}
 		}
 		res.Action = "created"
 		return res, nil
@@ -100,15 +107,19 @@ func BootstrapAgents(repoRoot string, force bool) (AgentsResult, error) {
 		res.Action = "unchanged"
 		return res, nil
 	case hasSDDSection(content):
-		if err := os.WriteFile(path, []byte(replaceSDDSection(content, snippet)), 0o644); err != nil {
-			return res, err
+		if !dryRun {
+			if err := os.WriteFile(path, []byte(replaceSDDSection(content, snippet)), 0o644); err != nil {
+				return res, err
+			}
 		}
 		res.Action = "replaced"
 		return res, nil
 	default:
-		appended := strings.TrimRight(content, "\n") + "\n\n" + snippet + "\n"
-		if err := os.WriteFile(path, []byte(appended), 0o644); err != nil {
-			return res, err
+		if !dryRun {
+			appended := strings.TrimRight(content, "\n") + "\n\n" + snippet + "\n"
+			if err := os.WriteFile(path, []byte(appended), 0o644); err != nil {
+				return res, err
+			}
 		}
 		res.Action = "appended"
 		return res, nil
