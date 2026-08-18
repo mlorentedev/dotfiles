@@ -1,7 +1,7 @@
 ---
 id: "DOCS-013-agents-spec-subcommands"
 type: spec
-status: draft
+status: archived
 created: "2026-08-18"
 owner: manu
 issue: "mlorentedev/dotfiles#1016"
@@ -43,3 +43,5 @@ template_version: "1.0"
 - Precedent test: `TestIDPatternProseMatchesCode` in `cli/internal/spec/drift_test.go`
 
 - Related patterns: `00_meta/patterns/<pattern>.md` (if any)
+
+<!-- archived 2026-08-18 — PR: https://github.com/mlorentedev/dotfiles/pull/1046 -->

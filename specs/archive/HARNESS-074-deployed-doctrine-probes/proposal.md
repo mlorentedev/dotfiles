@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-074-deployed-doctrine-probes"
 type: spec
-status: draft
+status: archived
 created: "2026-08-18"
 owner: manu
 issue: "mlorentedev/dotfiles#1035"
@@ -44,3 +44,5 @@ AC2 of HARNESS-072 requires enforced regions (e.g. `pr-stewardship`, `definition
 - Bitácora work-gate: [mlorentedev/dotfiles#1035](https://github.com/mlorentedev/dotfiles/issues/1035)
 - Prior work: `HARNESS-072-pr-stewardship`
 
+
+<!-- archived 2026-08-18 — PR: https://github.com/mlorentedev/dotfiles/pull/1046 -->
