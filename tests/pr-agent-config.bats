@@ -150,7 +150,7 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
     printf '%s\n' "$group" | grep -q 'github.event.issue.number'
 }
 
-@test "pr-agent: the workflow's trigger list agrees with PR-Agent's own pr_actions" {
+@test "pr-agent: every event the workflow fires on is handled by something" {
     # #1053. Two event lists in one file that must agree, and nothing compared
     # them: the workflow asked for `synchronize`, PR-Agent's pr_actions default
     # excludes it, so every push started a runner, built the Docker action and
@@ -161,25 +161,81 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
     # reviewed" and means "the action declined to act". GUARD-002 exists because
     # that green is worse than a red one.
     #
-    # Asserted as set equality, not substring presence: a list that gains an
-    # event the other lacks is the drift, in either direction.
-    local wf_types pr_actions
-    wf_types=$(python3 -c "
-import yaml, json
+    # The invariant is NOT set equality any more, and the change is a widening of
+    # the same finding rather than a weakening of it. Upstream routes
+    # `synchronize` down a separate path — "handle_push_trigger = false # when
+    # true, handle synchronize events using push_commands" — so under equality a
+    # correct configuration is unrepresentable, and the obvious repair (adding
+    # synchronize to pr_actions) is a setting that asserts nothing.
+    #
+    # What must hold is what #1053 actually found: nothing in the workflow's
+    # trigger list may go unhandled. Every type is handled by pr_actions, except
+    # synchronize, which is handled if and only if handle_push_trigger is true.
+    run python3 -c "
+import json, sys, yaml
 d = yaml.safe_load(open('$WF'))
-print('\n'.join(sorted(d[True]['pull_request']['types'])))
-")
-    pr_actions=$(python3 -c "
-import yaml, json
-d = yaml.safe_load(open('$WF'))
+types = set(d[True]['pull_request']['types'])
 env = d['jobs']['review']['steps'][-1]['env']
-print('\n'.join(sorted(json.loads(env['github_action_config.pr_actions']))))
-")
-    if [ "$wf_types" != "$pr_actions" ]; then
-        printf 'workflow types and github_action_config.pr_actions disagree:\n' >&2
-        diff <(printf '%s\n' "$wf_types") <(printf '%s\n' "$pr_actions") >&2
-        return 1
-    fi
+actions = set(json.loads(env['github_action_config.pr_actions']))
+push_on = str(env.get('github_action_config.handle_push_trigger', 'false')).lower() == 'true'
+
+handled = set(actions)
+if push_on:
+    handled.add('synchronize')
+unhandled = sorted(types - handled)
+if unhandled:
+    print('the workflow fires on events nothing handles: ' + ', '.join(unhandled))
+    sys.exit(1)
+# The reverse direction still matters: a handler for an event the workflow never
+# fires on is dead configuration that reads as coverage.
+orphan = sorted(actions - types)
+if orphan:
+    print('pr_actions handles events the workflow never fires: ' + ', '.join(orphan))
+    sys.exit(1)
+if 'synchronize' in types and not push_on:
+    print('synchronize fires but handle_push_trigger is off: every push builds and reviews nothing')
+    sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# Enabling the push path without naming its commands silently reinstates
+# `describe`, whose default is ['/describe', '/review'] — and describe rewrites
+# the PR body, which this repo turned OFF as a decision twelve lines above. A
+# default that quietly re-enables what you disabled elsewhere is the same defect
+# one layer down.
+#
+# Asserted as EXACT equality with ["/review"], after a reviewer pointed out that
+# the first version only rejected /describe — so it passed on `[]` and on
+# ["/improve"]. `[]` is the dangerous one: the push trigger would fire, run
+# nothing, and this guard would stay green while the feature it protects was
+# entirely inert. A guard whose green survives the death of its subject is the
+# defect this whole file exists to catch, written into the file itself.
+#
+# Exact rather than "contains /review" on purpose: adding a command to the push
+# path costs a second inference call on every push, which is a decision worth
+# forcing through this line rather than letting it arrive as an edit nobody
+# weighs.
+@test "pr-agent: the push path runs exactly /review, no more and no less" {
+    run python3 -c "
+import json, sys, yaml
+env = yaml.safe_load(open('$WF'))['jobs']['review']['steps'][-1]['env']
+if str(env.get('github_action_config.handle_push_trigger', 'false')).lower() != 'true':
+    sys.exit(0)
+raw = env.get('github_action_config.push_commands')
+if raw is None:
+    print('handle_push_trigger is on with no push_commands: describe returns by default')
+    sys.exit(1)
+cmds = [c.strip() for c in json.loads(raw)]
+if cmds != ['/review']:
+    print(f'push_commands is {cmds!r}, want exactly [\'/review\']')
+    if '/describe' in cmds:
+        print('  /describe rewrites the PR body, turned off deliberately')
+    if not cmds:
+        print('  an empty list makes the push trigger fire and do nothing')
+    sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
 
 @test "pr-agent: describe does not rewrite the PR body" {
