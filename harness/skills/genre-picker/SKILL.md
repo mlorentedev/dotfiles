@@ -1,17 +1,25 @@
 ---
 generated: true
 generated_from: 00_meta/skills/genre-picker/SKILL.md
-generated_sha: 628ddd54e3282282
+generated_sha: 3ad0a754cbceb4b4
 id: genre-picker-skill
 type: skill
 status: active
-created: "2026-06-20"
+created: '2026-06-20'
 owner: manu
 name: genre-picker
-description: Classify a piece of knowledge into its 00_meta meta-type (skill / pattern / runbook / template / spec) BEFORE creating it, so it lands in the right folder and never drifts. Triggers on /genre-picker, "is this a pattern or a runbook?", "should this be a skill or a pattern?", "where does this go?", "classify this knowledge", "what meta-type is this", "qué es esto, patrón o runbook", and BEFORE authoring any new 00_meta/ artifact. Applies the boundary tests from pattern-knowledge-placement at write-time.
+description: Classify a piece of knowledge into its 00_meta meta-type (skill / pattern
+  / runbook / template / spec) BEFORE creating it, so it lands in the right folder
+  and never drifts. Triggers on /genre-picker, "is this a pattern or a runbook?",
+  "should this be a skill or a pattern?", "where does this go?", "classify this knowledge",
+  "what meta-type is this", "qué es esto, patrón o runbook", and BEFORE authoring
+  any new 00_meta/ artifact. Applies the boundary tests from pattern-knowledge-placement
+  at write-time.
 allowed-tools: [Read, Grep, Glob]
+keywords: [genre picker, classify knowledge, pattern or runbook, skill or pattern,
+  que meta-tipo es]
+paths: [00_meta/**]
 ---
-
 # Genre Picker — classify before you create
 
 > The taxonomy SSOT is [[pattern-knowledge-placement]] § "Within the store: the meta-type taxonomy". This skill is the **write-time application** of it: run it BEFORE creating any `00_meta/` artifact so it lands in the right type/folder from the start — preventing exactly the drift the sweeps keep cleaning up. It is itself a skill (a capability invoked on a trigger) that *defers* the boundary definitions to a pattern — the taxonomy practising what it preaches.

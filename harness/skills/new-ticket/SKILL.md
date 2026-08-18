@@ -1,17 +1,23 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: dcc95707e91b91c7
+generated_sha: cd89b515ade938f7
 id: new-ticket-skill
 type: skill
 status: active
-created: "2026-06-10"
+created: '2026-06-10'
 owner: manu
 name: new-ticket
-description: "Create a bitácora ticket interactively with suggested defaults. Triggers on /new-ticket, 'new ticket', 'create a ticket', 'file an issue on the board', 'crea un ticket', 'nuevo ticket', and the detect-then-ticket standing order. Proposes Type, Priority, Status, assignee and the AREA-NNN-slug ID, the human confirms, then it opens the issue and sets the board fields."
+description: Create a bitácora ticket interactively with suggested defaults. Triggers
+  on /new-ticket, 'new ticket', 'create a ticket', 'file an issue on the board', 'crea
+  un ticket', 'nuevo ticket', and the detect-then-ticket standing order. Proposes
+  Type, Priority, Status, assignee and the AREA-NNN-slug ID, the human confirms, then
+  it opens the issue and sets the board fields.
 allowed-tools: [Bash, Read, AskUserQuestion]
+keywords: [new ticket, create ticket, file issue, nuevo ticket, crea ticket, bitacora
+    issue]
+paths: []
 ---
-
 # New Ticket Workflow
 
 > One command turns a title (+ optional description) into a board-ready issue on the bitácora (GitHub Project #1): consistent `Status` / `Priority` / `Type` and a stable `AREA-NNN-slug` ID, with the right home repo. Implements the ID convention (CUR-008) and the status lifecycle (HARNESS-010).

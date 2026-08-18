@@ -52,9 +52,22 @@ What genuinely blocks:
       a path to green.
 - [ ] T5. [AC1] Verify on a **live** PR: a PR-Agent run completing flips the gate
       with no human action and no manual re-run. Inspection does not satisfy AC1.
-- [ ] T6. [AC6] Document the required-check adoption with its ordering
-      constraint, in the gate's own workflow and in the reviewer registry comment
-      block, so the constraint travels with the thing it constrains.
+- [x] T6. [AC6] Document the required-check adoption with its ordering
+      constraint, in the gate's own workflow, so it travels with the thing it
+      constrains. Raised by PR-Agent's review of #1056 — the reviewer found the
+      gap this spec had written and not built.
+
+## The wake-up (AC7-AC9)
+
+- [x] T7. [AC8] Make "dispositioned" mechanical before building anything that
+      reads it. A triage record is a comment under a stable heading, declared
+      once in `harness/review-attestation.json` beside the reviewer registry
+      the gate already reads — one string, two consumers.
+- [x] T8. [AC7] [AC9] `dotf pr triage-queue`: list open PRs whose newest
+      reviewer output is newer than their newest triage. Domain in
+      `internal/prtriage` with the `gh` call at the boundary, so the core is
+      tested without a network. It lists; it never applies.
+- [x] T9. [AC7] Verify against the live repository rather than fixtures alone.
 
 ## Closing
 

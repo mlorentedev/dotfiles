@@ -35,6 +35,7 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newUpdateCmd())
 	root.AddCommand(newHarnessCmd())
 	root.AddCommand(newDeployCmd())
+	root.AddCommand(newPrCmd())
 	return root
 }
 

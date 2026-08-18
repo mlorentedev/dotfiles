@@ -222,13 +222,13 @@ If the vault moves to a different path, set its override in `~/.config/dotfiles/
 
 1. Clone dotfiles and vault, run the setup script for your OS
 2. Read `~/Projects/knowledge/00_meta/patterns/pattern-ai-protocol.md` — the master AI workflow governance doc
-3. Read `~/Projects/knowledge/10_projects/<repo>/00-context.md` for each project you join
+3. Read `~/Projects/knowledge/10_projects/<repo>/context.md` for each project you join
 4. After your first sprint, run `/crystallize` to add your first vault lessons
 
 ### What to do when starting a new project
 
 1. Create `~/Projects/knowledge/10_projects/<new-repo>/` with standard files:
-   - `00-context.md` — project overview and AI config
+   - `context.md` — project overview and AI config
    - `11-tasks.md` — active backlog
    - `90-lessons.md` — lessons learned
    - `memory/` — directory for Claude Code memory (create empty)

@@ -26,7 +26,11 @@ Three observable changes, in a required order.
 
 **The verdict becomes enforceable rather than advisory.** The `review-attestation` **commit status** joins branch protection's required checks, so a merge is refused mechanically until the gate is green. Never the check-run, which cannot be revised after creation (#1041) — a required check-run frozen at `pending` blocks every PR permanently.
 
-**The triage loop gains a wake-up.** The same `workflow_run` event signals that reviewer output is ready to disposition. `pr-review-triage` already reads the comments, produces a per-item disposition and applies under confirmation; what it lacks is anything telling it the moment has arrived.
+**The triage loop gains a wake-up.** `pr-review-triage` already reads the comments, produces a per-item disposition and applies under confirmation; what it lacks is anything telling it the moment has arrived.
+
+The wake-up is a **pull**, not a push, and that is a finding rather than a compromise. CI cannot wake a local agent session: `workflow_run` re-evaluates the gate, and GitHub notifies the human, but nothing reaches an agent. So the mechanism an agent can actually use is a query it runs at a checkpoint — `dotf pr triage-queue`, listing open PRs whose reviewer output is newer than their last recorded disposition.
+
+That requires "dispositioned" to be mechanical rather than remembered, which it currently is not: today the disposition lives in a chat message and evaporates. The triage record becomes a comment on the PR under a stable heading, so the Review item of the Definition of Done stops being a claim and becomes an artifact. The queue reads that marker; the skill writes it; both take the string from `harness/review-attestation.json`, which already owns the reviewer registry.
 
 ## Out of scope
 
@@ -50,6 +54,9 @@ Three observable changes, in a required order.
 - [ ] AC4. The trigger re-evaluates the pull request the reviewer actually ran on, and no other.
 - [ ] AC5. A guard fails when the gate's workflow loses its `workflow_run` trigger, and has been observed failing on that specific mutation — including confirmation that the mutation reached the file, since an invalid mutation and an absent guard produce the same green.
 - [ ] AC6. The required-check adoption is documented with its ordering constraint, so it cannot be enabled before #1041.
+- [ ] AC7. Reviewer output that has not been dispositioned is **findable without anyone remembering to look**: a read-only query lists open PRs carrying reviewer output newer than their last recorded triage. It lists; it never applies.
+- [ ] AC8. "Dispositioned" is mechanical, not a judgement: a PR leaves the queue when a triage record newer than the reviewer's output exists on it, and re-enters when the reviewer speaks again.
+- [ ] AC9. The queue and the gate read the same reviewer registry. Neither hardcodes a marker string the other also knows.
 
 ## References
 

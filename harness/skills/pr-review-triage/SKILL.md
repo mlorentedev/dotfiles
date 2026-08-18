@@ -1,17 +1,26 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 73db5d5501d55752
+generated_sha: 1c678b768344f2fc
 id: pr-review-triage-skill
 type: skill
 status: active
-created: "2026-08-08"
+created: '2026-08-08'
 owner: manu
 name: pr-review-triage
-description: Triage an open pull request after its checks and reviewers have run — read the CI result, read every review comment, and give each one a disposition (apply / skip / defer) with a one-line reason. Triggers on /pr-review-triage, "triage the PR", "review the review", "what did the reviewer say", "revisa los comentarios de la PR", "check CI and the bot comments", and by default once a PR you opened has come back — from its checks and from its reviewers, whichever lands later, because checks finishing is not the end of the window. Never applies a change or merges without explicit human confirmation.
+description: Triage an open pull request after its checks and reviewers have run —
+  read the CI result, read every review comment, and give each one a disposition (apply
+  / skip / defer) with a one-line reason. Triggers on /pr-review-triage, "triage the
+  PR", "review the review", "what did the reviewer say", "revisa los comentarios de
+  la PR", "check CI and the bot comments", and by default once a PR you opened has
+  come back — from its checks and from its reviewers, whichever lands later, because
+  checks finishing is not the end of the window. Never applies a change or merges
+  without explicit human confirmation.
 allowed-tools: [Bash, Read, Grep]
+keywords: [pr review triage, triage pr, review bot comments, revisa comentarios pr,
+  ci triage]
+paths: [.github/workflows/**]
 ---
-
 # /pr-review-triage — dispose of what the PR came back with
 
 Opening a pull request is not the end of a change. Its checks report, its reviewers comment, and both are then routinely ignored because nothing says when to come back. This skill is that moment: read what came back, decide per item, and leave nothing floating.

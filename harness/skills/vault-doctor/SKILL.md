@@ -1,16 +1,20 @@
 ---
 generated: true
 generated_from: 00_meta/skills/vault-doctor/SKILL.md
-generated_sha: 470ac7cc4e48ae0c
+generated_sha: 0333b6ba8f202d3d
 id: vault-doctor-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: vault-doctor
-description: Use when the Obsidian vault needs structural maintenance — unresolved links, missing frontmatter, orphan notes, or stale content. Triggers include vault_health reporting failures, /insights showing structural warnings, or periodic vault cleanup sessions.
+description: Use when the Obsidian vault needs structural maintenance — unresolved
+  links, missing frontmatter, orphan notes, or stale content. Triggers include vault_health
+  reporting failures, /insights showing structural warnings, or periodic vault cleanup
+  sessions.
+keywords: [vault doctor, vault health, unresolved links, orphan notes, reparar vault]
+paths: [00_meta/**, .obsidian/**]
 ---
-
 # Vault Doctor
 
 Structural maintenance for the Obsidian knowledge vault. Diagnoses issues, prioritizes by severity, and fixes them systematically.

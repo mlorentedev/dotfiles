@@ -1,17 +1,24 @@
 ---
 generated: true
 generated_from: 00_meta/skills/enrich-us/SKILL.md
-generated_sha: ea27f2a5743c7f9e
+generated_sha: 9bac2539087ba5c8
 id: enrich-us-skill
 type: skill
 status: active
-created: "2026-05-14"
+created: '2026-05-14'
 owner: manu
 name: enrich-us
-description: Take a backlog item or pasted user story and rewrite it into an implementation-ready form (fields, endpoints, files-to-modify, DoD, non-functional requirements). Triggers on /enrich-us, "enrich SDD-014", "rewrite this user story", "make this ticket implementation-ready". Single-shot rewrite (NOT Socratic — that is /spec fill's job). Outputs `## Original` + `## Enhanced` sections. Ported and adapted from LIDR-academy/lidr-specboot.
-allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_patch]
+description: Take a backlog item or pasted user story and rewrite it into an implementation-ready
+  form (fields, endpoints, files-to-modify, DoD, non-functional requirements). Triggers
+  on /enrich-us, "enrich SDD-014", "rewrite this user story", "make this ticket implementation-ready".
+  Single-shot rewrite (NOT Socratic — that is /spec fill's job). Outputs `## Original`
+  + `## Enhanced` sections. Ported and adapted from LIDR-academy/lidr-specboot.
+allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_search,
+  mcp__hive__vault_patch]
+keywords: [enrich user story, enrich ticket, user story rewrite, make ticket ready,
+  enriquecer historia]
+paths: []
 ---
-
 # Enrich User Story / Backlog Item
 
 > Take a backlog item or pasted user story and rewrite it into an implementation-ready form: complete fields, endpoints, files-to-modify, DoD, non-functional requirements. Output two sections — `## Original` and `## Enhanced` — so the user can paste the enhanced version into `specs/<feature-id>/proposal.md` (Why/What) or back into the GitHub issue.
