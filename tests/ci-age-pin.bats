@@ -39,7 +39,7 @@ setup() {
     # documentation ABOUT the thing rather than the thing is the same false
     # positive GUARD-002 hit, and it trains people to weaken the guard.
     local joined
-    joined=$(grep -vE '^[[:space:]]*#' "$CI" | sed -e :a -e '/\\$/N; s/\\\n//; ta')
+    joined=$(grep -vE '^[[:space:]]*#' "$CI" | awk '{ if (/\\$/) { printf "%s", substr($0,1,length-1) } else { print } }')
     if printf '%s\n' "$joined" | grep -nE 'apt-get[[:space:]]+install\b[^|;&]*\bage\b'; then
         printf 'age must come from the pinned release, not apt — see AGE_VERSION.\n' >&2
         return 1

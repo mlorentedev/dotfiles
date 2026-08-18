@@ -175,7 +175,8 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
 import json, sys, yaml
 d = yaml.safe_load(open('$WF'))
 types = set(d[True]['pull_request']['types'])
-env = d['jobs']['review']['steps'][-1]['env']
+step = next(s for s in d['jobs']['review']['steps'] if 'pr-agent' in s.get('uses', ''))
+env = step['env']
 actions = set(json.loads(env['github_action_config.pr_actions']))
 push_on = str(env.get('github_action_config.handle_push_trigger', 'false')).lower() == 'true'
 
@@ -219,7 +220,9 @@ if 'synchronize' in types and not push_on:
 @test "pr-agent: the push path runs exactly /review, no more and no less" {
     run python3 -c "
 import json, sys, yaml
-env = yaml.safe_load(open('$WF'))['jobs']['review']['steps'][-1]['env']
+d = yaml.safe_load(open('$WF'))
+step = next(s for s in d['jobs']['review']['steps'] if 'pr-agent' in s.get('uses', ''))
+env = step['env']
 if str(env.get('github_action_config.handle_push_trigger', 'false')).lower() != 'true':
     sys.exit(0)
 raw = env.get('github_action_config.push_commands')
