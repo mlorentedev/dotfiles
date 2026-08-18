@@ -271,7 +271,7 @@ registry manages (§"folder taxonomy" listed only apps/infra/floor). The impleme
 Floor secrets (`ssh-id-ed25519`, the age keys) carry **no `bw:` block** and are never
 migrated — they are needed before Bitwarden is reachable (circular dependency, §4).
 
-Implementation: `specs/CLI-024-secrets-set` (write primitive), `specs/CLI-024-secrets-migrate`
+Implementation: `specs/archive/CLI-024-secrets-set` (write primitive), `specs/archive/CLI-024-secrets-migrate`
 (cutover). A draft A1 registry rewrite seeds the per-entry `bw:` targets.
 
 ## Ratification (2026-06-28): accepted — execution begins
