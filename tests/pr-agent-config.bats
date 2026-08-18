@@ -109,3 +109,70 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
     # inference on a change the author has not finished making.
     grep -q 'draft == false' "$WF"
 }
+
+@test "pr-agent: a comment cannot cancel an in-flight review" {
+    # The defect this encodes (#1040): a PR comment is an issue_comment whose
+    # issue.number IS the PR number. With the group keyed on the number alone, a
+    # comment-triggered run landed in the same concurrency group as the running
+    # pull_request run and cancel-in-progress killed it. PR-Agent is a Docker
+    # action; CodeRabbit's auto-summary comment reliably arrives during the build.
+    #
+    # Measured before the fix on #1037 and #1038: both cancelled mid-build, both
+    # workflows green, zero reviews. It had been broken since the hour it merged
+    # and nothing noticed, because the only symptom is a cancelled run.
+    #
+    # Asserted on the group EXPRESSION rather than on behaviour, because nothing
+    # here can run GitHub's scheduler. What it protects is the discriminator:
+    # remove github.event_name from the key and the two event types collide again.
+    grep -qE '^\s*group:.*github\.event_name' "$WF"
+}
+
+@test "pr-agent: both PR-number sources stay in the concurrency key" {
+    # The event_name suffix above only helps while the key still identifies the
+    # PR. A "simplification" that drops either source re-breaks it differently:
+    # without issue.number every slash-command run shares one group, without
+    # pull_request.number every push does.
+    local group
+    group=$(grep -E '^\s*group:' "$WF")
+    printf '%s\n' "$group" | grep -q 'github.event.pull_request.number'
+    printf '%s\n' "$group" | grep -q 'github.event.issue.number'
+}
+
+@test "pr-agent: the workflow's trigger list agrees with PR-Agent's own pr_actions" {
+    # #1053. Two event lists in one file that must agree, and nothing compared
+    # them: the workflow asked for `synchronize`, PR-Agent's pr_actions default
+    # excludes it, so every push started a runner, built the Docker action and
+    # reviewed nothing. Measured on #1048 — 4 pull_request runs, 1 artifact.
+    #
+    # The cost was never inference; pushes make no model calls. It was that the
+    # run reported `review: SUCCESS`, which reads as "your new commits were
+    # reviewed" and means "the action declined to act". GUARD-002 exists because
+    # that green is worse than a red one.
+    #
+    # Asserted as set equality, not substring presence: a list that gains an
+    # event the other lacks is the drift, in either direction.
+    local wf_types pr_actions
+    wf_types=$(python3 -c "
+import yaml, json
+d = yaml.safe_load(open('$WF'))
+print('\n'.join(sorted(d[True]['pull_request']['types'])))
+")
+    pr_actions=$(python3 -c "
+import yaml, json
+d = yaml.safe_load(open('$WF'))
+env = d['jobs']['review']['steps'][-1]['env']
+print('\n'.join(sorted(json.loads(env['github_action_config.pr_actions']))))
+")
+    if [ "$wf_types" != "$pr_actions" ]; then
+        printf 'workflow types and github_action_config.pr_actions disagree:\n' >&2
+        diff <(printf '%s\n' "$wf_types") <(printf '%s\n' "$pr_actions") >&2
+        return 1
+    fi
+}
+
+@test "pr-agent: describe does not rewrite the PR body" {
+    # A model rewriting a body that carries hand-written measurement tables,
+    # merge orders and before/after evidence destroys the part worth reading.
+    # Off as a decision; pinned so it cannot drift back on a default.
+    grep -q 'github_action_config.auto_describe: "false"' "$WF"
+}
