@@ -47,12 +47,8 @@ model_weak = "openai/qwen3.6"
 custom_model_max_tokens = 200000
 max_model_tokens = 200000
 
-# The reviewer answers in Spanish because Manu reads it, and a review comment is
-# conversation about the change rather than part of the durable record. The
-# English-only standing order still binds everything it names — commit messages,
-# branch names, PR titles and bodies, code comments — and it binds this file too:
-# the instructions below stay in English, only the output is translated. If that
-# reading of "durable record" is wrong, this is the one line to change back.
+# The reviewer answers in English to ensure all durable PR review records and
+# review comments remain strictly in English per global harness doctrine.
 # Release PRs are not reviewed, and this pairs with an exemption in
 # harness/review-attestation.json — the two must move together or the change
 # makes things worse.
@@ -76,7 +72,7 @@ max_model_tokens = 200000
 # string that lets a change past both.
 ignore_pr_source_branches = ["^release-please--"]
 
-response_language = "es-ES"
+response_language = "en-US"
 
 # AGENTS.md is this repo's behavioural SSOT, so the standing orders, the
 # English-only rule, the no-auto-merge rule and the shell-compatibility table all
