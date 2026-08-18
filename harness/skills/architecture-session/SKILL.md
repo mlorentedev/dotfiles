@@ -1,17 +1,27 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: 59addebb95d6329d
+generated_sha: 6b6147f215489937
 id: architecture-session-skill
 type: skill
 status: active
-created: "2026-05-28"
+created: '2026-05-28'
 owner: manu
 name: architecture-session
-description: "Run a pure-architecture / definition session on a project. Triggers on /architecture-session, /arch, \"sesion de arquitectura\", \"arch session for X\", \"definir arquitectura de X\", \"revisar arquitectura de X\", \"evaluar opciones para X\". Six phases A-F: state verification, multi-reference audit (Regla del 3 gate), constraint formalization, options + rejection list, decision (ADR + plan + vault patch in-session), recap. Refuses to advance past Phase B without N>=2 references audited for any decision affecting cross-instance reuse. Pairs with /spec init (downstream implementation) and /adversarial-review (post-implementation gate)."
-allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp__hive__vault_search, mcp__hive__vault_write, mcp__hive__vault_patch, mcp__hive__capture_lesson]
+description: 'Run a pure-architecture / definition session on a project. Triggers
+  on /architecture-session, /arch, "sesion de arquitectura", "arch session for X",
+  "definir arquitectura de X", "revisar arquitectura de X", "evaluar opciones para
+  X". Six phases A-F: state verification, multi-reference audit (Regla del 3 gate),
+  constraint formalization, options + rejection list, decision (ADR + plan + vault
+  patch in-session), recap. Refuses to advance past Phase B without N>=2 references
+  audited for any decision affecting cross-instance reuse. Pairs with /spec init (downstream
+  implementation) and /adversarial-review (post-implementation gate).'
+allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp__hive__vault_search,
+  mcp__hive__vault_write, mcp__hive__vault_patch, mcp__hive__capture_lesson]
+keywords: [architecture session, sesion de arquitectura, definir arquitectura, arch
+    session, adr decision, evaluar opciones]
+paths: [docs/adr/**, '**/30-architecture/**']
 ---
-
 # Architecture Session
 
 > Pure architecture / definition session: no implementation, no code. The output is **decisions persisted in the vault** (ADR + plan revision + task tracking update), not commits. Implements the discipline crystallized in `pattern-decision-persistence` + `pattern-workflow-protocol` (Exit Phase 2) + ADR-015 "Regla del 3 en abstraccion".
@@ -168,7 +178,7 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 2. **Update the plan** of record. If a `plan-*.md` motivated this session, patch it: append a "Decision recorded" line linking the new ADR, and update the "Next steps" section if the decision changes it.
 3. **Index:** the repo `docs/adr/` self-indexes (GitHub renders the directory) — no separate index file to patch. (Legacy vault-only project: patch the project `_index.md`.)
 4. **Update task tracking** if the decision creates, closes, or reshapes tasks. Open or update GitHub issues via `gh`.
-5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons.md`**. Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
+5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons/`** (and `_index.md`). Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
 
 **Blocking rule.** Phase E does not exit until at least the ADR file is written. The user CANNOT defer the write to "later" -- per `pattern-decision-persistence` "Anti-Patterns", `I'll update the vault later` = the decision is lost.
 

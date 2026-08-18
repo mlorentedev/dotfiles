@@ -1,16 +1,19 @@
 ---
 generated: true
 generated_from: 00_meta/skills/systematic-debugging/SKILL.md
-generated_sha: 4073a48a21a67880
+generated_sha: 8bd8357bc628e989
 id: systematic-debugging-skill
 type: skill
 status: active
-created: "2026-05-30"
+created: '2026-05-30'
 owner: manu
 name: systematic-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
+description: Use when encountering any bug, test failure, or unexpected behavior,
+  before proposing fixes
+keywords: [debug, debugging, root cause, troubleshoot, investigate bug, diagnosticar
+    fallo]
+paths: [docs/troubleshooting/**]
 ---
-
 # Systematic Debugging
 
 ## Overview

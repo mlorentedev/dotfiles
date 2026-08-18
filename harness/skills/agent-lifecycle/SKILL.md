@@ -1,22 +1,27 @@
 ---
 generated: true
 generated_from: 00_meta/skills/agent-lifecycle/SKILL.md
-generated_sha: 68d4aea1064e8033
+generated_sha: 92f81c7cd33a7f39
 id: agent-lifecycle-skill
 type: skill
 status: active
-created: "2026-06-09"
+created: '2026-06-09'
 owner: manu
 name: agent-lifecycle
-description: "Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery, vault integration, config optimization, cronjob scheduling, and container deployment. Absorbs agent-bootstrap, agent-config-optimization, cronjob-management, and vault-integration (the standalone agent-config-optimization skill is retired into this skill's Section 3)."
+description: Complete operational lifecycle of a Hermes Agent instance — bootstrap/recovery,
+  vault integration, config optimization, cronjob scheduling, and container deployment.
+  Absorbs agent-bootstrap, agent-config-optimization, cronjob-management, and vault-integration
+  (the standalone agent-config-optimization skill is retired into this skill's Section
+  3).
 version: 1.0.0
 platforms: [linux]
 metadata:
   hermes:
     tags: [bootstrap, recovery, config, cron, vault, container, ops, lifecycle]
     related_skills: [vault-sync, mcp-integration, hermes-agent]
+keywords: [agent bootstrap, agent recovery, agent cronjob, agent deploy, hermes, steward]
+paths: [80_agents/**, '**/agents/*.yaml']
 ---
-
 # Agent Lifecycle — Setup, Config, Scheduling & Recovery
 
 Complete operational lifecycle of a Hermes Agent instance. This is the umbrella skill for everything that keeps an agent running, recoverable, and properly configured.

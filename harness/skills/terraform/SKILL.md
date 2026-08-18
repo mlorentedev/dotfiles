@@ -1,18 +1,22 @@
 ---
 generated: true
 generated_from: 00_meta/skills/terraform/SKILL.md
-generated_sha: 713b30401906ba24
+generated_sha: 38f52acfb023c8df
 id: terraform-skill
 type: skill
 status: active
-created: "2026-06-02"
+created: '2026-06-02'
 owner: manu
 name: terraform
-description: Use when writing, reviewing, or debugging Terraform/OpenTofu modules, tests, CI, scans, or state ops — diagnoses the failure mode (identity churn, secret exposure, blast radius, CI drift, compliance, state corruption, provider-upgrade risk, testing blind spots) with version-aware guards, then generates fixes.
+description: Use when writing, reviewing, or debugging Terraform/OpenTofu modules,
+  tests, CI, scans, or state ops — diagnoses the failure mode (identity churn, secret
+  exposure, blast radius, CI drift, compliance, state corruption, provider-upgrade
+  risk, testing blind spots) with version-aware guards, then generates fixes.
 source: https://github.com/antonbabenko/terraform-skill (terraform-skill)
 license: Apache-2.0
+keywords: [terraform, opentofu, tf, terraform plan, terraform apply, hcl, iac]
+paths: ['**/*.tf', '**/*.tfvars', '**/terraform/**']
 ---
-
 # Terraform / OpenTofu
 
 Diagnose first, then fix. Every response states runtime assumptions, identifies the risk category, proposes remediation with tradeoffs, gives validation commands, and includes rollback notes for destructive changes.

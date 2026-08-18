@@ -1,16 +1,23 @@
 ---
 generated: true
 generated_from: 00_meta/skills/context-refresh/SKILL.md
-generated_sha: 00078eaf1e444a52
+generated_sha: 5adcf3f04b77865f
 id: context-refresh-skill
 type: skill
 status: active
-created: "2026-06-06"
+created: '2026-06-06'
 owner: manu
 name: context-refresh
-description: Use after a brainstorm / ADR / phase-closing session to refresh a project's context.md patchable fields (phase, focus, blocked_by, recent_adrs, last_updated) WITHOUT touching the stable body. Keeps context.md cheap for agent orientation at session start (HARNESS-006). Triggers on /context-refresh, "actualiza el contexto", "refresh project context", or automatically from /handoff when an ADR was written or a phase milestone closed this session. Do NOT use for backlog/task changes — that state lives in the GitHub Project "bitácora", not here.
+description: Use after a brainstorm / ADR / phase-closing session to refresh a project's
+  context.md patchable fields (phase, focus, blocked_by, recent_adrs, last_updated)
+  WITHOUT touching the stable body. Keeps context.md cheap for agent orientation at
+  session start (HARNESS-006). Triggers on /context-refresh, "actualiza el contexto",
+  "refresh project context", or automatically from /handoff when an ADR was written
+  or a phase milestone closed this session. Do NOT use for backlog/task changes —
+  that state lives in the GitHub Project "bitácora", not here.
+keywords: [context refresh, actualiza contexto, refresh context, context.md update]
+paths: ['**/00-context.md', '**/context.md']
 ---
-
 # /context-refresh — Project Context Patcher
 
 Keeps `context.md` current and cheap for **agent orientation at session start** (HARNESS-006:
@@ -22,7 +29,7 @@ the five frontmatter *patchable* fields; the stable body is human-owned and is n
 - **Patchable (this skill writes):** frontmatter `phase`, `focus`, `blocked_by`, `recent_adrs`, `last_updated`.
 - **Stable (this skill NEVER writes):** everything below the frontmatter — Vision, Strategic direction,
   Where things live, Stack. If those are wrong, that is a human edit, not this skill.
-- **Out of layer (never here):** task backlog → GitHub Project "bitácora"; lessons → repo `docs/lessons.md`;
+- **Out of layer (never here):** task backlog → GitHub Project "bitácora"; lessons → repo `docs/lessons/`;
   ADR bodies → repo `docs/adr/`. This skill records *state and pointers*, not content. See [[pattern-knowledge-placement]].
 
 ## Protocol
