@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/agent-lifecycle/SKILL.md
-generated_sha: 92f81c7cd33a7f39
+generated_sha: d432cf76b1f0e8d0
 id: agent-lifecycle-skill
 type: skill
 status: active
@@ -448,7 +448,7 @@ Every time you install, configure, or enable a system service:
 1. **Install** the package
 2. **Verify** the service is running
 3. **Check runtime config**
-4. **Record in vault** — update `80_agents/hermes-nan/20-servers.md`
+4. **Record in vault** — update `80_agents/hermes-nan/servers.md`
 5. **Git commit + push**
 
 **Pitfall — patch tool + markdown tables:** The `patch` tool may add `||` (double pipe) prefixes instead of preserving single `|` pipes in markdown tables. **Workaround:** After patching a table, always `read_file` the full file to verify formatting. If the table broke, rewrite the entire file with `write_file` instead.

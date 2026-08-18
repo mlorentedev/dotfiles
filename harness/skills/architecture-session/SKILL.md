@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: 6b6147f215489937
+generated_sha: 5cb7fdff7d61b017
 id: architecture-session-skill
 type: skill
 status: active
@@ -137,25 +137,30 @@ paths: [docs/adr/**, '**/30-architecture/**']
 
 ---
 
-## Phase D -- Options + Rejection List
+## Phase D -- Options + Rejection List (Socratic Filter)
 
-**Goal:** generate 3-5 candidate options, evaluate them against the constraint table, and check the rejection list before re-debating an already-rejected alternative.
+**Goal:** generate 3-5 candidate options, subject them to the **4-Question Socratic Filter** ([[pattern-socratic-diagnostic-trees]]), evaluate them against the constraint table, and maintain the falsifiable rejection list.
 
 **Steps:**
 
 1. **Read the rejection list** in `session-protocol.md` (section "Alternativas evaluadas y descartadas"). Each row: alternative + reason discarded + date. If the user proposes one of these, surface the prior reason and ask: "Has the trigger to reopen this changed?"
-2. **Generate 3-5 options.** For each: 1-line summary, pros, cons. Lean on the patterns catalog (`00_meta/patterns/_index.md`) for vocabulary; do not invent terms when a canonical one exists.
-3. **Map options to constraints.** Render the matrix:
+2. **Apply the 4-Question Socratic Filter:**
+   - **Q1 (Invariants):** Name the non-negotiable invariant (e.g. offline-first, <10ms latency, zero-token cost). Immediately discard any option violating it.
+   - **Q2 (Naive Trap):** Analyze the naive solution — *why don't we just do the simplest thing?* What is its second-order failure mode under scale/load?
+   - **Q3 (Falsifiable Rejection Criteria):** For each discarded option, specify the **exact measurable metric** ($N>10k$, $T>200ms$, $Cost>\$10/mo$) that would trigger its reconsideration.
+   - **Q4 (Door Classification):** Classify the decision: **Type 1 (One-Way Door / irreversible)** requires full ADR + multi-reference audit; **Type 2 (Two-Way Door / reversible)** allows fast implementation with lightweight receipt.
+3. **Generate 3-5 options.** For each: 1-line summary, pros, cons, and door classification. Lean on the patterns catalog (`00_meta/patterns/_index.md`) for vocabulary; do not invent terms when a canonical one exists.
+4. **Map options to constraints.** Render the matrix:
 
-   | Option | C1 | C2 | C3 | ... | Cn |
-   |---|---|---|---|---|---|
-   | A | ok | ok | gap | ... | ok |
-   | B | ok | ok | ok | ... | gap |
-   | ... | | | | | |
+   | Option | Door Type | C1 | C2 | C3 | ... | Cn |
+   |---|---|---|---|---|---|---|
+   | A | Type 1 | ok | ok | gap | ... | ok |
+   | B | Type 2 | ok | ok | ok | ... | gap |
+   | ... | | | | | | |
 
-4. **Ask the user for selection.** If user picks, advance to Phase E. If user says "defer", treat the decision as **explicit deferral with triggers** and still write an ADR with `status: deferred` (per ADR-016 template).
+5. **Ask the user for selection.** If user picks, advance to Phase E. If user says "defer", treat the decision as **explicit deferral with triggers** and still write an ADR with `status: deferred` (per ADR-016 template).
 
-**Output of Phase D:** options-vs-constraints matrix in the conversation, plus the user's selection (or explicit deferral with triggers).
+**Output of Phase D:** options-vs-constraints matrix with Socratic filter results in the conversation, plus the user's selection (or explicit deferral with triggers).
 
 ---
 
