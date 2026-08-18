@@ -15,7 +15,17 @@ created: "2026-08-18"
 > blocked in sequence, and starting at the wrong end blocks the repository.
 
 
-## Blocked on, before any task here starts
+## Blocked on — corrected after measurement
+
+The original wording said no task here could start until both landed. That was
+wrong about **T1 and T2**, and the correction is worth keeping because it changed
+the schedule. #1047's diff touches `scripts/check-review-attestation.sh`, its
+tests, the registry and six fixtures — and **not the workflow**, which is where
+the trigger lives. And #1041 fixes the frozen *check-run* while the trigger fixes
+the *commit status*: two different signals, not two stages of one. So the trigger
+was disjoint from both and shipped first.
+
+What genuinely blocks:
 
 - [ ] B1. **#1047 merges** — the classifier learns to count comment-shaped review
       output. Until then there is no verdict worth re-evaluating. Held by another
@@ -26,11 +36,11 @@ created: "2026-08-18"
 
 ## Implementation
 
-- [ ] T1. [AC5] Write the guard first: a case asserting the gate's workflow
+- [x] T1. [AC5] Write the guard first: a case asserting the gate's workflow
       declares a `workflow_run` trigger on `pr-agent`. Observe it red before the
       trigger exists, **and assert the mutation reached the file** — an invalid
       mutation and an absent guard produce the same green.
-- [ ] T2. [AC1] [AC4] Add the `workflow_run` trigger and recover the pull request
+- [x] T2. [AC1] [AC4] Add the `workflow_run` trigger and recover the pull request
       from the run payload. A trigger that re-evaluates the wrong PR is worse
       than no trigger, so the recovery is the substance of this task, not the
       trigger line.
