@@ -84,3 +84,49 @@ cancel-exempt list, so a reviewer finishing on one PR would have cancelled the
 re-evaluation of another. That is #1040 exactly, one workflow over, arrived by a
 different route, and it would have shipped inside the fix for the defect #1040
 caused.
+
+
+## Session evidence — the wake-up (T6-T9)
+
+`dotf pr triage-queue`, run against the live repository:
+
+```
+3 pull request(s) awaiting a disposition:
+
+  #1051  docs(spec): archive HARNESS-061-effectiveness-probes (#852)
+         github-actions reviewed, never triaged, 2026-08-17 19:05
+  #1049  chore(main): release 0.43.1
+         github-actions reviewed, never triaged, 2026-08-17 18:47
+  #1048  refactor(docs): slim AGENTS.md to crisp boundary rules...
+         github-actions reviewed, never triaged, 2026-08-17 18:47
+exit=1
+```
+
+Three real PRs carrying PR-Agent reviews nobody had acted on — which is the
+condition the command exists to surface, found on its first run.
+
+`#1056` was expected in that list and is absent. Checked rather than assumed:
+it had merged four minutes earlier, so it is not an open PR. The command was
+right and the expectation was stale.
+
+Unit coverage is 8 table cases plus two registry cases, in
+`cli/internal/prtriage/prtriage_test.go`: never triaged, triaged, **re-reviewed
+after triage** (the case that matters — pushing a fix makes the reviewer
+re-review and the old disposition no longer covers it), both spellings of a bot
+login, a declared reviewer commenting without a marker, an undeclared author
+using one, the marker quoted mid-prose, and a registry with an empty marker
+being refused rather than matching everything.
+
+`go build`, `go vet`, `go test ./...`, and golangci-lint at the pinned version:
+**0 issues**.
+
+## AC1 — verified by this pull request itself
+
+#1056 merged at 01:39, putting the `workflow_run` trigger on the default branch,
+which is the only place it fires from. This PR is therefore the first one it can
+act on: PR-Agent reviews it, the trigger fires, and the gate re-evaluates with
+no human comment and no manual re-run. The sequencing constraint that made AC1
+unverifiable turned into the vehicle that verifies it.
+
+Evidence to capture on this PR: a `review-attestation` run whose event is
+`workflow_run`, with no human comment preceding it.
