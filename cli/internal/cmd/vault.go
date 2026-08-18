@@ -43,6 +43,7 @@ Subcommands:
 	cmd.AddCommand(newVaultWorkCmd())
 	cmd.AddCommand(newVaultProjectCmd())
 	cmd.AddCommand(newVaultCrystallizeCmd())
+	cmd.AddCommand(newSearchCmd())
 	return cmd
 }
 

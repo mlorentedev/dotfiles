@@ -15,7 +15,7 @@ import (
 func newHarnessCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "harness",
-		Short: "Harness and pattern trigger inspection tools",
+		Short: "Harness, pattern trigger and skill suggestion tools",
 		Long: `harness provides utilities for inspecting agent harness configuration,
 pattern triggers, and workflow integrations.`,
 		SilenceUsage: true,
@@ -24,6 +24,96 @@ pattern triggers, and workflow integrations.`,
 		},
 	}
 	cmd.AddCommand(newHarnessTriggersCmd())
+	cmd.AddCommand(newHarnessSuggestCmd())
+	return cmd
+}
+
+func newHarnessSuggestCmd() *cobra.Command {
+	var (
+		prompt  string
+		diffMode bool
+		jsonOut bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "suggest [paths...]",
+		Short: "Suggest relevant patterns and skills for a prompt, files, or diff",
+		Long: `suggest analyzes a task description (prompt), touched files, or git diff
+and suggests matching patterns and skills to load.`,
+		Example: `  dotf harness suggest --prompt "we need to debug this memory leak in python"
+  dotf harness suggest specs/FEATURE-1/proposal.md
+  dotf harness suggest --prompt "refactor docker setup" Dockerfile
+  git diff main...HEAD | dotf harness suggest --diff`,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := harness.LoadTriggers(env.RepoDir())
+			if err != nil {
+				return err
+			}
+
+			var paths []string
+			if diffMode {
+				var diffContent string
+				if len(args) > 0 {
+					data, err := os.ReadFile(args[0])
+					if err != nil {
+						return err
+					}
+					diffContent = string(data)
+				} else {
+					data, err := io.ReadAll(cmd.InOrStdin())
+					if err != nil {
+						return fmt.Errorf("read diff from stdin: %w", err)
+					}
+					diffContent = string(data)
+				}
+				paths = harness.ExtractPathsFromDiff(diffContent)
+			} else {
+				if len(args) == 0 && prompt == "" {
+					if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
+						if data, err := io.ReadAll(cmd.InOrStdin()); err == nil && len(data) > 0 {
+							paths = harness.ExtractPathsFromDiff(string(data))
+						}
+					}
+				} else {
+					paths = args
+				}
+			}
+
+			sugg := harness.Suggest(cfg.Triggers, prompt, paths)
+
+			if jsonOut {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(sugg)
+			}
+
+			out := cmd.OutOrStdout()
+			if len(sugg.Patterns) > 0 {
+				_, _ = fmt.Fprintln(out, "Patterns:")
+				for _, p := range sugg.Patterns {
+					_, _ = fmt.Fprintf(out, "  - %s\n", p)
+				}
+			}
+			if len(sugg.Skills) > 0 {
+				if len(sugg.Patterns) > 0 {
+					_, _ = fmt.Fprintln(out)
+				}
+				_, _ = fmt.Fprintln(out, "Skills:")
+				for _, s := range sugg.Skills {
+					_, _ = fmt.Fprintf(out, "  - %s\n", s)
+				}
+			}
+			if len(sugg.Patterns) == 0 && len(sugg.Skills) == 0 {
+				_, _ = fmt.Fprintln(out, "No matching patterns or skills found.")
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&prompt, "prompt", "p", "", "user prompt or task description to analyze")
+	cmd.Flags().BoolVarP(&diffMode, "diff", "d", false, "read unified diff from file or stdin")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output results as a JSON object")
 	return cmd
 }
 
