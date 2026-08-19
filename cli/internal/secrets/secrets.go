@@ -22,6 +22,14 @@ const (
 	BackendAge        = "age"
 	BackendAgeOffline = "age-offline"
 	BackendBW         = "bw"
+	// BackendFileAuthority is a secret whose authority IS the local plaintext
+	// file: nothing resolves it, because there is nothing to resolve it FROM.
+	// The age identity is the case it exists for — every `age`/`age-offline`
+	// secret is decrypted with it, so it cannot be one of them without being
+	// encrypted under itself (#937). Its health question is not "did it
+	// resolve" but "is it there, is it 0600, and does it still match the copy
+	// held off this machine" — see fileAuthorityResolver.
+	BackendFileAuthority = "file-authority"
 	// BackendDefault is the empty tag carried by a hand-built Entry{Var, File}
 	// from a pre-bw caller. It is NOT a valid registry declaration — the parser
 	// rejects it — but it IS resolvable, as age, for back-compat.
@@ -35,7 +43,7 @@ const (
 // "unknown backend" on a user's machine — Go cannot make it a compile error
 // without an exhaustive switch, which this repo's lint config does not enable.
 func ValidBackends() []string {
-	return []string{BackendAge, BackendAgeOffline, BackendBW}
+	return []string{BackendAge, BackendAgeOffline, BackendBW, BackendFileAuthority}
 }
 
 // Entry is one flattened registry secret — the form Registry.Entries produces and

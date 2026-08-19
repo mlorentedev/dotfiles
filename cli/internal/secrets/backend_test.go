@@ -37,22 +37,55 @@ func TestResolversCoverEveryValidBackend(t *testing.T) {
 // ValidBackends is the single answer to "what may a registry declare" rather
 // than a list that drifts from the switch it was extracted from.
 func TestParseRegistry_AcceptsExactlyValidBackends(t *testing.T) {
-	tmpl := `
+	// One template no longer fits every backend: file-authority exposes a file and
+	// takes no age source, so a single env-shaped fixture would report it rejected
+	// while the parser is behaving correctly. Each backend brings the minimal
+	// registry that is VALID for it, and the map is checked for completeness below
+	// — a new backend with no fixture fails here rather than going untested, which
+	// is the hole a hand-written list leaves (the same one #1033 left elsewhere).
+	valid := map[string]string{
+		BackendAge: `
 version: 1
 secrets:
-  - id: s
-    plane: app
-    backend: %s
-    age: some.src
-    bw: { item: some-item, field: api-token }
-    expose: { env: SOME_VAR }
-`
+  - {id: s, plane: app, backend: age, age: some.src, expose: {env: SOME_VAR}}
+`,
+		BackendAgeOffline: `
+version: 1
+secrets:
+  - {id: s, plane: floor, backend: age-offline, age: some.src, expose: {env: SOME_VAR}}
+`,
+		BackendBW: `
+version: 1
+secrets:
+  - {id: s, plane: app, backend: bw, bw: {item: some-item, field: api-token}, expose: {env: SOME_VAR}}
+`,
+		// Carries a `bw:` block with NO `field` on purpose: that is what the shipped
+		// registry entry looks like, and it parses only because file-authority never
+		// runs checkBwSources. Without it here, the fixture would pass while the real
+		// entry's shape went unexercised.
+		BackendFileAuthority: `
+version: 1
+secrets:
+  - {id: s, plane: floor, backend: file-authority, bw: {item: SOME-ITEM}, expose: {file: {var: SOME_KEY, path: "~/.config/age/key.txt", mode: "0600"}}}
+`,
+	}
+
 	for _, b := range ValidBackends() {
-		if _, err := ParseRegistry([]byte(strings.Replace(tmpl, "%s", b, 1))); err != nil {
+		src, ok := valid[b]
+		if !ok {
+			t.Errorf("backend %q is in ValidBackends but this test has no valid fixture for it — "+
+				"add one, or the backend ships with its accept-path untested", b)
+			continue
+		}
+		if _, err := ParseRegistry([]byte(src)); err != nil {
 			t.Errorf("backend %q is in ValidBackends but the parser rejects it: %v", b, err)
 		}
 	}
-	if _, err := ParseRegistry([]byte(strings.Replace(tmpl, "%s", "vault", 1))); err == nil {
+
+	// The other direction, unchanged: a backend outside the list is refused whatever
+	// shape it arrives in.
+	outside := strings.Replace(valid[BackendAge], "backend: age", "backend: vault", 1)
+	if _, err := ParseRegistry([]byte(outside)); err == nil {
 		t.Error("parser accepted a backend outside ValidBackends")
 	}
 }

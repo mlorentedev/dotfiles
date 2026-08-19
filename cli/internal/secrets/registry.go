@@ -251,6 +251,10 @@ func validateSecret(s *Secret, i int, seen map[string]bool, seenVar map[string]s
 		if err := s.checkBwSources(); err != nil {
 			return err
 		}
+	case BackendFileAuthority:
+		if err := s.checkFileAuthoritySources(); err != nil {
+			return err
+		}
 	}
 	if err := checkBWFolder(s); err != nil {
 		return err
@@ -362,6 +366,30 @@ func (s *Secret) checkAgeSources() error {
 	return nil
 }
 
+// checkFileAuthoritySources enforces the shape of a root. A file expose, because
+// a key belongs on disk at a path with a mode — not in an environment variable
+// where it would be inherited by every child of every process that read it. No
+// age source, because declaring one names a ciphertext that cannot exist: this
+// file is what decrypts ciphertexts, and encrypting it under itself is the
+// chicken-and-egg #937 is about.
+//
+// A `bw:` block IS allowed and is the convenience copy. Authority stays on disk;
+// the Bitwarden entry exists so a rebuilt machine can fetch it once, and so the
+// two can be compared for drift (#1000). ADR-028 §2.
+func (s *Secret) checkFileAuthoritySources() error {
+	if s.Expose.File == nil {
+		return fmt.Errorf("secret %q: file-authority exposes a file, never env vars", s.ID)
+	}
+	if s.Expose.File.Var == "" || s.Expose.File.Path == "" {
+		return fmt.Errorf("secret %q: file expose needs var+path", s.ID)
+	}
+	if s.Age != "" {
+		return fmt.Errorf("secret %q: file-authority takes no age source (got %q) — "+
+			"the file IS the authority, and cannot be encrypted under itself", s.ID, s.Age)
+	}
+	return nil
+}
+
 // checkBwSources verifies every exposed var/file has a Bitwarden item + field.
 func (s *Secret) checkBwSources() error {
 	if s.BW == nil || s.BW.Item == "" {
@@ -399,11 +427,20 @@ func (r *Registry) Entries(home string) []Entry {
 	var es []Entry
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
-		if s.Backend == BackendBW {
+		switch s.Backend {
+		case BackendBW:
 			es = append(es, s.bwEntries(home)...)
-			continue
+		case BackendFileAuthority:
+			// Flattens identically to an age file secret — Var, Dest, Mode, and an
+			// empty source — and keeps its own Backend tag, which is what routes it
+			// to the resolver that refuses. Named explicitly rather than left to the
+			// default: a future backend would otherwise inherit ageEntries' shape in
+			// silence, which is how a consumer gets taught about one variant and
+			// forgotten for another (REFACTOR-012).
+			es = append(es, s.ageEntries(home)...)
+		default:
+			es = append(es, s.ageEntries(home)...)
 		}
-		es = append(es, s.ageEntries(home)...)
 	}
 	return es
 }

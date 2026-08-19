@@ -56,6 +56,32 @@ type Resolver interface {
 	Resolve(e Entry) ([]byte, error)
 }
 
+// NotMaterialized marks a backend that must never reach a child process, whatever
+// its health check does. It is separate from Verifier on purpose: "answers its own
+// health question" and "must not be handed out" are two different properties that
+// happen to coincide in the one backend that has either today, and EnvFor used the
+// first as a proxy for the second until the round-2 review of OPS-026 pointed out
+// that a future backend implementing Verifier for any other reason would vanish
+// from the secret set in silence. That is this repository's recurring defect —
+// a signal consulted for a question it was not asked — inside the change that
+// exists to fix an instance of it.
+//
+// The reason string is what the refusal says, so the two consumers cannot drift.
+type NotMaterialized interface {
+	NotMaterializedReason(e Entry) string
+}
+
+// Verifier is the optional half of Resolver, for a backend whose health question
+// is not "did it resolve". Loader.Verify prefers it when a resolver implements it
+// and falls back to Resolve otherwise, so the ordinary backends are untouched.
+//
+// It exists because one backend's answer cannot be produced by resolving: the age
+// root has no source to resolve FROM, and asking `run` to hand it out is a
+// widening of blast radius rather than a health check (#937).
+type Verifier interface {
+	VerifyEntry(e Entry) error
+}
+
 // Loader resolves entries to child-process environment, fetching on demand. It holds
 // the per-backend seams — Decrypt (age) and BW (Bitwarden) — both injectable so
 // EnvFor is unit-testable with no age binary, no age key, and no Bitwarden vault.
@@ -71,10 +97,11 @@ type Loader struct {
 func (l *Loader) resolvers() map[string]Resolver {
 	age := ageResolver{secretsDir: l.SecretsDir, keyPath: l.KeyPath, decrypt: l.Decrypt}
 	return map[string]Resolver{
-		BackendDefault:    age,
-		BackendAge:        age,
-		BackendAgeOffline: age,
-		BackendBW:         bwResolver{reader: l.BW},
+		BackendDefault:       age,
+		BackendAge:           age,
+		BackendAgeOffline:    age,
+		BackendBW:            bwResolver{reader: l.BW},
+		BackendFileAuthority: fileAuthorityResolver{},
 	}
 }
 
@@ -97,6 +124,18 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 		r, ok := resolvers[e.Backend]
 		if !ok {
 			return nil, fmt.Errorf("secret %q: unknown backend %q", e.Var, e.Backend)
+		}
+		// A backend that answers its own health question is one nothing resolves —
+		// today, the age root. Skipping it when resolving EVERYTHING is the point:
+		// `run` asks for the secret set, not for the key those secrets are
+		// decrypted with, and nobody asked for this one.
+		//
+		// The skip is deliberately conditional on `only == nil`. Naming it
+		// explicitly (`--only AGE_KEY_PERSONAL`) falls through to Resolve, which
+		// refuses out loud. Skipping there too would answer an explicit request
+		// with silence, which is the failure mode this repository keeps finding.
+		if _, never := r.(NotMaterialized); never && only == nil {
+			continue
 		}
 		plaintext, err := r.Resolve(e)
 		if err != nil {
@@ -148,6 +187,11 @@ func (l *Loader) Verify(e Entry) error {
 	r, ok := l.resolvers()[e.Backend]
 	if !ok {
 		return fmt.Errorf("unknown backend %q", e.Backend)
+	}
+	// A backend may answer the health question itself. Checked before Resolve,
+	// because for the one backend that does, Resolve is defined to refuse.
+	if v, isVerifier := r.(Verifier); isVerifier {
+		return v.VerifyEntry(e)
 	}
 	plaintext, err := r.Resolve(e)
 	if err != nil {
@@ -217,4 +261,60 @@ func materialize(dest string, content []byte, mode os.FileMode) error {
 // `age -d` appends a trailing newline that must not become part of the value.
 func stripNewlines(s string) string {
 	return strings.NewReplacer("\r", "", "\n", "").Replace(s)
+}
+
+// fileAuthorityResolver is the age root's backend: a secret whose authority is the
+// plaintext file on this disk. There is no ciphertext and no remote, so there is
+// nothing to resolve — and handing the key that decrypts every other secret to a
+// child process through the same facade as those secrets widens the blast radius
+// instead of narrowing it, which is the opposite of what `run` is for.
+//
+// So Resolve refuses, deliberately and with a reason, and the health question is
+// answered by VerifyEntry instead: present, and 0600.
+//
+// What VerifyEntry does NOT yet check is that the file still matches the copy held
+// off this machine. That comparison is the point of #1000 — a drifted copy is
+// indistinguishable from a good one until the day it is needed — and it needs a
+// live Bitwarden session, so it is a second slice rather than a silent omission.
+// Until it lands, this check answers a narrower question than the one that matters,
+// and says so here rather than letting a reader assume otherwise.
+type fileAuthorityResolver struct{}
+
+func (fileAuthorityResolver) NotMaterializedReason(e Entry) string {
+	return fmt.Sprintf("%s is the age root: it is not materialized through this facade, "+
+		"because every other secret is decrypted with it", e.Var)
+}
+
+func (r fileAuthorityResolver) Resolve(e Entry) ([]byte, error) {
+	return nil, errors.New(r.NotMaterializedReason(e))
+}
+
+// VerifyEntry reports the root's health without reading its contents. A missing
+// file is ErrSecretAbsent (MISSING, not FAILED) — the same tolerance every other
+// backend gets for "not provisioned on this machine", since a fresh checkout
+// legitimately has no key yet. A wrong mode is FAILED: the file is present and
+// readable by someone it should not be, which is a real defect and not an absence.
+func (fileAuthorityResolver) VerifyEntry(e Entry) error {
+	if e.Dest == "" {
+		return fmt.Errorf("no path declared for the file-authority secret")
+	}
+	fi, err := os.Stat(e.Dest)
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: %s", ErrSecretAbsent, e.Dest)
+	}
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", e.Dest, err)
+	}
+	// Not just directories: a FIFO, socket or device node at this path can carry
+	// mode 0600 and pass every other check here, while `age --decrypt` fails on it.
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file (%s)", e.Dest, fi.Mode().Type())
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("%s is empty", e.Dest)
+	}
+	// Permission bits only, and only where they exist — see checkKeyMode's two
+	// build-tagged halves. setuid/sticky and the type bits are not what was
+	// declared, and a mask mismatch there would report a confusing cause.
+	return checkKeyMode(fi, e.Dest, e.Mode)
 }
