@@ -53,3 +53,28 @@ Produced in the session of 2026-08-19, not recalled.
 - The shape "a check that cannot answer the real question yet must say so where the
   check lives" — `fileAuthorityResolver`'s comment about the deferred drift
   comparison. Same family as lesson 212.
+
+## Round 1 adversarial review — disposition
+
+`nan/deepseek-v4-flash`, verdict **FAIL** on `43e351f`. Five findings, all five applied.
+Recorded here rather than only in the transcript, because a verdict nobody dispositioned
+is the silent green this repository spent 2026-08-17/18 cataloguing.
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 1 | **Blocker** (REAL) | `EnvFor` resolves every entry, so the root's refusing resolver broke `dotf secrets run` outright for every invocation without `--only`. The `Verifier` seam was consulted by `Verify` and not by `EnvFor`. | **Applied.** Reproduced first: branch binary errors, main's exits 0. `run` now SKIPS a self-verifying entry when `only == nil` and REFUSES it when named explicitly — a bulk request nobody aimed at the root gets silence, an explicit one gets a loud refusal. |
+| 2 | Major (THEORETICAL) | `TestResolversCoverEveryValidBackend` asserts a resolver EXISTS, never that it works inside the loop it lives in — which is why a green suite shipped the Blocker. | **Applied.** `TestEnvFor_ResolvesEverySingleBackendWithoutError` puts one entry of every declared backend through `EnvFor`. |
+| 3 | Major (THEORETICAL) | `EnvFor` had zero coverage for `file-authority`. | **Applied.** Two cases, skip and explicit refusal. |
+| 4 | Minor (THEORETICAL) | `Entries()` routed the backend by fallthrough; a future backend would inherit `ageEntries` silently. | **Applied.** An explicit `switch` case with the reason, citing REFACTOR-012. |
+| 5 | Minor (REAL) | The `bw:` block has no `field` and nothing reads it; a reader could take it for a live source. | **Applied.** Stated in the proposal's *What* and at the point of use in the registry. |
+
+**Mutation evidence for the new guards:** with the `EnvFor` skip removed (confirmed
+present: `grep -c` of the guard line returns 0), `TestEnvFor_SkipsTheRootWhenResolvingEverything`
+and `TestEnvFor_ResolvesEverySingleBackendWithoutError` both FAIL; both pass after revert.
+They would have caught the Blocker.
+
+**What the round teaches, beyond this spec:** `Verify` was green, the unit suite was
+green, and the shipped command was broken — because a seam was added to one consumer of
+the resolver map and not the other. That is REFACTOR-012's shape, which this very file
+cites, arriving in the change that cites it. Static coverage of "does a resolver exist"
+could not see it; only exercising the loop could.

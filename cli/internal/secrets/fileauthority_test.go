@@ -133,3 +133,84 @@ secrets:
 		t.Fatal("file-authority exposing env vars must be rejected")
 	}
 }
+
+// --- EnvFor: the door the Verifier seam did not close on its own ---------------
+//
+// Every case below exists because the first cut of this backend shipped a Verifier
+// consulted by Verify and NOT by EnvFor, so `dotf secrets run` — which resolves
+// every entry — hit the root's refusing resolver and failed outright. Verify was
+// green, the unit tests were green, and the command was broken. Found by the
+// adversarial review of OPS-026, not by this suite; these are the cases that would
+// have caught it.
+
+func TestEnvFor_SkipsTheRootWhenResolvingEverything(t *testing.T) {
+	l := loaderFor(t)
+	entries := []Entry{
+		{Var: "ORDINARY", Backend: BackendAge, File: "ordinary"},
+		{Var: "AGE_KEY_PERSONAL", Backend: BackendFileAuthority, IsFile: true,
+			Dest: filepath.Join(t.TempDir(), "key.txt"), Mode: 0o600},
+	}
+
+	env, err := l.EnvFor(entries, nil)
+	if err != nil {
+		t.Fatalf("resolving everything must not fail because the root cannot be resolved: %v", err)
+	}
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "AGE_KEY_PERSONAL=") {
+			t.Fatal("the age root must never reach a child process's environment")
+		}
+	}
+	if len(env) != 1 || !strings.HasPrefix(env[0], "ORDINARY=") {
+		t.Fatalf("the other secrets must still resolve, got %v", env)
+	}
+}
+
+func TestEnvFor_RefusesTheRootWhenNamedExplicitly(t *testing.T) {
+	// The skip is for a bulk request nobody aimed at the root. An explicit
+	// --only AGE_KEY_PERSONAL is a question, and answering it with silence — an
+	// empty environment and exit 0 — is the failure mode this repo keeps finding.
+	l := loaderFor(t)
+	entries := []Entry{{Var: "AGE_KEY_PERSONAL", Backend: BackendFileAuthority, IsFile: true,
+		Dest: filepath.Join(t.TempDir(), "key.txt"), Mode: 0o600}}
+
+	_, err := l.EnvFor(entries, map[string]bool{"AGE_KEY_PERSONAL": true})
+	if err == nil {
+		t.Fatal("naming the root explicitly must be refused out loud, not silently skipped")
+	}
+	if !strings.Contains(err.Error(), "age root") {
+		t.Errorf("the refusal must say what it refused and why, got: %v", err)
+	}
+}
+
+func TestEnvFor_ResolvesEverySingleBackendWithoutError(t *testing.T) {
+	// The coverage test next door asserts a resolver EXISTS per backend. It cannot
+	// see whether that resolver breaks the loop it lives in — which is exactly how
+	// the blocker above passed a green suite. This asserts the loop survives one
+	// entry of every declared backend.
+	l := loaderFor(t)
+	l.BW = stubBW{}
+
+	var entries []Entry
+	for _, b := range ValidBackends() {
+		e := Entry{Var: "V_" + strings.ToUpper(strings.ReplaceAll(b, "-", "_")), Backend: b}
+		switch b {
+		case BackendBW:
+			e.Item, e.Field = "item", "field"
+		case BackendFileAuthority:
+			e.IsFile, e.Dest, e.Mode = true, filepath.Join(t.TempDir(), "key.txt"), 0o600
+		default:
+			e.File = "src"
+		}
+		entries = append(entries, e)
+	}
+
+	if _, err := l.EnvFor(entries, nil); err != nil {
+		t.Fatalf("EnvFor must survive one entry of every declared backend, got: %v", err)
+	}
+}
+
+// stubBW is a BWReader that answers anything, so the loop-survival case above is
+// about the loop and not about Bitwarden.
+type stubBW struct{}
+
+func (stubBW) Field(_, _ string) (string, error) { return "bw-value", nil }

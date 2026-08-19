@@ -40,5 +40,12 @@
     "verification": "grep -n 'file-authority' docs/adr/adr-028-secrets-two-tier-bitwarden-age.md",
     "state": "done",
     "evidence": "Amended at line 146 with a dated note enumerating all three reasons the previous example could not validate: age-offline with a file expose requires an age source, expose.file requires var, and `offline:` is not a field on the schema."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f7",
+    "behavior": "AC8 — `dotf secrets run` resolves the whole secret set with the root present: it SKIPS an entry whose resolver answers its own health question, and REFUSES that entry when it is named explicitly with --only. Added by the round-1 adversarial review, which found the first cut broke `run` outright: EnvFor iterates every entry and the root's resolver refuses, so every invocation without --only failed. Verify was green and the unit suite was green while the command was broken.",
+    "verification": "go test ./internal/secrets/ -run 'EnvFor'",
+    "state": "done",
+    "evidence": "Reproduced against the branch binary before any fix: `dotf secrets run -- true` -> `Error: AGE_KEY_PERSONAL is the age root...`, while main's binary on the same command exits 0. After the fix: bulk run exits 0; `--only AGE_KEY_PERSONAL` still refuses out loud; `--only NAN_API_KEY` still works. The three new EnvFor cases were observed FAILING with the skip removed (mutation confirmed present: 0 occurrences of the guard line) and passing after revert."
   }
 ]

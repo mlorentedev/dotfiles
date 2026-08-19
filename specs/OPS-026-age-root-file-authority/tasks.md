@@ -55,5 +55,7 @@ created: "2026-08-19"
 - [x] `go build`, `go vet`, `go test ./...` (17 packages), `golangci-lint run` at the
       pinned 2.12.2 — 0 issues
 - [x] `dotf secrets verify` — 34 ok, 0 missing, 0 failed (33 before)
-- [ ] PR opened referencing this spec folder
-- [ ] Adversarial review passes before archive
+- [x] PR opened referencing this spec folder (#1075)
+- [x] Round 1 adversarial review: FAIL, five findings, all five applied — see
+      `verification.md` for the disposition table
+- [ ] Round 2 adversarial review passes before archive

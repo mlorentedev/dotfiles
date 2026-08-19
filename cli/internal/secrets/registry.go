@@ -427,11 +427,20 @@ func (r *Registry) Entries(home string) []Entry {
 	var es []Entry
 	for i := range r.Secrets {
 		s := &r.Secrets[i]
-		if s.Backend == BackendBW {
+		switch s.Backend {
+		case BackendBW:
 			es = append(es, s.bwEntries(home)...)
-			continue
+		case BackendFileAuthority:
+			// Flattens identically to an age file secret — Var, Dest, Mode, and an
+			// empty source — and keeps its own Backend tag, which is what routes it
+			// to the resolver that refuses. Named explicitly rather than left to the
+			// default: a future backend would otherwise inherit ageEntries' shape in
+			// silence, which is how a consumer gets taught about one variant and
+			// forgotten for another (REFACTOR-012).
+			es = append(es, s.ageEntries(home)...)
+		default:
+			es = append(es, s.ageEntries(home)...)
 		}
-		es = append(es, s.ageEntries(home)...)
 	}
 	return es
 }

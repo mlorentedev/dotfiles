@@ -110,6 +110,18 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 		if !ok {
 			return nil, fmt.Errorf("secret %q: unknown backend %q", e.Var, e.Backend)
 		}
+		// A backend that answers its own health question is one nothing resolves —
+		// today, the age root. Skipping it when resolving EVERYTHING is the point:
+		// `run` asks for the secret set, not for the key those secrets are
+		// decrypted with, and nobody asked for this one.
+		//
+		// The skip is deliberately conditional on `only == nil`. Naming it
+		// explicitly (`--only AGE_KEY_PERSONAL`) falls through to Resolve, which
+		// refuses out loud. Skipping there too would answer an explicit request
+		// with silence, which is the failure mode this repository keeps finding.
+		if _, isVerifier := r.(Verifier); isVerifier && only == nil {
+			continue
+		}
 		plaintext, err := r.Resolve(e)
 		if err != nil {
 			return nil, err

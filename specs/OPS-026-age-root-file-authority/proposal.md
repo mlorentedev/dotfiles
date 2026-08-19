@@ -40,6 +40,12 @@ Observable afterwards:
   and a drifted or wrong-key copy reports FAILED rather than OK.
 - ADR-028's worked example is amended to something the validator accepts.
 
+A `bw:` block on such a secret is **tolerated, not required, and not a source**.
+`checkFileAuthoritySources` never calls `checkBwSources`, so no `field` is demanded
+and nothing resolves through it. It is documentation of where the convenience copy
+lives, which is where #1000's drift comparison will look. A reader who assumes it is
+a live source would be wrong, so the registry entry says so at the point of use.
+
 ## Out of scope
 
 - **Making the off-machine copy.** That is a physical act — printed, on a USB, in a
@@ -51,6 +57,13 @@ Observable afterwards:
   to a child process through the same facade as the secrets it protects is a widening
   of blast radius, not a convenience. The `expose.file` contract records where the
   file belongs; materialising it through `run` is deliberately not added.
+
+  **Not to be confused with breaking `run`,** which the first cut did: `EnvFor`
+  resolves every entry, so the refusing resolver failed the whole command. A feature
+  limitation and a regression are not the same thing, and the review of round 1 was
+  right to call that a Blocker. `run` now SKIPS the root when resolving everything
+  and REFUSES it when named explicitly — silence for a request nobody aimed at the
+  root, a loud refusal for one that was.
 - **The drift comparison.** Checking that the local key still matches the copy held
   off this machine is #1000's own AC3, not this spec's. It was drafted here and moved
   out on the way: it needs a live Bitwarden session and `age-keygen -y`, and — now
