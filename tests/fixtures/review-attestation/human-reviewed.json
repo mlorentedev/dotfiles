@@ -1,2 +1,2 @@
 {"number":3,"state":"OPEN","author":{"login":"mlorentedev"},"labels":[],"body":"body","comments":[],
- "reviews":[{"author":{"login":"someone-else"},"state":"APPROVED","body":"LGTM, the mutation test convinced me."}]}
+ "reviews":[{"author":{"login":"someone-else"},"state":"APPROVED","authorAssociation":"COLLABORATOR","body":"LGTM, the mutation test convinced me."}]}

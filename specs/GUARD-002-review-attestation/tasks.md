@@ -97,3 +97,15 @@ terminal state. Every entry starts `pending` with empty `evidence`.
 - [x] The pairing itself is guarded, across both files. The first version was not
       — removing the reviewer exclusion broke no test, which is the half-applied
       state the design exists to prevent, present in the change that designed it.
+
+## Post-ship, found by composition with #786
+
+- [x] [AC8] A review attests only from a member or a declared reviewer (#1033).
+      `authorAssociation` is the discriminator, already present in the payload;
+      CONTRIBUTOR is excluded because a merged commit grants it to accounts of
+      either kind. Verified with `bats tests/check-review-attestation.bats -f '#1033'`
+      and by running the old and new script side by side over five live PRs,
+      which change no verdict
+- [x] [AC8] The guard that should have caught it now derives its list from the
+      registry. "The script names no reviewer of its own" refuted three
+      hand-written names while the file named a fourth, added by #1047

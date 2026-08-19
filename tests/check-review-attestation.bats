@@ -148,7 +148,16 @@ refute_grep() {
     # If a login appears here at all — even in prose — the registry has stopped
     # being the single place a reviewer is declared, and the next migration is a
     # code change again.
-    refute_grep 'coderabbitai' "$SCRIPT"
+    #
+    # Derived from the registry rather than listed by hand. A hand-written list
+    # only refutes the names someone thought of, and this test passed for as long
+    # as the script named a reviewer the list happened to omit — found while
+    # closing #1033, in a comment added by #1047. The literals below stay because
+    # they name things no longer in the registry, which a derived list cannot see.
+    while read -r login; do
+        [ -n "$login" ] || continue
+        refute_grep "$login" "$SCRIPT"
+    done < <(jq -r '.reviewers[]?.login' "$REPO/harness/review-attestation.json")
     refute_grep 'pr-agent' "$SCRIPT"
     refute_grep 'rate limited by' "$SCRIPT"
 }
@@ -501,4 +510,57 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
     # This file names no vendor and no path, under test, and the exemption must
     # not be where that rule finally breaks.
     refute_grep 'release-please|CHANGELOG\.md|\.release-please-manifest' "$SCRIPT"
+}
+
+# --- #1033: the reviews API door -----------------------------------------------
+#
+# #1047 taught the classifier to count comment-shaped reviews, and gated that on a
+# declared (login, marker) pair. The reviews[] door kept the original rule — any
+# author who is not the PR author — for another day, and these cases pin the door
+# shut. They exist in pairs on purpose: a rule that only ever refuses is
+# indistinguishable from a broken gate.
+
+@test "#1033: an undeclared automation login cannot attest through reviews[]" {
+    run "$SCRIPT" --payload "$F/undeclared-bot-review.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"stale-labeler-bot"* ]]
+    [[ "$output" != *"attested"* ]]
+}
+
+@test "#1033: the refusal says reviews exist, instead of claiming none do" {
+    # The whole gate rests on its report being true. Telling a PR that carries a
+    # review "no reviewer output on this PR yet" is a false statement, and the one
+    # a reader would act on by asking for a review it already has.
+    run "$SCRIPT" --payload "$F/undeclared-bot-review.json"
+    [[ "$output" == *"reviews exist"* ]]
+    [[ "$output" != *"no reviewer output"* ]]
+}
+
+@test "#1033: a declared reviewer still attests through reviews[]" {
+    run "$SCRIPT" --payload "$F/bot-reviewed.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+}
+
+@test "#1033: a member's review attests without being declared anywhere" {
+    run "$SCRIPT" --payload "$F/human-reviewed.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+}
+
+@test "#1033: CONTRIBUTOR is not a member association" {
+    # Granted by having had a commit merged, which an automation account holds as
+    # easily as a person. Counting it would reopen this defect at the door it was
+    # closed at.
+    run "$SCRIPT" --payload "$F/contributor-review.json"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"drive-by-bot"* ]]
+}
+
+@test "#1033: a review with no authorAssociation does not attest an undeclared login" {
+    # Real payloads always carry the field; one that does not is a fixture, or a
+    # capture predating it. Absent reads as absent, which refuses loudly rather
+    # than attesting silently.
+    run "$SCRIPT" --payload "$F/no-association-review.json"
+    [ "$status" -eq 1 ]
 }

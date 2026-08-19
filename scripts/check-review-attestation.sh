@@ -13,7 +13,7 @@
 #
 # States, decided by CONTENT rather than by check status:
 #
-#   attested  a review happened (bot or human, not the author)   -> exit 0
+#   attested  a review happened (a member, or a declared bot)     -> exit 0
 #   exempt    the diff carries nothing a review could act on     -> exit 0
 #   disclosed no review, but the escape is declared in full      -> exit 0
 #   declined  a reviewer said it could not review                -> exit 1
@@ -164,19 +164,79 @@ printf '%s' "$PR_JSON" | jq -e . >/dev/null 2>&1 \
 # whole point of the artifact. This mirrors harness/reviewer-pool.json's
 # standing rule that the reviewer must not be the implementer.
 PR_AUTHOR="$(printf '%s' "$PR_JSON" | jq -r '.author.login // ""')"
-INDEPENDENT="$(printf '%s' "$PR_JSON" | jq -r --arg a "$PR_AUTHOR" \
-    '[.reviews[]? | select((.author.login // "") != $a)] | length')"
+# A review attests when its author is not the PR author, AND that author is either
+# a member of this repository or a DECLARED reviewer.
+#
+# The second half is #1033. The original rule counted any entry in reviews[] whose
+# author was not the PR author — which reads as "somebody other than me looked" and
+# actually means "some identity other than mine appeared". Those two differ exactly
+# where an identity is SHARED: every workflow in this repository posts under one
+# and the same automation login, so a labeler, a release job or a summary step could
+# attest for a PR nobody reviewed. A person's identity cannot be shared that way, which is why
+# only bot reviews need a declaration and any human review still counts.
+#
+# The bot/human bit is NOT in this payload. `gh pr view --json reviews` returns
+# login, authorAssociation and state, and nothing else. REST carries `user.type`,
+# but spells the login with a `[bot]` suffix — reaching for it would add a second
+# API call AND a second spelling to every fixture, to learn something
+# `authorAssociation` already answers well enough. Measured across this
+# repository's last sixty pull requests on 2026-08-19: every bot-authored review
+# read `NONE`, and the one human-authored review read `OWNER`.
+#
+# Well enough, not exactly — and the residue falls the safe way. An outside human
+# whose association reads NONE does not attest, and the refusal below tells them to
+# be declared. A gate that under-attests refuses a good PR loudly; one that
+# over-attests passes a bad one in silence, and #906 exists because of the second.
+#
+# A payload with no `authorAssociation` at all — a hand-written fixture, or a
+# capture predating this field — reads as absent, so an undeclared login in it does
+# not attest. That is the same safe direction, and it is a fixture bug rather than a
+# gate bug: the field is always present in real output.
+#
+# CONTRIBUTOR is deliberately NOT a member association here. It is granted by having
+# had a commit merged, which a bot holds as easily as a person — including it would
+# reopen this defect through the door it was just closed at.
+ATTESTING="$(printf '%s' "$PR_JSON" | jq -r --arg a "$PR_AUTHOR" --slurpfile cfg "$CONFIG" '
+    def norm: (. // "") | ascii_downcase | sub("\\[bot\\]$"; "");
+    (($cfg[0].reviewers // []) | map(.login | norm)) as $declared
+    | ["OWNER", "MEMBER", "COLLABORATOR"] as $member
+    | [ .reviews[]?
+        | select((.author.login | norm) != ($a | norm))
+        | { login: (.author.login // "?"),
+            assoc: (.authorAssociation // ""),
+            n:     (.author.login | norm) }
+        | select(((.assoc as $x | $member   | index($x)) != null)
+                 or ((.n    as $y | $declared | index($y)) != null))
+        | .login
+      ] | unique | join(", ")')"
 
-if [ "$INDEPENDENT" -gt 0 ]; then
-    REVIEWERS="$(printf '%s' "$PR_JSON" | jq -r --arg a "$PR_AUTHOR" \
-        '[.reviews[]? | select((.author.login // "") != $a) | .author.login // "?"] | unique | join(", ")')"
-    say "[OK] attested — reviewed by: $REVIEWERS"
+if [ -n "$ATTESTING" ]; then
+    say "[OK] attested — reviewed by: $ATTESTING"
     exit 0
 fi
 
+# Reviews that exist but do not qualify, kept only for the refusal message. Telling
+# a PR that carries three reviews "pending — no reviewer output yet" is a false
+# statement, and a gate built so that green means reviewed cannot afford to be wrong
+# about why it went red. Same reasoning that keeps `declined` and `pending` apart.
+UNQUALIFIED="$(printf '%s' "$PR_JSON" | jq -r --arg a "$PR_AUTHOR" --slurpfile cfg "$CONFIG" '
+    def norm: (. // "") | ascii_downcase | sub("\\[bot\\]$"; "");
+    (($cfg[0].reviewers // []) | map(.login | norm)) as $declared
+    | ["OWNER", "MEMBER", "COLLABORATOR"] as $member
+    | [ .reviews[]?
+        | select((.author.login | norm) != ($a | norm))
+        | { login: (.author.login // "?"),
+            assoc: (.authorAssociation // ""),
+            n:     (.author.login | norm) }
+        | select(((.assoc as $x | $member   | index($x)) == null)
+                 and ((.n    as $y | $declared | index($y)) == null))
+        | .login
+      ] | unique | join(", ")')"
+
 # --- attested by a comment-shaped review? --------------------------------------
-# A reviewer that does not use the reviews API. PR-Agent (#786) runs under
-# GITHUB_TOKEN as github-actions and publishes through the COMMENTS api, so
+# A reviewer that does not use the reviews API. The reviewer shipped by #786 runs
+# under GITHUB_TOKEN as the shared automation login and publishes through the
+# COMMENTS api, so
 # reviews[] is empty on a PR it genuinely reviewed — measured on #1037 and #1042,
 # both carrying a real Guide and both reading as unattested (#1045). The gate
 # built to make green mean "reviewed" was calling the repo's own reviewer
@@ -318,6 +378,12 @@ if [ -n "$DECLINED_BY" ]; then
     printf '[FAIL] declined — %s posted a notice that no review ran (marker: "%s")\n' "$DECLINED_BY" "$DECLINED_MARKER" >&2
     printf '       A notice that no review ran leaves this PR UNREVIEWED. Its checks may still be green:\n' >&2
     printf '       the reviewer reports its own status, and a skipped review is not a failed one.\n' >&2
+elif [ -n "$UNQUALIFIED" ]; then
+    printf '[FAIL] pending — reviews exist, but none of them attests: %s\n' "$UNQUALIFIED" >&2
+    printf '       A review counts when its author is a member of this repository, or is\n' >&2
+    printf '       declared in the reviewer registry. A shared bot identity is neither until\n' >&2
+    printf '       it is declared: every workflow here posts under the same login, so counting\n' >&2
+    printf '       it unconditionally would let a labeler attest for a PR nobody read (#1033).\n' >&2
 else
     printf '[FAIL] pending — no reviewer output on this PR yet\n' >&2
 fi
