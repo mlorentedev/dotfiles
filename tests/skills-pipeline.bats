@@ -42,6 +42,19 @@ stub_copilot() {
     [ ! -L "$FAKEHOME/.config/opencode/commands/spec.md" ]
 }
 
+@test "HARNESS-075: deployed claude skills drop paths: and neutral keys, ensuring unconditional discovery" {
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    # Claude Code treats `paths:` frontmatter as a conditional skill (deferred until a matching path is touched).
+    # Deployed skills must not carry `paths:` or other store-only metadata in their top-level frontmatter.
+    [ -d "$FAKEHOME/.claude/skills" ]
+    for f in "$FAKEHOME"/.claude/skills/*/SKILL.md; do
+        [ -f "$f" ] || continue
+        fm="$(awk '/^---[[:space:]]*$/{n++; next} n==1{print} n>=2{exit}' "$f")"
+        ! echo "$fm" | grep -qE '^(paths|keywords|requires|id|type|status|created|owner|targets):'
+    done
+}
+
 @test "SDD-011: deployed /spec carries the Agent-Side Activation Rule (claude + opencode)" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
