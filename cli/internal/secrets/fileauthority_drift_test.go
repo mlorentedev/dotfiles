@@ -106,14 +106,21 @@ secrets:
 func TestParseRegistry_RecipientMustLookLikeARecipient(t *testing.T) {
 	// A private key pasted here by accident is the mistake worth catching: it would
 	// commit the secret this whole file exists to protect.
+	const pastedByMistake = "AGE-SECRET-KEY-1THISWOULDBETHEACTUALPRIVATEKEY"
 	src := `
 version: 1
 secrets:
-  - {id: s, plane: floor, backend: file-authority, recipient: AGE-SECRET-KEY-1OOPS, expose: {file: {var: K, path: "~/k", mode: "0600"}}}
+  - {id: s, plane: floor, backend: file-authority, recipient: ` + pastedByMistake + `, expose: {file: {var: K, path: "~/k", mode: "0600"}}}
 `
 	err := parseErr(t, src)
 	if !strings.Contains(err.Error(), "age public recipient") {
 		t.Errorf("the refusal must name what was expected, got: %v", err)
+	}
+	// And it must NOT echo the value. The likeliest way to reach this branch is
+	// pasting the private key, and an error message reaches terminal scrollback and
+	// CI logs — printing it would commit the one secret this field protects.
+	if strings.Contains(err.Error(), pastedByMistake) {
+		t.Fatalf("the refusal echoed the rejected value, which may be a private key: %v", err)
 	}
 }
 

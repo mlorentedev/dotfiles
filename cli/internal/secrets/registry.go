@@ -414,7 +414,12 @@ func checkRecipient(s *Secret) error {
 			"nothing would compare it", s.ID, s.Backend)
 	}
 	if !strings.HasPrefix(s.Recipient, "age1") {
-		return fmt.Errorf("secret %q: recipient %q is not an age public recipient (expected an age1... string)", s.ID, s.Recipient)
+		// The value is NOT echoed. The likeliest way to land here is pasting the
+		// PRIVATE key by mistake, and an error message goes to terminal scrollback
+		// and CI logs — printing it would commit the one secret this field exists
+		// to protect. Name the shape, never the content.
+		return fmt.Errorf("secret %q: recipient does not look like an age public recipient "+
+			"(expected a string starting with age1; value not shown, in case it is a private key)", s.ID)
 	}
 	return nil
 }

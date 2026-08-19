@@ -2,7 +2,9 @@ package doctor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -188,10 +190,20 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 //     backup is one people learn to scroll past, which is the failure this whole
 //     area exists to prevent.
 func checkEscrowDescribesVault(sys *System, escrowDir string, rep *Report) {
-	blob, err := os.ReadFile(filepath.Join(escrowDir, secrets.ManifestFileName))
-	if err != nil {
+	manifestPath := filepath.Join(escrowDir, secrets.ManifestFileName)
+	blob, err := os.ReadFile(manifestPath)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
 		rep.Skip("escrow has no manifest, so drift against the vault is unknown — " +
 			"re-run `dotf secrets backup` to mint one")
+		return
+	case err != nil:
+		// Absence and unreadability are different facts, and the escrow check
+		// twenty lines above says so about itself: "a stat error is NOT proof of
+		// absence". Reporting a permission error as "no manifest yet" would send
+		// the reader to run backup, which will not fix a permission error.
+		rep.Warn(fmt.Sprintf("cannot read the escrow manifest at %s (%v) — drift against the vault was not checked",
+			manifestPath, err))
 		return
 	}
 	var stored secrets.EscrowManifest

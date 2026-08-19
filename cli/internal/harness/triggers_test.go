@@ -340,4 +340,3 @@ name: skill2
 		t.Fatalf("deps[skill1] = %v; want %v", deps["skill1"], expected)
 	}
 }
-

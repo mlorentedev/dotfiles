@@ -64,7 +64,7 @@ func okConfig(t *testing.T, exp BWExporter) BackupConfig {
 
 func TestBackup_WritesCiphertext_0600(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte(sampleExport)})
-	path, err := Backup(cfg)
+	path, _, err := Backup(cfg)
 	if err != nil {
 		t.Fatalf("Backup: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestBackup_WritesCiphertext_0600(t *testing.T) {
 
 func TestBackup_NoPlaintextOnDisk(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte(sampleExport)})
-	path, err := Backup(cfg)
+	path, _, err := Backup(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,9 @@ func TestBackup_NoPlaintextOnDisk(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, leak := range []string{"password", `"p"`, `"name"`, "login"} {
+		// Key-boundary forms, so a future field merely CONTAINING one of these
+		// substrings cannot false-positive the leak check.
+		for _, leak := range []string{`"password"`, `"p"`, `"name"`, `"login"`} {
 			if bytes.Contains(blob, []byte(leak)) {
 				t.Errorf("%s leaked %q from the export: %s", e.Name(), leak, blob)
 			}
@@ -138,7 +140,7 @@ func TestBackup_RecipientThreadedToEncryptor(t *testing.T) {
 		gotRecipient = r
 		return b64Encrypt(pt, r)
 	}
-	if _, err := Backup(cfg); err != nil {
+	if _, _, err := Backup(cfg); err != nil {
 		t.Fatal(err)
 	}
 	if gotRecipient != "age1specific" {
@@ -148,7 +150,7 @@ func TestBackup_RecipientThreadedToEncryptor(t *testing.T) {
 
 func TestBackup_RoundTripVerifyPasses(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte(sampleExport)})
-	if _, err := Backup(cfg); err != nil {
+	if _, _, err := Backup(cfg); err != nil {
 		t.Fatalf("a clean round-trip must verify: %v", err)
 	}
 }
@@ -157,7 +159,7 @@ func TestBackup_TamperedCiphertext_RemovesFileAndErrors(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte(sampleExport)})
 	// Decrypt returns bytes that don't match the export → round-trip mismatch.
 	cfg.Decrypt = func(string, string) ([]byte, error) { return []byte(`{"items":[]}`), nil }
-	if _, err := Backup(cfg); err == nil {
+	if _, _, err := Backup(cfg); err == nil {
 		t.Fatal("expected a round-trip verify failure")
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DestDir, EscrowFileName)); !os.IsNotExist(err) {
@@ -167,7 +169,7 @@ func TestBackup_TamperedCiphertext_RemovesFileAndErrors(t *testing.T) {
 
 func TestBackup_NonJSONExport_FailsVerify(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte("this is not json")})
-	if _, err := Backup(cfg); err == nil {
+	if _, _, err := Backup(cfg); err == nil {
 		t.Fatal("expected a non-JSON export to fail the verify (format drift guard)")
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DestDir, EscrowFileName)); !os.IsNotExist(err) {
@@ -177,7 +179,7 @@ func TestBackup_NonJSONExport_FailsVerify(t *testing.T) {
 
 func TestBackup_ExporterError_NoFile(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{err: fmt.Errorf("bw export: vault is locked")})
-	if _, err := Backup(cfg); err == nil {
+	if _, _, err := Backup(cfg); err == nil {
 		t.Fatal("expected the exporter error to surface")
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DestDir, EscrowFileName)); !os.IsNotExist(err) {
@@ -188,7 +190,7 @@ func TestBackup_ExporterError_NoFile(t *testing.T) {
 func TestBackup_RecipientError_NoFile(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte(sampleExport)})
 	cfg.Recipient = func(string) (string, error) { return "", fmt.Errorf("age key not found") }
-	if _, err := Backup(cfg); err == nil {
+	if _, _, err := Backup(cfg); err == nil {
 		t.Fatal("expected the recipient error to surface")
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DestDir, EscrowFileName)); !os.IsNotExist(err) {
@@ -198,13 +200,13 @@ func TestBackup_RecipientError_NoFile(t *testing.T) {
 
 func TestBackup_EmptyExport_Refused(t *testing.T) {
 	cfg := okConfig(t, fakeExporter{data: []byte{}})
-	if _, err := Backup(cfg); err == nil {
+	if _, _, err := Backup(cfg); err == nil {
 		t.Fatal("expected a refusal to escrow an empty vault")
 	}
 }
 
 func TestBackup_NilExporter_Errors(t *testing.T) {
-	if _, err := Backup(BackupConfig{}); err == nil {
+	if _, _, err := Backup(BackupConfig{}); err == nil {
 		t.Fatal("expected an error when no exporter is configured")
 	}
 }
@@ -240,5 +242,41 @@ func TestExportLockHint_PassesThroughUnrelatedErrors(t *testing.T) {
 	orig := errors.New("Failed to fetch: getaddrinfo ENOTFOUND")
 	if got := exportLockHint(orig); got != orig { //nolint:errorlint // identity is the assertion
 		t.Fatalf("unrelated error was rewritten: %v", got)
+	}
+}
+
+// The escrow recovers the account; the manifest is bookkeeping about it. A caller
+// must be able to tell those apart, and the signature — not a sentinel error — is
+// what makes that impossible to collapse. Exit semantics pinned here because the
+// first cut returned an error for a manifest failure and `dotf secrets backup`
+// exited non-zero while printing "the escrow itself is good": a message and an
+// exit code disagreeing about the same event.
+func TestBackup_ManifestFailureIsAWarningNotAFailure(t *testing.T) {
+	// An export with no ids: valid enough to escrow, not enough to describe.
+	cfg := okConfig(t, fakeExporter{data: []byte(`{"encrypted":false,"items":[{"name":"x"}]}`)})
+
+	path, warn, err := Backup(cfg)
+	if err != nil {
+		t.Fatalf("the escrow succeeded; only its manifest did not — err must be nil, got: %v", err)
+	}
+	if path == "" {
+		t.Fatal("the escrow path must still be returned")
+	}
+	if warn == "" {
+		t.Fatal("a manifest that could not be written must be reported, not swallowed")
+	}
+	if !strings.Contains(warn, "the escrow itself is good") {
+		t.Errorf("the warning must tell the operator what survived, got: %q", warn)
+	}
+	if _, statErr := os.Stat(path); statErr != nil {
+		t.Errorf("the escrow must remain on disk: %v", statErr)
+	}
+}
+
+func TestBackup_EscrowFailureIsStillAnError(t *testing.T) {
+	// The other direction, so the split cannot degrade into "nothing ever fails".
+	cfg := okConfig(t, fakeExporter{err: errors.New("bw is locked")})
+	if _, _, err := Backup(cfg); err == nil {
+		t.Fatal("a failed export must still be an error, not a warning")
 	}
 }

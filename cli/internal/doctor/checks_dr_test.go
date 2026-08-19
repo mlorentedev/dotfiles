@@ -389,3 +389,35 @@ func TestDR_DeletionIsSeenEvenWhenNothingIsNewer(t *testing.T) {
 		t.Errorf("the warning must name the remedy, got: %s", out)
 	}
 }
+
+// Absence and unreadability are different facts. Reporting a permission error as
+// "no manifest yet" sends the reader to run backup, which will not fix a permission
+// error — and the escrow check twenty lines above says exactly this about itself.
+func TestDR_UnreadableManifest_WarnsRatherThanClaimingAbsence(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: mode 000 is still readable, so the case cannot be produced")
+	}
+	dir := t.TempDir()
+	escrowWith(t, dir, storedManifest(t, "1", "2"))
+	unreadable := filepath.Join(dir, "sensitive", "dr", secrets.ManifestFileName)
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o600) })
+	// Confirm the fixture really is unreadable, or this asserts nothing.
+	if _, err := os.ReadFile(unreadable); err == nil {
+		t.Skip("could not make the manifest unreadable in this environment")
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if strings.Contains(out, "has no manifest") {
+		t.Fatalf("an unreadable manifest was reported as an absent one:\n%s", out)
+	}
+	if !strings.Contains(out, "cannot read the escrow manifest") {
+		t.Errorf("want the cannot-read warning, got: %s", out)
+	}
+}

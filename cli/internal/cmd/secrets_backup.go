@@ -47,7 +47,7 @@ func newSecretsBackupCmd() *cobra.Command {
 				}
 				destDir = filepath.Join(dir, "dr")
 			}
-			path, err := secrets.Backup(secrets.BackupConfig{
+			path, manifestWarn, err := secrets.Backup(secrets.BackupConfig{
 				Exporter:  bwExporter,
 				Recipient: ageRecipient,
 				Encrypt:   ageEncryptor,
@@ -59,6 +59,13 @@ func newSecretsBackupCmd() *cobra.Command {
 				return err
 			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "escrow written and verified: %s\n", path)
+			// The escrow is what recovers the account; the manifest is bookkeeping
+			// about it. Exiting non-zero here would tell a script the DR backup
+			// failed when it succeeded — a message and an exit code disagreeing,
+			// which is the defect class this repository spends its time on.
+			if manifestWarn != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", manifestWarn)
+			}
 			return nil
 		},
 	}

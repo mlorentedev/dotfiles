@@ -76,8 +76,8 @@ func TestResolveVaultMemory(t *testing.T) {
 
 func TestClaudeProjectKey(t *testing.T) {
 	for in, want := range map[string]string{
-		"/home/me/Projects/dotfiles":                     "-home-me-Projects-dotfiles",
-		`C:\Users\mlorente\Projects\Workspace\dotfiles`:  "C--Users-mlorente-Projects-Workspace-dotfiles",
+		"/home/me/Projects/dotfiles":                    "-home-me-Projects-dotfiles",
+		`C:\Users\mlorente\Projects\Workspace\dotfiles`: "C--Users-mlorente-Projects-Workspace-dotfiles",
 	} {
 		if got := ClaudeProjectKey(in); got != want {
 			t.Errorf("ClaudeProjectKey(%q) = %q, want %q", in, got, want)
