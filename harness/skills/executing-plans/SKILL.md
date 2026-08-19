@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/executing-plans/SKILL.md
-generated_sha: 3556db7bdaa98026
+generated_sha: b0dd14d9930cf38c
 id: executing-plans-skill
 type: skill
 status: active
@@ -12,6 +12,7 @@ description: Use when you have a written implementation plan to execute, typical
   after /writing-plans produces a plan file.
 keywords: [execute plan, ejecutar plan, run plan, plan execution]
 paths: ['**/plan*.md', '**/implementation-plan*.md']
+requires: [systematic-debugging, test-driven-development, verification-before-completion]
 ---
 # Executing Plans
 

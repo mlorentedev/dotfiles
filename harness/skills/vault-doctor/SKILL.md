@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/vault-doctor/SKILL.md
-generated_sha: 0333b6ba8f202d3d
+generated_sha: 477bbfbc0aed2551
 id: vault-doctor-skill
 type: skill
 status: active
@@ -14,6 +14,7 @@ description: Use when the Obsidian vault needs structural maintenance — unreso
   sessions.
 keywords: [vault doctor, vault health, unresolved links, orphan notes, reparar vault]
 paths: [00_meta/**, .obsidian/**]
+requires: [insights]
 ---
 # Vault Doctor
 

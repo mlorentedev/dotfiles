@@ -71,7 +71,9 @@
         "unit test",
         "integration test",
         "pytest",
-        "go test"
+        "go test",
+        "bats",
+        "vitest"
       ]
     },
     {
@@ -104,9 +106,11 @@
         "pyproject.toml",
         "setup.py",
         "requirements*.txt",
-        "uv.lock"
+        "uv.lock",
+        "*.py",
+        "**/*.py"
       ],
-      "description": "Triggered when modifying Python packaging or dependencies",
+      "description": "Triggered when modifying Python packaging, async code, or dependencies",
       "skills": [
         "async-python-patterns"
       ],
@@ -115,7 +119,244 @@
         "typer",
         "rich",
         "fastapi",
-        "asyncio"
+        "asyncio",
+        "pytest"
+      ]
+    },
+    {
+      "id": "infrastructure-as-code",
+      "pattern": "pattern-terraform-standards",
+      "globs": [
+        "*.tf",
+        "**/*.tf",
+        "*.tfvars",
+        "**/*.tfvars",
+        "terraform.tfstate*",
+        "**/.terraform.lock.hcl"
+      ],
+      "description": "Triggered when modifying Terraform or OpenTofu infrastructure code",
+      "skills": [
+        "terraform"
+      ],
+      "keywords": [
+        "terraform",
+        "opentofu",
+        "tofu",
+        "terragrunt",
+        "hcl",
+        "iac",
+        "infraestructura",
+        "tf"
+      ]
+    },
+    {
+      "id": "kubernetes-packaging",
+      "pattern": "pattern-kubernetes-packaging",
+      "globs": [
+        "Chart.yaml",
+        "**/Chart.yaml",
+        "values*.yaml",
+        "**/values*.yaml",
+        "templates/*.yaml",
+        "**/templates/*.yaml",
+        "templates/*.tpl",
+        "**/templates/*.tpl"
+      ],
+      "description": "Triggered when modifying Kubernetes manifests or Helm charts",
+      "skills": [
+        "helm"
+      ],
+      "keywords": [
+        "helm",
+        "chart",
+        "kubernetes",
+        "k8s",
+        "manifest",
+        "values.yaml"
+      ]
+    },
+    {
+      "id": "golang-engineering",
+      "pattern": "pattern-go-standards",
+      "globs": [
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "**/*.go"
+      ],
+      "description": "Triggered when modifying Go codebase, dependencies, or modules",
+      "skills": [
+        "golang-pro"
+      ],
+      "keywords": [
+        "golang",
+        "go",
+        "goroutine",
+        "channel",
+        "grpc",
+        "pprof",
+        "gin",
+        "chi",
+        "cobra"
+      ]
+    },
+    {
+      "id": "security-and-quality-audit",
+      "pattern": "pattern-security-audit",
+      "globs": [
+        ".trivy*",
+        "gitleaks.toml",
+        ".gitleaks.toml",
+        "security/**",
+        ".snyk"
+      ],
+      "description": "Triggered when performing security, performance, or quality audits",
+      "skills": [
+        "audit",
+        "project-maturation"
+      ],
+      "keywords": [
+        "security",
+        "vulnerability",
+        "sql injection",
+        "xss",
+        "audit",
+        "auditoria",
+        "seguridad",
+        "cve",
+        "snyk",
+        "gitleaks",
+        "trivy",
+        "hardening"
+      ]
+    },
+    {
+      "id": "architecture-and-adr",
+      "pattern": "pattern-architecture-session",
+      "globs": [
+        "docs/adr/**",
+        "**/docs/adr/**",
+        "architecture/**",
+        "00_meta/patterns/**"
+      ],
+      "description": "Triggered when making architectural decisions or reviewing ADRs",
+      "skills": [
+        "architecture-session",
+        "read-all-adrs"
+      ],
+      "keywords": [
+        "architecture",
+        "arquitectura",
+        "adr",
+        "sesion de arquitectura",
+        "decision record",
+        "trade-off",
+        "system design"
+      ]
+    },
+    {
+      "id": "task-and-ticket-tracking",
+      "pattern": "pattern-bitacora-tracking",
+      "globs": [
+        ".github/workflows/add-to-bitacora*.yml",
+        ".github/ISSUE_TEMPLATE/**"
+      ],
+      "description": "Triggered when managing bitacora tickets or user stories",
+      "skills": [
+        "new-ticket",
+        "prd-to-issues",
+        "enrich-us"
+      ],
+      "keywords": [
+        "ticket",
+        "issue",
+        "bitacora",
+        "nuevo ticket",
+        "crea un ticket",
+        "file issue",
+        "user story",
+        "prd",
+        "enrich"
+      ]
+    },
+    {
+      "id": "vault-and-knowledge-management",
+      "pattern": "pattern-knowledge-placement",
+      "globs": [
+        "00_meta/**",
+        "10_projects/**",
+        "50_work/**",
+        "80_agents/**"
+      ],
+      "description": "Triggered when maintaining the knowledge vault or placing documentation",
+      "skills": [
+        "vault-doctor",
+        "place-knowledge",
+        "genre-picker",
+        "crystallize",
+        "insights",
+        "context-refresh",
+        "dispose-proposals"
+      ],
+      "keywords": [
+        "vault",
+        "knowledge",
+        "placement",
+        "frontmatter",
+        "doctor",
+        "insights",
+        "metatype",
+        "crystallize",
+        "context refresh"
+      ]
+    },
+    {
+      "id": "hardware-and-embedded-debug",
+      "pattern": "pattern-hardware-debugging",
+      "globs": [
+        "firmware/**",
+        "drivers/**",
+        "*.dts",
+        "*.dtb",
+        "hardware/**"
+      ],
+      "description": "Triggered when troubleshooting hardware, firmware, or embedded devices",
+      "skills": [
+        "debug-hardware"
+      ],
+      "keywords": [
+        "hardware",
+        "firmware",
+        "sensor",
+        "camera",
+        "gpio",
+        "i2c",
+        "spi",
+        "register",
+        "embedded",
+        "serial",
+        "uart"
+      ]
+    },
+    {
+      "id": "plan-authoring-and-execution",
+      "pattern": "pattern-plan-execution",
+      "globs": [
+        "plans/**",
+        "**/plans/**",
+        "docs/plans/**"
+      ],
+      "description": "Triggered when creating or executing structured implementation plans",
+      "skills": [
+        "writing-plans",
+        "executing-plans"
+      ],
+      "keywords": [
+        "plan",
+        "implementation plan",
+        "executing plan",
+        "writing plan",
+        "plan de ejecucion"
       ]
     },
     {
@@ -160,7 +401,17 @@
         "**/mcp_*.py",
         "**/mcp_*.go"
       ],
-      "description": "Triggered when modifying MCP server configurations or tools"
+      "skills": [
+        "mcp-builder"
+      ],
+      "description": "Triggered when modifying MCP server configurations or tools",
+      "keywords": [
+        "mcp",
+        "model context protocol",
+        "fastmcp",
+        "mcp tool",
+        "mcp server"
+      ]
     }
   ]
 }

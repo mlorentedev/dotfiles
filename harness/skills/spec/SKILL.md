@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: f23aedf75e7691b0
+generated_sha: f5a3ab72397faaac
 id: spec-skill
 type: skill
 status: active
@@ -20,6 +20,7 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
 keywords: [spec, sdd, rdd, spec init, spec fill, spec check, spec archive, scaffold
     spec]
 paths: [specs/**]
+requires: [adversarial-review, verification-before-completion]
 ---
 # Spec Workflow
 

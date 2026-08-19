@@ -38,3 +38,29 @@ assert 'docker' in data['skills']
 "
     [ "$status" -eq 0 ]
 }
+
+@test "harness suggest: resolves terraform trigger on iac prompt" {
+    cd "$CLI"
+    run go run ./cmd/dotf harness suggest --prompt "create terraform module for EKS cluster"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pattern-terraform-standards"* ]]
+    [[ "$output" == *"terraform"* ]]
+}
+
+@test "harness suggest: resolves helm trigger on Chart.yaml path" {
+    cd "$CLI"
+    run go run ./cmd/dotf harness suggest Chart.yaml
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pattern-kubernetes-packaging"* ]]
+    [[ "$output" == *"helm"* ]]
+}
+
+@test "harness suggest: resolves transitive skill dependencies" {
+    cd "$CLI"
+    run go run ./cmd/dotf harness suggest specs/FEATURE-1/proposal.md
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"spec"* ]]
+    [[ "$output" == *"adversarial-review"* ]]
+    [[ "$output" == *"verification-before-completion"* ]]
+}
+

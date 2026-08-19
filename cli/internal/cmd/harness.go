@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
@@ -46,7 +45,7 @@ and suggests matching patterns and skills to load.`,
   git diff main...HEAD | dotf harness suggest --diff`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := harness.LoadTriggers(env.RepoDir())
+			cfg, err := harness.LoadTriggers("")
 			if err != nil {
 				return err
 			}
@@ -134,7 +133,7 @@ pattern IDs from the harness trigger rules.`,
   dotf harness triggers --json specs/tasks.md`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := harness.LoadTriggers(env.RepoDir())
+			cfg, err := harness.LoadTriggers("")
 			if err != nil {
 				return err
 			}

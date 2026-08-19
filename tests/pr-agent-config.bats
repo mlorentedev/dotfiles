@@ -59,6 +59,10 @@ refute_grep() {
     grep -qE '^max_model_tokens = [0-9]+' "$CFG"
 }
 
+@test "pr-agent: response language is English per English-only durable record policy" {
+    grep -q 'response_language = "en-US"' "$CFG"
+}
+
 @test "pr-agent: AGENTS.md enters the review prompt" {
     # The repo's behavioural SSOT becomes review criteria for free: standing
     # orders, English-only, no-auto-merge, the shell compatibility table.

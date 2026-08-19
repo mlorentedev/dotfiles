@@ -58,6 +58,13 @@
     },
     "license": {
       "description": "Upstream license identifier; pairs with source."
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional list of prerequisite skills that must be transitively loaded when this skill is active."
     }
   },
   "additionalProperties": true
