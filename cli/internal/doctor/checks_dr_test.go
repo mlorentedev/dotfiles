@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // lineContaining returns the first report line mentioning substr, so a case can
@@ -249,5 +252,140 @@ func TestDR_StaleEscrowWarns(t *testing.T) {
 
 	if !strings.Contains(buf.String(), "DR escrow is 120 days old") {
 		t.Errorf("want the escrow staleness warning, got: %s", buf.String())
+	}
+}
+
+// --- #1077: does the escrow still DESCRIBE the vault, not just how old is it ----
+//
+// The distinction these cases exist for was measured on the real machine before
+// they were written: the escrow was four days old — inside escrowMaxAge, reported
+// "present and fresh" by the check above — while the live vault already held one
+// item it did not. A deletion is worse still: the item simply stops existing, and
+// every survivor can predate the escrow, so no age comparison can see it.
+
+// escrowWith writes an escrow and, when manifest is non-empty, its manifest.
+func escrowWith(t *testing.T, dir, manifest string) {
+	t.Helper()
+	drDir := filepath.Join(dir, "sensitive", "dr")
+	if err := os.MkdirAll(drDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(drDir, "bitwarden-export.age"), []byte("ciphertext"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if manifest != "" {
+		if err := os.WriteFile(filepath.Join(drDir, secrets.ManifestFileName), []byte(manifest), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func storedManifest(t *testing.T, ids ...string) string {
+	t.Helper()
+	items := make([]secrets.ItemRevision, 0, len(ids))
+	for _, id := range ids {
+		items = append(items, secrets.ItemRevision{ID: id, RevisionDate: "2026-01-0" + id + "T00:00:00.000Z"})
+	}
+	m, err := secrets.ManifestFromItems(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func liveVault(t *testing.T, ids ...string) func() ([]secrets.ItemRevision, error) {
+	t.Helper()
+	items := make([]secrets.ItemRevision, 0, len(ids))
+	for _, id := range ids {
+		items = append(items, secrets.ItemRevision{ID: id, RevisionDate: "2026-01-0" + id + "T00:00:00.000Z"})
+	}
+	return func() ([]secrets.ItemRevision, error) { return items, nil }
+}
+
+// Every escrow written before this feature has no manifest, including the real one
+// until backup next runs. FAILing there would turn doctor red everywhere the moment
+// this merges — the deploy-skew shape measured twice this week (#992).
+func TestDR_NoManifest_SkipsWithTheRemedy(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, "")
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("a pre-existing escrow is not a broken one:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "no manifest") || !strings.Contains(buf.String(), "dotf secrets backup") {
+		t.Errorf("the skip must name the state AND the remedy, got: %s", buf.String())
+	}
+}
+
+// An unchecked escrow reported as fresh is this check's own defect arriving through
+// the check itself.
+func TestDR_NoVaultListing_SkipsRatherThanPasses(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, storedManifest(t, "1", "2"))
+	sys := drSys(time.Now())
+	sys.BWItemRevisions = func() ([]secrets.ItemRevision, error) {
+		return nil, errors.New("bw serve: daemon is locked")
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(sys, &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if strings.Contains(out, "still describes the vault") {
+		t.Fatalf("a check that could not run must not report success:\n%s", out)
+	}
+	if !strings.Contains(out, "drift was not checked") || !strings.Contains(out, "locked") {
+		t.Errorf("the skip must say it did not check, and why, got: %s", out)
+	}
+}
+
+func TestDR_MatchingVaultIsSilentlyFine(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, storedManifest(t, "1", "2"))
+	sys := drSys(time.Now())
+	sys.BWItemRevisions = liveVault(t, "2", "1") // same set, different order
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(sys, &Config{DotfilesDir: dir}, rep)
+
+	if !strings.Contains(buf.String(), "still describes the vault (2 items)") {
+		t.Errorf("an unchanged vault must pass and say so, got: %s", buf.String())
+	}
+	if strings.Contains(buf.String(), "no longer describes") {
+		t.Errorf("ordering must not be mistaken for drift, got: %s", buf.String())
+	}
+}
+
+// The case the whole feature exists for: an item is gone, and every survivor
+// predates the escrow, so nothing about TIME can see it.
+func TestDR_DeletionIsSeenEvenWhenNothingIsNewer(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, storedManifest(t, "1", "2", "3"))
+	sys := drSys(time.Now())
+	sys.BWItemRevisions = liveVault(t, "1", "2")
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(sys, &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if !strings.Contains(out, "DELETED") {
+		t.Fatalf("a deletion must be named as one, got: %s", out)
+	}
+	if rep.Failures() != 0 {
+		t.Errorf("a stale escrow is remediable by one command; WARN, not FAIL:\n%s", out)
+	}
+	if !strings.Contains(out, "dotf secrets backup") {
+		t.Errorf("the warning must name the remedy, got: %s", out)
 	}
 }

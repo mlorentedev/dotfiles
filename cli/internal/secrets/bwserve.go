@@ -238,6 +238,11 @@ func scrubPassword(err error, password string) error {
 type bwServeListItem struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// RevisionDate is carried for the DR freshness comparison (#1077), which
+	// reduces the live vault to the same (id, revision) pairs the escrow manifest
+	// is built from. Measured present on this endpoint 2026-08-19; the export and
+	// the listing describe the same set.
+	RevisionDate string `json:"revisionDate"`
 }
 
 // BWServeReader is the serve-backed BWReader: a drop-in for BWGet behind the
@@ -286,6 +291,30 @@ type bwServeListData struct {
 // It deliberately does NOT use the ?search= filter: the point is the whole set,
 // and search is a fuzzy substring match (see getItemJSON), which would make an
 // absent item indistinguishable from one whose name merely failed to match.
+// ItemRevisions returns the (id, revision) pair for every item in the vault — the
+// live half of the DR freshness comparison. Ids and timestamps only, never a name
+// or a value, so a health check can run it without ever holding a secret.
+//
+// Like ItemNames it deliberately avoids ?search=: the point is the WHOLE set, and a
+// fuzzy substring filter would make a deleted item indistinguishable from one whose
+// name merely failed to match — which is precisely the mutation this comparison
+// exists to catch.
+func (r BWServeReader) ItemRevisions() ([]ItemRevision, error) {
+	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bw serve list items: %w", err)
+	}
+	var list bwServeListData
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, fmt.Errorf("bw serve list items: unparseable data: %w", err)
+	}
+	out := make([]ItemRevision, 0, len(list.Data))
+	for _, it := range list.Data {
+		out = append(out, ItemRevision{ID: it.ID, RevisionDate: it.RevisionDate})
+	}
+	return out, nil
+}
+
 func (r BWServeReader) ItemNames() ([]string, error) {
 	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
 	if err != nil {

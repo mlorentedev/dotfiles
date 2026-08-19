@@ -1,10 +1,13 @@
 package doctor
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // Disaster-recovery readiness.
@@ -142,6 +145,16 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 		rep.Pass("DR escrow present and fresh")
 	}
 
+	// Age is a cheaper question than the one that matters. Measured on this machine
+	// 2026-08-19: the escrow was four days old — comfortably inside escrowMaxAge and
+	// reported "fresh" by the branch above — while the live vault already held one
+	// item it did not. Worse, a DELETION is invisible to any age comparison: the
+	// deleted item simply stops existing, and every survivor can predate the escrow.
+	//
+	// So this asks the other question, from a manifest written beside the escrow at
+	// backup time (#1077).
+	checkEscrowDescribesVault(sys, filepath.Dir(escrow), rep)
+
 	// The drill. This is the one that matters, and the one no other check can
 	// stand in for: an escrow that exists proves a file was written, never that
 	// anyone can restore from it.
@@ -157,4 +170,52 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 		rep.Pass(fmt.Sprintf("recovery drill run %d days ago",
 			int(sys.Now().Sub(info.ModTime()).Hours()/24)))
 	}
+}
+
+// checkEscrowDescribesVault compares what the escrow contained with what the vault
+// holds now. Three outcomes, and the two SKIPs are as load-bearing as the compare:
+//
+//   - No manifest: every escrow written before this feature is in that state,
+//     including the one on this machine until `backup` next runs. FAILing there
+//     would turn doctor red everywhere on merge — the deploy-skew shape measured
+//     twice this week (#992) — so it SKIPs and names the remedy.
+//   - No session: the daemon is locked or absent. An unchecked escrow reported as
+//     fresh is this check's own defect arriving through the check itself, so it
+//     SKIPs with the reason and never passes.
+//   - Compared: silent when the digests agree, and Warn — not Fail — when they do
+//     not. A stale escrow is expected after any mutation and is remediable by one
+//     command; a section that goes red after every `rotate` until someone re-runs
+//     backup is one people learn to scroll past, which is the failure this whole
+//     area exists to prevent.
+func checkEscrowDescribesVault(sys *System, escrowDir string, rep *Report) {
+	blob, err := os.ReadFile(filepath.Join(escrowDir, secrets.ManifestFileName))
+	if err != nil {
+		rep.Skip("escrow has no manifest, so drift against the vault is unknown — " +
+			"re-run `dotf secrets backup` to mint one")
+		return
+	}
+	var stored secrets.EscrowManifest
+	if err := json.Unmarshal(blob, &stored); err != nil {
+		rep.Warn(fmt.Sprintf("escrow manifest is unreadable (%v) — re-run `dotf secrets backup`", err))
+		return
+	}
+	if sys.BWItemRevisions == nil {
+		rep.Skip("no vault listing available, so escrow drift was not checked")
+		return
+	}
+	items, err := sys.BWItemRevisions()
+	if err != nil {
+		rep.Skip(fmt.Sprintf("could not list the vault, so escrow drift was not checked: %v", err))
+		return
+	}
+	live, err := secrets.ManifestFromItems(items)
+	if err != nil {
+		rep.Skip(fmt.Sprintf("could not describe the live vault, so escrow drift was not checked: %v", err))
+		return
+	}
+	if diff := stored.Differs(live); diff != "" {
+		rep.Warn("DR escrow no longer describes the vault: " + diff + " Re-run `dotf secrets backup`.")
+		return
+	}
+	rep.Pass(fmt.Sprintf("DR escrow still describes the vault (%d items)", stored.Count))
 }

@@ -119,6 +119,11 @@ type System struct {
 	// vault does not have takes down every unscoped `dotf secrets run`, and the
 	// only symptom is whatever that run was driving (BUG-080).
 	BWItemNames func() ([]string, error)
+	// BWItemRevisions lists (id, revision) for every vault item — the live half of
+	// the DR freshness comparison (#1077). Separate from BWItemNames because they
+	// answer different questions and one returning the other's shape is how a
+	// consumer gets taught about one and forgotten for the other.
+	BWItemRevisions func() ([]secrets.ItemRevision, error)
 }
 
 // resolveSecret is the production ResolveSecret: the age store (checkout-first,
@@ -193,6 +198,9 @@ func realSystem() *System {
 		ResolveSecret: resolveSecret,
 		BWItemNames: func() ([]string, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemNames()
+		},
+		BWItemRevisions: func() ([]secrets.ItemRevision, error) {
+			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemRevisions()
 		},
 		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)

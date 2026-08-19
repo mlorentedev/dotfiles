@@ -45,14 +45,31 @@ type EscrowManifest struct {
 // digest sees. The escrow's blind spots are the manifest's, by construction.
 func ManifestFrom(export []byte) (EscrowManifest, error) {
 	var doc struct {
-		Items []struct {
-			ID           string `json:"id"`
-			RevisionDate string `json:"revisionDate"`
-		} `json:"items"`
+		Items []ItemRevision `json:"items"`
 	}
 	if err := json.Unmarshal(export, &doc); err != nil {
 		return EscrowManifest{}, fmt.Errorf("manifest: export is not the expected JSON document: %w", err)
 	}
+	return ManifestFromItems(doc.Items)
+}
+
+// ItemRevision is the pair both producers reduce to: the escrowed export and the
+// live vault listing. Having ONE reduction is the point — two spellings of "what a
+// manifest is over" is the two-file agreement nobody checks, and here it would
+// produce permanent false drift between two descriptions of the same vault.
+//
+// Measured 2026-08-19 before this was built, because the equivalence is an
+// assumption until it is not: the escrow held 177 items, `/list/object/items`
+// returned 178, and the sets differed by exactly one id — an addition, not a
+// systematic divergence. Both carry `id` and `revisionDate`.
+type ItemRevision struct {
+	ID           string `json:"id"`
+	RevisionDate string `json:"revisionDate"`
+}
+
+// ManifestFromItems is the reduction itself.
+func ManifestFromItems(items []ItemRevision) (EscrowManifest, error) {
+	doc := struct{ Items []ItemRevision }{items}
 	if len(doc.Items) == 0 {
 		// Refusing beats describing nothing: a manifest claiming zero items would
 		// later read as "everything was deleted" against any real vault, which is

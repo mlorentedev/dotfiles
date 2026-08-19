@@ -30,16 +30,16 @@
   {
     "id": "OPS-032-dr-drift-detection-f5",
     "behavior": "AC5 — the freshness check reports addition, modification and deletion distinctly, including a deletion whose survivors all predate the escrow.",
-    "verification": "not yet implemented — slice B",
-    "state": "pending",
-    "evidence": ""
+    "verification": "go test ./internal/doctor/ -run TestDR && go test ./internal/secrets/ -run Differs",
+    "state": "done",
+    "evidence": "Demonstrated on the REAL vault before the tests were written, which is the order that matters: the escrow held 177 items and the live listing 178, sets differing by exactly one id. `dotf doctor` with a manifest describing the real escrow reported `[WARN] DR escrow no longer describes the vault: 1 item(s) added since the escrow was written. The escrow describes the vault as of 2026-08-15T08:21:32.256Z` — in the SAME run where the age check said the escrow was present and fresh, which is #1077 shown rather than argued. The deletion case is unit-pinned by TestDR_DeletionIsSeenEvenWhenNothingIsNewer, whose fixture asserts every survivor predates the escrow so nothing about time could see it. Equivalence of the two sources was MEASURED, not assumed, before wiring: 0 ids only in the escrow, 1 only live, 177 in both."
   },
   {
     "id": "OPS-032-dr-drift-detection-f6",
     "behavior": "AC6 — an escrow with no manifest is SKIPPED with the remediation named, never FAILED; no session is SKIPPED with a reason, never OK.",
-    "verification": "not yet implemented — slice B",
-    "state": "pending",
-    "evidence": ""
+    "verification": "go test ./internal/doctor/ -run 'NoManifest|NoVaultListing'",
+    "state": "done",
+    "evidence": "Both SKIP paths observed live and unit-pinned. On this machine, with no manifest yet: `[SKIP] escrow has no manifest, so drift against the vault is unknown — re-run `dotf secrets backup` to mint one`. The locked-daemon path asserts the check never reports success when it could not run. A mismatch is WARN and not FAIL deliberately: a stale escrow is expected after any mutation and is remediable by one command, and a section that goes red after every rotate is one people learn to scroll past. Mutation evidence: `if diff != \"\"` neutered to `false && diff != \"\"` (chosen because deleting the branch instead failed to COMPILE — an invalid instrument, caught for the third time tonight) makes TestDR_DeletionIsSeenEvenWhenNothingIsNewer FAIL; it passes after revert."
   },
   {
     "id": "OPS-032-dr-drift-detection-f7",
