@@ -41,6 +41,7 @@ jobs:
     # board via the reconciler or a manual item-add.
     if: github.event_name == 'issues' || github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Add to bitácora board
         env:

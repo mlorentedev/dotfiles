@@ -13,6 +13,7 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -43,6 +44,7 @@ jobs:
 
   lint-powershell:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -75,6 +77,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # the bats suite; the job that hung on 2026-08-19
     steps:
       - uses: actions/checkout@v7
 
@@ -119,8 +122,18 @@ jobs:
           age-keygen --version >/dev/null
 
       - name: Install zsh
+        # Bounded on purpose. The Azure Ubuntu mirror intermittently stops
+        # answering — visible in the log as `Ign: http://azure.archive.ubuntu.com`
+        # — and an unbounded `apt-get update` then sits in silence until a human
+        # notices and cancels the run. Measured 2026-08-19 on run 32223603170:
+        # last output 06:30:08, cancelled by hand at 06:38:22. Eight minutes of
+        # nothing, and it had happened before.
+        #
+        # These options do not make the mirror work. They make its failure LOUD
+        # and quick — roughly 45s and a real error — instead of a hang that looks
+        # identical to slow progress.
         run: |
-          sudo apt-get update
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=15
           sudo apt-get install -y --no-install-recommends zsh
 
       # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
@@ -285,6 +298,7 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [lint]
     steps:
       - uses: actions/checkout@v7

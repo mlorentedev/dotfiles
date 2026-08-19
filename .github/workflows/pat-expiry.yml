@@ -47,6 +47,7 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # gh label/issue calls need a repo context; this job has no actions/checkout,
