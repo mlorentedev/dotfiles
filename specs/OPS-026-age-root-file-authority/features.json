@@ -1,0 +1,51 @@
+[
+  {
+    "id": "OPS-026-age-root-file-authority-f1",
+    "behavior": "AC1 — `file-authority` is in ValidBackends() and validateSecret accepts a secret declaring it with a file expose and no age source, while still rejecting one that omits var/path, declares an age source, or exposes env vars.",
+    "verification": "go test ./internal/secrets/ -run 'FileAuthority|AcceptsExactlyValidBackends'",
+    "state": "done",
+    "evidence": "8/8 pass. The accept path is covered per-backend now: TestParseRegistry_AcceptsExactlyValidBackends carried one env-shaped template for every backend, which reported file-authority rejected while the parser was correct. It now holds a valid fixture per backend and fails when a backend has none, so a future backend cannot ship with its accept path untested."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f2",
+    "behavior": "AC2 — AGE_KEY_PERSONAL exists in secrets/registry.yaml as plane: floor, backend: file-authority, with the bw block naming the convenience copy, and `dotf secrets ls` shows it.",
+    "verification": "dotf secrets ls | grep AGE_KEY_PERSONAL",
+    "state": "done",
+    "evidence": "`AGE_KEY_PERSONAL           floor     AGE_KEY_PERSONAL` — listed alongside SSH_KEY under floor."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f3",
+    "behavior": "AC3 — `dotf secrets verify` reports the root without attempting a decrypt, and the pre-existing 33 entries do not regress.",
+    "verification": "dotf secrets verify",
+    "state": "done",
+    "evidence": "Baseline before: 33 ok, 0 missing, 0 failed. After: `OK  AGE_KEY_PERSONAL  file-authority` and 34 ok, 0 missing, 0 failed. No decrypt is attempted — Loader.Verify dispatches to VerifyEntry before Resolve, and Resolve is defined to refuse."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f4",
+    "behavior": "AC4 — a wrong-mode file reports FAILED, observed by mutating the mode with the mutation confirmed present first.",
+    "verification": "go test ./internal/secrets/ -run 'FileAuthority_WrongMode|DefaultsToO600'",
+    "state": "done",
+    "evidence": "Both pass, and observed live against a scratch registry pointing at a throwaway key so the real root was never touched: 0600 -> `1 ok`; chmod 0644 (confirmed `stat` reads 644 before the run) -> `0 ok, 0 missing, 1 failed` with a non-zero exit; file removed (confirmed absent) -> `0 ok, 1 missing, 0 failed`. The unit test also asserts the fixture is really 0644 before asserting the failure, because umask could otherwise produce 0600 and pass the case for the wrong reason."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f5",
+    "behavior": "AC5 — a fingerprint mismatch against the declared off-machine copy reports FAILED; with no Bitwarden session the comparison reports SKIPPED with a reason, never OK.",
+    "verification": "not yet implemented — second slice",
+    "state": "deferred",
+    "evidence": "DEFERRED, deliberately and visibly. The drift comparison needs a live Bitwarden session and `age-keygen -y`, and it is the point of #1000 rather than of this spec. The resolver's own comment states that VerifyEntry answers a narrower question than the one that matters until this lands, so a reader cannot mistake the gap for coverage."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f6",
+    "behavior": "AC6 — the resolver-coverage binding stays honest: file-authority has a Loader entry, and it is a resolver that REFUSES rather than a missing one.",
+    "verification": "go test ./internal/secrets/ -run 'ResolversCoverEveryValidBackend|ResolveRefuses'",
+    "state": "done",
+    "evidence": "Both pass. The design changed during implementation: the original AC assumed file-authority would have NO Loader entry and that the coverage test would need text explaining the hole. Instead it has a resolver whose Resolve returns an error, so the coverage test needs no exemption at all, and TestFileAuthority_ResolveRefuses pins the refusal — without it, a future change could make the root materializable through `dotf secrets run`."
+  },
+  {
+    "id": "OPS-026-age-root-file-authority-f7",
+    "behavior": "AC7 — ADR-028's worked example is amended to the shape the validator accepts, and says why the root cannot be age-offline.",
+    "verification": "grep -n 'file-authority' docs/adr/adr-028-secrets-two-tier-bitwarden-age.md",
+    "state": "done",
+    "evidence": "Amended at line 146 with a dated note enumerating all three reasons the previous example could not validate: age-offline with a file expose requires an age source, expose.file requires var, and `offline:` is not a field on the schema."
+  }
+]

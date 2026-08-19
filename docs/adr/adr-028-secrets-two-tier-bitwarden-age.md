@@ -141,13 +141,39 @@ secrets:
       file: { path: "~/.kube/kubelab.config", mode: "0600" }   # materialize as a file, not env
     consumers: [local]
 
-  - id: age-key-personal               # the floor: offline-authoritative, bw copy = convenience
+  - id: AGE_KEY_PERSONAL               # the ROOT: authority is this disk, bw copy = convenience
     plane: floor
-    backend: age-offline
-    bw: { folder: "dotfiles/floor", item: "AGE-SECRET-KEY-PERSONAL" }
-    offline: required
-    expose: { file: { path: "~/.config/age/key.txt", mode: "0600" } }
+    backend: file-authority            # not age-offline — see below
+    bw: { item: AGE-SECRET-KEY-PERSONAL }
+    expose: { file: { var: AGE_KEY_PERSONAL, path: "~/.config/age/key.txt", mode: "0600" } }
+    consumers: [local]
 ```
+
+**Amended 2026-08-19 (#937, OPS-026).** This example previously declared
+`backend: age-offline`, an `offline: required` field, and a file expose without
+`var`. None of the three was implementable, and the entry was never added for that
+reason rather than by oversight:
+
+- `age-offline` with a file expose **requires** an `age:` source — the basename of a
+  ciphertext under `sensitive/`. The age identity has none and can have none: every
+  such ciphertext is decrypted *with* this file, so it would have to be encrypted
+  under itself.
+- `expose.file` requires `var` as well as `path`.
+- `offline:` is not a field on the schema. It would have been silently ignored,
+  which is worse than being rejected.
+
+The root is therefore its own backend, `file-authority`: a secret whose authority
+**is** the local plaintext file. Nothing resolves it, so `verify` asks the questions
+that actually mean something for a root — present, `0600`, and (once #1000 lands)
+still matching the copy held off this machine — and `dotf secrets run` refuses to
+materialize it, because handing the key that decrypts every other secret to a child
+process through the same facade as those secrets widens the blast radius instead of
+narrowing it.
+
+The `bw:` block carries no folder: the ratified taxonomy has none for `floor`
+(`validBWFolders` is `apps`, `infra`), and adding one is a separate decision. It
+names where the convenience copy lives, which is where the drift comparison of
+#1000 will look. **Authority stays on disk.**
 
 - **`id`** is the only stable handle; `dotf secrets run --only openai-api-key -- <cmd>` resolves it.
 - **`expose`** is the contract: `env` (one or many→field) and/or `file` (path+mode). Env names stay `UPPER_SNAKE` (consumer contract); the store name is canonical-by-service.

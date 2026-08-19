@@ -56,6 +56,17 @@ type Resolver interface {
 	Resolve(e Entry) ([]byte, error)
 }
 
+// Verifier is the optional half of Resolver, for a backend whose health question
+// is not "did it resolve". Loader.Verify prefers it when a resolver implements it
+// and falls back to Resolve otherwise, so the ordinary backends are untouched.
+//
+// It exists because one backend's answer cannot be produced by resolving: the age
+// root has no source to resolve FROM, and asking `run` to hand it out is a
+// widening of blast radius rather than a health check (#937).
+type Verifier interface {
+	VerifyEntry(e Entry) error
+}
+
 // Loader resolves entries to child-process environment, fetching on demand. It holds
 // the per-backend seams — Decrypt (age) and BW (Bitwarden) — both injectable so
 // EnvFor is unit-testable with no age binary, no age key, and no Bitwarden vault.
@@ -71,10 +82,11 @@ type Loader struct {
 func (l *Loader) resolvers() map[string]Resolver {
 	age := ageResolver{secretsDir: l.SecretsDir, keyPath: l.KeyPath, decrypt: l.Decrypt}
 	return map[string]Resolver{
-		BackendDefault:    age,
-		BackendAge:        age,
-		BackendAgeOffline: age,
-		BackendBW:         bwResolver{reader: l.BW},
+		BackendDefault:       age,
+		BackendAge:           age,
+		BackendAgeOffline:    age,
+		BackendBW:            bwResolver{reader: l.BW},
+		BackendFileAuthority: fileAuthorityResolver{},
 	}
 }
 
@@ -149,6 +161,11 @@ func (l *Loader) Verify(e Entry) error {
 	if !ok {
 		return fmt.Errorf("unknown backend %q", e.Backend)
 	}
+	// A backend may answer the health question itself. Checked before Resolve,
+	// because for the one backend that does, Resolve is defined to refuse.
+	if v, isVerifier := r.(Verifier); isVerifier {
+		return v.VerifyEntry(e)
+	}
 	plaintext, err := r.Resolve(e)
 	if err != nil {
 		return err
@@ -217,4 +234,60 @@ func materialize(dest string, content []byte, mode os.FileMode) error {
 // `age -d` appends a trailing newline that must not become part of the value.
 func stripNewlines(s string) string {
 	return strings.NewReplacer("\r", "", "\n", "").Replace(s)
+}
+
+// fileAuthorityResolver is the age root's backend: a secret whose authority is the
+// plaintext file on this disk. There is no ciphertext and no remote, so there is
+// nothing to resolve — and handing the key that decrypts every other secret to a
+// child process through the same facade as those secrets widens the blast radius
+// instead of narrowing it, which is the opposite of what `run` is for.
+//
+// So Resolve refuses, deliberately and with a reason, and the health question is
+// answered by VerifyEntry instead: present, and 0600.
+//
+// What VerifyEntry does NOT yet check is that the file still matches the copy held
+// off this machine. That comparison is the point of #1000 — a drifted copy is
+// indistinguishable from a good one until the day it is needed — and it needs a
+// live Bitwarden session, so it is a second slice rather than a silent omission.
+// Until it lands, this check answers a narrower question than the one that matters,
+// and says so here rather than letting a reader assume otherwise.
+type fileAuthorityResolver struct{}
+
+func (fileAuthorityResolver) Resolve(e Entry) ([]byte, error) {
+	return nil, fmt.Errorf("%s is the age root: it is not materialized through this facade, "+
+		"because every other secret is decrypted with it", e.Var)
+}
+
+// VerifyEntry reports the root's health without reading its contents. A missing
+// file is ErrSecretAbsent (MISSING, not FAILED) — the same tolerance every other
+// backend gets for "not provisioned on this machine", since a fresh checkout
+// legitimately has no key yet. A wrong mode is FAILED: the file is present and
+// readable by someone it should not be, which is a real defect and not an absence.
+func (fileAuthorityResolver) VerifyEntry(e Entry) error {
+	if e.Dest == "" {
+		return fmt.Errorf("no path declared for the file-authority secret")
+	}
+	fi, err := os.Stat(e.Dest)
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: %s", ErrSecretAbsent, e.Dest)
+	}
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", e.Dest, err)
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("%s is a directory, not a key file", e.Dest)
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("%s is empty", e.Dest)
+	}
+	want := e.Mode
+	if want == 0 {
+		want = 0o600
+	}
+	// Compare the permission bits only; setuid/sticky and the type bits are not
+	// what was declared, and a mask mismatch there would report a confusing cause.
+	if got := fi.Mode().Perm(); got != want.Perm() {
+		return fmt.Errorf("%s has mode %04o, expected %04o", e.Dest, got, want.Perm())
+	}
+	return nil
 }
