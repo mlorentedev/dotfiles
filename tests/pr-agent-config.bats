@@ -81,9 +81,36 @@ sys.exit(0 if 'AGENTS.md' in files else 1)
     [ "$status" -eq 0 ]
 }
 
-@test "pr-agent: the workflow pins the action to a tag, not a moving ref" {
-    grep -qE 'uses: The-PR-Agent/pr-agent@v[0-9]' "$WF"
-    refute_grep 'uses: The-PR-Agent/pr-agent@(main|master|latest)' "$WF"
+@test "pr-agent: the workflow pins the action to an immutable commit, not a tag" {
+    # The old form of this test asserted `@v[0-9]` while its own title said "not a
+    # moving ref" — and a tag IS a moving ref: it belongs to upstream, and whoever
+    # can move it decides what runs in a job holding NAN_API_KEY and
+    # `pull-requests: write`, on a PUBLIC repository. The test encoded the weaker
+    # property its name disclaimed, which is why a tag pin survived review.
+    #
+    # 40 hex characters, checked as such rather than by pattern-matching a version:
+    # the point is immutability, and only a commit id has it.
+    local ref
+    ref="$(grep -oE 'uses: The-PR-Agent/pr-agent@[0-9a-zA-Z._-]+' "$WF" | head -1 | cut -d@ -f2)"
+    [ -n "$ref" ] || { printf 'the workflow does not reference the action at all\n' >&2; return 1; }
+    if ! printf '%s' "$ref" | grep -qE '^[0-9a-f]{40}$'; then
+        printf 'action pinned to %q — expected a 40-character commit id\n' "$ref" >&2
+        return 1
+    fi
+    # The comment beside it must still say which release that commit is, or the pin
+    # becomes unreadable and the next bump is made blind.
+    grep -qE '@[0-9a-f]{40}\s+# v[0-9]' "$WF"
+}
+
+@test "pr-agent: the comment trigger is gated on repository membership" {
+    # PUBLIC repository: any account can comment on a pull request, and
+    # issue_comment runs in the BASE repo context WITH secrets. Without this gate a
+    # stranger typing a slash command spends the inference budget and exercises
+    # `pull-requests: write` on demand.
+    grep -q 'github.event.comment.author_association' "$WF"
+    for assoc in OWNER MEMBER COLLABORATOR; do
+        grep -q "$assoc" "$WF"
+    done
 }
 
 @test "pr-agent: the endpoint is NaN, and no OpenAI credential is referenced" {
