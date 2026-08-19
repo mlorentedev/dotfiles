@@ -233,6 +233,7 @@ func Backup(cfg BackupConfig) (path string, manifestWarn string, err error) {
 	// have worked here and taught exactly one call site — the next one would
 	// re-import the bug, which is the shape this very change was written to fix.
 	if mErr := writeManifest(filepath.Dir(path), plaintext); mErr != nil {
+		_ = os.Remove(filepath.Join(filepath.Dir(path), ManifestFileName))
 		return path, fmt.Sprintf("escrow written and verified, but its manifest could not be: %v "+
 			"(re-run `dotf secrets backup` to mint one; the escrow itself is good)", mErr), nil
 	}

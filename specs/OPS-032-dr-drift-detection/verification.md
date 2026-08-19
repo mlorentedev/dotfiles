@@ -18,7 +18,7 @@ Produced 2026-08-19, in this session.
   `dotf doctor`, in the same run where the age check reported the escrow "present and
   fresh":
 
-  ```
+  ```text
   [WARN] DR escrow no longer describes the vault: 1 item(s) added since the escrow was
          written. The escrow describes the vault as of 2026-08-15T08:21:32.256Z.
   ```

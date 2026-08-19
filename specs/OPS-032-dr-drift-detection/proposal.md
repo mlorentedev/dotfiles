@@ -96,25 +96,25 @@ the value.
 
 ## Acceptance criteria
 
-- [ ] AC1 — `recipient:` parses on a `file-authority` secret, is rejected on any other
+- [x] AC1 — `recipient:` parses on a `file-authority` secret, is rejected on any other
       backend, and a secret without it verifies exactly as it does today.
-- [ ] AC2 — `dotf secrets verify` reports FAILED when the local key's derived recipient
+- [x] AC2 — `dotf secrets verify` reports FAILED when the local key's derived recipient
       differs from the declared one, naming both; observed by pointing the entry at a
       key with a different recipient, mutation confirmed present first.
-- [ ] AC3 — with `age-keygen` absent or unreadable the check reports its own failure
+- [x] AC3 — with `age-keygen` absent or unreadable the check reports its own failure
       rather than passing; the pre-existing 34 entries do not regress.
-- [ ] AC4 — `dotf secrets backup` writes `escrow-manifest.json` beside the escrow with
+- [x] AC4 — `dotf secrets backup` writes `escrow-manifest.json` beside the escrow with
       `count`, `max_revision` and `digest`, containing no item name, field or value;
       `sensitive/dr/.gitignore` un-ignores it by exact name.
-- [ ] AC5 — the freshness check reports the three mutations distinctly on a synthetic
+- [x] AC5 — the freshness check reports the three mutations distinctly on a synthetic
       vault: an addition, a modification, and **a deletion whose survivors all predate
       the escrow** — the case a timestamp comparison passes.
-- [ ] AC6 — an escrow with **no** manifest is SKIPPED with the remediation named, never
+- [x] AC6 — an escrow with **no** manifest is SKIPPED with the remediation named, never
       FAILED; and with no Bitwarden session the comparison is SKIPPED with a reason,
       never OK.
-- [ ] AC7 — the runbook names where the offline copy of the age root lives, and never
+- [x] AC7 — the runbook names where the offline copy of the age root lives, and never
       its value.
-- [ ] AC8 — `GOOS=windows go vet ./...` clean, and any property that is not applicable
+- [x] AC8 — `GOOS=windows go vet ./...` clean, and any property that is not applicable
       on a platform says so in its own file rather than being inferred.
 
 ## References

@@ -143,19 +143,11 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 	case sys.Now().Sub(info.ModTime()) > escrowMaxAge:
 		rep.Warn(fmt.Sprintf("DR escrow is %d days old — re-run `dotf secrets backup`; secrets added since are not in it",
 			int(sys.Now().Sub(info.ModTime()).Hours()/24)))
+		checkEscrowDescribesVault(sys, filepath.Dir(escrow), rep)
 	default:
 		rep.Pass("DR escrow present and fresh")
+		checkEscrowDescribesVault(sys, filepath.Dir(escrow), rep)
 	}
-
-	// Age is a cheaper question than the one that matters. Measured on this machine
-	// 2026-08-19: the escrow was four days old — comfortably inside escrowMaxAge and
-	// reported "fresh" by the branch above — while the live vault already held one
-	// item it did not. Worse, a DELETION is invisible to any age comparison: the
-	// deleted item simply stops existing, and every survivor can predate the escrow.
-	//
-	// So this asks the other question, from a manifest written beside the escrow at
-	// backup time (#1077).
-	checkEscrowDescribesVault(sys, filepath.Dir(escrow), rep)
 
 	// The drill. This is the one that matters, and the one no other check can
 	// stand in for: an escrow that exists proves a file was written, never that
@@ -209,6 +201,10 @@ func checkEscrowDescribesVault(sys *System, escrowDir string, rep *Report) {
 	var stored secrets.EscrowManifest
 	if err := json.Unmarshal(blob, &stored); err != nil {
 		rep.Warn(fmt.Sprintf("escrow manifest is unreadable (%v) — re-run `dotf secrets backup`", err))
+		return
+	}
+	if stored.Digest == "" || stored.Count == 0 {
+		rep.Warn("escrow manifest carries no digest — re-run `dotf secrets backup`")
 		return
 	}
 	if sys.BWItemRevisions == nil {

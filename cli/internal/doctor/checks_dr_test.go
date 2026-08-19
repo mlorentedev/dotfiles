@@ -421,3 +421,37 @@ func TestDR_UnreadableManifest_WarnsRatherThanClaimingAbsence(t *testing.T) {
 		t.Errorf("want the cannot-read warning, got: %s", out)
 	}
 }
+
+func TestDR_EmptyOrZeroDigestManifest_Warns(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, `{"count": 0, "digest": ""}`)
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if !strings.Contains(out, "carries no digest") {
+		t.Errorf("want the empty digest warning, got: %s", out)
+	}
+}
+
+func TestDR_AbsentEscrowWithLeftoverManifest_OnlyReportsEscrowMissing(t *testing.T) {
+	dir := t.TempDir()
+	drDir := filepath.Join(dir, "sensitive", "dr")
+	if err := os.MkdirAll(drDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(drDir, secrets.ManifestFileName), []byte(storedManifest(t, "1")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if strings.Contains(out, "describes the vault") {
+		t.Errorf("manifest check must not run when escrow is absent, got: %s", out)
+	}
+}
