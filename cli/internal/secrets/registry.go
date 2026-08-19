@@ -43,6 +43,15 @@ type Secret struct {
 	Consumers []string  `yaml:"consumers"`
 	Rotate    string    `yaml:"rotate"`
 	Validate  string    `yaml:"validate"` // optional liveness check on sync (e.g. "github-token")
+	// Recipient is the age PUBLIC recipient a file-authority secret must derive to.
+	// Public by construction — it is what someone uses to encrypt TO this key — so
+	// it is committed, unlike everything else this file points at.
+	//
+	// Optional: without it the secret verifies exactly as before. With it, verify
+	// answers a question nothing else can — is the key on this disk still the key
+	// that was declared — which a replaced, truncated or wrongly-restored root
+	// otherwise passes right up until the day it is needed (#1000 AC3).
+	Recipient string `yaml:"recipient"`
 }
 
 // BWSource is a bw backend source: the Bitwarden item (its unique name or id) and,
@@ -256,6 +265,9 @@ func validateSecret(s *Secret, i int, seen map[string]bool, seenVar map[string]s
 			return err
 		}
 	}
+	if err := checkRecipient(s); err != nil {
+		return err
+	}
 	if err := checkBWFolder(s); err != nil {
 		return err
 	}
@@ -390,6 +402,23 @@ func (s *Secret) checkFileAuthoritySources() error {
 	return nil
 }
 
+// checkRecipient rejects a declared recipient on any backend that cannot act on it.
+// Accepting it silently elsewhere would be the worse failure: a reader would take
+// the key as pinned when nothing compares it, which is a declaration that lies.
+func checkRecipient(s *Secret) error {
+	if s.Recipient == "" {
+		return nil
+	}
+	if s.Backend != BackendFileAuthority {
+		return fmt.Errorf("secret %q: recipient is only meaningful on a file-authority secret, not %q — "+
+			"nothing would compare it", s.ID, s.Backend)
+	}
+	if !strings.HasPrefix(s.Recipient, "age1") {
+		return fmt.Errorf("secret %q: recipient %q is not an age public recipient (expected an age1... string)", s.ID, s.Recipient)
+	}
+	return nil
+}
+
 // checkBwSources verifies every exposed var/file has a Bitwarden item + field.
 func (s *Secret) checkBwSources() error {
 	if s.BW == nil || s.BW.Item == "" {
@@ -465,13 +494,14 @@ func parseFileMode(s string) os.FileMode {
 func (s *Secret) ageEntries(home string) []Entry {
 	if s.Expose.File != nil {
 		return []Entry{{
-			Var:      s.Expose.File.Var,
-			Backend:  s.Backend,
-			File:     s.Age,
-			IsFile:   true,
-			Dest:     expandHome(s.Expose.File.Path, home),
-			Mode:     parseFileMode(s.Expose.File.Mode),
-			Validate: s.Validate,
+			Var:       s.Expose.File.Var,
+			Backend:   s.Backend,
+			File:      s.Age,
+			IsFile:    true,
+			Dest:      expandHome(s.Expose.File.Path, home),
+			Mode:      parseFileMode(s.Expose.File.Mode),
+			Validate:  s.Validate,
+			Recipient: s.Recipient,
 		}}
 	}
 	es := make([]Entry, 0, len(s.Expose.Env.Vars))

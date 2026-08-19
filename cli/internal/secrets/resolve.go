@@ -90,6 +90,10 @@ type Loader struct {
 	KeyPath    string    // age identity key path
 	Decrypt    Decryptor // nil → AgeDecrypt
 	BW         BWReader  // bw field reader; nil → bw entries fail with a clear error
+	// Recipient derives an age public recipient from an identity file; nil →
+	// AgeRecipient. Injected for the same reason as the other two: the drift check
+	// must be testable with no age binary and no real key.
+	Recipient RecipientFn
 }
 
 // resolvers maps a backend name to its Resolver. "" maps to age so a hand-built
@@ -101,7 +105,7 @@ func (l *Loader) resolvers() map[string]Resolver {
 		BackendAge:           age,
 		BackendAgeOffline:    age,
 		BackendBW:            bwResolver{reader: l.BW},
-		BackendFileAuthority: fileAuthorityResolver{},
+		BackendFileAuthority: fileAuthorityResolver{recipient: l.Recipient},
 	}
 }
 
@@ -278,7 +282,9 @@ func stripNewlines(s string) string {
 // live Bitwarden session, so it is a second slice rather than a silent omission.
 // Until it lands, this check answers a narrower question than the one that matters,
 // and says so here rather than letting a reader assume otherwise.
-type fileAuthorityResolver struct{}
+type fileAuthorityResolver struct {
+	recipient RecipientFn // nil → AgeRecipient
+}
 
 func (fileAuthorityResolver) NotMaterializedReason(e Entry) string {
 	return fmt.Sprintf("%s is the age root: it is not materialized through this facade, "+
@@ -294,7 +300,7 @@ func (r fileAuthorityResolver) Resolve(e Entry) ([]byte, error) {
 // backend gets for "not provisioned on this machine", since a fresh checkout
 // legitimately has no key yet. A wrong mode is FAILED: the file is present and
 // readable by someone it should not be, which is a real defect and not an absence.
-func (fileAuthorityResolver) VerifyEntry(e Entry) error {
+func (r fileAuthorityResolver) VerifyEntry(e Entry) error {
 	if e.Dest == "" {
 		return fmt.Errorf("no path declared for the file-authority secret")
 	}
@@ -316,5 +322,44 @@ func (fileAuthorityResolver) VerifyEntry(e Entry) error {
 	// Permission bits only, and only where they exist — see checkKeyMode's two
 	// build-tagged halves. setuid/sticky and the type bits are not what was
 	// declared, and a mask mismatch there would report a confusing cause.
-	return checkKeyMode(fi, e.Dest, e.Mode)
+	if err := checkKeyMode(fi, e.Dest, e.Mode); err != nil {
+		return err
+	}
+	return r.checkNotDrifted(e)
+}
+
+// checkNotDrifted answers the one question the other checks cannot: is the key on
+// this disk still the key that was declared? A root replaced, truncated, or restored
+// from the wrong backup passes present-regular-0600 without complaint, and stays
+// indistinguishable from a healthy one until the day it is needed (#1000 AC3).
+//
+// Undeclared means not checked, and that is a deliberate no-op rather than a silent
+// pass: without `recipient:` there is nothing to compare against, and inventing a
+// comparison would be worse than not making one. The registry rejects `recipient:`
+// on any backend that would not act on it, so the field cannot be a declaration that
+// lies.
+//
+// Only the PUBLIC recipient is derived, compared, or printed. `age-keygen -y` reads
+// the private key and emits the public half; the private half must never reach a log,
+// an error message, or a fixture.
+func (r fileAuthorityResolver) checkNotDrifted(e Entry) error {
+	if e.Recipient == "" {
+		return nil
+	}
+	derive := r.recipient
+	if derive == nil {
+		derive = AgeRecipient
+	}
+	got, err := derive(e.Dest)
+	if err != nil {
+		// A check that cannot run reports that it could not run. Returning nil here
+		// would turn "age-keygen is missing" into "the key is fine", which is the
+		// failure this check exists to prevent, arriving through the check itself.
+		return fmt.Errorf("cannot derive the recipient of %s to compare it with the declared one: %w", e.Dest, err)
+	}
+	if got != e.Recipient {
+		return fmt.Errorf("%s derives recipient %s, but the registry declares %s — "+
+			"the key on this disk is not the declared one", e.Dest, got, e.Recipient)
+	}
+	return nil
 }
