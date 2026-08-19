@@ -152,6 +152,14 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 			rep.Pass(fmt.Sprintf("%s -> bw:%s (age store not asserted)", display, e.Item))
 			continue
 		}
+		if e.Backend == secrets.BackendFileAuthority {
+			if pathExists(e.Dest) {
+				rep.Pass(fmt.Sprintf("%s -> %s (file-authority on disk)", display, e.Dest))
+			} else {
+				rep.Fail(fmt.Sprintf("%s -> %s (file-authority missing on disk)", display, e.Dest))
+			}
+			continue
+		}
 		referenced[e.File] = true
 		if pathExists(filepath.Join(secretsDir, e.File+".secret.age")) {
 			rep.Pass(fmt.Sprintf("%s -> %s.secret.age", display, e.File))
