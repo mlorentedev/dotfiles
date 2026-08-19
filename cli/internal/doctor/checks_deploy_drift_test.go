@@ -47,10 +47,10 @@ func TestCheckDeployDrift(t *testing.T) {
 			wantSubstr:  "agree",
 		},
 		{
-			name:        "managed file absent in deploy → not drift",
-			repoFiles:   []file{{"scripts/x.sh", "echo hi"}},
-			lsFiles:     []string{"scripts/x.sh"},
-			wantSubstr:  "agree",
+			name:       "managed file absent in deploy → not drift",
+			repoFiles:  []file{{"scripts/x.sh", "echo hi"}},
+			lsFiles:    []string{"scripts/x.sh"},
+			wantSubstr: "agree",
 		},
 		{
 			name:       "no deploy-dir → skip",

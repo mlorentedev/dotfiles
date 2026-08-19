@@ -224,7 +224,6 @@ func TestEffectiveHooksPath_NilSeamIsUnsetNotPanic(t *testing.T) {
 	}
 }
 
-
 // TestHookForStage_ExecutableIsAHook is the green direction of
 // TestHookForStage_NonExecutableIsNotAHook. The red case alone cannot tell a
 // correct executable-bit check from a function that returns "" for everything —

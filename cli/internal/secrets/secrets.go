@@ -61,6 +61,9 @@ type Entry struct {
 	Dest     string      // materialization path (~ expanded); only when IsFile
 	Mode     os.FileMode // file permissions (0 → 0600 default); only when IsFile
 	Validate string      // optional liveness-check key carried from the registry (sync ci)
+	// Recipient is the declared age public recipient for a file-authority secret;
+	// empty means undeclared, and undeclared means the drift check does not run.
+	Recipient string
 }
 
 // SourceID is the entry's underlying-secret identity: the backend tag plus the

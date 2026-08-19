@@ -101,7 +101,7 @@ secrets:
     consumers: [local]
 `
 	fw := newFakeWriter()
-	fw.notFound["kubelab-kubeconfig"] = true // target item absent → --yes creates it
+	fw.notFound["kubelab-kubeconfig"] = true                                                           // target item absent → --yes creates it
 	kubeconfig := "apiVersion: v1\nclusters:\n- cluster:\n    server: https://kubelab\nkind: Config\n" // trailing newline, like age -d
 	out, err := migrateExec(t, fileRegistry, fw, kubeconfig, "KUBECONFIG", "--yes")
 	if err != nil {

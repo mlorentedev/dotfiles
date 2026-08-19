@@ -58,7 +58,7 @@ func useRepoSensitiveDir(t *testing.T, dir string, err error) {
 
 func TestSecretsBackup_HappyPath(t *testing.T) {
 	dir := t.TempDir()
-	stubBackupSeams(t, fakeExp{data: []byte(`{"items":[{"name":"a"}]}`)})
+	stubBackupSeams(t, fakeExp{data: []byte(`{"items":[{"id":"11111111-2222-3333-4444-555555555555","revisionDate":"2026-08-15T03:07:00.000Z","name":"a"}]}`)})
 	useRepoSensitiveDir(t, dir, nil)
 
 	var out bytes.Buffer
@@ -80,7 +80,7 @@ func TestSecretsBackup_HappyPath(t *testing.T) {
 
 func TestSecretsBackup_OutFlagOverridesDest(t *testing.T) {
 	dir := t.TempDir()
-	stubBackupSeams(t, fakeExp{data: []byte(`{"items":[]}`)})
+	stubBackupSeams(t, fakeExp{data: []byte(`{"items":[{"id":"11111111-2222-3333-4444-555555555555","revisionDate":"2026-08-15T03:07:00.000Z","name":"a"}]}`)})
 	// repoSensitiveDir would fail loud; --out must bypass it entirely.
 	useRepoSensitiveDir(t, "", fmt.Errorf("no checkout"))
 

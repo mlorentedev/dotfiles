@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"testing"
+	"time"
 )
 
 // seedPool writes a repo whose pool holds one pi-backed reviewer.

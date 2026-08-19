@@ -158,9 +158,9 @@ type BackupConfig struct {
 //
 // Order matters for the no-partial-file guarantee: recipient, export, and encrypt all run
 // BEFORE any write, so a locked vault or an absent key fails fast with nothing on disk.
-func Backup(cfg BackupConfig) (string, error) {
+func Backup(cfg BackupConfig) (path string, manifestWarn string, err error) {
 	if cfg.Exporter == nil {
-		return "", errors.New("backup: no exporter configured")
+		return "", "", errors.New("backup: no exporter configured")
 	}
 	recipientFn := cfg.Recipient
 	if recipientFn == nil {
@@ -178,43 +178,66 @@ func Backup(cfg BackupConfig) (string, error) {
 	// 1. Recipient from the identity — fail fast if the key is absent/unreadable.
 	recipient, err := recipientFn(cfg.KeyPath)
 	if err != nil {
-		return "", fmt.Errorf("backup: age identity required at %s to encrypt the escrow: %w", cfg.KeyPath, err)
+		return "", "", fmt.Errorf("backup: age identity required at %s to encrypt the escrow: %w", cfg.KeyPath, err)
 	}
 	if strings.TrimSpace(recipient) == "" {
-		return "", fmt.Errorf("backup: empty age recipient derived from %s", cfg.KeyPath)
+		return "", "", fmt.Errorf("backup: empty age recipient derived from %s", cfg.KeyPath)
 	}
 
 	// 2. Export the full vault — fail fast if bw is locked/unreachable.
 	plaintext, err := cfg.Exporter.Export()
 	if err != nil {
-		return "", fmt.Errorf("backup: %w", err)
+		return "", "", fmt.Errorf("backup: %w", err)
 	}
 	if len(plaintext) == 0 {
-		return "", errors.New("backup: bw export produced an empty vault — refusing to escrow nothing")
+		return "", "", errors.New("backup: bw export produced an empty vault — refusing to escrow nothing")
 	}
 	defer zero(plaintext) // best-effort scrub of the whole-vault plaintext after use
 
 	// 3. Encrypt in memory; the plaintext never reaches disk.
 	ciphertext, err := encrypt(plaintext, recipient)
 	if err != nil {
-		return "", fmt.Errorf("backup: %w", err)
+		return "", "", fmt.Errorf("backup: %w", err)
 	}
 
 	// 4. Atomic 0600 write of the ciphertext only.
 	if err := os.MkdirAll(cfg.DestDir, 0o700); err != nil {
-		return "", fmt.Errorf("backup: create %s: %w", cfg.DestDir, err)
+		return "", "", fmt.Errorf("backup: create %s: %w", cfg.DestDir, err)
 	}
-	path := filepath.Join(cfg.DestDir, name)
+	path = filepath.Join(cfg.DestDir, name)
 	if err := AtomicWrite(path, ciphertext); err != nil {
-		return "", fmt.Errorf("backup: %w", err)
+		return "", "", fmt.Errorf("backup: %w", err)
 	}
 
 	// 5. Verify the on-disk artifact round-trips to the exact export.
 	if err := verifyEscrow(path, plaintext, cfg); err != nil {
 		_ = os.Remove(path) // never leave a corrupt/empty escrow behind
-		return "", fmt.Errorf("backup: round-trip verify failed (removed %s): %w", name, err)
+		return "", "", fmt.Errorf("backup: round-trip verify failed (removed %s): %w", name, err)
 	}
-	return path, nil
+
+	// 6. Describe what was escrowed, so a later check can ask whether the escrow
+	// still matches the vault rather than only how old it is (#1077). Derived from
+	// the plaintext already in memory — no extra call, no session of its own.
+	//
+	// Written AFTER the verify, and a failure here does NOT remove the escrow. The
+	// escrow is the artifact that recovers the account; the manifest is bookkeeping
+	// about it. Deleting a verified escrow over a bookkeeping file would invert the
+	// priorities exactly when they matter most. The state a failure leaves behind —
+	// escrow present, manifest absent — is the same one every escrow written before
+	// this feature is in, and the freshness check treats it as SKIP-with-remedy
+	// rather than as a fault.
+	//
+	// Returned as a WARNING, never as err. The signature carries the distinction so
+	// no caller can collapse it: err means the ESCROW failed, manifestWarn means the
+	// escrow is good and only its bookkeeping is missing. A sentinel error would
+	// have worked here and taught exactly one call site — the next one would
+	// re-import the bug, which is the shape this very change was written to fix.
+	if mErr := writeManifest(filepath.Dir(path), plaintext); mErr != nil {
+		_ = os.Remove(filepath.Join(filepath.Dir(path), ManifestFileName))
+		return path, fmt.Sprintf("escrow written and verified, but its manifest could not be: %v "+
+			"(re-run `dotf secrets backup` to mint one; the escrow itself is good)", mErr), nil
+	}
+	return path, "", nil
 }
 
 // verifyEscrow decrypts the just-written escrow and asserts it round-trips to the exact
@@ -245,4 +268,20 @@ func zero(b []byte) {
 	for i := range b {
 		b[i] = 0
 	}
+}
+
+// writeManifest derives the escrow's description and writes it beside the artifact.
+// 0600 like everything else here, though it holds no secret: the directory is
+// deny-by-default and a permissive file in it invites the assumption that the next
+// one may be permissive too.
+func writeManifest(destDir string, export []byte) error {
+	m, err := ManifestFrom(export)
+	if err != nil {
+		return err
+	}
+	blob, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("manifest: %w", err)
+	}
+	return AtomicWrite(filepath.Join(destDir, ManifestFileName), append(blob, '\n'))
 }

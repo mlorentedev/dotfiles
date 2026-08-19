@@ -1,0 +1,58 @@
+[
+  {
+    "id": "OPS-032-dr-drift-detection-f1",
+    "behavior": "AC1 — `recipient:` parses on a file-authority secret, is rejected on any other backend, and a secret without it verifies exactly as it does today.",
+    "verification": "go test ./internal/secrets/ -run 'Recipient|Drift_Undeclared'",
+    "state": "done",
+    "evidence": "3 cases pass. Rejection on another backend and on a non-`age1` string are both asserted, the second because a private key pasted there by accident would commit the secret this file exists to protect. Undeclared is a deliberate no-op, asserted by checking the derive seam is never CALLED — not merely that the result is nil."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f2",
+    "behavior": "AC2 — verify reports FAILED when the derived recipient differs from the declared one, naming both.",
+    "verification": "go test ./internal/secrets/ -run 'Drift_Mismatch'",
+    "state": "done",
+    "evidence": "Observed live against a scratch registry pointing at the REAL key with a deliberately wrong declaration, mutation confirmed distinct first: `FAILED ... derives recipient age166v8... but the registry declares age1qqq... — the key on this disk is not the declared one`, and the same registry with the right value returns `1 ok`. Unit case additionally pins that BOTH strings appear, because \"they differ\" without saying how sends the reader to the wrong one. Mutation: with the comparison replaced by a no-op (confirmed present, 0 matching lines) TestDrift_MismatchFailsAndNamesBoth FAILS; passes after revert."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f3",
+    "behavior": "AC3 — a check that cannot run reports its own failure rather than passing, and the pre-existing 34 entries do not regress.",
+    "verification": "go test ./internal/secrets/ -run 'Drift_CannotDerive' && dotf secrets verify",
+    "state": "done",
+    "evidence": "`dotf secrets verify` -> 34 ok, 0 missing, 0 failed with the recipient declared on the live registry. The cannot-derive case asserts the underlying cause is carried, not swallowed: returning nil there would turn \"age-keygen is absent\" into \"the key is fine\", which is this check's own failure arriving through the check itself."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f4",
+    "behavior": "AC4 — backup writes escrow-manifest.json beside the escrow, un-ignored by exact name.",
+    "verification": "go test ./internal/secrets/ -run 'Manifest|Differs' && git check-ignore sensitive/dr/vault.json && ! git check-ignore sensitive/dr/escrow-manifest.json",
+    "state": "done",
+    "evidence": "13 cases pass. Live structural evidence from the REAL escrow, values never leaving the pipe: count=177, max_revision=2026-08-15T08:21:32.256Z, digest=0557ec4dd833d1b204e13586b02ba69c58c717232b9ef7073ef4d68d257936b7. The value-free claim is ASSERTED, not promised: a sentinel string planted in the export's name and login.password fields must be absent from the marshalled manifest, and the manifest must carry no name/login/password/folder key. The .gitignore un-ignore was verified by staging behaviour rather than by `git check-ignore -v`, which exits 0 when ANY pattern matches including a negation — the first instrument read backwards. `git add` stages escrow-manifest.json and still refuses vault.json."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f5",
+    "behavior": "AC5 — the freshness check reports addition, modification and deletion distinctly, including a deletion whose survivors all predate the escrow.",
+    "verification": "go test ./internal/doctor/ -run TestDR && go test ./internal/secrets/ -run Differs",
+    "state": "done",
+    "evidence": "Demonstrated on the REAL vault before the tests were written, which is the order that matters: the escrow held 177 items and the live listing 178, sets differing by exactly one id. `dotf doctor` with a manifest describing the real escrow reported `[WARN] DR escrow no longer describes the vault: 1 item(s) added since the escrow was written. The escrow describes the vault as of 2026-08-15T08:21:32.256Z` — in the SAME run where the age check said the escrow was present and fresh, which is #1077 shown rather than argued. The deletion case is unit-pinned by TestDR_DeletionIsSeenEvenWhenNothingIsNewer, whose fixture asserts every survivor predates the escrow so nothing about time could see it. Equivalence of the two sources was MEASURED, not assumed, before wiring: 0 ids only in the escrow, 1 only live, 177 in both."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f6",
+    "behavior": "AC6 — an escrow with no manifest is SKIPPED with the remediation named, never FAILED; no session is SKIPPED with a reason, never OK.",
+    "verification": "go test ./internal/doctor/ -run 'NoManifest|NoVaultListing'",
+    "state": "done",
+    "evidence": "Both SKIP paths observed live and unit-pinned. On this machine, with no manifest yet: `[SKIP] escrow has no manifest, so drift against the vault is unknown — re-run `dotf secrets backup` to mint one`. The locked-daemon path asserts the check never reports success when it could not run. A mismatch is WARN and not FAIL deliberately: a stale escrow is expected after any mutation and is remediable by one command, and a section that goes red after every rotate is one people learn to scroll past. Mutation evidence: `if diff != \"\"` neutered to `false && diff != \"\"` (chosen because deleting the branch instead failed to COMPILE — an invalid instrument, caught for the third time tonight) makes TestDR_DeletionIsSeenEvenWhenNothingIsNewer FAIL; it passes after revert."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f7",
+    "behavior": "AC7 — the runbook names where the offline copy lives, and never its value.",
+    "verification": "grep -n 'age-keygen -y' docs/runbooks/guide-secrets-governance.md && grep -i 'VeraCrypt' docs/runbooks/guide-secrets-governance.md && ! grep -E 'AGE-SECRET-KEY-' docs/runbooks/guide-secrets-governance.md",
+    "state": "done",
+    "evidence": "The RECOVER protocol already named the location (an encrypted VeraCrypt USB) — #1000's AC1 was written when that was believed absent and was already half-satisfied. What was missing is the loop closing: step 1 now verifies the restored key against the declared recipient BEFORE the chain continues. A wrong key decrypts nothing and finds out four steps later; one from a stale backup decrypts SOME things, which is worse."
+  },
+  {
+    "id": "OPS-032-dr-drift-detection-f8",
+    "behavior": "AC8 — GOOS=windows go vet clean, and any property not applicable on a platform says so in its own file.",
+    "verification": "cd cli && go vet ./... && GOOS=windows go vet ./...",
+    "state": "done",
+    "evidence": "Both clean. Nothing in this slice touches a platform-specific property: deriving an age recipient and comparing two strings are portable, so no new build-tagged split was needed."
+  }
+]

@@ -93,6 +93,21 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
    veracrypt -d /media/secrets               # unmount when done
    ```
 
+   **Verify the key before trusting the rest of the chain.** A restored key that is
+   the wrong one decrypts nothing, and finds out four steps later; one restored from
+   a stale backup decrypts *some* things, which is worse. The public recipient is
+   declared in `secrets/registry.yaml` on `AGE_KEY_PERSONAL` and is safe to read
+   aloud — it is what someone uses to encrypt *to* this key:
+
+   ```bash
+   age-keygen -y ~/.config/age/key.txt      # must equal the `recipient:` in the registry
+   dotf secrets verify                      # does the same comparison, plus the rest
+   ```
+
+   `verify` reports FAILED and names both strings when they differ (#1000 AC3). Before
+   that check existed, a replaced or wrongly-restored root was indistinguishable from a
+   healthy one until the day it was needed.
+
    A USB written by `backup-secrets-to-usb.sh` also carries `ci-age-key.txt`, a standalone decrypt script and a `secrets/` mirror, so `cd /media/secrets && ./age-standalone.sh decrypt` recovers everything **without the repo**. A hand-copied USB holds `key.txt` alone — still enough for this chain, which is what matters here.
 
    Creating and refreshing that USB lives in [`secrets-management.md` § Physical Backup](secrets-management.md#physical-backup-usb--veracrypt). That runbook carries an out-of-date banner scoped to its `env-mapping.conf` workflow; the VeraCrypt procedure is **not** part of what was retired and remains current under ADR-028, which keeps age as the DR floor.
