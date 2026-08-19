@@ -214,6 +214,22 @@ func Backup(cfg BackupConfig) (string, error) {
 		_ = os.Remove(path) // never leave a corrupt/empty escrow behind
 		return "", fmt.Errorf("backup: round-trip verify failed (removed %s): %w", name, err)
 	}
+
+	// 6. Describe what was escrowed, so a later check can ask whether the escrow
+	// still matches the vault rather than only how old it is (#1077). Derived from
+	// the plaintext already in memory — no extra call, no session of its own.
+	//
+	// Written AFTER the verify, and a failure here does NOT remove the escrow. The
+	// escrow is the artifact that recovers the account; the manifest is bookkeeping
+	// about it. Deleting a verified escrow over a bookkeeping file would invert the
+	// priorities exactly when they matter most. The state a failure leaves behind —
+	// escrow present, manifest absent — is the same one every escrow written before
+	// this feature is in, and the freshness check treats it as SKIP-with-remedy
+	// rather than as a fault.
+	if err := writeManifest(filepath.Dir(path), plaintext); err != nil {
+		return path, fmt.Errorf("backup: escrow written and verified at %s, but its manifest could not be: %w\n"+
+			"re-run `dotf secrets backup` to mint one; the escrow itself is good", path, err)
+	}
 	return path, nil
 }
 
@@ -245,4 +261,20 @@ func zero(b []byte) {
 	for i := range b {
 		b[i] = 0
 	}
+}
+
+// writeManifest derives the escrow's description and writes it beside the artifact.
+// 0600 like everything else here, though it holds no secret: the directory is
+// deny-by-default and a permissive file in it invites the assumption that the next
+// one may be permissive too.
+func writeManifest(destDir string, export []byte) error {
+	m, err := ManifestFrom(export)
+	if err != nil {
+		return err
+	}
+	blob, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("manifest: %w", err)
+	}
+	return AtomicWrite(filepath.Join(destDir, ManifestFileName), append(blob, '\n'))
 }

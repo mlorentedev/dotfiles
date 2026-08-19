@@ -229,8 +229,8 @@ is the only record of how.`,
 // a subcommand because the pipeline needs something executable to name.
 func newSpecTranscriptSinkCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:    "transcript-sink <path>",
-		Short:  "Internal: pass a reviewer stream through, storing only its auditable events",
+		Use:   "transcript-sink <path>",
+		Short: "Internal: pass a reviewer stream through, storing only its auditable events",
 		Long: `Read a reviewer's jsonl stream on stdin, write every line to stdout, and
 store only the settled events at <path>.
 

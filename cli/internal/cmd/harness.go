@@ -29,9 +29,9 @@ pattern triggers, and workflow integrations.`,
 
 func newHarnessSuggestCmd() *cobra.Command {
 	var (
-		prompt  string
+		prompt   string
 		diffMode bool
-		jsonOut bool
+		jsonOut  bool
 	)
 
 	cmd := &cobra.Command{

@@ -5,3 +5,7 @@
 *
 !.gitignore
 !*.age
+# The manifest, by EXACT NAME and never by glob. It carries no secret — item ids and
+# revision timestamps only — but `!*.json` would un-ignore a plaintext `bw export`
+# dropped here, which is the single thing this file exists to make impossible.
+!escrow-manifest.json

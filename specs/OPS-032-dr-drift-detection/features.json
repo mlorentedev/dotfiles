@@ -23,9 +23,9 @@
   {
     "id": "OPS-032-dr-drift-detection-f4",
     "behavior": "AC4 — backup writes escrow-manifest.json beside the escrow, un-ignored by exact name.",
-    "verification": "not yet implemented — slice B",
-    "state": "pending",
-    "evidence": ""
+    "verification": "go test ./internal/secrets/ -run 'Manifest|Differs' && git check-ignore sensitive/dr/vault.json",
+    "state": "done",
+    "evidence": "13 cases pass. Live structural evidence from the REAL escrow, values never leaving the pipe: count=177, max_revision=2026-08-15T08:21:32.256Z, digest=0557ec4dd833d1b204e13586b02ba69c58c717232b9ef7073ef4d68d257936b7. The value-free claim is ASSERTED, not promised: a sentinel string planted in the export's name and login.password fields must be absent from the marshalled manifest, and the manifest must carry no name/login/password/folder key. The .gitignore un-ignore was verified by staging behaviour rather than by `git check-ignore -v`, which exits 0 when ANY pattern matches including a negation — the first instrument read backwards. `git add` stages escrow-manifest.json and still refuses vault.json."
   },
   {
     "id": "OPS-032-dr-drift-detection-f5",

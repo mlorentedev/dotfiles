@@ -12,8 +12,12 @@ import (
 	"testing"
 )
 
-// sampleExport stands in for `bw export --format json` — a small but valid JSON document.
-const sampleExport = `{"encrypted":false,"items":[{"name":"x","login":{"password":"p"}}]}`
+// sampleExport stands in for `bw export --format json` — a small but valid JSON
+// document. It carries `id` and `revisionDate` because a real export always does, and
+// the escrow manifest (#1077) is derived from exactly those two. The earlier fixture
+// had neither and passed anyway, which is the shape of a fake that has drifted from
+// the thing it stands in for.
+const sampleExport = `{"encrypted":false,"items":[{"id":"11111111-2222-3333-4444-555555555555","revisionDate":"2026-08-15T03:07:00.000Z","name":"x","login":{"password":"p"}}]}`
 
 // fakeExporter is the BWExporter seam fake: a canned export or a canned error.
 type fakeExporter struct {
@@ -96,12 +100,28 @@ func TestBackup_NoPlaintextOnDisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 {
-		t.Errorf("dest dir holds %d files, want exactly the .age escrow", len(entries))
-	}
+	// The invariant is "no plaintext EXPORT reaches disk", and this used to be
+	// enforced by the cheaper proxy "no .json reaches disk". The manifest (#1077) is
+	// a .json that carries no value, so the proxy stopped standing for the thing —
+	// the same substitution this repository keeps finding. Assert the invariant.
+	allowed := map[string]bool{EscrowFileName: true, ManifestFileName: true}
 	for _, e := range entries {
-		if filepath.Ext(e.Name()) == ".json" {
-			t.Errorf("a plaintext json export was written to disk: %s", e.Name())
+		if !allowed[e.Name()] {
+			t.Errorf("unexpected file in the escrow dir: %s", e.Name())
+			continue
+		}
+		if e.Name() == EscrowFileName {
+			continue
+		}
+		// The manifest is allowed to exist, NOT to carry anything from the export.
+		blob, err := os.ReadFile(filepath.Join(filepath.Dir(path), e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, leak := range []string{"password", `"p"`, `"name"`, "login"} {
+			if bytes.Contains(blob, []byte(leak)) {
+				t.Errorf("%s leaked %q from the export: %s", e.Name(), leak, blob)
+			}
 		}
 	}
 	got, _ := os.ReadFile(path)
