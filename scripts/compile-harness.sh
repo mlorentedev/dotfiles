@@ -258,14 +258,47 @@ render_skill() {
     awk -v kind="$kind" -v gf="$srcpath" -v gs="$sha" '
         /^---[[:space:]]*$/ {
             fm++
-            if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
+            if (fm==1) {
+                print
+                print "generated: true"
+                print "generated_from: " gf
+                print "generated_sha: " gs
+                next
+            }
+            if (fm==2) {
+                print
+                next
+            }
         }
-        fm==1 && kind=="command" && /^name:/ { next }   # opencode commands key off filename
-        # The record (HARNESS-069) already carries its own generated_* fields,
-        # describing its relationship to the vault. Strip them here so deploy
-        # injects one fresh set, describing the deploy targets relationship to
-        # the record, instead of stacking a second set on top.
-        fm==1 && /^generated(_from|_sha)?:/ { next }
+        fm==1 {
+            if (/^[a-zA-Z0-9_-]+:/) {
+                if (kind == "command" && /^name:/) {
+                    keep = 0
+                    next
+                }
+                # The record (HARNESS-069) already carries its own generated_* fields.
+                # Strip them here so deploy injects one fresh set above.
+                if (/^generated(_from|_sha)?:/) {
+                    keep = 0
+                    next
+                }
+                # Native skill execution fields recognized by agent runtimes (Claude Code, AGY, OpenCode, Copilot)
+                if (/^(name|description|allowed-tools|when_to_use|model|effort|context|argument-hint|arguments|user-invocable|disable-model-invocation):/) {
+                    keep = 1
+                    print
+                    next
+                }
+                # Drop neutral/store-only keys (id, type, status, created, owner, paths, keywords, requires, targets, source, license, etc.)
+                # In particular, dropping `paths:` ensures Claude Code discovers skills as unconditional at session start.
+                keep = 0
+                next
+            }
+            # Continuation line (indented multiline value)
+            if (keep == 1) {
+                print
+            }
+            next
+        }
         { print }
     ' "$record"
 }
