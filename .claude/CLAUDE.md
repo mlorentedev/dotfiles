@@ -41,6 +41,12 @@ for f in scripts/*.sh setup-linux.sh; do bash -n "$f"; done
 cd cli
 go build ./... && go vet ./... && go test ./...
 golangci-lint run
+
+# The Windows leg of CI compiles the same tree. A Linux-only loop cannot see a
+# Windows build error, and `test (windows-latest)` fails the whole PACKAGE on
+# one — measured on #1075, where a `syscall.Mkfifo` in a test file passed every
+# local check and broke the Windows build. Cheap, and it closes that gap:
+GOOS=windows go vet ./...
 ```
 
 **Use the pinned linter, not whatever is installed.** CI resolves
