@@ -22,8 +22,3 @@ setup() {
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-timeouts.py" "$REPO"
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
-
-@test "apt is bounded on BOTH schemes, since setting only http is what failed" {
-    grep -q 'Acquire::http::Timeout' "$REPO/.github/workflows/ci.yml"
-    grep -q 'Acquire::https::Timeout' "$REPO/.github/workflows/ci.yml"
-}

@@ -40,8 +40,17 @@ def apt_steps_without_timeout(root):
             if "apt-get" not in str(step.get("run", "")):
                 continue
             seen = True
+            name = step.get("name", "<unnamed>")
             if "timeout-minutes" not in step:
-                out.append("%s / %s" % (job_name, step.get("name", "<unnamed>")))
+                out.append("%s / %s: no timeout-minutes" % (job_name, name))
+            # Bound to THIS step's run block, not to the file. A file-wide grep
+            # passes when some other step carries the options and the apt step
+            # does not — a check answering a cheaper question than the one asked,
+            # which is the defect this whole guard exists for.
+            run = str(step.get("run", ""))
+            for opt in ("Acquire::http::Timeout", "Acquire::https::Timeout"):
+                if opt not in run:
+                    out.append("%s / %s: missing %s in its own run block" % (job_name, name, opt))
     if not seen:
         out.append("no apt step found at all — did it move, or was it removed?")
     return out

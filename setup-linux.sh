@@ -1330,8 +1330,15 @@ if [ -d "$VAULT_ROOT" ]; then
             rmdir "$target_dir" 2>/dev/null || true
         fi
 
-        ln -s "$memory_source" "$target_dir"
-        linked_memory_count=$((linked_memory_count + 1))
+        # Count SUCCESSES, not attempts. Incrementing unconditionally made the
+        # summary below report links that were never created — a counter
+        # answering "how many did I try" while its message claims "how many
+        # worked".
+        if ln -s "$memory_source" "$target_dir"; then
+            linked_memory_count=$((linked_memory_count + 1))
+        else
+            log_warning "could not link auto-memory for ${project_name}: ln -s failed"
+        fi
     }
 
     # 10_projects/*: convention — repo at ~/Projects/<name>
@@ -1349,12 +1356,21 @@ if [ -d "$VAULT_ROOT" ]; then
 
     # 50_work/**/memory: work projects — CWD is the vault path itself
     if [ -d "$VAULT_WORK" ]; then
+        # `find` used to run inside the process substitution, where its exit
+        # status is discarded and `2>/dev/null` hid the reason. A failed scan then
+        # linked nothing while setup reported success. Run it first, keep its
+        # status, and say so when it fails.
+        if ! work_memory_dirs=$(find "$VAULT_WORK" -type d -name "memory" 2>&1); then
+            log_warning "scanning ${VAULT_WORK} for memory dirs failed: ${work_memory_dirs}"
+            work_memory_dirs=""
+        fi
         while read -r memory_source; do
+            [ -n "$memory_source" ] || continue
             project_dir=$(dirname "$memory_source")
             project_name=$(basename "$project_dir")
             cwd_path="$project_dir"
             _link_memory "$memory_source" "$cwd_path" "$project_name"
-        done < <(find "$VAULT_WORK" -type d -name "memory" 2>/dev/null)
+        done < <(printf '%s\n' "$work_memory_dirs")
     fi
 
     if [ "$linked_memory_count" -gt 0 ]; then

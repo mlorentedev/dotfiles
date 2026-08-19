@@ -187,4 +187,3 @@ func TestReport_Coloring(t *testing.T) {
 		t.Errorf("section header should be bolded, got:\n%s", out)
 	}
 }
-

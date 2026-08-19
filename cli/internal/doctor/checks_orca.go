@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,10 +35,21 @@ func checkOrcaHook(sys *System, rep *Report, fix bool) {
 		switch b, err := os.ReadFile(orcaJSON); {
 		case err != nil:
 			rep.Fail("orca.json unreadable: " + err.Error())
+		case !json.Valid(b):
+			// Before any repair: the tuner is a regex, so it happily rewrites a
+			// malformed document into a differently malformed one and the write
+			// succeeds. Reporting Fix there would claim a repair on a file Orca
+			// still cannot load — a success message about an operation whose goal
+			// was never checked.
+			rep.Fail("orca.json is not valid JSON — fix or remove it; refusing to tune a file Orca cannot load")
 		case orcaTimeoutBelow(b, 30):
 			if fix {
 				tuned := orcaTuneTimeout(b, 30)
-				if err := os.WriteFile(orcaJSON, tuned, 0o644); err != nil {
+				if !json.Valid(tuned) {
+					// The input parsed and the output does not: the tuner broke it.
+					// Never write that, and never call it a Fix.
+					rep.Fail("tuning orca.json would have produced invalid JSON — left untouched")
+				} else if err := os.WriteFile(orcaJSON, tuned, 0o644); err != nil {
 					rep.Fail("failed to tune orca.json: " + err.Error())
 				} else {
 					rep.Fix("orca.json: bumped hook timeoutSec to 30 (DX-006)")
