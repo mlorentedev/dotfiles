@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.45.0](https://github.com/mlorentedev/dotfiles/compare/v0.44.0...v0.45.0) (2026-08-19)
+
+
+### Features
+
+* **cli:** add dotf search and dotf harness suggest commands ([#1067](https://github.com/mlorentedev/dotfiles/issues/1067)) ([27c7ccf](https://github.com/mlorentedev/dotfiles/commit/27c7ccf41edcdca2a6839d94712a6ea6482dd2ff))
+* **harness:** skill dependencies resolution and full trigger catalog ([#1070](https://github.com/mlorentedev/dotfiles/issues/1070)) ([6c17f9c](https://github.com/mlorentedev/dotfiles/commit/6c17f9ce5832ef239a59604af46494397db9fa3b))
+* **secrets:** check the age root has not drifted, and whether the escrow still describes the vault ([#1077](https://github.com/mlorentedev/dotfiles/issues/1077)) ([#1079](https://github.com/mlorentedev/dotfiles/issues/1079)) ([c805e8f](https://github.com/mlorentedev/dotfiles/commit/c805e8f4b2ee0c0e8c758b5018a176d206417fd5))
+* **secrets:** give the age root a backend, so the inventory contains its own root ([#937](https://github.com/mlorentedev/dotfiles/issues/937)) ([#1075](https://github.com/mlorentedev/dotfiles/issues/1075)) ([10204ae](https://github.com/mlorentedev/dotfiles/commit/10204ae2bac6c4ba65d9919d51b5671c9bf7ee87))
+
+
+### Bug Fixes
+
+* **ci:** a review attests only from a member or a declared reviewer ([#1033](https://github.com/mlorentedev/dotfiles/issues/1033)) ([#1071](https://github.com/mlorentedev/dotfiles/issues/1071)) ([2bac1c5](https://github.com/mlorentedev/dotfiles/commit/2bac1c59e8f2bdabe79eac8c4ee3a077bfd527b2))
+* **ci:** pin the reviewer action by commit and gate its comment trigger on membership ([#1078](https://github.com/mlorentedev/dotfiles/issues/1078)) ([6e1c114](https://github.com/mlorentedev/dotfiles/commit/6e1c114f0240a9fcbedc037f835a4545b154a9b8))
+* **harness:** filter neutral metadata on skill deploy for unconditional discovery ([#1080](https://github.com/mlorentedev/dotfiles/issues/1080)) ([#1081](https://github.com/mlorentedev/dotfiles/issues/1081)) ([ecceec8](https://github.com/mlorentedev/dotfiles/commit/ecceec83f32ffcae19f2b5b7f1a7f3aebdbabe26))
+
 ## [0.44.0](https://github.com/mlorentedev/dotfiles/compare/v0.43.0...v0.44.0) (2026-08-18)
 
 
