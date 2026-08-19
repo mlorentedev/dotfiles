@@ -140,12 +140,34 @@ jobs:
         # `https://archive.ubuntu.com`. Bounding the step needs no knowledge of
         # apt's option surface at all — it ends whatever apt is doing, whichever
         # transport it is doing it over.
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: |
-          sudo apt-get update \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=15 \
-            -o Acquire::https::Timeout=15
+          set -euo pipefail
+
+          apt_opts='-o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15'
+
+          # Try the install WITHOUT touching the network first. The runner image
+          # ships apt lists, so on a good day zsh installs from them and the
+          # mirror never enters the picture. This is the cheapest possible way to
+          # not depend on a service we do not own.
+          if sudo apt-get install -y --no-install-recommends zsh; then
+              echo "zsh installed from the image's package lists; no mirror needed"
+              exit 0
+          fi
+
+          # Only if that failed do we refresh, and then with bounded retries: the
+          # Ubuntu mirrors go unreachable often enough to have cost this repo two
+          # cancelled runs and a 16-minute hang on 2026-08-19. A single attempt
+          # against a flaky remote is a coin toss reported as a code failure.
+          for attempt in 1 2 3; do
+              echo "apt-get update, attempt ${attempt}/3"
+              # shellcheck disable=SC2086  # apt_opts is a deliberate word-split list
+              if sudo apt-get update $apt_opts; then
+                  break
+              fi
+              [ "$attempt" -lt 3 ] && sleep 10
+          done
+
           sudo apt-get install -y --no-install-recommends zsh
 
       # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
