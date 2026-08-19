@@ -282,9 +282,18 @@ fi
 # Matched by DIFF SIGNATURE and nothing else. Not by author: the tools that open
 # such changes run under a human token, so an author rule never fires (verified
 # on a live one, whose author reads as a person). Not by branch: any branch can
-# be named to match. Every changed file must appear in the declared set, so
-# touching one other file ends the exemption — nothing to borrow, nothing to
-# game.
+# be named to match. The match is SET EQUALITY, both directions: every changed file
+# must be in the signature AND every file in the signature must have changed. So
+# touching one extra file ends the exemption, and so does touching one FEWER —
+# nothing to borrow, nothing to game.
+#
+# The second direction is the one worth stating out loud, because an earlier version
+# of this comment described only the first, and a downstream port implemented the
+# superset it described. Under the real semantics that port exempted three of its
+# release-shaped changes and refused a fourth, because the tool that opens them there
+# emits a file set that varies. A comment that understates its own predicate is a
+# defect with a delay fuse: correct about this repository, wrong for whoever reads it
+# next.
 #
 # The signature itself, and the name of whatever produces it, live in the
 # registry. This file names no tool and no path, which is a rule it already had
@@ -308,7 +317,7 @@ EXEMPT_NAME="$(printf '%s' "$PR_JSON" | jq -r --slurpfile cfg "$CONFIG" '
       end')"
 
 if [ -n "$EXEMPT_NAME" ]; then
-    say "[OK] exempt — every changed file is in the \"$EXEMPT_NAME\" signature; nothing here is reviewable"
+    say "[OK] exempt — the changed files are exactly the \"$EXEMPT_NAME\" signature; nothing here is reviewable"
     exit 0
 fi
 
