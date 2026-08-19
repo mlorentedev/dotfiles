@@ -153,6 +153,10 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 			continue
 		}
 		if e.Backend == secrets.BackendFileAuthority {
+			if e.Dest == "" {
+				rep.Fail(fmt.Sprintf("%s -> (no path) file-authority missing path", display))
+				continue
+			}
 			if pathExists(e.Dest) {
 				rep.Pass(fmt.Sprintf("%s -> %s (file-authority on disk)", display, e.Dest))
 			} else {
