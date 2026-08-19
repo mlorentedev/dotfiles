@@ -1,7 +1,7 @@
 ---
 id: "OPS-032-dr-drift-detection"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-19"
 issue: "mlorentedev/dotfiles#1077"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -125,3 +125,5 @@ the value.
 - `#992` — the deploy-skew class the bootstrapping risk belongs to
 - Related ADR: `docs/adr/adr-028-secrets-two-tier-bitwarden-age.md` §5
 - Related patterns: `00_meta/patterns/pattern-verification-fails-toward-unproven.md`
+
+<!-- archived 2026-08-19 — PR: https://github.com/mlorentedev/dotfiles/pull/1079 -->
