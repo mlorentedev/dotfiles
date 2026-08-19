@@ -77,7 +77,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # the bats suite; the job that hung on 2026-08-19
+    timeout-minutes: 12 # the bats suite runs in ~3 min; a ceiling, not a budget
     steps:
       - uses: actions/checkout@v7
 
@@ -132,8 +132,20 @@ jobs:
         # These options do not make the mirror work. They make its failure LOUD
         # and quick — roughly 45s and a real error — instead of a hang that looks
         # identical to slow progress.
+        #
+        # The step carries its own ceiling, and that is the load-bearing part. The
+        # first attempt at this bounded apt with apt's OWN options and still hung
+        # for 16 minutes: `Acquire::http::Timeout` is per-SCHEME and does not cover
+        # https, while the mirror it actually stalls on is
+        # `https://archive.ubuntu.com`. Bounding the step needs no knowledge of
+        # apt's option surface at all — it ends whatever apt is doing, whichever
+        # transport it is doing it over.
+        timeout-minutes: 3
         run: |
-          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=15
+          sudo apt-get update \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=15 \
+            -o Acquire::https::Timeout=15
           sudo apt-get install -y --no-install-recommends zsh
 
       # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
