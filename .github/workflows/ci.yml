@@ -13,6 +13,7 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -43,6 +44,7 @@ jobs:
 
   lint-powershell:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -75,6 +77,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 12 # the bats suite runs in ~3 min; a ceiling, not a budget
     steps:
       - uses: actions/checkout@v7
 
@@ -119,8 +122,52 @@ jobs:
           age-keygen --version >/dev/null
 
       - name: Install zsh
+        # Bounded on purpose. The Azure Ubuntu mirror intermittently stops
+        # answering — visible in the log as `Ign: http://azure.archive.ubuntu.com`
+        # — and an unbounded `apt-get update` then sits in silence until a human
+        # notices and cancels the run. Measured 2026-08-19 on run 32223603170:
+        # last output 06:30:08, cancelled by hand at 06:38:22. Eight minutes of
+        # nothing, and it had happened before.
+        #
+        # These options do not make the mirror work. They make its failure LOUD
+        # and quick — roughly 45s and a real error — instead of a hang that looks
+        # identical to slow progress.
+        #
+        # The step carries its own ceiling, and that is the load-bearing part. The
+        # first attempt at this bounded apt with apt's OWN options and still hung
+        # for 16 minutes: `Acquire::http::Timeout` is per-SCHEME and does not cover
+        # https, while the mirror it actually stalls on is
+        # `https://archive.ubuntu.com`. Bounding the step needs no knowledge of
+        # apt's option surface at all — it ends whatever apt is doing, whichever
+        # transport it is doing it over.
+        timeout-minutes: 5
         run: |
-          sudo apt-get update
+          set -euo pipefail
+
+          apt_opts='-o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15'
+
+          # Try the install WITHOUT touching the network first. The runner image
+          # ships apt lists, so on a good day zsh installs from them and the
+          # mirror never enters the picture. This is the cheapest possible way to
+          # not depend on a service we do not own.
+          if sudo apt-get install -y --no-install-recommends zsh; then
+              echo "zsh installed from the image's package lists; no mirror needed"
+              exit 0
+          fi
+
+          # Only if that failed do we refresh, and then with bounded retries: the
+          # Ubuntu mirrors go unreachable often enough to have cost this repo two
+          # cancelled runs and a 16-minute hang on 2026-08-19. A single attempt
+          # against a flaky remote is a coin toss reported as a code failure.
+          for attempt in 1 2 3; do
+              echo "apt-get update, attempt ${attempt}/3"
+              # shellcheck disable=SC2086  # apt_opts is a deliberate word-split list
+              if sudo apt-get update $apt_opts; then
+                  break
+              fi
+              [ "$attempt" -lt 3 ] && sleep 10
+          done
+
           sudo apt-get install -y --no-install-recommends zsh
 
       # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
@@ -285,6 +332,7 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [lint]
     steps:
       - uses: actions/checkout@v7

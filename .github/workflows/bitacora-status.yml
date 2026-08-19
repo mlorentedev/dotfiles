@@ -28,6 +28,7 @@ jobs:
     # Never resurrect a closed issue's status when it is (re)assigned.
     if: github.event.issue.state == 'open'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Move assigned issue to In Progress
         uses: actions/github-script@v9

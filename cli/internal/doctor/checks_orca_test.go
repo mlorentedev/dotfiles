@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -41,7 +42,7 @@ func TestCheckOrcaHook(t *testing.T) {
 
 			var buf bytes.Buffer
 			rep := capture(&buf)
-			checkOrcaHook(sys, rep)
+			checkOrcaHook(sys, rep, false)
 
 			if rep.Failures() != tc.wantFailures {
 				t.Fatalf("failures = %d, want %d\n%s", rep.Failures(), tc.wantFailures, buf.String())
@@ -50,5 +51,30 @@ func TestCheckOrcaHook(t *testing.T) {
 				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
 			}
 		})
+	}
+}
+
+func TestCheckOrcaHook_Fix(t *testing.T) {
+	home := t.TempDir()
+	jsonPath := filepath.Join(home, ".copilot", "hooks", "orca.json")
+	writeFile(t, jsonPath, `{"hooks":{"x":{"timeoutSec":5}}}`)
+	sys := newSys(map[string]string{"HOME": home}, nil, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkOrcaHook(sys, rep, true)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("failures = %d, want 0\n%s", rep.Failures(), buf.String())
+	}
+	if !strings.Contains(buf.String(), "bumped hook timeoutSec to 30") {
+		t.Fatalf("output missing fix message: %s", buf.String())
+	}
+	content, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if orcaTimeoutBelow(content, 30) {
+		t.Fatalf("expected orca.json to be tuned to >= 30, got: %s", string(content))
 	}
 }

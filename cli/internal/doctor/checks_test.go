@@ -321,6 +321,52 @@ func TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted(t *testing.T) {
 	}
 }
 
+func TestCheckSecrets_FileAuthorityBackend(t *testing.T) {
+	dotfiles := t.TempDir()
+	home := t.TempDir()
+	keyPath := filepath.Join(home, ".config", "age", "key.txt")
+	writeFile(t, keyPath, "AGE-SECRET-KEY-1...")
+	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"),
+		"version: 1\nsecrets:\n"+
+			"  - id: age-root\n"+
+			"    plane: root\n"+
+			"    backend: file-authority\n"+
+			"    recipient: age1test\n"+
+			"    path: ~/.config/age/key.txt\n"+
+			"    expose:\n"+
+			"      file:\n"+
+			"        var: AGE_KEY_PERSONAL\n"+
+			"        path: ~/.config/age/key.txt\n"+
+			"  - id: missing-root\n"+
+			"    plane: root\n"+
+			"    backend: file-authority\n"+
+			"    recipient: age1missing\n"+
+			"    path: ~/.config/age/missing.txt\n"+
+			"    expose:\n"+
+			"      file:\n"+
+			"        var: AGE_KEY_MISSING\n"+
+			"        path: ~/.config/age/missing.txt\n")
+
+	cfg := &Config{DotfilesDir: dotfiles}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkSecrets(newSys(map[string]string{"HOME": home}, nil, nil), cfg, rep)
+	out := buf.String()
+
+	if rep.Failures() != 1 {
+		t.Fatalf("failures = %d, want 1 (missing root only)\n%s", rep.Failures(), out)
+	}
+	if !strings.Contains(out, "AGE_KEY_PERSONAL [file] ->") || !strings.Contains(out, "file-authority on disk") {
+		t.Errorf("present file-authority must pass, got: %s", out)
+	}
+	if !strings.Contains(out, "AGE_KEY_MISSING [file] ->") || !strings.Contains(out, "file-authority missing on disk") {
+		t.Errorf("missing file-authority must fail, got: %s", out)
+	}
+	if strings.Contains(out, ".secret.age (missing)") {
+		t.Errorf("file-authority must not look for .secret.age, got: %s", out)
+	}
+}
+
 func TestCheckTmux(t *testing.T) {
 	home := t.TempDir()
 	dotfiles := filepath.Join(home, ".dotfiles")

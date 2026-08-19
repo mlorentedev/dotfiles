@@ -91,6 +91,7 @@ jobs:
     # to attest to.
     if: github.event_name == 'pull_request' || github.event.issue.pull_request || github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       # Pinned to the BASE branch, never the PR's head. Without this the job
       # checked out the pull request and ran the classifier and registry from
