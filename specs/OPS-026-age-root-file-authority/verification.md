@@ -23,8 +23,8 @@ Produced in the session of 2026-08-19, not recalled.
                        -> 0 ok, 1 missing, 0 failed   (MISSING, not FAILED)
   ```
 
-- AC5 -> **deferred**, see `features.json` f5 and `tasks.md`
 - AC6 -> `TestFileAuthority_ResolveRefuses` + `TestResolversCoverEveryValidBackend`
+  (the drift comparison moved to #1000; see the proposal's Out of scope)
 - AC7 -> `docs/adr/adr-028-secrets-two-tier-bitwarden-age.md:146`
 
 ## Test status

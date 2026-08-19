@@ -32,13 +32,14 @@ created: "2026-08-19"
 - [x] [AC7] ADR-028's worked example amended, with all three reasons the old one
       could not validate
 
-## Deferred, and visibly so
+## Moved out, not dropped
 
-- [ ] [AC5] The drift comparison: local fingerprint vs the Bitwarden convenience
-      copy, SKIPPED-with-a-reason when there is no session, never OK. Needs a live
-      session and `age-keygen -y`; it is the point of **#1000** rather than of this
-      spec. `fileAuthorityResolver`'s own comment says the check answers a narrower
-      question until this lands, so the gap cannot be mistaken for coverage
+- The drift comparison was drafted as an AC here and belongs to **#1000**, whose
+  AC3 already asks for it. With the off-machine copy now an offline USB rather
+  than a vault item, the check that pays is the local key against a **declared
+  public recipient** — no Bitwarden session, works offline — which is a design
+  decision for that issue. Recorded in this proposal's Out of scope, and
+  `fileAuthorityResolver`'s comment says its check is the narrower one until then
 
 ## Not this spec's work, found while doing it
 

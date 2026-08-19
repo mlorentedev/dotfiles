@@ -28,13 +28,6 @@
     "evidence": "Both pass, and observed live against a scratch registry pointing at a throwaway key so the real root was never touched: 0600 -> `1 ok`; chmod 0644 (confirmed `stat` reads 644 before the run) -> `0 ok, 0 missing, 1 failed` with a non-zero exit; file removed (confirmed absent) -> `0 ok, 1 missing, 0 failed`. The unit test also asserts the fixture is really 0644 before asserting the failure, because umask could otherwise produce 0600 and pass the case for the wrong reason."
   },
   {
-    "id": "OPS-026-age-root-file-authority-f5",
-    "behavior": "AC5 — a fingerprint mismatch against the declared off-machine copy reports FAILED; with no Bitwarden session the comparison reports SKIPPED with a reason, never OK.",
-    "verification": "not yet implemented — second slice",
-    "state": "deferred",
-    "evidence": "DEFERRED, deliberately and visibly. The drift comparison needs a live Bitwarden session and `age-keygen -y`, and it is the point of #1000 rather than of this spec. The resolver's own comment states that VerifyEntry answers a narrower question than the one that matters until this lands, so a reader cannot mistake the gap for coverage."
-  },
-  {
     "id": "OPS-026-age-root-file-authority-f6",
     "behavior": "AC6 — the resolver-coverage binding stays honest: file-authority has a Loader entry, and it is a resolver that REFUSES rather than a missing one.",
     "verification": "go test ./internal/secrets/ -run 'ResolversCoverEveryValidBackend|ResolveRefuses'",

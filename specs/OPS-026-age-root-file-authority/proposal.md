@@ -51,6 +51,14 @@ Observable afterwards:
   to a child process through the same facade as the secrets it protects is a widening
   of blast radius, not a convenience. The `expose.file` contract records where the
   file belongs; materialising it through `run` is deliberately not added.
+- **The drift comparison.** Checking that the local key still matches the copy held
+  off this machine is #1000's own AC3, not this spec's. It was drafted here and moved
+  out on the way: it needs a live Bitwarden session and `age-keygen -y`, and — now
+  that the off-machine copy is an offline USB rather than a vault item — the check
+  that actually pays is comparing the local key against a **declared public
+  recipient**, which needs no session at all. That is a design decision belonging to
+  #1000. `fileAuthorityResolver`'s comment states that its check answers a narrower
+  question until then, so the gap cannot be read as coverage.
 - **Multi-root support.** One root, one machine. A second machine with its own
   identity is a real future case and is explicitly not designed for here.
 
@@ -86,9 +94,6 @@ Observable afterwards:
       the pre-existing 33 entries still report `33 ok, 0 missing, 0 failed`.
 - [ ] AC4 — a wrong-mode file (e.g. `0644`) reports FAILED, observed by mutating the
       mode and seeing the check fail, with the mutation confirmed present first.
-- [ ] AC5 — a fingerprint mismatch against the declared off-machine copy reports FAILED,
-      observed the same way with a deliberately wrong key; and with no Bitwarden session
-      the comparison reports SKIPPED with a reason, never OK.
 - [ ] AC6 — the resolver-coverage test states in its own text why `file-authority` has
       no Loader entry, so a future reader cannot mistake the exclusion for an oversight.
 - [ ] AC7 — ADR-028's worked example (lines 134-139) is amended to the shape the
