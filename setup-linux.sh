@@ -1309,6 +1309,7 @@ VAULT_PROJECTS="$VAULT_ROOT/10_projects"
 VAULT_WORK="$VAULT_ROOT/50_work"
 if [ -d "$VAULT_ROOT" ]; then
     log_info "Deploying auto-memory symlinks from vault..."
+    linked_memory_count=0
 
     # Helper: create symlink for a vault memory dir
     _link_memory() {
@@ -1330,7 +1331,7 @@ if [ -d "$VAULT_ROOT" ]; then
         fi
 
         ln -s "$memory_source" "$target_dir"
-        log_success "Linked auto-memory: $project_name"
+        linked_memory_count=$((linked_memory_count + 1))
     }
 
     # 10_projects/*: convention — repo at ~/Projects/<name>
@@ -1348,12 +1349,16 @@ if [ -d "$VAULT_ROOT" ]; then
 
     # 50_work/**/memory: work projects — CWD is the vault path itself
     if [ -d "$VAULT_WORK" ]; then
-        find "$VAULT_WORK" -type d -name "memory" 2>/dev/null | while read -r memory_source; do
+        while read -r memory_source; do
             project_dir=$(dirname "$memory_source")
             project_name=$(basename "$project_dir")
             cwd_path="$project_dir"
             _link_memory "$memory_source" "$cwd_path" "$project_name"
-        done
+        done < <(find "$VAULT_WORK" -type d -name "memory" 2>/dev/null)
+    fi
+
+    if [ "$linked_memory_count" -gt 0 ]; then
+        log_success "Linked auto-memory for $linked_memory_count project(s) from vault"
     fi
 
     # Migrate orphan memories: local Claude Code memories not yet in vault

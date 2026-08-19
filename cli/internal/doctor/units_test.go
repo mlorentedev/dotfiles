@@ -150,3 +150,41 @@ func TestReportSuppressesPassesUnlessVerbose(t *testing.T) {
 		t.Error("verbose report must list passing checks")
 	}
 }
+
+func TestReport_Coloring(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewReport(&buf, true)
+	r.SetColor(true)
+	r.Section("Color Section")
+	r.Pass("pass msg")
+	r.Fail("fail msg")
+	r.Warn("warn msg")
+	r.Skip("skip msg")
+	r.Info("info msg")
+	r.Fix("fix msg")
+	r.Summary()
+
+	out := buf.String()
+	if !strings.Contains(out, "\033[32m[ OK ]\033[0m") {
+		t.Errorf("pass tag should be colorized with green, got:\n%s", out)
+	}
+	if !strings.Contains(out, "\033[31m[FAIL]\033[0m") {
+		t.Errorf("fail tag should be colorized with red, got:\n%s", out)
+	}
+	if !strings.Contains(out, "\033[33m[WARN]\033[0m") {
+		t.Errorf("warn tag should be colorized with yellow, got:\n%s", out)
+	}
+	if !strings.Contains(out, "\033[36m[SKIP]\033[0m") {
+		t.Errorf("skip tag should be colorized with cyan, got:\n%s", out)
+	}
+	if !strings.Contains(out, "\033[34m[INFO]\033[0m") {
+		t.Errorf("info tag should be colorized with blue, got:\n%s", out)
+	}
+	if !strings.Contains(out, "\033[35m[FIX ]\033[0m") {
+		t.Errorf("fix tag should be colorized with magenta, got:\n%s", out)
+	}
+	if !strings.Contains(out, "\033[1m[Color Section]\033[0m") {
+		t.Errorf("section header should be bolded, got:\n%s", out)
+	}
+}
+

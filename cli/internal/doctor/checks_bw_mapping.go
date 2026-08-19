@@ -54,7 +54,11 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 	present, err := sys.BWItemNames()
 	if err != nil {
 		// Locked, absent daemon, transport error: not this section's finding.
-		rep.Skip(fmt.Sprintf("vault item list unavailable (%v) — mapping unverifiable", err))
+		reason := err.Error()
+		if strings.Contains(reason, "connection refused") || strings.Contains(reason, "unreachable") {
+			reason = "bw serve daemon not running"
+		}
+		rep.Skip(fmt.Sprintf("vault item list unavailable (%s) — mapping unverifiable", reason))
 		return
 	}
 	have := make(map[string]bool, len(present))

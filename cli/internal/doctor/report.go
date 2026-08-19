@@ -3,6 +3,9 @@ package doctor
 import (
 	"fmt"
 	"io"
+	"os"
+
+	"golang.org/x/term"
 )
 
 // Status is the outcome of a single check. Only StatusFail drives a non-zero
@@ -28,6 +31,26 @@ var statusTag = map[Status]string{
 	StatusFix:  "[FIX ]",
 }
 
+const (
+	ansiReset   = "\033[0m"
+	ansiBold    = "\033[1m"
+	ansiRed     = "\033[31m"
+	ansiGreen   = "\033[32m"
+	ansiYellow  = "\033[33m"
+	ansiBlue    = "\033[34m"
+	ansiMagenta = "\033[35m"
+	ansiCyan    = "\033[36m"
+)
+
+var coloredTag = map[Status]string{
+	StatusPass: ansiGreen + "[ OK ]" + ansiReset,
+	StatusFail: ansiRed + "[FAIL]" + ansiReset,
+	StatusWarn: ansiYellow + "[WARN]" + ansiReset,
+	StatusSkip: ansiCyan + "[SKIP]" + ansiReset,
+	StatusInfo: ansiBlue + "[INFO]" + ansiReset,
+	StatusFix:  ansiMagenta + "[FIX ]" + ansiReset,
+}
+
 // Report accumulates check outcomes, prints them grouped by section, and
 // computes the process exit code. It folds healthcheck's PASS/FAIL/WARN/SKIP
 // and doctor's [ok]/[warn]/[fail]/[info]/[fix] into one tag vocabulary.
@@ -38,6 +61,7 @@ var statusTag = map[Status]string{
 type Report struct {
 	w       io.Writer
 	verbose bool
+	color   bool
 
 	totals map[Status]int
 
@@ -47,10 +71,34 @@ type Report struct {
 	sectionOpen bool // a Section() header has been printed and not yet flushed
 }
 
+// isColorEnabled checks whether the output writer is an interactive terminal
+// and that color emission is not disabled via NO_COLOR or TERM=dumb.
+func isColorEnabled(w io.Writer) bool {
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	if f, ok := w.(*os.File); ok {
+		return term.IsTerminal(int(f.Fd()))
+	}
+	return false
+}
+
 // NewReport builds a Report writing to w. When verbose is false, passing
-// checks are summarised rather than listed line-by-line.
+// checks are summarised rather than listed line-by-line. Color is enabled
+// automatically when w is an interactive terminal.
 func NewReport(w io.Writer, verbose bool) *Report {
-	return &Report{w: w, verbose: verbose, totals: map[Status]int{}, secCounts: map[Status]int{}}
+	return &Report{
+		w:         w,
+		verbose:   verbose,
+		color:     isColorEnabled(w),
+		totals:    map[Status]int{},
+		secCounts: map[Status]int{},
+	}
+}
+
+// SetColor forces color output on or off (useful in tests or explicit flags).
+func (r *Report) SetColor(c bool) {
+	r.color = c
 }
 
 // emit writes to the report's sink. A write error to stdout/a buffer is not
@@ -67,7 +115,11 @@ func (r *Report) Section(title string) {
 	r.secCounts = map[Status]int{}
 	r.secPrinted = 0
 	r.sectionOpen = true
-	r.emit("\n[%s]\n", title)
+	if r.color {
+		r.emit("\n%s[%s]%s\n", ansiBold, title, ansiReset)
+	} else {
+		r.emit("\n[%s]\n", title)
+	}
 }
 
 func (r *Report) add(s Status, msg string) {
@@ -76,7 +128,11 @@ func (r *Report) add(s Status, msg string) {
 	if s == StatusPass && !r.verbose {
 		return // suppressed; surfaced in the section summary instead
 	}
-	r.emit("  %s %s\n", statusTag[s], msg)
+	tag := statusTag[s]
+	if r.color {
+		tag = coloredTag[s]
+	}
+	r.emit("  %s %s\n", tag, msg)
 	r.secPrinted++
 }
 
@@ -100,7 +156,11 @@ func (r *Report) flush() {
 			total += c
 		}
 		if total > 0 {
-			r.emit("  (%d checks, all ok)\n", total)
+			if r.color {
+				r.emit("  %s(%d checks, all ok)%s\n", ansiGreen, total, ansiReset)
+			} else {
+				r.emit("  (%d checks, all ok)\n", total)
+			}
 		}
 	}
 	r.sectionOpen = false
@@ -110,10 +170,26 @@ func (r *Report) flush() {
 // after all checks have run.
 func (r *Report) Summary() {
 	r.flush()
-	r.emit("\nResults: %d passed, %d failed, %d warned, %d skipped\n",
-		r.totals[StatusPass], r.totals[StatusFail], r.totals[StatusWarn], r.totals[StatusSkip])
-	if r.totals[StatusFix] > 0 {
-		r.emit("Applied %d fix action(s)\n", r.totals[StatusFix])
+	if r.color {
+		if r.totals[StatusFail] > 0 {
+			r.emit("\nResults: %s%d passed%s, %s%d failed%s, %s%d warned%s, %s%d skipped%s\n",
+				ansiGreen, r.totals[StatusPass], ansiReset,
+				ansiRed+ansiBold, r.totals[StatusFail], ansiReset,
+				ansiYellow, r.totals[StatusWarn], ansiReset,
+				ansiCyan, r.totals[StatusSkip], ansiReset)
+		} else {
+			r.emit("\n%sResults: %d passed, 0 failed, %d warned, %d skipped%s\n",
+				ansiGreen+ansiBold, r.totals[StatusPass], r.totals[StatusWarn], r.totals[StatusSkip], ansiReset)
+		}
+		if r.totals[StatusFix] > 0 {
+			r.emit("%sApplied %d fix action(s)%s\n", ansiMagenta, r.totals[StatusFix], ansiReset)
+		}
+	} else {
+		r.emit("\nResults: %d passed, %d failed, %d warned, %d skipped\n",
+			r.totals[StatusPass], r.totals[StatusFail], r.totals[StatusWarn], r.totals[StatusSkip])
+		if r.totals[StatusFix] > 0 {
+			r.emit("Applied %d fix action(s)\n", r.totals[StatusFix])
+		}
 	}
 }
 

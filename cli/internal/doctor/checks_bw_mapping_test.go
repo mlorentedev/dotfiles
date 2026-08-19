@@ -89,6 +89,28 @@ func TestCheckBWMapping_UnavailableVaultSkips(t *testing.T) {
 	}
 }
 
+func TestCheckBWMapping_UnreachableDaemonCleansError(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: NAN_API_KEY, plane: app, backend: bw, bw: {item: nan-api-key, field: api-key}, expose: {env: NAN_API_KEY}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.BWItemNames = func() ([]string, error) {
+		return nil, errors.New("bw serve list items: bw serve daemon unreachable: GET /list/object/items: dial tcp 127.0.0.1:8087: connect: connection refused")
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkBWMapping(sys, patCfg(t, registry), rep)
+
+	out := buf.String()
+	if !strings.Contains(out, "vault item list unavailable (bw serve daemon not running) — mapping unverifiable") {
+		t.Errorf("expected clean daemon unreachable error, got:\n%s", out)
+	}
+	if strings.Contains(out, "dial tcp 127.0.0.1:8087") {
+		t.Errorf("raw dial error should not leak into SKIP message:\n%s", out)
+	}
+}
+
 // An age-only registry has nothing to compare: SKIP, never a PASS implying the
 // mapping was checked. "Nothing to check" and "checked, all good" are different
 // statements and only one of them is evidence.
