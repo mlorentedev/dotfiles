@@ -47,5 +47,12 @@
     "verification": "bats tests/check-review-attestation.bats -f 'AC7'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "GUARD-002-review-attestation-f8",
+    "behavior": "AC8 — a review attests only when its author is not the PR author AND that author is either a member of this repository or a declared reviewer. Filed as #1033 while checking whether this gate and the reviewer of #786 compose: the original rule counted any entry in reviews[] with an author other than the PR author, which is 'somebody else looked' only where identities are not shared. Every workflow here posts under one automation login, so a labeler or a release job attested for a PR nobody read. #1047 closed the same hole on the comments door and left this one open, which was worse than symmetry: a reader of the hardened path concludes the rule holds everywhere. The discriminator is authorAssociation, already in the payload — REST's user.type would have cost an API call and a second login spelling in every fixture for the same answer. CONTRIBUTOR is excluded on purpose: it is granted by a merged commit, which an automation account holds as easily as a person.",
+    "verification": "bats tests/check-review-attestation.bats -f '#1033'",
+    "state": "done",
+    "evidence": "6/6 cases pass. Both new guards observed failing on their own mutation with the mutation confirmed present first: replacing the member-or-declared predicate with select(true) fails cases 51, 52, 55 and 56; appending a declared login to the script fails case 14. No live PR changes verdict — #1057, #1065, #1067, #1068 and #1070 attest identically under the old and new script, run side by side."
   }
 ]

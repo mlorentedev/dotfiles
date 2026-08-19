@@ -180,6 +180,32 @@ whether a bot performed it.
       Until then AC7 is verified structurally, and the first live proof comes after
       merge.
 
+## Post-ship defects, and the criterion they added
+
+Two holes in "did a review happen" were found after the gate shipped, both by
+asking whether it composes with the reviewer of #786 rather than by a failure.
+Both are the same shape: the gate asked *who appeared* when it meant *who
+looked*, and those differ wherever an identity is shared.
+
+- **#1045 — the comments door.** The reviewer of #786 publishes through the
+  comments API, so `reviews[]` is empty on a PR it genuinely reviewed. Closed by
+  #1047, which counts a comment-shaped review on a declared `(login, marker)`
+  pair.
+- **#1033 — the reviews door.** Any author other than the PR author attested.
+  Every workflow in this repository posts under one automation login, so a
+  labeler, a release job or a summary step could attest for a PR nobody read.
+
+**AC8 — a review attests only when its author is not the PR author, and that
+author is either a member of this repository or a declared reviewer.** Any human
+review still counts, unchanged and deliberately: an individual's identity cannot
+be shared the way an automation login is, so only bot reviews need declaring.
+
+Worth keeping as a lesson about partial fixes: closing #1045's door and not
+#1033's left the registry authoritative for who may attest by comment and
+decorative for who may attest by review. That is worse than having fixed
+neither, because a reader of the hardened path reasonably concludes the rule is
+enforced everywhere.
+
 ## References
 
 - Bitácora board: `mlorentedev/dotfiles#906` (see the `issue:` frontmatter field)
