@@ -60,9 +60,19 @@ jobs:
   review:
     # issue_comment fires on issues too; and skip draft PRs, which are by
     # definition not asking to be read yet.
+    #
+    # The issue_comment half is gated on the commenter's association, and that gate
+    # is load-bearing rather than defensive. This repository is PUBLIC: any account
+    # can comment on a pull request, `issue_comment` runs in the BASE repo context
+    # with secrets available, and without this line a stranger typing `/review`
+    # spends the inference budget and exercises `pull-requests: write` on demand.
+    #
+    # The association set is the one the attestation classifier already treats as
+    # "belongs to this repository", so membership has one definition here and not two.
     if: >
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request)
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request
+        && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
@@ -71,7 +81,12 @@ jobs:
       # action) — the first draft of this file pinned `@v0.30`, which does not
       # exist at all.
       - name: PR-Agent
-        uses: The-PR-Agent/pr-agent@v0.42.0
+        # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
+        # whoever can move `v0.42.0` decides what runs here, and what runs here holds
+        # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
+        # is not a theoretical actor. Resolved from the API rather than copied:
+        # `gh api repos/The-PR-Agent/pr-agent/git/ref/tags/v0.42.0`.
+        uses: The-PR-Agent/pr-agent@f6af7d77554ff8d26adffded077e6461329e92fa  # v0.42.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
