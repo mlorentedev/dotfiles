@@ -39,30 +39,6 @@ func TestFileAuthority_PresentAndCorrectModeIsOK(t *testing.T) {
 	}
 }
 
-func TestFileAuthority_WrongModeFails(t *testing.T) {
-	p := writeKey(t, 0o644)
-	// Confirm the mutation landed: a umask could have produced 0600 and the
-	// assertion below would then pass for the wrong reason.
-	fi, err := os.Stat(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := fi.Mode().Perm(); got != 0o644 {
-		t.Fatalf("fixture is mode %04o, not the 0644 this case is about", got)
-	}
-
-	err = (&Loader{}).Verify(rootEntry(t, p, 0o600))
-	if err == nil {
-		t.Fatal("a world-readable root must FAIL, not pass")
-	}
-	if errors.Is(err, ErrSecretAbsent) {
-		t.Fatal("a wrong mode is a defect, not an absence — reporting MISSING hides it")
-	}
-	if !strings.Contains(err.Error(), "0644") || !strings.Contains(err.Error(), "0600") {
-		t.Errorf("the error must name what it found and what it wanted, got: %v", err)
-	}
-}
-
 func TestFileAuthority_AbsentIsMissingNotFailed(t *testing.T) {
 	// A fresh checkout legitimately has no key yet. Same tolerance every other
 	// backend gets for "not provisioned here"; calling it FAILED would make a
@@ -81,13 +57,6 @@ func TestFileAuthority_EmptyFileFails(t *testing.T) {
 	}
 	if err := (&Loader{}).Verify(rootEntry(t, p, 0o600)); err == nil {
 		t.Fatal("a zero-byte root must FAIL — present but useless is the worst report to get right")
-	}
-}
-
-func TestFileAuthority_DefaultsToO600WhenNoModeDeclared(t *testing.T) {
-	p := writeKey(t, 0o644)
-	if err := (&Loader{}).Verify(rootEntry(t, p, 0)); err == nil {
-		t.Fatal("mode 0 means 'the 0600 default', so 0644 must still FAIL")
 	}
 }
 

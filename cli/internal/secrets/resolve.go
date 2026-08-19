@@ -313,14 +313,8 @@ func (fileAuthorityResolver) VerifyEntry(e Entry) error {
 	if fi.Size() == 0 {
 		return fmt.Errorf("%s is empty", e.Dest)
 	}
-	want := e.Mode
-	if want == 0 {
-		want = 0o600
-	}
-	// Compare the permission bits only; setuid/sticky and the type bits are not
-	// what was declared, and a mask mismatch there would report a confusing cause.
-	if got := fi.Mode().Perm(); got != want.Perm() {
-		return fmt.Errorf("%s has mode %04o, expected %04o", e.Dest, got, want.Perm())
-	}
-	return nil
+	// Permission bits only, and only where they exist — see checkKeyMode's two
+	// build-tagged halves. setuid/sticky and the type bits are not what was
+	// declared, and a mask mismatch there would report a confusing cause.
+	return checkKeyMode(fi, e.Dest, e.Mode)
 }
