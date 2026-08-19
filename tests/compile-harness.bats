@@ -353,6 +353,52 @@ run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
     [ "$(grep -c '^generated_from:' "$FAKEHOME/.copilot/skills/demo-skill/SKILL.md")" -eq 1 ]
 }
 
+@test "skills: --deploy drops neutral/store-only keys (paths, keywords, requires, id, etc.) from native frontmatter" {
+    seed_skills_fixture
+    mkdir -p "$VAULT/00_meta/skills/full-skill"
+    cat > "$VAULT/00_meta/skills/full-skill/SKILL.md" <<'EOF'
+---
+id: full-skill
+type: skill
+status: active
+created: '2026-05-31'
+owner: manu
+name: full-skill
+description: Full skill with metadata.
+allowed-tools: [Bash, Read, Edit, Write]
+keywords: [full, test]
+paths: ['**/test/**', src/**]
+requires: [other-skill]
+targets: [claude, opencode]
+---
+
+# Full Skill
+
+Body content.
+EOF
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+
+    F="$FAKEHOME/.claude/skills/full-skill/SKILL.md"
+    [ -f "$F" ]
+    grep -q '^name: full-skill' "$F"
+    grep -q '^description: ' "$F"
+    grep -q '^allowed-tools: ' "$F"
+    grep -q '^generated: true' "$F"
+    grep -q '^generated_from: 00_meta/skills/full-skill/SKILL.md' "$F"
+
+    # neutral/store-only keys must NOT leak into deployed frontmatter
+    ! grep -qE '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$F"
+
+    # opencode command drops name, keeps description + allowed-tools, drops neutral keys
+    OC="$FAKEHOME/.config/opencode/commands/full-skill.md"
+    [ -f "$OC" ]
+    ! grep -q '^name:' "$OC"
+    grep -q '^description: ' "$OC"
+    grep -q '^allowed-tools: ' "$OC"
+    ! grep -qE '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$OC"
+}
+
 @test "AC1: --deploy replaces a pre-existing vault symlink with a regular copy" {
     seed_skills_fixture
     run_refresh; [ "$status" -eq 0 ]
