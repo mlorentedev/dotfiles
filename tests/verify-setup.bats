@@ -298,7 +298,7 @@ setup() {
     # targets[] admits opencode (absent targets = all agents) must have a command.
     # A literal count rots on every skill added or unfenced.
     local expected=0 f
-    for f in "$HOME"/.claude/skills/*/SKILL.md; do
+    for f in "$REPO_DIR"/harness/skills/*/SKILL.md; do
         [ -f "$f" ] || continue
         local targets
         targets=$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^targets:/{print; exit}' "$f")
