@@ -78,3 +78,25 @@ green, and the shipped command was broken — because a seam was added to one co
 the resolver map and not the other. That is REFACTOR-012's shape, which this very file
 cites, arriving in the change that cites it. Static coverage of "does a resolver exist"
 could not see it; only exercising the loop could.
+
+## Round 2 adversarial review — disposition
+
+`nan/deepseek-v4-flash`, verdict **PASS WITH GAPS** on `0765026`. No Blocker, no Major.
+Five Minor findings, all five applied.
+
+| # | Reality | Finding | Disposition |
+|---|---|---|---|
+| 1 | REAL | AC6's wording still described a design that changed during implementation ("no Loader entry"), while `features.json` f6 described the real one. | **Applied.** AC6 now says what the code does: the backend HAS a resolver, and it refuses. |
+| 2 | REAL | Two features carried the id `f7` — the AC8 entry added by round 1 collided with the ADR one. A tool indexing by id sees one of the two. | **Applied.** Renumbered to `f8`. My error, and a data-integrity one rather than a cosmetic one. |
+| 3 | THEORETICAL | `VerifyEntry` rejected directories but not FIFOs, sockets or device nodes — any of which can carry mode 0600, pass every check, and fail under `age --decrypt`. | **Applied.** `!fi.Mode().IsRegular()`, with a FIFO test case. |
+| 4 | THEORETICAL | `EnvFor` skipped on `Verifier`, using "answers its own health question" as a proxy for "must never be handed out". A future backend implementing `Verifier` for any other reason would vanish from the secret set in silence. | **Applied, and it is the best finding of the round.** A separate `NotMaterialized` interface now carries that meaning, and `Resolve` derives its refusal from the same string so the two consumers cannot drift. This was the session's recurring defect — a signal consulted for a question it was not asked — inside the change that exists to fix an instance of it. |
+| 5 | THEORETICAL | The `file-authority` parser fixture had no `bw:` block, so the shipped entry's actual shape (a `bw:` with no `field`) was unexercised. | **Applied.** The fixture now carries it, with a comment saying why. |
+
+Re-verified after: 17 Go packages ok, `golangci-lint` at the pinned 2.12.2 with 0 issues,
+`dotf secrets verify` 34 ok / 0 missing / 0 failed, bulk `secrets run` exit 0, and
+`--only AGE_KEY_PERSONAL` still refused out loud.
+
+**Note on the gate this creates.** Findings 1 and 2 were *in the contract files*, so
+applying them invalidates the `reviewed_sha` of the review that found them. That is
+the staleness check working as designed, and it is also the tension #1036 describes.
+Round 3 is run rather than argued with.

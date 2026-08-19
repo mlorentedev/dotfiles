@@ -33,10 +33,10 @@ func countingHandler(n *int, path string, f *fakeBWServe) http.HandlerFunc {
 // If someone later adds a third backend and wires only one half to it, this fails.
 func TestSelectBWBackend_ReadAndWriteAlwaysAgree(t *testing.T) {
 	tests := []struct {
-		name       string
-		status     string // fake daemon status; "" -> daemon unreachable
+		name        string
+		status      string // fake daemon status; "" -> daemon unreachable
 		unreachable bool
-		wantDaemon bool
+		wantDaemon  bool
 	}{
 		{name: "unlocked daemon is used for both halves", status: "unlocked", wantDaemon: true},
 		{name: "locked daemon falls back on both halves", status: "locked", wantDaemon: false},

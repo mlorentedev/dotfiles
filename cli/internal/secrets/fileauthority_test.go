@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -214,3 +215,40 @@ func TestEnvFor_ResolvesEverySingleBackendWithoutError(t *testing.T) {
 type stubBW struct{}
 
 func (stubBW) Field(_, _ string) (string, error) { return "bw-value", nil }
+
+func TestFileAuthority_NonRegularFileFails(t *testing.T) {
+	// A FIFO at the key path carries mode 0600 and passes every other check here,
+	// while `age --decrypt` fails on it. Round-2 review of OPS-026.
+	dir := t.TempDir()
+	p := filepath.Join(dir, "key.txt")
+	if err := syscall.Mkfifo(p, 0o600); err != nil {
+		t.Skipf("cannot create a FIFO here: %v", err)
+	}
+	err := (&Loader{}).Verify(rootEntry(t, p, 0o600))
+	if err == nil {
+		t.Fatal("a non-regular file at the key path must FAIL, not report OK")
+	}
+	if !strings.Contains(err.Error(), "regular file") {
+		t.Errorf("the error must name the actual problem, got: %v", err)
+	}
+}
+
+func TestNotMaterialized_IsWhatEnvForSkipsOn(t *testing.T) {
+	// EnvFor skipped on Verifier until round 2 pointed out that "answers its own
+	// health question" and "must never be handed out" are different properties.
+	// This pins the split: the root implements BOTH, and the skip is on the second.
+	var r any = fileAuthorityResolver{}
+	if _, ok := r.(NotMaterialized); !ok {
+		t.Fatal("the age root must declare itself as never-materialized, which is what EnvFor skips on")
+	}
+	if _, ok := r.(Verifier); !ok {
+		t.Fatal("the age root must also answer its own health question")
+	}
+	// The refusal string has one source, so the two consumers cannot drift.
+	res := fileAuthorityResolver{}
+	e := Entry{Var: "AGE_KEY_PERSONAL"}
+	_, err := res.Resolve(e)
+	if err == nil || err.Error() != res.NotMaterializedReason(e) {
+		t.Errorf("Resolve must refuse with exactly the declared reason, got: %v", err)
+	}
+}

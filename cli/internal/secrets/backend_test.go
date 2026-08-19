@@ -59,10 +59,14 @@ version: 1
 secrets:
   - {id: s, plane: app, backend: bw, bw: {item: some-item, field: api-token}, expose: {env: SOME_VAR}}
 `,
+		// Carries a `bw:` block with NO `field` on purpose: that is what the shipped
+		// registry entry looks like, and it parses only because file-authority never
+		// runs checkBwSources. Without it here, the fixture would pass while the real
+		// entry's shape went unexercised.
 		BackendFileAuthority: `
 version: 1
 secrets:
-  - {id: s, plane: floor, backend: file-authority, expose: {file: {var: SOME_KEY, path: "~/.config/age/key.txt", mode: "0600"}}}
+  - {id: s, plane: floor, backend: file-authority, bw: {item: SOME-ITEM}, expose: {file: {var: SOME_KEY, path: "~/.config/age/key.txt", mode: "0600"}}}
 `,
 	}
 

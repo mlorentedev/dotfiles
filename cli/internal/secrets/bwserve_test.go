@@ -38,7 +38,7 @@ func TestBWServeCommand_DefaultsBinToBw(t *testing.T) {
 // covering exactly the endpoints this package calls. Response shapes are
 // copied from the OPS-021 spike's live probes against bw 2026.5.0.
 type fakeBWServe struct {
-	status string // unauthenticated | locked | unlocked
+	status string                     // unauthenticated | locked | unlocked
 	items  map[string]json.RawMessage // id -> full item JSON
 	names  map[string]string          // id -> name, for /list/object/items
 

@@ -56,6 +56,21 @@ type Resolver interface {
 	Resolve(e Entry) ([]byte, error)
 }
 
+// NotMaterialized marks a backend that must never reach a child process, whatever
+// its health check does. It is separate from Verifier on purpose: "answers its own
+// health question" and "must not be handed out" are two different properties that
+// happen to coincide in the one backend that has either today, and EnvFor used the
+// first as a proxy for the second until the round-2 review of OPS-026 pointed out
+// that a future backend implementing Verifier for any other reason would vanish
+// from the secret set in silence. That is this repository's recurring defect —
+// a signal consulted for a question it was not asked — inside the change that
+// exists to fix an instance of it.
+//
+// The reason string is what the refusal says, so the two consumers cannot drift.
+type NotMaterialized interface {
+	NotMaterializedReason(e Entry) string
+}
+
 // Verifier is the optional half of Resolver, for a backend whose health question
 // is not "did it resolve". Loader.Verify prefers it when a resolver implements it
 // and falls back to Resolve otherwise, so the ordinary backends are untouched.
@@ -119,7 +134,7 @@ func (l *Loader) EnvFor(entries []Entry, only map[string]bool) ([]string, error)
 		// explicitly (`--only AGE_KEY_PERSONAL`) falls through to Resolve, which
 		// refuses out loud. Skipping there too would answer an explicit request
 		// with silence, which is the failure mode this repository keeps finding.
-		if _, isVerifier := r.(Verifier); isVerifier && only == nil {
+		if _, never := r.(NotMaterialized); never && only == nil {
 			continue
 		}
 		plaintext, err := r.Resolve(e)
@@ -265,9 +280,13 @@ func stripNewlines(s string) string {
 // and says so here rather than letting a reader assume otherwise.
 type fileAuthorityResolver struct{}
 
-func (fileAuthorityResolver) Resolve(e Entry) ([]byte, error) {
-	return nil, fmt.Errorf("%s is the age root: it is not materialized through this facade, "+
+func (fileAuthorityResolver) NotMaterializedReason(e Entry) string {
+	return fmt.Sprintf("%s is the age root: it is not materialized through this facade, "+
 		"because every other secret is decrypted with it", e.Var)
+}
+
+func (r fileAuthorityResolver) Resolve(e Entry) ([]byte, error) {
+	return nil, errors.New(r.NotMaterializedReason(e))
 }
 
 // VerifyEntry reports the root's health without reading its contents. A missing
@@ -286,8 +305,10 @@ func (fileAuthorityResolver) VerifyEntry(e Entry) error {
 	if err != nil {
 		return fmt.Errorf("stat %s: %w", e.Dest, err)
 	}
-	if fi.IsDir() {
-		return fmt.Errorf("%s is a directory, not a key file", e.Dest)
+	// Not just directories: a FIFO, socket or device node at this path can carry
+	// mode 0600 and pass every other check here, while `age --decrypt` fails on it.
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file (%s)", e.Dest, fi.Mode().Type())
 	}
 	if fi.Size() == 0 {
 		return fmt.Errorf("%s is empty", e.Dest)

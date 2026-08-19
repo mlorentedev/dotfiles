@@ -107,8 +107,10 @@ a live source would be wrong, so the registry entry says so at the point of use.
       the pre-existing 33 entries still report `33 ok, 0 missing, 0 failed`.
 - [ ] AC4 — a wrong-mode file (e.g. `0644`) reports FAILED, observed by mutating the
       mode and seeing the check fail, with the mutation confirmed present first.
-- [ ] AC6 — the resolver-coverage test states in its own text why `file-authority` has
-      no Loader entry, so a future reader cannot mistake the exclusion for an oversight.
+- [ ] AC6 — `file-authority` HAS a Loader entry, and it is a resolver that refuses
+      rather than a missing one, so the coverage binding needs no exemption. The
+      refusal is pinned by a test, because a later change would otherwise "fix" it
+      into resolving.
 - [ ] AC7 — ADR-028's worked example (lines 134-139) is amended to the shape the
       validator accepts, and says why the root cannot be `age-offline`.
 
