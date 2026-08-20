@@ -54,11 +54,30 @@ which is indistinguishable from nobody having looked — and a queue that never
 drains is one nobody reads. The queue re-opens by itself the moment a reviewer
 speaks again, so recording early costs nothing.
 
-**The brief, not a hook.** A `~/.claude` hook would be Claude-only and does not
-run in remote or cloud sessions at all. The session brief is Go, it is the one
-moment every session has in common, and it already serves opencode, agy and
-copilot. Both assembly paths are wired — the agnostic `Brief` and the Claude
-adapter — because a loop that closes in one harness is not closed.
+**Native mechanism where one exists; an instruction floor everywhere else.**
+This follows ADR-032 rather than inventing a posture. Claude has a session-time
+execution surface, so the probe is wired into it — that is the native leg, not a
+Claude-only solution. Both CLI assembly paths carry the section (the agnostic
+`Brief` and the Claude adapter) so no second implementation is needed when
+another harness gains a surface.
+
+But measured 2026-08-20, **nothing invokes `dotf mem session-start --format`**:
+opencode and agy consume static instruction files and expose no session hook. A
+capability with no consumer is the same shape as the reader-with-no-writer this
+spec exists to fix, one layer up. So the floor is an **instruction**, carried by
+the always-injected `pr-stewardship` doctrine: it names `dotf pr triage-queue`
+and the `## Review triage` marker explicitly, and renders through
+`compile-harness.sh` into `AGENTS.md` — the one artifact every harness reads.
+
+For a harness with no session-time execution surface, instruction-level
+determinism is the maximum the platform offers; there is no hook to wire. That
+is ADR-032's "enforcement is presence + dispatch" applied honestly rather than
+claimed. Wiring native hooks per harness is a follow-up leg, one per harness that
+has a surface to wire.
+
+The same render reaches the reviewer for free: `.pr_agent.toml` declares
+`repo_context_files = ["AGENTS.md", ".claude/CLAUDE.md"]`, so PR-Agent reads the
+same doctrine the agents do, from the same SSOT.
 
 **Three states, and the middle one is why this is careful.** *Pending* names the
 PRs. *No reviewer registry* is silent: most repositories do not run this loop,
@@ -87,6 +106,14 @@ reader-with-no-writer gap observed downstream in kubelab closes with it.
       restated, so it keeps one definition and not two.
 - [x] `dotf mem session-start` asks the queue on the agnostic path and the Claude
       adapter both.
+- [x] The checkpoint is stated as doctrine in the vault SSOT and renders through
+      `compile-harness.sh --refresh` into `AGENTS.md` and `ai/claude/CLAUDE.md`,
+      so every harness receives it whether or not it can execute anything at
+      session start — and the PR reviewer receives it too, via
+      `repo_context_files`.
+- [x] The package comment no longer claims consumers the agnostic path does not
+      have, and records the deploy-time staleness constraint for whoever builds
+      the first one.
 - [x] A repository with no reviewer registry renders no section at all.
 - [x] A repository with a registry but no reachable `gh` reports the failure and
       states that it is not an empty queue.
