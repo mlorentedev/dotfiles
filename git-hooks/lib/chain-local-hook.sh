@@ -43,6 +43,27 @@ shift
 
 toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
+# BUG-090: pre-commit's own env-build clones live under its store and must
+# never re-enter this dispatcher. When a hook repo (e.g. pre-commit-hooks)
+# needs its environment built, pre-commit clones it into the store and checks
+# out the pinned rev — an ordinary git checkout, which fires the GLOBAL
+# post-checkout hook same as any other. If that clone carries its own
+# .pre-commit-config.yaml (upstream dogfoods itself), the fallback below would
+# hand it straight back to `pre-commit hook-impl`, re-entering the SAME shared
+# store the outer invocation is already holding locked to build that very
+# environment. Parent waits on the checkout it triggered; child waits on the
+# lock the parent holds. Deadlock, reproduced live: `pre-commit install-hooks`
+# hung indefinitely on a first-time env build, confirmed via the process tree
+# (a nested `hook-impl --hook-type post-checkout` sleeping inside the store
+# clone) with no unrelated cause (no leaked GIT_DIR/GIT_INDEX_FILE in its
+# environ). These clones are not user repos; their gates must never run here,
+# the same reasoning BUG-036 already applies to pre-commit's OWN config.
+# Store path per pre-commit's own Store.get_default_directory().
+precommit_store="${PRE_COMMIT_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/pre-commit}"
+case "$toplevel" in
+    "$precommit_store"/*) exit 0 ;;
+esac
+
 # Hooks are shared repo state, not per-worktree state: git keeps them in the
 # COMMON git dir. In a linked worktree — and under --separate-git-dir —
 # $toplevel/.git is a `gitdir:` pointer FILE, not a directory, so assuming that

@@ -1,10 +1,12 @@
 ---
 id: "IDEAS-006-ai-topical-discovery"
 type: spec
-status: draft
+status: abandoned
 created: "2026-05-25"
 tags: [spec, proposal, ideas-006, ai, setup, refactor, dotfiles-survey, tier-3]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned in owner triage 2026-08-20. Never started, and the spec declines itself: its own Why section records that research/dotfiles-survey.md rated this Tier-3 (filosofico) and recommended NOT pursuing the full refactor. Cold since 2026-05-26."
 ---
 
 # IDEAS-006: Topical discovery for `ai/<agent>/`

@@ -3,6 +3,7 @@ id: "MEMORY-001-mirror"
 type: spec
 status: draft # draft | implementing | verifying | archived
 created: "2026-05-27"
+issue: "mlorentedev/dotfiles#1092"
 tags: [spec, proposal]
 template_version: "1.0"
 ---
