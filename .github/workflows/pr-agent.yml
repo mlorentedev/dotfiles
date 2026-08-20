@@ -179,8 +179,9 @@ jobs:
           # `describe` REWRITES the PR body. The bodies in this repo carry
           # hand-written measurement tables, merge orders and before/after
           # evidence — the part worth reading — and a model rewriting them
-          # destroys exactly that. Also removes one of the three inference calls
-          # per PR. Turned off as a decision, not left off by accident.
+          # destroys exactly that. Turned off as a decision, not left off by
+          # accident. With auto_improve also off (#1107), `review` is the only
+          # pass that still runs unasked — one inference call per event.
           github_action_config.auto_describe: "false"
           github_action_config.auto_review: "true"
           # OFF, to halve the inference this workflow demands per PR (#1107).

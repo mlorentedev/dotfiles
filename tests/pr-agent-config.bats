@@ -44,8 +44,16 @@ refute_grep() {
     # Safe because GUARD-002 exists: a failed review shows as `declined` and the
     # PR goes red, so absence is loud. A cheap fallback would trade a loud
     # absence for a quiet rubber stamp.
-    grep -qE '^fallback_models = \[\]' "$CFG"
-    refute_grep '^fallback_models = \[[^]]' "$CFG"
+    #
+    # This asserted an EMPTY list until #1107, and that assertion has been
+    # narrowed rather than deleted. The empty list was never the point; not
+    # falling back to a model the pool excludes was. #1107 measured a per-model
+    # concurrency limit (8 concurrent to deepseek -> 5x200 + 3x429, while mimo
+    # answered 200 during that saturation), which makes a same-tier second NaN
+    # model a genuine fallback rather than a cheaper one. What must stay
+    # impossible is naming one of the excluded models here.
+    refute_grep 'fallback_models = \[[^]]*qwen3\.6' "$CFG"
+    refute_grep 'fallback_models = \[[^]]*gemma4' "$CFG"
 }
 
 @test "pr-agent: the reviewing model is the one measured, not the fast one" {
@@ -394,6 +402,40 @@ if has_ignored != has_sig:
 if not has_ignored or not has_sig:
     print('expected the workflow branch exclusion and the 3-file signature to be declared')
     sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# #1107: the fallback exists to dodge a PER-MODEL concurrency limit (measured:
+# 8 concurrent to deepseek gives 5x200 + 3x429, while mimo answers 200 during
+# that saturation). A fallback on the SAME model, or an empty list, does not
+# solve what this was added for.
+@test "pr-agent: the fallback is a second NaN model, not the primary again" {
+    run python3 -c "
+import tomllib, sys
+cfg = tomllib.load(open('$CFG', 'rb'))['config']
+fb = cfg.get('fallback_models', [])
+primary = cfg.get('model')
+if not fb:
+    print('fallback_models is empty: a saturated primary leaves no reviewer (#1107)'); sys.exit(1)
+if primary in fb:
+    print('the fallback repeats the primary, so it shares its concurrency bucket'); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# The pool excludes the latency-optimised daily models BY NAME because "a
+# reviewer that PASSes cheaply is worse than no gate". A fallback naming one of
+# them would put two files in this repo holding opposite policies — the
+# contradiction review-attestation.json already flags on #786.
+@test "pr-agent: the fallback is not a model the reviewer pool excludes by name" {
+    run python3 -c "
+import tomllib, json, sys
+fb = tomllib.load(open('$CFG', 'rb'))['config'].get('fallback_models', [])
+pool = open('$REPO/harness/reviewer-pool.json').read()
+bad = [m for m in fb if m.split('/')[-1] in ('qwen3.6', 'gemma4')]
+if bad:
+    print('fallback names a model the pool excludes by name: ' + repr(bad)); sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
