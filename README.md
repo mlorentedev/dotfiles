@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.s
 Override the clone target with `DOTFILES_DIR` or the upstream URL with `DOTFILES_REPO`:
 
 ```bash
-DOTFILES_DIR=/tmp/df curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | DOTFILES_DIR=/tmp/df bash
 ```
 
 Or **manually**:
