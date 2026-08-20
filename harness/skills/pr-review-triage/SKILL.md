@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 1c678b768344f2fc
+generated_sha: 3d91cddcae99ac9e
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -94,7 +94,9 @@ Three outcomes, and only one means "no findings":
 
 Note the asymmetry: some checks are configured to comment, others only to set a check status. Anything that never comments is triaged in step 2, not here — an empty comment list is not evidence that nothing scanned the change.
 
-**Stop here when there is nothing to dispose of.** Green checks and no comments — or only status notices, or only remarks with no bearing on the change — is the common case, and it ends in one line: *"CI green, no review findings."* Do not manufacture a table for an empty review, do not reply to noise, and do not invent work to look thorough. The steps below exist for when a review actually said something.
+**Skip to step 7 when there is nothing to dispose of.** Green checks and no comments — or only status notices, or only remarks with no bearing on the change — is the common case, and for the human in front of you it ends in one line: *"CI green, no review findings."* Do not manufacture findings for an empty review, do not reply to noise, and do not invent work to look thorough. Steps 4 to 6 exist for when a review actually said something.
+
+You still record the outcome on the PR. **"Nothing to dispose of" is a disposition**, and step 7 says why it has to be written down rather than said: an unrecorded empty triage leaves the PR in the queue permanently, which is indistinguishable from nobody having looked.
 
 ### 4. Read every comment, including the resolved-looking ones
 
@@ -132,7 +134,31 @@ Print one row per comment with its proposed disposition and reason, and **wait f
 
 After confirmation: apply the accepted ones as commits, file the deferred ones as tickets, reply to the skipped ones with the reason. Then say what you did, with the ticket numbers.
 
-### 7. Never
+### 7. Record the disposition on the PR — always, including the empty case
+
+A disposition that lives only in this conversation evaporates when the session ends, and the Definition of Done's **Review** item then rests on a claim nobody can check. Post the table as a comment on the PR, under this exact heading:
+
+```markdown
+## Review triage
+
+| Item | Disposition | Reason |
+|---|---|---|
+| #12 `src/deploy.sh:44` | apply | the guard misses the CRLF case, real defect |
+| #13 `tests/foo.bats:8` | defer | valid, but a second behaviour → filed as #NNN |
+| #14 `README.md:2` | skip | suggests a convention ADR-012 decided against |
+
+Reviewer output dispositioned: <reviewer login>, <timestamp of their newest comment>.
+```
+
+```bash
+gh pr comment <N> --repo <owner>/<repo> --body-file <file>
+```
+
+**The heading is a contract, not a formatting choice.** `dotf pr triage-queue` reads it back to decide whether a PR is still pending: a PR is pending when its newest reviewer output is newer than its newest triage record. The string is declared once, in `harness/review-attestation.json` under `triage.marker` — this skill writes it and the queue reads it. Match it exactly, at the start of a line.
+
+**Record the empty case too.** *"CI green, no review findings"* is a disposition and it must be written down like any other — one row saying so is enough. Skipping it because there was nothing to apply leaves the PR in the queue forever, and a queue that never drains is one nobody reads. The queue re-opens by itself the moment a reviewer speaks again, so recording early costs nothing.
+
+### 8. Never
 
 - **Never merge.** Merging is a supervised human action, and auto-merge is forbidden in every repository. This skill ends at a triaged PR, never at a merged one.
 - **Never apply in bulk without reading.** Accepting a whole review because it is long is the same failure as ignoring it.
@@ -141,6 +167,8 @@ After confirmation: apply the accepted ones as commits, file the deferred ones a
 ## Output
 
 One line when there was nothing to dispose of. Otherwise: the disposition table, the actions taken after confirmation, and the ticket numbers for everything deferred. If CI was red, the failing check and what you did about it.
+
+Either way the `## Review triage` comment lands on the PR (step 7). The conversation output is for the human in front of you; the comment is what survives the session and what the queue reads.
 
 ## Pairs with
 
