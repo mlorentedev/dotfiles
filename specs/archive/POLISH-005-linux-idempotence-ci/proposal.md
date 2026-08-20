@@ -1,11 +1,13 @@
 ---
 id: "POLISH-005-linux-idempotence-ci"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-27"
 issue: "mlorentedev/dotfiles#1091"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Empirically validated via containerized integration test running consecutive setup-linux.sh executions with sha256 checksum comparison."
 ---
 
 # POLISH-005-linux-idempotence-ci

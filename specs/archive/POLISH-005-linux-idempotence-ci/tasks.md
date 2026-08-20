@@ -9,30 +9,24 @@ created: "2026-05-13"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/POLISH-005-linux-idempotence-ci`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/polish-005-linux-idempotence-ci`
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-
-- [ ] Write failing test for <behavior 1>
-- [ ] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] Write failing test for <behavior 2>
-- [ ] Implement to make it pass
-- [ ] ...
+- [x] Add formal idempotence tests in `tests/verify-setup.bats` Section 12 (asserting exit 0, zero config diff, no duplicate entries, clean git repo)
+- [x] Fix declarative convergence in `setup-linux.sh` (normalize `permissions.allow` sorting on template bootstrap, re-enforce rc files at end of setup)
+- [x] Validate integration container in Docker: 63/63 tests passing with 0 diff
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 

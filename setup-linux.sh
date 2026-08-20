@@ -1246,7 +1246,8 @@ merge_claude_settings() {
     local template_substituted
     template_substituted=$(jq --arg cmd "$hook_command" --arg endcmd "$session_end_command" \
         '(.hooks.SessionStart[0].hooks[0].command) = $cmd
-         | (.hooks.SessionEnd[0].hooks[0].command) = $endcmd' \
+         | (.hooks.SessionEnd[0].hooks[0].command) = $endcmd
+         | .permissions.allow = (.permissions.allow | unique)' \
         "$template_path" 2>/dev/null)
     if [ -z "$template_substituted" ]; then
         log_warning "Claude settings template substitution failed, skipping merge"
@@ -1482,6 +1483,11 @@ if command -v dotf >/dev/null 2>&1; then
         log_warning "dotf env generate failed (profiles fall back to inline defaults)"
     fi
 fi
+
+# Re-enforce main dotfiles at the end of setup to overwrite any third-party installer mutations.
+deploy_file "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
+[ -f "$DOTFILES_DIR/.bashrc" ] && deploy_file "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
+[ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
 
 # Final assertion against env-contract.json -- catches drift between what
 # setup just deployed and what's actually in place / on PATH / in env vars.
