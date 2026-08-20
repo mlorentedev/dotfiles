@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 3d91cddcae99ac9e
+generated_sha: ac110dd5b55e6992
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -157,6 +157,8 @@ gh pr comment <N> --repo <owner>/<repo> --body-file <file>
 **The heading is a contract, not a formatting choice.** `dotf pr triage-queue` reads it back to decide whether a PR is still pending: a PR is pending when its newest reviewer output is newer than its newest triage record. The string is declared once, in `harness/review-attestation.json` under `triage.marker` — this skill writes it and the queue reads it. Match it exactly, at the start of a line.
 
 **Record the empty case too.** *"CI green, no review findings"* is a disposition and it must be written down like any other — one row saying so is enough. Skipping it because there was nothing to apply leaves the PR in the queue forever, and a queue that never drains is one nobody reads. The queue re-opens by itself the moment a reviewer speaks again, so recording early costs nothing.
+
+**Edit an existing table when re-triaging.** If a `## Review triage` comment already exists from this session, edit it (using `gh pr comment <N> --edit-last` or by comment ID) rather than posting a second identical table, avoiding duplicate comment noise on the PR.
 
 ### 8. Never
 

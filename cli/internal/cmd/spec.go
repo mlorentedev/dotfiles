@@ -203,7 +203,7 @@ is the only record of how.`,
 				if err := runCommand(repoRoot, launch); err != nil {
 					return fmt.Errorf("starting the tmux session: %w", err)
 				}
-				if err := confirmLaunched(session, transcript); err != nil {
+				if err := confirmLaunched(session, transcript, id, chosen, entries); err != nil {
 					return err
 				}
 				cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
@@ -278,7 +278,7 @@ var transcriptSink = func(transcript string) []string {
 // fail; it does NOT promise the run will finish. A death at minute three is
 // inherently unwatched in detached mode, and `spec archive` refusing without a
 // review.md stays the backstop for that.
-func confirmLaunched(session, transcript string) error {
+func confirmLaunched(session, transcript, specID string, current spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
 	const (
 		window = 3 * time.Second        // ~6x the slowest observed startup failure
 		step   = 250 * time.Millisecond // cheap enough to poll, coarse enough not to spin
@@ -288,9 +288,16 @@ func confirmLaunched(session, transcript string) error {
 		if sessionAlive(session) {
 			continue
 		}
+		var nextAdvice string
+		for _, e := range entries {
+			if e.ID != current.ID {
+				nextAdvice = fmt.Sprintf("\nOr try another pool member (e.g. if saturated):\n    dotf spec review %s --reviewer %s", specID, e.ID)
+				break
+			}
+		}
 		return fmt.Errorf("the review died on startup — tmux session %q is already gone.\n%s\n"+
-			"Nothing was reviewed and %s was not written; re-run with --foreground to watch it fail live",
-			session, reviewerLastWords(transcript), spec.ReviewFile)
+			"Nothing was reviewed and %s was not written; re-run with --foreground to watch it fail live.%s",
+			session, reviewerLastWords(transcript), spec.ReviewFile, nextAdvice)
 	}
 	return nil
 }
