@@ -1,11 +1,13 @@
 ---
 id: "IDEAS-005-curl-bootstrap"
 type: spec
-status: draft
+status: archived
 created: "2026-05-25"
 issue: "mlorentedev/dotfiles#1094"
 tags: [spec, proposal, ideas-005, bootstrap, dotfiles-survey, tier-2]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Empirically verified by unit test suite tests/install-bootstrap.bats covering 8 tests across all failure/success modes, syntax validation, and shellcheck."
 ---
 
 # IDEAS-005: One-liner curl bootstrap
@@ -109,3 +111,5 @@ Adding (not in template, load-bearing here):
 ## LOC estimate
 
 ~40 LOC `install.sh` + ~50 LOC bats + ~30 LOC README diff = **~120 LOC total**. Above the 50-LOC threshold; full SDD discipline applies.
+
+<!-- archived 2026-08-20 — PR: https://github.com/mlorentedev/dotfiles/pull/1108 -->
