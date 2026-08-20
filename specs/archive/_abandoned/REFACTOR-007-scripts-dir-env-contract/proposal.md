@@ -1,10 +1,12 @@
 ---
 id: "REFACTOR-007-scripts-dir-env-contract"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned in owner triage 2026-08-20. The spec required an (a)/(b) decision on the cross-OS SCRIPTS_DIR contract that was never taken, and no env-contract.json was ever created. The underlying path-resolution problem was solved by another route: ADR-025 shipped dotf env, which resolves per-machine paths without this contract."
 ---
 
 # REFACTOR-007-scripts-dir-env-contract
