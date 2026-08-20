@@ -1,11 +1,13 @@
 ---
 id: "CLI-034-spec-archive-review-gate"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-09"
 issue: "mlorentedev/dotfiles#875"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Work shipped and merged under #875; the issue was then closed by hand, so the archive-on-merge gate (keyed on a PR closing keyword) never saw it and the spec was left active. A retroactive adversarial review cannot gate code already on main, so the waiver is recorded instead of manufacturing one. Backlog reconciliation 2026-08-19."
 ---
 
 # CLI-034: Spec archive review gate
