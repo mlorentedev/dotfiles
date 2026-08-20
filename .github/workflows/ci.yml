@@ -14,13 +14,53 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      powershell: ${{ steps.filter.outputs.powershell }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'cli/**'
+              - 'scripts/**'
+              - 'powershell/**'
+              - 'windows/**'
+              - 'setup-linux.sh'
+              - 'setup-windows.ps1'
+              - 'tests/**'
+              - '.github/**'
+              - 'git-hooks/**'
+              - 'harness/**'
+              - 'versions.conf'
+              - 'packages.json'
+              - 'mcp-servers.json'
+              - '.PSScriptAnalyzerSettings.psd1'
+              - '.golangci.yml'
+              - '.pre-commit-config.yaml'
+            powershell:
+              - '**/*.ps1'
+              - '**/*.psm1'
+              - '.PSScriptAnalyzerSettings.psd1'
+              - '.github/workflows/ci.yml'
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [changes]
     steps:
       - uses: actions/checkout@v7
 
       - name: Validate shell scripts syntax
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           for script in scripts/*.sh setup-linux.sh; do
             echo "Checking $script..."
@@ -28,35 +68,42 @@ jobs:
           done
 
       - name: Check for shellcheck issues (scripts/)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: './scripts'
           severity: error
 
       - name: Check for shellcheck issues (root scripts)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           shellcheck --severity=error setup-linux.sh
 
       - name: Verify skill records render cleanly, offline (SDD-008)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           ./scripts/compile-harness.sh --check
 
       - name: Lint bats @test names (no silent-skipped tests)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           ./scripts/check-bats-names.sh tests/
 
   lint-powershell:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [changes]
     steps:
       - uses: actions/checkout@v7
 
       - name: Install PSScriptAnalyzer
+        if: github.event_name == 'push' || needs.changes.outputs.powershell == 'true'
         shell: pwsh
         run: |
           Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
 
       - name: Run PSScriptAnalyzer
+        if: github.event_name == 'push' || needs.changes.outputs.powershell == 'true'
         shell: pwsh
         run: |
           $files = Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1 |
@@ -81,87 +128,36 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 12 # the bats suite runs in ~3 min; a ceiling, not a budget
+    needs: [changes]
     steps:
       - uses: actions/checkout@v7
 
-      # age comes from the pinned release, not apt — the same reasoning the
-      # Windows job below already applies (BUG-025), arrived at here for a second
-      # reason as well.
-      #
-      # 1. It did not honour the pin. versions.conf says AGE_VERSION=1.3.1;
-      #    `apt-get install age` on ubuntu-24.04 gives 1.1.1, so the Linux suite
-      #    had never once exercised the version this repo declares — for the tool
-      #    that decrypts every secret. Windows tested 1.3.1 and Linux tested
-      #    1.1.1, from one line of the same manifest.
-      # 2. It was slow and getting slower, because it depends on an Ubuntu
-      #    mirror's throughput on the day. Measured 2026-08-18 on one PR: the
-      #    step took 10s, then 66s, then over three minutes on consecutive runs.
-      #    `Fetched 6615 kB in 39s (168 kB/s)` — the packages, not the work.
-      #    GitHub's release CDN is not that mirror.
-      #
-      # zsh still needs apt (not present on the runner image), so `update` stays
-      # for it — but it no longer gates the tool the secrets tests depend on.
       - name: Install age (pinned release — honours AGE_VERSION, as Windows does)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
-          # `. ./versions.conf`, never `. versions.conf`: a slashless argument to
-          # the source builtin is searched on $PATH only. bash falls back to the
-          # cwd and zsh does not, so the bare form silently yields an empty
-          # version and installs `@v`. Prohibited-pattern table, .claude/CLAUDE.md.
           . ./versions.conf
           [ -n "${AGE_VERSION:-}" ] || { echo "AGE_VERSION missing from versions.conf" >&2; exit 1; }
           url="https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
           curl -fsSL "$url" | tar xz
           sudo install -m0755 age/age age/age-keygen /usr/local/bin/
           rm -rf age
-          # Fail loudly here if the pin and the binary disagree, rather than
-          # letting the suite report on a version nobody asked for. This is the
-          # assertion whose absence let 1.1.1 run for months.
-          # Compare with a leading `v` stripped from BOTH sides: age prints
-          # `v1.3.1` but 1.2.1 printed `1.2.1`, so pinning the prefix would turn
-          # a correct install red the next time upstream changes its mind about
-          # it. The version is the claim; the `v` is punctuation.
           got="$(age --version | sed 's/^v//')"
           [ "$got" = "${AGE_VERSION#v}" ] || { echo "age is $got, expected ${AGE_VERSION#v}" >&2; exit 1; }
           age-keygen --version >/dev/null
 
       - name: Install zsh
-        # Bounded on purpose. The Azure Ubuntu mirror intermittently stops
-        # answering — visible in the log as `Ign: http://azure.archive.ubuntu.com`
-        # — and an unbounded `apt-get update` then sits in silence until a human
-        # notices and cancels the run. Measured 2026-08-19 on run 32223603170:
-        # last output 06:30:08, cancelled by hand at 06:38:22. Eight minutes of
-        # nothing, and it had happened before.
-        #
-        # These options do not make the mirror work. They make its failure LOUD
-        # and quick — roughly 45s and a real error — instead of a hang that looks
-        # identical to slow progress.
-        #
-        # The step carries its own ceiling, and that is the load-bearing part. The
-        # first attempt at this bounded apt with apt's OWN options and still hung
-        # for 16 minutes: `Acquire::http::Timeout` is per-SCHEME and does not cover
-        # https, while the mirror it actually stalls on is
-        # `https://archive.ubuntu.com`. Bounding the step needs no knowledge of
-        # apt's option surface at all — it ends whatever apt is doing, whichever
-        # transport it is doing it over.
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         timeout-minutes: 5
         run: |
           set -euo pipefail
 
           apt_opts='-o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15'
 
-          # Try the install WITHOUT touching the network first. The runner image
-          # ships apt lists, so on a good day zsh installs from them and the
-          # mirror never enters the picture. This is the cheapest possible way to
-          # not depend on a service we do not own.
           if sudo apt-get install -y --no-install-recommends zsh; then
               echo "zsh installed from the image's package lists; no mirror needed"
               exit 0
           fi
 
-          # Only if that failed do we refresh, and then with bounded retries: the
-          # Ubuntu mirrors go unreachable often enough to have cost this repo two
-          # cancelled runs and a 16-minute hang on 2026-08-19. A single attempt
-          # against a flaky remote is a coin toss reported as a code failure.
           for attempt in 1 2 3; do
               echo "apt-get update, attempt ${attempt}/3"
               # shellcheck disable=SC2086  # apt_opts is a deliberate word-split list
@@ -173,27 +169,20 @@ jobs:
 
           sudo apt-get install -y --no-install-recommends zsh
 
-      # tests/knowledge-crystallize-go-parity.bats proves `dotf vault crystallize`
-      # is byte-identical to the shell oracle on the golden corpus (CLI-021). It
-      # SKIPS when the Go toolchain is absent, and a skipped parity check is a
-      # green suite that proves nothing -- the same shape as BUG-055 and #807. The
-      # runner's preinstalled Go is not pinned to cli/go.mod, so set it up here.
       - uses: actions/setup-go@v7
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
 
-      # tests/precommit-fallback-real.bats runs the REAL pre-commit through a real
-      # `git commit` (BUG-055). It skips when the binary is absent, so without this
-      # step the one check that exercises upstream's actual behaviour would skip
-      # here and the suite would go green on the stubbed cases alone -- which is
-      # exactly how BUG-055 shipped.
       - name: Install pre-commit
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           pipx install pre-commit || pip install --user pre-commit
           pre-commit --version
 
       - name: Install bats-core
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           source versions.conf
           curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
@@ -203,6 +192,7 @@ jobs:
           bats --version
 
       - name: Setup mock environment
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           mkdir -p ~/.dotfiles/sensitive ~/.dotfiles/scripts ~/.config/age
           age-keygen -o ~/.config/age/key.txt 2>/dev/null
@@ -215,43 +205,22 @@ jobs:
           ln -sf ~/.dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
 
       - name: Run bats test suite
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         env:
-          # tests/spec-gate-pr-real.bats drives the REAL `gh`, and an
-          # unauthenticated gh exits at the auth check before it validates
-          # --json field names -- so without a token that suite would assert
-          # nothing and still go green. Deliberately NOT named GH_TOKEN: only
-          # that suite reads this, so no other suite's auth state changes and
-          # none of them can start making real API calls. It buys no API access
-          # either -- with a token present, field validation and repo resolution
-          # both resolve offline. Same intent as the setup-go and pre-commit
-          # steps above: make sure the real-dependency checks cannot skip here.
           DOTF_TEST_GH_TOKEN: ${{ github.token }}
         run: |
           bats tests/*.bats
 
-  # WIN-004 (#125): execute the Windows deployment end-to-end. Every
-  # Windows-only bug since SDD-002 (BUG-005/020/021/022) escaped the
-  # ubuntu-only CI because PSScriptAnalyzer is static analysis, not execution.
-  # PR-only: windows-latest minutes bill 2x Linux (proposal R4).
-  # Sandbox strategy: re-encrypt the one secret consumed by {env:} tokens with
-  # a throwaway age key so the SDD-009 substitution path runs for real, and
-  # mock only the vault surface that setup-windows.ps1's auto-memory junction
-  # and obsidian-CLI paths consume.
   test-windows:
     runs-on: windows-latest
     if: github.event_name == 'pull_request'
     timeout-minutes: 30
+    needs: [changes]
     steps:
       - uses: actions/checkout@v7
 
-      # Deterministic age install. `choco install age.portable` reported success
-      # but intermittently left age-keygen unresolvable on PATH in the next step
-      # (chocolatey shim/PATH propagation flake), false-reddening unrelated PRs
-      # (BUG-025; sibling of the eza flake BUG-024/#414). Fetch the pinned
-      # official release instead, wire it onto PATH explicitly, and verify both
-      # binaries resolve here so a layout change fails loudly at install time —
-      # not as a cryptic "age-keygen not recognized" downstream.
       - name: Install age (deterministic release + registry PATH — BUG-025)
+        if: needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
@@ -263,49 +232,33 @@ jobs:
           Expand-Archive -Path age.zip -DestinationPath $dest -Force
           $ageDir = Join-Path $dest 'age'
           Add-Content $env:GITHUB_PATH $ageDir
-          # setup-windows.ps1 rebuilds $env:PATH from the Machine+User registry
-          # (dropping process-level $GITHUB_PATH additions), so age must ALSO live
-          # on the registry PATH or load-secrets.ps1 silently returns without
-          # exporting NAN_API_KEY — leaving pi's models.json {env:...} placeholder
-          # unresolved at deploy time. choco's age went onto the Machine PATH and
-          # survived that rebuild; this restores the property via the User PATH.
           $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
           if ($userPath -notlike "*$ageDir*") {
             [Environment]::SetEnvironmentVariable('PATH', "$userPath;$ageDir", 'User')
           }
-          # Guard the guard: fail here if the binaries are not where we expect.
           & (Join-Path $ageDir 'age.exe') --version
           & (Join-Path $ageDir 'age-keygen.exe') --version
 
       - name: Sandbox secrets + minimal vault
+        if: needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\age" | Out-Null
           age-keygen -o "$env:USERPROFILE\.config\age\key.txt"
           $pub = (Select-String "$env:USERPROFILE\.config\age\key.txt" -Pattern 'age1[0-9a-z]+').Matches.Value | Select-Object -First 1
           'ci-dummy-nan-key' | age -r $pub -o sensitive\nan.api-key.secret.age
-          # Minimal vault tree so setup-windows.ps1's "Deploy auto-memory
-          # junctions from vault" block (gated on Test-Path $VaultRoot) is
-          # exercised end-to-end on the runner.
           $vault = "$env:USERPROFILE\Projects\knowledge"
           foreach ($d in '00_meta', '10_projects', '40_resources', '.obsidian') {
             New-Item -ItemType Directory -Force (Join-Path $vault $d) | Out-Null
           }
           '{}' | Set-Content (Join-Path $vault '.obsidian\types.json') -Encoding UTF8
-          # Stub obsidian CLI so setup-windows.ps1's Get-Command obsidian check
-          # takes the "already installed" path instead of an npm global install.
           $stub = "$env:USERPROFILE\ci-stub-bin"
           New-Item -ItemType Directory -Force $stub | Out-Null
           Set-Content (Join-Path $stub 'obsidian.cmd') '@echo off'
           Add-Content $env:GITHUB_PATH $stub
 
-      # Deliberately Windows PowerShell 5.1 so the BUG-005 pwsh re-exec path
-      # is exercised in CI, not just direct-pwsh invocation (proposal R2).
-      # Both vars point at the checkout: `dotf secrets render` derives the
-      # registry path from DOTFILES_DIR, and the BUG-021 pre-export
-      # derives the repo root from DOTFILES_REPO_DIR -- its default assumes
-      # ~\Projects\dotfiles, which does not exist on a runner.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
+        if: needs.changes.outputs.code == 'true'
         shell: powershell
         env:
           DOTFILES_DIR: ${{ github.workspace }}
@@ -313,6 +266,7 @@ jobs:
         run: .\setup-windows.ps1
 
       - name: Run Pester suites
+        if: needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
@@ -320,6 +274,7 @@ jobs:
           Invoke-Pester -Path tests -CI
 
       - name: Run PowerShell bats subset (Git Bash, pinned bats)
+        if: needs.changes.outputs.code == 'true'
         shell: bash
         run: |
           source versions.conf
@@ -336,17 +291,19 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [lint]
+    needs: [changes, lint]
     steps:
       - uses: actions/checkout@v7
 
       - name: Extract BATS_VERSION from versions.conf
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         id: versions
         run: |
           source versions.conf
           echo "BATS_VERSION=$BATS_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build integration test container
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           docker build \
             --build-arg BATS_VERSION=${{ steps.versions.outputs.BATS_VERSION }} \
@@ -354,5 +311,6 @@ jobs:
             -t dotfiles-integration-test .
 
       - name: Run integration tests
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           docker run --rm dotfiles-integration-test
