@@ -1,10 +1,12 @@
 ---
 id: "AI-022-hive-daemon-activation"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-06-03"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Verified shipped 2026-08-19, all five acceptance criteria met against the live system: mcp-servers.json registers hive as `hive client` (the daemon proxy); both setup scripts migrate a stale `uvx hive-vault` entry; setup installs the supervised service gated on hive-vault >= 1.32.0 (systemd --user on Linux, Scheduled Task on Windows) and degrades non-fatally to the stdio fallback below that version; hive.service is loaded/active/running with hive-upgrade.timer armed. The spec carried no declared issue, so no closing keyword ever reached the archive-on-merge gate."
 ---
 
 # AI-022-hive-daemon-activation
