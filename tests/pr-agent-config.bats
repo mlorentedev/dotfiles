@@ -355,14 +355,28 @@ sys.exit(0 if 1 <= t <= 8 else 1)
 # removed — which is exactly what happened when this was first written: deleting
 # the reviewer exclusion broke nothing.
 @test "pr-agent: excluding release PRs from review is paired with a gate exemption" {
+    # The exclusion lives in the workflow's job-level `if`, NOT in .pr_agent.toml's
+    # ignore_pr_source_branches. That key is applied on upstream's webhook path and
+    # is inert for the Action entrypoint, so it read like a decision and asserted
+    # nothing (#1073, measured on #1085 — a release-please-- head ref that carried
+    # a "## PR Reviewer Guide" comment anyway). Only a gate the reviewed tool
+    # cannot ignore is worth pairing against.
+    #
+    # Detected with grep rather than inside the python below, because the pattern
+    # carries both quote characters and embedding it in a double-quoted heredoc
+    # mangles them.
+    local has_exclusion=no
+    if grep -q "startsWith(github.event.pull_request.head.ref, 'release-please--')" \
+        "$REPO/.github/workflows/pr-agent.yml"; then
+        has_exclusion=yes
+    fi
+
     run python3 -c "
-import json, sys, tomllib
-cfg = tomllib.load(open('$CFG', 'rb'))['config']
-ignored = cfg.get('ignore_pr_source_branches', [])
+import json, sys
 reg = json.load(open('$REPO/harness/review-attestation.json'))
 exempt = reg.get('exempt', {}).get('signatures', [])
 
-has_ignored = '^release-please--' in ignored
+has_ignored = '$has_exclusion' == 'yes'
 rp_sig = next((s for s in exempt if s.get('name') == 'release-please'), None)
 expected_files = {'.release-please-manifest.json', 'CHANGELOG.md', 'versions.conf'}
 has_sig = rp_sig is not None and set(rp_sig.get('files', [])) == expected_files
@@ -370,15 +384,15 @@ has_sig = rp_sig is not None and set(rp_sig.get('files', [])) == expected_files
 if has_ignored != has_sig:
     if has_ignored:
         print('the reviewer skips release PRs the gate still demands a review for:')
-        print('  ignore_pr_source_branches = ' + repr(ignored))
+        print('  the workflow if: excludes release-please-- head refs')
         print('  no release-please signature in the registry -> those PRs can never go green')
     else:
         print('the gate exempts release PRs the reviewer still reviews:')
         print('  exempt.signatures = ' + repr([s.get('name') for s in exempt]))
-        print('  ignore_pr_source_branches missing ^release-please--')
+        print('  the workflow if: does not exclude release-please-- head refs')
     sys.exit(1)
 if not has_ignored or not has_sig:
-    print('expected release-please branch pattern and 3-file signature to be declared')
+    print('expected the workflow branch exclusion and the 3-file signature to be declared')
     sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }

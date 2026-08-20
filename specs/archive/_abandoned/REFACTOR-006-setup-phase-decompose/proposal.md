@@ -1,10 +1,12 @@
 ---
 id: "REFACTOR-006-setup-phase-decompose"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned in owner triage 2026-08-20. Never started: setup-linux.sh has zero phase functions and the tasks.md still holds the untouched template placeholders. Cold since 2026-06-10."
 ---
 
 # REFACTOR-006-setup-phase-decompose

@@ -19,7 +19,7 @@
 
 ## Model Tier (per AGENTS.md "Model Selection")
 
-- **Top / Mid / Low:** TBD — concrete identifiers pending AI-017 / AI-018 audits on Windows. Follow AGENTS.md tier semantics and default to CLI v2 preset.
+- **Top:** `gpt-5.6-terra` / `gpt-5.6` / `claude-3.7-sonnet` (deep reasoning / architecture) | **Mid:** `gpt-5.6-sol` / `gpt-5` (default / implementation / tests) | **Low:** `gpt-5.6-luna` / `o3-mini` (syntax / quick transforms).
 
 ## Skills
 

@@ -1,10 +1,13 @@
 ---
 id: "IDEAS-002-shell-functions"
 type: spec
-status: implementing
+status: archived
 created: "2026-05-25"
+issue: "mlorentedev/dotfiles#1093"
 tags: [spec, proposal, ideas-002, shell, dotfiles-survey, tier-1]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Verified shipped and battle-tested across 18 Bats unit tests and daily use in .zsh/functions.sh."
 ---
 
 # IDEAS-002: Swiss-army shell functions

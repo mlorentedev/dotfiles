@@ -3,6 +3,7 @@ id: "POLISH-005-linux-idempotence-ci"
 type: spec
 status: draft # draft | implementing | verifying | archived
 created: "2026-05-27"
+issue: "mlorentedev/dotfiles#1091"
 tags: [spec, proposal]
 template_version: "1.0"
 ---

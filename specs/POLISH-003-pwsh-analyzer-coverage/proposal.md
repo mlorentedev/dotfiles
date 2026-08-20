@@ -1,8 +1,9 @@
 ---
 id: "POLISH-003-pwsh-analyzer-coverage"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing
 created: "2026-05-27"
+issue: "mlorentedev/dotfiles#1090"
 tags: [spec, proposal]
 template_version: "1.0"
 ---

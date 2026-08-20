@@ -1,10 +1,12 @@
 ---
 id: "AI-010-ollama-native"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned in owner triage 2026-08-20. Never started, and the premise lapsed: ollama is not installed on the machine and the local-inference need is served by the NaN cluster instead. Cold since 2026-05-27."
 ---
 
 # AI-010-ollama-native
