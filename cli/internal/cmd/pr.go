@@ -53,16 +53,17 @@ computed must not read as an empty one. The message says which.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			pending, err := prtriage.Fetch(c.Context(), repo, registry)
+			reg, err := prtriage.LoadRegistry(registry)
 			if err != nil {
 				c.PrintErrln("pr triage-queue:", err)
 				return err
 			}
-			marker, err := prtriage.Marker(registry)
+			pending, err := prtriage.FetchWithRegistry(c.Context(), repo, reg)
 			if err != nil {
 				c.PrintErrln("pr triage-queue:", err)
 				return err
 			}
+			marker := reg.Triage.Marker
 			if len(pending) == 0 {
 				_, _ = fmt.Fprintln(c.OutOrStdout(), "[OK] no reviewer output is awaiting a disposition")
 				return nil

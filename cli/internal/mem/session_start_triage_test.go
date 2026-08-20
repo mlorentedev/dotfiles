@@ -77,6 +77,12 @@ func TestBriefSkipsTriageWhenProbeIsNil(t *testing.T) {
 	if got := Brief(opts); !strings.Contains(got, "[pr-triage]") {
 		t.Fatalf("a wired probe must reach the agnostic brief, got %q", got)
 	}
+
+	opts.TriageQueue = func() (string, error) { return "", errors.New("timeout querying queue") }
+	got := Brief(opts)
+	if !strings.Contains(got, "[pr-triage]") || !strings.Contains(got, "timeout querying queue") || !strings.Contains(got, "not an empty queue") {
+		t.Fatalf("an error probe must render loud failure in the agnostic brief, got %q", got)
+	}
 }
 
 // The agnostic brief is what opencode, agy and copilot consume. Wiring the probe
@@ -99,5 +105,11 @@ func TestClaudeContextCarriesTriageSection(t *testing.T) {
 	}
 	if got := ClaudeContext(in); !strings.Contains(got, "#1085") {
 		t.Fatalf("inside a git repo the section must render, got %q", got)
+	}
+
+	in.TriageQueue = func() (string, error) { return "", errors.New("gh api unreachable") }
+	got := ClaudeContext(in)
+	if !strings.Contains(got, "[pr-triage]") || !strings.Contains(got, "gh api unreachable") || !strings.Contains(got, "not an empty queue") {
+		t.Fatalf("an error probe must render loud failure in Claude context, got %q", got)
 	}
 }
