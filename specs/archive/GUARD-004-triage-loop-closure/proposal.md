@@ -1,7 +1,7 @@
 ---
 id: "GUARD-004-triage-loop-closure"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-20"
 issue: "mlorentedev/dotfiles#1099"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
