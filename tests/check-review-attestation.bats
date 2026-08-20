@@ -231,6 +231,18 @@ sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
 "
 }
 
+@test "AC7: the workflow triggers on pull_request_review (#1115)" {
+    python3 -c "
+import sys, yaml
+d = yaml.safe_load(open('$REPO/.github/workflows/review-attestation.yml'))
+on = d[True] if True in d else d['on']
+pr_review = on.get('pull_request_review', {})
+types = set(pr_review.get('types', []))
+expected = {'submitted', 'edited', 'dismissed'}
+sys.exit(0 if expected.issubset(types) else 1)
+"
+}
+
 @test "AC7: the workflow does not swallow the gate's failure" {
     # A `continue-on-error: true` here would rebuild the exact defect: a check
     # that runs, decides 'not reviewed', and reports green anyway.
