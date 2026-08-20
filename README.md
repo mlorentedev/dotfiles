@@ -12,6 +12,22 @@ Personal development environment: shell configs, AI tool integration, and encryp
 
 ### Linux
 
+**One-liner** (factory-fresh machine — needs only `git` and `curl`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
+```
+
+> **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | less`
+
+Override the clone target with `DOTFILES_DIR` or the upstream URL with `DOTFILES_REPO`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | DOTFILES_DIR=/tmp/df bash
+```
+
+Or **manually**:
+
 ```bash
 # Clone the repo to a checkout dir (NOT ~/.dotfiles — that is the deploy target
 # setup writes into; cloning into it makes setup refuse, #695). Requires: git, curl.
