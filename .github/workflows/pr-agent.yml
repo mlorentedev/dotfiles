@@ -107,6 +107,25 @@ jobs:
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Serialise inference repo-wide: QUEUE, never cancel (#1107).
+    #
+    # This is a SECOND group, at job level, and it does not replace the
+    # workflow-level one above — the two answer different questions. The
+    # workflow group is per-PR and cancels, so a burst of pushes still collapses
+    # to one review of the settled state (#1042). This one is repo-wide and does
+    # not cancel, so two PRs never ask NaN for inference at the same time.
+    #
+    # ADR-032 names the rule: the top tier "queues or escalates, NEVER degrades
+    # silently". Queuing is the sanctioned behaviour, and it is what was missing:
+    # the cluster's 5 slots were being spent by our own parallel CI, so a review
+    # failed rather than waited.
+    #
+    # It cannot guarantee a free slot — pi, qq and hive draw on the same pool —
+    # but it caps this workflow's demand at one, leaving the rest for interactive
+    # use instead of racing it.
+    concurrency:
+      group: pr-agent-nan-inference
+      cancel-in-progress: false
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -164,4 +183,20 @@ jobs:
           # per PR. Turned off as a decision, not left off by accident.
           github_action_config.auto_describe: "false"
           github_action_config.auto_review: "true"
-          github_action_config.auto_improve: "true"
+          # OFF, to halve the inference this workflow demands per PR (#1107).
+          #
+          # NaN allows 5 concurrent requests, shared with pi, qq and hive
+          # embeddings. Every PR was spending two of them — one on the review, one
+          # on suggestions — and six PRs in one session got no review at all
+          # because the pool was exhausted.
+          #
+          # Suggestions are the half to drop, not the review, and the registry
+          # already says why: `## PR Code Suggestions` is deliberately excluded
+          # from review_markers because "suggestions are not a review". So the
+          # second call could never turn a PR green; it competed with the call
+          # that could.
+          #
+          # The [pr_code_suggestions] config stays and stays tested — `/improve`
+          # on demand still behaves. What changes is that it no longer runs
+          # unasked on every push.
+          github_action_config.auto_improve: "false"
