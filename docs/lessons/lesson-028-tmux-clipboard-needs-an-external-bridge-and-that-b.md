@@ -30,4 +30,4 @@ bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel 'xclip 
 - X11 → keep `xclip`.
 - Wayland → swap to `wl-copy` in `tmux.conf` **and** install `wl-clipboard` instead of `xclip`.
 
-Check current server with `echo $XDG_SESSION_TYPE`. Full operational walkthrough lives in [`runbooks/guide-tmux.md`](runbooks/guide-tmux.md) under the "Copy / paste" section.
+Check current server with `echo $XDG_SESSION_TYPE`. Full operational walkthrough lives in [`runbooks/guide-tmux.md`](../runbooks/guide-tmux.md) under the "Copy / paste" section.

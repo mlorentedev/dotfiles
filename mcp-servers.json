@@ -18,6 +18,12 @@
       "args": "hive client",
       "prerequisite_binary": "uv",
       "prerequisite_command": "uv tool install --upgrade hive-vault"
+    },
+    {
+      "name": "pdf-modifier",
+      "transport": "stdio",
+      "args": "uvx pdf-modifier-mcp",
+      "prerequisite_binary": "uv"
     }
   ]
 }

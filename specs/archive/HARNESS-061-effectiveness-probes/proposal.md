@@ -40,7 +40,7 @@ One session surfaced four defects sharing a single shape: a check verified a *re
 
 ## Acceptance criteria
 
-- [ ] A guard check cannot pass by reading global config while git resolves an effective value; a repo-local override is detected and the affected repo named, with the remedy stated.
+- [ ] A guard check cannot pass by reading global config while git resolves an effective value; the check probes the repos that matter by effect (the dotfiles repo and the vault, where the guard directly protects the single sink). A repo-local override in a non-probed repo is not detected by this check, which is a deliberate scoping decision.
 - [ ] The vault secret gate passes when the gate reaches pre-commit through the dispatcher fallback with no `.git/hooks/<stage>` present, and does not pass for a dispatcher with no config to act on.
 - [ ] A non-executable hook resolves as absent, so the probe does not reintroduce the file-exists question it replaced.
 - [ ] A new bats suite stubbing a third-party binary fails until it pairs with a real-dependency test or is explicitly exempted.

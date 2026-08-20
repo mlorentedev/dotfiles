@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "hive-vault": {
+      "command": "uvx",
+      "args": [
+        "hive-vault"
+      ]
+    },
+    "pdf-modifier": {
+      "command": "uvx",
+      "args": [
+        "pdf-modifier-mcp"
+      ]
+    }
+  }
+}
