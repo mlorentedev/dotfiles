@@ -1,11 +1,13 @@
 ---
 id: "MEMORY-001-mirror"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-27"
 issue: "mlorentedev/dotfiles#1092"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Verified implementation and architectural alignment: Claude Code SessionEnd hook wired via ai/claude/settings.json; OpenCode and AGY continuity delivered via harness /handoff command and skills; Copilot exclusion decision and cross-agent memory guide documented in docs/runbooks/guide-cross-agent-memory.md; dotf mem session-start/session-end provide cross-OS CLI parity."
 ---
 
 # MEMORY-001-mirror

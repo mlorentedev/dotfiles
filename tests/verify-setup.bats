@@ -433,3 +433,57 @@ setup() {
     ver="$(dotf version 2>/dev/null)"
     [[ "$ver" == dotf\ version\ * ]]
 }
+
+# =============================================================================
+# Section 12: Idempotence (POLISH-005)
+# =============================================================================
+#
+# Running setup-linux.sh a second time on an already-configured system must:
+# 1. Exit 0 cleanly without errors
+# 2. Not mutate or duplicate deployed configuration (byte-identical deployed state)
+# 3. Leave the repo checkout clean
+
+@test "POLISH-005: second setup-linux.sh run exits 0 cleanly with zero config diff" {
+    local snap1="/tmp/snap1-$$.sha256"
+    local snap2="/tmp/snap2-$$.sha256"
+
+    # Collect hashes of deployed dotfiles and configs before second run
+    find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
+         "$HOME/.zsh" "$HOME/.bash" "$HOME/.ssh" \
+         -type f ! -path "*/.git/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum > "$snap1"
+    sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config" >> "$snap1"
+
+    # Execute second run
+    cd "$REPO_DIR"
+    run bash setup-linux.sh
+    [ "$status" -eq 0 ]
+
+    # Collect hashes after second run
+    find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
+         "$HOME/.zsh" "$HOME/.bash" "$HOME/.ssh" \
+         -type f ! -path "*/.git/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum > "$snap2"
+    sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config" >> "$snap2"
+
+    # Assert diff is empty
+    run diff -u "$snap1" "$snap2"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+
+    rm -f "$snap1" "$snap2"
+}
+
+@test "POLISH-005: rc files contain no duplicate entries after second setup run" {
+    local zsh_path_count bash_path_count
+    zsh_path_count=$(grep -c 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.zshrc" || true)
+    bash_path_count=$(grep -c 'export PATH="\$HOME/.dotfiles/scripts:\$PATH"' "$HOME/.bashrc" || true)
+    [ "$zsh_path_count" -eq 1 ]
+    [ "$bash_path_count" -eq 1 ]
+}
+
+@test "POLISH-005: setup leaves repo checkout clean after second run" {
+    [ -d "$REPO_DIR/.git" ] || skip "repo checkout is not a git repo in this container"
+    run git -C "$REPO_DIR" status --porcelain
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
