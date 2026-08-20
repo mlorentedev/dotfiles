@@ -69,8 +69,40 @@ jobs:
     #
     # The association set is the one the attestation classifier already treats as
     # "belongs to this repository", so membership has one definition here and not two.
+    #
+    # The release-branch exclusion is HERE, not in `.pr_agent.toml`, and that
+    # move is the fix for #1073. The config declared
+    # `ignore_pr_source_branches = ["^release-please--"]` and the reviewer went
+    # on reviewing release PRs anyway: measured on #1085, whose head ref is
+    # `release-please--branches--main` and which carries a `## PR Reviewer Guide`
+    # comment posted at 07:36:44. Upstream applies that key on its webhook path;
+    # the Action entrypoint takes its settings from the env below, so the line
+    # read like a decision and asserted nothing — the same shape as the
+    # `synchronize`-in-`pr_actions` trap documented further down.
+    #
+    # A workflow-level `if` cannot be ignored by the tool it gates. The cost of
+    # the old arrangement was not cosmetic: every release PR spent inference
+    # budget on a diff that is a mechanical restatement of commits already
+    # reviewed when they landed, which is the same reasoning behind the gate's
+    # own release-please exemption in harness/review-attestation.json.
+    #
+    # Only the `pull_request` half is gated. A human typing `/review` on a
+    # release PR is asking on purpose, and this must not silently refuse them.
+    #
+    # This repository is PUBLIC, so the branch name is attacker-chosen: anyone
+    # can open a PR from a branch called `release-please--anything` and skip the
+    # reviewer. That buys nothing. Skipping the reviewer does not attest a
+    # review — `review-attestation` reads `declined`/`pending` and stays red, and
+    # the gate's own release exemption is keyed on DIFF SIGNATURE, never on the
+    # branch, precisely so a borrowed name cannot satisfy both. Two independent
+    # conditions, and this one only ever removes a review; it can never grant one.
+    #
+    # `head.ref` is read by the expression engine here, never interpolated into a
+    # `run:` — the injection concern that normally attaches to it does not apply
+    # to an `if`.
     if: >
-      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        && !startsWith(github.event.pull_request.head.ref, 'release-please--')) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
