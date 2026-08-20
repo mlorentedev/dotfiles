@@ -1,10 +1,12 @@
 ---
 id: "SDD-004-session-start-config"
 type: spec
-status: draft
+status: archived
 created: "2026-05-21"
 tags: [spec, proposal, sdd-004, cross-os, session-start, ssot, audit-002-followup]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Verified shipped 2026-08-19: session-start-config.json exists at the repo root and tests/session-start-config.bats passes 4/4, asserting valid JSON, the 6 thresholds and the 11 injector entries. The claude-session-start.{sh,ps1} pair the spec was written against has since been absorbed into `dotf mem session-start` by the ADR-020 strangler-fig, so the config extraction shipped and its host was then converged. No declared issue, so the gate never saw it."
 ---
 
 # SDD-004: Session start config
