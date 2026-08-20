@@ -3,6 +3,7 @@ id: "IDEAS-005-curl-bootstrap"
 type: spec
 status: draft
 created: "2026-05-25"
+issue: "mlorentedev/dotfiles#1094"
 tags: [spec, proposal, ideas-005, bootstrap, dotfiles-survey, tier-2]
 template_version: "1.0"
 ---
