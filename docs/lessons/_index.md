@@ -226,4 +226,5 @@ tags: [lessons, index, dotfiles]
 | [210 - Under squash-merge, `git branch --merged` says no about every branch that landed](lesson-210-under-squash-merge-git-branch-merged-says-no-about.md) | 2026-08-16 |  |
 | [211 - Worktree config discovery must prefer CWD walk-up over global repo env](lesson-211-worktree-config-discovery-must-prefer-cwd-walk-up-over-global-repo-env.md) | 2026-08-18 |  |
 | [212 - An invalid instrument is indistinguishable from an absent guard](lesson-212-an-invalid-instrument-is-indistinguishable-from-an.md) | 2026-08-19 |  |
-
+| [213 - A reviewer that reports success while publishing nothing, in two shapes](lesson-213-a-reviewer-that-reports-success-while-publishing.md) | 2026-08-20 |  |
+| [214 - A declared status is not evidence, and a guard that exists is not a guard that covers](lesson-214-a-declared-status-is-not-evidence-probe-the-syst.md) | 2026-08-20 |  |
