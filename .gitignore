@@ -47,6 +47,14 @@ node_modules/
 .cache/
 .npm/
 .yarn/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.astro/
+.worktrees/
 
 # AI
 # .claude/ is deliberately NOT ignored wholesale: CLAUDE.md is this repo's

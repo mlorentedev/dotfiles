@@ -37,12 +37,16 @@ else
     export AGY_HOME="${AGY_HOME:-$HOME/.gemini/antigravity-cli}"
     export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
     export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
+    export COPILOT_MODEL="${COPILOT_MODEL:-gpt-5.6}"
 fi
 export AGY_APP_DATA="$AGY_HOME"
 export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
 export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
 export GEMINI_DIR="$HOME/.gemini"
 export GEMINI_HOME="$HOME/.gemini"
+# Telemetry suppression (prevents agent prompts and unnecessary analytics network calls)
+export ASTRO_TELEMETRY_DISABLED=1
+export DO_NOT_TRACK=1
 # COPILOT_HOME / OPENCODE_HOME now come from the ADR-025 cascade above
 # (sourced paths.sh, or the bootstrap fallback) — the old unconditional
 # exports here clobbered that, so they were removed.
@@ -66,7 +70,7 @@ export NAN_BASE_URL="https://api.nan.builders/v1"
 # the agent had no use for it (#976). Scoping is least privilege and startup
 # time at once.
 if command -v dotf >/dev/null 2>&1; then
-    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode "$@"; }
+    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY,OLLAMA_API_KEY -- opencode "$@"; }
     pi() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "$@"; }
     # agy is deliberately NOT wrapped. It authenticates with its own stored
     # credentials and reads no variable this registry exposes — verified against

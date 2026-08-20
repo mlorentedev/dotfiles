@@ -60,8 +60,7 @@ age -r "$(age-keygen -y ~/.config/age/key.txt)" \
 # (then paste your sk-... key, press Ctrl-D)
 
 # Verify the secret can be decrypted + loaded:
-. scripts/load-secrets.sh && secrets_refresh
-echo "${NAN_API_KEY:0:8}…"   # masked sanity-check
+dotf secrets verify
 ```
 
 ### 3. Activate the integration
@@ -148,7 +147,7 @@ OpenCode no expone estos como provider-level config; los inyecta por agente. Par
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `oc /models` shows no `nan/*` entries | `~/.config/opencode/opencode.jsonc` not deployed | Re-run `./setup-linux.sh` |
-| `401 Unauthorized` from `qqn` | `$NAN_API_KEY` not exported in current shell | Reload shell (`exec zsh`), or `. scripts/load-secrets.sh && secrets_refresh` |
+| `401 Unauthorized` from `qqn` | `$NAN_API_KEY` not exported in current shell | Reload shell (`exec zsh`), or check with `dotf secrets verify` |
 | `429 rate limit` errors during agentic loops | NaN's 100 rpm / 5 concurrent cap | Switch to `openrouter/<model>` for the burst, or backoff |
 | `524 timeout` on `kokoro` TTS | Large audio request, NaN server timeout | Split input into shorter chunks |
 | `NAN_API_KEY` empty after `secrets_refresh` | `sensitive/nan.api-key.secret.age` missing / unreadable | Re-run Setup §2; check `~/.config/age/key.txt` exists |

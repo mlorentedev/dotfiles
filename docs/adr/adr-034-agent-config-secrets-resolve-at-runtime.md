@@ -3,7 +3,7 @@
 - **Status:** accepted
 - **Date:** 2026-08-16
 - **Supersedes (partially):** the deploy-time substitution posture of SDD-009, per config as each converts
-- **Related:** [ADR-028](adr-028-secrets-two-tier-bitwarden-age.md), [ADR-020](adr-020-tooling-cli-go-convergence.md), [ADR-030](adr-030-checkout-vs-deployed-copy.md)
+- **Related:** [ADR-028](adr-028-secrets-two-tier-bitwarden-age.md), [ADR-020](adr-020-tooling-cli-go-convergence.md), [ADR-030](adr-030-secrets-registry-source-model.md)
 - **Issue:** #987
 
 ## Context

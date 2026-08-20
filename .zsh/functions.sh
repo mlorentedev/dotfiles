@@ -147,8 +147,18 @@ getcertnames() {
 #   qf -> nan/deepseek-v4-flash (long-context 500K, large transforms)
 _qq_call() {
     local model="$1" name="$2"; shift 2
-    [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
-    opencode run -m "$model" "$*"
+    if [ ! -t 0 ]; then
+        local stdin_data
+        stdin_data=$(cat)
+        if [ $# -gt 0 ]; then
+            opencode run -m "$model" "$*"$'\n\n'"$stdin_data"
+        else
+            opencode run -m "$model" "$stdin_data"
+        fi
+    else
+        [ $# -eq 0 ] && { printf 'usage: %s <consulta libre>\n' "$name" >&2; return 1; }
+        opencode run -m "$model" "$*"
+    fi
 }
 
 # oc / ocfull: opencode TUI dispatch. `--pure` bypasses MCPs + skills + plugins,

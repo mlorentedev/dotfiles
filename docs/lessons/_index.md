@@ -9,8 +9,8 @@ tags: [lessons, index, dotfiles]
 
 # Dotfiles — Lessons Learned Index
 
-> Granular project-bound lessons, gotchas, and post-mortems for dotfiles (210 entries).
-> Individual lessons live alongside this index as .
+> Granular project-bound lessons, gotchas, and post-mortems for dotfiles (212 entries).
+> Individual lessons live alongside this index as `lesson-NNN-*.md` files.
 
 | Lesson | Date | Scope |
 |---|---|---|

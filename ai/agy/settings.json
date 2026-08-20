@@ -1,15 +1,24 @@
 {
   "allowNonWorkspaceAccess": true,
-  "model": "Gemini 3.5 Flash (High)",
+  "model": "Gemini 3.7 Flash (High)",
   "notifications": true,
   "permissions": {
     "allow": [
-      "command(agy)"
+      "command(*)",
+      "read_file(*)",
+      "write_file(*)",
+      "read_url(*)",
+      "search_web(*)"
+    ],
+    "deny": [
+      "command(rm -rf /)",
+      "command(rm -rf ~/*)"
     ]
   },
   "trustedWorkspaces": [
     "/home/manu/Projects/*",
-    "C:/Users/mlorente/Projects/*"
+    "C:/Users/mlorente/Projects/*",
+    "C:/Users/mlorente/Projects/Workspace/*"
   ],
   "workspace": {
     "autoSave": true,
@@ -21,18 +30,30 @@
       "**/out/**",
       "**/.pydantic_cache/**",
       "**/.pytest_cache/**",
-      "**/.mypy_cache/**"
+      "**/.mypy_cache/**",
+      "**/.ruff_cache/**",
+      "**/.venv/**",
+      "**/__pycache__/**",
+      "**/.cache/**",
+      "**/coverage/**",
+      "**/htmlcov/**",
+      "**/.astro/**",
+      "**/.worktrees/**",
+      "**/.ansible/**",
+      "**/.terraform/**",
+      "**/.gemini/**",
+      "**/.antigravitycli/**",
+      "**/specs/**/review-transcript.jsonl*"
     ],
     "maxFileSizeMB": 15
   },
   "safety": {
-    "toolPermission": "request-review",
+    "toolPermission": "always-proceed",
     "sandboxMode": false,
-    "dangerouslySkipPermissions": false,
-    "allowedCommands": ["git", "npm run build", "pytest", "go test", "ls", "cat", "grep"]
+    "dangerouslySkipPermissions": false
   },
   "modelConfigs": {
-    "defaultModel": "gemini-3.5-flash",
+    "defaultModel": "gemini-3.7-flash",
     "customAliases": {
       "chat-base": {
         "modelConfig": {
@@ -45,14 +66,24 @@
             }
           }
         }
+      },
+      "deep-think": {
+        "modelConfig": {
+          "generateContentConfig": {
+            "temperature": 0.2,
+            "topP": 0.95,
+            "thinkingConfig": {
+              "thinkingLevel": "HIGH"
+            }
+          }
+        }
       }
     }
   },
   "context": {
     "fileName": [
       "AGENTS.md",
-      "AGY.md",
-      "MEMORY.md"
+      "AGY.md"
     ],
     "autoLoadContext": true,
     "maxContextTokens": 2000000
@@ -63,7 +94,7 @@
     "keep_thinking": false,
     "networkTimeoutMs": 60000,
     "maxRetries": 2,
-    "maxConcurrentSubagents": 4,
+    "maxConcurrentSubagents": 6,
     "telemetryEnabled": false
   },
   "ui": {
