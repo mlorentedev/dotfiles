@@ -1,8 +1,10 @@
 package prtriage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -142,5 +144,40 @@ func TestTheRealRegistryServesBothConsumers(t *testing.T) {
 	}
 	if markers == 0 {
 		t.Fatal("no reviewer declares review_markers: the queue can never see comment-shaped output")
+	}
+}
+
+// 100 open PRs indicates boundary truncation on `gh pr list --limit 100`.
+// It must return a loud error rather than silently returning a truncated queue.
+func TestParseWireBoundaryLimit(t *testing.T) {
+	r := reg()
+
+	// Under 100: success
+	out99 := `[{"number": 1, "title": "t", "url": "u", "comments": [{"author": {"login": "github-actions"}, "body": "## PR Reviewer Guide\nx", "createdAt": "2026-08-20T01:00:00Z"}]}]`
+	got, err := parseWire([]byte(out99), r)
+	if err != nil {
+		t.Fatalf("parseWire with 1 PR returned unexpected error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(got))
+	}
+
+	// 100 entries: boundary limit error
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i := 1; i <= 100; i++ {
+		if i > 1 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(fmt.Sprintf(`{"number": %d, "title": "t%d", "url": "u%d", "comments": []}`, i, i, i))
+	}
+	sb.WriteString("]")
+
+	_, err = parseWire([]byte(sb.String()), r)
+	if err == nil {
+		t.Fatal("expected loud error when wire returns 100 items (boundary limit), got nil")
+	}
+	if !strings.Contains(err.Error(), "hit boundary limit") || !strings.Contains(err.Error(), "100") {
+		t.Fatalf("error must cite boundary limit and count, got: %v", err)
 	}
 }

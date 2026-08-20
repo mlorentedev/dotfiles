@@ -52,7 +52,6 @@ func Fetch(ctx context.Context, repo, registryPath string) ([]Status, error) {
 // FetchWithRegistry asks GitHub for open PRs using a pre-loaded Registry,
 // avoiding redundant disk reads when the caller already has the registry.
 func FetchWithRegistry(ctx context.Context, repo string, reg Registry) ([]Status, error) {
-	const prLimit = 100
 	args := []string{"pr", "list", "--state", "open", "--limit", fmt.Sprintf("%d", prLimit),
 		"--json", "number,title,url,comments"}
 	if repo != "" {
@@ -62,7 +61,12 @@ func FetchWithRegistry(ctx context.Context, repo string, reg Registry) ([]Status
 	if err != nil {
 		return nil, fmt.Errorf("gh pr list: %w", err)
 	}
+	return parseWire(out, reg)
+}
 
+const prLimit = 100
+
+func parseWire(out []byte, reg Registry) ([]Status, error) {
 	var wire []ghPR
 	if err := json.Unmarshal(out, &wire); err != nil {
 		return nil, fmt.Errorf("parse gh output: %w", err)
