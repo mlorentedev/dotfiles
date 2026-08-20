@@ -9,34 +9,33 @@ created: "2026-05-25"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/IDEAS-002-shell-functions`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions" (R1-R5 all have mitigations spec'd)
-- [ ] Decide sourcing strategy: wait for IDEAS-003 (loop) OR explicit `source` in `.zshrc`/`.bashrc`?
+- [x] Branch created from main: `feat/ideas-002-shell-functions`
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions" (R1-R5 all have mitigations spec'd)
+- [x] Decide sourcing strategy: wait for IDEAS-003 (loop) OR explicit `source` in `.zshrc`/`.bashrc`?
 
 ## Implementation
 
 > TDD order. One function per cycle: write failing bats test → implement → shellcheck → next.
 
-- [ ] Write failing bats test for `mkd`. Implement `mkd()` in new file `.zsh/functions.zsh`. Wire up sourcing in `.zshrc` + `.bashrc`. Confirm pass + shellcheck clean.
-- [ ] Write failing bats test for `gz`. Implement `gz()`. Confirm pass + shellcheck clean.
-- [ ] Write failing bats test for `dataurl` (with graceful MIME fallback for R2). Implement `dataurl()`. Confirm pass + shellcheck clean.
-- [ ] Write failing bats test for `targz` (gzip-only path; document zopfli/pigz preference in code). Implement `targz()`. Confirm pass + shellcheck clean.
-- [ ] Add smoke test for `server` (skippable if python3 missing) + `getcertnames` (skippable if no network). Implement both functions. Confirm shellcheck clean.
-- [ ] Cross-shell parity check: matrix-run all bats tests under bash and zsh.
-- [ ] Update README with "Shell helpers" section (6 one-liners + name-collision caveat referencing IDEAS-001).
-- [ ] Run `healthcheck.sh` — confirm no regressions in cumulative tool detection.
-- [ ] Refactor pass: extract common helpers if any duplication emerged.
+- [x] Write failing bats test for `mkd`. Implement `mkd()` in new file `.zsh/functions.sh`. Wire up sourcing in `.zshrc` + `.bashrc`. Confirm pass + shellcheck clean.
+- [x] Write failing bats test for `gz`. Implement `gz()`. Confirm pass + shellcheck clean.
+- [x] Write failing bats test for `dataurl` (with graceful MIME fallback for R2). Implement `dataurl()`. Confirm pass + shellcheck clean.
+- [x] Write failing bats test for `targz` (gzip-only path; document zopfli/pigz preference in code). Implement `targz()`. Confirm pass + shellcheck clean.
+- [x] Add smoke test for `server` (skippable if python3 missing) + `getcertnames` (skippable if no network). Implement both functions. Confirm shellcheck clean.
+- [x] Cross-shell parity check: matrix-run all bats tests under bash and zsh.
+- [x] Update README with "Shell helpers" section (6 one-liners + name-collision caveat referencing IDEAS-001).
+- [x] Run `healthcheck.sh` — confirm no regressions in cumulative tool detection.
+- [x] Refactor pass: extract common helpers if any duplication emerged.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks N/A (shell)
-- [ ] Lint: `shellcheck .zsh/functions.zsh` exits 0
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Type checks N/A (shell)
+- [x] Lint: `shellcheck .zsh/functions.sh` exits 0
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 
