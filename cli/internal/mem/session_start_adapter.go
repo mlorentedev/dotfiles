@@ -35,6 +35,9 @@ type ClaudeContextInput struct {
 	ConfigPath   string        // session-start-config.json (SDD-004 thresholds)
 	Now          time.Time     // injected clock for staleness/temperature
 	DoctorQuick  func() string // returns `dotf doctor --quick` output; nil = skip
+	// TriageQueue returns the pull requests awaiting a disposition, or an error
+	// when the question could not be answered. nil skips the section.
+	TriageQueue func() (string, error)
 }
 
 // ClaudeContext assembles the additionalContext string in claude-session-start.sh's
@@ -56,6 +59,9 @@ func ClaudeContext(in ClaudeContextInput) string {
 		ctx += hiveProject(in.Cwd, in.Vault)
 		ctx += specs(in.Cwd)
 		ctx += lessonsStaleness(in.Cwd, lessonsStaleDays, in.Now)
+		if in.TriageQueue != nil {
+			ctx += triageQueue(in.TriageQueue())
+		}
 	}
 
 	vaultName := ""

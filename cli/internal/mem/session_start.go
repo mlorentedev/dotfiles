@@ -4,8 +4,22 @@
 // detection, vault-health, active/archived spec counts, lessons-staleness, and
 // vault-baseline integrity — and renders them via --format=stdout|markdown.
 //
-// This is the layer opencode/agy/copilot consume (out-of-band, via the HARNESS-001
-// compiler) and that the Claude adapter (PR2b) wraps in its additionalContext JSON.
+// This is the layer opencode/agy/copilot are INTENDED to consume (out-of-band, via
+// the HARNESS-001 compiler) and that the Claude adapter (PR2b) wraps in its
+// additionalContext JSON.
+//
+// Measured 2026-08-20: nothing invokes `dotf mem session-start --format` yet. Only
+// Claude has a session-time execution surface wired (setup-linux.sh installs the
+// SessionStart hook); opencode and agy consume static instruction files and offer
+// no hook to attach to. So this path is a capability whose consumers are still
+// instruction-level — the always-injected `pr-stewardship` doctrine carries the
+// floor for harnesses that cannot execute anything at session start.
+//
+// If a future consumer renders this brief into a static file at DEPLOY time
+// rather than calling it per session, the TriageQueue section must be excluded
+// from that path: a point-in-time queue frozen into an instruction file would
+// assert stale data as live, which is the failure class this section exists to
+// prevent.
 // The output is contractually byte-equivalent to session-brief.sh, so every emitter
 // mirrors the shell's exact spacing, leading-newline framing, and message text.
 package mem
@@ -32,6 +46,12 @@ type BriefOptions struct {
 	ScriptsDir string
 	StaleDays  int
 	Now        time.Time
+	// TriageQueue returns the compact list of pull requests awaiting a
+	// disposition, or an error when the question could not be answered. nil
+	// skips the section entirely — which is what the hermetic tests pass, and
+	// what a caller with no GitHub reach should pass rather than inventing an
+	// empty queue.
+	TriageQueue func() (string, error)
 }
 
 // ansiSeq strips the SGR colour codes vault-health.sh emits, matching the shell's
@@ -58,6 +78,9 @@ func Brief(opts BriefOptions) string {
 	brief += vaultHealth(vaultRoot, vaultName, opts.ScriptsDir)
 	brief += specs(opts.Cwd)
 	brief += lessonsStaleness(opts.Cwd, staleDays, opts.Now)
+	if opts.TriageQueue != nil {
+		brief += triageQueue(opts.TriageQueue())
+	}
 	brief += vaultBaseline(vaultRoot)
 
 	// Drop a leading blank line when there was no headline (no-vault CWD): the
