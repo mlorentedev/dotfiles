@@ -164,34 +164,52 @@ func TestSecretsTooling_AgeKeygenMissingWarnsAndSkips(t *testing.T) {
 	}
 }
 
-func TestSecretsTooling_AgeVersionPinMatch(t *testing.T) {
-	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "age", "key.txt"), "k\n")
-
-	cfg := &Config{Versions: map[string]string{"AGE_VERSION": "1.3.1"}}
-	cmdOut := map[string]string{"age --version": "v1.3.1\n"}
-
-	out, fails := runSecretsToolingFull(t, map[string]string{"HOME": home}, []string{"bw", "age", "age-keygen"}, cmdOut, cfg, nil)
-	if fails != 0 {
-		t.Fatalf("want 0 failures, got %d\n%s", fails, out)
+func TestSecretsTooling_AgeVersionPin(t *testing.T) {
+	tests := []struct {
+		name       string
+		installed  string
+		pinned     string
+		wantStatus string
+		wantText   string
+	}{
+		{
+			name:       "exact match with leading v",
+			installed:  "v1.3.1\n",
+			pinned:     "1.3.1",
+			wantStatus: "[ OK ]",
+			wantText:   "age version matches versions.conf (1.3.1)",
+		},
+		{
+			name:       "exact match without leading v",
+			installed:  "1.3.1\n",
+			pinned:     "1.3.1",
+			wantStatus: "[ OK ]",
+			wantText:   "age version matches versions.conf (1.3.1)",
+		},
+		{
+			name:       "version drift produces warning without failure",
+			installed:  "1.2.1\n",
+			pinned:     "1.3.1",
+			wantStatus: "[WARN]",
+			wantText:   "age version drift: installed=1.2.1 pinned=1.3.1",
+		},
 	}
-	if !strings.Contains(out, "age version matches versions.conf (1.3.1)") {
-		t.Errorf("expected age version match in report\n%s", out)
-	}
-}
 
-func TestSecretsTooling_AgeVersionDrift(t *testing.T) {
-	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "age", "key.txt"), "k\n")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			writeFile(t, filepath.Join(home, ".config", "age", "key.txt"), "k\n")
 
-	cfg := &Config{Versions: map[string]string{"AGE_VERSION": "1.3.1"}}
-	cmdOut := map[string]string{"age --version": "1.2.1\n"}
+			cfg := &Config{Versions: map[string]string{"AGE_VERSION": tt.pinned}}
+			cmdOut := map[string]string{"age --version": tt.installed}
 
-	out, fails := runSecretsToolingFull(t, map[string]string{"HOME": home}, []string{"bw", "age", "age-keygen"}, cmdOut, cfg, nil)
-	if fails != 0 {
-		t.Fatalf("version drift must not FAIL (WARN only), got %d failures\n%s", fails, out)
-	}
-	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "age version drift: installed=1.2.1 pinned=1.3.1") {
-		t.Errorf("expected age version drift WARN in report\n%s", out)
+			out, fails := runSecretsToolingFull(t, map[string]string{"HOME": home}, []string{"bw", "age", "age-keygen"}, cmdOut, cfg, nil)
+			if fails != 0 {
+				t.Fatalf("want 0 failures, got %d\n%s", fails, out)
+			}
+			if !strings.Contains(out, tt.wantStatus) || !strings.Contains(out, tt.wantText) {
+				t.Errorf("expected %s and %q in report\n%s", tt.wantStatus, tt.wantText, out)
+			}
+		})
 	}
 }

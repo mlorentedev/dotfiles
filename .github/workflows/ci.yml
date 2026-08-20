@@ -316,10 +316,13 @@ jobs:
 
       - name: Build integration test container
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        env:
+          BATS_VERSION: ${{ steps.versions.outputs.BATS_VERSION }}
+          AGE_VERSION: ${{ steps.versions.outputs.AGE_VERSION }}
         run: |
           docker build \
-            --build-arg BATS_VERSION=${{ steps.versions.outputs.BATS_VERSION }} \
-            --build-arg AGE_VERSION=${{ steps.versions.outputs.AGE_VERSION }} \
+            --build-arg BATS_VERSION="$BATS_VERSION" \
+            --build-arg AGE_VERSION="$AGE_VERSION" \
             -f tests/Dockerfile.integration \
             -t dotfiles-integration-test .
 

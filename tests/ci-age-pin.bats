@@ -71,8 +71,10 @@ setup() {
 @test "setup-linux.sh: age install pins AGE_VERSION rather than fetching latest" {
     local setup_sh="$REPO/setup-linux.sh"
     grep -q 'AGE_VERSION' "$setup_sh"
-    grep -q 'FiloSottile/age' "$setup_sh"
-    if grep -q 'filippo.io/age/latest' "$setup_sh"; then
+    grep -q 'FiloSottile/age/releases/download/v' "$setup_sh"
+    local age_section
+    age_section="$(sed -n '/Installing age/,/age already installed/p' "$setup_sh")"
+    if echo "$age_section" | grep -q 'filippo.io/age/latest' || echo "$age_section" | grep -q 'releases/latest'; then
         printf 'setup-linux.sh still fetches latest age instead of pinned AGE_VERSION\n' >&2
         return 1
     fi
