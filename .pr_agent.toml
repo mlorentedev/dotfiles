@@ -65,12 +65,12 @@ max_model_tokens = 200000
 # attestation gate correctly calls `pending` and which nothing can ever clear —
 # the unreachable state filed as #1061. One half alone is worse than neither.
 #
-# Source branch rather than title or author: the title is free text, and the
-# author is a human (release-please runs under a PAT), so an author rule would
-# never fire. The gate's half matches on diff signature instead, deliberately
-# not on this branch name — two independent conditions, so neither is a single
-# string that lets a change past both.
-ignore_pr_source_branches = ["^release-please--"]
+# `ignore_pr_source_branches` was declared here and never fired (#1073). Upstream
+# applies it on the webhook path; the Action entrypoint takes its settings from
+# the workflow env, so the key read like a decision and asserted nothing —
+# measured on #1085, a `release-please--branches--main` PR that was reviewed
+# anyway. The exclusion now lives in .github/workflows/pr-agent.yml's job-level
+# `if`, which the tool it gates cannot ignore. Do not reinstate it here.
 
 response_language = "en-US"
 
