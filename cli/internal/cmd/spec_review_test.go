@@ -163,6 +163,31 @@ func TestSpecReviewQuotesTheReviewerStderrWhenItDies(t *testing.T) {
 	}
 }
 
+func TestSpecReviewSuggestsAlternativePoolMemberOnDeath(t *testing.T) {
+	root := makeRepo(t)
+	dir := filepath.Join(root, "harness")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pool := `{"pool":[
+		{"id":"nan/deepseek-v4-flash","runner":"pi","provider":"nan","model":"deepseek-v4-flash","role":"primary"},
+		{"id":"nan/mimo-v2.5","runner":"pi","provider":"nan","model":"mimo-v2.5","role":"fallback"}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, "reviewer-pool.json"), []byte(pool), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, false)
+
+	_, _, err := execute(t, "spec", "review", "AI-001-x")
+	if err == nil {
+		t.Fatal("expected the dead launch to fail")
+	}
+	if !strings.Contains(err.Error(), "dotf spec review AI-001-x --reviewer nan/mimo-v2.5") {
+		t.Errorf("expected error to suggest the next pool member, got: %v", err)
+	}
+}
+
 func TestSpecReviewAnnouncesALaunchThatSurvived(t *testing.T) {
 	root := makeRepo(t)
 	seedPool(t, root)
