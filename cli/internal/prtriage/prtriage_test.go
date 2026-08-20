@@ -169,7 +169,7 @@ func TestParseWireBoundaryLimit(t *testing.T) {
 		if i > 1 {
 			sb.WriteString(",")
 		}
-		sb.WriteString(fmt.Sprintf(`{"number": %d, "title": "t%d", "url": "u%d", "comments": []}`, i, i, i))
+		fmt.Fprintf(&sb, `{"number": %d, "title": "t%d", "url": "u%d", "comments": []}`, i, i, i)
 	}
 	sb.WriteString("]")
 
