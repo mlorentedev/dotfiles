@@ -430,6 +430,32 @@ sys.exit(0 if expected.issubset(types) else 1)
     [[ "$output" == *"pending"* ]]
 }
 
+@test "#1122: a clean CodeRabbit review comment attests without reviews[]" {
+    # CodeRabbit opens a formal review only when it has findings. When it has
+    # none, it leaves reviews[] empty and posts "No actionable comments were
+    # generated in the recent review" as a comment. That is a completed review
+    # and must attest identically to one with findings.
+    local tmp_payload="$TMP/coderabbit-clean-review.json"
+    cat <<'EOF' > "$tmp_payload"
+{
+  "author": {"login": "someone"},
+  "reviews": [],
+  "comments": [
+    {
+      "author": {"login": "coderabbitai"},
+      "body": "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\nNo actionable comments were generated in the recent review. 🎉"
+    }
+  ],
+  "labels": [],
+  "body": "## Summary\n\nclean change"
+}
+EOF
+    run "$SCRIPT" --payload "$tmp_payload"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"coderabbitai"* ]]
+}
+
 @test "AC: an undeclared bot cannot attest by posting the same marker" {
     # The failure mode this guards is #1033 arriving through the comments door.
     # Matching "a bot commented" would let a labeler or release bot attest; the
