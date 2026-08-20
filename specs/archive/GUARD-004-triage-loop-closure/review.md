@@ -3,7 +3,7 @@ spec: "GUARD-004-triage-loop-closure"
 verdict: "PASS-WITH-GAPS"
 reviewed_sha: "12d0116bd0291bc020bf4cb0d0b8f5d24b2cace3"
 reviewer: "nan/mimo-v2.5"
-date: "2026-08-22"
+date: "2026-08-20"
 ---
 
 ## Adversarial review
