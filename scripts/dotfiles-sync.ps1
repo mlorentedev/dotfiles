@@ -130,8 +130,8 @@ function Sync-Secrets {
 # Sync git repos
 function Sync-Git {
     Write-Info "Pushing from repo..."
-    $diffResult = & git -C $DotfilesRepo diff --quiet 2>&1
-    $cachedResult = & git -C $DotfilesRepo diff --cached --quiet 2>&1
+    $null = & git -C $DotfilesRepo diff --quiet 2>&1
+    $null = & git -C $DotfilesRepo diff --cached --quiet 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "  Uncommitted changes in repo - commit first"
         return
