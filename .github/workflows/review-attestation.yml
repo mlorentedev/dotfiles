@@ -35,6 +35,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled, edited]
     branches: [main]
+  # Human reviews submitted/edited/dismissed via GitHub UI or Reviews API (#1115).
+  # Emits pull_request_review (not pull_request or issue_comment), so the gate
+  # must re-evaluate when a real review lands or is dismissed.
+  pull_request_review:
+    types: [submitted, edited, dismissed]
   # The load-bearing trigger. A reviewer usually lands AFTER the checks have
   # settled, which is the one moment the answer is always "pending" — asking
   # only at `pull_request` time would guarantee the least useful answer. A new
@@ -89,7 +94,7 @@ jobs:
   attestation:
     # issue_comment fires on issues too; only pull requests have a review state
     # to attest to.
-    if: github.event_name == 'pull_request' || github.event.issue.pull_request || github.event_name == 'workflow_run'
+    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event.issue.pull_request || github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
