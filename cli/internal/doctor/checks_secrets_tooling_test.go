@@ -19,14 +19,18 @@ func runSecretsTooling(t *testing.T, env map[string]string, onPath []string) (st
 // so the round-trip PASS / FAIL / not-called paths are table-testable with no
 // real age binary or key. A nil rt keeps newSys's success default.
 func runSecretsToolingRT(t *testing.T, env map[string]string, onPath []string, rt func(string) error) (string, int) {
+	return runSecretsToolingFull(t, env, onPath, nil, nil, rt)
+}
+
+func runSecretsToolingFull(t *testing.T, env map[string]string, onPath []string, cmdOut map[string]string, cfg *Config, rt func(string) error) (string, int) {
 	t.Helper()
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	sys := newSys(env, onPath, nil)
+	sys := newSys(env, onPath, cmdOut)
 	if rt != nil {
 		sys.AgeRoundTrip = rt
 	}
-	checkSecretsTooling(sys, rep)
+	checkSecretsTooling(sys, cfg, rep)
 	rep.Summary()
 	return buf.String(), rep.Failures()
 }
@@ -157,5 +161,37 @@ func TestSecretsTooling_AgeKeygenMissingWarnsAndSkips(t *testing.T) {
 	}
 	if !strings.Contains(out, "age-keygen not in PATH") {
 		t.Errorf("expected the WARN about the missing age-keygen\n%s", out)
+	}
+}
+
+func TestSecretsTooling_AgeVersionPinMatch(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".config", "age", "key.txt"), "k\n")
+
+	cfg := &Config{Versions: map[string]string{"AGE_VERSION": "1.3.1"}}
+	cmdOut := map[string]string{"age --version": "v1.3.1\n"}
+
+	out, fails := runSecretsToolingFull(t, map[string]string{"HOME": home}, []string{"bw", "age", "age-keygen"}, cmdOut, cfg, nil)
+	if fails != 0 {
+		t.Fatalf("want 0 failures, got %d\n%s", fails, out)
+	}
+	if !strings.Contains(out, "age version matches versions.conf (1.3.1)") {
+		t.Errorf("expected age version match in report\n%s", out)
+	}
+}
+
+func TestSecretsTooling_AgeVersionDrift(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".config", "age", "key.txt"), "k\n")
+
+	cfg := &Config{Versions: map[string]string{"AGE_VERSION": "1.3.1"}}
+	cmdOut := map[string]string{"age --version": "1.2.1\n"}
+
+	out, fails := runSecretsToolingFull(t, map[string]string{"HOME": home}, []string{"bw", "age", "age-keygen"}, cmdOut, cfg, nil)
+	if fails != 0 {
+		t.Fatalf("version drift must not FAIL (WARN only), got %d failures\n%s", fails, out)
+	}
+	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "age version drift: installed=1.2.1 pinned=1.3.1") {
+		t.Errorf("expected age version drift WARN in report\n%s", out)
 	}
 }

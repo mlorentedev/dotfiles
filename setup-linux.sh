@@ -210,14 +210,15 @@ else
     log_info "xclip installed: $(xclip -version 2>&1 | head -n1)"
 fi
 
-# age (file encryption — required by secrets system)
+# age (file encryption — required by secrets system; pins AGE_VERSION from versions.conf)
 if ! command -v age >/dev/null 2>&1; then
     log_info "Installing age..."
-    curl -Lo /tmp/age.tar.gz "https://dl.filippo.io/age/latest?for=linux/amd64" 2>/dev/null \
+    AGE_VER="${AGE_VERSION:-1.3.1}"
+    curl -Lo /tmp/age.tar.gz "https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz" 2>/dev/null \
         && tar xzf /tmp/age.tar.gz -C /tmp \
         && cp /tmp/age/age /tmp/age/age-keygen "$HOME/.local/bin/" \
         && rm -rf /tmp/age.tar.gz /tmp/age \
-        && log_success "age installed" \
+        && log_success "age installed (v${AGE_VER})" \
         || log_warning "age installation failed"
 else
     log_info "age already installed"

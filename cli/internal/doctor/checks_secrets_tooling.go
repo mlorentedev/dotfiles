@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
@@ -30,7 +31,7 @@ const roundTripSentinel = "dotf-doctor-age-round-trip"
 // step further than "the file exists": it round-trips a sentinel through the key
 // (#518). A present-but-broken key (corrupt, wrong, unreadable) is a FAIL — a red
 // check at setup time instead of a silent surprise at recover time.
-func checkSecretsTooling(sys *System, rep *Report) {
+func checkSecretsTooling(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Secrets tooling")
 
 	if sys.has("bw") {
@@ -46,6 +47,14 @@ func checkSecretsTooling(sys *System, rep *Report) {
 	hasAge := sys.has("age")
 	if hasAge {
 		rep.Pass("age (DR escrow + bootstrap floor) found")
+		if cfg != nil && cfg.Versions != nil {
+			pin := strings.TrimPrefix(cfg.Versions["AGE_VERSION"], "v")
+			if pin != "" {
+				if installed := ageVersion(sys); installed != "" {
+					matchPin(rep, "age", installed, pin)
+				}
+			}
+		}
 	} else {
 		rep.Fail("age not in PATH — re-run setup (ADR-028 DR floor)")
 	}
@@ -117,4 +126,22 @@ func ageRoundTrip(keyPath string) error {
 		return errors.New("decrypted bytes differ from the sentinel (key/identity mismatch)")
 	}
 	return nil
+}
+
+// ageVersion extracts the installed semver from `age --version`, stripping any
+// leading 'v' to compare cleanly against versions.conf pin (Issue #1060).
+func ageVersion(sys *System) string {
+	out, err := sys.CommandOutput("age", "--version")
+	if err != nil {
+		return ""
+	}
+	first := strings.TrimSpace(out)
+	if i := strings.IndexByte(first, '\n'); i >= 0 {
+		first = strings.TrimSpace(first[:i])
+	}
+	fields := strings.Fields(first)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.TrimPrefix(fields[len(fields)-1], "v")
 }
