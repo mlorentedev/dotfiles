@@ -13,7 +13,7 @@
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:ea171c3de1a715ff) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:e4cff3c3b77d6548) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -46,7 +46,26 @@ Any of the five may be skipped, but only as a stated decision naming which one a
 
 **A comment is not a review, and green checks are not the end of one.** Both halves have been observed failing here. On one PR every check went green and the reviewer then posted four Major findings. On another, checks went green and the reviewer posted *"review limit reached — we couldn't start this review"*: a comment arrived, and nobody looked. **A notice that no review ran leaves the PR unreviewed.** Tell the two apart by content, never by author — a review names files, lines, or claims; a notice talks about the review itself. Proceeding on an unreviewed PR is allowed; proceeding silently is not. "Merged unreviewed, reviewer quota exhausted" is a disclosure; saying nothing is a claim of review that never happened.
 
+**Ask the queue rather than remember it, and write the answer where it survives.** Two commands make the disposition mechanical instead of conscientious, and they work from any shell and any agent because they are the same binary everywhere:
+
+- **`dotf pr triage-queue`** — run it at session start, and again before reporting any PR work complete, in a repository that carries a reviewer registry. It lists pull requests whose newest reviewer output is newer than their newest recorded triage. **A non-zero exit is a queue you must read, never an empty one**: it exits non-zero both when work is pending *and* when the question could not be answered, precisely so an unanswerable queue is never mistaken for a clear one.
+- **The `## Review triage` comment** — record the dispositions on the PR itself under that heading, *including when there was nothing to dispose of*. "CI green, no review findings" is a disposition; leaving it unwritten is indistinguishable from nobody having looked, and it leaves the PR queued forever. The heading is declared once, in the repository's reviewer registry, and read back by the queue.
+
+Where a harness offers a session-time execution surface, wire the first one into it and stop relying on the instruction — a hook that fires beats an agent that remembers. Where it offers none, this paragraph *is* the mechanism, which is why it lives in the always-injected doctrine and not in a skill: an instruction every agent receives is the floor that survives a harness with no hooks at all.
+
 **A change that closes a spec gets an independent adversarial review before it archives.** The trigger is the archive gate and nothing wider — not every PR that touches a spec folder. It names an obligation that already binds mechanically, so the only question is whether you meet it deliberately or discover it as a refusal: the spec gate declines to merge a PR closing a spec's issue without archiving it, `spec archive` declines without a passing review, and the reviewer pool declines one signed by the wrong model. The reviewer must not be the implementer; that independence is the entire value.
+
+> Injected verbatim into every agent's instructions (harness `enforced` id `secrets-never-in-output`). Section 6 defends the commit; this defends the transcript, which no scanner reaches.
+
+**The transcript is a durable artifact.** It is stored on disk, it may be synced, and later sessions read it. Everything the commit path forbids, it forbids too — and unlike a commit, nothing scans it and nothing can un-print it.
+
+**Never dump a secrets store to standard output.** Decrypting a whole file and filtering the result is the shape that bites: the filter narrows what a human *reads*, never what was decrypted and emitted, and the transcript captures the stream before the filter runs. Measured 2026-08-20: one such command put a cloud access key pair, two control-plane keys and an admin password into a session transcript at once. Extract the single value you need, or keep the value out of stdout entirely by injecting it into the child process that consumes it — `dotf secrets run -- <cmd>` where it exists, the equivalent extract-or-exec form of your secrets tool everywhere else.
+
+**Verify a credential by consequence, never by printing it.** To establish that a secret works, run the operation that uses it and report the exit status. Printing it to prove it exists is not verification; it is the failure. The same reasoning that makes a guard check whether a review was published rather than whether a known error appeared.
+
+**This is not a tool defect and no tool will stop you.** Decrypting to stdout is exactly what a decryption command is for. There is no deterministic pre-exposure hook available either — agent stdout cannot be intercepted across every harness, and a scrubber that works in one is absent in the rest. This paragraph is the mechanism.
+
+**If a value does reach the output: say so immediately, name the affected credentials by type, and stop.** Disclosure over silence, the same posture as an unreviewed merge. Then treat them as compromised and rotate — an exposed credential in a transcript nobody rotated is indistinguishable from one that was never exposed, right up until it is not.
 <!-- END HARNESS GENERATED -->
 * **Skills:** Auto-loaded via slash commands from `~/.claude/skills/<skill>/SKILL.md` (deployed by `compile-harness.sh --deploy`).
 * **TaskCreate / TaskUpdate / TaskList:** Use for non-trivial work (≥3 steps). Mark `in_progress` before start, `completed` on finish.

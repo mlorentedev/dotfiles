@@ -21,21 +21,50 @@
 # review, so a PR could edit it to attest itself) and a vacuous test predicate.
 model = "openai/deepseek-v4-flash"
 
-# NO cheap fallback, and this deliberately departs from #786's draft, which
-# proposed `fallback_models = ["qwen3.6"]`.
+# ONE fallback, and the reason is concurrency rather than quality (#1107).
 #
-# harness/reviewer-pool.json excludes qwen3.6 from the adversarial-review pool by
-# name, on the grounds that "a reviewer that PASSes cheaply is worse than no
-# gate, because it converts the gate into a green checkmark". Adopting it as a
-# fallback here would put two files in the repo holding opposite policies on who
-# may review.
+# Measured 2026-08-20 against api.nan.builders with minimal requests:
 #
-# The safe direction is available precisely because GUARD-002 exists: if this
-# reviewer fails, the review-attestation gate reports `declined` and the PR goes
-# red. A failure is therefore VISIBLE, which makes "no review" strictly better
-# than "a cheap review that passes everything". Falling back to a
-# latency-optimised model would trade a loud absence for a quiet rubber stamp.
-fallback_models = []
+#   8 concurrent -> deepseek-v4-flash :  5 x 200,  3 x 429
+#   2 concurrent -> mimo-v2.5, fired WHILE deepseek was saturated :  2 x 200
+#
+# The limit is PER MODEL, not per API key: each carries its own bucket of five.
+# So a second NaN model genuinely dodges the exhaustion that left six PRs
+# unreviewed in a single session, and it costs no new CI credential — which
+# matters, because the workflow's "exactly one secret" guard is deliberate.
+#
+# This does NOT reopen the contradiction review-attestation.json flags on #786.
+# That one is specific: #786 proposed qwen3.6, which reviewer-pool.json excludes
+# BY NAME on the grounds that "a reviewer that PASSes cheaply is worse than no
+# gate". mimo-v2.5 is excluded by neither name nor class — the pool's line is
+# drawn around the latency-optimised daily models, and the local capability
+# record puts mimo on deepseek's side of it:
+#
+#   deepseek-v4-flash  1,048,576 ctx  reasoning
+#   mimo-v2.5          1,048,576 ctx  reasoning
+#   qwen3.6              262,144 ctx
+#   gemma4               262,144 ctx
+#
+# Stated honestly: that is a profile match, not a benchmark. mimo has not been
+# evaluated against the pool's bar, and if it ever signs an adversarial review
+# it must be admitted to reviewer-pool.json first — that file governs the
+# spec-level gate, which this is not.
+#
+# On ADR-032's "the top tier has no fallback, on purpose": read precisely, that
+# rule forbids silently degrading to a MID model, because a mysterious quality
+# drop is what ADR-011 exists to prevent. A lateral move inside the same tier is
+# not that. The honest caveat is that "same tier" here rests on the declared
+# profile above and not on an evaluation — so if the guarantee is wanted rather
+# than assumed, mimo has to be measured against the pool's bar and the verdict
+# written into reviewer-pool.json. Until then this is a stated assumption, and a
+# fallback that produced a visibly worse review is the signal to revisit it.
+#
+# A third tier on another provider was considered and dropped. It would answer a
+# NaN OUTAGE rather than NaN saturation, and only saturation has been observed;
+# no Google credential exists in the registry, and routing via OpenRouter would
+# spend a finite paid balance on every PR and add the second secret the guard
+# exists to prevent.
+fallback_models = ["openai/mimo-v2.5"]
 
 # Cheap passes only — descriptions and commit summaries, never the review.
 model_weak = "openai/qwen3.6"

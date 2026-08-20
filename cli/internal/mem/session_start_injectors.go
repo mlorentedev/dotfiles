@@ -131,3 +131,31 @@ func temperatureLabel(daysAgo, hotDays, warmDays, coldDays int) string {
 		return "ARCHIVE"
 	}
 }
+
+// triageQueue renders the PR-triage checkpoint.
+//
+// GUARD-002 made a green check mean "a review happened". It says nothing about
+// whether anyone acted on the review, and nothing pushes that fact into an agent
+// session: a workflow_run re-evaluates the gate and GitHub notifies the human,
+// but no channel reaches here. So the loop closes at the one moment every session
+// has in common, which is this brief — determinism by code, not by an agent
+// remembering to ask.
+//
+// `summary` is the compact list of pending PRs; empty means the queue is clear.
+// An error is REPORTED, never swallowed. `dotf pr triage-queue` exits non-zero
+// when it cannot answer precisely so that a queue which could not be computed
+// never reads as an empty one, and that rule has to survive the trip into here —
+// silence on failure would recreate exactly the blind spot the queue exists to
+// remove.
+func triageQueue(summary string, err error) string {
+	if err != nil {
+		return "\n[pr-triage] queue could not be computed: " + err.Error() +
+			"\n  This is not an empty queue. Run `dotf pr triage-queue` to see why."
+	}
+	if strings.TrimSpace(summary) == "" {
+		return ""
+	}
+	return "\n[pr-triage] awaiting a disposition: " + summary +
+		"\n  Dispose with /pr-review-triage. Nothing counts as triaged until its" +
+		"\n  table lands on the PR under the registry's triage marker."
+}
