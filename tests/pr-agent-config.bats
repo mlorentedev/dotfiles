@@ -439,3 +439,27 @@ if bad:
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
+
+# #1107: PR-Agent swallowed a RateLimitError into a clean exit, so six PRs in one
+# session carried a green `review` job and no review. ADR-032 forbids exactly
+# that — "queues or escalates, NEVER degrades silently" — so the job must fail
+# when it published nothing.
+@test "pr-agent: the workflow fails when no review was published" {
+    grep -q 'name: Fail if no review was published' "$REPO/.github/workflows/pr-agent.yml" \
+        || { echo "the no-review guard step is gone; a silent degrade is back (#1107)" >&2; false; }
+}
+
+# The heading is declared once, in the reviewer registry, and read by three
+# consumers now: the attestation classifier, `dotf pr triage-queue`, and this
+# guard. Restating it in the workflow would rebuild the two-file agreement
+# nobody checks that the registry exists to prevent.
+@test "pr-agent: the no-review guard reads its marker from the registry, not a literal" {
+    run grep -c 'contents/harness/review-attestation.json' "$REPO/.github/workflows/pr-agent.yml"
+    [ "$status" -eq 0 ] && [ "$output" -ge 1 ] \
+        || { echo "the guard no longer reads the marker from the registry" >&2; false; }
+
+    # And it must read the BASE ref: this repository is public, so a PR able to
+    # supply the marker would redefine it to something it does post.
+    grep -q 'BASE_REF:' "$REPO/.github/workflows/pr-agent.yml" \
+        || { echo "the guard must resolve the registry at the base ref, not the PR head" >&2; false; }
+}
