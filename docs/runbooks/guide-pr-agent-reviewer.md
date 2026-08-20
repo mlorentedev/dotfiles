@@ -35,42 +35,49 @@ It is deliberately not a replacement yet: it runs **alongside** CodeRabbit for a
 bounded window, because #786 requires recording which tool found what before
 either is retired, and the standing rule caps autonomous reviewers at two.
 
-## What it costs — read this before assuming it is one call
+## What it costs, and the limit that actually bites
 
-**It consumes the NaN subscription on every pull-request event, three times.**
+**One inference call per reviewed event.** It was three; two were turned off as
+decisions, and the second of them (#1107) was forced by a measured failure.
 
-A clean run publishes three artifacts, measured on #1042:
-
-| Artifact | Command | Model |
+| Artifact | Command | State |
 |---|---|---|
-| the PR body, rewritten with a generated summary | `describe` | `model_weak` — qwen3.6 |
-| **PR Reviewer Guide** — the actual review | `review` | `model` — deepseek-v4-flash |
-| **PR Code Suggestions** | `improve` | `model` — deepseek-v4-flash |
+| the PR body, rewritten with a generated summary | `describe` | **off** — it rewrites the author's body, and the bodies here carry measurement tables worth keeping |
+| **PR Reviewer Guide** — the actual review | `review` | **on**. This is the only artifact that attests under GUARD-002 |
+| **PR Code Suggestions** | `improve` | **off** (#1107) — `review-attestation.json` excludes its marker because *"suggestions are not a review"*, so it could never turn a PR green while competing for the slot that could |
 
-The workflow passes no `auto_describe` / `auto_review` / `auto_improve` inputs, so
-**all three run by default**. Diff size measured on #1037: 20 412 tokens against a
-stated 200 000 budget, so a review reads the whole diff rather than a window.
+`/describe` and `/improve` still work as slash commands on an open PR. What
+changed is that they no longer run unasked.
 
-The multiplier that matters is not the PR, it is the **push**. The workflow fires
-on `opened`, `synchronize`, `reopened` and `ready_for_review` — `synchronize` is
-every push to the branch. A PR with five pushes is roughly fifteen inference
-calls, on the full diff each time.
+### The limit that bites is concurrency, not volume
 
-### The lever, if consumption needs cutting
+Measured 2026-08-20 against `api.nan.builders`:
 
-Turning off the two passes that are not the review cuts it to about a third:
-
-```toml
-[github_action_config]
-auto_describe = false
-auto_improve  = false
-auto_review   = true
+```
+8 concurrent -> deepseek-v4-flash :  5 x 200,  3 x 429
+2 concurrent -> mimo-v2.5, fired WHILE deepseek was saturated :  2 x 200
 ```
 
-Worth considering on its own merits, not only for cost: `describe` **rewrites the
-PR body**, wrapping the author's text under a `### User description` heading and
-adding a generated summary above it. If the PR body is written carefully, that is
-a change you may not want.
+**Five simultaneous requests per model, and the bucket is per model rather than
+per API key.** The pool is shared with pi's TUI, `qq` and hive embeddings, so a
+busy session exhausts it — six PRs in one session received no review at all
+(#1096, #1100, #1101, #1103, #1104, #1105), every one of them reporting a green
+`review` job.
+
+Three things now stand between that and a silent green:
+
+1. `auto_improve = false` halves what this workflow asks for.
+2. A job-level concurrency group serialises inference repo-wide and **queues**
+   rather than cancelling — ADR-032's *"queues or escalates, never degrades
+   silently"*. Note the ceiling: GitHub holds one pending run per group, so in a
+   burst of three or more the extras are cancelled rather than queued. Visibly.
+3. `fallback_models = ["openai/mimo-v2.5"]` — a second NaN model with its own
+   bucket of five, which is what makes it a fallback rather than a rename.
+
+The multiplier that matters is still the **push**, not the PR: the workflow fires
+on every push to the branch, so a PR with five pushes is five reviews of the full
+diff. The per-PR concurrency group collapses a burst of pushes into one review of
+the settled state.
 
 ## Operating it
 
@@ -80,10 +87,16 @@ a change you may not want.
   comment*; it does not submit a formal GitHub review. `gh pr view N --json
   reviews` will not show it. This is why it cannot currently attest under
   GUARD-002 — see #1033.
-- **Changing the reviewing model** is one line in `.pr_agent.toml`. There is no
-  fallback model, by decision: `harness/reviewer-pool.json` excludes the
-  latency-optimised models by name, and a reviewer that passes cheaply is worse
-  than no gate. A failure is meant to be loud, and GUARD-002 makes it so.
+- **Changing the reviewing model** is one line in `.pr_agent.toml`. There is one
+  fallback, `openai/mimo-v2.5`, and the reason is **concurrency, not quality**:
+  the limit is per model, so a second NaN model has its own bucket of five.
+  What has not changed is the quality bar — `harness/reviewer-pool.json` excludes
+  the latency-optimised models (`qwen3.6`, `gemma4`) **by name**, because a
+  reviewer that passes cheaply is worse than no gate, and neither may be added
+  here. mimo is excluded by neither name nor class; that is a profile match
+  (1M context, reasoning) rather than a benchmark, and it is stated as such in
+  `.pr_agent.toml`. If a failure survives both models it is still meant to be
+  loud, and GUARD-002 plus the no-review guard in the workflow make it so.
 - **Changing what it checks**: `[pr_reviewer] extra_instructions`. Every review
   opens with a harness-compliance pass over `AGENTS.md` and `.claude/CLAUDE.md`,
   reported per item even when everything passes.
