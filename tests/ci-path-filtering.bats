@@ -21,3 +21,9 @@ setup() {
     grep -q 'needs.changes.outputs.code' "$CI_YML"
     grep -q 'needs.changes.outputs.powershell' "$CI_YML"
 }
+
+@test "HARNESS-041: critical deploy and agent paths are included in code filter" {
+    for path in 'ai/**' 'cli/**' 'sensitive/**' '.zshrc' '.bashrc' '.gitconfig' 'setup-linux.sh' 'setup-windows.ps1'; do
+        grep -q -- "$path" "$CI_YML"
+    done
+}

@@ -30,10 +30,21 @@ jobs:
         with:
           filters: |
             code:
+              - 'ai/**'
               - 'cli/**'
               - 'scripts/**'
               - 'powershell/**'
               - 'windows/**'
+              - 'sensitive/**'
+              - '.zsh/**'
+              - '.bash/**'
+              - '.zshrc'
+              - '.bashrc'
+              - '.profile'
+              - '.gitconfig'
+              - 'tmux.conf'
+              - '.inputrc'
+              - '.editorconfig'
               - 'setup-linux.sh'
               - 'setup-windows.ps1'
               - 'tests/**'
