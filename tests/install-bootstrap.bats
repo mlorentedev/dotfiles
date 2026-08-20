@@ -28,18 +28,35 @@ teardown() {
 }
 
 @test "IDEAS-005: install.sh honors DOTFILES_DIR for fresh clone" {
+    remote="$TEST_TMPDIR/remote-repo"
+    git init "$remote"
+    git -C "$remote" config user.email "test@example.com"
+    git -C "$remote" config user.name "Test"
+    echo "content" > "$remote/file.txt"
+    git -C "$remote" add .
+    git -C "$remote" commit -m "init"
+
     target="$TEST_TMPDIR/fresh-dotfiles"
     DOTFILES_DIR="$target" \
-    DOTFILES_REPO="$BATS_TEST_DIRNAME/.." \
+    DOTFILES_REPO="$remote" \
     DOTFILES_SKIP_SETUP=1 \
         bash "$INSTALL_SH"
     [ -d "$target/.git" ]
 }
 
 @test "IDEAS-005: install.sh updates existing clone (idempotent)" {
+    remote="$TEST_TMPDIR/remote-repo"
+    git init "$remote"
+    git -C "$remote" config user.email "test@example.com"
+    git -C "$remote" config user.name "Test"
+    echo "content" > "$remote/file.txt"
+    git -C "$remote" add .
+    git -C "$remote" commit -m "init"
+
     target="$TEST_TMPDIR/existing-dotfiles"
-    git clone "$DOTFILES_DIR" "$target"
+    git clone "$remote" "$target"
     DOTFILES_DIR="$target" \
+    DOTFILES_REPO="$remote" \
     DOTFILES_SKIP_SETUP=1 \
         bash "$INSTALL_SH"
     [ -d "$target/.git" ]
