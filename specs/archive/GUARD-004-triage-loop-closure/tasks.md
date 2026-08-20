@@ -22,4 +22,4 @@ created: "2026-08-20"
       call at 5s
 - [x] Tests written for all three states, including the failure-is-not-empty rule
 - [x] Full verification run and recorded in `verification.md`
-- [ ] Independent adversarial review before archive (must not be the implementer)
+- [x] Independent adversarial review before archive (must not be the implementer)
