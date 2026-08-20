@@ -2,17 +2,20 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/doctor"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
+	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -122,7 +125,14 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
-	brief := mem.Brief(mem.BriefOptions{Cwd: cwd, ScriptsDir: memScriptsDir(), StaleDays: 14, Now: time.Now()})
+	brief := mem.Brief(mem.BriefOptions{
+		Cwd: cwd, ScriptsDir: memScriptsDir(), StaleDays: 14, Now: time.Now(),
+		// The file-based agents get the same probe as the Claude hook. Wiring it
+		// on one path only would rebuild the asymmetry this CLI exists to remove:
+		// opencode, agy and copilot read this brief, and a triage loop that only
+		// closes in one harness is not closed.
+		TriageQueue: memTriageQueue(cwd),
+	})
 	out, err := mem.RenderBrief(brief, format)
 	if err != nil {
 		return err
@@ -154,6 +164,7 @@ func runClaudeHook(cmd *cobra.Command) error {
 			_, _ = doctor.Run(doctor.Options{Quick: true, Out: &buf})
 			return buf.String()
 		},
+		TriageQueue: memTriageQueue(cwd),
 	})
 	out, err := mem.ClaudeEnvelope(ctx)
 	if err != nil {
@@ -161,6 +172,41 @@ func runClaudeHook(cmd *cobra.Command) error {
 	}
 	_, err = fmt.Fprint(cmd.OutOrStdout(), out)
 	return err
+}
+
+// memTriageQueue builds the session-start triage probe for cwd, or nil when this
+// repository does not run the review-triage loop at all.
+//
+// The nil case is load-bearing and is NOT the same as an empty queue. Most repos
+// carry no reviewer registry; reporting "could not be computed" in every one of
+// them would train the reader to skim past the line, and the line only has value
+// while it is rare. A missing registry means "not applicable" and stays silent;
+// a registry that is present and unanswerable is reported loudly.
+//
+// The gh call is bounded at five seconds. Session start is a latency budget
+// nobody volunteered for, and an unreachable API must degrade to one visible
+// message rather than a hung shell.
+func memTriageQueue(cwd string) func() (string, error) {
+	registry := filepath.Join(cwd, "harness", "review-attestation.json")
+	if _, err := os.Stat(registry); err != nil {
+		return nil
+	}
+	return func() (string, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		pending, err := prtriage.Fetch(ctx, "", registry)
+		if err != nil {
+			return "", err
+		}
+		if len(pending) == 0 {
+			return "", nil
+		}
+		refs := make([]string, 0, len(pending))
+		for _, st := range pending {
+			refs = append(refs, fmt.Sprintf("#%d", st.PR.Number))
+		}
+		return strings.Join(refs, ", "), nil
+	}
 }
 
 // cwdFromPayload extracts the hook JSON's .cwd, or "" when absent/malformed.

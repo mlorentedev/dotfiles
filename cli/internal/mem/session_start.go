@@ -32,6 +32,12 @@ type BriefOptions struct {
 	ScriptsDir string
 	StaleDays  int
 	Now        time.Time
+	// TriageQueue returns the compact list of pull requests awaiting a
+	// disposition, or an error when the question could not be answered. nil
+	// skips the section entirely — which is what the hermetic tests pass, and
+	// what a caller with no GitHub reach should pass rather than inventing an
+	// empty queue.
+	TriageQueue func() (string, error)
 }
 
 // ansiSeq strips the SGR colour codes vault-health.sh emits, matching the shell's
@@ -58,6 +64,9 @@ func Brief(opts BriefOptions) string {
 	brief += vaultHealth(vaultRoot, vaultName, opts.ScriptsDir)
 	brief += specs(opts.Cwd)
 	brief += lessonsStaleness(opts.Cwd, staleDays, opts.Now)
+	if opts.TriageQueue != nil {
+		brief += triageQueue(opts.TriageQueue())
+	}
 	brief += vaultBaseline(vaultRoot)
 
 	// Drop a leading blank line when there was no headline (no-vault CWD): the
