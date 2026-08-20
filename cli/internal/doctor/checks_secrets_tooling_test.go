@@ -19,14 +19,18 @@ func runSecretsTooling(t *testing.T, env map[string]string, onPath []string) (st
 // so the round-trip PASS / FAIL / not-called paths are table-testable with no
 // real age binary or key. A nil rt keeps newSys's success default.
 func runSecretsToolingRT(t *testing.T, env map[string]string, onPath []string, rt func(string) error) (string, int) {
+	return runSecretsToolingFull(t, env, onPath, nil, nil, rt)
+}
+
+func runSecretsToolingFull(t *testing.T, env map[string]string, onPath []string, cmdOut map[string]string, cfg *Config, rt func(string) error) (string, int) {
 	t.Helper()
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	sys := newSys(env, onPath, nil)
+	sys := newSys(env, onPath, cmdOut)
 	if rt != nil {
 		sys.AgeRoundTrip = rt
 	}
-	checkSecretsTooling(sys, rep)
+	checkSecretsTooling(sys, cfg, rep)
 	rep.Summary()
 	return buf.String(), rep.Failures()
 }
@@ -157,5 +161,55 @@ func TestSecretsTooling_AgeKeygenMissingWarnsAndSkips(t *testing.T) {
 	}
 	if !strings.Contains(out, "age-keygen not in PATH") {
 		t.Errorf("expected the WARN about the missing age-keygen\n%s", out)
+	}
+}
+
+func TestSecretsTooling_AgeVersionPin(t *testing.T) {
+	tests := []struct {
+		name       string
+		installed  string
+		pinned     string
+		wantStatus string
+		wantText   string
+	}{
+		{
+			name:       "exact match with leading v",
+			installed:  "v1.3.1\n",
+			pinned:     "1.3.1",
+			wantStatus: "[ OK ]",
+			wantText:   "age version matches versions.conf (1.3.1)",
+		},
+		{
+			name:       "exact match without leading v",
+			installed:  "1.3.1\n",
+			pinned:     "1.3.1",
+			wantStatus: "[ OK ]",
+			wantText:   "age version matches versions.conf (1.3.1)",
+		},
+		{
+			name:       "version drift produces warning without failure",
+			installed:  "1.2.1\n",
+			pinned:     "1.3.1",
+			wantStatus: "[WARN]",
+			wantText:   "age version drift: installed=1.2.1 pinned=1.3.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			writeFile(t, filepath.Join(home, ".config", "age", "key.txt"), "k\n")
+
+			cfg := &Config{Versions: map[string]string{"AGE_VERSION": tt.pinned}}
+			cmdOut := map[string]string{"age --version": tt.installed}
+
+			out, fails := runSecretsToolingFull(t, map[string]string{"HOME": home}, []string{"bw", "age", "age-keygen"}, cmdOut, cfg, nil)
+			if fails != 0 {
+				t.Fatalf("want 0 failures, got %d\n%s", fails, out)
+			}
+			if !strings.Contains(out, tt.wantStatus) || !strings.Contains(out, tt.wantText) {
+				t.Errorf("expected %s and %q in report\n%s", tt.wantStatus, tt.wantText, out)
+			}
+		})
 	}
 }

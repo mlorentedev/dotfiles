@@ -306,18 +306,23 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Extract BATS_VERSION from versions.conf
+      - name: Extract versions from versions.conf
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         id: versions
         run: |
           source versions.conf
           echo "BATS_VERSION=$BATS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "AGE_VERSION=$AGE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build integration test container
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        env:
+          BATS_VERSION: ${{ steps.versions.outputs.BATS_VERSION }}
+          AGE_VERSION: ${{ steps.versions.outputs.AGE_VERSION }}
         run: |
           docker build \
-            --build-arg BATS_VERSION=${{ steps.versions.outputs.BATS_VERSION }} \
+            --build-arg BATS_VERSION="$BATS_VERSION" \
+            --build-arg AGE_VERSION="$AGE_VERSION" \
             -f tests/Dockerfile.integration \
             -t dotfiles-integration-test .
 
