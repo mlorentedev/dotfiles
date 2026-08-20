@@ -1,10 +1,12 @@
 ---
 id: "POLISH-004-cross-os-polish-bundle"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Verified shipped 2026-08-19. The work merged as 679126e \"feat(POLISH-004): add .editorconfig + .inputrc cross-OS polish (#133) (#178)\" — so unlike the manual-close zombies this one closed through a PR, but the spec predates the `spec init` issue gate and declares no `issue:`, so the archive-on-merge gate had nothing to map the closing keyword onto. Five of six ACs re-verified against the tree today: .editorconfig and .inputrc are at the repo root, setup-linux.sh deploys .inputrc, tests/inputrc.bats asserts the deployment, and README documents both. AC2 (editorconfig-checker exits 0) was verified by PR #178 at merge; the tool is not installed locally."
 ---
 
 # POLISH-004-cross-os-polish-bundle

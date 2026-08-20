@@ -1,10 +1,12 @@
 ---
 id: "MEMORY-001-cross-agent-session-bridge"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-05-31"
 tags: [spec, proposal, session-memory, continuity, cross-agent, adr-014, harness-001]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Verified shipped 2026-08-19: every task in tasks.md is checked, and the capability is live under a different name. `dotf mem session-end` implements AC1 and AC2 verbatim - it archives the `## Session Handoff` block into <vault>/10_projects/<project>/sessions/<date>-<project>-claude.md and no-ops cleanly on trivial, missing or malformed input. AC3's SessionEnd hook is wired in ai/claude/settings.json. AC4's cross-OS parity holds by construction: the shell twins named in the ACs were absorbed into the Go CLI per ADR-020, so one binary serves both platforms. No declared issue, so the gate never saw it."
 ---
 
 # MEMORY-001-cross-agent-session-bridge
