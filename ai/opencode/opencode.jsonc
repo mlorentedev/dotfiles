@@ -35,7 +35,7 @@
 
   "provider": {
     // NaN community — primary daily provider.
-    // API key: $NAN_API_KEY (sensitive/nan.api-key.secret.age, exported by load-secrets.sh).
+    // API key: $NAN_API_KEY (sensitive/nan.api-key.secret.age, managed via dotf secrets).
     "nan": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "NaN",
@@ -275,7 +275,23 @@
   // the same repo until hive MCP adds a lock-file to auto-commit.
   // File watcher — skip noisy directories to reduce I/O.
   "watcher": {
-    "ignore": ["node_modules/**", "dist/**", ".git/**", "*.log", "build/**"]
+    "ignore": [
+      "node_modules/**",
+      "dist/**",
+      ".git/**",
+      "*.log",
+      "build/**",
+      ".venv/**",
+      "__pycache__/**",
+      ".pytest_cache/**",
+      ".ruff_cache/**",
+      "target/**",
+      ".turbo/**",
+      ".next/**",
+      "coverage/**",
+      ".cache/**",
+      "vendor/**"
+    ]
   },
   "mcp": {
     "sequential-thinking": {
@@ -293,6 +309,11 @@
     "hive": {
       "type": "local",
       "command": ["uvx", "hive-vault"],
+      "enabled": true
+    },
+    "pdf-modifier": {
+      "type": "local",
+      "command": ["uvx", "pdf-modifier-mcp"],
       "enabled": true
     }
   }

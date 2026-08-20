@@ -1,10 +1,18 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "opus",
   "effortLevel": "xhigh",
+  "advisorModel": "fable",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "permissions": {
+    "deny": [
+      "Bash(rm -rf /:*)",
+      "Bash(rm -rf ~/*:*)",
+      "Bash(git push *--force*:*)",
+      "Bash(git reset --hard*:*)"
+    ],
     "allow": [
       "mcp__hive__vault_query",
       "mcp__hive__vault_write",
@@ -22,12 +30,21 @@
       "Bash(git pull:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(go test:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(shellcheck:*)",
+      "Bash(bats:*)",
+      "Bash(dotf doctor:*)",
+      "Bash(dotf spec:*)",
       "Bash(helm search repo:*)",
       "Bash(helm show chart:*)",
       "Bash(nslookup:*)",
       "Bash(dig:*)",
       "Bash(gh auth status:*)",
-      "Skill(bender-config)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(gh search:*)",
       "Bash(gh issue list:*)",

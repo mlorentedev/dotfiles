@@ -15,6 +15,7 @@
     // ingested via per-model `interleaved` in opencode.jsonc; this binds the
     // show/hide toggle (also available as the /thinking command). Default is
     // unbound ("none"), which is why the reasoning felt invisible.
-    "display_thinking": "ctrl+o"
+    "display_thinking": "ctrl+o",
+    "messages_copy": "ctrl+y"
   }
 }

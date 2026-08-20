@@ -46,4 +46,4 @@ Verification check before claiming the change is live:
 grep -c "<new content>" ~/.<file>   # should match what's in the repo file
 ```
 
-Cross-ref: [`runbooks/guide-tmux.md`](runbooks/guide-tmux.md) documents the same flow under "How the config gets deployed".
+Cross-ref: [`runbooks/guide-tmux.md`](../runbooks/guide-tmux.md) documents the same flow under "How the config gets deployed".
