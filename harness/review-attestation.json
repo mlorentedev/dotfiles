@@ -77,7 +77,9 @@
         "rate limited by coderabbit.ai"
       ],
       "why": "Free tier, ~1 review/hour account-wide. On 2026-08-16 PRs #1007, #1009 and #1013 each carried this notice simultaneously, with zero reviews between them, while `gh pr checks` reported `CodeRabbit  pass`. Neither pushing new commits nor an explicit `@coderabbitai review` reclaims a slot while the quota is spent — measured, both.",
-      "review_markers": []
+      "review_markers": [
+        "No actionable comments were generated in the recent review"
+      ]
     },
     {
       "login": "github-actions",
