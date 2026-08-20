@@ -67,7 +67,12 @@ else
     export AGY_HOME="${AGY_HOME:-$HOME/.gemini/antigravity-cli}"
     export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
     export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
+    export COPILOT_MODEL="${COPILOT_MODEL:-gpt-5.6}"
 fi
+
+# Telemetry suppression (prevents agent prompts and unnecessary analytics network calls)
+export ASTRO_TELEMETRY_DISABLED=1
+export DO_NOT_TRACK=1
 
 # AI provider endpoints — NaN community (primary, OpenAI-compatible).
 # API key in $NAN_API_KEY - injected on demand via `dotf secrets run` (see below), not the ambient shell.
@@ -88,7 +93,7 @@ export NAN_BASE_URL="https://api.nan.builders/v1"
 # the agent had no use for it (#976). Scoping is least privilege and startup
 # time at once.
 if command -v dotf >/dev/null 2>&1; then
-    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode "$@"; }
+    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY,OLLAMA_API_KEY -- opencode "$@"; }
     pi() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "$@"; }
     # agy is deliberately NOT wrapped. It authenticates with its own stored
     # credentials and reads no variable this registry exposes — verified against

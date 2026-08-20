@@ -90,8 +90,6 @@ echo "$ANTIGRAVITY_ENDPOINT"   # expect https://cloudcode-pa.googleapis.com
 
 ## Fallback / recovery
 
-- Auth or update corruption: see [Gemini CLI Recovery](archive/guide-gemini-cli-recovery.md)
-  (`~/.gemini/` paths are shared).
 - Quota lost on AI Plus: drop Gemini from the daily rotation; Claude Code +
   OpenCode remain primary. Re-evaluate only if Gemini reliance rises.
 
@@ -100,4 +98,4 @@ echo "$ANTIGRAVITY_ENDPOINT"   # expect https://cloudcode-pa.googleapis.com
 - Decision spec: `specs/archive/AI-020-gemini-empirical-validation/` (matrix + evidence).
 - Follow-up: `specs/AI-024-antigravity-oauth-verification/` (OAuth/quota guard).
 - Upstream: <https://goo.gle/gemini-cli-migration>.
-- Related: [AI Tools Setup](ai-tools-setup.md), [Gemini CLI Recovery](archive/guide-gemini-cli-recovery.md).
+- Related: [AI Tools Setup](ai-tools-setup.md).

@@ -4,9 +4,9 @@ Project-bound knowledge for `dotfiles`, kept in-repo (docs-as-code). The *operat
 
 - [`architecture.md`](architecture.md) — **where does X live**: the normative repo tree, CI-guarded (`tests/architecture-md.bats`)
 - [`adr/`](adr/) — Architecture Decision Records (the *why* behind decisions) and the repo audits (`audit-*.md`) / architecture map
-- [`runbooks/`](runbooks/) — operational procedures (setup, secrets, tooling)
-- [`troubleshooting/`](troubleshooting/) — known issues and their fixes
-- [`lessons.md`](lessons.md) — accumulated gotchas and post-mortems
+- [`runbooks/`](runbooks/) — operational procedures (setup, secrets, tooling; indexed at [`runbooks/_index.md`](runbooks/_index.md))
+- [`troubleshooting/`](troubleshooting/) — known issues and their fixes (indexed at [`troubleshooting/_index.md`](troubleshooting/_index.md))
+- [`lessons/`](lessons/) — accumulated gotchas and post-mortems (indexed at [`lessons/_index.md`](lessons/_index.md); legacy stub: [`lessons.md`](lessons.md))
 - [`secrets-inventory.md`](secrets-inventory.md) — dated secrets-migration snapshot (see its own banner for current status)
 
 ## I want to…
@@ -17,7 +17,7 @@ Project-bound knowledge for `dotfiles`, kept in-repo (docs-as-code). The *operat
 | Add or rotate a secret | [`runbooks/guide-secrets-governance.md`](runbooks/guide-secrets-governance.md) |
 | Understand *why* a decision was made | [`adr/`](adr/) — find it by topic, newest ADR wins on conflict |
 | Fix something that's broken | [`troubleshooting/`](troubleshooting/) — symptom → cause → fix |
-| Avoid repeating a past mistake | [`lessons.md`](lessons.md) |
+| Avoid repeating a past mistake | [`lessons/`](lessons/) |
 | Set up a new machine's AI tooling | [`runbooks/`](runbooks/) — see the runbook for the tool in question |
 | Check whether a doc's claims are still trusted | the relevant `adr/audit-*.md` — each records what was verified and when |
 

@@ -2,6 +2,7 @@
   "defaultProvider": "nan",
   "defaultModel": "qwen3.6",
   "defaultThinkingLevel": "high",
+  "temperature": 0.2,
   "enabledModels": [
     "nan/qwen3.6",
     "nan/gemma4",

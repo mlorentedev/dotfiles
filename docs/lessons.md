@@ -11,4 +11,4 @@ tags: [project, dotfiles, lessons]
 
 > **Notice:** Lessons have been migrated to the modular directory format to optimize token efficiency and prevent monolithic bloat.
 >
-> 👉 **Canonical Index:** [](lessons/_index.md)
+> 👉 **Canonical Index:** [lessons/_index.md](lessons/_index.md)

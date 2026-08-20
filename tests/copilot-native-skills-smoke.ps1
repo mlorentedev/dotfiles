@@ -14,8 +14,8 @@ function Ensure-Directory {
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
-function Write-Info { param([string]$Message) }
-function Write-Success { param([string]$Message) }
+function Write-Info { param([string]$Message) $null = $Message }
+function Write-Success { param([string]$Message) $null = $Message }
 function Write-Warn { param([string]$Message) Write-Warning $Message }
 
 function Import-SetupFunction {

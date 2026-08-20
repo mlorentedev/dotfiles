@@ -1,10 +1,12 @@
 ---
 id: "IDEAS-004-collision-prompt"
 type: spec
-status: draft
+status: abandoned
 created: "2026-05-25"
 tags: [spec, proposal, ideas-004, setup, ux, dotfiles-survey, tier-2]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned in owner triage 2026-08-20. Never started: setup-linux.sh has no symlink-collision prompt. A survey-sourced idea rated Tier-2, declined against a backlog of 192 open issues. Cold since 2026-05-26."
 ---
 
 # IDEAS-004: Interactive collision prompt on symlink deploy

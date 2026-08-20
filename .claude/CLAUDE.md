@@ -93,8 +93,10 @@ dotf doctor --fix                   # Safely repair auto-fixable drift
 dotf spec init <spec-id> --issue <N> # scaffold a feature spec gated on an open issue
 dotf spec review <spec-id>          # launch detached adversarial review in tmux
 dotf spec archive <spec-id>         # archive spec upon successful independent review
+
+# Shell Diagnostics
+profile-shell                       # alias to `scripts/shell-profile.sh`; diagnostic tool when shell startup >300ms
 ```
-Alias to `scripts/shell-profile.sh`. Diagnostic tool — use when interactive shell startup feels >300ms (Linux baseline ~100-150ms with current `.zshrc` + plugins).
 
 ### Running knowledge crystallization
 
@@ -117,16 +119,17 @@ Alias to `scripts/shell-profile.sh`. Diagnostic tool — use when interactive sh
 
 See runbook: `docs/runbooks/guide-knowledge-distillation.md`
 
-### Using opencode (AI coding agent — primary daily after PR2)
+### Using opencode (AI coding agent — primary daily)
 ```bash
-oc                    # TUI launcher (opencode Go subscription, $10/mo fixed)
-qq "tu pregunta"      # one-shot quick-question via opencode-go/qwen3.6-plus (bash/zsh/pwsh)
+oc                    # TUI launcher (NaN provider default)
+qq "tu pregunta"      # one-shot quick-question via nan/qwen3.6 (bash/zsh/pwsh)
+qf "explica..."       # one-shot long-context question via nan/deepseek-v4-flash
 ```
-- Default TUI model: DeepSeek V4 Pro (Go catalog). A/B candidate: Kimi K2.6 — selectable via `/models` in TUI.
-- `qq` wrapper pinned to `opencode-go/qwen3.6-plus` (multilingual, fast, never-rate-limited). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`. Cross-platform name is `qq` (not `??`) because PowerShell 7+ reserves `??` as null-coalescing operator.
-- Frontier on-demand: provider `openrouter` (consumes existing `OPENROUTER_API_KEY` $5 credit).
-- First-time setup: launch `oc`, run `/connect` → select **OpenCode Go**, paste API key from opencode.ai/zen.
-- 3-layer PAYG guardrail: (1) `opencode.jsonc` lists only Go models, (2) Zen workspace cap $0, (3) no payment method for PAYG. Runbook: `docs/runbooks/guide-opencode-go-setup.md`.
+- Default TUI model: `nan/qwen3.6` (NaN community catalog; fast ~0.8s, 256K context).
+- `qq` wrapper pinned to `nan/qwen3.6` (multilingual, fast, never-rate-limited). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`.
+- `qf` wrapper pinned to `nan/deepseek-v4-flash` (1M context reasoning model).
+- Frontier on-demand: provider `openrouter` (consumes existing `OPENROUTER_API_KEY` credit).
+- Runbook: `docs/runbooks/guide-opencode-go-setup.md`.
 - Config: `ai/opencode/opencode.jsonc` → `~/.config/opencode/opencode.jsonc` (deployed by `setup-linux.sh`).
 - ⚠ Coexistence constraint: don't run `oc` and `claude` in parallel on the same repo until hive MCP adds a lock-file to its auto-commit.
 

@@ -60,3 +60,21 @@ alias tx='tmux new -A -s'         # attach-or-create by name: tx dotfiles
 alias txl='tmux ls'               # list sessions
 alias txa='tmux a'                # attach to most recent
 alias txk='tmux kill-session -t'  # kill named session: txk dotfiles
+
+# Modern Python (uv) shortcuts
+alias uvr="uv run"
+alias uvt="uv run pytest"
+alias uvl="uv run ruff check"
+
+# Go shortcuts
+alias gtr="go test -v -race ./..."
+alias gci="golangci-lint run"
+
+# Platform & Cloud shortcuts
+alias tk="poetry run toolkit"
+alias sops-edit="sops"
+
+# Astro web shortcuts
+alias astrod="npm run dev"
+alias astrob="npm run build"
+alias astroc="npx astro check"

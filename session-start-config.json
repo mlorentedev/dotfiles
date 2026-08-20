@@ -11,7 +11,7 @@
   },
   "injectors": {
     "sdd_reminder": { "enabled": true, "comment": "Unconditional Discipline Gate reminder (SDD-001), first in additionalContext" },
-    "doctor_drift": { "enabled": true, "comment": "Surface env-contract drift via scripts/doctor.{sh,ps1}" },
+    "doctor_drift": { "enabled": true, "comment": "Surface env-contract drift via dotf doctor --quick" },
     "hive_project": { "enabled": true, "comment": "Detect vault project match for CWD (10_projects + 50_work/45-development)" },
     "specs_summary": { "enabled": true, "comment": "Count active vs archived specs and flag [AGENT-DRAFT]/[AGENT-SUGGESTION] tags" },
     "vault_root_detection": { "enabled": true, "comment": "Walk up from CWD to find Obsidian vault (.obsidian/)" },
