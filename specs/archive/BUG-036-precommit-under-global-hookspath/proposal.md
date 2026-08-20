@@ -1,11 +1,13 @@
 ---
 id: "BUG-036-precommit-under-global-hookspath"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-06"
 issue: "mlorentedev/dotfiles#748"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, security]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Work shipped and merged under #748; the issue was then closed by hand, so the archive-on-merge gate (keyed on a PR closing keyword) never saw it and the spec was left active. A retroactive adversarial review cannot gate code already on main, so the waiver is recorded instead of manufacturing one. Backlog reconciliation 2026-08-19."
 ---
 
 # BUG-036-precommit-under-global-hookspath
