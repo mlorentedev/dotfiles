@@ -50,7 +50,8 @@ setup() {
 
 @test "setup-linux.sh installs age if missing" {
     grep -q 'command -v age' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'filippo.io/age' "$DOTFILES_DIR/setup-linux.sh"
+    grep -q 'FiloSottile/age' "$DOTFILES_DIR/setup-linux.sh"
+    grep -q 'AGE_VERSION' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh installs eza if missing" {

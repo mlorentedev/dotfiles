@@ -67,3 +67,25 @@ setup() {
     grep -q 'age --version' "$CI"
     grep -qE 'AGE_VERSION#v|expected \$\{AGE_VERSION' "$CI"
 }
+
+@test "setup-linux.sh: age install pins AGE_VERSION rather than fetching latest" {
+    local setup_sh="$REPO/setup-linux.sh"
+    grep -q 'AGE_VERSION' "$setup_sh"
+    grep -q 'FiloSottile/age/releases/download/v' "$setup_sh"
+    local age_section
+    age_section="$(sed -n '/Installing age/,/age already installed/p' "$setup_sh")"
+    if echo "$age_section" | grep -q 'filippo.io/age/latest' || echo "$age_section" | grep -q 'releases/latest'; then
+        printf 'setup-linux.sh still fetches latest age instead of pinned AGE_VERSION\n' >&2
+        return 1
+    fi
+}
+
+@test "integration: Dockerfile.integration installs pinned AGE_VERSION release rather than apt" {
+    local dockerfile="$REPO/tests/Dockerfile.integration"
+    grep -q 'ARG AGE_VERSION' "$dockerfile"
+    grep -q 'FiloSottile/age/releases/download/v\${AGE_VERSION}' "$dockerfile"
+    if grep -vE '^[[:space:]]*#' "$dockerfile" | grep -E 'apt-get install.*age\b'; then
+        printf 'Dockerfile.integration still installs age from apt\n' >&2
+        return 1
+    fi
+}

@@ -85,7 +85,7 @@ func Run(opts Options) (int, error) {
 		checkMemoryShape(sys, rep, opts.Fix)
 		checkPathFiles(sys, cfg, rep)
 		checkSecrets(sys, cfg, rep)
-		checkSecretsTooling(sys, rep)
+		checkSecretsTooling(sys, cfg, rep)
 		checkBitwardenReach(sys, rep)
 		checkBWServeDaemon(sys, rep)
 		checkBWMapping(sys, cfg, rep)
