@@ -366,3 +366,58 @@ add_linked_worktree() {
     [ "$status" -eq 0 ]
     [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]]
 }
+
+# BUG-090: pre-commit builds a hook repo's environment by cloning it into its own
+# store and checking out the pinned rev — an ordinary git checkout, which fires
+# THIS dispatcher too under a global core.hooksPath. If the cloned repo carries
+# its own .pre-commit-config.yaml (upstream dogfooding, e.g. pre-commit-hooks
+# itself), the BUG-036 fallback above hands it straight back to `pre-commit
+# hook-impl`, re-entering the SAME shared store the outer invocation is already
+# holding locked to build that very environment. Reproduced live: a first-time
+# `pre-commit install-hooks` hung indefinitely; the process tree showed a nested
+# `hook-impl --hook-type post-checkout` sleeping inside the store clone, with no
+# leaked GIT_DIR/GIT_INDEX_FILE to explain it any other way. These clones are not
+# user repos, so their gates must never reach pre-commit at all — the fix exits
+# before the BUG-036 fallback whenever $toplevel resolves under the store.
+
+add_store_config() {
+    mkdir -p "$STORE_REPO"
+    git -C "$STORE_REPO" init -q
+    cat > "$STORE_REPO/.pre-commit-config.yaml" <<'YAML'
+repos:
+  - repo: local
+    hooks:
+      - id: demo
+        name: demo
+        entry: "true"
+        language: system
+        stages: [post-checkout]
+YAML
+}
+
+@test "BUG-090: a repo under pre-commit's own store is a clean no-op, even with a config" {
+    stub_precommit 0
+    STORE_REPO="$WORK/pre-commit-store/repoabc123"
+    add_store_config
+    cd "$STORE_REPO"
+
+    run bash -c "PRE_COMMIT_HOME='$WORK/pre-commit-store' '$CHAIN' post-checkout 0000000000000000000000000000000000000000 abc 1 < /dev/null"
+    [ "$status" -eq 0 ]
+    # The whole point: pre-commit must never be invoked from inside its own store,
+    # not merely that the dispatcher itself exits cleanly.
+    [ ! -f "$ARGS_LOG" ]
+}
+
+@test "BUG-090: a repo merely sibling to the store path still falls through to pre-commit" {
+    # Guards the fix against an overly broad match — e.g. a bare prefix compare
+    # that would also swallow "$WORK/pre-commit-store-unrelated". Only a real
+    # path component boundary should count as \"inside the store\".
+    stub_precommit 0
+    STORE_REPO="$WORK/pre-commit-store-unrelated/repoabc123"
+    add_store_config
+    cd "$STORE_REPO"
+
+    run bash -c "PRE_COMMIT_HOME='$WORK/pre-commit-store' '$CHAIN' post-checkout 0000000000000000000000000000000000000000 abc 1 < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type post-checkout"* ]]
+}

@@ -59,23 +59,23 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $scripts = @(
-            'setup-windows.ps1',
-            'scripts/knowledge-crystallize.ps1',
-            'scripts/obs-cli.ps1',
-            'powershell/profile.ps1'
-          )
+          $files = Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1 |
+            Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
           $failed = $false
-          foreach ($script in $scripts) {
-            Write-Host "Analyzing $script..." -ForegroundColor Cyan
-            $results = Invoke-ScriptAnalyzer -Path $script -Settings .PSScriptAnalyzerSettings.psd1 -Severity Error,Warning
+          $total = 0
+          foreach ($file in $files) {
+            $relPath = [System.IO.Path]::GetRelativePath((Get-Location).Path, $file.FullName)
+            Write-Host "Analyzing $relPath..." -ForegroundColor Cyan
+            $results = Invoke-ScriptAnalyzer -Path $file.FullName -Settings .PSScriptAnalyzerSettings.psd1 -Severity Error,Warning
             if ($results) {
               $results | Format-Table -AutoSize
               $failed = $true
             } else {
               Write-Host "  No issues found." -ForegroundColor Green
             }
+            $total++
           }
+          Write-Host "Analyzed $total PowerShell files." -ForegroundColor Cyan
           if ($failed) { exit 1 }
 
   test:
