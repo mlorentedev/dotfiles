@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-075-model-map-routing-registry"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-21"
 issue: "mlorentedev/dotfiles#1124"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, orchestration, routing, registry]
