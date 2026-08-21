@@ -96,6 +96,7 @@ func Run(opts Options) (int, error) {
 		checkTmux(sys, cfg, rep)
 		checkOpenCode(sys, cfg, rep)
 		checkGolangciLint(sys, cfg, rep)
+		checkModelMap(cfg, rep)
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
 		checkDeployDrift(sys, cfg, rep)
 		checkRepoDirResolves(rep)

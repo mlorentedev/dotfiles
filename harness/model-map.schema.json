@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mlorentedev/dotfiles/harness/model-map.schema.json",
+  "title": "model-map",
+  "description": "The dispatch-time routing registry (ADR-032 \u00a73, shaped by ADR-035). Validated by cli/internal/harness/model_map.go, which reads THIS FILE rather than restating its rules \u2014 so the contract lives here and only its interpreter lives in Go. Adding a keyword here requires implementing it there; an unimplemented keyword is a loud error, never a silent pass.",
+  "type": "object",
+  "required": [
+    "$comment",
+    "version",
+    "pools",
+    "harnesses",
+    "tiers",
+    "chains",
+    "services"
+  ],
+  "additionalProperties": false,
+  "x-poolReferencesResolve": true,
+  "properties": {
+    "$comment": {
+      "description": "The measured rationale. Policy registries in this repo carry it because the reasoning is the artifact \u2014 reviewer-pool.json's $comment is the only record of why its fallback order is what it is.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "version": {
+      "description": "Two consumer classes read this file at different cadences \u2014 the render engine resolves `tiers` at compile time, a dispatcher resolves `chains` at run time \u2014 and that is the drift this field exists for.",
+      "type": "integer"
+    },
+    "pools": {
+      "description": "Inference pools. A pool is a quota, not a tool: `nan` is a pool, `pi` is a harness that reaches it.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "auth",
+          "probe"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "auth": {
+            "type": "string",
+            "enum": [
+              "subscription",
+              "seat",
+              "payg"
+            ]
+          },
+          "concurrency": {
+            "description": "Level 1 declaration only. NOTHING decrements this today \u2014 a dispatcher would, and there is none. Declaring it makes the budget legible, which is more than existed before; it does not make it enforced.",
+            "type": "integer"
+          },
+          "concurrency_note": {
+            "type": "string"
+          },
+          "rpm": {
+            "type": "integer"
+          },
+          "reserve_interactive": {
+            "type": "integer"
+          },
+          "shared_with": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "probe": {
+            "description": "How to answer 'is this pool reachable HERE'. `env:NAME` or `bin:NAME`. The map declares what can exist; the probe answers whether it does on this machine.",
+            "type": "string"
+          },
+          "escalation_only": {
+            "type": "boolean"
+          },
+          "why": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "harnesses": {
+      "description": "Agent runtimes. Each names the pools it can reach \u2014 and every name must resolve in `pools`, which is the rule x-poolReferencesResolve enforces and a stock schema cannot express.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "pools",
+          "render"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "pools": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "render": {
+            "type": "string",
+            "enum": [
+              "agent-md",
+              "agent-yaml",
+              "adapter",
+              "native",
+              "pointer"
+            ]
+          },
+          "spawn": {
+            "type": "string",
+            "enum": [
+              "task",
+              "subagent",
+              "fleet",
+              "none"
+            ]
+          },
+          "why": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tiers": {
+      "description": "Neutral tier -> a model id per harness. Resolved at COMPILE time and fed into each harness's native render.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "chains": {
+      "description": "Ordered fallback per tier, as `pool:model`. Resolved at RUN time and read only by a level-2 dispatcher: a Claude Task cannot fail over to NaN, so cross-pool fallback exists only outside the session. Kept separate from reviewer-pool.json deliberately \u2014 that one ranks independence above availability, this one ranks availability. ADR-035 states the merge trigger: a third consumer needing an ordered chain.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "services": {
+      "description": "Non-chat endpoints (embeddings, rerank). They are provider surfaces the map is responsible for, and they fit neither tiers nor chains.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "pool",
+          "model"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "pool": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

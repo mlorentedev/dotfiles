@@ -1,0 +1,150 @@
+{
+  "$comment": [
+    "The dispatch-time routing registry. Shape decided by ADR-035; contents from ADR-032 section 3 as",
+    "that ADR amends it. Validated against harness/model-map.schema.json by",
+    "cli/internal/harness/model_map.go, which reads the schema as data rather than restating it.",
+    "",
+    "NOT EMBEDDED, and that is deliberate. triggers.go next door carries a //go:embed copy and",
+    "falls back to it when the repo file is missing. For a routing map that is disqualifying: an",
+    "absent file would resolve to a build-time default and every check downstream would call it",
+    "healthy. Constraint C15 — a map that cannot be read fails loudly, never as empty and never as",
+    "a permissive default. See #1137 for the drift the embedded triggers copy already carries.",
+    "",
+    "CONCURRENCY IS DECLARED, NOT ENFORCED. This is level 1 of ADR-035's split. Nothing decrements",
+    "these numbers today because a dispatcher would, and `dotf agent` is still an unknown command.",
+    "Level 2 will bound only what dotf itself launches, and the honest guarantee stays narrow:",
+    "'dotf alone will never be the cause of exhaustion', never 'exhaustion will not happen'.",
+    "",
+    "NaN's limit is PER MODEL, not per API key — measured 2026-08-20: eight concurrent requests to",
+    "deepseek returned 5x200 and 3x429 while mimo answered 200 throughout that saturation. So a",
+    "second NaN model is a second lane, and a chain that falls through to one is not merely",
+    "retrying into the same wall. The reserve is static; adaptive reservation is out of scope.",
+    "",
+    "THE `top` TIER HAS NO FALLBACK, on purpose (ADR-032 section 4). Degrading the top tier silently is",
+    "how a gate becomes a green checkmark. It queues or escalates; it does not quietly get cheaper.",
+    "",
+    "`openrouter` and `codex` are both absent because they are RETIRED, not because they were",
+    "overlooked: openrouter was deleted upstream in August 2026, and codex is no longer used by",
+    "this operator (confirmed 2026-08-21). ADR-032 section 3 referenced a `codex` pool it never declared;",
+    "the resolution is deletion, not declaration. They are named here so the absences read as",
+    "decisions, which is why the assertions are structural rather than a grep for these words.",
+    "check is what asserts it, not a grep for this word.",
+    "",
+    "Model ids: alias where the harness self-rotates, canonical id where it does not. Claude Code",
+    "accepts opus/sonnet/haiku, which resolve to the current member of each family, so rotation",
+    "costs nothing there. Every other pool takes the canonical id."
+  ],
+  "version": 1,
+  "pools": {
+    "nan": {
+      "auth": "subscription",
+      "concurrency": 5,
+      "concurrency_note": "per model, not per API key — measured 2026-08-20",
+      "rpm": 60,
+      "reserve_interactive": 2,
+      "shared_with": [
+        "pi-tui",
+        "qq",
+        "qf",
+        "hive-embeddings",
+        "pr-agent-ci"
+      ],
+      "probe": "env:NAN_API_KEY",
+      "why": "Reasoning-class models on a flat subscription. The pool CI and the TUI both draw from, which is why the reserve exists."
+    },
+    "claude": {
+      "auth": "subscription",
+      "concurrency": 10,
+      "probe": "bin:claude",
+      "why": "The only harness with a session-time execution surface, so the only one where a hook can fire rather than an instruction being remembered."
+    },
+    "copilot": {
+      "auth": "seat",
+      "probe": "bin:copilot",
+      "why": "Seat-based, so concurrency is a fleet property rather than a number this map can state honestly."
+    },
+    "opencode": {
+      "auth": "subscription",
+      "probe": "bin:opencode",
+      "why": "The daily driver TUI. Draws on the NaN catalog through its own provider config."
+    }
+  },
+  "harnesses": {
+    "claude": {
+      "pools": [
+        "claude"
+      ],
+      "render": "agent-md",
+      "spawn": "task"
+    },
+    "pi": {
+      "pools": [
+        "nan"
+      ],
+      "render": "adapter",
+      "spawn": "subagent",
+      "why": "pi is not a pool; it is the harness that reaches NaN, and the only one with no declarative agent format — hence render: adapter (#563)."
+    },
+    "opencode": {
+      "pools": [
+        "opencode",
+        "nan"
+      ],
+      "render": "agent-md",
+      "spawn": "task"
+    },
+    "copilot": {
+      "pools": [
+        "copilot"
+      ],
+      "render": "agent-md",
+      "spawn": "fleet"
+    },
+    "agy": {
+      "pools": [
+        "nan"
+      ],
+      "render": "agent-md",
+      "spawn": "none",
+      "why": "Present in the reviewer pool as the provider-diverse fallback arm, so it belongs in the map that routes to it."
+    }
+  },
+  "tiers": {
+    "top": {
+      "claude": "opus"
+    },
+    "mid": {
+      "claude": "sonnet",
+      "nan": "deepseek-v4-flash",
+      "opencode": "qwen3.6-plus"
+    },
+    "low": {
+      "claude": "haiku",
+      "nan": "qwen3.6"
+    }
+  },
+  "chains": {
+    "top": [
+      "claude:opus"
+    ],
+    "mid": [
+      "claude:sonnet",
+      "nan:deepseek-v4-flash",
+      "nan:mimo-v2.5"
+    ],
+    "low": [
+      "nan:qwen3.6",
+      "claude:haiku"
+    ]
+  },
+  "services": {
+    "embeddings": {
+      "pool": "nan",
+      "model": "qwen3-embedding"
+    },
+    "rerank": {
+      "pool": "nan",
+      "model": "qwen3-rerank"
+    }
+  }
+}
