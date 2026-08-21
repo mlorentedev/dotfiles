@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f1",
+    "behavior": "harness/model-map.json exists, parses, and carries all seven declared blocks",
+    "verification": "python3 -c \"import json,sys; d=json.load(open('harness/model-map.json')); need={'$comment','version','pools','harnesses','tiers','chains','services'}; missing=need-set(d); sys.exit(1 if missing else 0)\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f2",
+    "behavior": "the shipped map validates against the shipped schema",
+    "verification": "cd cli && go test ./internal/harness/ -run TestModelMapValidatesAgainstSchema",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f3",
+    "behavior": "the schema rejects a harness referencing a pool absent from pools",
+    "verification": "cd cli && go test ./internal/harness/ -run TestSchemaRejectsDanglingPoolReference",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f4",
+    "behavior": "no openrouter pool is declared and no harness references one",
+    "verification": "! grep -q openrouter harness/model-map.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f5",
+    "behavior": "the loader exposes tier resolution and chain resolution as distinct consumer classes",
+    "verification": "cd cli && go test ./internal/harness/ -run TestModelMapConsumerClasses",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f6",
+    "behavior": "dotf doctor distinguishes absent, unparseable and schema-invalid as three loud outcomes, none rendering as an empty or permissive map",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestModelMapCheckThreeBrokenStates",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f7",
+    "behavior": "budget fields are exposed read-only with no counter — level 1 declaration only",
+    "verification": "cd cli && go test ./internal/harness/ -run TestModelMapBudgetIsDeclarationOnly",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-075-model-map-routing-registry-f8",
+    "behavior": "bats covers the registry file and the doctor check",
+    "verification": "~/.local/bin/bats tests/model-map.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
