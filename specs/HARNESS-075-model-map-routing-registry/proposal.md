@@ -126,9 +126,20 @@ known and mitigated in the acceptance criteria rather than left floating.
       per ADR-035 Decision 2.
 - [ ] **AC2** — `harness/model-map.schema.json` exists as the declarative contract, and the shipped
       map validates against **that file** — read at validation time, never re-expressed as Go
-      literals. The validator is native (no schema-engine dependency) and supports only the
-      JSON Schema subset the file actually uses; encountering a construct it does not implement is
-      a loud error, never a silent pass.
+      literals. Standard draft-2020-12 keywords are interpreted by a conforming library
+      (`santhosh-tekuri/jsonschema/v6`), so the subset the file may use is the whole draft rather
+      than an allow-list Go has to keep up with.
+
+      *Amended 2026-08-21, after round 5.* As first written this criterion bound the validator to
+      be native with no schema-engine dependency, and bound an unimplemented construct to be a loud
+      error. The Risks section above records why the first half was abandoned — the threshold
+      declared before round 4 fired — but the criterion itself was left standing, so the spec
+      asserted a property the shipped code contradicts. The second half survives the pivot in the
+      only place it still means anything: draft 2020-12 makes an unknown keyword an annotation,
+      which is the tolerance the two `x-` cross-block rules depend on to coexist with the library,
+      and is therefore also what would make a MISSPELLED rule name invisible. So the `x-` namespace
+      is this repo's own and is validated as a closed set — an `x-` keyword the validator does not
+      implement is a loud error. Standard keywords are the library's to interpret.
 - [ ] **AC3** — The schema **rejects** a `harnesses.<h>.pools[]` entry naming a pool absent from
       `pools`. Proven by a fixture that fails validation, not by inspection.
 - [ ] **AC4** — The built map declares no `openrouter` pool, and no harness references one.
