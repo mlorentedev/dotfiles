@@ -13,7 +13,7 @@ created: "2026-08-21"
 - [x] Branch created from main: `feat/harness-075-model-map`
 - [x] `proposal.md` is complete and acceptance criteria are testable
 - [x] No open questions left in `proposal.md` "Risks / open questions" — ADR-035 closed all four
-- [ ] **PR #1136 (ADR-035) merged.** This spec transcribes its decisions; opening this spec's PR
+- [x] **PR #1136 (ADR-035) merged** 2026-08-21T02:11Z. This spec transcribes its decisions; opening this spec's PR
       first would cite an ADR that does not exist on `main`.
 
 ## Implementation
