@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mlorentedev/dotfiles/harness/model-map.schema.json",
   "title": "model-map",
-  "description": "The dispatch-time routing registry (ADR-032 \u00a73, shaped by ADR-035). Validated by cli/internal/harness/model_map.go, which reads THIS FILE rather than restating its rules \u2014 so the contract lives here and only its interpreter lives in Go. Adding a keyword here requires implementing it there; an unimplemented keyword is a loud error, never a silent pass.",
+  "description": "The dispatch-time routing registry (ADR-032 §3, shaped by ADR-035). Validated by cli/internal/harness/model_map.go, which reads THIS FILE rather than restating its rules — so the contract lives here and only its interpreter lives in Go. Adding a keyword here requires implementing it there; an unimplemented keyword is a loud error, never a silent pass.",
   "type": "object",
   "required": [
     "$comment",
@@ -17,7 +17,7 @@
   "x-poolReferencesResolve": true,
   "properties": {
     "$comment": {
-      "description": "The measured rationale. Policy registries in this repo carry it because the reasoning is the artifact \u2014 reviewer-pool.json's $comment is the only record of why its fallback order is what it is.",
+      "description": "The measured rationale. Policy registries in this repo carry it because the reasoning is the artifact — reviewer-pool.json's $comment is the only record of why its fallback order is what it is.",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -25,7 +25,7 @@
       }
     },
     "version": {
-      "description": "Two consumer classes read this file at different cadences \u2014 the render engine resolves `tiers` at compile time, a dispatcher resolves `chains` at run time \u2014 and that is the drift this field exists for.",
+      "description": "Two consumer classes read this file at different cadences — the render engine resolves `tiers` at compile time, a dispatcher resolves `chains` at run time — and that is the drift this field exists for.",
       "type": "integer"
     },
     "pools": {
@@ -49,17 +49,20 @@
             ]
           },
           "concurrency": {
-            "description": "Level 1 declaration only. NOTHING decrements this today \u2014 a dispatcher would, and there is none. Declaring it makes the budget legible, which is more than existed before; it does not make it enforced.",
-            "type": "integer"
+            "description": "Level 1 declaration only. NOTHING decrements this today — a dispatcher would, and there is none. Declaring it makes the budget legible, which is more than existed before; it does not make it enforced.",
+            "type": "integer",
+            "minimum": 0
           },
           "concurrency_note": {
             "type": "string"
           },
           "rpm": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0
           },
           "reserve_interactive": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0
           },
           "shared_with": {
             "type": "array",
@@ -81,7 +84,7 @@
       }
     },
     "harnesses": {
-      "description": "Agent runtimes. Each names the pools it can reach \u2014 and every name must resolve in `pools`, which is the rule x-poolReferencesResolve enforces and a stock schema cannot express.",
+      "description": "Agent runtimes. Each names the pools it can reach — and every name must resolve in `pools`, which is the rule x-poolReferencesResolve enforces and a stock schema cannot express.",
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
@@ -132,19 +135,24 @@
         "type": "object",
         "minProperties": 1,
         "additionalProperties": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1,
+          "description": "A model id. `minLength` alone is not enough: draft 2020-12 counts code points untrimmed, so \"  \" satisfies minLength 1. The pattern is how the standard expresses non-blank, and it is what a hand-rolled validator got wrong by trimming instead.",
+          "pattern": "^\\S.*$"
         }
       }
     },
     "chains": {
-      "description": "Ordered fallback per tier, as `pool:model`. Resolved at RUN time and read only by a level-2 dispatcher: a Claude Task cannot fail over to NaN, so cross-pool fallback exists only outside the session. Kept separate from reviewer-pool.json deliberately \u2014 that one ranks independence above availability, this one ranks availability. ADR-035 states the merge trigger: a third consumer needing an ordered chain.",
+      "description": "Ordered fallback per tier, as `pool:model`. Resolved at RUN time and read only by a level-2 dispatcher: a Claude Task cannot fail over to NaN, so cross-pool fallback exists only outside the session. Kept separate from reviewer-pool.json deliberately — that one ranks independence above availability, this one ranks availability. ADR-035 states the merge trigger: a third consumer needing an ordered chain.",
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
         "type": "array",
         "minItems": 1,
         "items": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[^:[:space:]]+:[^:[:space:]]+$",
+          "description": "`pool:model`, both halves non-empty and free of whitespace. A pattern rather than minLength, because \"nan:\" is four characters and still routes nowhere. The trailing `+` rather than `.*` is deliberate: `.*` accepted \"nan:deepseek   \" and \"nan:deep:seek\"."
         }
       }
     },
@@ -160,13 +168,18 @@
         "additionalProperties": false,
         "properties": {
           "pool": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S.*$"
           },
           "model": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S.*$"
           }
         }
       }
     }
-  }
+  },
+  "x-tiersHaveChains": true
 }

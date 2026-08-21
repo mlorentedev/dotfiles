@@ -61,9 +61,9 @@ created: "2026-08-21"
       installed (BUG-071)
 - [x] [AC9] bats suite green — 1394/1394, BATS_EXIT=0
 - [x] `verification.md` filled in with the command output that proves each criterion
-- [ ] Independent adversarial review from `harness/reviewer-pool.json` — required by the archive
+- [ ] Independent adversarial review from `harness/reviewer-pool.json` — **4 rounds run, all FAIL, all findings closed; round 5 pending** — required by the archive
       gate, and the reviewer must not be the implementer
-- [ ] PR opened referencing this spec folder, **after PR #1136 has merged**
+- [x] PR opened referencing this spec folder, after PR #1136 merged — **#1143**, opened 2026-08-21
 
 ## Machine-readable features
 

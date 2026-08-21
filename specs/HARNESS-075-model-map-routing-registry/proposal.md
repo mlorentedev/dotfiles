@@ -66,17 +66,44 @@ known and mitigated in the acceptance criteria rather than left floating.
   intent.** The failure mode this repository keeps hitting is a positive-looking signal, so the
   check must distinguish *absent*, *unparseable* and *schema-invalid*, and must never render any of
   them as an empty-but-valid map. AC6 pins this.
-- **AC2 and AC6 need schema validation, and `cli` has three direct dependencies.** `go list -m all`
-  finds no schema engine, so validating with one would ship a fourth direct dependency inside the
-  `dotf` binary — the doctor check validates at runtime, not only in CI. **Decided 2026-08-21:
-  native Go, no new dependency** (C7, and the module's evident three-dependency discipline).
-  The obvious cost of that choice is two places where the rules live, and it is avoided by
-  construction: **the validator reads `model-map.schema.json` and enforces what it finds there**,
-  rather than restating the rules as Go code. The schema stays the single source of truth and is
-  still consumable by editors and any external validator; what is hand-rolled is the interpreter,
-  not the rules. Its bound: it implements only the subset the schema file uses, and an
-  unimplemented construct must fail loudly rather than pass silently — otherwise the validator
-  becomes the very thing C15 forbids, a check that reports health it never established.
+- **AC2 and AC6 need schema validation, and `cli` had three direct dependencies.** The first
+  decision (2026-08-21) was **native Go, no new dependency** (C7 plus the module's evident
+  three-dependency discipline), with the validator reading `model-map.schema.json` as data so the
+  schema file stayed the single source of truth and only its interpreter was hand-rolled.
+
+  **That decision was taken with a falsifiable threshold, and the threshold fired.** Declared before
+  the evidence arrived: *any NEW interpreter-semantics finding in adversarial review round 4 means
+  the no-dependency choice is empirically a defect factory.* Round 4 delivered **two** — malformed
+  `properties` elements and non-string `required` members skipped silently (the class round 3's
+  Blocker was meant to seal, one level deeper), and `minimum` unimplemented so negative budgets
+  validated.
+
+  **Family tally across four rounds: eight**, every one of them something a conforming
+  implementation gets right by construction — `minLength`, `pattern`, `minimum`, member types,
+  `properties` element types, `enum` deep equality, malformed-schema detection, and a non-conforming
+  `minLength` that trimmed whitespace where draft 2020-12 counts code points untrimmed. That last
+  one meant **the schema's two consumers could disagree about the same document**: an editor using a
+  real validator accepted `"  "` where `dotf` rejected it.
+
+  **Revised 2026-08-21: `santhosh-tekuri/jsonschema/v6` interprets the standard keywords.** What did
+  not change: the schema FILE remains the SSOT, and both custom cross-block rules stay, because no
+  schema language expresses them. What changed is only who interprets standard keywords — and the
+  keyword allow-list died with the interpreter it guarded, since draft 2020-12 treats unknown
+  keywords as annotations, which is exactly the tolerance `x-poolReferencesResolve` and
+  `x-tiersHaveChains` need.
+
+  **Measured dependency cost, reported rather than assumed:** direct requires 3 → 4; one new module
+  links into the binary alongside it, `golang.org/x/text`, an official Go sub-repository;
+  `dlclark/regexp2` appears in the module graph but does not link. Not "zero transitive", not a tree.
+
+  **The proof the swap loses nothing:** every named regression test from rounds 1–4 passes against
+  the library-backed validator. Three needed changes and each is recorded in the code rather than
+  quietly applied — one test was DELETED because its premise (an unimplemented construct to be loud
+  about) no longer exists, one had its inline schema corrected to express non-blank the standard way
+  rather than relying on the old trimming, and one had its assertion moved from the old error
+  wording to the property. **A fourth failure was a real regression this swap introduced and is
+  fixed:** the library does not police our own `x-` keywords, so a bare bool assertion re-opened the
+  round-2 defect. They are type-checked explicitly now.
 
 - **The neighbouring registry embeds a build-time copy of itself, and `model-map.json` must not.**
   `triggers.go` carries `//go:embed triggers.json` and falls back to it when the repo file is not

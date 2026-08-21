@@ -39,8 +39,17 @@ func checkModelMap(cfg *Config, rep *Report) {
 
 	doc, err := os.ReadFile(mapPath)
 	if err != nil {
+		// This check reads the DEPLOYED copy (cfg.DotfilesDir), like every other
+		// harness check here, so the ordinary cause of an absent map is a repo
+		// that has moved ahead of the deploy dir rather than a missing file. Say
+		// so: the FAIL is correct per C15, but a diagnostic that names only the
+		// symptom sends the reader hunting for a file that is right there in the
+		// checkout. setup-linux.sh mirrors the whole directory
+		// (`cp -rf harness/. $DOTFILES_DIR/harness/`), so re-running setup is the
+		// fix and no per-file wiring is needed.
 		rep.Fail(fmt.Sprintf(
-			"%s not found at %s — this is not an empty routing map, and nothing falls back to a default",
+			"%s not found at %s — this is not an empty routing map, and nothing falls back to a default.\n"+
+				"    This check reads the deployed copy; if the file exists in your checkout, re-run setup to mirror it.",
 			harness.ModelMapFile, mapPath))
 		return
 	}
