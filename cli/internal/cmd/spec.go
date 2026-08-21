@@ -417,7 +417,7 @@ agent) or by hand. Do not skip the Why.`,
 			}
 
 			cmd.Printf("\n[OK] Created: specs/%s\n", id)
-			cmd.Printf("     proposal.md, tasks.md, verification.md\n")
+			cmd.Printf("     proposal.md, tasks.md, verification.md, features.json\n")
 			if issueNum > 0 {
 				cmd.Printf("     Work-gate linked: issue #%d\n", issueNum)
 			}
