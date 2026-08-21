@@ -1,6 +1,8 @@
 package harness
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -92,5 +94,65 @@ func TestValidatorRejectsUnimplementedSchemaConstructs(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "patternProperties") {
 		t.Errorf("the error must name the unimplemented construct, got: %v", err)
+	}
+}
+
+// The assertion that keeps the shipped map and the shipped schema from drifting
+// apart. Both are read from disk rather than from fixtures, because a fixture
+// proves the validator works and this proves the repository is correct.
+func TestModelMapValidatesAgainstSchema(t *testing.T) {
+	root := repoRootForTest(t)
+	got, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("the shipped map must validate against the shipped schema: %v", err)
+	}
+	for _, block := range []string{"$comment", "version", "pools", "harnesses", "tiers", "chains", "services"} {
+		if _, ok := got[block]; !ok {
+			t.Errorf("missing block %q", block)
+		}
+	}
+}
+
+// ADR-035 amendment: the provider was deleted upstream, so no pool may declare it
+// and no harness may reference it. Structural, not textual — the $comment names
+// openrouter on purpose, so that its absence reads as a decision.
+func TestModelMapDeclaresNoDeletedProvider(t *testing.T) {
+	root := repoRootForTest(t)
+	m, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	pools, _ := m["pools"].(map[string]any)
+	if _, present := pools["openrouter"]; present {
+		t.Error("pools declares openrouter, a provider deleted upstream")
+	}
+	harnesses, _ := m["harnesses"].(map[string]any)
+	for name, raw := range harnesses {
+		h, _ := raw.(map[string]any)
+		for _, p := range toStrings(h["pools"]) {
+			if p == "openrouter" {
+				t.Errorf("harnesses.%s references the deleted openrouter pool", name)
+			}
+		}
+	}
+}
+
+// repoRootForTest walks up from the test's working directory to the repo root,
+// so the test reads the files the repository actually ships rather than a copy.
+func repoRootForTest(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ModelMapFile)); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("could not find %s walking up from %s", ModelMapFile, dir)
+		}
+		dir = parent
 	}
 }
