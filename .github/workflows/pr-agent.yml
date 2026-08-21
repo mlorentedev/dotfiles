@@ -108,25 +108,6 @@ jobs:
         && startsWith(github.event.comment.body, '/'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Serialise inference repo-wide: QUEUE, never cancel (#1107).
-    #
-    # This is a SECOND group, at job level, and it does not replace the
-    # workflow-level one above — the two answer different questions. The
-    # workflow group is per-PR and cancels, so a burst of pushes still collapses
-    # to one review of the settled state (#1042). This one is repo-wide and does
-    # not cancel, so two PRs never ask NaN for inference at the same time.
-    #
-    # ADR-032 names the rule: the top tier "queues or escalates, NEVER degrades
-    # silently". Queuing is the sanctioned behaviour, and it is what was missing:
-    # the cluster's 5 slots were being spent by our own parallel CI, so a review
-    # failed rather than waited.
-    #
-    # It cannot guarantee a free slot — pi, qq and hive draw on the same pool —
-    # but it caps this workflow's demand at one, leaving the rest for interactive
-    # use instead of racing it.
-    concurrency:
-      group: pr-agent-nan-inference
-      cancel-in-progress: false
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
