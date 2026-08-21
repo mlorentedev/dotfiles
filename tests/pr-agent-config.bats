@@ -56,8 +56,46 @@ refute_grep() {
     refute_grep 'fallback_models = \[[^]]*gemma4' "$CFG"
 }
 
-@test "pr-agent: the reviewing model is the one measured, not the fast one" {
-    grep -q 'model = "openai/deepseek-v4-flash"' "$CFG"
+@test "pr-agent: the reviewing model is reasoning-class, not the fast one" {
+    # This pinned `deepseek-v4-flash` by name until #1149 moved CI to its own
+    # model lane. Pinning one id made a routing change look like a regression,
+    # so the assertion now names the PROPERTY that actually matters and the
+    # excluded models by name — the same shape the fallback test above already
+    # uses, and the same reason.
+    #
+    # The property: the reviewing model must be reasoning-class. The line
+    # reviewer-pool.json draws is context window plus a mandatory reasoning
+    # chain — deepseek-v4-flash and mimo-v2.5 at 1M sit on one side, qwen3.6 and
+    # gemma4 at 262K on the other. A reviewer that PASSes cheaply is worse than
+    # no gate.
+    run grep -E '^model = "openai/(deepseek-v4-flash|mimo-v2\.5)"' "$CFG"
+    [ "$status" -eq 0 ]
+
+    # And the excluded ones stay impossible in the primary slot, not only in the
+    # fallback list. The old test could not catch this, because asserting one
+    # allowed id says nothing about which ids are forbidden.
+    refute_grep '^model = "openai/qwen3\.6"' "$CFG"
+    refute_grep '^model = "openai/gemma4"' "$CFG"
+}
+
+@test "pr-agent: CI and the spec-review gate do not share a model" {
+    # #1149. NaN's concurrency limit is per MODEL, not per API key, so CI and
+    # `dotf spec review` drawing on the same id share one bucket of five.
+    # Measured 2026-08-21: a spec review died with
+    # `429: deepseek-v4-flash concurrency limit` because PR-Agent was reviewing
+    # the very PR that review had to clear. CI starved the gate its own PR
+    # needed to pass.
+    #
+    # Two models are two independent buckets, so the fix is separation and this
+    # asserts it stays separated. The pool's PRIMARY is what matters: that is
+    # what `dotf spec review` reaches for first.
+    pool_primary="$(python3 -c "
+import json
+d = json.load(open('$REPO/harness/reviewer-pool.json'))
+print(next(e['model'] for e in d['pool'] if e['role'] == 'primary'))
+")"
+    [ -n "$pool_primary" ]
+    refute_grep "^model = \"openai/${pool_primary}\"" "$CFG"
 }
 
 @test "pr-agent: the token budget is stated, because NaN models are not in LiteLLM's registry" {
