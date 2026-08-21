@@ -416,6 +416,50 @@ func TestGitStalenessIgnoresVerificationMd(t *testing.T) {
 	}
 }
 
+// TestGitStalenessRebaseWithoutContractChangeIsNotStale verifies that rebasing
+// a branch when contract files are byte-identical does not falsely mark the
+// review as stale (#1036).
+func TestGitStalenessRebaseWithoutContractChangeIsNotStale(t *testing.T) {
+	root := t.TempDir()
+	gitRun(t, root, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(root, "init.txt"), []byte("initial\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, root, "add", "init.txt")
+	gitRun(t, root, "commit", "-qm", "init")
+
+	// Branch out to feature branch and create/commit the spec
+	gitRun(t, root, "checkout", "-b", "feat/my-spec")
+	writeSpec(t, root, "AI-001-x", map[string]string{
+		"proposal.md":     "---\nstatus: verifying\n---\nclean\n",
+		"tasks.md":        "tasks\n",
+		"verification.md": "evidence\n",
+	})
+	gitRun(t, root, "add", "-A")
+	gitRun(t, root, "commit", "-qm", "feat: create spec")
+	reviewedSHA := gitRun(t, root, "rev-parse", "HEAD")
+
+	// Advance main with an unrelated change
+	gitRun(t, root, "checkout", "main")
+	if err := os.WriteFile(filepath.Join(root, "other.txt"), []byte("main work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, root, "add", "other.txt")
+	gitRun(t, root, "commit", "-qm", "chore: main commit")
+
+	// Rebase feature branch onto main (rewrites the spec commit SHA)
+	gitRun(t, root, "checkout", "feat/my-spec")
+	gitRun(t, root, "rebase", "main")
+
+	stale, known, reason := gitStaleness{}.Stale(root, "AI-001-x", reviewedSHA)
+	if !known {
+		t.Fatalf("git repository must be answerable")
+	}
+	if stale {
+		t.Errorf("review should not be stale after rebase with identical contract files, got reason: %q", reason)
+	}
+}
+
 func TestGitStalenessUnresolvableShaIsStale(t *testing.T) {
 	root, _ := gitSpecRepo(t, "AI-001-x")
 
