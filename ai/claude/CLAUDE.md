@@ -13,7 +13,7 @@
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:e4cff3c3b77d6548) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:9ea6f418d63d5cee) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -34,7 +34,7 @@ Working code is not a finished change. Before saying done, each of these is true
 2. **Knowledge** — what was learned is written where it belongs, this session: build/operate detail in the repo (docs/lessons/, docs/adr/), cross-project insight in the store.
 3. **Board** — the ticket matches reality: picked up when you start, blocked when blocked, closed with the change that closed it.
 4. **Review** — an open PR is not finished work. Its checks and its reviewer comments are triaged, and each comment is applied, ticketed, or declined with a reason.
-5. **Evidence** — no completion claim without the command output that proves it, produced in this session.
+5. **Evidence** — no completion claim without the command output that proves it, produced in this session (e.g. test runs, and for PR work, `dotf pr triage-queue` returning exit 0 / queue clear).
 
 Any of the five may be skipped, but only as a stated decision naming which one and why. Silence is not a skip.
 

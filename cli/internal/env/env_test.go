@@ -239,11 +239,54 @@ func TestResolveRepoFirstFallsBackDeployedThenWalkUpThenEmpty(t *testing.T) {
 	}
 }
 
+func TestRepoDirPrefersWorktreeCwdOverDotfilesRepoDir(t *testing.T) {
+	// DOTFILES_REPO_DIR points at the main checkout, but the operator runs
+	// inside a git worktree (where .git is a file, not a directory). The worktree
+	// must win so mutations land in the branch being worked on (BUG-072).
+	mainRepo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(mainRepo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", mainRepo)
+
+	worktree := t.TempDir()
+	gitFile := filepath.Join(worktree, ".git")
+	if err := os.WriteFile(gitFile, []byte("gitdir: "+filepath.Join(mainRepo, ".git", "worktrees", "wt")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(worktree, "cli", "internal")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	got, err := filepath.EvalSymlinks(RepoDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.EvalSymlinks(worktree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("RepoDir() = %q, want worktree %q (not DOTFILES_REPO_DIR %q)", got, want, mainRepo)
+	}
+}
+
 func TestRepoDirPrefersDotfilesRepoDir(t *testing.T) {
 	repo := t.TempDir()
 	t.Setenv("DOTFILES_REPO_DIR", repo)
-	if got := RepoDir(); got != repo {
-		t.Errorf("RepoDir() = %q, want %q", got, repo)
+	t.Chdir(t.TempDir()) // outside any git repo
+	got, err := filepath.EvalSymlinks(RepoDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("RepoDir() = %q, want %q", got, want)
 	}
 }
 
@@ -293,6 +336,7 @@ func TestResolveRegistryPathPrefersRepoCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DOTFILES_REPO_DIR", repo)
+	t.Chdir(t.TempDir())
 
 	if got := ResolveRegistryPath(); got != want {
 		t.Errorf("ResolveRegistryPath() = %q, want repo copy %q", got, want)
@@ -305,6 +349,7 @@ func TestResolveRegistryPathFallsBackToDeployed(t *testing.T) {
 	t.Setenv("DOTFILES_REPO_DIR", t.TempDir()) // empty: no secrets/registry.yaml
 	deployed := t.TempDir()
 	t.Setenv("DOTFILES_DIR", deployed)
+	t.Chdir(t.TempDir())
 	want := filepath.Join(deployed, "secrets", "registry.yaml")
 
 	if got := ResolveRegistryPath(); got != want {
@@ -315,6 +360,7 @@ func TestResolveRegistryPathFallsBackToDeployed(t *testing.T) {
 func TestRepoRegistryPathReturnsCheckoutPath(t *testing.T) {
 	repo := t.TempDir()
 	t.Setenv("DOTFILES_REPO_DIR", repo)
+	t.Chdir(t.TempDir())
 	got, err := RepoRegistryPath()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -343,6 +389,7 @@ func TestResolveSensitiveDirPrefersRepoCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DOTFILES_REPO_DIR", repo)
+	t.Chdir(t.TempDir())
 
 	if got := ResolveSensitiveDir(); got != want {
 		t.Errorf("ResolveSensitiveDir() = %q, want repo copy %q", got, want)
@@ -355,6 +402,7 @@ func TestResolveSensitiveDirFallsBackToDeployed(t *testing.T) {
 	t.Setenv("DOTFILES_REPO_DIR", t.TempDir()) // empty: no sensitive/
 	deployed := t.TempDir()
 	t.Setenv("DOTFILES_DIR", deployed)
+	t.Chdir(t.TempDir())
 	want := filepath.Join(deployed, "sensitive")
 
 	if got := ResolveSensitiveDir(); got != want {
@@ -367,6 +415,7 @@ func TestRepoSensitiveDirPrefersRepoCheckout(t *testing.T) {
 	// committable (the write side of ADR-030 / #635).
 	repo := t.TempDir()
 	t.Setenv("DOTFILES_REPO_DIR", repo)
+	t.Chdir(t.TempDir())
 	got, err := RepoSensitiveDir()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
