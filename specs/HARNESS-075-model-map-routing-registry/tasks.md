@@ -59,11 +59,21 @@ created: "2026-08-21"
       whole package on one error
 - [x] [AC9] `golangci-lint run` green **on the version pinned in `versions.conf`**, not whatever is
       installed (BUG-071)
-- [x] [AC9] bats suite green — 1394/1394, BATS_EXIT=0
+- [x] [AC9] bats suite green — 1394/1394, BATS_EXIT=0 at the time of writing; re-run on the
+      assembled tree against current main, where the count has since drifted upward as main gained
+      tests. The count is evidence of a run, not a contract
 - [x] `verification.md` filled in with the command output that proves each criterion
-- [ ] Independent adversarial review from `harness/reviewer-pool.json` — required by the archive
+- [ ] Independent adversarial review from `harness/reviewer-pool.json` — **5 rounds run, all
+      FAIL.** Round 5 (`nan/deepseek-v4-flash`, `reviewed_sha` `1b1cfb3`) returned a Blocker that
+      no earlier round could see: the change reviewed was never the change merged. Its two Majors
+      and four Minors are closed by the PR below; the round-6 re-review it asks for must run
+      against the MERGED sha, and that is what the archive gate still awaits. Required by that
       gate, and the reviewer must not be the implementer
-- [ ] PR opened referencing this spec folder, **after PR #1136 has merged**
+- [x] PR opened referencing this spec folder, after PR #1136 merged — **#1143**, opened 2026-08-21
+- [ ] **#1143 merged the pre-review implementation.** It carried the ORIGINAL validator: every
+      round-1..4 finding this record describes as closed was open in the merged tree, because the
+      branch holding the fixes was never an ancestor of the merge. A second PR lands them, and
+      until it merges this row is what stands between the record and reality
 
 ## Machine-readable features
 

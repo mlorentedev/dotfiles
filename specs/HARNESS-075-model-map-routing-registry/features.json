@@ -9,14 +9,14 @@
   {
     "id": "HARNESS-075-model-map-routing-registry-f2",
     "behavior": "the shipped map validates against the shipped schema",
-    "verification": "cd cli && go test ./internal/harness/ -run '^TestModelMapValidatesAgainstSchema$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapValidatesAgainstSchema '",
+    "verification": "cd cli && go test -count=1 ./internal/harness/ -run '^TestModelMapValidatesAgainstSchema$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapValidatesAgainstSchema '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f3",
     "behavior": "the schema rejects a harness referencing a pool absent from pools",
-    "verification": "cd cli && go test ./internal/harness/ -run '^TestSchemaRejectsDanglingPoolReference$' -v 2>&1 | grep -q -- '--- PASS: TestSchemaRejectsDanglingPoolReference '",
+    "verification": "cd cli && go test -count=1 ./internal/harness/ -run '^TestSchemaRejectsDanglingPoolReference$' -v 2>&1 | grep -q -- '--- PASS: TestSchemaRejectsDanglingPoolReference '",
     "state": "pending",
     "evidence": ""
   },
@@ -30,21 +30,21 @@
   {
     "id": "HARNESS-075-model-map-routing-registry-f5",
     "behavior": "the loader exposes tier resolution and chain resolution as distinct consumer classes",
-    "verification": "cd cli && go test ./internal/harness/ -run '^TestModelMapConsumerClasses$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapConsumerClasses '",
+    "verification": "cd cli && go test -count=1 ./internal/harness/ -run '^TestModelMapConsumerClasses$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapConsumerClasses '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f6",
     "behavior": "dotf doctor distinguishes absent, unparseable and schema-invalid as three loud outcomes, none rendering as an empty or permissive map",
-    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelMapCheckThreeBrokenStates$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapCheckThreeBrokenStates '",
+    "verification": "cd cli && go test -count=1 ./internal/doctor/ -run '^TestModelMapCheckThreeBrokenStates$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapCheckThreeBrokenStates '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f7",
     "behavior": "budget fields are exposed read-only with no counter \u2014 level 1 declaration only",
-    "verification": "cd cli && go test ./internal/harness/ -run '^TestModelMapBudgetIsDeclarationOnly$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapBudgetIsDeclarationOnly '",
+    "verification": "cd cli && go test -count=1 ./internal/harness/ -run '^TestModelMapBudgetIsDeclarationOnly$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapBudgetIsDeclarationOnly '",
     "state": "pending",
     "evidence": ""
   },
