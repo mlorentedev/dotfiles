@@ -20,9 +20,9 @@ import (
 // templateNames are the spec files rendered into specs/<id>/, in a stable
 // order. proposal.md is special-cased (it carries the issue: frontmatter and
 // the ## Why provenance comment); the others are pure placeholder substitution.
-var templateNames = []string{"proposal.md", "tasks.md", "verification.md"}
+var templateNames = []string{"proposal.md", "tasks.md", "verification.md", "features.json"}
 
-//go:embed templates/proposal.md templates/tasks.md templates/verification.md
+//go:embed templates/proposal.md templates/tasks.md templates/verification.md templates/features.json
 var templatesFS embed.FS
 
 // idPattern is the canonical feature-id grammar: an AREA-NNN ticket whose AREA

@@ -151,19 +151,21 @@ func ResolveContractPath() string {
 	return ResolveRepoFirst("env-contract.json", os.Getenv("DOTFILES_REPO_DIR"), DotfilesDir(Home()), cwd)
 }
 
-// RepoDir resolves the dotfiles checkout root: DOTFILES_REPO_DIR when it points at
-// a real directory, else walking up from the working directory for a .git entry (a
-// file in a worktree, a directory in a normal clone — os.Stat matches both). Returns
-// "" when neither locates a checkout. This is the shared "where is the checkout"
-// seam the registry resolvers (ADR-030) build on.
+// RepoDir resolves the dotfiles checkout root: walking up from the current working
+// directory for a .git entry (a file in a worktree, a directory in a normal clone —
+// os.Stat matches both) wins over DOTFILES_REPO_DIR when inside a checkout. This ensures
+// worktree invocations target the worktree rather than the main checkout pointed to by
+// DOTFILES_REPO_DIR (BUG-072). Falls back to DOTFILES_REPO_DIR when it points at a real
+// directory, and returns "" when neither locates a checkout. This is the shared
+// "where is the checkout" seam the registry resolvers (ADR-030) build on.
 func RepoDir() string {
-	if r := os.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
-		return r
-	}
 	if cwd, err := os.Getwd(); err == nil {
 		if git := walkUpFor(cwd, ".git"); git != "" {
 			return filepath.Dir(git)
 		}
+	}
+	if r := os.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
+		return r
 	}
 	return ""
 }

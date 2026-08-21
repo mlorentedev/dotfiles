@@ -28,7 +28,7 @@ func newSecretsMigrateCmd() *cobra.Command {
 			"--yes creates the absent Bitwarden item; --dry-run reports without writing.\n" +
 			"File secrets migrate byte-exact (no newline trimming).\n\n" +
 			"Out of scope (refused with a specific reason): a secret sharing its age\n" +
-			"source with another (use --split).",
+			"source with another (split tokens manually per #321).",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -133,7 +133,7 @@ func migrateGuard(reg *secrets.Registry, s *secrets.Secret) error {
 			}
 		}
 		if shared > 1 {
-			return fmt.Errorf("%q shares its age source %q with another entry (per-purpose split) — use `migrate --split` (C9), which issues distinct tokens", s.ID, s.Age)
+			return fmt.Errorf("%q shares its age source %q with another entry — split into distinct Bitwarden tokens manually (tracked by #321)", s.ID, s.Age)
 		}
 	}
 	return nil
