@@ -228,3 +228,5 @@ tags: [lessons, index, dotfiles]
 | [212 - An invalid instrument is indistinguishable from an absent guard](lesson-212-an-invalid-instrument-is-indistinguishable-from-an.md) | 2026-08-19 |  |
 | [213 - A reviewer that reports success while publishing nothing, in two shapes](lesson-213-a-reviewer-that-reports-success-while-publishing.md) | 2026-08-20 |  |
 | [214 - A declared status is not evidence, and a guard that exists is not a guard that covers](lesson-214-a-declared-status-is-not-evidence-probe-the-syst.md) | 2026-08-20 |  |
+| [215 - A parser written for one runner reads the other runner's review as empty](lesson-215-a-parser-for-one-runner-reads-the-other-runners-re.md) | 2026-08-21 |  |
+| [216 - A three-dot diff does not answer "what is main missing"](lesson-216-a-three-dot-diff-does-not-answer-what-main-is-missi.md) | 2026-08-21 |  |
