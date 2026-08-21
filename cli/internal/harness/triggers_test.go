@@ -340,3 +340,49 @@ name: skill2
 		t.Fatalf("deps[skill1] = %v; want %v", deps["skill1"], expected)
 	}
 }
+
+// TestRealTriggersFileValid guards harness/triggers.json against silent rot or schema deviation (GUARD #1137).
+func TestRealTriggersFileValid(t *testing.T) {
+	cfg, err := ParseTriggers(defaultTriggersJSON)
+	if err != nil {
+		t.Fatalf("ParseTriggers(defaultTriggersJSON) failed: %v", err)
+	}
+	if cfg.Version < 1 {
+		t.Errorf("expected Version >= 1, got %d", cfg.Version)
+	}
+	if len(cfg.Triggers) == 0 {
+		t.Fatal("expected non-empty triggers array")
+	}
+
+	seenIDs := make(map[string]bool)
+	for i, rule := range cfg.Triggers {
+		if rule.ID == "" {
+			t.Errorf("trigger[%d] has empty ID", i)
+		}
+		if seenIDs[rule.ID] {
+			t.Errorf("duplicate trigger ID %q", rule.ID)
+		}
+		seenIDs[rule.ID] = true
+
+		if rule.Pattern == "" {
+			t.Errorf("trigger %q has empty Pattern", rule.ID)
+		}
+		if len(rule.Globs) == 0 && len(rule.Keywords) == 0 {
+			t.Errorf("trigger %q has neither globs nor keywords", rule.ID)
+		}
+	}
+}
+
+// TestTriggersEmbeddedMatchesDiskSSOT guards against drift between harness/triggers.json and embedded copy (#1137).
+func TestTriggersEmbeddedMatchesDiskSSOT(t *testing.T) {
+	root := "../../.."
+	diskPath := filepath.Join(root, "harness", "triggers.json")
+	diskBytes, err := os.ReadFile(diskPath)
+	if err != nil {
+		t.Skipf("skipping drift test outside repository root: %v", err)
+		return
+	}
+	if !reflect.DeepEqual(diskBytes, defaultTriggersJSON) {
+		t.Errorf("embedded triggers.json drifted from %s; re-sync copies", diskPath)
+	}
+}
