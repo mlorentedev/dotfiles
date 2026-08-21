@@ -73,6 +73,33 @@ func TestReviewerCommandRunsThroughTheSecretsFacade(t *testing.T) {
 	}
 }
 
+// When a pool member declares SecretID, the launcher scopes the injection with
+// `--only <secret_id>` to shield the reviewer from unrelated broken secrets (BUG-089).
+func TestReviewerCommandScopesSecretsWhenSecretIDDeclared(t *testing.T) {
+	cases := []struct {
+		entry    ReviewerEntry
+		wantOnly string
+	}{
+		{
+			entry:    ReviewerEntry{ID: "nan/deepseek-v4-flash", Runner: "pi", Provider: "nan", Model: "deepseek-v4-flash", SecretID: "NAN_API_KEY"},
+			wantOnly: "NAN_API_KEY",
+		},
+		{
+			entry:    ReviewerEntry{ID: "agy/gemini-3.1-pro-high", Runner: "agy", Model: "gemini-3.1-pro-high", SecretID: "GEMINI_API_KEY"},
+			wantOnly: "GEMINI_API_KEY",
+		},
+	}
+	for _, c := range cases {
+		argv, err := ReviewerCommand(c.entry, "p", 0, "/repo")
+		if err != nil {
+			t.Fatalf("%s: %v", c.entry.ID, err)
+		}
+		if len(argv) < 6 || argv[0] != "dotf" || argv[1] != "secrets" || argv[2] != "run" || argv[3] != "--only" || argv[4] != c.wantOnly || argv[5] != "--" {
+			t.Errorf("%s must use `dotf secrets run --only %s --`, got %v", c.entry.ID, c.wantOnly, argv[:min(6, len(argv))])
+		}
+	}
+}
+
 // agy's --print-timeout defaults to 5m. BUG-074's third round took roughly 25
 // minutes, so the fallback dies on defaults — the concrete form of "configured
 // is not exercised".
