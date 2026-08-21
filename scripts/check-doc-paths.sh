@@ -65,7 +65,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 if [ "$#" -eq 0 ]; then
-    # Auto-discover instruction files when invoked without arguments (BUG-088, #1021)
+    # Auto-discover instruction files when invoked without arguments (BUG-088, #1021).
+    # Governed files: all active agent instructions and READMEs.
+    # Exclusions for stated reasons:
+    #   harness/ — generated artifacts from vault; checked by compile-harness.sh --check
+    #   specs/   — per-feature historical proposals and archived logs, not standing instructions
+    #   docs/    — historical decision records/lessons mentioning retired scripts by design
     if command -v git >/dev/null 2>&1 && { [ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ]; }; then
         while IFS= read -r _f; do
             [ -n "$_f" ] && set -- "$@" "$_f"
