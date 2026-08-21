@@ -9,42 +9,42 @@
   {
     "id": "HARNESS-075-model-map-routing-registry-f2",
     "behavior": "the shipped map validates against the shipped schema",
-    "verification": "cd cli && go test ./internal/harness/ -run TestModelMapValidatesAgainstSchema",
+    "verification": "cd cli && go test ./internal/harness/ -run '^TestModelMapValidatesAgainstSchema$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapValidatesAgainstSchema '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f3",
     "behavior": "the schema rejects a harness referencing a pool absent from pools",
-    "verification": "cd cli && go test ./internal/harness/ -run TestSchemaRejectsDanglingPoolReference",
+    "verification": "cd cli && go test ./internal/harness/ -run '^TestSchemaRejectsDanglingPoolReference$' -v 2>&1 | grep -q -- '--- PASS: TestSchemaRejectsDanglingPoolReference '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f4",
-    "behavior": "no openrouter pool is declared and no harness references one (structural, not textual \u2014 the $comment may name it)",
-    "verification": "python3 -c 'import json,sys; d=json.load(open(\"harness/model-map.json\")); bad = \"openrouter\" in d.get(\"pools\",{}) or any(\"openrouter\" in h.get(\"pools\",[]) for h in d.get(\"harnesses\",{}).values()); sys.exit(1 if bad else 0)'",
+    "behavior": "no retired provider (openrouter, codex) is declared as a pool or harness, or referenced by one \u2014 structural, not textual: the $comment names both on purpose",
+    "verification": "python3 -c 'import json,sys; d=json.load(open(\"harness/model-map.json\")); bad=[x for x in (\"openrouter\",\"codex\") if x in d.get(\"pools\",{}) or x in d.get(\"harnesses\",{}) or any(x in h.get(\"pools\",[]) for h in d.get(\"harnesses\",{}).values())]; sys.exit(1 if bad else 0)'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f5",
     "behavior": "the loader exposes tier resolution and chain resolution as distinct consumer classes",
-    "verification": "cd cli && go test ./internal/harness/ -run TestModelMapConsumerClasses",
+    "verification": "cd cli && go test ./internal/harness/ -run '^TestModelMapConsumerClasses$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapConsumerClasses '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f6",
     "behavior": "dotf doctor distinguishes absent, unparseable and schema-invalid as three loud outcomes, none rendering as an empty or permissive map",
-    "verification": "cd cli && go test ./internal/doctor/ -run TestModelMapCheckThreeBrokenStates",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelMapCheckThreeBrokenStates$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapCheckThreeBrokenStates '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f7",
     "behavior": "budget fields are exposed read-only with no counter \u2014 level 1 declaration only",
-    "verification": "cd cli && go test ./internal/harness/ -run TestModelMapBudgetIsDeclarationOnly",
+    "verification": "cd cli && go test ./internal/harness/ -run '^TestModelMapBudgetIsDeclarationOnly$' -v 2>&1 | grep -q -- '--- PASS: TestModelMapBudgetIsDeclarationOnly '",
     "state": "pending",
     "evidence": ""
   },

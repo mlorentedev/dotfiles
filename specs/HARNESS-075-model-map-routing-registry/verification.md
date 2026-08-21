@@ -166,16 +166,62 @@ $ go test ./...             → 17 packages ok, 0 FAIL
 $ golangci-lint run         → 0 issues.   (v2.12.2, matching the versions.conf pin)
 ```
 
-## Two defects found in this spec's own verification, before any code was written
+## Three defects found in this spec's own verification
+
+Recorded because they are the exact class the spec exists to prevent, committed inside the spec.
+The third is the worst of them and was found last, by running the commands rather than reading them.
+
+### 3. Five of the eight verification commands could pass vacuously
+
+`go test -run <name>` **exits 0 when the name matches nothing**:
+
+```
+$ go test ./internal/harness/ -run TestThisNameDoesNotExistAnywhere
+ok  github.com/mlorentedev/dotfiles/cli/internal/harness  0.002s [no tests to run]
+$ echo $?
+0
+```
+
+So `f2`, `f3`, `f5`, `f6` and `f7` — every Go-backed criterion — would have reported PASS the moment
+its test was renamed or deleted. The features.json contract says a criterion is verified; what it
+actually asserted was that the package compiles.
+
+Fixed by requiring the test to have reported a pass, which fails on a **missing** test and on a
+**failing** one:
+
+```bash
+cd cli && go test ./internal/<pkg>/ -run '^<Name>$' -v 2>&1 | grep -q -- '--- PASS: <Name> '
+```
+
+Here the pipeline's exit code being `grep`'s is the point rather than the hazard. Verified across
+all three states:
+
+| state | exit |
+|---|---|
+| test exists and passes | 0 |
+| test name matches nothing | 1 |
+| test exists and fails | 1 |
+
+And mutation-verified on the real command — renaming `TestModelMapValidatesAgainstSchema` away made
+`f2` exit 1, and restoring it returned 0.
+
+**A first attempt at the fix was itself wrong**, which is worth recording: the pattern
+`'--- PASS: <Name>$'` never matched, because `go test -v` appends a duration (`--- PASS: TestX (0.00s)`).
+It failed closed rather than open, so it was caught immediately — but a check that always fails gets
+disabled rather than fixed, which is its own failure mode.
+
+### 1 and 2, found before any code was written
+
+
 
 Recorded because they are the exact class the spec exists to prevent, committed inside the spec.
 
-1. **`features.json` f1 could never pass.** `$comment` was embedded in a **double-quoted**
+**f1 could never pass.** `$comment` was embedded in a **double-quoted**
    `python3 -c` argument, so the shell expanded it to the empty string before python saw it: the
    required-key set became `{'', 'version', …}` and the check exited 1 on a *correct* map,
    permanently. Measured against a seven-key stub — exit 1 under the old form, exit 0 under the
    fixed one, and exit 1 on a stub missing `chains`.
-2. **f4 would have failed a correct map.** It forbade the string `openrouter` anywhere in the file,
+**f4 would have failed a correct map.** It forbade the string `openrouter` anywhere in the file,
    while `tasks.md` asks the `$comment` to carry the measured rationale — and *"openrouter was
    deleted upstream"* is that rationale. Replaced with a structural check.
 
