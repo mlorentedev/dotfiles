@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.46.0](https://github.com/mlorentedev/dotfiles/compare/v0.45.0...v0.46.0) (2026-08-21)
+
+
+### Features
+
+* **ai:** optimize multi-agent configurations, documentation, and tooling ([#1089](https://github.com/mlorentedev/dotfiles/issues/1089)) ([3033778](https://github.com/mlorentedev/dotfiles/commit/303377891a9230f09f20b307a873cb38219f3306))
+* **harness:** admit mimo-v2.5 to the reviewer pool, with the verdict stated honestly ([#1116](https://github.com/mlorentedev/dotfiles/issues/1116)) ([12d0116](https://github.com/mlorentedev/dotfiles/commit/12d0116bd0291bc020bf4cb0d0b8f5d24b2cace3))
+* **harness:** bind pr triage queue to DoD evidence gate and handoff skill ([#1131](https://github.com/mlorentedev/dotfiles/issues/1131)) ([33d797e](https://github.com/mlorentedev/dotfiles/commit/33d797ef32c43beff80edddf5afa742d99376337))
+* **harness:** build model-map.json, its schema, and the first doctor check over a registry ([#1143](https://github.com/mlorentedev/dotfiles/issues/1143)) ([e22a4d0](https://github.com/mlorentedev/dotfiles/commit/e22a4d0b18f3d367f4821ae9c39cdf534409882d))
+* **harness:** forbid printing a secret, in the doctrine every agent receives ([#1114](https://github.com/mlorentedev/dotfiles/issues/1114)) ([fcaa403](https://github.com/mlorentedev/dotfiles/commit/fcaa403c2faeb3f45ca3db3722ac7a94c7e817e9))
+* one-liner curl bootstrap install.sh (IDEAS-005) ([#1108](https://github.com/mlorentedev/dotfiles/issues/1108)) ([ef66667](https://github.com/mlorentedev/dotfiles/commit/ef66667ce217e50dfdccc6c8bb2f3e58970ea636))
+* **spec:** scaffold features.json during dotf spec init ([#1127](https://github.com/mlorentedev/dotfiles/issues/1127)) ([6e51d65](https://github.com/mlorentedev/dotfiles/commit/6e51d659a01737b0a5514a80df381d93ac00a1bc)), closes [#1076](https://github.com/mlorentedev/dotfiles/issues/1076)
+
+
+### Bug Fixes
+
+* **attestation:** recognize CodeRabbit clean-review comment as attestation ([#1125](https://github.com/mlorentedev/dotfiles/issues/1125)) ([9fa89f9](https://github.com/mlorentedev/dotfiles/commit/9fa89f9cf6bf99b7e753b394bd5ab17e8a152307)), closes [#1122](https://github.com/mlorentedev/dotfiles/issues/1122)
+* **ci:** cap the reviewer's inference demand, and queue instead of failing ([#1110](https://github.com/mlorentedev/dotfiles/issues/1110)) ([fc9d6f0](https://github.com/mlorentedev/dotfiles/commit/fc9d6f06d13f353a0d75d2115e28e9f2ef271f1d))
+* **ci:** fail the review job when it published no review ([#1109](https://github.com/mlorentedev/dotfiles/issues/1109)) ([237b595](https://github.com/mlorentedev/dotfiles/commit/237b595fe7fc8b3eed50406785210e9743a092f0))
+* **ci:** filter pr-agent issue_comment trigger to slash commands only ([#1135](https://github.com/mlorentedev/dotfiles/issues/1135)) ([881546f](https://github.com/mlorentedev/dotfiles/commit/881546f2feef718a1f6126414a79f6d9d20a408b)), closes [#1134](https://github.com/mlorentedev/dotfiles/issues/1134)
+* **ci:** gate release PRs out of the reviewer where the tool cannot ignore it ([#1102](https://github.com/mlorentedev/dotfiles/issues/1102)) ([26c1bcf](https://github.com/mlorentedev/dotfiles/commit/26c1bcf7e5f3587367181c8adc119ec2155dbe3a))
+* **ci:** give PR-Agent its own model lane so it stops starving the spec-review gate ([#1150](https://github.com/mlorentedev/dotfiles/issues/1150)) ([c368c03](https://github.com/mlorentedev/dotfiles/commit/c368c0325cbaf56c57fbda7a9be5fe8e61860257)), closes [#1149](https://github.com/mlorentedev/dotfiles/issues/1149)
+* **ci:** remove job-level concurrency lock in pr-agent workflow ([#1146](https://github.com/mlorentedev/dotfiles/issues/1146)) ([e09de16](https://github.com/mlorentedev/dotfiles/commit/e09de165963cdae32e9d8c9f4e440553f0d78b7e))
+* **ci:** trigger review-attestation on pull_request_review events ([#1121](https://github.com/mlorentedev/dotfiles/issues/1121)) ([2261a8e](https://github.com/mlorentedev/dotfiles/commit/2261a8e9db4dae176e73de8ec776abec81fa480e)), closes [#1115](https://github.com/mlorentedev/dotfiles/issues/1115)
+* **docs:** auto-discover instruction files and wire check-doc-paths into CI and pre-commit ([#1133](https://github.com/mlorentedev/dotfiles/issues/1133)) ([5b39065](https://github.com/mlorentedev/dotfiles/commit/5b390653d3d950df111d38c7d9390829b8f99b0a))
+* **doctor:** report stale or unsynced bw cache as WARN in mapping check ([#1144](https://github.com/mlorentedev/dotfiles/issues/1144)) ([10868de](https://github.com/mlorentedev/dotfiles/commit/10868debc96d3fce86187e802c9282d962292a90)), closes [#1015](https://github.com/mlorentedev/dotfiles/issues/1015)
+* **doctor:** support file-authority backend, auto-tune orca hook, and bump pi pin ([#1082](https://github.com/mlorentedev/dotfiles/issues/1082)) ([31bcc7f](https://github.com/mlorentedev/dotfiles/commit/31bcc7fc9ba84c260cb5247d79d3a1ae589abe2b))
+* **env:** prefer cwd worktree over DOTFILES_REPO_DIR in RepoDir ([#1129](https://github.com/mlorentedev/dotfiles/issues/1129)) ([2340479](https://github.com/mlorentedev/dotfiles/commit/2340479abd7054fda44e12e8ab48b1b654317cc3)), closes [#939](https://github.com/mlorentedev/dotfiles/issues/939)
+* **harness:** land the model-map review fixes that [#1143](https://github.com/mlorentedev/dotfiles/issues/1143) merged without ([#1155](https://github.com/mlorentedev/dotfiles/issues/1155)) ([63acd91](https://github.com/mlorentedev/dotfiles/commit/63acd91f7f299255dd1a825933f3c32322dcd585)), closes [#1124](https://github.com/mlorentedev/dotfiles/issues/1124)
+* **hooks:** stop the global dispatcher re-entering pre-commit's own store ([#1097](https://github.com/mlorentedev/dotfiles/issues/1097)) ([fad8b12](https://github.com/mlorentedev/dotfiles/commit/fad8b125974a99e51b4d2f4f0de86528a9583aea))
+* **prtriage:** address 5 Minor findings from mimo-v2.5 review ([#1123](https://github.com/mlorentedev/dotfiles/issues/1123)) ([6d6e1ad](https://github.com/mlorentedev/dotfiles/commit/6d6e1ad29775d900a3b3ffb53a70cb8206171c83))
+* **review:** close the triage loop — the marker gets a writer, and the queue gets a wake-up ([#1101](https://github.com/mlorentedev/dotfiles/issues/1101)) ([44c9417](https://github.com/mlorentedev/dotfiles/commit/44c94173297b250a275ce6f3284c498f3c00fac2))
+* **secrets:** enforce AGE_VERSION across setup, integration container, and doctor ([#1120](https://github.com/mlorentedev/dotfiles/issues/1120)) ([429d4ca](https://github.com/mlorentedev/dotfiles/commit/429d4cadc9127f1f1da3c16337a78f7da3c4834d))
+* **secrets:** rewrite non-existent --split flag in migrate messages ([#1130](https://github.com/mlorentedev/dotfiles/issues/1130)) ([ae79bbf](https://github.com/mlorentedev/dotfiles/commit/ae79bbfdef034ef832c0bd1c905958cc3d9166e7)), closes [#941](https://github.com/mlorentedev/dotfiles/issues/941)
+* **spec:** compare content instead of ancestry for review staleness ([#1126](https://github.com/mlorentedev/dotfiles/issues/1126)) ([380fe75](https://github.com/mlorentedev/dotfiles/commit/380fe7509938da01686d13779c8c8839e027ad88))
+* **spec:** scope secret injection during review launch via pool secret_id ([#1132](https://github.com/mlorentedev/dotfiles/issues/1132)) ([40045ea](https://github.com/mlorentedev/dotfiles/commit/40045ea7db92c7135d9391c390f7859985456112)), closes [#1025](https://github.com/mlorentedev/dotfiles/issues/1025)
+
 ## [0.45.0](https://github.com/mlorentedev/dotfiles/compare/v0.44.0...v0.45.0) (2026-08-19)
 
 
