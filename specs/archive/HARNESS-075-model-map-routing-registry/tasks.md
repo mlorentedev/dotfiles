@@ -63,17 +63,23 @@ created: "2026-08-21"
       assembled tree against current main, where the count has since drifted upward as main gained
       tests. The count is evidence of a run, not a contract
 - [x] `verification.md` filled in with the command output that proves each criterion
-- [ ] Independent adversarial review from `harness/reviewer-pool.json` — **5 rounds run, all
-      FAIL.** Round 5 (`nan/deepseek-v4-flash`, `reviewed_sha` `1b1cfb3`) returned a Blocker that
-      no earlier round could see: the change reviewed was never the change merged. Its two Majors
-      and four Minors are closed by the PR below; the round-6 re-review it asks for must run
-      against the MERGED sha, and that is what the archive gate still awaits. Required by that
-      gate, and the reviewer must not be the implementer
+- [x] Independent adversarial review from `harness/reviewer-pool.json` — **6 rounds, five FAIL
+      then PASS.** Round 5 returned a Blocker no earlier round could see: the change reviewed had
+      never merged. Round 6 (`nan/deepseek-v4-flash`, `reviewed_sha` `63acd91`, the merged sha)
+      re-ran all eight feature commands, the full Go loop, `GOOS=windows go vet`, the pinned
+      linter and bats at 1397/1397, verified `git merge-base --is-ancestor 63acd91 origin/main`
+      itself rather than accepting the claim, and returned **PASS** with rubric A on correctness,
+      verification, scope, reliability and maintainability. Required by the archive gate, and the
+      reviewer was not the implementer
 - [x] PR opened referencing this spec folder, after PR #1136 merged — **#1143**, opened 2026-08-21
-- [ ] **#1143 merged the pre-review implementation.** It carried the ORIGINAL validator: every
-      round-1..4 finding this record describes as closed was open in the merged tree, because the
-      branch holding the fixes was never an ancestor of the merge. A second PR lands them, and
-      until it merges this row is what stands between the record and reality
+- [x] **#1143 merged the pre-review implementation, and #1155 corrected it.** #1143 carried the
+      ORIGINAL validator: every round-1..4 finding this record describes as closed was open in the
+      merged tree, because the branch holding the fixes was never an ancestor of the merge.
+      **PR #1155** landed them onto current main as `63acd91`, assembled by taking the spec's own
+      files onto main rather than replaying a branch that predated #1142, #1144, #1145, #1146 and
+      #1150. Round 6 reproduced the closure at that sha. Nothing automatic would have caught the
+      divergence — the staleness gate watches the contract files, not the merged diff — which is
+      filed as #1153 and is the durable lesson of this spec
 
 ## Machine-readable features
 
