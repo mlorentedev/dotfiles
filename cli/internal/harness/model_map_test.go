@@ -116,22 +116,36 @@ func TestModelMapValidatesAgainstSchema(t *testing.T) {
 // ADR-035 amendment: the provider was deleted upstream, so no pool may declare it
 // and no harness may reference it. Structural, not textual — the $comment names
 // openrouter on purpose, so that its absence reads as a decision.
-func TestModelMapDeclaresNoDeletedProvider(t *testing.T) {
+func TestModelMapDeclaresNoRetiredProvider(t *testing.T) {
+	// Both are retired rather than overlooked: openrouter was deleted upstream in
+	// August 2026, and codex is no longer used by this operator (2026-08-21).
+	// ADR-032 section 3 referenced a `codex` pool it never declared, and the
+	// resolution is deletion, not declaration — a pool nobody dispatches to is a
+	// route to nowhere whether or not it validates.
+	//
+	// Structural, not textual. The $comment names both on purpose, so that their
+	// absence reads as a decision to the next person who wonders where they went.
+	retired := []string{"openrouter", "codex"}
 	root := repoRootForTest(t)
 	m, err := LoadModelMap(root)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
 	pools, _ := m["pools"].(map[string]any)
-	if _, present := pools["openrouter"]; present {
-		t.Error("pools declares openrouter, a provider deleted upstream")
-	}
 	harnesses, _ := m["harnesses"].(map[string]any)
-	for name, raw := range harnesses {
-		h, _ := raw.(map[string]any)
-		for _, p := range toStrings(h["pools"]) {
-			if p == "openrouter" {
-				t.Errorf("harnesses.%s references the deleted openrouter pool", name)
+	for _, dead := range retired {
+		if _, present := pools[dead]; present {
+			t.Errorf("pools declares %q, which is retired", dead)
+		}
+		if _, present := harnesses[dead]; present {
+			t.Errorf("harnesses declares %q, which is retired", dead)
+		}
+		for name, raw := range harnesses {
+			h, _ := raw.(map[string]any)
+			for _, p := range toStrings(h["pools"]) {
+				if p == dead {
+					t.Errorf("harnesses.%s references the retired %q pool", name, dead)
+				}
 			}
 		}
 	}
@@ -154,5 +168,82 @@ func repoRootForTest(t *testing.T) string {
 			t.Fatalf("could not find %s walking up from %s", ModelMapFile, dir)
 		}
 		dir = parent
+	}
+}
+
+// AC5: the two consumer classes must be reachable separately, because they
+// resolve at different times. A compile-time consumer that can silently reach a
+// run-time field is exactly the drift the `version` key exists to survive.
+func TestModelMapConsumerClasses(t *testing.T) {
+	root := repoRootForTest(t)
+	m, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	t.Run("tier resolution is compile time", func(t *testing.T) {
+		got, err := ResolveTier(m, "mid", "claude")
+		if err != nil {
+			t.Fatalf("ResolveTier: %v", err)
+		}
+		if got != "sonnet" {
+			t.Errorf("mid/claude = %q, want sonnet", got)
+		}
+		// A tier that does not resolve for a harness must say so, not return "".
+		if _, err := ResolveTier(m, "mid", "copilot"); err == nil {
+			t.Error("a tier with no entry for a harness must be a loud error, not an empty string")
+		}
+	})
+
+	t.Run("chain resolution is run time", func(t *testing.T) {
+		chain, err := ResolveChain(m, "mid")
+		if err != nil {
+			t.Fatalf("ResolveChain: %v", err)
+		}
+		if len(chain) < 2 {
+			t.Fatalf("the mid chain must have a fallback, got %v", chain)
+		}
+		if chain[0] != "claude:sonnet" {
+			t.Errorf("chain order is meaning, not arrangement: first = %q", chain[0])
+		}
+	})
+
+	t.Run("the top tier has no fallback, on purpose", func(t *testing.T) {
+		chain, err := ResolveChain(m, "top")
+		if err != nil {
+			t.Fatalf("ResolveChain(top): %v", err)
+		}
+		if len(chain) != 1 {
+			t.Errorf("top must queue or escalate rather than degrade silently (ADR-032 §4), got %v", chain)
+		}
+	})
+}
+
+// AC7: the budget is declared and NOT enforced, and the API must not let a
+// caller believe otherwise. Nothing here decrements anything.
+func TestModelMapBudgetIsDeclarationOnly(t *testing.T) {
+	root := repoRootForTest(t)
+	m, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	b, err := DeclaredBudget(m, "nan")
+	if err != nil {
+		t.Fatalf("DeclaredBudget: %v", err)
+	}
+	if b.Concurrency != 5 || b.ReserveInteractive != 2 {
+		t.Errorf("nan budget = %+v, want concurrency 5 reserve 2 (measured 2026-08-20)", b)
+	}
+	if len(b.SharedWith) == 0 {
+		t.Error("the nan pool is shared, and a budget that does not say so overstates its own guarantee")
+	}
+	// A pool with no declared concurrency must report absence, never zero — zero
+	// reads as "no capacity" and absence means "not declared".
+	b2, err := DeclaredBudget(m, "copilot")
+	if err != nil {
+		t.Fatalf("DeclaredBudget(copilot): %v", err)
+	}
+	if b2.ConcurrencyDeclared {
+		t.Error("copilot declares no concurrency; the budget must report it undeclared, not 0")
 	}
 }

@@ -310,3 +310,96 @@ func sortedKeys(m map[string]any) []string {
 	sort.Strings(keys)
 	return keys
 }
+
+// The two consumer classes, kept apart at the API because they resolve at
+// different times: `tiers` feeds each harness's render at compile time, `chains`
+// is read by a dispatcher at run time. One file, two cadences — which is what
+// the `version` key exists to survive.
+
+// ResolveTier answers which model id a neutral tier means for one harness.
+// Compile-time consumer.
+func ResolveTier(m map[string]any, tier, harness string) (string, error) {
+	tiers, ok := m["tiers"].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("%s declares no tiers block", ModelMapFile)
+	}
+	entry, ok := tiers[tier].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("tier %q is not declared in %s", tier, ModelMapFile)
+	}
+	model, ok := entry[harness].(string)
+	if !ok {
+		return "", fmt.Errorf(
+			"tier %q declares no model for harness %q in %s\n"+
+				"declare one, or route this harness to a tier that has one — resolving to an "+
+				"empty model id would render a definition that names no model at all",
+			tier, harness, ModelMapFile)
+	}
+	return model, nil
+}
+
+// ResolveChain answers the ordered fallback for a tier, as `pool:model`.
+// Run-time consumer, read only by a level-2 dispatcher.
+//
+// Order is meaning, not arrangement. And a single-entry chain is a statement:
+// the `top` tier has no fallback on purpose (ADR-032 §4), because a top tier
+// that quietly degrades converts a gate into a green checkmark. It queues or
+// escalates instead.
+func ResolveChain(m map[string]any, tier string) ([]string, error) {
+	chains, ok := m["chains"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%s declares no chains block", ModelMapFile)
+	}
+	raw, ok := chains[tier]
+	if !ok {
+		return nil, fmt.Errorf("tier %q has no chain in %s", tier, ModelMapFile)
+	}
+	chain := toStrings(raw)
+	if len(chain) == 0 {
+		return nil, fmt.Errorf(
+			"tier %q declares an empty chain in %s — an empty chain is not 'no fallback', "+
+				"it is a dispatch with nowhere to go", tier, ModelMapFile)
+	}
+	return chain, nil
+}
+
+// Budget is what a pool DECLARES. Nothing in this package decrements any of it.
+//
+// The naming is deliberate: ADR-035 ships level 1 (declaration) and defers level
+// 2 (enforcement where dotf is the launcher) until a dispatcher exists to do the
+// decrementing. A type called `Semaphore` or a method called `Acquire` would
+// imply a guarantee this repo cannot keep — NaN's slots are shared with the pi
+// TUI, qq, hive embeddings and CI, none of which route through dotf.
+type Budget struct {
+	// ConcurrencyDeclared distinguishes "not declared" from "zero". Zero reads as
+	// no capacity; absent means the pool does not state one, which is the honest
+	// answer for a seat-based pool where concurrency is a fleet property.
+	ConcurrencyDeclared bool
+	Concurrency         int
+	ReserveInteractive  int
+	RPM                 int
+	// SharedWith names the consumers that draw on the same quota and that dotf
+	// cannot see. It is the reason the eventual guarantee is "dotf alone will
+	// never be the cause of exhaustion" rather than "exhaustion will not happen".
+	SharedWith []string
+}
+
+// DeclaredBudget reads one pool's declared budget. It enforces nothing.
+func DeclaredBudget(m map[string]any, pool string) (Budget, error) {
+	pools, ok := m["pools"].(map[string]any)
+	if !ok {
+		return Budget{}, fmt.Errorf("%s declares no pools block", ModelMapFile)
+	}
+	p, ok := pools[pool].(map[string]any)
+	if !ok {
+		return Budget{}, fmt.Errorf("pool %q is not declared in %s", pool, ModelMapFile)
+	}
+	var b Budget
+	if c, ok := toInt(p["concurrency"]); ok {
+		b.Concurrency, b.ConcurrencyDeclared = c, true
+	}
+	b.ReserveInteractive, _ = toInt(p["reserve_interactive"])
+	b.RPM, _ = toInt(p["rpm"])
+	b.SharedWith = toStrings(p["shared_with"])
+	return b, nil
+}
