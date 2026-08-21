@@ -166,6 +166,23 @@ $ go test ./...             → 17 packages ok, 0 FAIL
 $ golangci-lint run         → 0 issues.   (v2.12.2, matching the versions.conf pin)
 ```
 
+Shell layer, run to completion with its **own** exit code captured rather than a pipeline's:
+
+```
+$ ~/.local/bin/bats tests/*.bats > bats-full.txt 2>&1; echo "BATS_EXIT=$?"
+BATS_EXIT=0
+1..1394        ok: 1394        not ok: 0
+```
+
+The eight new cases ran as 631-638 — checked by their numbers in the output, not assumed from the
+file existing.
+
+**An earlier attempt at this evidence was worthless and is recorded rather than replaced.** The
+first run was `bats tests/*.bats | tail -6`, whose exit code belongs to `tail`, not to `bats`. It
+reported 0 while proving nothing, and the captured file held nine lines. Same class as finding 3
+below, and the second time in one session that a truncating pipe swallowed the exit code being
+reported on.
+
 ## Three defects found in this spec's own verification
 
 Recorded because they are the exact class the spec exists to prevent, committed inside the spec.

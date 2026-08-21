@@ -59,7 +59,7 @@ created: "2026-08-21"
       whole package on one error
 - [x] [AC9] `golangci-lint run` green **on the version pinned in `versions.conf`**, not whatever is
       installed (BUG-071)
-- [ ] [AC9] bats suite green
+- [x] [AC9] bats suite green — 1394/1394, BATS_EXIT=0
 - [x] `verification.md` filled in with the command output that proves each criterion
 - [ ] Independent adversarial review from `harness/reviewer-pool.json` — required by the archive
       gate, and the reviewer must not be the implementer
