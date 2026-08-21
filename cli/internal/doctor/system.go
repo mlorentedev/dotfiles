@@ -12,6 +12,7 @@ package doctor
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -124,6 +125,9 @@ type System struct {
 	// answer different questions and one returning the other's shape is how a
 	// consumer gets taught about one and forgotten for the other.
 	BWItemRevisions func() ([]secrets.ItemRevision, error)
+	// BWLastSync returns the timestamp of the last successful Bitwarden sync.
+	// Returns zero time if never synced or unreadable (BUG-087).
+	BWLastSync func() (time.Time, error)
 }
 
 // resolveSecret is the production ResolveSecret: the age store (checkout-first,
@@ -201,6 +205,24 @@ func realSystem() *System {
 		},
 		BWItemRevisions: func() ([]secrets.ItemRevision, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemRevisions()
+		},
+		BWLastSync: func() (time.Time, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), bwStatusTimeout)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bw", "status")
+			var stdout bytes.Buffer
+			cmd.Stdout = &stdout
+			if err := cmd.Run(); err != nil {
+				return time.Time{}, err
+			}
+			var st bwState
+			if err := json.Unmarshal(stdout.Bytes(), &st); err != nil {
+				return time.Time{}, err
+			}
+			if st.LastSync == "" {
+				return time.Time{}, nil
+			}
+			return time.Parse(time.RFC3339, st.LastSync)
 		},
 		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)
