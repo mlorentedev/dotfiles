@@ -1,7 +1,7 @@
 ---
 id: "POLISH-003-pwsh-analyzer-coverage"
 type: spec
-status: implementing
+status: archived
 created: "2026-05-27"
 issue: "mlorentedev/dotfiles#1090"
 tags: [spec, proposal]
@@ -46,3 +46,5 @@ The `lint-powershell` job replaces the hardcoded array with dynamic discovery (`
 - Vault: `10_projects/dotfiles/11-tasks.md` § "Session 2026-05-27 — fresh-eyes audit" → POLISH-003.
 - CI workflow: `.github/workflows/ci.yml:36-67` (lint-powershell job).
 - Related bugs that would have been caught: BUG-005, BUG-020-SplitPath-LiteralPath-Parent, BUG-021-gitconfig-hash-check.
+
+<!-- archived 2026-08-21 — PR: https://github.com/mlorentedev/dotfiles/pull/1100 -->
