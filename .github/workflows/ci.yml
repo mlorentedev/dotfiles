@@ -100,6 +100,11 @@ jobs:
         run: |
           ./scripts/check-bats-names.sh tests/
 
+      - name: Verify referenced doc paths exist (BUG-088)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        run: |
+          ./scripts/check-doc-paths.sh
+
   lint-powershell:
     runs-on: ubuntu-latest
     timeout-minutes: 15
