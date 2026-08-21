@@ -414,8 +414,17 @@ dotf doctor (real binary) healthy map -> INFO; ghost pool -> FAIL naming chains.
 1–4 were spent hardening a component; the merge took the state from before any of it. Nothing in
 the machinery noticed: the staleness gate watches `proposal.md`, `tasks.md` and `features.json`,
 so a spec whose CODE diverges from the reviewed sha passes it. The reviewer named this as UNTESTED
-and it remains so — filed rather than fixed here, because a guard comparing merged-vs-reviewed shas
-is its own change.
+and it remains so: **filed as #1153**, not fixed here, because a guard comparing merged-vs-reviewed
+shas is its own change. Round 5's own recommendation — re-review at the merged sha — is a
+workaround for that missing guard, and it works only while a human remembers to follow it.
+
+Two more defects were filed while assembling this PR, neither belonging to it. **#1152**: the
+spec-gate prepush adapter resolves the branch's PR with `gh pr view`, which does not filter by
+state, so a branch whose PR already merged inherits that PR's closing keyword and every later push
+is refused. That is what the previous session bypassed with `--no-verify` without diagnosing, and
+the bypass also skips the secret scan sharing the hook. **#1154**: `cli/internal/doctor/report.go`
+is not gofmt-clean on main while the pinned `golangci-lint` v2.12.2 reports 0 issues — the
+unformatted file is cosmetic, the linter not reporting it is not.
 
 **Assembling this PR surfaced why the obvious fix would have been worse.** The branch forked before
 #1142, #1144, #1145, #1146 and #1150. Replaying it — or taking `git diff origin/main HEAD` — would

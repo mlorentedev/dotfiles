@@ -231,3 +231,4 @@ tags: [lessons, index, dotfiles]
 | [215 - A parser written for one runner reads the other runner's review as empty](lesson-215-a-parser-for-one-runner-reads-the-other-runners-re.md) | 2026-08-21 |  |
 | [216 - A three-dot diff does not answer "what is main missing"](lesson-216-a-three-dot-diff-does-not-answer-what-main-is-missi.md) | 2026-08-21 |  |
 | [217 - `go test -run` passes when the test name matches nothing](lesson-217-go-test-run-passes-when-the-test-name-matches-not.md) | 2026-08-21 |  |
+| [218 - The Go build cache does not see the data file your test reads](lesson-218-the-go-build-cache-does-not-see-the-data-file-your.md) | 2026-08-21 |  |
