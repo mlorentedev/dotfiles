@@ -12,16 +12,28 @@
 # is NaN's, set as OPENAI.API_BASE in the workflow. The model itself is not the
 # hosted OpenAI one.
 #
-# deepseek-v4-flash is not a guess. #786's body argued from a 2026-06-11 research
-# note that REJECTED PR-Agent because "local-model quality drops below the bar",
-# then reasoned that cluster inference should be a different tier. That was a
-# projection. It is now measured: three adversarial reviews ran on this model on
-# 2026-08-16 and each produced findings a rubber stamp would not — including a
-# security hole in GUARD-002 (the gate ran its own classifier from the PR under
-# review, so a PR could edit it to attest itself) and a vacuous test predicate.
-model = "openai/deepseek-v4-flash"
+# mimo-v2.5, and the reason is LANE SEPARATION rather than quality (#1149).
+#
+# deepseek-v4-flash held this slot until 2026-08-21 and earned it; nothing about
+# that record is retracted. What changed is that deepseek is ALSO the primary in
+# harness/reviewer-pool.json, which governs the `dotf spec review` the archive
+# gate requires — and NaN's limit is per MODEL, so CI and the gate shared one
+# bucket of five. Measured: a spec review on #1143 died with a deepseek 429
+# because PR-Agent was reviewing that same PR. Two models are two buckets.
+#
+# The trade, stated rather than buried: CI review moves to the model with the
+# weaker established record — mimo is pool-admitted but was never ranked against
+# deepseek. That buys the GATE's capacity with some of CI's review strength,
+# which is the right way round, because the gate is blocking and CI review is
+# advisory. Visibly weaker reviews here are the signal to revisit, NOT to move
+# back on top of the gate. Full measurement trail in #1149.
+model = "openai/mimo-v2.5"
 
-# ONE fallback, and the reason is concurrency rather than quality (#1107).
+# ONE fallback, now deepseek-v4-flash — the reverse of the pre-2026-08-21
+# arrangement (#1149). It reintroduces contention with the gate on exactly the
+# runs where it fires, accepted deliberately: it fires only when mimo is
+# unreachable, and a review competing for a slot beats a review that does not
+# happen.
 #
 # Measured 2026-08-20 against api.nan.builders with minimal requests:
 #
@@ -45,10 +57,9 @@ model = "openai/deepseek-v4-flash"
 #   qwen3.6              262,144 ctx
 #   gemma4               262,144 ctx
 #
-# Stated honestly: that is a profile match, not a benchmark. mimo has not been
-# evaluated against the pool's bar, and if it ever signs an adversarial review
-# it must be admitted to reviewer-pool.json first — that file governs the
-# spec-level gate, which this is not.
+# Stated honestly: that is a profile match, not a benchmark. An earlier version
+# of this note added that mimo was not yet pool-admitted; it was admitted on
+# 2026-08-20, so that caveat is dropped and only the profile one stands.
 #
 # On ADR-032's "the top tier has no fallback, on purpose": read precisely, that
 # rule forbids silently degrading to a MID model, because a mysterious quality
@@ -64,15 +75,16 @@ model = "openai/deepseek-v4-flash"
 # no Google credential exists in the registry, and routing via OpenRouter would
 # spend a finite paid balance on every PR and add the second secret the guard
 # exists to prevent.
-fallback_models = ["openai/mimo-v2.5"]
+fallback_models = ["openai/deepseek-v4-flash"]
 
 # Cheap passes only — descriptions and commit summaries, never the review.
 model_weak = "openai/qwen3.6"
 
 # NaN models are absent from LiteLLM's registry, so the token budget must be
 # stated explicitly or LiteLLM assumes a small default and truncates the diff.
-# deepseek-v4-flash advertises 1M context; 200k is a deliberate floor well inside
-# it, raised only against measured need.
+# Both models here advertise 1M context — deepseek-v4-flash and mimo-v2.5 alike,
+# which is the line reviewer-pool.json draws around reasoning-class — so 200k is
+# a deliberate floor well inside either, raised only against measured need.
 custom_model_max_tokens = 200000
 max_model_tokens = 200000
 
