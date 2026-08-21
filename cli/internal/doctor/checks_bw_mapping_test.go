@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The exact live state that took the archive gate down on 2026-08-15: the
@@ -131,5 +132,71 @@ func TestCheckBWMapping_NoBwSecretsSkips(t *testing.T) {
 	}
 	if rep.Failures() != 0 || !strings.Contains(buf.String(), "no bw-backed secrets") {
 		t.Errorf("expected the no-bw-secrets SKIP\n%s", buf.String())
+	}
+}
+
+// BUG-087: a stale cache must WARN naming the sync age and remediation rather than FAIL.
+func TestCheckBWMapping_StaleCacheWarnsInsteadOfFails(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: DOCKERHUB_TOKEN, plane: app, backend: bw, bw: {item: dockerhub, field: PAT}, expose: {env: DOCKERHUB_TOKEN}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.BWItemNames = func() ([]string, error) {
+		return []string{"nan-api-key"}, nil
+	}
+	// Last sync was 48 hours ago (stale > 24h)
+	sys.BWLastSync = func() (time.Time, error) {
+		return fixedTestNow.Add(-48 * time.Hour), nil
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkBWMapping(sys, patCfg(t, registry), rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("stale cache must not FAIL; want 0 failures, got %d\n%s", rep.Failures(), buf.String())
+	}
+	if rep.Warnings() != 1 {
+		t.Fatalf("stale cache must WARN; want 1 warning, got %d\n%s", rep.Warnings(), buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "not found in local vault cache (last synced 48h0m0s ago)") {
+		t.Errorf("expected stale cache message with age, got:\n%s", out)
+	}
+	if !strings.Contains(out, "dotf secrets sync") {
+		t.Errorf("expected remediation action 'dotf secrets sync', got:\n%s", out)
+	}
+}
+
+// BUG-087: a vault that was never synced must WARN stating never synced rather than FAIL.
+func TestCheckBWMapping_UnsyncedCacheWarnsInsteadOfFails(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: DOCKERHUB_TOKEN, plane: app, backend: bw, bw: {item: dockerhub, field: PAT}, expose: {env: DOCKERHUB_TOKEN}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.BWItemNames = func() ([]string, error) {
+		return []string{"nan-api-key"}, nil
+	}
+	// Never synced (zero time)
+	sys.BWLastSync = func() (time.Time, error) {
+		return time.Time{}, nil
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkBWMapping(sys, patCfg(t, registry), rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("unsynced cache must not FAIL; want 0 failures, got %d\n%s", rep.Failures(), buf.String())
+	}
+	if rep.Warnings() != 1 {
+		t.Fatalf("unsynced cache must WARN; want 1 warning, got %d\n%s", rep.Warnings(), buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "not found in local vault cache (never synced)") {
+		t.Errorf("expected never synced message, got:\n%s", out)
+	}
+	if !strings.Contains(out, "dotf secrets sync") {
+		t.Errorf("expected remediation action 'dotf secrets sync', got:\n%s", out)
 	}
 }

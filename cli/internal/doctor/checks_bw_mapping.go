@@ -4,9 +4,19 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
+
+// bwMappingStaleSync is the threshold beyond which the local vault cache is
+// considered potentially stale when reporting missing items (BUG-087).
+//
+// If the vault was synced within this window, a missing item is considered a
+// genuine absence (FAIL). If the vault has not been synced or is older than
+// this window, doctor emits a WARN indicating the item was not found in the
+// local cache and advising a `dotf secrets sync`.
+const bwMappingStaleSync = 24 * time.Hour
 
 // checkBWMapping asserts that every Bitwarden item the registry names actually
 // exists in the vault — the drift between the mapping SSOT and the store it maps
@@ -27,8 +37,11 @@ import (
 // so it stays cheap enough for the full sweep and safe to run anywhere.
 //
 // Severity mirrors checkBitwardenReach's rule: an unreachable or locked vault is
-// not a finding here (that section owns it), but a reachable vault missing an
-// item a live entry depends on is a FAIL, because something is already broken.
+// not a finding here (that section owns it). When an item appears missing:
+//   - If the daemon's last sync is fresh (within bwMappingStaleSync), it is a FAIL
+//     because the item is genuinely absent from the vault.
+//   - If the daemon's last sync is stale or unknown (never synced), it is a WARN
+//     explaining that the item was not found in the local cache and advising a sync (BUG-087).
 func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Bitwarden mapping (registry -> vault)")
 
@@ -74,12 +87,31 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 	}
 	sort.Strings(missing)
 
+	var lastSync time.Time
+	if sys.BWLastSync != nil {
+		if t, err := sys.BWLastSync(); err == nil {
+			lastSync = t
+		}
+	}
+
 	for _, item := range missing {
 		ids := declared[item]
 		sort.Strings(ids)
-		rep.Fail(fmt.Sprintf(
-			"%s: no such item in the vault, named by %s — every `dotf secrets run` without --only fails on it, including `dotf spec review`",
-			item, strings.Join(ids, ", ")))
+
+		if !lastSync.IsZero() && sys.Now().Sub(lastSync) >= 0 && sys.Now().Sub(lastSync) <= bwMappingStaleSync {
+			rep.Fail(fmt.Sprintf(
+				"%s: no such item in the vault, named by %s — every `dotf secrets run` without --only fails on it, including `dotf spec review`",
+				item, strings.Join(ids, ", ")))
+		} else if lastSync.IsZero() {
+			rep.Warn(fmt.Sprintf(
+				"%s: not found in local vault cache (never synced), named by %s — run `dotf secrets sync` to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
+				item, strings.Join(ids, ", ")))
+		} else {
+			age := sys.Now().Sub(lastSync).Round(time.Minute)
+			rep.Warn(fmt.Sprintf(
+				"%s: not found in local vault cache (last synced %s ago), named by %s — run `dotf secrets sync` to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
+				item, age, strings.Join(ids, ", ")))
+		}
 	}
 	if len(missing) == 0 {
 		rep.Pass(fmt.Sprintf("all %d bw item(s) named by the registry exist in the vault", len(declared)))
