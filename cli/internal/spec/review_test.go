@@ -434,6 +434,7 @@ func TestGitStalenessRebaseWithoutContractChangeIsNotStale(t *testing.T) {
 		"proposal.md":     "---\nstatus: verifying\n---\nclean\n",
 		"tasks.md":        "tasks\n",
 		"verification.md": "evidence\n",
+		"features.json":   "[]\n",
 	})
 	gitRun(t, root, "add", "-A")
 	gitRun(t, root, "commit", "-qm", "feat: create spec")
