@@ -260,6 +260,14 @@ func TestSecretsMigrate_ScopeGuards(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
 				t.Fatalf("guard %q: err = %v, want one containing %q", c.name, err, c.wantErr)
 			}
+			if c.name == "shared age source" {
+				if !strings.Contains(err.Error(), "#321") {
+					t.Errorf("shared age error must reference #321, got: %v", err)
+				}
+				if strings.Contains(err.Error(), "--split") {
+					t.Errorf("shared age error must not reference nonexistent --split flag, got: %v", err)
+				}
+			}
 			if len(fw.sets) != 0 || len(fw.created) != 0 {
 				t.Errorf("guard %q must write nothing: sets=%v created=%v", c.name, fw.sets, fw.created)
 			}
