@@ -27,14 +27,66 @@ const (
 	ModelMapSchemaFile = "harness/model-map.schema.json"
 )
 
-// implementedKeywords is the JSON Schema subset this validator understands.
+// customRules are the cross-block checks no schema language expresses, keyed by
+// the `x-` keyword in the schema that switches each one on.
 //
-// The allow-list is the point, not the contents. A validator that skips a
-// keyword it does not implement reports a document valid without having checked
-// what the schema asked for — health it never established, which is the failure
-// class this registry exists to close. Adding a keyword to the schema therefore
-// requires adding it here, and forgetting is a loud test failure rather than a
-// quiet weakening of the contract.
+// The slice is a CLOSED set, and that is the point. Draft 2020-12 treats an
+// unknown keyword as an annotation — the tolerance these `x-` extensions rely on
+// to coexist with a conforming library, and the same tolerance that makes a
+// misspelling invisible. `x-poolReferenceResolve` (singular) is not a rule name,
+// so a lookup finds nothing, the rule never runs, and a document carrying a ghost
+// pool validates clean. Review round 2 closed the wrong-TYPE variant of this and
+// left the wrong-NAME variant open; round 5 found it.
+//
+// Standard keywords stay the library's business. The `x-` namespace is ours, so
+// it is policed as a closed set rather than tolerated as annotation — which is
+// the loudness property the deleted keyword allow-list used to provide for free.
+var customRules = []struct {
+	name string
+	run  func(any) error
+}{
+	{"x-poolReferencesResolve", checkPoolReferences},
+	{"x-tiersHaveChains", checkTiersHaveChains},
+}
+
+// checkCustomRuleNamespace rejects any top-level `x-` keyword that is not a rule
+// this validator implements.
+//
+// Deliberately NOT the mirror rule ("every known rule must be declared"). That
+// belongs to the shipped schema, not to this function: a unit test isolating one
+// cross-block rule must be able to pass a schema declaring only that rule, and
+// forcing every caller to name both would trade a real guard for test noise.
+// TestShippedSchemaDeclaresEveryCustomRule asserts the shipped schema declares
+// both, which is the only document where an omission means anything.
+//
+// Keys are sorted so a schema with two bad keywords reports the same one every
+// run; map iteration order would make the message a coin flip.
+func checkCustomRuleNamespace(schema map[string]any) error {
+	known := make(map[string]bool, len(customRules))
+	names := make([]string, 0, len(customRules))
+	for _, r := range customRules {
+		known[r.name] = true
+		names = append(names, r.name)
+	}
+
+	unknown := make([]string, 0)
+	for key := range schema {
+		if strings.HasPrefix(key, "x-") && !known[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	sort.Strings(unknown)
+
+	return fmt.Errorf(
+		"%s: %q is not a custom rule this validator implements (known: %s) — "+
+			"a misspelled rule name is read as an annotation and the rule silently never runs, "+
+			"which is indistinguishable from it passing",
+		ModelMapSchemaFile, unknown[0], strings.Join(names, ", "))
+}
+
 // ValidateModelMap checks doc against schema.
 //
 // Standard JSON Schema keywords are interpreted by santhosh-tekuri/jsonschema,
@@ -99,13 +151,10 @@ func ValidateModelMap(doc, schema []byte) error {
 	// false and silently disable the rule, which is the defect round 2 found and
 	// which delegating standard keywords does not fix, because these are not
 	// standard keywords.
-	for _, flag := range []struct {
-		name string
-		run  func(any) error
-	}{
-		{"x-poolReferencesResolve", checkPoolReferences},
-		{"x-tiersHaveChains", checkTiersHaveChains},
-	} {
+	if err := checkCustomRuleNamespace(s); err != nil {
+		return err
+	}
+	for _, flag := range customRules {
 		raw, present := s[flag.name]
 		if !present {
 			continue

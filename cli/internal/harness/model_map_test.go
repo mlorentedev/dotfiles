@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -417,6 +418,118 @@ func TestValidatorRejectsMalformedPoolReferenceFlag(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "x-poolReferencesResolve") {
 		t.Errorf("the error must name the malformed flag, got: %v", err)
+	}
+}
+
+// Round-5 review finding (Major/REAL): round 2 closed the wrong-TYPE variant of
+// the disabled-rule defect and left the wrong-NAME variant open.
+//
+// A misspelled rule name is not a malformed value — there IS no value, because
+// the key the validator looks up is absent. The library reads the typo'd key as
+// a draft-2020-12 annotation, the Go walk finds nothing under the real name and
+// skips, and a document with a ghost pool validates with a nil error. The
+// keyword allow-list the library replaced caught exactly this by construction,
+// so leaving it open was a regression of the loudness property, not a gap.
+func TestValidatorRejectsUnknownCustomRuleName(t *testing.T) {
+	// The reviewer's own reproduction: `x-poolReferenceResolve`, singular.
+	schema := []byte(`{"type": "object", "x-poolReferenceResolve": true}`)
+	doc := []byte(`{"pools": {"nan": {}}, "harnesses": {"pi": {"pools": ["ghost"]}}}`)
+
+	err := ValidateModelMap(doc, schema)
+	if err == nil {
+		t.Fatal("a misspelled custom rule name must be a loud error — the rule never runs, which is indistinguishable from it passing, and the ghost pool in this doc proves it")
+	}
+	if !strings.Contains(err.Error(), "x-poolReferenceResolve") {
+		t.Errorf("the error must name the unrecognised keyword so the typo is visible, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "x-poolReferencesResolve") {
+		t.Errorf("the error must name the rules it does know, or the reader cannot see the correction, got: %v", err)
+	}
+}
+
+// A standard keyword this validator does not special-case is the library's
+// business and must NOT be caught by the namespace guard — the guard polices
+// `x-`, which is ours, not the whole schema.
+func TestValidatorToleratesStandardKeywordsItDoesNotOwn(t *testing.T) {
+	schema := []byte(`{"type": "object", "title": "t", "$comment": "c", "deprecated": true}`)
+	doc := []byte(`{"pools": {"nan": {}}}`)
+
+	if err := ValidateModelMap(doc, schema); err != nil {
+		t.Errorf("standard keywords are the library's to interpret, not the namespace guard's to reject, got: %v", err)
+	}
+}
+
+// The mirror of the namespace guard, and the reason that guard does not carry it
+// itself: deleting or renaming a rule out of the SHIPPED schema disables it, and
+// no unit test passing a minimal schema can tell that apart from deliberate
+// scoping. This is the one document where an omission is always a defect.
+func TestShippedSchemaDeclaresEveryCustomRule(t *testing.T) {
+	root := repoRootForTest(t)
+	raw, err := os.ReadFile(filepath.Join(root, ModelMapSchemaFile))
+	if err != nil {
+		t.Fatalf("read shipped schema: %v", err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("parse shipped schema: %v", err)
+	}
+
+	for _, rule := range customRules {
+		raw, present := schema[rule.name]
+		if !present {
+			t.Errorf("%s does not declare %s, so that cross-block rule never runs against the shipped map", ModelMapSchemaFile, rule.name)
+			continue
+		}
+		if on, ok := raw.(bool); !ok || !on {
+			t.Errorf("%s declares %s as %#v; it must be true or the rule is off", ModelMapSchemaFile, rule.name, raw)
+		}
+	}
+}
+
+// Round-5 review finding (Minor/SPECULATIVE, fixed anyway): model ids were
+// pattern-guarded as VALUES while pool NAMES — the keys those values are reached
+// through — were unconstrained, so `pools: {"  ": {...}}` validated and a harness
+// could reference it. Same class as the blank-model-id defect two rounds earlier,
+// one level of the document up, which is why it is closed rather than filed.
+//
+// Two arms, and the blank pool is declared but referenced by NOTHING. Both
+// details are load-bearing, and mutation testing is what established that —
+// twice, on drafts that review rounds would have passed:
+//
+//   - Without the control arm, the document also left `harnesses`/`tiers`/
+//     `chains` empty and wrote `auth` as an object, so it failed for five
+//     reasons unrelated to the pool name and passed with the guard removed.
+//   - With the control arm but the blank pool wired into `chains`, the chain
+//     item pattern (`^[^:[:space:]]+:[^:[:space:]]+$`) rejected "  :model"
+//     first — again passing with `propertyNames` deleted.
+//
+// So the guard under test is isolated only when the sole difference between the
+// arms is a key that no other rule can reach.
+func TestShippedSchemaRejectsBlankPoolNames(t *testing.T) {
+	root := repoRootForTest(t)
+	schema, err := os.ReadFile(filepath.Join(root, ModelMapSchemaFile))
+	if err != nil {
+		t.Fatalf("read shipped schema: %v", err)
+	}
+
+	// `spare` is an extra pool nothing references; every other block routes
+	// through `nan`, so only the pool KEY differs between the two arms.
+	doc := func(spare string) []byte {
+		return []byte(`{"$comment": ["c"], "version": 1,
+		  "pools": {
+		    "nan": {"auth": "subscription", "probe": "env:X"},
+		    "` + spare + `": {"auth": "payg", "probe": "bin:y"}},
+		  "harnesses": {"pi": {"pools": ["nan"], "render": "native"}},
+		  "tiers": {"mid": {"pi": "deepseek-v4-flash"}},
+		  "chains": {"mid": ["nan:deepseek-v4-flash"]},
+		  "services": {}}`)
+	}
+
+	if err := ValidateModelMap(doc("ollama"), schema); err != nil {
+		t.Fatalf("the control document must validate, or the blank-name arm below proves nothing: %v", err)
+	}
+	if err := ValidateModelMap(doc("  "), schema); err == nil {
+		t.Fatal("a whitespace-only pool NAME must be rejected — the model ids it routes to are pattern-guarded, and a key nothing can type is not a quota")
 	}
 }
 

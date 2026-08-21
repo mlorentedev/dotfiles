@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mlorentedev/dotfiles/harness/model-map.schema.json",
   "title": "model-map",
-  "description": "The dispatch-time routing registry (ADR-032 §3, shaped by ADR-035). Validated by cli/internal/harness/model_map.go, which reads THIS FILE rather than restating its rules — so the contract lives here and only its interpreter lives in Go. Adding a keyword here requires implementing it there; an unimplemented keyword is a loud error, never a silent pass.",
+  "description": "The dispatch-time routing registry (ADR-032 §3, shaped by ADR-035). Validated by cli/internal/harness/model_map.go, which reads THIS FILE rather than restating its rules — so the contract lives here and only its interpreter lives in Go. Standard draft-2020-12 keywords are interpreted by santhosh-tekuri/jsonschema, so adding one here needs no Go change. The `x-` namespace is this repo's own: those keywords name cross-block rules implemented in Go, they are a closed set, and one this validator does not implement is a loud error rather than the annotation draft 2020-12 would otherwise make it.",
   "type": "object",
   "required": [
     "$comment",
@@ -32,6 +32,10 @@
       "description": "Inference pools. A pool is a quota, not a tool: `nan` is a pool, `pi` is a harness that reaches it.",
       "type": "object",
       "minProperties": 1,
+      "propertyNames": {
+        "description": "The same non-blank rule the model-id VALUES carry, applied to the pool NAMES. Round 5 surfaced the asymmetry: values were pattern-guarded and keys were not, so `pools: {\"  \": {...}}` validated and a harness could reference it. `propertyNames` is how draft 2020-12 constrains keys; `minProperties` only counts them.",
+        "pattern": "^\\S.*$"
+      },
       "additionalProperties": {
         "type": "object",
         "required": [
