@@ -66,27 +66,44 @@ busy session exhausts it — six PRs in one session received no review at all
 
 Three things now stand between that and a silent green:
 
-1. `auto_improve = false` halves what this workflow asks for.
-2. A job-level concurrency group serialises inference repo-wide and **queues**
-   rather than cancelling — ADR-032's *"queues or escalates, never degrades
-   silently"*. Note the ceiling: GitHub holds one pending run per group, so in a
-   burst of three or more the extras are cancelled rather than queued. Visibly.
+1. `auto_improve = false` halves what this workflow asks for (#1107).
+2. **Parallel execution across NaN slots without GHA job locks (#1135)**:
+   A job-level GHA concurrency group previously throttled runs to 1 and cancelled
+   in-between jobs due to GHA's max pending queue depth of 1. By removing the
+   global GHA lock and relying on per-PR concurrency (`group: pr-agent-${{ pr.number }}`),
+   batches of PRs review concurrently across NaN's 10 slots.
 3. `fallback_models = ["openai/mimo-v2.5"]` — a second NaN model with its own
-   bucket of five, which is what makes it a fallback rather than a rename.
+   bucket of five, which is what makes it an automatic fallback under LiteLLM
+   if `deepseek-v4-flash` is saturated.
 
 The multiplier that matters is still the **push**, not the PR: the workflow fires
 on every push to the branch, so a PR with five pushes is five reviews of the full
 diff. The per-PR concurrency group collapses a burst of pushes into one review of
 the settled state.
 
+## High-Velocity Batch PR & Triage Workflow
+
+To maximize developer velocity without sacrificing review hygiene:
+
+1. **Sprint Phase (Parallel PR creation)**:
+   The developer or agent opens multiple PRs in series for distinct atomic tickets.
+   No local pre-push lock blocks PR creation while previous PRs await review.
+2. **Async CI Phase (Parallel review)**:
+   GitHub Actions and PR-Agent review each PR in parallel in the cloud across
+   available NaN slots. Non-slash comments (`## Review triage`, discussions) are
+   strictly filtered out (`startsWith(comment.body, '/')`), preventing review loops (#1134).
+3. **Triage Sweep Phase (`dotf pr triage-queue`)**:
+   Before closing a session or merging, the agent queries `dotf pr triage-queue`.
+   The agent evaluates findings, applies fixes via TDD, pushes updates, and posts
+   the `## Review triage` table on each PR until the queue reports `[OK] 0 pending`.
+
 ## Operating it
 
-- **Nothing to trigger.** It fires on the PR event. Slash commands (`/review`,
-  `/describe`, `/improve`) work as comments on an open PR.
-- **Read the output as a comment, not a review.** PR-Agent posts an *issue
-  comment*; it does not submit a formal GitHub review. `gh pr view N --json
-  reviews` will not show it. This is why it cannot currently attest under
-  GUARD-002 — see #1033.
+- **Nothing to trigger.** It fires automatically on the `pull_request` event (`opened`, `synchronize`).
+  Slash commands (`/review`, `/describe`, `/improve`) work as comments on an open PR.
+- **Attestation under GUARD-002**: PR-Agent posts an issue comment carrying the
+  `## PR Reviewer Guide` marker, which `check-review-attestation.sh` recognizes
+  as a valid review attestation (`[OK] attested`).
 - **Changing the reviewing model** is one line in `.pr_agent.toml`. There is one
   fallback, `openai/mimo-v2.5`, and the reason is **concurrency, not quality**:
   the limit is per model, so a second NaN model has its own bucket of five.

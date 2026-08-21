@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: ac110dd5b55e6992
+generated_sha: 1bb26bdb5271dfb3
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -53,6 +53,13 @@ gh pr checks <N> --repo <owner>/<repo> --watch --interval 30
 ```
 
 Watch it once rather than polling in a loop. If a reviewer bot is still pending after the checks settle, wait for that one specific thing — a triage run against half the comments produces a disposition table you will have to redo.
+
+### 1b. Batch Workflow (High-Velocity PR Creation)
+
+When resolving multiple backlog items in a single session:
+- **Do not block local progress waiting for reviews.** Open each atomic PR in series and let CI and autonomous reviewers (PR-Agent) process them asynchronously in parallel.
+- Non-slash comments (`## Review triage`, conversation) are filtered out at the workflow level, so posting triage tables does not trigger review loops or consume inference quota.
+- **Batch sweep before closing:** Run `dotf pr triage-queue` to list all PRs whose reviews have finished across the batch, then iterate through each pending PR, apply needed fixes via TDD, push updates, and record `## Review triage`.
 
 ### 2. Report CI honestly
 
