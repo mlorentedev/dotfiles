@@ -183,7 +183,11 @@ merge trigger: a third consumer needing an ordered fallback chain.**
 Recorded here rather than edited into an accepted ADR:
 
 - **`harnesses.codex.pools: ["codex"]` references a `codex` pool that `pools` never declares.**
-  A dangling reference in the reference schema. The schema must reject it.
+  A dangling reference in the reference schema. The schema must reject it — **and the resolution is
+  deletion, not declaration**: the owner confirmed on 2026-08-21 that codex is no longer used, so
+  declaring the missing pool would have made a route to nowhere validate. A `~/.codex` directory on
+  the account is a leftover, not evidence of a live runtime. (`harness/manifest.json` still carries
+  a codex deploy target; that is separate cleanup.)
 - **`pools.openrouter` describes a provider deleted upstream** and must not be carried into the
   built file.
 
