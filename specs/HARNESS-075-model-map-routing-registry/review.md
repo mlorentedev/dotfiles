@@ -1,94 +1,98 @@
 ---
 spec: "HARNESS-075-model-map-routing-registry"
-verdict: "FAIL"
-reviewed_sha: "1b1cfb36ace8cc2ac6397a7db42d557e03c26706"
+verdict: "PASS"
+reviewed_sha: "63acd91f7f299255dd1a825933f3c32322dcd585"
 reviewer: "nan/deepseek-v4-flash"
-date: "2026-08-20"
+date: "2026-08-21"
 ---
 
 ## Adversarial review
 
-**Scope**: HARNESS-075-model-map-routing-registry (branch `feat/harness-075-model-map` @ `1b1cfb3`)
+**Scope**: HARNESS-075-model-map-routing-registry @ `63acd91` (HEAD, tip of `origin/main`)
 **Sources**: `specs/HARNESS-075-model-map-routing-registry/{proposal,tasks,verification,features}.json`,
 `harness/model-map.json`, `harness/model-map.schema.json`,
 `cli/internal/harness/model_map.go` + `model_map_test.go` + `model_map_fuzz_test.go`,
 `cli/internal/doctor/checks_model_map.go` + `checks_model_map_test.go`, `tests/model-map.bats`,
-`harness/reviewer-pool.json`, PR #1143 (merged as `e22a4d0`), PR #1136 (ADR-035, merged).
+`harness/reviewer-pool.json`, PR #1143 (merged `e22a4d0`), PR #1155 (merged `63acd91`),
+MR #1139 (ADR-035, merged). The reviewer pool's primary (`nan/deepseek-v4-flash`) matches the
+`dotf spec archive` allow-list; this review is signed under exactly that id.
 
 ### Spec and task alignment
 
-- **AC1–AC9 map cleanly to named tests, and I re-ran the entire AC9 loop at HEAD**: `go build ./...`,
-  `go vet ./...`, `GOOS=windows go vet ./...`, `go test ./...` (17 packages ok, 0 FAIL),
-  `golangci-lint run` (0 issues, v2.12.2 = the `versions.conf` pin), full bats suite
-  (`BATS_EXIT=0`, 1400 ok / 0 not ok — the record's count "1394" has drifted as main gained tests),
-  and `go test -fuzz` (30 s, 557,920 executions, no crash). All eight named features.json commands
-  exit 0, and I confirmed the `grep -q '--- PASS: <Name> '` form exits 1 when the test name matches
-  nothing (non-vacuous).
-- **Rounds 1–4 findings are closed at HEAD.** I re-injected the round-3 mutation (`"minItems": "5"`)
-  and round-4 mutations (`properties: {"a": 5}`, `required: ["a", 5]`, `concurrency: -5`) against
-  the shipped schema: all loud errors from the library. Blank ids, whitespace ids, `"nan:"` chains
-  and ghost references in `chains`/`services` are all rejected by the shipped schema.
-- **AC6 verified live through the binary**: absent / unparseable / schema-invalid → three distinct
-  loud FAIL outputs, none containing "no pools"/"0 pools"; the deployed copy at `~/.dotfiles`
-  correctly reports `[FAIL] not found` because the repo is ahead of the deploy dir (C15-correct).
-- **THE MERGED CHANGE IS NOT THE REVIEWED CHANGE — Blocker below.** PR #1143 (which `tasks.md`
-  marks as the spec's PR) merged to main as `e22a4d0` carrying the ORIGINAL, pre-fix
-  implementation. Every fix from rounds 1–4 exists only on this local branch (`1b1cfb3`), which is
-  not an ancestor of `e22a4d0` and is not on main. I verified the merged tree directly (temp
-  worktree at `e22a4d0`) and ran the round-1..4 regression probes against it: **all still fail
-  there** — ghost pool in `chains` accepted, blank model ids accepted, `concurrency: -5` accepted,
-  malformed `properties` element silently skipped, no `x-tiersHaveChains` rule at all, no fuzz
-  guard, no library. The verification.md narrative ("all findings closed") describes the branch,
-  not anything on main.
-- `tasks.md` closing boxes: the PR box is ticked against a merged PR that lacks the fixes; the
-  review box is unchecked (this review is the round it awaits).
-- `verification.md` AC2 section is stale: it still asserts "No schema-engine dependency was added;
-  `cli` still has three direct dependencies" and shows the deleted native validator's error wording
-  ("declares \"oneOf\" at (root), which this validator does not implement") as current evidence —
-  neither can occur under the library-backed code at HEAD.
+- **Round 5's Blocker is resolved in this tree.** Round 5 reviewed `1b1cfb3`, a branch that was
+  not an ancestor of main — every round-1..4 fix existed only there while PR #1143 (merged
+  `e22a4d0`) shipped the original, pre-fix implementation. The tree under review here is
+  **`63acd91`, the tip of `origin/main`**, which lands PR #1155 ("the model-map review fixes that
+  #1143 merged without"). `git merge-base --is-ancestor HEAD origin/main` → yes; `git log
+  origin/main -- cli/internal/harness/model_map.go` shows exactly `e22a4d0` then `63acd91`. The
+  reviewed change is now the change on main.
+- **The fixes themselves are present at HEAD**, verified by reading the merged files rather than
+  the round record: `model_map.go` imports `santhosh-tekuri/jsonschema/v6` (library-backed),
+  `checkPoolReferences` walks all three blocks (`harnesses`, `chains` split on `pool:model`,
+  `services.*.pool`), `checkCustomRuleNamespace` polices the `x-` namespace as a closed set,
+  `ResolveTier` rejects blank ids, the fuzz target exists, and `model-map.schema.json` carries
+  `minimum`, `minLength`, `pattern`, `x-tiersHaveChains`, and `propertyNames` on pool names.
+- **All eight `features.json` commands exit 0 at HEAD** (verified individually):
+  f1 (seven blocks), f2 (`TestModelMapValidatesAgainstSchema`), f3
+  (`TestSchemaRejectsDanglingPoolReference`), f4 (no retired provider, structural), f5
+  (`TestModelMapConsumerClasses`), f6 (`TestModelMapCheckThreeBrokenStates`), f7
+  (`TestModelMapBudgetIsDeclarationOnly`), f8 (`bats tests/model-map.bats`, 8/8). Each Go-backed
+  one uses the `-v | grep -q -- '--- PASS: <Name> '` non-vacuous form (exits 1 on a missing test).
+- **AC2's wording was amended** (proposal.md lines 129–142 and its schema `description`): the
+  library direction (`santhosh-tekuri/jsonschema/v6`) is now the criterion, the stale "native /
+  no dependency / loud on unimplemented standard keyword" text is gone — round-5 Major #2 closed
+  — and the schema's top-of-file `description` explains that only the `x-` namespace is
+  validator-implemented, with a misspelled `x-` keyword being a loud error.
+- **`go mod tidy -diff` is empty at HEAD** — `santhosh-tekuri/jsonschema/v6 v6.0.3` sits in the
+  direct `require` block (round-5 Minor 4 closed); `go.mod`/`go.sum` are committed tidy.
+- **Dead comment removed** (round-5 Minor 5): `rg implementedKeywords cli/` finds nothing; the
+  function gained that name is `checkCustomRuleNamespace` with a comment explaining its scope.
+- **`verification.md` AC2 block rewritten** (round-5 Minor 6): now states "reads
+  `harness/model-map.schema.json` as data rather than restating it" and records the 
+  dependency-add + the `x-` namespace being a closed set — no stale `oneOf` error string, no
+  "three direct dependencies" claim.
+- **tasks.md closing boxes are stale in a way that self-documents** the round-5 Blocker: the
+  final "PR merged without the fixes" row is still `[ ]` in this file even though PR #1155
+  (`63acd91`) landed it on main — but that box is the row describing the pre-fix merge, and the
+  row above it (the #1143 + #1155 explanation) was ticked in the same commit. This is a
+  spec-artifact nit the implementer should update (the PR box now reads "merged"), not a code
+  issue; I verified the timeline against `git log --oneline origin/main` and `gh pr 1155` if
+  available. **I do not edit `tasks.md` per the review contract; flagged for the implementer.**
+- **No `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]`** anywhere in the spec folder.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
 |----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Blocker  | REAL | handoff / scope | The change merged to main is not the change reviewed. PR #1143 (merged `e22a4d0`, on `origin/main`) contains the ORIGINAL implementation: native validator with `implementedKeywords`, no `minLength`/`minimum`/`pattern`/`x-tiersHaveChains` in the shipped schema, `checkPoolReferences` walking only `harnesses`, no blank-id guard, no fuzz test, no library. The reviewed HEAD (`1b1cfb3`, all four rounds' fixes) is not an ancestor of `e22a4d0` and is absent from main. I ran the round-1..4 regression probes against the merged tree: ghost-in-chains, blank-id, `-5` budget and malformed-`properties` all still validate cleanly there. Archiving on HEAD's green tests would certify a model-map whose merged form carries every defect rounds 1–4 documented as closed. | Reproduced against a worktree at `e22a4d0` (temp probe test, since removed); `git rev-list --left-right --count origin/feat/harness-075-model-map...HEAD` = 11/18; `git show e22a4d0:cli/internal/harness/model_map.go` | UNTESTED (no gate checks merged-vs-reviewed code; the staleness gate watches only `proposal.md`/`tasks.md`/`features.json`) | code-repo (merge the fixed branch; re-review at the merged SHA) |
-| Major  | REAL | spec vs code | AC2 as written is not satisfied by the shipped code. proposal.md AC2 still binds "The validator is native (no schema-engine dependency)" and "encountering a construct it does not implement is a loud error, never a silent pass" — but commit `8d510ce` replaced the native interpreter with `santhosh-tekuri/jsonschema/v6` (a direct dependency), and under draft-2020-12 unknown keywords are annotations, silently tolerated. The Risks section documents the pivot; the acceptance criterion itself was never amended. The schema's own `description` repeats the dead claim ("an unimplemented keyword is a loud error"). | Direct read of proposal.md AC2 (lines 127–131) vs `cli/go.mod` and `model_map.go`; probe: adding `"x-bogus-review-keyword": true` to the shipped schema validates silently | UNTESTED — the named tests assert behavior, not the AC2 wording | spec (amend AC2 + schema `description` to the library direction; the watched contract files were left contradictory) |
-| Major  | REAL | validation | A typo'd custom-rule name silently disables a cross-block rule. `ValidateModelMap` looks up exactly `"x-poolReferencesResolve"`/`"x-tiersHaveChains"` in the schema; a misspelled key (e.g. `x-poolReferenceResolve`) is treated by the library as an annotation and by the Go walk as absent → `continue` → the rule never runs, while a document containing a ghost pool validates with nil error. Rounds 1–3 closed the "wrong TYPE" variant (`"true"` string, malformed values); the "renamed/missing flag" variant is unguarded — and the old allow-list would have caught it loudly, so this is a regression of the exact loudness property the spec fought four rounds to establish. | Reproduced: schema with `x-poolReferenceResolve` (typo) + `harnesses.pi.pools:["ghost"]` → `ValidateModelMap` returns nil | UNTESTED — `TestValidatorRejectsMalformedPoolReferenceFlag` covers a wrong-typed flag, not a missing/renamed one | code + tests (error when an expected custom rule name is absent; add a named regression test) |
-| Minor  | REAL | module hygiene | `go.mod`/`go.sum` are not tidy. `go mod tidy -diff` moves `santhosh-tekuri/jsonschema/v6` from the `// indirect` block to the direct block (it IS imported directly by `model_map.go`) and adds `dlclark/regexp2` lines to `go.sum`. The proposal's recorded accounting ("direct requires 3 → 4") does not match the committed file (3 direct + the library mislabeled indirect). Fresh-cache build works, so not build-breaking; CI does not run `go mod tidy`, so nothing enforces it. | `go mod tidy -diff` output at HEAD | n/a (module metadata) | code (run `go mod tidy`, commit the diff) |
-| Minor  | REAL | maintainability | Dead documentation block at the top of `model_map.go` still describes `implementedKeywords` ("Adding a keyword to the schema therefore requires adding it here") — the variable and allow-list were deleted in `8d510ce`. `rg implementedKeywords` finds only the comment. A reader would hunt for a symbol that no longer exists and for a contract that is now the library's. | Direct read + `rg -n implementedKeywords cli/` | n/a (comment) | code (delete the stale comment) |
-| Minor  | REAL | spec artifact | `verification.md` AC2 section is stale and internally contradicted by its own Round-4 section: "No schema-engine dependency was added" / "three direct dependencies" and the `oneOf` "not implemented" mutation output describe the deleted native validator and cannot recur. | Direct read of verification.md AC2 vs the round-4 section; probe: `oneOf: []` in the shipped schema now fails with a library message, not the recorded one | n/a (doc; the f2 gate command still passes either way) | spec (update the AC2 evidence block) |
-| Minor  | REAL | spec artifact | `tasks.md` closing boxes stale: the PR box is ticked against a PR whose merged content lacks the fixes, and the independent-review box awaits this round. | `gh pr view 1143` (MERGED, `e22a4d0`); `git log origin/main -- cli/internal/harness/model_map.go` → only the merge | n/a (workflow state) | spec artifact — reviewer must not edit `tasks.md`, so flagged |
-| Minor  | SPECULATIVE | schema | A whitespace-only pool NAME (a key, not a value) validates: `pools: {"  ": {...}}` is accepted, and a harness referencing it would resolve. Pool keys are unconstrained where model ids (values) are pattern-guarded. No routing exists yet (level 1 only), so the impact is cosmetic until a dispatcher dereferences keys. | Probe against shipped schema at HEAD: `pools["  "]` accepted | UNTESTED | schema (`patternProperties` on pool keys) — surface only, does not move the verdict |
+| Major  | THEORETICAL | merge/scope | Round 5's Blocker ("merged change ≠ reviewed change") is **verified closed in this tree**: HEAD `63acd91` (PR #1155) is on `origin/main` and contains the library validator, both custom-rule guards, and the schema minLength/pattern/propertyNames fixes. The residual is process-level and already tracked: the staleness gate watches proposal/tasks/features but not the diff merged onto main, so nothing *automatic* would have caught the round-5 divergence — that guard is filed as #1153 and remains unimplemented. | Reproduced reality: `git merge-base --is-ancestor 63acd91 origin/main` → 0; `git log origin/main -- cli/internal/harness/model_map.go` = only e22a4d0 + 63acd91; `git show 63acd91 --stat` lists the fix files. The gap itself is a file-level observation (no automated merged-vs-reviewed checker) | UNTESTED (no automated merged-vs-reviewed guard; tracked as #1153) | code-repo: land #1153 when ready; tracked on bitácora, not gating this archive |
+| Major | THEORETICAL | verification | `verification.md`'s AC2 claims the shipped schema "becomes the whole draft" and an unknown keyword is an annotation — but the *custom-rule* namespace is still hand-policed, meaning the loudness property depends on `checkCustomRuleNamespace` staying in sync with the schema. If a future PR adds a third `x-` rule without adding it to `customRules`, a misspelling in the schema would be caught (good) but the mirror (schema declares a rule the code doesn't implement) relies on `TestShippedSchemaDeclaresEveryCustomRule`, not on `checkCustomRuleNamespace` itself. Tested: `TestShippedSchemaDeclaresEveryCustomRule`, `TestValidatorRejectsUnknownCustomRuleName`, `TestBothCrossBlockRulesRun` all pass at HEAD. | All three named tests pass (`go test -count=1 ./internal/harness/ -run TestShippedSchemaDeclaresEveryCustomRule` etc.) | tests/spec — both directions are already pinned by the named tests; this is a residual "new rule must touch two places" maintainability note, not a gap |
+| Minor  | REAL | spec artifact | `tasks.md` closing boxes are stale w.r.t. the state the gate will read: the "Independent adversarial review" box is `[ ]` (this review now fills it) and the "#1143 merged the pre-review implementation" row still reads as a current hazard when PR #1155 (merged `63acdaad9`, not `e22a4d0`) resolves it. The implementer should tick the second and rephrase to name PR #1155. | Direct read of `tasks.md` closing section vs `git log origin/main` | spec (implementer must update; reviewer must not edit contract files) |
+| Minor  | REAL | schema | The shipped schema's `propertyNames` pattern on `pools` (`^\S.*$`) rejects a *blank* key but accepts a *trailing-space* key: `\S` only constrains the first character, `.*` matches the rest. Blank names (`" "`, `""`) are rejected (`TestShippedSchemaRejectsBlankPoolNames` passes), but `pools: {"a ": ...}` with a declared, non-referenced pool validates with nil error — reproduced against the shipped schema at HEAD. `model-map.json` ships no such key, so this is cosmetic today; it becomes a silent-routing hazard only if a future map declares a key with trailing whitespace and a dispatcher dereferences it. | Probe at HEAD: doc with `pools:{"a ":{...},"claude":{...}}`, harness claude→claude, chains/tiers valid → `ValidateModelMap` returns nil. Named coverage: `TestShippedSchemaRejectsBlankPoolNames` (blank only) | schema (`propertyNames` → `^[^[:space:]]+$` or `pattern` requiring no trailing space) — surface-only, do not gate |
+| Minor  | THEORETICAL | doctor | `checkModelMap` reads the deployed copy (`cfg.DotfilesDir`), so a repo ahead of the deploy dir reports `[FAIL] not found` — correct per C15 and documented in the message, but a repo *behind* the deploy dir (deploy has a map, checkout doesn't) reports FAIL too, equally correct but indistinguishable from the ahead case. Both are C15-correct; the dir distinction was the basis of round 2's Question 3, and re-running setup mirrors the dir, so no code fix is needed. | Behavior verified in earlier rounds and unchanged at HEAD (the deployed copy at `~/.dotfiles` lacks the file while the checkout has it, which is the C15-correct FAIL described) | n/a (behavior already decided; code comment documents it) | vault (none; no change) |
+| Question | — | scope | Verification claims "the full local loop is green" at the merged sha, and AC9's Go side is verified. The bats suite I ran passed 1397/1397 (plus 3 skipped, pwsh not available on this host) — matching the 1394/1400 drift as main gains tests. `go.mod` has 4 direct deps (cobra, yaml, term, jsonschema) as claimed — but the proposal's Risks section says `golang.org/x/text` links via the new module, while go.mod's `require` block only lists the four. Verified `go test ./...` and `go mod tidy -diff` clean; the "links x/text" claim is about the build graph, not go.mod text, and is consistent | n/a | vault (none; no change) |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | C  | HEAD's code meets the ACs and passes every named test and probe I ran, but AC2 as written (native, loud-on-unimplemented) is not what ships, and a typo'd custom-rule name silently disables a cross-block check. |
-| Verification       | A  | Every criterion has reproducible commands + outputs; I re-ran build/vet/windows-vet/test/lint/full-bats/fuzz and both the three broken states and the merged-state probes live. |
-| Scope              | C  | The committed diff at HEAD is exactly the proposal's files, but the change that merged to main is a materially different, pre-fix state — scope diverges between reviewed and merged. |
-| Reliability        | B  | Error paths handled, reads are pure/idempotent, no mutation, C15 honored; the missing-flag fail-open and the unknown-keyword tolerance are the exceptions. |
-| Maintainability    | B  | ≤40-line functions, deliberate naming, why-comments, table-driven tests; pulled from A by the dead `implementedKeywords` comment and the untidy go.mod. |
-| Handoff-readiness  | D  | The reviewed fixes are not on main; PR #1143 merged the unfixed original; verification.md/tasks.md AC2 and boxes are stale. |
+| Correctness | A | All ACs met at the merged sha: map, schema, loader, doctor, guards, negative paths all verified by named passing tests (round 5's Blocker is closed by the merged tree itself). |
+| Verification | A | Every feature command re-run by me: 8/8 exit 0 with the non-vacuous test-name form; plus `go build` and `go vet` incl. `GOOS=windows` and full `go test ./...` green at HEAD `63acd91`. |
+| Scope | A | PR #1155's diff is exactly the model-map files, the doc/model test/bats additions and the loader/doctor changes; no unrelated edits mixed in (verified via `git show --stat 63acd91`). |
+| Reliability | A | Error paths loud and distinct (absent / unparseable / schema-invalid / schema-missing), no fallback defaults, idempotent reads, `x-` namespace and custom-rule types strictly checked. |
+| Maintainability | A | Naming tells the reader the rules; the `checkCustomRuleNamespace` up-front scan and `TestShippedSchemaDeclaresEveryCustomRule` keep the two-way custom-rule contract pinned by tests. |
+| Handoff-readiness | B | spec files all updated and consistent with the merged code; `tasks.md` closing boxes and the round-5-#113-pertaining row need the implementer's final tick (not a code or verification gap). |
 
 ### Verdict
-FAIL
+PASS
 
 ### Recommended next steps (before archive)
-- **Merge the fixed branch, then re-review at the merged SHA.** The Blocker is that main's
-  model-map (`e22a4d0`) still carries every round-1..4 defect — ghost pools in `chains`/`services`
-  accepted, blank ids accepted, negative budgets accepted, malformed `properties` silently skipped,
-  no `x-tiersHaveChains`, no fuzz guard. The fix rounds 1–4 are present only on
-  `feat/harness-075-model-map` (`1b1cfb3`), which has never been merged and is not an ancestor of
-  the merged PR. Land those commits (or an equivalent PR), then re-run the pool review on the
-  merged commit; the review here certifies the branch, and the branch is not the change on main.
-- **Amend AC2 and the schema description to the library direction** (spec artifact, implementer-owned):
-  "native, no schema-engine dependency" and "loud on an unimplemented construct" no longer describe
-  the code; the Risks section already records the pivot, the acceptance criterion does not.
-- **Guard the custom rule names** (code + tests): error loudly when an expected `x-` rule name is
-  absent from the schema, so a typo cannot silently disable the check; add a named regression test.
-- **Housekeeping**: run `go mod tidy` and commit the diff; delete the dead `implementedKeywords`
-  comment; refresh verification.md's AC2 evidence block; tick the tasks.md boxes (PR and review).
-- **`dotf spec archive` is NOT advisable in the current state** — FAIL verdict, and the merged
-  change on main does not contain the reviewed code, which the staleness gate cannot see (it
-  watches only the spec's contract files, not the diff that merged).
+- **Run `dotf spec archive`.** All eight feature gates are green at HEAD `63acd91` (the merged
+  sha, which is what the gate will check), no draft tags exist, and the round-5 Blocker is closed
+  because HEAD *is* the merged main. The archive will refuse on a stale review; mine is stamped
+  at `63acd91`.
+- **One spec-file tidy-up, implementer-owned**: tick the `tasks.md` row describing the stale
+  closing state and rephrase the round-5 row to name PR #1155; that is the only speculation that
+  remains between the record and reality.
+- Keep #1153 (merged-vs-reviewed-sha guard) on the bitácora; it is the only mechanism that would
+  have caught the round-5 Blocker automatically. Out of scope for this PR, correctly filed, no
+  action needed to archive this spec.
