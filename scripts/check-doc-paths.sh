@@ -61,18 +61,35 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ "$#" -eq 0 ]; then
+    # Auto-discover instruction files when invoked without arguments (BUG-088, #1021).
+    # Governed files: all active agent instructions and READMEs.
+    # Exclusions for stated reasons:
+    #   harness/ — generated artifacts from vault; checked by compile-harness.sh --check
+    #   specs/   — per-feature historical proposals and archived logs, not standing instructions
+    #   docs/    — historical decision records/lessons mentioning retired scripts by design
+    if command -v git >/dev/null 2>&1 && { [ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ]; }; then
+        while IFS= read -r _f; do
+            [ -n "$_f" ] && set -- "$@" "$_f"
+        done < <(git -C "$REPO_ROOT" ls-files '*.md' 2>/dev/null \
+            | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md|README\.md)$' \
+            | grep -vE '^harness/|^specs/|^docs/' || true)
+    fi
+fi
+
 if [ "$#" -eq 0 ]; then
     cat >&2 <<'EOF'
-Usage: check-doc-paths.sh <file>...
+Usage: check-doc-paths.sh [<file>...]
   Verifies that every repo-relative path named in backticks inside <file>
   exists on disk. Paths resolve against the repo root (the parent of the
-  directory holding this script).
+  directory holding this script). When no files are passed, discovers all
+  in-scope instruction files in the repo.
 EOF
     exit 2
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 KNOWN_EXT='\.(sh|ps1|zsh|bats|conf|md|json|jsonc|ya?ml|toml)$'
 

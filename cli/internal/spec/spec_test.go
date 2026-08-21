@@ -76,6 +76,11 @@ func TestRenderSubstitutesAndFixesIssueFrontmatter(t *testing.T) {
 	if !strings.Contains(proposal, "## Why\n\n<!-- from issue #358: Port init-spec -->\n") {
 		t.Errorf("Why comment not injected in the expected position:\n%s", proposal)
 	}
+
+	features := files["features.json"]
+	if !strings.Contains(features, `"id": "CLI-007-dot-spec-init-f1"`) {
+		t.Errorf("features.json missing substituted id:\n%s", features)
+	}
 }
 
 // TestRenderStampsCreatedInAllFiles guards the CodeRabbit-found bug (dotfiles#359):
@@ -118,7 +123,7 @@ func TestScaffoldWritesFilesAndGuardsClobber(t *testing.T) {
 	if warn != "" {
 		t.Errorf("unexpected warning: %q", warn)
 	}
-	for _, name := range []string{"proposal.md", "tasks.md", "verification.md"} {
+	for _, name := range []string{"proposal.md", "tasks.md", "verification.md", "features.json"} {
 		p := filepath.Join(root, "specs", "CLI-007-dot-spec-init", name)
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("expected %s to exist: %v", p, err)

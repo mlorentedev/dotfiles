@@ -50,6 +50,15 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      # BUG-088 (#1021): verify all repo paths referenced in backticks inside
+      # agent instruction files resolve on disk.
+      - id: check-doc-paths
+        name: Check referenced doc paths in instruction files
+        entry: ./scripts/check-doc-paths.sh
+        language: script
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: sdd-spec-gate
         name: SDD spec-gate (Tier 4)
         # BUG-061: routed through the prepush adapter, not check-spec-gate.sh
