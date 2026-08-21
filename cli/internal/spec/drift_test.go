@@ -32,6 +32,7 @@ func TestEmbeddedTemplatesMatchVault(t *testing.T) {
 		"proposal.md":     "spec-proposal.md",
 		"tasks.md":        "spec-tasks.md",
 		"verification.md": "spec-verification.md",
+		"features.json":   "spec-features.json",
 	}
 	for embedded, vaultName := range pairs {
 		want, err := os.ReadFile(filepath.Join(tmplDir, vaultName))

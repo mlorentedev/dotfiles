@@ -34,20 +34,28 @@ const TranscriptFile = "review-transcript.jsonl"
 // ReviewerEntry is one pool member. `id` is the canonical string the reviewer
 // records in review.md and the gate matches on; `provider`/`model` are the
 // launcher's flags, deliberately explicit rather than parsed out of `id`.
+// `secret_id` optionally names the specific credential (or comma-separated list)
+// to inject via `dotf secrets run --only`, preventing broken unrelated secrets
+// from blocking a review (BUG-089, #1025). When absent, falls back to unscoped
+// resolution.
 type ReviewerEntry struct {
 	ID       string `json:"id"`
 	Runner   string `json:"runner"`
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
 	Role     string `json:"role"`
+	SecretID string `json:"secret_id,omitempty"`
 }
 
 // ReviewerCommand builds the argv that runs one pooled reviewer non-interactively.
 //
 // Every runner is invoked through `dotf secrets run --`, which is the only
 // sanctioned way to hand a credential to a process (ADR-028): secrets reach the
-// child and never the ambient shell. The interactive `pi`/`agy` shell functions
-// wrap the binaries the same way, so this is the same path a human takes.
+// child and never the ambient shell. If the pool entry declares a SecretID,
+// `--only <secret_id>` scopes the injection to only the required credential,
+// shielding the review from unrelated broken registry entries (BUG-089).
+// The interactive `pi`/`agy` shell functions wrap the binaries the same way, so
+// this is the same path a human takes.
 //
 // The model is ALWAYS passed explicitly. Relying on a runner's configured
 // default is how BUG-074's third round came to be pinned by coincidence: it
@@ -77,7 +85,11 @@ func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration, repo
 		return nil, fmt.Errorf("pool entry %q has no model to pin — the launcher must not fall back to a runner default", e.ID)
 	}
 
-	base := []string{"dotf", "secrets", "run", "--"}
+	base := []string{"dotf", "secrets", "run"}
+	if s := strings.TrimSpace(e.SecretID); s != "" {
+		base = append(base, "--only", s)
+	}
+	base = append(base, "--")
 
 	switch e.Runner {
 	case "pi":

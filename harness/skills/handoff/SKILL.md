@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: db3dfa8ef34781cc
+generated_sha: f5fa706682302b3f
 id: handoff-skill
 type: skill
 status: active
@@ -135,6 +135,17 @@ Verify all produced artifacts before asserting completion:
 - Verify commit hashes: `git cat-file -e <hash>^{commit}`
 - Verify PR states: `gh pr view <N>`
 - Unpushed or uncommitted items must be logged as **uncommitted WIP** in Open threads, never claimed done.
+
+### 4b. PR review triage (Definition of Done §4 & pr-stewardship)
+
+Before concluding any session touching or creating PRs, verify that no open PR is awaiting a disposition:
+
+```bash
+dotf pr triage-queue
+```
+
+- **Exit 0 (`[OK] no reviewer output is awaiting a disposition`):** Queue is clear, proceed.
+- **Exit 1 (PRs listed awaiting disposition):** You MUST run `/pr-review-triage` (or post the `## Review triage` table on each listed PR) before claiming the session or PR is finished. Never leave reviewer findings or unrecorded empty reviews floating.
 
 ### 5. Next action
 

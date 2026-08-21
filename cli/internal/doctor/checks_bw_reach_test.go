@@ -55,6 +55,7 @@ func TestBWBackedSecrets_CountsOnlyBWBackend(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DOTFILES_REPO_DIR", root)
+	t.Chdir(root)
 
 	n, err := bwBackedSecrets()
 	if err != nil {
@@ -86,6 +87,7 @@ secrets:
 		t.Fatal(err)
 	}
 	t.Setenv("DOTFILES_REPO_DIR", root)
+	t.Chdir(root)
 
 	n, err := bwBackedSecrets()
 	if err != nil {
@@ -165,6 +167,7 @@ func TestCommandOutputBounded_KeepsStreamsSeparate(t *testing.T) {
 // severity exactly when the check can no longer tell.
 func TestBWBackedSecrets_MissingRegistryErrors(t *testing.T) {
 	t.Setenv("DOTFILES_REPO_DIR", t.TempDir())
+	t.Chdir(t.TempDir())
 	if _, err := bwBackedSecrets(); err == nil {
 		t.Fatal("a missing registry must error, never report zero")
 	}

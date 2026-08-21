@@ -194,9 +194,11 @@ governed_files() {
     ! instruction_files | grep -qx "$PROBE_REL"
 }
 
-@test "check-doc-paths: usage error without arguments [#916]" {
+@test "check-doc-paths: auto-discovers instruction files when run without arguments [#1021]" {
     run "$GUARD"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "check-doc-paths: OK AGENTS.md" ]]
+    [[ "$output" =~ "check-doc-paths: OK ai/claude/CLAUDE.md" ]]
 }
 
 @test "check-doc-paths: rejects a token that escapes the repo root [#916]" {
