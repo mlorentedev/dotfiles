@@ -66,6 +66,17 @@ known and mitigated in the acceptance criteria rather than left floating.
   intent.** The failure mode this repository keeps hitting is a positive-looking signal, so the
   check must distinguish *absent*, *unparseable* and *schema-invalid*, and must never render any of
   them as an empty-but-valid map. AC6 pins this.
+- **AC2 and AC6 need a JSON Schema validator in Go, and `cli` has three direct dependencies.**
+  `go list -m all` finds none, so validating with a schema engine adds a dependency that ships
+  inside the `dotf` binary — the doctor check validates at runtime, not only in CI. "New dependency"
+  is an explicit SDD trigger in this repo, and C7 asks for no unswappable vendor dependency on the
+  default path. **This is a decision, not a detail, and it is named here rather than appearing
+  silently in `go.mod`.** Two honest shapes: add the dependency, or keep
+  `model-map.schema.json` as the declarative contract for editors and external tooling while the Go
+  side enforces the same constraints natively — which avoids the dependency and costs a second
+  place where the rules live. AC3's cross-block reference check is implementable in plain Go either
+  way; AC2 as worded ("validates against it") is what forces the choice.
+
 - **Two consumer classes over one file is the drift risk `version` exists for.** The loader must
   expose them separately so a compile-time consumer cannot silently depend on a run-time field.
 

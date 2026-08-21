@@ -2,7 +2,7 @@
   {
     "id": "HARNESS-075-model-map-routing-registry-f1",
     "behavior": "harness/model-map.json exists, parses, and carries all seven declared blocks",
-    "verification": "python3 -c \"import json,sys; d=json.load(open('harness/model-map.json')); need={'$comment','version','pools','harnesses','tiers','chains','services'}; missing=need-set(d); sys.exit(1 if missing else 0)\"",
+    "verification": "python3 -c 'import json,sys; d=json.load(open(\"harness/model-map.json\")); need={\"$comment\",\"version\",\"pools\",\"harnesses\",\"tiers\",\"chains\",\"services\"}; sys.exit(1 if need-set(d) else 0)'",
     "state": "pending",
     "evidence": ""
   },
@@ -22,8 +22,8 @@
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f4",
-    "behavior": "no openrouter pool is declared and no harness references one",
-    "verification": "! grep -q openrouter harness/model-map.json",
+    "behavior": "no openrouter pool is declared and no harness references one (structural, not textual \u2014 the $comment may name it)",
+    "verification": "python3 -c 'import json,sys; d=json.load(open(\"harness/model-map.json\")); bad = \"openrouter\" in d.get(\"pools\",{}) or any(\"openrouter\" in h.get(\"pools\",[]) for h in d.get(\"harnesses\",{}).values()); sys.exit(1 if bad else 0)'",
     "state": "pending",
     "evidence": ""
   },
@@ -43,7 +43,7 @@
   },
   {
     "id": "HARNESS-075-model-map-routing-registry-f7",
-    "behavior": "budget fields are exposed read-only with no counter — level 1 declaration only",
+    "behavior": "budget fields are exposed read-only with no counter \u2014 level 1 declaration only",
     "verification": "cd cli && go test ./internal/harness/ -run TestModelMapBudgetIsDeclarationOnly",
     "state": "pending",
     "evidence": ""
