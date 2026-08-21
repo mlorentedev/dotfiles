@@ -35,8 +35,9 @@ created: "2026-08-21"
       that keeps the two from drifting apart later.
 - [ ] [P] [AC5] Write failing tests for the loader's two consumer classes — tier resolution
       (compile time) and chain resolution (run time) — asserting they are reachable separately.
-- [ ] [AC5] Implement the loader in `cli/internal/harness/`, following the shape of
-      `triggers.go` so it reads like its neighbours.
+- [ ] [AC5] Implement the loader in `cli/internal/harness/`, following the shape of `triggers.go`
+      so it reads like its neighbours — **except for the embed**. No `//go:embed`, no fallback: an
+      unreadable map is an error, because a build-time default is what C15 forbids (#1137).
 - [ ] [AC7] Expose the budget fields (`concurrency`, `reserve_interactive`, `shared_with`) read-only,
       **with no counter**. Name the accessor so it cannot be mistaken for enforcement.
 - [ ] [P] [AC6] Write failing tests for the doctor check across **three** broken states — absent,

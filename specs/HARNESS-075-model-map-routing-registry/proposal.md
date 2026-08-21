@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-075-model-map-routing-registry"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-08-21"
 issue: "mlorentedev/dotfiles#1124"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, orchestration, routing, registry]
@@ -66,16 +66,27 @@ known and mitigated in the acceptance criteria rather than left floating.
   intent.** The failure mode this repository keeps hitting is a positive-looking signal, so the
   check must distinguish *absent*, *unparseable* and *schema-invalid*, and must never render any of
   them as an empty-but-valid map. AC6 pins this.
-- **AC2 and AC6 need a JSON Schema validator in Go, and `cli` has three direct dependencies.**
-  `go list -m all` finds none, so validating with a schema engine adds a dependency that ships
-  inside the `dotf` binary — the doctor check validates at runtime, not only in CI. "New dependency"
-  is an explicit SDD trigger in this repo, and C7 asks for no unswappable vendor dependency on the
-  default path. **This is a decision, not a detail, and it is named here rather than appearing
-  silently in `go.mod`.** Two honest shapes: add the dependency, or keep
-  `model-map.schema.json` as the declarative contract for editors and external tooling while the Go
-  side enforces the same constraints natively — which avoids the dependency and costs a second
-  place where the rules live. AC3's cross-block reference check is implementable in plain Go either
-  way; AC2 as worded ("validates against it") is what forces the choice.
+- **AC2 and AC6 need schema validation, and `cli` has three direct dependencies.** `go list -m all`
+  finds no schema engine, so validating with one would ship a fourth direct dependency inside the
+  `dotf` binary — the doctor check validates at runtime, not only in CI. **Decided 2026-08-21:
+  native Go, no new dependency** (C7, and the module's evident three-dependency discipline).
+  The obvious cost of that choice is two places where the rules live, and it is avoided by
+  construction: **the validator reads `model-map.schema.json` and enforces what it finds there**,
+  rather than restating the rules as Go code. The schema stays the single source of truth and is
+  still consumable by editors and any external validator; what is hand-rolled is the interpreter,
+  not the rules. Its bound: it implements only the subset the schema file uses, and an
+  unimplemented construct must fail loudly rather than pass silently — otherwise the validator
+  becomes the very thing C15 forbids, a check that reports health it never established.
+
+- **The neighbouring registry embeds a build-time copy of itself, and `model-map.json` must not.**
+  `triggers.go` carries `//go:embed triggers.json` and falls back to it when the repo file is not
+  found — and `harness/triggers.json` and `cli/internal/harness/triggers.json` are byte-identical
+  duplicates with **no sync mechanism** (filed on #1137). For a routing map that fallback is
+  disqualifying: an absent file would resolve to a build-time default and the doctor check would
+  report it healthy, which is precisely what C15 forbids. **Decision: `model-map.json` is never
+  embedded and has no fallback.** Where the file cannot be read, the loader errors. This is a
+  deliberate divergence from the neighbouring idiom, recorded so it reads as a decision rather than
+  an inconsistency.
 
 - **Two consumer classes over one file is the drift risk `version` exists for.** The loader must
   expose them separately so a compile-time consumer cannot silently depend on a run-time field.
@@ -86,7 +97,11 @@ known and mitigated in the acceptance criteria rather than left floating.
       `$comment`, `version`, `pools`, `harnesses`, `tiers`, `chains`, `services`. Both registry
       idioms are present (`$comment` for the rationale, `version` for the two consumer classes),
       per ADR-035 Decision 2.
-- [ ] **AC2** — `harness/model-map.schema.json` exists and `model-map.json` validates against it.
+- [ ] **AC2** — `harness/model-map.schema.json` exists as the declarative contract, and the shipped
+      map validates against **that file** — read at validation time, never re-expressed as Go
+      literals. The validator is native (no schema-engine dependency) and supports only the
+      JSON Schema subset the file actually uses; encountering a construct it does not implement is
+      a loud error, never a silent pass.
 - [ ] **AC3** — The schema **rejects** a `harnesses.<h>.pools[]` entry naming a pool absent from
       `pools`. Proven by a fixture that fails validation, not by inspection.
 - [ ] **AC4** — The built map declares no `openrouter` pool, and no harness references one.
