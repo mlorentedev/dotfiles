@@ -171,7 +171,7 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 		return true, true, fmt.Sprintf("reviewed_sha %s is not a commit in this history (rewritten by a rebase?)", reviewedSHA)
 	}
 
-	args := []string{"-C", repoRoot, "log", "--format=", "--name-only", reviewedSHA + "..HEAD", "--"}
+	args := []string{"-C", repoRoot, "diff", "--name-only", reviewedSHA, "HEAD", "--"}
 	for _, name := range contractFiles {
 		args = append(args, filepath.Join("specs", specID, name))
 	}
