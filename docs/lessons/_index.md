@@ -230,3 +230,4 @@ tags: [lessons, index, dotfiles]
 | [214 - A declared status is not evidence, and a guard that exists is not a guard that covers](lesson-214-a-declared-status-is-not-evidence-probe-the-syst.md) | 2026-08-20 |  |
 | [215 - A parser written for one runner reads the other runner's review as empty](lesson-215-a-parser-for-one-runner-reads-the-other-runners-re.md) | 2026-08-21 |  |
 | [216 - A three-dot diff does not answer "what is main missing"](lesson-216-a-three-dot-diff-does-not-answer-what-main-is-missi.md) | 2026-08-21 |  |
+| [217 - `go test -run` passes when the test name matches nothing](lesson-217-go-test-run-passes-when-the-test-name-matches-not.md) | 2026-08-21 |  |
