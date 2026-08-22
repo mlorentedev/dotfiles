@@ -13,10 +13,11 @@ teardown() { rm -rf "$TMP"; }
 
 @test "compile-harness --check works from a non-git copy (root resolved from SCRIPT_DIR)" {
     # Assemble a complete, NON-git copy of exactly what --check reads.
-    mkdir -p "$TMP/scripts" "$TMP/ai/claude"
+    mkdir -p "$TMP/scripts" "$TMP/ai/claude" "$TMP/ai/orca"
     cp "$REPO/scripts/compile-harness.sh" "$TMP/scripts/"
     cp "$REPO/AGENTS.md" "$TMP/"
     cp "$REPO/ai/claude/CLAUDE.md" "$TMP/ai/claude/"
+    cp "$REPO/ai/orca/ORCA.md" "$TMP/ai/orca/"
     cp -r "$REPO/harness" "$TMP/"
     [ ! -d "$TMP/.git" ]   # genuinely not a git repo
 

@@ -1,0 +1,3 @@
+- **Zero manual operations:** Never perform ad-hoc manual changes on remote systems, servers, or cloud environments.
+- **Strict IaC & Idempotence:** Every configuration or environment change MUST be codified as reproducible IaC (Ansible, Terraform, K8s manifests, dotfiles) and verified idempotent (`changed=0` on re-run).
+- **In-flight documentation & zero debt:** Lessons, ADRs, and issues must be recorded in real-time (`docs/lessons/`, `docs/adr/`), never deferred.

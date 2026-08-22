@@ -1,0 +1,24 @@
+{
+  "features": [
+    {
+      "id": "AC1",
+      "description": "ai/orca overlay files exist",
+      "status": "passing"
+    },
+    {
+      "id": "AC2",
+      "description": "initrepo template for orca.yaml is tracked",
+      "status": "passing"
+    },
+    {
+      "id": "AC3",
+      "description": "harness manifest declares iac-and-idempotence and compile-harness passes",
+      "status": "passing"
+    },
+    {
+      "id": "AC4",
+      "description": "bats and go unit tests pass",
+      "status": "passing"
+    }
+  ]
+}

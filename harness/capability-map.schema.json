@@ -48,9 +48,9 @@
         "additionalProperties": false,
         "properties": {
           "field": {
-            "description": "The native frontmatter/config key the resolved value is written to (claude: tools; opencode: permission).",
+            "description": "The native frontmatter/config key the resolved value is written to (claude: tools; opencode: permission). Restricted to an identifier token: a value carrying a comma or a brace would alter the rendered value rather than appear in it — `Read,Bash` renders as two granted tools, and `read},{bash` breaks out of the flow mapping entirely. Measured 2026-08-22 against the resolver before this pattern existed. The render escapes nothing by design, so the CONTRACT is where that is prevented.",
             "type": "string",
-            "pattern": "^\\S+$"
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
           },
           "form": {
             "description": "How the native value is shaped. `csv` is an ALLOW-LIST of tool names — omitting one denies it. `decision-map` is an object of per-key decisions where an unnamed key falls back to a default, so it grants without denying. The distinction changes what a capability set MEANS, which is why the resolver renders a complete value rather than concatenating per-capability tokens.",
@@ -61,9 +61,9 @@
             ]
           },
           "grant": {
-            "description": "For form `decision-map` only: the value written for a granted key (e.g. `allow`). Meaningless for `csv`, where presence is the grant.",
+            "description": "For form `decision-map` only: the value written for a granted key (e.g. `allow`). Meaningless for `csv`, where presence is the grant. Restricted to an identifier token: a value carrying a comma or a brace would alter the rendered value rather than appear in it — `Read,Bash` renders as two granted tools, and `read},{bash` breaks out of the flow mapping entirely. Measured 2026-08-22 against the resolver before this pattern existed. The render escapes nothing by design, so the CONTRACT is where that is prevented.",
             "type": "string",
-            "pattern": "^\\S+$"
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
           },
           "why": {
             "type": "string"
@@ -78,11 +78,35 @@
               "uniqueItems": true,
               "items": {
                 "type": "string",
-                "pattern": "^\\S+$"
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                "description": "A native tool or permission key. Restricted to an identifier token: a value carrying a comma or a brace would alter the rendered value rather than appear in it — `Read,Bash` renders as two granted tools, and `read},{bash` breaks out of the flow mapping entirely. Measured 2026-08-22 against the resolver before this pattern existed. The render escapes nothing by design, so the CONTRACT is where that is prevented."
               }
             }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "form": {
+                  "const": "decision-map"
+                }
+              },
+              "required": [
+                "form"
+              ]
+            },
+            "then": {
+              "required": [
+                "field",
+                "form",
+                "capabilities",
+                "grant"
+              ],
+              "description": "A decision-map harness with no `grant` has no decision to write, so it would grant nothing. Caught at load rather than at resolve, so an unusable map never reaches a render."
+            }
+          }
+        ]
       }
     }
   }
