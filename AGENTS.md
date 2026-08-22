@@ -130,7 +130,12 @@ to it by `TestIDPatternProseMatchesCode`; do not reword it.
 
 Before creating ANY branch for code changes, SDD is mandatory if ANY apply:
 
-- ~50–300 LOC of production diff (excluding tests, generated files, lockfiles)
+- ~50–300 LOC of production diff (excluding tests, generated files, lockfiles). **The count is
+  EXECUTABLE lines** — declarative data, schemas and comment blocks are excluded, because the cap
+  rations the control flow a reviewer holds in their head, and a table is read as a table. Excluded
+  is not free: declare the breakdown in the PR body whenever total added lines exceed the cap. Nor
+  is it "cheap to review" — a registry where one wrong entry silently grants or denies deserves more
+  care than most code. SSOT: `00_meta/patterns/pattern-git-workflow.md` §10.
 - touches a public contract (API, CLI flag, exported type, alias, file path, deployed config schema)
 - adds or removes a dependency
 - is the first step of a multi-PR sequence
@@ -248,7 +253,7 @@ Where a harness offers a session-time execution surface, wire the first one into
 
 ### Autonomy Boundaries
 
-- **Escalate, don't grind.** Stop and escalate when: the same failure repeats (≥2 tries), a taste/ownership decision appears, or the diff exceeds the ~300 LOC atomic-PR cap ([ADR-017](docs/adr/adr-017-alignment-audit-karpathy-anthropic.md)).
+- **Escalate, don't grind.** Stop and escalate when: the same failure repeats (≥2 tries), a taste/ownership decision appears, or the diff exceeds the ~300 LOC atomic-PR cap ([ADR-017](docs/adr/adr-017-alignment-audit-karpathy-anthropic.md)) — counted as **executable** lines, per the Discipline Gate above.
 
 ### Parallel Sessions & Coordination
 
