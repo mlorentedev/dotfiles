@@ -71,6 +71,47 @@ setup() {
     done < <(jq -r '.agents.deploy[].agent' "$REPO/harness/manifest.json")
 }
 
+@test "real dotf: harness --help lists resolve-capabilities too" {
+    run "$DOTF" harness --help
+    [ "$status" -eq 0 ]
+    # The render probes for each subcommand independently, so both names must be
+    # listed in the shape scripts/compile-harness.sh greps for.
+    printf '%s\n' "$output" | grep -qE '^[[:space:]]*resolve-capabilities[[:space:]]'
+}
+
+@test "real dotf: resolve-capabilities writes the whole frontmatter line to stdout" {
+    run bash -c "'$DOTF' harness resolve-capabilities read,shell --harness claude --repo-root '$REPO' 2>/dev/null"
+    [ "$status" -eq 0 ]
+    # field name included: the shell must not have to know it differs per harness
+    [ "$output" = "tools: Read, Glob, Bash" ]
+}
+
+@test "real dotf: the two native forms really do differ" {
+    # The claim the whole registry rests on. claude renders an allow-list, and
+    # opencode a decision map, from the SAME neutral request.
+    run bash -c "'$DOTF' harness resolve-capabilities shell --harness claude --repo-root '$REPO' 2>/dev/null"
+    [ "$status" -eq 0 ]
+    [ "$output" = "tools: Bash" ]
+    run bash -c "'$DOTF' harness resolve-capabilities shell --harness opencode --repo-root '$REPO' 2>/dev/null"
+    [ "$status" -eq 0 ]
+    [ "$output" = "permission: {bash: allow}" ]
+}
+
+@test "real dotf: the shipped capability map answers every verb every agent record declares" {
+    local rec caps agent
+    while IFS= read -r agent; do
+        for rec in "$REPO"/harness/agents/*/AGENT.md; do
+            [ -f "$rec" ] || continue
+            caps="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^capabilities:/{sub(/^capabilities:[[:space:]]*/,""); print; exit} n>=2{exit}' "$rec")"
+            [ -n "$caps" ] || continue
+            caps="${caps#[}"; caps="${caps%]}"; caps="${caps// /}"
+            run "$DOTF" harness resolve-capabilities "$caps" --harness "$agent" --repo-root "$REPO"
+            [ "$status" -eq 0 ]
+            [ -n "$output" ]
+        done
+    done < <(jq -r '.agents.deploy[].agent' "$REPO/harness/manifest.json")
+}
+
 @test "real dotf: a full deploy renders the resolved model id into the agent file" {
     # End to end through the real script and the real binary: the claim the stub
     # suite can only approximate.
@@ -83,5 +124,8 @@ setup() {
     # curator declares `model: top`; claude's top tier is opus
     grep -q '^model: opus' "$F"
     ! grep -q '^model: top' "$F"
+    # and its neutral capabilities became native tool names
+    grep -qE '^tools: .*Read' "$F"
+    ! grep -q '^capabilities:' "$F"
     rm -rf "$FAKEHOME"
 }

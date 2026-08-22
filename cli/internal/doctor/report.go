@@ -207,4 +207,3 @@ func (r *Report) Failures() int { return r.totals[StatusFail] }
 
 // Warnings returns how many checks warned (handy for assertions in tests).
 func (r *Report) Warnings() int { return r.totals[StatusWarn] }
-

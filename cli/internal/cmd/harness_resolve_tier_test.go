@@ -200,29 +200,32 @@ func TestHarnessResolveTierFailsLoudWithoutAMap(t *testing.T) {
 	}
 }
 
-// TestHarnessHelpListsResolveTier pins the capability probe in
+// TestHarnessHelpListsSubcommands pins the capability probe in
 // scripts/compile-harness.sh, which decides whether the dotf on PATH is new
-// enough to resolve a tier by grepping `dotf harness --help` for this exact
-// subcommand name.
+// enough by grepping `dotf harness --help` for a subcommand name.
 //
 // The probe exists because the exit status cannot answer the question: a dotf
-// predating the subcommand rejects `--harness` with exit 1, which is
-// indistinguishable from a genuine routing refusal (#1158). Renaming the
-// subcommand without updating that grep would make the probe answer "too old"
-// forever, silently degrading every agent render to no model line — the exact
-// failure this feature removed. This test is the tripwire.
-func TestHarnessHelpListsResolveTier(t *testing.T) {
+// predating a subcommand rejects its flags with exit 1, which is
+// indistinguishable from a genuine refusal (#1158). Renaming one of these
+// without updating that grep would make the probe answer "too old" forever,
+// silently degrading every agent render — a guard that fails OPEN and reports
+// health. This test is the tripwire, and it covers BOTH registries' consumers
+// because the shell now probes for each independently.
+func TestHarnessHelpListsSubcommands(t *testing.T) {
 	stdout, stderr, err := captureRealStreams(t, "harness", "--help")
 	if err != nil {
 		t.Fatalf("harness --help failed: %v (stderr=%q)", err, stderr)
 	}
-	// Same shape the shell greps for: the name at the start of its line in the
-	// command list, followed by whitespace before its summary.
-	if !regexp.MustCompile(`(?m)^\s*resolve-tier\s`).MatchString(stdout + stderr) {
-		t.Errorf("`dotf harness --help` does not list resolve-tier as a command.\n"+
-			"scripts/compile-harness.sh greps for exactly this to decide whether the "+
-			"installed dotf can resolve a tier; without it every agent renders with no "+
-			"model line.\ngot:\n%s", stdout+stderr)
+	out := stdout + stderr
+	for _, sub := range []string{"resolve-tier", "resolve-capabilities"} {
+		// Same shape the shell greps for: the name at the start of its line in
+		// the command list, followed by whitespace before its summary.
+		if !regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(sub) + `\s`).MatchString(out) {
+			t.Errorf("`dotf harness --help` does not list %q as a command.\n"+
+				"scripts/compile-harness.sh greps for exactly this to decide whether the "+
+				"installed dotf can resolve it; without it every agent renders without that "+
+				"field.\ngot:\n%s", sub, out)
+		}
 	}
 }
 
