@@ -18,8 +18,13 @@ setup() {
 
 # --- Top-level keys (the "ours" subset) ---
 
-@test "template has model = opus" {
-    [[ "$(jq -r '.model' "$SETTINGS_TEMPLATE")" == "opus" ]]
+@test "template has model = opus[1m]" {
+    # The `[1m]` suffix selects the 1M-context variant. It matters that the
+    # TEMPLATE carries it, not just the deployed file: the merge policy is
+    # `template wins` for model, so every setup run resets whatever /model
+    # last saved. With a bare "opus" here, a 1M default chosen interactively
+    # survives exactly until the next deploy -- silently.
+    [[ "$(jq -r '.model' "$SETTINGS_TEMPLATE")" == "opus[1m]" ]]
 }
 
 @test "template has effortLevel = xhigh" {
@@ -30,21 +35,73 @@ setup() {
     # The merge policy is an ALLOW-LIST in two places -- a jq expression in
     # setup-linux.sh and an if-chain in setup-windows.ps1. A key added to the
     # template and named in neither is a SILENT no-op on every existing
-    # installation, reaching only machines bootstrapped from scratch. Measured:
-    # outputStyle sat in the template while the deployed settings.json had no
-    # such key at all.
+    # installation, reaching only machines bootstrapped from scratch.
     #
-    # Scoped to the scalar top-level keys. The structured ones (permissions,
-    # hooks, enabledPlugins, env) have their own merge semantics asserted below
-    # and are handled by name in both scripts.
+    # This test used to enumerate `model effortLevel outputStyle` by hand and
+    # claim in a comment that the structured keys were "handled by name in both
+    # scripts". That claim was FALSE for `env`, and nothing checked it: the
+    # template carried CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS while the deployed
+    # settings.json had no `env` key at all -- the same failure outputStyle had
+    # already caused once. A hand-written list cannot catch the key nobody
+    # thought to add to it, so the list now comes FROM THE TEMPLATE: any new
+    # top-level key must be named in both policies or this fails.
     local key
-    for key in model effortLevel outputStyle; do
-        jq -e --arg k "$key" 'has($k)' "$SETTINGS_TEMPLATE" >/dev/null || continue
-        grep -q "\.$key = \$tmpl\.$key\|\$tmpl\.$key" "$DOTFILES_DIR/setup-linux.sh" \
+    while IFS= read -r key; do
+        # `$schema` is editor metadata for JSON language servers. It is never
+        # deployed, so it is exempt BY NAME -- a stated decision, not a gap.
+        if [ "$key" = "\$schema" ]; then continue; fi
+        grep -qF -- "\$tmpl.$key" "$DOTFILES_DIR/setup-linux.sh" \
             || { echo "setup-linux.sh merge policy never mentions '$key'" >&2; return 1; }
-        grep -q "ContainsKey('$key')" "$DOTFILES_DIR/setup-windows.ps1" \
+        grep -qF -- "ContainsKey('$key')" "$DOTFILES_DIR/setup-windows.ps1" \
             || { echo "setup-windows.ps1 merge policy never mentions '$key'" >&2; return 1; }
-    done
+    done < <(jq -r 'keys[]' "$SETTINGS_TEMPLATE")
+}
+
+@test "the merge carries env through and preserves machine-local entries" {
+    # `env` is how a feature flag reaches Claude Code's own process
+    # environment: settings.env is merged into process.env at startup, which is
+    # what makes CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL able to un-hide
+    # /advisor. Asserting the SHIPPED jq expression, not a copy of it.
+    local expr existing out
+    expr="$(sed -n "/^    merged=\$(jq --argjson tmpl /,/^    ' \"\$target_path\"/p" \
+        "$DOTFILES_DIR/setup-linux.sh" \
+        | sed -e "1s/.*jq --argjson tmpl \"\$template_substituted\" '//" -e "\$d")"
+    [ -n "$expr" ]
+
+    existing='{"model":"sonnet","env":{"MACHINE_LOCAL":"keep"}}'
+    out="$(printf '%s' "$existing" | jq --argjson tmpl \
+        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{},"env":{"CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL":"1"}}' \
+        "$expr" 2>&1)"
+    [ -n "$out" ]
+    # template key arrives...
+    [ "$(printf '%s' "$out" | jq -r '.env.CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL')" = "1" ]
+    # ...and the machine-local one is not clobbered
+    [ "$(printf '%s' "$out" | jq -r '.env.MACHINE_LOCAL')" = "keep" ]
+
+    # a target with no env at all must still receive it
+    out="$(printf '%s' '{"model":"sonnet"}' | jq --argjson tmpl \
+        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{},"env":{"A":"1"}}' \
+        "$expr" 2>&1)"
+    [ "$(printf '%s' "$out" | jq -r '.env.A')" = "1" ]
+}
+
+@test "template env enables the advisor tool" {
+    # /advisor is hidden unless this flag is set: the gate reads
+    # CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL from the process env, and
+    # falls back to a server-side flag that is off for this account. Without
+    # it, advisorModel is read but the tool never attaches -- silently.
+    [ "$(jq -r '.env.CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL' "$SETTINGS_TEMPLATE")" = "1" ]
+}
+
+@test "template advisorModel is one of the values Claude Code accepts" {
+    # The CLI validates against ["fable","opus","sonnet"] (plus "off"); anything
+    # else is rejected at startup with "cannot be used as an advisor".
+    local advisor
+    advisor="$(jq -r '.advisorModel // "off"' "$SETTINGS_TEMPLATE")"
+    case "$advisor" in
+        fable|opus|sonnet|off) ;;
+        *) echo "advisorModel '$advisor' is not an accepted value" >&2; return 1 ;;
+    esac
 }
 
 @test "the merge expression survives a template that omits an optional key" {

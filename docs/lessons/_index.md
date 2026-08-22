@@ -234,3 +234,4 @@ tags: [lessons, index, dotfiles]
 | [218 - The Go build cache does not see the data file your test reads](lesson-218-the-go-build-cache-does-not-see-the-data-file-your.md) | 2026-08-21 |  |
 | [219 - A stale CLI refuses with the same exit status as a legitimate refusal](lesson-219-a-stale-cli-refuses-with-the-same-exit-status-as-a.md) | 2026-08-21 |  |
 | [220 - Four defects, one shape: a thing verified by a proxy that lives somewhere else](lesson-220-four-defects-one-shape-a-thing-verified-by-a-proxy.md) | 2026-08-22 |  |
+| [221 - An allow-list merge makes every new template key a silent no-op](lesson-221-an-allow-list-merge-makes-every-new-template-key-a.md) | 2026-08-22 |  |
