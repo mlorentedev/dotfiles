@@ -47,6 +47,39 @@ setup() {
     done
 }
 
+@test "the merge expression survives a template that omits an optional key" {
+    # jq: a condition that evaluates to `empty` makes the WHOLE if-expression
+    # produce nothing, so `if ($tmpl.key // empty) then ... else . end` does not
+    # mean "leave it alone when absent" -- it means the entire merge pipeline
+    # yields an empty result. merge_claude_settings then logs "merge produced
+    # empty output, skipping write" and NO key deploys: not model, not
+    # effortLevel, not permissions, not hooks. `has()` is the guard that means
+    # what the other one looks like it means.
+    #
+    # Extracted from setup-linux.sh so this tests the shipped expression rather
+    # than a copy of it.
+    local expr existing out
+    expr="$(sed -n "/^    merged=\$(jq --argjson tmpl /,/^    ' \"\$target_path\"/p" \
+        "$DOTFILES_DIR/setup-linux.sh" \
+        | sed -e "1s/.*jq --argjson tmpl \"\$template_substituted\" '//" -e "\$d")"
+    [ -n "$expr" ]
+    existing='{"model":"sonnet","userCustom":"preserve me"}'
+
+    # a template WITHOUT the optional key must still merge everything else
+    out="$(printf '%s' "$existing" | jq --argjson tmpl \
+        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{}}' \
+        "$expr" 2>&1)"
+    [ -n "$out" ]
+    [ "$(printf '%s' "$out" | jq -r '.model')" = "opus" ]
+    [ "$(printf '%s' "$out" | jq -r '.userCustom')" = "preserve me" ]
+
+    # and a template WITH it must carry it through
+    out="$(printf '%s' "$existing" | jq --argjson tmpl \
+        '{"model":"opus","effortLevel":"xhigh","outputStyle":"Concise","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{}}' \
+        "$expr" 2>&1)"
+    [ "$(printf '%s' "$out" | jq -r '.outputStyle')" = "Concise" ]
+}
+
 @test "template has outputStyle and both merge policies propagate it" {
     [[ "$(jq -r '.outputStyle' "$SETTINGS_TEMPLATE")" != "null" ]]
     grep -q 'outputStyle' "$DOTFILES_DIR/setup-linux.sh"
