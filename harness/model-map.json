@@ -115,9 +115,9 @@
       "pools": [
         "nan"
       ],
-      "render": "agent-md",
+      "render": "adapter",
       "spawn": "none",
-      "why": "Present in the reviewer pool as the provider-diverse fallback arm, so it belongs in the map that routes to it."
+      "why": "Present in the reviewer pool as the provider-diverse fallback arm, so it belongs in the map that routes to it. render is `adapter`, NOT agent-md (#1162): the model reaches agy as a launcher flag, exactly as it does for pi. Measured 2026-08-21 — cli/internal/spec/review_launch.go builds `agy --model <id> --output-format stream-json …`, and `agy agents` lists none. It was declared agent-md while this file\u0027s own $comment grouped it with pi as a launcher-flag harness; nothing caught the contradiction because tiers had no consumer until #1165."
     }
   },
   "tiers": {
