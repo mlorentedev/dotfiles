@@ -32,10 +32,11 @@ created: "2026-08-22"
       -> 6 new bats cases in `tests/compile-harness.bats`, 5 in `tests/compile-harness-real.bats`,
       3 Go tests (12 subtests) in `cli/internal/cmd/harness_resolve_tier_test.go`
 
-**Deviation from AC6 as written, and why.** The criterion said the deploy fails when `dotf` is
-absent. It does not: a missing or too-old resolver now WARNS and renders without the model line.
-See "Decisions" below — the change was forced by evidence, and the failing half of AC6 (skill
-deploy survives) is still asserted, against the unresolvable-tier failure instead.
+**No deviation from the committed acceptance criteria.** An earlier draft of AC6 required the
+deploy to *fail* when `dotf` was absent; that draft was revised in `proposal.md` before this PR
+was opened, and the committed AC6 matches the implemented behaviour (warn, render without the
+model line). The reasoning behind the revision is under "Decisions" below — it was forced by
+evidence, not preference.
 
 ## Test status
 
@@ -50,7 +51,7 @@ Every command below was run in this session, in this worktree.
 - `shellcheck scripts/*.sh setup-linux.sh` -> clean (one pre-existing SC1091 info on an unrelated file)
 - `bash -n` on every script, `zsh -n scripts/compile-harness.sh` -> clean
 - `./scripts/check-bats-names.sh tests/` -> `OK (99 file(s) clean)`
-- `bats tests/*.bats` -> **1413 passing, 0 failing**
+- `bats tests/*.bats` -> **1418 passing, 0 failing**
 - Baseline confirmed: the same suite on `main` before this branch -> 0 failing, so the 17
   failures seen mid-implementation were this change's and are now resolved rather than tolerated
 
@@ -84,12 +85,49 @@ Manual smoke: the real `dotf` built from this branch resolves `top/claude` -> `o
   RECORD. The caller resolves and passes the finished line in.
 - **The render writes through a temp file.** `render_agent ... > "$outp"` truncates the target
   before the renderer runs, so a failed resolution left an EMPTY agent definition behind: a file
-  naming no model, the exact failure the change exists to prevent. It now renders to `mktemp` and
-  moves on success, leaving the previous definition intact on failure.
+  naming no model, the exact failure the change exists to prevent. It now renders to a temp file
+  and moves on success, leaving the previous definition intact on failure. The temp sits BESIDE the
+  target rather than in `$TMPDIR`: `mktemp` creates 0600, which would deploy agent files with
+  different permissions from every other deployed artifact (664 here, asserted by a test), and a
+  `mv` out of `$TMPDIR` can cross filesystems and degrade the atomic rename into a copy.
 - **A stub was paired with a real test rather than exempted.** `tests/stub-real-pairing.bats`
   (BUG-055) flagged the new `dotf` stub. Unlike the `gh`/`hive` suites in its exemption table,
   `dotf` is our own binary and a real test mutates nothing, so `tests/compile-harness-real.bats`
   builds it and drives the real path end to end.
+
+## Review dispositions (adversarial review + PR reviewers)
+
+`dotf spec review` ran `nan/deepseek-v4-flash` (pi, pool primary) at `b644acc`: verdict
+**PASS-WITH-GAPS**, five Minor REAL findings and one THEORETICAL Question. CodeRabbit posted ten
+inline comments on #1165, and PR-Agent a reviewer guide. All applied except two, declined with
+reasons; the full table is the PR's `## Review triage` comment. The ones that changed behaviour:
+
+- **The resolver's stderr is no longer swallowed.** `2>/dev/null` made a schema-invalid map report
+  as *"tier top does not resolve for harness claude"* — blaming the record for a defect in the
+  registry, which defeats the point of splitting the failure by cause. The wrapper message now
+  points at the resolver's own diagnosis instead of asserting one. New bats case asserts the cause
+  survives into the deploy output.
+- **The capability probe lost its pipe.** `cmd | grep -q` can exit 141 under `pipefail` when grep
+  closes the pipe early, reporting "too old" for a current binary. Matched from a here-string now.
+- **`deploy_agents` was over the repo's own 40-line limit**, so tier resolution moved into
+  `agent_model_line`. Every function in the changed set is now under 20 lines.
+- **`ai/claude/settings.json`'s new key would never have deployed.** `merge_claude_settings` is an
+  explicit allow-list (`model`, `effortLevel`, `permissions.allow`, `hooks.*`, `enabledPlugins`);
+  everything else is preserved from the existing file. Verified on this machine: the template
+  carried `outputStyle` and the deployed settings had no such key. Both `setup-linux.sh` and
+  `setup-windows.ps1` now name it, and `tests/claude-settings-template.bats` asserts every
+  dotfiles-owned scalar key appears in both policies — negative-controlled by removing the jq
+  clause and watching the guard go red.
+- **Every `features.json` verifier now propagates the runner's exit status** (`out=$(runner) && grep`)
+  and pins tests by unique NAME rather than by `ok N` position. Two coverage gaps the old set left
+  are now their own features (`f6b` too-old resolver, `f6c` resolver diagnosis), plus `f10` for the
+  merge policy.
+
+Declined: extracting Go table-test bodies and the cobra command into sub-40-line helpers with a
+`Deps` injection struct (table-driven tests routinely exceed it here, and no other `dotf` command
+injects its env/registry seams — adopting it in one place would make this file the outlier), and
+moving `outputStyle` to a separate PR (the repo owner asked for it in this one; it is declared in
+the proposal's Out of scope instead).
 
 ## Promotion candidates
 

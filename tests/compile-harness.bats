@@ -851,6 +851,31 @@ seed_doctrine_fixture() {
     grep -q '^model: haiku' "$FAKEHOME/.claude/agents/curator.md"
 }
 
+@test "agents: the resolver's own diagnosis reaches the deploy output, not just a generic tier error" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # An unreadable MAP and an undeclared TIER both fail the render, and only the
+    # resolver can tell them apart. Swallowing its stderr made a schema-invalid
+    # map read as "tier top does not resolve", blaming the record for a defect in
+    # the registry. The stub stands in for the resolver naming a real cause.
+    cat > "$STUB_BIN/dotf" <<'DIAG'
+#!/usr/bin/env bash
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier  Resolve a neutral model tier\n'
+    exit 0
+fi
+printf 'chains.top[0] names "ghost" - the pools block does not declare it\n' >&2
+exit 1
+DIAG
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    [ "$status" -ne 0 ]
+    # the CAUSE survives, not only the generic wrapper
+    [[ "$output" == *ghost* ]]
+    # and the wrapper must not assert a cause it cannot know
+    [[ "$output" != *"does not resolve for harness"* ]]
+}
+
 @test "agents: the rendered file keeps umask permissions, not a temp file's 0600" {
     seed_agents_fixture
     run_refresh; [ "$status" -eq 0 ]

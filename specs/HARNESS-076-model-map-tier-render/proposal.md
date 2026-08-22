@@ -56,6 +56,16 @@ and a Go test pins that string so the probe cannot rot into always-answering "to
 - Fixing the `agy` render/`$comment` contradiction (#1162). This spec surfaces it and leaves it declared.
 - Adding tier entries for harnesses that lack them. The map is read as it is, not edited.
 
+**One declared exception to the scope.** `ai/claude/settings.json` gains `"outputStyle": "Concise"`,
+a change the repo owner made and asked to carry in this PR. It is unrelated to the tier render and
+is recorded here so the diff is self-explaining rather than looking like drift. Reviewing it
+surfaced a real defect and its fix, which *is* in scope for a settings change: the
+`merge_claude_settings` policy is an explicit **allow-list**, so a key added to the template and
+not named there is a silent no-op on every existing installation — verified on this machine, where
+the deployed `~/.claude/settings.json` had no `outputStyle` at all. Both `setup-linux.sh` and
+`setup-windows.ps1` now name it, and a test asserts every dotfiles-owned scalar key appears in both
+policies so the next one cannot fail silently.
+
 ## Risks / open questions
 
 - **This makes `compile-harness.sh` depend on `dotf` for the first time.** The script had zero `dotf`

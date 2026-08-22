@@ -1267,13 +1267,23 @@ merge_claude_settings() {
     fi
 
     # Per-key merge via single jq invocation. Policy table in proposal.md:
-    # model, effortLevel: template wins. permissions.allow: UNION (deduped).
-    # hooks.SessionStart: template wins (replace). enabledPlugins: object
-    # merge (template wins on conflict). All other keys: existing preserved.
+    # model, effortLevel, outputStyle: template wins. permissions.allow: UNION
+    # (deduped). hooks.SessionStart: template wins (replace). enabledPlugins:
+    # object merge (template wins on conflict). All other keys: existing preserved.
+    #
+    # `outputStyle` joins the template-wins set because the policy is an explicit
+    # ALLOW-LIST: a key added to the template and not named here is silently a
+    # no-op on every existing installation, reaching only machines bootstrapped
+    # from scratch. Measured on this repo's own box — the key sat in the template
+    # while the deployed file had no `outputStyle` at all. It belongs with `model`
+    # and `effortLevel`: same file, same kind of setting, dotfiles-owned.
+    # `// empty` leaves the existing value alone if a template ever omits it,
+    # rather than writing null and having Claude read an invalid style.
     local merged
     merged=$(jq --argjson tmpl "$template_substituted" '
         .model = $tmpl.model
         | .effortLevel = $tmpl.effortLevel
+        | (if ($tmpl.outputStyle // empty) then .outputStyle = $tmpl.outputStyle else . end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
         | .hooks = (.hooks // {})

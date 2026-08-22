@@ -16,7 +16,7 @@ The agent render needed to tell two failures apart, because they demand opposite
 The obvious discriminator is the exit status. It does not work. Measured against the `dotf`
 actually deployed on the dev box, which predates the subcommand (#1158):
 
-```
+```console
 $ dotf harness resolve-tier top --harness claude --repo-root .
 Error: unknown flag: --harness
 $ echo $?

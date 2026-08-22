@@ -245,9 +245,13 @@ function Merge-ClaudeSettings {
     }
     if ($null -eq $existing) { $existing = @{} }
 
-    # Per-key merge policy (table in proposal.md)
+    # Per-key merge policy (table in proposal.md). The policy is an ALLOW-LIST,
+    # so a key added to the template and not named here is a silent no-op on
+    # every existing installation -- which is exactly what happened to
+    # outputStyle. Keep this list in step with setup-linux.sh's jq expression.
     if ($template.ContainsKey('model')) { $existing['model'] = $template['model'] }
     if ($template.ContainsKey('effortLevel')) { $existing['effortLevel'] = $template['effortLevel'] }
+    if ($template.ContainsKey('outputStyle')) { $existing['outputStyle'] = $template['outputStyle'] }
 
     # permissions.allow: UNION (template + existing, deduped)
     if ($template.ContainsKey('permissions') -and $template['permissions'].ContainsKey('allow')) {
