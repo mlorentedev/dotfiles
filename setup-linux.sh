@@ -660,7 +660,24 @@ else
     log_info "Obsidian CLI already installed at $(command -v obsidian)"
 fi
 
+# Claude Code (primary AI coding agent — see ADR-009)
+log_info "Setting up Claude Code CLI..."
+if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then
+    log_info "Installing Claude Code CLI via official install script..."
+    if curl -fsSL https://claude.ai/install.sh | bash; then
+        log_success "Claude Code installed"
+    elif command -v npm >/dev/null 2>&1; then
+        log_info "Falling back to npm install for Claude Code..."
+        npm install -g @anthropic-ai/claude-code || log_warning "Claude Code install failed"
+    else
+        log_warning "Claude Code install failed — re-run setup or install manually"
+    fi
+else
+    log_info "Claude Code already installed"
+fi
+
 # OpenCode (secondary AI coding agent — see ADR-009 and specs/AI-011-opencode-bootstrap)
+
 # Idempotent per pattern-setup-script-idempotence:
 #   - install only if absent (no forced re-install on every run)
 #   - reconcile config (not skip-if-exists) so source-of-truth wins on drift

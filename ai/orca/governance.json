@@ -1,0 +1,22 @@
+{
+  "sourceControlAi": {
+    "enabled": true,
+    "actions": {
+      "branchName": {
+        "commandInputTemplate": "Format: <type>/<kebab-case-description> (e.g. feat/add-metrics, fix/auth-token).\nRules:\n- English only.\n- NEVER include milestone, sprint, or phase numbers (e.g. NEVER feat/phase-3.1-scaffold).\n- Keep concise and descriptive.\n{basePrompt}"
+      },
+      "commitMessage": {
+        "commandInputTemplate": "Format: <type>(<scope>): <short summary in imperative mood>\nRules:\n- English only.\n- Conventional Commits format (feat, fix, chore, docs, refactor, test).\n- Strictly NO AI attribution, NO 'Co-Authored-By' trailers, NO bot emojis, NO 'Generated with' footers.\n{basePrompt}"
+      },
+      "pullRequest": {
+        "commandInputTemplate": "Format:\n## Why\n<problem description>\n\n## What changed\n<bullet points of key changes>\n\n## Verification\n<commands run and test outputs proving completion>\n\nRules:\n- English only.\n- NO AI attribution or bot signatures.\n- NO internal milestone/phase references in title or body.\n{basePrompt}"
+      },
+      "fixChecks": {
+        "commandInputTemplate": "Investigate failing check output. Fix root cause or record a ticket. Follow Definition of Done §4.\n{basePrompt}"
+      },
+      "resolveComments": {
+        "commandInputTemplate": "For each reviewer comment, apply the fix, file a ticket with root cause, or decline with a reasoned explanation. Never leave unread.\n{basePrompt}"
+      }
+    }
+  }
+}

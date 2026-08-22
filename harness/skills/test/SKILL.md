@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/test/SKILL.md
-generated_sha: 93e751f3e151daa9
+generated_sha: 47192803c8d525d8
 id: test-skill
 type: skill
 status: active
@@ -66,3 +66,39 @@ class TestUserService:
 ## Output
 
 Complete test file with imports, fixtures, mocks, and all test cases.
+
+---
+
+## Mutation Testing (Anti-Vacuous Test Verification)
+
+> Detailed doctrine in [[00_meta/patterns/pattern-mutation-testing|pattern-mutation-testing]].
+
+Code coverage proves lines executed; **mutation testing proves the tests actually notice when behavior is broken**. Use mutation testing on agent-authored logic and security guards before trusting the test suite.
+
+### Quick Invocations (Diff-Scoped)
+
+* **Python (`mutmut`):**
+  ```bash
+  mutmut run --paths-to-mutate <changed_module.py>
+  mutmut results
+  mutmut show <mutant_id>
+  ```
+* **Go (`go-mutesting`):**
+  ```bash
+  go-mutesting ./pkg/<target>/...
+  ```
+* **TypeScript (`Stryker`):**
+  ```bash
+  npx stryker run --mutate '<changed_file.ts>'
+  ```
+* **Rust (`cargo-mutants`):**
+  ```bash
+  cargo mutants --file <changed_file.rs>
+  ```
+
+### Reading Surviving Mutants
+A surviving mutant means the synthetic bug produced no test failures:
+1. Identify the unasserted boundary or side-effect.
+2. Add a targeted test case asserting that specific behavior.
+3. Re-run the mutation command until the mutant is killed.
+

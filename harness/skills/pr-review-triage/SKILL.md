@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 1bb26bdb5271dfb3
+generated_sha: 071c5ede2400634a
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -77,6 +77,12 @@ A failing check is a finding about the change, not an obstacle to the triage. Tw
 
 - **A guard firing on a deliberate change.** A pinned count, an exhaustive list, a discipline gate. It is doing its job; update the guard's expectation in this PR, do not route around it.
 - **A gate demanding process, not code.** Fill the artifact it asks for. Reaching for the skip label is a decision that needs a stated reason, and "the gate was inconvenient" is not one.
+
+### 2b. Bot-Regenerated PRs — Verify the SHA, not the PR number
+
+Bot PRs (such as `release-please` or dependabot rebases) force-update the PR head on every push to the base branch.
+* **The failure mode:** The PR number is stable, but the head SHA moves. Checks verified earlier belonged to a commit no longer in the PR, and the new head may sit stalled behind GitHub's manual approval gate (`action_required` for bot-authored workflow runs), which sends no notification.
+* **Discipline:** Treat the head SHA (`.head.sha` / `headRefOid`) as the true identity of what was verified. Re-query `gh pr view <N> --json headRefOid,statusCheckRollup` before repeating a "checks are green" claim.
 
 ### 3. Give the reviewers time, then check the review actually happened
 

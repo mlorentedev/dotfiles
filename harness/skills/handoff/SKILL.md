@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: f5fa706682302b3f
+generated_sha: 1f5326ba40e967ad
 id: handoff-skill
 type: skill
 status: active
@@ -55,7 +55,8 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 **Rules:**
 - **Dense & Bounded:** ~8 lines. Convert relative dates to absolute.
 - **Markdown hard breaks:** End each handoff field line with two trailing spaces (`  `) for clean rendering in Obsidian.
-- **Path resolution:** Target is `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md`. Resolve `$VAULT_PATH` via: (1) env var, (2) `dotf env path VAULT_PATH`, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) Fail closed if unset. Never hardcode literal paths.
+- **Path resolution (Target Repo vs Session CWD, HARNESS-066):** Target is `$VAULT_PATH/10_projects/<target-repo>/memory/MEMORY.md`. The `<target-repo>` MUST be resolved from the **repositories actually modified/worked during the session** (via git remotes and worktrees touched), NOT blind session `cwd`. If multiple repos were modified, write the continuity block to the primary worked repo and record an explicit cross-pointer in the others. Resolve `$VAULT_PATH` via: (1) env var, (2) `dotf env path VAULT_PATH`, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) Fail closed if unset. Never hardcode literal paths.
+- **Independence caveat:** Never leak full design rationale or spec argumentation into a repo's auto-memory that would bias an independent `/adversarial-review` (write a pointer and task ref instead).
 - **Placement (Cache-stable, HARNESS-029):** The block is the **LAST** section of `MEMORY.md`, *after* the stable index content. Keeping volatile handoff text out of the prefix prevents prompt cache thrashing.
 - **Write mechanics (Concurrency-safe, HARNESS-028):** Re-read `MEMORY.md` immediately before writing; match-and-replace only the `## Session Handoff` block using string replace (never overwrite the entire file blind). If concurrent writes occurred, merge threads.
 
@@ -63,7 +64,7 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 
 In ADDITION to the replaced-in-place continuity block, record the session journal:
 
-- **Path:** `<project-area>/sessions/<YYYY-MM-DD>-<project>-<agent>.md` (e.g. `10_projects/knowledge/sessions/`, `10_projects/<repo>/sessions/`). Never under `00_meta/sessions/`.
+- **Path:** `<target-repo-area>/sessions/<YYYY-MM-DD>-<target-repo>-<agent>.md` (e.g. `10_projects/<target-repo>/sessions/`, derived from the repository where work was executed). Never under `00_meta/sessions/`.
 - **Frontmatter Law:**
   ```yaml
   ---
@@ -76,6 +77,12 @@ In ADDITION to the replaced-in-place continuity block, record the session journa
   ---
   ```
   *(Emit `id`, `type`, `status` as the first three keys for deterministic `vault_health` validation).*
+- **Content:** Frontmatter per above + journal body sections:
+  - `## Context & Objectives`
+  - `## Work Completed` (with issue, PR, commit, and artifact links)
+  - `## Decisions`
+  - `## Next Actions`
+  *(Unlike the ~8-line continuity block snapshot in step 1, the session record is the durable append-only journal).*
 - **Append-only:** One file per session. If multiple sessions occur on the same day, suffix `-2`, `-3`.
 
 ### 2. Knowledge harvest & documentation sync (Standing Order #3)
