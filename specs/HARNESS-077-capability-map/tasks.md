@@ -13,48 +13,40 @@ created: "2026-08-22"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/HARNESS-077-capability-map`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/capability-map`
+- [x] `proposal.md` complete, acceptance criteria testable
+- [x] No open questions left — the two native shapes were verified against the shipping tools, and
+      the scope cut (doctor checks, rule-plumbing refactor) is recorded in Out of scope with reasons
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
-
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+- [x] [AC5] Failing Go test: an absent / unschema'd / non-JSON / partial-coverage map all refuse
+- [x] [AC5] `capability_map.go`: loader + `ValidateCapabilityMap` + `checkVocabularyCoverage`
+- [x] [AC1][AC2] Failing Go table test: `csv` renders an allow-list, `decision-map` a flow mapping
+- [x] [AC1][AC2] `ResolveCapabilities` — resolves a SET, returns the whole frontmatter line
+- [x] [AC3][AC4] Failing Go test: unmapped capability and undeclared harness each name themselves
+- [x] [AC3][AC4] Return the loader's phrasing unchanged; do not re-wrap
+- [x] `dotf harness resolve-capabilities` wired under `dotf harness`
+- [x] Generalise the shell capability probe over the subcommand name; retarget the Go tripwire test
+      at BOTH subcommands, since each field probes independently
+- [x] [AC6] Failing bats: `capabilities: [read, search, edit]` renders native `tools:`
+- [x] [AC6] `agent_capability_line` + `render_agent` emits it
+- [x] [AC7] Failing bats: a record declaring no capabilities renders without the field
+- [x] [AC8] Failing bats: a dotf knowing resolve-tier but not resolve-capabilities warns for that
+      field only, and the model line still resolves
+- [x] #1168: a whitespace-bearing model id blames the map, not a stale dotf (own exit status)
+- [x] #1169: collect failing records and report them all, instead of aborting on the first
+- [x] [AC9] Real-binary cases in `tests/compile-harness-real.bats`, including that the two native
+      forms genuinely differ
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-
-## Machine-readable features
-
-This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
-
-**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
-
-Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-077-capability-map/features.json`):
-
-```json
-[
-  {
-    "id": "HARNESS-077-capability-map-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+- [x] Every acceptance criterion covered by at least one test
+- [x] `features.json` entries propagate the runner's exit status and pin tests by unique name
+- [x] `go build` / `go vet` / `GOOS=windows go vet` / `go test ./...` green
+- [x] `golangci-lint run` -> 0 issues at the `versions.conf` pin; `gofmt` clean
+- [x] `shellcheck --severity=error` (CI's level) clean; `bash -n` and `zsh -n` clean
+- [x] `bats tests/*.bats` -> 1429 passing, 0 failing
+- [x] Scope kept to one idea; the doctor checks and the rule-plumbing refactor are filed, not folded
+- [x] `verification.md` filled in with this session's output
+- [x] PR opened referencing this spec folder

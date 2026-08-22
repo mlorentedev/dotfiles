@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mlorentedev/dotfiles/harness/capability-map.schema.json",
   "title": "capability-map",
-  "description": "The compile-time capability registry (ADR-027 §2, shaped by ADR-035). Validated by cli/internal/harness/capability_map.go, which reads THIS FILE rather than restating its rules — the contract lives here and only its interpreter lives in Go. The `x-` namespace names cross-block rules implemented in Go: it is a closed set, and one this validator does not implement is a loud error rather than the annotation draft 2020-12 would otherwise make it.",
+  "description": "The compile-time capability registry (ADR-027 §2, shaped by ADR-035). Validated by cli/internal/harness/capability_map.go, which reads THIS FILE rather than restating its rules — the contract lives here and only its interpreter lives in Go. Unlike model-map.schema.json this declares NO `x-` cross-block rule: the one cross-block invariant here (every harness covers the declared vocabulary) is checked in the loader instead. model-map's rule plumbing is a package-level closed set bound to that one schema, and generalising it to per-schema rule sets touches a file hardened over six adversarial review rounds — a refactor that deserves its own deliberate change rather than riding along with a new registry.",
   "type": "object",
   "required": [
     "$comment",
@@ -11,7 +11,6 @@
     "harnesses"
   ],
   "additionalProperties": false,
-  "x-capabilitiesCoverVocabulary": true,
   "properties": {
     "$comment": {
       "description": "The measured rationale, including which native shapes were verified and how. The reasoning is the artifact.",

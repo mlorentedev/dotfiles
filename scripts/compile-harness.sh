@@ -332,21 +332,25 @@ render_skill() {
 # the binary KNOWS the subcommand is the only question whose answer does not
 # depend on the arguments it failed to parse. TestHarnessHelpListsResolveTier
 # pins the string this greps for, so the probe cannot rot into always-false.
-dotf_knows_resolve_tier() {
-    local help
+# Generalised over the subcommand name, because there are now two consumers of
+# this file's registries and each needs the same "is the binary new enough"
+# question asked about ITS OWN subcommand. TestHarnessHelpListsSubcommands pins
+# both strings from the Go side.
+dotf_knows_subcommand() {
+    local want="$1" help
     help="$(dotf harness --help 2>/dev/null)" || return 1
     # Matched from a here-string rather than through a pipe. `cmd | grep -q`
     # closes the pipe the moment it matches, and under `set -o pipefail` a
     # producer killed by the resulting SIGPIPE makes the pipeline exit 141 —
     # reporting "too old" for a binary that just proved it is current. No pipe,
     # no such failure mode, and the anchored match is unchanged.
-    grep -q '^[[:space:]]*resolve-tier[[:space:]]' <<<"$help"
+    grep -q "^[[:space:]]*${want}[[:space:]]" <<<"$help"
 }
 
 resolve_model_tier() {
     local tier="$1" agent="$2" out
     type -P dotf >/dev/null 2>&1 || return 2
-    dotf_knows_resolve_tier || return 2
+    dotf_knows_subcommand resolve-tier || return 2
     # The resolver's stderr is deliberately NOT swallowed. It is the only place
     # that distinguishes "this tier declares no model for this harness" from
     # "the map itself is unreadable" — naming the ghost pool, the bad keyword or
@@ -356,10 +360,19 @@ resolve_model_tier() {
     if ! out="$(dotf harness resolve-tier "$tier" --harness "$agent" --repo-root "$REPO_ROOT")"; then
         return 1
     fi
-    # A model id is one non-empty token. Belt and braces behind the probe above:
-    # anything with whitespace in it is not a model id, whatever produced it.
+    # A model id is one non-empty token. Behind the capability probe above, a
+    # whitespace-bearing answer can no longer mean "stale binary printing help" —
+    # the resolver ran and answered, so the defect is in the MAP (#1168). Saying
+    # "dotf is too old" here sent the operator to rebuild a binary that is fine,
+    # while the real fault sat in model-map.json. Exit 3, its own outcome, so the
+    # caller can name the value and the file. The schema permits it because its
+    # non-blank pattern anchors only the first character (#1159).
     case "$out" in
-        ''|*[[:space:]]*) return 2 ;;
+        '') return 2 ;;
+        *[[:space:]]*)
+            printf '[ERROR] %s gives tier "%s" on harness "%s" the id "%s" — a model id is one token with no whitespace\n' \
+                "harness/model-map.json" "$tier" "$agent" "$out" >&2
+            return 3 ;;
     esac
     printf '%s\n' "$out"
 }
@@ -388,12 +401,51 @@ agent_model_line() {
                "$tier" "$agent" >&2
            printf '       %s deploys WITHOUT a model line; install/rebuild dotf and re-run --deploy\n' "$name" >&2
            ;;
+        3) # The map answered with something that is not a model id, and
+           # resolve_model_tier already named the value and the file. Still fatal
+           # (bad data, C15) but never "rebuild dotf".
+           return 1 ;;
         *) # The cause is on the line(s) the resolver already printed: an
            # undeclared tier and an unreadable map both land here, and only it
            # knows which. Point at that rather than asserting a cause this frame
            # cannot tell apart.
            printf '[ERROR] resolving tier "%s" for harness "%s" failed; see the resolver error above\n' \
                "$tier" "$agent" >&2
+           return 1 ;;
+    esac
+}
+
+# Print the frontmatter capability line for one record on one harness, or nothing.
+#
+# Exactly the shape of agent_model_line, one field over, and the same three
+# outcomes for the same reasons: a record declaring no capabilities renders
+# without the field, an unavailable resolver warns and degrades, and only a
+# resolver that ran and refused is fatal.
+#
+# The whole LINE comes back from dotf, field name included, because the native
+# field differs per harness — `tools:` for claude, `permission:` for opencode —
+# and this frame has no business knowing which.
+agent_capability_line() {
+    local record="$1" agent="$2" name="$3" caps rc=0 line
+    caps="$(skill_field "$record" capabilities)"
+    [ -n "$caps" ] || return 0
+    # Strip the YAML flow-sequence brackets: the record writes
+    # `capabilities: [read, search]`, the CLI takes a comma list.
+    caps="${caps#[}"; caps="${caps%]}"; caps="${caps// /}"
+    [ -n "$caps" ] || return 0
+    type -P dotf >/dev/null 2>&1 || rc=2
+    if [ "$rc" -eq 0 ] && ! dotf_knows_subcommand resolve-capabilities; then rc=2; fi
+    if [ "$rc" -eq 0 ]; then
+        line="$(dotf harness resolve-capabilities "$caps" --harness "$agent" --repo-root "$REPO_ROOT")" || rc=1
+    fi
+    case "$rc" in
+        0) printf '%s\n' "$line" ;;
+        2) printf '[WARN] cannot resolve capabilities "%s" for harness "%s": dotf is absent, or predates the resolve-capabilities subcommand\n' \
+               "$caps" "$agent" >&2
+           printf '       %s deploys WITHOUT a capability line; install/rebuild dotf and re-run --deploy\n' "$name" >&2
+           ;;
+        *) printf '[ERROR] resolving capabilities "%s" for harness "%s" failed; see the resolver error above\n' \
+               "$caps" "$agent" >&2
            return 1 ;;
     esac
 }
@@ -415,13 +467,13 @@ agent_model_line() {
 # good record just because the machine running CI has no dotf. Empty renders no
 # model line, which is also what a record declaring no tier produces.
 render_agent() {
-    local record="$1" srcpath="$2" model_line="${3:-}" sha
+    local record="$1" srcpath="$2" model_line="${3:-}" cap_line="${4:-}" sha
     sha="$(sha_of "$record")"
-    awk -v gf="$srcpath" -v gs="$sha" -v ml="$model_line" '
+    awk -v gf="$srcpath" -v gs="$sha" -v ml="$model_line" -v cl="$cap_line" '
         /^---[[:space:]]*$/ {
             fm++
             if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
-            if (fm==2) { if (ml != "") print ml; print; next }
+            if (fm==2) { if (ml != "") print ml; if (cl != "") print cl; print; next }
         }
         fm==1 { if ($0 ~ /^(name|description):/) print; next }
         { print }
@@ -792,7 +844,8 @@ deploy_prune() {
 # the Action level, deferred to H-045. Mirrors deploy_skills; agent-md render is
 # a single file. ---
 deploy_agents() {
-    local ag_vsub ag_recdir agent render dir ag_dir name outp tmp_agent model_line
+    local ag_vsub ag_recdir agent render dir ag_dir name outp tmp_agent model_line cap_line
+    local failed=()
     ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
     ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
     if [[ ! -d "$ag_recdir" ]]; then
@@ -822,21 +875,39 @@ deploy_agents() {
             outp="$HOME/$dir/$name.md"
             [[ -L "$outp" ]] && rm -f "$outp"
             mkdir -p "$(dirname "$outp")"
-            model_line="$(agent_model_line "$ag_dir/AGENT.md" "$agent" "$name")" || return 1
+            # COLLECT, do not abort (#1169). Returning on the first bad record
+            # left every agent behind it undeployed, for a defect in one — and
+            # which ones those were depended on directory iteration order. The
+            # operator now sees the complete list in a single run, the same
+            # reason `dotf pr triage-queue` reports the whole queue. The exit is
+            # still non-zero, and the message says plainly that some agents DID
+            # deploy, because a non-zero exit that half-succeeded must not read
+            # as "nothing happened".
+            if ! model_line="$(agent_model_line "$ag_dir/AGENT.md" "$agent" "$name")"; then
+                failed+=("$agent/$name"); continue
+            fi
+            if ! cap_line="$(agent_capability_line "$ag_dir/AGENT.md" "$agent" "$name")"; then
+                failed+=("$agent/$name"); continue
+            fi
             tmp_agent="$outp.tmp.$$"
-            if ! render_agent "$ag_dir/AGENT.md" "$ag_vsub/$name/AGENT.md" "$model_line" > "$tmp_agent"; then
+            if ! render_agent "$ag_dir/AGENT.md" "$ag_vsub/$name/AGENT.md" "$model_line" "$cap_line" > "$tmp_agent"; then
                 rm -f "$tmp_agent"
                 printf '[ERROR] agent render failed: %s -> %s\n' "$ag_dir/AGENT.md" "$outp" >&2
-                return 1
+                failed+=("$agent/$name"); continue
             fi
             if ! mv "$tmp_agent" "$outp"; then
                 rm -f "$tmp_agent"
                 printf '[ERROR] could not replace %s\n' "$outp" >&2
-                return 1
+                failed+=("$agent/$name"); continue
             fi
             printf '[deploy] agent -> %s\n' "$outp"
         done
     done < <(jq -r '.agents.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
+    if [ "${#failed[@]}" -ne 0 ]; then
+        printf '[ERROR] %s agent record(s) failed to render: %s\n' "${#failed[@]}" "${failed[*]}" >&2
+        printf '        every OTHER agent deployed; re-run --deploy after fixing the records above\n' >&2
+        return 1
+    fi
     # 2. presence-level determinism: inject forced skills into each harness's
     #    always-loaded instructions file (uniform injection — no provider hook).
     if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then

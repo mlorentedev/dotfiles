@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-077-capability-map"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-08-22"
 issue: "mlorentedev/dotfiles#560"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, agents, capabilities, agnosticism]
@@ -58,6 +58,15 @@ rather than a per-capability token the render concatenates blindly.
 - Runtime permission enforcement. This renders a declaration; nothing here checks what a running
   agent actually does.
 - `chains`, the dispatcher, `dotf agent run`. Untouched, still level-2 work.
+- **The `dotf doctor` check over this registry**, and #1164's check that a record's declared tier
+  agrees with `model-map.json`. Both are diagnostics over registries rather than parts of the
+  render, they live in the same `cli/internal/doctor/` neighbourhood, and folding them in pushed
+  this diff past ADR-017's ~300-line atomic cap. They ship together as the immediate follow-up.
+- **Unifying the schema custom-rule plumbing.** `model-map`'s `customRules` is a package-level
+  closed set bound to one schema, so a second registry cannot declare an `x-` rule without a
+  refactor of a file hardened over six adversarial review rounds. This registry's one cross-block
+  invariant runs in its loader instead, and the refactor is filed separately so it is deliberate
+  rather than a side effect.
 
 ## Risks / open questions
 
@@ -80,22 +89,20 @@ rather than a per-capability token the render concatenates blindly.
 
 ## Acceptance criteria
 
-- [ ] `dotf harness resolve-capabilities read,search,edit,shell --harness claude` prints a
+- [x] `dotf harness resolve-capabilities read,search,edit,shell --harness claude` prints a
       `tools:`-ready value naming the native Claude tools, exit 0, nothing on stderr.
-- [ ] The same for `--harness opencode` prints its `permission:` object form.
-- [ ] An undeclared capability exits non-zero naming the capability and the harness, and prints
+- [x] The same for `--harness opencode` prints its `permission:` object form.
+- [x] An undeclared capability exits non-zero naming the capability and the harness, and prints
       nothing to stdout.
-- [ ] A harness the map does not cover exits non-zero naming it, rather than resolving to empty.
-- [ ] An absent or schema-invalid `harness/capability-map.json` fails rather than defaulting (C15).
-- [ ] `curator` declaring `capabilities: [read, search, edit, shell]` deploys a `curator.md` whose
+- [x] A harness the map does not cover exits non-zero naming it, rather than resolving to empty.
+- [x] An absent or schema-invalid `harness/capability-map.json` fails rather than defaulting (C15).
+- [x] `curator` declaring `capabilities: [read, search, edit, shell]` deploys a `curator.md` whose
       frontmatter carries the resolved `tools:` line alongside `name`, `description`, `model` and
       `generated_*`.
-- [ ] A record declaring no `capabilities` renders without the field, unchanged.
-- [ ] An absent or too-old `dotf` warns and renders without the field rather than failing the
+- [x] A record declaring no `capabilities` renders without the field, unchanged.
+- [x] An absent or too-old `dotf` warns and renders without the field rather than failing the
       harness deploy, matching #1165.
-- [ ] `dotf doctor` reports on the registry — present, parseable, schema-valid — as it does for
-      `model-map.json`.
-- [ ] Go table tests for the resolver, bats for the render and both degradation shapes, and a
+- [x] Go table tests for the resolver, bats for the render and both degradation shapes, and a
       real-binary case in `tests/compile-harness-real.bats`.
 
 ## References
