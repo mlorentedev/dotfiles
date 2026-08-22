@@ -45,15 +45,28 @@ setup() {
     # already caused once. A hand-written list cannot catch the key nobody
     # thought to add to it, so the list now comes FROM THE TEMPLATE: any new
     # top-level key must be named in both policies or this fails.
-    local key
+    # Scoped to the two merge function BODIES, not to the whole scripts. Both
+    # files say `ContainsKey(...)` and `$tmpl.` in unrelated places --
+    # setup-windows.ps1 has `$tool.ContainsKey('Version')` in its winget loop --
+    # so a whole-file grep would let a template key named `Version` satisfy this
+    # guard while Merge-ClaudeSettings ignored it. A guard that passes on the
+    # broken thing is the defect this whole test exists to prevent.
+    local linux_merge windows_merge key
+    linux_merge="$(sed -n '/^merge_claude_settings() {/,/^}/p' "$DOTFILES_DIR/setup-linux.sh")"
+    windows_merge="$(sed -n '/^function Merge-ClaudeSettings {/,/^}/p' "$DOTFILES_DIR/setup-windows.ps1")"
+    # An empty extract would fail every key below, which is the safe direction,
+    # but say so explicitly rather than blaming the first key.
+    [ -n "$linux_merge" ] || { echo "could not extract merge_claude_settings from setup-linux.sh" >&2; return 1; }
+    [ -n "$windows_merge" ] || { echo "could not extract Merge-ClaudeSettings from setup-windows.ps1" >&2; return 1; }
+
     while IFS= read -r key; do
         # `$schema` is editor metadata for JSON language servers. It is never
         # deployed, so it is exempt BY NAME -- a stated decision, not a gap.
         if [ "$key" = "\$schema" ]; then continue; fi
-        grep -qF -- "\$tmpl.$key" "$DOTFILES_DIR/setup-linux.sh" \
-            || { echo "setup-linux.sh merge policy never mentions '$key'" >&2; return 1; }
-        grep -qF -- "ContainsKey('$key')" "$DOTFILES_DIR/setup-windows.ps1" \
-            || { echo "setup-windows.ps1 merge policy never mentions '$key'" >&2; return 1; }
+        printf '%s\n' "$linux_merge" | grep -qF -- "\$tmpl.$key" \
+            || { echo "merge_claude_settings never mentions '$key'" >&2; return 1; }
+        printf '%s\n' "$windows_merge" | grep -qF -- "ContainsKey('$key')" \
+            || { echo "Merge-ClaudeSettings never mentions '$key'" >&2; return 1; }
     done < <(jq -r 'keys[]' "$SETTINGS_TEMPLATE")
 }
 

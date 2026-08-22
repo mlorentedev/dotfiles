@@ -63,6 +63,28 @@ fail-first: injecting a `someNewKey` into the template makes the test fail with
 
 `$schema` is exempt **by name** — a stated decision, not a gap.
 
+### The guard's first version had the defect it was built to prevent
+
+Review caught it. The greps above originally scanned the **whole scripts**, and
+`setup-windows.ps1` says `$tool.ContainsKey('Version')` in its winget loop, far
+from `Merge-ClaudeSettings`. So a template key named `Version` would satisfy the
+Windows half of the guard while the merge ignored it. Measured, on that exact
+state — template carries `Version`, `merge_claude_settings` handles it,
+`Merge-ClaudeSettings` does not:
+
+```
+OLD GUARD (whole-file grep): PASSES   <-- the hole
+NEW GUARD (scoped to bodies): not ok 5
+                              # Merge-ClaudeSettings never mentions 'Version'
+```
+
+The fix extracts both merge function bodies with `sed` and greps inside those.
+The point is not the `sed`: it is that **a guard is a claim about a specific
+region of code, and grepping a whole file quietly widens the region until the
+claim is no longer the one you meant.** Writing a test against the thing you
+care about is not enough; it has to be scoped to it, or the surrounding file
+answers on its behalf. Same shape as the bug in this lesson, one level up.
+
 ## The generalisable rule
 
 **A test that enumerates what it checks cannot catch the item nobody thought to
