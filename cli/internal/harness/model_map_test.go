@@ -671,3 +671,89 @@ func TestEnumHandlesNonComparableValues(t *testing.T) {
 		})
 	}
 }
+
+// TestRenderKindAgreesWithTierKeying pins the rule the map's own `$comment`
+// states and that its data contradicted for `agy` (#1162):
+//
+//	"TIERS ARE KEYED BY WHATEVER CONSUMES THE MODEL ID [...] A harness whose
+//	 render is `adapter` keys by its pool."
+//
+// An `adapter` harness takes the model as a launcher flag — `pi --model X`,
+// `agy --model X` — so there is no rendered field to put an id into, and asking
+// for a harness-keyed tier is a question about a field that does not exist.
+// Conversely a harness that DOES render an id must not be declared `adapter`,
+// or ResolveTier would refuse a lookup the render genuinely needs.
+//
+// `agy` was declared `render: agent-md` while the same file's prose grouped it
+// with `pi` as a launcher-flag harness. Nothing caught it because `tiers` had no
+// consumer at all until #1165, and `agy` is not in manifest.json's
+// `agents.deploy`. Verified 2026-08-21 against the launcher: review_launch.go
+// builds `agy --model <id> …`, and `agy agents` lists none.
+// tierlessRenderers are harnesses declared as rendering a model id that no tier
+// names yet, each with the reason the answer is not known. This is a KNOWN
+// BACKLOG, not an approval: a new entry fails the test until someone chooses,
+// so the set can only shrink deliberately. Same idiom as EXEMPT_SUITES in
+// tests/stub-real-pairing.bats.
+//
+//	copilot  render: agent-md is CORRECT — Copilot CLI custom agents take a
+//	         `model:` string in their .agent.md frontmatter (github/copilot-cli
+//	         #2133 confirms it, and that it rejects the array form VS Code
+//	         accepts). What is missing is only WHICH ids this seat accepts, and
+//	         that is not knowable from this machine: the binary is not installed,
+//	         and copilot appears only in manifest.json's agents.presence, never
+//	         agents.deploy. Declaring guessed ids would put a route to nowhere in
+//	         the map that validates cleanly — the class ADR-035 deleted the
+//	         phantom `codex` pool to avoid. Deferred to the Windows box (#1170).
+var tierlessRenderers = map[string]bool{"copilot": true}
+
+func TestRenderKindAgreesWithTierKeying(t *testing.T) {
+	root := repoRootForTest(t)
+	m, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	harnesses, ok := m["harnesses"].(map[string]any)
+	if !ok {
+		t.Fatal("no harnesses block")
+	}
+	tiers, ok := m["tiers"].(map[string]any)
+	if !ok {
+		t.Fatal("no tiers block")
+	}
+
+	// Which harnesses any tier names directly.
+	keyed := map[string]string{}
+	for _, tier := range sortedKeys(tiers) {
+		entry, ok := tiers[tier].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, name := range sortedKeys(entry) {
+			keyed[name] = tier
+		}
+	}
+
+	for _, name := range sortedKeys(harnesses) {
+		h, ok := harnesses[name].(map[string]any)
+		if !ok {
+			continue
+		}
+		render, _ := h["render"].(string)
+		tier, hasTier := keyed[name]
+
+		if render == "adapter" && hasTier {
+			t.Errorf("harness %q declares render %q but tier %q names it directly.\n"+
+				"An adapter harness takes the model as a launcher flag, so it keys by POOL "+
+				"(%v) and must have no harness-keyed tier entry. Either drop the tier entry "+
+				"or stop calling it an adapter.", name, render, tier, toStrings(h["pools"]))
+		}
+		if render != "adapter" && !hasTier && !tierlessRenderers[name] {
+			t.Errorf("harness %q declares render %q — a kind that renders a model id into a "+
+				"definition file — but no tier names it, so ResolveTier refuses every lookup "+
+				"for it.\nEither give it a tier entry, or declare it an adapter if its model "+
+				"actually arrives as a launcher flag.\nIf the answer genuinely is not known yet, "+
+				"add it to tierlessRenderers with the reason.", name, render)
+		}
+	}
+}
