@@ -1159,6 +1159,47 @@ ONEBAD
     [[ "$output" == *"NO agent deployed"* ]]
 }
 
+@test "agents: a block-style capabilities list fails loudly instead of granting everything" {
+    seed_agents_fixture
+    # skill_field reads the inline form only. Rendering "no capability line" for
+    # an ALLOW-LIST field does not deny -- it grants the harness default set, so
+    # this is the one degrade that must never be silent.
+    python3 - "$VAULT/00_meta/agents/definitions/curator/AGENT.md" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace(
+    "capabilities: [read, search, edit]",
+    "capabilities:\n  - read\n  - search"))
+PY
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"block style"* ]]
+    [[ "$output" == *GRANT* || "$output" == *"would GRANT"* ]]
+    [ ! -f "$FAKEHOME/.claude/agents/curator.md" ]
+}
+
+@test "agents: the unavailable-resolver warning states that it GRANTS, not denies" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # a dotf that knows resolve-tier but not resolve-capabilities
+    cat > "$STUB_BIN/dotf" <<'HALF2'
+#!/usr/bin/env bash
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier  x\n'
+    exit 0
+fi
+[ "$1 $2" = "harness resolve-tier" ] || { printf 'Error: unknown flag\n' >&2; exit 1; }
+printf 'opus\n'
+HALF2
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    [ "$status" -eq 0 ]
+    # the direction is the whole risk: a missing model line is neutral, a missing
+    # allow-list line is permissive, and the operator must be told which this is
+    [[ "$output" == *GRANTS* ]]
+}
+
 @test "agents: the capability list parses identically under bash and zsh" {
     # `${caps#[}` unescaped is a bracket expression that never closes: bash
     # strips the literal, zsh aborts with `bad pattern: [` at RUN time. `zsh -n`
