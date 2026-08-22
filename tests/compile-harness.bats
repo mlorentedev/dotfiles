@@ -1153,8 +1153,25 @@ ONEBAD
     # BOTH records appear, so one deploy tells the operator the whole story
     [[ "$output" == *curator* ]]
     [[ "$output" == *scribe* ]]
-    # and the summary says plainly that this was not an all-or-nothing failure
-    [[ "$output" == *"every OTHER agent deployed"* ]]
+    # ...and when NONE survived, the summary says so. Claiming "others deployed"
+    # here would be false, and the operator decides whether to roll back on
+    # exactly this sentence.
+    [[ "$output" == *"NO agent deployed"* ]]
+}
+
+@test "agents: the capability list parses identically under bash and zsh" {
+    # `${caps#[}` unescaped is a bracket expression that never closes: bash
+    # strips the literal, zsh aborts with `bad pattern: [` at RUN time. `zsh -n`
+    # does not catch it, because it is a pattern error rather than a syntax one —
+    # which is why this is a behavioural test and not another lint.
+    local expr='caps="[read, search, edit]"; caps="${caps#\[}"; caps="${caps%\]}"; caps="${caps// /}"; printf "%s" "$caps"'
+    local from_bash from_zsh
+    from_bash="$(bash -c "$expr")"
+    [ "$from_bash" = "read,search,edit" ]
+    if command -v zsh >/dev/null 2>&1; then
+        from_zsh="$(zsh -c "$expr")"
+        [ "$from_zsh" = "$from_bash" ]
+    fi
 }
 
 @test "agents: --deploy injects a presence region (forced skills) into every harness instructions file" {

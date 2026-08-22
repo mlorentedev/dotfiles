@@ -1,0 +1,55 @@
+---
+spec: "HARNESS-077-capability-map"
+verdict: "FAIL"
+reviewed_sha: "57b9f56b66165d2d536bd856e1cac2a4d288fc3b"
+reviewer: "nan/deepseek-v4-flash"
+date: "2026-08-21"
+---
+
+## Adversarial review
+
+**Scope**: HARNESS-077-capability-map (`feat/capability-map`, HEAD `57b9f56`, 2 commits over main)
+**Sources**: `specs/HARNESS-077-capability-map/{proposal,tasks,verification}.md`, `features.json`; `harness/capability-map.json` + `capability-map.schema.json`; `cli/internal/harness/capability_map.go` (+ test); `cli/internal/cmd/harness_resolve_capabilities.go`; `scripts/compile-harness.sh`; `tests/compile-harness.bats` / `tests/compile-harness-real.bats`; live `https://opencode.ai/config.json` (fetched this session).
+
+> **Integrity note**: the working tree was clean at session start. During this review (22:11-22:12), a parallel process — almost certainly the implementing session — added **uncommitted** changes to `harness/capability-map.schema.json`, `cli/internal/harness/capability_map_test.go` and `scripts/compile-harness.sh` (schema pattern hardening, a new `TestCapabilityMapRejectsRenderBreakingNames`, an escaping fix for the very zsh defect found below, and a deploy-summary counter). Those changes are **not** part of `57b9f56`, were not reviewed here, and must not be treated as reviewed. This review certifies `57b9f56` only; the tree must be re-examined after those edits are committed.
+
+### Spec and task alignment
+
+- All 9 acceptance criteria map to ticked tasks; every `[x]` has diff evidence in the two-commit branch. Contract files (`proposal.md`, `tasks.md`, `features.json`) read but **not** modified; no `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` tags remain.
+- All 13 `features.json` verifier commands executed this session: **13/13 exit 0** (their `state: pending` is correct — only the harness may set `passing`).
+- Suite, verified this session against the committed tree: `go build ./... && go vet ./... && go test ./...`; `GOOS=windows go vet ./...`; `golangci-lint run` → `0 issues.`; `gofmt` clean apart from `internal/doctor/report.go` (untouched, pre-existing #1154); `bash -n` + `zsh -n` clean; `shellcheck --severity=error` exit 0; `bats tests/compile-harness.bats` 69/69; `bats tests/compile-harness-real.bats` 9/9.
+- Mutation passes (both reverted; `capability-map.json` verified byte-clean vs HEAD): renaming a claude native fails `TestResolveCapabilitiesAgainstShippedMap`; deleting a capability key fails `TestShippedCapabilityMapCoversEveryDeclaredHarness`.
+- Native-shape claims re-verified today against the **live** opencode schema: every mapped `permission` key (`read`, `list`, `grep`, `glob`, `edit`, `bash`, `webfetch`, `websearch`) exists in `PermissionConfig`; `allow` is in the `ask|allow|deny` enum; `tools` is `@deprecated Use 'permission' field instead`. AC1/AC3/AC4 executed against the real binary (values on stdout, empty stderr; unmapped capability and undeclared harness exit non-zero with nothing on stdout and the topic+harness named).
+
+### Findings
+
+| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location |
+|----------|---------|------|---------|----------|---------------------------|--------------|
+| Major | REAL | code (bash+zsh law) | Committed `agent_capability_line` uses `caps="${caps#[}"; caps="${caps%]}"` — an **unescaped** bracket as a removal pattern. Bash tolerates it (deploy works under bash); **zsh aborts at runtime with `zsh:1: bad pattern: [`**, so the script violates AGENTS.md's "must run under bash *and* zsh" law, and `zsh -n` does **not** catch it (it is a pattern error, not a syntax error — demonstrated: `zsh -n` exits 0 on the offending line). Any zsh-context execution of the deploy (zsh-flavoured setup, sourcing, future zsh CI) dies mid-deploy with no ability to degrade | reproduced: `zsh -c 'x="[read, search]"; y="${x#[}"; ... echo "$y"'` → `zsh:1: bad pattern: [` exit 1; the escaped variant (`\#\[` / `\%\]`) survives and prints the value; a `zsh -n` run on the same line exits 0 | UNTESTED — no runtime zsh execution test exists for this script; only `zsh -n` which this defeats | code: escape the brackets (an identical fix is already drafted uncommitted in the tree) + tests: add a zsh execution probe to the shell check |
+| Major | REAL | spec artifacts (verification.md) | The "end-to-end payoff" paragraph in `verification.md` is false as written. It claims curator declares `capabilities: [read, search, edit]` and the deployed `curator.md` carries `tools: Read, Glob, Bash`. The shipped record declares `capabilities: [read, search, edit, shell]`, and the real pipeline renders `tools: Read, Glob, Grep, Edit, Write, Bash`. `Read, Glob, Bash` is exactly the bats **stub**'s canned answer — the prose describes the stub fixture but claims the real deploy, in the sentence the verification itself calls "the claim the whole registry rests on" | reproduced: `dotf harness resolve-capabilities read,search,edit,shell --harness claude` → `tools: Read, Glob, Grep, Edit, Write, Bash` (exit 0, empty stderr); full `--deploy` into a temp HOME wrote the identical line into `curator.md` | Corrected fact pinned by `tests/compile-harness-real.bats` "real dotf: a full deploy renders the resolved model id into the agent file"; the misquoted set itself: UNTESTED | spec: `verification.md` — cite the actual record and the actual resolved value plus the one-line command that reproduces it |
+| Minor | THEORETICAL | silent fail-open on a valid YAML form | A record declaring `capabilities:` in **block style** is silently treated as having none. `skill_field` extracts only the inline form; for block form it returns `""`, and `agent_capability_line`'s `[ -n "$caps" ] || return 0` renders the target **without** a `tools:` line — for a csv allow-list that means a Claude agent with the default full tool set, declared intent inverted. `harness/agent-frontmatter.schema.json` places no `type` on `capabilities`, so no record is rejected | `awk` probe feeding block form to `skill_field` returns empty (demonstrated); code read of the empty-check | UNTESTED — no named test declares capabilities in block style | code (fail loudly instead of silently dropping) + `harness/agent-frontmatter.schema.json` (declare the array shape) + tests |
+| Minor | THEORETICAL | validator / schema gaps | A `decision-map` harness with no `grant` (and, before any hardening, comma/brace-carrying native names) passed `ValidateCapabilityMap` + `checkVocabularyCoverage` and failed only at `ResolveCapabilities`. The shipped map cannot drift there — the Go whole-vocabulary test resolves and would fail — the gap is about future hand-authored maps. An in-flight uncommitted change in this tree already adds a load-time reject test (`TestCapabilityMapRejectsRenderBreakingNames`) and schema pattern tightening; that is the right fix but it is not committed or reviewed | code read at 57b9f56: `grant` optional in schema, form enum includes `decision-map`, loader checks only vocabulary | resolution path covered by `TestShippedCapabilityMapCoversEveryDeclaredHarness`; the validator gap: UNTESTED | spec artifact (schema `if/then`: grant required when form = decision-map) + tests (in-flight draft addresses it) |
+| Minor | THEORETICAL | degrade semantics | AC8's allowed degrade (absent or too-old `dotf`) renders the record without the `tools:` line. For an allow-list that is not "no opinion" — it grants the full default set on every stale machine. Deliberate per AC8 (#1165 precedent) and warned in the WARN text; the fail-OPEN direction for the allow-list half is never called out | code read of the `rc=2` branch in `agent_capability_line` | named bats case "agents: a dotf that knows resolve-tier but not resolve-capabilities warns for that field only" asserts field-absent; what the running agent then receives: UNTESTED | spec only (document the fail-open profile) |
+| Question | REAL (measured) | ADR-017 atomic cap | Production diff (map + schema + Go loader/cmd + shell, excluding tests/specs) is ~609 added lines against the ~300-LOC cap cited in AGENTS.md; the out-of-scope cut (doctor checks) was to stay within the cap, but JSON data files may or may not count. Measurement-basis question for the human | `git diff --numstat main...HEAD`: 1392 added / 34 removed total; ~609 in `harness/`+cli+script | UNTESTED | repo docs (state the counting basis) or split render from registry |
+
+### Evaluator rubric
+
+| Dimension | Grade (A-D) | Rationale (one line) |
+|-----------|-------------|----------------------|
+| Correctness        | C | Happy paths everywhere pass, but the committed shell breaks at runtime under zsh (REAL), and two negative corners (block form, missing grant) are unguarded |
+| Verification       | C | 13/13 verifier commands pass and real-bats complements the stub layer, but the headline evidence paragraph in verification.md is demonstrably wrong |
+| Scope              | A | Diff maps exactly to the proposal; #1168/#1169 tracked in tasks; follow-ups filed, not folded |
+| Reliability        | B | Unreadable/unmapped/un-declared all fail loudly by name; collect-not-abort (#1169) works; the zsh failure is the runtime exception |
+| Maintainability    | B | clear naming and why-comments; two functions exceed the 40-line guidance, minor smell |
+| Handoff-readiness  | B | all artifacts written; lessons/ADR/promotion correctly empty; verification.md + the tree-not-at-sha caveat need handling before archive |
+
+### Verdict
+**FAIL** — the committed `57b9f56` carries one REAL Major (zsh runtime abort, a legal shell-law violation missed by `zsh -n`), plus a REAL Major in the verification artifact; the rubric floors at C. Both fails have fixes already drafted or trivially writable; nothing here is a D and the code is otherwise well-tested, so the flip path is short and cheap.
+
+### Recommended next steps (before archive)
+
+1. **Commit the in-flight tree changes** (schema pattern hardening + `TestCapabilityMapRejectsRenderBreakingNames` + the escaped-bracket fix + the deployed counter) — the bracket fix resolves the zsh Major, the test resolves the no-grant Major gap, and the schema restricts the render-breaking name class. Then:
+2. **Add a regression for the shell law**: a bats/zsh probe that *executes* `compile-harness.sh`-relevant parameter expansions under `zsh -z`-style runtime, not just `zsh -n`, so a future unescaped pattern is caught. Name it, e.g. `@test "capability strip runs under zsh (no bad pattern)"`.
+3. **Correct `verification.md`'s "end-to-end payoff"** paragraph: curator declares `capabilities: [read, search, edit, shell]`; deployed `curator.md` carries `tools: Read, Glob, Grep, Edit, Write, Bash` alongside `model: opus`, no `capabilities:` line; add the reproduction command.
+4. Re-run the 13 `features.json` verifiers (they pass on the current state) and re-run this review on the amended commit.
+5. Track the Minors (block-style silent drop; fail-open degrade note) as follow-up issues; none blocks archive after the above.

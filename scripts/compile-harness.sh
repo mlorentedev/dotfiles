@@ -431,7 +431,13 @@ agent_capability_line() {
     [ -n "$caps" ] || return 0
     # Strip the YAML flow-sequence brackets: the record writes
     # `capabilities: [read, search]`, the CLI takes a comma list.
-    caps="${caps#[}"; caps="${caps%]}"; caps="${caps// /}"
+    #
+    # The brackets are ESCAPED. Unescaped, `${caps#[}` is a pattern opening a
+    # bracket expression that never closes: bash tolerates it and strips the
+    # literal, zsh aborts with `bad pattern: [` at RUN time. `zsh -n` does not
+    # catch it because it is a pattern error, not a syntax error — so the usual
+    # syntax check gives false confidence here. Measured 2026-08-22.
+    caps="${caps#\[}"; caps="${caps%\]}"; caps="${caps// /}"
     [ -n "$caps" ] || return 0
     type -P dotf >/dev/null 2>&1 || rc=2
     if [ "$rc" -eq 0 ] && ! dotf_knows_subcommand resolve-capabilities; then rc=2; fi
@@ -845,7 +851,7 @@ deploy_prune() {
 # a single file. ---
 deploy_agents() {
     local ag_vsub ag_recdir agent render dir ag_dir name outp tmp_agent model_line cap_line
-    local failed=()
+    local failed=() deployed=0
     ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
     ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
     if [[ ! -d "$ag_recdir" ]]; then
@@ -900,12 +906,20 @@ deploy_agents() {
                 printf '[ERROR] could not replace %s\n' "$outp" >&2
                 failed+=("$agent/$name"); continue
             fi
+            deployed=$((deployed + 1))
             printf '[deploy] agent -> %s\n' "$outp"
         done
     done < <(jq -r '.agents.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
     if [ "${#failed[@]}" -ne 0 ]; then
         printf '[ERROR] %s agent record(s) failed to render: %s\n' "${#failed[@]}" "${failed[*]}" >&2
-        printf '        every OTHER agent deployed; re-run --deploy after fixing the records above\n' >&2
+        # Say which it was. "every OTHER agent deployed" is false when none did,
+        # and a summary that overstates what survived is worse than none — the
+        # operator decides whether to roll back on exactly this sentence.
+        if [ "$deployed" -gt 0 ]; then
+            printf '        %s agent(s) DID deploy; re-run --deploy after fixing the records above\n' "$deployed" >&2
+        else
+            printf '        NO agent deployed; re-run --deploy after fixing the records above\n' >&2
+        fi
         return 1
     fi
     # 2. presence-level determinism: inject forced skills into each harness's

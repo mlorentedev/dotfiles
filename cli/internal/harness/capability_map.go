@@ -94,34 +94,46 @@ func checkVocabularyCoverage(doc any) error {
 		if !ok {
 			return fmt.Errorf("%s: harness %q declares no capabilities block", CapabilityMapFile, name)
 		}
-		var missing []string
-		for _, v := range vocab {
-			if _, present := caps[v]; !present {
-				missing = append(missing, v)
-			}
+		if err := checkHarnessCoversVocabulary(name, caps, vocab); err != nil {
+			return err
 		}
-		if len(missing) > 0 {
-			sort.Strings(missing)
-			return fmt.Errorf(
-				"%s: harness %q maps no native names for %s — every harness must cover the whole "+
-					"declared vocabulary. A partial harness validates cleanly and then renders a "+
-					"definition missing exactly the tool the persona asked for",
-				CapabilityMapFile, name, strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// checkHarnessCoversVocabulary enforces both directions for one harness: it maps
+// every declared verb, and it maps nothing else.
+//
+// The missing direction is the dangerous one — a partial harness validates
+// cleanly and then renders a definition missing exactly the tool the persona
+// asked for. The extra direction is quieter but still wrong: a mapping for a verb
+// no record can ask for reads as coverage while being unreachable.
+func checkHarnessCoversVocabulary(name string, caps map[string]any, vocab []string) error {
+	var missing []string
+	for _, v := range vocab {
+		if _, present := caps[v]; !present {
+			missing = append(missing, v)
 		}
-		// The reverse: a native name declared for a verb outside the vocabulary
-		// is dead weight that reads as coverage.
-		var extra []string
-		for _, k := range sortedKeys(caps) {
-			if !contains(vocab, k) {
-				extra = append(extra, k)
-			}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf(
+			"%s: harness %q maps no native names for %s — every harness must cover the whole "+
+				"declared vocabulary. A partial harness validates cleanly and then renders a "+
+				"definition missing exactly the tool the persona asked for",
+			CapabilityMapFile, name, strings.Join(missing, ", "))
+	}
+	var extra []string
+	for _, k := range sortedKeys(caps) {
+		if !contains(vocab, k) {
+			extra = append(extra, k)
 		}
-		if len(extra) > 0 {
-			return fmt.Errorf(
-				"%s: harness %q maps %s, which the vocabulary does not declare — "+
-					"add it to `vocabulary` or drop it, but do not leave a mapping nothing can ask for",
-				CapabilityMapFile, name, strings.Join(extra, ", "))
-		}
+	}
+	if len(extra) > 0 {
+		return fmt.Errorf(
+			"%s: harness %q maps %s, which the vocabulary does not declare — "+
+				"add it to `vocabulary` or drop it, but do not leave a mapping nothing can ask for",
+			CapabilityMapFile, name, strings.Join(extra, ", "))
 	}
 	return nil
 }
@@ -174,27 +186,41 @@ func LoadCapabilityMap(repoRoot string) (map[string]any, error) {
 // per-capability token for a caller to concatenate would lose that distinction
 // at exactly the layer that has to preserve it.
 func ResolveCapabilities(m map[string]any, caps []string, harness string) (string, error) {
+	h, err := harnessBlock(m, harness)
+	if err != nil {
+		return "", err
+	}
+	table, ok := h["capabilities"].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("%s: harness %q declares no capabilities block", CapabilityMapFile, harness)
+	}
+	natives, err := collectNatives(caps, table, harness)
+	if err != nil {
+		return "", err
+	}
+	return renderNatives(h, natives, harness)
+}
+
+func harnessBlock(m map[string]any, harness string) (map[string]any, error) {
 	harnesses, ok := m["harnesses"].(map[string]any)
 	if !ok {
-		return "", fmt.Errorf("%s declares no harnesses block", CapabilityMapFile)
+		return nil, fmt.Errorf("%s declares no harnesses block", CapabilityMapFile)
 	}
 	h, ok := harnesses[harness].(map[string]any)
 	if !ok {
-		return "", fmt.Errorf(
+		return nil, fmt.Errorf(
 			"harness %q is not declared in %s (declared: %s)\n"+
 				"a harness whose native tool vocabulary has not been verified is absent on purpose — "+
 				"guessing native names would render a definition granting tools that do not exist",
 			harness, CapabilityMapFile, strings.Join(sortedKeys(harnesses), ", "))
 	}
-	field, _ := h["field"].(string)
-	form, _ := h["form"].(string)
-	table, ok := h["capabilities"].(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("%s: harness %q declares no capabilities block", CapabilityMapFile, harness)
-	}
+	return h, nil
+}
 
-	// Native names in declaration order per capability, deduped across the set,
-	// first occurrence wins. Deterministic so the rendered file does not churn.
+// collectNatives flattens the requested verbs into native names in declaration
+// order, deduped across the set with the first occurrence winning. Deterministic
+// so the rendered file does not churn between deploys.
+func collectNatives(caps []string, table map[string]any, harness string) ([]string, error) {
 	var natives []string
 	seen := map[string]bool{}
 	for _, c := range caps {
@@ -204,7 +230,7 @@ func ResolveCapabilities(m map[string]any, caps []string, harness string) (strin
 		}
 		raw, present := table[c]
 		if !present {
-			return "", fmt.Errorf(
+			return nil, fmt.Errorf(
 				"capability %q is not mapped for harness %q in %s (mapped: %s)",
 				c, harness, CapabilityMapFile, strings.Join(sortedKeys(table), ", "))
 		}
@@ -216,13 +242,22 @@ func ResolveCapabilities(m map[string]any, caps []string, harness string) (strin
 		}
 	}
 	if len(natives) == 0 {
-		return "", fmt.Errorf(
-			"no capabilities requested for harness %q — resolving to an empty %s would render a "+
-				"definition granting nothing, which is not the same as declaring none",
-			harness, field)
+		return nil, fmt.Errorf(
+			"no capabilities requested for harness %q — resolving to an empty value would render a "+
+				"definition granting nothing, which is not the same as declaring none", harness)
 	}
+	return natives, nil
+}
 
-	switch form {
+// renderNatives writes the harness's declared form.
+//
+// Nothing is escaped here, on purpose: a frontmatter line is not a shell command,
+// and the values are held to identifier tokens by the schema instead. That is
+// where a comma or a brace has to be stopped, because here it would not appear in
+// the output — it would ALTER it. See TestCapabilityMapRejectsRenderBreakingNames.
+func renderNatives(h map[string]any, natives []string, harness string) (string, error) {
+	field, _ := h["field"].(string)
+	switch form, _ := h["form"].(string); form {
 	case "csv":
 		return fmt.Sprintf("%s: %s", field, strings.Join(natives, ", ")), nil
 	case "decision-map":
