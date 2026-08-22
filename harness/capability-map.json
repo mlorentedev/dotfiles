@@ -1,0 +1,105 @@
+{
+  "$comment": [
+    "The compile-time capability registry — the second half of ADR-027 section 2's agnosticism pair,",
+    "whose first half is harness/model-map.json. Shape decided by ADR-035 (shape C: $comment for the",
+    "rationale, version for the consumer cadence, a JSON Schema beside it, and a dotf doctor check).",
+    "Validated by cli/internal/harness/capability_map.go, which reads the schema as data.",
+    "",
+    "NOT EMBEDDED, and for the same reason model-map.json is not: an absent map that resolved to a",
+    "build-time default would grant or deny tool access silently. Constraint C15 — a map that cannot",
+    "be read fails loudly, never as empty and never as a permissive default.",
+    "",
+    "THE NATIVE SHAPES GENUINELY DIFFER, which is why this is a map and not a rename. Verified",
+    "2026-08-22 against the shipping tools rather than assumed:",
+    "",
+    "  claude   frontmatter `tools:` — a comma-separated list of native tool names. An ALLOW-LIST:",
+    "           a tool not named is unavailable to the agent. Read off the installed plugin agents,",
+    "           e.g. `tools: Read, Glob, Grep, Bash, Edit`.",
+    "  opencode agent `permission:` — an object keyed read/edit/glob/grep/list/bash/webfetch/",
+    "           websearch/... with values ask|allow|deny (https://opencode.ai/config.json). A",
+    "           DECISION MAP: a key not named falls back to the config default, so naming a",
+    "           capability says nothing about the rest. opencode's own `tools` field is marked",
+    "           '@deprecated Use permission field instead' in that schema, so mapping onto it would",
+    "           ship a deprecation on day one.",
+    "",
+    "That asymmetry is load-bearing. Naming a capability in an allow-list grants it AND denies",
+    "everything else; naming it in a decision map only grants it. So `form` is declared per harness",
+    "and the resolver renders the complete native value for a capability SET, rather than emitting a",
+    "per-capability token for a caller to concatenate blindly.",
+    "",
+    "GROUPINGS ARE DELIBERATELY GENEROUS. An allow-list that is too narrow denies silently — a Claude",
+    "agent granted `read` but not Glob simply cannot glob, with no error anywhere. That is the inverse",
+    "of the model-tier failure, which is loud once resolved, and it argues for mapping a neutral verb",
+    "onto every native tool a competent implementation of that verb needs.",
+    "",
+    "ABSENT HARNESSES ARE ABSENT ON PURPOSE, not by oversight. `pi` and `agy` are `adapter` harnesses",
+    "in model-map.json (#1162): they take runtime flags and render no definition file, so there is no",
+    "field to put a capability value into. `copilot` renders agent definitions but its native tool",
+    "vocabulary cannot be checked from this machine — the binary is not installed — and #1170 already",
+    "holds the same not-verifiable-here question for its model tier. Declaring guessed native names",
+    "would put a route to nowhere here that validates cleanly, which is the class ADR-035 deleted the",
+    "phantom `codex` pool to avoid."
+  ],
+  "version": 1,
+  "vocabulary": [
+    "read",
+    "search",
+    "edit",
+    "shell",
+    "web"
+  ],
+  "harnesses": {
+    "claude": {
+      "field": "tools",
+      "form": "csv",
+      "why": "Agent frontmatter takes a comma-separated allow-list of native tool names.",
+      "capabilities": {
+        "read": [
+          "Read",
+          "Glob"
+        ],
+        "search": [
+          "Grep",
+          "Glob"
+        ],
+        "edit": [
+          "Edit",
+          "Write"
+        ],
+        "shell": [
+          "Bash"
+        ],
+        "web": [
+          "WebFetch",
+          "WebSearch"
+        ]
+      }
+    },
+    "opencode": {
+      "field": "permission",
+      "form": "decision-map",
+      "grant": "allow",
+      "why": "Agent config takes a permission object, not a tool list; `tools` is deprecated upstream. Declared here with a verified native vocabulary even though opencode is not yet an agents.deploy target, because a registry covering one harness is what makes the pipe neutral by mechanism and single-vendor by data.",
+      "capabilities": {
+        "read": [
+          "read",
+          "list"
+        ],
+        "search": [
+          "grep",
+          "glob"
+        ],
+        "edit": [
+          "edit"
+        ],
+        "shell": [
+          "bash"
+        ],
+        "web": [
+          "webfetch",
+          "websearch"
+        ]
+      }
+    }
+  }
+}

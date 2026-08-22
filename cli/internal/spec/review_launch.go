@@ -36,8 +36,20 @@ const TranscriptFile = "review-transcript.jsonl"
 // launcher's flags, deliberately explicit rather than parsed out of `id`.
 // `secret_id` optionally names the specific credential (or comma-separated list)
 // to inject via `dotf secrets run --only`, preventing broken unrelated secrets
-// from blocking a review (BUG-089, #1025). When absent, falls back to unscoped
-// resolution.
+// from blocking a review (BUG-089, #1025).
+//
+// `auth: "login"` is its mutually exclusive alternative, for a runner that holds
+// its own credentials and needs none injected. `agy` is one: its OAuth token
+// lives in ~/.gemini/antigravity-cli/google_credentials.json and the binary
+// answers with no API key in the environment at all.
+//
+// Declaring NEITHER is what made the fallback arm decorative (#1156). The entry
+// named GEMINI_API_KEY, a secret the registry has never held, so every attempt to
+// use the provider-diverse arm died at `dotf secrets run --only`; nothing noticed
+// because the primary always answered. An empty `secret_id` is not a safe default
+// either — it falls through to an UNSCOPED injection, handing every credential to
+// a process that needs none. TestEveryPoolEntryDeclaresItsAuth requires exactly
+// one of the two, so "no secret" can never again mean "nobody said".
 type ReviewerEntry struct {
 	ID       string `json:"id"`
 	Runner   string `json:"runner"`
@@ -45,6 +57,7 @@ type ReviewerEntry struct {
 	Model    string `json:"model"`
 	Role     string `json:"role"`
 	SecretID string `json:"secret_id,omitempty"`
+	Auth     string `json:"auth,omitempty"`
 }
 
 // ReviewerCommand builds the argv that runs one pooled reviewer non-interactively.
@@ -85,11 +98,18 @@ func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration, repo
 		return nil, fmt.Errorf("pool entry %q has no model to pin — the launcher must not fall back to a runner default", e.ID)
 	}
 
-	base := []string{"dotf", "secrets", "run"}
-	if s := strings.TrimSpace(e.SecretID); s != "" {
-		base = append(base, "--only", s)
+	// A login-authenticated runner is invoked directly. Wrapping it would inject
+	// every credential in the registry into a process that reads none of them,
+	// and would let one unrelated broken entry block the review — the failure
+	// scoping was introduced to prevent, reached from the other direction.
+	var base []string
+	if strings.TrimSpace(e.Auth) != "login" {
+		base = []string{"dotf", "secrets", "run"}
+		if s := strings.TrimSpace(e.SecretID); s != "" {
+			base = append(base, "--only", s)
+		}
+		base = append(base, "--")
 	}
-	base = append(base, "--")
 
 	switch e.Runner {
 	case "pi":

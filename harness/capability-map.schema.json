@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mlorentedev/dotfiles/harness/capability-map.schema.json",
+  "title": "capability-map",
+  "description": "The compile-time capability registry (ADR-027 §2, shaped by ADR-035). Validated by cli/internal/harness/capability_map.go, which reads THIS FILE rather than restating its rules — the contract lives here and only its interpreter lives in Go. Unlike model-map.schema.json this declares NO `x-` cross-block rule: the one cross-block invariant here (every harness covers the declared vocabulary) is checked in the loader instead. model-map's rule plumbing is a package-level closed set bound to that one schema, and generalising it to per-schema rule sets touches a file hardened over six adversarial review rounds — a refactor that deserves its own deliberate change rather than riding along with a new registry.",
+  "type": "object",
+  "required": [
+    "$comment",
+    "version",
+    "vocabulary",
+    "harnesses"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$comment": {
+      "description": "The measured rationale, including which native shapes were verified and how. The reasoning is the artifact.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "version": {
+      "description": "The consumer cadence marker. This registry resolves at COMPILE time only — there is no run-time half, unlike model-map.json where `tiers` and `chains` resolve at different times.",
+      "type": "integer"
+    },
+    "vocabulary": {
+      "description": "The neutral capability verbs, taken as given from harness/agent-frontmatter.schema.json. Declared here so a harness block can be checked against it rather than against whatever the first harness happened to list.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "harnesses": {
+      "description": "Per-harness native representation. Only harnesses whose native vocabulary was VERIFIED belong here; a guessed entry validates cleanly and routes nowhere.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "field",
+          "form",
+          "capabilities"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "description": "The native frontmatter/config key the resolved value is written to (claude: tools; opencode: permission).",
+            "type": "string",
+            "pattern": "^\\S+$"
+          },
+          "form": {
+            "description": "How the native value is shaped. `csv` is an ALLOW-LIST of tool names — omitting one denies it. `decision-map` is an object of per-key decisions where an unnamed key falls back to a default, so it grants without denying. The distinction changes what a capability set MEANS, which is why the resolver renders a complete value rather than concatenating per-capability tokens.",
+            "type": "string",
+            "enum": [
+              "csv",
+              "decision-map"
+            ]
+          },
+          "grant": {
+            "description": "For form `decision-map` only: the value written for a granted key (e.g. `allow`). Meaningless for `csv`, where presence is the grant.",
+            "type": "string",
+            "pattern": "^\\S+$"
+          },
+          "why": {
+            "type": "string"
+          },
+          "capabilities": {
+            "description": "Neutral verb -> the native names it needs. Deliberately generous: an allow-list that is too narrow denies silently, with no error anywhere.",
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^\\S+$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

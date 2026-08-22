@@ -82,6 +82,7 @@ func checkModelMap(cfg *Config, rep *Report) {
 		harness.ModelMapFile, len(pools), len(harnesses)))
 
 	reportDeclaredBudgets(parsed, pools, rep)
+	checkAgentTiersResolve(cfg, parsed, rep)
 }
 
 // reportDeclaredBudgets prints what the map DECLARES and says plainly that
