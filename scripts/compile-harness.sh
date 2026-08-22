@@ -428,10 +428,30 @@ agent_model_line() {
 agent_capability_line() {
     local record="$1" agent="$2" name="$3" caps rc=0 line
     caps="$(skill_field "$record" capabilities)"
-    [ -n "$caps" ] || return 0
+    if [ -z "$caps" ]; then
+        # skill_field reads the INLINE form only. A record written in YAML block
+        # style declares capabilities that this returns as empty, and rendering
+        # "no capability line" for an ALLOW-LIST field does not mean "no opinion"
+        # -- it grants the harness's full default tool set. Failing open on a
+        # permission field is the one degrade that must not be silent, so detect
+        # the block form and refuse rather than quietly widening access.
+        if awk '/^---[[:space:]]*$/{n++; next} n==1 && /^capabilities:[[:space:]]*$/{found=1} n>=2{exit} END{exit !found}' "$record"; then
+            printf '[ERROR] %s declares `capabilities:` in YAML block style, which this renderer does not read\n' "$record" >&2
+            printf '        use the inline form -- `capabilities: [read, shell]` -- because rendering no\n' >&2
+            printf '        capability line would GRANT the full default tool set, not deny it\n' >&2
+            return 1
+        fi
+        return 0
+    fi
     # Strip the YAML flow-sequence brackets: the record writes
     # `capabilities: [read, search]`, the CLI takes a comma list.
-    caps="${caps#[}"; caps="${caps%]}"; caps="${caps// /}"
+    #
+    # The brackets are ESCAPED. Unescaped, `${caps#[}` is a pattern opening a
+    # bracket expression that never closes: bash tolerates it and strips the
+    # literal, zsh aborts with `bad pattern: [` at RUN time. `zsh -n` does not
+    # catch it because it is a pattern error, not a syntax error — so the usual
+    # syntax check gives false confidence here. Measured 2026-08-22.
+    caps="${caps#\[}"; caps="${caps%\]}"; caps="${caps// /}"
     [ -n "$caps" ] || return 0
     type -P dotf >/dev/null 2>&1 || rc=2
     if [ "$rc" -eq 0 ] && ! dotf_knows_subcommand resolve-capabilities; then rc=2; fi
@@ -442,7 +462,13 @@ agent_capability_line() {
         0) printf '%s\n' "$line" ;;
         2) printf '[WARN] cannot resolve capabilities "%s" for harness "%s": dotf is absent, or predates the resolve-capabilities subcommand\n' \
                "$caps" "$agent" >&2
-           printf '       %s deploys WITHOUT a capability line; install/rebuild dotf and re-run --deploy\n' "$name" >&2
+           # Spell out the DIRECTION, because it differs from the model field and
+           # the difference is the whole risk. A missing `model:` line inherits
+           # the session's model, which is neutral. A missing allow-list field
+           # does not deny -- it grants whatever the harness defaults to. Same
+           # degrade decision as #1165, opposite blast radius.
+           printf '       %s deploys WITHOUT a capability line, which for an allow-list field GRANTS\n' "$name" >&2
+           printf '       the harness default set rather than denying -- rebuild dotf and re-run --deploy\n' >&2
            ;;
         *) printf '[ERROR] resolving capabilities "%s" for harness "%s" failed; see the resolver error above\n' \
                "$caps" "$agent" >&2
@@ -845,7 +871,7 @@ deploy_prune() {
 # a single file. ---
 deploy_agents() {
     local ag_vsub ag_recdir agent render dir ag_dir name outp tmp_agent model_line cap_line
-    local failed=()
+    local failed=() deployed=0
     ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
     ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
     if [[ ! -d "$ag_recdir" ]]; then
@@ -900,12 +926,20 @@ deploy_agents() {
                 printf '[ERROR] could not replace %s\n' "$outp" >&2
                 failed+=("$agent/$name"); continue
             fi
+            deployed=$((deployed + 1))
             printf '[deploy] agent -> %s\n' "$outp"
         done
     done < <(jq -r '.agents.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")
     if [ "${#failed[@]}" -ne 0 ]; then
         printf '[ERROR] %s agent record(s) failed to render: %s\n' "${#failed[@]}" "${failed[*]}" >&2
-        printf '        every OTHER agent deployed; re-run --deploy after fixing the records above\n' >&2
+        # Say which it was. "every OTHER agent deployed" is false when none did,
+        # and a summary that overstates what survived is worse than none — the
+        # operator decides whether to roll back on exactly this sentence.
+        if [ "$deployed" -gt 0 ]; then
+            printf '        %s agent(s) DID deploy; re-run --deploy after fixing the records above\n' "$deployed" >&2
+        else
+            printf '        NO agent deployed; re-run --deploy after fixing the records above\n' >&2
+        fi
         return 1
     fi
     # 2. presence-level determinism: inject forced skills into each harness's

@@ -17,9 +17,11 @@ The two claims worth singling out, because the whole registry rests on them:
 - **The native forms genuinely differ**, from the same neutral request. `shell` resolves to
   `tools: Bash` for claude and `permission: {bash: allow}` for opencode. Asserted against the real
   binary in `tests/compile-harness-real.bats` "the two native forms really do differ".
-- **The end-to-end payoff.** `curator` declares `capabilities: [read, search, edit]`; the deployed
-  `curator.md` now carries `tools: Read, Glob, Bash` alongside `model: opus`, and no `capabilities:`
-  line. Before this change it carried neither.
+- **The end-to-end payoff.** `curator` declares `capabilities: [read, search, edit, shell]`; the
+  deployed `curator.md` now carries `tools: Read, Glob, Grep, Edit, Write, Bash` alongside
+  `model: opus`, and no `capabilities:` line. Before this change it carried neither. (`Bash` comes
+  from `shell` — an earlier draft of this paragraph quoted the *bats fixture's* shorter three-verb
+  list against the *real* record's output, which is why the two disagreed.)
 
 ## Test status
 
