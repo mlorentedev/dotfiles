@@ -325,19 +325,42 @@ fi
 # A reviewer posted, but what it posted says no review ran. Told apart by the
 # vendor's own machine marker, never by prose: a review names files, lines or
 # claims; a notice talks about the review itself.
+# An ADVISORY reviewer's decline is recorded separately and never refuses.
+#
+# The distinction is about what the signal measures. A counting reviewer saying
+# "I could not review" is a fact about this change's review. An advisory
+# reviewer saying it is a fact about a third party's billing state, which is not
+# something the author can act on and not something that makes the change worse.
+#
+# Measured across one full session on 2026-08-22: CodeRabbit was rate limited on
+# every PR opened, so `declined` became the FIRST verdict on every change and
+# flipped green about ninety seconds later when PR-Agent posted. This workflow's
+# own comment names why that matters — "a gate whose normal state is red has
+# stopped being a gate" — and it was becoming true of this one.
+#
+# Nothing is weakened. An advisory decline still prevents `attested`; it just
+# yields `pending`, which is the honest reading: no review has happened yet.
 DECLINED_BY=""
 DECLINED_MARKER=""
-while IFS=$'\t' read -r login marker; do
+ADVISORY_DECLINED_BY=""
+while IFS=$'\t' read -r login marker advisory; do
     [ -n "$login" ] || continue
     hit="$(printf '%s' "$PR_JSON" | jq -r --arg l "$login" --arg m "$marker" '
         def norm: (. // "") | ascii_downcase | sub("\\[bot\\]$"; "");
         [.comments[]? | select((.author.login | norm) == ($l | norm)) | select((.body // "") | contains($m))] | length')"
     if [ "$hit" -gt 0 ]; then
+        if [ "$advisory" = "true" ]; then
+            # Recorded, not fatal. Reported below so "it could not run" stays
+            # distinguishable from silence — they are different facts even when
+            # they produce the same verdict.
+            [ -n "$ADVISORY_DECLINED_BY" ] || ADVISORY_DECLINED_BY="$login"
+            continue
+        fi
         DECLINED_BY="$login"
         DECLINED_MARKER="$marker"
         break
     fi
-done < <(jq -r '.reviewers[]? | . as $r | ($r.declined_markers[]? | [$r.login, .] | @tsv)' "$CONFIG")
+done < <(jq -r '.reviewers[]? | . as $r | ($r.declined_markers[]? | [$r.login, ., (($r.advisory // false) | tostring)] | @tsv)' "$CONFIG")
 
 # --- the declared escape -------------------------------------------------------
 # BOTH halves, never one. A label alone is a click; a rationale alone is a note
@@ -393,6 +416,12 @@ elif [ -n "$UNQUALIFIED" ]; then
     printf '       declared in the reviewer registry. A shared bot identity is neither until\n' >&2
     printf '       it is declared: every workflow here posts under the same login, so counting\n' >&2
     printf '       it unconditionally would let a labeler attest for a PR nobody read (#1033).\n' >&2
+elif [ -n "$ADVISORY_DECLINED_BY" ]; then
+    # Not silence, and saying so matters: the author should not go looking for a
+    # reviewer that already answered "I could not run".
+    printf '[FAIL] pending — %s could not review (advisory: its availability is a third-party\n' "$ADVISORY_DECLINED_BY" >&2
+    printf '       quota, not a property of this change, so it does not refuse). No counting\n' >&2
+    printf '       reviewer has attested yet.\n' >&2
 else
     printf '[FAIL] pending — no reviewer output on this PR yet\n' >&2
 fi
