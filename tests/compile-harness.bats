@@ -68,10 +68,20 @@ seed_dotf_stub() {
 # The capability probe: the render greps this for the subcommand name to decide
 # whether the binary is new enough. cli/internal/cmd pins the real help's shape.
 if [ "$1 $2" = "harness --help" ]; then
-    printf 'Available Commands:\n  resolve-tier  Resolve a neutral model tier\n  triggers      x\n'
+    printf 'Available Commands:\n  resolve-tier          Resolve a neutral model tier\n  resolve-capabilities  Resolve neutral capabilities\n  triggers              x\n'
     exit 0
 fi
-# Only the one subcommand the render calls; anything else is a test bug.
+if [ "$1 $2" = "harness resolve-capabilities" ]; then
+    if [ -n "${STUB_CAP_LINE-unset}" ] && [ "${STUB_CAP_LINE-unset}" != "unset" ]; then
+        printf '%s\n' "$STUB_CAP_LINE"; exit 0
+    fi
+    if [ "${STUB_CAP_LINE-unset}" = "unset" ]; then
+        printf 'tools: Read, Glob, Bash\n'; exit 0
+    fi
+    printf 'capability "%s" is not mapped for harness "%s"\n' "$3" "$5" >&2
+    exit 1
+fi
+# Only the subcommands the render calls; anything else is a test bug.
 [ "$1 $2" = "harness resolve-tier" ] || { printf 'stub: unexpected: %s\n' "$*" >&2; exit 127; }
 if [ -n "${STUB_TIER_MODEL:-}" ]; then
     printf '%s\n' "$STUB_TIER_MODEL"
@@ -350,7 +360,8 @@ EOF
 # A test that wants the unresolvable path sets STUB_TIER_MODEL="" before calling.
 run_deploy() {
     run env HOME="$FAKEHOME" PATH="${DEPLOY_PATH:-${STUB_BIN:-}:$PATH}" \
-        STUB_TIER_MODEL="${STUB_TIER_MODEL-opus}" "$SCRIPT" --deploy
+        STUB_TIER_MODEL="${STUB_TIER_MODEL-opus}" \
+        STUB_CAP_LINE="${STUB_CAP_LINE-unset}" "$SCRIPT" --deploy
 }
 
 @test "render: --refresh stamps the committed record with its own provenance (HARNESS-069), no \$HOME write" {
@@ -1020,6 +1031,130 @@ EOF
     # deploy_skills runs BEFORE deploy_agents, so a failed agent render must not
     # cost the skills their deploy — the ordering in cmd_deploy is load-bearing
     [ -f "$FAKEHOME/.claude/skills/demo-skill/SKILL.md" ]
+}
+
+@test "agents: --deploy resolves neutral capabilities into the rendered frontmatter" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    # the record declares `capabilities: [read, search, edit]`; the deployed file
+    # must carry the harness's NATIVE tool names, never the neutral verbs
+    grep -q '^tools: Read, Glob, Bash' "$F"
+    ! grep -qE '^capabilities:' "$F"
+    [ "$(grep -c '^tools:' "$F")" -eq 1 ]
+}
+
+@test "agents: a record declaring no capabilities renders without the field" {
+    seed_agents_fixture
+    sed -i '/^capabilities: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    [ -f "$F" ]
+    ! grep -q '^tools:' "$F"
+    # the model line is independent and must still be there
+    grep -q '^model: opus' "$F"
+}
+
+@test "agents: an unmappable capability fails the deploy without truncating the definition" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    STUB_CAP_LINE="" run_deploy
+    [ "$status" -ne 0 ]
+    [[ "$output" == *capabilit* ]]
+    # the previous definition survives, same guarantee as the tier path
+    [ -s "$F" ]
+    grep -q '^tools: Read, Glob, Bash' "$F"
+}
+
+@test "agents: a dotf that knows resolve-tier but not resolve-capabilities warns for that field only" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # The realistic staleness shape once two subcommands exist: a binary new
+    # enough for one and not the other. Each field probes independently, so the
+    # model line must still resolve.
+    cat > "$STUB_BIN/dotf" <<'HALF'
+#!/usr/bin/env bash
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier  Resolve a neutral model tier\n'
+    exit 0
+fi
+[ "$1 $2" = "harness resolve-tier" ] || { printf 'Error: unknown flag\n' >&2; exit 1; }
+printf 'opus\n'
+HALF
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"predates the resolve-capabilities"* ]]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    grep -q '^model: opus' "$F"
+    ! grep -q '^tools:' "$F"
+}
+
+@test "BUG-1168: a whitespace-bearing model id blames the map, not a stale dotf" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # The resolver ran and answered; the answer is just not a model id. Reporting
+    # "dotf is too old" sent the operator to rebuild a binary that was fine.
+    STUB_TIER_MODEL="opus 4" run_deploy
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"model-map.json"* ]]
+    [[ "$output" == *"opus 4"* ]]
+    [[ "$output" != *"predates the resolve-tier"* ]]
+}
+
+@test "DESIGN-1169: a bad record does not block the agents behind it" {
+    seed_agents_fixture
+    # a second persona on a DIFFERENT tier, so the stub can refuse exactly one
+    mkdir -p "$VAULT/00_meta/agents/definitions/scribe"
+    printf -- '---\nname: scribe\ndescription: second persona.\nkind: invocable\nmodel: mid\n---\n\n# Scribe\n' \
+        > "$VAULT/00_meta/agents/definitions/scribe/AGENT.md"
+    run_refresh; [ "$status" -eq 0 ]
+    cat > "$STUB_BIN/dotf" <<'ONEBAD'
+#!/usr/bin/env bash
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier          x\n  resolve-capabilities  x\n'
+    exit 0
+fi
+if [ "$1 $2" = "harness resolve-capabilities" ]; then printf 'tools: Read\n'; exit 0; fi
+if [ "$1 $2" = "harness resolve-tier" ]; then
+    # refuse `mid` only: scribe fails, curator (top) resolves
+    [ "$3" = "mid" ] && { printf 'tier "mid" declares no model for harness "claude"\n' >&2; exit 1; }
+    printf 'opus\n'; exit 0
+fi
+exit 127
+ONEBAD
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    # non-zero, because one record genuinely failed
+    [ "$status" -ne 0 ]
+    # ...and the GOOD record still deployed. Before #1169 this depended on
+    # directory iteration order: `curator` sorts before `scribe`, so aborting on
+    # the first failure would have left curator deployed and any record after
+    # scribe silently skipped.
+    [ -f "$FAKEHOME/.claude/agents/curator.md" ]
+    grep -q '^model: opus' "$FAKEHOME/.claude/agents/curator.md"
+    # the failing one wrote nothing, not even a truncated file
+    [ ! -f "$FAKEHOME/.claude/agents/scribe.md" ]
+    [[ "$output" == *scribe* ]]
+}
+
+@test "DESIGN-1169: every failing record is named in one run, not just the first" {
+    seed_agents_fixture
+    mkdir -p "$VAULT/00_meta/agents/definitions/scribe"
+    printf -- '---\nname: scribe\ndescription: second persona.\nkind: invocable\nmodel: top\n---\n\n# Scribe\n' \
+        > "$VAULT/00_meta/agents/definitions/scribe/AGENT.md"
+    run_refresh; [ "$status" -eq 0 ]
+    STUB_TIER_MODEL="" run_deploy
+    [ "$status" -ne 0 ]
+    # BOTH records appear, so one deploy tells the operator the whole story
+    [[ "$output" == *curator* ]]
+    [[ "$output" == *scribe* ]]
+    # and the summary says plainly that this was not an all-or-nothing failure
+    [[ "$output" == *"every OTHER agent deployed"* ]]
 }
 
 @test "agents: --deploy injects a presence region (forced skills) into every harness instructions file" {

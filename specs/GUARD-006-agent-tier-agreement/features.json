@@ -1,0 +1,51 @@
+[
+  {
+    "id": "GUARD-006-agent-tier-agreement-f1",
+    "behavior": "A record whose tier one deploy target cannot answer FAILs, naming record, tier and harness",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestAgentTiersResolve$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAgentTiersResolve/a_tier_one_deploy_target_cannot_answer '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-006-agent-tier-agreement-f2",
+    "behavior": "A tier no tiers block declares at all FAILs the same way",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestAgentTiersResolve$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAgentTiersResolve/a_tier_no_tier_block_declares_at_all '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-006-agent-tier-agreement-f3",
+    "behavior": "A record declaring no tier is not drift",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestAgentTiersResolve$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAgentTiersResolve/a_record_declaring_no_tier_is_not_drift '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-006-agent-tier-agreement-f4",
+    "behavior": "A record scoped by targets is judged only against the harnesses it targets",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestAgentTiersResolve$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAgentTiersResolve/a_record_scoped_by_targets_is_judged_only_against_those '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-006-agent-tier-agreement-f5",
+    "behavior": "A valid record passes and the pass line reports how many pairs were checked",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestAgentTiersResolve$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAgentTiersResolve/a_tier_the_deploy_target_can_answer '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-006-agent-tier-agreement-f6",
+    "behavior": "An absent targets list means EVERY harness, the same default the render uses",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestRecordTargetsDefaultsToEveryHarness$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRecordTargetsDefaultsToEveryHarness '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-006-agent-tier-agreement-f7",
+    "behavior": "Inputs this check does not own (absent/unparseable manifest, no deploy targets) produce no FAIL",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestAgentTiersMissingInputsAreNotFailures$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAgentTiersMissingInputsAreNotFailures '",
+    "state": "pending",
+    "evidence": ""
+  }
+]
