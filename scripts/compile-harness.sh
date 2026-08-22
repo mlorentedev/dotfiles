@@ -156,6 +156,33 @@ render_region() {
     done
 }
 
+# Like render_region, but for the CHARACTER-CAPPED surfaces (doctrine.deploy).
+#
+# The name "compact doctrine payload" described an intention, not a behaviour:
+# deploy_doctrine concatenated the records verbatim, so the payload grew by the
+# full size of every doctrine id added and the cap was breached the moment one
+# was. Measured 2026-08-22 — .gemini/GEMINI.md at 12114 against a 12000 cap, and
+# only a bats assertion noticed.
+#
+# What is dropped is the provenance blockquote each record opens with ("Injected
+# verbatim into every agent's instructions (harness `enforced` id X)…"). That
+# line tells a HUMAN reading AGENTS.md where the block came from. An agent
+# consuming a capped payload needs the rules, not their filing history, and it is
+# 737 characters across the three records that carry one.
+#
+# NOT A SUMMARISER. Every rule survives byte-for-byte; only the meta-text about
+# where the rules live is removed. Compacting enforcement prose by paraphrase is
+# how a rule quietly loses its teeth, so this only ever deletes lines it can
+# identify exactly.
+render_region_compact() {
+    render_region "$@" | awk '
+        /^> Injected verbatim into every agent/ { skipped = 1; next }
+        # The blank line that followed it would otherwise leave a double gap.
+        skipped && /^[[:space:]]*$/ { skipped = 0; next }
+        { skipped = 0; print }
+    '
+}
+
 # Per-file deployed line cap (0 = no cap).
 cap_for() {
     case "$1" in
@@ -989,7 +1016,7 @@ build_agent_presence() {
 has_doctrine() { jq -e '.doctrine.deploy' "$MANIFEST" >/dev/null 2>&1; }
 
 deploy_doctrine() {
-    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars ids
+    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars gen_chars ids
     mapfile -t ids < <(jq -r '.doctrine.inject[]' "$MANIFEST")
     while IFS=$'\t' read -r agent file cap shadow; do
         [[ -n "$agent" ]] || continue
@@ -997,7 +1024,7 @@ deploy_doctrine() {
         payload="$(mktemp)"
         {
             printf '## Non-negotiable rules (harness-enforced)\n\n'
-            render_region "${ids[@]}"
+            render_region_compact "${ids[@]}"
             printf '\n'
             build_agent_presence "$ag_recdir" "$agent"
         } > "$payload"
@@ -1031,18 +1058,32 @@ deploy_doctrine() {
             { printf '\n%s\n' "$begin"; cat "$payload"; printf '%s\n' "$END_MARKER"; } >> "$tmp"
         fi
         mv "$tmp" "$file_abs"
-        rm -f "$payload"
         printf '[deploy] doctrine -> %s\n' "$file_abs"
 
         # The cap covers the WHOLE file, user content included: the platform
         # truncates or rejects the file, and it does not care who wrote which half.
+        #
+        # But the two causes need different actions, and one warning saying only
+        # the total conflated them. "Your file is large" is the operator's to fix
+        # by trimming their own prose; "our generated doctrine no longer fits on
+        # its own" is OURS, and it means the next doctrine id silently pushes
+        # rules past the point the agent reads. So report the generated share
+        # too, and say which case this is.
         if [[ "$cap" != 0 ]]; then
             chars="$(wc -m < "$file_abs")"
-            if (( chars > cap )); then
+            gen_chars="$(wc -m < "$payload")"
+            if (( gen_chars > cap )); then
+                printf '[deploy] WARN %s: the GENERATED doctrine alone is %s characters, over the %s cap\n' \
+                    "$file_abs" "$gen_chars" "$cap" >&2
+                printf '        this is ours, not the user'"'"'s content — drop an id from doctrine.inject in harness/manifest.json,\n' >&2
+                printf '        or shorten the largest enforced records (wc -m harness/enforced/*.md | sort -rn)\n' >&2
+            elif (( chars > cap )); then
                 printf '[deploy] WARN %s is %s characters, over the %s the platform documents — content past the cap may never be read\n' \
                     "$file_abs" "$chars" "$cap" >&2
+                printf '        the generated doctrine is %s of that; the rest is the file'"'"'s own content\n' "$gen_chars" >&2
             fi
         fi
+        rm -f "$payload"
     done < <(jq -r '.doctrine.deploy[] | "\(.agent)\t\(.file)\t\(.char_cap // 0)\t\(.shadowed_by // "")"' "$MANIFEST")
 }
 
