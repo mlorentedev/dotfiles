@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.47.0](https://github.com/mlorentedev/dotfiles/compare/v0.46.0...v0.47.0) (2026-08-22)
+
+
+### Features
+
+* **ai:** integrate Orca ADE overlay and enforce IaC idempotence doctrine ([#1176](https://github.com/mlorentedev/dotfiles/issues/1176)) ([3117fe0](https://github.com/mlorentedev/dotfiles/commit/3117fe013ab1134a5f72fa6637fa482e3901d3ff))
+* **ci:** configure CodeRabbit instead of inheriting somebody else's defaults ([#1187](https://github.com/mlorentedev/dotfiles/issues/1187)) ([434bdc4](https://github.com/mlorentedev/dotfiles/commit/434bdc428120f517e04cf0775cd8a9e2359d6631))
+* **doctor:** catch a record whose declared tier model-map cannot answer ([#1174](https://github.com/mlorentedev/dotfiles/issues/1174)) ([e54263c](https://github.com/mlorentedev/dotfiles/commit/e54263c390574bbde3fdf5f273b3547ad97c7ac6))
+* **harness:** give capabilities the same seam the model tier got ([#1172](https://github.com/mlorentedev/dotfiles/issues/1172)) ([2116a58](https://github.com/mlorentedev/dotfiles/commit/2116a58434eae0b9819c39b509f60cb241c2e7a0))
+* **harness:** give model-map's tiers block its first consumer ([#1165](https://github.com/mlorentedev/dotfiles/issues/1165)) ([8e45bd8](https://github.com/mlorentedev/dotfiles/commit/8e45bd8ec7ee45ed6b632d9f21c866d365a1af6a))
+* **spec:** refuse to archive on a verdict the reviewer never wrote ([#1178](https://github.com/mlorentedev/dotfiles/issues/1178)) ([81d0b51](https://github.com/mlorentedev/dotfiles/commit/81d0b5193e1f18285bb92d5298749eaa013cb6f1))
+
+
+### Bug Fixes
+
+* **ci:** a reviewer whose quota is exhausted must not refuse the change ([#1184](https://github.com/mlorentedev/dotfiles/issues/1184)) ([279951f](https://github.com/mlorentedev/dotfiles/commit/279951f9a969a78cd0d0a36701554567c955d5b0))
+* **ci:** the attestation check-run must not carry a verdict that will change ([#1185](https://github.com/mlorentedev/dotfiles/issues/1185)) ([4b76def](https://github.com/mlorentedev/dotfiles/commit/4b76defab5f6b41664ebc5f2ef5410a4bbed4ea1))
+* **doctor:** key each doctrine marker on its own rule, not another's prose ([#1182](https://github.com/mlorentedev/dotfiles/issues/1182)) ([a91ec35](https://github.com/mlorentedev/dotfiles/commit/a91ec35f238c8252403ef1a2ce368b2b3457953d))
+* **harness:** agy takes its model as a launcher flag, so it is an adapter ([#1171](https://github.com/mlorentedev/dotfiles/issues/1171)) ([358e8ca](https://github.com/mlorentedev/dotfiles/commit/358e8caa95fbc7eb8ede88059137d796c7fb8261))
+* **harness:** land the capability-map review fixes that [#1172](https://github.com/mlorentedev/dotfiles/issues/1172) merged without ([#1179](https://github.com/mlorentedev/dotfiles/issues/1179)) ([2dd16a2](https://github.com/mlorentedev/dotfiles/commit/2dd16a2c51d4bb5c21e35490da6f44b3269c71be))
+* **harness:** make the compact doctrine payload actually compact ([#1181](https://github.com/mlorentedev/dotfiles/issues/1181)) ([b2d3de1](https://github.com/mlorentedev/dotfiles/commit/b2d3de1090b5f43b22c012f0a67c8fcc8b08f185))
+* **setup:** jq `// empty` guard silently disabled the whole Claude settings merge ([#1167](https://github.com/mlorentedev/dotfiles/issues/1167)) ([968174d](https://github.com/mlorentedev/dotfiles/commit/968174d5e7b19b3106ca8155c8fe9a645237cec9))
+* **spec:** the provider-diverse reviewer arm has never worked ([#1177](https://github.com/mlorentedev/dotfiles/issues/1177)) ([bb9b99b](https://github.com/mlorentedev/dotfiles/commit/bb9b99b89828f081cfde0ef0b6d8f973fe62b641))
+
 ## [0.46.0](https://github.com/mlorentedev/dotfiles/compare/v0.45.0...v0.46.0) (2026-08-21)
 
 
