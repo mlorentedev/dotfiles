@@ -251,12 +251,44 @@ jobs:
           # revise and which is the signal branch protection must require.
           # `declined` still fails here and immediately, because a reviewer
           # saying it could not review is actionable the moment it is said.
-          if [ "$CODE" != "0" ] && [ "$KIND" = "pending" ] && [ "$EVENT" = "pull_request" ]; then
+          # WIDENED from `pending` to EVERY kind, and the reason is structural
+          # rather than a preference about strictness.
+          #
+          # A check-run cannot be revised: it belongs to the run that created it,
+          # and runs from issue_comment and workflow_run attach to the default
+          # branch, so they cannot reach it either. On the `pull_request` event
+          # NO verdict is final — the reviewers have not run yet, by
+          # construction. Publishing any failure here writes a provisional value
+          # into an immutable slot, which is the defect #1041 named; restricting
+          # the exemption to `pending` narrowed the window instead of closing it.
+          #
+          # Measured 2026-08-22: `declined` was the first verdict on every PR
+          # opened in a full session, because CodeRabbit's rate-limit notice
+          # lands within seconds. Each one froze red permanently while the commit
+          # status beside it went green — "a gate whose normal state is red has
+          # stopped being a gate", arrived at through the one kind the exemption
+          # did not cover.
+          #
+          # #1184 made that particular verdict rare by marking CodeRabbit
+          # advisory. This closes the shape rather than the instance: any future
+          # counting reviewer that answers fast would reopen it.
+          #
+          # NOTHING IS SOFTENED. The verdict is published to the
+          # `review-attestation` COMMIT STATUS in the step above — revisable by
+          # every later run, and the signal branch protection must require. This
+          # step decides only whether an unrevisable check-run carries a value
+          # that is expected to change. Every other event still fails: by then a
+          # reviewer has had its turn, so the verdict means something.
+          if [ "$CODE" != "0" ] && [ "$EVENT" = "pull_request" ]; then
             echo "$SUMMARY"
             echo
-            echo "Not failed here: no reviewer has posted yet, which is the expected"
-            echo "state this early. The verdict lives on the 'review-attestation'"
-            echo "commit status, which later runs revise as reviewers arrive."
+            echo "Not failed here: this run fires as the PR opens, before any reviewer"
+            echo "has had a turn, so no verdict it computes is final. A check-run cannot"
+            echo "be revised, so it must not carry one that will change."
+            echo
+            echo "The verdict lives on the 'review-attestation' commit status, which"
+            echo "later runs revise as reviewers arrive — and which is the signal to"
+            echo "require in branch protection."
             exit 0
           fi
           if [ "$CODE" != "0" ]; then
