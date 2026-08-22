@@ -198,6 +198,27 @@ is the only record of how.`,
 				return nil
 			}
 
+			// Record what we are asking for, BEFORE the reviewer starts. This is
+			// the only part of the evidence the reviewed party does not author:
+			// the head we actually pointed it at, the pool member we resolved,
+			// and the digest of whatever review.md held going in.
+			//
+			// The digest is the load-bearing one. A detached launch can only ever
+			// report that the runner STARTED, so nothing here can observe a run
+			// that ends without writing a verdict — measured twice on 2026-08-22,
+			// once by turn cap and once by a provider quota — and the previous
+			// round's verdict then sits on disk looking exactly like a fresh one.
+			// `spec archive` compares the digest and refuses.
+			//
+			// A failure to write it is a WARNING, not a refusal: losing the guard
+			// is worse than losing the review, but refusing to launch because a
+			// sidecar could not be written would make the guard a liability the
+			// first time a spec dir is read-only.
+			if err := spec.WriteReviewRequest(specDir, spec.HeadSHA(repoRoot), chosen.ID); err != nil {
+				cmd.PrintErrf("[WARN] could not record the review request: %v\n", err)
+				cmd.PrintErrf("       the archive gate cannot then tell a fresh verdict from the previous one\n")
+			}
+
 			if useTmux {
 				cmd.Printf("Session:    %s\n\n", session)
 				if err := runCommand(repoRoot, launch); err != nil {
