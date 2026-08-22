@@ -8,7 +8,7 @@
 * **External Placement:** Never nest worktrees inside a repository. All worktrees live as sibling directories (e.g. `/home/manu/workspaces/orca-agent/<repo>-<slug>`).
 * **Hooks:** Follow `orca.yaml` setup and archive hooks. Pinned toolchains are managed via `mise`.
 
-<!-- BEGIN HARNESS GENERATED (sha256:6d01176da5d23b03) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:d96bda9e8359af7f) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -20,9 +20,9 @@
 - Phase/milestone tracking belongs in the bitácora GitHub Project (issues + board), not in git history or the vault (per ADR-018).
 - **Auto-merge is forbidden in every repository.** Never run `gh pr merge --auto`, never enable "Auto-merge" in the GitHub UI, and keep the repo setting `allow_auto_merge=false`. Auto-merge lands a PR the instant CI goes green — bypassing the human review gate in §1.
 - Every PR merges deliberately, after a human has reviewed it and CI is green (squash or rebase per §4, diff verified per §5). Merge is a supervised action, never a queued automatic one. An agent merges only when the user has authorized merging that specific PR.
-- **Zero manual operations:** Never perform ad-hoc out-of-band manual changes or temporary fixes on remote systems, servers, clusters, or cloud environments.
-- **Strict IaC & Idempotence:** Every configuration, provision, deployment, or environment change MUST be codified in the repository as reproducible Infrastructure as Code (e.g. Ansible playbooks/roles, Terraform, Kubernetes manifests, dotfiles scripts) and verified to be 100% idempotent (`changed=0` on re-run).
-- **In-flight documentation & zero debt:** Lessons, ADRs, and operational insights must be persisted in real-time as they occur (`docs/lessons/`, `docs/adr/`), never deferred to the end of the session. Defects noticed along the way must be fixed in scope or immediately filed as a GitHub issue with verified root cause.
+- **Zero manual operations:** Never perform ad-hoc manual changes on remote systems, servers, or cloud environments.
+- **Strict IaC & Idempotence:** Every configuration or environment change MUST be codified as reproducible IaC (Ansible, Terraform, K8s manifests, dotfiles) and verified idempotent (`changed=0` on re-run).
+- **In-flight documentation & zero debt:** Lessons, ADRs, and issues must be recorded in real-time (`docs/lessons/`, `docs/adr/`), never deferred.
 
 > Injected verbatim into every agent's instructions (harness `enforced` id `definition-of-done`) and executed by the `verification-before-completion` skill. It **binds** existing standing orders to the moment of closing; it does not restate them.
 

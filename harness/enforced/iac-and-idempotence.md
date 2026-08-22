@@ -1,3 +1,3 @@
-- **Zero manual operations:** Never perform ad-hoc out-of-band manual changes or temporary fixes on remote systems, servers, clusters, or cloud environments.
-- **Strict IaC & Idempotence:** Every configuration, provision, deployment, or environment change MUST be codified in the repository as reproducible Infrastructure as Code (e.g. Ansible playbooks/roles, Terraform, Kubernetes manifests, dotfiles scripts) and verified to be 100% idempotent (`changed=0` on re-run).
-- **In-flight documentation & zero debt:** Lessons, ADRs, and operational insights must be persisted in real-time as they occur (`docs/lessons/`, `docs/adr/`), never deferred to the end of the session. Defects noticed along the way must be fixed in scope or immediately filed as a GitHub issue with verified root cause.
+- **Zero manual operations:** Never perform ad-hoc manual changes on remote systems, servers, or cloud environments.
+- **Strict IaC & Idempotence:** Every configuration or environment change MUST be codified as reproducible IaC (Ansible, Terraform, K8s manifests, dotfiles) and verified idempotent (`changed=0` on re-run).
+- **In-flight documentation & zero debt:** Lessons, ADRs, and issues must be recorded in real-time (`docs/lessons/`, `docs/adr/`), never deferred.
