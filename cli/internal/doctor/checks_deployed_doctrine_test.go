@@ -21,7 +21,7 @@ func TestCheckDeployedDoctrine(t *testing.T) {
 - English only in git/GitHub artifacts
 - No internal phase/milestone references
 - Auto-merge is forbidden in every repository
-- Definition of Done
+- Working code is not a finished change
 - What binds is the disposition, not the waiting (PR Stewardship)
 - Atomic PRs, ~300 LOC hard cap
 <!-- END HARNESS GENERATED -->
@@ -56,7 +56,7 @@ func TestCheckDeployedDoctrine(t *testing.T) {
 		badContent := `<!-- BEGIN HARNESS GENERATED (sha256:123) -->
 - English only in git/GitHub artifacts
 - No internal phase/milestone references
-- Definition of Done
+- Working code is not a finished change
 - What binds is the disposition, not the waiting (PR Stewardship)
 <!-- END HARNESS GENERATED -->
 `

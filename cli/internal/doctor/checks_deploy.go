@@ -348,9 +348,16 @@ var enforcedRegionMarkers = map[string]string{
 	"english-only":        "English only",
 	"no-phase-references": "No internal phase/milestone references",
 	"no-auto-merge":       "Auto-merge is forbidden",
-	"definition-of-done":  "Definition of Done",
-	"pr-stewardship":      "What binds is the disposition",
-	"pr-sizing":           "Atomic PRs, ~300 LOC hard cap",
+	// The rule's own opening line, not the phrase "Definition of Done" — which
+	// appears nowhere in this record. Its only occurrence in the enforced set was
+	// inside pr-stewardship's provenance blockquote ("It elaborates Definition of
+	// Done §4 …"), so this check verified one region by finding another's
+	// meta-text, and broke the moment #1181 compacted those blockquotes out of
+	// the capped payload while the doctrine itself was entirely intact.
+	// TestEveryDoctrineMarkerIsInItsOwnRecord keeps every marker honest.
+	"definition-of-done": "Working code is not a finished change",
+	"pr-stewardship":     "What binds is the disposition",
+	"pr-sizing":          "Atomic PRs, ~300 LOC hard cap",
 }
 
 var deployedDoctrineTargets = []struct {
