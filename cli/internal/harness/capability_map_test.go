@@ -206,6 +206,47 @@ func TestShippedCapabilityMapCoversEveryDeclaredHarness(t *testing.T) {
 	}
 }
 
+// TestCapabilityMapRejectsRenderBreakingNames is the guard for a defect measured
+// on 2026-08-22: the resolver escapes nothing, so before the schema restricted
+// these fields to identifier tokens, a native name carrying a comma or a brace
+// did not appear in the rendered value — it ALTERED it.
+//
+//	"Read,Bash"    rendered as `tools: Read,Bash`   -> Bash granted to an agent
+//	                                                   that only asked for `read`
+//	"read},{bash"  rendered as `permission: {read},{bash: allow}` -> broke out of
+//	                                                   the flow mapping entirely
+//
+// The first is privilege escalation through data. The render is deliberately
+// unescaped — a frontmatter line is not a shell command — so the CONTRACT is
+// where this has to be prevented, and this test is what keeps it there.
+func TestCapabilityMapRejectsRenderBreakingNames(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+	}{
+		{"a comma in a native name would grant a second tool", commaNativeCapabilityMap},
+		{"a brace in a native name would escape the flow mapping", braceNativeCapabilityMap},
+		{"a comma in the field name would split the line", commaFieldCapabilityMap},
+		{"a decision-map harness with no grant cannot grant anything", noGrantCapabilityMap},
+	}
+	root := repoRootForTest(t)
+	schema, err := os.ReadFile(filepath.Join(root, CapabilityMapSchemaFile))
+	if err != nil {
+		t.Fatalf("read shipped schema: %v", err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeCapFixture(t, dir, CapabilityMapSchemaFile, string(schema))
+			writeCapFixture(t, dir, CapabilityMapFile, tt.doc)
+			if _, err := LoadCapabilityMap(dir); err == nil {
+				t.Fatal("expected the map to be rejected at LOAD; " +
+					"reaching the resolver means the rendered value can be altered by its own data")
+			}
+		})
+	}
+}
+
 func writeCapFixture(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, rel)
@@ -237,4 +278,26 @@ const extraVerbCapabilityMap = `{
   "version": 1,
   "vocabulary": ["read"],
   "harnesses": {"claude": {"field": "tools", "form": "csv", "capabilities": {"read": ["Read"], "telepathy": ["Mind"]}}}
+}`
+
+const commaNativeCapabilityMap = `{
+  "$comment": ["fixture"], "version": 1, "vocabulary": ["read"],
+  "harnesses": {"claude": {"field": "tools", "form": "csv", "capabilities": {"read": ["Read,Bash"]}}}
+}`
+
+const braceNativeCapabilityMap = `{
+  "$comment": ["fixture"], "version": 1, "vocabulary": ["read"],
+  "harnesses": {"oc": {"field": "permission", "form": "decision-map", "grant": "allow", "capabilities": {"read": ["read},{bash"]}}}
+}`
+
+const commaFieldCapabilityMap = `{
+  "$comment": ["fixture"], "version": 1, "vocabulary": ["read"],
+  "harnesses": {"claude": {"field": "tools, model", "form": "csv", "capabilities": {"read": ["Read"]}}}
+}`
+
+// A decision map with no decision to write grants nothing. Caught at load so an
+// unusable map never reaches a render.
+const noGrantCapabilityMap = `{
+  "$comment": ["fixture"], "version": 1, "vocabulary": ["read"],
+  "harnesses": {"oc": {"field": "permission", "form": "decision-map", "capabilities": {"read": ["read"]}}}
 }`

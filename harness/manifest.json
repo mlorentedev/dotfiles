@@ -6,6 +6,7 @@
     { "id": "english-only",        "source": "pattern-git-workflow.md#8-language-policy" },
     { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" },
     { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" },
+    { "id": "iac-and-idempotence", "source": "pattern-git-workflow.md#12-infrastructure-as-code-zero-manual-operations-policy" },
     { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" },
     { "id": "pr-stewardship",      "source": "pattern-change-lifecycle.md#pr-stewardship" },
     { "id": "secrets-never-in-output", "source": "pattern-secrets-security.md#8-never-print-a-secret" },
@@ -14,7 +15,8 @@
       "source": "pattern-git-workflow.md#10-pr-sizing-policy",
       "opt_out": {
         "AGENTS.md": "the targets region counters harness defaults only; a precedence rule between two of our own rules overrides none, and #824 already states this policy in this file's hand-written prose (#830)",
-        "ai/claude/CLAUDE.md": "same as AGENTS.md — the compact doctrine payload substitutes for the constitution agy and codex never receive, and this file's reader already gets the policy from AGENTS.md (#830)"
+        "ai/claude/CLAUDE.md": "same as AGENTS.md — the compact doctrine payload substitutes for the constitution agy and codex never receive, and this file's reader already gets the policy from AGENTS.md (#830)",
+        "ai/orca/ORCA.md": "same as AGENTS.md — the compact doctrine payload substitutes for the constitution agy and codex never receive, and this file's reader already gets the policy from AGENTS.md (#830)"
       }
     }
   ],
@@ -23,13 +25,19 @@
       "agent": "agents",
       "kind": "native",
       "file": "AGENTS.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
     },
     {
       "agent": "claude",
       "kind": "pointer",
       "file": "ai/claude/CLAUDE.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
+    },
+    {
+      "agent": "orca",
+      "kind": "pointer",
+      "file": "ai/orca/ORCA.md",
+      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
     }
   ],
   "skills": {
@@ -47,7 +55,7 @@
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
   },
   "doctrine": {
-    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "definition-of-done", "pr-stewardship", "secrets-never-in-output", "pr-sizing"],
+    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output", "pr-sizing"],
     "deploy": [
       {
         "agent": "agy",
