@@ -199,6 +199,26 @@ func ResolveSensitiveDir() string {
 	return filepath.Join(DotfilesDir(Home()), "sensitive")
 }
 
+// ResolveHarnessRoot locates the root that CONTAINS harness/ — the directory to
+// hand LoadModelMap, which joins the registry path onto it. Same ADR-030
+// precedence as ResolveRegistryPath and ResolveSensitiveDir: the checkout wins
+// over the deployed copy, because a dev machine whose ~/.dotfiles lags the repo
+// must not route on yesterday's map.
+//
+// Returns a root even when neither holds a harness/ dir. That is deliberate:
+// reporting "not found" here would let a caller treat an absent registry as a
+// condition to handle, and C15 says an unreadable map fails loudly at the load.
+// Resolving to a path that does not exist keeps the error where it belongs — in
+// LoadModelMap, phrased as "this is not an empty routing map".
+func ResolveHarnessRoot() string {
+	if root := RepoDir(); root != "" {
+		if isDir(filepath.Join(root, "harness")) {
+			return root
+		}
+	}
+	return DotfilesDir(Home())
+}
+
 // RepoRegistryPath returns secrets/registry.yaml inside the dotfiles checkout, or an
 // error when no checkout is found. WRITERS (dotf secrets migrate) MUST use this: the
 // registry is a version-controlled SSOT, so a mutation has to land in the checkout to

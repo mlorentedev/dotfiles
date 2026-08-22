@@ -232,3 +232,4 @@ tags: [lessons, index, dotfiles]
 | [216 - A three-dot diff does not answer "what is main missing"](lesson-216-a-three-dot-diff-does-not-answer-what-main-is-missi.md) | 2026-08-21 |  |
 | [217 - `go test -run` passes when the test name matches nothing](lesson-217-go-test-run-passes-when-the-test-name-matches-not.md) | 2026-08-21 |  |
 | [218 - The Go build cache does not see the data file your test reads](lesson-218-the-go-build-cache-does-not-see-the-data-file-your.md) | 2026-08-21 |  |
+| [219 - A stale CLI refuses with the same exit status as a legitimate refusal](lesson-219-a-stale-cli-refuses-with-the-same-exit-status-as-a.md) | 2026-08-21 |  |

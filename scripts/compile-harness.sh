@@ -303,21 +303,78 @@ render_skill() {
     ' "$record"
 }
 
+# Resolve a neutral model tier (top|mid|low) to $agent's model id.
+#
+# Shells out to `dotf` rather than reading harness/model-map.json with jq, and
+# that is the whole point: jq here would restate the resolution rules in a second
+# place and skip the schema validation entirely, so a map the Go validator
+# rejects would render clean. Routing rules true in one place only (ADR-035).
+#
+# THREE OUTCOMES, and the difference between the last two is the whole design:
+#   0  resolved — the model id is on stdout
+#   1  the resolver RAN AND REFUSED — an undeclared tier, or a map that is absent
+#      or schema-invalid. A genuine routing error, and C15's case: fail loudly.
+#   2  the resolver is UNAVAILABLE — no dotf on PATH, or a dotf too old to carry
+#      this subcommand (#1158, measured: the deployed binary routinely predates
+#      the tree). NOT C15: C15 governs a map that cannot be READ, and an absent
+#      binary is a bootstrap state, not an unreadable map. setup-linux.sh installs
+#      dotf best-effort (`install_dotf || log_warning`), so treating this as fatal
+#      would make a warned-past dependency a hard prerequisite of the entire
+#      harness deploy. The caller warns loudly and renders without the model line,
+#      which is what this script did unconditionally before — never worse than the
+#      status quo, and it still SAYS SO, which is the honest-degradation bar
+#      (ADR-032).
+#
+# Telling outcome 1 from outcome 2 needs a CAPABILITY probe, not the exit status:
+# measured 2026-08-21, a dotf predating this subcommand answers
+# `harness resolve-tier top --harness claude` with `unknown flag: --harness` and
+# exit 1 — byte-identical in status to a genuine routing refusal. Asking whether
+# the binary KNOWS the subcommand is the only question whose answer does not
+# depend on the arguments it failed to parse. TestHarnessHelpListsResolveTier
+# pins the string this greps for, so the probe cannot rot into always-false.
+dotf_knows_resolve_tier() {
+    dotf harness --help 2>/dev/null | grep -q '^[[:space:]]*resolve-tier[[:space:]]'
+}
+
+resolve_model_tier() {
+    local tier="$1" agent="$2" out
+    type -P dotf >/dev/null 2>&1 || return 2
+    dotf_knows_resolve_tier || return 2
+    if ! out="$(dotf harness resolve-tier "$tier" --harness "$agent" --repo-root "$REPO_ROOT" 2>/dev/null)"; then
+        return 1
+    fi
+    # A model id is one non-empty token. Belt and braces behind the probe above:
+    # anything with whitespace in it is not a model id, whatever produced it.
+    case "$out" in
+        ''|*[[:space:]]*) return 2 ;;
+    esac
+    printf '%s\n' "$out"
+}
+
 # --- agents (kind: render, ADR-027) ---
 # Render one neutral AGENT.md record to a harness-native agent file on stdout.
 # agent-md (claude/opencode): keep only name/description in the frontmatter (the
-# native required subset), inject `generated_*` provenance, body verbatim. The
-# neutral-only / deferred keys (kind, model, capabilities, skills, targets) are
-# dropped here — model/capability mapping is H-044; consumption is enforced by
-# the emitted hook (deploy_agent_hooks), not by frontmatter.
+# native required subset), inject `generated_*` provenance, emit the already-
+# resolved model line, body verbatim. The remaining neutral-only / deferred keys
+# (kind, capabilities, skills, targets) are dropped here — capability mapping is
+# #560; consumption is enforced by the emitted hook (deploy_agent_hooks), not by
+# frontmatter.
+#
+# `model_line` is passed in, ALREADY RESOLVED, rather than resolved here. That
+# keeps this a pure renderer, and it is what lets --check stay environment-free:
+# whether a tier resolves depends on the deploy machine (is dotf installed, is
+# model-map.json readable), while whether a RECORD renders depends only on the
+# record. A drift gate that conflated the two would report drift on a perfectly
+# good record just because the machine running CI has no dotf. Empty renders no
+# model line, which is also what a record declaring no tier produces.
 render_agent() {
-    local record="$1" srcpath="$2" sha
+    local record="$1" srcpath="$2" model_line="${3:-}" sha
     sha="$(sha_of "$record")"
-    awk -v gf="$srcpath" -v gs="$sha" '
+    awk -v gf="$srcpath" -v gs="$sha" -v ml="$model_line" '
         /^---[[:space:]]*$/ {
             fm++
             if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
-            if (fm==2) { print; next }
+            if (fm==2) { if (ml != "") print ml; print; next }
         }
         fm==1 { if ($0 ~ /^(name|description):/) print; next }
         { print }
@@ -688,7 +745,7 @@ deploy_prune() {
 # the Action level, deferred to H-045. Mirrors deploy_skills; agent-md render is
 # a single file. ---
 deploy_agents() {
-    local ag_vsub ag_recdir agent render dir ag_dir name outp
+    local ag_vsub ag_recdir agent render dir ag_dir name outp tmp_agent tier model_id model_line rc
     ag_vsub="$(jq -r '.agents.vault_subpath' "$MANIFEST")"
     ag_recdir="$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
     if [[ ! -d "$ag_recdir" ]]; then
@@ -697,6 +754,19 @@ deploy_agents() {
     fi
     # 1. render each AGENT.md record -> its per-harness $HOME path (single file),
     #    de-symlinking first (BUG-100 safety).
+    #
+    #    Rendered to a temp file and moved on success, never straight to $outp:
+    #    a redirect truncates the target BEFORE the renderer runs, so a failed
+    #    model-tier resolution would leave an EMPTY agent definition behind —
+    #    a file naming no model, which is the failure this render was changed to
+    #    prevent. Fail loud, and leave the previous definition intact.
+    #
+    #    The temp file sits BESIDE the target rather than in $TMPDIR, and is
+    #    created by the same redirect as before. Two reasons, both behavioural:
+    #    mktemp creates 0600, which would deploy agent files with different
+    #    permissions from every other deployed artifact (664 here), and a mv out
+    #    of $TMPDIR can cross filesystems, degrading the atomic rename this
+    #    relies on into a copy.
     while IFS=$'\t' read -r agent render dir; do
         for ag_dir in "$ag_recdir"/*/; do
             [[ -f "$ag_dir/AGENT.md" ]] || continue
@@ -705,7 +775,38 @@ deploy_agents() {
             outp="$HOME/$dir/$name.md"
             [[ -L "$outp" ]] && rm -f "$outp"
             mkdir -p "$(dirname "$outp")"
-            render_agent "$ag_dir/AGENT.md" "$ag_vsub/$name/AGENT.md" > "$outp"
+            # Resolve the neutral tier BEFORE rendering, so an unresolvable one
+            # costs nothing but an error. A record declaring no tier renders
+            # without a model line, exactly as it always did.
+            model_line=""
+            tier="$(skill_field "$ag_dir/AGENT.md" model)"
+            if [ -n "$tier" ]; then
+                # Assigned apart from `local` on purpose: `local x="$(cmd)"`
+                # reports local's own status, so a failed resolve would be
+                # invisible here and render `model: ` with nothing after it.
+                # `|| rc=$?` keeps set -e from taking the branch away.
+                rc=0; model_id="$(resolve_model_tier "$tier" "$agent")" || rc=$?
+                case "$rc" in
+                    0) model_line="model: $model_id" ;;
+                    2) # resolver unavailable: say so, then render as before
+                       printf '[WARN] cannot resolve model tier "%s" for harness "%s": dotf is absent, or predates the resolve-tier subcommand\n' \
+                           "$tier" "$agent" >&2
+                       printf '       %s deploys WITHOUT a model line; install/rebuild dotf and re-run --deploy\n' "$name" >&2
+                       ;;
+                    *) # the resolver ran and refused: a real routing error (C15)
+                       printf '[ERROR] agent render failed: %s -> %s\n' "$ag_dir/AGENT.md" "$outp" >&2
+                       printf '        tier "%s" does not resolve for harness "%s" — see harness/model-map.json\n' \
+                           "$tier" "$agent" >&2
+                       return 1 ;;
+                esac
+            fi
+            tmp_agent="$outp.tmp.$$"
+            if ! render_agent "$ag_dir/AGENT.md" "$ag_vsub/$name/AGENT.md" "$model_line" > "$tmp_agent"; then
+                rm -f "$tmp_agent"
+                printf '[ERROR] agent render failed: %s -> %s\n' "$ag_dir/AGENT.md" "$outp" >&2
+                return 1
+            fi
+            mv "$tmp_agent" "$outp"
             printf '[deploy] agent -> %s\n' "$outp"
         done
     done < <(jq -r '.agents.deploy[] | "\(.agent)\t\(.render)\t\(.dir)"' "$MANIFEST")

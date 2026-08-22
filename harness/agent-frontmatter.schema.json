@@ -9,7 +9,7 @@
     "name": { "type": "string", "minLength": 1, "description": "Persona identifier; also the deployed agent file name." },
     "description": { "type": "string", "minLength": 1, "description": "When-to-invoke / trigger text the harness matches against." },
     "kind": { "type": "string", "enum": ["invocable", "autonomous"], "description": "invocable = no 80_agents/ state; autonomous = persona cataloged here, live state in 80_agents/<name>/." },
-    "model": { "type": "string", "description": "Neutral tier (top|mid|low); mapped to a provider id via model-map at compile (H-044). Dropped from the slice render." },
+    "model": { "type": "string", "description": "Neutral tier (top|mid|low); resolved to this harness's model id at deploy via harness/model-map.json, and emitted into the rendered frontmatter (#1161). A tier the map cannot answer fails the render rather than dropping the field — a definition naming no model is the degrade the routing registry exists to prevent (ADR-035). Absent = rendered with no model line." },
     "capabilities": { "description": "Neutral capability vocab (e.g. [read, search, edit, shell, web]); mapped to provider tools via capability-map at compile (H-044)." },
     "skills": { "description": "Forced-consumption skills; compiled to the harness determinism hook (presence/action/dispatch)." },
     "targets": { "description": "Optional per-agent harness allowlist (e.g. [claude]); absent = all harnesses." },

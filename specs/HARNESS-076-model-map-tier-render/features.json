@@ -1,0 +1,65 @@
+[
+  {
+    "id": "HARNESS-076-model-map-tier-render-f1",
+    "behavior": "dotf harness resolve-tier top --harness claude prints opus on stdout and exits 0",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestHarnessResolveTier$' -v 2>&1 | grep -q -- '--- PASS: TestHarnessResolveTier/the_tier_the_only_deployed_agent_declares '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f2",
+    "behavior": "A tier a harness does not declare exits non-zero, names the tier and the harness, and writes nothing to stdout",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestHarnessResolveTier$' -v 2>&1 | grep -q -- '--- PASS: TestHarnessResolveTier/a_declared_harness_that_no_tier_declares '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f3",
+    "behavior": "An absent, unschema'd, schema-invalid or non-JSON model-map fails rather than resolving to a default (C15)",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestHarnessResolveTierFailsLoudWithoutAMap$' -v 2>&1 | grep -q -- '--- PASS: TestHarnessResolveTierFailsLoudWithoutAMap '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f4",
+    "behavior": "A record declaring model: top deploys as model: opus, and the neutral tier never reaches the rendered file",
+    "verification": "bats tests/compile-harness.bats -f 'resolves the neutral model tier' 2>&1 | grep -qE '^ok 1 '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f5",
+    "behavior": "An unresolvable tier fails the deploy and leaves the previous agent definition intact rather than truncating it",
+    "verification": "bats tests/compile-harness.bats -f 'unresolvable tier' 2>&1 | grep -qE '^ok 2 ' ",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f6",
+    "behavior": "An absent or too-old dotf warns and renders without a model line instead of failing the harness deploy",
+    "verification": "bats tests/compile-harness.bats -f 'dotf' 2>&1 | grep -qE '^ok 2 '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f7",
+    "behavior": "Skill deploy still completes when the agent render fails",
+    "verification": "bats tests/compile-harness.bats -f 'skill deploy survives' 2>&1 | grep -qE '^ok 1 '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f8",
+    "behavior": "kind, capabilities, skills and targets are still dropped from the rendered frontmatter; only model changed",
+    "verification": "bats tests/compile-harness.bats -f 'neutral keys dropped' 2>&1 | grep -qE '^ok 1 '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f9",
+    "behavior": "The real dotf binary, not a stub, satisfies the capability probe and the stdout contract the render depends on",
+    "verification": "bats tests/compile-harness-real.bats 2>&1 | grep -qE '^ok 5 '",
+    "state": "pending",
+    "evidence": ""
+  }
+]

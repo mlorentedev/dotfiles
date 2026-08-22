@@ -87,6 +87,16 @@ func TestStdoutContracts(t *testing.T) {
 			wantSub:  "dotf version",
 			consumer: `install-dotf.sh: dotf version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'`,
 		},
+		{
+			// The resolved id is substituted straight into rendered agent
+			// frontmatter. On stderr it would capture as "", and the render
+			// would emit a bare `model:` — a definition naming no model, which
+			// is the exact degrade model-map.json was built to prevent.
+			name:     "harness resolve-tier — compile-harness substitutes this into agent frontmatter",
+			args:     []string{"harness", "resolve-tier", "top", "--harness", "claude"},
+			wantSub:  "opus",
+			consumer: `compile-harness.sh: model_id="$(dotf harness resolve-tier "$tier" --harness "$agent")"`,
+		},
 	}
 
 	for _, tt := range tests {
