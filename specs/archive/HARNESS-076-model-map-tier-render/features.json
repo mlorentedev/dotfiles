@@ -1,0 +1,86 @@
+[
+  {
+    "id": "HARNESS-076-model-map-tier-render-f1",
+    "behavior": "dotf harness resolve-tier top --harness claude prints opus on stdout and exits 0",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestHarnessResolveTier$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestHarnessResolveTier/the_tier_the_only_deployed_agent_declares '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f2",
+    "behavior": "A tier a harness does not declare exits non-zero, names the tier and the harness, and writes nothing to stdout",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestHarnessResolveTier$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestHarnessResolveTier/a_declared_harness_that_no_tier_declares '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f3",
+    "behavior": "An absent, unschema'd, schema-invalid or non-JSON model-map fails rather than resolving to a default (C15)",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestHarnessResolveTierFailsLoudWithoutAMap$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestHarnessResolveTierFailsLoudWithoutAMap/a_map_the_schema_rejects '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f4",
+    "behavior": "A record declaring model: top deploys as model: opus, and the neutral tier never reaches the rendered file",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'resolves the neutral model tier into the rendered frontmatter' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*resolves the neutral model tier into the rendered frontmatter$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f5",
+    "behavior": "An unresolvable tier fails the deploy and leaves the previous agent definition intact rather than truncating it",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'an unresolvable tier leaves the PREVIOUS agent definition intact' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*leaves the PREVIOUS agent definition intact$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f6",
+    "behavior": "An absent dotf warns and renders without a model line instead of failing the harness deploy",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'an absent dotf warns and renders without a model line' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*it does not fail the deploy$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f6b",
+    "behavior": "A dotf too old to know resolve-tier warns rather than embedding its help output as the model id",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'a dotf too old to know resolve-tier' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*rather than embedding its help output$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f6c",
+    "behavior": "The resolver's own diagnosis reaches the deploy output, so a schema-invalid map is not misreported as a tier problem",
+    "verification": "out=$(bats tests/compile-harness.bats -f \"the resolver's own diagnosis reaches the deploy output\" 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*not just a generic tier error$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f7",
+    "behavior": "Skill deploy still completes when the agent render fails",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'skill deploy survives a failed agent render' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*skill deploy survives a failed agent render$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f8",
+    "behavior": "kind, capabilities, skills and targets are still dropped from the rendered frontmatter; only model changed",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'renders agent-md' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*neutral keys dropped\\)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f9",
+    "behavior": "The real dotf binary, not a stub, satisfies the capability probe and the stdout contract the render depends on",
+    "verification": "out=$(bats tests/compile-harness-real.bats 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ real dotf: a full deploy renders the resolved model id into the agent file$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-076-model-map-tier-render-f10",
+    "behavior": "The Claude settings merge policy names every dotfiles-owned scalar key on both platforms, so a template key is never a silent no-op",
+    "verification": "out=$(bats tests/claude-settings-template.bats -f 'named in both merge policies' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*named in both merge policies$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

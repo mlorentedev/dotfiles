@@ -26,6 +26,33 @@ setup() {
     [[ "$(jq -r '.effortLevel' "$SETTINGS_TEMPLATE")" == "xhigh" ]]
 }
 
+@test "every dotfiles-owned top-level key is named in both merge policies" {
+    # The merge policy is an ALLOW-LIST in two places -- a jq expression in
+    # setup-linux.sh and an if-chain in setup-windows.ps1. A key added to the
+    # template and named in neither is a SILENT no-op on every existing
+    # installation, reaching only machines bootstrapped from scratch. Measured:
+    # outputStyle sat in the template while the deployed settings.json had no
+    # such key at all.
+    #
+    # Scoped to the scalar top-level keys. The structured ones (permissions,
+    # hooks, enabledPlugins, env) have their own merge semantics asserted below
+    # and are handled by name in both scripts.
+    local key
+    for key in model effortLevel outputStyle; do
+        jq -e --arg k "$key" 'has($k)' "$SETTINGS_TEMPLATE" >/dev/null || continue
+        grep -q "\.$key = \$tmpl\.$key\|\$tmpl\.$key" "$DOTFILES_DIR/setup-linux.sh" \
+            || { echo "setup-linux.sh merge policy never mentions '$key'" >&2; return 1; }
+        grep -q "ContainsKey('$key')" "$DOTFILES_DIR/setup-windows.ps1" \
+            || { echo "setup-windows.ps1 merge policy never mentions '$key'" >&2; return 1; }
+    done
+}
+
+@test "template has outputStyle and both merge policies propagate it" {
+    [[ "$(jq -r '.outputStyle' "$SETTINGS_TEMPLATE")" != "null" ]]
+    grep -q 'outputStyle' "$DOTFILES_DIR/setup-linux.sh"
+    grep -q 'outputStyle' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
 # --- hooks.SessionStart with placeholder ---
 
 @test "template hooks.SessionStart contains __HOOK_COMMAND__ placeholder" {

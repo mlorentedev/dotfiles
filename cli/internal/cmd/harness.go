@@ -24,6 +24,7 @@ pattern triggers, and workflow integrations.`,
 	}
 	cmd.AddCommand(newHarnessTriggersCmd())
 	cmd.AddCommand(newHarnessSuggestCmd())
+	cmd.AddCommand(newHarnessResolveTierCmd())
 	return cmd
 }
 

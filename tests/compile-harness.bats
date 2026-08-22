@@ -48,6 +48,43 @@ teardown() { cd / || true; rm -rf "$TMP"; }
 
 run_refresh() { run env VAULT_PATH="$VAULT" "$SCRIPT" --refresh; }
 
+# Stub `dotf` on PATH so the agent render can resolve a model tier without a Go
+# toolchain in this job.
+#
+# The split is deliberate, not a shortcut. This layer's contract with the
+# resolver is "call it, substitute its stdout, honour its exit status", and that
+# is what these tests pin. The other half — that the real `dotf harness
+# resolve-tier` writes the model id to STDOUT rather than stderr — is pinned in
+# cli/internal/cmd/stdout_contract_test.go, where a Go toolchain exists. Neither
+# side takes the other's word for it.
+#
+# Do NOT "fix" this by building dotf here: ADR-020 keeps the Go and shell layers
+# on two loops, and the bats job installs no Go.
+seed_dotf_stub() {
+    STUB_BIN="$TMP/stubbin"
+    mkdir -p "$STUB_BIN"
+    cat > "$STUB_BIN/dotf" <<'STUB'
+#!/usr/bin/env bash
+# The capability probe: the render greps this for the subcommand name to decide
+# whether the binary is new enough. cli/internal/cmd pins the real help's shape.
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier  Resolve a neutral model tier\n  triggers      x\n'
+    exit 0
+fi
+# Only the one subcommand the render calls; anything else is a test bug.
+[ "$1 $2" = "harness resolve-tier" ] || { printf 'stub: unexpected: %s\n' "$*" >&2; exit 127; }
+if [ -n "${STUB_TIER_MODEL:-}" ]; then
+    printf '%s\n' "$STUB_TIER_MODEL"
+    exit 0
+fi
+# Mirrors the real command's failure shape: nothing on stdout, both the tier and
+# the harness named on stderr, non-zero exit.
+printf 'tier "%s" declares no model for harness "%s"\n' "$3" "$5" >&2
+exit 1
+STUB
+    chmod +x "$STUB_BIN/dotf"
+}
+
 @test "--help exits 0 and prints usage" {
     run "$SCRIPT" --help
     [ "$status" -eq 0 ]
@@ -308,7 +345,13 @@ targets: [claude]
 EOF
 }
 
-run_deploy() { run env HOME="$FAKEHOME" "$SCRIPT" --deploy; }
+# STUB_TIER_MODEL defaults to the id the shipped map really resolves `top` to for
+# claude, so a passing fixture and the real deploy agree on the value.
+# A test that wants the unresolvable path sets STUB_TIER_MODEL="" before calling.
+run_deploy() {
+    run env HOME="$FAKEHOME" PATH="${DEPLOY_PATH:-${STUB_BIN:-}:$PATH}" \
+        STUB_TIER_MODEL="${STUB_TIER_MODEL-opus}" "$SCRIPT" --deploy
+}
 
 @test "render: --refresh stamps the committed record with its own provenance (HARNESS-069), no \$HOME write" {
     seed_skills_fixture
@@ -625,6 +668,7 @@ EOF
 seed_agents_fixture() {
     FAKEHOME="$TMP/home"
     mkdir -p "$FAKEHOME"
+    seed_dotf_stub
     cat > "$REPO/harness/manifest.json" <<'EOF'
 { "version": 1, "vault_subpath": "00_meta/patterns",
   "enforced": [], "targets": [],
@@ -773,14 +817,209 @@ seed_doctrine_fixture() {
     grep -qE '^generated_sha: [0-9a-f]{16}' "$F"
     grep -q '^generated_from: 00_meta/agents/definitions/curator/AGENT.md' "$F"
     grep -qF 'Body line one.' "$F"
-    # neutral-only / deferred keys must NOT leak into the native agent frontmatter
-    ! grep -qE '^(kind|model|capabilities|skills|targets):' "$F"
+    # neutral-only / deferred keys must NOT leak into the native agent frontmatter.
+    # `model` is NO LONGER one of them: it is resolved, not dropped (see the tier
+    # tests below), so removing it from this list is the behaviour change.
+    ! grep -qE '^(kind|capabilities|skills|targets):' "$F"
     # the record's own provenance (HARNESS-069, added at --refresh) must not
     # survive alongside deploy's own — render_agent's name/description-only
     # passthrough already drops it, but pin that behavior explicitly
     [ "$(grep -c '^generated:' "$F")" -eq 1 ]
     [ "$(grep -c '^generated_from:' "$F")" -eq 1 ]
     [ "$(grep -c '^generated_sha:' "$F")" -eq 1 ]
+}
+
+@test "agents: --deploy resolves the neutral model tier into the rendered frontmatter" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    # the record declares `model: top`; the deployed file must name the harness's
+    # model id, never the neutral tier — a harness reading `model: top` would ask
+    # its provider for a model called "top"
+    grep -q '^model: opus' "$F"
+    ! grep -q '^model: top' "$F"
+    # exactly one model line: the resolved one replaces the record's, never joins it
+    [ "$(grep -c '^model:' "$F")" -eq 1 ]
+}
+
+@test "agents: --deploy passes the record's own tier through to the resolver" {
+    seed_agents_fixture
+    sed -i 's/^model: top$/model: low/' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    run_refresh; [ "$status" -eq 0 ]
+    STUB_TIER_MODEL=haiku run_deploy; [ "$status" -eq 0 ]
+    grep -q '^model: haiku' "$FAKEHOME/.claude/agents/curator.md"
+}
+
+@test "agents: the resolver's own diagnosis reaches the deploy output, not just a generic tier error" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # An unreadable MAP and an undeclared TIER both fail the render, and only the
+    # resolver can tell them apart. Swallowing its stderr made a schema-invalid
+    # map read as "tier top does not resolve", blaming the record for a defect in
+    # the registry. The stub stands in for the resolver naming a real cause.
+    cat > "$STUB_BIN/dotf" <<'DIAG'
+#!/usr/bin/env bash
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier  Resolve a neutral model tier\n'
+    exit 0
+fi
+printf 'chains.top[0] names "ghost" - the pools block does not declare it\n' >&2
+exit 1
+DIAG
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    [ "$status" -ne 0 ]
+    # the CAUSE survives, not only the generic wrapper
+    [[ "$output" == *ghost* ]]
+    # and the wrapper must not assert a cause it cannot know
+    [[ "$output" != *"does not resolve for harness"* ]]
+}
+
+@test "agents: the rendered file keeps umask permissions, not a temp file's 0600" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    # The render now writes through a temp file. Staging it in $TMPDIR with
+    # mktemp would deploy 0600, differing from every other deployed artifact;
+    # a sibling temp created by the same redirect keeps the umask result.
+    # Compared against a file the same deploy wrote by plain redirect, so this
+    # pins "same as everything else" rather than a hardcoded mode.
+    printf 'probe\n' > "$FAKEHOME/.probe-umask"
+    [ "$(stat -c '%a' "$F")" = "$(stat -c '%a' "$FAKEHOME/.probe-umask")" ]
+}
+
+@test "agents: a failed render leaves no temp file beside the target" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    STUB_TIER_MODEL="" run_deploy
+    [ "$status" -ne 0 ]
+    # the sibling temp lives in the deploy dir, so a leak would be visible to
+    # whatever reads that directory looking for agent definitions
+    run bash -c "ls '$FAKEHOME/.claude/agents/' | grep -c '\.tmp\.'"
+    [ "$output" = "0" ]
+}
+
+@test "agents: a record declaring no tier renders without a model line" {
+    seed_agents_fixture
+    sed -i '/^model: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    [ -f "$F" ]
+    grep -q '^name: curator' "$F"
+    # not declaring a tier is not an error — it renders as it always did
+    ! grep -q '^model:' "$F"
+}
+
+@test "agents: an unresolvable tier fails the deploy instead of rendering a model-less definition" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    STUB_TIER_MODEL="" run_deploy
+    [ "$status" -ne 0 ]
+    # the operator must learn WHICH tier and WHICH harness could not be resolved
+    [[ "$output" == *top* ]]
+    [[ "$output" == *claude* ]]
+    # and the render must not leave a truncated definition behind: a file naming
+    # no model is the exact degrade the resolution was added to prevent
+    [ ! -f "$FAKEHOME/.claude/agents/curator.md" ]
+}
+
+@test "agents: an unresolvable tier leaves the PREVIOUS agent definition intact" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    grep -q '^model: opus' "$F"
+    # a later deploy whose resolution fails must not truncate what is already there
+    STUB_TIER_MODEL="" run_deploy
+    [ "$status" -ne 0 ]
+    [ -s "$F" ]
+    grep -q '^model: opus' "$F"
+}
+
+@test "agents: an absent dotf warns and renders without a model line, it does not fail the deploy" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # Genuinely absent, which means the developer's own ~/.local/bin must be off
+    # PATH too: leaving it on would find the REAL dotf and test something else
+    # entirely, passing or failing for reasons unrelated to the branch under
+    # test. System dirs only, which is also what CI has.
+    rm -f "$STUB_BIN/dotf"
+    DEPLOY_PATH="$STUB_BIN:/usr/local/bin:/usr/bin:/bin" run_deploy
+    # NOT fatal: setup-linux.sh installs dotf best-effort, so a missing resolver
+    # must not take the whole harness deploy down with it. C15 governs a map that
+    # cannot be READ; an absent binary is a bootstrap state.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *dotf* ]]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    [ -f "$F" ]
+    grep -q '^name: curator' "$F"
+    # degraded exactly to the pre-change behaviour — never worse than status quo
+    ! grep -q '^model:' "$F"
+}
+
+@test "agents: a dotf too old to know resolve-tier warns rather than embedding its help output" {
+    seed_agents_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    # Cobra runs a parent command's own RunE for an unrecognised subcommand, so
+    # `dotf harness resolve-tier` on a binary predating it prints the harness help
+    # and exits 0. A zero status alone would make that help text the model id.
+    # This is #1158's class: the deployed dotf routinely predates the tree.
+    cat > "$STUB_BIN/dotf" <<'STALE'
+#!/usr/bin/env bash
+# A binary that knows `harness` but not `resolve-tier`. Its help omits the
+# subcommand, and — measured against the real stale binary on 2026-08-21 — it
+# rejects the unknown flag with exit 1, the SAME status a genuine routing refusal
+# returns. Only the capability probe separates them.
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  suggest   x\n  triggers  x\n'
+    exit 0
+fi
+printf 'Error: unknown flag: --harness\n' >&2
+exit 1
+STALE
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"predates"* ]]
+    F="$FAKEHOME/.claude/agents/curator.md"
+    [ -f "$F" ]
+    # the help screen must not have become the model id
+    ! grep -q '^model:' "$F"
+    ! grep -q 'Usage:' "$F"
+}
+
+@test "agents: skill deploy survives a failed agent render" {
+    seed_agents_fixture
+    # give the fixture a skill too, so both halves of --deploy have work to do
+    mkdir -p "$VAULT/00_meta/skills/demo-skill"
+    cat > "$VAULT/00_meta/skills/demo-skill/SKILL.md" <<'EOF'
+---
+name: demo-skill
+description: A demo skill.
+render: skill
+---
+
+Skill body.
+EOF
+    local tmp
+    tmp="$(mktemp)"
+    jq '.skills = { "vault_subpath": "00_meta/skills", "record_dir": "harness/skills",
+                    "schema": "harness/skill-frontmatter.schema.json",
+                    "deploy": [ { "agent": "claude", "dir": ".claude/skills" } ] }' \
+        "$REPO/harness/manifest.json" > "$tmp" && mv "$tmp" "$REPO/harness/manifest.json"
+    cat > "$REPO/harness/skill-frontmatter.schema.json" <<'EOF'
+{ "required": ["name", "description"] }
+EOF
+    run_refresh; [ "$status" -eq 0 ]
+    STUB_TIER_MODEL="" run_deploy
+    [ "$status" -ne 0 ]
+    # deploy_skills runs BEFORE deploy_agents, so a failed agent render must not
+    # cost the skills their deploy — the ordering in cmd_deploy is load-bearing
+    [ -f "$FAKEHOME/.claude/skills/demo-skill/SKILL.md" ]
 }
 
 @test "agents: --deploy injects a presence region (forced skills) into every harness instructions file" {
