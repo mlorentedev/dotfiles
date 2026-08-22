@@ -97,22 +97,36 @@ if 'workflow_run.head_sha' not in group:
 # posted and the only possible verdict is `pending` — so it froze red on every
 # correct PR, permanently, while the commit status beside it went green. A gate
 # whose normal state is red teaches its readers to scroll past it.
-@test "review-attestation: pending does not freeze the check-run red [#1041]" {
-    grep -q 'KIND" = "pending" \] && \[ "$EVENT" = "pull_request"' "$WF"
+@test "review-attestation: the pull_request run never freezes the check-run red [#1041]" {
+    # WIDENED from `pending` to every kind. A check-run cannot be revised, and on
+    # the pull_request event NO verdict is final -- the reviewers have not run
+    # yet, by construction. Restricting the exemption to `pending` narrowed the
+    # window instead of closing it: measured 2026-08-22, `declined` was the first
+    # verdict on every PR opened in a full session, and each froze red for good.
+    grep -q '\[ "$EVENT" = "pull_request" \]; then' "$WF"
 }
 
-# ...and the softening is exactly that narrow. A reviewer saying it could not
-# review is actionable the moment it is said, on any path.
-@test "review-attestation: declined still fails immediately, on every path [#1041]" {
+# ...and the exemption is scoped to the ONE event that cannot mean anything yet.
+# Every other path still fails: by then a reviewer has had its turn.
+@test "review-attestation: every non-pull_request path still fails [#1041]" {
     run bash -c '
       body=$(sed -n "/Fail the run when the PR is not attested/,\$p" "'"$WF"'")
-      # the exemption must name pending; if it ever names declined, or drops the
-      # event guard, the gate has been widened into silence
-      echo "$body" | grep -q "KIND\" = \"pending\"" || exit 1
-      echo "$body" | grep -q "KIND\" = \"declined\"" && exit 1
+      # the exemption must be guarded on the EVENT; losing that guard would make
+      # the gate never fail anywhere, which is widening it into silence
+      echo "$body" | grep -q "EVENT\" = \"pull_request\"" || exit 1
+      # and the unconditional refusal must survive after it
+      echo "$body" | grep -q "exit \"\$CODE\"" || exit 1
       exit 0
     '
     [ "$status" -eq 0 ]
+}
+
+@test "review-attestation: the verdict still reaches a REVISABLE signal [#1041]" {
+    # The exemption is only defensible because the commit status carries the
+    # verdict and every later run can revise it. If the publish step ever went
+    # away, softening the check-run would become plain silence.
+    grep -q 'statuses' "$WF"
+    grep -q 'Publish the verdict onto the PR head' "$WF"
 }
 
 # The workflow extracts the verdict KIND from the classifier's own structured
