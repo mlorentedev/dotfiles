@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit is the SECOND opinion here, not the first. PR-Agent is the automatic
+# reviewer (.github/workflows/pr-agent.yml, TOOL-013) and runs on every push;
+# CodeRabbit's job is the independent look, and its findings have earned that —
+# on #1172 it caught a privilege escalation through data that the shipped tests,
+# the schema and an adversarial review had all passed over.
+#
+# Every setting below exists because leaving it at its default was measured to
+# cost something. Defaults are not neutral: an unwritten config is a set of
+# decisions somebody else made for a different repository.
+
+language: "en-US"
+early_access: false
+
+tone_instructions: |
+  Be terse. Name the file, the line and the failing input. Prefer one reproducible
+  finding over three plausible ones. This repository values a claim you can run
+  over a claim that reads well.
+
+reviews:
+  # `chill`, not `assertive`. Measured upstream rather than assumed: crossplane
+  # tested assertive and reported "approx 200 comments on one PR […] the signal
+  # to noise ratio isn't good enough" (crossplane/crossplane, 12k stars). The
+  # same trade decided `auto_improve: false` in the PR-Agent workflow here.
+  profile: chill
+
+  # The PR bodies in this repository carry hand-written measurement tables, merge
+  # orders and before/after evidence — the part worth reading. This is the same
+  # decision already recorded for the other tool: the PR-Agent workflow sets
+  # `auto_describe: false` because "describe REWRITES the PR body […] a model
+  # rewriting them destroys exactly that". CodeRabbit brings the same threat
+  # through a different door.
+  high_level_summary: false
+  high_level_summary_placeholder: "@coderabbitai summary"
+  changed_files_summary: false
+  sequence_diagrams: false
+  poem: false
+
+  # Labels and reviewers are the board's business (ADR-018), not a reviewer's.
+  # An auto-applied label here is how #1180 acquired a `skip-sdd` that changed
+  # which gate rules applied.
+  auto_apply_labels: false
+  suggested_labels: false
+  suggested_reviewers: false
+
+  # A closed PR's review is spend with nothing to spend it on.
+  abort_on_close: true
+
+  auto_review:
+    enabled: true
+
+    # THE SETTING THIS FILE EXISTS FOR.
+    #
+    # Default is `true`: CodeRabbit re-reviews after every push, and its own docs
+    # state that "automatic incremental reviews count toward the same
+    # per-developer PR review rate limit as manual PR reviews".
+    #
+    # Measured 2026-08-22: CodeRabbit was rate limited on EVERY pull request
+    # opened across a full session. The work pattern here is many small pushes
+    # per PR, which is precisely the profile that burns the allowance — so the
+    # quota was spent on re-reviews nobody asked for, and gone by the time a
+    # human wanted a second opinion.
+    #
+    # The value is not lost by turning this off, and that is the point. Its best
+    # finding of that session — a privilege escalation through data on #1172 —
+    # came from the FIRST review of the PR, not from an incremental pass. The
+    # first look is kept; the re-reads are on request.
+    #
+    # `@coderabbitai review` when a PR is genuinely ready, which is upstream's
+    # own recommendation for repositories with frequent pushes.
+    auto_incremental_review: false
+
+    # Belt and braces. With incremental review off this should never be reached,
+    # but if it is ever turned back on, a fast-moving branch must not spend the
+    # allowance before the PR is ready. Upstream recommends 1-2 for this profile;
+    # pingcap/docs runs 3.
+    auto_pause_after_reviewed_commits: 1
+
+    # A draft is not asking to be reviewed. The most common setting among the
+    # large repositories surveyed: crossplane, MONAI, biomejs, pingcap, wso2.
+    drafts: false
+
+    # CodeRabbit always includes the default branch, but naming it keeps auto
+    # review working if the default is ever renamed (pingcap/docs records the
+    # same reasoning).
+    base_branches:
+      - "^main$"
+
+  path_instructions:
+    - path: "**/*.sh"
+      instructions: >-
+        Scripts here MUST run under bash AND zsh. Flag any construct that behaves
+        differently: an unescaped bracket in a parameter expansion pattern
+        (`${v#[}` aborts zsh at RUN time and `zsh -n` does not catch it),
+        `echo -e`, `&>`, `local x="$(cmd)"` masking the command's exit status
+        under `set -e`, and unquoted word-splitting, which zsh does not perform.
+    - path: "harness/*.json"
+      instructions: >-
+        These are declarative registries consumed by the render and the gates. A
+        value that reaches rendered output must be checked for characters that
+        could ALTER that output rather than appear in it — a comma in a
+        comma-separated field, a brace in a flow mapping. Flag any new field
+        whose absence would read as a default rather than as a decision.
+    - path: ".github/workflows/*.yml"
+      instructions: >-
+        Flag untrusted event payload interpolated into `run:` (issue/PR titles and
+        bodies, comment bodies, branch names) instead of passed through `env:`.
+        Also flag a verdict published to a check-run that later runs cannot
+        revise.
