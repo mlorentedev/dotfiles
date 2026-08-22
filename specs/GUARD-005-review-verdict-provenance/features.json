@@ -1,8 +1,50 @@
 [
   {
     "id": "GUARD-005-review-verdict-provenance-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "A run that writes no verdict is refused at archive, naming that cause",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestProvenanceCatchesAReviewThatWroteNothing$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestProvenanceCatchesAReviewThatWroteNothing '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005-review-verdict-provenance-f2",
+    "behavior": "A fresh verdict on the launched sha by the launched reviewer passes",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestProvenanceAcceptsAFreshVerdict$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestProvenanceAcceptsAFreshVerdict '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005-review-verdict-provenance-f3",
+    "behavior": "A verdict claiming a sha the launcher never pointed at is refused",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestProvenanceCatchesAVerdictOnAnotherSha$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestProvenanceCatchesAVerdictOnAnotherSha '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005-review-verdict-provenance-f4",
+    "behavior": "A verdict signed by a different pool member than the one launched is refused",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestProvenanceCatchesADifferentPoolMember$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestProvenanceCatchesADifferentPoolMember '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005-review-verdict-provenance-f5",
+    "behavior": "No sidecar means the guard is not asserted, not that the review is bad",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestProvenanceIsSilentWithoutASidecar$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestProvenanceIsSilentWithoutASidecar '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005-review-verdict-provenance-f6",
+    "behavior": "An unparseable sidecar fails loudly rather than silently disabling the guard",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestUnparseableSidecarIsLoud$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestUnparseableSidecarIsLoud '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005-review-verdict-provenance-f7",
+    "behavior": "The digest records what was there, including the empty first-review case",
+    "verification": "cd cli && out=$(go test ./internal/spec/ -run '^TestWriteReviewRequestRecordsTheDigestOfWhatWasThere$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestWriteReviewRequestRecordsTheDigestOfWhatWasThere '",
     "state": "pending",
     "evidence": ""
   }
