@@ -1277,13 +1277,18 @@ merge_claude_settings() {
     # from scratch. Measured on this repo's own box — the key sat in the template
     # while the deployed file had no `outputStyle` at all. It belongs with `model`
     # and `effortLevel`: same file, same kind of setting, dotfiles-owned.
-    # `// empty` leaves the existing value alone if a template ever omits it,
-    # rather than writing null and having Claude read an invalid style.
+    # Guarded with `has()`, NOT with `// empty`. In jq a condition that evaluates
+    # to `empty` makes the whole if-expression produce nothing, so `// empty`
+    # here does not mean "leave it alone when absent" — it means the entire merge
+    # yields an empty result, `merged` is empty, and the function bails with
+    # "merge produced empty output, skipping write". A template that ever omits
+    # this one optional key would then deploy NOTHING: not model, not
+    # effortLevel, not permissions, not hooks.
     local merged
     merged=$(jq --argjson tmpl "$template_substituted" '
         .model = $tmpl.model
         | .effortLevel = $tmpl.effortLevel
-        | (if ($tmpl.outputStyle // empty) then .outputStyle = $tmpl.outputStyle else . end)
+        | (if ($tmpl | has("outputStyle")) then .outputStyle = $tmpl.outputStyle else . end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
         | .hooks = (.hooks // {})
