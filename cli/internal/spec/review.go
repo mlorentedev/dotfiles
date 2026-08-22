@@ -303,6 +303,13 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 			"re-run /adversarial-review for this spec, or pass --force-without-review",
 			ReviewFile, review.Spec, specID)
 	}
+	// Provenance before verdict, deliberately. Both later checks read the file's
+	// CLAIMS; this one asks whether the file is the answer to the question this
+	// repository asked. Put it after, and a stale PASS left behind by a reviewer
+	// that wrote nothing would be accepted before anything looked.
+	if err := checkReviewProvenance(specDir, review); err != nil {
+		return err
+	}
 	if review.Verdict.Blocks() {
 		return fmt.Errorf("%s records verdict %s — address the findings and re-review before archiving\n"+
 			"to override, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
@@ -321,4 +328,59 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// what they concluded — a valid, fresh, passing review signed by the wrong
 	// model is still a self-review, and the earlier checks cannot see that.
 	return checkReviewerPool(repoRoot, review.Reviewer)
+}
+
+// checkReviewProvenance compares review.md against the sidecar the LAUNCHER
+// wrote, which is the only part of the evidence the reviewed party did not
+// author.
+//
+// Absent sidecar → no finding. Reviews predating this guard, and hand-written
+// ones, remain governed by the verdict, staleness and pool checks; refusing them
+// would invalidate every review already on disk to close a hole none of them
+// demonstrably has.
+func checkReviewProvenance(specDir string, review Review) error {
+	req, found, err := ReadReviewRequest(specDir)
+	if err != nil {
+		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review, or pass --force-without-review", err)
+	}
+	if !found {
+		return nil
+	}
+
+	// The digest is the no-verdict case, and it is checked first because it
+	// explains the sha mismatch that would otherwise be reported instead: a
+	// reviewer that wrote nothing leaves the PREVIOUS round's sha in place, and
+	// "the shas differ" would send the reader hunting for a rebase.
+	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == fileDigest(filepath.Join(specDir, ReviewFile)) {
+		return fmt.Errorf("%s has not changed since the review was launched — the reviewer wrote no verdict\n"+
+			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
+			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state), or pass --force-without-review",
+			ReviewFile)
+	}
+
+	if req.ReviewedSHA != "" && review.ReviewedSHA != "" && req.ReviewedSHA != review.ReviewedSHA {
+		return fmt.Errorf("%s claims reviewed_sha %s but the review was launched against %s\n"+
+			"the launcher records the head it pointed the reviewer at; the frontmatter is the reviewer's own claim about it\n"+
+			"re-run /adversarial-review against the current head, or pass --force-without-review",
+			ReviewFile, short(review.ReviewedSHA), short(req.ReviewedSHA))
+	}
+
+	// Reviewer identity, last of the three: checkReviewerPool already refuses a
+	// signature from outside the pool, so what this adds is narrower — a verdict
+	// signed by a DIFFERENT pool member than the one that was launched, which
+	// that check cannot see because both are admitted.
+	if req.Reviewer != "" && review.Reviewer != "" && req.Reviewer != review.Reviewer {
+		return fmt.Errorf("%s is signed by %q but %q was launched — the verdict is not from the run that was requested\n"+
+			"re-run /adversarial-review, or pass --force-without-review",
+			ReviewFile, review.Reviewer, req.Reviewer)
+	}
+	return nil
+}
+
+// short renders a sha for a human-readable error without hiding a short input.
+func short(sha string) string {
+	if len(sha) <= 12 {
+		return sha
+	}
+	return sha[:12]
 }

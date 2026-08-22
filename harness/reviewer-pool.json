@@ -49,9 +49,9 @@
       "id": "agy/gemini-3.1-pro-high",
       "runner": "agy",
       "model": "gemini-3.1-pro-high",
-      "secret_id": "GEMINI_API_KEY",
       "role": "fallback",
-      "why": "A second provider family, independent of both NaN and Anthropic — provider diversity rather than merely a different model. Pro tier at high effort; the flash tiers are excluded for the same reason qwen3.6 is. agy has no --provider flag; the model id selects the family."
+      "why": "A second provider family, independent of both NaN and Anthropic — provider diversity rather than merely a different model. Pro tier at high effort; the flash tiers are excluded for the same reason qwen3.6 is. agy has no --provider flag; the model id selects the family. AUTH IS LOGIN, not a key (#1156): agy holds an OAuth token at ~/.gemini/antigravity-cli/google_credentials.json and answers with no API key in the environment at all (measured 2026-08-22). This entry previously named GEMINI_API_KEY, a secret the registry has never declared, so every attempt to use the provider-diverse arm died at `dotf secrets run --only` -- and nothing noticed, because the primary always answered. The arm this pool exists to provide had therefore never run once.",
+      "auth": "login"
     },
     {
       "id": "nan/mimo-v2.5",
