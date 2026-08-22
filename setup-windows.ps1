@@ -252,6 +252,19 @@ function Merge-ClaudeSettings {
     if ($template.ContainsKey('model')) { $existing['model'] = $template['model'] }
     if ($template.ContainsKey('effortLevel')) { $existing['effortLevel'] = $template['effortLevel'] }
     if ($template.ContainsKey('outputStyle')) { $existing['outputStyle'] = $template['outputStyle'] }
+    if ($template.ContainsKey('advisorModel')) { $existing['advisorModel'] = $template['advisorModel'] }
+
+    # env: object merge (template wins on conflict). These are feature flags
+    # Claude Code reads from its OWN process environment -- settings.env is
+    # merged into process.env at startup, which is how
+    # CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL reaches the gate deciding
+    # whether /advisor exists. Per-key so a machine-local flag survives.
+    if ($template.ContainsKey('env')) {
+        if (-not $existing.ContainsKey('env')) { $existing['env'] = @{} }
+        foreach ($envKey in $template['env'].Keys) {
+            $existing['env'][$envKey] = $template['env'][$envKey]
+        }
+    }
 
     # permissions.allow: UNION (template + existing, deduped)
     if ($template.ContainsKey('permissions') -and $template['permissions'].ContainsKey('allow')) {

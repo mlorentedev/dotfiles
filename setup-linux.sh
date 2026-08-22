@@ -1284,9 +1284,17 @@ merge_claude_settings() {
     fi
 
     # Per-key merge via single jq invocation. Policy table in proposal.md:
-    # model, effortLevel, outputStyle: template wins. permissions.allow: UNION
-    # (deduped). hooks.SessionStart: template wins (replace). enabledPlugins:
-    # object merge (template wins on conflict). All other keys: existing preserved.
+    # model, effortLevel, outputStyle, advisorModel: template wins.
+    # permissions.allow: UNION (deduped). hooks.SessionStart: template wins
+    # (replace). enabledPlugins, env: object merge (template wins on conflict).
+    # All other keys: existing preserved.
+    #
+    # `env` carries feature flags Claude Code reads from its OWN process
+    # environment -- settings.env is Object.assign'd into process.env at
+    # startup, which is how CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL
+    # reaches the gate that decides whether /advisor exists at all. It merges
+    # per-key rather than replacing, so a machine-local flag a user added by
+    # hand survives a redeploy.
     #
     # `outputStyle` joins the template-wins set because the policy is an explicit
     # ALLOW-LIST: a key added to the template and not named here is silently a
@@ -1306,6 +1314,8 @@ merge_claude_settings() {
         .model = $tmpl.model
         | .effortLevel = $tmpl.effortLevel
         | (if ($tmpl | has("outputStyle")) then .outputStyle = $tmpl.outputStyle else . end)
+        | (if ($tmpl | has("advisorModel")) then .advisorModel = $tmpl.advisorModel else . end)
+        | (if ($tmpl | has("env")) then .env = ((.env // {}) + $tmpl.env) else . end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
         | .hooks = (.hooks // {})
