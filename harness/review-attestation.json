@@ -68,7 +68,9 @@
     "One string, two consumers, declared once. The skill writes it and the queue",
     "reads it, and putting it in either would have made the pair a two-file",
     "agreement nobody checks — the failure class this repo spent 2026-08-17 into",
-    "the 18th cataloguing."
+    "the 18th cataloguing.",
+    "",
+    "`advisory: true` marks a reviewer whose REVIEW attests but whose DECLINE does not refuse. It exists for a reviewer whose availability is a third party's billing state rather than a property of the change. An advisory decline is reported — silence and 'it could not run' are still different facts — but it yields `pending` rather than `declined`, so the gate refuses for the honest reason: no review has happened yet. Absent or false, a reviewer counts fully."
   ],
   "reviewers": [
     {
@@ -76,10 +78,11 @@
       "declined_markers": [
         "rate limited by coderabbit.ai"
       ],
-      "why": "Free tier, ~1 review/hour account-wide. On 2026-08-16 PRs #1007, #1009 and #1013 each carried this notice simultaneously, with zero reviews between them, while `gh pr checks` reported `CodeRabbit  pass`. Neither pushing new commits nor an explicit `@coderabbitai review` reclaims a slot while the quota is spent — measured, both.",
+      "why": "ADVISORY (2026-08-22): its review still attests, but its DECLINE no longer refuses. Measured across one full session — CodeRabbit was rate limited on every PR opened, so `declined` became the normal first verdict on every change and flipped green ~90s later when PR-Agent posted. The workflow's own note says it: a gate whose normal state is red has stopped being a gate. The quota is a billing state of a third party, not a property of the change, and refusing on it spends this gate's credibility on a transient. Same disposition as codex, which is likewise exhausted most of the time. What is NOT weakened: the PR still cannot read as attested until a counting reviewer actually reviews — an advisory decline yields `pending`, which is the honest answer, because a reviewer that could not run is not a reviewer that refused the change.",
       "review_markers": [
         "No actionable comments were generated in the recent review"
-      ]
+      ],
+      "advisory": true
     },
     {
       "login": "github-actions",

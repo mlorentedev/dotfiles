@@ -32,19 +32,65 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 
 # --- AC1/AC3: classifies the three states, by content ---
 
-@test "AC1: classifies the REAL #1009 rate-limit payload as declined" {
+@test "AC1: the REAL #1009 rate-limit payload still refuses, now as advisory-pending" {
+    # coderabbitai is ADVISORY as of 2026-08-22: its review attests, its decline
+    # does not refuse. The PR is still NOT attested -- what changed is the reason
+    # given, and the reason is the honest one. A reviewer that could not run has
+    # not refused the change; no review has happened yet.
     run "$SCRIPT" --payload "$F/pr-1009.raw.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"declined"* ]]
+    [[ "$output" == *"pending"* ]]
     [[ "$output" == *"coderabbitai"* ]]
+    [[ "$output" == *"could not review"* ]]
+    # and it is NOT reported as silence: the author must not go hunting for a
+    # reviewer that already answered
+    [[ "$output" != *"no reviewer output on this PR yet"* ]]
 }
 
-@test "AC1: classifies the other two real captures as declined too" {
+@test "AC1: the other two real captures behave the same way" {
     for pr in 1007 1013; do
         run "$SCRIPT" --payload "$F/pr-${pr}.raw.json"
         [ "$status" -eq 1 ]
-        [[ "$output" == *"declined"* ]]
+        [[ "$output" == *"pending"* ]]
+        [[ "$output" == *"could not review"* ]]
     done
+}
+
+@test "an advisory decline is still distinguishable from silence" {
+    # Same verdict, different fact. Collapsing them would lose the one thing the
+    # advisory reviewer's notice is still good for.
+    run "$SCRIPT" --payload "$F/pr-1009.raw.json"
+    advisory_msg="$output"
+    run "$SCRIPT" --payload "$F/no-output.json"
+    silence_msg="$output"
+    [ "$advisory_msg" != "$silence_msg" ]
+}
+
+@test "a NON-advisory reviewer's decline still refuses hard" {
+    # The mechanism must survive the policy. If every decline became advisory,
+    # GUARD-002 would have been deleted rather than tuned.
+    cfg="$TMP/counting.json"
+    jq '(.reviewers[] | select(.login == "coderabbitai") | .advisory) = false' \
+        "$BATS_TEST_DIRNAME/../harness/review-attestation.json" > "$cfg"
+    run "$SCRIPT" --payload "$F/pr-1009.raw.json" --config "$cfg"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"declined"* ]]
+}
+
+@test "an advisory reviewer's REVIEW still attests" {
+    # Advisory scopes the decline, never the review. A CodeRabbit review that
+    # actually happens is as good an attestation as any.
+    cfg="$BATS_TEST_DIRNAME/../harness/review-attestation.json"
+    marker="$(jq -r '.reviewers[] | select(.login == "coderabbitai") | .review_markers[0]' "$cfg")"
+    payload="$TMP/cr-reviewed.json"
+    jq -n --arg m "$marker" '{
+        author: {login: "someone"},
+        comments: [{author: {login: "coderabbitai"}, body: ("prefix " + $m + " suffix")}],
+        reviews: [], labels: [], body: "", files: []
+    }' > "$payload"
+    run "$SCRIPT" --payload "$payload"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested"* ]]
 }
 
 @test "AC3: a PR with no reviewer output is pending, not declined" {
@@ -358,10 +404,29 @@ sys.exit(0 if expected.issubset(types) else 1)
 @test "AC3: the declined message names both the reviewer and the marker" {
     # Preserve-why, asserted rather than assumed: an operator must be able to
     # tell WHICH reviewer declined and on what evidence.
+    #
+    # Exercised against a COUNTING reviewer, because that is the only path that
+    # still produces `declined`. coderabbitai went advisory on 2026-08-22, and
+    # pointing this at it would have quietly turned a test of the message into a
+    # test of the advisory branch -- passing while asserting nothing about the
+    # thing its name claims.
+    cfg="$TMP/counting.json"
+    jq '(.reviewers[] | select(.login == "coderabbitai") | .advisory) = false' \
+        "$BATS_TEST_DIRNAME/../harness/review-attestation.json" > "$cfg"
+    run "$SCRIPT" --payload "$F/coderabbit-rate-limited.json" --config "$cfg"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"declined"* ]]
+    [[ "$output" == *"coderabbitai"* ]]
+    [[ "$output" == *"rate limited by coderabbit.ai"* ]]
+}
+
+@test "AC3: the advisory message names the reviewer, without claiming it refused" {
+    # The advisory path owes the same preserve-why, in its own words.
     run "$SCRIPT" --payload "$F/coderabbit-rate-limited.json"
     [ "$status" -eq 1 ]
     [[ "$output" == *"coderabbitai"* ]]
-    [[ "$output" == *"rate limited by coderabbit.ai"* ]]
+    [[ "$output" == *"advisory"* ]]
+    [[ "$output" != *"declined"* ]]
 }
 
 @test "meta: no bare negated assertion survives in this suite" {
