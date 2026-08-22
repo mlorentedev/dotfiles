@@ -1,7 +1,7 @@
 ---
 id: "AI-023-orca-ade-and-iac-doctrine"
 type: spec
-status: implementing
+status: archived
 created: "2026-08-22"
 issue: "mlorentedev/dotfiles#1175"
 tags: [spec, proposal, orca, iac, doctrine]
