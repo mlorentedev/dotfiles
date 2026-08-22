@@ -1,0 +1,44 @@
+# orca.yaml — Orca ADE project lifecycle & automation template
+version: 1
+
+scripts:
+  setup: |
+    echo "==> [Orca Hook] Initializing worktree $ORCA_WORKSPACE_NAME..."
+    
+    # 1. Activate pinned mise toolchains
+    if command -v mise >/dev/null 2>&1; then
+      mise install --yes
+    fi
+
+    # 2. Polyglot dependency installation
+    if [ -f "pyproject.toml" ]; then
+      if command -v poetry >/dev/null 2>&1; then
+        poetry install --quiet
+      elif command -v uv >/dev/null 2>&1; then
+        uv sync --quiet
+      fi
+    elif [ -f "package.json" ]; then
+      if command -v pnpm >/dev/null 2>&1; then
+        pnpm install --silent
+      else
+        npm install --silent
+      fi
+    elif [ -f "go.mod" ]; then
+      go mod download
+    elif [ -f "Cargo.toml" ]; then
+      cargo check --quiet
+    fi
+
+    # 3. Safe environment bootstrap
+    if [ -f "$ORCA_ROOT_PATH/.env.local" ] && [ ! -f ".env.local" ]; then
+      cp "$ORCA_ROOT_PATH/.env.local" ".env.local"
+    fi
+
+  archive: |
+    echo "==> [Orca Hook] Tearing down worktree $ORCA_WORKSPACE_NAME..."
+    if [ -f "docker-compose.yml" ] || [ -f "compose.yml" ]; then
+      docker compose down --remove-orphans --volumes 2>/dev/null || true
+    fi
+
+issue:
+  command: "gh issue view {{artifact_url}}"

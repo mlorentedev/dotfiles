@@ -1,18 +1,13 @@
-# CLAUDE.md
+# ORCA.md
 
-> **First, read `AGENTS.md` at the repo root** — canonical SSOT for all agents (Standing Orders, Decision Hierarchy, Neural Hive, MCP, Operational Rules). This file (`~/.claude/CLAUDE.md` after deploy) holds only Claude Code-specific tooling extensions.
->
-> If `AGENTS.md` is missing from the current repo, default to canonical version at `$DOTFILES_REPO_DIR/AGENTS.md` (resolved via `machine.json` per ADR-025).
+> **First, read `AGENTS.md` at the repo root** — canonical SSOT for all agents (Standing Orders, Decision Hierarchy, Neural Hive, MCP, Operational Rules). This file holds Orca ADE-specific tooling extensions and agent guidelines.
 
-## Auto-Maintenance Rules
+## Orca ADE Operating Notes
 
-- **Session Handoff:** Run `/handoff` (`00_meta/skills/handoff/SKILL.md`) at the end of non-trivial sessions. Replaces `## Session Handoff` continuity block in `MEMORY.md`.
-- **Auto-Crystallize:** If context includes `CRYSTALLIZE NEEDED`, run `/crystallize` before user tasks.
-- **Auto-Archive:** If context reports >60d cold memory files, move to `memory/archive/` and update `MEMORY.md`.
+* **Worktree Environment:** Worktree root is at `$ORCA_WORKTREE_PATH`; repository root is at `$ORCA_ROOT_PATH`.
+* **External Placement:** Never nest worktrees inside a repository. All worktrees live as sibling directories (e.g. `/home/manu/workspaces/orca-agent/<repo>-<slug>`).
+* **Hooks:** Follow `orca.yaml` setup and archive hooks. Pinned toolchains are managed via `mise`.
 
-## Claude Code Tooling Notes
-
-* **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
 <!-- BEGIN HARNESS GENERATED (sha256:6d01176da5d23b03) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
@@ -70,13 +65,3 @@ Where a harness offers a session-time execution surface, wire the first one into
 
 **If a value does reach the output: say so immediately, name the affected credentials by type, and stop.** Disclosure over silence, the same posture as an unreviewed merge. Then treat them as compromised and rotate — an exposed credential in a transcript nobody rotated is indistinguishable from one that was never exposed, right up until it is not.
 <!-- END HARNESS GENERATED -->
-* **Skills:** Auto-loaded via slash commands from `~/.claude/skills/<skill>/SKILL.md` (deployed by `compile-harness.sh --deploy`).
-* **TaskCreate / TaskUpdate / TaskList:** Use for non-trivial work (≥3 steps). Mark `in_progress` before start, `completed` on finish.
-* **AskUserQuestion:** Use for branching decisions (2-4 options), marking "(Recommended)" on preferred.
-* **MEMORY.md:** Auto-loads at session start (capped at 200 lines). Index-only; link to topic files.
-
-## Project Memory Hierarchy & Models
-
-1. **Resolution Order:** `~/.claude/CLAUDE.md` $\rightarrow$ `<repo>/AGENTS.md` (authoritative SSOT) $\rightarrow$ `<repo>/.claude/CLAUDE.md` $\rightarrow$ `<project-hash>/memory/MEMORY.md`.
-2. **Model Tier:** Top: `claude-opus-4-7` (architecture/debug) | Mid: `claude-sonnet-4-6` (default/refactor) | Low: `claude-haiku-4-5-20251001` (lookups).
-
