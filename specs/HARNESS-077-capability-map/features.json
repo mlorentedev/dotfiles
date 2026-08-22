@@ -1,0 +1,93 @@
+[
+  {
+    "id": "HARNESS-077-capability-map-f1",
+    "behavior": "claude renders a csv allow-list from a neutral capability set",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestResolveCapabilitiesAgainstShippedMap$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestResolveCapabilitiesAgainstShippedMap/claude_renders_a_csv_allow-list '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f2",
+    "behavior": "opencode renders a decision map from the same neutral request",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestResolveCapabilitiesAgainstShippedMap$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestResolveCapabilitiesAgainstShippedMap/opencode_renders_a_decision_map '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f3",
+    "behavior": "Overlapping natives are deduped, first occurrence wins",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestResolveCapabilitiesAgainstShippedMap$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestResolveCapabilitiesAgainstShippedMap/overlapping_natives_are_deduped,_first_occurrence_wins '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f4",
+    "behavior": "An unmapped capability names itself and the harness, returning nothing",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestResolveCapabilitiesAgainstShippedMap$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestResolveCapabilitiesAgainstShippedMap/an_unmapped_capability_names_itself_and_the_harness '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f5",
+    "behavior": "An undeclared harness names what IS declared rather than resolving to empty",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestResolveCapabilitiesAgainstShippedMap$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestResolveCapabilitiesAgainstShippedMap/an_undeclared_harness_names_what_IS_declared '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f6",
+    "behavior": "An absent, unschema'd, non-JSON or partially-covering capability map fails rather than defaulting (C15)",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestCapabilityMapFailsLoudWhenUnreadable$' -v 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCapabilityMapFailsLoudWhenUnreadable/a_harness_that_does_not_cover_the_whole_vocabulary '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f7",
+    "behavior": "A record declaring capabilities deploys native tool names, never the neutral verbs",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'resolves neutral capabilities into the rendered frontmatter' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*resolves neutral capabilities into the rendered frontmatter$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f8",
+    "behavior": "A record declaring no capabilities renders without the field",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'a record declaring no capabilities renders without the field' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*renders without the field$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f9",
+    "behavior": "An unmappable capability fails the deploy without truncating the previous definition",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'an unmappable capability fails the deploy' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*without truncating the definition$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f10",
+    "behavior": "A dotf knowing resolve-tier but not resolve-capabilities warns for that field only",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'knows resolve-tier but not resolve-capabilities' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*warns for that field only$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f11",
+    "behavior": "A whitespace-bearing model id blames the map, not a stale dotf (#1168)",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'BUG-1168' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*blames the map, not a stale dotf$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f12",
+    "behavior": "A bad record does not block the agents behind it, and every failure is named in one run (#1169)",
+    "verification": "out=$(bats tests/compile-harness.bats -f 'DESIGN-1169: a bad record' 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ .*does not block the agents behind it$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-077-capability-map-f13",
+    "behavior": "The real dotf binary proves the two native forms differ and satisfies the capability probe",
+    "verification": "out=$(bats tests/compile-harness-real.bats 2>&1) && printf '%s' \"$out\" | grep -qE '^ok [0-9]+ real dotf: the two native forms really do differ$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
