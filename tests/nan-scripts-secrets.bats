@@ -7,6 +7,8 @@
 # sourcing the retired `load-secrets` twin. Structural (grep-based) like the
 # other RC/script contract tests in this suite.
 
+load 'lib/refute'
+
 setup() {
     export SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     NAN_SCRIPTS=(nan-bench.sh nan-debug.sh nan-quality-bench.sh)
@@ -20,13 +22,13 @@ setup() {
 
 @test "nan-* scripts do not source the retired load-secrets twin" {
     for s in "${NAN_SCRIPTS[@]}"; do
-        ! grep -qE 'load-secrets' "$SCRIPTS_DIR/$s" || { echo "still references load-secrets: $s"; return 1; }
+        refute_grep 'load-secrets' "$SCRIPTS_DIR/$s"
     done
 }
 
 @test "nan-* scripts do not call secrets_refresh (the old twin API)" {
     for s in "${NAN_SCRIPTS[@]}"; do
-        ! grep -q 'secrets_refresh' "$SCRIPTS_DIR/$s" || { echo "still calls secrets_refresh: $s"; return 1; }
+        refute_grep_fixed 'secrets_refresh' "$SCRIPTS_DIR/$s"
     done
 }
 

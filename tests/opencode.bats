@@ -3,6 +3,8 @@
 # Relational tests per pattern-setup-script-idempotence — verify invariants,
 # not just presence.
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SETUP_SCRIPT="$DOTFILES_DIR/setup-linux.sh"
@@ -26,7 +28,7 @@ setup() {
     # Windows always-overwrite strategy. The staged-substituted tmp file is
     # moved into place on every run (substitution may have changed content);
     # there is no "already in sync" skip path that could mask drift.
-    ! grep -q 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
+    refute_grep 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
     grep -q 'mv "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
 }
 
@@ -41,7 +43,7 @@ setup() {
 @test "opencode PATH is baked into repo .zshrc and .bashrc (SSOT, no setup-time mutation)" {
     grep -q 'export PATH="\$HOME/.opencode/bin:\$PATH"' "$DOTFILES_DIR/.zshrc"
     grep -q 'export PATH="\$HOME/.opencode/bin:\$PATH"' "$DOTFILES_DIR/.bashrc"
-    ! grep -q 'ensure_line_in_file.*OPENCODE_PATH_LINE' "$SETUP_SCRIPT"
+    refute_grep 'ensure_line_in_file.*OPENCODE_PATH_LINE' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh upgrades a below-minimum opencode to the versions.conf pin (REFACTOR-011/013)" {
@@ -50,7 +52,7 @@ setup() {
     # != reconcile would downgrade a newer install. Gate on version_gte so only
     # an older opencode triggers an upgrade.
     grep -q 'version_gte "$installed_opencode" "$OPENCODE_VERSION"' "$SETUP_SCRIPT"
-    ! grep -q 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
+    refute_grep_fixed 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
     # Convergence is verified by re-query, not by installer exit code: a
     # shadowing install (npm global) would otherwise produce a false SUCCESS.
     grep -q 'shadows it in PATH' "$SETUP_SCRIPT"
@@ -62,7 +64,7 @@ setup() {
 
 @test "setup-linux.sh opencode install URL uses opencode.ai (not anomalyco fork)" {
     grep -q 'curl -fsSL https://opencode.ai/install' "$SETUP_SCRIPT"
-    ! grep -q 'curl.*anomalyco' "$SETUP_SCRIPT"
+    refute_grep 'curl.*anomalyco' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh opencode block has no new silenced errors (2>/dev/null || true)" {
@@ -73,13 +75,13 @@ setup() {
 # --- Regression: aider sunset ---
 
 @test "setup-linux.sh no longer installs aider" {
-    ! grep -q "uv tool install --python 3.12 aider-chat" "$SETUP_SCRIPT"
-    ! grep -q "# Aider (AI pair programming)" "$SETUP_SCRIPT"
+    refute_grep_fixed "uv tool install --python 3.12 aider-chat" "$SETUP_SCRIPT"
+    refute_grep_fixed "# Aider (AI pair programming)" "$SETUP_SCRIPT"
 }
 
 @test "setup-windows.ps1 no longer installs aider" {
-    ! grep -q "Installing aider-chat via uv" "$DOTFILES_DIR/setup-windows.ps1"
-    ! grep -q "DEPLOY AIDER CONFIGURATION" "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep_fixed "Installing aider-chat via uv" "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep_fixed "DEPLOY AIDER CONFIGURATION" "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup-linux.sh keeps uv install (used by hive MCP server)" {
@@ -92,23 +94,24 @@ setup() {
 }
 
 @test ".zsh/aliases.zsh no longer has aider tier aliases" {
-    ! grep -qE '^alias (ai|aic|aia)=' "$ALIASES_FILE"
+    refute_grep '^alias (ai|aic|aia)=' "$ALIASES_FILE"
 }
 
 @test "powershell/profile.ps1 no longer has aider tier functions" {
-    ! grep -qE '^function (ai|aic|aia) ' "$DOTFILES_DIR/powershell/profile.ps1"
+    refute_grep '^function (ai|aic|aia) ' "$DOTFILES_DIR/powershell/profile.ps1"
 }
 
 @test "AGENTS.md no longer lists Aider in the agent matrix" {
-    ! grep -qE 'and Aider all read this file' "$AGENTS_MD"
+    refute_grep 'and Aider all read this file' "$AGENTS_MD"
 }
 
 @test "README.md no longer mentions Aider" {
-    ! grep -qi "aider" "$DOTFILES_DIR/README.md"
+    run grep -in 'aider' "$DOTFILES_DIR/README.md"
+    [ "$status" -eq 1 ] || { printf 'README still mentions aider:\n%s\n' "$output" >&2; return 1; }
 }
 
 @test "env-contract.json uv purpose no longer mentions aider" {
-    ! grep -q '"Python tool installs (aider' "$DOTFILES_DIR/env-contract.json"
+    refute_grep_fixed '"Python tool installs (aider' "$DOTFILES_DIR/env-contract.json"
 }
 
 # --- opencode.jsonc structure ---
@@ -137,7 +140,7 @@ setup() {
     grep -q '"deepseek/deepseek-v4-pro":' "$OPENCODE_CFG"
     grep -q '"minimax/minimax-m3":' "$OPENCODE_CFG"
     # No OpenAI/Google/Anthropic OpenRouter model entries.
-    ! grep -qE '"(openai|google|anthropic)/[^"]+":[[:space:]]*\{[[:space:]]*"name"' "$OPENCODE_CFG"
+    refute_grep '"(openai|google|anthropic)/[^"]+":[[:space:]]*\{[[:space:]]*"name"' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc has ollama provider (homelab via VPN)" {
@@ -159,11 +162,11 @@ setup() {
         grep -qE "\"$m\":" "$OPENCODE_CFG" || { echo "missing chat model $m" >&2; false; }
     done
     # Non-chat models must NOT appear (would break config load)
-    ! grep -qE '"qwen3-embedding":|"kokoro":|"whisper":' "$OPENCODE_CFG"
+    refute_grep '"qwen3-embedding":|"kokoro":|"whisper":' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc no longer references opencode-go (Go subscription cancelled per SDD-007)" {
-    ! grep -q '"opencode-go":' "$OPENCODE_CFG"
+    refute_grep_fixed '"opencode-go":' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc mirrors the 3 active MCP servers (hive, context7, sequential-thinking)" {
@@ -171,7 +174,7 @@ setup() {
         grep -qE "\"$srv\":" "$OPENCODE_CFG" || { echo "missing MCP $srv" >&2; false; }
     done
     # drawio + socket intentionally removed (see opencode.jsonc comment)
-    ! grep -qE '^\s*"drawio":|^\s*"socket":' "$OPENCODE_CFG"
+    refute_grep '^\s*"drawio":|^\s*"socket":' "$OPENCODE_CFG"
 }
 
 @test "opencode.jsonc DX keys present (share disabled, autoupdate notify, providers pruned, tool_output, read-only plan agent)" {
@@ -245,15 +248,15 @@ setup() {
 @test "ai/copilot/copilot-instructions.md is a pointer (no template-placeholder bug)" {
     grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
     # Bug fix regression: must not contain the broken placeholder string
-    ! grep -q "the knowledge base (\`~/Projects/knowledge/" "$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
+    refute_grep_fixed "the knowledge base (\`~/Projects/knowledge/" "$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
     # Bug fix regression: must not contain the wrong Apps\knowledge path
-    ! grep -q "Apps\\\\knowledge" "$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
+    refute_grep "Apps\\\\knowledge" "$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
 }
 
 @test ".github/copilot-instructions.md is a pointer (no template-placeholder bug)" {
     grep -q "First, read \[\`AGENTS.md\`\]" "$DOTFILES_DIR/.github/copilot-instructions.md"
-    ! grep -q "the knowledge base (\`~/Projects/knowledge/" "$DOTFILES_DIR/.github/copilot-instructions.md"
-    ! grep -q "Apps\\\\knowledge" "$DOTFILES_DIR/.github/copilot-instructions.md"
+    refute_grep_fixed "the knowledge base (\`~/Projects/knowledge/" "$DOTFILES_DIR/.github/copilot-instructions.md"
+    refute_grep "Apps\\\\knowledge" "$DOTFILES_DIR/.github/copilot-instructions.md"
 }
 
 # --- OpenCode diagnostics integration ---
@@ -271,7 +274,7 @@ setup() {
 }
 
 @test "opencode.jsonc reasoning comment updated off the stale 1.15.10 'renders neither' note (DX-004 AC5)" {
-    ! grep -q 'Opencode (1.15.10) renders neither' "$OPENCODE_CFG"
+    refute_grep_fixed 'Opencode (1.15.10) renders neither' "$OPENCODE_CFG"
     grep -q 'interleaved' "$OPENCODE_CFG"
 }
 
@@ -287,5 +290,5 @@ setup() {
     grep -q 'TUI_SRC="\$CURRENT_DIR/ai/opencode/tui.json"' "$SETUP_SCRIPT"
     grep -q 'cmp -s "\$TUI_SRC" "\$TUI_DST"' "$SETUP_SCRIPT"
     # tui.json carries no secrets: it must NOT go through dotf secrets render
-    ! grep -qE 'dotf secrets render "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
+    refute_grep 'dotf secrets render "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
 }

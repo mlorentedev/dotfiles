@@ -50,7 +50,8 @@ setup() {
 }
 
 @test "command_exists returns false for missing command" {
-    ! command_exists __nonexistent_cmd_xyz__
+    run command_exists __nonexistent_cmd_xyz__
+    [ "$status" -eq 1 ]
 }
 
 @test "file_exists finds real file" {
@@ -58,7 +59,8 @@ setup() {
 }
 
 @test "file_exists returns false for missing file" {
-    ! file_exists "/nonexistent/file_xyz.txt"
+    run file_exists "/nonexistent/file_xyz.txt"
+    [ "$status" -eq 1 ]
 }
 
 @test "dir_exists finds real directory" {
@@ -66,7 +68,8 @@ setup() {
 }
 
 @test "dir_exists returns false for missing directory" {
-    ! dir_exists "/nonexistent/dir_xyz"
+    run dir_exists "/nonexistent/dir_xyz"
+    [ "$status" -eq 1 ]
 }
 
 @test "symlink_valid detects valid symlink" {
@@ -84,7 +87,8 @@ setup() {
     echo "content" > "$target"
     ln -sf "$target" "$link"
     rm -f "$target"
-    ! symlink_valid "$link"
+    run symlink_valid "$link"
+    [ "$status" -eq 1 ]
     rm -f "$link"
 }
 
@@ -95,12 +99,14 @@ setup() {
 
 @test "var_is_set returns false for unset variable" {
     unset TEST_UNSET_VAR 2>/dev/null
-    ! var_is_set TEST_UNSET_VAR
+    run var_is_set TEST_UNSET_VAR
+    [ "$status" -eq 1 ]
 }
 
 @test "var_is_set returns false for empty variable" {
     TEST_EMPTY_VAR=""
-    ! var_is_set TEST_EMPTY_VAR
+    run var_is_set TEST_EMPTY_VAR
+    [ "$status" -eq 1 ]
 }
 
 # --- String helpers ---

@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for versions.conf format and sourcing
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export VERSIONS_CONF="$DOTFILES_DIR/versions.conf"
@@ -19,12 +21,12 @@ setup() {
 }
 
 @test "versions.conf contains no export statements" {
-    ! grep -q '^export ' "$VERSIONS_CONF"
+    refute_grep '^export ' "$VERSIONS_CONF"
 }
 
 @test "versions.conf contains no quoted values" {
-    ! grep -qE '^[A-Z_]+=".+"' "$VERSIONS_CONF"
-    ! grep -qE "^[A-Z_]+='.+'" "$VERSIONS_CONF"
+    refute_grep '^[A-Z_]+=".+"' "$VERSIONS_CONF"
+    refute_grep "^[A-Z_]+='.+'" "$VERSIONS_CONF"
 }
 
 @test "versions.conf sets JAVA_VERSION" {
