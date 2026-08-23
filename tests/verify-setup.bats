@@ -537,6 +537,14 @@ setup() {
     # The assertion dotf doctor makes, made directly: a green --check here is
     # what a green [Harness + skill drift] section means.
     [ -x "$DOTFILES_DIR/scripts/compile-harness.sh" ]
+    # `--check` requires jq ON PATH (`type -P jq || exit 2`), and setup installs
+    # it to ~/.local/bin without putting that on this process's PATH (#1202).
+    # SKIP rather than inject the path: injecting would make this test green on
+    # a machine where `dotf doctor` is red, which is the failure mode
+    # docs/lessons/lesson-223 is about. A named skip says which condition was
+    # hit; once #1202 lands, this starts running here on its own.
+    command -v jq >/dev/null 2>&1 || \
+        skip "jq is not on PATH, so --check exits 2 before it can answer about drift (#1202)"
     run bash "$DOTFILES_DIR/scripts/compile-harness.sh" --check
     [ "$status" -eq 0 ]
     echo "$output" | grep -q 'no harness drift'
