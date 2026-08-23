@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for AGENTS.md SDD Discipline Gate enforcement (SDD-001)
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export AGENTS_MD="$DOTFILES_DIR/AGENTS.md"
@@ -96,8 +98,8 @@ setup() {
 @test "AGENTS.md does NOT reintroduce the retired work/personal routing axis" {
     # Negative guard: these markers encode the old axis that mis-routed build/operate
     # artifacts to the vault. Their presence is a regression.
-    ! grep -qF 'for work projects' "$AGENTS_MD"
-    ! grep -qF '30-architecture/adr' "$AGENTS_MD"
+    refute_grep_fixed 'for work projects' "$AGENTS_MD"
+    refute_grep_fixed '30-architecture/adr' "$AGENTS_MD"
 }
 
 # --- HARNESS-064: adversarial-review trigger (#879) ---

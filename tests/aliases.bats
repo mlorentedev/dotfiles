@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for .zsh/aliases.zsh
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export ALIASES_FILE="$DOTFILES_DIR/.zsh/aliases.zsh"
@@ -37,7 +39,7 @@ setup() {
 @test "aliases.zsh no longer defines oc/ocfull (moved to .zsh/functions.sh, REFACTOR-010)" {
     # oc/ocfull are now shared bash/zsh functions in .zsh/functions.sh.
     # Positive coverage lives in tests/shell-wrapper-dedup.bats.
-    ! grep -qE '^alias (oc|ocfull)=' "$ALIASES_FILE"
+    refute_grep '^alias (oc|ocfull)=' "$ALIASES_FILE"
 }
 
 @test "aliases.zsh defines oclog alias for live opencode log tailing" {
@@ -48,7 +50,7 @@ setup() {
 }
 
 @test "aliases.zsh no longer defines aider tier aliases (sunset)" {
-    ! grep -qE '^alias (ai|aic|aia)=' "$ALIASES_FILE"
+    refute_grep '^alias (ai|aic|aia)=' "$ALIASES_FILE"
 }
 
 # --- Copilot CLI v2 aliases (BUG-003: rename from ghcs/ghce) ---
@@ -82,14 +84,14 @@ setup() {
 @test "aliases.zsh no longer defines _qq_call body (moved to .zsh/functions.sh, REFACTOR-010)" {
     # The qq/qf noglob aliases stay here but reference the shared _qq_call,
     # which now lives once in .zsh/functions.sh (sourced by both shells).
-    ! grep -qE '^_qq_call\(\)' "$ALIASES_FILE"
+    refute_grep '^_qq_call\(\)' "$ALIASES_FILE"
 }
 
 @test "aliases.zsh no longer defines ghcs/ghce (renamed in BUG-003)" {
     # Anchor to start-of-line + alias/function definition forms only -- comments
     # mentioning the old names (e.g. "replaces ghcs/ghce wrappers") are fine.
-    ! grep -qE '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
-    ! grep -qE '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
+    refute_grep '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
+    refute_grep '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
 }
 
 # CHORE-001: shell-profile.sh discoverability via `profile-shell` alias.
@@ -118,7 +120,9 @@ setup() {
 }
 
 @test "aliases.zsh gprj does not point to Apps" {
-    ! grep 'alias gprj=' "$ALIASES_FILE" | grep -q 'Apps'
+    run grep 'alias gprj=' "$ALIASES_FILE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *Apps* ]]
 }
 
 # --- Git shortcuts ---
@@ -190,10 +194,10 @@ setup() {
 
 @test "parity: ghcs/ghce removed from both aliases.zsh and profile.ps1" {
     ps_file="$DOTFILES_DIR/powershell/profile.ps1"
-    ! grep -qE '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
-    ! grep -qE '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
-    ! grep -qE '^\s*function ghcs' "$ps_file"
-    ! grep -qE '^\s*function ghce' "$ps_file"
+    refute_grep '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
+    refute_grep '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
+    refute_grep '^\s*function ghcs' "$ps_file"
+    refute_grep '^\s*function ghce' "$ps_file"
 }
 
 # --- tmux aliases ---

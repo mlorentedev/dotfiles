@@ -2,6 +2,8 @@
 # Tests for cross-file docs sync (SDD-005).
 # Catches the drift class that hit BUG-001, BUG-002, and AI-019 → AUDIT-003.
 
+load 'lib/refute'
+
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     AI_COPILOT="$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
@@ -52,6 +54,6 @@ teardown() {
 @test "copilot-instructions: both describe native Agent Skills discovery" {
     grep -qF '~/.copilot/skills/' "$AI_COPILOT"
     grep -qF '~/.copilot/skills/' "$GH_COPILOT"
-    ! grep -qF 'Copilot has no per-skill discovery mechanism' "$AI_COPILOT"
-    ! grep -qF 'Copilot has no per-skill discovery mechanism' "$GH_COPILOT"
+    refute_grep_fixed 'Copilot has no per-skill discovery mechanism' "$AI_COPILOT"
+    refute_grep_fixed 'Copilot has no per-skill discovery mechanism' "$GH_COPILOT"
 }

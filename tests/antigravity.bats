@@ -6,6 +6,8 @@
 # These tests assume agy is installed AND setup-linux.sh has been run.
 # CI containers without agy binary or post-setup state will skip these tests.
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export GEMINI_HOME="$HOME/.gemini"
@@ -32,7 +34,9 @@ setup() {
     cmd=$(jq -r '.mcpServers["hive-vault"].command' "$DOTFILES_DIR/ai/agy/mcp_servers.json")
     [ "$cmd" = "uvx" ]
     # Regression guard: --directory must not return.
-    ! jq -r '.mcpServers["hive-vault"].args | join(" ")' "$DOTFILES_DIR/ai/agy/mcp_servers.json" | grep -qE '\-\-directory'
+    run jq -r '.mcpServers["hive-vault"].args | join(" ")' "$DOTFILES_DIR/ai/agy/mcp_servers.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"--directory"* ]]
 }
 
 @test "ai/agy/mcp_servers.json VAULT_PATH is the placeholder, not a hardcoded user path" {
@@ -41,7 +45,7 @@ setup() {
     local vault
     vault=$(jq -r '.mcpServers["hive-vault"].env.VAULT_PATH' "$DOTFILES_DIR/ai/agy/mcp_servers.json")
     [ "$vault" = '${VAULT_PATH}' ]
-    ! grep -qE '/home/[a-z]+/|C:\\\\Users\\\\' "$DOTFILES_DIR/ai/agy/mcp_servers.json"
+    refute_grep '/home/[a-z]+/|C:\\\\Users\\\\' "$DOTFILES_DIR/ai/agy/mcp_servers.json"
 }
 
 @test "setup-linux.sh substitutes \${VAULT_PATH} and preflights vault dir" {
@@ -73,8 +77,8 @@ setup() {
     # No stray "Gemini-specific" / "GEMINI.md" body references in the
     # canonical SSOT (archived specs and the cleanup logic in setup-*.{sh,ps1}
     # are excluded by file scope).
-    ! grep -qF 'Gemini-specific' "$DOTFILES_DIR/ai/agy/AGY.md"
-    ! grep -qF '# GEMINI.md' "$DOTFILES_DIR/ai/agy/AGY.md"
+    refute_grep_fixed 'Gemini-specific' "$DOTFILES_DIR/ai/agy/AGY.md"
+    refute_grep_fixed '# GEMINI.md' "$DOTFILES_DIR/ai/agy/AGY.md"
 }
 
 @test "ANTIGRAVITY_ENDPOINT is set to production in .zshrc" {

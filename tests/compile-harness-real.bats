@@ -17,6 +17,8 @@
 # The CI `test` job already sets up Go (actions/setup-go, ci.yml), so this runs
 # there rather than skipping.
 
+load 'lib/refute'
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     SCRIPT="$REPO/scripts/compile-harness.sh"
@@ -123,9 +125,9 @@ setup() {
     [ -f "$F" ]
     # curator declares `model: top`; claude's top tier is opus
     grep -q '^model: opus' "$F"
-    ! grep -q '^model: top' "$F"
+    refute_grep '^model: top' "$F"
     # and its neutral capabilities became native tool names
     grep -qE '^tools: .*Read' "$F"
-    ! grep -q '^capabilities:' "$F"
+    refute_grep '^capabilities:' "$F"
     rm -rf "$FAKEHOME"
 }

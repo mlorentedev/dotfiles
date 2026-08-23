@@ -23,6 +23,8 @@
 # ticket + deliberate recapture rather than a silent "cleanup" folded into
 # an unrelated change.
 
+load 'lib/refute'
+
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/vault-health"
     export GVH_ORACLE_SH="$BATS_TEST_DIRNAME/../scripts/vault-health.sh"
@@ -167,7 +169,7 @@ assert_golden() {
     # recaptured (tests/golden/vault-health/capture.sh) to match — so this test
     # now pins the FIXED shape, and a regression back to double-passing the
     # flag is what would turn it red.
-    ! grep -q -- '--vault knowledge --vault knowledge' \
+    refute_grep_fixed '--vault knowledge --vault knowledge' \
         "$HERE/cases/all-pass/expected/obsidian-argv"
     grep -qx -- '--no-sandbox orphans --vault knowledge' \
         "$HERE/cases/all-pass/expected/obsidian-argv"

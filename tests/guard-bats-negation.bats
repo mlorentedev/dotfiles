@@ -28,29 +28,15 @@
 # #1034 empties it; when the last entry goes, so does the list.
 quarantine_list() {
     cat <<'LIST'
-tests/agents-md.bats 2
-tests/aliases.bats 10
-tests/antigravity.bats 4
 tests/bitacora-reconcile.bats 1
 tests/bitacora-rollout.bats 1
 tests/board-pickup.bats 1
 tests/check-doc-paths.bats 1
-tests/compile-harness-real.bats 2
-tests/docs-drift.bats 2
 tests/hermes-setup.bats 1
-tests/hive-upgrade-timer.bats 4
 tests/install-dotf-ps1.bats 1
-tests/knowledge-crystallize-ps1.bats 2
-tests/nan-scripts-secrets.bats 2
-tests/opencode.bats 23
 tests/pi-config.bats 4
 tests/pwsh-analyzer-coverage.bats 1
 tests/shell-wrapper-dedup.bats 2
-tests/skills-pipeline.bats 4
-tests/utils.bats 6
-tests/vault-health-golden.bats 1
-tests/verify-setup.bats 2
-tests/versions-conf.bats 3
 tests/versions-no-hardcode.bats 2
 tests/windows-defaults.bats 2
 LIST

@@ -3,6 +3,8 @@
 # daily Scheduled Task (Windows). The upgrade policy that feeds the Phase C
 # daemon's restart-on-upgrade (hive#176).
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 }
@@ -32,7 +34,7 @@ setup() {
 # The ExecStart must be an ABSOLUTE path: a --user oneshot gets a minimal PATH
 # that may omit ~/.local/bin, so a bare `uv` would fail every slot.
 @test "hive-upgrade.service ExecStart is absolute, not a bare uv on PATH" {
-    ! grep -qE '^ExecStart=uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    refute_grep '^ExecStart=uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
     grep -qE '^ExecStart=%h/' "$DOTFILES_DIR/systemd/hive-upgrade.service"
 }
 
@@ -132,7 +134,7 @@ setup() {
 # Register-ScheduledTask (which would default to the windowed Interactive logon).
 @test "setup-windows.ps1 routes the hive-upgrade task through the S4U helper" {
     grep -qF 'Register-HiveScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1"
-    ! grep -qF 'Register-ScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep_fixed 'Register-ScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup-windows.ps1 hive-upgrade action is windowless (-WindowStyle Hidden)" {
@@ -204,11 +206,11 @@ setup() {
 }
 
 @test "hive-upgrade.ps1 does not collapse no-install into the already-current guard" {
-    ! grep -qF '-not $installed -or' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    refute_grep_fixed '-not $installed -or' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
 }
 
 @test "hive-upgrade.ps1 never runs uv tool ... --reinstall" {
-    ! grep -qE '\$uv tool.*--reinstall' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
+    refute_grep '\$uv tool.*--reinstall' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
 }
 
 @test "hive-upgrade.ps1 is ASCII-only (PSScriptAnalyzer CI)" {

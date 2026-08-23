@@ -2,6 +2,8 @@
 # verify-setup.bats - Integration tests verifying setup-linux.sh side effects
 # Run inside the container built from tests/Dockerfile.integration
 
+load 'lib/refute'
+
 setup() {
     if [ -z "$DOTFILES_INTEGRATION_TEST" ]; then
         skip "only runs inside integration test container"
@@ -193,7 +195,7 @@ setup() {
     # setup-linux.sh strips frontmatter with sed '/^---$/,/^---$/d'
     for prompt in "$HOME/.gemini/prompts"/*.md; do
         [ -f "$prompt" ] || continue
-        ! head -1 "$prompt" | grep -q '^---$'
+        [ "$(head -1 "$prompt")" != '---' ] || { printf 'frontmatter left in %s\n' "$prompt" >&2; return 1; }
     done
 }
 
@@ -314,7 +316,7 @@ setup() {
     [ ! -f "$HOME/.config/opencode/commands/crystallize.md" ]
     # rendered command carries provenance + drops name: (opencode keys off filename)
     grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/audit.md"
-    ! grep -q '^name:' "$HOME/.config/opencode/commands/audit.md"
+    refute_grep '^name:' "$HOME/.config/opencode/commands/audit.md"
 }
 
 @test "no MCP servers registered (claude CLI absent)" {

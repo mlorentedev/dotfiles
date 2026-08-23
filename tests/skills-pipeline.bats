@@ -5,6 +5,8 @@
 # round-trip at the filesystem level. Runs offline (no vault); the integration
 # container exercises the full setup-linux.sh end-to-end.
 
+load 'lib/refute'
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     SCRIPT="$REPO/scripts/compile-harness.sh"
@@ -36,7 +38,7 @@ stub_copilot() {
     grep -q '^name: spec' "$FAKEHOME/.claude/skills/spec/SKILL.md"
     # opencode: spec command file present (name: dropped — keyed off filename)
     [ -f "$FAKEHOME/.config/opencode/commands/spec.md" ]
-    ! grep -q '^name:' "$FAKEHOME/.config/opencode/commands/spec.md"
+    refute_grep '^name:' "$FAKEHOME/.config/opencode/commands/spec.md"
     # AC1: neither deployed path is a symlink
     [ ! -L "$FAKEHOME/.claude/skills/spec" ]
     [ ! -L "$FAKEHOME/.config/opencode/commands/spec.md" ]
@@ -51,7 +53,8 @@ stub_copilot() {
     for f in "$FAKEHOME"/.claude/skills/*/SKILL.md; do
         [ -f "$f" ] || continue
         fm="$(awk '/^---[[:space:]]*$/{n++; next} n==1{print} n>=2{exit}' "$f")"
-        ! echo "$fm" | grep -qE '^(paths|keywords|requires|id|type|status|created|owner|targets):'
+        run grep -nE '^(paths|keywords|requires|id|type|status|created|owner|targets):' <<<"$fm"
+        [ "$status" -eq 1 ] || { printf 'store-only frontmatter left in %s:\n%s\n' "$f" "$output" >&2; return 1; }
     done
 }
 
@@ -70,7 +73,7 @@ stub_copilot() {
     [ "$status" -eq 0 ]
     [ -f "$FAKEHOME/.gemini/skills/spec/SKILL.md" ]
     [ -f "$FAKEHOME/.gemini/prompts/spec.md" ]
-    ! grep -q '^name:' "$FAKEHOME/.gemini/prompts/spec.md"   # frontmatter stripped
+    refute_grep '^name:' "$FAKEHOME/.gemini/prompts/spec.md"   # frontmatter stripped
 }
 
 @test "HANDOFF-001: /handoff deploys cross-agent (claude + opencode + agy) with its checklist" {
@@ -131,7 +134,7 @@ stub_copilot() {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     grep -qF -- '**spec**' "$FAKEHOME/.copilot/copilot-instructions.md"
-    ! grep -qF -- '**crystallize**' "$FAKEHOME/.copilot/copilot-instructions.md"
+    refute_grep_fixed '**crystallize**' "$FAKEHOME/.copilot/copilot-instructions.md"
 }
 
 @test "HARNESS-051: copilot gets native /spec and /handoff skills" {

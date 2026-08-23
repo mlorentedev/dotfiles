@@ -2,6 +2,7 @@
 # Tests for scripts/knowledge-crystallize.ps1 (structural + PSScriptAnalyzer)
 
 load 'winpath'
+load 'lib/refute'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -35,7 +36,7 @@ setup() {
     # resolves the key via Get-ClaudeProjectKey (dotf-backed single source).
     grep -q "utils.ps1" "$PS1_SCRIPT"
     grep -q 'Get-ClaudeProjectKey' "$PS1_SCRIPT"
-    ! grep -q 'function Get-EncodedPath' "$PS1_SCRIPT"
+    refute_grep_fixed 'function Get-EncodedPath' "$PS1_SCRIPT"
 }
 
 @test "knowledge-crystallize.ps1 has Get-DecodedPath function" {
@@ -66,7 +67,7 @@ setup() {
     # The bug mapped ':' to '' (delete), producing C-Users-... which Claude never
     # reads. The correct key maps ':' to '-' (C--Users-...). Guard both: the buggy
     # delete pattern is gone, and the decoder expects the double-dash drive key.
-    ! grep -q "Replace.*':'.*''" "$PS1_SCRIPT"
+    refute_grep "Replace.*':'.*''" "$PS1_SCRIPT"
     grep -q "A-Za-z\].*--" "$PS1_SCRIPT"
 }
 
