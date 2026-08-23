@@ -503,16 +503,23 @@ setup() {
 
 @test "every harness manifest target exists in the deploy dir" {
     [ -f "$DOTFILES_DIR/harness/manifest.json" ]
-    command -v jq >/dev/null 2>&1 || {
-        echo "jq is absent, so the target list cannot be read"
+    # Resolve jq the same way setup does: it is installed to ~/.local/bin, which
+    # is not necessarily on this process's PATH (#1202).
+    local jq_bin=""
+    if command -v jq >/dev/null 2>&1; then
+        jq_bin="jq"
+    elif [ -x "$HOME/.local/bin/jq" ]; then
+        jq_bin="$HOME/.local/bin/jq"
+    else
+        echo "jq is absent from PATH and ~/.local/bin, so the list cannot be read"
         return 1
-    }
+    fi
     local missing="" checked=0
     while IFS= read -r target; do
         [ -n "$target" ] || continue
         checked=$((checked + 1))
         [ -f "$DOTFILES_DIR/$target" ] || missing="$missing $target"
-    done < <(jq -r '.targets[].file' "$DOTFILES_DIR/harness/manifest.json")
+    done < <("$jq_bin" -r '.targets[].file' "$DOTFILES_DIR/harness/manifest.json")
     # An empty list would make every assertion below vacuously true, which is
     # how a guard reports "all clear" on a manifest it never read.
     [ "$checked" -gt 0 ] || {

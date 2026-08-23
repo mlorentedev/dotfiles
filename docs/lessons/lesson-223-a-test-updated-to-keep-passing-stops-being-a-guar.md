@@ -46,9 +46,16 @@ all, and adding it is the obvious local fix. That is what makes the shape worth
 naming: **the change that keeps a guard green is not always the change that keeps
 it a guard.**
 
-The structural cause underneath: the target list existed in **three** places —
-the manifest, `setup-linux.sh`'s copy block, and the test's assembly block. A list
-restated three times can only diverge, and it diverged silently in the one copy
+The structural cause underneath: the target list existed in **four** places — the
+manifest, `setup-linux.sh`'s copy block, `compile-harness-rootresolve.bats`'s
+assembly block, and `setup-linux.bats`, which asserted each literal `safe_copy`
+line by `grep -qF`. The fourth only surfaced when the fix removed those lines and
+CI went red on it, which is its own small lesson: **a test that asserts the
+presence of a hardcoded list can only check that the entries someone remembered
+are there, never that the list is complete.** It was green throughout, on a list
+missing the entry that mattered.
+
+A list restated four times can only diverge, and it diverged silently in the copy
 that had no assertion attached.
 
 ## Rule
@@ -68,6 +75,27 @@ that had no assertion attached.
   check with an unactionable message trains the operator to ignore the check,
   which costs more than the original defect. "Target absent" and "target present
   but disagrees" need different messages; collapsing them is what produced this.
+
+## What the new guard found on its first run
+
+Worth recording, because it is the argument for writing the outcome assertion at
+all. The integration guard went red on its very first CI run — not on the bug it
+was written for, but on a latent one underneath it. In one setup run, 22 seconds
+apart and in the same process:
+
+```
+[SUCCESS] jq installed
+[WARNING] Claude Code CLI, npx, or jq not found, skipping MCP server registration
+```
+
+Both lines are true. `jq` is downloaded to `$HOME/.local/bin`, which the rc files
+put on `PATH` and the running setup process does not have. So `command -v jq`
+is false immediately after a successful install, and every step gated on it —
+MCP server registration among them — is silently skipped on precisely the fresh
+machine that needs it. The success message reports the *download*; the later
+check asks about the *lookup*. **"Installed" has to mean the same thing the next
+check asks about, or the two will disagree and both will look right.** Tracked as
+`#1202`; worked around here by resolving the binary path explicitly.
 
 ## Evidence
 

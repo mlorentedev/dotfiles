@@ -572,11 +572,22 @@ fi
 if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     ensure_directory "$DOTFILES_DIR/harness"
     cp -rf "$CURRENT_DIR/harness/." "$DOTFILES_DIR/harness/" 2>/dev/null || true
-    if command -v jq >/dev/null 2>&1 && [ -f "$CURRENT_DIR/harness/manifest.json" ]; then
+    # Resolve jq by path, not by name. The installer above downloads it to
+    # ~/.local/bin, which the rc files put on PATH but THIS process may not have
+    # — measured in the integration container, where setup logs "jq installed"
+    # and then "jq not found" 22 seconds later in the same run. A `command -v`
+    # test alone therefore skips the mirror right after a successful install.
+    _jq=""
+    if command -v jq >/dev/null 2>&1; then
+        _jq="jq"
+    elif [ -x "$HOME/.local/bin/jq" ]; then
+        _jq="$HOME/.local/bin/jq"
+    fi
+    if [ -n "$_jq" ] && [ -f "$CURRENT_DIR/harness/manifest.json" ]; then
         # Read line by line: `for f in $(jq ...)` does not word-split in zsh,
         # which would yield ONE target containing every path (see CLAUDE.md's
         # prohibited-pattern table — this row fails silently).
-        jq -r '.targets[].file' "$CURRENT_DIR/harness/manifest.json" 2>/dev/null \
+        "$_jq" -r '.targets[].file' "$CURRENT_DIR/harness/manifest.json" 2>/dev/null \
         | while IFS= read -r _harness_target; do
             [ -n "$_harness_target" ] || continue
             [ -f "$CURRENT_DIR/$_harness_target" ] || continue
@@ -588,6 +599,7 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     else
         log_warning "jq or harness/manifest.json unavailable — harness targets not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
     fi
+    unset _jq
 fi
 
 # Claude Code
