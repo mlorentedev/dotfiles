@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.1](https://github.com/mlorentedev/dotfiles/compare/v0.47.0...v0.47.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **setup:** deploy the settings.json env block instead of dropping it ([#1188](https://github.com/mlorentedev/dotfiles/issues/1188)) ([62ea2f3](https://github.com/mlorentedev/dotfiles/commit/62ea2f3df0ee274d59dd947f1d35cc003d20fdae))
+
 ## [0.47.0](https://github.com/mlorentedev/dotfiles/compare/v0.46.0...v0.47.0) (2026-08-22)
 
 
