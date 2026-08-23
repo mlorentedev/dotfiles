@@ -20,7 +20,8 @@ trigger. The split is declared here so no PR silently absorbs the next:
 |---|---|---|---|
 | **A** | `mlorentedev/hive` | worker becomes NaN-only (Ollama + OpenRouter removed); `hive delegate` dispatch verb, single-shot, `--model` and `--timeout` required | unblocks AC6 |
 | **B** | `dotfiles` | `dotf agent run` — flags, JSON contract, chain walk through the existing loader, fake backend | AC1, AC2, AC5 |
-| **C** | `dotfiles` | semaphore, timeout + cancellation, fail-closed refusals | AC3, AC4 |
+| **C1** | `dotfiles` | cross-process semaphore over the declared budget; timeout kills and releases the slot before the worker is reaped | AC3 |
+| **C2** | `dotfiles` | machine identity, `pools.deny` evaluated at dispatch time, fail-closed refusals and their wording | AC4 |
 | **D** | `dotfiles` | real backends: subprocess and hive probes, the tie-break, end-to-end smoke | AC6 |
 | **E** | `dotfiles` | IaC: hive service unit via `dotf secrets run`, `environment.d` and `mcp_servers.json` cleanup, `dotf doctor` reachability check | AC7, AC8, AC9 |
 
@@ -92,17 +93,43 @@ Added while implementing B, each because the work surfaced it rather than becaus
 - [x] [AC1] `agent run` registered in `TestStdoutContracts`, the existing registry of subcommands
       whose output is machine-read.
 
-### PR C — the brakes
+### PR C1 — the semaphore and the deadline
 
-- [ ] [P] [AC3] Failing test: a fake backend that outlives its deadline is killed, and the semaphore
-      slot is observably free **before** the worker is reaped
-- [ ] [AC3] Implement per-dispatch timeout (required, no silent default) and cancellation
-- [ ] [P] [AC4] Failing test: an unreadable concurrency counter exits non-zero rather than reading as
-      zero in use
+- [x] [P] [AC3] Failing test: a fake backend that outlives its deadline is abandoned, and the
+      semaphore slot is observably free **before** the worker is reaped
+- [x] [AC3] Implement per-dispatch timeout (required, no silent default) and cancellation
+- [x] [AC3] Implement the semaphore over `harness.DeclaredBudget` — capacity is `concurrency` minus
+      `reserve_interactive`, per pool
+- [x] [P] [AC4] Failing test: an unreadable concurrency counter refuses rather than reading as zero in
+      use. **Tagged AC4 and landed in C1** because in this design the counter IS the semaphore state,
+      so the test has nowhere else to live; the rest of AC4 is C2's.
+
+Added while implementing C1:
+
+- [x] [AC3] The backend call runs on its own goroutine, selected against the deadline. Handing the
+      backend a context is not enough: a backend that ignores it — a subprocess blocked on a read, a
+      remote that never answers — would hold the dispatcher open forever and make the declared
+      timeout fiction.
+- [x] [AC3] A saturated pool advances the chain **without reaching the backend**, and leaves a
+      `pool_unavailable` attempt behind. A timeout does **not** advance it.
+- [x] [AC3] A pool that declares no concurrency is *unbounded*, not capacity zero, and the record
+      says so (`unbounded`). Reading a seat-based pool's silence as zero would refuse every dispatch
+      the map never asked to refuse.
+- [x] [AC3] The OS file lock (`flock` / `LockFileEx`, behind build tags) rather than a marker file:
+      the kernel drops it when the holder dies, so a `dotf` killed with SIGKILL frees its slot.
+
+### PR C2 — machine identity and denial
+
 - [ ] [AC4] Failing test: a machine whose identity cannot be established denies every non-local pool
-- [ ] [AC4] Implement the semaphore over `harness.DeclaredBudget`, and both fail-closed paths
+- [ ] [AC4] Implement machine identity and `pools.deny`, read from `machine.json` **at dispatch time**
+      (ADR-032 §7) and never cached
+- [ ] [AC4] Validate `pools.deny` names against the map's pools — a typo (`claud`) would leave
+      `claude` allowed, a silent failure in the direction §8 exists to prevent
 - [ ] [AC4] Assert the wording: help text and error messages state *`dotf` alone will never be the
       cause of exhaustion*, never that exhaustion cannot happen
+- [ ] [AC4] Point the bats smoke at a fixture HOME. Once identity is required, the smoke's own
+      dispatches refuse on any machine that has not declared one — including CI. The case that
+      asserts the refusal is AC4's bats evidence.
 
 ### PR D — the real backends
 

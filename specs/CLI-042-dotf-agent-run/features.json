@@ -50,8 +50,8 @@
   },
   {
     "id": "CLI-042-dotf-agent-run-f8",
-    "behavior": "AC3 — a dispatch exceeding its timeout kills the worker and releases its semaphore slot without waiting for it, reporting a non-zero exit with a timeout status",
-    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestTimeoutReleasesSlotBeforeReap$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestTimeoutReleasesSlotBeforeReap'",
+    "behavior": "AC3 — a dispatch exceeding its timeout is abandoned, reports a non-zero exit with a timeout status, and its slot is free BEFORE the worker is reaped",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_TimeoutReleasesSlotBeforeReap$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_TimeoutReleasesSlotBeforeReap'",
     "state": "pending",
     "evidence": ""
   },
@@ -59,6 +59,41 @@
     "id": "CLI-042-dotf-agent-run-f9",
     "behavior": "AC3 — the per-dispatch deadline actually reaches the backend rather than being a parsed-but-inert flag (the half of AC3 that PR B can hold; the kill is PR C's)",
     "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_BackendReceivesADeadline$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_BackendReceivesADeadline'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f18",
+    "behavior": "AC3 — a timeout does not advance the chain: the task may still be running, so a second pool would double-spend on work that may already have been billed",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_TimeoutDoesNotAdvanceTheChain$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_TimeoutDoesNotAdvanceTheChain'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f19",
+    "behavior": "AC3 — the semaphore bounds concurrency at the declared capacity per pool, pools are independent, and release is idempotent",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestSemaphore_' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestSemaphore_BoundsConcurrencyAtCapacity'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f20",
+    "behavior": "AC3 — the enforced capacity is concurrency minus reserve_interactive, and a pool declaring no concurrency is unbounded rather than capacity zero",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestDeclaredCapacity$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDeclaredCapacity'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f21",
+    "behavior": "AC3 — the semaphore holds through the compiled binary and the real OS lock: a saturated pool is skipped and the chain advances",
+    "verification": "~/.local/bin/bats tests/dotf-agent-run.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f22",
+    "behavior": "AC4 — an unreadable semaphore state directory is a refusal, not zero in use, and does not classify as busy (which would advance the chain against the same broken state)",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestSemaphore_UnreadableStateIsAnErrorNotZeroInUse$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestSemaphore_UnreadableStateIsAnErrorNotZeroInUse'",
     "state": "pending",
     "evidence": ""
   },

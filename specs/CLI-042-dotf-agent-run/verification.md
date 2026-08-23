@@ -9,9 +9,10 @@ created: "2026-08-23"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-**PR B only.** This spec ships as the five-PR sequence `tasks.md` declares. B covers AC1, AC2 and AC5;
-the rest are named here as open with the PR that owns them, so a partly-filled section is never read
-as a partly-met criterion.
+**PRs B and C1.** This spec ships as the sequence `tasks.md` declares (C was split into C1/C2 during
+C1, because one PR carrying both AC3 and AC4 does not fit the atomic cap). B covered AC1, AC2 and
+AC5; **C1 covers AC3**. The rest are named here as open with the PR that owns them, so a
+partly-filled section is never read as a partly-met criterion.
 
 - [x] AC1 (JSON contract on stdout, logs on stderr) -> `TestAgentRun_WritesOneJSONObjectToStdout`,
       `TestAgentRun_RefusalsLeaveStdoutEmpty`, `TestAgentRun_ReportsTheRouteTheMapDeclares`,
@@ -20,11 +21,20 @@ as a partly-met criterion.
 - [x] AC2 (pool-unavailable advances the chain, task-failed does not) -> `TestDispatch_ChainWalk`
       (6 cases, including the exhausted chain, an unrecognised status and a malformed entry),
       `TestDispatch_RecordsDurationAndAttempts`, `TestExitCode`
-- [ ] AC3 (timeout kills the worker and frees the slot before reaping) -> **PR C.** The half B can
-      hold is proven: `TestDispatch_BackendReceivesADeadline` shows the per-dispatch deadline reaches
-      the backend rather than being a parsed-but-inert flag. The kill and the slot release need
-      something real to kill.
-- [ ] AC4 (fails closed on an unreadable counter and an unidentifiable machine) -> **PR C**
+- [x] AC3 (timeout abandons the worker and frees the slot before reaping) -> **PR C1.**
+      `TestDispatch_TimeoutReleasesSlotBeforeReap` takes the freed slot *while the abandoned worker is
+      still running*, which is only possible if the release does not wait on it.
+      `TestDispatch_TimeoutDoesNotAdvanceTheChain`, `TestSemaphore_*` (capacity, pool independence,
+      idempotent release), `TestDeclaredCapacity` (reserve subtracted; undeclared ≠ zero), and a bats
+      case that saturates the pool with real `flock`s and drives the compiled binary.
+      **Read the guarantee narrowly**, as the map and ADR-032 §3 both do: this bounds `dotf`-dispatched
+      work only. A hand-run `qq`, a pi TUI turn or a hive embedding call takes a slot the semaphore
+      never sees. The claim is *`dotf` alone will never be the cause of exhaustion*, not that
+      exhaustion cannot happen.
+- [ ] AC4 (fails closed on an unreadable counter and an unidentifiable machine) -> **PR C2**, except
+      the counter half, which landed in C1 (`TestSemaphore_UnreadableStateIsAnErrorNotZeroInUse`) —
+      in this design the semaphore state IS the counter, so the test has nowhere else to live. The
+      machine-identity half and the wording assertion are C2's.
 - [x] AC5 (the top tier escalates, never degrades) -> `TestDispatch_TopTierNeverDegrades` (behaviour)
       and `TestChainsTopIsCappedWithoutLosingTheChainShape` (shape, in the schema)
 - [ ] AC6 (the hive backend answers and reports pool + model) -> **PR D.** Still unrunnable on this
@@ -38,7 +48,8 @@ as a partly-met criterion.
 
 ## Test status
 
-Produced 2026-08-23 on branch `feat/dotf-agent-run`, off `origin/main` @ `a27dcc8`.
+Produced 2026-08-23. PR B on `feat/dotf-agent-run` off `a27dcc8`; PR C1 on
+`feat/dotf-agent-brakes` off `7e734c4`. Both figures below are from the C1 run.
 
 - Go: `cd cli && go build ./... && go vet ./... && go test ./...` -> all packages ok, 0 failures
 - Windows leg: `GOOS=windows go vet ./...` -> clean (the CI leg that compiles the same tree)
@@ -46,7 +57,11 @@ Produced 2026-08-23 on branch `feat/dotf-agent-run`, off `origin/main` @ `a27dcc
 - Lint: `golangci-lint run` (v2.12.2, matching the `versions.conf` pin) -> **0 issues**
 - Shell: `~/.local/bin/bats tests/*.bats` -> **1462 tests, exit 0, 0 failures**; `shellcheck` clean on
   the new `tests/dotf-agent-run.bats`
-- `features.json` commands executed individually: **10 exit 0, 7 exit non-zero**. The ten are f1–f7,
+- `features.json` commands executed individually: **16 exit 0, 6 exit non-zero** after C1 (was 10/7
+  after B; C1 added five features and turned f8 green). The six that fail are AC4's machine half
+  (f10, f11 → C2), AC6 (f14 → D) and AC7–AC9 (f15–f17 → E).
+
+  The B-era figure, for the record: **10 exit 0, 7 exit non-zero**. The ten are f1–f7,
   f9, f12 and f13; note f9 belongs to AC3, which is PR C's — it is the half of that criterion B can
   hold (the deadline reaches the backend), and counting it under B would misreport AC3 as met. The
   seven that fail are the criteria PRs C, D and E own, which is what `pending` has to mean.
@@ -72,6 +87,17 @@ breaking them:
 - Removing the sibling `$ref` from `chains.top` in the schema -> three of the five cases in
   `TestChainsTopIsCappedWithoutLosingTheChainShape` fail: `chains.top: "claude:opus"` (a string) and
   `chains.top: []` are both **accepted**.
+
+C1's three, each dying for a different reason — which is the evidence the assertions are independent
+rather than one assertion wearing three hats:
+
+- Waiting for the worker before releasing the slot (`<-done` ahead of `Release`) -> the dispatch never
+  returns at all; the test's own 5s guard fires.
+- Not releasing on the timeout path -> the slot is still held while the abandoned worker runs, and the
+  test names it: *the reserve then under-counts what is free for as long as the worker lives*.
+- `IsPoolBusy` returning false -> a full pool stops the walk instead of advancing it; two tests fail.
+- And through the binary: making every pool unbounded -> the bats saturation case fails, because the
+  dispatch goes to the pool whose slots are all held.
 
 ## Decisions made during implementation
 
