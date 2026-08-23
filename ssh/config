@@ -35,8 +35,11 @@ Host jet1
   User manu
   IdentityFile ~/.ssh/id_ed25519
 
-Host aws1
-  Hostname aws1.kubelab.internal
+# The Argo CD hub. NAME, never a mesh IP: a MIG recreate rotates it
+# (.21 -> .24 -> .12 -> .13 across August 2026), so a pinned address is stale
+# from the next recreate onward. MagicDNS tracks it.
+Host gcp1
+  Hostname gcp1.kubelab.internal
   User deployer
   IdentityFile ~/.ssh/id_ed25519
 
@@ -86,7 +89,8 @@ Host jet1-lan
   IdentityFile ~/.ssh/id_ed25519
   ProxyJump rpi4-lan
 
-# aws1-pub removed — use `terraform output public_ip` for bootstrap access
+# No hub-pub alias: the GCP hub has no static public address to pin, and its
+# bootstrap access is `gcloud compute ssh` against the MIG's current instance.
 
 Host vps-pub
   Hostname 162.55.57.175
@@ -132,8 +136,10 @@ Host jet1-ext
   IdentityFile ~/.ssh/id_ed25519
   ProxyJump vps-pub
 
-Host aws1-ext
-  Hostname 100.64.0.7
+# Resolved on the bastion, which is itself on the mesh — so the name works here
+# too, and survives the recreates that would strand a pinned address.
+Host gcp1-ext
+  Hostname gcp1.kubelab.internal
   User deployer
   IdentityFile ~/.ssh/id_ed25519
   ProxyJump vps-pub
