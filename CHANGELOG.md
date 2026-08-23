@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.48.0](https://github.com/mlorentedev/dotfiles/compare/v0.47.1...v0.48.0) (2026-08-23)
+
+
+### Features
+
+* **harness:** compile catchup session briefing skill from vault ([#1198](https://github.com/mlorentedev/dotfiles/issues/1198)) ([9c644ec](https://github.com/mlorentedev/dotfiles/commit/9c644eca062ccf55a06ee686b2bdddb6acffdde4))
+
+
+### Bug Fixes
+
+* **mem:** only project and reference memories archive on age ([#1193](https://github.com/mlorentedev/dotfiles/issues/1193)) ([064f20c](https://github.com/mlorentedev/dotfiles/commit/064f20ce2be2c765f298292042992acb533854b9)), closes [#967](https://github.com/mlorentedev/dotfiles/issues/967)
+
 ## [0.47.1](https://github.com/mlorentedev/dotfiles/compare/v0.47.0...v0.47.1) (2026-08-22)
 
 
