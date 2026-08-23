@@ -13,6 +13,10 @@ var version = "dev"
 
 func main() {
 	if err := cmd.New(version).Execute(); err != nil {
-		os.Exit(1)
+		// Not a bare 1: `dotf agent run` distinguishes "no pool could serve
+		// this" from "the task failed", and that distinction has to survive the
+		// process boundary or a composer cannot act on it. Everything else is
+		// untagged and still exits 1.
+		os.Exit(cmd.ExitCode(err))
 	}
 }

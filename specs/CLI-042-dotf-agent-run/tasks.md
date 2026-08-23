@@ -39,31 +39,58 @@ The dispatcher must therefore treat an unrecognised exit code as *task failed*, 
 
 ## Setup
 
-- [ ] Branch created from main: `feat/dotf-agent-run`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions" — **two are still open**: the
-      backend tie-break for a `nan` chain entry, and the secret-delivery shape for the hive daemon
-- [ ] Issue opened on `mlorentedev/hive` for PR A, linked as blocking #1190
+- [x] Branch created from main: `feat/dotf-agent-run`
+- [x] `proposal.md` is complete and acceptance criteria are testable — the nine were blessed in PR B
+      (2026-08-23), with AC6 and AC8 reworded against what PR A actually shipped
+- [x] No open questions left in `proposal.md` "Risks / open questions" **that gate the PR being
+      worked**. The two that remain — the backend tie-break for a `nan` chain entry, and the
+      secret-delivery shape for the hive daemon — are scoped to PRs D and E respectively, and neither
+      is reachable from B or C: there is no second backend to tie-break between until D, and no daemon
+      to deliver a secret to until E. They must be closed before their own PR opens, not before this
+      one does.
+- [x] Issue opened on `mlorentedev/hive` for PR A, linked as blocking #1190 — `mlorentedev/hive#384`,
+      shipped and released as `hive-vault` 4.1.0; `hive delegate` is installed and dispatches
 
 ## Implementation
 
 ### PR B — the command and its contract
 
-- [ ] [P] [AC1] Failing test: `dotf agent run` writes one JSON object to stdout with `status`,
+- [x] [P] [AC1] Failing test: `dotf agent run` writes one JSON object to stdout with `status`,
       `pool`, `model`, `exit`, `duration_ms`, `output`, and nothing but JSON on stdout
-- [ ] [AC1] Implement the command, its flags (`--role`, `--task`, `--tier`, `--cwd`, `--timeout`,
+- [x] [AC1] Implement the command, its flags (`--role`, `--task`, `--tier`, `--cwd`, `--timeout`,
       `--backend`) and the JSON encoder; every log line goes to stderr
-- [ ] [P] [AC2] Failing test: a fake backend scripted to return *pool unavailable* advances to the
+- [x] [P] [AC2] Failing test: a fake backend scripted to return *pool unavailable* advances to the
       next `chains` entry; one scripted to return *task failed* does not
-- [ ] [AC2] Implement the chain walk over `harness.ResolveChain`, and the error classification that
+- [x] [AC2] Implement the chain walk over `harness.ResolveChain`, and the error classification that
       keeps the two cases distinct
-- [ ] [AC2] Failing test + implement: chain exhausted — every entry unavailable — is its own outcome,
+- [x] [AC2] Failing test + implement: chain exhausted — every entry unavailable — is its own outcome,
       distinguishable from a task failure
-- [ ] [P] [AC5] Failing test: `--tier top` with `claude:opus` unavailable escalates and exits
+- [x] [P] [AC5] Failing test: `--tier top` with `claude:opus` unavailable escalates and exits
       non-zero, and never resolves a mid-tier model
-- [ ] [AC5] Implement the top-tier no-degrade rule
-- [ ] Refactor: the backend interface is the seam — one method, the five semantics, no backend-specific
+- [x] [AC5] Implement the top-tier no-degrade rule
+- [x] Refactor: the backend interface is the seam — one method, the five semantics, no backend-specific
       types leaking into the dispatcher
+
+Added while implementing B, each because the work surfaced it rather than because it was planned:
+
+- [x] [AC2] Exit-code plumbing: `main()` could only ever exit 1, so `chain_exhausted` was
+      indistinguishable from a task failure at the process boundary — the exact collapse AC2 forbids
+      one layer down. A tagged error, unwrapped in `main`, rather than the `os.Exit`-inside-`RunE`
+      precedent in `secrets.go`, which costs a re-exec harness in its test file.
+- [x] [AC1] A `dry-run` backend, so the criterion's bats half runs against something. See the decision
+      table in `proposal.md`.
+- [x] [AC1] The record's output cap (`agent.OutputCap`) with an in-band `truncated` marker — ADR-032
+      §2's "output bounded by a cap" is part of the record contract, so it belongs to B, and a capped
+      output that does not say so reads as a complete short answer.
+- [x] [AC5] `chains.top` capped at one entry in `model-map.schema.json`. The behaviour rule alone
+      would leave a map free to *declare* a fallback the dispatcher silently ignores. **The first
+      attempt at this was wrong in an instructive way:** naming `top` under `properties` exempts it
+      from `additionalProperties`, so a bare `maxItems` removed the array type, the minimum and the
+      `pool:model` pattern — an edit that reads as a tightening and is a loosening. The sibling
+      `$ref` is what holds the shape, and `TestChainsTopIsCappedWithoutLosingTheChainShape` fails
+      without it.
+- [x] [AC1] `agent run` registered in `TestStdoutContracts`, the existing registry of subcommands
+      whose output is machine-read.
 
 ### PR C — the brakes
 

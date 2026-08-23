@@ -239,3 +239,4 @@ tags: [lessons, index, dotfiles]
 | [223 - A test updated to keep passing stops being a guard](lesson-223-a-test-updated-to-keep-passing-stops-being-a-guar.md) | 2026-08-23 |  |
 | [224 - A negated assertion is exempt from `set -e`, so it cannot fail a test](lesson-224-a-negated-assertion-is-exempt-from-set-e-so-it-cann.md) | 2026-08-23 |  |
 | [225 - A stacked PR costs a reviewer, and re-conflicts on every squash](lesson-225-a-stacked-pr-costs-a-reviewer-and-re-conflicts-on-e.md) | 2026-08-23 |  |
+| [226 - Naming a key under `properties` exempts it from `additionalProperties`, so adding a constraint there can loosen the schema](lesson-226-naming-a-key-under-properties-exempts-it-from-additio.md) | 2026-08-23 |  |

@@ -1,7 +1,7 @@
 ---
 id: "CLI-042-dotf-agent-run"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-08-23"
 issue: "mlorentedev/dotfiles#1190"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -45,6 +45,14 @@ Three contract decisions taken deliberately, recorded here so they are not re-de
 | Dispatch mode | **Synchronous**: blocks, returns R | ADR-032 §2's seam is literally *"run role A on task T, isolated in W, return R"*. Local evidence: `dotf spec review` launches **detached**, which is exactly why GUARD-005 exists — a detached launcher cannot observe its own verdict, so it needed a sidecar plus a downstream assertion. Starting synchronous avoids reopening that hole; `--detach` can be added later, never the reverse. |
 | Backend selection | **Probe, with `--backend` as an override** | ADR-032 §7: machine facts are probed, never stored — an inventory file rots, a probe cannot lie. Consistent with how the map already declares `probe: bin:claude` / `env:NAN_API_KEY`. The flag exists to force a backend and to make tests deterministic. |
 | stdout | **JSON always**; logs to stderr | The consumer of `agent run` is a dispatcher, not a person — the verb exists to be composed. Precedent: `dotf env path` and the agent-mode contract of #700. |
+
+Three more fixed while implementing PR B, recorded here so they are not re-derived either:
+
+| Decision | Choice | Why |
+|---|---|---|
+| Exit codes | **0 answered, 1 task failed, 3 no pool could serve.** Anything unrecognised is read as *task failed*. | The same three `hive delegate` uses, deliberately: one vocabulary spans the seam, so a composer that already speaks to hive speaks to `dotf agent run` without a translation table — and a translation table is where the two would drift. The fail-closed direction is pinned by the same reasoning as in `tasks.md`: reading an unknown code as *unavailable* would advance the chain and spend a second pool on a task that may already have been answered. The record's `status` carries the fine-grained truth (`escalated` and `chain_exhausted` share exit 3 and are different facts); the exit code carries the coarse class. |
+| A `dry-run` backend | **A first-class backend, shipped in PR B** — resolves the route, sends nothing, reports `status: dry_run` and exit 0. | Two reasons, and the second is the one that made it a decision rather than a convenience. It has standing value after PR D: inspecting which pool and model a tier resolves to on this machine, without spending a slot of a shared quota. And it is what makes AC1's bats half *runnable* — without it PR B would ship a criterion whose verification command selects nothing, which is precisely the defect measured on this spec's sibling in the 2026-08-22 session (four of eight `features.json` commands ran zero tests). The scripted fake the Go tests use stays test-only and is reachable only through the seam: a `--backend` value that exists to make tests pass is a surface users reach by accident. |
+| No backend default | **`--backend` is required until probing lands (PR D).** | Defaulting to `dry-run` would be the worst option available: a dispatch that silently ran nothing and exited 0. A loud refusal naming what exists is the fail-closed direction, and it disappears on its own when the probe can answer. |
 
 **Backends: two, and the second one has to be repaired first.** Decided 2026-08-22 after the
 measurement in Risks below: a seam validated against a single implementation is a speculative
@@ -177,7 +185,8 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] **AC1 — the machine contract holds.** `dotf agent run --role <r> --task <t> --tier mid` writes a
+- [ ] **AC1 — the machine contract holds.** `dotf agent run --role <r> --task <t> --tier mid --backend
+      <b> --timeout <d>` writes a
       single JSON object to **stdout** carrying at least `status`, `pool`, `model`, `exit`,
       `duration_ms` and `output`, with every log line on **stderr**. Verified by a table-driven Go test
       and a bats smoke that pipes stdout through a JSON parser with stderr attached.
@@ -208,15 +217,28 @@ Observable outcomes. Each must be testable.
 - [ ] **AC5 — the top tier never degrades silently.** With `claude:opus` unavailable, a `--tier top`
       dispatch escalates and exits non-zero; it never falls through to a mid-tier model. Tested.
 - [ ] **AC6 — the hive backend passes a real smoke check.** `dotf agent run --backend hive --tier mid`
-      returns an answer served by NaN and reports `pool=nan` with the model the chain resolved. This is
-      the criterion hive's repair exists to unblock, and it is the one that cannot pass today.
+      returns an answer and reports `pool=nan` with the model the chain resolved. This is the criterion
+      hive's repair exists to unblock, and it is the one that cannot pass on this machine today.
+      **Reworded 2026-08-23, after PR A shipped.** The original said "returns an answer *served by NaN*",
+      which is not observable from this side of the seam: `hive delegate --help` describes "the
+      configured worker" and names no provider on any shipped surface (`mlorentedev/hive#392`, `#394`),
+      by design. The pool name in the record is the DISPATCHER's claim, read from `chains` — so the
+      falsifiable form is *the model the chain named is the model that answered*, and the smoke asserts
+      that rather than grepping hive's output for a provider string it will never print.
 - [ ] **AC7 — the NaN credential never lands in a file.** The hive service unit invokes
       `dotf secrets run -- hive serve`, and the deployed `environment.d` fragment contains no
       credential. Asserted by a test reading the rendered unit and grepping the deployed fragment,
       verified by consequence (the daemon answers) rather than by printing the value.
-- [ ] **AC8 — the drop of Ollama and OpenRouter is complete, not partial.** No configuration this repo
-      deploys still names them for hive's worker, and `ai/agy/mcp_servers.json`'s `HIVE_OLLAMA_ENDPOINT`
-      is removed in the same change that removes the provider.
+- [ ] **AC8 — the drop of Ollama and OpenRouter from hive's worker is complete, not partial.** No
+      configuration this repo deploys still names either **for hive's worker**, and
+      `ai/agy/mcp_servers.json`'s `HIVE_OLLAMA_ENDPOINT` is removed in the same change.
+      **Scoped and re-measured 2026-08-23; NOT retired.** Two corrections. First, the criterion is
+      about hive's worker and nothing wider: `ai/opencode/opencode.jsonc` declares `ollama` and
+      `openrouter` as providers of the **opencode TUI**, which this drop does not touch — removing
+      those would be an unrelated regression wearing this criterion's clothes. Second, hive removing
+      the provider upstream did not satisfy this: `HIVE_OLLAMA_ENDPOINT` is still deployed at
+      `ai/agy/mcp_servers.json:10` on this tree. Hive dropping a provider and this repo ceasing to
+      deploy its endpoint are two changes, and only the first has happened.
 - [ ] **AC9 — "zero reachable models" is caught at diagnostic time, not under dispatch load.**
       `dotf doctor` reports a backend that probes present but can serve nothing, and fails rather than
       passing quietly. This is the incident-to-guard emission for the defect that shaped this spec:
