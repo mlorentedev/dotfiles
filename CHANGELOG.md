@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.1](https://github.com/mlorentedev/dotfiles/compare/v0.48.0...v0.48.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **setup:** derive the harness mirror from the manifest, not a hardcoded list ([#1201](https://github.com/mlorentedev/dotfiles/issues/1201)) ([b04a6c4](https://github.com/mlorentedev/dotfiles/commit/b04a6c4e8c44ccfe7d30e950d74262747fe5cd20))
+
 ## [0.48.0](https://github.com/mlorentedev/dotfiles/compare/v0.47.1...v0.48.0) (2026-08-23)
 
 
