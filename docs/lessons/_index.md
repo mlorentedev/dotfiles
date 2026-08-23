@@ -238,3 +238,4 @@ tags: [lessons, index, dotfiles]
 | [222 - A coupling's scope is measured, not inferred from where you saw it fail](lesson-222-a-couplings-scope-is-measured-not-inferred-from-whe.md) | 2026-08-23 |  |
 | [223 - A test updated to keep passing stops being a guard](lesson-223-a-test-updated-to-keep-passing-stops-being-a-guar.md) | 2026-08-23 |  |
 | [224 - A negated assertion is exempt from `set -e`, so it cannot fail a test](lesson-224-a-negated-assertion-is-exempt-from-set-e-so-it-cann.md) | 2026-08-23 |  |
+| [225 - A stacked PR costs a reviewer, and re-conflicts on every squash](lesson-225-a-stacked-pr-costs-a-reviewer-and-re-conflicts-on-e.md) | 2026-08-23 |  |
