@@ -236,3 +236,4 @@ tags: [lessons, index, dotfiles]
 | [220 - Four defects, one shape: a thing verified by a proxy that lives somewhere else](lesson-220-four-defects-one-shape-a-thing-verified-by-a-proxy.md) | 2026-08-22 |  |
 | [221 - An allow-list merge makes every new template key a silent no-op](lesson-221-an-allow-list-merge-makes-every-new-template-key-a.md) | 2026-08-22 |  |
 | [222 - A coupling's scope is measured, not inferred from where you saw it fail](lesson-222-a-couplings-scope-is-measured-not-inferred-from-whe.md) | 2026-08-23 |  |
+| [223 - A test updated to keep passing stops being a guard](lesson-223-a-test-updated-to-keep-passing-stops-being-a-guar.md) | 2026-08-23 |  |

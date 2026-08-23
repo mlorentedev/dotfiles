@@ -487,3 +487,51 @@ setup() {
     [ -z "$output" ]
 }
 
+# =============================================================================
+# Section: harness injection targets are mirrored into the deploy dir
+#
+# `dotf doctor` runs `compile-harness.sh --check` from $DOTFILES_DIR, so every
+# file harness/manifest.json declares as a target must exist there. #1176 added
+# ai/orca/ORCA.md to the manifest without a copy line in setup-linux.sh, and the
+# result was a permanent doctor FAIL whose printed remedy could not clear it:
+# running --refresh from the repo exits 0, because the repo has the file (#1200).
+#
+# This asserts the OUTCOME on a real deploy, which is the half no unit test can
+# reach — tests/compile-harness-rootresolve.bats builds its own tmp mirror, so
+# it passed throughout by hand-copying the file setup never delivered.
+# =============================================================================
+
+@test "every harness manifest target exists in the deploy dir" {
+    [ -f "$DOTFILES_DIR/harness/manifest.json" ]
+    command -v jq >/dev/null 2>&1 || {
+        echo "jq is absent, so the target list cannot be read"
+        return 1
+    }
+    local missing="" checked=0
+    while IFS= read -r target; do
+        [ -n "$target" ] || continue
+        checked=$((checked + 1))
+        [ -f "$DOTFILES_DIR/$target" ] || missing="$missing $target"
+    done < <(jq -r '.targets[].file' "$DOTFILES_DIR/harness/manifest.json")
+    # An empty list would make every assertion below vacuously true, which is
+    # how a guard reports "all clear" on a manifest it never read.
+    [ "$checked" -gt 0 ] || {
+        echo "read zero targets from manifest.json — the guard checked nothing"
+        return 1
+    }
+    [ -z "$missing" ] || {
+        echo "manifest targets missing from $DOTFILES_DIR:$missing"
+        echo "setup-linux.sh must mirror every harness/manifest.json target"
+        return 1
+    }
+}
+
+@test "compile-harness --check passes from the deploy dir" {
+    # The assertion dotf doctor makes, made directly: a green --check here is
+    # what a green [Harness + skill drift] section means.
+    [ -x "$DOTFILES_DIR/scripts/compile-harness.sh" ]
+    run bash "$DOTFILES_DIR/scripts/compile-harness.sh" --check
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q 'no harness drift'
+}
+
