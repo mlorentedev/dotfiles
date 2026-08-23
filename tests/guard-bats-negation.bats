@@ -110,9 +110,11 @@ quarantined_count() {
 }
 
 @test "guard: the detector actually detects, on a fixture with a known answer" {
-    # A guard that silently matches nothing reports a clean suite forever. This
-    # pins the detector against a file whose answer is counted by hand: three
-    # bare negations, and four shapes that must NOT count.
+    # A guard that silently matches nothing reports a clean suite forever, and
+    # one that overcounts turns the ratchet into noise. This pins the detector
+    # against a file whose answer is counted by hand: three bare negations, and
+    # six shapes that must NOT count — including a commented-out negation and a
+    # `!` that is merely an argument, which are the plausible false positives.
     local probe
     probe="$(mktemp)"
     {
@@ -124,6 +126,8 @@ quarantined_count() {
         printf '    [ ! -f x ]\n'
         printf '    refute_grep a b\n'
         printf '    printf "%%s" "!"\n'
+        printf '    # ! grep -q a b\n'
+        printf '    foo || ! bar\n'
         printf '}\n'
     } > "$probe"
 
