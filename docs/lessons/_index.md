@@ -235,3 +235,4 @@ tags: [lessons, index, dotfiles]
 | [219 - A stale CLI refuses with the same exit status as a legitimate refusal](lesson-219-a-stale-cli-refuses-with-the-same-exit-status-as-a.md) | 2026-08-21 |  |
 | [220 - Four defects, one shape: a thing verified by a proxy that lives somewhere else](lesson-220-four-defects-one-shape-a-thing-verified-by-a-proxy.md) | 2026-08-22 |  |
 | [221 - An allow-list merge makes every new template key a silent no-op](lesson-221-an-allow-list-merge-makes-every-new-template-key-a.md) | 2026-08-22 |  |
+| [222 - A coupling's scope is measured, not inferred from where you saw it fail](lesson-222-a-couplings-scope-is-measured-not-inferred-from-whe.md) | 2026-08-23 |  |
