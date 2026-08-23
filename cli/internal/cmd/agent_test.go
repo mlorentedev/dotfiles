@@ -11,12 +11,41 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
+// declareIdentity points machine.json at a fixture that declares one, so a case
+// exercising the dispatch path is not stopped by the identity gate.
+//
+// It is a fixture rather than the machine's real file for the reason the gate
+// exists: a test that passed only on a machine whose owner had configured it
+// would be green here and red in CI, and the version that "fixed" that would be
+// one that skipped the gate.
+func declareIdentity(t *testing.T, deny ...string) {
+	t.Helper()
+	cfg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	dir := filepath.Join(cfg, "dotfiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	list, err := json.Marshal(deny)
+	if err != nil {
+		t.Fatalf("marshal deny: %v", err)
+	}
+	if deny == nil {
+		list = []byte("[]")
+	}
+	body := `{"machine": {"id": "test-machine"}, "pools": {"deny": ` + string(list) + `}}`
+	if err := os.WriteFile(filepath.Join(dir, "machine.json"), []byte(body), 0o600); err != nil {
+		t.Fatalf("seed machine.json: %v", err)
+	}
+}
+
 // AC1. This is a stdout contract, so it is tested through captureRealStreams
 // rather than execute(): the consumer is a dispatcher reading a pipe, and a
 // record written to stderr is an empty string at that call site while looking
 // perfectly fine in a merged capture (BUG-070 #915).
 func TestAgentRun_WritesOneJSONObjectToStdout(t *testing.T) {
 	root := repoRootForTest(t)
+	declareIdentity(t)
 
 	stdout, stderr, err := captureRealStreams(t,
 		"agent", "run",
@@ -80,6 +109,7 @@ func TestAgentRun_WritesOneJSONObjectToStdout(t *testing.T) {
 // failed dispatch would otherwise read a truncated object.
 func TestAgentRun_RefusalsLeaveStdoutEmpty(t *testing.T) {
 	root := repoRootForTest(t)
+	declareIdentity(t)
 	base := []string{"agent", "run", "--repo-root", root}
 
 	tests := []struct {
@@ -150,6 +180,7 @@ func TestAgentRun_RefusalsLeaveStdoutEmpty(t *testing.T) {
 // stdout, exit 1 — never exit 3, which a composer would read as "busy, try the
 // next pool" and retry against a registry that is broken for every pool.
 func TestAgentRun_AMapTheSchemaRefusesStopsBeforeDispatch(t *testing.T) {
+	declareIdentity(t)
 	root := t.TempDir()
 	writeMapFixture(t, root, mapFixtureWithMidChain(`["nan-deepseek-v4-flash"]`))
 	copySchemaFixture(t, root)
@@ -174,6 +205,7 @@ func TestAgentRun_AMapTheSchemaRefusesStopsBeforeDispatch(t *testing.T) {
 // command works against reality; this one proves it reports the route it was
 // given rather than one it invented.
 func TestAgentRun_ReportsTheRouteTheMapDeclares(t *testing.T) {
+	declareIdentity(t)
 	root := t.TempDir()
 	writeMapFixture(t, root, mapFixtureWithMidChain(`["nan:mimo-v2.5"]`))
 	copySchemaFixture(t, root)

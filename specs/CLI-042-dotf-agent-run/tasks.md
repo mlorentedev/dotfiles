@@ -120,16 +120,31 @@ Added while implementing C1:
 
 ### PR C2 — machine identity and denial
 
-- [ ] [AC4] Failing test: a machine whose identity cannot be established denies every non-local pool
-- [ ] [AC4] Implement machine identity and `pools.deny`, read from `machine.json` **at dispatch time**
+- [x] [AC4] Failing test: a machine whose identity cannot be established denies every non-local pool
+- [x] [AC4] Implement machine identity and `pools.deny`, read from `machine.json` **at dispatch time**
       (ADR-032 §7) and never cached
-- [ ] [AC4] Validate `pools.deny` names against the map's pools — a typo (`claud`) would leave
+- [x] [AC4] Validate `pools.deny` names against the map's pools — a typo (`claud`) would leave
       `claude` allowed, a silent failure in the direction §8 exists to prevent
-- [ ] [AC4] Assert the wording: help text and error messages state *`dotf` alone will never be the
+- [x] [AC4] Assert the wording: help text and error messages state *`dotf` alone will never be the
       cause of exhaustion*, never that exhaustion cannot happen
-- [ ] [AC4] Point the bats smoke at a fixture HOME. Once identity is required, the smoke's own
+- [x] [AC4] Point the bats smoke at a fixture HOME. Once identity is required, the smoke's own
       dispatches refuse on any machine that has not declared one — including CI. The case that
       asserts the refusal is AC4's bats evidence.
+
+Added while implementing C2:
+
+- [x] [AC4] `MachinePolicy`'s **zero value denies everything**, so a caller that forgets to populate
+      it gets the safe answer rather than the permissive one. The fail-closed direction is the
+      default by construction, not by remembering to ask.
+- [x] [AC4] An **absent** `machine.json` is an unidentified machine (denies, no error); a
+      **malformed** one is a hard error. Conflating them would send an operator hunting for a policy
+      that is really a syntax error.
+- [x] [AC4] Denial is evaluated **before the semaphore**, so a forbidden pool consumes nothing —
+      not even a slot another dispatch could have used.
+- [x] [AC4] Every entry denied is its own status (`denied`, exit 3), distinguishable from
+      `chain_exhausted`: one sends an operator to quota and outages, the other to `machine.json`.
+- [x] [AC4] `machine.json.example` carries the `machine` and `pools` blocks — it is the surface
+      people copy, so a gate whose remedy is undocumented there is a gate people route around.
 
 ### PR D — the real backends
 

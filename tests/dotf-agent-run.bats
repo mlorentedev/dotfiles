@@ -19,6 +19,14 @@ setup() {
     # subscription), so a smoke that used the default would take real slots from
     # whatever else is dispatching on this box.
     SEM_DIR="$BATS_TEST_TMPDIR/slots"
+    # `dotf agent run` refuses on a machine that has not declared an identity
+    # (ADR-032 §8), so the smoke points machine.json at a fixture rather than
+    # the real one. Pointing at the real file would make these cases pass only
+    # on a machine whose owner had configured it — green here, red in CI.
+    export XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/config"
+    mkdir -p "$XDG_CONFIG_HOME/dotfiles"
+    printf '%s\n' '{"machine": {"id": "bats-fixture"}, "pools": {"deny": []}}' \
+        > "$XDG_CONFIG_HOME/dotfiles/machine.json"
 }
 
 # Build once per file run into a cached location, so the cases do not pay a
@@ -172,4 +180,52 @@ print("advanced")
 ' "$rec"
     [ "$status" -eq 0 ]
     [ "$output" = "advanced" ]
+}
+
+@test "agent run: a machine with no declared identity is refused, and told how to fix it" {
+    _build_dotf
+    # A config dir that exists and holds no machine.json — the rebuilt-machine
+    # case ADR-032 §8 is about, not a broken environment.
+    local empty="$BATS_TEST_TMPDIR/no-identity"
+    mkdir -p "$empty"
+    run env XDG_CONFIG_HOME="$empty" "$DOTF_BIN" agent run \
+        --role r --task t --tier mid --backend dry-run --timeout 30s \
+        --repo-root "$REPO_ROOT" --semaphore-dir "$SEM_DIR"
+    [ "$status" -eq 1 ]
+    printf '%s' "$output" | grep -q 'has not declared an identity'
+    printf '%s' "$output" | grep -q 'machine.json'
+}
+
+@test "agent run: the refusal writes nothing to stdout" {
+    _build_dotf
+    local empty="$BATS_TEST_TMPDIR/no-identity-2"
+    mkdir -p "$empty"
+    run bash -c "XDG_CONFIG_HOME='$empty' '$DOTF_BIN' agent run --role r --task t \
+        --tier mid --backend dry-run --timeout 30s --repo-root '$REPO_ROOT' \
+        --semaphore-dir '$SEM_DIR' 2>/dev/null"
+    [ "$status" -eq 1 ]
+    [ -z "$output" ]
+}
+
+@test "agent run: a denied pool is skipped and the chain advances" {
+    _build_dotf
+    _need_python
+    local cfg="$BATS_TEST_TMPDIR/deny-claude" rec="$BATS_TEST_TMPDIR/denied.json"
+    mkdir -p "$cfg/dotfiles"
+    printf '%s\n' '{"machine": {"id": "corp"}, "pools": {"deny": ["claude"]}}' \
+        > "$cfg/dotfiles/machine.json"
+    run bash -c "XDG_CONFIG_HOME='$cfg' '$DOTF_BIN' agent run --role r --task t \
+        --tier mid --backend dry-run --timeout 30s --repo-root '$REPO_ROOT' \
+        --semaphore-dir '$SEM_DIR' >'$rec' 2>/dev/null"
+    [ "$status" -eq 0 ]
+    run python3 -c '
+import json, sys
+r = json.load(open(sys.argv[1]))
+assert r["pool"] != "claude", r["pool"]
+assert r["attempts"][0]["pool"] == "claude", r["attempts"]
+assert r["attempts"][0]["status"] == "denied", r["attempts"]
+print(r["pool"])
+' "$rec"
+    [ "$status" -eq 0 ]
+    [ "$output" = "nan" ]
 }

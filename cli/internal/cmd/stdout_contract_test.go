@@ -68,6 +68,8 @@ func captureRealStreams(t *testing.T, args ...string) (stdout, stderr string, er
 // an empty string at the call site rather than a visible failure.
 func TestStdoutContracts(t *testing.T) {
 	t.Setenv("VAULT_PATH", "/tmp/stdout-contract-probe")
+	// `agent run` refuses on a machine with no declared identity (ADR-032 §8).
+	declareIdentity(t)
 
 	tests := []struct {
 		name     string

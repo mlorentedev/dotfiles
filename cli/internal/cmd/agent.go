@@ -58,7 +58,25 @@ A pool reporting itself unavailable advances to the next entry in the chain; a
 task that ran and failed does NOT — retrying a real failure on another model
 turns a bad answer into a silent second opinion. The top tier never degrades: if
 its pool cannot serve, this escalates and exits non-zero rather than quietly
-answering from a weaker model.`,
+answering from a weaker model.
+
+CONCURRENCY. Dispatches are bounded per pool at the map's declared concurrency
+minus its reserve_interactive, and the bound covers dispatches made through this
+command and nothing else. The pools are shared with consumers it cannot see — a
+hand-run qq, a pi TUI turn, hive embeddings, CI — each of which takes capacity
+no semaphore here counts. So the guarantee is exactly this and no wider:
+
+    dotf alone will never be the cause of exhaustion.
+
+The reserve makes starvation of your interactive session unlikely; it cannot
+make it impossible, and a dispatch that hits a rate limit is reported as the
+pool being unavailable so the chain moves on rather than retrying into the wall.
+
+DENIAL. Which pools a machine may use is declared in its machine.json, and is
+evaluated here at dispatch time rather than baked in at config time. A machine
+that has not declared an identity is refused outright: an undeclared machine
+denies every non-local pool, because defaulting the unknown case to "allowed"
+fails silently and in the direction nobody notices.`,
 		Example: `  dotf agent run --role reviewer --task "review this diff" --tier mid --backend dry-run --timeout 2m
   dotf agent run --role architect --task "decide" --tier top --backend dry-run --timeout 5m`,
 		Args:         cobra.NoArgs,
@@ -94,6 +112,17 @@ answering from a weaker model.`,
 				return err
 			}
 
+			policy, err := env.LoadMachinePolicy(env.MachinePath(env.Home()))
+			if err != nil {
+				return err
+			}
+			if !policy.Identified {
+				return fmt.Errorf(unidentifiedMachine, env.MachinePath(env.Home()))
+			}
+			if err := policy.ValidateDeny(declaredPools(m)); err != nil {
+				return err
+			}
+
 			semDir := semaphoreDir
 			if semDir == "" {
 				// Not derived from --repo-root: the budget is a property of the
@@ -107,6 +136,7 @@ answering from a weaker model.`,
 			rec := agent.Dispatch(cmd.Context(), agent.Options{
 				Tier: tier, Role: role, Task: task, Cwd: cwd,
 				Chain: chain, Timeout: timeout,
+				Denied:    policy.Denies,
 				Semaphore: agent.NewSemaphore(semDir),
 				Capacity:  declaredCapacity(m),
 			}, backend)
@@ -199,4 +229,43 @@ func summarise(rec agent.Record) error {
 	default:
 		return fmt.Errorf("task failed on %s:%s (exit %d)", rec.Pool, rec.Model, rec.Exit)
 	}
+}
+
+// unidentifiedMachine is the refusal a machine gets when it has not said who it
+// is. ADR-032 §8 makes this the required direction rather than a convenience:
+// a rebuilt corporate machine that has not restored machine.json probes
+// successfully for personal pools, so defaulting to "allowed" would fail
+// silently and in the wrong direction.
+//
+// It names the file, the key and a working value, because a fail-closed
+// refusal whose remedy the operator has to go and look up is a fail-closed
+// refusal people route around.
+const unidentifiedMachine = `this machine has not declared an identity, so every non-local pool is denied (ADR-032 §8)
+
+Declare one in %s:
+
+    {
+      "machine": { "id": "<a-name-for-this-machine>" },
+      "pools":   { "deny": [] }
+    }
+
+Keep any existing "paths" block; this adds to the same file. The deny list is
+where a machine forbids pools it must not use — an empty list denies nothing.
+The default is denial rather than permission on purpose: a rebuilt machine that
+has not restored this file probes successfully for every pool, and allowing them
+would be a silent failure in the direction that cannot be noticed`
+
+// declaredPools is the set of pool names the routing map declares — the
+// allow-list `pools.deny` entries are checked against, so a typo is refused
+// rather than silently leaving the pool it meant to forbid allowed.
+func declaredPools(m map[string]any) map[string]bool {
+	out := map[string]bool{}
+	pools, ok := m["pools"].(map[string]any)
+	if !ok {
+		return out
+	}
+	for name := range pools {
+		out[name] = true
+	}
+	return out
 }

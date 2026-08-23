@@ -9,9 +9,9 @@ created: "2026-08-23"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-**PRs B and C1.** This spec ships as the sequence `tasks.md` declares (C was split into C1/C2 during
+**PRs B, C1 and C2.** This spec ships as the sequence `tasks.md` declares (C was split into C1/C2 during
 C1, because one PR carrying both AC3 and AC4 does not fit the atomic cap). B covered AC1, AC2 and
-AC5; **C1 covers AC3**. The rest are named here as open with the PR that owns them, so a
+AC5; **C1 covers AC3, C2 covers AC4**. With that, **AC1-AC5 are complete**; the rest are named here as open with the PR that owns them, so a
 partly-filled section is never read as a partly-met criterion.
 
 - [x] AC1 (JSON contract on stdout, logs on stderr) -> `TestAgentRun_WritesOneJSONObjectToStdout`,
@@ -31,10 +31,17 @@ partly-filled section is never read as a partly-met criterion.
       work only. A hand-run `qq`, a pi TUI turn or a hive embedding call takes a slot the semaphore
       never sees. The claim is *`dotf` alone will never be the cause of exhaustion*, not that
       exhaustion cannot happen.
-- [ ] AC4 (fails closed on an unreadable counter and an unidentifiable machine) -> **PR C2**, except
-      the counter half, which landed in C1 (`TestSemaphore_UnreadableStateIsAnErrorNotZeroInUse`) —
-      in this design the semaphore state IS the counter, so the test has nowhere else to live. The
-      machine-identity half and the wording assertion are C2's.
+- [x] AC4 (fails closed on an unreadable counter and an unidentifiable machine) -> **the counter half
+      in C1** (`TestSemaphore_UnreadableStateIsAnErrorNotZeroInUse` — in this design the semaphore
+      state IS the counter); **the machine half and the wording in C2**:
+      `TestLoadMachinePolicy_*` (4 tests: unidentified denies everything across four shapes, declared
+      identity, identified-with-no-deny-list allows, malformed is an error not an absence),
+      `TestMachinePolicy_ValidateDenyNames`, `TestAgentRun_AnUnidentifiedMachineIsRefused` (asserts
+      the remedy is IN the message), `TestAgentRun_ADenyTypoIsRefused`,
+      `TestAgentRun_EveryPoolDeniedIsItsOwnOutcome`, `TestDispatch_ADenied*` (3), and three bats cases
+      through the compiled binary.
+      `TestAgentRun_StatesTheNarrowGuaranteeAndNotAWiderOne` asserts the wording in both directions:
+      the narrow guarantee verbatim, and four overstatements that must NOT appear.
 - [x] AC5 (the top tier escalates, never degrades) -> `TestDispatch_TopTierNeverDegrades` (behaviour)
       and `TestChainsTopIsCappedWithoutLosingTheChainShape` (shape, in the schema)
 - [ ] AC6 (the hive backend answers and reports pool + model) -> **PR D.** Still unrunnable on this

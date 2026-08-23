@@ -41,6 +41,10 @@ const (
 	StatusEscalated Status = "escalated"
 	// StatusDryRun — the routing was resolved and deliberately not executed.
 	StatusDryRun Status = "dry_run"
+	// StatusDenied — this machine forbids the pool (ADR-032 §7). A policy fact,
+	// not an availability one, but it advances the chain for the same reason:
+	// another entry may name a pool this machine does allow.
+	StatusDenied Status = "denied"
 	// StatusTimeout — the dispatch outlived its deadline and was abandoned.
 	// A dispatcher-level status: no backend returns it.
 	//
@@ -124,7 +128,10 @@ func ExitCode(s Status) int {
 	switch s {
 	case StatusOK, StatusDryRun:
 		return 0
-	case StatusChainExhausted, StatusEscalated:
+	case StatusChainExhausted, StatusEscalated, StatusDenied:
+		// Denied joins the 3 family: like an exhausted chain it means nothing
+		// ran, and unlike a task failure another machine may well be permitted
+		// to run it. The record's status carries the reason.
 		return 3
 	default:
 		return 1
