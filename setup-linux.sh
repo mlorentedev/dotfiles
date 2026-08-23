@@ -558,16 +558,61 @@ fi
 # (healthcheck section 12) can verify drift offline from ~/.dotfiles. The engine
 # resolves its root from its own location, and the rootresolve regression test
 # models exactly this complete non-git copy: scripts/ (compile-harness.sh) +
-# AGENTS.md + ai/claude/CLAUDE.md + harness/. setup copied none of the latter
-# three, so --check exited 2 (manifest not found) and section 12 reported a false
-# drift FAIL. This runs AFTER --refresh so the snapshot matches the refreshed
-# repo state (else the repo<->deploy drift sub-check would then see drift).
+# harness/ + every file harness/manifest.json declares as an injection target.
+# This runs AFTER --refresh so the snapshot matches the refreshed repo state
+# (else the repo<->deploy drift sub-check would then see drift).
+#
+# The target list is DERIVED from the manifest, never restated here. It was a
+# hardcoded pair (AGENTS.md + ai/claude/CLAUDE.md) until #1200: adding
+# ai/orca/ORCA.md as a third target (#1176) needed a copy line nobody wrote, so
+# --check evaluated a target the mirror had never received and reported a drift
+# FAIL whose own printed remedy could not clear it — running --refresh from the
+# repo exits 0, because the repo has the file. Deriving the list means the next
+# manifest entry is mirrored by construction rather than by remembering.
 if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     ensure_directory "$DOTFILES_DIR/harness"
     cp -rf "$CURRENT_DIR/harness/." "$DOTFILES_DIR/harness/" 2>/dev/null || true
-    safe_copy "$CURRENT_DIR/AGENTS.md" "$DOTFILES_DIR/" 2>/dev/null || true
-    ensure_directory "$DOTFILES_DIR/ai/claude"
-    safe_copy "$CURRENT_DIR/ai/claude/CLAUDE.md" "$DOTFILES_DIR/ai/claude/" 2>/dev/null || true
+    # Resolve jq by path, not by name. The installer above downloads it to
+    # ~/.local/bin, which the rc files put on PATH but THIS process may not have
+    # — measured in the integration container, where setup logs "jq installed"
+    # and then "jq not found" 22 seconds later in the same run. A `command -v`
+    # test alone therefore skips the mirror right after a successful install.
+    _jq=""
+    if command -v jq >/dev/null 2>&1; then
+        _jq="jq"
+    elif [ -x "$HOME/.local/bin/jq" ]; then
+        _jq="$HOME/.local/bin/jq"
+    fi
+    if [ -n "$_jq" ] && [ -f "$CURRENT_DIR/harness/manifest.json" ]; then
+        # Read line by line: `for f in $(jq ...)` does not word-split in zsh,
+        # which would yield ONE target containing every path (see CLAUDE.md's
+        # prohibited-pattern table — this row fails silently).
+        "$_jq" -r '.targets[].file' "$CURRENT_DIR/harness/manifest.json" 2>/dev/null \
+        | while IFS= read -r _harness_target; do
+            [ -n "$_harness_target" ] || continue
+            # A declared target the checkout does not have is a broken checkout,
+            # and skipping it silently reproduces the very defect this block
+            # fixes: the mirror ends up incomplete and `--check` fails later on
+            # a marker count that names neither the manifest nor the missing
+            # file. Name it here, where the cause is still visible. Setup does
+            # not abort — it is idempotent and long, and one absent target must
+            # not cost a machine the rest of its provisioning — but the warning
+            # is loud and `verify-setup.bats` fails on the resulting gap.
+            if [ ! -f "$CURRENT_DIR/$_harness_target" ]; then
+                log_warning "harness/manifest.json declares a target the checkout does not have: $_harness_target — not mirrored, 'dotf doctor' will report harness drift"
+                continue
+            fi
+            _harness_target_dir="$(dirname "$DOTFILES_DIR/$_harness_target")"
+            ensure_directory "$_harness_target_dir"
+            if ! safe_copy "$CURRENT_DIR/$_harness_target" "$_harness_target_dir/" 2>/dev/null; then
+                log_warning "failed to mirror harness target $_harness_target to $_harness_target_dir — 'dotf doctor' will report harness drift"
+            fi
+        done
+        unset _harness_target _harness_target_dir
+    else
+        log_warning "jq or harness/manifest.json unavailable — harness targets not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
+    fi
+    unset _jq
 fi
 
 # Claude Code

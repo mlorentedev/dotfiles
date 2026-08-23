@@ -422,27 +422,51 @@ setup() {
 # (~/.dotfiles), and the engine resolves its root from its own location. That
 # offline check needs the harness inputs mirrored into the deploy dir -- exactly
 # the complete non-git copy the rootresolve regression test models: scripts/
-# (compile-harness.sh, already copied) + AGENTS.md + ai/claude/CLAUDE.md +
-# harness/. setup copied none of the latter three, so --check exited 2 (manifest
-# not found) and section 12 reported a false drift FAIL. These guards lock the
-# mirror in, AND assert it runs AFTER --refresh so the snapshot matches the
-# refreshed repo state (else the repo<->deploy drift sub-check would see drift).
+# (compile-harness.sh, already copied) + harness/ + every file
+# harness/manifest.json declares as an injection target. setup copied none of
+# them, so --check exited 2 (manifest not found) and section 12 reported a false
+# drift FAIL. These guards lock the mirror in, AND assert it runs AFTER --refresh
+# so the snapshot matches the refreshed repo state (else the repo<->deploy drift
+# sub-check would see drift).
 
 @test "setup-linux.sh mirrors harness/ into the deploy dir (drift fix)" {
     grep -qF 'cp -rf "$CURRENT_DIR/harness/." "$DOTFILES_DIR/harness/"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh mirrors AGENTS.md into the deploy dir (drift fix)" {
-    grep -qF 'safe_copy "$CURRENT_DIR/AGENTS.md" "$DOTFILES_DIR/"' "$DOTFILES_DIR/setup-linux.sh"
+@test "setup-linux.sh derives the mirrored target list from harness/manifest.json" {
+    # This used to assert two literal `safe_copy` lines, one per target. That
+    # made the test a FOURTH restatement of the manifest's list -- alongside the
+    # manifest itself, the deploy block, and compile-harness-rootresolve.bats --
+    # and it could only ever assert that the targets someone remembered were
+    # copied, never that the list was complete. #1200: a third target was added
+    # to the manifest with no copy line, and this test stayed green while
+    # `dotf doctor` failed permanently.
+    #
+    # Assert the derivation instead. The OUTCOME -- every declared target
+    # actually present in $DOTFILES_DIR -- is asserted by verify-setup.bats
+    # against a real deploy, which is the half source-text grep cannot reach.
+    # Patterns must not start with `-`: grep reads a leading dash as an OPTION
+    # and exits 2 (usage error), which a boolean assertion cannot tell apart
+    # from 1 (not found) — the test would report "the derivation is missing"
+    # when grep never looked at the file.
+    grep -qF '.targets[].file' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF '"$CURRENT_DIR/harness/manifest.json"' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'safe_copy "$CURRENT_DIR/$_harness_target" "$_harness_target_dir/"' \
+        "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh resolves jq by path, not only by name (#1202)" {
+    # The installer downloads jq to ~/.local/bin, which this process's PATH may
+    # not carry: the integration container logs "jq installed" and "jq not
+    # found" 22 seconds apart in one run. A `command -v jq` test alone silently
+    # skips the mirror right after a successful install, so the derivation
+    # no-ops and every manifest target goes missing without an error.
+    grep -qF '[ -x "$HOME/.local/bin/jq" ]' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh installs the GUARD memory-sink git-hooks (#418 deploy + wire)" {
     grep -qF '. ./scripts/install-git-hooks.sh' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'install_git_hooks' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh mirrors ai/claude/CLAUDE.md into the deploy dir (drift fix)" {
-    grep -qF 'safe_copy "$CURRENT_DIR/ai/claude/CLAUDE.md" "$DOTFILES_DIR/ai/claude/"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh harness mirror runs AFTER compile-harness --refresh (ordering guard)" {
