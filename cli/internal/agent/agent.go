@@ -41,6 +41,14 @@ const (
 	StatusEscalated Status = "escalated"
 	// StatusDryRun — the routing was resolved and deliberately not executed.
 	StatusDryRun Status = "dry_run"
+	// StatusTimeout — the dispatch outlived its deadline and was abandoned.
+	// A dispatcher-level status: no backend returns it.
+	//
+	// It does NOT advance the chain, for the reason task_failed does not: the
+	// task may well have been submitted and be running still, so spending a
+	// second pool on it is a double-spend against work that may already have
+	// been billed.
+	StatusTimeout Status = "timeout"
 )
 
 // TierTop is the tier that must never degrade. Named rather than inlined
@@ -108,6 +116,10 @@ func Classify(s Status) Status {
 // unavailable). One vocabulary across the seam means a composer that already
 // speaks to hive speaks to this without a translation table — and a translation
 // table is where the two would drift.
+// A timeout exits 1, with the rest of the "the task did not succeed" family: 3
+// means *no pool could serve this, try elsewhere*, and a timed-out dispatch may
+// have been served perfectly well and merely too slowly. Reporting it as 3
+// would invite a composer to retry it against another pool.
 func ExitCode(s Status) int {
 	switch s {
 	case StatusOK, StatusDryRun:

@@ -36,6 +36,7 @@ actually answered.`,
 func newAgentRunCmd() *cobra.Command {
 	var (
 		role, task, tier, cwd, backendName, repoRoot string
+		semaphoreDir                                 string
 		timeout                                      time.Duration
 	)
 
@@ -93,9 +94,21 @@ answering from a weaker model.`,
 				return err
 			}
 
+			semDir := semaphoreDir
+			if semDir == "" {
+				// Not derived from --repo-root: the budget is a property of the
+				// MACHINE, and two checkouts of this repo draw on one NaN
+				// subscription. A per-checkout counter would bound neither.
+				if semDir, err = agent.DefaultSemaphoreDir(); err != nil {
+					return err
+				}
+			}
+
 			rec := agent.Dispatch(cmd.Context(), agent.Options{
 				Tier: tier, Role: role, Task: task, Cwd: cwd,
 				Chain: chain, Timeout: timeout,
+				Semaphore: agent.NewSemaphore(semDir),
+				Capacity:  declaredCapacity(m),
 			}, backend)
 
 			// The record reaches stdout whatever the outcome: its consumer is a
@@ -119,9 +132,39 @@ answering from a weaker model.`,
 	c.Flags().StringVar(&cwd, "cwd", "", "working copy the task runs against (default: the current directory)")
 	c.Flags().DurationVar(&timeout, "timeout", 0, "per-dispatch deadline, e.g. 90s or 5m (required)")
 	c.Flags().StringVar(&backendName, "backend", "", "backend to dispatch through (required until probing lands)")
+	c.Flags().StringVar(&semaphoreDir, "semaphore-dir", "",
+		"directory holding per-pool slot state (default: the machine's runtime dir; the budget is a machine property, not a checkout's)")
 	c.Flags().StringVar(&repoRoot, "repo-root", "",
 		"root containing harness/model-map.json (default: the checkout, else DOTFILES_DIR)")
 	return c
+}
+
+// declaredCapacity answers how many concurrent dispatches a pool admits, and
+// whether the map declares a number at all.
+//
+// The reserve is subtracted here rather than in the semaphore: `concurrency`
+// and `reserve_interactive` are both the map's to state, and what the semaphore
+// enforces is the difference — with nan's 5 and a reserve of 2, a fan-out
+// claims at most 3, leaving the TUI room it never has to ask for.
+//
+// A pool that declares nothing returns declared=false, not zero. Zero would
+// refuse every dispatch to a seat-based pool whose concurrency is a fleet
+// property the map cannot honestly state.
+func declaredCapacity(m map[string]any) func(string) (int, bool) {
+	return func(pool string) (int, bool) {
+		b, err := harness.DeclaredBudget(m, pool)
+		if err != nil || !b.ConcurrencyDeclared {
+			return 0, false
+		}
+		capacity := b.Concurrency - b.ReserveInteractive
+		if capacity < 1 {
+			// A reserve that swallows the pool is a declaration error, not a
+			// standing refusal: floor at one so the map cannot silently disable
+			// dispatch, and let the reserve be wrong loudly elsewhere.
+			capacity = 1
+		}
+		return capacity, true
+	}
 }
 
 // resolveBackend picks the implementation behind the seam.
