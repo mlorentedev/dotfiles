@@ -10,6 +10,8 @@
 # So these tests do not inspect the workflow's text; they EXECUTE the classifier,
 # and the load-bearing ones execute it under `bash -e` (see "the regression").
 
+load 'lib/refute'
+
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/bitacora-reconcile.sh"
     FIX="/tmp/bats_reconcile_$$_${BATS_TEST_NUMBER:-0}"
@@ -47,10 +49,13 @@ teardown() {
     rm -rf "$FIX"
 }
 
-# `grep -s` so this holds when gh was never called at all and the log is absent —
-# which is itself the assertion on the soft-pass paths.
 refute_issue_filed() {
-    ! grep -qs "issue create" "$GH_LOG"
+    # The log may not exist at all — gh was never called — and that absence is
+    # itself the assertion on the soft-pass paths. It is the one case where a
+    # missing file is a pass rather than the error refute_grep treats it as, so
+    # it is stated here instead of being folded into `grep -s`.
+    [ -f "$GH_LOG" ] || return 0
+    refute_grep_fixed 'issue create' "$GH_LOG"
 }
 
 @test "success: notice and exit 0" {

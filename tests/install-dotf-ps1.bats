@@ -6,6 +6,8 @@
 # mirrored here). Behavioral correctness is the direct mirror of install-dotf.sh
 # (bats-tested on Linux) plus a real-release smoke during the WIN-006 verification.
 
+load 'lib/refute'
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     PS1="$SCRIPTS_DIR/install-dotf.ps1"
@@ -69,7 +71,7 @@ setup() {
     grep -qE 'function +Set-DotfBinary' "$PS1"
     grep -qF 'Move-Item' "$PS1"
     # The naive one-shot copy straight onto the live target must be gone.
-    ! grep -qF "Copy-Item -Path \$exe" "$PS1"
+    refute_grep_fixed "Copy-Item -Path \$exe" "$PS1"
 }
 
 @test "setup-windows.ps1 dot-sources install-dotf.ps1 and calls Install-Dotf" {

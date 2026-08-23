@@ -14,6 +14,8 @@
 # added" would have passed against the broken version too, since the stub would
 # happily answer either form.
 
+load 'lib/refute'
+
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/bitacora-rollout.sh"
     FIX="/tmp/bats_rollout_$$_${BATS_TEST_NUMBER:-0}"
@@ -73,7 +75,7 @@ count_calls() {
     [ "$status" -eq 0 ]
     # `gh project item-add --owner` is the form BITACORA_PAT cannot execute.
     # Nothing in the backfill may reach for it again.
-    ! grep -q '^project ' "$GH_LOG"
+    refute_grep '^project ' "$GH_LOG"
 }
 
 @test "the regression: each open item is added via addProjectV2ItemById" {

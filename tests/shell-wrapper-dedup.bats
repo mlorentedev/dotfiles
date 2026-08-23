@@ -4,6 +4,8 @@
 # (_qq_call) and the oc/ocfull wrappers live once in .zsh/functions.sh;
 # each rc keeps only its thin shell-specific qq/qf/dbg wrapper.
 
+load 'lib/refute'
+
 setup() {
     REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 }
@@ -73,7 +75,14 @@ setup() {
     # (matches shell-alias-collision.bats' ZSH_SOURCED) -- .zsh/functions.zsh
     # and .zsh/nvm.zsh were missing here, so a collision defined in either
     # would have gone undetected by this specific check.
-    ! grep -qE '^(function )?(gp|gpr)\(\)' "$REPO_ROOT/.bashrc" "$REPO_ROOT/.zshrc" "$REPO_ROOT/.zsh/functions.sh" "$REPO_ROOT/.zsh/functions.zsh" "$REPO_ROOT/.zsh/nvm.zsh"
+    #
+    # One file per call, deliberately: refute_grep takes a single file so that a
+    # path which does not exist is a loud error rather than a quiet absence, and
+    # a multi-file grep cannot tell the two apart.
+    local rc
+    for rc in .bashrc .zshrc .zsh/functions.sh .zsh/functions.zsh .zsh/nvm.zsh; do
+        refute_grep '^(function )?(gp|gpr)\(\)' "$REPO_ROOT/$rc"
+    done
 }
 
 # --- AC7: utils.sh sourced declaratively; .profile no longer mutates rc files ---
@@ -83,7 +92,7 @@ setup() {
 }
 
 @test "AC7: .profile no longer appends 'source utils.sh' to ~/.bashrc or ~/.zshrc" {
-    ! grep -qE '>>[[:space:]]*"\$HOME/\.(bashrc|zshrc)"' "$REPO_ROOT/.profile"
+    refute_grep '>>[[:space:]]*"\$HOME/\.(bashrc|zshrc)"' "$REPO_ROOT/.profile"
 }
 
 @test "AC7: version_gte resolves after sourcing functions.sh (bash, via utils.sh)" {
