@@ -99,15 +99,36 @@
   },
   {
     "id": "CLI-042-dotf-agent-run-f10",
-    "behavior": "AC4 — an unreadable concurrency counter exits non-zero rather than reading as zero in use, and an unidentifiable machine denies every non-local pool",
-    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestFailsClosed$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestFailsClosed'",
+    "behavior": "AC4 — a machine whose identity cannot be established denies every non-local pool, and the refusal names the file, the key and a working value",
+    "verification": "cd cli && out=$(go test ./internal/env/ -run '^TestLoadMachinePolicy_UnidentifiedMachineIsNotAPermissiveOne$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestLoadMachinePolicy_UnidentifiedMachineIsNotAPermissiveOne'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f11",
     "behavior": "AC4 — help text and error messages state the narrow guarantee ('dotf alone will never be the cause of exhaustion'), never that exhaustion cannot happen",
-    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestGuaranteeWordingIsNarrow$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestGuaranteeWordingIsNarrow'",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestAgentRun_StatesTheNarrowGuaranteeAndNotAWiderOne$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestAgentRun_StatesTheNarrowGuaranteeAndNotAWiderOne'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f23",
+    "behavior": "AC4 — the command refuses an unidentified machine before dispatching, leaves stdout empty, and exits 1",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestAgentRun_AnUnidentifiedMachineIsRefused$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestAgentRun_AnUnidentifiedMachineIsRefused'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f24",
+    "behavior": "AC4 — pools.deny is evaluated per entry at dispatch time: a denied pool is skipped without being reached, and every pool denied is its own status rather than chain_exhausted",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_(ADeniedPoolIsSkippedAndTheChainAdvances|EveryEntryDeniedIsItsOwnStatus|ADeniedPoolTakesNoSemaphoreSlot)$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_ADeniedPoolIsSkippedAndTheChainAdvances'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f25",
+    "behavior": "AC4 — a pools.deny entry naming no declared pool is refused, because the typo silently leaves the pool it meant to forbid allowed",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestAgentRun_ADenyTypoIsRefused$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestAgentRun_ADenyTypoIsRefused'",
     "state": "pending",
     "evidence": ""
   },

@@ -1,8 +1,15 @@
 {
-  "_comment": "EXAMPLE per-machine path overrides (ADR-025). Copy to ~/.config/dotfiles/machine.json (Windows: %USERPROFILE%\\.config\\dotfiles\\machine.json) and edit. List ONLY the keys this machine relocates vs env-contract.json defaults; omit the rest. After editing, run `dotf env generate`. The real machine.json lives OUTSIDE any repo and is never committed — this example is the only path file that belongs in git.",
+  "_comment": "EXAMPLE per-machine path overrides (ADR-025). Copy to ~/.config/dotfiles/machine.json (Windows: %USERPROFILE%\\.config\\dotfiles\\machine.json) and edit. List ONLY the keys this machine relocates vs env-contract.json defaults; omit the rest. The `machine` and `pools` blocks below are separate from `paths` and are read by `dotf agent run`. After editing, run `dotf env generate`. The real machine.json lives OUTSIDE any repo and is never committed — this example is the only path file that belongs in git.",
   "paths": {
     "DOTFILES_REPO_DIR": "/home/you/Projects/dotfiles",
     "VAULT_PATH": "/home/you/Projects/knowledge",
     "HIVE_VAULT_PATH": "/home/you/Projects/knowledge"
+  },
+  "machine": {
+    "id": "give-this-machine-a-name"
+  },
+  "pools": {
+    "_comment": "Pools this machine must NOT dispatch to (ADR-032 §7), evaluated at dispatch time. An empty list denies nothing. A corporate machine forbidding personal pools would read [\"claude\", \"nan\"]. Every name must be one the routing map declares — a typo is refused rather than ignored, because it would silently leave the pool it meant to forbid allowed.",
+    "deny": []
   }
 }

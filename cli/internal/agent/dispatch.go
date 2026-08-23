@@ -19,6 +19,16 @@ type Options struct {
 	Cwd     string
 	Chain   []string
 	Timeout time.Duration
+	// Denied reports whether this machine forbids a pool. Evaluated per entry
+	// AT DISPATCH TIME rather than resolved once at config time (ADR-032 §7):
+	// otherwise a level-2 dispatch from a personal session could route work
+	// content through a personal pool on behalf of a denied machine.
+	//
+	// Nil means no policy was supplied. The command never leaves it nil — it
+	// refuses before the walk when the machine is unidentified — so nil here is
+	// a caller that is deliberately not enforcing denial, such as a unit test
+	// of the walk itself.
+	Denied func(pool string) bool
 	// Semaphore bounds concurrent dispatches per pool. Nil means no bound —
 	// only correct where the caller genuinely is not the launcher.
 	Semaphore *Semaphore
@@ -93,6 +103,14 @@ func Dispatch(ctx context.Context, opts Options, be Backend) Record {
 			return rec
 		}
 
+		if opts.Denied != nil && opts.Denied(pool) {
+			// Denial is checked before the slot is taken and before the backend
+			// is reached: a forbidden pool must consume nothing at all, not even
+			// a semaphore slot.
+			rec.Attempts = append(rec.Attempts, Attempt{Pool: pool, Model: model, Status: StatusDenied})
+			continue
+		}
+
 		// The slot is taken BEFORE the backend is reached and released as soon
 		// as the attempt is over, whether it answered or was abandoned.
 		slot, unbounded, err := acquire(opts, pool)
@@ -149,9 +167,16 @@ func Dispatch(ctx context.Context, opts Options, be Backend) Record {
 	// Nothing ran anywhere. The two ways to arrive here are different facts and
 	// get different names: the top tier DECLINED a fallback, a lower tier ran
 	// OUT of them.
-	if noFallback {
+	switch {
+	case allDenied(rec.Attempts):
+		// Naming this separately matters to whoever reads the record: "no pool
+		// could serve this" sends an operator looking at quota and outages,
+		// while "this machine forbids every pool the tier routes to" sends them
+		// to machine.json, which is where the answer actually is.
+		rec.Status = StatusDenied
+	case noFallback:
 		rec.Status = StatusEscalated
-	} else {
+	default:
 		rec.Status = StatusChainExhausted
 	}
 	rec.Exit = ExitCode(rec.Status)
@@ -225,3 +250,18 @@ func splitEntry(entry string) (pool, model string, err error) {
 }
 
 func elapsed(from, to time.Time) int64 { return to.Sub(from).Milliseconds() }
+
+// allDenied reports whether every entry the walk considered was refused by
+// machine policy. False for an empty slice: a chain with no entries never got
+// as far as being denied.
+func allDenied(attempts []Attempt) bool {
+	if len(attempts) == 0 {
+		return false
+	}
+	for _, a := range attempts {
+		if a.Status != StatusDenied {
+			return false
+		}
+	}
+	return true
+}
