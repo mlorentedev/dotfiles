@@ -109,7 +109,10 @@ provision() {
 }
 
 @test "guard: setup.sh touches none of the local-deploy surface (comments excluded)" {
-    ! grep -vE '^[[:space:]]*#' "$SETUP" | grep -qE 'setup-linux\.sh|setup-windows\.ps1|mcp-servers\.json'
+    local body
+    body="$(grep -vE '^[[:space:]]*#' "$SETUP")"
+    run grep -nE 'setup-linux\.sh|setup-windows\.ps1|mcp-servers\.json' <<<"$body"
+    [ "$status" -eq 1 ] || { printf 'local-deploy surface referenced:\n%s\n' "$output" >&2; return 1; }
 }
 
 @test "sync wrapper aborts a conflicted rebase (never wedges the clone)" {
