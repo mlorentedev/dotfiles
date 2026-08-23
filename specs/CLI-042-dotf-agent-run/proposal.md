@@ -151,9 +151,12 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
   lowers the repair from "add a provider" to "route the worker through the transport hive already
   has, and deploy its configuration as IaC".
 - **`delegate_task` exposes neither `timeout` nor cancellation**, and ADR-032 §2 rules a backend that
-  cannot enforce a timeout ineligible. Stated as rebuttable rather than blocking: a client-side
-  deadline that kills the process and releases the semaphore slot plausibly satisfies semantics 3–4,
-  at the cost that the remote worker keeps consuming invisibly.
+  cannot enforce a timeout ineligible. A client-side deadline that kills the process and releases the
+  slot satisfies semantics 3–4 *for the dispatcher*, but not for the pool: the remote worker keeps
+  consuming a NaN slot the semaphore has already handed back, so the reserve silently over-counts what
+  is free. **Resolution: the hive verb must propagate cancellation and terminate the worker**
+  (`mlorentedev/hive#384`), and AC3 is written so the weaker form fails the criterion rather than
+  redefining it.
 - **[RESOLVED 2026-08-22] hive has no dispatch CLI verb.** `hive --help` offers only the stdio MCP
   server, the daemon, the client shim, `service` and `self-upgrade`. Resolution: **add the verb on the
   hive side** rather than an MCP client in `dotf` (see What). Hive's `client` shim already routes to
@@ -182,10 +185,21 @@ Observable outcomes. Each must be testable.
       to the next `chains` entry for the tier; a backend reporting *task failed* does not, and the
       emitted record names the pool and model that actually answered. Table-driven test over a fake
       backend with scripted responses, including the case where the chain is exhausted.
-- [ ] **AC3 — timeout and cancellation are real.** A dispatch that exceeds its timeout kills the
-      worker, releases its semaphore slot **without waiting for it**, and reports a non-zero exit with
-      a `timeout` status. Test with a fake backend that outlives its deadline, asserting the slot is
-      free before the worker is reaped.
+- [ ] **AC3 — timeout and cancellation are real, and the guarantee is stated at the strength it
+      actually holds.** A dispatch that exceeds its timeout kills the worker, releases its semaphore
+      slot **without waiting for it**, and reports a non-zero exit with a `timeout` status. Test with
+      a fake backend that outlives its deadline, asserting the slot is free before the worker is
+      reaped.
+      **Backend-specific condition, not a caveat to be dropped:** for `subprocess` the killed process
+      *is* the consumer, so the guarantee is exact. For `hive` it is not — killing the local
+      `hive delegate` process does not by itself stop a worker running behind the daemon, which would
+      keep consuming a NaN slot the semaphore has already released. `hive delegate` must therefore
+      **propagate cancellation to the worker and terminate it**; that requirement is stated in
+      `mlorentedev/hive#384` and is part of what makes the backend eligible under ADR-032 §2. Until it
+      is met, the honest statement is *the slot is released locally and the remote worker may outlive
+      it* — and a backend that can only offer that is one whose reserve accounting is a guess. **AC3
+      is not satisfied by the weaker form**: if the hive verb ships without cancellation propagation,
+      the correct outcome is that hive fails the eligibility test, not that AC3 is reworded down.
 - [ ] **AC4 — it fails closed and loudly, never permissively.** With an unreadable concurrency
       counter, `dotf agent run` exits non-zero rather than treating it as zero in use; with a machine
       whose identity cannot be established, every non-local pool is denied. Both cases tested, and

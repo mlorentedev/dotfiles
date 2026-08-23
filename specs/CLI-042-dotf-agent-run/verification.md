@@ -9,9 +9,15 @@ created: "2026-08-23"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [ ] AC1 (JSON contract on stdout, logs on stderr) -> commit `<hash>` / test `<name>`
+- [ ] AC2 (pool-unavailable advances the chain, task-failed does not) -> commit `<hash>` / test `<name>`
+- [ ] AC3 (timeout kills the worker and frees the slot before reaping) -> commit `<hash>` / test `<name>`
+- [ ] AC4 (fails closed on an unreadable counter and an unidentifiable machine) -> commit `<hash>` / test `<name>`
+- [ ] AC5 (the top tier escalates, never degrades) -> commit `<hash>` / test `<name>`
+- [ ] AC6 (the hive backend answers through NaN and reports pool + model) -> commit `<hash>` / test `<name>`
+- [ ] AC7 (`dotf secrets run -- hive serve`; no credential in a deployed file) -> commit `<hash>` / test `<name>`
+- [ ] AC8 (Ollama and OpenRouter fully removed from deployed config) -> commit `<hash>` / test `<name>`
+- [ ] AC9 (`dotf doctor` fails a backend that can serve nothing) -> commit `<hash>` / test `<name>`
 
 ## Test status
 
