@@ -10,6 +10,8 @@
 # We re-assert syntax here too so this file is self-contained as the canonical
 # per-script suite, but the load-bearing additions are the guard tests.
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
@@ -110,19 +112,6 @@ teardown() {
     # failure mode being ended, so absence must not be quiet.
     grep -q 'log_warning "No DR escrow' "$BACKUP_SCRIPT"
     grep -q "dotf secrets backup" "$BACKUP_SCRIPT"
-}
-
-# `! cmd` is EXEMPT from `set -e`, so a bare `! grep` anywhere but the final line
-# of a @test is silently ignored and the case passes on its last assertion alone.
-# The first assertion below was dead for exactly that reason. Same defect found
-# in tests/check-review-attestation.bats, where it was hiding a real violation.
-refute_grep() {
-    local pattern="$1" file="$2"
-    if grep -qE "$pattern" "$file"; then
-        printf 'expected NOT to find /%s/ in %s, but it is there:\n' "$pattern" "$file" >&2
-        grep -nE "$pattern" "$file" >&2
-        return 1
-    fi
 }
 
 @test "backup-secrets-to-usb.sh keeps the USB payload a declared list, not a recursive sweep" {

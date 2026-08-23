@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for setup-linux.sh
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 }
@@ -74,8 +76,8 @@ setup() {
     # `dotf secrets render` over the registry, and their own runtime resolver).
     grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$DOTFILES_DIR/setup-linux.sh"
     # the eager-source + the old secrets_show twin API are gone
-    ! grep -qE 'load-secrets\.sh" >/dev/null 2>&1' "$DOTFILES_DIR/setup-linux.sh"
-    ! grep -qF 'secrets_show ' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'load-secrets\.sh" >/dev/null 2>&1' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'secrets_show ' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh installs gh if missing" {
@@ -190,7 +192,7 @@ setup() {
 # MCP server list must live in mcp-servers.json, not hardcoded in setup-linux.sh.
 @test "setup-linux.sh MCP registration reads from mcp-servers.json" {
     grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-linux.sh"
-    ! grep -qE 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # MCP registration must check existence before adding, not blindly retry.
@@ -312,8 +314,8 @@ setup() {
 # presence of the cleanup block.
 
 @test "setup scripts no longer register the thedotmack marketplace (MEM-002)" {
-    ! grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh"
-    ! grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup scripts ship the idempotent claude-mem cleanup block (MEM-002)" {
