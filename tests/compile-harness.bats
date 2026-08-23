@@ -3,6 +3,8 @@
 # Each test runs the real script against an isolated temp git repo + fake vault,
 # so the real AGENTS.md / CLAUDE.md are never touched.
 
+load 'lib/refute'
+
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/compile-harness.sh"
     TMP="/tmp/bats_harness_$$_${BATS_TEST_NUMBER:-0}"
@@ -284,9 +286,9 @@ EOF
 @test "setup-linux.sh no longer deploys skills from the removed ai/skills tree" {
     # assert no ACTIVE code path reads the deleted sources (historical mentions
     # in comments are allowed; the deploy is now compile-harness.sh --deploy)
-    ! grep -qF '"$CURRENT_DIR/ai/skills/' "$BATS_TEST_DIRNAME/../setup-linux.sh"
-    ! grep -qF '"$CURRENT_DIR/ai/opencode/commands' "$BATS_TEST_DIRNAME/../setup-linux.sh"
-    ! grep -qF 'OPENCODE_CMDS_SRC=' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    refute_grep_fixed '"$CURRENT_DIR/ai/skills/' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    refute_grep_fixed '"$CURRENT_DIR/ai/opencode/commands' "$BATS_TEST_DIRNAME/../setup-linux.sh"
+    refute_grep_fixed 'OPENCODE_CMDS_SRC=' "$BATS_TEST_DIRNAME/../setup-linux.sh"
 }
 
 @test "AC4: injection past the line cap fails (ai/claude/CLAUDE.md)" {
@@ -397,7 +399,7 @@ run_deploy() {
     [ "$(grep -c '^generated_sha:' "$FAKEHOME/.claude/skills/demo-skill/SKILL.md")" -eq 1 ]
     # opencode command drops name:, keeps description + provenance
     [ -f "$FAKEHOME/.config/opencode/commands/demo-skill.md" ]
-    ! grep -q '^name:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
+    refute_grep '^name:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     grep -q '^description:' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.config/opencode/commands/demo-skill.md"
     [ "$(grep -c '^generated_from:' "$FAKEHOME/.config/opencode/commands/demo-skill.md")" -eq 1 ]
@@ -442,15 +444,15 @@ EOF
     grep -q '^generated_from: 00_meta/skills/full-skill/SKILL.md' "$F"
 
     # neutral/store-only keys must NOT leak into deployed frontmatter
-    ! grep -qE '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$F"
+    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$F"
 
     # opencode command drops name, keeps description + allowed-tools, drops neutral keys
     OC="$FAKEHOME/.config/opencode/commands/full-skill.md"
     [ -f "$OC" ]
-    ! grep -q '^name:' "$OC"
+    refute_grep '^name:' "$OC"
     grep -q '^description: ' "$OC"
     grep -q '^allowed-tools: ' "$OC"
-    ! grep -qE '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$OC"
+    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$OC"
 }
 
 @test "AC1: --deploy replaces a pre-existing vault symlink with a regular copy" {
@@ -486,8 +488,8 @@ EOF
     grep -q '^name: demo-skill' "$FAKEHOME/.gemini/skills/demo-skill/SKILL.md"
     grep -qE '^generated_sha: [0-9a-f]{16}' "$FAKEHOME/.gemini/skills/demo-skill/SKILL.md"
     [ -f "$FAKEHOME/.gemini/prompts/demo-skill.md" ]
-    ! grep -q '^name:' "$FAKEHOME/.gemini/prompts/demo-skill.md"
-    ! grep -q '^description:' "$FAKEHOME/.gemini/prompts/demo-skill.md"
+    refute_grep '^name:' "$FAKEHOME/.gemini/prompts/demo-skill.md"
+    refute_grep '^description:' "$FAKEHOME/.gemini/prompts/demo-skill.md"
     grep -q 'sha256:' "$FAKEHOME/.gemini/prompts/demo-skill.md"
     grep -q 'Body line one.' "$FAKEHOME/.gemini/prompts/demo-skill.md"
 }
@@ -501,7 +503,7 @@ EOF
     grep -qF -- 'Demo skill for the render pipeline.' "$FAKEHOME/.copilot/copilot-instructions.md"
     grep -qE 'BEGIN HARNESS GENERATED \(sha256:[0-9a-f]{16}\)' "$FAKEHOME/.copilot/copilot-instructions.md"
     # claude-only opt-out absent from the copilot catalog
-    ! grep -q 'claude-only' "$FAKEHOME/.copilot/copilot-instructions.md"
+    refute_grep_fixed 'claude-only' "$FAKEHOME/.copilot/copilot-instructions.md"
 }
 
 @test "AC6: per-skill targets[] limits which agents receive deployed output" {
@@ -633,8 +635,8 @@ EOF
     grep -qF 'nested rule line'      "$REPO/harness/enforced/demo.md"
     grep -qF 'rule line two'         "$REPO/harness/enforced/demo.md"
     # the next same-level section is the boundary and must not leak in
-    ! grep -qF 'unrelated'        "$REPO/harness/enforced/demo.md"
-    ! grep -qF 'Next Section'     "$REPO/harness/enforced/demo.md"
+    refute_grep_fixed 'unrelated'        "$REPO/harness/enforced/demo.md"
+    refute_grep_fixed 'Next Section'     "$REPO/harness/enforced/demo.md"
 }
 
 @test "ENGINE-002: --refresh aborts loudly when the manifest anchor is missing (FM D3)" {
@@ -831,7 +833,7 @@ seed_doctrine_fixture() {
     # neutral-only / deferred keys must NOT leak into the native agent frontmatter.
     # `model` is NO LONGER one of them: it is resolved, not dropped (see the tier
     # tests below), so removing it from this list is the behaviour change.
-    ! grep -qE '^(kind|capabilities|skills|targets):' "$F"
+    refute_grep '^(kind|capabilities|skills|targets):' "$F"
     # the record's own provenance (HARNESS-069, added at --refresh) must not
     # survive alongside deploy's own — render_agent's name/description-only
     # passthrough already drops it, but pin that behavior explicitly
@@ -849,7 +851,7 @@ seed_doctrine_fixture() {
     # model id, never the neutral tier — a harness reading `model: top` would ask
     # its provider for a model called "top"
     grep -q '^model: opus' "$F"
-    ! grep -q '^model: top' "$F"
+    refute_grep '^model: top' "$F"
     # exactly one model line: the resolved one replaces the record's, never joins it
     [ "$(grep -c '^model:' "$F")" -eq 1 ]
 }
@@ -922,7 +924,7 @@ DIAG
     [ -f "$F" ]
     grep -q '^name: curator' "$F"
     # not declaring a tier is not an error — it renders as it always did
-    ! grep -q '^model:' "$F"
+    refute_grep '^model:' "$F"
 }
 
 @test "agents: an unresolvable tier fails the deploy instead of rendering a model-less definition" {
@@ -969,7 +971,7 @@ DIAG
     [ -f "$F" ]
     grep -q '^name: curator' "$F"
     # degraded exactly to the pre-change behaviour — never worse than status quo
-    ! grep -q '^model:' "$F"
+    refute_grep '^model:' "$F"
 }
 
 @test "agents: a dotf too old to know resolve-tier warns rather than embedding its help output" {
@@ -999,8 +1001,8 @@ STALE
     F="$FAKEHOME/.claude/agents/curator.md"
     [ -f "$F" ]
     # the help screen must not have become the model id
-    ! grep -q '^model:' "$F"
-    ! grep -q 'Usage:' "$F"
+    refute_grep '^model:' "$F"
+    refute_grep_fixed 'Usage:' "$F"
 }
 
 @test "agents: skill deploy survives a failed agent render" {
@@ -1041,7 +1043,7 @@ EOF
     # the record declares `capabilities: [read, search, edit]`; the deployed file
     # must carry the harness's NATIVE tool names, never the neutral verbs
     grep -q '^tools: Read, Glob, Bash' "$F"
-    ! grep -qE '^capabilities:' "$F"
+    refute_grep '^capabilities:' "$F"
     [ "$(grep -c '^tools:' "$F")" -eq 1 ]
 }
 
@@ -1052,7 +1054,7 @@ EOF
     run_deploy; [ "$status" -eq 0 ]
     F="$FAKEHOME/.claude/agents/curator.md"
     [ -f "$F" ]
-    ! grep -q '^tools:' "$F"
+    refute_grep '^tools:' "$F"
     # the model line is independent and must still be there
     grep -q '^model: opus' "$F"
 }
@@ -1091,7 +1093,7 @@ HALF
     [[ "$output" == *"predates the resolve-capabilities"* ]]
     F="$FAKEHOME/.claude/agents/curator.md"
     grep -q '^model: opus' "$F"
-    ! grep -q '^tools:' "$F"
+    refute_grep '^tools:' "$F"
 }
 
 @test "BUG-1168: a whitespace-bearing model id blames the map, not a stale dotf" {
@@ -1301,7 +1303,7 @@ HALF2
     run_deploy; [ "$status" -eq 0 ]
     # claude: curator targets it, scribe does not
     grep -q 'curator' "$FAKEHOME/.claude/CLAUDE.md"
-    ! grep -q 'scribe' "$FAKEHOME/.claude/CLAUDE.md"
+    refute_grep_fixed 'scribe' "$FAKEHOME/.claude/CLAUDE.md"
     # opencode: both personas target it
     grep -q 'curator' "$FAKEHOME/.config/opencode/AGENTS.md"
     grep -q 'scribe' "$FAKEHOME/.config/opencode/AGENTS.md"

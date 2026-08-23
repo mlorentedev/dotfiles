@@ -3,6 +3,8 @@
 # The template is the SSOT for the "dotfiles-owned" subset of ~/.claude/settings.json.
 # Per-key merge policy is documented in specs/SDD-002-settings-portability/proposal.md.
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SETTINGS_TEMPLATE="$DOTFILES_DIR/ai/claude/settings.json"
@@ -258,14 +260,14 @@ setup() {
 @test "setup-linux.sh plugin install loop must NOT include plugins removed for zero usage" {
     for plugin in github code-simplifier claude-md-management claude-code-setup \
         ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
-        ! grep -qE "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-linux.sh"
+        refute_grep "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-linux.sh"
     done
 }
 
 @test "setup-windows.ps1 plugin install loop must NOT include plugins removed for zero usage" {
     for plugin in github code-simplifier claude-md-management claude-code-setup \
         ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
-        ! grep -qE "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-windows.ps1"
+        refute_grep "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-windows.ps1"
     done
 }
 

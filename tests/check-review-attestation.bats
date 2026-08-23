@@ -11,6 +11,8 @@
 # ever stops classifying that file as `declined`, the gate has stopped doing
 # the one thing it was built for.
 
+load 'lib/refute'
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     SCRIPT="$REPO/scripts/check-review-attestation.sh"
@@ -171,23 +173,6 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"declined"* ]]
     [[ "$output" == *"pr-agent"* ]]
-}
-
-# refute_grep exists because `! cmd` is EXEMPT from `set -e` in bash. A bare
-# `! grep -q X file` anywhere except the final line of a @test is silently
-# ignored, so the test passes on the strength of its last assertion alone.
-#
-# That is not hypothetical here: this file's AC5 case asserted the script names
-# no reviewer, the script DID name one in a comment, and the suite reported
-# green for as long as the violated assertion was not the last line. Found via a
-# reviewer comment about a different defect in the same predicate.
-refute_grep() {
-    local pattern="$1" file="$2"
-    if grep -qE "$pattern" "$file"; then
-        printf 'expected NOT to find /%s/ in %s, but it is there:\n' "$pattern" "$file" >&2
-        grep -nE "$pattern" "$file" >&2
-        return 1
-    fi
 }
 
 @test "AC5: the script names no reviewer of its own" {
@@ -429,12 +414,10 @@ sys.exit(0 if expected.issubset(types) else 1)
     [[ "$output" != *"declined"* ]]
 }
 
-@test "meta: no bare negated assertion survives in this suite" {
-    # The pitfall that hid a real violation here: `! cmd` is exempt from set -e,
-    # so a failing negation anywhere but the last line of a @test is ignored.
-    # refute_grep is the replacement; this keeps the pattern from creeping back.
-    refute_grep '^[[:space:]]*![[:space:]]*grep' "$BATS_TEST_FILENAME"
-}
+# The "meta: no bare negated assertion survives in this suite" case that used to
+# live here now covers every file in tests/, not just this one: see
+# tests/guard-bats-negation.bats (#1034).  Two guards for one rule is one guard
+# and one thing that quietly disagrees with it.
 
 @test "AC7: the workflow tolerates the gate not yet existing on the base branch" {
     # Chicken-and-egg found in production on #1019: pinning checkout to the base

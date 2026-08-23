@@ -2,6 +2,7 @@
 # Tests for setup-windows.ps1 (structural + PSScriptAnalyzer)
 
 load 'winpath'
+load 'lib/refute'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -55,8 +56,8 @@ setup() {
 }
 
 @test "setup-windows.ps1 no longer deploys Aider configuration (sunset)" {
-    ! grep -q 'Deploying Aider configuration' "$PS1_SCRIPT"
-    ! grep -q 'Installing aider-chat via uv' "$PS1_SCRIPT"
+    refute_grep_fixed 'Deploying Aider configuration' "$PS1_SCRIPT"
+    refute_grep_fixed 'Installing aider-chat via uv' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 registers MCP servers" {
@@ -77,8 +78,8 @@ setup() {
     # Migrated off the load-secrets eager dot-source (ADR-028). agy's
     # OPENROUTER_API_KEY is baked into mcp_config.json via `dotf secrets show`
     # after Install-Dotf, before the agy block (opencode/pi self-resolve).
-    ! grep -qE '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
-    ! grep -qF 'Eager-load secrets' "$PS1_SCRIPT"
+    refute_grep '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
+    refute_grep_fixed 'Eager-load secrets' "$PS1_SCRIPT"
     grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$PS1_SCRIPT"
 }
 
@@ -133,8 +134,8 @@ setup() {
 
 @test "setup-windows.ps1 detects copilot via Get-Command, not gh extension list" {
     grep -qF "Get-Command copilot" "$PS1_SCRIPT"
-    ! grep -qF "gh extension list" "$PS1_SCRIPT"
-    ! grep -qF "github/gh-copilot" "$PS1_SCRIPT"
+    refute_grep_fixed "gh extension list" "$PS1_SCRIPT"
+    refute_grep_fixed "github/gh-copilot" "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 auto-installs GitHub.Copilot via winget" {
@@ -147,7 +148,7 @@ setup() {
     # init-project.ps1 et al. were retired -> dotf init. setup must clean up old
     # copies, never Copy-Item them.
     grep -q 'init-repo-github-defaults.ps1' "$PS1_SCRIPT"
-    ! grep -qE 'Copy-Item .*init-project\.ps1' "$PS1_SCRIPT"
+    refute_grep 'Copy-Item .*init-project\.ps1' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys knowledge-crystallize.ps1" {
@@ -161,7 +162,7 @@ setup() {
 # MEM-002: claude-mem-heal.ps1 is retired (ADR-016 Q2). setup-windows.ps1 must
 # NOT deploy it any more.
 @test "setup-windows.ps1 no longer deploys claude-mem-heal.ps1 (MEM-002)" {
-    ! grep -q 'claude-mem-heal.ps1' "$PS1_SCRIPT"
+    refute_grep_fixed 'claude-mem-heal.ps1' "$PS1_SCRIPT"
     [ ! -f "$DOTFILES_DIR/scripts/claude-mem-heal.ps1" ]
 }
 
@@ -211,7 +212,7 @@ setup() {
 # MCP server list must live in mcp-servers.json, not hardcoded in the setup script.
 @test "setup-windows.ps1 MCP registration reads from mcp-servers.json" {
     grep -q 'mcp-servers\.json' "$PS1_SCRIPT"
-    ! grep -Eq 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$PS1_SCRIPT"
+    refute_grep 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$PS1_SCRIPT"
 }
 
 # MCP registration must check existence before adding, not blindly retry.
@@ -282,7 +283,7 @@ setup() {
 # idempotent cleanup that uninstalls the plugin + prunes leftover dirs.
 
 @test "setup-windows.ps1 no longer registers the thedotmack marketplace (MEM-002)" {
-    ! grep -qF 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT"
+    refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 ships the idempotent claude-mem cleanup block (MEM-002)" {
@@ -324,7 +325,7 @@ setup() {
     # -ne reconcile would downgrade a newer install. Gate on Test-VersionAtLeast
     # so only a below-minimum opencode triggers an upgrade.
     grep -qF 'Test-VersionAtLeast $installedVer $tool.Version' "$PS1_SCRIPT"
-    ! grep -qF '$installedVer -ne $tool.Version' "$PS1_SCRIPT"
+    refute_grep_fixed '$installedVer -ne $tool.Version' "$PS1_SCRIPT"
     grep -qE 'winget install \$tool\.Id --version \$tool\.Version' "$PS1_SCRIPT"
     # Convergence is verified by re-query, not by winget's exit code: a
     # shadowing install (npm global, scoop) would otherwise produce a false
@@ -365,8 +366,8 @@ setup() {
 @test "setup-windows.ps1 no longer deploys skills from the removed ai\\skills tree (SDD-008)" {
     # the ai\skills / ai\opencode\commands references that remain are historical
     # comments in the Deploy-SkillRecord block, never active Test-Path sources.
-    ! grep -qE '\$skillsSource\s*=\s*"\$DotfilesDir\\ai\\skills"' "$PS1_SCRIPT"
-    ! grep -qE '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
+    refute_grep '\$skillsSource\s*=\s*"\$DotfilesDir\\ai\\skills"' "$PS1_SCRIPT"
+    refute_grep '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
 @test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
@@ -441,7 +442,7 @@ setup() {
 }
 
 @test "negative parity: setup-linux.sh does not reference PSVersion (BUG-005 is Windows-only)" {
-    ! grep -qF 'PSVersion' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'PSVersion' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-windows.ps1 deploys SSH config" {
@@ -558,15 +559,15 @@ setup() {
     # AGENTS.md itself may mention 'CORE PRINCIPLE' as documentation text -- that
     # is fine. The bug is using it as a Select-String -Pattern, which post-AI-013
     # never matches the deployed file and emits a spurious [ERROR] every run.
-    ! grep -qF -- '-Pattern "CORE PRINCIPLE"' "$PS1_SCRIPT"
+    refute_grep_fixed '-Pattern "CORE PRINCIPLE"' "$PS1_SCRIPT"
 }
 
 @test "parity: both setup scripts detect copilot via binary, not gh extension" {
     grep -qF "command -v copilot" "$DOTFILES_DIR/setup-linux.sh"
     grep -qF "Get-Command copilot" "$PS1_SCRIPT"
     # Neither should still reference the legacy extension path
-    ! grep -qF "github/gh-copilot" "$DOTFILES_DIR/setup-linux.sh"
-    ! grep -qF "github/gh-copilot" "$PS1_SCRIPT"
+    refute_grep_fixed "github/gh-copilot" "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed "github/gh-copilot" "$PS1_SCRIPT"
 }
 
 # --- SDD-002: settings.json template merge ---
@@ -581,7 +582,7 @@ setup() {
 @test "SDD-002: setup-windows.ps1 calls Merge-ClaudeSettings (not inline hashtable)" {
     grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
     # The legacy inline hook hashtable must be gone
-    ! grep -qE '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
+    refute_grep '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
 }
 
 @test "SDD-002: setup-windows.ps1 references the template path ai\\claude\\settings.json" {
@@ -601,7 +602,7 @@ setup() {
 @test "SDD-002: setup-linux.sh calls merge_claude_settings (not inline HOOK_ENTRY)" {
     grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
     # The legacy inline HOOK_ENTRY jq -n heredoc must be gone
-    ! grep -qF 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "SDD-002: setup-linux.sh references the template path ai/claude/settings.json" {

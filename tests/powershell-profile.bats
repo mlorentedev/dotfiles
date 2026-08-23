@@ -2,6 +2,7 @@
 # Tests for powershell/profile.ps1 (structural)
 
 load 'winpath'
+load 'lib/refute'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -35,11 +36,11 @@ setup() {
     grep -qE 'if \(Get-Command opencode' "$PROFILE_SCRIPT"
     grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
     # Regression guard: ensure --pure isn't quietly reintroduced for Windows.
-    ! grep -qE 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
+    refute_grep 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
 }
 
 @test "profile.ps1 no longer defines aider tier functions (sunset)" {
-    ! grep -qE '^function (ai|aic|aia) ' "$PROFILE_SCRIPT"
+    refute_grep '^function (ai|aic|aia) ' "$PROFILE_SCRIPT"
 }
 
 # --- Cross-machine path resolution (ADR-025): no hardcoded repo literal ---
@@ -49,7 +50,7 @@ setup() {
     # still find the repo script. The old literal 'Projects\dotfiles\scripts'
     # broke on any machine whose repo is not under ~/Projects/dotfiles.
     grep -qF '$env:DOTFILES_REPO_DIR' "$PROFILE_SCRIPT"
-    ! grep -qF "'Projects\\dotfiles\\scripts\\nan-debug.sh'" "$PROFILE_SCRIPT"
+    refute_grep_fixed "'Projects\\dotfiles\\scripts\\nan-debug.sh'" "$PROFILE_SCRIPT"
 }
 
 # --- On-demand secrets (ADR-028: no ambient export; wrap AI CLIs via dotf secrets run) ---
@@ -59,13 +60,13 @@ setup() {
     # session. opencode (reads {env:NAN_API_KEY} from opencode.jsonc), pi and agy
     # are wrapped to launch through `dotf secrets run`, so the secret lives only
     # in their child process — never the session.
-    ! grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+    refute_grep 'load-secrets\.ps1' "$PROFILE_SCRIPT"
     grep -qE 'function opencode \{ dotf secrets run' "$PROFILE_SCRIPT"
 }
 
 @test "parity: neither .bashrc nor profile.ps1 auto-loads secrets; both wrap the AI CLIs" {
-    ! grep -qE 'source .*load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
-    ! grep -qE 'load-secrets\.ps1' "$PROFILE_SCRIPT"
+    refute_grep 'source .*load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
+    refute_grep 'load-secrets\.ps1' "$PROFILE_SCRIPT"
     grep -qE 'opencode\(\) \{ dotf secrets run' "$DOTFILES_DIR/.bashrc"
     grep -qE 'function opencode \{ dotf secrets run' "$PROFILE_SCRIPT"
 }
@@ -102,7 +103,7 @@ setup() {
 @test "profile.ps1 hc function wraps dotf doctor (CLI-018)" {
     # hc was a healthcheck.ps1 launcher; after CLI-018 it runs dotf doctor.
     grep -A6 '^function hc' "$PROFILE_SCRIPT" | grep -qF 'dotf doctor'
-    ! grep -qF 'healthcheck.ps1' "$PROFILE_SCRIPT"
+    refute_grep_fixed 'healthcheck.ps1' "$PROFILE_SCRIPT"
 }
 
 @test "profile.ps1 valid PowerShell syntax (if pwsh available)" {
