@@ -8,7 +8,7 @@
 
 - **Session Handoff:** Run `/handoff` (`00_meta/skills/handoff/SKILL.md`) at the end of non-trivial sessions. Replaces `## Session Handoff` continuity block in `MEMORY.md`.
 - **Auto-Crystallize:** If context includes `CRYSTALLIZE NEEDED`, run `/crystallize` before user tasks.
-- **Auto-Archive:** If context reports >60d cold memory files, move to `memory/archive/` and update `MEMORY.md`.
+- **Auto-Archive:** Act on `ARCHIVE NEEDED` only for the files it names. The banner lists candidates with their type, and it never proposes a `feedback` memory or one whose type cannot be read — mtime records when a rule was last *edited*, not when it was last relied on (#967). Moving a file also drops its `MEMORY.md` pointer, the only surface loaded at session start, so archive the named files and remove their index lines in the same edit; anything labelled `STANDING` stays put.
 
 ## Claude Code Tooling Notes
 
