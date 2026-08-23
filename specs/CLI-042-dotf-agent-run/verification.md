@@ -46,8 +46,11 @@ Produced 2026-08-23 on branch `feat/dotf-agent-run`, off `origin/main` @ `a27dcc
 - Lint: `golangci-lint run` (v2.12.2, matching the `versions.conf` pin) -> **0 issues**
 - Shell: `~/.local/bin/bats tests/*.bats` -> **1462 tests, exit 0, 0 failures**; `shellcheck` clean on
   the new `tests/dotf-agent-run.bats`
-- `features.json` commands executed individually: the nine belonging to PR B exit 0; the eight
-  belonging to PRs C/D/E exit non-zero, which is what `pending` has to mean. **This was not free** —
+- `features.json` commands executed individually: **10 exit 0, 7 exit non-zero**. The ten are f1–f7,
+  f9, f12 and f13; note f9 belongs to AC3, which is PR C's — it is the half of that criterion B can
+  hold (the deadline reaches the backend), and counting it under B would misreport AC3 as met. The
+  seven that fail are the criteria PRs C, D and E own, which is what `pending` has to mean.
+  **This was not free** —
   the file's original commands named tests that do not exist, and `go test -run <nonexistent>` exits
   **0** with `[no tests to run]`, so every one of them would have certified an unwritten test. All
   seventeen were rewritten to the form `go test -run '^X$' -v | grep -q '^--- PASS: X'`, which fails
