@@ -92,30 +92,86 @@ func memoryTemperature(memoryDir string, hotDays, warmDays, coldDays int, now ti
 	}
 	sort.Strings(names) // the shell's glob expands in sorted order
 
-	var report strings.Builder
-	hasArchive := false
+	var report, candidates strings.Builder
+	archivable := 0
 	nowEpoch := now.Unix()
 	for _, name := range names {
-		info, err := os.Stat(filepath.Join(memoryDir, name))
+		path := filepath.Join(memoryDir, name)
+		info, err := os.Stat(path)
 		if err != nil {
 			continue
 		}
 		daysAgo := int((nowEpoch - info.ModTime().Unix()) / 86400)
 		label := temperatureLabel(daysAgo, hotDays, warmDays, coldDays)
-		if label == "ARCHIVE" {
-			hasArchive = true
+		if label != "ARCHIVE" {
+			fmt.Fprintf(&report, "\n  %s: %s (%dd ago)", label, name, daysAgo)
+			continue
 		}
-		fmt.Fprintf(&report, "\n  %s: %s (%dd ago)", label, name, daysAgo)
+		typ := memoryType(path)
+		if !archivableTypes[typ] {
+			if typ == "" {
+				typ = "unknown"
+			}
+			fmt.Fprintf(&report, "\n  STANDING: %s (%dd ago, type=%s — not archivable on age)", name, daysAgo, typ)
+			continue
+		}
+		archivable++
+		fmt.Fprintf(&report, "\n  ARCHIVE: %s (%dd ago, type=%s)", name, daysAgo, typ)
+		fmt.Fprintf(&candidates, "\n  - %s (%dd, type=%s)", name, daysAgo, typ)
 	}
 
 	if report.Len() == 0 {
 		return ""
 	}
 	out := "\nMemory temperature:" + report.String()
-	if hasArchive {
-		out += "\nARCHIVE NEEDED: Move memory files >60d old to memory/archive/ and update MEMORY.md index"
+	if archivable > 0 {
+		out += fmt.Sprintf(
+			"\nARCHIVE NEEDED (%d): move to memory/archive/ and drop each file's MEMORY.md pointer in the same edit%s",
+			archivable, candidates.String())
 	}
 	return out
+}
+
+// archivableTypes are the memory kinds an age sweep may retire, and the list is
+// deliberately short (HARNESS-073, #967).
+//
+// mtime records when a memory was last EDITED, never when it was last relied on,
+// so a standing guardrail untouched for ninety days is the most settled entry in
+// the directory rather than the most disposable one. On 2026-08-14 the age sweep
+// proposed four `feedback` memories at once — the no-AI-attribution rule, the
+// worktree rule, the incident-to-guard rule and the two-tier deploy lesson — all
+// four load-bearing, all four followed that same session.
+//
+// A missing or unrecognised type is exempt too, and that is the fail-closed half:
+// archiving a memory also drops its pointer from MEMORY.md, the only surface
+// loaded at session start, so the rule does not merely move — it stops being seen.
+// The unknown case must therefore degrade to "kept", never to "moved".
+var archivableTypes = map[string]bool{"project": true, "reference": true}
+
+// memoryType returns the `metadata.type` of an auto-memory file, or "" when the
+// file carries no frontmatter or no such key.
+//
+// The key is matched exactly after trimming, so the sibling `node_type:` present
+// in every one of these files never satisfies it — a substring match would report
+// every memory as type "memory" and re-open the defect from the other side.
+func memoryType(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(b), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return ""
+	}
+	for _, line := range lines[1:] {
+		if strings.TrimSpace(line) == "---" {
+			return ""
+		}
+		if key, val, ok := strings.Cut(line, ":"); ok && strings.TrimSpace(key) == "type" {
+			return strings.TrimSpace(val)
+		}
+	}
+	return ""
 }
 
 // temperatureLabel buckets an age in days against the HOT/WARM/COLD thresholds.
