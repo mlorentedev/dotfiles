@@ -1,6 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mlorentedev/dotfiles/harness/model-map.schema.json",
+  "$defs": {
+    "chain": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[^:[:space:]]+:[^:[:space:]]+$",
+        "description": "`pool:model`, both halves non-empty and free of whitespace. A pattern rather than minLength, because \"nan:\" is four characters and still routes nowhere. The trailing `+` rather than `.*` is deliberate: `.*` accepted \"nan:deepseek   \" and \"nan:deep:seek\"."
+      }
+    }
+  },
   "title": "model-map",
   "description": "The dispatch-time routing registry (ADR-032 §3, shaped by ADR-035). Validated by cli/internal/harness/model_map.go, which reads THIS FILE rather than restating its rules — so the contract lives here and only its interpreter lives in Go. Standard draft-2020-12 keywords are interpreted by santhosh-tekuri/jsonschema, so adding one here needs no Go change. The `x-` namespace is this repo's own: those keywords name cross-block rules implemented in Go, they are a closed set, and one this validator does not implement is a loud error rather than the annotation draft 2020-12 would otherwise make it.",
   "type": "object",
@@ -150,14 +161,15 @@
       "description": "Ordered fallback per tier, as `pool:model`. Resolved at RUN time and read only by a level-2 dispatcher: a Claude Task cannot fail over to NaN, so cross-pool fallback exists only outside the session. Kept separate from reviewer-pool.json deliberately — that one ranks independence above availability, this one ranks availability. ADR-035 states the merge trigger: a third consumer needing an ordered chain.",
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": {
-        "type": "array",
-        "minItems": 1,
-        "items": {
-          "type": "string",
-          "pattern": "^[^:[:space:]]+:[^:[:space:]]+$",
-          "description": "`pool:model`, both halves non-empty and free of whitespace. A pattern rather than minLength, because \"nan:\" is four characters and still routes nowhere. The trailing `+` rather than `.*` is deliberate: `.*` accepted \"nan:deepseek   \" and \"nan:deep:seek\"."
+      "properties": {
+        "top": {
+          "$ref": "#/$defs/chain",
+          "maxItems": 1,
+          "description": "The top tier declares no fallback, and the schema is where that is a SHAPE rule (ADR-032 §4). The dispatcher enforces the matching BEHAVIOUR rule — it never advances past the first entry — and the two are not a duplication: this one stops a second entry being written, that one stops a second entry being used if one ever is. A top tier that quietly degrades converts a gate into a green checkmark. The $ref is load-bearing: naming `top` under `properties` exempts it from `additionalProperties`, so without it this key would lose the array type, the minimum and the `pool:model` pattern that every other tier is held to."
         }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/chain"
       }
     },
     "services": {

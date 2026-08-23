@@ -97,6 +97,17 @@ func TestStdoutContracts(t *testing.T) {
 			wantSub:  "opus",
 			consumer: `compile-harness.sh: model_id="$(dotf harness resolve-tier "$tier" --harness "$agent")"`,
 		},
+		{
+			// The whole point of `agent run` is to be composed: its consumer is
+			// a dispatcher piping stdout into a parser, never a person reading
+			// a terminal. A record on stderr would parse as empty input, which
+			// jq reports as a null rather than as an error — a dispatch that
+			// silently reads as "no answer" instead of failing.
+			name:     "agent run — the record is piped into a JSON parser by its caller",
+			args:     []string{"agent", "run", "--role", "reviewer", "--task", "probe", "--tier", "mid", "--backend", "dry-run", "--timeout", "30s"},
+			wantSub:  `"status":"dry_run"`,
+			consumer: `a dispatcher: dotf agent run ... | jq -r .status`,
+		},
 	}
 
 	for _, tt := range tests {
