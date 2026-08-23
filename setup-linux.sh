@@ -590,10 +590,23 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
         "$_jq" -r '.targets[].file' "$CURRENT_DIR/harness/manifest.json" 2>/dev/null \
         | while IFS= read -r _harness_target; do
             [ -n "$_harness_target" ] || continue
-            [ -f "$CURRENT_DIR/$_harness_target" ] || continue
+            # A declared target the checkout does not have is a broken checkout,
+            # and skipping it silently reproduces the very defect this block
+            # fixes: the mirror ends up incomplete and `--check` fails later on
+            # a marker count that names neither the manifest nor the missing
+            # file. Name it here, where the cause is still visible. Setup does
+            # not abort — it is idempotent and long, and one absent target must
+            # not cost a machine the rest of its provisioning — but the warning
+            # is loud and `verify-setup.bats` fails on the resulting gap.
+            if [ ! -f "$CURRENT_DIR/$_harness_target" ]; then
+                log_warning "harness/manifest.json declares a target the checkout does not have: $_harness_target — not mirrored, 'dotf doctor' will report harness drift"
+                continue
+            fi
             _harness_target_dir="$(dirname "$DOTFILES_DIR/$_harness_target")"
             ensure_directory "$_harness_target_dir"
-            safe_copy "$CURRENT_DIR/$_harness_target" "$_harness_target_dir/" 2>/dev/null || true
+            if ! safe_copy "$CURRENT_DIR/$_harness_target" "$_harness_target_dir/" 2>/dev/null; then
+                log_warning "failed to mirror harness target $_harness_target to $_harness_target_dir — 'dotf doctor' will report harness drift"
+            fi
         done
         unset _harness_target _harness_target_dir
     else

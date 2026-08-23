@@ -8,7 +8,7 @@
 
 `dotf doctor` reported, persistently:
 
-```
+```text
 [Harness + skill drift]
   [FAIL] harness/skill drift (run: compile-harness.sh --refresh, then re-deploy)
 ```
@@ -83,7 +83,7 @@ all. The integration guard went red on its very first CI run — not on the bug 
 was written for, but on a latent one underneath it. In one setup run, 22 seconds
 apart and in the same process:
 
-```
+```text
 [SUCCESS] jq installed
 [WARNING] Claude Code CLI, npx, or jq not found, skipping MCP server registration
 ```
@@ -99,7 +99,7 @@ check asks about, or the two will disagree and both will look right.** Tracked a
 
 ## Evidence
 
-```
+```console
 $ bash ~/.dotfiles/scripts/compile-harness.sh --check
 [ERROR] /home/manu/.dotfiles/ai/orca/ORCA.md: need exactly 1 BEGIN + 1 END HARNESS marker (found /)
 [check] FAIL: harness drift detected
