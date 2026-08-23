@@ -9,6 +9,8 @@
 # Hermetic: a fake `gh` on PATH logs each `issue edit` (repo + number) and answers
 # `issue view --json state` from a controllable fixture, so no network is touched.
 
+load 'lib/refute'
+
 setup() {
     HELPER="$BATS_TEST_DIRNAME/../git-hooks/lib/board-pickup.sh"
     TMP="$(mktemp -d "/tmp/bats_pickup_XXXXXX")"
@@ -68,7 +70,7 @@ run_helper() { ( cd "$REPO" && bash "$HELPER" "$@" ); }
     run run_helper "" "" "1"
     [ "$status" -eq 0 ]
     grep -q "mlorentedev/dotfiles 77" "$GHLOG"
-    ! grep -q "mlorentedev/knowledge" "$GHLOG"
+    refute_grep_fixed "mlorentedev/knowledge" "$GHLOG"
 }
 
 @test "current-repo issue missing: falls back to the knowledge bitacora home" {

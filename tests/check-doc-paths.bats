@@ -191,7 +191,10 @@ governed_files() {
     printf 'Generated record naming `scripts/gone.sh`.\n' > "$DOTFILES_DIR/$PROBE_REL"
     git -C "$DOTFILES_DIR" add -N "$PROBE_REL"
 
-    ! instruction_files | grep -qx "$PROBE_REL"
+    local discovered
+    discovered="$(instruction_files)"
+    run grep -qxF "$PROBE_REL" <<<"$discovered"
+    [ "$status" -eq 1 ]
 }
 
 @test "check-doc-paths: auto-discovers instruction files when run without arguments [#1021]" {

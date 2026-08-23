@@ -6,19 +6,12 @@
 # afterwards — a reviewer that quietly rubber-stamps, or that quietly reads
 # credential material.
 
+load 'lib/refute'
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CFG="$REPO/.pr_agent.toml"
     WF="$REPO/.github/workflows/pr-agent.yml"
-}
-
-refute_grep() {
-    local pattern="$1" file="$2"
-    if grep -qE "$pattern" "$file"; then
-        printf 'expected NOT to find /%s/ in %s, but it is there:\n' "$pattern" "$file" >&2
-        grep -nE "$pattern" "$file" >&2
-        return 1
-    fi
 }
 
 @test "pr-agent: the config and workflow both exist" {

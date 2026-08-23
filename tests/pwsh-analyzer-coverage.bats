@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for POLISH-003: PSScriptAnalyzer full repository coverage
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export CI_YML="$DOTFILES_DIR/.github/workflows/ci.yml"
@@ -11,7 +13,7 @@ setup() {
 }
 
 @test "POLISH-003: lint-powershell does not hardcode static script list" {
-    ! grep -q '\$scripts = @(' "$CI_YML"
+    refute_grep_fixed '$scripts = @(' "$CI_YML"
 }
 
 @test "POLISH-003: repo contains at least 20 powershell scripts subject to analysis" {

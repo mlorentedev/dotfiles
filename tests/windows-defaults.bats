@@ -5,6 +5,7 @@
 # tests/windows-defaults.Tests.ps1 (Pester, Windows-only).
 
 load 'winpath'
+load 'lib/refute'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -42,7 +43,8 @@ setup() {
 # --- HKCU-only invariant (AC: all writes target HKCU:\ only) ---
 
 @test "windows-defaults.ps1 never references HKLM (HKCU-only invariant)" {
-    ! grep -qi 'HKLM' "$PS1_SCRIPT"
+    run grep -in 'HKLM' "$PS1_SCRIPT"
+    [ "$status" -eq 1 ] || { printf 'HKCU-only invariant broken:\n%s\n' "$output" >&2; return 1; }
 }
 
 @test "windows-defaults.ps1 validates -Root stays inside HKCU at runtime" {
@@ -73,7 +75,7 @@ setup() {
 }
 
 @test "windows-defaults.ps1 never restarts explorer.exe itself (anti-scope)" {
-    ! grep -qE 'Stop-Process|taskkill|Restart-Computer' "$PS1_SCRIPT"
+    refute_grep 'Stop-Process|taskkill|Restart-Computer' "$PS1_SCRIPT"
 }
 
 # --- setup-windows.ps1 integration (AC: -WithDefaults flag, OFF by default) ---

@@ -3,6 +3,8 @@
 # plaintext secret in git, and the curated model set stays consistent with
 # its own README (NaN + non-big-3 paid OpenRouter).
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PI_MODELS="$DOTFILES_DIR/ai/pi/models.json"
@@ -15,7 +17,7 @@ setup() {
 }
 
 @test "ai/pi/models.json has no literal API key" {
-    ! grep -qE '"apiKey"[[:space:]]*:[[:space:]]*"sk-' "$PI_MODELS"
+    refute_grep '"apiKey"[[:space:]]*:[[:space:]]*"sk-' "$PI_MODELS"
 }
 
 @test "ai/pi/models.json uses the \${NAN_API_KEY} placeholder, resolved at runtime" {
@@ -31,7 +33,7 @@ setup() {
 # This assertion is the inverse of the one it replaced: that test required the broken
 # form and passed for as long as the bug existed.
 @test "ai/pi/models.json carries no {env:...} placeholder pi cannot resolve [BUG-081b]" {
-    ! grep -qF '{env:' "$PI_MODELS"
+    refute_grep_fixed '{env:' "$PI_MODELS"
 }
 
 @test "ai/pi/models.json is valid JSON" {
@@ -45,11 +47,11 @@ setup() {
 }
 
 @test "ai/pi/settings.json omits the volatile lastChangelogVersion (seed-if-missing)" {
-    ! grep -qF 'lastChangelogVersion' "$PI_SETTINGS"
+    refute_grep_fixed 'lastChangelogVersion' "$PI_SETTINGS"
 }
 
 @test "ai/pi/settings.json enabledModels exclude OpenAI/Google/Anthropic OpenRouter providers" {
-    ! grep -qE 'openrouter/(openai|google|anthropic)/' "$PI_SETTINGS"
+    refute_grep 'openrouter/(openai|google|anthropic)/' "$PI_SETTINGS"
 }
 
 # --- Referential integrity between the two files -------------------------
