@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // scriptedBackend answers a fixed response per `pool:model` entry and records
@@ -48,7 +49,11 @@ func TestDispatch_ChainWalk(t *testing.T) {
 		wantPool   string
 		wantModel  string
 		wantExit   int
-		wantSeen   []string
+		// wantRecExit is the record's own exit field. Kept separate from
+		// wantExit so a path that forgets to set it cannot borrow the
+		// derived value and look correct.
+		wantRecExit int
+		wantSeen    []string
 	}{
 		{
 			name:  "pool unavailable advances to the next entry",
@@ -58,11 +63,12 @@ func TestDispatch_ChainWalk(t *testing.T) {
 				"claude:sonnet":         {Status: StatusPoolUnavailable},
 				"nan:deepseek-v4-flash": {Status: StatusOK, Output: "answered"},
 			},
-			wantStatus: StatusOK,
-			wantPool:   "nan",
-			wantModel:  "deepseek-v4-flash",
-			wantExit:   0,
-			wantSeen:   []string{"claude:sonnet", "nan:deepseek-v4-flash"},
+			wantStatus:  StatusOK,
+			wantPool:    "nan",
+			wantModel:   "deepseek-v4-flash",
+			wantExit:    0,
+			wantRecExit: 0,
+			wantSeen:    []string{"claude:sonnet", "nan:deepseek-v4-flash"},
 		},
 		{
 			name:  "task failed does not advance",
@@ -72,11 +78,12 @@ func TestDispatch_ChainWalk(t *testing.T) {
 				"claude:sonnet":         {Status: StatusTaskFailed, Exit: 2, Output: "boom"},
 				"nan:deepseek-v4-flash": {Status: StatusOK, Output: "must never be reached"},
 			},
-			wantStatus: StatusTaskFailed,
-			wantPool:   "claude",
-			wantModel:  "sonnet",
-			wantExit:   1,
-			wantSeen:   []string{"claude:sonnet"},
+			wantStatus:  StatusTaskFailed,
+			wantPool:    "claude",
+			wantModel:   "sonnet",
+			wantExit:    1,
+			wantRecExit: 2,
+			wantSeen:    []string{"claude:sonnet"},
 		},
 		{
 			name:  "every entry unavailable is chain exhausted, not a task failure",
@@ -87,9 +94,10 @@ func TestDispatch_ChainWalk(t *testing.T) {
 				"nan:deepseek-v4-flash": {Status: StatusPoolUnavailable},
 				"nan:mimo-v2.5":         {Status: StatusPoolUnavailable},
 			},
-			wantStatus: StatusChainExhausted,
-			wantExit:   3,
-			wantSeen:   []string{"claude:sonnet", "nan:deepseek-v4-flash", "nan:mimo-v2.5"},
+			wantStatus:  StatusChainExhausted,
+			wantExit:    3,
+			wantRecExit: 3,
+			wantSeen:    []string{"claude:sonnet", "nan:deepseek-v4-flash", "nan:mimo-v2.5"},
 		},
 		{
 			name:  "an unrecognised backend status is a task failure, never an advance",
@@ -98,11 +106,12 @@ func TestDispatch_ChainWalk(t *testing.T) {
 			script: map[string]Response{
 				"claude:sonnet": {Status: Status("who knows"), Exit: 9},
 			},
-			wantStatus: StatusTaskFailed,
-			wantPool:   "claude",
-			wantModel:  "sonnet",
-			wantExit:   1,
-			wantSeen:   []string{"claude:sonnet"},
+			wantStatus:  StatusTaskFailed,
+			wantPool:    "claude",
+			wantModel:   "sonnet",
+			wantExit:    1,
+			wantRecExit: 9,
+			wantSeen:    []string{"claude:sonnet"},
 		},
 		{
 			name:  "a malformed chain entry fails closed rather than being skipped",
@@ -111,20 +120,22 @@ func TestDispatch_ChainWalk(t *testing.T) {
 			script: map[string]Response{
 				"nan:deepseek-v4-flash": {Status: StatusOK, Output: "must never be reached"},
 			},
-			wantStatus: StatusTaskFailed,
-			wantExit:   1,
-			wantSeen:   nil,
+			wantStatus:  StatusTaskFailed,
+			wantExit:    1,
+			wantRecExit: 1,
+			wantSeen:    nil,
 		},
 		{
-			name:       "dry run reports the resolved route and exits zero",
-			tier:       "mid",
-			chain:      []string{"claude:sonnet"},
-			script:     map[string]Response{"claude:sonnet": {Status: StatusDryRun}},
-			wantStatus: StatusDryRun,
-			wantPool:   "claude",
-			wantModel:  "sonnet",
-			wantExit:   0,
-			wantSeen:   []string{"claude:sonnet"},
+			name:        "dry run reports the resolved route and exits zero",
+			tier:        "mid",
+			chain:       []string{"claude:sonnet"},
+			script:      map[string]Response{"claude:sonnet": {Status: StatusDryRun}},
+			wantStatus:  StatusDryRun,
+			wantPool:    "claude",
+			wantModel:   "sonnet",
+			wantExit:    0,
+			wantRecExit: 0,
+			wantSeen:    []string{"claude:sonnet"},
 		},
 	}
 
@@ -151,6 +162,13 @@ func TestDispatch_ChainWalk(t *testing.T) {
 			}
 			if got := ExitCode(rec.Status); got != tc.wantExit {
 				t.Errorf("exit = %d, want %d", got, tc.wantExit)
+			}
+			// The record's own `exit` field, not just the derived one. They are
+			// two different things and a caller reads the field: a record saying
+			// `"status":"task_failed","exit":0` contradicts itself, and the
+			// process exiting 1 beside it does not repair the record.
+			if rec.Exit != tc.wantRecExit {
+				t.Errorf("rec.Exit = %d, want %d (status %q)", rec.Exit, tc.wantRecExit, rec.Status)
 			}
 			if strings.Join(be.seen, ",") != strings.Join(tc.wantSeen, ",") {
 				t.Errorf("attempted %v, want %v", be.seen, tc.wantSeen)
@@ -234,6 +252,42 @@ func TestDispatch_OutputIsCappedAndSaysSo(t *testing.T) {
 	}
 	if !rec.Truncated {
 		t.Error("truncated = false; a capped output that does not say so reads as a complete short answer")
+	}
+}
+
+// The cap counts bytes and a model's output is not ASCII, so the cut can land
+// inside a rune.
+//
+// The fixture's rune WIDTH is the whole test. An ASCII one cannot see the bug at
+// all — every byte is a boundary. Neither can a two-byte one: OutputCap is
+// 65536, which is even, so a run of "é" always divides exactly and the cut lands
+// on a boundary by arithmetic rather than by the code being correct. That
+// version of this test passed against the byte-slicing cap it was written to
+// catch. A three-byte rune is the smallest that misses: 65536 mod 3 == 1, so the
+// cut lands one byte into a rune and something must step it back.
+func TestDispatch_OutputIsCutOnARuneBoundary(t *testing.T) {
+	multibyte := strings.Repeat("€", OutputCap) // 3 bytes each
+	be := &scriptedBackend{byEntry: map[string]Response{
+		"claude:sonnet": {Status: StatusOK, Output: multibyte},
+	}}
+
+	rec := Dispatch(context.Background(), Options{
+		Tier: "mid", Chain: []string{"claude:sonnet"}, Timeout: time.Minute,
+		Now: fixedClock(time.Millisecond),
+	}, be)
+
+	if !rec.Truncated {
+		t.Fatal("truncated = false on an output twice the cap")
+	}
+	if len(rec.Output) > OutputCap {
+		t.Errorf("output length = %d, exceeds the cap %d", len(rec.Output), OutputCap)
+	}
+	if !utf8.ValidString(rec.Output) {
+		t.Error("output is not valid UTF-8: the cut split a rune, so the record reports corruption " +
+			"where it meant to report a limit")
+	}
+	if strings.ContainsRune(rec.Output, utf8.RuneError) {
+		t.Error("output carries U+FFFD; an orphan byte was kept rather than the cut being moved back")
 	}
 }
 

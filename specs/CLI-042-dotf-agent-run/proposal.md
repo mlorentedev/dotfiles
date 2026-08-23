@@ -185,7 +185,8 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] **AC1 — the machine contract holds.** `dotf agent run --role <r> --task <t> --tier mid` writes a
+- [ ] **AC1 — the machine contract holds.** `dotf agent run --role <r> --task <t> --tier mid --backend
+      <b> --timeout <d>` writes a
       single JSON object to **stdout** carrying at least `status`, `pool`, `model`, `exit`,
       `duration_ms` and `output`, with every log line on **stderr**. Verified by a table-driven Go test
       and a bats smoke that pipes stdout through a JSON parser with stderr attached.

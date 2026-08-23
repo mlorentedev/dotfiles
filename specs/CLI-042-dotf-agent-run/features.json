@@ -2,7 +2,7 @@
   {
     "id": "CLI-042-dotf-agent-run-f1",
     "behavior": "AC1 — `dotf agent run` writes one JSON object to stdout carrying status, tier, pool, model, exit, duration_ms and output, with every log line on stderr",
-    "verification": "cd cli && go test ./internal/cmd/ -run '^TestAgentRun_WritesOneJSONObjectToStdout$' -v 2>&1 | grep -q '^--- PASS: TestAgentRun_WritesOneJSONObjectToStdout'",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestAgentRun_WritesOneJSONObjectToStdout$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestAgentRun_WritesOneJSONObjectToStdout'",
     "state": "pending",
     "evidence": ""
   },
@@ -16,84 +16,84 @@
   {
     "id": "CLI-042-dotf-agent-run-f3",
     "behavior": "AC1 — a refusal before dispatch (no role/task, no tier, no timeout, no backend, unknown backend, undeclared tier) leaves stdout empty and exits 1, never 3",
-    "verification": "cd cli && go test ./internal/cmd/ -run '^TestAgentRun_RefusalsLeaveStdoutEmpty$' -v 2>&1 | grep -q '^--- PASS: TestAgentRun_RefusalsLeaveStdoutEmpty'",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestAgentRun_RefusalsLeaveStdoutEmpty$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestAgentRun_RefusalsLeaveStdoutEmpty'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f4",
     "behavior": "AC1 — `agent run` is registered in the stdout-contract registry alongside the other machine-read subcommands",
-    "verification": "cd cli && go test ./internal/cmd/ -run '^TestStdoutContracts$' -v 2>&1 | grep -q 'PASS: TestStdoutContracts/agent_run'",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestStdoutContracts$' -v 2>&1) && printf '%s' \"$out\" | grep -q 'PASS: TestStdoutContracts/agent_run'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f5",
     "behavior": "AC2 — a backend reporting pool-unavailable advances to the next chains entry; one reporting task-failed does not; an exhausted chain is its own status; an unrecognised status is a task failure, never an advance",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestDispatch_ChainWalk$' -v 2>&1 | grep -q '^--- PASS: TestDispatch_ChainWalk'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_ChainWalk$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_ChainWalk'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f6",
     "behavior": "AC2 — the record names the pool and model that answered, and every attempt the walk made, so a skipped entry leaves a trace",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestDispatch_RecordsDurationAndAttempts$' -v 2>&1 | grep -q '^--- PASS: TestDispatch_RecordsDurationAndAttempts'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_RecordsDurationAndAttempts$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_RecordsDurationAndAttempts'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f7",
     "behavior": "AC2 — the two classes survive the process boundary: chain-exhausted exits 3 and a task failure exits 1, so a composer can act on the difference",
-    "verification": "cd cli && go test ./internal/cmd/ -run '^TestExitCode$' -v 2>&1 | grep -q '^--- PASS: TestExitCode'",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run '^TestExitCode$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestExitCode'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f8",
     "behavior": "AC3 — a dispatch exceeding its timeout kills the worker and releases its semaphore slot without waiting for it, reporting a non-zero exit with a timeout status",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestTimeoutReleasesSlotBeforeReap$' -v 2>&1 | grep -q '^--- PASS: TestTimeoutReleasesSlotBeforeReap'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestTimeoutReleasesSlotBeforeReap$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestTimeoutReleasesSlotBeforeReap'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f9",
     "behavior": "AC3 — the per-dispatch deadline actually reaches the backend rather than being a parsed-but-inert flag (the half of AC3 that PR B can hold; the kill is PR C's)",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestDispatch_BackendReceivesADeadline$' -v 2>&1 | grep -q '^--- PASS: TestDispatch_BackendReceivesADeadline'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_BackendReceivesADeadline$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_BackendReceivesADeadline'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f10",
     "behavior": "AC4 — an unreadable concurrency counter exits non-zero rather than reading as zero in use, and an unidentifiable machine denies every non-local pool",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestFailsClosed$' -v 2>&1 | grep -q '^--- PASS: TestFailsClosed'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestFailsClosed$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestFailsClosed'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f11",
     "behavior": "AC4 — help text and error messages state the narrow guarantee ('dotf alone will never be the cause of exhaustion'), never that exhaustion cannot happen",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestGuaranteeWordingIsNarrow$' -v 2>&1 | grep -q '^--- PASS: TestGuaranteeWordingIsNarrow'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestGuaranteeWordingIsNarrow$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestGuaranteeWordingIsNarrow'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f12",
     "behavior": "AC5 — a --tier top dispatch whose first entry is unavailable escalates and exits non-zero; it never reaches a second entry and never carries a lower-tier answer",
-    "verification": "cd cli && go test ./internal/agent/ -run '^TestDispatch_TopTierNeverDegrades$' -v 2>&1 | grep -q '^--- PASS: TestDispatch_TopTierNeverDegrades'",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestDispatch_TopTierNeverDegrades$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestDispatch_TopTierNeverDegrades'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f13",
     "behavior": "AC5 — the map cannot declare a top-tier fallback either: chains.top is capped at one entry AND still held to the array type, the minimum and the pool:model pattern",
-    "verification": "cd cli && go test ./internal/harness/ -run '^TestChainsTopIsCappedWithoutLosingTheChainShape$' -v 2>&1 | grep -q '^--- PASS: TestChainsTopIsCappedWithoutLosingTheChainShape'",
+    "verification": "cd cli && out=$(go test ./internal/harness/ -run '^TestChainsTopIsCappedWithoutLosingTheChainShape$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestChainsTopIsCappedWithoutLosingTheChainShape'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f14",
     "behavior": "AC6 — the hive backend answers and the record reports the pool and model the chain resolved (the pool name is the dispatcher's claim from `chains`; hive names no provider)",
-    "verification": "dotf agent run --backend hive --tier mid --role scout --task 'reply with OK' --timeout 120s | jq -e '.pool == \"nan\" and .status == \"ok\"'",
+    "verification": "dotf agent run --backend hive --tier mid --role scout --task 'reply with OK' --timeout 120s | jq -e --arg m \"$(dotf harness resolve-tier mid --harness pi)\" '.pool == \"nan\" and .status == \"ok\" and .model == $m'",
     "state": "pending",
     "evidence": ""
   },
@@ -114,7 +114,7 @@
   {
     "id": "CLI-042-dotf-agent-run-f17",
     "behavior": "AC9 — `dotf doctor` fails when a backend probes present but can serve no model, so 'zero reachable models' is caught at diagnostic time",
-    "verification": "cd cli && go test ./internal/doctor/ -run '^TestBackendReachability$' -v 2>&1 | grep -q '^--- PASS: TestBackendReachability'",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestBackendReachability$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestBackendReachability'",
     "state": "pending",
     "evidence": ""
   }

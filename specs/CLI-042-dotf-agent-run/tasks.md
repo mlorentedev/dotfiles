@@ -73,7 +73,7 @@ The dispatcher must therefore treat an unrecognised exit code as *task failed*, 
 
 Added while implementing B, each because the work surfaced it rather than because it was planned:
 
-- [x] [AC1] Exit-code plumbing: `main()` could only ever exit 1, so `chain_exhausted` was
+- [x] [AC2] Exit-code plumbing: `main()` could only ever exit 1, so `chain_exhausted` was
       indistinguishable from a task failure at the process boundary — the exact collapse AC2 forbids
       one layer down. A tagged error, unwrapped in `main`, rather than the `os.Exit`-inside-`RunE`
       precedent in `secrets.go`, which costs a re-exec harness in its test file.

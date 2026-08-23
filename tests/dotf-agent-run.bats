@@ -28,6 +28,13 @@ _build_dotf() {
     fi
 }
 
+# python3 parses the record in three cases. It is probed like `go` and `jq` are,
+# so a checkout without it SKIPS rather than fails — the file header promises
+# that, and an unprobed dependency turns a missing interpreter into a red suite.
+_need_python() {
+    command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+}
+
 _run_dry() {
     _build_dotf
     "$DOTF_BIN" agent run \
@@ -37,6 +44,7 @@ _run_dry() {
 
 @test "agent run: stdout alone is a parseable JSON object" {
     _build_dotf
+    _need_python
     # stderr deliberately NOT merged: the claim is that a consumer capturing
     # only stdout gets the whole record. Merging 2>&1 would let a record written
     # to the wrong stream pass.
@@ -47,6 +55,7 @@ _run_dry() {
 }
 
 @test "agent run: the record names status, route and duration" {
+    _need_python
     run _run_dry mid
     [ "$status" -eq 0 ]
     local parsed
@@ -72,6 +81,7 @@ print("MISSING:" + ",".join(missing) if missing else r["status"] + " " + r["pool
 
 @test "agent run: the top tier resolves to its single declared entry" {
     _build_dotf
+    _need_python
     # Through a file rather than re-interpolating $output into another shell:
     # the record contains quotes, and a case that breaks on its own payload
     # fails for the wrong reason.

@@ -75,6 +75,7 @@ func Dispatch(ctx context.Context, opts Options, be Backend) Record {
 			// a broken registry silently, which is how a map stays broken.
 			rec.Status = StatusTaskFailed
 			rec.Output = err.Error()
+			rec.Exit = ExitCode(rec.Status)
 			rec.DurationMS = elapsed(started, now())
 			return rec
 		}

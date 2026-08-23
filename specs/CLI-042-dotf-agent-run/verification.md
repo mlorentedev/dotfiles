@@ -52,9 +52,15 @@ Produced 2026-08-23 on branch `feat/dotf-agent-run`, off `origin/main` @ `a27dcc
   seven that fail are the criteria PRs C, D and E own, which is what `pending` has to mean.
   **This was not free** —
   the file's original commands named tests that do not exist, and `go test -run <nonexistent>` exits
-  **0** with `[no tests to run]`, so every one of them would have certified an unwritten test. All
-  seventeen were rewritten to the form `go test -run '^X$' -v | grep -q '^--- PASS: X'`, which fails
-  when the test is absent.
+  **0** with `[no tests to run]`, so every one of them would have certified an unwritten test. The
+  **13 Go commands** were rewritten to capture the status before matching —
+  `out=$(go test -run '^X$' -v 2>&1) && printf '%s' "$out" | grep -q '^--- PASS: X'` — which fails
+  both when the test is absent and when `go test` exits non-zero after printing the PASS line. The
+  pipeline form does neither: `grep` reports the pipeline's status, so a package where one subtest
+  passes and another fails still certifies. The remaining four (f2, f15, f16 are bats over a whole
+  file; f14 is `dotf … | jq -e`) do not take that form and did not need it — bats fails on a missing
+  file, and f14's predicate now compares `.model` against the resolved chain entry rather than
+  accepting any non-empty record.
 
 ### Mutation checks
 

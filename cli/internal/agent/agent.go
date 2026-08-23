@@ -8,6 +8,7 @@ package agent
 import (
 	"context"
 	"time"
+	"unicode/utf8"
 )
 
 // Status is a dispatch outcome carried as a VALUE, not as an error type.
@@ -118,12 +119,22 @@ func ExitCode(s Status) int {
 	}
 }
 
-// capOutput bounds output at OutputCap and says so in-band. Truncating without
-// a marker produces a record that reads as a complete short answer, which is
-// worse than a long one.
+// capOutput bounds output at OutputCap and reports the truncation to its
+// caller, which records it in the record's `truncated` field. Truncating
+// without that marker produces a record that reads as a complete short answer,
+// which is worse than a long one.
+//
+// The cut moves back to a rune boundary. OutputCap counts bytes, and a model's
+// output is not ASCII: cutting mid-rune leaves orphan bytes that decode as
+// U+FFFD, so the record would report corruption where it meant to report a
+// limit.
 func capOutput(s string) (string, bool) {
 	if len(s) <= OutputCap {
 		return s, false
 	}
-	return s[:OutputCap], true
+	cut := OutputCap
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut], true
 }
