@@ -24,9 +24,18 @@ trigger. The split is declared here so no PR silently absorbs the next:
 | **D** | `dotfiles` | real backends: subprocess and hive probes, the tie-break, end-to-end smoke | AC6 |
 | **E** | `dotfiles` | IaC: hive service unit via `dotf secrets run`, `environment.d` and `mcp_servers.json` cleanup, `dotf doctor` reachability check | AC7, AC8, AC9 |
 
-**A is a hard dependency of D.** It needs its own issue on `mlorentedev/hive`, linked as blocking
-#1190, and a release that `uv tool upgrade` can reach — a PR merged upstream is not a version this
-machine runs.
+**A is a hard dependency of D.** It is tracked as `mlorentedev/hive#384` with its own spec,
+`specs/HIVE-384-nan-worker-and-delegate-verb/` in that repo, and it ships as `feat!` → **4.0.0**.
+What D waits on is not the merge but the **release**: merge → release-please PR → merge → GitHub
+Release → PyPI → `uv tool upgrade hive-vault`. A PR merged upstream is not a version this machine
+runs.
+
+**The seam's error classification is the cross-repo contract, so it is pinned on both sides.** The
+hive verb exits `3` for *pool unavailable* and `1` for *task failed*; this dispatcher advances the
+chain on the first and must not on the second. If either side changes those codes unilaterally, a
+bad answer becomes a silent retry against a different model — the exact failure ADR-032 §2 names.
+The dispatcher must therefore treat an unrecognised exit code as *task failed*, never as
+*unavailable*: the fail-closed direction is the one that does not retry.
 
 ## Setup
 
