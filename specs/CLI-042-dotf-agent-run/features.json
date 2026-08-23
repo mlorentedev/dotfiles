@@ -1,0 +1,72 @@
+[
+  {
+    "id": "CLI-042-dotf-agent-run-f1",
+    "behavior": "AC1 — `dotf agent run` writes one JSON object to stdout carrying status, pool, model, exit, duration_ms and output, with every log line on stderr",
+    "verification": "cd cli && go test ./internal/agent/ -run TestRunEmitsJSONContract",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f2",
+    "behavior": "AC2 — a backend reporting pool-unavailable advances to the next chains entry; one reporting task-failed does not, and the record names the pool and model that answered",
+    "verification": "cd cli && go test ./internal/agent/ -run TestChainAdvancesOnlyOnPoolUnavailable",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f3",
+    "behavior": "AC3 — a dispatch exceeding its timeout kills the worker and releases its semaphore slot without waiting for it, reporting a non-zero exit with a timeout status",
+    "verification": "cd cli && go test ./internal/agent/ -run TestTimeoutReleasesSlotBeforeReap",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f4",
+    "behavior": "AC4 — an unreadable concurrency counter exits non-zero rather than reading as zero in use, and an unidentifiable machine denies every non-local pool",
+    "verification": "cd cli && go test ./internal/agent/ -run TestFailsClosed",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f5",
+    "behavior": "AC4 — help text and error messages state the narrow guarantee ('dotf alone will never be the cause of exhaustion'), never that exhaustion cannot happen",
+    "verification": "cd cli && go test ./internal/agent/ -run TestGuaranteeWordingIsNarrow",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f6",
+    "behavior": "AC5 — a --tier top dispatch with claude:opus unavailable escalates and exits non-zero; it never falls through to a mid-tier model",
+    "verification": "cd cli && go test ./internal/agent/ -run TestTopTierNeverDegrades",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f7",
+    "behavior": "AC6 — the hive backend answers through NaN and reports the pool and model the chain resolved",
+    "verification": "dotf agent run --backend hive --tier mid --role scout --task 'reply with OK' | jq -e '.pool == \"nan\" and .status == \"ok\"'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f8",
+    "behavior": "AC7 — the hive service unit invokes `dotf secrets run -- hive serve`, and the deployed environment.d fragment carries no credential",
+    "verification": "~/.local/bin/bats tests/hive-service-secret-delivery.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f9",
+    "behavior": "AC8 — no configuration this repo deploys still names Ollama or OpenRouter for hive's worker",
+    "verification": "~/.local/bin/bats tests/hive-provider-drop.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f10",
+    "behavior": "AC9 — `dotf doctor` fails when a backend probes present but can serve no model, so 'zero reachable models' is caught at diagnostic time",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestBackendReachability",
+    "state": "pending",
+    "evidence": ""
+  }
+]
