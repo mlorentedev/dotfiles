@@ -120,7 +120,7 @@ jobs:
         # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
         # is not a theoretical actor. Resolved from the API rather than copied:
         # `gh api repos/The-PR-Agent/pr-agent/git/ref/tags/v0.42.0`.
-        uses: The-PR-Agent/pr-agent@f6af7d77554ff8d26adffded077e6461329e92fa  # v0.42.0
+        uses: The-PR-Agent/pr-agent@4ebd5c5333c6ef21509e7304d27969eb825e6f22  # v0.43.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
