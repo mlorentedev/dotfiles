@@ -112,11 +112,18 @@ func isHandoffHeading(line string) bool {
 // buildRecord renders the durable session record (frontmatter + heading + block).
 // This is the single converged form of the two drifting shell twins: the .sh used
 // an em-dash in the heading, the .ps1 a hyphen — the em-dash wins.
+//
+// The frontmatter satisfies the vault Frontmatter Law (id, type, status, created,
+// owner) with id/type/status as the first three keys, per handoff/SKILL.md §1b —
+// vault_health and vault-validate.py §1 both report a missing field as an error.
 func buildRecord(date, project, sid, block string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	fmt.Fprintf(&b, "id: \"session-%s-%s-claude\"\n", date, project)
 	b.WriteString("type: session\n")
+	b.WriteString("status: active\n")
+	fmt.Fprintf(&b, "created: \"%s\"\n", date)
+	b.WriteString("owner: manu\n")
 	fmt.Fprintf(&b, "session_id: %s\n", sid)
 	b.WriteString("agent: claude\n")
 	fmt.Fprintf(&b, "project: %s\n", project)
