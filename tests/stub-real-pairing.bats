@@ -38,6 +38,13 @@ setup() {
 #                             does; the API's verdict on that call only arrives from a real run.
 #   board-pickup              stubs `gh` — same; a real run self-assigns real issues
 #   guard-memory-sink         stubs `git` — the real path is covered end-to-end by the dispatcher's own commit-time behaviour
+#   guard-no-gui              stubs `obsidian` — and here a real run is not merely inconvenient, it is
+#                             the defect. That suite's whole subject is that a test must never launch a
+#                             GUI application; a real-dependency sibling would be a test that opens
+#                             Obsidian against the developer's live vault, which is the thing measured
+#                             on 2026-08-23 (18 stray processes) and the reason the guard exists. The
+#                             stub there is not standing in for a real run — it proves the guard yields
+#                             to a test's own stub.
 #   hermes-setup              stubs remote installers — a real run provisions an agent host
 #   install-dotf              stubs the release download — a real run fetches from GitHub releases
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
@@ -47,8 +54,9 @@ setup() {
 #                             .bats file itself — see #892) — same rationale as vault-health: a
 #                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
-EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup guard-memory-sink hermes-setup
-install-dotf shell-profile skills-pipeline vault-health vault-health-golden vault-maintenance-weekly"
+EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup guard-memory-sink guard-no-gui
+hermes-setup install-dotf shell-profile skills-pipeline vault-health vault-health-golden
+vault-maintenance-weekly"
 
 exempt() {
     local base

@@ -240,3 +240,4 @@ tags: [lessons, index, dotfiles]
 | [224 - A negated assertion is exempt from `set -e`, so it cannot fail a test](lesson-224-a-negated-assertion-is-exempt-from-set-e-so-it-cann.md) | 2026-08-23 |  |
 | [225 - A stacked PR costs a reviewer, and re-conflicts on every squash](lesson-225-a-stacked-pr-costs-a-reviewer-and-re-conflicts-on-e.md) | 2026-08-23 |  |
 | [226 - Naming a key under `properties` exempts it from `additionalProperties`, so adding a constraint there can loosen the schema](lesson-226-naming-a-key-under-properties-exempts-it-from-additio.md) | 2026-08-23 |  |
+| [227 - A test suite inherits the developer's installed applications, and PATH is the door](lesson-227-a-test-suite-inherits-the-developers-installed-apps.md) | 2026-08-23 |  |
