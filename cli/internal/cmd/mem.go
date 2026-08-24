@@ -82,7 +82,14 @@ func newMemSessionEndCmd() *cobra.Command {
 			payload, _ := io.ReadAll(cmd.InOrStdin())
 			// Best-effort by contract: a SessionEnd hook must never crash a
 			// session, so the write result is intentionally discarded — exit 0.
-			_, _ = mem.SessionEnd(payload, vault.ResolveVault(), time.Now().UTC())
+			//
+			// Local time, not UTC: `now` is formatted down to a calendar date
+			// that becomes the record's filename and its human-facing heading,
+			// so it must be the date the operator actually worked (CLI-043).
+			// UTC filed every post-18:00 session in America/Denver under the
+			// next day and collided with the following morning's record.
+			// session-start below is already local; this keeps the pair consistent.
+			_, _ = mem.SessionEnd(payload, vault.ResolveVault(), time.Now())
 			return nil
 		},
 	}

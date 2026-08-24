@@ -241,3 +241,4 @@ tags: [lessons, index, dotfiles]
 | [225 - A stacked PR costs a reviewer, and re-conflicts on every squash](lesson-225-a-stacked-pr-costs-a-reviewer-and-re-conflicts-on-e.md) | 2026-08-23 |  |
 | [226 - Naming a key under `properties` exempts it from `additionalProperties`, so adding a constraint there can loosen the schema](lesson-226-naming-a-key-under-properties-exempts-it-from-additio.md) | 2026-08-23 |  |
 | [227 - A test suite inherits the developer's installed applications, and PATH is the door](lesson-227-a-test-suite-inherits-the-developers-installed-apps.md) | 2026-08-23 |  |
+| [228 - A calendar date is not a timestamp, and UTC is the wrong zone for one](lesson-228-a-calendar-date-is-not-a-timestamp-utc-is-wrong-for.md) | 2026-08-23 |  |
