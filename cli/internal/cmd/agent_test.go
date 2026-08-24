@@ -20,6 +20,7 @@ import (
 // one that skipped the gate.
 func declareIdentity(t *testing.T, deny ...string) {
 	t.Helper()
+	isolatePATH(t)
 	cfg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	dir := filepath.Join(cfg, "dotfiles")
@@ -37,6 +38,18 @@ func declareIdentity(t *testing.T, deny ...string) {
 	if err := os.WriteFile(filepath.Join(dir, "machine.json"), []byte(body), 0o600); err != nil {
 		t.Fatalf("seed machine.json: %v", err)
 	}
+}
+
+// isolatePATH empties PATH for the duration of a test, so no backend probe can
+// find a real harness binary.
+//
+// Without it these cases dispatch for real the moment --backend stops being
+// required: one run reached `claude -p`, took 35 seconds and spent a live
+// request. A test that spends quota is not hermetic, and one whose result
+// depends on which binaries the machine happens to have is not a test.
+func isolatePATH(t *testing.T) {
+	t.Helper()
+	t.Setenv("PATH", t.TempDir())
 }
 
 // AC1. This is a stdout contract, so it is tested through captureRealStreams
@@ -116,6 +129,10 @@ func TestAgentRun_RefusalsLeaveStdoutEmpty(t *testing.T) {
 		name    string
 		args    []string
 		errSubs []string
+		// wantExit defaults to 1: a refusal before dispatch must never read as
+		// `pool unavailable`. The chain-exhausted case is the one exception and
+		// says so.
+		wantExit int
 	}{
 		{
 			name:    "no task",
@@ -131,11 +148,6 @@ func TestAgentRun_RefusalsLeaveStdoutEmpty(t *testing.T) {
 			name:    "no timeout",
 			args:    []string{"--role", "r", "--task", "t", "--tier", "mid", "--backend", "dry-run"},
 			errSubs: []string{"--timeout is required", "not eligible"},
-		},
-		{
-			name:    "no backend",
-			args:    []string{"--role", "r", "--task", "t", "--tier", "mid", "--timeout", "1m"},
-			errSubs: []string{"--backend is required", "dry-run"},
 		},
 		{
 			name:    "unknown backend",
@@ -163,9 +175,12 @@ func TestAgentRun_RefusalsLeaveStdoutEmpty(t *testing.T) {
 					t.Errorf("error %q does not name %q", err.Error(), sub)
 				}
 			}
-			if ExitCode(err) != 1 {
-				t.Errorf("exit = %d, want 1: a refusal before dispatch must not read as `pool unavailable`",
-					ExitCode(err))
+			want := tc.wantExit
+			if want == 0 {
+				want = 1
+			}
+			if got := ExitCode(err); got != want {
+				t.Errorf("exit = %d, want %d", got, want)
 			}
 		})
 	}
@@ -293,5 +308,47 @@ func writeMapFixture(t *testing.T, root, body string) {
 	}
 	if err := os.WriteFile(filepath.Join(path, "model-map.json"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
+	}
+}
+
+// --backend became optional in PR D: the probe chooses. That moves the
+// no-backend case out of the refusal table, because it is no longer a refusal
+// before dispatch — the walk runs, finds no transport for any entry, and
+// reports it. The record still reaches stdout, and the exit code is 3 rather
+// than 1: nothing ran, so another machine may well be able to run it.
+func TestAgentRun_NoHarnessOnPathExhaustsTheChainRatherThanRefusing(t *testing.T) {
+	declareIdentity(t) // also isolates PATH
+	root := repoRootForTest(t)
+
+	stdout, _, err := captureRealStreams(t,
+		"agent", "run", "--role", "r", "--task", "t", "--tier", "mid",
+		"--timeout", "1m", "--repo-root", root,
+	)
+	if err == nil {
+		t.Fatal("a dispatch with no transport for any pool succeeded")
+	}
+	if got := ExitCode(err); got != 3 {
+		t.Errorf("exit = %d, want 3", got)
+	}
+
+	var rec struct {
+		Status   string `json:"status"`
+		Attempts []struct {
+			Status string `json:"status"`
+		} `json:"attempts"`
+	}
+	if jsonErr := json.Unmarshal([]byte(stdout), &rec); jsonErr != nil {
+		t.Fatalf("no record for a walk that happened: %v (%q)", jsonErr, stdout)
+	}
+	if rec.Status != "chain_exhausted" {
+		t.Errorf("status = %q, want chain_exhausted", rec.Status)
+	}
+	if len(rec.Attempts) != 3 {
+		t.Errorf("attempts = %d, want 3 (the whole mid chain was tried)", len(rec.Attempts))
+	}
+	// Critically NOT dry_run: an unforced dispatch must never silently resolve
+	// to the backend that does nothing.
+	if rec.Status == "dry_run" {
+		t.Error("the probe selected dry-run")
 	}
 }

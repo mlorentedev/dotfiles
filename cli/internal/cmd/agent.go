@@ -94,7 +94,7 @@ fails silently and in the direction nobody notices.`,
 				return fmt.Errorf("--timeout is required and must be positive: ADR-032 §2 makes a bounded dispatch " +
 					"part of the contract, and a backend that cannot be bounded is not eligible")
 			}
-			backend, err := resolveBackend(backendName)
+			backend, err := agent.ResolveRouter(agent.DefaultBackends(), backendName)
 			if err != nil {
 				return err
 			}
@@ -161,7 +161,8 @@ fails silently and in the direction nobody notices.`,
 	c.Flags().StringVar(&tier, "tier", "", "neutral tier whose chain is walked: top|mid|low (required)")
 	c.Flags().StringVar(&cwd, "cwd", "", "working copy the task runs against (default: the current directory)")
 	c.Flags().DurationVar(&timeout, "timeout", 0, "per-dispatch deadline, e.g. 90s or 5m (required)")
-	c.Flags().StringVar(&backendName, "backend", "", "backend to dispatch through (required until probing lands)")
+	c.Flags().StringVar(&backendName, "backend", "",
+		"force one backend: subprocess|hive|dry-run (default: probe, preferring subprocess where the harness binary is present)")
 	c.Flags().StringVar(&semaphoreDir, "semaphore-dir", "",
 		"directory holding per-pool slot state (default: the machine's runtime dir; the budget is a machine property, not a checkout's)")
 	c.Flags().StringVar(&repoRoot, "repo-root", "",
@@ -197,24 +198,10 @@ func declaredCapacity(m map[string]any) func(string) (int, bool) {
 	}
 }
 
-// resolveBackend picks the implementation behind the seam.
-//
-// Probing (ADR-032 §7) selects it automatically once a real backend exists;
-// until then the flag is required, and its absence is a loud refusal rather
-// than a default. Defaulting to dry-run would be the worst of the options: a
-// dispatch that silently ran nothing and exited 0.
-func resolveBackend(name string) (agent.Backend, error) {
-	switch name {
-	case "dry-run":
-		return agent.DryRun{}, nil
-	case "":
-		return nil, fmt.Errorf("--backend is required: the only backend implemented today is `dry-run`, " +
-			"which resolves the route without dispatching. The subprocess and hive backends, and the probe " +
-			"that would pick one for you, are not built yet")
-	default:
-		return nil, fmt.Errorf("unknown backend %q: the only backend implemented today is `dry-run`", name)
-	}
-}
+// The backend is no longer chosen by a switch: `agent.DefaultBackends()` is the
+// probe order and `agent.ResolveRouter` validates the --backend override
+// against it. Routing is per chain ENTRY, because `chains.mid` mixes pools and
+// hive serves only one of them.
 
 // summarise is the human line on stderr. The JSON already carries the truth; a
 // person reading a failing &&-chain should not have to pipe it through a parser

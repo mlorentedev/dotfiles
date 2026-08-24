@@ -148,14 +148,34 @@ Added while implementing C2:
 
 ### PR D — the real backends
 
-- [ ] [AC6] Failing test: backend probe selects `subprocess` when a harness binary is present and
+- [x] [AC6] Failing test: backend probe selects `subprocess` when a harness binary is present and
       `hive` when it is not; `--backend` overrides both
-- [ ] [AC6] Implement the subprocess backend (`claude -p`, `pi -p`) on the shared process machinery
-- [ ] [AC6] Implement the hive backend as `hive delegate` over the **same** process machinery — argv
+- [x] [AC6] Implement the subprocess backend (`claude -p`, `pi --print`) on the shared process machinery
+- [x] [AC6] Implement the hive backend as `hive delegate` over the **same** process machinery — argv
       is its transport, not a second mechanism
-- [ ] [AC6] Resolve and encode the tie-break for a `nan` chain entry servable by both backends
+- [x] [AC6] Resolve and encode the tie-break for a `nan` chain entry servable by both backends —
+      **answered here, per this file's own instruction that it not be left to code review**:
+      `bin:pi` present → subprocess, absent → hive, `--backend` overrides. The probe order in
+      `agent.DefaultBackends()` IS the tie-break.
 - [ ] [AC6] End-to-end smoke: `dotf agent run --backend hive --tier mid` answers, and reports
-      `pool=nan` with the model the chain resolved
+      `pool=nan` with the model the chain resolved — **still blocked, and now on two counts.** hive
+      has no worker endpoint configured on this machine (known), and `pi --print` reaches no nan
+      model from an environment without the credential (measured today). Both are environment, not
+      code. The machinery is covered by stub binaries on PATH: real fork/exec, real kill-on-deadline,
+      real exit-code mapping, zero quota.
+
+Added while implementing D:
+
+- [x] [AC6] A `Router` that is itself a `Backend`, selecting per chain ENTRY rather than per dispatch
+- [x] [AC6] `dry-run` marked `ExplicitOnly` — it serves every pool, so being in probe order made it
+      the silent answer to any dispatch naming no backend
+- [x] [AC6] Exit 0 with empty output classified `task_failed`, from the measured `pi --print` case
+- [x] [AC6] `cmd.WaitDelay` on the child, so a grandchild holding the output pipe cannot block the
+      reap past the deadline and undo AC3's guarantee in the real case
+- [x] [AC6] Task text on **stdin** for claude and pi (argv is world-readable via `ps` and bounded by
+      ARG_MAX); `hive delegate` requires `--prompt` on argv, recorded as a limitation of its contract
+- [x] [AC6] Command tests isolate `PATH`. Once `--backend` became optional they dispatched for real —
+      one run reached `claude -p`, took 35s and spent a live request.
 
 ### PR E — the deployment, as IaC
 

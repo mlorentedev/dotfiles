@@ -129,13 +129,11 @@ print(r["pool"])
     printf '%s' "$output" | grep -q -- '--timeout is required'
 }
 
-@test "agent run: no backend is a loud refusal, not a silent dry run" {
-    _build_dotf
-    run bash -c "'$DOTF_BIN' agent run --role r --task t --tier mid \
-        --timeout 30s --repo-root '$REPO_ROOT' --semaphore-dir '$SEM_DIR' 2>&1 >/dev/null"
-    [ "$status" -eq 1 ]
-    printf '%s' "$output" | grep -q -- '--backend is required'
-}
+
+# The former "no backend is a loud refusal" case lived here. PR D made --backend
+# optional — the probe chooses — so a missing backend is no longer a refusal at
+# all. Its replacement is the last case in this file: with nothing on PATH the
+# chain exhausts, and critically does NOT silently resolve to dry-run.
 
 @test "agent run: a saturated pool is skipped and the chain advances to the next entry" {
     _build_dotf
@@ -228,4 +226,48 @@ print(r["pool"])
 ' "$rec"
     [ "$status" -eq 0 ]
     [ "$output" = "nan" ]
+}
+
+@test "agent run: the probe selects a backend by which harness binary is present" {
+    _build_dotf
+    _need_python
+    # Stub harness binaries on PATH, so this exercises the real probe and the
+    # real fork/exec through the compiled binary without spending any quota.
+    local stubs="$BATS_TEST_TMPDIR/stubs" rec="$BATS_TEST_TMPDIR/probe.json"
+    mkdir -p "$stubs"
+    printf '#!/bin/sh\nprintf "answered by the claude stub"\n' > "$stubs/claude"
+    chmod +x "$stubs/claude"
+
+    run bash -c "PATH='$stubs:/usr/bin:/bin' '$DOTF_BIN' agent run --role r --task t \
+        --tier mid --timeout 30s --repo-root '$REPO_ROOT' --semaphore-dir '$SEM_DIR' \
+        >'$rec' 2>/dev/null"
+    [ "$status" -eq 0 ]
+    run python3 -c '
+import json, sys
+r = json.load(open(sys.argv[1]))
+assert r["status"] == "ok", r["status"]
+assert r["pool"] == "claude", r["pool"]           # the only harness on PATH
+assert "claude stub" in r["output"], r["output"]
+print(r["pool"])
+' "$rec"
+    [ "$status" -eq 0 ]
+    [ "$output" = "claude" ]
+}
+
+@test "agent run: with no harness on PATH the chain exhausts, never a silent dry run" {
+    _build_dotf
+    _need_python
+    local empty="$BATS_TEST_TMPDIR/nobins" rec="$BATS_TEST_TMPDIR/none.json"
+    mkdir -p "$empty"
+    run bash -c "PATH='$empty' '$DOTF_BIN' agent run --role r --task t \
+        --tier mid --timeout 30s --repo-root '$REPO_ROOT' --semaphore-dir '$SEM_DIR' \
+        >'$rec' 2>/dev/null"
+    [ "$status" -eq 3 ]
+    run python3 -c '
+import json, sys
+r = json.load(open(sys.argv[1]))
+assert r["status"] == "chain_exhausted", r["status"]
+print(r["status"])
+' "$rec"
+    [ "$status" -eq 0 ]
 }
