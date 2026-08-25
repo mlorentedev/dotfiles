@@ -66,14 +66,85 @@ fi
 
 # The whole point of AC7: nothing on disk. A credential in an EnvironmentFile or
 # an environment.d fragment would satisfy every check above and defeat the criterion.
+#
+# `find`, never a glob in a `for`. The first draft of this block used
+# `for f in …/environment.d/*.conf`, which is the prohibited-pattern row in
+# .claude/CLAUDE.md, and it failed in the worst possible direction for a SECURITY
+# check. Measured with a planted credential in hive.env:
+#
+#   bash -> CAUGHT: credential in …/hive.env
+#   zsh  -> "no matches found" — NOMATCH aborts the whole compound command, so
+#           hive.env was never examined either, and the script went on to print
+#           its "[OK] nothing on disk" line having looked at nothing.
+#
+# A false negative here reads as "the credential is safely off disk" when it is
+# sitting right there. Caught by the reviewer on #1232.
+# The names come from the REGISTRY, not from a guess about what a credential
+# looks like. The first draft matched /API_KEY|TOKEN|SECRET|PASSWORD/ and would
+# have missed 14 of this repo's 35 declared secrets — BITACORA_PAT, TS_AUTHKEY,
+# KUBECONFIG, SSH_KEY, AGE_KEY_PERSONAL, every *_BACKUP_CODE and *_RECOVERY_CODE.
+# A 40% blind spot in a check whose only job is to notice a credential on disk.
+#
+# The heuristic stays as a FALLBACK for a tree with no readable registry, and the
+# script says which one it used — a narrower check reported as if it were the
+# full one is how the blind spot survived in the first place.
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+# A function, not a heredoc inside $( ), which is fragile across shells: the
+# first version of this silently took the fallback path on a tree where the
+# registry was perfectly readable.
+registry_cred_regex() {
+    python3 - "$1" <<'PY'
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+names = []
+for s in doc.get("secrets", []) or []:
+    exp = s.get("expose") or {}
+    env = exp.get("env")
+    if isinstance(env, str):
+        names.append(env)
+    elif isinstance(env, list):
+        names += [v for v in env if isinstance(v, str)]
+    elif isinstance(env, dict):
+        names += list(env.keys())
+    fil = exp.get("file")
+    if isinstance(fil, dict) and fil.get("var"):
+        names.append(fil["var"])
+if names:
+    print("^[[:space:]]*(export[[:space:]]+)?(" + "|".join(sorted(set(names))) + ")=")
+PY
+}
+
+CRED_RE=""
+if [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/secrets/registry.yaml" ]; then
+    CRED_RE="$(registry_cred_regex "$REPO_ROOT/secrets/registry.yaml" 2>/dev/null || true)"
+fi
+if [ -n "$CRED_RE" ]; then
+    printf '       (scanning for the %s names declared in secrets/registry.yaml)\n' \
+        "$(printf '%s' "$CRED_RE" | awk -F'|' '{print NF}')"
+else
+    CRED_RE='^[[:space:]]*(export[[:space:]]+)?[A-Za-z_]*(API_KEY|TOKEN|SECRET|PASSWORD)[A-Za-z_]*='
+    printf '       (registry unreadable — falling back to a NAME HEURISTIC, which is narrower)\n'
+fi
+CANDIDATES="$(
+    [ -f "$CFG/hive/hive.env" ] && printf '%s\n' "$CFG/hive/hive.env"
+    find "$CFG/environment.d" -maxdepth 1 -type f -name '*.conf' 2>/dev/null
+)"
+
+# Read line by line rather than `for f in $CANDIDATES`: zsh does not word-split
+# an unquoted parameter, so that form yields ONE field containing every path.
+# The heredoc keeps the loop in THIS shell, so LEAK survives it — a pipe would
+# put it in a subshell and the assignment would be lost.
 LEAK=0
-for f in "$HOME/.config/hive/hive.env" "${XDG_CONFIG_HOME:-$HOME/.config}"/environment.d/*.conf; do
-    [ -f "$f" ] || continue
-    if grep -qE '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_]*(API_KEY|TOKEN|SECRET|PASSWORD)[A-Za-z_]*=' "$f"; then
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if grep -qE "$CRED_RE" "$f" 2>/dev/null; then
         bad "a credential-shaped assignment is on disk in $f"
         LEAK=1
     fi
-done
+done <<CANDIDATE_LIST
+$CANDIDATES
+CANDIDATE_LIST
 [ "$LEAK" -eq 0 ] && ok "no credential-shaped assignment in hive.env or any environment.d fragment"
 
 hdr "AC9 — doctor catches 'probes present, serves nothing'"
