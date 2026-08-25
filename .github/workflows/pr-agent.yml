@@ -100,8 +100,39 @@ jobs:
     # `head.ref` is read by the expression engine here, never interpolated into a
     # `run:` — the injection concern that normally attaches to it does not apply
     # to an `if`.
+    # The Dependabot exclusion is the same shape as the release-please one above
+    # and lands for a harder reason: on a Dependabot-triggered run this reviewer
+    # CANNOT work. GitHub serves those runs from a separate secrets store, and
+    # this repo's is empty (`dependabot/secrets` -> total_count: 0), so
+    # `secrets.NAN_API_KEY` expands to "" — LiteLLM cannot authenticate, PR-Agent
+    # swallows the failure and exits green, and the guard below then goes red on
+    # every weekly PR. Measured 2026-08-24 on #1219/#1220 (HARNESS-080, #1221).
+    #
+    # Keyed on `github.actor` rather than on the branch, and unlike the
+    # release-please line above that choice is load-bearing rather than
+    # stylistic: `github.actor` is the SAME field GitHub reads to pick the
+    # secrets store, so the skip fires exactly when the credential is missing.
+    # A human pushing to a Dependabot branch is a different actor with the
+    # secrets present, and gets a real review. `dependabot[bot]` is also
+    # unforgeable — GitHub does not permit `[` in a user login — which the
+    # attacker-chosen branch name discussed above is not.
+    #
+    # This removes a review, it can never grant one: `review-attestation` still
+    # reads `pending` and the PR still cannot merge until a human reviews it.
+    # That is `dependabot.yml`'s stated policy ("every PR is reviewed and merged
+    # by a human"), and the classifier already counts a human review
+    # (`check-review-attestation.sh`) with `pull_request_review` re-firing the
+    # gate. Mirroring NAN_API_KEY into the Dependabot store was the alternative
+    # and was rejected: it spends scarce NaN concurrency — 5 requests shared with
+    # pi, qq and hive embeddings, see #1107 — on dependency bumps whose verdict a
+    # human makes anyway.
+    #
+    # Only the `pull_request` half is gated, for the same reason as release PRs:
+    # a human typing `/review` on a Dependabot PR is asking on purpose, that run
+    # is triggered by the human, and its secrets are present.
     if: >
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        && github.actor != 'dependabot[bot]'
         && !startsWith(github.event.pull_request.head.ref, 'release-please--')) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)

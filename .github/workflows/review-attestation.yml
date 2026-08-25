@@ -8,15 +8,26 @@ name: review-attestation
 # available asserted the opposite of the truth. This job adds an honest one
 # beside it — it cannot change the vendor's own check status.
 #
-# NOT `required` in branch protection yet. Promoting it is a real step with a
-# real order, and getting the order wrong blocks the repository — so the order
-# lives here, next to the thing it constrains, rather than in a ticket nobody
-# reads at the moment of enabling it.
+# REQUIRED in branch protection. Promoting it was a real step with a real order,
+# and getting the order wrong blocks the repository — so the order lives here,
+# next to the thing it constrains, rather than in a ticket nobody reads at the
+# moment of enabling it.
 #
 #   1. #1047  the classifier counts comment-shaped review output.        DONE
 #   2. #1041  a `pending` verdict stops freezing the check-run red.      DONE
 #   3. #1052  a `workflow_run` re-evaluates when the reviewer finishes.  DONE
-#   4. promote — and promote the STATUS, never the check-run.
+#   4. promote — and promote the STATUS, never the check-run.            DONE
+#
+# Verified 2026-08-24 (HARNESS-080, #1221):
+#
+#   gh api repos/OWNER/REPO/branches/main/protection \
+#     --jq .required_status_checks.contexts
+#   -> ["lint","lint-powershell","test","test-windows","review-attestation"]
+#
+# Step 4 had been executed and this header still said "not required yet", while
+# the failure message at the bottom of this file told every reader the check
+# "does not veto". A gate that misreports its own authority is the same class of
+# defect as one that misreports a review.
 #
 # Require the commit status `review-attestation`, never the `attestation`
 # check-run. A check-run belongs to the run that created it and can never be
@@ -300,7 +311,8 @@ jobs:
             echo "  (b) Declare the unreviewed merge: add the 'merged-unreviewed' label AND a"
             echo "      non-empty '## Unreviewed merge rationale' section to the PR body."
             echo
-            echo "This check is NOT required in branch protection: it reports, it does not veto."
-            echo "Proceeding on an unreviewed PR is allowed. Proceeding silently is not."
+            echo "This check IS required in branch protection, so (a) or (b) is not advice."
+            echo "Proceeding on an unreviewed PR is allowed — that is what (b) is for."
+            echo "Proceeding silently is not."
           fi
           exit "$CODE"
