@@ -67,7 +67,7 @@ func checkHiveBackendCanServe(sys *System, rep *Report) {
 	for _, line := range strings.Split(out, "\n") {
 		switch {
 		case strings.HasPrefix(line, "ExecStart="):
-			execStart = strings.TrimPrefix(line, "ExecStart=")
+			execStart = execArgv(strings.TrimPrefix(line, "ExecStart="))
 		case strings.HasPrefix(line, "Environment="):
 			environment = strings.TrimPrefix(line, "Environment=")
 		}
@@ -113,4 +113,31 @@ func checkHiveBackendCanServe(sys *System, rep *Report) {
 	}
 
 	rep.Pass("hive.service carries both halves of the worker contract — the backend can reach its pool")
+}
+
+// execArgv pulls the command line out of the record `systemctl show -p ExecStart`
+// actually prints, which is NOT a bare command:
+//
+//	ExecStart={ path=/u/bin/hive ; argv[]=/u/bin/hive serve ; ignore_errors=no ; … }
+//
+// Matching against the whole record would let an unrelated field satisfy the
+// check — `path=` alone repeats the binary, and the trailing status fields are
+// attacker-free but noise. Reading `argv[]` narrows the match to the command the
+// unit will actually run.
+//
+// A plain value (no `argv[]=`) is returned unchanged: `--value` output and the
+// empty string for an unknown unit both take that path, and neither should be
+// mangled here.
+func execArgv(record string) string {
+	const key = "argv[]="
+	i := strings.Index(record, key)
+	if i < 0 {
+		return record
+	}
+	rest := record[i+len(key):]
+	// Fields are ` ; `-separated inside the record.
+	if j := strings.Index(rest, " ; "); j >= 0 {
+		rest = rest[:j]
+	}
+	return strings.TrimSpace(rest)
 }
