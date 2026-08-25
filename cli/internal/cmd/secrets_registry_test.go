@@ -288,6 +288,42 @@ func TestResolveOnly_IdSelectsAllVars_NameSelectsOne(t *testing.T) {
 	}
 }
 
+// The ambiguity the hive daemon's ExecStart depends on, pinned.
+//
+// The real NAN_API_KEY secret has an ID equal to one of the two vars it exposes,
+// so `--only NAN_API_KEY` is simultaneously an id token and a var token.
+// Selector resolves IDs FIRST, which is what delivers HIVE_WORKER_API_KEY to
+// hive's worker from a flag that names only NAN_API_KEY
+// (systemd/hive.service.d/10-dotf-secrets.conf).
+//
+// Swapping those two loops would still pass every other test here — and would
+// silently strip hive's credential, restoring the unconfigured-worker state
+// CLI-042 AC9 exists to catch. That failure would surface as a daemon that runs
+// and answers nothing, which is precisely the shape that went unnoticed once.
+func TestResolveOnly_IdWinsWhenIdAndVarNameCollide(t *testing.T) {
+	const collides = `version: 1
+secrets:
+  - id: NAN_API_KEY
+    plane: app
+    backend: bw
+    bw: { item: nan-api-key, field: api-key }
+    expose: { env: [NAN_API_KEY, HIVE_WORKER_API_KEY] }
+`
+	reg, err := secrets.ParseRegistry([]byte(collides))
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := resolveOnly(reg, "NAN_API_KEY")
+	if err != nil {
+		t.Fatalf("resolveOnly: %v", err)
+	}
+	if len(set) != 2 || !set["NAN_API_KEY"] || !set["HIVE_WORKER_API_KEY"] {
+		t.Errorf("--only NAN_API_KEY = %v, want BOTH vars: the token matches the "+
+			"secret's id, and an id selects every var it exposes. Selecting only "+
+			"the same-named var would leave hive's worker without a credential.", set)
+	}
+}
+
 func TestSecretsVerify_ReportsStatuses_NoValues(t *testing.T) {
 	useTempRegistry(t, "version: 1\nsecrets:\n"+
 		"  - {id: age-ok, plane: app, backend: age, age: a.key, expose: {env: AGE_OK}}\n"+

@@ -6,9 +6,7 @@
         "hive-vault"
       ],
       "env": {
-        "VAULT_PATH": "${VAULT_PATH}",
-        "HIVE_OLLAMA_ENDPOINT": "http://ollama.kubelab.live:11434",
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+        "VAULT_PATH": "${VAULT_PATH}"
       },
       "timeout": 30000,
       "trust": false

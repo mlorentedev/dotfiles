@@ -133,6 +133,69 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   validated map, covered in the `agent` package; the command-layer test was rewritten to assert the
   consequence that IS reachable — no record, empty stdout, exit 1 and never 3.
 
+## PR E — the deployment (2026-08-24)
+
+### Verified in this session
+
+| What | Evidence |
+|---|---|
+| Go layer | `go build ./...`, `go vet ./...`, `GOOS=windows go vet ./...` all clean; `golangci-lint` (pinned 2.12.2) **0 issues** |
+| Go tests | `go test -count=1 ./...` exit 0, including 9 new `TestHiveBackendCanServe_*`, `TestRunChild_ForwardsSIGTERMToChild`, `TestResolveOnly_IdWinsWhenIdAndVarNameCollide` |
+| Shell layer | `bash -n` + `zsh -n` clean on all four changed scripts; `shellcheck` reports nothing new |
+| bats | `tests/agent-runtime-deployment.bats` 14/14 |
+| features.json | f15, f16, f17, f30 each **executed as written** and passing; proven non-vacuous — the same command with a filter selecting nothing FAILS |
+| Multi-var registry, by consequence | `dotf secrets run --only NAN_API_KEY` puts **both** `NAN_API_KEY` and `HIVE_WORKER_API_KEY` in the child env, and `OPENAI_API_KEY` stays out (scoping holds). `dotf secrets verify` → 35 ok, 0 missing, 0 failed |
+
+### Guards proven able to fail
+
+Per the guard-can-fail discipline (#1203, #1206), each new guard was run against
+the shape it exists to refuse:
+
+- **Signal forwarding** — with `signal.Notify` removed, the test reports
+  `forwarder helper exited -1 … stdout=""` and **the runner survives to report
+  it**. That containment is the design: a guard whose failure mode is "the test
+  harness dies" gets muted by whoever hits it.
+- **AC8 provider drop** — caught both a restored `HIVE_OLLAMA_ENDPOINT` key and
+  a *renamed* key whose value still pointed at ollama, which is what makes it a
+  class assertion rather than a string grep.
+
+### NOT verified, and owed
+
+**The by-consequence half of AC7, and all of AC6's end-to-end smoke.** Both need
+`./setup-linux.sh` to have run, and the deploy is deferred to the next release
+cut by the repo owner's decision. Nothing here may be read as evidence the
+daemon answers.
+
+The measurement to capture on either side of that deploy, which is the whole
+point of the criterion:
+
+| | Command | Expected |
+|---|---|---|
+| Before | hive `worker_status` | `Configured: no — set HIVE_WORKER_BASE_URL` *(captured 2026-08-24)* |
+| After | hive `worker_status` | `Configured: yes`, provider reachable |
+| After | `dotf doctor` | the *hive backend reachability* section flips FAIL → PASS |
+| After | `dotf agent run --backend hive --tier mid` | answers, record reports `pool: nan` |
+| Idempotence | second `./setup-linux.sh` | `hive.service credential drop-in already current (no restart)` |
+
+Until that runs, **AC6 and AC7 are not closed and CLI-042 must not archive.**
+The doctor section going red on this machine right now is not a defect in the
+check — it is the check working, and the deploy is what turns it green.
+
+### The finding that shaped this PR
+
+The first implementation of AC7 injected `NAN_API_KEY` and passed 9 of 9 new
+tests. It would have deployed and changed nothing, because hive's worker reads
+`HIVE_WORKER_API_KEY` and `HIVE_WORKER_BASE_URL` and ignores `NAN_API_KEY`
+entirely.
+
+Every one of those 9 tests asserted the unit's **shape** — does it invoke
+`secrets run`, does it carry `--only`, is the `ExecStart` list reset — and not
+one asserted its **effect**. What broke the tie was asking the daemon:
+`worker_status` answered `Configured: no`. Same class as lesson 229 the day
+before: a check on the form of a thing, standing in for a check on what it does.
+This is why the owed measurements above are stated as a before/after pair rather
+than a box to tick.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.

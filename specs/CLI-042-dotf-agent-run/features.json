@@ -183,22 +183,29 @@
   },
   {
     "id": "CLI-042-dotf-agent-run-f15",
-    "behavior": "AC7 — the hive service unit invokes `dotf secrets run -- hive serve`, and the deployed environment.d fragment carries no credential",
-    "verification": "~/.local/bin/bats tests/hive-service-secret-delivery.bats",
+    "behavior": "AC7 — the hive service unit invokes `dotf secrets run` and carries BOTH halves of the worker contract (HIVE_WORKER_API_KEY via the registry id, HIVE_WORKER_BASE_URL in the unit); no credential lands in the unit, the environment.d fragment, or any deployed file",
+    "verification": "out=$(~/.local/bin/bats tests/agent-runtime-deployment.bats --filter 'AC7' 2>&1) && n=$(printf '%s' \"$out\" | grep -c '^ok ') && [ \"$n\" -ge 8 ] && ! printf '%s' \"$out\" | grep -q '^not ok'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f16",
-    "behavior": "AC8 — no configuration this repo deploys still names Ollama or OpenRouter for hive's WORKER (opencode's own provider catalogue is out of scope and must survive)",
-    "verification": "~/.local/bin/bats tests/hive-provider-drop.bats",
+    "behavior": "AC8 — no configuration this repo deploys still names Ollama or OpenRouter for hive's WORKER, asserted as a class over hive-vault's declared env (opencode's own provider catalogue is out of scope and must survive)",
+    "verification": "out=$(~/.local/bin/bats tests/agent-runtime-deployment.bats --filter 'AC8' 2>&1) && n=$(printf '%s' \"$out\" | grep -c '^ok ') && [ \"$n\" -ge 3 ] && ! printf '%s' \"$out\" | grep -q '^not ok'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-042-dotf-agent-run-f17",
-    "behavior": "AC9 — `dotf doctor` fails when a backend probes present but can serve no model, so 'zero reachable models' is caught at diagnostic time",
-    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestBackendReachability$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestBackendReachability'",
+    "behavior": "AC9 — `dotf doctor` FAILS when hive probes present but is missing either half of its worker contract, so 'serves nothing' is caught at diagnostic time rather than under dispatch load",
+    "verification": "cd cli && out=$(go test -count=1 ./internal/doctor/ -run '^TestHiveBackendCanServe' -v 2>&1) && n=$(printf '%s' \"$out\" | grep -c '^--- PASS: TestHiveBackendCanServe') && [ \"$n\" -ge 8 ] && ! printf '%s' \"$out\" | grep -q '^--- FAIL'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f30",
+    "behavior": "AC7 — `dotf secrets run` forwards SIGINT/SIGTERM to its child rather than dying and orphaning it, because the hive unit makes it a supervisor and a MainPID for the first time",
+    "verification": "cd cli && out=$(go test -count=1 ./internal/cmd/ -run '^TestRunChild_ForwardsSIGTERMToChild$' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestRunChild_ForwardsSIGTERMToChild'",
     "state": "pending",
     "evidence": ""
   }

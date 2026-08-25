@@ -263,6 +263,17 @@ Observable outcomes. Each must be testable.
       `dotf secrets run -- hive serve`, and the deployed `environment.d` fragment contains no
       credential. Asserted by a test reading the rendered unit and grepping the deployed fragment,
       verified by consequence (the daemon answers) rather than by printing the value.
+      **Widened 2026-08-24 by measurement, not by preference.** The criterion as first written names
+      only the credential, and a unit satisfying exactly that still serves nothing: hive's worker
+      contract has TWO halves, `HIVE_WORKER_API_KEY` **and** `HIVE_WORKER_BASE_URL`, and neither is
+      `NAN_API_KEY` — the variable the first implementation injected. Measured on msi: `hive.service`
+      had been `active (running)` for 2h40m while the daemon's own `worker_status` reported
+      `Configured: no — set HIVE_WORKER_BASE_URL`. So AC7 now requires the unit to carry both halves.
+      The base URL is configuration rather than a secret and belongs in the unit; the credential
+      reaches it through `dotf secrets run --only NAN_API_KEY`, whose token is the registry **id**,
+      which selects every var that secret exposes — `secrets/registry.yaml` gains
+      `HIVE_WORKER_API_KEY` as a second exposed name over the one Bitwarden item, so there remains
+      one credential and one rotation.
 - [ ] **AC8 — the drop of Ollama and OpenRouter from hive's worker is complete, not partial.** No
       configuration this repo deploys still names either **for hive's worker**, and
       `ai/agy/mcp_servers.json`'s `HIVE_OLLAMA_ENDPOINT` is removed in the same change.
