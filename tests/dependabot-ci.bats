@@ -23,48 +23,85 @@ setup() {
 
 # --- the class guard ---------------------------------------------------------
 
-@test "dependabot: every pull_request workflow needing a repo secret excludes dependabot" {
-    # A workflow qualifies when BOTH hold: it triggers on `pull_request`, and it
-    # reads a secret other than GITHUB_TOKEN (which is always present, merely
-    # read-only for Dependabot). Such a job cannot do its work on a Dependabot
-    # run, so it must not pretend to try.
+@test "dependabot: every pull_request job needing a repo secret excludes dependabot" {
+    # Scoped PER JOB, not per file, and that distinction is the whole assertion.
+    # A file-wide `grep` accepts a guard that sits on some OTHER job — or in a
+    # comment — while the job actually holding the credential runs unguarded.
+    # It would report green on a workflow whose `lint` job carries the guard and
+    # whose `publish` job reads a deploy token without it, which is precisely
+    # the arrangement this file exists to make impossible. Raised by CodeRabbit
+    # on the first revision of this test, correctly: a guard that looks like it
+    # covers the class is the failure mode of the very lesson this PR writes.
     #
-    # Read line by line rather than word-split: zsh does not split unquoted
-    # parameters, so `set -- $list` would yield one field holding everything.
-    offenders=""
-    while IFS= read -r wf; do
-        [ -n "$wf" ] || continue
-        grep -qE '^[[:space:]]{2}pull_request:' "$wf" || continue
-        grep -oE 'secrets\.[A-Z_]+' "$wf" | grep -qv 'secrets\.GITHUB_TOKEN' || continue
-        grep -q "$ACTOR_GUARD" "$wf" || offenders="$offenders $(basename "$wf")"
-    done <<< "$(find "$WF_DIR" -maxdepth 1 -name '*.yml' | sort)"
+    # Secret names are matched EXACTLY. `secrets.GITHUB_TOKEN2` is not
+    # GITHUB_TOKEN, and a substring test silently exempted the job that read it.
+    #
+    # Parsed with PyYAML rather than grepped, following tests/pr-agent-config.bats.
+    # Note `d[True]`: YAML 1.1 resolves a bare `on:` key to the boolean true, so
+    # `d['on']` is a KeyError on every workflow file in this repository.
+    run python3 -c "
+import pathlib, re, sys, yaml
 
-    if [ -n "$offenders" ]; then
-        echo "These workflows run on pull_request, read a repository secret, and do not"
-        echo "exclude dependabot[bot] — on a Dependabot PR that secret is the empty string:"
-        echo "  $offenders"
-        echo
-        echo "Add \"github.actor != 'dependabot[bot]'\" to the job's \`if:\`, or move the"
-        echo "credential into the Dependabot secrets store deliberately."
-        return 1
-    fi
+GUARD = \"github.actor != 'dependabot[bot]'\"
+offenders = []
+for wf in sorted(pathlib.Path('$WF_DIR').glob('*.yml')):
+    doc = yaml.safe_load(open(wf))
+    if not isinstance(doc, dict):
+        continue
+    triggers = doc.get(True, doc.get('on'))
+    if not isinstance(triggers, dict) or 'pull_request' not in triggers:
+        continue
+    for name, job in (doc.get('jobs') or {}).items():
+        body = yaml.safe_dump(job)
+        secrets = set(re.findall(r'secrets\.([A-Za-z_][A-Za-z0-9_]*)', body))
+        secrets.discard('GITHUB_TOKEN')
+        if not secrets:
+            continue
+        if GUARD not in str(job.get('if', '')):
+            offenders.append('%s job %s reads %s' % (wf.name, name, ', '.join(sorted(secrets))))
+
+if offenders:
+    print('These jobs run on pull_request and read a repository secret, but their')
+    print('own \`if:\` does not exclude dependabot[bot]. On a Dependabot run that')
+    print('secret is the empty string, so the job cannot succeed and never will:')
+    for o in offenders:
+        print('  ' + o)
+    print('')
+    print('Add \"github.actor != %s\" to THAT JOB (a guard on a' % repr('dependabot[bot]'))
+    print('sibling job does not protect this one), or put the credential into the')
+    print('Dependabot secrets store as a deliberate decision.')
+    sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
 
-@test "dependabot: the class guard actually inspects the workflow directory" {
-    # Without this, the loop above passes vacuously the day the glob, the path
-    # or the trigger pattern stops matching anything — a guard that inspects
+@test "dependabot: the class guard actually inspects some secret-using jobs" {
+    # Without this, the check above passes vacuously the day the glob, the `on:`
+    # key or the secret pattern stops matching anything — a guard that inspected
     # nothing reports the same green as a guard that found nothing wrong. The
     # repository has paid for that distinction (#1203, #1206).
-    matched=0
-    while IFS= read -r wf; do
-        [ -n "$wf" ] || continue
-        grep -qE '^[[:space:]]{2}pull_request:' "$wf" || continue
-        grep -oE 'secrets\.[A-Z_]+' "$wf" | grep -qv 'secrets\.GITHUB_TOKEN' || continue
-        matched=$((matched + 1))
-    done <<< "$(find "$WF_DIR" -maxdepth 1 -name '*.yml' | sort)"
+    run python3 -c "
+import pathlib, re, sys, yaml
 
-    # add-to-project.yml (BITACORA_PAT) and pr-agent.yml (NAN_API_KEY).
-    [ "$matched" -ge 2 ]
+inspected = []
+for wf in sorted(pathlib.Path('$WF_DIR').glob('*.yml')):
+    doc = yaml.safe_load(open(wf))
+    if not isinstance(doc, dict):
+        continue
+    triggers = doc.get(True, doc.get('on'))
+    if not isinstance(triggers, dict) or 'pull_request' not in triggers:
+        continue
+    for name, job in (doc.get('jobs') or {}).items():
+        secrets = set(re.findall(r'secrets\.([A-Za-z_][A-Za-z0-9_]*)', yaml.safe_dump(job)))
+        secrets.discard('GITHUB_TOKEN')
+        if secrets:
+            inspected.append('%s:%s' % (wf.name, name))
+
+# add-to-project.yml (BITACORA_PAT) and pr-agent.yml (NAN_API_KEY).
+print('inspected: ' + ', '.join(inspected))
+sys.exit(0 if len(inspected) >= 2 else 1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
 
 # --- add-to-project ----------------------------------------------------------

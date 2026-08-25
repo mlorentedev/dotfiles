@@ -9,7 +9,16 @@ tags: [lesson, dotfiles]
 
 # Lesson 229: An empty secret is not an error, so a job with no credential fails as if the work failed
 
-**Context**: Every Dependabot PR opened since 2026-08-07 carried red checks — `add-to-project`, `review`, and `review-attestation` downstream of them. Measured on #1219 and #1220 (HARNESS-080, #1221). GitHub serves Dependabot-triggered `pull_request` runs from a **separate** secrets store; this repository's was empty (`gh api repos/OWNER/REPO/dependabot/secrets` → `total_count: 0`), while the Actions store held all three secrets.
+**Context**: Every Dependabot PR opened since 2026-08-07 carried red checks — `add-to-project`, `review`, and `review-attestation` downstream of them. Measured on #1219 and #1220 (HARNESS-080, #1221). GitHub serves Dependabot-triggered `pull_request` runs from a **separate** secrets store; this repository's was empty, while the Actions store held all three secrets:
+
+```sh
+# Projected with --jq, never dumped. The endpoint returns names and timestamps
+# rather than values, but "decrypt everything, then filter what a human reads"
+# is the shape the transcript rule forbids — and a command copied out of a
+# lesson is a command someone will run against a store that does hold more.
+gh api repos/OWNER/REPO/dependabot/secrets --jq '.total_count'   # -> 0
+gh api repos/OWNER/REPO/actions/secrets    --jq '.total_count'   # -> 3
+```
 
 **Problem**: `secrets.BITACORA_PAT` and `secrets.NAN_API_KEY` do not raise when the store lacks them — they expand to the **empty string**. So each job proceeded to do its work with no credential, and each failed at the point where the credential was used rather than at the point where it was missing. The resulting red says *"could not add this item to the board"* and *"PR-Agent published no review"* — both true, both describing a symptom three layers from the cause, and both indistinguishable from the genuine failures those messages were written for. Neither job was ever going to succeed, so the red was permanent, and a check that is always red is one everybody learns to scroll past. It went unread for seventeen days.
 
