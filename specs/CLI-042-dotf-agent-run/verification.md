@@ -166,20 +166,65 @@ the shape it exists to refuse:
 cut by the repo owner's decision. Nothing here may be read as evidence the
 daemon answers.
 
-The measurement to capture on either side of that deploy, which is the whole
-point of the criterion:
+`verify-deployment.sh` in this folder runs every owed check in one command, so
+the closing session reads output rather than re-deriving what to look at:
 
-| | Command | Expected |
-|---|---|---|
-| Before | hive `worker_status` | `Configured: no — set HIVE_WORKER_BASE_URL` *(captured 2026-08-24)* |
-| After | hive `worker_status` | `Configured: yes`, provider reachable |
-| After | `dotf doctor` | the *hive backend reachability* section flips FAIL → PASS |
-| After | `dotf agent run --backend hive --tier mid` | answers, record reports `pool: nan` |
-| Idempotence | second `./setup-linux.sh` | `hive.service credential drop-in already current (no restart)` |
+```bash
+./specs/CLI-042-dotf-agent-run/verify-deployment.sh
+```
 
-Until that runs, **AC6 and AC7 are not closed and CLI-042 must not archive.**
-The doctor section going red on this machine right now is not a defect in the
-check — it is the check working, and the deploy is what turns it green.
+It never prints a credential — it reports variable NAMES and counts, and proves
+the key works by consequence (the daemon answers).
+
+**The BEFORE state, captured 2026-08-25T03:25Z, before any deploy.** This is
+perishable evidence: it stops existing the moment `./setup-linux.sh` runs, so it
+is frozen here rather than described.
+
+```
+=== AC7 — the credential reaches the daemon, and lives in no file ===
+[FAIL] drop-in NOT deployed — ./setup-linux.sh has not run, or its hive block was skipped
+[FAIL] loaded ExecStart has NO credential injection (the drop-in did not take effect)
+[FAIL] HIVE_WORKER_BASE_URL absent — the worker stays unconfigured even WITH a key
+[FAIL] the running daemon does NOT hold HIVE_WORKER_API_KEY — restart it, or the injection failed
+[OK]   no credential-shaped assignment in hive.env or any environment.d fragment
+
+=== AC9 — doctor catches 'probes present, serves nothing' ===
+[FAIL] dotf doctor printed neither verdict — is the installed binary older than this check?
+
+=== AI-030 — the pi packages the same deploy installs ===
+[FAIL] pi packages: 0 installed, manifest declares 9
+
+pass=1 fail=6 skip=1   (--no-dispatch)
+```
+
+Corroborated independently at the same moment, from the daemon itself and from
+the kernel:
+
+| Source | Reading |
+|---|---|
+| hive `worker_status` | `Configured: no — set HIVE_WORKER_BASE_URL` |
+| `systemctl show -p ExecStart` | `argv[]=/home/manu/.local/bin/hive serve` — no injection |
+| `systemctl show -p Environment` | `VAULT_PATH=…` only |
+| `/proc/<pid>/environ`, NAMES only | **0** credential-shaped variables |
+| `~/.config/systemd/user/hive.service.d/` | does not exist |
+
+**The AFTER state is what the same script must print**: every line `[OK]`, exit 0,
+including the live dispatch answering with `pool: nan`.
+
+**A third thing the deploy fixes, found while writing this:** the installed
+`~/.local/bin/dotf` has **no `agent run` subcommand at all**. The binary predates
+PR B. Every PR of this epic is merged to main and not one of them is live on this
+machine — the two-tier deploy rule in its purest form, and the reason the script
+checks the installed binary rather than the source tree.
+
+Until this runs, **AC6 and AC7 are not closed and CLI-042 must not archive.**
+The doctor section going red here is not a defect in the check — it is the check
+working, and the deploy is what turns it green.
+
+**Idempotence** is not asserted by the script: run `./setup-linux.sh` a second
+time and confirm it prints `hive.service credential drop-in already current (no
+restart)` and installs 0 pi packages. A deploy that changes something on every
+pass is not IaC.
 
 ### The finding that shaped this PR
 

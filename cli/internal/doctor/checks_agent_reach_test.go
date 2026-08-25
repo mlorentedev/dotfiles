@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-// found/notFound build the LookPath seam for a set of binaries that resolve.
+// lookPathFor builds the LookPath seam: the named binaries resolve, everything
+// else reports "not found". The check keys three distinct outcomes off this
+// (no systemctl, no hive, both present), so each test states its host exactly.
 func lookPathFor(present ...string) func(string) (string, error) {
 	set := map[string]bool{}
 	for _, p := range present {
@@ -21,13 +23,32 @@ func lookPathFor(present ...string) func(string) (string, error) {
 	}
 }
 
-// unitSeam fakes `systemctl show -p ExecStart -p Environment`, which returns one
-// Key=value line per requested directive.
+// unitSeam fakes `systemctl show -p ExecStart -p Environment` in the format it
+// REALLY prints. ExecStart is not a bare command but a record:
+//
+//	ExecStart={ path=… ; argv[]=… ; ignore_errors=no ; start_time=[n/a] ; … }
+//
+// The first version of these tests fed a plain command string, so all seven
+// passed against a format systemd never emits. Captured verbatim from
+// `systemctl --user show hive.service` on msi, 2026-08-24 — the same defect
+// lesson 230 in this very PR is about, caught by the reviewer rather than by me.
+//
+// An empty execStart reproduces an unknown unit, where systemctl prints no
+// ExecStart line at all.
 func unitSeam(execStart, environment string) func(string, ...string) (string, error) {
-	out := "ExecStart=" + execStart + "\nEnvironment=" + environment + "\n"
+	var out string
+	if execStart != "" {
+		bin, _, _ := strings.Cut(execStart, " ")
+		out = "ExecStart={ path=" + bin + " ; argv[]=" + execStart +
+			" ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }\n"
+	}
+	out += "Environment=" + environment + "\n"
 	return func(_ string, _ ...string) (string, error) { return out, nil }
 }
 
+// failingSeam makes the systemctl shell-out fail, which is a DIFFERENT state
+// from an empty reading: an unanswered question must never be reported as a
+// clean bill of health.
 func failingSeam(err error) func(string, ...string) (string, error) {
 	return func(_ string, _ ...string) (string, error) { return "", err }
 }
@@ -38,6 +59,30 @@ const (
 	goodExecStart = "/home/u/.local/bin/dotf secrets run --only NAN_API_KEY -- /home/u/.local/bin/hive serve"
 	goodEnv       = "HIVE_WORKER_BASE_URL=https://api.nan.builders/v1"
 )
+
+// The record format, pinned against output captured verbatim from this machine
+// rather than against what the fake produces — otherwise the fake and the parser
+// can agree with each other forever while both disagree with systemd.
+func TestExecArgv_ParsesTheRecordSystemdActuallyPrints(t *testing.T) {
+	const captured = `{ path=/home/manu/.local/bin/hive ; argv[]=/home/manu/.local/bin/hive serve ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }`
+
+	if got, want := execArgv(captured), "/home/manu/.local/bin/hive serve"; got != want {
+		t.Errorf("execArgv = %q, want %q", got, want)
+	}
+	// A record whose argv is fine must not be satisfied by the trailing status
+	// fields, nor truncated by them.
+	if strings.Contains(execArgv(captured), "ignore_errors") {
+		t.Error("execArgv leaked a trailing record field into the command line")
+	}
+	// Plain values pass through: `--value` output and the empty string for an
+	// unknown unit both take that path.
+	if got := execArgv("/u/bin/dotf secrets run -- /u/bin/hive serve"); got != "/u/bin/dotf secrets run -- /u/bin/hive serve" {
+		t.Errorf("a plain command must pass through unchanged, got %q", got)
+	}
+	if got := execArgv(""); got != "" {
+		t.Errorf("empty must stay empty, got %q", got)
+	}
+}
 
 // The criterion's case, and the one measured on this machine: the daemon is
 // supervised and running, every probe says hive is present, and its ExecStart
@@ -128,7 +173,7 @@ func TestHiveBackendCanServe_CredentialInjectedPasses(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 	sys := &System{
-		LookPath: lookPathFor("systemctl", "hive"),
+		LookPath:      lookPathFor("systemctl", "hive"),
 		CommandOutput: unitSeam(goodExecStart, goodEnv),
 	}
 
