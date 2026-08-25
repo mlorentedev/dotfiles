@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.49.0](https://github.com/mlorentedev/dotfiles/compare/v0.48.1...v0.49.0) (2026-08-25)
+
+
+### Features
+
+* **agent:** give hive's daemon its worker contract without a credential on disk ([#1230](https://github.com/mlorentedev/dotfiles/issues/1230)) ([981fd93](https://github.com/mlorentedev/dotfiles/commit/981fd9353afbd9d446bcff7812142ae6d1a1cfc0))
+* **cli:** bound dispatch concurrency and enforce the per-dispatch deadline ([#1212](https://github.com/mlorentedev/dotfiles/issues/1212)) ([8171ac1](https://github.com/mlorentedev/dotfiles/commit/8171ac10badd8e1a92d059ece91e94426d7fd699)), closes [#1190](https://github.com/mlorentedev/dotfiles/issues/1190)
+* **cli:** deny dispatch on a machine that has not declared who it is ([#1213](https://github.com/mlorentedev/dotfiles/issues/1213)) ([9531527](https://github.com/mlorentedev/dotfiles/commit/95315274eb994d64a4741a94e0d1366f02f1d05f))
+* **cli:** dotf agent run dispatches over the tier chain ([#1209](https://github.com/mlorentedev/dotfiles/issues/1209)) ([7e734c4](https://github.com/mlorentedev/dotfiles/commit/7e734c4de291c306cdfde6fdbf96bc271224f925)), closes [#1190](https://github.com/mlorentedev/dotfiles/issues/1190)
+* **cli:** probe real backends and route each chain entry to one that serves it ([#1227](https://github.com/mlorentedev/dotfiles/issues/1227)) ([4783a2d](https://github.com/mlorentedev/dotfiles/commit/4783a2dc316a377f06b5d9ab13d8893b8bff7ee6))
+* **pi:** declare pi packages in a manifest setup reconciles on every run ([#1226](https://github.com/mlorentedev/dotfiles/issues/1226)) ([9c44d7a](https://github.com/mlorentedev/dotfiles/commit/9c44d7a7d1d6580baee122868d0807db0206407c))
+
+
+### Bug Fixes
+
+* **ci:** stop running the jobs a Dependabot PR cannot possibly pass ([#1223](https://github.com/mlorentedev/dotfiles/issues/1223)) ([c9e6674](https://github.com/mlorentedev/dotfiles/commit/c9e66747a1438e290d21b7880540e503f04f4b54))
+* **cli-042:** the on-disk credential scan skipped everything under zsh, and missed 40% of secrets ([#1234](https://github.com/mlorentedev/dotfiles/issues/1234)) ([240d28b](https://github.com/mlorentedev/dotfiles/commit/240d28b367b2dd186857f67da1e1f80366143247))
+* **doctor:** parse the real ExecStart record, and add one-command post-deploy verification ([#1232](https://github.com/mlorentedev/dotfiles/issues/1232)) ([50203fa](https://github.com/mlorentedev/dotfiles/commit/50203fa221f1c40bee65147d3cf20cb5765f0453))
+* **mem:** file session records under the local calendar date and complete their frontmatter ([#1217](https://github.com/mlorentedev/dotfiles/issues/1217)) ([5e18ffa](https://github.com/mlorentedev/dotfiles/commit/5e18ffa82b0448eb36103793e101be564ee2cf08))
+* **ssh:** the hub alias still named the instance that was destroyed ([#1211](https://github.com/mlorentedev/dotfiles/issues/1211)) ([b801be0](https://github.com/mlorentedev/dotfiles/commit/b801be009c47582524d9047b04e13d8a2c130615))
+* **tests:** make it impossible for a test to launch a GUI application ([#1215](https://github.com/mlorentedev/dotfiles/issues/1215)) ([17d749a](https://github.com/mlorentedev/dotfiles/commit/17d749a8c362231768fa609db930abdc8fb66e7c))
+
 ## [0.48.1](https://github.com/mlorentedev/dotfiles/compare/v0.48.0...v0.48.1) (2026-08-23)
 
 
