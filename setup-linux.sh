@@ -935,6 +935,73 @@ if [ -f "$PI_SETTINGS_SRC" ]; then
     fi
 fi
 
+# pi packages (AI-030, #1224): reconcile ai/pi/packages.json against what the
+# live settings.json already declares, and install the difference.
+#
+# This runs AFTER the seed above and writes through `pi install`, never by
+# editing settings.json here. Two reasons, and neither is style. First, that
+# file is seed-if-missing precisely because pi owns it — writing the array from
+# setup would reintroduce the clobber #754 removed. Second, `pi install` also
+# unpacks the package under ~/.pi/agent/npm/, so an array entry this script
+# wrote by hand would name a package that is not on disk.
+#
+# `$PI_BIN`, never `pi`. The shell function of that name is a `dotf secrets run`
+# wrapper that resolves a Bitwarden item first, so it FAILS on a locked vault —
+# and setup must not require an unlocked vault to install an extension. The
+# version check above already reaches for $PI_BIN for the same reason.
+#
+# Idempotent by set difference, so a second run installs nothing and says so.
+PI_PACKAGES_SRC="$CURRENT_DIR/ai/pi/packages.json"
+if [ -f "$PI_PACKAGES_SRC" ]; then
+    if [ ! -x "$PI_BIN" ]; then
+        log_warning "pi not installed — skipping pi package reconcile (re-run setup after pi installs)"
+    elif ! command -v jq >/dev/null 2>&1; then
+        log_warning "jq not found — skipping pi package reconcile"
+    else
+        # Declared. A malformed manifest must be loud, not silently empty: an
+        # empty want-list installs nothing and reads exactly like "all present".
+        PI_PKG_WANTED=$(jq -er '.packages[].source' "$PI_PACKAGES_SRC" 2>/dev/null) || PI_PKG_WANTED=""
+        if [ -z "$PI_PKG_WANTED" ]; then
+            log_warning "ai/pi/packages.json declares no readable packages — not reconciling"
+        else
+            # Present. Entries are strings or objects carrying `source`; the
+            # object form is what upstream uses for per-resource filtering, and
+            # a reader that handled only strings would reinstall those forever.
+            PI_PKG_PRESENT=""
+            if [ -f "$PI_SETTINGS_DST" ]; then
+                PI_PKG_PRESENT=$(jq -r '(.packages // [])[] | if type == "object" then (.source // empty) else . end' \
+                    "$PI_SETTINGS_DST" 2>/dev/null) || PI_PKG_PRESENT=""
+            fi
+
+            pi_pkg_added=0
+            pi_pkg_failed=0
+            pi_pkg_present=0
+            while IFS= read -r pi_pkg; do
+                [ -n "$pi_pkg" ] || continue
+                if printf '%s\n' "$PI_PKG_PRESENT" | grep -Fxq "$pi_pkg"; then
+                    pi_pkg_present=$((pi_pkg_present + 1))
+                    continue
+                fi
+                log_info "Installing pi package $pi_pkg ..."
+                if "$PI_BIN" install "$pi_pkg" >/dev/null 2>&1; then
+                    pi_pkg_added=$((pi_pkg_added + 1))
+                else
+                    log_warning "pi install $pi_pkg failed — run \"$PI_BIN install $pi_pkg\" to see why"
+                    pi_pkg_failed=$((pi_pkg_failed + 1))
+                fi
+            done <<EOF
+$PI_PKG_WANTED
+EOF
+
+            if [ "$pi_pkg_added" -eq 0 ] && [ "$pi_pkg_failed" -eq 0 ]; then
+                log_info "pi packages already reconciled ($pi_pkg_present declared, 0 changed)"
+            else
+                log_success "pi packages: $pi_pkg_added installed, $pi_pkg_present already present, $pi_pkg_failed failed"
+            fi
+        fi
+    fi
+fi
+
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
 # Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
 # carries no secrets, so it deploys verbatim. opencode reads tui.json natively.

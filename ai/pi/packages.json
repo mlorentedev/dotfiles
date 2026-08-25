@@ -1,0 +1,78 @@
+{
+  "$comment": [
+    "Declarative manifest of pi packages setup reconciles (AI-030, #1224).",
+    "",
+    "A pi package ships extensions, skills, prompts and themes over npm. The",
+    "installer is `pi install npm:<name>@<version>`, which does TWO things: it",
+    "installs under ~/.pi/agent/npm/ and it writes the entry into the `packages`",
+    "array of the LIVE ~/.pi/agent/settings.json.",
+    "",
+    "Which is why the array is NOT in ai/pi/settings.json, where it would seem to",
+    "belong. That file is seed-if-missing -- pi rewrites it at runtime, so setup",
+    "copies it once and never again (setup-linux.sh, and tests/pi-config.bats pins",
+    "the contract in both setup scripts). Declaring packages there would reach a",
+    "fresh machine and never an existing one, which is the opposite of what a",
+    "repository that is redeployed on every update needs. So: this file is the",
+    "declaration, `pi install` is the only writer of the live array, and setup",
+    "reconciles one against the other on every run.",
+    "",
+    "EVERY ENTRY CARRIES A VERSION, and that is not tidiness. Upstream states it",
+    "plainly: 'Pi packages run with full system access -- extensions execute",
+    "arbitrary code and skills can instruct the model to run executables.' That is",
+    "inside an agent holding NAN_API_KEY with write access to these repositories.",
+    "A repository that pins its GitHub Actions by commit SHA, because a tag is",
+    "mutable and belongs to upstream, does not then declare nine floating npm",
+    "packages. `tests/pi-config.bats` refuses an unpinned entry.",
+    "",
+    "Bumping one is a deliberate edit here, which is the point: it puts a diff and",
+    "a reviewer between upstream's publish and this machine's next setup run.",
+    "",
+    "Fields:",
+    "  source  the argument to `pi install`, INCLUDING the version. Compared",
+    "          verbatim against the live settings.json entries, so the reconcile",
+    "          is a set difference rather than a version negotiation.",
+    "  why     what it is for. An entry nobody can justify is one to delete, and",
+    "          this is where that question gets asked.",
+    "",
+    "Docs: https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md"
+  ],
+  "version": 1,
+  "packages": [
+    {
+      "source": "npm:pi-effort@0.0.8",
+      "why": "Controls thinking effort per model. settings.json already sets defaultThinkingLevel; this makes it steerable in session."
+    },
+    {
+      "source": "npm:pi-web-access@0.24.2",
+      "why": "Web search, URL fetch, repo clone, PDF extraction. The capability opencode reaches through MCP; pi has no equivalent built in."
+    },
+    {
+      "source": "npm:@ayulab/pi-rewind@0.4.6",
+      "why": "/rewind checkpoint navigation -- undo a turn without discarding the session."
+    },
+    {
+      "source": "npm:@narumitw/pi-plan-mode@0.53.0",
+      "why": "Read-only /plan collaboration mode. The Socratic Guardrail in AGENTS.md asks for a plan before code on high-load work; this is the surface for it."
+    },
+    {
+      "source": "npm:@narumitw/pi-goal@0.53.1",
+      "why": "Autonomous single-objective /goal completion loop."
+    },
+    {
+      "source": "npm:pi-subagents@0.56.0",
+      "why": "Single-agent delegation and scripted multi-agent runs. Adjacent to CLI-042's executor seam -- worth comparing before either hardens."
+    },
+    {
+      "source": "npm:pi-memory@0.4.2",
+      "why": "Semantic memory. NOT a second memory sink: GUARD-001 makes the vault the only sink for agent memory, so this stays session-scoped recall."
+    },
+    {
+      "source": "npm:pi-cc-extensions@0.8.67",
+      "why": "Claude Code-style UI and context indicators, so the two agents read the same way."
+    },
+    {
+      "source": "npm:pi-add-dir@1.3.1",
+      "why": "Adds external directories to a session and loads their AGENTS.md -- the cross-repo case this multi-repo setup hits constantly."
+    }
+  ]
+}
