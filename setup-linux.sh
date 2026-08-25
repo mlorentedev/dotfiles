@@ -414,19 +414,16 @@ fi
 if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
     log_info "Consolidating Antigravity MCP servers..."
 
-    # Recover OpenRouter key: env → existing config → secrets vault.
     # NOTE: canonical agy schema uses `mcpServers` (not `servers`) per Antigravity docs.
-    OLD_KEY="${OPENROUTER_API_KEY:-}"
-    if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ]; then
-        # `|| true` keeps the assignment safe under set -e even when grep
-        # returns 1 (no matches) or jq fails on a missing config file
-        # (fresh-install path on CI containers without the master MCP yet).
-        OLD_KEY=$(jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' "$GEMINI_HOME/config/mcp_config.json" 2>/dev/null | grep -v "null" || true)
-    fi
-    if [ -z "$OLD_KEY" ] || [ "$OLD_KEY" = "null" ] || [ "$OLD_KEY" = '${OPENROUTER_API_KEY}' ]; then
-        # Last resort: fetch straight from the dotf secrets facade (ADR-028).
-        OLD_KEY="$(dotf secrets show OPENROUTER_API_KEY 2>/dev/null || true)"
-    fi
+    #
+    # CLI-042 AC8: the OpenRouter key recovery cascade that stood here is gone
+    # with the provider. hive's worker is NaN-only since mlorentedev/hive#384, so
+    # an OPENROUTER_API_KEY handed to hive-vault buys nothing — and the cascade
+    # ended in `dotf secrets show`, baking a live credential into
+    # mcp_config.json in plaintext. Removing the provider removes that file as a
+    # place a secret lives, which is AC7's rule applied to the same daemon from
+    # the other side. opencode's own OpenRouter provider is untouched: that is a
+    # different consumer, and the spec scopes this criterion to hive's worker.
 
     # Substitute ${VAULT_PATH} placeholder with the canonical Linux vault dir.
     # Committed JSON uses a placeholder so the same source works cross-OS;
@@ -445,9 +442,8 @@ if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
         log_warning "  the VAULT_PATH env var in your shell."
     fi
 
-    NEW_MCP_CONFIG=$(jq --arg key "$OLD_KEY" --arg vault "$VAULT_PATH_DEFAULT" '
-        .mcpServers["hive-vault"].env.OPENROUTER_API_KEY = (if $key != "" and $key != "null" then $key else .mcpServers["hive-vault"].env.OPENROUTER_API_KEY end)
-        | .mcpServers["hive-vault"].env.VAULT_PATH = $vault
+    NEW_MCP_CONFIG=$(jq --arg vault "$VAULT_PATH_DEFAULT" '
+        .mcpServers["hive-vault"].env.VAULT_PATH = $vault
     ' "$CURRENT_DIR/ai/agy/mcp_servers.json")
 
     # Merge stdio servers from root mcp-servers.json into mcpServers map
@@ -1208,6 +1204,37 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
         log_success "Installed hive daemon service (systemd --user, v$hive_ver)"
     else
         log_warning "hive service install failed (non-fatal; client works via fallback)"
+    fi
+
+    # CLI-042 AC7: the NaN credential reaches the daemon through
+    # `dotf secrets run`, never through a file. `hive service install` above owns
+    # hive.service and exposes no flag to change its ExecStart, so the override
+    # is a systemd DROP-IN. That also makes it survive the next re-install --
+    # which the hive-upgrade.timer can trigger every 15 minutes, and which would
+    # silently clobber a competing hive.service shipped from this repo.
+    if command -v systemctl >/dev/null 2>&1; then
+        HIVE_DROPIN_SRC="$CURRENT_DIR/systemd/hive.service.d/10-dotf-secrets.conf"
+        HIVE_DROPIN_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/hive.service.d"
+        HIVE_DROPIN_DST="$HIVE_DROPIN_DIR/10-dotf-secrets.conf"
+        if [ -f "$HIVE_DROPIN_SRC" ]; then
+            ensure_directory "$HIVE_DROPIN_DIR"
+            # Compare before writing. deploy_file writes unconditionally, and a
+            # daemon restarted on every setup run is NOT idempotent -- it would
+            # drop live MCP sessions on each pass. Content equality is the
+            # convergence test, so only a real change earns a restart and a
+            # re-run reports changed=0.
+            if [ -f "$HIVE_DROPIN_DST" ] && cmp -s "$HIVE_DROPIN_SRC" "$HIVE_DROPIN_DST"; then
+                log_info "hive.service credential drop-in already current (no restart)"
+            else
+                deploy_file "$HIVE_DROPIN_SRC" "$HIVE_DROPIN_DST"
+                systemctl --user daemon-reload >/dev/null 2>&1 || true
+                if systemctl --user restart hive.service >/dev/null 2>&1; then
+                    log_success "hive daemon takes NAN_API_KEY from dotf secrets run (nothing on disk)"
+                else
+                    log_warning "hive.service restart failed; drop-in deployed but the running daemon keeps the old ExecStart"
+                fi
+            fi
+        fi
     fi
 
     # ADR-025 + HARNESS-024 (#446): the hive serve daemon is a systemd --user

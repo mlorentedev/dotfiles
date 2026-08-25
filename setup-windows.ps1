@@ -1390,20 +1390,15 @@ $rootMcpSrc = "$DotfilesDir\mcp-servers.json"
 if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq -ErrorAction SilentlyContinue)) {
     Write-Info "Consolidating Antigravity MCP servers..."
 
-    # Recover OpenRouter key from existing master config.
     # NOTE: canonical agy schema uses `mcpServers` (not `servers`).
-    $oldKey = $env:OPENROUTER_API_KEY
-    if ([string]::IsNullOrEmpty($oldKey)) {
-        $existingMaster = Join-Path $GeminiHome "config\mcp_config.json"
-        if (Test-Path $existingMaster) {
-            $oldKey = & jq -r '.mcpServers["hive-vault"].env.OPENROUTER_API_KEY // empty' $existingMaster 2>$null | Where-Object { $_ -ne "null" }
-        }
-    }
-
+    #
+    # CLI-042 AC8: the OpenRouter key recovery that stood here is gone with the
+    # provider. hive's worker is NaN-only since mlorentedev/hive#384, so an
+    # OPENROUTER_API_KEY handed to hive-vault buys nothing, and recovering it
+    # from the existing master config kept a live credential in mcp_config.json
+    # in plaintext across every redeploy. Parity with setup-linux.sh.
+    # opencode's own OpenRouter provider is a different consumer and untouched.
     $mcpConfigJson = Get-Content $mcpServersSrc -Raw | ConvertFrom-Json
-    if (-not [string]::IsNullOrEmpty($oldKey) -and $oldKey -ne '${OPENROUTER_API_KEY}') {
-        $mcpConfigJson.mcpServers."hive-vault".env.OPENROUTER_API_KEY = $oldKey
-    }
 
     # Substitute ${VAULT_PATH} placeholder with the canonical Windows vault dir.
     # The committed JSON uses ${VAULT_PATH} so it's OS-portable; agy does NOT

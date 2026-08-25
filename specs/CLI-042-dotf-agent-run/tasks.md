@@ -179,17 +179,47 @@ Added while implementing D:
 
 ### PR E — the deployment, as IaC
 
-- [ ] [AC7] Failing test: the rendered hive service unit invokes `dotf secrets run -- hive serve`
-- [ ] [AC7] Implement the unit and its deployment in `setup-linux.sh`, verified idempotent
-      (`changed=0` on re-run)
-- [ ] [AC7] Assert no credential in the deployed `environment.d` fragment; verify the daemon by
-      consequence (it answers), never by printing the value
-- [ ] [P] [AC8] Remove `HIVE_OLLAMA_ENDPOINT` from `ai/agy/mcp_servers.json` and any other config this
-      repo deploys naming Ollama or OpenRouter for hive's worker
-- [ ] [AC8] Assertion that the removal stays removed — the incident-to-guard rule
-- [ ] [P] [AC9] Failing test: `dotf doctor` fails when a backend probes present but can serve nothing
-- [ ] [AC9] Implement the reachability check, so "zero models" is caught at diagnostic time rather
-      than under dispatch load
+- [x] [AC7] Failing test: the rendered hive service unit invokes `dotf secrets run -- hive serve`
+- [x] [AC7] Implement the unit and its deployment in `setup-linux.sh`, verified idempotent
+      (`changed=0` on re-run). Shipped as a systemd **drop-in**
+      (`systemd/hive.service.d/10-dotf-secrets.conf`): `hive service install` owns `hive.service`
+      and exposes no flag to change its `ExecStart`, and a competing unit shipped from this repo
+      would be clobbered by the next re-install — which `hive-upgrade.timer` can trigger every 15
+      minutes. Idempotence is a content compare before the write, so only a real change restarts
+      the daemon and a second pass reports `changed=0`.
+- [x] [AC7] Assert no credential in the deployed `environment.d` fragment.
+      **The by-consequence half is NOT done — see `verification.md`.** The deploy is deferred to the
+      next release cut, so the before/after `worker_status` pair is recorded as owed, not claimed.
+- [x] [AC7] **A widening found by measurement, not preference.** hive reads `HIVE_WORKER_API_KEY`
+      and `HIVE_WORKER_BASE_URL`, never `NAN_API_KEY` — the variable the first implementation
+      injected. It would have deployed with 9 green tests while the worker stayed unconfigured,
+      because those tests asserted the unit's SHAPE and never its effect. The registry gains the
+      second exposed name over the same Bitwarden item (`expose.env` list form, parsed since day one
+      and never exercised until now, so one credential keeps one rotation); the base URL is
+      configuration and lives in the unit.
+- [x] [AC7] `dotf secrets run` forwards SIGINT/SIGTERM to its child. This criterion makes it a
+      systemd MainPID and a daemon supervisor for the first time, and it was dying on the first
+      signal and orphaning the child. Guarded with a nested helper so a regression reports a red
+      assertion instead of killing the test runner.
+- [x] [P] [AC8] Remove `HIVE_OLLAMA_ENDPOINT` from `ai/agy/mcp_servers.json` and any other config
+      this repo deploys naming Ollama or OpenRouter for hive's worker. **Wider than the endpoint
+      line:** both setup scripts recovered `OPENROUTER_API_KEY` and baked it into `mcp_config.json`
+      in plaintext on every redeploy, `setup-linux.sh` ending that cascade in `dotf secrets show`.
+      Dropping the provider removes a file the credential lived in — AC7's rule reaching the same
+      daemon from the other side.
+- [x] [AC8] Assertion that the removal stays removed — the incident-to-guard rule. Written as a
+      CLASS over hive-vault's declared env, keys *and* values, not a grep for one string: proven
+      against a restored `HIVE_OLLAMA_ENDPOINT` and against a renamed key whose value still points
+      at ollama. A companion assertion pins the scope boundary — `ai/opencode/opencode.jsonc` must
+      KEEP its ollama/openrouter providers, so an over-eager future sweep fails here first.
+- [x] [P] [AC9] Failing test: `dotf doctor` fails when a backend probes present but can serve nothing
+- [x] [AC9] Implement the reachability check, so "zero models" is caught at diagnostic time rather
+      than under dispatch load. A **proxy**, deliberately: hive's `worker_status` MCP tool is the
+      stronger surface (hive#384 built it for exactly this), but reaching it from `dotf doctor`
+      means an MCP client in Go — the dependency and drift-prone handshake PR D rejected for the
+      backend, and no better a trade for a diagnostic. The proxy asks whether the unit carries both
+      halves of the worker contract: free, and sound in the one direction that matters. Its limit
+      is stated in the code rather than hidden — a present-but-wrong key still reads as configured.
 
 ## Closing
 

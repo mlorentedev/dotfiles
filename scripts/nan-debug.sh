@@ -9,6 +9,25 @@
 
 set -euo pipefail
 
+# NAN_API_KEY: injected by `dotf secrets run`. Self-fetching it with
+# `dotf secrets show` is no longer possible and no longer desirable.
+#
+# Not possible: CLI-042 gave the nan-api-key item a second exposed name
+# (HIVE_WORKER_API_KEY, hive's own worker contract), and `show` refuses a
+# multi-var secret because one value on stdout is ambiguous for it.
+#
+# Not desirable: `show` put the credential in a shell variable, where `set -x`,
+# a core dump or an `env` in a subshell can spill it. Re-exec'ing through `run`
+# keeps it in the process environment and out of the script's own state.
+#
+# This must precede argument parsing: the re-exec replays "$@", and the parser
+# below consumes it with shift.
+if [ -z "${NAN_API_KEY:-}" ] && [ -z "${NAN_DEBUG_REEXEC:-}" ] && command -v dotf >/dev/null 2>&1; then
+    # The sentinel bounds the re-exec to one hop, so a `run` that somehow
+    # returned without injecting cannot spin.
+    NAN_DEBUG_REEXEC=1 exec dotf secrets run --only NAN_API_KEY -- "$0" "$@"
+fi
+
 MODEL="deepseek-v4-flash"
 PROMPT_FILE=""
 ARGS=()
@@ -34,13 +53,7 @@ else
     exit 1
 fi
 
-# NAN_API_KEY: injected by `dotf secrets run`, or self-fetched via `dotf secrets
-# show` on demand (ADR-028 — never the ambient shell env).
-if [ -z "${NAN_API_KEY:-}" ] && command -v dotf >/dev/null 2>&1; then
-    NAN_API_KEY="$(dotf secrets show NAN_API_KEY 2>/dev/null || true)"
-    export NAN_API_KEY
-fi
-[ -z "${NAN_API_KEY:-}" ] && { echo "ERROR: NAN_API_KEY not set. Run: dotf secrets run -- $0" >&2; exit 1; }
+[ -z "${NAN_API_KEY:-}" ] && { echo "ERROR: NAN_API_KEY not set. Run: dotf secrets run --only NAN_API_KEY -- $0" >&2; exit 1; }
 
 BASE_URL="${NAN_BASE_URL:-https://api.nan.builders/v1}"
 

@@ -8,15 +8,20 @@
 
 set -euo pipefail
 
-# NAN_API_KEY: injected by `dotf secrets run -- <this script>`, or self-fetched
-# on demand via `dotf secrets show` (ADR-028 — never the ambient shell env).
-if [ -z "${NAN_API_KEY:-}" ] && command -v dotf >/dev/null 2>&1; then
-    NAN_API_KEY="$(dotf secrets show NAN_API_KEY 2>/dev/null || true)"
-    export NAN_API_KEY
+# NAN_API_KEY: injected by `dotf secrets run`. The `dotf secrets show` self-fetch
+# that stood here is gone — CLI-042 gave nan-api-key a second exposed name
+# (HIVE_WORKER_API_KEY), and `show` refuses a multi-var secret because one value
+# on stdout is ambiguous for it. Re-exec'ing through `run` is also the stronger
+# form: the credential stays in the process environment instead of a shell
+# variable that `set -x` or a core dump can spill.
+if [ -z "${NAN_API_KEY:-}" ] && [ -z "${NAN_BENCH_REEXEC:-}" ] && command -v dotf >/dev/null 2>&1; then
+    # The sentinel bounds the re-exec to one hop, so a `run` that somehow
+    # returned without injecting cannot spin.
+    NAN_BENCH_REEXEC=1 exec dotf secrets run --only NAN_API_KEY -- "$0" "$@"
 fi
 
 if [ -z "${NAN_API_KEY:-}" ]; then
-    echo "ERROR: NAN_API_KEY not set. Run: dotf secrets run -- $0" >&2
+    echo "ERROR: NAN_API_KEY not set. Run: dotf secrets run --only NAN_API_KEY -- $0" >&2
     exit 1
 fi
 

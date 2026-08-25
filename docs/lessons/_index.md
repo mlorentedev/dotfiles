@@ -243,3 +243,4 @@ tags: [lessons, index, dotfiles]
 | [227 - A test suite inherits the developer's installed applications, and PATH is the door](lesson-227-a-test-suite-inherits-the-developers-installed-apps.md) | 2026-08-23 |  |
 | [228 - A calendar date is not a timestamp, and UTC is the wrong zone for one](lesson-228-a-calendar-date-is-not-a-timestamp-utc-is-wrong-for.md) | 2026-08-23 |  |
 | [229 - An empty secret is not an error, so a job with no credential fails as if the work failed](lesson-229-an-empty-secret-is-not-an-error-so-a-job-with-no-cr.md) | 2026-08-24 |  |
+| [230 - A config that parses is not a config the consumer reads](lesson-230-a-config-that-parses-is-not-a-config-the-consumer-re.md) | 2026-08-24 |  |

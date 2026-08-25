@@ -6,9 +6,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -501,6 +503,22 @@ func resolveOnly(reg *secrets.Registry, s string) (map[string]bool, error) {
 // runChild runs argv with environ and inherited stdio, returning the child's exit
 // code. A non-zero exit is the child's own status (not our error); only a failure
 // to launch (binary missing, etc.) is returned as an error.
+//
+// SIGINT and SIGTERM are forwarded to the child rather than killing us out from
+// under it. Without this, Go's default disposition terminates `dotf` on the first
+// signal and leaves the child ORPHANED: a Ctrl-C returns the prompt while the
+// command keeps running, and `kill <dotf-pid>` never reaches what actually holds
+// the secret. The case that forced it is CLI-042 AC7 — the hive daemon runs as
+// `dotf secrets run -- hive serve`, so this process is a systemd unit's MainPID
+// and a supervisor for the first time. systemd's default KillMode=control-group
+// would SIGTERM the whole cgroup and paper over the gap there; every other caller
+// (a shell, `timeout`, a CI runner) signals the process, not a cgroup, and got
+// the orphan.
+//
+// Scoped to the two signals a supervisor actually sends. SIGKILL and SIGSTOP
+// cannot be caught, and forwarding the rest (SIGHUP, SIGWINCH, job control)
+// would mean re-implementing a shell's terminal handling for a wrapper that owns
+// no terminal.
 func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	if len(argv) == 0 {
 		return 1, errors.New("no command given after --")
@@ -508,7 +526,32 @@ func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer)
 	c := exec.Command(argv[0], argv[1:]...) //nolint:gosec // argv is the user's own command
 	c.Env = environ
 	c.Stdin, c.Stdout, c.Stderr = stdin, stdout, stderr
-	err := c.Run()
+	if err := c.Start(); err != nil {
+		return 1, fmt.Errorf("launch %s: %w", argv[0], err)
+	}
+
+	// Buffered so a signal arriving between Start and the goroutine's first
+	// receive is delivered rather than dropped.
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case s := <-sigs:
+				// Best-effort: the child may have already exited, in which case
+				// the signal has nowhere to go and the Wait below is what matters.
+				_ = c.Process.Signal(s)
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	err := c.Wait()
+	close(done)
+	signal.Stop(sigs)
+
 	if err == nil {
 		return 0, nil
 	}
@@ -516,7 +559,7 @@ func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer)
 	if errors.As(err, &ee) {
 		return ee.ExitCode(), nil
 	}
-	return 1, fmt.Errorf("launch %s: %w", argv[0], err)
+	return 1, fmt.Errorf("wait %s: %w", argv[0], err)
 }
 
 // ageKeyPath resolves the age identity: $AGE_KEY_PATH, else ~/.config/age/key.txt
