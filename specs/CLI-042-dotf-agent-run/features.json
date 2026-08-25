@@ -148,8 +148,36 @@
   },
   {
     "id": "CLI-042-dotf-agent-run-f14",
-    "behavior": "AC6 — the hive backend answers and the record reports the pool and model the chain resolved (the pool name is the dispatcher's claim from `chains`; hive names no provider)",
+    "behavior": "AC6 — the hive backend answers and the record reports the pool and model the chain resolved. BLOCKED on this machine: no hive worker endpoint, and pi reaches no nan model without the credential. Environment, not code.",
     "verification": "dotf agent run --backend hive --tier mid --role scout --task 'reply with OK' --timeout 120s | jq -e --arg m \"$(dotf harness resolve-tier mid --harness pi)\" '.pool == \"nan\" and .status == \"ok\" and .model == $m'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f26",
+    "behavior": "AC6 — the router selects a backend per chain entry by which pools it can serve; a forced backend skips entries it cannot serve so the chain advances; dry-run is never chosen by the probe",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestRouter_' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestRouter_DryRunIsNeverChosenByTheProbe'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f27",
+    "behavior": "AC6 — the subprocess backend runs the mapped harness, passes the task on stdin not argv, is killed on the deadline, and classifies a non-zero exit and an empty answer as task_failed",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestSubprocess_' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestSubprocess_ExitZeroWithNoOutputIsATaskFailure'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f28",
+    "behavior": "AC6 — the hive backend maps the documented exit codes (0 ok, 3 unavailable, 1 task failed, unknown fails closed), passes the contract argv, and renders the timeout as whole seconds rounded up",
+    "verification": "cd cli && out=$(go test ./internal/agent/ -run '^TestHive_' -v 2>&1) && printf '%s' \"$out\" | grep -q '^--- PASS: TestHive_MapsTheDocumentedExitCodes'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-042-dotf-agent-run-f29",
+    "behavior": "AC6 — the probe holds through the compiled binary: a stub harness on PATH is selected and answers; an empty PATH exhausts the chain rather than silently resolving to dry-run",
+    "verification": "~/.local/bin/bats tests/dotf-agent-run.bats",
     "state": "pending",
     "evidence": ""
   },

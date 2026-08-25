@@ -63,6 +63,16 @@ Four more fixed while implementing PR C1:
 | `timeout` in the vocabulary | **A dispatcher-level status, exit 1, and it does NOT advance the chain.** | It joins `escalated` as a status no backend returns. Exit 1 rather than 3 because 3 means *no pool could serve this, try elsewhere*, and a timed-out dispatch may have been served perfectly well and merely too slowly — reporting 3 would invite a composer to retry it against another pool. Not advancing is the same anti-double-spend reasoning as `task_failed`: the task may have been submitted and be running still, and a second pool would be billed for work already in flight. |
 | The deadline is enforced, not merely handed over | **The backend runs on its own goroutine and its result is selected against the deadline.** | Passing a context and trusting it is the shape that fails silently. A subprocess blocked on a read, or a remote that never answers, would hold the dispatcher open indefinitely while `--timeout` claimed otherwise. ADR-032 §2 rules a backend that cannot enforce a timeout ineligible; this makes the dispatcher's own guarantee independent of the backend's cooperation. |
 
+Four more fixed while implementing PR D:
+
+| Decision | Choice | Why |
+|---|---|---|
+| Backend selection shape | **A `Router` that is itself a `Backend`, choosing per REQUEST.** | Forced by the data rather than by taste: `chains.mid` mixes `claude:sonnet` with `nan:deepseek-v4-flash`, and hive serves only nan, so a backend chosen once per dispatch could not walk that chain. Making the router a `Backend` is what leaves `Dispatch` untouched — the seam absorbs the fan-out instead of the dispatcher learning what a backend is. |
+| A forced backend that cannot serve an entry | **Reports that entry `pool_unavailable`, so the chain advances** — it does not fail the dispatch. | This is what makes AC6's own smoke work as written: `--backend hive --tier mid` must skip `claude:sonnet` and answer on nan. Failing instead would make the flag mean "use only this backend AND only pools it serves", which no criterion asks for. |
+| Subprocess error classification | **A process that ran and exited non-zero is `task_failed`, always.** Unavailability is decided BEFORE dispatch, by the probe. | Neither `claude -p` nor `pi --print` has an exit code meaning "rate limited", and grepping stderr for one is the fragile proxy this repo keeps catching. The honest consequence, stated rather than hidden: **a 429 through the subprocess backend reads as `task_failed` in v1.** That is the fail-closed direction — it stops rather than spending a second pool on work that may already have been billed. |
+| `dry-run` is reachable only by name | **`ExplicitOnly`: it is skipped by the probe and selected only by `--backend dry-run`.** | It serves every pool by construction, so leaving it in probe order made it the answer to every dispatch that named no backend — a dispatch that silently ran nothing and exited 0. That is precisely the option PR B's table rejected, reintroduced by accident when dry-run joined the backend list, and caught by a test rather than by review. |
+
+
 
 **Backends: two, and the second one has to be repaired first.** Decided 2026-08-22 after the
 measurement in Risks below: a seam validated against a single implementation is a speculative
@@ -146,13 +156,27 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
   **Resolution: hive is NaN-only and single-shot; the dispatcher owns the chain** (see What). The
   Gemini arm is a map-level question, not a backend-level one.
 
-- **[OPEN — must be answered in `tasks.md`, not in code review] Which backend serves a `nan` chain
+- **[RESOLVED 2026-08-23 in PR D, as `tasks.md` required] Which backend serves a `nan` chain
   entry when two can.** After the repair, both `subprocess` (via `pi --model <id>`) and `hive` can
   serve `nan:deepseek-v4-flash`. The probe order and the tie-break are a contract decision, not an
   implementation detail: they determine which process consumes the pool's slot and what
-  `pool`/`model` reporting means when two transports reach the same model. Proposed default, to be
-  confirmed with the task breakdown: **prefer `subprocess` on an interactive machine and `hive` where
-  no harness binary is present**, with `--backend` overriding both.
+  `pool`/`model` reporting means when two transports reach the same model. **Resolution: the proposed
+  default, operationalised as a probe rather than as a notion of "interactive".** `bin:pi` present →
+  subprocess; absent → hive; `--backend` overrides both. The probe order in `agent.DefaultBackends()`
+  IS the tie-break, so the answer lives in one ordered list rather than in a conditional.
+
+  Two measurements taken while resolving it, both of which change what the surrounding code may
+  assume:
+
+  1. **`NAN_API_KEY` is empty in any ordinary environment here.** It is a registered secret resolved
+     just-in-time (ADR-028) and pi decrypts it itself. So the map's declared `pools.nan.probe` —
+     `env:NAN_API_KEY` — would report nan unreachable on a machine where it is perfectly reachable.
+     Dispatch-time servability is therefore probed as `bin:pi`. The map declares what a pool IS;
+     the transport answers whether it can serve it right now, and the two are not the same question.
+  2. **`printf … | pi --print` exits 0, answers nothing, and warns `No models match pattern "nan/…"`
+     on stderr** when the credential is absent. A backend reporting that as `ok` would hand its
+     caller a successful record containing no answer, which is worse than a failure because nothing
+     downstream would look twice. Hence: exit 0 with empty stdout is classified `task_failed`.
 
 - **[OPEN — SRE, and the sharpest detail of the repair] How `NAN_API_KEY` reaches the hive daemon.**
   With Ollama and OpenRouter gone, the worker needs a NaN credential, and a plaintext key in
