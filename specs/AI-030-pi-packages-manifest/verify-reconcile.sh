@@ -25,6 +25,11 @@ trap 'rm -rf "$WORK"' EXIT
 
 fail() { printf '[FAIL] %s\n' "$*" >&2; exit 1; }
 
+# Resolved once, absolutely. AC7b runs with a masked PATH, and a `PATH=... bash`
+# prefix resolves `bash` itself through that same masked PATH.
+BASH_BIN="$(command -v bash)"
+[ -x "$BASH_BIN" ] || fail "bash not found"
+
 # --- extract the block -------------------------------------------------------
 
 # shellcheck disable=SC2016  # the literal `$CURRENT_DIR` IS the pattern being matched
@@ -103,7 +108,7 @@ n="$(installed_count "$WORK/pi")"
 [ "$n" -eq 0 ] || fail "AC6: object-form entries were reinstalled ($n) — only the string form is being read"
 printf '[OK] AC6  object-form entries recognised, 0 reinstalled\n'
 
-# --- AC7: pi absent warns and continues --------------------------------------
+# --- AC7a: pi absent warns and continues -------------------------------------
 : > "$PI_SIM_LOG"
 if bash "$WORK/run.sh" "$REPO" "$WORK/no-such-pi" "$PI_SIM_SETTINGS" "$WORK/block.sh" >"$WORK/out" 2>&1; then
     grep -q 'skipping pi package reconcile' "$WORK/out" \
@@ -111,6 +116,35 @@ if bash "$WORK/run.sh" "$REPO" "$WORK/no-such-pi" "$PI_SIM_SETTINGS" "$WORK/bloc
     printf '[OK] AC7  pi absent: warned, exit 0, bootstrap continues\n'
 else
     fail "AC7: pi absent aborted the block — a missing extension host must not fail setup"
+fi
+
+# --- AC7b: npm absent warns ONCE, not once per package -----------------------
+#
+# `pi install` shells out to npm, so without this guard the loop runs and every
+# entry fails separately: a missing Node toolchain reported N times as N package
+# failures instead of once as its cause. Exercised by running the block against
+# a PATH holding only what it needs, with npm deliberately left out — the guard
+# reads `command -v npm`, which is PATH-resolved, so this drives the real check
+# rather than asserting on the text of it.
+mkdir -p "$WORK/bin"
+for tool in jq grep sed awk cat; do
+    src="$(command -v "$tool" 2>/dev/null || true)"
+    [ -n "$src" ] && ln -sf "$src" "$WORK/bin/$tool"
+done
+command -v npm >/dev/null 2>&1 || fail "AC7b needs npm present on the host to prove it is being masked"
+[ ! -e "$WORK/bin/npm" ] || fail "AC7b: npm leaked into the masked PATH — the scenario would pass vacuously"
+
+: > "$PI_SIM_LOG"
+if PATH="$WORK/bin" "$BASH_BIN" "$WORK/run.sh" "$REPO" "$WORK/pi" "$PI_SIM_SETTINGS" "$WORK/block.sh" >"$WORK/out" 2>&1; then
+    grep -q 'npm not found' "$WORK/out" \
+        || fail "AC7b: npm absent produced no npm-specific warning: $(cat "$WORK/out")"
+    warnings="$(grep -c 'skipping pi package reconcile' "$WORK/out")"
+    [ "$warnings" -eq 1 ] || fail "AC7b: expected one warning, got $warnings"
+    n="$(wc -l < "$PI_SIM_LOG" | tr -d ' ')"
+    [ "$n" -eq 0 ] || fail "AC7b: npm absent still attempted $n installs"
+    printf '[OK] AC7  npm absent: warned once, 0 install attempts, exit 0\n'
+else
+    fail "AC7b: npm absent aborted the block — a missing toolchain must not fail setup: $(cat "$WORK/out")"
 fi
 
 printf '\n[OK] AC4-AC7 verified against the block extracted from setup-linux.sh:%s-%s\n' "$START" "$END"

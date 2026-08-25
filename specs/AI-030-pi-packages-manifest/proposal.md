@@ -87,8 +87,9 @@ so.
       (idempotent, `changed=0`).
 - [x] **AC6** — entries already present in the live array in the **object** form
       are recognised and not reinstalled.
-- [x] **AC7** — with pi absent the reconcile warns and the bootstrap continues
-      (exit 0); it never aborts setup.
+- [x] **AC7** — with pi absent, **or npm absent**, the reconcile warns once and
+      the bootstrap continues (exit 0); it never aborts setup, and it never
+      reports a missing toolchain as N separate package failures.
 - [x] **AC8** — an unreadable or empty manifest is reported, never treated as
       "nothing to do".
 - [x] **AC9** — Linux installs through `$PI_BIN`, not the `pi` shell function.

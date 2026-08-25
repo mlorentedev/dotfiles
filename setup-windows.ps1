@@ -1265,6 +1265,12 @@ $piPackagesSrc = Join-Path $DotfilesDir 'ai\pi\packages.json'
 if (Test-Path -LiteralPath $piPackagesSrc -PathType Leaf) {
     if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
         Write-Warn "pi not installed - skipping pi package reconcile (re-run setup after pi installs)"
+    } elseif (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        # `pi install` shells out to npm. Without this the loop runs and every
+        # entry fails individually, reporting a missing Node toolchain nine
+        # times as nine package failures instead of once as its actual cause.
+        # Linux parity: the same guard in setup-linux.sh.
+        Write-Warn "npm not available - skipping pi package reconcile (install Node.js then re-run)"
     } else {
         # A malformed manifest must be loud, not silently empty: an empty
         # want-list installs nothing and reads exactly like "all present".

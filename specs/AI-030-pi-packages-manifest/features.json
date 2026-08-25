@@ -43,8 +43,8 @@
   },
   {
     "id": "AI-030-pi-packages-manifest-f7",
-    "behavior": "AC7 - with pi absent the reconcile warns and setup continues with exit 0",
-    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh",
+    "behavior": "AC7 - with pi or npm absent the reconcile warns once and setup continues with exit 0",
+    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh && bats tests/pi-packages.bats -f 'guard on npm'",
     "state": "pending",
     "evidence": ""
   },

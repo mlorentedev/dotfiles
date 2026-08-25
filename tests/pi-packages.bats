@@ -117,6 +117,16 @@ setup() {
     grep -q 'skipping pi package reconcile' "$SETUP_SH"
 }
 
+@test "pi packages: both setups guard on npm, not only on pi" {
+    # `pi install` shells out to npm. Guarding only on pi means a missing Node
+    # toolchain is reported N times as N package failures instead of once as its
+    # cause -- the "symptom three layers from the cause" shape this repository
+    # keeps paying for. Raised by the PR reviewer on #1226 against the
+    # acceptance criterion that asked for both guards.
+    grep -q 'npm not found — skipping pi package reconcile' "$SETUP_SH"
+    grep -q 'npm not available - skipping pi package reconcile' "$SETUP_PS1"
+}
+
 @test "pi packages: setup-linux refuses an unreadable manifest instead of reading it empty" {
     # An empty want-list installs nothing and logs exactly like "everything is
     # already present". `jq -e` makes a malformed manifest loud.

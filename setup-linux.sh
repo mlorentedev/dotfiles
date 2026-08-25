@@ -955,6 +955,14 @@ PI_PACKAGES_SRC="$CURRENT_DIR/ai/pi/packages.json"
 if [ -f "$PI_PACKAGES_SRC" ]; then
     if [ ! -x "$PI_BIN" ]; then
         log_warning "pi not installed — skipping pi package reconcile (re-run setup after pi installs)"
+    elif ! command -v npm >/dev/null 2>&1; then
+        # `pi install` shells out to npm. Without this, the loop runs and every
+        # entry fails individually, so a missing Node toolchain is reported nine
+        # times as nine package failures instead of once as its actual cause.
+        # Reported by the PR reviewer on #1226 against the acceptance criterion
+        # that asked for both guards; the block above this one already gates
+        # pi's own install on npm for the same reason.
+        log_warning "npm not found — skipping pi package reconcile (install Node.js, then re-run setup)"
     elif ! command -v jq >/dev/null 2>&1; then
         log_warning "jq not found — skipping pi package reconcile"
     else
