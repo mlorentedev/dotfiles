@@ -1,0 +1,72 @@
+[
+  {
+    "id": "AI-030-pi-packages-manifest-f1",
+    "behavior": "AC1 - the manifest is valid JSON, declares at least one package, has no duplicate source, and every entry carries a non-empty why",
+    "verification": "bats tests/pi-packages.bats -f 'valid JSON|declared twice|says what it is for'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f2",
+    "behavior": "AC2 - every declared source is pinned to an explicit version",
+    "verification": "jq -r '.packages[].source' ai/pi/packages.json | grep -vcE '^npm:@?[a-z0-9._/-]+@[0-9]+\\.[0-9]+\\.[0-9]+' | grep -qx 0",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f3",
+    "behavior": "AC2 - the pin guard itself rejects an unpinned source, so it cannot pass vacuously",
+    "verification": "bats tests/pi-packages.bats -f 'rejects an unpinned source'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f4",
+    "behavior": "AC3 - the packages array is absent from the seed settings.json and neither setup script writes it directly",
+    "verification": "! jq -e 'has(\"packages\")' ai/pi/settings.json >/dev/null && bats tests/pi-packages.bats -f 'never writes the packages array'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f5",
+    "behavior": "AC4 + AC5 - a first run installs every declared package and a second run installs nothing (idempotent)",
+    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f6",
+    "behavior": "AC6 - entries present in the live array in the object form are recognised and not reinstalled",
+    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f7",
+    "behavior": "AC7 - with pi or npm absent the reconcile warns once and setup continues with exit 0",
+    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh && bats tests/pi-packages.bats -f 'guard on npm'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f8",
+    "behavior": "AC8 - an unreadable or empty manifest is reported, never read as nothing-to-do",
+    "verification": "bats tests/pi-packages.bats -f 'refuses an unreadable manifest'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f9",
+    "behavior": "AC9 - the Linux reconcile installs through $PI_BIN, not the pi shell function that fails on a locked vault",
+    "verification": "bats tests/pi-packages.bats -f 'not the shell function'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f10",
+    "behavior": "AC10 - setup-windows.ps1 reconciles the same manifest with the same semantics, adding no non-ASCII",
+    "verification": "bats tests/pi-packages.bats -f 'setup-windows' && python3 -c \"import sys; sys.exit(0 if sum(1 for l in open('setup-windows.ps1',encoding='utf-8') if any(ord(c)>126 for c in l)) == 10 else 1)\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]

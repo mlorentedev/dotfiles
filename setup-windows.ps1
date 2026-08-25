@@ -1253,6 +1253,79 @@ if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
     }
 }
 
+# pi packages (AI-030, #1224): reconcile ai\pi\packages.json against what the
+# live settings.json already declares, and install the difference.
+# Linux parity: the "pi packages" block in setup-linux.sh.
+#
+# Written through `pi install`, never by editing settings.json here. That file
+# is seed-if-missing because pi owns it, and `pi install` also unpacks the
+# package under the agent's npm dir, so an entry written by hand would name a
+# package that is not on disk.
+$piPackagesSrc = Join-Path $DotfilesDir 'ai\pi\packages.json'
+if (Test-Path -LiteralPath $piPackagesSrc -PathType Leaf) {
+    if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
+        Write-Warn "pi not installed - skipping pi package reconcile (re-run setup after pi installs)"
+    } elseif (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        # `pi install` shells out to npm. Without this the loop runs and every
+        # entry fails individually, reporting a missing Node toolchain nine
+        # times as nine package failures instead of once as its actual cause.
+        # Linux parity: the same guard in setup-linux.sh.
+        Write-Warn "npm not available - skipping pi package reconcile (install Node.js then re-run)"
+    } else {
+        # A malformed manifest must be loud, not silently empty: an empty
+        # want-list installs nothing and reads exactly like "all present".
+        $piWanted = @()
+        try {
+            $piManifest = Get-Content -LiteralPath $piPackagesSrc -Raw | ConvertFrom-Json
+            $piWanted = @($piManifest.packages | ForEach-Object { $_.source } | Where-Object { $_ })
+        } catch {
+            Write-Warn "ai\pi\packages.json is not readable JSON - not reconciling"
+        }
+        if ($piWanted.Count -eq 0) {
+            Write-Warn "ai\pi\packages.json declares no readable packages - not reconciling"
+        } else {
+            # Entries are strings or objects carrying `source`; the object form
+            # is upstream's per-resource filtering shape, and a reader handling
+            # only strings would reinstall those on every run.
+            $piPresent = @()
+            if (Test-Path -LiteralPath $piSettingsDst -PathType Leaf) {
+                try {
+                    $piLive = Get-Content -LiteralPath $piSettingsDst -Raw | ConvertFrom-Json
+                    $piPresent = @($piLive.packages | ForEach-Object {
+                        if ($_ -is [string]) { $_ } else { $_.source }
+                    } | Where-Object { $_ })
+                } catch {
+                    $piPresent = @()
+                }
+            }
+
+            $piAdded = 0
+            $piFailed = 0
+            $piAlready = 0
+            foreach ($piPkgName in $piWanted) {
+                if ($piPresent -contains $piPkgName) {
+                    $piAlready++
+                    continue
+                }
+                Write-Info "Installing pi package $piPkgName ..."
+                & pi install $piPkgName 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    $piAdded++
+                } else {
+                    Write-Warn "pi install $piPkgName failed - run 'pi install $piPkgName' to see why"
+                    $piFailed++
+                }
+            }
+
+            if ($piAdded -eq 0 -and $piFailed -eq 0) {
+                Write-Info "pi packages already reconciled ($piAlready declared, 0 changed)"
+            } else {
+                Write-Success "pi packages: $piAdded installed, $piAlready already present, $piFailed failed"
+            }
+        }
+    }
+}
+
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
 # Plain copy: unlike opencode.jsonc this file carries no secrets, so no env-var
 # substitution (DX-004). opencode reads .config\opencode\tui.json natively.

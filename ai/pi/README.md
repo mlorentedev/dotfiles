@@ -10,6 +10,7 @@ SSOT (see root `AGENTS.md`).
 |--------|---------------|-------|
 | `models.json` | `~/.pi/agent/models.json` | NaN custom provider. `apiKey` is `{env:NAN_API_KEY}` in source; `setup-{linux,windows}` inject the literal at deploy time (SDD-009 pattern) so the deployed config is self-contained cross-OS and the key is never committed. |
 | `settings.json` | `~/.pi/agent/settings.json` | UX defaults + curated `enabledModels`. **Seed-if-missing**: pi mutates this file at runtime (`lastChangelogVersion`), so setup deploys it only when absent and never clobbers local edits. |
+| `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup installs the difference against the live `settings.json` on every run, through `pi install`. See below. |
 | (canonical `AGENTS.md`) | `~/.pi/agent/AGENTS.md` | Cross-agent SSOT system prompt, deployed verbatim (same as opencode). |
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
@@ -21,6 +22,31 @@ machine that already has `~/.pi/agent/settings.json`, edit that file too, or del
 re-run setup to take the committed defaults wholesale. `tests/pi-config.bats` pins that
 contract in both setup scripts — until #754 they compared source against destination and,
 because the deployed file always differs, overwrote it on every run.
+
+## Packages
+
+`packages.json` declares the pi packages (extensions, skills, prompts, themes)
+this environment wants. `setup-{linux,windows}` reconciles it against the live
+`~/.pi/agent/settings.json` on **every** run and installs what is missing, so an
+existing machine converges on the next setup and a fresh one on its first
+(AI-030, #1224).
+
+It is **not** a deployed file, and the `packages` array deliberately does not
+live in `settings.json` above. That file is seed-if-missing, so anything
+declared there would reach a fresh machine and never this one. `pi install`
+writes the live array itself — and unpacks the package to disk while doing it,
+which an array entry written by setup would not.
+
+Every entry is pinned. Upstream is explicit that packages *"run with full system
+access — extensions execute arbitrary code and skills can instruct the model to
+run executables"*, inside an agent holding `NAN_API_KEY`. `tests/pi-packages.bats`
+refuses an unpinned entry. Bumping one is a deliberate edit here, which puts a
+diff and a reviewer between upstream's publish and the next setup run.
+
+Adding one by hand (`pi install npm:pkg@1.2.3`) works and writes the live array,
+but nothing else will ever know about it — put it in `packages.json` instead.
+
+Docs: <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
 
 ## Install
 
