@@ -158,6 +158,12 @@ PY
 # longer runs, and its slot was actively breaking opencode's launch. Naming
 # openrouter alone restores the guard's edge, since the alternation would now pass
 # on a file that had lost the provider this test exists to protect.
+# Narrowed twice. The reviewer caught the second gap in the PR that fixed the
+# first: matching the bare word passes when `openrouter` survives only in a
+# COMMENT, so deleting the provider entry while leaving its prose would read as
+# healthy. Match the declaration, on a non-comment line -- the same "ask what it
+# does, not what it says" this file's other assertions already apply.
 @test "AC8: opencode's own provider catalogue is NOT collateral" {
-    grep -qi 'openrouter' "$DOTFILES_DIR/ai/opencode/opencode.jsonc"
+    run bash -c "grep -vE '^[[:space:]]*//' '$DOTFILES_DIR/ai/opencode/opencode.jsonc' | grep -qE '\"openrouter\"[[:space:]]*:'"
+    [ "$status" -eq 0 ]
 }
