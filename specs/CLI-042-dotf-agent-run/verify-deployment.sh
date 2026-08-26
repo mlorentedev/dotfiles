@@ -53,13 +53,56 @@ case "$ENVIRON" in
 esac
 
 # NAMES only. A count is evidence; a value in a transcript is an incident.
+# The credential lands in the process that SERVES, and that is not the process systemd
+# calls Main. `dotf secrets run` forks and stays on as supervisor -- #1230 gave it
+# SIGINT/SIGTERM forwarding precisely because that change made it a daemon supervisor
+# for the first time -- so MainPID is `dotf secrets run` itself, and its OWN environment
+# correctly holds no credential. The injection targets the child, which is the point:
+# the supervisor resolves the secret without ever putting it in its own environment.
+#
+# Measured 2026-08-25 on msi with the daemon healthy and AC6 green:
+#   162154  dotf secrets run --only NAN_API_KEY -- .../hive serve   <- MainPID, 56 vars, no credential
+#   162175  .../python3 .../hive serve                              <- 58 vars, HIVE_WORKER_API_KEY present
+#
+# Reading MainPID printed "the running daemon does NOT hold HIVE_WORKER_API_KEY" on a
+# machine where hive was answering dispatches over that very credential -- a FAIL on a
+# criterion that was satisfied, contradicted by the AC6 check ten lines below it.
+#
+# So: scan every process in the unit's cgroup rather than one PID. That is robust to
+# fork-vs-exec and to which process systemd happens to consider Main. MainPID is folded
+# in as well, to stay correct if `dotf secrets run` ever exec's instead of forking.
+CGROUP="$(systemctl --user show hive.service -p ControlGroup --value 2>/dev/null)"
 PID="$(systemctl --user show hive.service -p MainPID --value 2>/dev/null)"
-if [ -n "$PID" ] && [ "$PID" != "0" ] && [ -r "/proc/$PID/environ" ]; then
-    if tr '\0' '\n' < "/proc/$PID/environ" | cut -d= -f1 | grep -qx 'HIVE_WORKER_API_KEY'; then
-        ok "the RUNNING daemon holds HIVE_WORKER_API_KEY (name observed, value never read)"
-    else
-        bad "the running daemon does NOT hold HIVE_WORKER_API_KEY — restart it, or the injection failed"
+UNIT_PIDS=""
+if [ -n "$CGROUP" ] && [ -r "/sys/fs/cgroup${CGROUP}/cgroup.procs" ]; then
+    UNIT_PIDS="$(cat "/sys/fs/cgroup${CGROUP}/cgroup.procs" 2>/dev/null)"
+fi
+if [ -n "$PID" ] && [ "$PID" != "0" ]; then
+    UNIT_PIDS="$UNIT_PIDS
+$PID"
+fi
+
+# Line-by-line, never `for p in $UNIT_PIDS`: zsh does not word-split an unquoted
+# parameter, so that form yields one field holding every pid. Same prohibited-pattern
+# row that made the on-disk scan a false all-clear on #1232.
+HOLDER=""
+INSPECTED=0
+while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ -r "/proc/$p/environ" ] || continue
+    INSPECTED=$((INSPECTED + 1))
+    if tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | cut -d= -f1 | grep -qx 'HIVE_WORKER_API_KEY'; then
+        HOLDER="$p"
+        break
     fi
+done <<UNIT_PID_LIST
+$UNIT_PIDS
+UNIT_PID_LIST
+
+if [ -n "$HOLDER" ]; then
+    ok "a process in hive.service holds HIVE_WORKER_API_KEY (pid $HOLDER; name observed, value never read)"
+elif [ "$INSPECTED" -gt 0 ]; then
+    bad "none of the $INSPECTED process(es) in hive.service holds HIVE_WORKER_API_KEY — the injection failed"
 else
     # "Not running" is two different states and only one of them is benign. A unit that
     # was never started is genuinely un-inspectable, and a SKIP is honest. A unit that
