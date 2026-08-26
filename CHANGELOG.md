@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.50.0](https://github.com/mlorentedev/dotfiles/compare/v0.49.0...v0.50.0) (2026-08-26)
+
+
+### Features
+
+* **agents:** fan out the invocable roster — five personas, the steward catalog entry, and a drift guard ([#1240](https://github.com/mlorentedev/dotfiles/issues/1240)) ([2729c09](https://github.com/mlorentedev/dotfiles/commit/2729c09ce7e060a30d54e0f7c27d73414abe3ca5))
+
+
+### Bug Fixes
+
+* **cli-042:** the post-deploy check reported FAIL when healthy and SKIP when dead ([#1235](https://github.com/mlorentedev/dotfiles/issues/1235)) ([d49e6f8](https://github.com/mlorentedev/dotfiles/commit/d49e6f87357483cb5cc3b87ca5a0b400527ceb4e))
+* **opencode:** drop the ollama provider, which had stopped opencode from starting ([#1242](https://github.com/mlorentedev/dotfiles/issues/1242)) ([f2a2d77](https://github.com/mlorentedev/dotfiles/commit/f2a2d77501fbca8413c01fe72160d0124cf3e607))
+
 ## [0.49.0](https://github.com/mlorentedev/dotfiles/compare/v0.48.1...v0.49.0) (2026-08-25)
 
 
