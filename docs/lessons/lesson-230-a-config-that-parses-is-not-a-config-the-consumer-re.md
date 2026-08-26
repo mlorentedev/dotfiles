@@ -91,3 +91,52 @@ it done. The tool that would have told me in one call was already installed.
   from `dotf doctor` would put an MCP client inside a diagnostic. A proxy whose
   limit is written down is honest; one whose limit is implied is this lesson
   repeating.
+
+## Recurrence — 2026-08-25, three more instances in the guard written for this lesson
+
+The verification script added to close CLI-042 carried this same defect three
+times over. All three were found by running it on a deployed machine, and none
+was visible from reading it:
+
+| Check | Asked the form | What it should ask |
+|---|---|---|
+| AC9 | does `dotf doctor` print the verdict string? | doctor **summarises** passing sections, so the string appears only under `--verbose` — the passing branch was unreachable and reported FAIL on a satisfied criterion |
+| AC7 daemon | does `MainPID` hold the credential? | `dotf secrets run` forks and stays as supervisor, so `MainPID` is the supervisor, whose environment correctly has no credential — the serving child had it all along |
+| AC7 state | is the daemon running? | "not running" conflates *never started* with *started and died*; a crash-looping daemon was reported as a benign SKIP |
+
+A fourth was caught by the reviewer on the PR fixing the first three: the new
+failure detector **enumerated** `Result=` failure modes and missed `watchdog`,
+reintroducing the same false-benign report one value along. Fixed by inverting
+the test — `success` is the only value whose meaning is fixed; anything else is
+a failure, including values systemd has not defined yet.
+
+**Every one failed in the direction that reads as health.** A satisfied criterion
+reported as broken is the benign direction and it still cost a session; the other
+three would have signed off on a dead daemon.
+
+The sharpest instance is AC7: the script printed *"the running daemon does NOT
+hold HIVE_WORKER_API_KEY"* ten lines above *"hive answered; record reports
+pool=nan"*. **The output contradicted itself and the run still exited 1 on the
+wrong criterion.** Two checks of the same system disagreeing is a signal to
+believe the one that measures consequence.
+
+## Recurrence — the mirror failure, same day
+
+The same session nearly shipped a fix for a defect that did not exist. hive
+crash-looped after the deploy; its journal said `exec: "bw": executable file not
+found in $PATH`, and I wrote up a finding — as fact — that the drop-in's
+convergence design was defeated and the daemon would never recover. The implied
+fix was rendering the nvm bin directory into the unit's PATH at setup.
+
+`dotf secrets` resolves over the **bw serve daemon**, not the CLI. The CLI is a
+fallback consulted only while the vault is locked. One `dotf secrets unlock`
+later the daemon converged on its next retry with the PATH untouched, exactly as
+the drop-in's own comment said it would.
+
+So this lesson has two directions, not one. Reasoning about an artifact instead
+of measuring its consumer produces **false greens** when you are writing a check
+and **false reds** when you are writing a finding. The remedy is identical and it
+is not more tests: *run the thing and ask the consumer*. Ticketed as #1237,
+because the misleading message is real — it names the fallback's incidental
+problem instead of the actionable cause, and it appears in the journal, which is
+read during an incident by someone who does not yet know why the service is down.
