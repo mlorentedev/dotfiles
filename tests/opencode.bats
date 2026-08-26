@@ -143,9 +143,16 @@ setup() {
     refute_grep '"(openai|google|anthropic)/[^"]+":[[:space:]]*\{[[:space:]]*"name"' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc has ollama provider (homelab via VPN)" {
-    grep -q '"ollama":' "$OPENCODE_CFG"
-    grep -q 'ollama.kubelab.live' "$OPENCODE_CFG"
+# The ollama provider is gone and must stay gone: the homelab endpoint no longer
+# runs, and its slot was never inert. It named {env:OLLAMA_API_KEY}, the shell
+# wrappers named OLLAMA_API_KEY in their `--only` list, and no registry entry ever
+# existed for it -- so `dotf secrets run` failed loud and opencode did not start.
+# Comment lines are excluded deliberately: the removal is documented in place,
+# and a whole-file refute fails on the explanation of the thing it checks. What
+# must not return is the declaration, not the record of why it went.
+@test "opencode.jsonc declares no ollama provider" {
+    run bash -c "grep -vE '^[[:space:]]*//' '$OPENCODE_CFG' | grep -nE '\"ollama\"[[:space:]]*:|ollama\.kubelab\.live|OLLAMA_API_KEY' || true"
+    [ -z "$output" ] || { echo "ollama is still declared: $output"; false; }
 }
 
 @test "opencode.jsonc default model is nan/qwen3.6 (fast default; deepseek-v4-flash on-demand)" {

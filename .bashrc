@@ -93,7 +93,11 @@ export NAN_BASE_URL="https://api.nan.builders/v1"
 # the agent had no use for it (#976). Scoping is least privilege and startup
 # time at once.
 if command -v dotf >/dev/null 2>&1; then
-    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY,OLLAMA_API_KEY -- opencode "$@"; }
+    # Every token here must be a live registry id: `--only` fails loud on an
+    # unknown one, so a stale name does not degrade the launch, it prevents it.
+    # OLLAMA_API_KEY was listed for a provider slot whose registry entry was
+    # never created, and opencode had stopped starting on both shells as a result.
+    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode "$@"; }
     pi() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "$@"; }
     # agy is deliberately NOT wrapped. It authenticates with its own stored
     # credentials and reads no variable this registry exposes — verified against

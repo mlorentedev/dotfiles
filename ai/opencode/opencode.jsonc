@@ -16,7 +16,6 @@
 //   Embeddings / Audio: qwen3-embedding, kokoro (TTS), whisper (STT) — exposed for
 //                       cluster completeness; not chat-routable (use curl / OpenAI SDK directly).
 //   Frontier on-demand: openrouter/* (PAYG, uses existing $5 credit) — Opus / Sonnet / GPT-4
-//   Local:   ollama (homelab/VPN endpoint, user-managed in separate session)
 // Selection: TUI `/models` picker. Wrappers `qq` (nan/qwen3.6) / `qf` (nan/deepseek-v4-flash)
 //            in .zsh/aliases.zsh + .bashrc + powershell/profile.ps1.
 {
@@ -203,23 +202,17 @@
         "qwen/qwen3-coder-plus": { "name": "Qwen3 Coder Plus" },
         "minimax/minimax-m3": { "name": "MiniMax M3" }
       }
-    },
+    }
 
     // (compaction block sits at top level — see below the provider block)
 
-    // Ollama — homelab endpoint (VPN-only). User wires the API key as a secret
-    // (sensitive/ollama.api-key.secret.age, registry entry in
-    // secrets/registry.yaml). Model list intentionally empty — user
-    // adds models as they pull them on the homelab side; opencode discovers via
-    // /v1/models when the endpoint is reachable.
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (homelab via VPN)",
-      "options": {
-        "baseURL": "https://ollama.kubelab.live/v1",
-        "apiKey": "{env:OLLAMA_API_KEY}"
-      }
-    }
+    // Ollama was here — a homelab endpoint behind the VPN, kept as a slot since
+    // AI-011 waiting on AI-010 to wire it. Removed 2026-08-25: the endpoint no
+    // longer runs, and the slot was not inert. Its `{env:OLLAMA_API_KEY}` was
+    // named by the shell wrappers' `--only` list while no registry entry ever
+    // existed, and `dotf secrets run --only` fails loud on an unknown id — so
+    // opencode did not start at all, on either shell. A provider slot waiting on
+    // a credential that is never coming is not a placeholder, it is a break.
   },
 
   // Context compaction — NaN-recommended block (https://nan.builders/docs/examples).
@@ -244,7 +237,7 @@
   // session (opencode moves fast; install is unpinned via opencode.ai/install).
   "autoupdate": "notify",
   // Keep the /models picker clean: don't auto-load providers detected from
-  // ambient env vars (OPENAI_API_KEY etc.). Only nan/openrouter/ollama remain.
+  // ambient env vars (OPENAI_API_KEY etc.). Only nan/openrouter remain.
   "disabled_providers": ["openai", "anthropic", "google"],
   // Trim noisy tool output before it burns context (defaults are 2000/51200).
   // Pairs with the token-thrift compaction block above.

@@ -149,9 +149,21 @@ PY
     refute_grep 'hive-vault"\.env\.HIVE_OLLAMA_ENDPOINT' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# The scope boundary, asserted rather than trusted: the spec explicitly keeps
-# opencode's provider catalogue, and a future over-eager "remove ollama
-# everywhere" sweep would be an unrelated regression wearing AC8's clothes.
+# The scope boundary, asserted rather than trusted: AC8 drops providers from
+# hive's WORKER, and opencode's own TUI catalogue must not be collateral.
+#
+# Narrowed 2026-08-25. This read `grep -qiE 'ollama|openrouter'`, which passes
+# while EITHER survives -- so it could not tell "both kept" from "one left". That
+# stopped being hypothetical when ollama was removed deliberately: the endpoint no
+# longer runs, and its slot was actively breaking opencode's launch. Naming
+# openrouter alone restores the guard's edge, since the alternation would now pass
+# on a file that had lost the provider this test exists to protect.
+# Narrowed twice. The reviewer caught the second gap in the PR that fixed the
+# first: matching the bare word passes when `openrouter` survives only in a
+# COMMENT, so deleting the provider entry while leaving its prose would read as
+# healthy. Match the declaration, on a non-comment line -- the same "ask what it
+# does, not what it says" this file's other assertions already apply.
 @test "AC8: opencode's own provider catalogue is NOT collateral" {
-    grep -qiE 'ollama|openrouter' "$DOTFILES_DIR/ai/opencode/opencode.jsonc"
+    run bash -c "grep -vE '^[[:space:]]*//' '$DOTFILES_DIR/ai/opencode/opencode.jsonc' | grep -qE '\"openrouter\"[[:space:]]*:'"
+    [ "$status" -eq 0 ]
 }
