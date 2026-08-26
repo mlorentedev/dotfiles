@@ -61,7 +61,30 @@ if [ -n "$PID" ] && [ "$PID" != "0" ] && [ -r "/proc/$PID/environ" ]; then
         bad "the running daemon does NOT hold HIVE_WORKER_API_KEY — restart it, or the injection failed"
     fi
 else
-    note "daemon not running, so its environment could not be inspected"
+    # "Not running" is two different states and only one of them is benign. A unit that
+    # was never started is genuinely un-inspectable, and a SKIP is honest. A unit that
+    # STARTED AND DIED is a failure, and a SKIP there reports the criterion as merely
+    # unverified while the daemon crash-loops in the background.
+    #
+    # Measured 2026-08-25 on msi: hive.service sat in `activating (auto-restart)` after
+    # five consecutive exit-code failures, and this block printed its SKIP. The run
+    # reported pass=5 fail=2 with the daemon dead -- and neither failure was this one.
+    # Only AC6's dispatch caught it, for an unrelated reason.
+    #
+    # Result= is the discriminator, not ActiveState=: a crash-looping unit reads
+    # ActiveState=activating (indistinguishable from a healthy slow start) while
+    # Result= already records exit-code.
+    STATE="$(systemctl --user show hive.service -p ActiveState --value 2>/dev/null)"
+    RESULT="$(systemctl --user show hive.service -p Result --value 2>/dev/null)"
+    RESTARTS="$(systemctl --user show hive.service -p NRestarts --value 2>/dev/null)"
+    case "${STATE}/${RESULT}" in
+        failed/*|*/exit-code|*/signal|*/core-dump|*/timeout|*/oom-kill)
+            bad "hive.service STARTED AND DIED (ActiveState=$STATE Result=$RESULT NRestarts=${RESTARTS:-0}) — journalctl --user -u hive.service -n 20"
+            ;;
+        *)
+            note "daemon not running (ActiveState=${STATE:-unknown}), so its environment could not be inspected"
+            ;;
+    esac
 fi
 
 # The whole point of AC7: nothing on disk. A credential in an EnvironmentFile or
@@ -149,8 +172,24 @@ CANDIDATE_LIST
 
 hdr "AC9 — doctor catches 'probes present, serves nothing'"
 
+# --verbose is load-bearing, not cosmetic. `dotf doctor` SUMMARISES a section whose
+# checks all pass -- it prints "(1 checks, all ok)" and never the check's own message --
+# so the healthy verdict this block greps for is emitted ONLY under --verbose. Without
+# it the `ok` branch below is unreachable: a healthy machine falls through to "printed
+# neither verdict" and the criterion reports FAIL precisely when it is satisfied.
+#
+# Measured 2026-08-25 on msi, after the deploy that made this check green:
+#   dotf doctor           -> [hive backend reachability (dotf agent run)]
+#                            (1 checks, all ok)
+#   dotf doctor --verbose -> [ OK ] hive.service carries both halves of the worker
+#                            contract -- the backend can reach its pool
+#
+# Third time this spec has shipped a check that asks the FORM of a thing instead of
+# what it does (lesson 230). The failing half worked -- 'can serve nothing' is printed
+# unconditionally, because a FAILING check is never summarised away. Only the passing
+# half was unreachable, which is why nothing caught it until a green machine ran it.
 if command -v dotf >/dev/null 2>&1; then
-    DOC="$(dotf doctor 2>&1)"
+    DOC="$(dotf doctor --verbose 2>&1)"
     if printf '%s' "$DOC" | grep -q 'can serve nothing'; then
         bad "dotf doctor still reports the backend serving nothing — the deploy did not take"
     elif printf '%s' "$DOC" | grep -q 'can reach its pool'; then
