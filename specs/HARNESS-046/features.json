@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-046-f1",
+    "behavior": "All six invocable definitions plus the hermes-nan catalog entry render into harness/agents/ via the engine",
+    "verification": "./scripts/compile-harness.sh --refresh >/dev/null 2>&1 && test \"$(find harness/agents -mindepth 1 -maxdepth 1 -type d | wc -l)\" -eq 7",
+    "state": "verified",
+    "evidence": "2026-08-25 on msi: refresh reported 7 agent records (architect, builder, curator, hermes-nan, planner, reviewer, shipper); directory count = 7."
+  },
+  {
+    "id": "HARNESS-046-f2",
+    "behavior": "A second refresh pass is byte-identical: the generator is idempotent",
+    "verification": "B=$(md5sum harness/agents/*/AGENT.md | md5sum); ./scripts/compile-harness.sh --refresh >/dev/null 2>&1; A=$(md5sum harness/agents/*/AGENT.md | md5sum); test \"$B\" = \"$A\"",
+    "state": "verified",
+    "evidence": "2026-08-25 on msi: second pass byte-identical, changed=0."
+  },
+  {
+    "id": "HARNESS-046-f3",
+    "behavior": "dotf doctor's agent-tier check validates every rendered record and each declared tier resolves in the model map",
+    "verification": "DOTFILES_DIR=$PWD dotf doctor --verbose 2>&1 | grep -qE 'every declared agent tier resolves.*\\(7 checked\\)'",
+    "state": "verified",
+    "evidence": "2026-08-25 on msi: '[ OK ] every declared agent tier resolves for its deploy targets (7 checked)'. The same check on main reports '(1 checked)', which is the contrast that proves it reads these records rather than passing vacuously."
+  },
+  {
+    "id": "HARNESS-046-f4",
+    "behavior": "ROSTER.md and the definitions agree on forced skills, and no invocable role bundles fewer than three",
+    "verification": "python3 specs/HARNESS-046/check-roster-consistency.py",
+    "state": "verified",
+    "evidence": "2026-08-25 on msi: 'roster and definitions consistent (6 invocable roles, all >= 3 skills)', exit 0. Confirmed the guard can fail: removing read-all-adrs from the architect row made it exit 1 naming the divergence; restoring returned it to exit 0. A check never observed failing is not a verified check."
+  },
+  {
+    "id": "HARNESS-046-f5",
+    "behavior": "The hermes-nan entry points at its live state and duplicates none of it",
+    "verification": "grep -q '80_agents/hermes-nan' harness/agents/hermes-nan/AGENT.md && grep -q 'kind: autonomous' harness/agents/hermes-nan/AGENT.md",
+    "state": "verified",
+    "evidence": "2026-08-25 on msi: the record declares kind: autonomous and points at 80_agents/hermes-nan/; none of that tree's contents are copied into the catalog entry."
+  }
+]
