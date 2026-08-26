@@ -120,14 +120,24 @@ else
     STATE="$(systemctl --user show hive.service -p ActiveState --value 2>/dev/null)"
     RESULT="$(systemctl --user show hive.service -p Result --value 2>/dev/null)"
     RESTARTS="$(systemctl --user show hive.service -p NRestarts --value 2>/dev/null)"
-    case "${STATE}/${RESULT}" in
-        failed/*|*/exit-code|*/signal|*/core-dump|*/timeout|*/oom-kill)
-            bad "hive.service STARTED AND DIED (ActiveState=$STATE Result=$RESULT NRestarts=${RESTARTS:-0}) — journalctl --user -u hive.service -n 20"
-            ;;
-        *)
-            note "daemon not running (ActiveState=${STATE:-unknown}), so its environment could not be inspected"
-            ;;
-    esac
+    # Test for success, never for a list of failures. The first draft enumerated
+    # exit-code|signal|core-dump|timeout|oom-kill and thereby missed `watchdog`, which
+    # would have been reported as a benign SKIP -- the very bug this block exists to
+    # fix, reintroduced one value along. Caught by the reviewer on this PR.
+    #
+    # systemd defines at least ten Result= values (success, protocol, timeout,
+    # exit-code, signal, core-dump, watchdog, start-limit-hit, resources, oom-kill) and
+    # is free to add more. Any enumeration of failure modes is a list that goes stale;
+    # `success` is the one value whose meaning is fixed. Inverting the test also fails
+    # in the safe direction: an unrecognised Result reads as a failure, not as health.
+    #
+    # ActiveState=failed is kept as a separate arm because a unit can be failed while
+    # Result= has not yet been set to anything meaningful.
+    if [ "$STATE" = "failed" ] || { [ -n "$RESULT" ] && [ "$RESULT" != "success" ]; }; then
+        bad "hive.service STARTED AND DIED (ActiveState=$STATE Result=$RESULT NRestarts=${RESTARTS:-0}) — journalctl --user -u hive.service -n 20"
+    else
+        note "daemon not running (ActiveState=${STATE:-unknown}), so its environment could not be inspected"
+    fi
 fi
 
 # The whole point of AC7: nothing on disk. A credential in an EnvironmentFile or
