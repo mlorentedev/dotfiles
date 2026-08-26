@@ -976,19 +976,41 @@ deploy_agents() {
     fi
 }
 
-# Build the agent-presence block for <agent>: one line per persona that targets
-# this harness, naming its forced skills. Deterministic order (glob sorts). Empty
-# output (no persona targets this harness) tells the caller to skip injection.
+# Build the agent-presence block for <agent>: one line per INVOCABLE persona that
+# targets this harness, naming its forced skills. Deterministic order (glob
+# sorts). Empty output (no persona targets this harness) tells the caller to skip
+# injection.
+#
+# `kind: autonomous` records are cataloged, never injected. The block's own
+# sentence is "when acting as one", and you never act as an autonomous instance:
+# it is a long-running agent that runs elsewhere on its own schedule, so naming
+# its forced skills in an interactive session instructs nobody. This is a
+# correctness filter that happens to also save characters, not the reverse.
+#
+# Characters matter here because this block is part of the CHARACTER-CAPPED
+# doctrine payload (see render_region_compact). The .gemini/GEMINI.md cap is a
+# hard platform limit — Antigravity caps EACH rules file at 12000 — and it has
+# now been breached twice: at 12114 on 2026-08-22 by adding a doctrine id, and at
+# 12045 when the roster went from one persona to seven. Both times only a bats
+# assertion noticed.
+#
+# The rule for staying under it is the one render_region_compact already
+# established: drop META-TEXT, never the rules themselves. The explanatory
+# sentence below was 133 characters restating what the "MUST consume" lines
+# already say; every persona's skill list survives byte-for-byte, because
+# compacting enforcement prose by paraphrase is how a rule quietly loses its
+# teeth.
 # Args: <record_dir> <agent>
 build_agent_presence() {
     local ag_recdir="$1" agent="$2" ag_dir name skills_line first=1
     for ag_dir in "$ag_recdir"/*/; do
         [[ -f "$ag_dir/AGENT.md" ]] || continue
         name="$(basename "$ag_dir")"
+        [[ "$(skill_field "$ag_dir/AGENT.md" kind)" == "autonomous" ]] && continue
         skill_targets_agent "$ag_dir/AGENT.md" "$agent" || continue
         if [[ "$first" == 1 ]]; then
             printf '## Active agent personas — forced skills\n\n'
-            printf 'These personas enforce their skills by injection (determinism by code, not memory). When acting as one, you MUST consume its skills.\n\n'
+            printf 'When acting as one, you MUST consume its skills.\n\n'
             first=0
         fi
         skills_line="$(skill_field "$ag_dir/AGENT.md" skills)"
