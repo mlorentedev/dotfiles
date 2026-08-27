@@ -139,7 +139,12 @@ func ExpandDst(dst, home string, resolve func(string) string) (string, error) {
 	if len(bad) > 0 {
 		return "", fmt.Errorf("destination %q: unresolvable path variable(s) %s", dst, strings.Join(bad, ", "))
 	}
-	return out, nil
+	// The manifest spells destinations with "/" on every OS; the resolved
+	// {HOME} is native. Normalise so the result is a path in the OS's own form
+	// rather than `C:\Users\u/.pi/agent/models.json` — accepted by the syscall,
+	// but never equal to the filepath.Join'ed path a check compares it against
+	// (CLI-054/#1301).
+	return filepath.Clean(filepath.FromSlash(out)), nil
 }
 
 // Renderer materialises {env:VAR} placeholders in a staged file. The seam exists

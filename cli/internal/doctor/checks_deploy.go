@@ -328,6 +328,39 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 			rep.Skip("pi models.json substitution — age identity absent ({env:} resolves at runtime)")
 		}
 	}
+
+	// Launchability. Everything above is a static predicate — files and PATH —
+	// and every one of them was green on a box where `pi` could not start
+	// (WIN-012/#1293). The shell wrappers (profile.ps1, .zshrc, .bashrc) run
+	// both agents under `dotf secrets run`, which resolves their keys BEFORE
+	// exec'ing the binary; while those keys live in a locked Bitwarden vault the
+	// resolution fails and the agent never launches. Report the precondition the
+	// wrappers actually depend on, not a proxy for it.
+	if piConfigured || pathExists(cfgPath) {
+		reportAgentLaunchability(sys, rep)
+	}
+}
+
+// reportAgentLaunchability reports whether the agent wrappers' key resolution
+// can succeed right now. WARN, never FAIL: every reboot locks the vault, and a
+// doctor that is red on every fresh boot is one nobody reads. Silent while no
+// registry entry resolves through Bitwarden — the keys then come from the age
+// floor, which needs no daemon — and while the registry is unreadable, which
+// checkBitwardenReach already reports with its own reason.
+func reportAgentLaunchability(sys *System, rep *Report) {
+	live, err := sys.BWBackedSecrets()
+	if err != nil || live == 0 {
+		return
+	}
+	st, err := sys.BWServeStatus()
+	if err != nil {
+		return // checkBWServeDaemon reports the unreadable state
+	}
+	if st == "unlocked" {
+		rep.Pass("agent wrappers can resolve their keys (bw serve daemon unlocked)")
+		return
+	}
+	rep.Warn("pi/opencode wrappers will refuse to launch: their keys resolve through Bitwarden and no unlocked bw serve daemon is reachable — run `dotf secrets unlock` (once per boot; the daemon then serves every terminal)")
 }
 
 // checkHarnessDrift reproduces healthcheck section 11's harness/skill-record
@@ -506,7 +539,16 @@ const (
 // file with nothing to match it in the un-appended repo source. Without
 // dropping it, checkInstructionDrift reported drift on every target
 // immediately after a clean --deploy — caught in review before merge.
+//
+// Line endings are normalised first. A deployed copy written by a Windows
+// tool arrives CRLF while the repo source is LF (`.gitattributes` `*.md
+// eol=lf`), and with a bare "\n" split every line kept a trailing "\r": the
+// END marker never matched, so the strip swallowed the rest of the file, and
+// every other line differed anyway — a drift FAIL no redeploy could clear
+// (WIN-008/#1289). EOL is not content; the writer is fixed separately, and
+// this keeps the comparator honest about the next writer that is not.
 func stripHarnessRegions(content string) string {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
 	lines := strings.Split(content, "\n")
 	out := make([]string, 0, len(lines))
 	skip, endMarker := false, ""
