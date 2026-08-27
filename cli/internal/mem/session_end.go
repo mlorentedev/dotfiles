@@ -52,7 +52,25 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	if p.Cwd == "" {
 		return "", nil
 	}
+	// THE PROJECT IS THE REPOSITORY, not the basename of wherever the session
+	// happens to be standing.
+	//
+	// This read `filepath.Base(p.Cwd)`, so a session whose working directory was
+	// a subdirectory — `cli/`, where most work in this repository happens —
+	// resolved the wrong project, found no MEMORY.md, and SILENTLY ARCHIVED
+	// NOTHING. An unknown number of sessions produced no record at all, and the
+	// no-op contract above is precisely what made it invisible.
+	//
+	// It shares RepoIdentity with ThreadKey rather than deriving the fact a
+	// second time: two derivations of one truth in one package is the
+	// divergent-parser defect this repository has now found five times.
+	// git is authoritative WHERE IT KNOWS; the basename stays as the fallback so
+	// a session outside any repository keeps working exactly as before. Fixing a
+	// defect must not quietly narrow who the function serves.
 	project := filepath.Base(p.Cwd)
+	if id, ok := RepoIdentity(p.Cwd); ok {
+		project = id.Project
+	}
 
 	memory := filepath.Join(vaultPath, "10_projects", project, "memory", "MEMORY.md")
 	content, err := os.ReadFile(memory)

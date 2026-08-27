@@ -202,23 +202,11 @@ func TestSessionEndArchivesPerWorktreeRatherThanOverEachOther(t *testing.T) {
 	}
 
 	// Two worktrees, written the way git writes a linked worktree.
-	mk := func(name string) string {
-		// Named "proj" because SessionEnd resolves the project as
-		// filepath.Base(cwd) — see the defect noted below.
-		wt := filepath.Join(t.TempDir(), "proj")
-		if err := os.MkdirAll(wt, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		gd := filepath.Join(t.TempDir(), ".git", "worktrees", name)
-		if err := os.MkdirAll(gd, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+gd+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		return wt
-	}
-	a, b := mk("wt-a"), mk("wt-b")
+	// Two worktrees of the SAME repository on DIFFERENT branches — the real
+	// concurrent case. The project comes from the repo, the thread from the
+	// branch, and both from the one RepoIdentity.
+	a := gitFixture(t, "proj", "wt-a", "feat/a")
+	b := gitFixture(t, "proj", "wt-b", "feat/b")
 
 	// Marshalled, never concatenated: a Windows cwd is `C:\Users\...` and every
 	// backslash is a JSON escape, so a hand-built payload fails to parse and
@@ -250,7 +238,7 @@ func TestSessionEndArchivesPerWorktreeRatherThanOverEachOther(t *testing.T) {
 		}
 	}
 	// And the name is the one the skill would derive, not a second convention.
-	if want := JournalName(fixedNow.Format("2006-01-02"), "proj", "claude", "wt-a"); filepath.Base(wroteA) != want {
+	if want := JournalName(fixedNow.Format("2006-01-02"), "proj", "claude", "feat-a"); filepath.Base(wroteA) != want {
 		t.Errorf("archive name %q diverges from JournalName %q", filepath.Base(wroteA), want)
 	}
 }
