@@ -36,9 +36,14 @@ func newMemHandoffWriteCmd() *cobra.Command {
 		Long: `handoff-write replaces one thread's sub-block under "## Session Handoff",
 reading the body from stdin. Every other thread is left byte-identical.
 
-The thread key defaults to this working directory's worktree (e.g. wt-pi-harness),
-because that is what distinguishes two concurrent sessions — not the agent and not
-the date. A checkout that is not a worktree resolves to "main".
+A thread is a LINE OF WORK, and git already names it: the branch. So the key
+defaults to the current branch (e.g. feat-x), which means work resumed tomorrow on
+another machine lands in the same thread. Ambient work on main/master is qualified
+by host (main@msi), because two machines' main are not one line of work, and a
+detached HEAD falls back to worktree@host rather than guessing.
+
+Pass --thread to override — a session that switches branches mid-flight re-keys
+otherwise, and the line of work may well be the one it started on.
 
 Skills should call this instead of instructing an Edit: the merge is the part that
 was being got wrong, and it belongs where it can be tested.`,
@@ -103,7 +108,7 @@ was being got wrong, and it belongs where it can be tested.`,
 	}
 
 	cmd.Flags().StringVar(&memoryPath, "memory", "", "path to the project's MEMORY.md")
-	cmd.Flags().StringVar(&thread, "thread", "", "thread key (default: this worktree)")
+	cmd.Flags().StringVar(&thread, "thread", "", "thread key (default: this checkout's branch)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the result instead of writing it")
 	return cmd
 }
@@ -123,10 +128,13 @@ func newMemThreadCmd() *cobra.Command {
 		Short: "Print this session's handoff thread key and journal filename",
 		Long: `thread answers "which session am I" from the working directory.
 
-Journal files were named <date>-<project>-<agent>.md, so two WORKTREES on one day
-collided into -2 and -3 suffixes encoding nothing — six such files exist across
-two days, and no session could derive its own. With the worktree in the key, it
-is derivable rather than remembered.`,
+Journal files were named <date>-<project>-<agent>.md, so two concurrent sessions
+on one day collided into -2 and -3 suffixes encoding nothing — six such files
+exist across two days, and no session could derive its own. With the thread in
+the key, it is derivable rather than remembered.
+
+The key is the branch, so the same line of work resumed on another machine
+resolves to the same journal. See handoff-write for the full rule.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			key := mem.ThreadKeyForCwd()

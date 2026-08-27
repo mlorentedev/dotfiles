@@ -9,8 +9,13 @@ tags: [lessons, index, dotfiles]
 
 # Dotfiles — Lessons Learned Index
 
-> Granular project-bound lessons, gotchas, and post-mortems for dotfiles (212 entries).
+> Granular project-bound lessons, gotchas, and post-mortems for dotfiles.
 > Individual lessons live alongside this index as `lesson-NNN-*.md` files.
+>
+> The entry count used to be stated here. It was a third copy of a fact the
+> directory listing and this table already hold, it drifted from both (it read
+> 212 against 234 files and 230 rows), and a stale count reads as authoritative.
+> Count the files.
 
 | Lesson | Date | Scope |
 |---|---|---|
@@ -244,3 +249,8 @@ tags: [lessons, index, dotfiles]
 | [228 - A calendar date is not a timestamp, and UTC is the wrong zone for one](lesson-228-a-calendar-date-is-not-a-timestamp-utc-is-wrong-for.md) | 2026-08-23 |  |
 | [229 - An empty secret is not an error, so a job with no credential fails as if the work failed](lesson-229-an-empty-secret-is-not-an-error-so-a-job-with-no-cr.md) | 2026-08-24 |  |
 | [230 - A config that parses is not a config the consumer reads](lesson-230-a-config-that-parses-is-not-a-config-the-consumer-re.md) | 2026-08-24 |  |
+| [231 - A hand-wired dev symlink outranks the managed install, and the host fails closed](lesson-231-a-hand-wired-dev-symlink-outranks-the-managed-instal.md) | 2026-08-26 |  |
+| [232 - Detect the shape that is wrong, not the shape that is merely absent](lesson-232-detect-the-shape-that-is-wrong-not-the-shape-that.md) | 2026-08-26 |  |
+| [233 - Piping a single-element array into ConvertTo-Json unwraps it](lesson-233-piping-a-single-element-array-into-convertto-json-un.md) | 2026-08-26 |  |
+| [234 - Orchestrating Orca ADE declarative configuration and bidirectional settings capture](lesson-234-orchestrating-orca-ade-declarative-configuration-and-bi.md) | 2026-08-26 |  |
+| [235 - Reproducing a bug from an environment that already works measures the environment, not the bug](lesson-235-reproducing-a-bug-from-an-environment-that-alread.md) | 2026-08-27 |  |
