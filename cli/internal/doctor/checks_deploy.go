@@ -580,20 +580,19 @@ func stripHarnessRegions(content string) string {
 
 // checkHarnessMirrorOrphans detects harness/{skills,agents} records present in
 // the deploy mirror (cfg.DotfilesDir) with no counterpart in the repo — the gap
-// BUG-058/#843 describes: setup-linux.sh's repo->mirror copy
-// (`cp -rf harness/. $DOTFILES_DIR/harness/`) is copy-only, so a record deleted
-// from the repo survives in the mirror forever and keeps failing
+// BUG-058/#843 describes: the repo->mirror copy (`dotf harness mirror`, and the
+// setup-linux.sh bash block before it) is copy-only, so a record deleted from
+// the repo survives in the mirror forever and keeps failing
 // checkCompileHarnessDrift, which runs FROM the mirror. Per #802's decided
 // semantic (doctor --fix prunes; setup only copies/warns) — generated records
 // are prunable automatically here, unlike sensitive/*.secret.age.
 //
-// Windows has no repo/mirror split — setup-windows.ps1 sets
-// `$DotfilesDir = $PSScriptRoot`, i.e. the deploy dir IS the checkout — so this
-// only applies where a distinct mirror exists.
+// This applies on every OS. It used to early-return on Windows on the belief
+// that Windows had no repo/mirror split; it did — setup-windows.ps1's
+// `$DotfilesDest` is `~/.dotfiles`, the very dir cfg.DotfilesDir resolves to —
+// it just never received harness/ (WIN-007/#1288). The "mirror IS the
+// checkout" case is the guard below, wherever it occurs.
 func checkHarnessMirrorOrphans(sys *System, cfg *Config, rep *Report, fix bool) {
-	if sys.GOOS == "windows" {
-		return
-	}
 	repo := resolveRepoDir(sys)
 	if repo == "" || filepath.Clean(repo) == filepath.Clean(cfg.DotfilesDir) {
 		return // no checkout found, or the "mirror" IS the checkout — nothing to compare
