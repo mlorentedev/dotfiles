@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/cyclomatic-complexity/SKILL.md
-generated_sha: e305ae169b0993e2
+generated_sha: 8cacaae276dc5f65
 id: cyclomatic-complexity-skill
 type: skill
 status: active
@@ -15,7 +15,7 @@ source: https://github.com/saurabhkumar8112/cyclomatic-complexity-skill
 license: Apache-2.0
 keywords: [cyclomatic complexity, cognitive complexity, refactor nesting, god function,
   reduce complexity, guard clauses, extract function, code smells, spaghetti code]
-paths: ['**/*.py', '**/*.go', '**/*.ts', '**/*.js', '**/*.rs', '**/*.c', '**/*.cpp']
+paths: ['**/*.py', '**/*.go', '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.rs', '**/*.c', '**/*.cpp']
 requires: [test]
 ---
 # Cyclomatic Complexity & Refactoring
@@ -27,7 +27,7 @@ Refactor code to reduce cyclomatic complexity, eliminate deep nesting, and keep 
 Cyclomatic Complexity ($\text{CC}$) measures independent execution paths:
 $$\text{CC} = \text{Decision Points} + 1$$
 
-Decision points: `if`, `else if`, `case`, loops (`for`, `while`), `catch`, ternary operators (`? :`), and boolean operators (`&&`, `||`) inside conditions.
+Decision points: `if`, `else if`/`elif`, `case`, loops (`for`, `while`), `catch`/`except`, ternary operators (`? :`), and boolean operators (`&&`, `||`, Python `and`, `or`) inside conditions.
 
 ### Threshold Brackets
 - **1–5**: Low complexity. Clean, leave alone.
@@ -42,7 +42,7 @@ Decision points: `if`, `else if`, `case`, loops (`for`, `while`), `catch`, terna
 Prefer deterministic AST tools when available in the environment:
 - **Python**: `radon cc -s -a <path>` or `ruff check --select C901`
 - **Go**: `gocyclo -over 10 <path>` or `golangci-lint run --enable cyclop,gocyclo`
-- **TypeScript / JavaScript**: `npx eslint --rule 'complexity: ["error", 10]' <path>`
+- **TypeScript / JavaScript / React**: `npx --no-install eslint --rule 'complexity: ["error", 10]' <path>`
 - **Polyglot / Other**: `lizard <path>`
 
 *When no tool is available, count decision points manually per function and display the calculation.*
@@ -82,8 +82,8 @@ End refactoring operations with a concise summary:
 
 | Function | CC Before | CC After | Refactoring Applied |
 |---|---|---|---|
-| `parseOrder` | 14 | 4 | Extracted `validateHeader`, `resolveDiscount` |
-| `calculateTax` | 12 | 3 | Guard clauses + tax lookup table |
+| `<functionName>` | 14 | 4 | Extracted `validateHeader`, `resolveDiscount` |
+| `<functionName2>` | 12 | 3 | Guard clauses + lookup table |
 
-**Verification:** All tests passed (14 unit tests, 0 regressions).
+**Verification:** <Command output / test run results proving zero regressions>
 ```
