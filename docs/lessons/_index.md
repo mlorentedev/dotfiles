@@ -254,3 +254,8 @@ tags: [lessons, index, dotfiles]
 | [233 - Piping a single-element array into ConvertTo-Json unwraps it](lesson-233-piping-a-single-element-array-into-convertto-json-un.md) | 2026-08-26 |  |
 | [234 - Orchestrating Orca ADE declarative configuration and bidirectional settings capture](lesson-234-orchestrating-orca-ade-declarative-configuration-and-bi.md) | 2026-08-26 |  |
 | [235 - Reproducing a bug from an environment that already works measures the environment, not the bug](lesson-235-reproducing-a-bug-from-an-environment-that-alread.md) | 2026-08-27 |  |
+| [236 - A CI job that installs a tool and never puts it on PATH certifies nothing it was built to check](lesson-236-a-ci-job-that-installs-a-tool-and-never-puts-it-on-p.md) | 2026-08-27 |  |
+| [237 - CREATE_NEW_PROCESS_GROUP is not detachment: a console child dies with its terminal](lesson-237-create-new-process-group-is-not-detachment-a-console.md) | 2026-08-27 |  |
+| [238 - Two independent defects, each sufficient for a permanent red, hide behind one symptom](lesson-238-two-independent-defects-each-sufficient-for-a-perman.md) | 2026-08-27 |  |
+| [239 - Re-measure a filed bug on the current toolchain before implementing its fix](lesson-239-re-measure-a-filed-bug-on-the-current-toolchain-before.md) | 2026-08-27 |  |
+| [240 - A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off](lesson-240-a-partial-mirror-the-code-believes-absent-the-check.md) | 2026-08-27 |  |

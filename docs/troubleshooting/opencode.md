@@ -139,3 +139,36 @@ DeepSeek V4 Pro on Go infrastructure: ~1–3s first-token latency from Europe, 4
 - [`guide-opencode-go-setup.md`](../runbooks/guide-opencode-go-setup.md) — one-time setup + guardrail (predates the NaN provider switch; see its own banner)
 - SSOT for current provider/model facts: `ai/opencode/opencode.jsonc`
 - Upstream docs: <https://opencode.ai/docs/>
+
+## Windows
+
+Measured 2026-08-27 on the Windows work box; each item names the ticket that
+carries the fix.
+
+### `OpenCode locked. below pinned minimum …` on setup, then "another install shadows it"
+
+Two installs coexist: npm-global `opencode-ai` (scoop's node `bin`, first on
+PATH) and winget `SST.opencode` (what `setup-windows.ps1` pinned). The version
+parse took the last token of the first output line and accepted `locked.` as a
+version. Check with `Get-Command opencode -All`.
+
+Decision (2026-08-27, AI-034 #1294): **npm is the channel for node-distributed
+agents on every OS** — opencode joins `packages.json` beside pi and bw, `dotf
+tools install` converges it, and both the winget and the Linux curl-script
+installs are retired. Until it lands, remove the copy you do not want (`npm rm
+-g opencode-ai` or `winget uninstall SST.opencode`) so one binary owns PATH.
+
+### `opencode` / `pi` exit immediately: *bitwarden vault is locked … run `dotf secrets unlock`*
+
+The shell wrappers run the agents under `dotf secrets run`, which resolves the
+NaN key through Bitwarden **before** exec'ing the binary; while the vault is
+locked the agent never starts. Run `dotf secrets unlock` once per boot — the
+daemon then serves every terminal. Before #1304 the Windows daemon died with
+the terminal that unlocked it (WIN-012); `dotf doctor` now WARNs with this exact
+remedy when the keys are bw-backed and no unlocked daemon is reachable.
+
+### `ΓÇö` and similar glyphs in captured output
+
+The console decoded native output with OEM code page 437. `scripts/utils.ps1`
+and the deployed profile set UTF-8 console I/O (WIN-009, #1290); re-run setup
+and open a fresh terminal.

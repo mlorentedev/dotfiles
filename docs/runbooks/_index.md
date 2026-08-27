@@ -6,6 +6,8 @@ Operational guides and procedures for managing the dotfiles environment.
 |---|---|---|
 | [guide-secrets-governance.md](guide-secrets-governance.md) | Secrets lifecycle, `dotf secrets`, Age encryption & Bitwarden sync | Active |
 | [guide-opencode-go-setup.md](guide-opencode-go-setup.md) | OpenCode setup, NaN provider, models & coexistence rules | Active |
+| [ai-tools-setup.md](ai-tools-setup.md) | AI tools setup: what each setup script deploys per agent, `dotf init`, MCP registration | Active |
+| [guide-cross-agent-memory.md](guide-cross-agent-memory.md) | Cross-agent session memory bridge (handoff threads, vault-linked auto-memory) | Active |
 | [guide-antigravity-cli-migration.md](guide-antigravity-cli-migration.md) | Antigravity CLI (`agy`) setup, permissions & model configuration | Active |
 | [guide-pr-agent-reviewer.md](guide-pr-agent-reviewer.md) | PR-Agent automated code review workflow | Active |
 | [guide-knowledge-distillation.md](guide-knowledge-distillation.md) | Knowledge crystallization, observation promotion & vault syncing | Active |

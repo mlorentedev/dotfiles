@@ -89,10 +89,9 @@ dotf init my-project --stack python
 dotf init . --stack go         # Initialize current directory
 ```
 
-On Windows (PowerShell), until a Windows `dotf` install path exists (#380):
-```powershell
-project-init my-project python
-```
+The same commands work on Windows (PowerShell): `setup-windows.ps1` installs
+`dotf` into `~/.local/bin` (WIN-006, #380 closed 2026-06-21). `project-init`
+remains as a thin wrapper that calls `dotf init` (CLI-020).
 
 ### Option B: Manual Setup
 
