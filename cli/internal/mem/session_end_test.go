@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -219,11 +220,23 @@ func TestSessionEndArchivesPerWorktreeRatherThanOverEachOther(t *testing.T) {
 	}
 	a, b := mk("wt-a"), mk("wt-b")
 
-	wroteA, err := SessionEnd([]byte(`{"cwd":"`+a+`","session_id":"sa"}`), vault, fixedNow)
+	// Marshalled, never concatenated: a Windows cwd is `C:\Users\...` and every
+	// backslash is a JSON escape, so a hand-built payload fails to parse and
+	// SessionEnd no-ops SILENTLY. Caught by CI on windows-latest; GOOS=windows
+	// go vet cannot see it, because vet is not a test run.
+	payload := func(cwd, sid string) []byte {
+		b, err := json.Marshal(map[string]string{"cwd": cwd, "session_id": sid})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	wroteA, err := SessionEnd(payload(a, "sa"), vault, fixedNow)
 	if err != nil || wroteA == "" {
 		t.Fatalf("first archive failed: %v", err)
 	}
-	wroteB, err := SessionEnd([]byte(`{"cwd":"`+b+`","session_id":"sb"}`), vault, fixedNow)
+	wroteB, err := SessionEnd(payload(b, "sb"), vault, fixedNow)
 	if err != nil || wroteB == "" {
 		t.Fatalf("second archive failed: %v", err)
 	}
