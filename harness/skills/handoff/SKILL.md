@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: c7f721197379048f
+generated_sha: 1f31020398b7688c
 id: handoff-skill
 type: skill
 status: active
@@ -65,9 +65,18 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
   printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD"
   ```
 
-  The section holds **one sub-block per thread**, keyed by worktree
-  (`### wt-pi-harness`). The command replaces only *your* thread and leaves every
-  other byte-identical.
+  The section holds **one sub-block per thread**, keyed by worktree and marked
+  (`### thread: wt-pi-harness`). The command replaces only *your* thread and
+  leaves every other byte-identical.
+
+  **It is agent-agnostic by construction.** The thread is what **git** says the
+  worktree is — a linked worktree's `.git` is a file reading
+  `gitdir: …/worktrees/<name>` — not a naming convention. So a worktree made by
+  Claude Code, Orca, opencode, pi, agy, copilot or a bare `git worktree add` all
+  get their own thread without any of them knowing about the others. The marker
+  exists for the same reason: a plain `### <key>` is indistinguishable from an
+  ordinary subheading like `### Next Actions`, and identity must be declared,
+  never inferred from shape.
 
   **This replaces HARNESS-028's merge-by-hand rule because that rule kept
   losing.** It said "if concurrent writes occurred, merge threads", and it was

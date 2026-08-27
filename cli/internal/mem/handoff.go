@@ -10,8 +10,19 @@ import (
 // HandoffHeading is the section every session's handoff lives under.
 const HandoffHeading = "## Session Handoff"
 
-// ThreadPrefix opens one thread's sub-block.
-const ThreadPrefix = "### "
+// ThreadPrefix opens one thread's sub-block, and it is MARKED rather than merely
+// shaped.
+//
+// A plain `### <key>` is indistinguishable from an ordinary subheading, and
+// handoff bodies legitimately carry those — `### Next Actions`, `### Decisions`.
+// The PR reviewer on #1279 found the consequence: such a heading truncated the
+// thread's span, so a replacement rewrote only the part above it and stranded
+// the rest under the previous thread. Data loss on ordinary content.
+//
+// Heuristics about which `###` is "really" a thread cannot fix that — the shapes
+// are identical. An explicit marker can, and it is the same choice made for hook
+// entries in #1272: identity is declared, never inferred.
+const ThreadPrefix = "### thread: "
 
 // WriteThread replaces one thread's sub-block inside the handoff section,
 // leaving every other thread byte-identical.
@@ -95,21 +106,40 @@ func handoffSection(lines []string) (int, int) {
 }
 
 // threadSpan locates one thread's sub-block within the section.
+//
+// A thread ends at the next MARKED thread heading, so an ordinary `###`
+// subheading inside a body is just content. See ThreadPrefix for why the marker
+// exists rather than a heuristic.
 func threadSpan(lines []string, start, end int, key string) (int, int) {
-	want := ThreadPrefix + key
 	for i := start + 1; i < end; i++ {
 		if !isThreadHeading(lines[i], key) {
 			continue
 		}
 		for j := i + 1; j < end; j++ {
-			if strings.HasPrefix(lines[j], ThreadPrefix) {
+			if _, ok := threadHeadingKey(lines[j]); ok {
 				return i, j
 			}
 		}
 		return i, end
 	}
-	_ = want
 	return -1, -1
+}
+
+// threadHeadingKey returns the key a `### ` line declares, if any.
+func threadHeadingKey(line string) (string, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimRight(line, " \t\r"), ThreadPrefix)
+	if !ok {
+		return "", false
+	}
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return "", false
+	}
+	head, _, found := strings.Cut(rest, " ")
+	if found {
+		return head, true
+	}
+	return rest, true
 }
 
 // isThreadHeading matches "### <key>" and "### <key> (anything)", so a thread can
@@ -187,14 +217,26 @@ func trimTrailingBlank(lines []string, from, to int) int {
 // session in any subdirectory — `cli/`, where most work here happens — resolved
 // to "main". The tests passed because every case they supplied was a worktree
 // root; running `dotf mem thread` from `cli/` did not.
+// GIT IS CONSULTED ACROSS THE WHOLE WALK-UP BEFORE THE CONVENTION IS CONSULTED
+// AT ALL, and the ordering is the fix for a second reviewer finding on #1279:
+// interleaving them let an ordinary directory that merely CONTAINS `-wt-`
+// (`vendor-wt-cache`, say) claim its own thread while sitting inside a plain
+// checkout whose `.git` one level up said "main". Authoritative answers come
+// first; a name-shaped guess is only for a tree git does not know at all.
 func ThreadKey(cwd string) string {
-	dir := filepath.Clean(cwd)
-	for {
+	for dir := filepath.Clean(cwd); ; {
 		if name, ok := gitWorktreeName(dir); ok {
 			return name
 		}
-		// Fallback: this repository's own convention, for a path that is not a
-		// git worktree at all (a test fixture, or a tree checked out by copy).
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	// git knows nothing about this path — a test fixture, or a tree copied
+	// rather than cloned. Fall back to this repository's own convention.
+	for dir := filepath.Clean(cwd); ; {
 		if _, slug, found := strings.Cut(filepath.Base(dir), "-wt-"); found && slug != "" {
 			return "wt-" + slug
 		}

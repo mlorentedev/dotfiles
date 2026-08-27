@@ -16,12 +16,12 @@ const memoryWithTwoThreads = `# Project Memory
 
 ## Session Handoff
 
-### wt-cli-023 (feat/cli-050-crystallize-cutover)
+### thread: wt-cli-023 (feat/cli-050-crystallize-cutover)
 
 **Last task:** CLI-050 shipped, PR #1276 open.
 **Next action:** merge #1276.
 
-### wt-pi-harness (fix/harness-045-reviewer-findings)
+### thread: wt-pi-harness (fix/harness-045-reviewer-findings)
 
 **Last task:** #561 binding core, PR #1272 merged.
 **Next action:** AC7 guards before migrating the 35 skills.
@@ -48,7 +48,7 @@ func TestWriteThreadLeavesEveryOtherThreadByteIdentical(t *testing.T) {
 	if !strings.Contains(out, "**Last task:** CLI-050 shipped, PR #1276 open.") {
 		t.Error("the other session's thread was lost — this is the exact clobber")
 	}
-	if !strings.Contains(out, "### wt-cli-023 (feat/cli-050-crystallize-cutover)") {
+	if !strings.Contains(out, "### thread: wt-cli-023 (feat/cli-050-crystallize-cutover)") {
 		t.Error("the other session's heading was lost")
 	}
 	// Ours, replaced not appended.
@@ -58,7 +58,7 @@ func TestWriteThreadLeavesEveryOtherThreadByteIdentical(t *testing.T) {
 	if strings.Contains(out, "#561 binding core") {
 		t.Error("our old content survived alongside the new — appended instead of replaced")
 	}
-	if n := strings.Count(out, "### wt-pi-harness"); n != 1 {
+	if n := strings.Count(out, "### thread: wt-pi-harness"); n != 1 {
 		t.Errorf("our thread appears %d times, want 1", n)
 	}
 	// Everything outside the section is untouched.
@@ -98,9 +98,9 @@ func TestWriteThreadAppendsANewThreadWithoutReordering(t *testing.T) {
 	if !changed {
 		t.Error("a new thread must report changed")
 	}
-	iCli := strings.Index(out, "### wt-cli-023")
-	iPi := strings.Index(out, "### wt-pi-harness")
-	iNew := strings.Index(out, "### wt-new")
+	iCli := strings.Index(out, "### thread: wt-cli-023")
+	iPi := strings.Index(out, "### thread: wt-pi-harness")
+	iNew := strings.Index(out, "### thread: wt-new")
 	if iCli < 0 || iPi < 0 || iNew < 0 {
 		t.Fatal("a thread went missing")
 	}
@@ -119,7 +119,7 @@ func TestWriteThreadMatchesAThreadWhoseBranchChanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(out, "### wt-pi-harness"); n != 1 {
+	if n := strings.Count(out, "### thread: wt-pi-harness"); n != 1 {
 		t.Errorf("a changed branch created a second thread (%d headings)", n)
 	}
 }
@@ -148,7 +148,7 @@ func TestWrittenThreadsStayInsideTheArchivedBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	block := extractHandoffBlock(out)
-	for _, want := range []string{"### wt-cli-023", "### wt-pi-harness", "archived too"} {
+	for _, want := range []string{"### thread: wt-cli-023", "### thread: wt-pi-harness", "archived too"} {
 		if !strings.Contains(block, want) {
 			t.Errorf("archival lost %q — the writer and the archiver disagree about the section boundary", want)
 		}
@@ -242,5 +242,53 @@ func TestJournalNameIsDerivableAndDistinctPerWorktree(t *testing.T) {
 		if got := JournalName("2026-08-27", "dotfiles", "claude", thread); got != "2026-08-27-dotfiles-claude.md" {
 			t.Errorf("thread %q must produce the unsuffixed name, got %q", thread, got)
 		}
+	}
+}
+
+// REVIEWER FINDING (#1279): a `###` heading inside a thread's BODY truncated its
+// span, so a replacement rewrote only the part before it and orphaned the rest.
+// Handoff bodies legitimately carry `### Next Actions` and the like, so this is
+// data loss on ordinary content.
+func TestWriteThreadSurvivesASubheadingInsideAThreadBody(t *testing.T) {
+	doc := "# M\n\n## Session Handoff\n\n" +
+		"### thread: wt-a\n\nintro for a\n\n### Next Actions\n\n- do the thing\n\n" +
+		"### thread: wt-b\n\nbody for b\n\n## Findings\n\ntail\n"
+
+	out, _, err := WriteThread(doc, "wt-a", "replaced body for a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "- do the thing") {
+		t.Error("the thread's own subheading content survived — the replacement covered only part of the thread")
+	}
+	if !strings.Contains(out, "body for b") {
+		t.Fatal("the NEXT thread was destroyed, absorbed into the replaced span")
+	}
+	if !strings.Contains(out, "### thread: wt-b") {
+		t.Fatal("the next thread's heading was destroyed")
+	}
+	if !strings.Contains(out, "replaced body for a") {
+		t.Error("the new body was not written")
+	}
+	if !strings.Contains(out, "tail") {
+		t.Error("content after the section was lost")
+	}
+}
+
+// REVIEWER FINDING (#1279): the naming fallback could claim a directory that
+// merely CONTAINS `-wt-` while sitting inside an ordinary checkout. git is
+// authoritative, so it must be consulted across the whole walk-up before the
+// convention is consulted at all.
+func TestThreadKeyPrefersGitOverAConventionalLookingSubdirectory(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	inner := filepath.Join(root, "vendor-wt-cache")
+	if err := os.MkdirAll(inner, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := ThreadKey(inner); got != "main" {
+		t.Errorf("a look-alike directory inside a main checkout got its own thread %q — git said main", got)
 	}
 }
