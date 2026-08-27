@@ -1,0 +1,264 @@
+{
+  "activeRuntimeEnvironmentId": null,
+  "agentCmdOverrides": {},
+  "agentDefaultArgs": {
+    "aider": "--yes-always",
+    "amp": "--dangerously-allow-all",
+    "antigravity": "--dangerously-skip-permissions",
+    "autohand": "--unrestricted",
+    "claude": "--dangerously-skip-permissions",
+    "claude-agent-teams": "--dangerously-skip-permissions",
+    "cline": "--auto-approve true",
+    "codex": "--dangerously-bypass-approvals-and-sandbox",
+    "command-code": "--yolo",
+    "continue": "--allow \"*\"",
+    "copilot": "--yolo",
+    "crush": "--yolo",
+    "cursor": "--yolo",
+    "devin": "--permission-mode bypass",
+    "gemini": "--yolo",
+    "grok": "--permission-mode bypassPermissions",
+    "hermes": "--yolo",
+    "kimi": "--yolo",
+    "kiro": "--trust-all-tools",
+    "mistral-vibe": "--agent auto-approve",
+    "openclaude": "--dangerously-skip-permissions",
+    "qwen-code": "--approval-mode yolo",
+    "rovo": "--yolo"
+  },
+  "agentDefaultEnv": {
+    "goose": {
+      "GOOSE_MODE": "auto"
+    }
+  },
+  "agentHibernationIdleMs": 1800000,
+  "agentStatusHooksEnabled": true,
+  "agentYoloDefaultsMigrated": true,
+  "appFontFamily": "Geist",
+  "appIcon": "blue",
+  "autoRenameBranchFromWork": true,
+  "autoRenameBranchFromWorkDefaultedOn": true,
+  "branchPrefix": "git-username",
+  "branchPrefixCustom": "",
+  "claudeAgentTeamsDefaultDisabledMigrated": true,
+  "claudeAgentTeamsMode": "off",
+  "combinedDiffFileTreeVisibleByDefault": false,
+  "commitMessageAi": {
+    "agentId": null,
+    "customAgentCommand": "",
+    "customPrompt": "",
+    "discoveredModelsByAgent": {},
+    "discoveredModelsByAgentByHost": {},
+    "enabled": true,
+    "selectedModelByAgent": {},
+    "selectedModelByAgentByHost": {},
+    "selectedThinkingByModel": {}
+  },
+  "compactWorktreeCards": false,
+  "confirmClosePinnedTab": true,
+  "ctrlTabOrderMode": "mru",
+  "defaultLinearTeamSelection": null,
+  "defaultRepoSelection": null,
+  "defaultTaskSource": "github",
+  "defaultTaskViewPreset": "all",
+  "defaultTuiAgent": "claude",
+  "diffDefaultView": "inline",
+  "disabledTuiAgents": [],
+  "editorAutoSave": false,
+  "editorAutoSaveDelayMs": 1000,
+  "editorMinimapEnabled": false,
+  "electronHttp1CompatibilityMode": false,
+  "enableGitHubAttribution": false,
+  "experimentalActivity": false,
+  "experimentalActivityDefaultedOffForAllUsers": true,
+  "experimentalAgentHibernation": false,
+  "experimentalMobile": true,
+  "experimentalNewWorktreeCardStyle": false,
+  "experimentalPet": false,
+  "experimentalTerminalAttention": false,
+  "experimentalWorktreeSymlinks": false,
+  "floatingTerminalDefaultedForAllUsers": true,
+  "floatingTerminalEnabled": true,
+  "floatingTerminalTriggerLocation": "floating-button",
+  "geminiCliOAuthEnabled": true,
+  "githubProjects": {
+    "activeProject": {
+      "number": 1,
+      "owner": "mlorentedev",
+      "ownerType": "user"
+    },
+    "lastViewByProject": {
+      "user:mlorentedev:1": {
+        "viewId": "PVTV_lAHOAM7xJs4BZ6GYzgKn8Go"
+      }
+    },
+    "pinned": [],
+    "recent": [
+      {
+        "lastOpenedAt": "2026-06-18T00:15:22.996Z",
+        "number": 1,
+        "owner": "mlorentedev",
+        "ownerType": "user"
+      }
+    ]
+  },
+  "httpProxyBypassRules": "",
+  "httpProxyUrl": "",
+  "keepComputerAwakeWhileAgentsRun": false,
+  "leftSidebarAppearanceMode": "default",
+  "leftSidebarTintColor": "#18181b",
+  "leftSidebarTintOpacity": 0.08,
+  "localAccountRuntime": "host",
+  "localAccountWslDistro": null,
+  "localBaseRefSuggestionDismissed": false,
+  "localWindowsRuntimeDefault": {
+    "kind": "windows-host"
+  },
+  "markdownReviewToolsEnabled": true,
+  "mobileAutoRestoreFitMs": null,
+  "mobileEmulatorDefaultDeviceUdid": null,
+  "mobileEmulatorEnabled": true,
+  "nestWorkspaces": true,
+  "notifications": {
+    "agentTaskComplete": true,
+    "customSoundId": "system",
+    "customSoundPath": null,
+    "customSoundVolume": 100,
+    "enabled": true,
+    "suppressWhenFocused": true,
+    "terminalBell": true
+  },
+  "openInApplications": [
+    {
+      "command": "code",
+      "id": "vscode",
+      "label": "VS Code"
+    }
+  ],
+  "openLinksInApp": false,
+  "openLinksInAppPreferencePrompted": false,
+  "primarySelectionMiddleClickPaste": true,
+  "primarySelectionMiddleClickPasteDefaultedForLinux": true,
+  "primarySelectionMiddleClickPasteDefaultedForTerminalDefaults": true,
+  "promptCacheTimerEnabled": false,
+  "promptCacheTtlMs": 300000,
+  "refreshLocalBaseRefOnWorktreeCreate": false,
+  "rightSidebarOpenByDefault": true,
+  "setupScriptLaunchMode": "new-tab",
+  "showAutomationsButton": true,
+  "showGitIgnoredFiles": true,
+  "showMobileButton": true,
+  "showTasksButton": true,
+  "showTitlebarAppName": true,
+  "skipCloseTerminalWithRunningProcessConfirm": false,
+  "skipCodexRateLimitResetConfirm": false,
+  "skipDeleteAutomationConfirm": false,
+  "skipDeleteWorktreeConfirm": false,
+  "sourceControlAi": {
+    "actions": {
+      "branchName": {
+        "commandInputTemplate": "{basePrompt}"
+      },
+      "commitMessage": {
+        "commandInputTemplate": "{basePrompt}"
+      },
+      "fixChecks": {
+        "commandInputTemplate": "{basePrompt}"
+      },
+      "fixCommitFailure": {
+        "commandInputTemplate": "{basePrompt}"
+      },
+      "pullRequest": {
+        "commandInputTemplate": "{basePrompt}"
+      },
+      "resolveComments": {
+        "commandInputTemplate": "{basePrompt}"
+      },
+      "resolveConflicts": {
+        "commandInputTemplate": "{basePrompt}"
+      }
+    },
+    "agentId": null,
+    "customAgentCommand": "",
+    "discoveredModelsByAgent": {},
+    "discoveredModelsByAgentByHost": {},
+    "enabled": true,
+    "instructionsByOperation": {
+      "branchName": "",
+      "commitMessage": "",
+      "pullRequest": ""
+    },
+    "launchActionDefaults": {},
+    "modelOverridesByOperation": {},
+    "prCreationDefaults": {
+      "draft": false,
+      "generateDetailsOnOpen": false,
+      "openAfterCreate": false,
+      "useTemplate": false
+    },
+    "selectedModelByAgent": {},
+    "selectedModelByAgentByHost": {},
+    "selectedThinkingByModel": {}
+  },
+  "sourceControlViewMode": "list",
+  "tabAutoGenerateTitle": false,
+  "telemetry": {
+    "existedBeforeTelemetryRelease": false,
+    "optedIn": true
+  },
+  "terminalActivePaneOpacity": 1,
+  "terminalAllowOsc52Clipboard": false,
+  "terminalClipboardOnSelect": false,
+  "terminalCursorBlink": true,
+  "terminalCursorStyle": "block",
+  "terminalCursorStyleDefaultedToBlock": true,
+  "terminalCustomThemes": [],
+  "terminalDividerColorDark": "#3f3f46",
+  "terminalDividerColorLight": "#d4d4d8",
+  "terminalDividerThicknessPx": 3,
+  "terminalFocusFollowsMouse": false,
+  "terminalFontFamily": "DejaVu Sans Mono",
+  "terminalFontSize": 14,
+  "terminalFontWeight": 500,
+  "terminalGpuAcceleration": "auto",
+  "terminalHiddenDeliveryGate": true,
+  "terminalHiddenViewParking": true,
+  "terminalInactivePaneOpacity": 0.8,
+  "terminalJISYenToBackslash": false,
+  "terminalLigatures": "auto",
+  "terminalLineHeight": 1,
+  "terminalMacOptionAsAlt": "auto",
+  "terminalMacOptionAsAltMigrated": true,
+  "terminalMainSideEffectAuthority": true,
+  "terminalModelQueryAuthority": true,
+  "terminalMouseHideWhileTyping": false,
+  "terminalPaneOpacityTransitionMs": 140,
+  "terminalQuickCommands": [],
+  "terminalRightClickToPaste": true,
+  "terminalScopeHistoryByWorktree": true,
+  "terminalScrollbackBytes": 10000000,
+  "terminalShortcutPolicy": "orca-first",
+  "terminalThemeDark": "Ghostty Default Style Dark",
+  "terminalThemeLight": "Builtin Tango Light",
+  "terminalUseSeparateLightTheme": true,
+  "terminalWindowsPowerShellImplementation": "auto",
+  "terminalWindowsShell": "powershell.exe",
+  "terminalWindowsWslDistro": null,
+  "theme": "dark",
+  "uiLanguage": "system",
+  "visibleTaskProviders": [
+    "github"
+  ],
+  "visibleTaskProvidersDefaultedForJira": true,
+  "voice": {
+    "dictationMode": "toggle",
+    "enabled": false,
+    "language": "en",
+    "modelsDir": "",
+    "openAiApiKeyConfigured": false,
+    "sttModel": "",
+    "terminalConfirmBeforeInsert": false,
+    "userModels": []
+  },
+  "windowBackgroundBlur": false
+}

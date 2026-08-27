@@ -32,11 +32,11 @@
   "snapshot": false,
   "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
   // Explicit fast model for title generation — avoids fallback delay.
-  "small_model": "nan/qwen3.6",
+  "small_model": "nan/qwen3.8-flash",
   // Default = fast model (matches the tier comment above). deepseek-v4-flash
   // is reasoning-heavy (~3s + mandatory reasoning chain) — reach for it
   // on-demand via the `qf` wrapper, not as the always-on default.
-  "model": "nan/qwen3.6",
+  "model": "nan/qwen3.8-flash",
 
   "provider": {
     // NaN community — primary daily provider.
@@ -47,7 +47,7 @@
       "options": {
         "baseURL": "https://api.nan.builders/v1",
         "apiKey": "{env:NAN_API_KEY}",
-        "model": "qwen3.6",
+        "model": "qwen3.8-flash",
         // Overall request timeout (opencode default = 300000). Generous on
         // purpose: reasoning models (deepseek-v4-flash via `qf`) and thinking-
         // enabled chats produce long generations; 60s here cut them off with
@@ -59,16 +59,37 @@
         "chunkTimeout": 60000
       },
       "models": {
+        "glm5.3-flash": {
+          "name": "GLM 5.3 Flash (Zhipu - 1M)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
+          }
+        },
         "deepseek-v4-flash": {
           "name": "DeepSeek V4 Flash (DeepSeek - 1M)",
-          // Surface NaN's reasoning chain in the TUI. NaN streams it in the
-          // non-standard `reasoning_content` field (a DeepSeek/Qwen alias), which
-          // @ai-sdk/openai-compatible drops by default. `interleaved` maps it to a
-          // reasoning part opencode can render (schema-verified on opencode 1.15.13).
-          // Toggle visibility with ctrl+o or `/thinking` (see ai/opencode/tui.json).
-          // NaN's other field, `provider_specific_fields.reasoning`, is NOT in the
-          // enum, so we map reasoning_content. Out-of-TUI fallback: the `dbg` alias
-          // (scripts/nan-debug.sh) curls NaN directly and prints reasoning + answer.
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
@@ -96,107 +117,6 @@
             }
           }
         },
-        "qwen3.6": {
-          "name": "Qwen 3.6 (Alibaba - 256K)",
-          // Surface reasoning in the TUI (see deepseek-v4-flash note).
-          "interleaved": { "field": "reasoning_content" },
-          "limit": {
-            "context": 256000,
-            "output": 8192
-          },
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
-          },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
-          "variants": {
-            "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
-            },
-            "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
-            }
-          }
-        },
-        "gemma4": {
-          "name": "Gemma 4 (Google - 256K)",
-          // Surface reasoning in the TUI (see deepseek-v4-flash note).
-          "interleaved": { "field": "reasoning_content" },
-          "limit": {
-            "context": 256000,
-            "output": 8192
-          },
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
-          },
-                    "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
-          "variants": {
-            "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
-            },
-            "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
-            }
-          }
-        },
-        "mimo-v2.5": {
-          "name": "MiMo V2.5 (Xiaomi - 1M)",
-          // Surface reasoning in the TUI (see deepseek-v4-flash note).
-          "interleaved": { "field": "reasoning_content" },
-          "limit": {
-            "context": 1000000,
-            "output": 8192
-          },
-          "modalities": {
-            "input": ["text", "image", "audio"],
-            "output": ["text"]
-          },
-                  "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
-          "variants": {
-            "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
-            },
-            "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
-            }
-          }
-        },
-        // Added 2026-08-26: catalog-only, not wired as default/small_model. NaN
-        // announced this on a promotional allocation expiring end of Aug 2026 —
-        // see ai/pi/README.md's Model environment section and #1244 for the
-        // routing-revisit follow-up. Verified via scripts/nan-debug.sh on a smoke
-        // prompt (emits reasoning_content) and on this repo's own planted
-        // `((count++))`/`set -e` bug (correct diagnosis, same test that admitted
-        // mimo-v2.5 into reviewer-pool.json) — genuinely capable, not just a
-        // cheap "flash" tier. Alibaba's own release notes: NATIVE context is
-        // 262,144, extended to 1M via YaRN in the production variant NaN serves;
-        // NaN's /v1/models omits context length, so 1M here is the vendor's
-        // production default, not independently measured against NaN's endpoint.
         "qwen3.8-flash": {
           "name": "Qwen 3.8 Flash Next (Alibaba - 1M)",
           "interleaved": { "field": "reasoning_content" },
@@ -226,14 +146,69 @@
             }
           }
         },
-        // Added 2026-08-26 — see the qwen3.8-flash comment above; same status,
-        // and the same planted-bug test passed correctly. Zhipu's own release
-        // notes put GLM-5.3-Flash's 1M context as NATIVE (no YaRN caveat).
-        "glm5.3-flash": {
-          "name": "GLM 5.3 Flash (Zhipu - 1M)",
+        "qwen3.6": {
+          "name": "Qwen 3.6 (Alibaba - 256K)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 256000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
+          }
+        },
+        "mimo-v2.5": {
+          "name": "MiMo V2.5 (Xiaomi - 1M)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image", "audio"],
+            "output": ["text"]
+          },
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
+          }
+        },
+        "gemma4": {
+          "name": "Gemma 4 (Google - 256K)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 256000,
             "output": 8192
           },
           "modalities": {
@@ -329,7 +304,7 @@
   // /models.
   "agent": {
     "plan": {
-      "model": "nan/qwen3.6",
+      "model": "nan/qwen3.8-flash",
       "permission": {
         "edit": "deny",
         "bash": "deny"

@@ -7,6 +7,10 @@
 * **Worktree Environment:** Worktree root is at `$ORCA_WORKTREE_PATH`; repository root is at `$ORCA_ROOT_PATH`.
 * **External Placement:** Never nest worktrees inside a repository. All worktrees live as sibling directories (e.g. `/home/manu/workspaces/orca-agent/<repo>-<slug>`).
 * **Hooks:** Follow `orca.yaml` setup and archive hooks. Pinned toolchains are managed via `mise`.
+* **Configuration & Keybindings (CLI-051):**
+  * `dotf deploy orca-keybindings`: Deploys `ai/orca/keybindings.json` to `~/.orca/keybindings.json`.
+  * `dotf orca export`: Extracts in-app keybindings and clean settings from `orca-data.json` into `ai/orca/`.
+  * `dotf orca tune [--dry-run]`: Applies baseline performance and privacy defaults (`experimentalAgentHibernation`, `agentHibernationIdleMs`, `refreshLocalBaseRefOnWorktreeCreate`, `telemetry.optedIn=false`).
 
 <!-- BEGIN HARNESS GENERATED (sha256:d96bda9e8359af7f) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).

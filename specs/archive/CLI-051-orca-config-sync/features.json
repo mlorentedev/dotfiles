@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-051-orca-config-sync-f1",
+    "behavior": "Orca keybindings baseline is declared in ai/deploy.json and deployed via dotf deploy",
+    "verification": "go test ./internal/deploy/...",
+    "state": "verified",
+    "evidence": "PASS: TestParseManifest_ShippedManifestIsValid, TestDeploy_InstallsWithDeclaredMode"
+  },
+  {
+    "id": "CLI-051-orca-config-sync-f2",
+    "behavior": "dotf orca export extracts clean settings and keybindings into dotfiles repo",
+    "verification": "go test ./internal/orca/...",
+    "state": "verified",
+    "evidence": "PASS: TestExport_ExtractsKeybindingsAndSettings"
+  },
+  {
+    "id": "CLI-051-orca-config-sync-f3",
+    "behavior": "dotf orca tune safely applies baseline tuning to orca-data.json with active process guards",
+    "verification": "go test ./internal/orca/...",
+    "state": "verified",
+    "evidence": "PASS: TestTune_DryRunDoesNotModify, TestTune_AppliesBaselineAndCreatesBackup, TestTune_GuardsAgainstRunningProcess"
+  },
+  {
+    "id": "CLI-051-orca-config-sync-f4",
+    "behavior": "dotf doctor verifies Orca keybindings deployment",
+    "verification": "go test ./internal/doctor/...",
+    "state": "verified",
+    "evidence": "PASS: TestCheckDeployDrift"
+  }
+]

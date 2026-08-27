@@ -60,7 +60,7 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 NaN only — the free tier, with no paid fallback in the picker.
 
-- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `mimo-v2.5`, `qwen3.8-flash`, `glm5.3-flash`
+- **NaN** (free, primary): `glm5.3-flash`, `deepseek-v4-flash`, `qwen3.8-flash`, `qwen3.6`, `mimo-v2.5`, `gemma4`
 
 `qwen3.8-flash` and `glm5.3-flash` (added 2026-08-26) are catalog additions only — picker
 availability, not a default or routing change. Both are live, reasoning-class, and
@@ -91,7 +91,7 @@ pi's picker also omits the rate-limited `:free` OpenRouter tier that `opencode.j
 the two sets are curated independently. `tests/pi-config.bats` asserts this list stays equal to
 `settings.json`'s `enabledModels`.
 
-Default: `nan/qwen3.6`, thinking level `high`. Change in `settings.json`. (Per-model context
+Default: `nan/qwen3.8-flash`, thinking level `high`. Change in `settings.json`. (Per-model context
 windows live in `models.json` — the one place they cannot drift from.)
 
 ## Secret

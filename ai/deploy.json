@@ -30,6 +30,13 @@
       "dst": "{HOME}/.pi/agent/models.json",
       "render": true,
       "mode": "0600"
+    },
+    {
+      "name": "orca-keybindings",
+      "src": "ai/orca/keybindings.json",
+      "dst": "{HOME}/.orca/keybindings.json",
+      "render": false,
+      "mode": "0644"
     }
   ]
 }
