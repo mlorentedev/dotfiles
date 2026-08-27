@@ -1,7 +1,7 @@
 ---
 id: "AI-032-pi-settings-field-sync"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1247"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -80,3 +80,5 @@ If the two arrays already match, nothing is written (idempotent, `changed=0`).
   deliberately does not overlap with)
 - `docs/lessons/lesson-150-a-config-file-the-tool-itself-rewrites-must-be-see.md` — why
   `ai/pi/settings.json` is seed-if-missing, the constraint this change works within
+
+<!-- archived 2026-08-27 — PR: https://github.com/mlorentedev/dotfiles/pull/1259 -->
