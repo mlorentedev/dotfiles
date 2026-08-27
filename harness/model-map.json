@@ -33,12 +33,16 @@
     "the resolution is deletion, not declaration. They are named here so the absences read as",
     "decisions, which is why the assertions are structural rather than a grep for these words.",
     "",
+    "HARNESS-086 (#1253): The `gemini` pool is declared because `agy` reaches a distinct, independent",
+    "provider family (Google/Gemini). Declaring it in `pools` and pointing `harnesses.agy.pools` at it",
+    "maintains provider diversity for the adversarial review gate and allows the fallback arm to resolve cleanly.",
+    "",
     "TIERS ARE KEYED BY WHATEVER CONSUMES THE MODEL ID, which is not always a harness.",
     "`claude` and `opencode` render the id into their own agent definition, so they key by harness.",
-    "`nan` keys by POOL, because the harnesses that reach it (`pi`, `agy`) take the model as a launcher",
-    "flag rather than a rendered field — `pi --model X`, `agy --model X`. So `pi` correctly has no tier",
-    "entry: its render is `adapter`, and there is no rendered definition to put a model id into. Asking",
-    "for a tier keyed `pi` is a question about a field that does not exist, which is why ResolveTier",
+    "`nan` and `gemini` key by POOL, because the harnesses that reach them (`pi`, `agy`) take the model as a launcher",
+    "flag rather than a rendered field — `pi --model X`, `agy --model X`. So `pi` and `agy` correctly have no tier",
+    "entry: their render is `adapter`, and there is no rendered definition to put a model id into. Asking",
+    "for a tier keyed `pi` or `agy` is a question about a field that does not exist, which is why ResolveTier",
     "errors rather than inventing one. A harness whose render is `adapter` keys by its pool.",
     "",
     "Model ids: alias where the harness self-rotates, canonical id where it does not. Claude Code",
@@ -47,6 +51,12 @@
   ],
   "version": 1,
   "pools": {
+    "gemini": {
+      "auth": "subscription",
+      "concurrency": 5,
+      "probe": "bin:agy",
+      "why": "The Google/Gemini provider family reached through the agy CLI harness. Supplies provider diversity for the adversarial review gate (HARNESS-086, #1253)."
+    },
     "nan": {
       "auth": "subscription",
       "concurrency": 5,
@@ -113,16 +123,17 @@
     },
     "agy": {
       "pools": [
-        "nan"
+        "gemini"
       ],
       "render": "adapter",
       "spawn": "none",
-      "why": "Present in the reviewer pool as the provider-diverse fallback arm, so it belongs in the map that routes to it. render is `adapter`, NOT agent-md (#1162): the model reaches agy as a launcher flag, exactly as it does for pi. Measured 2026-08-21 — cli/internal/spec/review_launch.go builds `agy --model <id> --output-format stream-json …`, and `agy agents` lists none. It was declared agent-md while this file\u0027s own $comment grouped it with pi as a launcher-flag harness; nothing caught the contradiction because tiers had no consumer until #1165."
+      "why": "Present in the reviewer pool as the provider-diverse fallback arm, so it belongs in the map that routes to it. render is `adapter`, NOT agent-md (#1162): the model reaches agy as a launcher flag, exactly as it does for pi. Measured 2026-08-21 — cli/internal/spec/review_launch.go builds `agy --model <id> --output-format stream-json …`, and `agy agents` lists none. Reaches the gemini pool for provider diversity (HARNESS-086, #1253)."
     }
   },
   "tiers": {
     "top": {
-      "claude": "opus"
+      "claude": "opus",
+      "gemini": "gemini-3.1-pro-high"
     },
     "mid": {
       "claude": "sonnet",
