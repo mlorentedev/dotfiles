@@ -5,38 +5,77 @@ created: "2026-08-27"
 
 # Verification - HARNESS-045-hook-emission
 
+> **Partial by design.** This records what the first sitting built and proved.
+> AC1 (setup wiring), AC2 (presence) and AC7 (the block-style guards) are open,
+> and `tasks.md` says which and why. Nothing below is claimed beyond what ran.
+
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+| AC | Proof |
+|---|---|
+| AC1 (declaration half) | `harness/manifest.json` carries `agents.bind`; `bats tests/compile-harness.bats` 72/72 exit 0, so adding the key disturbs no render |
+| AC3 (decision half) | `go test ./internal/harness/ -run TestGate` — blocks on an unconsumed `enforce: block`, opens once consumed, never blocks the skill invocation itself |
+| AC4 | `TestGateWarnDoesNotBlock` asserts `warn` reports and allows, on the same path as AC3 so the two cannot collapse |
+| AC5 | `TestMergeHooksIsIdempotent` — a second identical merge reports `changed=false` and leaves exactly one entry |
+| AC5+ | `TestMergeHooksReplacesOurOwnEntryRatherThanAccumulating` — idempotence under **change**, the assertion AC5/AC6 imply but neither states |
+| AC6 | `TestMergeHooksPreservesForeignEntries` and `TestMergeAgainstTheRealDeployedSettings` — **12 foreign hook entries in the real `~/.claude/settings.json`, all preserved** |
+| AC6+ | `TestMergeHooksSurvivesAForeignGroupAtIndexZero` — the ordering the positional shell path silently overwrites |
+| AC7 (loader half) | `TestPersonaRefusesToReadSkillsAsEmpty` — 7 malformed shapes, each a loud error, never an empty list |
+| AC8 | Every `Decide` test runs with no harness installed |
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+## The gate, driven as a binary
 
-## Test status
+```
+claude    {"session_id":"c","tool_name":"Bash",...}     EXIT=2
+agy       {"session_id":"a","tool_name":"Bash",...}     EXIT=2
+pi        {"session":"p","tool":"bash"}                 EXIT=2
+opencode  {"session":"o","tool":"bash"}                 EXIT=2
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+pi  invoke skill adversarial-review                     EXIT=0
+pi  retry the blocked call                              EXIT=0
+
+garbage on stdin                                        EXIT=0   ("payload not recognised")
+a real call, same run                                   EXIT=2   (the fix did not neuter the guard)
+```
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
+- **agy is not presence-only.** #561 defers it on the assumption it has no gate.
+  `~/.gemini/settings.json` declares `BeforeAgent`, `AfterAgent`, `BeforeTool`,
+  `AfterTool` in claude's exact command-hook format. It is the **cheapest**
+  harness to add after claude. Its field names remain unverified, so the agy leg
+  degrades to allow on a mismatch and its AC must stay structure-level until a
+  real payload is captured.
+- **opencode's gate is `permission.ask`, not `tool.execute.before`.** The latter
+  is typed `(input, output: {args}) => Promise<void>` — it mutates arguments and
+  returns nothing. #561 and ADR-027 name an event that cannot deny.
+- **Two families, not four cases**, so the wrapper this repo generates for pi and
+  opencode emits ONE canonical payload. That deletes two per-harness parsers
+  instead of adding them.
+- **No default severity.** An undeclared `enforce` resolves to `EnforceUnset`;
+  the gate refuses to act and `UnmigratedSkills()` surfaces it. `warn` would make
+  every unmigrated persona silently inert while checks reported it wired; `block`
+  would turn 35 existing skills into hard gates overnight.
+- **Ambiguity resolves to Allow, everywhere.** A gate that blocks on input it
+  cannot read blocks on every harness upgrade.
 
--
--
+## Three defects found by running it, not by reading it
+
+1. **A malformed payload blocked every call.** `normaliseToolCall` returned a
+   zero `ToolCall` and the doc comment claimed `Decide` would resolve that to
+   Allow. `Decide` does not: a valid persona with nothing consumed blocks. The
+   nine `Decide` unit tests all passed, because the defect lived in the **seam**
+   between normalisation and decision, which none of them crossed. Prose
+   asserting behaviour the code did not have — caught only by driving the binary.
+2. **Identity by repository evicted a live hook.** After adopting
+   `dotf mem session-start` on `SessionStart`, emitting the gate on that event
+   matched the memory hook's marker and replaced it. Identity had to become
+   per-purpose.
+3. **Adoption by exact command was missing**, so `bind` taking over a hook the
+   positional path wrote would have appended a duplicate rather than adopting it.
 
 ## Promotion candidates
 
-Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
-
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
-
-## Archive checklist
-
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-045-hook-emission/` -> `specs/archive/HARNESS-045-hook-emission/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- Nothing yet. The one cross-project candidate — *"a config surface shared with a
+  live third-party writer is merged by marker, never by position"* — is strong,
+  but it wants a second instance outside this repository first.

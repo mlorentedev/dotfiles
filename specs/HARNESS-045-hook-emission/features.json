@@ -1,8 +1,50 @@
 [
   {
     "id": "HARNESS-045-hook-emission-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "AC8 - the gate decision is a pure function over harness-neutral input: blocks an unconsumed enforce:block skill, opens once consumed, never blocks the skill invocation itself, and allows when it has no persona",
+    "verification": "cd cli && go test ./internal/harness/ -run TestGate",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-045-hook-emission-f2",
+    "behavior": "AC4 - a skill declared enforce:warn is reported and allowed, asserted on the same path as the blocking case so the two cannot collapse",
+    "verification": "cd cli && go test ./internal/harness/ -run TestGateWarnDoesNotBlock",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-045-hook-emission-f3",
+    "behavior": "AC7 (loader half) - a skills key the parser cannot read is a loud error in seven malformed shapes, never an empty list; an absent skills key is not an error",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestPersonaRefusesToReadSkillsAsEmpty|TestPersonaAbsentSkillsIsNotAnError'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-045-hook-emission-f4",
+    "behavior": "AC5 - emission is idempotent under re-run AND under change: a second identical merge reports changed=false, and a changed command replaces our entry rather than accumulating a second",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestMergeHooksIsIdempotent|TestMergeHooksReplacesOurOwnEntryRatherThanAccumulating'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-045-hook-emission-f5",
+    "behavior": "AC6 - a foreign hook entry survives emission, including one at index 0 where the positional shell path would overwrite it, and including the real deployed settings file",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestMergeHooksPreservesForeignEntries|TestMergeHooksSurvivesAForeignGroupAtIndexZero|TestMergeAgainstTheRealDeployedSettings'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-045-hook-emission-f6",
+    "behavior": "the normalisation seam reports whether it understood a payload, so an unreadable one allows instead of blocking every tool call - the defect that shipped and was caught by running the binary",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestNormalise|TestUnreadablePayloadNeverReachesDecideAsARealCall'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-045-hook-emission-f7",
+    "behavior": "AC1 (declaration half) - agents.bind is declared in harness/manifest.json and adding it disturbs no existing render",
+    "verification": "python3 -c \"import json;d=json.load(open('harness/manifest.json'));assert d['agents']['bind']\" && bats tests/compile-harness.bats",
     "state": "pending",
     "evidence": ""
   }
