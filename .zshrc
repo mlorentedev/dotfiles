@@ -37,7 +37,6 @@ else
     export AGY_HOME="${AGY_HOME:-$HOME/.gemini/antigravity-cli}"
     export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
     export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
-    export COPILOT_MODEL="${COPILOT_MODEL:-gpt-5.6}"
 fi
 export AGY_APP_DATA="$AGY_HOME"
 export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"

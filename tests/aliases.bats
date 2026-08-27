@@ -163,11 +163,14 @@ setup() {
     grep -q 'function gp' "$ps_file"
 }
 
-@test "parity: cop and cops exist in both aliases.zsh and profile.ps1" {
+@test "parity: cop and cops exist in aliases.zsh, .bashrc and profile.ps1" {
     ps_file="$DOTFILES_DIR/powershell/profile.ps1"
+    bashrc_file="$DOTFILES_DIR/.bashrc"
     grep -qE '^alias cop="copilot"' "$ALIASES_FILE"
+    grep -qE "^alias cop='copilot'" "$bashrc_file"
     grep -qE 'Set-Alias -Name cop -Value copilot' "$ps_file"
     grep -qE '^cops\(\)' "$ALIASES_FILE"
+    grep -qE '^cops\(\)' "$bashrc_file"
     grep -qE 'function cops' "$ps_file"
 }
 

@@ -67,7 +67,6 @@ else
     export AGY_HOME="${AGY_HOME:-$HOME/.gemini/antigravity-cli}"
     export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
     export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
-    export COPILOT_MODEL="${COPILOT_MODEL:-gpt-5.6}"
 fi
 
 # Telemetry suppression (prevents agent prompts and unnecessary analytics network calls)
@@ -168,6 +167,11 @@ fi
 # AI Tool Aliases
 alias g='agy'
 alias c='claude'
+# GitHub Copilot CLI: cop -> interactive agent; cops -> single-shot prompt with
+# --allow-all-tools (required by the CLI for -p mode). Same pair as aliases.zsh
+# and profile.ps1 -- bash had neither (AI-036/#1296).
+alias cop='copilot'
+cops() { copilot -p "$*" --allow-all-tools -s; }
 alias obsidian='obsidian --no-sandbox'
 
 # Gemini saved-prompt helper `agyp` lives in .zsh/functions.sh (shared bash/zsh,
