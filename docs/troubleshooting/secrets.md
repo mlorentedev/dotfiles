@@ -97,6 +97,25 @@ echo $KUBECONFIG  # Should show dest path
 - Destination directory doesn't exist (e.g., `~/.kube/` not created)
 - Dest file is newer than `.age` source (caching) — use `secrets_refresh`
 
+## Agent wrapper refuses to launch (vault locked)
+
+**Symptom.** `pi` or `opencode` exits at once with
+*Error: bw resolve nan-api-key/api-key: bitwarden vault is locked: no bw serve
+daemon is running — run `dotf secrets unlock`*.
+
+**Cause.** The wrappers (`.zshrc`, `.bashrc`, `powershell/profile.ps1`) are
+`dotf secrets run --only NAN_API_KEY,… -- <agent>`: the keys are resolved
+through the `bw serve` daemon before the agent process exists, and a locked
+vault fails the resolution (ADR-028 "not always exposed": nothing is in the
+ambient shell).
+
+**Fix.** `dotf secrets unlock` once per boot. The daemon is detached from the
+terminal that started it on every OS (Linux `Setsid`; Windows `DETACHED_PROCESS`
+since #1304 — before that, closing the unlocking terminal killed it and every
+wrapper in every other terminal failed together, WIN-012). `dotf doctor` WARNs
+with this remedy under `[OpenCode + pi]` while the keys are bw-backed and no
+unlocked daemon answers.
+
 ## Related
 
 - [Runbook: Secrets Management](../runbooks/secrets-management.md)

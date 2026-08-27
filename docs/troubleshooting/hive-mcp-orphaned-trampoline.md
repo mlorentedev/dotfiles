@@ -133,6 +133,18 @@ anything (dotfiles#796 / AI-028 PR1):
 Get-ScheduledTaskInfo -TaskName DotfilesHiveUpgrade   # LastTaskResult != 0 => broken install
 ```
 
+**Caveat (measured 2026-08-27, work box).** That signal reads `uv tool list`,
+and so does `setup-windows.ps1`'s version gate for `hive service`. Since hive
+moved to its own installer (`%LOCALAPPDATA%\hive\runtime\current\Scripts\hive.exe`
+behind a `hive.cmd` shim), `uv tool list` shows **no** hive-vault entry on a
+healthy box either: `hive --version` printed `hive-vault 3.0.0` while setup
+reported `hive <unknown> predates 'hive service'` and skipped daemon
+supervision, and the timer's "no install" exit fires for a working install. The
+instrument is wrong, not the box. Probe the binary (`hive --version`) until
+AI-028 (#791) lands; a stray `~/.local/bin/hive.exe` trampoline printing
+*uv trampoline failed to canonicalize script path* is the leftover of the old
+channel and is safe to delete once `hive --version` resolves elsewhere.
+
 That is detection, not repair — the recipe above is still the fix until #574 lands.
 
 The durable, cross-machine version of this check + repair is **#574** — `dotf doctor`
