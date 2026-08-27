@@ -931,6 +931,44 @@ if [ -f "$PI_SETTINGS_SRC" ]; then
     fi
 fi
 
+# Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
+# settings.json exists on the machine -- nothing pi itself writes at runtime
+# touches that array, only theme/lastChangelogVersion/defaultModel are (the
+# seed-if-missing guard above exists for exactly those three). Without this, a
+# catalog addition in the repo (e.g. #1254) never reaches a machine whose
+# settings.json already exists; the only way to pick it up was deleting the
+# live file and re-running setup, which would also blow away the user's real
+# theme/model choice. Runs unconditionally on a present destination -- on a
+# freshly-seeded file the two are already equal, so it is a same-second no-op.
+if [ -f "$PI_SETTINGS_DST" ] && [ -f "$PI_SETTINGS_SRC" ]; then
+    if ! command -v jq >/dev/null 2>&1; then
+        log_warning "jq not found — skipping pi enabledModels sync"
+    else
+        PI_MODELS_SRC_JSON=$(jq -c '.enabledModels' "$PI_SETTINGS_SRC" 2>/dev/null) || PI_MODELS_SRC_JSON=""
+        if [ -z "$PI_MODELS_SRC_JSON" ] || [ "$PI_MODELS_SRC_JSON" = "null" ]; then
+            log_warning "ai/pi/settings.json has no enabledModels — skipping pi enabledModels sync"
+        elif jq -e --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels == $m' "$PI_SETTINGS_DST" >/dev/null 2>&1; then
+            log_info "pi enabledModels already in sync"
+        else
+            # Same directory as the destination, not $TMPDIR: a cross-filesystem
+            # mv degrades to copy+delete (not atomic) and mktemp's 0600 mode
+            # would silently tighten the destination's permissions on the first
+            # sync. chmod --reference copies the live file's mode before the
+            # swap, so a rename within one filesystem is both atomic and
+            # permission-preserving.
+            PI_SETTINGS_TMP=$(mktemp "$(dirname "$PI_SETTINGS_DST")/.settings.json.XXXXXX")
+            if jq --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels = $m' "$PI_SETTINGS_DST" > "$PI_SETTINGS_TMP" 2>/dev/null \
+                && chmod --reference="$PI_SETTINGS_DST" "$PI_SETTINGS_TMP" 2>/dev/null; then
+                mv "$PI_SETTINGS_TMP" "$PI_SETTINGS_DST"
+                log_success "Synced pi enabledModels (theme/defaultModel/lastChangelogVersion preserved)"
+            else
+                rm -f "$PI_SETTINGS_TMP"
+                log_warning "failed to sync pi enabledModels — leaving $PI_SETTINGS_DST untouched"
+            fi
+        fi
+    fi
+fi
+
 # pi packages (AI-030, #1224): reconcile ai/pi/packages.json against what the
 # live settings.json already declares, and install the difference.
 #
