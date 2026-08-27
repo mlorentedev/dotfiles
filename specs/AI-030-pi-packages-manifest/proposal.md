@@ -95,10 +95,23 @@ so.
 - [x] **AC9** — Linux installs through `$PI_BIN`, not the `pi` shell function.
 - [x] **AC10** — `setup-windows.ps1` reconciles the same manifest with the same
       semantics (parity), and adds no non-ASCII to the file.
+- [x] **AC11** — a package that is installed and declared is also **loaded**.
+      Added 2026-08-26 for #1243, and it is the criterion whose absence this
+      spec's own verification demonstrated: AC1–AC10 all hold while pi refuses
+      to start. Measured that day — `pi -p` exited 1 with
+      `Failed to load extension ".../pi-subagents/index.ts": Tool "subagent"
+      conflicts with ~/.pi/agent/extensions/subagent/index.ts`, a hand-wired
+      symlink from 2026-08-09 into pi's own bundled examples. The declared
+      package was the one that never loaded, and nothing here could see it,
+      because counting entries in an array is not observing effect.
+      Enforced by `dotf doctor` (`cli/internal/doctor/checks_pi_extensions.go`,
+      repaired under `--fix`), which is the durable surface: this is machine
+      state, so CI cannot observe it and a doctor check is the only thing that
+      runs where the defect lives.
 
 ## References
 
-- Bitácora board: `mlorentedev/dotfiles#1224`
+- Bitácora board: `mlorentedev/dotfiles#1224`, and `#1243` for AC11.
 - Upstream docs: <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
 - Prior art in this repo: `ai/deploy.json` (CLI-039, #1023) — the same
   "declarative table, one behaviour, no per-OS twin logic" shape.

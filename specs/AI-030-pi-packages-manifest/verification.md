@@ -19,6 +19,7 @@ created: "2026-08-25"
 | AC8 unreadable manifest is loud | `tests/pi-packages.bats` — "refuses an unreadable manifest instead of reading it empty" |
 | AC9 Linux uses `$PI_BIN` | `tests/pi-packages.bats` — "installs through $PI_BIN, not the shell function" |
 | AC10 Windows parity, no new non-ASCII | `tests/pi-packages.bats` — three `setup-windows` cases; non-ASCII line count 10 before and 10 after |
+| AC11 a declared package actually **loads** | `dotf doctor` on the real machine — `[FAIL] extension "subagent" shadows the installed package of the same name`, then `[FIX ] quarantined ~/.pi/agent/extensions/subagent/index.ts`; effect confirmed by `pi -p` going from **exit 1** (`Failed to load extension … Tool "subagent" conflicts`) to **exit 0** answering `OK`, and a third `dotf doctor` run then reporting `[pi extensions] (1 checks, all ok)`. Unit-covered by `cli/internal/doctor/checks_pi_extensions_test.go` (6 cases: FAIL on collision, WARN without, the scoping rule that leaves an external writer's files alone, SKIP with no extensions dir, quarantine landing outside the auto-discovered tree, and no-clobber on a second `--fix`) |
 
 All on commit `2c20332` plus the spec commit that follows it.
 
