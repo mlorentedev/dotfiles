@@ -9,3 +9,8 @@
 # Windows, but setup-windows.ps1 deploys scripts to ~/scripts and nothing
 # creates the contract path, so the contract check fails on every fresh box.
 SCRIPTS_DIR=.*\.dotfiles\scripts \(path does not exist\)
+
+# TEST-005 (#1313): the runner has no Bitwarden identity, so the reach tier
+# (exposure-keyed: 28 registry entries resolve through Bitwarden) fails by its
+# own rule. Real boxes log in once; CI cannot and must not resolve real secrets.
+Bitwarden session is gone \(`bw status`: unauthenticated\)
