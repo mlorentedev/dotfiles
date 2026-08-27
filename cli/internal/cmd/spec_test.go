@@ -199,6 +199,7 @@ func TestSpecInit_UsesLocalCalendarDate(t *testing.T) {
 	}
 }
 
+// readFile reads the full contents of path as a string or fails the test.
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
