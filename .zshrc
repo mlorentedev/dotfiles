@@ -69,7 +69,22 @@ export NAN_BASE_URL="https://api.nan.builders/v1"
 # latency before the agent started, and died on the first locked entry even when
 # the agent had no use for it (#976). Scoping is least privilege and startup
 # time at once.
-if command -v dotf >/dev/null 2>&1; then
+# THE GUARD MUST NOT DEPEND ON $PATH, because it runs ~40 lines before the PATH
+# that would satisfy it. `~/.local/bin` — where dotf lives — is prepended further
+# down; here, `command -v dotf` succeeds only when the parent process happened to
+# export it already.
+#
+# Measured 2026-08-27: a terminal launched with a clean PATH (a fresh desktop
+# terminal, an IDE, an ADE) skipped this whole block, so `pi` and `opencode` were
+# never wrapped, ran without their injected credentials, and reported "No models
+# available" — with no error, because a guard that fails is silence. A terminal
+# that inherited a good PATH worked, which is why it looked intermittent and why
+# it could not be reproduced from an already-configured shell.
+#
+# Checking the known location fixes it without moving the PATH block: only the
+# GUARD is evaluated at source time. The function BODY runs at call time, by
+# which point PATH is complete and plain `dotf` resolves normally.
+if command -v dotf >/dev/null 2>&1 || [ -x "$HOME/.local/bin/dotf" ]; then
     # Every token here must be a live registry id: `--only` fails loud on an
     # unknown one, so a stale name does not degrade the launch, it prevents it.
     # OLLAMA_API_KEY was listed for a provider slot whose registry entry was
