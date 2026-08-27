@@ -173,3 +173,13 @@ setup() {
     [[ "$window" == *"\$env:COPILOT_HOME"* ]]
     [[ "$window" == *"\$env:OPENCODE_HOME"* ]]
 }
+
+@test "no rc file exports COPILOT_MODEL (retired: invalid id, fallback-only, absent on Windows) [AI-036]" {
+    # Copilot's model lives in ai/copilot/config.json (`model`) and --model; the
+    # export named a model the seat does not have and ran only in the
+    # paths.sh-missing fallback branch, so it was never set on a converged box.
+    for f in .bashrc .zshrc powershell/profile.ps1; do
+        run grep -F 'COPILOT_MODEL' "$DOTFILES_DIR/$f"
+        [ "$status" -ne 0 ]
+    done
+}

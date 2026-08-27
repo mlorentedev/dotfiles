@@ -19,7 +19,7 @@
 
 ## Model Tier (per AGENTS.md "Model Selection")
 
-- **Top:** `gpt-5.6-terra` / `gpt-5.6` / `claude-3.7-sonnet` (deep reasoning / architecture) | **Mid:** `gpt-5.6-sol` / `gpt-5` (default / implementation / tests) | **Low:** `gpt-5.6-luna` / `o3-mini` (syntax / quick transforms).
+- **Top:** `gpt-5.6-terra` / `claude-opus-5` (deep reasoning / architecture) | **Mid:** `gpt-5.6-sol` / `claude-sonnet-5` (default / implementation / tests) | **Low:** `gpt-5.6-luna` / `claude-haiku-4.5` (syntax / quick transforms). Ids as listed by `copilot help config` on the seat; the cross-agent routing SSOT is `harness/model-map.json`.
 
 ## Skills
 
