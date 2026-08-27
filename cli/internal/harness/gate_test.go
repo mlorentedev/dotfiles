@@ -79,6 +79,25 @@ func TestGateNeverBlocksTheSkillInvocationItself(t *testing.T) {
 	}
 }
 
+// The deadlock the PR reviewer on #1272 found: a WELL-FORMED payload naming the
+// skill primitive but carrying no readable argument.
+//
+// The original guard keyed on the skill's NAME, so an empty name fell through to
+// the enforcement path and blocked the invocation — permanently, because a
+// blocked call can never record consumption. The guard has to key on the tool's
+// IDENTITY. The earlier deadlock test passed only because it always supplied a
+// name, which is the case that was never in danger.
+func TestGateNeverBlocksASkillToolWithAnUnreadableName(t *testing.T) {
+	r := Decide(GateInput{
+		Persona:  gatePersona(SkillBinding{ID: "audit", Enforce: EnforceBlock}),
+		Call:     ToolCall{Tool: "Skill", Skill: "", IsSkillTool: true},
+		Consumed: map[string]bool{},
+	})
+	if r.Decision != Allow {
+		t.Fatalf("a skill invocation with an unreadable name must still be allowed, got %v — this deadlocks the session", r.Decision)
+	}
+}
+
 // Ambiguity resolves to Allow. A gate that blocks when it does not understand
 // its input becomes a gate whose normal state is red.
 func TestGateAllowsWhenItHasNoPersona(t *testing.T) {
@@ -131,6 +150,22 @@ func TestGateCorruptStateReadsAsEmptyNotAsAnError(t *testing.T) {
 	}
 	if got := LoadConsumed(p); len(got) != 0 {
 		t.Errorf("corrupt state must read empty, got %v", got)
+	}
+}
+
+// The collision the PR reviewer on #1272 found: character-mapping alone flattens
+// `a/b` and `a.b` to the same name, so one session's consumption record would
+// open another session's gate. UUIDs never collide, but "it does not happen with
+// well-behaved input" is not a property a path builder should rest on.
+func TestGateStatePathDoesNotCollideAcrossDistinctSessions(t *testing.T) {
+	dir := t.TempDir()
+	seen := map[string]string{}
+	for _, sid := range []string{"a/b", "a.b", "a_b", "a:b", "a b", "", "..", "x", "X"} {
+		p := StatePath(dir, sid)
+		if prev, dup := seen[p]; dup {
+			t.Errorf("session ids %q and %q map to the same state file %s", prev, sid, p)
+		}
+		seen[p] = sid
 	}
 }
 

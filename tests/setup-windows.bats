@@ -151,8 +151,10 @@ setup() {
     refute_grep 'Copy-Item .*init-project\.ps1' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys knowledge-crystallize.ps1" {
-    grep -q 'knowledge-crystallize.ps1' "$PS1_SCRIPT"
+@test "setup-windows.ps1 no longer deploys knowledge-crystallize.ps1 (CLI-050)" {
+    # dotf vault crystallize replaced it (#1269); no per-machine deploy step needed.
+    refute_grep 'Copy-Item .*knowledge-crystallize\.ps1' "$PS1_SCRIPT"
+    [ ! -f "$DOTFILES_DIR/scripts/knowledge-crystallize.ps1" ]
 }
 
 @test "setup-windows.ps1 deploys claude-session-start.ps1" {

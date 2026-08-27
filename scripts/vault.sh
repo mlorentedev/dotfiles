@@ -22,7 +22,7 @@ Subcommands:
       working-tree integrity. Requires Obsidian GUI running.
 
   maintenance
-      Weekly automated maintenance: knowledge-crystallize + health + desktop
+      Weekly automated maintenance: dotf vault crystallize + health + desktop
       notification. Logs to ~/.local/share/vault-maintenance/latest.log.
       Normally invoked via cron (Sundays 10:07).
 

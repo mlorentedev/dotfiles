@@ -1,24 +1,20 @@
 #!/usr/bin/env bash
 # Shared case runner for the crystallize golden corpus (CLI-021 / #672).
 #
-# ONE runner, used by BOTH capture.sh and knowledge-crystallize-golden.bats. That
-# is deliberate: if capture and verify normalised differently the goldens would be
-# meaningless, and the drift would be invisible because both sides would still be
-# self-consistent. Sharing the function makes the divergence unrepresentable.
-#
-# The shell is the oracle (see ORACLE for the pinned revisions). Nothing here may
-# "improve while translating" — a bug in the twin is reproduced faithfully and
-# ticketed separately, per the CLI-021 proposal's "Out of scope".
+# capture.sh and knowledge-crystallize-golden.bats, which used to share this
+# runner against the shell oracle, were deleted in CLI-050 (#1269) along with
+# the shell/PowerShell twins. tests/knowledge-crystallize-go-parity.bats is now
+# the only consumer; the goldens under cases/*/expected are static — see ORACLE
+# for the shell revisions that produced them, kept for provenance only.
 
-# gc_run_case CASE_DIR OUT_DIR [IMPL]
-#   Builds an isolated $HOME, materialises the case's fixtures, runs IMPL
-#   (default: the shell oracle), and writes normalised artefacts to OUT_DIR:
+# gc_run_case CASE_DIR OUT_DIR
+#   Builds an isolated $HOME, materialises the case's fixtures, runs the built
+#   dotf binary (GC_DOTF_BIN), and writes normalised artefacts to OUT_DIR:
 #       stdout     merged stdout+stderr, normalised
 #       exit       the exit status
 #       memory.md  every resulting MEMORY.md, concatenated with a header per file
 gc_run_case() {
     local case_dir="$1" out_dir="$2"
-    local impl="${3:-$GC_ORACLE_SH}"
 
     local sandbox fake_home
     sandbox=$(mktemp -d)
@@ -94,10 +90,12 @@ gc_run_case() {
     local runs=1
     [ -f "$case_dir/runs" ] && runs=$(cat "$case_dir/runs")
 
-    # Which implementation is under test. The SAME corpus drives both, which is
-    # the entire point: "byte-identical to the shell" is only a claim you can
-    # make if one set of expectations judges both.
-    local mode="${GC_IMPL_MODE:-shell}"
+    # GC_IMPL_MODE existed to select between the shell oracle and the Go port
+    # while both were live; the shell is gone (CLI-050 / #1269), so `go` is the
+    # only mode left. Kept as an explicit check, not silently assumed, so a
+    # future caller that forgets to build GC_DOTF_BIN fails loudly instead of
+    # running against an unset/empty binary path.
+    local mode="${GC_IMPL_MODE:-go}"
 
     local raw="$sandbox/raw.out"
     local n=1
@@ -106,9 +104,6 @@ gc_run_case() {
         # `|| rc=$?` rather than relying on the caller's flags — the same lesson
         # the reconciler cost us (docs/lessons.md, 2026-08-09).
         case "$mode" in
-            shell)
-                HOME="$fake_home" bash "$impl" "${args[@]}" >"$raw" 2>&1 || rc=$?
-                ;;
             go)
                 HOME="$fake_home" "$GC_DOTF_BIN" vault crystallize "${args[@]}" >"$raw" 2>&1 || rc=$?
                 ;;

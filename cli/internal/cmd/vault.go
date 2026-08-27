@@ -48,16 +48,20 @@ Subcommands:
 }
 
 // newVaultCrystallizeCmd builds `dotf vault crystallize [path]`, the Go port of
-// scripts/knowledge-crystallize.{sh,ps1} (CLI-021 / #490).
+// the former scripts/knowledge-crystallize.{sh,ps1} (CLI-021 / #490).
 //
 // It lands under the EXISTING `vault` noun on purpose: that noun already meant
 // "scaffold a vault entry" while the knowledge half — crystallize, maintain,
 // health — lived only in shell twins. Two disjoint meanings under one word is the
 // collision #490 exists to resolve, which is why this is not a top-level command.
 //
-// Built beside the twins: nothing is deleted and no caller is repointed here.
-// Both paths work after this, byte-identically on the golden corpus. The cutover
-// is CLI-023 (#492).
+// Built beside the twins in CLI-021, then cut over in CLI-050 (#1269): the
+// shell/PowerShell pair is deleted, every caller repoints here, and this is
+// the sole implementation. `vault health` and `vault maintain` (increments 2
+// and 3 of #490) are still unbuilt, and the rest of the cluster
+// (vault-health.sh, vault-maintenance-weekly.{sh,ps1}, obs-cli, the spec-gate
+// scripts) is still shell — that full cutover is CLI-023 (#492), blocked on
+// those plus CLI-022.
 func newVaultCrystallizeCmd() *cobra.Command {
 	var all bool
 
