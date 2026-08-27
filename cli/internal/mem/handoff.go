@@ -193,20 +193,30 @@ func trimTrailingBlank(lines []string, from, to int) int {
 
 // ThreadKey derives a stable thread identity from a working directory.
 //
-// The worktree, because that is what distinguishes two concurrent sessions — not
-// the agent and not the date. Journals were named `<date>-<project>-<agent>.md`
-// and two WORKTREES on one day collided into `-2`/`-3` suffixes encoding nothing;
-// six such files exist across two days, and no session could derive its own.
+// A THREAD IS A LINE OF WORK, AND GIT ALREADY NAMES IT: THE BRANCH.
 //
-// IT ASKS GIT FIRST, and only then falls back to this repository's naming
-// convention. That ordering is what makes the key agnostic across tools.
+// The first version keyed on the worktree. That correlates on one machine and
+// decorrelates the moment the work moves to another — and the vault is the SSOT
+// across machines, so the same branch continued on a second box must resolve to
+// the SAME thread rather than forking one. Every worktree in this repository is
+// born on its own branch (measured: three live worktrees, three distinct
+// branches, no duplicates), so the branch discriminates at least as well and it
+// travels.
 //
-// Several tools create worktrees here and each names them differently: this
-// repository writes `<repo>-wt-<slug>`, Claude Code's EnterWorktree writes
-// `.claude/worktrees/<name>`, Orca writes its own. A key derived from one
-// pattern resolves every other tool's worktree to "main" — so every session
-// running under a different tool would share one thread and clobber the others,
-// which is the bug this exists to fix, reintroduced for everyone not using our
+// THE HOSTNAME ENTERS ONLY WHERE IT DISAMBIGUATES. `main` on two machines is two
+// pieces of ambient work, so the default branch is keyed `main@<host>` while
+// every feature branch stays clean — the same only-when-it-disambiguates rule
+// JournalName applies to its `-main` suffix.
+//
+// A DETACHED HEAD is named `<worktree>@<host>` and says so, rather than
+// collapsing into a plausible "main" that would silently share a thread with
+// somebody else's work.
+//
+// It reads git's own on-disk state through RepoIdentity — no subprocess, no
+// naming convention — so a worktree created by Claude Code, Orca, opencode, pi,
+// agy, copilot or a bare `git worktree add` all behave identically. A key
+// derived from one tool's path pattern resolved every other tool's worktree to
+// "main", which reintroduced this very bug for everyone not using our
 // convention.
 //
 // git already knows, and states it on disk with no subprocess: a linked
@@ -224,15 +234,22 @@ func trimTrailingBlank(lines []string, from, to int) int {
 // checkout whose `.git` one level up said "main". Authoritative answers come
 // first; a name-shaped guess is only for a tree git does not know at all.
 func ThreadKey(cwd string) string {
-	for dir := filepath.Clean(cwd); ; {
-		if name, ok := gitWorktreeName(dir); ok {
-			return name
+	if id, ok := RepoIdentity(cwd); ok {
+		switch {
+		case id.Branch == "":
+			// Detached HEAD: no line of work to name. Say so rather than
+			// collapsing into a plausible "main" that would silently share a
+			// thread with somebody else's work.
+			name := id.Worktree
+			if name == "" {
+				name = "detached"
+			}
+			return sanitizeThread(name) + "@" + shortHost()
+		case isDefaultBranch(id.Branch):
+			return id.Branch + "@" + shortHost()
+		default:
+			return sanitizeThread(id.Branch)
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
 	}
 	// git knows nothing about this path — a test fixture, or a tree copied
 	// rather than cloned. Fall back to this repository's own convention.
@@ -246,38 +263,6 @@ func ThreadKey(cwd string) string {
 		}
 		dir = parent
 	}
-}
-
-// gitWorktreeName reads `.git` at dir. It returns the linked worktree's name, or
-// ("main", true) when `.git` is a directory — the main checkout. The bool
-// distinguishes "this is a git root and here is the answer" from "keep walking".
-func gitWorktreeName(dir string) (string, bool) {
-	p := filepath.Join(dir, ".git")
-	info, err := os.Lstat(p)
-	if err != nil {
-		return "", false
-	}
-	if info.IsDir() {
-		return "main", true
-	}
-	raw, err := os.ReadFile(p) // #nosec G304 -- the .git pointer of the cwd being resolved
-	if err != nil {
-		return "", false
-	}
-	target, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), "gitdir:")
-	if !ok {
-		return "", false
-	}
-	target = strings.TrimSpace(target)
-	// `…/.git/worktrees/<name>`; the last element is git's own name for it.
-	if parent := filepath.Base(filepath.Dir(filepath.Clean(target))); parent != "worktrees" {
-		return "", false
-	}
-	name := filepath.Base(filepath.Clean(target))
-	if name == "" || name == "." {
-		return "", false
-	}
-	return name, true
 }
 
 // ThreadKeyForCwd is ThreadKey over the process's working directory.

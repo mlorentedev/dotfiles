@@ -158,69 +158,137 @@ func TestWrittenThreadsStayInsideTheArchivedBlock(t *testing.T) {
 	}
 }
 
-// AGNOSTIC ACROSS TOOLS: the key must come from git, not from one tool's naming
-// convention. This repository writes `<repo>-wt-<slug>`, Claude Code's
-// EnterWorktree writes `.claude/worktrees/<name>`, and Orca writes its own. A key
-// derived from a path pattern resolves every foreign convention to "main", and
-// then every session using a different tool shares one thread and clobbers the
-// others — precisely the bug being fixed, reintroduced for everyone who is not
-// using this repo's convention.
-//
-// git already knows: a linked worktree's `.git` is a FILE reading
-// `gitdir: .../.git/worktrees/<name>`, while a main checkout's is a directory.
-// No subprocess, no convention.
-func TestThreadKeyReadsGitRatherThanANamingConvention(t *testing.T) {
-	// A linked worktree, written the way git writes it.
-	wt := t.TempDir()
-	gitdir := filepath.Join(t.TempDir(), ".git", "worktrees", "some-tool-name")
+// gitFixture writes a repo the way git writes one: a linked worktree whose
+// `.git` is a FILE pointing at `<repo>/.git/worktrees/<name>`, with HEAD naming
+// the branch. Returns the worktree path.
+func gitFixture(t *testing.T, repo, worktree, branch string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), repo)
+	gitdir := filepath.Join(root, ".git", "worktrees", worktree)
 	if err := os.MkdirAll(gitdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	head := "ref: refs/heads/" + branch + "\n"
+	if branch == "" {
+		head = "0123456789abcdef0123456789abcdef01234567\n" // detached
+	}
+	if err := os.WriteFile(filepath.Join(gitdir, "HEAD"), []byte(head), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(t.TempDir(), worktree)
+	if err := os.MkdirAll(wt, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+gitdir+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := ThreadKey(wt); got != "some-tool-name" {
-		t.Errorf("a worktree named by another tool must still get its own key, got %q", got)
-	}
+	return wt
+}
 
-	// A subdirectory of it resolves the same.
+func mainFixture(t *testing.T, repo, branch string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), repo)
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git", "HEAD"), []byte("ref: refs/heads/"+branch+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+// THE THREAD IS THE LINE OF WORK — THE BRANCH — NOT THE WORKTREE.
+//
+// The vault is the SSOT across machines, so the same branch continued on a
+// second box must resolve to the SAME thread rather than forking one. Keying on
+// the worktree correlates on one machine and decorrelates the moment the work
+// moves, which is exactly what "work from different machines" breaks.
+//
+// It reads git's own on-disk state, so a worktree created by any tool — Claude
+// Code, Orca, opencode, pi, agy, copilot, or a bare `git worktree add` — behaves
+// identically. A key derived from one tool's path pattern resolved every other
+// tool's worktree to "main" and reintroduced the clobber for everyone else.
+func TestThreadKeyIsTheBranchSoItTravelsBetweenMachines(t *testing.T) {
+	wt := gitFixture(t, "dotfiles", "whatever-this-tool-calls-it", "feat/harness-088")
+	if got := ThreadKey(wt); got != "feat-harness-088" {
+		t.Errorf("want the branch, got %q — the worktree name must not decide the thread", got)
+	}
 	sub := filepath.Join(wt, "cli", "internal")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := ThreadKey(sub); got != "some-tool-name" {
-		t.Errorf("a subdirectory of a foreign-convention worktree got %q", got)
+	if got := ThreadKey(sub); got != "feat-harness-088" {
+		t.Errorf("a subdirectory got %q", got)
 	}
-
-	// A main checkout: `.git` is a directory.
-	main := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(main, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if got := ThreadKey(main); got != "main" {
-		t.Errorf("a main checkout must be %q, got %q", "main", got)
+	// The SAME branch in a DIFFERENT worktree — the cross-machine case — is the
+	// same thread. This is the property the whole design turns on.
+	other := gitFixture(t, "dotfiles", "a-totally-different-directory", "feat/harness-088")
+	if ThreadKey(other) != ThreadKey(wt) {
+		t.Errorf("the same branch in two places produced two threads: %q vs %q", ThreadKey(other), ThreadKey(wt))
 	}
 }
 
-func TestThreadKeyDerivesFromTheWorktree(t *testing.T) {
-	for _, tc := range []struct{ cwd, want string }{
-		{"/home/x/Projects/dotfiles-wt-pi-harness", "wt-pi-harness"},
-		{"/home/x/Projects/dotfiles-wt-cli-023/", "wt-cli-023"},
-		{"/home/x/Projects/dotfiles", "main"},
-		{"/home/x/Projects/knowledge", "main"},
-		{"", "main"},
-		// SUBDIRECTORIES. The first version read only the basename, so a session
-		// in `cli/` — where most work in this repository happens — resolved to
-		// "main", and every such session would have shared one key and clobbered
-		// the others exactly as before. The tests passed because they all passed
-		// worktree roots; running `dotf mem thread` from `cli/` did not.
-		{"/home/x/Projects/dotfiles-wt-pi-harness/cli", "wt-pi-harness"},
-		{"/home/x/Projects/dotfiles-wt-pi-harness/cli/internal/mem", "wt-pi-harness"},
-		{"/home/x/Projects/dotfiles/cli/internal/mem", "main"},
-	} {
-		if got := ThreadKey(tc.cwd); got != tc.want {
-			t.Errorf("ThreadKey(%q) = %q, want %q", tc.cwd, got, tc.want)
+// The one genuine collision: the default branch is ambient work, and two
+// machines' `main` are not one thread. The hostname enters ONLY there.
+func TestThreadKeyQualifiesOnlyTheDefaultBranchWithTheHost(t *testing.T) {
+	for _, b := range []string{"main", "master"} {
+		got := ThreadKey(mainFixture(t, "dotfiles", b))
+		if !strings.HasPrefix(got, b+"@") {
+			t.Errorf("branch %q must be host-qualified, got %q", b, got)
 		}
+	}
+	if got := ThreadKey(gitFixture(t, "dotfiles", "w", "fix/thing")); strings.Contains(got, "@") {
+		t.Errorf("a feature branch must not carry the host, got %q", got)
+	}
+}
+
+// A detached HEAD has no line of work to name, and must say so rather than
+// collapsing into a plausible "main" that would silently share somebody's thread.
+func TestThreadKeyNamesADetachedHeadRatherThanGuessing(t *testing.T) {
+	got := ThreadKey(gitFixture(t, "dotfiles", "wt-detached", ""))
+	if !strings.HasPrefix(got, "wt-detached@") {
+		t.Errorf("a detached HEAD must be named after its worktree and host, got %q", got)
+	}
+}
+
+// THE DEBT FIX: the project is the REPOSITORY, not the basename of wherever the
+// session happens to be standing.
+//
+// `SessionEnd` resolved it as filepath.Base(cwd), so a session in a subdirectory
+// — `cli/`, where most work here happens — resolved the wrong project, found no
+// MEMORY.md, and SILENTLY ARCHIVED NOTHING. Same class as the thread-key defect,
+// in a different function; both read RepoIdentity now, so they cannot disagree.
+func TestRepoIdentityResolvesTheProjectFromAnywhereInTheTree(t *testing.T) {
+	wt := gitFixture(t, "dotfiles", "wt-x", "feat/y")
+	for _, dir := range []string{wt, filepath.Join(wt, "cli"), filepath.Join(wt, "cli", "internal", "mem")} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		id, ok := RepoIdentity(dir)
+		if !ok {
+			t.Fatalf("RepoIdentity failed at %s", dir)
+		}
+		if id.Project != "dotfiles" {
+			t.Errorf("at %s: project = %q, want dotfiles", dir, id.Project)
+		}
+		if id.Branch != "feat/y" {
+			t.Errorf("at %s: branch = %q, want feat/y", dir, id.Branch)
+		}
+	}
+	root := mainFixture(t, "knowledge", "master")
+	sub := filepath.Join(root, "10_projects", "dotfiles")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	id, ok := RepoIdentity(sub)
+	if !ok || id.Project != "knowledge" || id.Branch != "master" {
+		t.Errorf("main checkout subdirectory: got %+v ok=%v", id, ok)
+	}
+}
+
+func TestRepoIdentityReportsWhenGitKnowsNothing(t *testing.T) {
+	if _, ok := RepoIdentity(t.TempDir()); ok {
+		t.Error("a path outside any repository must report ok=false, not a guessed identity")
 	}
 }
 
@@ -280,15 +348,12 @@ func TestWriteThreadSurvivesASubheadingInsideAThreadBody(t *testing.T) {
 // authoritative, so it must be consulted across the whole walk-up before the
 // convention is consulted at all.
 func TestThreadKeyPrefersGitOverAConventionalLookingSubdirectory(t *testing.T) {
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	root := mainFixture(t, "dotfiles", "main")
 	inner := filepath.Join(root, "vendor-wt-cache")
 	if err := os.MkdirAll(inner, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := ThreadKey(inner); got != "main" {
+	if got := ThreadKey(inner); !strings.HasPrefix(got, "main@") {
 		t.Errorf("a look-alike directory inside a main checkout got its own thread %q — git said main", got)
 	}
 }

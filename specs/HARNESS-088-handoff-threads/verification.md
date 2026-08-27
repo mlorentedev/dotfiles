@@ -98,3 +98,36 @@ input the author was imagining.
   discipline.* First instance #1272 (hook emission alongside Orca), second this
   one (the handoff block). A third from outside this repo would make it a
   pattern; two is already enough to stop writing the rule as prose.
+
+## Second sitting — the debt, and cross-machine identity
+
+| AC | Proof |
+|---|---|
+| The project resolves from anywhere in the tree | `TestRepoIdentityResolvesTheProjectFromAnywhereInTheTree` — worktree root, `cli/`, `cli/internal/mem/`, and a main-checkout subdirectory |
+| A thread is the branch and travels | `TestThreadKeyIsTheBranchSoItTravelsBetweenMachines` — the same branch in two different worktrees is ONE thread, which is the cross-machine property the design turns on |
+| The host qualifies only where it disambiguates | `TestThreadKeyQualifiesOnlyTheDefaultBranchWithTheHost` — `main@host`, `master@host`, and a feature branch carrying no `@` |
+| A detached HEAD says so | `TestThreadKeyNamesADetachedHeadRatherThanGuessing` |
+| git knowing nothing is reported, not guessed | `TestRepoIdentityReportsWhenGitKnowsNothing` |
+
+Live, from `cli/` inside a worktree:
+
+```
+$ dotf mem thread --date 2026-08-27 --project dotfiles --agent claude
+thread   feat-harness-088-handoff-threads
+journal  sessions/2026-08-27-dotfiles-claude-feat-harness-088-handoff-threads.md
+
+$ cd ~/Projects/dotfiles && dotf mem thread
+thread   main@msi
+```
+
+### A mutation test of mine gave a FALSE NEGATIVE
+
+Worth recording because it is the failure mode this repository keeps meeting from
+a new angle. The first mutation replaced `Project:  filepath.Base(...)` written
+with **one** space where `gofmt` had written **two**, so nothing was mutated — and
+the passing test read as *"the test does not catch this"*. Re-run against the
+real target, it failed exactly as it should.
+
+**A mutation test that reports "no change" has not proven the test is weak; it
+has proven nothing at all.** Assert the mutation applied before believing its
+result.
