@@ -47,6 +47,9 @@ try {
     if ($parseErrors.Count -gt 0) {
         throw "setup-windows.ps1 failed to parse: $($parseErrors[0].Message)"
     }
+    # Write-Utf8LfFile (and the console encoding block) live in utils.ps1, which
+    # setup-windows.ps1 dot-sources before Deploy-SkillRecord runs.
+    . (Join-Path $repoRoot 'scripts\utils.ps1')
     foreach ($functionName in @(
         'Test-SkillTargetsAgent',
         'Get-SkillField',
@@ -58,7 +61,29 @@ try {
 
     $env:USERPROFILE = $scratch
     $env:COPILOT_HOME = $copilotHome
+    # The catalog is injected into an EXISTING deployed instructions file (the
+    # base file is copied verbatim earlier in setup). Seed it from the repo
+    # source so the injector runs, then assert the LF/no-BOM contract the
+    # doctor's drift check depends on (WIN-008/#1289).
+    Ensure-Directory $copilotHome
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'ai\copilot\copilot-instructions.md') -Destination (Join-Path $copilotHome 'copilot-instructions.md') -Force
     Deploy-SkillRecord -DotfilesDir $repoRoot
+
+    $instructions = Join-Path $copilotHome 'copilot-instructions.md'
+    $bytes = [System.IO.File]::ReadAllBytes($instructions)
+    if (-not ([System.Text.Encoding]::UTF8.GetString($bytes) -match 'skill catalog')) {
+        throw "catalog was not injected into $instructions"
+    }
+    if ($bytes -contains 13) {
+        throw "$instructions carries CR bytes; the deployed copy must stay LF like its repo source"
+    }
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        throw "$instructions starts with a UTF-8 BOM"
+    }
+    $skillBytes = [System.IO.File]::ReadAllBytes((Join-Path $copilotHome 'skills\handoff\SKILL.md'))
+    if ($skillBytes -contains 13) {
+        throw "rendered SKILL.md carries CR bytes"
+    }
 
     $handoff = Join-Path $copilotHome 'skills\handoff\SKILL.md'
     $auxiliary = Join-Path $copilotHome 'skills\systematic-debugging\root-cause-tracing.md'
@@ -75,13 +100,18 @@ try {
 
     $output = & $copilot.Source skill list 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "copilot skill list failed:`n$($output -join "`n")"
+        # The deploy half above is the deterministic guard. Discovery needs the
+        # CLI itself to run, which on a runner without a Copilot login may not;
+        # say so loudly rather than fail the deploy assertions with it.
+        Write-Warn "copilot skill list failed (discovery not verified):`n$($output -join "`n")"
+        Write-Output 'Windows setup deployed handoff (LF, no BOM); Copilot discovery not verified on this host.'
+        return
     }
     if (($output -join "`n") -notmatch '(?m)^\s*handoff\s+-') {
-        throw "Copilot did not discover handoff in $skillTarget`n$($output -join "`n")"
+        throw "Copilot did not discover handoff in $copilotHome`n$($output -join "`n")"
     }
 
-    Write-Output 'Windows setup deployed handoff and Copilot discovered it.'
+    Write-Output 'Windows setup deployed handoff (LF, no BOM) and Copilot discovered it.'
 }
 finally {
     $env:COPILOT_HOME = $previousCopilotHome

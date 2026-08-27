@@ -810,3 +810,22 @@ setup() {
     grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
     grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
+
+@test "setup-windows.ps1 writes rendered skill files and the copilot catalog through Write-Utf8LfFile, never Set-Content (WIN-008)" {
+    # Set-Content joins with CRLF and rewrites the whole file, so the deployed
+    # copilot-instructions.md drifted from its LF source on every run (#1289).
+    grep -qF 'Write-Utf8LfFile -Path $catFile' "$PS1_SCRIPT"
+    run grep -qF 'Set-Content -LiteralPath $catFile' "$PS1_SCRIPT"
+    [ "$status" -ne 0 ]
+    run grep -cF 'Write-Utf8LfFile -Path' "$PS1_SCRIPT"
+    [ "$output" -ge 3 ]
+}
+
+@test "setup-windows.ps1 mirrors sensitive/ recursively so dr/ reaches the deploy dir (WIN-011)" {
+    grep -qF "Copy-Item -Path (Join-Path \$sensitiveSource '*') -Destination \$sensitiveDest -Recurse -Force" "$PS1_SCRIPT"
+}
+
+@test "utils.ps1 and profile.ps1 set a UTF-8 console encoding (WIN-009)" {
+    grep -qF '[Console]::OutputEncoding = ' "$DOTFILES_DIR/scripts/utils.ps1"
+    grep -qF '[Console]::OutputEncoding = ' "$DOTFILES_DIR/powershell/profile.ps1"
+}
