@@ -240,10 +240,10 @@ func checkOptionalTools(sys *System, cfg *Config, c *Contract, rep *Report) {
 		rep.Pass("dotf in PATH (DOTF_VERSION not pinned — match not verified)")
 	default:
 		got := dotfVersion(sys)
-		switch {
-		case got == pin:
+		switch got {
+		case pin:
 			rep.Pass(fmt.Sprintf("dotf %s matches versions.conf", pin))
-		case got == "dev":
+		case "dev":
 			// A source build (cli/cmd/dotf/main.go's default): deliberate on a
 			// dev box, and what CI runs after building the PR under test. The
 			// pin exists to catch a STALE RELEASE binary, which this is not.
