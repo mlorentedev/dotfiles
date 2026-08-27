@@ -20,6 +20,8 @@
 # (incident->guard) to `printf '%s\n' '--- ... ---'`; the bash behavioral test
 # below is the regression guard (it fails on the old script, passes on the fix).
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
@@ -58,6 +60,13 @@ teardown() {
 @test "vault-maintenance-weekly.sh invokes both maintenance steps best-effort (|| true)" {
     grep -qE 'dotf vault crystallize --all .*\|\| true' "$MAINT_SCRIPT"
     grep -qE 'vault-health.sh" .*\|\| true' "$MAINT_SCRIPT"
+}
+
+@test "vault-maintenance-weekly.sh hardens PATH with ~/.local/bin before calling bare dotf" {
+    # cron runs with a minimal PATH that excludes ~/.local/bin (install-dotf.sh's
+    # install target); without this dotf silently resolves to nothing under
+    # `|| true` every Sunday. The behavioral regression guard is below.
+    grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$MAINT_SCRIPT"
 }
 
 @test "vault-maintenance-weekly.sh guards notify-send behind command -v (headless-safe)" {
@@ -133,6 +142,24 @@ EOF
     grep -qF 'dotf vault crystallize --all' "$log"
     grep -qF 'vault-health' "$log"
     grep -qF '=== Done:' "$log"
+}
+
+@test "vault-maintenance-weekly.sh resolves dotf under a cron-minimal PATH (no inherited ~/.local/bin)" {
+    # Regression guard for the reviewed regression: every prior test prepends
+    # $TMP (holding the dotf stub) onto PATH, which also happens to mask a
+    # missing PATH hardening in the script. cron never does that -- it starts
+    # from a minimal PATH with no ~/.local/bin -- so this places the stub where
+    # the REAL installer puts dotf ($HOME/.local/bin) and runs with a PATH that
+    # does not already contain it, so only the script's own PATH export can
+    # make it resolve.
+    _prep_sandbox "all clean"
+    mkdir -p "$FAKE_HOME/.local/bin"
+    mv "$TMP/dotf" "$FAKE_HOME/.local/bin/dotf"
+    run env HOME="$FAKE_HOME" PATH="/usr/bin:/bin" bash "$TMP/vault-maintenance-weekly.sh"
+    [ "$status" -eq 0 ]
+    log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
+    refute_grep_fixed 'command not found' "$log"
+    grep -qF 'all clean' "$log"
 }
 
 @test "vault-maintenance-weekly.sh tolerates a sibling that prints issue keywords (still exit 0, zsh run)" {

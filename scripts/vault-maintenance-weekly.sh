@@ -9,6 +9,12 @@
 
 set -euo pipefail
 
+# cron runs with a minimal PATH that does not include ~/.local/bin (install-dotf.sh's
+# install target), unlike an interactive shell. The old knowledge-crystallize.sh call
+# used an absolute path and never needed this; `dotf` is invoked by bare name below, so
+# without this the crystallize step silently no-ops under `|| true` every Sunday.
+export PATH="$HOME/.local/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 LOG_DIR="$HOME/.local/share/vault-maintenance"
 LOG_FILE="$LOG_DIR/latest.log"

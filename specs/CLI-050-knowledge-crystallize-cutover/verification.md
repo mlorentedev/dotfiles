@@ -30,6 +30,29 @@ created: "2026-08-27"
 - No regressions in existing test suite: yes, after fixing two tests the deletion broke (see
   Decisions below) — both are documented, not silently patched
 
+## Post-review fixes (round 1, reviewed sha `c1a3d84`, verdict FAIL)
+
+- **Major/REAL**: bare `dotf vault crystallize --all` in `vault-maintenance-weekly.sh` regressed
+  the weekly cron job — cron's minimal PATH excludes `~/.local/bin` (install-dotf.sh's install
+  target), unlike the old absolute-path shell call, so the step would silently no-op every Sunday
+  behind `|| true`. Fixed: `export PATH="$HOME/.local/bin:$PATH"` at the top of the script;
+  applied the same hardening to the `.ps1` twin for symmetry. New regression test
+  `"vault-maintenance-weekly.sh resolves dotf under a cron-minimal PATH"` — verified it actually
+  fails without the fix (`dotf: command not found` in the log) before committing it as green.
+- **Minor**: `features.json` f2's verification command wasn't literally reproducible — it flagged
+  2 unexcluded hits in `specs/HARNESS-063-spec-gate-adjacency/proposal.md`, a different, unrelated
+  active spec that names the old filename only as a worked example in its own design rationale.
+  Patching the exclusion list turned out fragile: this same PR's own post-review fix commit added
+  a new historical comment mentioning the retired filename, breaking the "fixed" version again
+  before it was even pushed. Rewrote f2 to match invocation SHAPE (sourcing, relative-path exec,
+  `Copy-Item`, `&`-invoke) scoped to production files, rather than any textual mention anywhere —
+  AC2 claims "no production file still invokes it", not "the string never appears in prose", and
+  the new command is durable against future documentation legitimately naming the retired script.
+- **Minor/THEORETICAL**: no test coverage exists for `vault-maintenance-weekly.ps1` at all (not
+  introduced by this PR). Applied the PATH fix there too, but did not build new Pester coverage in
+  this PR — no pwsh on this box to validate it, and it's a separable unit of work. Ticketed as
+  TEST-002 (#1277) instead of building it unverified.
+
 ## Decisions made during implementation
 
 - **Two bats files broke on deletion and needed real fixes, not just deletion.**

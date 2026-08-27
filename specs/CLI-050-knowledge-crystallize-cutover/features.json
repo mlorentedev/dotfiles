@@ -9,9 +9,16 @@
   {
     "id": "CLI-050-knowledge-crystallize-cutover-f2",
     "behavior": "every former caller repoints at dotf vault crystallize",
-    "verification": "! grep -rn 'knowledge-crystallize\\.sh\\|knowledge-crystallize\\.ps1' --include='*.sh' --include='*.ps1' --include='*.md' --include='*.yml' --include='*.go' . | grep -v 'specs/archive\\|specs/CLI-021\\|docs/adr/audit-\\|docs/lessons/\\|# CLI-050\\|old knowledge-crystallize.ps1 twin\\|(or .dotf vault crystallize.)'",
+    "verification": "! grep -rnE '(\\$SCRIPT_DIR/|\\./scripts/|Copy-Item .*|& [^ ]*)knowledge-crystallize\\.(sh|ps1)' scripts/ setup-linux.sh setup-windows.ps1 cli/internal/ .claude/CLAUDE.md docs/runbooks/guide-knowledge-distillation.md .github/workflows/ci.yml",
     "state": "passing",
-    "evidence": "Repointed: cli/internal/mem/session_start_injectors.go (+test), scripts/vault-maintenance-weekly.{sh,ps1}, setup-linux.sh, setup-windows.ps1, scripts/vault.sh, scripts/utils.ps1, .claude/CLAUDE.md, docs/runbooks/guide-knowledge-distillation.md, .github/workflows/ci.yml, docs/adr/adr-008-skills-ecosystem-overhaul.md, cli/internal/cmd/{vault,mem}.go doc comments. Remaining hits are intentional historical comments (setup-windows.ps1, vault-maintenance-weekly.ps1) or the vault-generated harness/skills/crystallize/SKILL.md, handled as a separate direct-to-vault-master follow-up per the proposal's Out of scope."
+    "evidence": "Repointed: cli/internal/mem/session_start_injectors.go (+test), scripts/vault-maintenance-weekly.{sh,ps1}, setup-linux.sh, setup-windows.ps1, scripts/vault.sh, scripts/utils.ps1, .claude/CLAUDE.md, docs/runbooks/guide-knowledge-distillation.md, .github/workflows/ci.yml, docs/adr/adr-008-skills-ecosystem-overhaul.md, cli/internal/cmd/{vault,mem}.go doc comments. Rewritten 2026-08-27 after the adversarial review (nan/deepseek-v4-flash) ran the first version literally and found unexcluded hits in an unrelated active spec's prose (specs/HARNESS-063-.../proposal.md) -- and a broader problem the review didn't catch yet: any blanket filename-mention grep keeps breaking every time a NEW historical comment legitimately names the retired script (which happened again in this same PR's post-review fix commit). AC2's actual claim is 'no production file still invokes it', not 'the string never appears in prose', so the command now matches invocation shape (sourcing, relative-path exec, Copy-Item, &-invoke) scoped to production files only -- durable against future documentation mentioning the retired name, which specs/reviews/lessons legitimately do."
+  },
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f6",
+    "behavior": "the weekly maintenance script resolves dotf correctly under cron's minimal PATH, not just under an interactive shell",
+    "verification": "bats tests/vault-maintenance-weekly.bats --filter 'cron-minimal PATH'",
+    "state": "passing",
+    "evidence": "Found by the adversarial review (Major, REAL): bare `dotf vault crystallize --all` (PATH-resolved) replaced an absolute-path call, and cron's default PATH excludes ~/.local/bin (install-dotf.sh's install target) -- the step would have silently no-op'd every Sunday, swallowed by `|| true`. Fixed by exporting PATH=\"$HOME/.local/bin:$PATH\" at the top of vault-maintenance-weekly.sh (and the PowerShell twin, for the same class of dependency on Scheduled Task PATH inheritance). New regression test 'vault-maintenance-weekly.sh resolves dotf under a cron-minimal PATH' places the stub at $FAKE_HOME/.local/bin/dotf and runs with PATH=/usr/bin:/bin (excluding the sandbox's own $TMP, which every other test relies on and which had been masking this gap) -- fails without the fix, passes with it."
   },
   {
     "id": "CLI-050-knowledge-crystallize-cutover-f3",

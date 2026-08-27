@@ -34,6 +34,15 @@ created: "2026-08-27"
       characterization contract, not a live shell comparison; drop the now-dead `shell` mode
       branch and `GC_ORACLE_SH` plumbing from `lib.sh`
 
+## Post-review fixes
+
+- [x] Harden `vault-maintenance-weekly.{sh,ps1}`'s PATH before calling bare `dotf` (cron/Task
+      Scheduler don't reliably inherit `~/.local/bin`) — reviewed Major, REAL
+- [x] Fix `features.json` f2's verification command to exclude the unrelated active spec
+      `specs/HARNESS-063-...` it was falsely flagging — reviewed Minor, REAL
+- [x] File TEST-002 (#1277) for the pre-existing `.ps1` test-coverage gap rather than build
+      unverified Pester tests — reviewed Minor, THEORETICAL
+
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
