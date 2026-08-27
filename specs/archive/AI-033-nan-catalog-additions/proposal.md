@@ -1,7 +1,7 @@
 ---
 id: "AI-033-nan-catalog-additions"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1254"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -80,3 +80,5 @@ Observable outcomes. Each must be testable.
   field-level sync, deferred)
 - `docs/lessons/lesson-150-a-config-file-the-tool-itself-rewrites-must-be-see.md` —
   why `ai/pi/settings.json` is seed-if-missing (context for the "out of scope" #1247 item)
+
+<!-- archived 2026-08-27 — PR: https://github.com/mlorentedev/dotfiles/pull/1255 -->
