@@ -39,6 +39,8 @@ func newMemCmd() *cobra.Command {
 	cmd.AddCommand(newMemSessionEndCmd())
 	cmd.AddCommand(newMemSessionStartCmd())
 	cmd.AddCommand(newMemProjectKeyCmd())
+	cmd.AddCommand(newMemHandoffWriteCmd())
+	cmd.AddCommand(newMemThreadCmd())
 	return cmd
 }
 

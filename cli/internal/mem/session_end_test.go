@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -175,5 +176,81 @@ func TestSessionEnd_EmptyVaultIsNoOp(t *testing.T) {
 	written, err := SessionEnd([]byte(`{"cwd":"/x/proj","session_id":"abc"}`), "", fixedNow)
 	if err != nil || written != "" {
 		t.Fatalf("empty vault must be a no-op, got written=%q err=%v", written, err)
+	}
+}
+
+// TWO CONCURRENT WORKTREES MUST NOT ARCHIVE OVER EACH OTHER.
+//
+// The archive filename was built here as `<date>-<project>-claude.md`, hardcoded
+// and with no thread, and written with os.WriteFile — a TRUNCATING write to a
+// shared name. With several worktrees running, the last SessionEnd destroyed
+// every other session's durable record, which is the same defect HARNESS-088
+// fixes in the handoff block, in the path that was supposed to be the safe copy.
+//
+// It also divergedfrom the skill: `dotf mem thread` names the journal with the
+// thread while this assembled its own — two files per session, drifting apart.
+// Both now come from JournalName.
+func TestSessionEndArchivesPerWorktreeRatherThanOverEachOther(t *testing.T) {
+	vault := t.TempDir()
+	memDir := filepath.Join(vault, "10_projects", "proj", "memory")
+	if err := os.MkdirAll(memDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(memDir, "MEMORY.md"),
+		[]byte("# M\n\n## Session Handoff\n\n### wt-a\n\nfrom a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Two worktrees, written the way git writes a linked worktree.
+	mk := func(name string) string {
+		// Named "proj" because SessionEnd resolves the project as
+		// filepath.Base(cwd) — see the defect noted below.
+		wt := filepath.Join(t.TempDir(), "proj")
+		if err := os.MkdirAll(wt, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		gd := filepath.Join(t.TempDir(), ".git", "worktrees", name)
+		if err := os.MkdirAll(gd, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+gd+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return wt
+	}
+	a, b := mk("wt-a"), mk("wt-b")
+
+	// Marshalled, never concatenated: a Windows cwd is `C:\Users\...` and every
+	// backslash is a JSON escape, so a hand-built payload fails to parse and
+	// SessionEnd no-ops SILENTLY. Caught by CI on windows-latest; GOOS=windows
+	// go vet cannot see it, because vet is not a test run.
+	payload := func(cwd, sid string) []byte {
+		b, err := json.Marshal(map[string]string{"cwd": cwd, "session_id": sid})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	wroteA, err := SessionEnd(payload(a, "sa"), vault, fixedNow)
+	if err != nil || wroteA == "" {
+		t.Fatalf("first archive failed: %v", err)
+	}
+	wroteB, err := SessionEnd(payload(b, "sb"), vault, fixedNow)
+	if err != nil || wroteB == "" {
+		t.Fatalf("second archive failed: %v", err)
+	}
+
+	if wroteA == wroteB {
+		t.Fatalf("both worktrees archived to the same file %q — the second destroyed the first", wroteA)
+	}
+	for _, p := range []string{wroteA, wroteB} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("archive %s does not exist: %v", p, err)
+		}
+	}
+	// And the name is the one the skill would derive, not a second convention.
+	if want := JournalName(fixedNow.Format("2006-01-02"), "proj", "claude", "wt-a"); filepath.Base(wroteA) != want {
+		t.Errorf("archive name %q diverges from JournalName %q", filepath.Base(wroteA), want)
 	}
 }
