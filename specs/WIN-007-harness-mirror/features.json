@@ -1,0 +1,37 @@
+[
+  {
+    "id": "WIN-007-harness-mirror-f1",
+    "behavior": "dotf harness mirror copies harness/ and every manifest .targets[].file into the deploy dir; a re-run reports 0 updated and rewrites nothing.",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestMirror_CopiesTheTreeAndEveryDeclaredTarget|TestMirror_IsIdempotentAndDoesNotRewriteIdenticalFiles'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-007-harness-mirror-f2",
+    "behavior": "A declared target the checkout lacks is named on stderr and the command exits 1 after mirroring everything else.",
+    "verification": "cd cli && go test ./internal/harness/ ./internal/cmd/ -run 'TestMirror_NamesADeclaredTargetTheCheckoutLacks|TestHarnessMirrorCmd$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-007-harness-mirror-f3",
+    "behavior": "A file only the deploy dir has survives a mirror run; pruning stays with dotf doctor --fix.",
+    "verification": "cd cli && go test ./internal/harness/ -run TestMirror_DoesNotPrune",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-007-harness-mirror-f4",
+    "behavior": "Both setup scripts call dotf harness mirror and setup-linux.sh no longer carries the bash+jq mirror block.",
+    "verification": "grep -qF 'dotf harness mirror' setup-windows.ps1 && grep -qF 'dotf harness mirror' setup-linux.sh && ! grep -qF 'cp -rf \"$CURRENT_DIR/harness/.\"' setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-007-harness-mirror-f5",
+    "behavior": "dotf doctor reports harness mirror orphans on Windows as on Linux, and the pi-packages count reads the checkout first.",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckHarnessMirrorOrphans|TestPiPackagesManifest'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

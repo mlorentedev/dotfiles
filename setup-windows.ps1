@@ -661,6 +661,20 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     }
 }
 
+# Mirror the harness inputs into the deploy dir (WIN-007/#1288): harness\ plus
+# every file harness\manifest.json declares as an injection target, so
+# `dotf doctor` reads model-map.json / model-pins.json from the copy it checks.
+# One Go implementation for both OSes (setup-linux.sh calls the same command).
+# Windows never had this block: doctor failed both registries after every setup
+# with a remedy ("re-run setup") that could not clear them. Idempotent (prints
+# "N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    dotf harness mirror
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf harness mirror reported a gap (above); 'dotf doctor' will report harness drift"
+    }
+}
+
 # Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
 # `hive serve` Scheduled Task now that the MCP loop's prerequisite installed/upgraded
 # the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing

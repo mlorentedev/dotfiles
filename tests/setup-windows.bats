@@ -798,3 +798,15 @@ setup() {
     grep -qF 'ai\opencode\tui.json' "$PS1_SCRIPT"
     grep -qF '.config\opencode\tui.json' "$PS1_SCRIPT"
 }
+
+@test "setup-windows.ps1 mirrors the harness inputs through dotf harness mirror (WIN-007)" {
+    # ~/.dotfiles/harness never existed on Windows, so `dotf doctor` failed the
+    # routing registry and the model-pin checks after every setup, with a
+    # remedy ("re-run setup") that could not clear them (#1288).
+    grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
+}
+
+@test "parity: both setups mirror the harness through the same dotf command (WIN-007)" {
+    grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
+    grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
+}

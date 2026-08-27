@@ -83,7 +83,7 @@ func checkPiExtensions(sys *System, cfg *Config, rep *Report, fix bool) {
 
 	if len(shadows) == 0 {
 		rep.Pass(fmt.Sprintf("no hand-wired extension shadows a manifest package (%d extension entries, %d packages declared)",
-			len(entries), piPackagesManifest(cfg.DotfilesDir)))
+			len(entries), piPackagesManifest(sys, cfg)))
 		return
 	}
 
@@ -219,9 +219,18 @@ func short(sys *System, p string) string {
 }
 
 // piPackagesManifest is the declaration setup reconciles against. Read only to
-// report how many packages are at stake when a shadow is found.
-func piPackagesManifest(dotfilesDir string) int {
-	doc, err := os.ReadFile(filepath.Join(dotfilesDir, "ai", "pi", "packages.json"))
+// report how many packages are at stake when a shadow is found. Checkout
+// first, mirror second — the ADR-030 precedence every other registry read
+// here follows: the deploy mirror never carried ai/pi/, so this reported
+// "0 packages declared" as a PASS on Windows (WIN-007/#1288).
+func piPackagesManifest(sys *System, cfg *Config) int {
+	path := filepath.Join(cfg.DotfilesDir, "ai", "pi", "packages.json")
+	if repo := resolveRepoDir(sys); repo != "" {
+		if p := filepath.Join(repo, "ai", "pi", "packages.json"); pathExists(p) {
+			path = p
+		}
+	}
+	doc, err := os.ReadFile(path) //nolint:gosec // repo-relative, fixed name
 	if err != nil {
 		return 0
 	}
