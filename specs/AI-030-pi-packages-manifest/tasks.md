@@ -42,6 +42,9 @@ created: "2026-08-25"
 - [x] [AC10] Mirror the block in `setup-windows.ps1`, with parity guards
 - [x] [AC5] [AC6] Verify behaviour by driving the real block, extracted from
       `setup-linux.sh` by anchor, against a stubbed `pi` — four scenarios
+- [x] [AC11] Add a doctor check that observes LOADING rather than declaration
+      (`cli/internal/doctor/checks_pi_extensions.go` + `_repair.go`), and prove
+      it against the live defect: `pi -p` exit 1 → exit 0 (#1243)
 
 ## Closing
 

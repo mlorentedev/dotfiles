@@ -19,6 +19,7 @@ created: "2026-08-25"
 | AC8 unreadable manifest is loud | `tests/pi-packages.bats` — "refuses an unreadable manifest instead of reading it empty" |
 | AC9 Linux uses `$PI_BIN` | `tests/pi-packages.bats` — "installs through $PI_BIN, not the shell function" |
 | AC10 Windows parity, no new non-ASCII | `tests/pi-packages.bats` — three `setup-windows` cases; non-ASCII line count 10 before and 10 after |
+| AC11 a declared package actually **loads** | `dotf doctor` on the real machine — `[FAIL] extension "subagent" shadows the installed package of the same name`, then `[FIX ] quarantined ~/.pi/agent/extensions/subagent/index.ts`; effect confirmed by `pi -p` going from **exit 1** (`Failed to load extension … Tool "subagent" conflicts`) to **exit 0** answering `OK`, and a third `dotf doctor` run then reporting `[pi extensions] (1 checks, all ok)`. Unit-covered by `cli/internal/doctor/checks_pi_extensions_test.go` (6 cases: FAIL on collision, WARN without, the scoping rule that leaves an external writer's files alone, SKIP with no extensions dir, quarantine landing outside the auto-discovered tree, and no-clobber on a second `--fix`) |
 
 All on commit `2c20332` plus the spec commit that follows it.
 
@@ -77,6 +78,20 @@ limitation `tests/stub-real-pairing.bats` exists to keep visible (BUG-055).
 - **`jq -er`, not `jq -r`.** A malformed manifest yields an empty want-list, and
   an empty want-list installs nothing while logging exactly like "everything is
   already present" — silent success on a broken input.
+- **The packaged `subagent` wins; the hand-wired link is quarantined** (#1243).
+  Two extensions provided the tool. The decision is for the one the manifest
+  declares — `npm:pi-subagents@0.56.0` — and against the 2026-08-09 symlink into
+  pi's bundled examples, on four grounds. It is **reproducible**: setup installs
+  it on every run and on a fresh machine, while nothing recreates the symlink.
+  It is **versioned**: the manifest pins `@0.56.0`, so upstream's publish passes
+  a diff and a reviewer, whereas the link tracks whatever the examples directory
+  happens to contain. It is **portable**: the link hard-codes
+  `~/.nvm/versions/node/v24.16.0/`, so it rots when that node version is removed
+  and is invisible to any other node. And it is **maintained**: the packaged
+  version is 0.56.0 against examples last touched in the pi release that shipped
+  them. The loser is quarantined rather than deleted — the choice is about which
+  one loads, not about discarding the user's; it is restorable with `mv` and its
+  target inside pi's npm package is never touched.
 - **The spec was written after the implementation.** The Discipline Gate trigger
   was found while measuring the diff for the PR, not while scoping. Recorded in
   `tasks.md` rather than disguised; a back-dated task list would make this folder

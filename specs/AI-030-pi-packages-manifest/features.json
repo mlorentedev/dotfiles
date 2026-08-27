@@ -68,5 +68,12 @@
     "verification": "bats tests/pi-packages.bats -f 'setup-windows' && python3 -c \"import sys; sys.exit(0 if sum(1 for l in open('setup-windows.ps1',encoding='utf-8') if any(ord(c)>126 for c in l)) == 10 else 1)\"",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f11",
+    "behavior": "AC11 - a package that is installed and declared is also LOADED: doctor detects a hand-wired extension symlink shadowing it, quarantines it under --fix outside the tree pi auto-discovers, refuses to clobber an earlier quarantine, and leaves an external writer's plain files alone",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestPiExtensions",
+    "state": "pending",
+    "evidence": ""
   }
 ]
