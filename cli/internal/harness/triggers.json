@@ -412,6 +412,42 @@
         "mcp tool",
         "mcp server"
       ]
+    },
+    {
+      "id": "code-complexity-and-refactor",
+      "pattern": "pattern-language-standards",
+      "globs": [
+        "*.py",
+        "**/*.py",
+        "*.go",
+        "**/*.go",
+        "*.ts",
+        "**/*.ts",
+        "*.js",
+        "**/*.js",
+        "*.rs",
+        "**/*.rs",
+        "*.c",
+        "**/*.c",
+        "*.cpp",
+        "**/*.cpp"
+      ],
+      "description": "Triggered when analyzing, reviewing, or refactoring complex code logic or nested branching",
+      "skills": [
+        "cyclomatic-complexity"
+      ],
+      "keywords": [
+        "cyclomatic",
+        "complexity",
+        "complejidad",
+        "refactor",
+        "nesting",
+        "god function",
+        "anidamiento",
+        "radon",
+        "gocyclo",
+        "guard clause"
+      ]
     }
   ]
 }

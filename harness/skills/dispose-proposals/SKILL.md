@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispose-proposals/SKILL.md
-generated_sha: 180bb72686ae728a
+generated_sha: 976b46e98e81ed1f
 id: dispose-proposals-skill
 type: skill
 status: active
@@ -85,13 +85,23 @@ so the same false cluster is not re-litigated next week.
 The drafts live in the vault → obsidian-git auto-commits the disposition edits (do not manual-commit).
 Report: N disposed (promoted/merged/kept/wontfix), with the issue numbers for accepts.
 
+### Step 6 — Execute Accepted Proposals (S5 Promotion Loop)
+When a proposal issue is approved on the board:
+1. Author or update the Tier-4 artifact in `00_meta/{patterns,skills,runbooks}/` following `genre-picker` and Frontmatter Law.
+2. If it is an enforced pattern or cross-agent skill, compile and distribute to all agent targets via dotfiles:
+   ```bash
+   bash "${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"/scripts/compile-harness.sh --refresh
+   bash "${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"/scripts/compile-harness.sh --deploy
+   ```
+3. Close the proposal issue with reference to the created Tier-4 artifact commit.
+
 ## Cadence & boundaries
 - **Weekly**, batched with `crystallize` + `insights` (one ordered review, not per-event interrupts).
 - Keep the `proposal` queue near zero so the vault never drifts far from clean.
 - You disposition recurrence candidates; promotion across the write-boundary into `00_meta/` (S5)
-  is a separate, deliberate step after the issue is accepted on the board.
+  is a deliberate step executed once the issue is accepted on the board.
 
 ## References
 - `00_meta/agents/runbooks/curation.md` (the loop + SOP), `proposals/_TEMPLATE.md` (draft schema)
 - `pattern-memory-consolidation`, `pattern-lesson-promotion` (anti-bloat promotion gates)
-- Epic knowledge#134 (CURATOR-001); this skill is S3 (#137). Producer: `emit-proposals.py`.
+- Epic knowledge#134 (CURATOR-001); S4 knowledge#138, S5 knowledge#139. Producer: `curator-analyze.py` / `emit-proposals.py`.

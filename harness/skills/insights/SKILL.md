@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 4a7575f442b00665
+generated_sha: 5d5cf25c6c860a18
 id: insights-skill
 type: skill
 status: active
@@ -75,9 +75,7 @@ If failures detected -> recommend `/vault-doctor`.
 
 ### Step 6 -- Decision Persistence Check (full mode)
 
-- Search recent session observations for decisions
-- For each decision, verify it was written to the affected vault file (ADR, context, tasks)
-- Flag unpersisted decisions:
+- For each decision, verify it was written to the affected artifact (repo ADR, context, pattern)
 
 ```
 Decision persistence:
