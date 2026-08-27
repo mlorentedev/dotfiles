@@ -375,18 +375,6 @@ if (Test-Path -LiteralPath $installHooksPs1) {
 
 Write-Info "Installing developer tools..."
 
-# Pin OpenCode to OPENCODE_VERSION from versions.conf (REFACTOR-011), mirroring
-# the Linux installer. winget honors --version. If the manifest is missing or
-# the key is absent, $opencodeVersion stays $null and OpenCode installs latest.
-$opencodeVersion = $null
-if (Test-Path -LiteralPath $versionsSource) {
-    foreach ($line in Get-Content -LiteralPath $versionsSource) {
-        if ($line -match '^\s*OPENCODE_VERSION\s*=\s*(.+?)\s*$') {
-            $opencodeVersion = $Matches[1].Trim().Trim('"').Trim("'")
-            break
-        }
-    }
-}
 
 $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
 if ($wingetCmd) {
@@ -397,46 +385,24 @@ if ($wingetCmd) {
         @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
         @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
         @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" },
-        # AI-014: OpenCode (secondary AI agent, ADR-009). User-scope winget
-        # package, no admin. Cleaner than the Linux curl-bash equivalent.
-        @{ Name = "OpenCode"; Cmd = "opencode"; Id = "SST.opencode"; Version = $opencodeVersion }
+        # Node.js is the prerequisite of the npm channel (ADR-036 class 3: no
+        # cross-OS channel, so winget here, nvm on Linux). It must exist before
+        # `dotf tools install` runs below, or bw and opencode cannot install on
+        # a clean box. A scoop/nvm node already on PATH is left alone.
+        @{ Name = "Node.js LTS"; Cmd = "node"; Id = "OpenJS.NodeJS.LTS" }
+        # opencode left this list for packages.json (npm on every OS, AI-034/#1294,
+        # ADR-036): `dotf tools install` below converges it. No winget tool carries
+        # a version pin any more, so the loop only installs what is absent.
     )
     foreach ($tool in $tools) {
         if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
             Write-Info "Installing $($tool.Name)..."
             try {
                 $wingetArgs = @($tool.Id, '--accept-package-agreements', '--accept-source-agreements')
-                # ContainsKey guard: utils.ps1 sets Set-StrictMode Latest, so
-                # $tool.Version on a hashtable WITHOUT that key throws instead
-                # of returning $null -- latent until a box actually needs the
-                # install branch (first caught by the WIN-004 CI runner).
-                if ($tool.ContainsKey('Version') -and $tool.Version) { $wingetArgs += @('--version', $tool.Version) }
                 & winget install @wingetArgs 2>$null | Out-Null
                 Write-Success "$($tool.Name) installed"
             } catch {
                 Write-Warn "Failed to install $($tool.Name): $_"
-            }
-        } elseif ($tool.ContainsKey('Version') -and $tool.Version) {
-            # REFACTOR-011/013: presence is not convergence, and the pin is a
-            # MINIMUM. A tool OLDER than the pin was skipped as "already
-            # installed"; an exact-match `-ne` reconcile would conversely
-            # DOWNGRADE a newer install. Upgrade only when installed < pin.
-            $installedVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
-            if (-not (Test-VersionAtLeast $installedVer $tool.Version)) {
-                Write-Info "$($tool.Name) $installedVer below pinned minimum $($tool.Version), upgrading..."
-                & winget install $tool.Id --version $tool.Version --accept-package-agreements --accept-source-agreements --force 2>$null | Out-Null
-                # Re-query instead of trusting winget's exit code: when the
-                # PATH-resolved binary comes from another package manager (npm
-                # global, scoop), winget converges its own copy but the
-                # shadowing install keeps winning -- that is not convergence.
-                $postVer = ((& $tool.Cmd --version 2>&1 | Select-Object -First 1) -split '\s+')[-1]
-                if (Test-VersionAtLeast $postVer $tool.Version) {
-                    Write-Success "$($tool.Name) upgraded to $postVer (>= $($tool.Version))"
-                } else {
-                    Write-Warn "$($tool.Name) still $postVer after winget install $($tool.Version): another install shadows it in PATH (e.g. npm global, scoop); converge that install instead"
-                }
-            } else {
-                Write-Info "$($tool.Name) already installed ($installedVer >= $($tool.Version))"
             }
         } else {
             Write-Info "$($tool.Name) already installed"
@@ -680,8 +646,16 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 # `hive service`, which an older hive routes to the blocking stdio server). The MCP
 # entry itself is already `hive client` (re-added from mcp-servers.json above).
 # Non-fatal: any failure leaves the in-process `hive client` fallback.
-$hiveVerMatch = (& uv tool list 2>$null | Select-String -Pattern '^hive-vault\s+v?([\d.]+)')
-$hiveVer = if ($hiveVerMatch) { $hiveVerMatch.Matches[0].Groups[1].Value } else { $null }
+# Probe the BINARY, not the installer registry: hive moved to its own installer
+# and `uv tool list` stopped seeing a healthy install (AI-028/#791), so this gate
+# skipped daemon supervision with "hive <unknown> predates 'hive service'" while
+# `hive --version` answered 3.0.0 on the work box. `dotf tools version` is the one
+# semver extraction both OSes share (ADR-036).
+$hiveVer = $null
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    $hiveVer = (& dotf tools version hive 2>$null | Select-Object -First 1)
+    if ($LASTEXITCODE -ne 0 -or -not $hiveVer) { $hiveVer = $null }
+}
 if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
     & hive service install *> $null
     $hiveSvcRc = $LASTEXITCODE
@@ -1083,7 +1057,7 @@ if (-not $obsidianCmd) {
 # ============================================================================
 # 2d. OPENCODE CONFIG + COMMANDS (AI-014)
 # ============================================================================
-# Binary install is handled in section 1c via winget SST.opencode. This block
+# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036). This block
 # deploys the canonical config + skill-derived commands using the same
 # reconcile-not-skip pattern as setup-linux.sh (AI-011, lines 415-465).
 # Both files: SHA256 byte-equality test before overwrite so user-side edits

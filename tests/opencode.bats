@@ -19,8 +19,11 @@ setup() {
     grep -q "OpenCode (secondary AI coding agent" "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode install is idempotent (command -v gate before install)" {
-    grep -q 'if ! command -v opencode' "$SETUP_SCRIPT"
+@test "opencode is a packages.json catalog tool (npm) and setup-linux.sh carries no install block (AI-034, ADR-036)" {
+    jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm" and .source.package=="opencode-ai")' "$DOTFILES_DIR/packages.json" >/dev/null
+    refute_grep_fixed 'opencode.ai/install' "$SETUP_SCRIPT"
+    refute_grep_fixed 'OPENCODE_BIN_DIR=' "$SETUP_SCRIPT"
+    refute_grep_fixed 'OPENCODE_VERSION' "$SETUP_SCRIPT"
 }
 
 @test "setup-linux.sh opencode config deploy is declarative always-overwrite (no cmp -s skip)" {
@@ -36,36 +39,28 @@ setup() {
     grep -q 'dotf secrets render "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode block has post-deploy assertion" {
-    grep -q "opencode binary not reachable" "$SETUP_SCRIPT"
+@test "setup-linux.sh opencode block has post-deploy assertion, probed through dotf tools version (ADR-036)" {
+    grep -q "opencode not reachable on PATH" "$SETUP_SCRIPT"
+    grep -qF 'tools version opencode' "$SETUP_SCRIPT"
+    # No second version-detection contract beside the shared probe.
+    refute_grep_fixed 'opencode --version 2>&1 | grep' "$SETUP_SCRIPT"
 }
 
-@test "opencode PATH is baked into repo .zshrc and .bashrc (SSOT, no setup-time mutation)" {
-    grep -q 'export PATH="\$HOME/.opencode/bin:\$PATH"' "$DOTFILES_DIR/.zshrc"
-    grep -q 'export PATH="\$HOME/.opencode/bin:\$PATH"' "$DOTFILES_DIR/.bashrc"
-    refute_grep 'ensure_line_in_file.*OPENCODE_PATH_LINE' "$SETUP_SCRIPT"
+@test "the retired ~/.opencode/bin channel is off PATH in .zshrc and .bashrc (AI-034, ADR-036)" {
+    # The curl-script copy would otherwise keep shadowing the npm one on the
+    # Linux box; doctor names the leftover, the rc files stop reaching for it.
+    refute_grep_fixed '.opencode/bin' "$DOTFILES_DIR/.zshrc"
+    refute_grep_fixed '.opencode/bin' "$DOTFILES_DIR/.bashrc"
 }
 
-@test "setup-linux.sh upgrades a below-minimum opencode to the versions.conf pin (REFACTOR-011/013)" {
-    # Presence is not convergence, and the pin is a MINIMUM: an opencode older
-    # than OPENCODE_VERSION was skipped as "already installed", while an exact
-    # != reconcile would downgrade a newer install. Gate on version_gte so only
-    # an older opencode triggers an upgrade.
-    grep -q 'version_gte "$installed_opencode" "$OPENCODE_VERSION"' "$SETUP_SCRIPT"
-    refute_grep_fixed 'installed_opencode" != "$OPENCODE_VERSION' "$SETUP_SCRIPT"
-    # Convergence is verified by re-query, not by installer exit code: a
-    # shadowing install (npm global) would otherwise produce a false SUCCESS.
-    grep -q 'shadows it in PATH' "$SETUP_SCRIPT"
+@test "packages.json is the only opencode pin (versions.conf carries none, ADR-036)" {
+    refute_grep '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf"
+    [ "$(jq -r '.tools[] | select(.name=="opencode") | .version' "$DOTFILES_DIR/packages.json")" != "" ]
 }
 
 # CLI-018: version-drift-is-WARN (yarn/opencode/pi) was asserted against
 # healthcheck.ps1; it now lives in go test (TestCheckOptionalTools_DotfDrift,
 # TestCheckVersionMatch) after the .ps1 was retired.
-
-@test "setup-linux.sh opencode install URL uses opencode.ai (not anomalyco fork)" {
-    grep -q 'curl -fsSL https://opencode.ai/install' "$SETUP_SCRIPT"
-    refute_grep 'curl.*anomalyco' "$SETUP_SCRIPT"
-}
 
 @test "setup-linux.sh opencode block has no new silenced errors (2>/dev/null || true)" {
     # Count silenced errors in opencode block specifically (between OPENCODE marker and next blank-line section)

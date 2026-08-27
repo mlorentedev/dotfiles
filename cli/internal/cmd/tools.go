@@ -32,6 +32,7 @@ func newToolsCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newToolsListCmd())
 	cmd.AddCommand(newToolsInstallCmd())
+	cmd.AddCommand(newToolsVersionCmd())
 	return cmd
 }
 
@@ -143,6 +144,32 @@ func newToolsListCmd() *cobra.Command {
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", t.Name, t.Version, t.Profile, asset)
 			}
 			return w.Flush()
+		},
+	}
+}
+
+// toolsVersionRunner is the exec seam for `dotf tools version`; tests inject a fake.
+var toolsVersionRunner tools.Runner = tools.ExecRunner
+
+func newToolsVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version <name>",
+		Short: "Print the semver a tool on PATH reports, or exit 1",
+		Long: "version runs `<name> --version` and prints the first semver in its output —\n" +
+			"the one extraction every caller shares (ADR-036). The setup scripts used to\n" +
+			"parse \"last token of the first line\" in seven places, and on the Windows\n" +
+			"work box that accepted `locked.` as opencode's version (AI-034, #1294).\n" +
+			"Exits 1 with nothing on stdout when the tool is absent or prints no version,\n" +
+			"so a shell caller can test either.",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			v := tools.ProbeVersion(args[0], toolsVersionRunner)
+			if v == "" {
+				return fmt.Errorf("%s: no version found on PATH", args[0])
+			}
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), v)
+			return nil
 		},
 	}
 }

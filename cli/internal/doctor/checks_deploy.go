@@ -10,6 +10,7 @@ import (
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // checkSymlinks reproduces healthcheck section 4: the dotfiles symlinks resolve.
@@ -273,13 +274,15 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	opencodeBin := filepath.Join(home, ".opencode", "bin", "opencode")
 	switch {
 	case sys.has("opencode"):
-		ver := trailingVersion(sys, "opencode", "--version")
+		ver := semverOf(sys, "opencode")
 		rep.Pass("opencode in PATH: " + ver)
-		matchPin(rep, "opencode", ver, cfg.Versions["OPENCODE_VERSION"])
+		matchPinFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), "packages.json")
 	case isExecFile(opencodeBin):
-		rep.Fail("opencode binary exists at " + opencodeBin + " but not in PATH (reload shell)")
+		// The retired curl-script channel (ADR-036) left a copy behind and
+		// nothing on PATH resolves: the rc files no longer add ~/.opencode/bin.
+		rep.Fail("opencode not on PATH; a legacy curl-script copy sits at " + opencodeBin + " — run `dotf tools install opencode` and delete the legacy copy (ADR-036)")
 	default:
-		rep.Fail("opencode binary missing (run setup)")
+		rep.Fail("opencode missing (run `dotf tools install opencode`)")
 	}
 
 	// opencode config + $schema.
@@ -302,7 +305,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	piConfigured := pathExists(filepath.Join(home, ".pi", "agent", "models.json"))
 	switch {
 	case sys.has("pi"):
-		ver := trailingVersion(sys, "pi", "--version")
+		ver := semverOf(sys, "pi")
 		rep.Pass("pi in PATH: " + ver)
 		matchPin(rep, "pi", ver, cfg.Versions["PI_VERSION"])
 	case isExecFile(piLocalBin):
@@ -328,6 +331,8 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 			rep.Skip("pi models.json substitution — age identity absent ({env:} resolves at runtime)")
 		}
 	}
+
+	checkShadowedCatalogTools(sys, cfg, rep)
 
 	// Launchability. Everything above is a static predicate — files and PATH —
 	// and every one of them was green on a box where `pi` could not start
@@ -827,35 +832,39 @@ func checkAntigravity(sys *System, rep *Report) {
 	}
 }
 
-// trailingVersion returns the last whitespace field of the first line of
-// `name <arg>` output (the awk '{print $NF}' idiom), or "unknown" on error.
-func trailingVersion(sys *System, name, arg string) string {
-	out, err := sys.CommandOutput(name, arg)
-	if err != nil {
-		return "unknown"
-	}
-	first := out
-	if i := strings.IndexByte(out, '\n'); i >= 0 {
-		first = out[:i]
-	}
-	fields := strings.Fields(first)
-	if len(fields) == 0 {
-		return "unknown"
-	}
-	return fields[len(fields)-1]
-}
-
 // matchPin compares an installed version against a versions.conf pin: empty pin
 // → SKIP, equal → PASS, drift → WARN (never a FAIL — a pinned-tool drift is
 // advisory, exactly as healthcheck treated it).
+// semverOf is the doctor-side face of tools.ProbeVersion: the first semver in
+// `<name> --version`, through the System seam so tests inject the banner.
+// trailingVersion (last token of the first line) is what reported "locked."
+// for opencode on the Windows work box (AI-034/#1294); "unknown" when the
+// tool prints no version at all, so the report line stays readable.
+func semverOf(sys *System, name string) string {
+	v := tools.ProbeVersion(name, func(n string, args ...string) ([]byte, error) {
+		out, err := sys.CommandOutput(n, args...)
+		return []byte(out), err
+	})
+	if v == "" {
+		return "unknown"
+	}
+	return v
+}
+
 func matchPin(rep *Report, tool, installed, pin string) {
+	matchPinFrom(rep, tool, installed, pin, "versions.conf")
+}
+
+// matchPinFrom is matchPin with the pin's source named: packages.json is the
+// SSOT for catalog tools (ADR-036), versions.conf for the rest.
+func matchPinFrom(rep *Report, tool, installed, pin, source string) {
 	switch {
 	case pin == "":
-		rep.Skip(tool + " version not pinned in versions.conf — match not verified")
+		rep.Skip(tool + " version not pinned in " + source + " — match not verified")
 	case installed == pin:
-		rep.Pass(fmt.Sprintf("%s version matches versions.conf (%s)", tool, pin))
+		rep.Pass(fmt.Sprintf("%s version matches %s (%s)", tool, source, pin))
 	default:
-		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s", tool, installed, pin))
+		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s (%s)", tool, installed, pin, source))
 	}
 }
 

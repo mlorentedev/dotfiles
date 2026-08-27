@@ -40,7 +40,7 @@ if [ "$CURRENT_DIR" = "$DOTFILES_DIR" ]; then
 fi
 
 # Single source of truth for tool versions (REFACTOR-011): source the manifest
-# from the checkout so $OPENCODE_VERSION / etc. are reliable
+# from the checkout so $PI_VERSION / etc. are reliable
 # regardless of the parent shell. Read from $CURRENT_DIR: the copy under
 # $DOTFILES_DIR does not exist yet on a first run (it is created below).
 [ -f "$CURRENT_DIR/versions.conf" ] && . "$CURRENT_DIR/versions.conf"
@@ -688,58 +688,16 @@ fi
 # OpenCode (secondary AI coding agent — see ADR-009 and specs/AI-011-opencode-bootstrap)
 
 # Idempotent per pattern-setup-script-idempotence:
-#   - install only if absent (no forced re-install on every run)
+#   - the binary is a packages.json catalog tool (npm on every OS, AI-034/#1294,
+#     ADR-036): `dotf tools install` above converges it; nothing installs here
 #   - reconcile config (not skip-if-exists) so source-of-truth wins on drift
 #   - no silenced errors; failures surface as log_warning
 log_info "Setting up OpenCode configuration..."
-OPENCODE_BIN_DIR="$HOME/.opencode/bin"
-OPENCODE_BINARY="$OPENCODE_BIN_DIR/opencode"
-
-if ! command -v opencode >/dev/null 2>&1 && [ ! -x "$OPENCODE_BINARY" ]; then
-    # Pin to $OPENCODE_VERSION from versions.conf (REFACTOR-011). The official
-    # installer honors `--version`. If the manifest is missing (broken checkout)
-    # OPENCODE_VERSION is empty -- fall back to latest rather than passing an
-    # empty --version, and let healthcheck surface the drift.
-    opencode_install_status=0
-    if [ -n "$OPENCODE_VERSION" ]; then
-        log_info "Installing opencode v$OPENCODE_VERSION via official install script..."
-        curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION" || opencode_install_status=$?
-    else
-        log_info "Installing opencode (latest; OPENCODE_VERSION unset) via official install script..."
-        curl -fsSL https://opencode.ai/install | bash || opencode_install_status=$?
-    fi
-    if [ "$opencode_install_status" -eq 0 ]; then
-        log_success "opencode installed to $OPENCODE_BIN_DIR"
-    else
-        log_warning "opencode install failed — re-run setup or install manually (https://opencode.ai/docs/)"
-    fi
-elif [ -n "$OPENCODE_VERSION" ]; then
-    # REFACTOR-011/013: presence is not convergence, and the pin is a MINIMUM.
-    # An opencode OLDER than the pin was previously skipped as "already
-    # installed"; an exact-match reconcile would conversely DOWNGRADE a newer
-    # install. Upgrade only when installed < pin (version_gte), never downgrade.
-    opencode_cmd="opencode"
-    command -v opencode >/dev/null 2>&1 || opencode_cmd="$OPENCODE_BINARY"
-    installed_opencode=$("$opencode_cmd" --version 2>/dev/null | head -1 | awk '{print $NF}')
-    if ! version_gte "$installed_opencode" "$OPENCODE_VERSION"; then
-        log_info "opencode ${installed_opencode:-unknown} below pinned minimum $OPENCODE_VERSION, upgrading..."
-        curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION" || true
-        # Re-query instead of trusting the installer exit code: when the
-        # PATH-resolved binary comes from another package manager (npm
-        # global), the installer converges its own copy but the shadowing
-        # install keeps winning -- that is not convergence.
-        converged_opencode=$("$opencode_cmd" --version 2>/dev/null | head -1 | awk '{print $NF}')
-        if version_gte "$converged_opencode" "$OPENCODE_VERSION"; then
-            log_success "opencode upgraded to ${converged_opencode:-$OPENCODE_VERSION} (>= $OPENCODE_VERSION)"
-        else
-            log_warning "opencode still ${converged_opencode:-unknown} after install of $OPENCODE_VERSION: another install shadows it in PATH (e.g. npm global); converge that install instead"
-        fi
-    else
-        log_info "opencode already installed (${installed_opencode:-unknown} >= $OPENCODE_VERSION)"
-    fi
-else
-    log_info "opencode already installed"
-fi
+# The curl-script install into ~/.opencode/bin and its "last token of the
+# first line" version parse lived here until AI-034. A leftover copy from that
+# channel is reported by `dotf doctor` (a catalog tool resolving from two PATH
+# directories) and is safe to delete once `command -v opencode` resolves the
+# npm one; the rc files no longer put ~/.opencode/bin on PATH.
 
 # Deploy opencode.jsonc with deploy-time {env:VAR} substitution (SDD-009).
 # Source ships placeholders like {env:NAN_API_KEY}; we substitute the literal
@@ -1036,13 +994,20 @@ fi
 # ai/opencode/commands/ + skills-to-opencode.sh path; the per-skill targets[]
 # now expresses what was the hard-coded Claude-only skip-list.
 
-# Post-deploy assertion — binary reachable + version reports
-if [ -x "$OPENCODE_BINARY" ] || command -v opencode >/dev/null 2>&1; then
-    OPENCODE_VERSION=$("$OPENCODE_BINARY" --version 2>&1 | head -1 || echo "unknown")
-    log_success "opencode ready: $OPENCODE_VERSION"
-    log_info "First-time use: launch \`opencode\` and run /connect to authenticate (Go subscription)"
+# Post-deploy assertion: binary reachable + version reports. Placement is
+# `dotf tools install`'s (packages.json, AI-034/#1294); this only verifies it,
+# through the one version probe (ADR-036) rather than a local parse.
+if command -v opencode >/dev/null 2>&1; then
+    _dotf=""
+    if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
+    opencode_ready_version=""
+    if [ -n "$_dotf" ]; then
+        opencode_ready_version=$("$_dotf" tools version opencode 2>/dev/null) || opencode_ready_version=""
+    fi
+    unset _dotf
+    log_success "opencode ready: ${opencode_ready_version:-unknown}"
 else
-    log_warning "opencode binary not reachable at $OPENCODE_BINARY after install — agent unavailable"
+    log_warning "opencode not reachable on PATH after 'dotf tools install' — agent unavailable (re-run 'dotf tools install opencode')"
 fi
 
 # GitHub Copilot CLI (BUG-003: standalone agentic CLI, drops legacy gh-copilot
@@ -1203,7 +1168,18 @@ fi
 # `hive service`, which an older hive routes to the blocking stdio server). The MCP
 # entry itself is already `hive client` (re-added from mcp-servers.json above).
 # Non-fatal: a missing systemd --user or any failure leaves the in-process fallback.
-hive_ver=$(uv tool list 2>/dev/null | sed -n 's/^hive-vault v\?\([0-9][0-9.]*\).*/\1/p' | head -1)
+# Probe the BINARY, not the installer registry: hive moved to its own installer
+# and `uv tool list` stopped seeing a healthy install (AI-028/#791), so this
+# gate skipped daemon supervision with "hive <unknown> predates 'hive service'"
+# while `hive --version` answered 3.0.0. `dotf tools version` is the one semver
+# extraction both OSes share (ADR-036); resolved by path as well as by name
+# because ~/.local/bin may not be on this process's PATH (#1202 class).
+hive_ver=""
+if command -v dotf >/dev/null 2>&1; then
+    hive_ver=$(dotf tools version hive 2>/dev/null || true)
+elif [ -x "$HOME/.local/bin/dotf" ]; then
+    hive_ver=$("$HOME/.local/bin/dotf" tools version hive 2>/dev/null || true)
+fi
 if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
     && [ "$(printf '1.32.0\n%s\n' "$hive_ver" | sort -V | head -1)" = "1.32.0" ]; then
     if hive service install >/dev/null 2>&1; then

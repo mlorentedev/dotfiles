@@ -54,9 +54,9 @@ setup() {
     [[ -n "$BATS_VERSION" ]]
 }
 
-@test "versions.conf sets OPENCODE_VERSION" {
+@test "versions.conf does not pin opencode (packages.json is the catalog pin SSOT, ADR-036)" {
     . "$VERSIONS_CONF"
-    [[ -n "$OPENCODE_VERSION" ]]
+    [[ -z "${OPENCODE_VERSION:-}" ]]
 }
 
 @test "versions.conf sets PI_VERSION" {
