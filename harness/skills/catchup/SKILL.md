@@ -34,6 +34,18 @@ paths: ["**/MEMORY.md", "**/context.md", "docs/adr/**"]
 ## The 6-Step Resumption Protocol
 
 ### Step 1: Memory Continuity Ingestion
+0. **Find out which session you are, first.** With several worktrees running at
+   once the handoff section holds one sub-block per thread, and yours is the one
+   that continues *your* work:
+
+   ```bash
+   dotf mem thread --date "$(date +%F)" --project <repo> --agent claude
+   ```
+
+   Read **your** `### <thread>` sub-block and the journal it names before the
+   others; read the others afterwards, as context on what else is in flight. A
+   session that reads a peer's thread as its own inherits a next action that was
+   never its.
 1. Resolve target repo from working directory or explicit parameter.
 2. Read `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (target the `## Session Handoff` block at EOF).
 3. Extract:

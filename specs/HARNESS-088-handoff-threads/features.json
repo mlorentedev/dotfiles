@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-088-handoff-threads-f1",
+    "behavior": "AC1 - writing one thread leaves every other thread byte-identical, and everything outside the handoff section untouched, on a fixture shaped like the actual clobber",
+    "verification": "cd cli && go test ./internal/mem/ -run TestWriteThreadLeavesEveryOtherThreadByteIdentical",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-088-handoff-threads-f2",
+    "behavior": "AC2 + AC3 - writing identical content reports changed=false and alters nothing; new content replaces rather than appends; a new thread is appended without reordering existing ones",
+    "verification": "cd cli && go test ./internal/mem/ -run 'TestWriteThreadIsIdempotent|TestWriteThreadAppendsANewThreadWithoutReordering|TestWriteThreadMatchesAThreadWhoseBranchChanged'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-088-handoff-threads-f3",
+    "behavior": "AC4 - the writer and extractHandoffBlock agree on the section boundary, so a thread-scoped file still archives whole; asserted by driving the archiver over the written output",
+    "verification": "cd cli && go test ./internal/mem/ -run TestWrittenThreadsStayInsideTheArchivedBlock",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-088-handoff-threads-f4",
+    "behavior": "AC5 - a missing handoff section and an empty thread key are loud errors, never a silent append or a blanked thread",
+    "verification": "cd cli && go test ./internal/mem/ -run 'TestWriteThreadRefusesWhenTheSectionIsAbsent|TestWriteThreadRejectsAnEmptyKey'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-088-handoff-threads-f5",
+    "behavior": "AC6 + AC7 - the thread key resolves from any subdirectory of a worktree (not just its root), and a journal filename is derivable from the working directory and distinct per worktree",
+    "verification": "cd cli && go test ./internal/mem/ -run 'TestThreadKeyDerivesFromTheWorktree|TestJournalNameIsDerivableAndDistinctPerWorktree'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -58,13 +58,47 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 - **Path resolution (Target Repo vs Session CWD, HARNESS-066):** Target is `$VAULT_PATH/10_projects/<target-repo>/memory/MEMORY.md`. The `<target-repo>` MUST be resolved from the **repositories actually modified/worked during the session** (via git remotes and worktrees touched), NOT blind session `cwd`. If multiple repos were modified, write the continuity block to the primary worked repo and record an explicit cross-pointer in the others. Resolve `$VAULT_PATH` via: (1) env var, (2) `dotf env path VAULT_PATH`, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) Fail closed if unset. Never hardcode literal paths.
 - **Independence caveat:** Never leak full design rationale or spec argumentation into a repo's auto-memory that would bias an independent `/adversarial-review` (write a pointer and task ref instead).
 - **Placement (Cache-stable, HARNESS-029):** The block is the **LAST** section of `MEMORY.md`, *after* the stable index content. Keeping volatile handoff text out of the prefix prevents prompt cache thrashing.
-- **Write mechanics (Concurrency-safe, HARNESS-028):** Re-read `MEMORY.md` immediately before writing; match-and-replace only the `## Session Handoff` block using string replace (never overwrite the entire file blind). If concurrent writes occurred, merge threads.
+- **Write mechanics — RUN THE COMMAND, do not Edit the file (HARNESS-088, #1278):**
+
+  ```bash
+  dotf mem thread                       # which session am I: wt-<slug>, or main
+  printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD"
+  ```
+
+  The section holds **one sub-block per thread**, keyed by worktree
+  (`### wt-pi-harness`). The command replaces only *your* thread and leaves every
+  other byte-identical.
+
+  **This replaces HARNESS-028's merge-by-hand rule because that rule kept
+  losing.** It said "if concurrent writes occurred, merge threads", and it was
+  violated three times in one evening — by three different sessions, none of
+  which noticed. Last-writer-wins produces a well-formed file and a successful
+  edit, so the failure is invisible to the writer and only surfaces when a later
+  session follows a pointer into a block that no longer exists. One shared
+  mutable slot with N concurrent writers is a data-structure problem; editing it
+  more carefully was never going to fix it.
+
+  End your thread with `Journal: sessions/<file>` so the record is reachable from
+  the index.
 
 ### 1b. Session record — append-only history (`sessions/<date>-<project>-<agent>.md`)
 
 In ADDITION to the replaced-in-place continuity block, record the session journal:
 
-- **Path:** `<target-repo-area>/sessions/<YYYY-MM-DD>-<target-repo>-<agent>.md` (e.g. `10_projects/<target-repo>/sessions/`, derived from the repository where work was executed). Never under `00_meta/sessions/`.
+- **Path:** `<target-repo-area>/sessions/<YYYY-MM-DD>-<target-repo>-<agent>-<thread>.md`, where `<thread>` is what `dotf mem thread` prints. Ask for the whole name rather than assembling it:
+
+  ```bash
+  dotf mem thread --date "$(date +%F)" --project <repo> --agent claude
+  ```
+
+  **The thread is in the name because the collision it prevents already
+  happened.** Naming was `<date>-<project>-<agent>.md`, so two *worktrees* on one
+  day collided into `-2` and `-3` suffixes encoding nothing — six such files
+  exist across two days, and no session could tell which one was its own. With
+  the worktree in the name it is derivable from the working directory.
+
+  Under `10_projects/<target-repo>/sessions/`, derived from the repository where
+  work was executed. Never under `00_meta/sessions/`.
 - **Frontmatter Law:**
   ```yaml
   ---
@@ -84,6 +118,24 @@ In ADDITION to the replaced-in-place continuity block, record the session journa
   - `## Next Actions`
   *(Unlike the ~8-line continuity block snapshot in step 1, the session record is the durable append-only journal).*
 - **Append-only:** One file per session. If multiple sessions occur on the same day, suffix `-2`, `-3`.
+
+### 1c. Shared surfaces — write via the owning command only
+
+A worktree isolates the repository tree, and the Bash sandbox already refuses
+cross-worktree git. What it does **not** isolate is a short, knowable list. With
+several sessions running at once, these are the places two of them can collide:
+
+| Surface | Write it via |
+|---|---|
+| `MEMORY.md` handoff | `dotf mem handoff-write` (never an Edit) |
+| Vault `sessions/` | the thread-scoped filename from `dotf mem thread` |
+| `~/.dotfiles` deploy dir | `setup-linux.sh` / `dotf deploy` |
+| `~/.claude/settings.json` and peers | the harness deploy path, which merges by marker |
+| The git stash | never bare `git stash` — see the standing order |
+
+Everything else a session touches lives inside its own worktree or its own
+per-session state. No lock file and no scheme: the fix for each row above is that
+one command owns the write, and the list is short enough to state.
 
 ### 2. Knowledge harvest & documentation sync (Standing Order #3)
 
