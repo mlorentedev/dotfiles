@@ -199,7 +199,7 @@ func TestExpandDst_UnresolvableTokenIsAnErrorNotAnEmptySegment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "/opt/pi/models.json" {
+	if got != filepath.FromSlash("/opt/pi/models.json") {
 		t.Errorf("want the resolved path, got %q", got)
 	}
 }

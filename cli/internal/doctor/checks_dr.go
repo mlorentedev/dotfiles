@@ -102,6 +102,24 @@ func reportAbsentEscrow(rep *Report, escrow string, live int, regErr error) {
 	rep.Skip("no DR escrow at " + escrow + " — no secret resolves through Bitwarden yet, so nothing depends on it")
 }
 
+// escrowPath locates the DR escrow the same way its writer places it: in the
+// CHECKOUT (`dotf secrets backup` writes env.RepoSensitiveDir + "dr", because
+// the escrow is version-controlled state — #635 durability class), falling
+// back to the deploy mirror only when no checkout is found. The mirror is
+// copy-only and by construction never fresher than the checkout; reading it
+// first only ever agreed on Linux because setup-linux.sh happens to copy
+// sensitive/ recursively. setup-windows.ps1 did not, and doctor there reported
+// total-loss risk over an escrow sitting in the checkout (WIN-011/#1292).
+func escrowPath(sys *System, cfg *Config) string {
+	const rel = "bitwarden-export.age"
+	if repo := resolveRepoDir(sys); repo != "" {
+		if p := filepath.Join(repo, "sensitive", "dr", rel); pathExists(p) {
+			return p
+		}
+	}
+	return filepath.Join(cfg.DotfilesDir, "sensitive", "dr", rel)
+}
+
 func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Disaster recovery")
 
@@ -125,7 +143,7 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 	// indistinguishable from "no problem here".
 	live, regErr := sys.BWBackedSecrets()
 
-	escrow := filepath.Join(cfg.DotfilesDir, "sensitive", "dr", "bitwarden-export.age")
+	escrow := escrowPath(sys, cfg)
 	switch info, err := os.Stat(escrow); {
 	case os.IsNotExist(err):
 		reportAbsentEscrow(rep, escrow, live, regErr)

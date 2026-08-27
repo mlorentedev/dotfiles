@@ -31,14 +31,26 @@ func lineContaining(out, substr string) string {
 // drSys builds a System for the DR check with NO bw-backed secrets, i.e. the
 // pre-migration machine where an absent escrow costs nothing. Severity is keyed
 // to that count (#997), so most tests need to state it; this is the neutral one.
-func drSys(now time.Time) *System { return drSysExposed(now, 0, nil) }
+func drSys(t *testing.T, now time.Time) *System { return drSysExposed(t, now, 0, nil) }
 
 // drSysExposed states the exposure explicitly: how many registry entries resolve
 // through Bitwarden, and whether the registry could be read at all. Those two
 // are the only inputs that move this check's severity.
-func drSysExposed(now time.Time, bwBacked int, regErr error) *System {
+//
+// The checkout it points at is an EMPTY temp dir: escrowPath prefers the
+// checkout's escrow over the mirror's, and without this the test cwd (inside
+// the real checkout) would walk up to the real escrow and every absence case
+// would see it.
+func drSysExposed(t *testing.T, now time.Time, bwBacked int, regErr error) *System {
+	t.Helper()
+	repo := t.TempDir()
 	return &System{
-		Getenv:          func(string) string { return "" },
+		Getenv: func(k string) string {
+			if k == "DOTFILES_REPO_DIR" {
+				return repo
+			}
+			return ""
+		},
 		LookPath:        func(n string) (string, error) { return "/usr/bin/" + n, nil },
 		Now:             func() time.Time { return now },
 		BWBackedSecrets: func() (int, error) { return bwBacked, regErr },
@@ -67,7 +79,7 @@ func TestDR_NoDrillRecorded_Warns(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(time.Now()), cfg, rep)
+	checkDisasterRecovery(drSys(t, time.Now()), cfg, rep)
 
 	if rep.Failures() != 0 {
 		t.Fatalf("an unproven backup is not a broken one; want WARN not FAIL:\n%s", buf.String())
@@ -88,7 +100,7 @@ func TestDR_RecentDrillPasses(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(now), cfg, rep)
+	checkDisasterRecovery(drSys(t, now), cfg, rep)
 
 	if !strings.Contains(buf.String(), "recovery drill run 30 days ago") {
 		t.Errorf("want the drill PASS with its age, got: %s", buf.String())
@@ -105,7 +117,7 @@ func TestDR_StaleDrillWarns(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(now), cfg, rep)
+	checkDisasterRecovery(drSys(t, now), cfg, rep)
 
 	if !strings.Contains(buf.String(), "last recovery drill was 400 days ago") {
 		t.Errorf("want the staleness warning with its age, got: %s", buf.String())
@@ -149,7 +161,7 @@ func TestDR_EscrowSeverityFollowsExposure(t *testing.T) {
 			var buf bytes.Buffer
 			rep := capture(&buf)
 
-			checkDisasterRecovery(drSysExposed(now, tt.bwBacked, tt.regErr), cfg, rep)
+			checkDisasterRecovery(drSysExposed(t, now, tt.bwBacked, tt.regErr), cfg, rep)
 
 			out := buf.String()
 			escrowLine := lineContaining(out, "DR escrow")
@@ -192,7 +204,7 @@ func TestDR_StaleEscrowWithExposure_StillWarns(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSysExposed(now, 28, nil), cfg, rep)
+	checkDisasterRecovery(drSysExposed(t, now, 28, nil), cfg, rep)
 
 	if rep.Failures() != 0 {
 		t.Fatalf("a stale escrow is degraded, not absent; want WARN not FAIL:\n%s", buf.String())
@@ -229,7 +241,7 @@ func TestDR_UnreadableEscrowWarnsRatherThanClaimingAbsence(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSysExposed(time.Now(), 28, nil), cfg, rep)
+	checkDisasterRecovery(drSysExposed(t, time.Now(), 28, nil), cfg, rep)
 
 	if rep.Failures() != 0 {
 		t.Fatalf("an unreadable escrow is not a proven-absent one; want WARN not FAIL:\n%s", buf.String())
@@ -248,7 +260,7 @@ func TestDR_StaleEscrowWarns(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(now), cfg, rep)
+	checkDisasterRecovery(drSys(t, now), cfg, rep)
 
 	if !strings.Contains(buf.String(), "DR escrow is 120 days old") {
 		t.Errorf("want the escrow staleness warning, got: %s", buf.String())
@@ -315,7 +327,7 @@ func TestDR_NoManifest_SkipsWithTheRemedy(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+	checkDisasterRecovery(drSys(t, time.Now()), &Config{DotfilesDir: dir}, rep)
 
 	if rep.Failures() != 0 {
 		t.Fatalf("a pre-existing escrow is not a broken one:\n%s", buf.String())
@@ -330,7 +342,7 @@ func TestDR_NoManifest_SkipsWithTheRemedy(t *testing.T) {
 func TestDR_NoVaultListing_SkipsRatherThanPasses(t *testing.T) {
 	dir := t.TempDir()
 	escrowWith(t, dir, storedManifest(t, "1", "2"))
-	sys := drSys(time.Now())
+	sys := drSys(t, time.Now())
 	sys.BWItemRevisions = func() ([]secrets.ItemRevision, error) {
 		return nil, errors.New("bw serve: daemon is locked")
 	}
@@ -351,7 +363,7 @@ func TestDR_NoVaultListing_SkipsRatherThanPasses(t *testing.T) {
 func TestDR_MatchingVaultIsSilentlyFine(t *testing.T) {
 	dir := t.TempDir()
 	escrowWith(t, dir, storedManifest(t, "1", "2"))
-	sys := drSys(time.Now())
+	sys := drSys(t, time.Now())
 	sys.BWItemRevisions = liveVault(t, "2", "1") // same set, different order
 	var buf bytes.Buffer
 	rep := capture(&buf)
@@ -371,7 +383,7 @@ func TestDR_MatchingVaultIsSilentlyFine(t *testing.T) {
 func TestDR_DeletionIsSeenEvenWhenNothingIsNewer(t *testing.T) {
 	dir := t.TempDir()
 	escrowWith(t, dir, storedManifest(t, "1", "2", "3"))
-	sys := drSys(time.Now())
+	sys := drSys(t, time.Now())
 	sys.BWItemRevisions = liveVault(t, "1", "2")
 	var buf bytes.Buffer
 	rep := capture(&buf)
@@ -411,7 +423,7 @@ func TestDR_UnreadableManifest_WarnsRatherThanClaimingAbsence(t *testing.T) {
 
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+	checkDisasterRecovery(drSys(t, time.Now()), &Config{DotfilesDir: dir}, rep)
 
 	out := buf.String()
 	if strings.Contains(out, "has no manifest") {
@@ -428,7 +440,7 @@ func TestDR_EmptyOrZeroDigestManifest_Warns(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+	checkDisasterRecovery(drSys(t, time.Now()), &Config{DotfilesDir: dir}, rep)
 
 	out := buf.String()
 	if !strings.Contains(out, "carries no digest") {
@@ -448,7 +460,7 @@ func TestDR_AbsentEscrowWithLeftoverManifest_OnlyReportsEscrowMissing(t *testing
 	var buf bytes.Buffer
 	rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(time.Now()), &Config{DotfilesDir: dir}, rep)
+	checkDisasterRecovery(drSys(t, time.Now()), &Config{DotfilesDir: dir}, rep)
 
 	out := buf.String()
 	if strings.Contains(out, "describes the vault") {

@@ -62,6 +62,15 @@ func TestStripHarnessRegions(t *testing.T) {
 			in:   "para one\n\npara two\n",
 			want: "para one\n\npara two\n",
 		},
+		{
+			// A deployed copy written CRLF by a Windows tool (WIN-008/#1289):
+			// the END marker must still close the region — a "\r"-suffixed
+			// marker used to leave skip mode on to EOF — and no "\r" survives
+			// into the comparison.
+			name: "CRLF input: the region closes and line endings normalise",
+			in:   "before\r\n<!-- BEGIN HARNESS GENERATED (sha256:abc) -->\r\ninjected\r\n<!-- END HARNESS GENERATED -->\r\nafter\r\n",
+			want: "before\nafter\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
