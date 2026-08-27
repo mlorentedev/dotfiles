@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 1f31020398b7688c
+generated_sha: 05f103c348e50bde
 id: handoff-skill
 type: skill
 status: active
@@ -69,13 +69,27 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
   (`### thread: wt-pi-harness`). The command replaces only *your* thread and
   leaves every other byte-identical.
 
-  **It is agent-agnostic by construction.** The thread is what **git** says the
-  worktree is — a linked worktree's `.git` is a file reading
-  `gitdir: …/worktrees/<name>` — not a naming convention. So a worktree made by
-  Claude Code, Orca, opencode, pi, agy, copilot or a bare `git worktree add` all
-  get their own thread without any of them knowing about the others. The marker
-  exists for the same reason: a plain `### <key>` is indistinguishable from an
-  ordinary subheading like `### Next Actions`, and identity must be declared,
+  **A thread is a LINE OF WORK, and git already names it: the branch.** Not the
+  worktree, not the machine, not the agent. So `feat/x` continued tomorrow on
+  another computer resolves to the *same* thread and picks up where it left off —
+  which is what "the vault is the SSOT" has to mean in practice.
+
+  | Situation | Thread |
+  |---|---|
+  | any feature branch | `feat-x` — clean, travels between machines |
+  | `main` / `master` | `main@<host>` — ambient work, and two machines' `main` are not one thread |
+  | detached HEAD | `<worktree>@<host>` — says so rather than guessing |
+
+  **Agent-agnostic by construction.** It reads git's own on-disk state — a linked
+  worktree's `.git` is a file naming its gitdir, and `HEAD` names the branch —
+  with no subprocess and no naming convention. A worktree made by Claude Code,
+  Orca, opencode, pi, agy, copilot or a bare `git worktree add` behaves
+  identically; an earlier version keyed on one tool's path pattern and resolved
+  every other tool's worktree to `main`, which reintroduced the clobber for
+  everyone else.
+
+  The marker exists for the same reason: a plain `### <key>` is indistinguishable
+  from an ordinary subheading like `### Next Actions`, so identity is declared,
   never inferred from shape.
 
   **This replaces HARNESS-028's merge-by-hand rule because that rule kept
