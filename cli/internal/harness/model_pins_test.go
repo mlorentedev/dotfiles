@@ -183,6 +183,40 @@ func TestExtractRefusesAnEmptyMatch(t *testing.T) {
 	}
 }
 
+// A tier key that is NOT a declared pool contributes to `bare` only, so a pin
+// claiming that model under some pool reports VerdictWrongPool rather than OK.
+//
+// That behaviour is deliberate — without a pool declaration nothing establishes
+// where the model lives, and WrongPool is a warning while Unknown would be a
+// failure — but it is subtle enough that the PR reviewer on #1256 flagged it as
+// a possible flaw. It was latent rather than live: every tier key in the shipped
+// map (`claude`, `nan`, `opencode`) IS a declared pool, so the reviewer's own
+// example could not occur. This pins the behaviour on a synthetic map so a
+// future edit that introduces a non-pool tier key finds a test rather than a
+// comment.
+func TestTierKeyThatIsNotAPoolStaysUnqualified(t *testing.T) {
+	m := map[string]any{
+		"pools": map[string]any{"nan": map[string]any{}},
+		"tiers": map[string]any{
+			"mid": map[string]any{"somewhere-else": "orphan-model"},
+		},
+		"chains":   map[string]any{},
+		"services": map[string]any{},
+	}
+	qualified, bare := DeclaredModels(m)
+
+	if !bare["orphan-model"] {
+		t.Error("a tier's model must always reach the bare set")
+	}
+	if qualified["somewhere-else:orphan-model"] {
+		t.Error("a non-pool tier key must not produce a qualified entry — that would invent an attribution the map never made")
+	}
+	p := Pin{ID: "x", Kind: "regex", Locator: "(x)", Prefix: "", Pool: "nan"}
+	if got := Check(p, "orphan-model", qualified, bare); got != VerdictWrongPool {
+		t.Errorf("want VerdictWrongPool (a warning: the model is known, its pool is not), got %v", got)
+	}
+}
+
 // DeclaredModels must not invent a pool attribution the map never made: tiers
 // are keyed by whatever consumes the id, and `claude`/`opencode` key by harness
 // there while `nan` keys by pool.
