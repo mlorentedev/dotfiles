@@ -17,6 +17,7 @@ repository; this file is the NOTICE-equivalent that preserves attribution as the
 | `mcp-builder` | [anthropics/skills](https://github.com/anthropics/skills) | mcp-builder | Apache-2.0 | © 2026 Anthropic, PBC |
 | `golang-pro` | [jeffallan/claude-skills](https://github.com/jeffallan/claude-skills) | golang-pro | MIT | © 2025 Jeff Allan |
 | `async-python-patterns` | [wshobson/agents](https://github.com/wshobson/agents) | async-python-patterns | MIT | © 2024 Seth Hobson |
+| `cyclomatic-complexity` | [saurabhkumar8112/cyclomatic-complexity-skill](https://github.com/saurabhkumar8112/cyclomatic-complexity-skill) | cyclomatic-complexity | Apache-2.0 | © 2026 Saurabh Kumar |
 
 All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03).
 Apache-2.0 and MIT both permit redistribution with attribution; this file plus the per-skill
