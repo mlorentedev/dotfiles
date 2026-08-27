@@ -562,11 +562,22 @@ fi
 # A declared target the checkout lacks is named and exits non-zero after
 # mirroring the rest: setup does not abort (it is long and idempotent), but the
 # warning is loud and verify-setup.bats fails on the resulting gap.
+# Resolve dotf by path, not only by name: install_dotf placed it in ~/.local/bin,
+# which the rc files put on PATH but THIS process may not have -- the integration
+# container installs dotf and then cannot see it in the same run (#1202 was the
+# identical trap with jq, and this block inherited it the moment it moved to dotf).
+_dotf=""
 if command -v dotf >/dev/null 2>&1; then
-    dotf harness mirror || log_warning "dotf harness mirror reported a gap (above) -- 'dotf doctor' will report harness drift"
-else
-    log_warning "dotf not on PATH -- harness not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
+    _dotf="dotf"
+elif [ -x "$HOME/.local/bin/dotf" ]; then
+    _dotf="$HOME/.local/bin/dotf"
 fi
+if [ -n "$_dotf" ]; then
+    "$_dotf" harness mirror || log_warning "dotf harness mirror reported a gap (above) -- 'dotf doctor' will report harness drift"
+else
+    log_warning "dotf not found (PATH or ~/.local/bin) -- harness not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
+fi
+unset _dotf
 
 # Claude Code
 ensure_directory "$HOME/.claude"

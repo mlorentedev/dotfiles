@@ -452,6 +452,14 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
+@test "setup-linux.sh resolves dotf by path for the harness mirror, not only by name (#1202 class)" {
+    # install_dotf places the binary in ~/.local/bin, which this process's PATH
+    # may not carry: the integration container installed dotf and then skipped
+    # the mirror in the same run, and verify-setup.bats caught the gap (#1305).
+    grep -qF '[ -x "$HOME/.local/bin/dotf" ]' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF '"$_dotf" harness mirror' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-linux.sh installs the GUARD memory-sink git-hooks (#418 deploy + wire)" {
     grep -qF '. ./scripts/install-git-hooks.sh' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'install_git_hooks' "$DOTFILES_DIR/setup-linux.sh"
