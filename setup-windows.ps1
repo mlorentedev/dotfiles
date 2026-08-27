@@ -1253,6 +1253,48 @@ if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
     }
 }
 
+# Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
+# settings.json exists on the machine -- nothing pi itself writes at runtime
+# touches that array, only theme/lastChangelogVersion/defaultModel are (the
+# seed-if-missing guard above exists for exactly those three). Without this, a
+# catalog addition in the repo (e.g. #1254) never reaches a machine whose
+# settings.json already exists. Linux parity: the same block in setup-linux.sh.
+if ((Test-Path -LiteralPath $piSettingsDst -PathType Leaf) -and (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf)) {
+    try {
+        # Null-check BEFORE wrapping in @(): @($null) is a one-element array
+        # containing $null, so its .Count is 1, not 0 -- wrapping first would
+        # make this guard never fire on a missing/empty enabledModels, and the
+        # block below would go on to write a literal null into a live
+        # settings.json. ConvertFrom-Json also returns $null (not an empty
+        # array) for a JSON `[]` on PowerShell Core (PowerShell/PowerShell#13595),
+        # so the null check alone covers both a missing key and an empty list.
+        $piSrcModelsRaw = (Get-Content -LiteralPath $piSettingsSrc -Raw | ConvertFrom-Json).enabledModels
+        $piSrcModels = if ($null -eq $piSrcModelsRaw) { @() } else { @($piSrcModelsRaw) }
+        if ($piSrcModels.Count -eq 0) {
+            Write-Warn "ai\pi\settings.json has no enabledModels - skipping pi enabledModels sync"
+        } else {
+            $piDstJson = Get-Content -LiteralPath $piSettingsDst -Raw | ConvertFrom-Json
+            $piDstModels = @($piDstJson.enabledModels)
+            # -InputObject, never a pipe: piping a single-element array into
+            # ConvertTo-Json unwraps it before the cmdlet ever sees a
+            # collection, so a 1-model enabledModels would compare unequal to
+            # itself. -InputObject binds the whole array as one parameter and
+            # is safe at any count, including zero.
+            $piSrcModelsJson = ConvertTo-Json -InputObject $piSrcModels -Compress
+            $piDstModelsJson = ConvertTo-Json -InputObject $piDstModels -Compress
+            if ($piSrcModelsJson -eq $piDstModelsJson) {
+                Write-Info "pi enabledModels already in sync"
+            } else {
+                $piDstJson.enabledModels = $piSrcModels
+                $piDstJson | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $piSettingsDst -Encoding UTF8
+                Write-Success "Synced pi enabledModels (theme/defaultModel/lastChangelogVersion preserved)"
+            }
+        }
+    } catch {
+        Write-Warn "failed to sync pi enabledModels - leaving $piSettingsDst untouched"
+    }
+}
+
 # pi packages (AI-030, #1224): reconcile ai\pi\packages.json against what the
 # live settings.json already declares, and install the difference.
 # Linux parity: the "pi packages" block in setup-linux.sh.
