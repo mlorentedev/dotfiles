@@ -1,7 +1,7 @@
 ---
 id: "CLI-051-orca-config-sync"
 type: spec
-status: implementing
+status: archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1273"
 tags: [spec, proposal, orca, cli, deploy]
