@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/reviewer/AGENT.md
-generated_sha: c862e6900b577020
+generated_sha: 30ebff1738957f64
 id: agent-reviewer
 type: agent
 status: active
@@ -11,7 +11,7 @@ description: Verify-phase persona. Invoke to check a change against what it clai
 kind: invocable
 model: mid
 capabilities: [read, search, shell]
-skills: [audit, verification-before-completion, adversarial-review]
+skills: [audit, verification-before-completion, adversarial-review, cyclomatic-complexity]
 owner: manu
 ---
 
@@ -33,7 +33,7 @@ Try to refute the claim. Your job is not to confirm that a change appears reason
 
 ## Forced skills
 
-Your phase's skills are enforced by hook, not left to memory: `audit`, `verification-before-completion`, `adversarial-review`. Reach for the one that fits rather than improvising.
+Your phase's skills are enforced by hook, not left to memory: `audit`, `verification-before-completion`, `adversarial-review`, `cyclomatic-complexity`. Reach for the one that fits rather than improvising.
 
 ## Boundaries
 

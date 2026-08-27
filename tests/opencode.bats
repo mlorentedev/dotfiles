@@ -164,8 +164,8 @@ setup() {
     grep -qE '"model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc exposes 4 chat NaN models (non-chat models intentionally excluded - opencode schema rejects 'embedding' modality)" {
-    for m in deepseek-v4-flash qwen3.6 gemma4 mimo-v2.5; do
+@test "opencode.jsonc exposes 6 chat NaN models (non-chat models intentionally excluded - opencode schema rejects 'embedding' modality)" {
+    for m in deepseek-v4-flash qwen3.6 gemma4 mimo-v2.5 qwen3.8-flash glm5.3-flash; do
         grep -qE "\"$m\":" "$OPENCODE_CFG" || { echo "missing chat model $m" >&2; false; }
     done
     # Non-chat models must NOT appear (would break config load)
@@ -273,11 +273,11 @@ setup() {
 
 # --- DX-004: reasoning visibility (interleaved) + TUI config (tui.json) ---
 
-@test "opencode.jsonc maps NaN reasoning_content via interleaved on all 4 chat models (DX-004 AC1)" {
+@test "opencode.jsonc maps NaN reasoning_content via interleaved on all 6 chat models (DX-004 AC1)" {
     # opencode only renders NaN's reasoning chain if reasoning_content is mapped
-    # to a reasoning part. All four chat models must carry the mapping.
+    # to a reasoning part. All six chat models must carry the mapping.
     count=$(grep -cE '"interleaved":[[:space:]]*\{[[:space:]]*"field":[[:space:]]*"reasoning_content"[[:space:]]*\}' "$OPENCODE_CFG")
-    [ "$count" -eq 4 ] || { echo "expected 4 interleaved blocks, got $count" >&2; false; }
+    [ "$count" -eq 6 ] || { echo "expected 6 interleaved blocks, got $count" >&2; false; }
 }
 
 @test "opencode.jsonc reasoning comment updated off the stale 1.15.10 'renders neither' note (DX-004 AC5)" {
