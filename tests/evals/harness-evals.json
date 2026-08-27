@@ -22,10 +22,10 @@
       "id": 2,
       "name": "Session Continuity Setup",
       "prompt": "My agent forgets everything between sessions. I need persistent memory and session handoff so it can work on multi-day features.",
-      "expected_output": "progress.md template, session-handoff.md structure, memory directory setup instructions",
+      "expected_output": "progress.md template, session_handoff.md structure, memory directory setup instructions",
       "expectations": [
         "progress.md includes sections: current state, what's done, what's in progress, blockers, next session should",
-        "session-handoff.md includes: what was accomplished, what remains, blockers/decisions, files modified",
+        "session_handoff.md includes: what was accomplished, what remains, blockers/decisions, files modified",
         "Instructions for memory directory creation (.claude/memory/ or similar)",
         "Two-step save invariant explained (topic file then index)"
       ]
