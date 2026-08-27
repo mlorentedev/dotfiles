@@ -16,6 +16,12 @@
 //   Embeddings / Audio: qwen3-embedding, kokoro (TTS), whisper (STT) — exposed for
 //                       cluster completeness; not chat-routable (use curl / OpenAI SDK directly).
 //   Frontier on-demand: openrouter/* (PAYG, uses existing $5 credit) — Opus / Sonnet / GPT-4
+//   Cataloged, not routed: nan/qwen3.8-flash, nan/glm5.3-flash — added 2026-08-26,
+//                       picker-only. Both are genuine frontier-tier 2026-08-26 releases
+//                       (Alibaba / Zhipu) with real 1M context, not weak "flash" tiers —
+//                       quality is not why they're unrouted. NaN's own allocation for
+//                       them is promotional and expires end of Aug 2026; see #1244
+//                       before promoting either past the picker.
 // Selection: TUI `/models` picker. Wrappers `qq` (nan/qwen3.6) / `qf` (nan/deepseek-v4-flash)
 //            in .zsh/aliases.zsh + .bashrc + powershell/profile.ps1.
 {
@@ -163,6 +169,78 @@
             "output": ["text"]
           },
                   "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
+          }
+        },
+        // Added 2026-08-26: catalog-only, not wired as default/small_model. NaN
+        // announced this on a promotional allocation expiring end of Aug 2026 —
+        // see ai/pi/README.md's Model environment section and #1244 for the
+        // routing-revisit follow-up. Verified via scripts/nan-debug.sh on a smoke
+        // prompt (emits reasoning_content) and on this repo's own planted
+        // `((count++))`/`set -e` bug (correct diagnosis, same test that admitted
+        // mimo-v2.5 into reviewer-pool.json) — genuinely capable, not just a
+        // cheap "flash" tier. Alibaba's own release notes: NATIVE context is
+        // 262,144, extended to 1M via YaRN in the production variant NaN serves;
+        // NaN's /v1/models omits context length, so 1M here is the vendor's
+        // production default, not independently measured against NaN's endpoint.
+        "qwen3.8-flash": {
+          "name": "Qwen 3.8 Flash Next (Alibaba - 1M)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": true
+            }
+          },
+          "variants": {
+            "fast": {
+              "chat_template_kwargs": {
+                "enable_thinking": false
+              }
+            },
+            "thinking": {
+              "chat_template_kwargs": {
+                "enable_thinking": true
+              }
+            }
+          }
+        },
+        // Added 2026-08-26 — see the qwen3.8-flash comment above; same status,
+        // and the same planted-bug test passed correctly. Zhipu's own release
+        // notes put GLM-5.3-Flash's 1M context as NATIVE (no YaRN caveat).
+        "glm5.3-flash": {
+          "name": "GLM 5.3 Flash (Zhipu - 1M)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "options": {
             "chat_template_kwargs": {
               "enable_thinking": true
             }
