@@ -51,6 +51,16 @@ if ($MyInvocation.InvocationName -ne '.') {
     $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' +
         [Environment]::GetEnvironmentVariable('PATH', 'User') + ';' + $env:PATH
 
+    # Name the PATH doctor ran with: a FAIL that reads "git missing" is a
+    # statement about this step's environment before it is one about the box.
+    $entries = @($env:PATH -split ';' | Where-Object { $_ })
+    Write-Host ("doctor gate: PATH has {0} entries, {1} chars" -f $entries.Count, $env:PATH.Length)
+    $entries | ForEach-Object { Write-Host "doctor gate:   $_" }
+    foreach ($probe in 'dotf', 'git', 'bash', 'node', 'bw') {
+        $cmd = Get-Command $probe -ErrorAction SilentlyContinue
+        Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
+    }
+
     $output = & dotf doctor 2>&1 | Out-String
     Write-Host $output
 
