@@ -45,7 +45,7 @@ func TestKnowledgeHealth(t *testing.T) {
 	t.Run("never-crystallized marker", func(t *testing.T) {
 		p := filepath.Join(t.TempDir(), "MEMORY.md")
 		mustWrite(t, p, "a\nb\n")
-		want := "\nKnowledge crystallization never run — run: ./scripts/knowledge-crystallize.sh"
+		want := "\nKnowledge crystallization never run — run: dotf vault crystallize"
 		if got := knowledgeHealth(p, 150, 14, now); got != want {
 			t.Errorf("got %q, want %q", got, want)
 		}

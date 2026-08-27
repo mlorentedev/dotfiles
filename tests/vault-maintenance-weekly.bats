@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 # Tests for scripts/vault-maintenance-weekly.sh (TEST-001 / #128)
 #
-# This script is mostly side-effectful: it execs two sibling scripts
-# (knowledge-crystallize.sh --all, vault-health.sh), writes a log under
-# $HOME/.local/share, and fires a best-effort desktop notification. The real
+# This script is mostly side-effectful: it runs `dotf vault crystallize --all`
+# (CLI-050 / #1269 — was the sibling script knowledge-crystallize.sh) plus the
+# sibling vault-health.sh, writes a log under $HOME/.local/share, and fires a
+# best-effort desktop notification. The real
 # maintenance run needs the Obsidian vault + every project, so we cannot unit
 # test it directly. Instead we:
 #   - assert syntax + structural guards on the real file, and
@@ -18,6 +19,8 @@
 # whole log block — so the script only worked under zsh. Fixed in the same PR
 # (incident->guard) to `printf '%s\n' '--- ... ---'`; the bash behavioral test
 # below is the regression guard (it fails on the old script, passes on the fix).
+
+load 'lib/refute'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -54,9 +57,16 @@ teardown() {
     grep -qF '${BASH_SOURCE[0]:-$0}' "$MAINT_SCRIPT"
 }
 
-@test "vault-maintenance-weekly.sh invokes both maintenance siblings best-effort (|| true)" {
-    grep -qE 'knowledge-crystallize.sh" --all .*\|\| true' "$MAINT_SCRIPT"
+@test "vault-maintenance-weekly.sh invokes both maintenance steps best-effort (|| true)" {
+    grep -qE 'dotf vault crystallize --all .*\|\| true' "$MAINT_SCRIPT"
     grep -qE 'vault-health.sh" .*\|\| true' "$MAINT_SCRIPT"
+}
+
+@test "vault-maintenance-weekly.sh hardens PATH with ~/.local/bin before calling bare dotf" {
+    # cron runs with a minimal PATH that excludes ~/.local/bin (install-dotf.sh's
+    # install target); without this dotf silently resolves to nothing under
+    # `|| true` every Sunday. The behavioral regression guard is below.
+    grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$MAINT_SCRIPT"
 }
 
 @test "vault-maintenance-weekly.sh guards notify-send behind command -v (headless-safe)" {
@@ -73,11 +83,14 @@ teardown() {
 # and a no-op notify-send shim first on PATH so the notification branch never
 # touches the real desktop bus.
 _prep_sandbox() {
-    # $1 = body printed by the knowledge-crystallize stub (controls issue count)
+    # $1 = body printed by the `dotf vault crystallize` stub (controls issue count)
+    local crystallize_body="$1"
     cp "$MAINT_SCRIPT" "$TMP/vault-maintenance-weekly.sh"
-    cat > "$TMP/knowledge-crystallize.sh" <<EOF
+    cat > "$TMP/dotf" <<EOF
 #!/usr/bin/env bash
-printf '%s\n' "$1"
+if [ "\$1" = "vault" ] && [ "\$2" = "crystallize" ]; then
+    printf '%s\n' "$crystallize_body"
+fi
 EOF
     cat > "$TMP/vault-health.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -87,7 +100,7 @@ EOF
 #!/usr/bin/env bash
 exit 0
 EOF
-    chmod +x "$TMP"/*.sh "$TMP/notify-send"
+    chmod +x "$TMP/dotf" "$TMP"/*.sh "$TMP/notify-send"
     export FAKE_HOME="$TMP/home"
     mkdir -p "$FAKE_HOME"
 }
@@ -111,7 +124,7 @@ EOF
     run env HOME="$FAKE_HOME" PATH="$TMP:$PATH" zsh "$TMP/vault-maintenance-weekly.sh"
     [ "$status" -eq 0 ]
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
-    grep -qF 'knowledge-crystallize --all' "$log"
+    grep -qF 'dotf vault crystallize --all' "$log"
     grep -qF 'vault-health' "$log"
     grep -qF '=== Done:' "$log"
 }
@@ -126,9 +139,27 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" != *"invalid option"* ]]
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
-    grep -qF 'knowledge-crystallize --all' "$log"
+    grep -qF 'dotf vault crystallize --all' "$log"
     grep -qF 'vault-health' "$log"
     grep -qF '=== Done:' "$log"
+}
+
+@test "vault-maintenance-weekly.sh resolves dotf under a cron-minimal PATH (no inherited ~/.local/bin)" {
+    # Regression guard for the reviewed regression: every prior test prepends
+    # $TMP (holding the dotf stub) onto PATH, which also happens to mask a
+    # missing PATH hardening in the script. cron never does that -- it starts
+    # from a minimal PATH with no ~/.local/bin -- so this places the stub where
+    # the REAL installer puts dotf ($HOME/.local/bin) and runs with a PATH that
+    # does not already contain it, so only the script's own PATH export can
+    # make it resolve.
+    _prep_sandbox "all clean"
+    mkdir -p "$FAKE_HOME/.local/bin"
+    mv "$TMP/dotf" "$FAKE_HOME/.local/bin/dotf"
+    run env HOME="$FAKE_HOME" PATH="/usr/bin:/bin" bash "$TMP/vault-maintenance-weekly.sh"
+    [ "$status" -eq 0 ]
+    log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
+    refute_grep_fixed 'command not found' "$log"
+    grep -qF 'all clean' "$log"
 }
 
 @test "vault-maintenance-weekly.sh tolerates a sibling that prints issue keywords (still exit 0, zsh run)" {

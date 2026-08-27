@@ -49,7 +49,7 @@ func knowledgeHealth(memoryFile string, maxLines, staleMaxDays int, now time.Tim
 	lastDate := lastCrystallized(string(data))
 	switch lastDate {
 	case "":
-		b.WriteString("\nKnowledge crystallization never run — run: ./scripts/knowledge-crystallize.sh")
+		b.WriteString("\nKnowledge crystallization never run — run: dotf vault crystallize")
 	default:
 		if last, perr := time.Parse("2006-01-02", lastDate); perr == nil {
 			if days := int(now.Sub(last) / (24 * time.Hour)); days > staleMaxDays {

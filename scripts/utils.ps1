@@ -109,9 +109,9 @@ function Test-FileDrift {
 # Claude Code's per-project key (the directory name under ~/.claude/projects) --
 # every '/', '\' and drive ':' maps to '-' (C:\Users\me\p -> C--Users-me-p). This
 # MUST stay byte-for-byte equal to memlink.ClaudeProjectKey (Go); a Pester guard
-# asserts that parity. It is the fast, no-subprocess path for hot loops (e.g. the
-# filesystem scan in knowledge-crystallize.ps1's decoder) and the offline fallback
-# for Get-ClaudeProjectKey.
+# asserts that parity. It is the fast, no-subprocess path for hot loops (e.g. a
+# project-path decoder's filesystem scan) and the offline fallback for
+# Get-ClaudeProjectKey.
 function Get-ClaudeProjectKeyEncoded {
     param([Parameter(Mandatory)][string]$Path)
     return $Path.Replace('/', '-').Replace('\', '-').Replace(':', '-')
