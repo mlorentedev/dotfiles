@@ -59,6 +59,34 @@ a real call, same run                                   EXIT=2   (the fix did no
 - **Ambiguity resolves to Allow, everywhere.** A gate that blocks on input it
   cannot read blocks on every harness upgrade.
 
+## Reviewer findings on #1272, applied
+
+PR-Agent raised two, both real, both fixed with a regression test each.
+
+1. **A skill invocation could deadlock the session.** On a *well-formed* payload
+   naming the skill primitive but carrying no readable argument, the skill name
+   came back empty, the call fell through to enforcement, and the gate blocked
+   the one action that could satisfy it — permanently, since a blocked call never
+   records consumption. The guard keyed on the skill's **name** when it had to
+   key on the tool's **identity**. `TestGateNeverBlocksTheSkillInvocationItself`
+   passed throughout, because it always supplied a name — the case that was never
+   in danger. Pinned by `TestGateNeverBlocksASkillToolWithAnUnreadableName`.
+2. **State paths could collide.** Character-mapping alone flattens `a/b` and
+   `a.b` to one file, so one session's consumption would open another's gate.
+   UUIDs never collide, but a session id is attacker-adjacent input landing in a
+   path. A digest is appended and the readable prefix kept. Pinned by
+   `TestGateStatePathDoesNotCollideAcrossDistinctSessions`.
+
+A third came from checking whether the pin guard shipped in #1256 had gone red on
+main: `tiers.low` acquired a `$comment`, and `DeclaredModels` treated every string
+in a tier as a model id, so the whole sentence entered the declared set. It only
+ever widened the set — no check could fail wrongly — but a registry that treats
+prose as an id is one coincidence away from masking real drift.
+
+**That check worked as designed**, and it is worth recording: `qwen3.8-flash` was
+promoted to pi's routed default **and** added to the map in the same change,
+which is exactly the coupling the pin registry exists to force.
+
 ## Three defects found by running it, not by reading it
 
 1. **A malformed payload blocked every call.** `normaliseToolCall` returned a

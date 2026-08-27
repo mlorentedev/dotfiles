@@ -217,6 +217,28 @@ func TestTierKeyThatIsNotAPoolStaysUnqualified(t *testing.T) {
 	}
 }
 
+// A `$comment` inside a tier is prose, not a model id. Found 2026-08-27 when
+// `tiers.low` acquired one: the whole sentence was entering the declared set.
+// Only ever widened it, so nothing could fail wrongly — but a registry that
+// treats prose as a model id is one coincidence away from masking real drift.
+func TestDeclaredModelsIgnoresAnnotationKeysInTiers(t *testing.T) {
+	m := map[string]any{
+		"pools": map[string]any{"nan": map[string]any{}},
+		"tiers": map[string]any{
+			"low": map[string]any{"nan": "qwen3.8-flash", "$comment": "some prose about the promotion"},
+		},
+		"chains":   map[string]any{},
+		"services": map[string]any{},
+	}
+	_, bare := DeclaredModels(m)
+	if !bare["qwen3.8-flash"] {
+		t.Error("the real model id must still be declared")
+	}
+	if bare["some prose about the promotion"] {
+		t.Error("a $comment's text was taken for a model id")
+	}
+}
+
 // DeclaredModels must not invent a pool attribution the map never made: tiers
 // are keyed by whatever consumes the id, and `claude`/`opencode` key by harness
 // there while `nan` keys by pool.
