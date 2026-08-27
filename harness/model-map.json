@@ -142,7 +142,8 @@
     },
     "low": {
       "claude": "haiku",
-      "nan": "qwen3.6"
+      "nan": "qwen3.8-flash",
+      "$comment": "qwen3.8-flash became the interactive daily driver for pi and opencode on 2026-08-27, replacing qwen3.6. It is 1M-context, reasoning-class, and promoted from catalog-only (#1244 allocation confirmed to continue). qwen3.6 remains available in the picker but is no longer the routed default."
     }
   },
   "chains": {
@@ -155,6 +156,7 @@
       "nan:mimo-v2.5"
     ],
     "low": [
+      "nan:qwen3.8-flash",
       "nan:qwen3.6",
       "claude:haiku"
     ]

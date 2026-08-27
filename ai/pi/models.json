@@ -10,44 +10,8 @@
       "timeoutSeconds": 300,
       "models": [
         {
-          "id": "qwen3.6",
-          "name": "qwen3.6 (NaN)",
-          "api": "openai-completions",
-          "reasoning": true,
-          "input": [
-            "text",
-            "image"
-          ],
-          "cost": {
-            "input": 0,
-            "output": 0,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          },
-          "contextWindow": 262144,
-          "maxTokens": 65536
-        },
-        {
-          "id": "gemma4",
-          "name": "Gemma4 (NaN)",
-          "api": "openai-completions",
-          "reasoning": true,
-          "input": [
-            "text",
-            "image"
-          ],
-          "cost": {
-            "input": 0,
-            "output": 0,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          },
-          "contextWindow": 262144,
-          "maxTokens": 65536
-        },
-        {
-          "id": "deepseek-v4-flash",
-          "name": "deepseek (NaN)",
+          "id": "glm5.3-flash",
+          "name": "glm5.3-flash (NaN)",
           "api": "openai-completions",
           "reasoning": true,
           "input": [
@@ -64,8 +28,8 @@
           "maxTokens": 65536
         },
         {
-          "id": "mimo-v2.5",
-          "name": "mimo (NaN)",
+          "id": "deepseek-v4-flash",
+          "name": "deepseek (NaN)",
           "api": "openai-completions",
           "reasoning": true,
           "input": [
@@ -100,8 +64,26 @@
           "maxTokens": 65536
         },
         {
-          "id": "glm5.3-flash",
-          "name": "glm5.3-flash (NaN)",
+          "id": "qwen3.6",
+          "name": "qwen3.6 (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 262144,
+          "maxTokens": 65536
+        },
+        {
+          "id": "mimo-v2.5",
+          "name": "mimo (NaN)",
           "api": "openai-completions",
           "reasoning": true,
           "input": [
@@ -115,6 +97,24 @@
             "cacheWrite": 0
           },
           "contextWindow": 1048576,
+          "maxTokens": 65536
+        },
+        {
+          "id": "gemma4",
+          "name": "Gemma4 (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 262144,
           "maxTokens": 65536
         }
       ],
