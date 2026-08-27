@@ -32,20 +32,34 @@ func TestNormaliseReportsWhetherThePayloadWasUnderstood(t *testing.T) {
 			wantOK:    true,
 			wantTool:  "Skill",
 			wantSkill: "audit", wantS: "s1"},
-		{name: "pi tool call", harnessName: "pi",
-			payload:  `{"sessionId":"s2","tool":"bash","arguments":{}}`,
+		// pi and opencode run in-process TypeScript, not command hooks, so the
+		// wrapper this repository generates for them emits the canonical shape.
+		{name: "pi via the generated wrapper", harnessName: "pi",
+			payload:  `{"session":"s2","tool":"bash"}`,
 			wantOK:   true,
 			wantTool: "bash", wantS: "s2"},
-		{name: "opencode tool call", harnessName: "opencode",
-			payload:  `{"sessionID":"s3","tool":"bash","args":{}}`,
+		{name: "opencode via the generated wrapper", harnessName: "opencode",
+			payload:  `{"session":"s3","tool":"bash"}`,
 			wantOK:   true,
 			wantTool: "bash", wantS: "s3"},
+		{name: "canonical skill invocation", harnessName: "pi",
+			payload:   `{"session":"s2","tool":"skill","skill":"audit"}`,
+			wantOK:    true,
+			wantTool:  "skill",
+			wantSkill: "audit", wantS: "s2"},
+		// agy uses claude's command-hook shape: ~/.gemini/settings.json declares
+		// BeforeTool in that exact format, so it takes the default branch.
+		{name: "agy command hook", harnessName: "agy",
+			payload:  `{"session_id":"s4","tool_name":"Bash","tool_input":{}}`,
+			wantOK:   true,
+			wantTool: "Bash", wantS: "s4"},
 
 		// Every one of these must report NOT understood, so the caller allows.
 		{name: "not json", harnessName: "claude", payload: `not json at all`},
 		{name: "empty", harnessName: "claude", payload: ``},
 		{name: "json without a tool", harnessName: "claude", payload: `{"session_id":"s1"}`},
-		{name: "wrong harness shape", harnessName: "pi", payload: `{"session_id":"s1","tool_name":"Bash"}`},
+		{name: "command shape sent to a wrapper harness", harnessName: "pi", payload: `{"session_id":"s1","tool_name":"Bash"}`},
+		{name: "canonical shape sent to a command harness", harnessName: "claude", payload: `{"session":"s1","tool":"bash"}`},
 		{name: "json array", harnessName: "claude", payload: `[1,2,3]`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -138,58 +138,69 @@ func defaultGateStateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "dotfiles")
 }
 
-// claudeHookPayload is the slice of claude's PreToolUse JSON the gate consumes.
-type claudeHookPayload struct {
+// commandHookPayload is the JSON a COMMAND hook receives on stdin.
+//
+// Two harnesses use this family. Claude sends it to `PreToolUse`; **agy sends it
+// to `BeforeTool`** — measured 2026-08-26, `~/.gemini/settings.json` carries
+// hooks in Claude's exact `{"hooks":[{"type":"command",...}]}` shape and declares
+// `BeforeAgent`, `AfterAgent`, `BeforeTool`, `AfterTool`. So agy is NOT
+// presence-only as #561 and ADR-027 assumed; it has a tool gate, and it is the
+// cheapest harness to add after claude rather than a deferred one.
+//
+// agy's exact FIELD names are unverified — no agy payload has been captured — so
+// a mismatch degrades to "not understood", which allows. The gate never blocks
+// on a guess.
+type commandHookPayload struct {
 	SessionID string         `json:"session_id"`
 	ToolName  string         `json:"tool_name"`
 	ToolInput map[string]any `json:"tool_input"`
 }
 
-// piHookPayload is pi's `tool_call` shape.
-type piHookPayload struct {
-	SessionID string         `json:"sessionId"`
-	Tool      string         `json:"tool"`
-	Arguments map[string]any `json:"arguments"`
+// canonicalPayload is the shape THIS REPOSITORY's own generated wrappers emit.
+//
+// pi and opencode run no command hook at all. pi's `tool_call` is an in-process
+// TypeScript handler returning `{block: true, reason}`; opencode's blocking
+// primitive is `permission.ask`, whose `output.status` accepts `"deny"`. Its
+// `tool.execute.before` — the event #561 and ADR-027 name as opencode's gate —
+// is typed `(input, output: {args}) => Promise<void>` and can only mutate
+// arguments. **It cannot deny.** Measured against the installed
+// `@opencode-ai/plugin` type definitions.
+//
+// Because the wrapper for those two is generated here, it emits ONE shape rather
+// than each harness's own. That deletes two per-harness parsers instead of
+// adding them: the only payload the gate must adapt to is the one it did not
+// author.
+type canonicalPayload struct {
+	SessionID string `json:"session"`
+	Tool      string `json:"tool"`
+	Skill     string `json:"skill"`
 }
 
-// opencodeHookPayload is opencode's `tool.execute.before` shape.
-type opencodeHookPayload struct {
-	SessionID string         `json:"sessionID"`
-	Tool      string         `json:"tool"`
-	Args      map[string]any `json:"args"`
-}
-
-// normaliseToolCall turns a harness's payload into the neutral shape.
+// normaliseToolCall turns a payload into the neutral shape and reports whether
+// it understood it at all.
 //
-// Normalisation is the ONLY per-harness code in the gate, and it is deliberately
-// dumb: field renaming, nothing else. Every judgement lives in harness.Decide.
-//
-// A payload that cannot be parsed yields a zero ToolCall, which Decide resolves
-// to Allow. Refusing to guess is the point — a gate that blocks on input it does
-// not understand blocks on every harness upgrade.
+// The `false` return is not defensive decoration. Without it, garbage on stdin
+// produced a zero ToolCall, Decide saw a valid persona with nothing consumed,
+// and the gate blocked every call — the opposite of the contract, measured and
+// fixed 2026-08-26. A gate that blocks on input it cannot read blocks on every
+// harness upgrade.
 func normaliseToolCall(harnessName string, payload []byte) (harness.ToolCall, bool) {
 	if len(payload) == 0 {
 		return harness.ToolCall{}, false
 	}
 	switch harnessName {
-	case "pi":
-		var p piHookPayload
-		if json.Unmarshal(payload, &p) != nil {
+	case "pi", "opencode":
+		var p canonicalPayload
+		if json.Unmarshal(payload, &p) != nil || p.Tool == "" {
 			return harness.ToolCall{}, false
 		}
-		return harness.ToolCall{SessionID: p.SessionID, Tool: p.Tool, Skill: skillArg(p.Tool, p.Arguments)}, p.Tool != ""
-	case "opencode":
-		var p opencodeHookPayload
-		if json.Unmarshal(payload, &p) != nil {
-			return harness.ToolCall{}, false
-		}
-		return harness.ToolCall{SessionID: p.SessionID, Tool: p.Tool, Skill: skillArg(p.Tool, p.Args)}, p.Tool != ""
+		return harness.ToolCall{SessionID: p.SessionID, Tool: p.Tool, Skill: strings.TrimSpace(p.Skill)}, true
 	default:
-		var p claudeHookPayload
-		if json.Unmarshal(payload, &p) != nil {
+		var p commandHookPayload
+		if json.Unmarshal(payload, &p) != nil || p.ToolName == "" {
 			return harness.ToolCall{}, false
 		}
-		return harness.ToolCall{SessionID: p.SessionID, Tool: p.ToolName, Skill: skillArg(p.ToolName, p.ToolInput)}, p.ToolName != ""
+		return harness.ToolCall{SessionID: p.SessionID, Tool: p.ToolName, Skill: skillArg(p.ToolName, p.ToolInput)}, true
 	}
 }
 
