@@ -1,14 +1,14 @@
 {
   "defaultProvider": "nan",
-  "defaultModel": "qwen3.6",
+  "defaultModel": "qwen3.8-flash",
   "defaultThinkingLevel": "high",
   "temperature": 0.2,
   "enabledModels": [
-    "nan/qwen3.6",
-    "nan/gemma4",
+    "nan/glm5.3-flash",
     "nan/deepseek-v4-flash",
-    "nan/mimo-v2.5",
     "nan/qwen3.8-flash",
-    "nan/glm5.3-flash"
+    "nan/qwen3.6",
+    "nan/mimo-v2.5",
+    "nan/gemma4"
   ]
 }
