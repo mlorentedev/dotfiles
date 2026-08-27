@@ -10,7 +10,7 @@ The `test-windows` job runs `setup-windows.ps1` end to end. Setup installs
 `dotf` into `~/.local/bin`, and nothing ever added that directory to
 `$GITHUB_PATH`. The real log of a green run (33051778423) reads, in order:
 
-```
+```text
 dotf 0.51.0 installed to C:\Users\runneradmin\.local\bin\dotf.exe
 ... dotf secrets render unavailable/failed
 ... dotf not on PATH -- skipping pi config deploy
@@ -42,7 +42,7 @@ A verifier that degrades gracefully in production must be a **gate** in CI, and
 it must run in the environment a real machine has (the default deploy dir, not
 the convenient one). Otherwise CI certifies the tree nobody reads.
 
-The fix builds `dotf` from the PR under test (the released binary lags the
+The fix (#1308, in review as this lesson is written) builds `dotf` from the PR under test (the released binary lags the
 tree, as the integration container already knew), puts it on `GITHUB_PATH`
 before setup, drops the `DOTFILES_DIR` override, and adds a post-setup
 `dotf doctor` step that fails the job. Setup itself stays non-fatal.
