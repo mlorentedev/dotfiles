@@ -297,9 +297,8 @@ jobs:
           Add-Content $env:GITHUB_PATH $bin
           & "$bin\dotf.exe" version
 
-      # DOTF_VERSION=dev keeps Install-Dotf from replacing the source build with
-      # the pinned release: it skips when the binary on PATH reports the pinned
-      # version, and a source build reports "dev". No DOTFILES_DIR override: the
+      # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
+      # the binary built above survives setup. No DOTFILES_DIR override: the
       # deploy dir is the real-box default (~/.dotfiles), so the gate below
       # certifies the tree a real machine reads, not the checkout (#1298 layer 3).
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
@@ -307,19 +306,21 @@ jobs:
         shell: powershell
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
-          DOTF_VERSION: dev
         run: .\setup-windows.ps1
 
       # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
       # asserted by tests/setup-windows.bats); CI is where a red doctor fails.
+      # .github/scripts/doctor-gate.ps1 refreshes PATH the way a fresh terminal
+      # would (setup appends winget/npm dirs to the User PATH, which a later
+      # step does not inherit) and fails on any [FAIL] not listed -- with its
+      # owning ticket -- in doctor-gate-known-failures.txt, or on a listed
+      # entry that no longer fires (a stale list is a failure too).
       - name: Post-setup doctor gate (TEST-003)
         if: needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
-        run: |
-          dotf doctor
-          if ($LASTEXITCODE -ne 0) { throw "dotf doctor reported failures after setup-windows.ps1 (see above)" }
+        run: pwsh -NoProfile -File .github/scripts/doctor-gate.ps1
 
       - name: Run Pester suites
         if: needs.changes.outputs.code == 'true'

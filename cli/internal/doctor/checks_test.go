@@ -421,6 +421,24 @@ func TestCheckOptionalTools_DotfDrift(t *testing.T) {
 	}
 }
 
+// A source build reports "dev" (cli/cmd/dotf/main.go). It is deliberate on a
+// dev box and is what CI runs after building the PR under test; the pin exists
+// to catch a stale RELEASE, so this is a SKIP with the reason, never drift.
+func TestCheckOptionalTools_DotfSourceBuildIsNotDrift(t *testing.T) {
+	cfg := &Config{Versions: map[string]string{"DOTF_VERSION": "0.2.0"}}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkOptionalTools(
+		newSys(nil, []string{"dotf", "gh"}, map[string]string{"dotf version": "dotf version dev"}),
+		cfg, nil, rep)
+	if rep.Failures() != 0 {
+		t.Errorf("a dev build must not be reported as drift\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "source build (dev)") {
+		t.Errorf("expected the source-build SKIP\n%s", buf.String())
+	}
+}
+
 func TestCheckHarnessDrift(t *testing.T) {
 	home := t.TempDir()
 	dotfiles := filepath.Join(home, ".dotfiles")

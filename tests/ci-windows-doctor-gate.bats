@@ -31,14 +31,24 @@ test_windows_job() {
     [ "$status" -ne 0 ]
 }
 
-@test "TEST-003: a post-setup dotf doctor step fails the job on a non-zero exit" {
+@test "TEST-003: a post-setup doctor gate step runs the gate script, which exits non-zero on an unlisted or stale FAIL" {
     job="$(test_windows_job)"
     printf '%s\n' "$job" | grep -qF 'Post-setup doctor gate'
-    printf '%s\n' "$job" | grep -qF 'dotf doctor'
-    printf '%s\n' "$job" | grep -qF 'if ($LASTEXITCODE -ne 0) { throw'
+    printf '%s\n' "$job" | grep -qF 'pwsh -NoProfile -File .github/scripts/doctor-gate.ps1'
+    grep -qF '& dotf doctor' "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
+    grep -qF 'exit 1' "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
 }
 
-@test "TEST-003: the source build is kept by Install-Dotf (DOTF_VERSION=dev on the setup step)" {
-    job="$(test_windows_job)"
-    printf '%s\n' "$job" | grep -qF 'DOTF_VERSION: dev'
+@test "TEST-003: the gate refreshes PATH like a fresh terminal before running doctor" {
+    grep -qF "[Environment]::GetEnvironmentVariable('PATH', 'User')" "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
+}
+
+@test "TEST-003: every known-failure entry names its owning ticket" {
+    # An entry without a ticket is an allow rule nobody owns.
+    awk 'BEGIN{ok=1} /^[[:space:]]*$/{seen=0; next} /^#/{ if ($0 ~ /#[0-9]+/) seen=1; next } { if (!seen) { print "no ticket before: " $0; ok=0 } seen=0 } END{exit !ok}' \
+        "$DOTFILES_DIR/.github/scripts/doctor-gate-known-failures.txt"
+}
+
+@test "TEST-003: the source build survives setup because Install-Dotf leaves a dev build in place" {
+    grep -qF "if (\$current -eq 'dev') {" "$DOTFILES_DIR/scripts/install-dotf.ps1"
 }

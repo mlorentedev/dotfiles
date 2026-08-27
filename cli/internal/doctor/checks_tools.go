@@ -3,6 +3,7 @@ package doctor
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -14,7 +15,11 @@ var coreTools = []string{
 
 // posixOnlyTools are absent on Windows by design — skip them there instead of
 // reporting a false failure (Windows uses pwsh, not zsh; direnv is POSIX-shell).
-var posixOnlyTools = map[string]bool{"zsh": true, "direnv": true}
+// wget joined on the first CI doctor run (TEST-003/#1298): no Windows setup
+// block installs it and no Windows script calls it (curl and Invoke-WebRequest
+// cover the role), so expecting it there failed every fresh box for a tool the
+// repo never provisions.
+var posixOnlyTools = map[string]bool{"zsh": true, "direnv": true, "wget": true}
 
 // checkCoreTools reproduces healthcheck section 1: the core toolchain is on
 // PATH. Names already version-checked by the contract (git, jq) are skipped here
@@ -63,7 +68,11 @@ func checkVersionedPaths(sys *System, rep *Report) {
 		switch {
 		case dir == "":
 			rep.Skip(t.envVar + " (variable not set)")
-		case isExecFile(filepath.Join(dir, "bin", t.binary)):
+		case isExecFile(filepath.Join(dir, "bin", t.binary)),
+			runtime.GOOS == "windows" && isExecFile(filepath.Join(dir, "bin", t.binary+".exe")):
+			// The .exe form: a JAVA_HOME set by the GitHub runner's toolcache
+			// holds java.exe, and the extensionless probe reported it missing
+			// (TEST-003/#1298 first run).
 			rep.Pass(fmt.Sprintf("%s (%s)", t.envVar, dir))
 		case isDir(dir):
 			rep.Fail(fmt.Sprintf("%s directory exists but %s not found in %s/bin/", t.envVar, t.binary, dir))
@@ -231,9 +240,15 @@ func checkOptionalTools(sys *System, cfg *Config, c *Contract, rep *Report) {
 		rep.Pass("dotf in PATH (DOTF_VERSION not pinned — match not verified)")
 	default:
 		got := dotfVersion(sys)
-		if got == pin {
+		switch {
+		case got == pin:
 			rep.Pass(fmt.Sprintf("dotf %s matches versions.conf", pin))
-		} else {
+		case got == "dev":
+			// A source build (cli/cmd/dotf/main.go's default): deliberate on a
+			// dev box, and what CI runs after building the PR under test. The
+			// pin exists to catch a STALE RELEASE binary, which this is not.
+			rep.Skip("dotf is a source build (dev) — the versions.conf pin does not apply")
+		default:
 			// FAIL, not WARN (OPS-025/#869): a stale dotf binary means every guard
 			// merged into doctor since it was built is not running at all on this
 			// machine — a categorically worse gap than an ordinary tool being one
