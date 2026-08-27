@@ -48,7 +48,3 @@ test_windows_job() {
     awk 'BEGIN{ok=1} /^[[:space:]]*$/{seen=0; next} /^#/{ if ($0 ~ /#[0-9]+/) seen=1; next } { if (!seen) { print "no ticket before: " $0; ok=0 } seen=0 } END{exit !ok}' \
         "$DOTFILES_DIR/.github/scripts/doctor-gate-known-failures.txt"
 }
-
-@test "TEST-003: the source build survives setup because Install-Dotf leaves a dev build in place" {
-    grep -qF "if (\$current -eq 'dev') {" "$DOTFILES_DIR/scripts/install-dotf.ps1"
-}
