@@ -87,6 +87,31 @@ prose as an id is one coincidence away from masking real drift.
 promoted to pi's routed default **and** added to the map in the same change,
 which is exactly the coupling the pin registry exists to force.
 
+### Command output after the fixes (Definition of Done §5)
+
+The reviewer on #1275 was right that the section above asserted the tests pass
+without showing it. Run uncached, in this session:
+
+```
+$ go clean -testcache && go test ./internal/harness/ ./internal/cmd/
+ok  github.com/mlorentedev/dotfiles/cli/internal/harness  0.040s
+ok  github.com/mlorentedev/dotfiles/cli/internal/cmd      0.570s
+
+$ go test ./internal/harness/ -run 'TestGateNeverBlocksASkillToolWithAnUnreadableName|TestGateStatePathDoesNotCollideAcrossDistinctSessions|TestDeclaredModelsIgnoresAnnotationKeysInTiers' -v
+--- PASS: TestGateNeverBlocksASkillToolWithAnUnreadableName
+--- PASS: TestGateStatePathDoesNotCollideAcrossDistinctSessions
+--- PASS: TestDeclaredModelsIgnoresAnnotationKeysInTiers
+
+$ go test ./...
+19/19 packages ok
+
+$ go build ./... && go vet ./... && GOOS=windows go vet ./...
+(clean, both platforms)
+
+$ golangci-lint run          # pinned 2.12.2, matching versions.conf
+0 issues.
+```
+
 ## Three defects found by running it, not by reading it
 
 1. **A malformed payload blocked every call.** `normaliseToolCall` returned a
