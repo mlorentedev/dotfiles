@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/builder/AGENT.md
-generated_sha: 0664eb62ec575941
+generated_sha: 93ccd2139b3bc8dc
 id: agent-builder
 type: agent
 status: active
@@ -11,7 +11,7 @@ description: Build-phase persona. Invoke to implement a change whose shape is al
 kind: invocable
 model: mid
 capabilities: [read, search, edit, shell]
-skills: [golang-pro, async-python-patterns, test, test-driven-development, mcp-builder, debug-hardware, systematic-debugging, creating-skills]
+skills: [golang-pro, async-python-patterns, cyclomatic-complexity, test, test-driven-development, mcp-builder, debug-hardware, systematic-debugging, creating-skills]
 owner: manu
 ---
 
@@ -33,7 +33,7 @@ Make the change work and prove it does. Working code is not a finished change: w
 
 ## Forced skills
 
-Your phase's skills are enforced by hook, not left to memory: `golang-pro`, `async-python-patterns`, `test`, `test-driven-development`, `mcp-builder`, `debug-hardware`, `systematic-debugging`, `creating-skills`. Reach for the one the task calls for rather than improvising.
+Your phase's skills are enforced by hook, not left to memory: `golang-pro`, `async-python-patterns`, `cyclomatic-complexity`, `test`, `test-driven-development`, `mcp-builder`, `debug-hardware`, `systematic-debugging`, `creating-skills`. Reach for the one the task calls for rather than improvising.
 
 ## Boundaries
 

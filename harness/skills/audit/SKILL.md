@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/audit/SKILL.md
-generated_sha: 74065d13a1af05e4
+generated_sha: c1a6813adc17676d
 id: audit-skill
 type: skill
 status: active
@@ -28,7 +28,7 @@ Analyze code for vulnerabilities, performance issues, and bad practices.
 | Auth | Missing validation, broken access control, CSRF |
 | Performance | N+1 queries, unbounded loops, blocking in async |
 | Resilience | Unhandled errors, missing timeouts, race conditions |
-| Quality | Magic numbers, deep nesting, missing types, dead code |
+| Quality | Cyclomatic complexity > 10 (use `/cyclomatic-complexity`), deep nesting, magic numbers, missing types, dead code |
 
 ## Output Format
 
