@@ -833,8 +833,8 @@ setup() {
     # Two registry-only rebuilds dropped process-only entries: the first hid the
     # PR's dotf from Install-Dotf, the second hid the runner's toolcache node from
     # the pi install ("npm not available"). A rebuild must end by appending $env:PATH.
-    total=$(grep -c 'GetEnvironmentVariable("PATH", "User")' "$PS1_SCRIPT")
-    kept=$(grep -c 'GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT")
+    total=$(grep -cF '$env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT")
+    kept=$(grep -cF '$env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT")
     [ "$total" -ge 2 ]
     [ "$total" -eq "$kept" ]
 }
