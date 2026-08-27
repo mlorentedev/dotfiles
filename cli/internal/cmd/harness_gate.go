@@ -82,6 +82,15 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				_ = harness.RecordConsumed(statePath, call.Skill)
 				return nil
 			}
+			if call.IsSkillTool {
+				// The tool IS the skill primitive but its argument was
+				// unreadable. There is nothing to record, and blocking would
+				// deadlock the session on the one action that could satisfy the
+				// gate — a well-formed payload with a missing argument, not a
+				// parse failure. Raised by the reviewer on #1272.
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
+				return nil
+			}
 
 			persona := loadGatePersona(repoRoot, role)
 			result := harness.Decide(harness.GateInput{
@@ -194,21 +203,28 @@ func normaliseToolCall(harnessName string, payload []byte) (harness.ToolCall, bo
 		if json.Unmarshal(payload, &p) != nil || p.Tool == "" {
 			return harness.ToolCall{}, false
 		}
-		return harness.ToolCall{SessionID: p.SessionID, Tool: p.Tool, Skill: strings.TrimSpace(p.Skill)}, true
+		return harness.ToolCall{SessionID: p.SessionID, Tool: p.Tool, Skill: strings.TrimSpace(p.Skill), IsSkillTool: isSkillTool(p.Tool)}, true
 	default:
 		var p commandHookPayload
 		if json.Unmarshal(payload, &p) != nil || p.ToolName == "" {
 			return harness.ToolCall{}, false
 		}
-		return harness.ToolCall{SessionID: p.SessionID, Tool: p.ToolName, Skill: skillArg(p.ToolName, p.ToolInput)}, true
+		return harness.ToolCall{SessionID: p.SessionID, Tool: p.ToolName, Skill: skillArg(p.ToolName, p.ToolInput), IsSkillTool: isSkillTool(p.ToolName)}, true
 	}
 }
 
 // skillArg extracts the skill name when the tool IS the harness's skill
 // primitive. Matched case-insensitively on the tool name because the three
 // harnesses spell it differently and none of them promises stability.
+// isSkillTool reports that the tool IS the harness's skill primitive, whatever
+// its arguments turned out to say. The gate must never block it: doing so
+// forbids the only action that could satisfy the gate.
+func isSkillTool(tool string) bool {
+	return strings.EqualFold(strings.TrimSpace(tool), "skill")
+}
+
 func skillArg(tool string, args map[string]any) string {
-	if !strings.EqualFold(tool, "skill") {
+	if !isSkillTool(tool) {
 		return ""
 	}
 	for _, k := range []string{"skill", "name", "command"} {

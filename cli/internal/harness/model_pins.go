@@ -128,6 +128,16 @@ func DeclaredModels(m map[string]any) (qualified map[string]bool, bare map[strin
 				continue
 			}
 			for consumer, model := range entry {
+				// `$`-prefixed keys are annotations, not consumers. Measured
+				// 2026-08-27: `tiers.low` acquired a `$comment` explaining the
+				// qwen3.8-flash promotion, and without this the whole sentence
+				// entered the declared-model set as a bogus id. It only ever
+				// widened the set, so no check could fail wrongly — but a
+				// registry that treats prose as a model id is one leaf-id
+				// coincidence away from masking real drift.
+				if strings.HasPrefix(consumer, "$") {
+					continue
+				}
 				id, ok := model.(string)
 				if !ok {
 					continue

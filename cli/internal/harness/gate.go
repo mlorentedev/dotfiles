@@ -1,6 +1,8 @@
 package harness
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -39,8 +41,21 @@ type ToolCall struct {
 	// Tool is the harness's name for the tool about to run.
 	Tool string
 	// Skill is the skill being invoked, when Tool is the harness's skill
-	// primitive. Empty otherwise.
+	// primitive. Empty otherwise — INCLUDING when the tool IS the skill
+	// primitive but its argument could not be read, which is why IsSkillTool
+	// exists separately.
 	Skill string
+	// IsSkillTool reports that the tool is the harness's skill primitive,
+	// whether or not the skill's NAME was readable.
+	//
+	// Without it the gate deadlocks on a WELL-FORMED payload with a missing
+	// argument: `Skill` comes back empty, the call falls through to the
+	// enforcement path, and the gate blocks the very invocation that would
+	// satisfy it — permanently, because a blocked call can never record
+	// consumption. Raised by the PR reviewer on #1272 and reproduced. The
+	// deadlock guard was checking the skill's NAME when it had to check the
+	// tool's IDENTITY.
+	IsSkillTool bool
 }
 
 // GateInput is everything a decision needs.
@@ -71,8 +86,10 @@ func Decide(in GateInput) GateResult {
 	}
 
 	// Invoking a skill is never gated: that is the act the gate exists to
-	// require, and blocking it would deadlock the session.
-	if in.Call.Skill != "" {
+	// require, and blocking it would deadlock the session. Keyed on the TOOL,
+	// not on whether the skill's name parsed — an unreadable argument must never
+	// turn the one unblockable action into a blocked one.
+	if in.Call.IsSkillTool || in.Call.Skill != "" {
 		return GateResult{Decision: Allow, Reason: "skill invocation"}
 	}
 
@@ -129,6 +146,13 @@ type consumedState struct {
 // per-machine data with no business in a git-tracked tree, and a stale file
 // simply means an over-permissive gate for one session rather than corrupted
 // configuration.
+// A DIGEST IS APPENDED, not merely a sanitised name. Character-mapping alone
+// collides: `a/b` and `a.b` both flatten to `a_b`, so one session's consumption
+// record would open another session's gate. Raised by the PR reviewer on #1272.
+// Well-behaved harnesses send UUIDs and would never hit it, but a session id is
+// attacker-adjacent input that lands in a filesystem path, and "it does not
+// happen with well-behaved input" is not a property a path builder should rely
+// on. The readable prefix is kept so the directory stays diagnosable by eye.
 func StatePath(stateDir, sessionID string) string {
 	safe := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
@@ -136,10 +160,14 @@ func StatePath(stateDir, sessionID string) string {
 		}
 		return '_'
 	}, sessionID)
+	if len(safe) > 48 {
+		safe = safe[:48]
+	}
 	if safe == "" {
 		safe = "unknown"
 	}
-	return filepath.Join(stateDir, "gate", safe+".json")
+	sum := sha256.Sum256([]byte(sessionID))
+	return filepath.Join(stateDir, "gate", safe+"-"+hex.EncodeToString(sum[:4])+".json")
 }
 
 // LoadConsumed reads a session's consumed skills. A missing or unreadable file
