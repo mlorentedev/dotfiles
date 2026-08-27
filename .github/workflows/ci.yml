@@ -273,13 +273,53 @@ jobs:
           Set-Content (Join-Path $stub 'obsidian.cmd') '@echo off'
           Add-Content $env:GITHUB_PATH $stub
 
+      # TEST-003 (#1298): setup installed dotf into ~/.local/bin and never put
+      # it on PATH, so every dotf-gated block (deploy, render, tools install,
+      # the post-setup doctor) skipped with a warning and the job stayed green
+      # over a red box. Build dotf from THIS PR (the released binary lags the
+      # tree; the integration container builds from source for the same
+      # reason) and make it reachable by effect before setup runs.
+      - uses: actions/setup-go@v7
+        if: needs.changes.outputs.code == 'true'
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Build dotf from this PR and put ~/.local/bin on PATH (TEST-003)
+        if: needs.changes.outputs.code == 'true'
+        shell: pwsh
+        run: |
+          $bin = "$env:USERPROFILE\.local\bin"
+          New-Item -ItemType Directory -Force $bin | Out-Null
+          Push-Location cli
+          go build -o "$bin\dotf.exe" ./cmd/dotf
+          Pop-Location
+          Add-Content $env:GITHUB_PATH $bin
+          & "$bin\dotf.exe" version
+
+      # DOTF_VERSION=dev keeps Install-Dotf from replacing the source build with
+      # the pinned release: it skips when the binary on PATH reports the pinned
+      # version, and a source build reports "dev". No DOTFILES_DIR override: the
+      # deploy dir is the real-box default (~/.dotfiles), so the gate below
+      # certifies the tree a real machine reads, not the checkout (#1298 layer 3).
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
         if: needs.changes.outputs.code == 'true'
         shell: powershell
         env:
-          DOTFILES_DIR: ${{ github.workspace }}
           DOTFILES_REPO_DIR: ${{ github.workspace }}
+          DOTF_VERSION: dev
         run: .\setup-windows.ps1
+
+      # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
+      # asserted by tests/setup-windows.bats); CI is where a red doctor fails.
+      - name: Post-setup doctor gate (TEST-003)
+        if: needs.changes.outputs.code == 'true'
+        shell: pwsh
+        env:
+          DOTFILES_REPO_DIR: ${{ github.workspace }}
+        run: |
+          dotf doctor
+          if ($LASTEXITCODE -ne 0) { throw "dotf doctor reported failures after setup-windows.ps1 (see above)" }
 
       - name: Run Pester suites
         if: needs.changes.outputs.code == 'true'
