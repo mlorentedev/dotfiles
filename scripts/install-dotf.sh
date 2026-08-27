@@ -92,7 +92,12 @@ install_dotf() {
         # and regexing the semver is correct for either. Do not tighten it to
         # stdout-only; that would silently break the idempotence skip on an old
         # binary and reinstall on every run.
-        _dotf_current="$(dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+        # `dev` is what a source build reports (cli/cmd/dotf/main.go). CI builds
+        # dotf from the PR under test and pins DOTF_VERSION=dev so this skip
+        # keeps that binary instead of replacing it with the last release --
+        # the release lags the tree, and testing it certified nothing about
+        # the change (#1305: `dotf harness mirror` did not exist in 0.51.0).
+        _dotf_current="$(dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|dev' | head -n1)"
         if [ "$_dotf_current" = "$version" ]; then
             log_info "dotf $version already installed; skipping"
             return 0

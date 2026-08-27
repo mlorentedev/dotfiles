@@ -317,16 +317,19 @@ jobs:
           source versions.conf
           echo "BATS_VERSION=$BATS_VERSION" >> "$GITHUB_OUTPUT"
           echo "AGE_VERSION=$AGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "GO_VERSION=$(sed -n 's/^go //p' cli/go.mod)" >> "$GITHUB_OUTPUT"
 
       - name: Build integration test container
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         env:
           BATS_VERSION: ${{ steps.versions.outputs.BATS_VERSION }}
           AGE_VERSION: ${{ steps.versions.outputs.AGE_VERSION }}
+          GO_VERSION: ${{ steps.versions.outputs.GO_VERSION }}
         run: |
           docker build \
             --build-arg BATS_VERSION="$BATS_VERSION" \
             --build-arg AGE_VERSION="$AGE_VERSION" \
+            --build-arg GO_VERSION="$GO_VERSION" \
             -f tests/Dockerfile.integration \
             -t dotfiles-integration-test .
 

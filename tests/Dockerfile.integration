@@ -11,6 +11,9 @@ FROM ubuntu:26.04
 
 ARG BATS_VERSION=1.13.0
 ARG AGE_VERSION=1.3.1
+# Go toolchain for building dotf from THIS tree (default mirrors cli/go.mod's
+# `go` directive; ci.yml passes the real value as a build-arg).
+ARG GO_VERSION=1.26.0
 
 # Minimal dependencies that setup-linux.sh actually needs. xz-utils is required
 # for the shellcheck install (a .tar.xz extracted with `tar xJf`); without it the
@@ -42,6 +45,16 @@ RUN curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS
     && /tmp/bats-core-${BATS_VERSION}/install.sh /usr/local \
     && rm -rf /tmp/bats.tar.gz /tmp/bats-core-${BATS_VERSION}
 
+# Go, for building dotf from the tree under test. The released dotf lags the
+# tree: setup-linux.sh's install_dotf downloaded 0.51.0 here, which had no
+# `harness mirror`, so the integration job tested the last release and failed
+# on the PR that added the command (#1305). Same principle as the Windows job
+# (TEST-003, #1298): CI certifies the PR's binary, not the previous one's.
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm -f /tmp/go.tar.gz
+ENV PATH="/usr/local/go/bin:${PATH}"
+
 # Non-root user (setup-linux.sh uses $HOME)
 RUN useradd -m -s /bin/bash testuser
 USER testuser
@@ -53,6 +66,14 @@ RUN mkdir -p /home/testuser/.config/age \
 
 # Copy repo to ~/dotfiles-repo (NOT ~/.dotfiles) to trigger the copy branch
 COPY --chown=testuser:testuser . /home/testuser/dotfiles-repo
+
+# dotf from this tree, where install_dotf places the release; DOTF_VERSION=dev
+# makes install_dotf treat the source build as already installed.
+RUN mkdir -p /home/testuser/.local/bin \
+    && cd /home/testuser/dotfiles-repo/cli \
+    && go build -o /home/testuser/.local/bin/dotf ./cmd/dotf \
+    && /home/testuser/.local/bin/dotf version
+ENV DOTF_VERSION=dev
 
 # Marker for verify-setup.bats to detect it's running inside the container
 ENV DOTFILES_INTEGRATION_TEST=1

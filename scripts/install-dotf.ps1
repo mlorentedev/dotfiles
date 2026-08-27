@@ -141,7 +141,9 @@ function Install-Dotf {
             # the semver is correct for either. (StrictMode makes `@()[-1]` throw,
             # so never index blind.)
             $verRaw = (& dotf version 2>&1 | Out-String)
-            $current = if ($verRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
+            # `dev` is what a source build reports; CI pins DOTF_VERSION=dev so the
+            # binary built from the PR under test is kept (parity with install-dotf.sh).
+            $current = if ($verRaw -match '(\d+\.\d+\.\d+|dev)') { $Matches[1] } else { '' }
             if ($current -eq $Version) {
                 Write-Host "dotf $Version already installed; skipping"
                 return $true
