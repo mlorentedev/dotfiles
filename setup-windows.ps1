@@ -609,14 +609,13 @@ $sensitiveDest = "$DotfilesDest\sensitive"
 if (Test-Path $sensitiveSource) {
     Ensure-Directory $sensitiveDest
     # The var->file mapping moved to secrets/registry.yaml (deployed below); sensitive/
-    # now holds only the encrypted .age blobs.
-    $ageFiles = Get-ChildItem -Path $sensitiveSource -Filter '*.secret.age' -ErrorAction SilentlyContinue
-    if ($ageFiles) {
-        foreach ($ageFile in $ageFiles) {
-            Copy-Item $ageFile.FullName "$sensitiveDest\" -Force
-        }
-        Write-Success "Deployed $($ageFiles.Count) encrypted secret files"
-    }
+    # holds the encrypted .age blobs and, under dr/, the Bitwarden DR escrow.
+    # Recursive, like setup-linux.sh's `cp -rf sensitive/*`: the top-level-only
+    # copy this used to be never mirrored dr/, and doctor reported total-loss risk
+    # over an escrow sitting in the checkout (WIN-011/#1292).
+    Copy-Item -Path (Join-Path $sensitiveSource '*') -Destination $sensitiveDest -Recurse -Force
+    $ageCount = (Get-ChildItem -Path $sensitiveDest -Filter '*.age' -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+    Write-Success "Deployed $ageCount encrypted secret files (sensitive/ mirrored recursively)"
 } else {
     Write-Warn "Sensitive directory not found at $sensitiveSource"
 }
@@ -2005,7 +2004,7 @@ function Deploy-SkillRecord {
                 if ((Test-Path -LiteralPath $target) -and ((Get-Item -LiteralPath $target -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
                     Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
                 }
-                Set-Content -LiteralPath $target -Value (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src) -Encoding UTF8
+                Write-Utf8LfFile -Path $target -Content (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src)
             } else {
                 $destDir = Join-Path $destBase $rec.Name
                 if (Test-Path -LiteralPath $destDir) {
@@ -2014,7 +2013,7 @@ function Deploy-SkillRecord {
                 }
                 Ensure-Directory $destDir
                 Copy-Item -Path (Join-Path $rec.FullName '*') -Destination $destDir -Recurse -Force -ErrorAction SilentlyContinue
-                Set-Content -LiteralPath (Join-Path $destDir 'SKILL.md') -Value (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src) -Encoding UTF8
+                Write-Utf8LfFile -Path (Join-Path $destDir 'SKILL.md') -Content (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src)
             }
         }
         # Prune our own stale outputs (skill removed, or targets[] dropped this agent).
@@ -2073,7 +2072,10 @@ function Deploy-SkillRecord {
                 }
                 $result.Add($line)
             }
-            Set-Content -LiteralPath $catFile -Value $result -Encoding UTF8
+            # LF + no BOM (WIN-008/#1289): Set-Content joined this list with CRLF and
+            # rewrote the whole file, so the deployed copy drifted from its LF source
+            # on every run and the doctor's drift FAIL could never clear.
+            Write-Utf8LfFile -Path $catFile -Content ($result -join "`n")
             Write-Success "Injected skill catalog into $catFile"
         }
     }
