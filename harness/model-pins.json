@@ -1,0 +1,206 @@
+{
+  "$comment": [
+    "The pin-site registry (HARNESS-067, #902). It declares WHERE a model id is",
+    "pinned for ROUTING outside harness/model-map.json, and how that site spells",
+    "it, so a guard can check the two agree.",
+    "",
+    "WHY THIS FILE EXISTS. model-map.json has a schema, a validating loader and",
+    "real compile-time consumers, and it binds no leaf. A model id is pinned in",
+    "roughly seven live places and nothing makes any of them agree with the map.",
+    "Measured 2026-08-26: ~/.pi/agent/settings.json carried",
+    "`nan/deepseek-v4-flash-0731`, which no longer resolves — pi printed",
+    "`No models match pattern` on EVERY start — plus three `openrouter/*` entries",
+    "for a provider retired in August 2026. Nobody noticed until an unrelated",
+    "investigation happened to read the file.",
+    "",
+    "CATALOG IS NOT ROUTING, and the distinction is the whole design. A leaf may",
+    "OFFER models the map does not route: `qwen3.8-flash` and `glm5.3-flash` are",
+    "in pi's and opencode's pickers deliberately and deliberately absent from the",
+    "map — availability on a promotional allocation pending a community vote",
+    "(#1244). A guard reading `leaf offers what the map does not know` as drift",
+    "would fire on a recorded decision. So only the pins listed here are checked,",
+    "each one a place that DECIDES WHICH MODEL DOES WORK, and a catalog superset",
+    "is never drift.",
+    "",
+    "NORMALIZATION IS DECLARED, NEVER INFERRED. One model, three correct",
+    "spellings: `nan:mimo-v2.5` here, `openai/mimo-v2.5` in .pr_agent.toml",
+    "(litellm treats NaN as an OpenAI-compatible provider, so the prefix names a",
+    "wire protocol rather than a vendor), and bare `mimo-v2.5` in",
+    "ai/pi/models.json. A grep-shaped guard cannot check that. Each entry below",
+    "carries the rule for turning its own spelling into a map-resolvable",
+    "`pool:id`.",
+    "",
+    "ALIASES ARE NOT DRIFT. model-map.json pins `opus`/`sonnet`/`haiku` for claude",
+    "because Claude Code resolves those to the current member of each family, so",
+    "rotation costs nothing there; every other pool takes a canonical id. A check",
+    "demanding canonical ids uniformly would break that asymmetry, which is why",
+    "resolution is against what the map declares rather than against a pattern.",
+    "",
+    "NOT LISTED, and each absence is a decision:",
+    "  harness/reviewer-pool.json  separate from the map BY DECISION (its own",
+    "                              $comment). Its `agy/gemini-3.1-pro-high` entry",
+    "                              is unroutable today — a question about the",
+    "                              map's completeness, filed as #1253.",
+    "  cli/internal/agent/backends.go  Go rather than JSON on purpose.",
+    "  HIVE_EMBED_BASE_URL         an endpoint, not a model id (#1231).",
+    "",
+    "Fields:",
+    "  file      repo-relative path, or a `$HOME`-rooted one for a deployed file",
+    "            (never a literal home — ADR-025).",
+    "  scope     `repo` (committed, checkable in CI) or `deployed` (machine",
+    "            state, checkable only by dotf doctor — CI never sees a machine).",
+    "  pins      each routing pin: how to find it and how to normalize it.",
+    "    id      stable name for the pin, used in diagnostics.",
+    "    kind    `json-path` (top-level key, or `key[]` for a string array),",
+    "            `toml-key`, `regex` (exactly one match) or `regex-all` (every",
+    "            match must resolve). Both regex kinds need exactly one capture",
+    "            group, and both ERROR when the locator matches nothing: a",
+    "            pattern that has rotted reports zero values, and zero values",
+    "            check clean.",
+    "    locator the path/key/pattern that extracts the raw value.",
+    "    prefix  the site's provider prefix, stripped and replaced by `pool`.",
+    "            An empty string means the site writes a bare id.",
+    "    pool    the model-map pool the normalized id must resolve in.",
+    "  why       what this pin decides. A pin nobody can justify is one to delete."
+  ],
+  "version": 1,
+  "sites": [
+    {
+      "file": "ai/pi/settings.json",
+      "scope": "repo",
+      "why": "pi's interactive default — the model a bare `pi` session runs on. NOTE this file is seed-if-missing (#754): it is checked, and it will never be generated, because pi rewrites it at runtime and a rendered copy would reach a fresh machine and never an existing one.",
+      "pins": [
+        {
+          "id": "pi-default-model",
+          "kind": "json-path",
+          "locator": "defaultModel",
+          "prefix": "",
+          "pool": "nan",
+          "why": "Deliberately `qwen3.6` (the low tier) rather than the mid tier's deepseek-v4-flash: it is the latency-optimised daily driver for interactive use. The divergence from `tiers.mid` is intentional, which is exactly what #902 asked to be declared rather than rediscovered."
+        }
+      ]
+    },
+    {
+      "file": "$HOME/.pi/agent/settings.json",
+      "scope": "deployed",
+      "why": "The live file pi actually reads. It is the one surface the repo cannot converge, so it is the one that drifted: measured 2026-08-26 carrying a dead dated id and three retired-provider entries.",
+      "pins": [
+        {
+          "id": "pi-deployed-default-model",
+          "kind": "json-path",
+          "locator": "defaultModel",
+          "prefix": "",
+          "pool": "nan",
+          "why": "The default a real session runs on, which had drifted to deepseek-v4-flash against the repo's qwen3.6."
+        },
+        {
+          "id": "pi-deployed-enabled-models",
+          "kind": "json-path",
+          "locator": "enabledModels[]",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "The picker catalog. Checked ONLY for ids that cannot resolve at all (a dead dated stamp, a retired provider) — never for being a superset of the map, which is what #1244 makes legitimate."
+        }
+      ]
+    },
+    {
+      "file": ".pr_agent.toml",
+      "scope": "repo",
+      "why": "The CI reviewer. Read from the repository by the workflow, so it can be checked and must never be rendered.",
+      "pins": [
+        {
+          "id": "pr-agent-primary",
+          "kind": "toml-key",
+          "locator": "model",
+          "prefix": "openai/",
+          "pool": "nan",
+          "why": "The model every PR review runs on. The `openai/` prefix is litellm's protocol name for NaN, not a vendor — the single clearest case for declaring normalization instead of guessing it."
+        },
+        {
+          "id": "pr-agent-weak",
+          "kind": "toml-key",
+          "locator": "model_weak",
+          "prefix": "openai/",
+          "pool": "nan",
+          "why": "The cheap model for mechanical sub-tasks."
+        }
+      ]
+    },
+    {
+      "file": "ai/opencode/opencode.jsonc",
+      "scope": "repo",
+      "why": "The daily-driver TUI's default. Owned by the deploy pipeline, so this is the first surface generation should claim in phase 2.",
+      "pins": [
+        {
+          "id": "opencode-default-model",
+          "kind": "json-path",
+          "locator": "model",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "The model `oc` opens on."
+        }
+      ]
+    },
+    {
+      "file": ".zsh/aliases.zsh",
+      "scope": "repo",
+      "why": "The qq/qf one-shot wrappers. Three copies of the same two pins exist across shells, which is itself the drift this registry makes visible.",
+      "pins": [
+        {
+          "id": "qq-zsh",
+          "kind": "regex",
+          "locator": "alias qq='noglob _qq_call ([^ ]+)",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "The quick-question model."
+        },
+        {
+          "id": "qf-zsh",
+          "kind": "regex",
+          "locator": "alias qf='noglob _qq_call ([^ ]+)",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "The long-context model."
+        }
+      ]
+    },
+    {
+      "file": ".bashrc",
+      "scope": "repo",
+      "why": "The bash twins of the two wrappers above. Kept in sync by hand today.",
+      "pins": [
+        {
+          "id": "qq-bash",
+          "kind": "regex",
+          "locator": "qq\\(\\) \\{ _qq_call ([^ ]+)",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "Must agree with qq-zsh; nothing enforces that today."
+        },
+        {
+          "id": "qf-bash",
+          "kind": "regex",
+          "locator": "qf\\(\\) \\{ _qq_call ([^ ]+)",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "Must agree with qf-zsh; nothing enforces that today."
+        }
+      ]
+    },
+    {
+      "file": "powershell/profile.ps1",
+      "scope": "repo",
+      "why": "The Windows twins. A third copy of the same two pins, and the one least likely to be noticed when the other two are edited — the Linux-only verification loop cannot see it, the same gap GOOS=windows vet exists to close for Go.",
+      "pins": [
+        {
+          "id": "qq-qf-pwsh",
+          "kind": "regex-all",
+          "locator": "opencode run -m (\\S+)",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "Both wrappers invoke the same form, so EVERY match must resolve rather than one regex per wrapper. Deliberate: a pattern clever enough to tell qq from qf across a multi-line PowerShell function is a pattern that silently matches nothing after an unrelated edit — and a locator that matches nothing is indistinguishable from a site with no drift. `regex-all` fails when there are zero matches, so it cannot pass vacuously."
+        }
+      ]
+    }
+  ]
+}

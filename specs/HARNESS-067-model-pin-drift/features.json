@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-067-model-pin-drift-f1",
+    "behavior": "AC1 - harness/model-pins.json declares every routing pin site with a normalization rule, a pool and a non-empty why, ids are unique, and every regex locator compiles with exactly one capture group",
+    "verification": "cd cli && go test ./internal/harness/ -run TestModelPinsRegistryIsWellFormed",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f2",
+    "behavior": "AC2 - every routing pin in a committed file resolves to a pool/model harness/model-map.json declares, checked against the real repository rather than a fixture, and refusing to report clean if it inspected zero pins",
+    "verification": "cd cli && go test ./internal/harness/ -run TestEveryRepoRoutingPinResolvesInTheMap",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f3",
+    "behavior": "AC3 - the guard rejects an unresolvable pin (a dated snapshot and a retired-provider id) while still accepting a live one, so it cannot pass vacuously",
+    "verification": "cd cli && go test ./internal/harness/ -run TestGuardRejectsAnUnresolvablePin",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f4",
+    "behavior": "AC4 - a catalog model the map does not route is not drift: no repo-scoped pin points at a catalog key, and the deployed check stays silent on gemma4, qwen3.8-flash and glm5.3-flash",
+    "verification": "cd cli && go test ./internal/harness/ -run TestCatalogEntriesAreNotCheckedAsRouting && go test ./internal/doctor/ -run TestModelPinsDoesNotReportAnUnroutedCatalogModel",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f5",
+    "behavior": "AC5 - dotf doctor reports a deployed catalog id that is a frozen dated snapshot of a routed model, naming why it is stale, and printing no literal home path",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestModelPinsReportsAFrozenSnapshot",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f6",
+    "behavior": "AC6 - a retired provider is reported distinctly from an unresolvable model id and is never misreported as a snapshot; a dead scalar routing pin FAILs rather than warns",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestModelPinsDistinguishesARetiredProvider|TestModelPinsFailsOnADeadDefaultModel'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f7",
+    "behavior": "AC7 - an absent, unparseable or empty registry fails loudly in both layers and never renders as a clean sweep; a locator that matches nothing is an error, not zero findings",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestModelPinsRefusesToReadAsEmpty|TestExtractRefusesAnEmptyMatch' && go test ./internal/doctor/ -run TestModelPinsFailsLoudlyWithoutARegistry",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-067-model-pin-drift-f8",
+    "behavior": "AC8 - the doctor check performs no writes: content and mtime of the deployed settings.json are unchanged after a run that produced findings",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestModelPinsNeverWrites",
+    "state": "pending",
+    "evidence": ""
+  }
+]
