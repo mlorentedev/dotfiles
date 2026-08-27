@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f1",
+    "behavior": "scripts/knowledge-crystallize.{sh,ps1} are deleted",
+    "verification": "test ! -e scripts/knowledge-crystallize.sh && test ! -e scripts/knowledge-crystallize.ps1",
+    "state": "passing",
+    "evidence": "Both paths absent after `git rm`; confirmed via `ls scripts/knowledge-crystallize.*` -> no matches found."
+  },
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f2",
+    "behavior": "every former caller repoints at dotf vault crystallize",
+    "verification": "! grep -rnE '(\\$SCRIPT_DIR/|\\./scripts/|Copy-Item .*|& [^ ]*)knowledge-crystallize\\.(sh|ps1)' scripts/ setup-linux.sh setup-windows.ps1 cli/internal/ .claude/CLAUDE.md docs/runbooks/guide-knowledge-distillation.md .github/workflows/ci.yml",
+    "state": "passing",
+    "evidence": "Repointed: cli/internal/mem/session_start_injectors.go (+test), scripts/vault-maintenance-weekly.{sh,ps1}, setup-linux.sh, setup-windows.ps1, scripts/vault.sh, scripts/utils.ps1, .claude/CLAUDE.md, docs/runbooks/guide-knowledge-distillation.md, .github/workflows/ci.yml, docs/adr/adr-008-skills-ecosystem-overhaul.md, cli/internal/cmd/{vault,mem}.go doc comments. Rewritten 2026-08-27 after the adversarial review (nan/deepseek-v4-flash) ran the first version literally and found unexcluded hits in an unrelated active spec's prose (specs/HARNESS-063-.../proposal.md) -- and a broader problem the review didn't catch yet: any blanket filename-mention grep keeps breaking every time a NEW historical comment legitimately names the retired script (which happened again in this same PR's post-review fix commit). AC2's actual claim is 'no production file still invokes it', not 'the string never appears in prose', so the command now matches invocation shape (sourcing, relative-path exec, Copy-Item, &-invoke) scoped to production files only -- durable against future documentation mentioning the retired name, which specs/reviews/lessons legitimately do."
+  },
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f6",
+    "behavior": "the weekly maintenance script resolves dotf correctly under cron's minimal PATH, not just under an interactive shell",
+    "verification": "bats tests/vault-maintenance-weekly.bats --filter 'cron-minimal PATH'",
+    "state": "passing",
+    "evidence": "Found by the adversarial review (Major, REAL): bare `dotf vault crystallize --all` (PATH-resolved) replaced an absolute-path call, and cron's default PATH excludes ~/.local/bin (install-dotf.sh's install target) -- the step would have silently no-op'd every Sunday, swallowed by `|| true`. Fixed by exporting PATH=\"$HOME/.local/bin:$PATH\" at the top of vault-maintenance-weekly.sh (and the PowerShell twin, for the same class of dependency on Scheduled Task PATH inheritance). New regression test 'vault-maintenance-weekly.sh resolves dotf under a cron-minimal PATH' places the stub at $FAKE_HOME/.local/bin/dotf and runs with PATH=/usr/bin:/bin (excluding the sandbox's own $TMP, which every other test relies on and which had been masking this gap) -- fails without the fix, passes with it."
+  },
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f3",
+    "behavior": "git diff touches only callers/docs/comments plus the deleted scripts and their superseded test files -- no unrelated changes",
+    "verification": "git diff --stat main -- . ':!specs/CLI-050-knowledge-crystallize-cutover'",
+    "state": "passing",
+    "evidence": "Diff scope: scripts/knowledge-crystallize.{sh,ps1} deleted; 4 bats files + capture.sh deleted; vault-maintenance-weekly.{sh,ps1}, setup-linux.sh, setup-windows.ps1, vault.sh, utils.ps1, session_start_injectors(.go/_test.go), vault.go, mem.go, crystallize.go, lib.sh, ORACLE, knowledge-crystallize-go-parity.bats, vault-maintenance-weekly.bats, setup-windows.bats, .claude/CLAUDE.md, the distillation runbook, ci.yml, adr-008 edited. Two tangential doc-staleness findings ticketed as DOCS-014 (#1271) rather than folded in."
+  },
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f4",
+    "behavior": "Go build/vet/test green; full bats suite green; GOOS=windows go vet clean",
+    "verification": "cd cli && go build ./... && go vet ./... && go test ./... && GOOS=windows go vet ./... && golangci-lint run; cd .. && bats tests/*.bats",
+    "state": "passing",
+    "evidence": "go build/vet/test: all packages ok. GOOS=windows go vet: clean. golangci-lint (pinned 2.12.2, matches versions.conf): 0 issues. bats: 1462 tests, 1462 ok, 0 not ok (exit 0). shellcheck --severity=error (matching CI's actual invocation) on setup-linux.sh and scripts/*.sh: exit 0."
+  },
+  {
+    "id": "CLI-050-knowledge-crystallize-cutover-f5",
+    "behavior": "no coverage gap opened by deleting the four shell-invoking bats files",
+    "verification": "cd cli && go test ./internal/vault/... -run 'TestIsYAMLBlockScalar|TestProcessProjectRefusesYAMLAndLeavesFileIntact' -v",
+    "state": "passing",
+    "evidence": "TestIsYAMLBlockScalar covers four-space and six-space block-scalar indent (the exact variance knowledge-crystallize-yaml-guard.bats asserted against the shell at two indent widths); TestProcessProjectRefusesYAMLAndLeavesFileIntact covers the refusal sentinel, byte-identical-file, and 4x [ERROR] line count. The go-parity suite's yaml-wrapped golden case covers the CLI-level end-to-end behavior. Two bats tests initially broke by the deletion (false-pass in setup-windows.bats, real failures in vault-maintenance-weekly.bats caused by the sandbox stub still shelling to a deleted script name) were found and fixed in the same PR, not left red or silently deleted."
+  }
+]

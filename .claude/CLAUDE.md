@@ -108,13 +108,13 @@ profile-shell                       # alias to `scripts/shell-profile.sh`; diagn
 /crystallize
 
 # Automated MEMORY.md date maintenance (post-sprint or in CI):
-./scripts/knowledge-crystallize.sh
+dotf vault crystallize
 
 # All projects at once (auto-discovers from ~/.claude/projects/):
-./scripts/knowledge-crystallize.sh --all
+dotf vault crystallize --all
 
 # For a specific project:
-./scripts/knowledge-crystallize.sh ~/Projects/kubelab
+dotf vault crystallize ~/Projects/kubelab
 ```
 
 See runbook: `docs/runbooks/guide-knowledge-distillation.md`

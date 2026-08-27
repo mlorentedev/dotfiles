@@ -1704,13 +1704,9 @@ foreach ($initOrphan in @(
     if (Test-Path $initOrphan) { Remove-Item $initOrphan -Force -ErrorAction SilentlyContinue }
 }
 
-$crystallizeSource = "$DotfilesDir\scripts\knowledge-crystallize.ps1"
-if (Test-Path $crystallizeSource) {
-    Copy-Item $crystallizeSource "$ScriptsDir\" -Force
-    Write-Success "Deployed knowledge-crystallize.ps1 to $ScriptsDir\"
-} else {
-    Write-Warn "knowledge-crystallize.ps1 not found at $crystallizeSource"
-}
+# CLI-050: knowledge-crystallize.ps1 retired — `dotf vault crystallize` is the
+# sole implementation now, and it needs no per-machine deploy step since it
+# ships inside the dotf binary itself.
 
 # CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired — both session
 # hooks now call agnostic `dotf mem` nouns directly (registered below), so there

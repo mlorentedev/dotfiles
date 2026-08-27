@@ -42,9 +42,9 @@ func newMemCmd() *cobra.Command {
 	return cmd
 }
 
-// newMemProjectKeyCmd exposes memlink.ClaudeProjectKey as a CLI so the Windows
-// PowerShell twins (setup-windows.ps1, knowledge-crystallize.ps1) obtain the
-// Claude auto-memory key from the one Go implementation instead of re-deriving it
+// newMemProjectKeyCmd exposes memlink.ClaudeProjectKey as a CLI so PowerShell
+// callers (scripts/utils.ps1's Get-ClaudeProjectKey) obtain the Claude
+// auto-memory key from the one Go implementation instead of re-deriving it
 // — the datum-duplication that drifted and mis-encoded the junction on Windows
 // (BUG-031/#689; #551 fixed only the Go side). Prints the key for <path> and a
 // trailing newline.

@@ -301,7 +301,6 @@ jobs:
             tests/powershell-profile.bats \
             tests/profile-heal-ps1.bats \
             tests/setup-windows.bats \
-            tests/knowledge-crystallize-ps1.bats \
             tests/obs-cli-ps1.bats
 
   integration:

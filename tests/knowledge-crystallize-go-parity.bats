@@ -1,12 +1,14 @@
 #!/usr/bin/env bats
-# Byte-parity between `dotf vault crystallize` and the shell oracle (CLI-021).
+# Characterization of `dotf vault crystallize` against the frozen golden corpus
+# (CLI-021, cut over from the shell twin in CLI-050).
 #
-# The claim increment 1 has to support is "the Go output is byte-identical to the
-# shell for every fixture". That claim is only meaningful if ONE set of
-# expectations judges both, so this reuses the very goldens captured from the
-# shell in tests/golden/crystallize/ and the very same runner (lib.sh) — it does
-# not re-derive anything in Go. A parity test that built its own expectations
-# would pass while the two implementations drifted.
+# knowledge-crystallize.{sh,ps1} are deleted (#1269 / CLI-050): `dotf vault
+# crystallize` is now the sole implementation, and there is no live oracle left
+# to compare against. The goldens under tests/golden/crystallize/cases/*/expected
+# — captured from the shell before deletion, per tests/golden/crystallize/ORACLE's
+# git history — are the frozen contract this Go implementation must keep
+# satisfying. gc_run_case's `go` mode (lib.sh) never shells out; it only runs the
+# built dotf binary and diffs its output against those static files.
 #
 # Skips (never fails) when the Go toolchain is absent, so a shell-only checkout
 # still runs the rest of the suite. CI installs Go for the `test` job precisely so
@@ -15,7 +17,6 @@
 
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/crystallize"
-    export GC_ORACLE_SH="$BATS_TEST_DIRNAME/../scripts/knowledge-crystallize.sh"
     # shellcheck source=golden/crystallize/lib.sh disable=SC1091
     . "$HERE/lib.sh"
     ACTUAL="$(mktemp -d)"
