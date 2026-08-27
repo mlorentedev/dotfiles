@@ -24,11 +24,10 @@ setup() {
     [ "$build_line" -gt "$copy_line" ]
 }
 
-@test "integration: DOTF_VERSION=dev keeps the source build through install_dotf" {
-    grep -qF 'ENV DOTF_VERSION=dev' "$DOCKERFILE"
+@test "integration: the source build is made before setup runs, so install_dotf sees it" {
     setup_line=$(grep -n 'bash setup-linux.sh' "$DOCKERFILE" | head -1 | cut -d: -f1)
-    env_line=$(grep -n '^ENV DOTF_VERSION=dev' "$DOCKERFILE" | head -1 | cut -d: -f1)
-    [ "$env_line" -lt "$setup_line" ]
+    build_line=$(grep -n 'go build -o /home/testuser/.local/bin/dotf' "$DOCKERFILE" | head -1 | cut -d: -f1)
+    [ "$build_line" -lt "$setup_line" ]
 }
 
 @test "integration: GO_VERSION reaches the container from cli/go.mod, not a second pin" {
@@ -37,7 +36,13 @@ setup() {
     grep -qF 'ARG GO_VERSION=' "$DOCKERFILE"
 }
 
-@test "both installers treat a 'dev' build as already installed when the pin is dev" {
+@test "both installers leave a 'dev' (source) build in place instead of replacing it with the release" {
+    # setup-linux.sh sources versions.conf, so a DOTF_VERSION=dev env override is
+    # clobbered back to the pin before install_dotf runs (measured on #1305's
+    # third run: "dotf dev drifted from pinned 0.51.0; converging"). The rule
+    # has to live in the installers themselves.
     grep -qF "grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+|dev'" "$REPO/scripts/install-dotf.sh"
+    grep -qF 'if [ "$_dotf_current" = "dev" ]; then' "$REPO/scripts/install-dotf.sh"
     grep -qF "(\\d+\\.\\d+\\.\\d+|dev)" "$REPO/scripts/install-dotf.ps1"
+    grep -qF "if (\$current -eq 'dev') {" "$REPO/scripts/install-dotf.ps1"
 }

@@ -67,13 +67,14 @@ RUN mkdir -p /home/testuser/.config/age \
 # Copy repo to ~/dotfiles-repo (NOT ~/.dotfiles) to trigger the copy branch
 COPY --chown=testuser:testuser . /home/testuser/dotfiles-repo
 
-# dotf from this tree, where install_dotf places the release; DOTF_VERSION=dev
-# makes install_dotf treat the source build as already installed.
+# dotf from this tree, where install_dotf places the release. It reports
+# `dev`, and install_dotf leaves a dev build in place (a DOTF_VERSION env
+# override cannot express this: setup-linux.sh sources versions.conf, which
+# sets DOTF_VERSION back to the pin).
 RUN mkdir -p /home/testuser/.local/bin \
     && cd /home/testuser/dotfiles-repo/cli \
     && go build -o /home/testuser/.local/bin/dotf ./cmd/dotf \
     && /home/testuser/.local/bin/dotf version
-ENV DOTF_VERSION=dev
 
 # Marker for verify-setup.bats to detect it's running inside the container
 ENV DOTFILES_INTEGRATION_TEST=1
