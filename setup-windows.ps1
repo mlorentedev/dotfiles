@@ -1043,7 +1043,10 @@ if (-not $obsidianCmd) {
             & npm install -g 'obsidian-cli' 2>$null | Out-Null
             # Refresh PATH so the freshly-installed binary is visible in this
             # session (same trick as the winget block in section 1c).
-            $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
+            # Keep the process PATH (same rule as the refresh after the winget loop):
+            # this registry-only rebuild dropped the runner's toolcache node, so
+            # "npm not available, skipping pi install" followed it (TEST-003/#1298).
+            $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH
             if (Get-Command obsidian -ErrorAction SilentlyContinue) {
                 Write-Success "Obsidian CLI installed"
             } else {

@@ -828,3 +828,13 @@ setup() {
 @test "setup-windows.ps1's PATH refresh keeps the process PATH (a GITHUB_PATH entry survived nothing before, TEST-003)" {
     grep -qF 'GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT"
 }
+
+@test "every registry PATH rebuild in setup-windows.ps1 keeps the process PATH (TEST-003)" {
+    # Two registry-only rebuilds dropped process-only entries: the first hid the
+    # PR's dotf from Install-Dotf, the second hid the runner's toolcache node from
+    # the pi install ("npm not available"). A rebuild must end by appending $env:PATH.
+    total=$(grep -c 'GetEnvironmentVariable("PATH", "User")' "$PS1_SCRIPT")
+    kept=$(grep -c 'GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT")
+    [ "$total" -ge 2 ]
+    [ "$total" -eq "$kept" ]
+}
