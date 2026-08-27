@@ -275,11 +275,13 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	case sys.has("opencode"):
 		ver := trailingVersion(sys, "opencode", "--version")
 		rep.Pass("opencode in PATH: " + ver)
-		matchPin(rep, "opencode", ver, cfg.Versions["OPENCODE_VERSION"])
+		matchPinFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), "packages.json")
 	case isExecFile(opencodeBin):
-		rep.Fail("opencode binary exists at " + opencodeBin + " but not in PATH (reload shell)")
+		// The retired curl-script channel (ADR-036) left a copy behind and
+		// nothing on PATH resolves: the rc files no longer add ~/.opencode/bin.
+		rep.Fail("opencode not on PATH; a legacy curl-script copy sits at " + opencodeBin + " — run `dotf tools install opencode` and delete the legacy copy (ADR-036)")
 	default:
-		rep.Fail("opencode binary missing (run setup)")
+		rep.Fail("opencode missing (run `dotf tools install opencode`)")
 	}
 
 	// opencode config + $schema.
@@ -328,6 +330,8 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 			rep.Skip("pi models.json substitution — age identity absent ({env:} resolves at runtime)")
 		}
 	}
+
+	checkShadowedCatalogTools(sys, cfg, rep)
 
 	// Launchability. Everything above is a static predicate — files and PATH —
 	// and every one of them was green on a box where `pi` could not start
@@ -849,13 +853,19 @@ func trailingVersion(sys *System, name, arg string) string {
 // → SKIP, equal → PASS, drift → WARN (never a FAIL — a pinned-tool drift is
 // advisory, exactly as healthcheck treated it).
 func matchPin(rep *Report, tool, installed, pin string) {
+	matchPinFrom(rep, tool, installed, pin, "versions.conf")
+}
+
+// matchPinFrom is matchPin with the pin's source named: packages.json is the
+// SSOT for catalog tools (ADR-036), versions.conf for the rest.
+func matchPinFrom(rep *Report, tool, installed, pin, source string) {
 	switch {
 	case pin == "":
-		rep.Skip(tool + " version not pinned in versions.conf — match not verified")
+		rep.Skip(tool + " version not pinned in " + source + " — match not verified")
 	case installed == pin:
-		rep.Pass(fmt.Sprintf("%s version matches versions.conf (%s)", tool, pin))
+		rep.Pass(fmt.Sprintf("%s version matches %s (%s)", tool, source, pin))
 	default:
-		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s", tool, installed, pin))
+		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s (%s)", tool, installed, pin, source))
 	}
 }
 

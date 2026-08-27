@@ -1,0 +1,37 @@
+[
+  {
+    "id": "AI-034-opencode-npm-channel-f1",
+    "behavior": "packages.json declares opencode as an npm catalog tool and versions.conf no longer pins it.",
+    "verification": "jq -e '.tools[] | select(.name==\"opencode\" and .source.type==\"npm\" and .source.package==\"opencode-ai\" and (.version|test(\"^[0-9]+\\\\.[0-9]+\\\\.[0-9]+$\")))' packages.json >/dev/null && ! grep -q '^OPENCODE_VERSION=' versions.conf",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-034-opencode-npm-channel-f2",
+    "behavior": "Neither setup script carries an opencode install block, a winget SST.opencode entry, the winget version-pin machinery, or the ~/.opencode/bin PATH export.",
+    "verification": "bats tests/opencode.bats tests/setup-windows.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-034-opencode-npm-channel-f3",
+    "behavior": "dotf tools version <name> prints the first semver of <name> --version and exits 1 when none; both setups gate hive service on it.",
+    "verification": "cd cli && go test ./internal/tools/ ./internal/cmd/ -run 'TestProbeVersion|TestToolsVersionCmd' && cd .. && bats tests/hive-upgrade-timer.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-034-opencode-npm-channel-f4",
+    "behavior": "dotf doctor reads opencode's pin from packages.json and WARNs, naming the directories, when an npm catalog tool resolves from more than one PATH entry.",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCatalogPin|TestCheckShadowedCatalogTools|TestCheckOpenCode'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-034-opencode-npm-channel-f5",
+    "behavior": "ADR-036 records the channel policy and the Linux migration consequence.",
+    "verification": "grep -q '^# ADR-036' docs/adr/adr-036-install-channels.md && grep -q 'opencode/bin' docs/adr/adr-036-install-channels.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]

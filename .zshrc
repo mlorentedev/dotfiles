@@ -178,9 +178,6 @@ complete -o nospace -C /usr/bin/terraform terraform
 # Dump zprof results at end of startup if profiling is enabled
 [[ -n "${DOTFILES_PROFILE:-}" ]] && zprof | head -25
 
-# opencode CLI
-export PATH="$HOME/.opencode/bin:$PATH"
-
 # Dotfiles scripts on PATH
 export PATH="$HOME/.dotfiles/scripts:$PATH"
 

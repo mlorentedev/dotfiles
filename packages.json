@@ -16,6 +16,15 @@
       }
     },
     {
+      "name": "opencode",
+      "version": "1.16.2",
+      "profile": "full",
+      "source": {
+        "type": "npm",
+        "package": "opencode-ai"
+      }
+    },
+    {
       "name": "bw",
       "version": "2026.5.0",
       "profile": "full",

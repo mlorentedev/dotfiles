@@ -220,9 +220,6 @@ if [[ -n "${DOTFILES_PROFILE:-}" ]]; then
     echo "bashrc profile written to /tmp/bashrc-profile.$$.log"
 fi
 
-# opencode CLI
-export PATH="$HOME/.opencode/bin:$PATH"
-
 # Dotfiles scripts on PATH
 export PATH="$HOME/.dotfiles/scripts:$PATH"
 

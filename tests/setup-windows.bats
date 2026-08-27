@@ -317,29 +317,14 @@ setup() {
 # reconcile-not-skip, and sync ai/opencode/commands/*.md to the user's
 # OpenCode commands directory.
 
-@test "setup-windows.ps1 installs OpenCode via winget SST.opencode (AI-014)" {
-    grep -qF 'SST.opencode' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 upgrades a below-minimum opencode to the versions.conf pin (REFACTOR-011/013)" {
-    # Presence is not convergence, and the pin is a MINIMUM: an opencode older
-    # than OPENCODE_VERSION was skipped as "already installed", while an exact
-    # -ne reconcile would downgrade a newer install. Gate on Test-VersionAtLeast
-    # so only a below-minimum opencode triggers an upgrade.
-    grep -qF 'Test-VersionAtLeast $installedVer $tool.Version' "$PS1_SCRIPT"
-    refute_grep_fixed '$installedVer -ne $tool.Version' "$PS1_SCRIPT"
-    grep -qE 'winget install \$tool\.Id --version \$tool\.Version' "$PS1_SCRIPT"
-    # Convergence is verified by re-query, not by winget's exit code: a
-    # shadowing install (npm global, scoop) would otherwise produce a false
-    # SUCCESS -- the same lie class this branch eliminates for S4U tasks.
-    grep -qF 'shadows it in PATH' "$PS1_SCRIPT"
-}
-
-# utils.ps1 sets Set-StrictMode Latest, so accessing a missing hashtable key
-# as a property throws. Latent until a box actually needs the install branch
-# (all tools present locally) -- first caught by the WIN-004 CI runner.
-@test "setup-windows.ps1 guards the optional Version key under StrictMode (WIN-004)" {
-    grep -qF "ContainsKey('Version')" "$PS1_SCRIPT"
+@test "setup-windows.ps1 installs OpenCode through packages.json (npm), not winget (AI-034, ADR-036)" {
+    # Two channels coexisted on the work box (npm-global first on PATH + winget),
+    # and the winget loop's version parse accepted "locked." as a version.
+    refute_grep_fixed 'SST.opencode' "$PS1_SCRIPT"
+    refute_grep_fixed 'OPENCODE_VERSION' "$PS1_SCRIPT"
+    refute_grep_fixed "ContainsKey('Version')" "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm")' "$DOTFILES_DIR/packages.json" >/dev/null
+    grep -qF 'dotf tools install' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
