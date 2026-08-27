@@ -10,6 +10,7 @@ import (
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // checkSymlinks reproduces healthcheck section 4: the dotfiles symlinks resolve.
@@ -273,7 +274,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	opencodeBin := filepath.Join(home, ".opencode", "bin", "opencode")
 	switch {
 	case sys.has("opencode"):
-		ver := trailingVersion(sys, "opencode", "--version")
+		ver := semverOf(sys, "opencode")
 		rep.Pass("opencode in PATH: " + ver)
 		matchPinFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), "packages.json")
 	case isExecFile(opencodeBin):
@@ -304,7 +305,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	piConfigured := pathExists(filepath.Join(home, ".pi", "agent", "models.json"))
 	switch {
 	case sys.has("pi"):
-		ver := trailingVersion(sys, "pi", "--version")
+		ver := semverOf(sys, "pi")
 		rep.Pass("pi in PATH: " + ver)
 		matchPin(rep, "pi", ver, cfg.Versions["PI_VERSION"])
 	case isExecFile(piLocalBin):
@@ -831,27 +832,25 @@ func checkAntigravity(sys *System, rep *Report) {
 	}
 }
 
-// trailingVersion returns the last whitespace field of the first line of
-// `name <arg>` output (the awk '{print $NF}' idiom), or "unknown" on error.
-func trailingVersion(sys *System, name, arg string) string {
-	out, err := sys.CommandOutput(name, arg)
-	if err != nil {
-		return "unknown"
-	}
-	first := out
-	if i := strings.IndexByte(out, '\n'); i >= 0 {
-		first = out[:i]
-	}
-	fields := strings.Fields(first)
-	if len(fields) == 0 {
-		return "unknown"
-	}
-	return fields[len(fields)-1]
-}
-
 // matchPin compares an installed version against a versions.conf pin: empty pin
 // → SKIP, equal → PASS, drift → WARN (never a FAIL — a pinned-tool drift is
 // advisory, exactly as healthcheck treated it).
+// semverOf is the doctor-side face of tools.ProbeVersion: the first semver in
+// `<name> --version`, through the System seam so tests inject the banner.
+// trailingVersion (last token of the first line) is what reported "locked."
+// for opencode on the Windows work box (AI-034/#1294); "unknown" when the
+// tool prints no version at all, so the report line stays readable.
+func semverOf(sys *System, name string) string {
+	v := tools.ProbeVersion(name, func(n string, args ...string) ([]byte, error) {
+		out, err := sys.CommandOutput(n, args...)
+		return []byte(out), err
+	})
+	if v == "" {
+		return "unknown"
+	}
+	return v
+}
+
 func matchPin(rep *Report, tool, installed, pin string) {
 	matchPinFrom(rep, tool, installed, pin, "versions.conf")
 }

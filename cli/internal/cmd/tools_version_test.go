@@ -21,23 +21,31 @@ func TestToolsVersionCmd(t *testing.T) {
 		}
 		return nil, errors.New("not found")
 	}
-	run := func(name string) (string, error) {
-		c := newToolsVersionCmd()
-		var out bytes.Buffer
-		c.SetOut(&out)
-		c.SetErr(&bytes.Buffer{})
-		c.SetArgs([]string{name})
-		err := c.Execute()
-		return strings.TrimSpace(out.String()), err
-	}
 
-	if got, err := run("hive"); err != nil || got != "3.0.0" {
-		t.Errorf("hive: want 3.0.0, got %q (%v)", got, err)
+	cases := []struct {
+		name    string
+		tool    string
+		want    string
+		wantErr bool
+	}{
+		{name: "prefixed banner", tool: "hive", want: "3.0.0"},
+		{name: "banner line before the number", tool: "opencode", want: "1.16.2"},
+		{name: "absent tool: empty stdout, exit error", tool: "nope", want: "", wantErr: true},
 	}
-	if got, err := run("opencode"); err != nil || got != "1.16.2" {
-		t.Errorf("opencode: the banner line must not be taken as the version, got %q (%v)", got, err)
-	}
-	if got, err := run("nope"); err == nil || got != "" {
-		t.Errorf("absent tool: want exit error and empty stdout, got %q (%v)", got, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newToolsVersionCmd()
+			var out bytes.Buffer
+			c.SetOut(&out)
+			c.SetErr(&bytes.Buffer{})
+			c.SetArgs([]string{tc.tool})
+			err := c.Execute()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tc.wantErr)
+			}
+			if got := strings.TrimSpace(out.String()); got != tc.want {
+				t.Errorf("stdout = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

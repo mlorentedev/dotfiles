@@ -39,8 +39,11 @@ setup() {
     grep -q 'dotf secrets render "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode block has post-deploy assertion" {
+@test "setup-linux.sh opencode block has post-deploy assertion, probed through dotf tools version (ADR-036)" {
     grep -q "opencode not reachable on PATH" "$SETUP_SCRIPT"
+    grep -qF 'tools version opencode' "$SETUP_SCRIPT"
+    # No second version-detection contract beside the shared probe.
+    refute_grep_fixed 'opencode --version 2>&1 | grep' "$SETUP_SCRIPT"
 }
 
 @test "the retired ~/.opencode/bin channel is off PATH in .zshrc and .bashrc (AI-034, ADR-036)" {

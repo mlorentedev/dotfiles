@@ -814,3 +814,11 @@ setup() {
     grep -qF '[Console]::OutputEncoding = ' "$DOTFILES_DIR/scripts/utils.ps1"
     grep -qF '[Console]::OutputEncoding = ' "$DOTFILES_DIR/powershell/profile.ps1"
 }
+
+@test "setup-windows.ps1 provisions Node.js before dotf tools install, the npm channel's prerequisite (ADR-036)" {
+    grep -qF 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT"
+    node_line=$(grep -n 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    tools_line=$(grep -n '^    dotf tools install$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$node_line" ] && [ -n "$tools_line" ]
+    [ "$node_line" -lt "$tools_line" ]
+}

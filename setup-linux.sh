@@ -995,9 +995,16 @@ fi
 # now expresses what was the hard-coded Claude-only skip-list.
 
 # Post-deploy assertion: binary reachable + version reports. Placement is
-# `dotf tools install`'s (packages.json, AI-034/#1294); this only verifies it.
+# `dotf tools install`'s (packages.json, AI-034/#1294); this only verifies it,
+# through the one version probe (ADR-036) rather than a local parse.
 if command -v opencode >/dev/null 2>&1; then
-    opencode_ready_version=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+    _dotf=""
+    if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
+    opencode_ready_version=""
+    if [ -n "$_dotf" ]; then
+        opencode_ready_version=$("$_dotf" tools version opencode 2>/dev/null) || opencode_ready_version=""
+    fi
+    unset _dotf
     log_success "opencode ready: ${opencode_ready_version:-unknown}"
 else
     log_warning "opencode not reachable on PATH after 'dotf tools install' — agent unavailable (re-run 'dotf tools install opencode')"

@@ -384,7 +384,12 @@ if ($wingetCmd) {
         @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
         @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
         @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
-        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" }
+        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" },
+        # Node.js is the prerequisite of the npm channel (ADR-036 class 3: no
+        # cross-OS channel, so winget here, nvm on Linux). It must exist before
+        # `dotf tools install` runs below, or bw and opencode cannot install on
+        # a clean box. A scoop/nvm node already on PATH is left alone.
+        @{ Name = "Node.js LTS"; Cmd = "node"; Id = "OpenJS.NodeJS.LTS" }
         # opencode left this list for packages.json (npm on every OS, AI-034/#1294,
         # ADR-036): `dotf tools install` below converges it. No winget tool carries
         # a version pin any more, so the loop only installs what is absent.

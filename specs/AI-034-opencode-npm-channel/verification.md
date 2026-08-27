@@ -11,7 +11,7 @@ All produced 2026-08-27 on the Windows work box (where the defect was measured),
 
 `features.json` verification commands (Git Bash, Go 1.26, jq, bats 1.13):
 
-```
+```text
 AI-034-opencode-npm-channel-f1: exit=0
 AI-034-opencode-npm-channel-f2: exit=0
 AI-034-opencode-npm-channel-f3: exit=0
@@ -23,7 +23,7 @@ Whole tree: `go build ./... && go vet ./... && GOOS=linux go vet ./...` clean; `
 
 **Real-box run** with `dotf` built from this branch:
 
-```
+```text
 $ dotf tools version hive
 3.0.0                      ← setup used to report "hive <unknown> predates 'hive service'"
 $ dotf tools version opencode

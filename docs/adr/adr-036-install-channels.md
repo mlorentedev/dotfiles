@@ -21,7 +21,7 @@ The repository already carried the right primitive: `packages.json` + `dotf tool
 
 ## Decision
 
-1. **Every tool this repository provisions has exactly one install channel, the same on every OS**, chosen by the tool's own distribution shape:
+1. **Every tool this repository provisions has exactly one install channel**, chosen by the tool's own distribution shape. For the first two classes below that channel is the same on every OS and lives in `packages.json`; the third class has no cross-OS channel by definition and takes the OS package manager or the official installer, one per OS, in the setup script:
 
    | Tool class | Channel | Source type |
    |---|---|---|
