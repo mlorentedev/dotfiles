@@ -1,14 +1,4 @@
 {
-  "activeClaudeManagedAccountId": "194c30b6-0535-451b-aa98-a239e237b22c",
-  "activeClaudeManagedAccountIdsByRuntime": {
-    "host": "194c30b6-0535-451b-aa98-a239e237b22c",
-    "wsl": {}
-  },
-  "activeCodexManagedAccountId": null,
-  "activeCodexManagedAccountIdsByRuntime": {
-    "host": null,
-    "wsl": {}
-  },
   "activeRuntimeEnvironmentId": null,
   "agentCmdOverrides": {},
   "agentDefaultArgs": {
@@ -52,23 +42,6 @@
   "branchPrefixCustom": "",
   "claudeAgentTeamsDefaultDisabledMigrated": true,
   "claudeAgentTeamsMode": "off",
-  "claudeManagedAccounts": [
-    {
-      "authMethod": "subscription-oauth",
-      "createdAt": 1781741538004,
-      "email": "mlorentedev@gmail.com",
-      "id": "194c30b6-0535-451b-aa98-a239e237b22c",
-      "lastAuthenticatedAt": 1781741538004,
-      "managedAuthPath": "/home/manu/.config/orca/claude-accounts/194c30b6-0535-451b-aa98-a239e237b22c/auth",
-      "managedAuthRuntime": "host",
-      "organizationName": "mlorentedev@gmail.com's Organization",
-      "organizationUuid": "c5b8e11f-9a2f-4cf5-b1ac-4d8a355105dc",
-      "updatedAt": 1781741538004,
-      "wslDistro": null,
-      "wslLinuxAuthPath": null
-    }
-  ],
-  "codexManagedAccounts": [],
   "combinedDiffFileTreeVisibleByDefault": false,
   "commitMessageAi": {
     "agentId": null,
@@ -104,12 +77,9 @@
   "experimentalPet": false,
   "experimentalTerminalAttention": false,
   "experimentalWorktreeSymlinks": false,
-  "floatingTerminalCwd": "~",
-  "floatingTerminalCwdMigratedToAppWorkspace": true,
   "floatingTerminalDefaultedForAllUsers": true,
   "floatingTerminalEnabled": true,
   "floatingTerminalTriggerLocation": "floating-button",
-  "floatingTerminalTrustedCwds": [],
   "geminiCliOAuthEnabled": true,
   "githubProjects": {
     "activeProject": {
@@ -167,8 +137,6 @@
   ],
   "openLinksInApp": false,
   "openLinksInAppPreferencePrompted": false,
-  "opencodeSessionCookie": "",
-  "opencodeWorkspaceId": "",
   "primarySelectionMiddleClickPaste": true,
   "primarySelectionMiddleClickPasteDefaultedForLinux": true,
   "primarySelectionMiddleClickPasteDefaultedForTerminalDefaults": true,
@@ -236,7 +204,6 @@
   "tabAutoGenerateTitle": false,
   "telemetry": {
     "existedBeforeTelemetryRelease": false,
-    "installId": "776c6bb5-75ed-47fc-b92a-1b5d10e960c2",
     "optedIn": true
   },
   "terminalActivePaneOpacity": 1,
@@ -293,7 +260,5 @@
     "terminalConfirmBeforeInsert": false,
     "userModels": []
   },
-  "windowBackgroundBlur": false,
-  "workspaceDir": "/home/manu/orca/workspaces",
-  "workspaceDirHistory": []
+  "windowBackgroundBlur": false
 }

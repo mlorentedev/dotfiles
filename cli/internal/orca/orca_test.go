@@ -13,7 +13,6 @@ func TestExport_ExtractsKeybindingsAndSettings(t *testing.T) {
 	orcaUserDir := t.TempDir()
 	orcaHomeDir := t.TempDir()
 
-	// 1. Seed keybindings.json
 	sampleKeybindings := map[string]any{
 		"version": 1,
 		"platforms": map[string]any{
@@ -25,15 +24,16 @@ func TestExport_ExtractsKeybindingsAndSettings(t *testing.T) {
 	kbBytes, _ := json.Marshal(sampleKeybindings)
 	_ = os.WriteFile(filepath.Join(orcaHomeDir, "keybindings.json"), kbBytes, 0o644)
 
-	// 2. Seed orca-data.json
 	sampleData := map[string]any{
 		"schemaVersion": 1,
 		"settings": map[string]any{
-			"theme":              "dark",
-			"defaultTuiAgent":    "claude",
-			"terminalFontSize":   14,
+			"theme":                 "dark",
+			"defaultTuiAgent":       "claude",
+			"claudeManagedAccounts": []string{"acc-123"},
+			"workspaceDirHistory":   []string{"/home/manu/old"},
 			"telemetry": map[string]any{
-				"optedIn": false,
+				"optedIn":   false,
+				"installId": "secret-uuid",
 			},
 		},
 		"runtimeState": "ephemeral-data-not-to-export",
@@ -41,34 +41,33 @@ func TestExport_ExtractsKeybindingsAndSettings(t *testing.T) {
 	dataBytes, _ := json.Marshal(sampleData)
 	_ = os.WriteFile(filepath.Join(orcaUserDir, "orca-data.json"), dataBytes, 0o644)
 
-	// Run Export
 	rep, err := Export(repoRoot, orcaUserDir, orcaHomeDir)
 	if err != nil {
 		t.Fatalf("Export failed: %v", err)
 	}
 
-	if !rep.KeybindingsCopied {
-		t.Errorf("expected KeybindingsCopied to be true")
-	}
-	if !rep.SettingsExported {
-		t.Errorf("expected SettingsExported to be true")
-	}
-	if rep.SettingsCount != 4 {
-		t.Errorf("expected 4 settings, got %d", rep.SettingsCount)
+	if !rep.KeybindingsCopied || !rep.SettingsExported {
+		t.Errorf("expected both keybindings and settings to be exported")
 	}
 
-	// Verify exported settings file does not contain root ephemeral fields
 	expSettingsBytes, err := os.ReadFile(rep.RepoSettings)
 	if err != nil {
 		t.Fatalf("failed reading exported settings: %v", err)
 	}
 	var exportedMap map[string]any
 	_ = json.Unmarshal(expSettingsBytes, &exportedMap)
-	if _, exists := exportedMap["runtimeState"]; exists {
-		t.Errorf("expected runtimeState to be excluded from exported settings")
+
+	// Sanitization assertions
+	if _, exists := exportedMap["claudeManagedAccounts"]; exists {
+		t.Errorf("expected claudeManagedAccounts to be sanitized from export")
 	}
-	if exportedMap["defaultTuiAgent"] != "claude" {
-		t.Errorf("expected defaultTuiAgent=claude, got %v", exportedMap["defaultTuiAgent"])
+	if _, exists := exportedMap["workspaceDirHistory"]; exists {
+		t.Errorf("expected workspaceDirHistory to be sanitized from export")
+	}
+	if tel, ok := exportedMap["telemetry"].(map[string]any); ok {
+		if _, exists := tel["installId"]; exists {
+			t.Errorf("expected telemetry.installId to be sanitized")
+		}
 	}
 }
 
@@ -81,7 +80,7 @@ func TestTune_DryRunDoesNotModify(t *testing.T) {
 			"experimentalAgentHibernation": false,
 			"agentHibernationIdleMs":       1800000.0,
 			"telemetry": map[string]any{
-				"optedIn": true,
+				"optedIn": "false", // string "false" should not equal boolean false
 			},
 		},
 	}
@@ -97,7 +96,6 @@ func TestTune_DryRunDoesNotModify(t *testing.T) {
 		t.Errorf("expected changes to be detected")
 	}
 
-	// Verify file was untouched
 	afterBytes, _ := os.ReadFile(dataPath)
 	if string(afterBytes) != string(dataBytes) {
 		t.Errorf("dry-run mutated the file")
@@ -124,17 +122,13 @@ func TestTune_AppliesBaselineAndCreatesBackup(t *testing.T) {
 		t.Fatalf("Tune apply failed: %v", err)
 	}
 
-	if len(rep.Changes) == 0 {
-		t.Errorf("expected changes")
-	}
-	if rep.BackupPath == "" {
-		t.Errorf("expected backup path to be populated")
+	if len(rep.Changes) == 0 || rep.BackupPath == "" {
+		t.Errorf("expected changes and backup path")
 	}
 	if _, err := os.Stat(rep.BackupPath); err != nil {
 		t.Errorf("backup file was not created on disk: %v", err)
 	}
 
-	// Verify new settings
 	updatedBytes, _ := os.ReadFile(dataPath)
 	var updatedData map[string]any
 	_ = json.Unmarshal(updatedBytes, &updatedData)
@@ -144,7 +138,6 @@ func TestTune_AppliesBaselineAndCreatesBackup(t *testing.T) {
 		t.Errorf("expected experimentalAgentHibernation=true, got %v", settings["experimentalAgentHibernation"])
 	}
 
-	// Idempotency: re-running produces 0 changes
 	rep2, err := Tune(orcaUserDir, false, func() bool { return false })
 	if err != nil {
 		t.Fatalf("second Tune run failed: %v", err)

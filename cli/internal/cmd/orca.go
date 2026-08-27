@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -37,35 +38,37 @@ func newOrcaExportCmd() *cobra.Command {
 			"ai/orca/ in the dotfiles checkout.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repoRoot := env.RepoDir()
-			if repoRoot == "" {
-				return fmt.Errorf("cannot locate dotfiles checkout — set DOTFILES_REPO_DIR or run from inside it")
-			}
-			home := env.Home()
-			orcaUserDataDir := filepath.Join(home, ".config", "orca")
-			orcaHomeDir := filepath.Join(home, ".orca")
-
-			rep, err := orca.Export(repoRoot, orcaUserDataDir, orcaHomeDir)
-			if err != nil {
-				return err
-			}
-
-			w := cmd.OutOrStdout()
-			if rep.KeybindingsCopied {
-				_, _ = fmt.Fprintf(w, "exported  keybindings  %s\n", rep.RepoKeybindings)
-			} else {
-				_, _ = fmt.Fprintf(w, "skipped   keybindings  (not found or invalid in %s)\n", orcaHomeDir)
-			}
-
-			if rep.SettingsExported {
-				_, _ = fmt.Fprintf(w, "exported  settings     %s (%d keys)\n", rep.RepoSettings, rep.SettingsCount)
-			} else {
-				_, _ = fmt.Fprintf(w, "skipped   settings     (orca-data.json not found in %s)\n", orcaUserDataDir)
-			}
-
-			return nil
+			return runOrcaExport(cmd.OutOrStdout())
 		},
 	}
+}
+
+func runOrcaExport(w io.Writer) error {
+	repoRoot := env.RepoDir()
+	if repoRoot == "" {
+		return fmt.Errorf("cannot locate dotfiles checkout — set DOTFILES_REPO_DIR or run from inside it")
+	}
+	home := env.Home()
+	orcaUserDataDir := filepath.Join(home, ".config", "orca")
+	orcaHomeDir := filepath.Join(home, ".orca")
+
+	rep, err := orca.Export(repoRoot, orcaUserDataDir, orcaHomeDir)
+	if err != nil {
+		return err
+	}
+
+	if rep.KeybindingsCopied {
+		_, _ = fmt.Fprintf(w, "exported  keybindings  %s\n", rep.RepoKeybindings)
+	} else {
+		_, _ = fmt.Fprintf(w, "skipped   keybindings  (not found or invalid in %s)\n", orcaHomeDir)
+	}
+
+	if rep.SettingsExported {
+		_, _ = fmt.Fprintf(w, "exported  settings     %s (%d keys)\n", rep.RepoSettings, rep.SettingsCount)
+	} else {
+		_, _ = fmt.Fprintf(w, "skipped   settings     (orca-data.json not found in %s)\n", orcaUserDataDir)
+	}
+	return nil
 }
 
 func newOrcaTuneCmd() *cobra.Command {
@@ -78,34 +81,37 @@ func newOrcaTuneCmd() *cobra.Command {
 			"It guards against running Orca processes and creates timestamped backups before writing.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			home := env.Home()
-			orcaUserDataDir := filepath.Join(home, ".config", "orca")
-
-			rep, err := orca.Tune(orcaUserDataDir, dryRun, orca.DefaultProcessChecker)
-			if err != nil {
-				return err
-			}
-
-			w := cmd.OutOrStdout()
-			if len(rep.Changes) == 0 {
-				_, _ = fmt.Fprintln(w, "in sync   orca-data.json already matches the tuned baseline")
-				return nil
-			}
-
-			for _, change := range rep.Changes {
-				if dryRun {
-					_, _ = fmt.Fprintf(w, "would tune settings.%s: %v -> %v\n", change.Key, change.Old, change.New)
-				} else {
-					_, _ = fmt.Fprintf(w, "tuned      settings.%s: %v -> %v\n", change.Key, change.Old, change.New)
-				}
-			}
-
-			if !dryRun && rep.BackupPath != "" {
-				_, _ = fmt.Fprintf(w, "backup     created at %s\n", rep.BackupPath)
-			}
-			return nil
+			return runOrcaTune(cmd.OutOrStdout(), dryRun)
 		},
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change without modifying orca-data.json")
 	return c
+}
+
+func runOrcaTune(w io.Writer, dryRun bool) error {
+	home := env.Home()
+	orcaUserDataDir := filepath.Join(home, ".config", "orca")
+
+	rep, err := orca.Tune(orcaUserDataDir, dryRun, orca.DefaultProcessChecker)
+	if err != nil {
+		return err
+	}
+
+	if len(rep.Changes) == 0 {
+		_, _ = fmt.Fprintln(w, "in sync   orca-data.json already matches the tuned baseline")
+		return nil
+	}
+
+	for _, change := range rep.Changes {
+		if dryRun {
+			_, _ = fmt.Fprintf(w, "would tune settings.%s: %v -> %v\n", change.Key, change.Old, change.New)
+		} else {
+			_, _ = fmt.Fprintf(w, "tuned      settings.%s: %v -> %v\n", change.Key, change.Old, change.New)
+		}
+	}
+
+	if !dryRun && rep.BackupPath != "" {
+		_, _ = fmt.Fprintf(w, "backup     created at %s\n", rep.BackupPath)
+	}
+	return nil
 }
