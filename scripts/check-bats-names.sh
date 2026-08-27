@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # check-bats-names.sh: catch bats @test names the runner silently fails to
 # register.
