@@ -69,7 +69,7 @@ This prevents stale skills from persisting on deployed machines after removal fr
 ### Weekly Maintenance Automation
 
 Three-layer approach:
-- **System cron/Task Scheduler** (permanent): `vault-maintenance-weekly.sh` / `.ps1` runs Sundays 10:07 AM, executes `knowledge-crystallize.sh --all` + `vault-health.sh`, sends desktop notification
+- **System cron/Task Scheduler** (permanent): `vault-maintenance-weekly.sh` / `.ps1` runs Sundays 10:07 AM, executes `dotf vault crystallize --all` + `vault-health.sh`, sends desktop notification
 - **Claude Code CronCreate** (session bonus): Durable trigger for in-session reminders (7-day auto-expiry)
 - **SessionStart hook** (passive safety net): Already warns when MEMORY.md is stale or vault health fails
 

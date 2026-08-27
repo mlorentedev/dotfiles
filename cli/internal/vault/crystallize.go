@@ -1,14 +1,16 @@
 package vault
 
-// crystallize.go — the Go port of scripts/knowledge-crystallize.{sh,ps1}
-// (CLI-021 / #490, AUDIT-007 PR5). Built BESIDE the twins: nothing is deleted
-// and no caller is repointed here — that is CLI-023 (#492).
+// crystallize.go — the Go port of the former scripts/knowledge-crystallize.{sh,ps1}
+// (CLI-021 / #490, AUDIT-007 PR5). Built BESIDE the twins in CLI-021; cut over
+// in CLI-050 (#1269), which deleted the shell/PowerShell pair and repointed
+// every caller here. This is now the sole implementation.
 //
-// The shell is the oracle. Every observable behaviour below is pinned by
-// tests/golden/crystallize/, captured at the revisions in that directory's
-// ORACLE file. Where the shell is buggy this code reproduces the bug and the
-// defect is ticketed separately (#873, #874) — a port that improves while
-// translating cannot be characterization-tested.
+// The shell WAS the oracle while it existed. Every observable behaviour below
+// is pinned by tests/golden/crystallize/, captured at the revisions recorded in
+// that directory's ORACLE file before deletion — those goldens are now this
+// code's frozen contract, not a live comparison. Where the shell was buggy this
+// code reproduces the bug and the defect is ticketed separately (#873, #874) —
+// a port that improves while translating cannot be characterization-tested.
 //
 // The one deliberate divergence: the shell colours its log tags via utils.sh;
 // no Go command in this CLI emits ANSI, so this does not either. The goldens

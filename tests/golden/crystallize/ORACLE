@@ -1,9 +1,11 @@
-# Oracle for the crystallize golden corpus.
-# Regenerate with tests/golden/crystallize/capture.sh
+# Oracle for the crystallize golden corpus — HISTORICAL, read-only.
 #
-# The assertion is on CONTENT (sha256), not on a commit SHA: CI checks out
-# shallow, where `git log -1 -- <path>` names the merge commit for every file,
-# and a rebase changes a SHA without changing a byte.
+# knowledge-crystallize.{sh,ps1} were deleted in CLI-050 (#1269): `dotf vault
+# crystallize` is the sole implementation now, so there is nothing left to
+# regenerate this corpus from and capture.sh was deleted with them. Kept as the
+# provenance record of which shell bytes produced the goldens under
+# tests/golden/crystallize/cases/*/expected — do not delete or "fix" the hashes
+# below, they describe scripts that no longer exist on disk.
 #
 # Captured: 2026-08-12
 # git (informational): 87f6ecb scripts/knowledge-crystallize.sh

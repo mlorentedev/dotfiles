@@ -54,21 +54,21 @@ CLAUDE.md / ai-protocol.md  ◄── Claude's standing instructions
 
 ## Components
 
-### `scripts/knowledge-crystallize.sh`
+### `dotf vault crystallize`
 
 **What:** Automated MEMORY.md maintenance. Updates dates, warns on size, prints checklist.
 **When:** After each sprint, or in a post-work automation.
-**Cross-platform:** Bash/zsh on Linux. PowerShell equivalent for Windows: see [Windows section](#windows-support).
+**Cross-platform:** One Go binary, same behavior on Linux and Windows — no per-OS twin.
 
 ```bash
 # Run for current project
-./scripts/knowledge-crystallize.sh
+dotf vault crystallize
 
 # Run for a specific project
-./scripts/knowledge-crystallize.sh ~/Projects/kubelab
+dotf vault crystallize ~/Projects/kubelab
 
 # Auto-discover and process ALL projects from ~/.claude/projects/ (recommended)
-./scripts/knowledge-crystallize.sh --all
+dotf vault crystallize --all
 ```
 
 The `--all` flag auto-discovers every project Claude Code has ever touched on this machine by scanning `~/.claude/projects/`. It decodes each project path and skips entries that don't exist on disk (stale entries from deleted projects or other machines).
@@ -94,7 +94,7 @@ The `--all` flag auto-discovers every project Claude Code has ever touched on th
 
 ### `scripts/vault-maintenance-weekly.sh` / `.ps1`
 
-**What:** Automated weekly maintenance. Runs `knowledge-crystallize.sh --all` + `vault-health.sh`, sends desktop notification with results.
+**What:** Automated weekly maintenance. Runs `dotf vault crystallize --all` + `vault-health.sh`, sends desktop notification with results.
 **When:** Cron/Task Scheduler fires every Sunday 10:07 AM. Can also be run manually.
 **Log:** `~/.local/share/vault-maintenance/latest.log` (Linux) / `%LOCALAPPDATA%\vault-maintenance\latest.log` (Windows).
 **Deployed by:** `setup-linux.sh` (crontab) / `setup-windows.ps1` (Register-ScheduledTask).
@@ -233,7 +233,7 @@ If the vault moves to a different path, set its override in `~/.config/dotfiles/
    - `90-lessons.md` — lessons learned
    - `memory/` — directory for Claude Code memory (create empty)
 2. Run Claude Code in the new repo — the session hook auto-creates the symlink/junction to `memory/`
-3. Run `./scripts/knowledge-crystallize.sh ~/Projects/<new-repo>` after your first session
+3. Run `dotf vault crystallize ~/Projects/<new-repo>` after your first session
 
 > **Work projects** (`50_work/`): Same structure but under `50_work/<area>/<project>/`. The session hook detects CWD inside the vault and maps accordingly.
 
@@ -247,19 +247,11 @@ Full parity with Linux. All components have PowerShell equivalents:
 |-----------|-------|---------|
 | Setup | `setup-linux.sh` (symlinks) | `setup-windows.ps1` (junctions, no admin) |
 | Session hook | `claude-session-start.sh` | `claude-session-start.ps1` |
-| Crystallize script | `knowledge-crystallize.sh` | `knowledge-crystallize.ps1` |
+| Crystallize | `dotf vault crystallize` (same binary, no per-OS twin) | `dotf vault crystallize` |
 | Weekly maintenance | `vault-maintenance-weekly.sh` (crontab) | `vault-maintenance-weekly.ps1` (Task Scheduler) |
 | Memory link type | Symlink (`ln -s`) | Junction (`New-Item -ItemType Junction`) |
 | Notification | `notify-send` | `System.Windows.Forms.NotifyIcon` |
 | Skills (`/insights`, `/crystallize`, `/vault-doctor`) | Work unchanged | Work unchanged |
-
-```powershell
-# Run crystallize for current project
-.\scripts\knowledge-crystallize.ps1
-
-# Run for all projects
-.\scripts\knowledge-crystallize.ps1 -All
-```
 
 **Windows-specific notes:**
 - Junctions are bidirectional and require no admin privileges
@@ -337,7 +329,7 @@ If insights reports issues:
 
 ```bash
 # Step 1: automated MEMORY.md maintenance
-./scripts/knowledge-crystallize.sh --all
+dotf vault crystallize --all
 
 # Step 2: open Claude in each active project, run /insights
 # Active projects: dotfiles, kubelab, hive, youtube-toolkit (adapt to your list)
@@ -364,7 +356,7 @@ In any Claude session, the skill descriptions should auto-trigger correctly:
 
 ## Troubleshooting
 
-### "No MEMORY.md found" from knowledge-crystallize script
+### "No MEMORY.md found" from `dotf vault crystallize`
 
 The path encoding must match what Claude Code uses:
 
@@ -375,11 +367,11 @@ Check: `ls ~/.claude/projects/ | grep kubelab`
 
 ### "Knowledge crystallization never run" warning in session hook
 
-Run `./scripts/knowledge-crystallize.sh` from within the project directory. This stamps the `## Last Crystallized:` line that the hook checks.
+Run `dotf vault crystallize` from within the project directory. This stamps the `## Last Crystallized:` line that the hook checks.
 
 ### MEMORY.md keeps growing
 
 Common causes:
 - claude-mem auto-adds context sections — trim them with `/crystallize`
-- Duplicate `# currentDate` entries — fixed automatically by `knowledge-crystallize.sh`
+- Duplicate `# currentDate` entries — fixed automatically by `dotf vault crystallize`
 - Backlog Status becoming too detailed — keep it to 3-4 bullet points maximum

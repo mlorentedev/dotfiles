@@ -1,13 +1,12 @@
 # vault-maintenance-weekly.ps1: Automated weekly vault maintenance
 #
-# Runs knowledge-crystallize.ps1 (all projects) + basic health checks.
+# Runs dotf vault crystallize (all projects) + basic health checks.
 # Logs results and sends toast notification (best-effort).
 #
 # Deployed to Task Scheduler by setup-windows.ps1: Sundays 10:00 AM
 # Usage: .\scripts\vault-maintenance-weekly.ps1
 
 $ErrorActionPreference = "Continue"
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LogDir = "$env:LOCALAPPDATA\vault-maintenance"
 $LogFile = "$LogDir\latest.log"
 
@@ -18,11 +17,12 @@ $output += "=== Vault Maintenance: $(Get-Date) ==="
 $output += ""
 
 # Step 1: MEMORY.md maintenance across all projects.
-# -All is a PowerShell [switch]; the POSIX-style "--all" bound positionally to
-# $ProjectDir and left $All false, so this task never fanned out (#689 / C5).
-$output += "--- knowledge-crystallize -All ---"
+# `dotf` is one Go binary parsing `--all` with cobra on both OSes, so the
+# PowerShell [switch]-vs-positional-binding trap that broke this fan-out under
+# the old knowledge-crystallize.ps1 twin (#689 / C5) does not apply here.
+$output += "--- dotf vault crystallize --all ---"
 try {
-    $crystOutput = & "$ScriptDir\knowledge-crystallize.ps1" -All 2>&1
+    $crystOutput = & dotf vault crystallize --all 2>&1
     $output += $crystOutput
 } catch {
     $output += "Error: $_"

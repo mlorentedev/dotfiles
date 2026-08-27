@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vault-maintenance-weekly.sh: Automated weekly vault maintenance
 #
-# Runs knowledge-crystallize --all + vault health checks.
+# Runs dotf vault crystallize --all + vault health checks.
 # Logs results and sends desktop notification (best-effort).
 #
 # Deployed to crontab by setup-linux.sh: Sundays 10:00 AM
@@ -18,8 +18,8 @@ mkdir -p "$LOG_DIR"
 {
     printf '=== Vault Maintenance: %s ===\n\n' "$(date)"
 
-    printf '%s\n' '--- knowledge-crystallize --all ---'
-    "$SCRIPT_DIR/knowledge-crystallize.sh" --all 2>&1 || true
+    printf '%s\n' '--- dotf vault crystallize --all ---'
+    dotf vault crystallize --all 2>&1 || true
     printf '\n'
 
     printf '%s\n' '--- vault-health ---'
