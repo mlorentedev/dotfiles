@@ -817,9 +817,10 @@ setup() {
 
 @test "setup-windows.ps1 provisions Node.js before dotf tools install, the npm channel's prerequisite (ADR-036)" {
     grep -qF 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT"
-    node_line=$(grep -n 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    # The .ps1 is CRLF (.gitattributes), so an end anchor must tolerate the CR on Linux.
-    tools_line=$(grep -nE '^    dotf tools install?$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    # The .ps1 is CRLF (.gitattributes) and GNU grep does not read a CR escape,
+    # so strip the CRs before anchoring on the line end (line numbers survive).
+    node_line=$(tr -d '' < "$PS1_SCRIPT" | grep -n 'Id = "OpenJS.NodeJS.LTS"' | head -1 | cut -d: -f1)
+    tools_line=$(tr -d '' < "$PS1_SCRIPT" | grep -n '^    dotf tools install$' | head -1 | cut -d: -f1)
     [ -n "$node_line" ] && [ -n "$tools_line" ]
     [ "$node_line" -lt "$tools_line" ]
 }
