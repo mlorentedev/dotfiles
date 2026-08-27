@@ -58,3 +58,30 @@ Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-088-handoff-th
   }
 ]
 ```
+
+## Found by audit, fixed in this PR
+
+- [x] The thread key asked a naming convention instead of git, so any worktree
+      made by another tool (Claude Code's `.claude/worktrees/`, Orca's) resolved
+      to `main` and every such session would have clobbered the others — the bug
+      itself, reintroduced for anyone not using this repo's convention.
+- [x] `SessionEnd` archived every worktree to one hardcoded `<date>-<project>-claude.md`
+      with a **truncating** write, so the last session destroyed the others'
+      durable records, and it assembled a filename the skill did not share.
+- [x] Both above written test-first and mutation-checked.
+
+## Found by audit, NOT fixed — recorded rather than folded in
+
+- [ ] **`SessionEnd` resolves the project as `filepath.Base(cwd)`.** A session
+      whose working directory is a subdirectory — `cli/`, where most work in this
+      repository happens — resolves the wrong project name, finds no `MEMORY.md`,
+      and **silently archives nothing**. Same class as the thread-key defect, in
+      a different function, and it means an unknown number of past sessions may
+      have produced no archive at all. Left out because it changes *which*
+      sessions archive, which needs its own measurement and its own evidence, not
+      a fold-in at the end of another PR.
+- [ ] **The gate's session state is keyed by session id alone** (`~/.local/state/dotfiles/gate/`).
+      Two harnesses reusing an id (`s1` from pi and `s1` from opencode) would
+      share a consumption record. Low exposure today — real harnesses send UUIDs —
+      and the same argument the reviewer's collision finding won on #1275, so it
+      should be fixed the same way when touched.

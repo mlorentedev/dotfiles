@@ -1,6 +1,8 @@
 package mem
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -156,6 +158,50 @@ func TestWrittenThreadsStayInsideTheArchivedBlock(t *testing.T) {
 	}
 }
 
+// AGNOSTIC ACROSS TOOLS: the key must come from git, not from one tool's naming
+// convention. This repository writes `<repo>-wt-<slug>`, Claude Code's
+// EnterWorktree writes `.claude/worktrees/<name>`, and Orca writes its own. A key
+// derived from a path pattern resolves every foreign convention to "main", and
+// then every session using a different tool shares one thread and clobbers the
+// others — precisely the bug being fixed, reintroduced for everyone who is not
+// using this repo's convention.
+//
+// git already knows: a linked worktree's `.git` is a FILE reading
+// `gitdir: .../.git/worktrees/<name>`, while a main checkout's is a directory.
+// No subprocess, no convention.
+func TestThreadKeyReadsGitRatherThanANamingConvention(t *testing.T) {
+	// A linked worktree, written the way git writes it.
+	wt := t.TempDir()
+	gitdir := filepath.Join(t.TempDir(), ".git", "worktrees", "some-tool-name")
+	if err := os.MkdirAll(gitdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+gitdir+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ThreadKey(wt); got != "some-tool-name" {
+		t.Errorf("a worktree named by another tool must still get its own key, got %q", got)
+	}
+
+	// A subdirectory of it resolves the same.
+	sub := filepath.Join(wt, "cli", "internal")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := ThreadKey(sub); got != "some-tool-name" {
+		t.Errorf("a subdirectory of a foreign-convention worktree got %q", got)
+	}
+
+	// A main checkout: `.git` is a directory.
+	main := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(main, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := ThreadKey(main); got != "main" {
+		t.Errorf("a main checkout must be %q, got %q", "main", got)
+	}
+}
+
 func TestThreadKeyDerivesFromTheWorktree(t *testing.T) {
 	for _, tc := range []struct{ cwd, want string }{
 		{"/home/x/Projects/dotfiles-wt-pi-harness", "wt-pi-harness"},
@@ -189,7 +235,12 @@ func TestJournalNameIsDerivableAndDistinctPerWorktree(t *testing.T) {
 	if a != "2026-08-27-dotfiles-claude-wt-pi-harness.md" {
 		t.Errorf("unexpected name %q", a)
 	}
-	if got := JournalName("2026-08-27", "dotfiles", "claude", ""); !strings.HasSuffix(got, "-main.md") {
-		t.Errorf("an empty thread must fall back to main, got %q", got)
+	// A single-checkout session keeps the historical name: "main" carries no
+	// information, and suffixing it would rename every archive on every
+	// single-session machine for nothing.
+	for _, thread := range []string{"", "main"} {
+		if got := JournalName("2026-08-27", "dotfiles", "claude", thread); got != "2026-08-27-dotfiles-claude.md" {
+			t.Errorf("thread %q must produce the unsuffixed name, got %q", thread, got)
+		}
 	}
 }

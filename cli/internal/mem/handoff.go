@@ -163,28 +163,39 @@ func trimTrailingBlank(lines []string, from, to int) int {
 
 // ThreadKey derives a stable thread identity from a working directory.
 //
-// The worktree's basename, because that is what actually distinguishes two
-// concurrent sessions — not the agent and not the date. Journal files were named
-// `<date>-<project>-<agent>.md` and two WORKTREES on one day collided into `-2`
-// and `-3` suffixes encoding nothing; six such files exist across two days. With
-// the worktree in the key, a session can derive its own journal name from its cwd
-// instead of guessing which suffix was its.
+// The worktree, because that is what distinguishes two concurrent sessions — not
+// the agent and not the date. Journals were named `<date>-<project>-<agent>.md`
+// and two WORKTREES on one day collided into `-2`/`-3` suffixes encoding nothing;
+// six such files exist across two days, and no session could derive its own.
 //
-// A checkout that is not a worktree resolves to "main", so the ordinary
-// single-session case reads naturally rather than carrying a hash.
-// IT WALKS UP, and that is not defensive coding. The first version read only
-// `filepath.Base(cwd)`, so a session working in any subdirectory — `cli/`, say,
-// which is where most of this repository's work happens — resolved to "main".
-// Every such session would have shared one thread key and clobbered each other
-// exactly as before, while the tests passed because they all passed worktree
-// roots. Found by running `dotf mem thread` from `cli/`.
+// IT ASKS GIT FIRST, and only then falls back to this repository's naming
+// convention. That ordering is what makes the key agnostic across tools.
+//
+// Several tools create worktrees here and each names them differently: this
+// repository writes `<repo>-wt-<slug>`, Claude Code's EnterWorktree writes
+// `.claude/worktrees/<name>`, Orca writes its own. A key derived from one
+// pattern resolves every other tool's worktree to "main" — so every session
+// running under a different tool would share one thread and clobber the others,
+// which is the bug this exists to fix, reintroduced for everyone not using our
+// convention.
+//
+// git already knows, and states it on disk with no subprocess: a linked
+// worktree's `.git` is a FILE reading `gitdir: …/.git/worktrees/<name>`, while a
+// main checkout's `.git` is a directory.
+//
+// IT ALSO WALKS UP. The first version read only `filepath.Base(cwd)`, so a
+// session in any subdirectory — `cli/`, where most work here happens — resolved
+// to "main". The tests passed because every case they supplied was a worktree
+// root; running `dotf mem thread` from `cli/` did not.
 func ThreadKey(cwd string) string {
 	dir := filepath.Clean(cwd)
 	for {
-		base := filepath.Base(dir)
-		// `<repo>-wt-<slug>` is this repository's worktree convention; keep the
-		// slug, which is the part a human recognises.
-		if _, slug, found := strings.Cut(base, "-wt-"); found && slug != "" {
+		if name, ok := gitWorktreeName(dir); ok {
+			return name
+		}
+		// Fallback: this repository's own convention, for a path that is not a
+		// git worktree at all (a test fixture, or a tree checked out by copy).
+		if _, slug, found := strings.Cut(filepath.Base(dir), "-wt-"); found && slug != "" {
 			return "wt-" + slug
 		}
 		parent := filepath.Dir(dir)
@@ -193,6 +204,38 @@ func ThreadKey(cwd string) string {
 		}
 		dir = parent
 	}
+}
+
+// gitWorktreeName reads `.git` at dir. It returns the linked worktree's name, or
+// ("main", true) when `.git` is a directory — the main checkout. The bool
+// distinguishes "this is a git root and here is the answer" from "keep walking".
+func gitWorktreeName(dir string) (string, bool) {
+	p := filepath.Join(dir, ".git")
+	info, err := os.Lstat(p)
+	if err != nil {
+		return "", false
+	}
+	if info.IsDir() {
+		return "main", true
+	}
+	raw, err := os.ReadFile(p) // #nosec G304 -- the .git pointer of the cwd being resolved
+	if err != nil {
+		return "", false
+	}
+	target, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), "gitdir:")
+	if !ok {
+		return "", false
+	}
+	target = strings.TrimSpace(target)
+	// `…/.git/worktrees/<name>`; the last element is git's own name for it.
+	if parent := filepath.Base(filepath.Dir(filepath.Clean(target))); parent != "worktrees" {
+		return "", false
+	}
+	name := filepath.Base(filepath.Clean(target))
+	if name == "" || name == "." {
+		return "", false
+	}
+	return name, true
 }
 
 // ThreadKeyForCwd is ThreadKey over the process's working directory.
@@ -206,9 +249,15 @@ func ThreadKeyForCwd() string {
 
 // JournalName is the session record filename for a thread, so "my journal" is
 // derivable from the working directory rather than remembered.
+// The thread is appended ONLY when it disambiguates. A single-checkout session
+// keeps the historical `<date>-<project>-<agent>.md`, because "main" carries no
+// information and suffixing it would rename every archive on every
+// single-session machine for nothing. Churn without a reader is not a migration,
+// it is noise — and the collision being fixed only ever occurred between
+// worktrees.
 func JournalName(date, project, agent, thread string) string {
-	if thread == "" {
-		thread = "main"
+	if thread == "" || thread == "main" {
+		return fmt.Sprintf("%s-%s-%s.md", date, project, agent)
 	}
 	return fmt.Sprintf("%s-%s-%s-%s.md", date, project, agent, thread)
 }

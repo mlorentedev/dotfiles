@@ -75,7 +75,19 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return "", err
 	}
-	out := filepath.Join(outDir, fmt.Sprintf("%s-%s-claude.md", date, project))
+	// PER WORKTREE, and through the SAME namer the skill uses.
+	//
+	// This was `<date>-<project>-claude.md`: hardcoded, thread-less, and written
+	// with a TRUNCATING os.WriteFile. With several worktrees running — five on
+	// this machine — every SessionEnd wrote the same path and the last one
+	// destroyed the others' durable records. That is HARNESS-088's defect in the
+	// path that was meant to be the safe copy.
+	//
+	// It also assembled its own filename while `dotf mem thread` assembled a
+	// different one, so the hook's archive and the skill's journal would drift
+	// into two files per session. Sharing JournalName removes the second
+	// convention rather than documenting it.
+	out := filepath.Join(outDir, JournalName(date, project, "claude", ThreadKey(p.Cwd)))
 	if err := os.WriteFile(out, []byte(buildRecord(date, project, sid, block)), 0o644); err != nil {
 		return "", err
 	}

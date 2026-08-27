@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 1f5326ba40e967ad
+generated_sha: c7f721197379048f
 id: handoff-skill
 type: skill
 status: active
@@ -81,7 +81,7 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
   End your thread with `Journal: sessions/<file>` so the record is reachable from
   the index.
 
-### 1b. Session record — append-only history (`sessions/<date>-<project>-<agent>.md`)
+### 1b. Session record — append-only history (`sessions/<date>-<project>-<agent>-<thread>.md`)
 
 In ADDITION to the replaced-in-place continuity block, record the session journal:
 
@@ -117,7 +117,10 @@ In ADDITION to the replaced-in-place continuity block, record the session journa
   - `## Decisions`
   - `## Next Actions`
   *(Unlike the ~8-line continuity block snapshot in step 1, the session record is the durable append-only journal).*
-- **Append-only:** One file per session. If multiple sessions occur on the same day, suffix `-2`, `-3`.
+- **Append-only:** One file per session, and the thread in the name keeps concurrent
+  sessions apart. A same-day `-2`/`-3` suffix is now only for a genuine SECOND
+  SITTING in the SAME worktree — never for two worktrees, which is what those
+  suffixes were silently absorbing before.
 
 ### 1c. Shared surfaces — write via the owning command only
 
