@@ -1,0 +1,23 @@
+[
+  {
+    "id": "HARNESS-086-cyclomatic-complexity-evals-f1",
+    "behavior": "cyclomatic-complexity skill compiles and validates against skill-frontmatter.schema.json",
+    "verification": "./scripts/compile-harness.sh --check",
+    "state": "passing",
+    "evidence": "[check] OK: no harness drift"
+  },
+  {
+    "id": "HARNESS-086-cyclomatic-complexity-evals-f2",
+    "behavior": "triggers.json contains code-complexity-and-refactor and matches embedded copy",
+    "verification": "bats tests/triggers-registry.bats",
+    "state": "passing",
+    "evidence": "5 tests, 0 failures"
+  },
+  {
+    "id": "HARNESS-086-cyclomatic-complexity-evals-f3",
+    "behavior": "tests/evals/harness-evals.json is valid JSON with 10 benchmark test cases",
+    "verification": "python3 -c 'import json; d=json.load(open(\"tests/evals/harness-evals.json\")); assert len(d[\"evals\"]) == 10'",
+    "state": "passing",
+    "evidence": "Exit 0"
+  }
+]
