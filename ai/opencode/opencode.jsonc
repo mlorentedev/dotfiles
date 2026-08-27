@@ -233,7 +233,7 @@
             }
           }
         }
-      },  // Non-chat NaN models (qwen3-embedding, kokoro TTS, whisper STT) are
+        // Non-chat NaN models (qwen3-embedding, kokoro TTS, whisper STT) are
         // intentionally NOT listed here: opencode's modality schema only allows
         // {text, audio, image, video, pdf} as output values; "embedding" is
         // rejected and a single invalid entry breaks ALL provider loading.
