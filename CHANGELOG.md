@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.51.0](https://github.com/mlorentedev/dotfiles/compare/v0.50.0...v0.51.0) (2026-08-27)
+
+
+### Features
+
+* **cli:** add orca ADE keybindings deployment and bidirectional settings capture ([#1274](https://github.com/mlorentedev/dotfiles/issues/1274)) ([da47c4e](https://github.com/mlorentedev/dotfiles/commit/da47c4ec6f203d18f49565236ea0e7b5e8a9b124))
+* **cli:** cut over knowledge-crystallize.{sh,ps1} to dotf vault crystallize ([#1276](https://github.com/mlorentedev/dotfiles/issues/1276)) ([0df4bf8](https://github.com/mlorentedev/dotfiles/commit/0df4bf8d59a012b226ec214ecbf3640e6ab47c7a)), closes [#1269](https://github.com/mlorentedev/dotfiles/issues/1269)
+* **harness:** add cyclomatic complexity skill and harness evaluation benchmarks ([#1246](https://github.com/mlorentedev/dotfiles/issues/1246)) ([d9a6e3a](https://github.com/mlorentedev/dotfiles/commit/d9a6e3aaed3a1182833f6e2d182ddcb52a012054))
+* **harness:** declare gemini pool for agy in model map to enable reviewer fallback ([#1264](https://github.com/mlorentedev/dotfiles/issues/1264)) ([86a1763](https://github.com/mlorentedev/dotfiles/commit/86a1763975118296df54574aa8ceffdd6402762a))
+* **harness:** declare where model ids are pinned, and check they resolve ([#1256](https://github.com/mlorentedev/dotfiles/issues/1256)) ([d7e5ddc](https://github.com/mlorentedev/dotfiles/commit/d7e5ddcc21d4988aef49c058ef31dbb2bd35ed0b))
+* **harness:** the agnostic binding core for personas, and emission that coexists with a live third-party writer ([#1272](https://github.com/mlorentedev/dotfiles/issues/1272)) ([19618e2](https://github.com/mlorentedev/dotfiles/commit/19618e25912f07ce7a128fa872b4b18d08c31e00))
+* **mem:** a thread is the branch, so work follows you between machines ([#1280](https://github.com/mlorentedev/dotfiles/issues/1280)) ([4397ba3](https://github.com/mlorentedev/dotfiles/commit/4397ba3ea8977ce17a04022145f7e99e99971f60))
+* **mem:** one handoff thread per worktree, so concurrent sessions stop clobbering each other ([#1279](https://github.com/mlorentedev/dotfiles/issues/1279)) ([71a4c39](https://github.com/mlorentedev/dotfiles/commit/71a4c39f7e77f369a7a58be849948c0a41d066f3))
+* **pi:** add qwen3.8-flash and glm5.3-flash to the NaN catalog ([#1255](https://github.com/mlorentedev/dotfiles/issues/1255)) ([cba6be2](https://github.com/mlorentedev/dotfiles/commit/cba6be2f0290ae84727b586acfef6c99be821550))
+* **pi:** sync enabledModels into an existing settings.json on setup ([#1259](https://github.com/mlorentedev/dotfiles/issues/1259)) ([661b9f8](https://github.com/mlorentedev/dotfiles/commit/661b9f8f5a3d1c7d4f5d8d3fe77f606583725058))
+
+
+### Bug Fixes
+
+* **cli:** stamp spec init created field with local calendar date ([#1257](https://github.com/mlorentedev/dotfiles/issues/1257)) ([5852cf2](https://github.com/mlorentedev/dotfiles/commit/5852cf20c719fa23ff0234d7ec87739f626854c2))
+* **harness:** apply the reviewer's findings on the persona gate ([#1275](https://github.com/mlorentedev/dotfiles/issues/1275)) ([a18981e](https://github.com/mlorentedev/dotfiles/commit/a18981e2d1b6c3a961843154f50eb2a48d6a1ec6))
+* **pi:** a hand-wired extension symlink shadowed the packaged one, and pi would not start ([#1248](https://github.com/mlorentedev/dotfiles/issues/1248)) ([5f80af8](https://github.com/mlorentedev/dotfiles/commit/5f80af892edb543410554b684e9366a823262f65))
+
 ## [0.50.0](https://github.com/mlorentedev/dotfiles/compare/v0.49.0...v0.50.0) (2026-08-26)
 
 
