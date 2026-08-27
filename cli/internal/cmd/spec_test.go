@@ -169,6 +169,37 @@ func TestSpecInitUnresolvableRepoFails(t *testing.T) {
 	}
 }
 
+// TestSpecInit_UsesLocalCalendarDate guards CLI-044 / lesson 228: spec created:
+// is a calendar date and must be formatted from the local clock, not UTC. An
+// evening spec at 18:30 in MDT (-0600) is 00:30 the next day in UTC; stamping it
+// in UTC dates the spec tomorrow.
+func TestSpecInit_UsesLocalCalendarDate(t *testing.T) {
+	root := makeRepo(t)
+	denver := time.FixedZone("MDT", -6*60*60)
+	evening := time.Date(2026, 8, 24, 19, 30, 0, 0, denver)
+	if evening.UTC().Format("2006-01-02") == evening.Format("2006-01-02") {
+		t.Fatal("fixture is not timezone-sensitive; it cannot catch the regression")
+	}
+
+	prev := now
+	now = func() time.Time { return evening }
+	t.Cleanup(func() { now = prev })
+
+	_, _, err := execute(t, "spec", "init", "AI-030-demo", "--force-no-gate")
+	if err != nil {
+		t.Fatalf("spec init: %v", err)
+	}
+
+	proposal := readFile(t, filepath.Join(root, "specs", "AI-030-demo", "proposal.md"))
+	if !strings.Contains(proposal, `created: "2026-08-24"`) {
+		t.Errorf("expected local date 2026-08-24 in created field, got:\n%s", proposal)
+	}
+	if strings.Contains(proposal, `created: "2026-08-25"`) {
+		t.Errorf("created field erroneously stamped in UTC (tomorrow):\n%s", proposal)
+	}
+}
+
+// readFile reads the full contents of path as a string or fails the test.
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)

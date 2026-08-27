@@ -214,6 +214,33 @@ func TestModelMapConsumerClasses(t *testing.T) {
 			t.Errorf("top must queue or escalate rather than degrade silently (ADR-032 §4), got %v", chain)
 		}
 	})
+
+	t.Run("gemini pool is declared for agy reviewer fallback (HARNESS-086)", func(t *testing.T) {
+		harnesses, _ := m["harnesses"].(map[string]any)
+		agy, ok := harnesses["agy"].(map[string]any)
+		if !ok {
+			t.Fatal("agy harness not declared in harnesses block")
+		}
+		pools := toStrings(agy["pools"])
+		var foundGemini bool
+		for _, p := range pools {
+			if p == "gemini" {
+				foundGemini = true
+				break
+			}
+		}
+		if !foundGemini {
+			t.Errorf("harnesses.agy.pools = %v, want to include 'gemini'", pools)
+		}
+
+		got, err := ResolveTier(m, "top", "gemini")
+		if err != nil {
+			t.Fatalf("ResolveTier(top, gemini): %v", err)
+		}
+		if got != "gemini-3.1-pro-high" {
+			t.Errorf("top/gemini = %q, want gemini-3.1-pro-high", got)
+		}
+	})
 }
 
 // AC7: the budget is declared and NOT enforced, and the API must not let a

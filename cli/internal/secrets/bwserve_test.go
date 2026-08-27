@@ -70,128 +70,159 @@ func (f *fakeBWServe) handler() http.HandlerFunc {
 		// backend selection now probes a data endpoint rather than /status (BUG-082:
 		// a /status call poisons item reads for ~0.5s), so "locked" has to be
 		// observable the way the real daemon makes it observable.
-		if f.status != "unlocked" && (strings.HasPrefix(r.URL.Path, "/object/") ||
-			strings.HasPrefix(r.URL.Path, "/list/object/") || r.URL.Path == "/sync") {
+		if f.isLockedDataEndpoint(r.URL.Path) {
 			writeEnvelope(w, false, "Vault is locked.", nil)
 			return
 		}
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/status":
-			// Real bw serve wraps this under "template" (captured live against
-			// bw 2026.5.0, 2026-08-15) -- see bwServeStatusData's doc comment.
-			// The fake matches reality, not the earlier wrong assumption, so a
-			// regression here is caught by every test in this file that
-			// depends on Status(), not just a single dedicated case.
-			writeEnvelope(w, true, "", map[string]any{
-				"object":   "template",
-				"template": map[string]string{"status": f.status},
-			})
-		case r.Method == http.MethodPost && r.URL.Path == "/unlock":
-			var body struct {
-				Password string `json:"password"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			if f.failUnlock || (f.unlockPassword != "" && body.Password != f.unlockPassword) {
-				writeEnvelope(w, false, "Cryptography error, The decryption operation failed", nil)
-				return
-			}
-			f.status = "unlocked"
-			writeEnvelope(w, true, "", nil)
-		case r.Method == http.MethodPost && r.URL.Path == "/sync":
-			f.syncs++
-			if f.failSync {
-				writeEnvelope(w, false, "Failed to sync.", nil)
-				return
-			}
-			writeEnvelope(w, true, "", nil)
-		case r.Method == http.MethodPost && r.URL.Path == "/lock":
-			f.status = "locked"
-			writeEnvelope(w, true, "", map[string]string{"title": "Your vault is locked."})
-		case r.Method == http.MethodGet && r.URL.Path == "/list/object/items":
-			search := r.URL.Query().Get("search")
-			var out []map[string]string
-			for id, name := range f.names {
-				if search == "" || strings.Contains(name, search) {
-					out = append(out, map[string]string{"id": id, "name": name})
-				}
-			}
-			// Real bw serve wraps this under {"object":"list","data":[...]}
-			// (captured live, 2026-08-15) -- same wrapping pattern as /status.
-			writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/object/item/"):
-			id := strings.TrimPrefix(r.URL.Path, "/object/item/")
-			item, ok := f.items[id]
-			if !ok {
-				writeEnvelope(w, false, "Not found.", nil)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = fmt.Fprintf(w, `{"success":true,"data":%s}`, item)
+		f.dispatch(w, r)
+	}
+}
 
-		// --- write path (BUG-084) ---------------------------------------
-		// bw serve takes a RAW JSON body on these, where the `bw` CLI needs
-		// base64 on stdin. That asymmetry is the only real difference between
-		// BWServeWriter and BWPut, so the fake reads raw JSON deliberately: a
-		// regression to base64 fails to decode here.
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/object/item/"):
-			id := strings.TrimPrefix(r.URL.Path, "/object/item/")
-			if _, ok := f.items[id]; !ok {
-				writeEnvelope(w, false, "Not found.", nil)
-				return
-			}
-			body, err := io.ReadAll(r.Body)
-			if err != nil || !json.Valid(body) {
-				writeEnvelope(w, false, "malformed request body", nil)
-				return
-			}
-			f.items[id] = json.RawMessage(body)
-			writeEnvelope(w, true, "", json.RawMessage(body))
+func (f *fakeBWServe) isLockedDataEndpoint(path string) bool {
+	return f.status != "unlocked" && (strings.HasPrefix(path, "/object/") ||
+		strings.HasPrefix(path, "/list/object/") || path == "/sync")
+}
 
-		case r.Method == http.MethodPost && r.URL.Path == "/object/item":
-			body, err := io.ReadAll(r.Body)
-			if err != nil || !json.Valid(body) {
-				writeEnvelope(w, false, "malformed request body", nil)
-				return
-			}
-			id := f.newID()
-			if f.items == nil {
-				f.items = map[string]json.RawMessage{}
-			}
-			if f.names == nil {
-				f.names = map[string]string{}
-			}
-			f.items[id] = json.RawMessage(body)
-			var named struct {
-				Name string `json:"name"`
-			}
-			_ = json.Unmarshal(body, &named)
-			f.names[id] = named.Name
-			f.created = append(f.created, json.RawMessage(body))
-			writeEnvelope(w, true, "", json.RawMessage(body))
+func (f *fakeBWServe) dispatch(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/status":
+		f.handleStatus(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/unlock":
+		f.handleUnlock(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/sync":
+		f.handleSync(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/lock":
+		f.handleLock(w)
+	case r.Method == http.MethodGet && r.URL.Path == "/list/object/items":
+		f.handleListItems(w, r)
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/object/item/"):
+		f.handleGetItem(w, r)
+	case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/object/item/"):
+		f.handlePutItem(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/object/item":
+		f.handleCreateItem(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/list/object/folders":
+		f.handleListFolders(w)
+	case r.Method == http.MethodPost && r.URL.Path == "/object/folder":
+		f.handleCreateFolder(w, r)
+	default:
+		http.NotFound(w, r)
+	}
+}
 
-		case r.Method == http.MethodGet && r.URL.Path == "/list/object/folders":
-			out := []map[string]string{}
-			for id, name := range f.folders {
-				out = append(out, map[string]string{"id": id, "name": name})
-			}
-			writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
+func (f *fakeBWServe) handleStatus(w http.ResponseWriter) {
+	writeEnvelope(w, true, "", map[string]any{
+		"object":   "template",
+		"template": map[string]string{"status": f.status},
+	})
+}
 
-		case r.Method == http.MethodPost && r.URL.Path == "/object/folder":
-			var body struct {
-				Name string `json:"name"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			id := f.newID()
-			if f.folders == nil {
-				f.folders = map[string]string{}
-			}
-			f.folders[id] = body.Name
-			writeEnvelope(w, true, "", map[string]string{"id": id, "name": body.Name})
+func (f *fakeBWServe) handleUnlock(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Password string `json:"password"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if f.failUnlock || (f.unlockPassword != "" && body.Password != f.unlockPassword) {
+		writeEnvelope(w, false, "Cryptography error, The decryption operation failed", nil)
+		return
+	}
+	f.status = "unlocked"
+	writeEnvelope(w, true, "", nil)
+}
 
-		default:
-			http.NotFound(w, r)
+func (f *fakeBWServe) handleSync(w http.ResponseWriter) {
+	f.syncs++
+	if f.failSync {
+		writeEnvelope(w, false, "Failed to sync.", nil)
+		return
+	}
+	writeEnvelope(w, true, "", nil)
+}
+
+func (f *fakeBWServe) handleLock(w http.ResponseWriter) {
+	f.status = "locked"
+	writeEnvelope(w, true, "", map[string]string{"title": "Your vault is locked."})
+}
+
+func (f *fakeBWServe) handleListItems(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("search")
+	var out []map[string]string
+	for id, name := range f.names {
+		if search == "" || strings.Contains(name, search) {
+			out = append(out, map[string]string{"id": id, "name": name})
 		}
 	}
+	writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
+}
+
+func (f *fakeBWServe) handleGetItem(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/object/item/")
+	item, ok := f.items[id]
+	if !ok {
+		writeEnvelope(w, false, "Not found.", nil)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = fmt.Fprintf(w, `{"success":true,"data":%s}`, item)
+}
+
+func (f *fakeBWServe) handlePutItem(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/object/item/")
+	if _, ok := f.items[id]; !ok {
+		writeEnvelope(w, false, "Not found.", nil)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil || !json.Valid(body) {
+		writeEnvelope(w, false, "malformed request body", nil)
+		return
+	}
+	f.items[id] = json.RawMessage(body)
+	writeEnvelope(w, true, "", json.RawMessage(body))
+}
+
+func (f *fakeBWServe) handleCreateItem(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil || !json.Valid(body) {
+		writeEnvelope(w, false, "malformed request body", nil)
+		return
+	}
+	id := f.newID()
+	if f.items == nil {
+		f.items = map[string]json.RawMessage{}
+	}
+	if f.names == nil {
+		f.names = map[string]string{}
+	}
+	f.items[id] = json.RawMessage(body)
+	var named struct {
+		Name string `json:"name"`
+	}
+	_ = json.Unmarshal(body, &named)
+	f.names[id] = named.Name
+	f.created = append(f.created, json.RawMessage(body))
+	writeEnvelope(w, true, "", json.RawMessage(body))
+}
+
+func (f *fakeBWServe) handleListFolders(w http.ResponseWriter) {
+	out := []map[string]string{}
+	for id, name := range f.folders {
+		out = append(out, map[string]string{"id": id, "name": name})
+	}
+	writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
+}
+
+func (f *fakeBWServe) handleCreateFolder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	id := f.newID()
+	if f.folders == nil {
+		f.folders = map[string]string{}
+	}
+	f.folders[id] = body.Name
+	writeEnvelope(w, true, "", map[string]string{"id": id, "name": body.Name})
 }
 
 // newID hands out the id for a created item/folder, defaulting to a fixed value so
