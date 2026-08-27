@@ -950,8 +950,15 @@ if [ -f "$PI_SETTINGS_DST" ] && [ -f "$PI_SETTINGS_SRC" ]; then
         elif jq -e --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels == $m' "$PI_SETTINGS_DST" >/dev/null 2>&1; then
             log_info "pi enabledModels already in sync"
         else
-            PI_SETTINGS_TMP=$(mktemp)
-            if jq --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels = $m' "$PI_SETTINGS_DST" > "$PI_SETTINGS_TMP" 2>/dev/null; then
+            # Same directory as the destination, not $TMPDIR: a cross-filesystem
+            # mv degrades to copy+delete (not atomic) and mktemp's 0600 mode
+            # would silently tighten the destination's permissions on the first
+            # sync. chmod --reference copies the live file's mode before the
+            # swap, so a rename within one filesystem is both atomic and
+            # permission-preserving.
+            PI_SETTINGS_TMP=$(mktemp "$(dirname "$PI_SETTINGS_DST")/.settings.json.XXXXXX")
+            if jq --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels = $m' "$PI_SETTINGS_DST" > "$PI_SETTINGS_TMP" 2>/dev/null \
+                && chmod --reference="$PI_SETTINGS_DST" "$PI_SETTINGS_TMP" 2>/dev/null; then
                 mv "$PI_SETTINGS_TMP" "$PI_SETTINGS_DST"
                 log_success "Synced pi enabledModels (theme/defaultModel/lastChangelogVersion preserved)"
             else

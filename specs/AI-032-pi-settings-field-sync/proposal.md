@@ -35,7 +35,9 @@ distinction that makes automating it safe.
 On every `setup-linux.sh` / `setup-windows.ps1` run, if `~/.pi/agent/settings.json`
 already exists, its `enabledModels` array is overwritten to match the repo's
 `ai/pi/settings.json` exactly — nothing else in the file is touched. A pre-existing
-`theme`, `lastChangelogVersion`, `defaultModel`, or any other field survives byte-for-byte.
+`theme`, `lastChangelogVersion`, `defaultModel`, or any other field survives value-for-value
+(both `jq` and `ConvertTo-Json` re-serialize the whole file, so indentation/whitespace can
+change; the values pi actually reads do not).
 If the two arrays already match, nothing is written (idempotent, `changed=0`).
 
 ## Out of scope

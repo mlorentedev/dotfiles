@@ -254,6 +254,13 @@ JSON
         || { echo "sync is not guarded on the destination existing:"; printf '%s\n' "$block"; return 1; }
     printf '%s\n' "$block" | grep -qF -e 'Test-Path -LiteralPath $piSettingsSrc -PathType Leaf' \
         || { echo "sync is not guarded on the source existing:"; printf '%s\n' "$block"; return 1; }
+    # @($null).Count is 1, not 0 -- wrapping the source's enabledModels in @()
+    # before checking for null/missing would make the "no models" guard never
+    # fire and go on to write a literal null into a live settings.json. The
+    # null check must happen BEFORE the @() wrap (reviewer-found, adversarial
+    # review of this spec, initially FAIL on exactly this).
+    printf '%s\n' "$block" | grep -qF -e '$null -eq $piSrcModelsRaw' \
+        || { echo "src guard does not null-check before wrapping in @() -- @(\$null).Count is 1, not 0:"; printf '%s\n' "$block"; return 1; }
     # -InputObject, never a bare pipe into ConvertTo-Json: piping unwraps a
     # single-element array before the cmdlet sees a collection.
     printf '%s\n' "$block" | grep -qF -e 'ConvertTo-Json -InputObject $piSrcModels' \
