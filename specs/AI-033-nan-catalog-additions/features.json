@@ -1,0 +1,37 @@
+[
+  {
+    "id": "AI-033-nan-catalog-additions-f1",
+    "behavior": "nan/qwen3.8-flash and nan/glm5.3-flash resolve to a valid entry in ai/pi/models.json and appear in ai/pi/settings.json's enabledModels",
+    "verification": "cd /home/manu/Projects/dotfiles-wt-nan-catalog && bats tests/pi-config.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-033-nan-catalog-additions-f2",
+    "behavior": "ai/pi/README.md's model list matches settings.json's enabledModels",
+    "verification": "cd /home/manu/Projects/dotfiles-wt-nan-catalog && bats tests/pi-config.bats -f 'README.md model list matches'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-033-nan-catalog-additions-f3",
+    "behavior": "ai/opencode/opencode.jsonc carries both models under provider.nan.models with reasoning_content interleaving mapped",
+    "verification": "cd /home/manu/Projects/dotfiles-wt-nan-catalog && bats tests/opencode.bats -f 'chat NaN models' -f 'interleaved'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-033-nan-catalog-additions-f4",
+    "behavior": "Neither model is referenced by defaultModel (pi) or model/small_model (opencode)",
+    "verification": "cd /home/manu/Projects/dotfiles-wt-nan-catalog && ! grep -E '\"(defaultModel|model|small_model)\":\\s*\"nan/(qwen3\\.8-flash|glm5\\.3-flash)\"' ai/pi/settings.json ai/opencode/opencode.jsonc",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-033-nan-catalog-additions-f5",
+    "behavior": "Both models verified live and functional against the real NaN API before merge",
+    "verification": "cd /home/manu/Projects/dotfiles-wt-nan-catalog && scripts/nan-debug.sh -m qwen3.8-flash 'responde solo: pong' && scripts/nan-debug.sh -m glm5.3-flash 'responde solo: pong'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

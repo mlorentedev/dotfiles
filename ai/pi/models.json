@@ -80,6 +80,42 @@
           },
           "contextWindow": 1048576,
           "maxTokens": 65536
+        },
+        {
+          "id": "qwen3.8-flash",
+          "name": "qwen3.8-flash (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 1048576,
+          "maxTokens": 65536
+        },
+        {
+          "id": "glm5.3-flash",
+          "name": "glm5.3-flash (NaN)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 1048576,
+          "maxTokens": 65536
         }
       ],
       "authHeader": false

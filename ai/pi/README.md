@@ -60,7 +60,27 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 NaN only — the free tier, with no paid fallback in the picker.
 
-- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `mimo-v2.5`
+- **NaN** (free, primary): `qwen3.6`, `gemma4`, `deepseek-v4-flash`, `mimo-v2.5`, `qwen3.8-flash`, `glm5.3-flash`
+
+`qwen3.8-flash` and `glm5.3-flash` (added 2026-08-26) are catalog additions only — picker
+availability, not a default or routing change. Both are live, reasoning-class, and
+independently strong: verified via `scripts/nan-debug.sh` on both a smoke prompt
+(surfaced `reasoning_content`) and this repo's own planted `((count++))`/`set -e` bug —
+the same defect that admitted `mimo-v2.5` to `harness/reviewer-pool.json` — which both
+identified correctly. Published third-party benchmarks back that up: Qwen3.8-Flash-Next
+(Alibaba) and GLM-5.3-Flash (Zhipu) both launched 2026-08-26 as genuine frontier-tier
+releases with real 1M context, not marketing inflation — see #1244 for sources. Quality is
+therefore *not* the reason they stay out of routing. The reason is that NaN announced them
+on a **promotional token allocation that expires end of August 2026**, ahead of a community
+vote on whether/how they stay, and neither has been run through `reviewer-pool.json`'s own
+admission procedure yet. Neither is wired into `defaultModel`, `harness/model-map.json`,
+`.pr_agent.toml` or `harness/reviewer-pool.json` — see #1244.
+
+One capability nuance for `qwen3.8-flash` specifically: Alibaba's own release notes put its
+*native* context at 262,144 tokens, extended to 1M via YaRN — the "production" NaN-served
+variant defaults to 1M, which is what's declared here, but YaRN-extended context can behave
+differently at the far end of the window than a natively-1M model (`deepseek-v4-flash`,
+`mimo-v2.5`). `glm5.3-flash`'s 1M is native per Zhipu.
 
 The three paid OpenRouter models (`deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`) were
 dropped from the picker: a paid model one keystroke away in a model list is a cost you take by
