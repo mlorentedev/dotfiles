@@ -966,7 +966,10 @@ if (-not $uvCmd) {
     try {
         $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
         Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
-        & $uvInstaller 2>$null
+        # A child process, never dot-sourced or run in this session: a remote
+        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
+        # runner lost npm right after these two (TEST-003/#1298).
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
         Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
         # Refresh PATH for current session
         $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
@@ -1009,7 +1012,7 @@ if (-not $bunCmd) {
     try {
         $bunInstaller = Join-Path $env:TEMP "bun-install.ps1"
         Invoke-RestMethod https://bun.sh/install.ps1 -OutFile $bunInstaller
-        & $bunInstaller 2>$null
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $bunInstaller 2>$null
         Remove-Item -Path $bunInstaller -Force -ErrorAction SilentlyContinue
         # Refresh PATH for current session
         $env:PATH = "$env:USERPROFILE\.bun\bin;$env:PATH"
@@ -1025,6 +1028,12 @@ if (-not $bunCmd) {
 } else {
     Write-Info "Bun already installed"
 }
+
+# What the rest of setup will see. The npm-driven blocks below (Obsidian CLI,
+# yarn, pi) each skip silently when npm is missing; naming the state here
+# turns "npm not available" into a finding with a cause.
+$npmSeen = Get-Command npm -ErrorAction SilentlyContinue
+Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
 
 # ============================================================================
 # 2c. OBSIDIAN CLI (BUG-013)

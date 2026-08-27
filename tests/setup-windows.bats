@@ -838,3 +838,14 @@ setup() {
     [ "$total" -ge 2 ]
     [ "$total" -eq "$kept" ]
 }
+
+@test "setup-windows.ps1 runs the uv and Bun installers in a child pwsh, never in its own session (TEST-003)" {
+    # A downloaded installer executed in-session can rewrite the process
+    # environment for the rest of setup; the runner lost npm after these two.
+    grep -qF -- '-File $uvInstaller' "$PS1_SCRIPT"
+    grep -qF -- '-File $bunInstaller' "$PS1_SCRIPT"
+    run grep -F '& $uvInstaller' "$PS1_SCRIPT"
+    [ "$status" -ne 0 ]
+    run grep -F '& $bunInstaller' "$PS1_SCRIPT"
+    [ "$status" -ne 0 ]
+}
