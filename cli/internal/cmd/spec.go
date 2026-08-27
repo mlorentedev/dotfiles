@@ -15,9 +15,10 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
-// now is the clock used to stamp created: in scaffolded specs. It is a package
-// var so tests can pin it deterministically.
-var now = func() time.Time { return time.Now().UTC() }
+// now is the clock used to stamp created: in scaffolded specs and session dates.
+// It is a package var so tests can pin it deterministically. Calendar dates are
+// local (lesson 228); instants are UTC.
+var now = func() time.Time { return time.Now() }
 
 func newSpecCmd() *cobra.Command {
 	cmd := &cobra.Command{
