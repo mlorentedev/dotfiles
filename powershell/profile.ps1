@@ -200,6 +200,24 @@ function prompt {
 }
 
 # ============================================================================
+# CONSOLE ENCODING
+# ============================================================================
+
+# UTF-8 console I/O (WIN-009/#1290). PowerShell decodes captured native output
+# with [Console]::OutputEncoding, which defaults to the system OEM code page, so
+# `dotf` output carrying an em dash rendered as OEM glyphs and any function
+# parsing it read corrupted bytes. Mirrors the block scripts/utils.ps1 applies
+# to setup itself.
+try {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [Console]::OutputEncoding = $utf8NoBom
+    [Console]::InputEncoding = $utf8NoBom
+    $OutputEncoding = $utf8NoBom
+} catch {
+    Write-Verbose "console encoding not set: $_"
+}
+
+# ============================================================================
 # ENVIRONMENT VARIABLES
 # ============================================================================
 
