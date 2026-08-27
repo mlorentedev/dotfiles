@@ -1,0 +1,22 @@
+{
+  "keybindings": {},
+  "platforms": {
+    "darwin": {},
+    "linux": {
+      "tab.nextAllTypes": [
+        "Mod+Alt+BracketRight"
+      ],
+      "tab.nextSameType": [
+        "Mod+Shift+BracketRight"
+      ],
+      "tab.previousAllTypes": [
+        "Mod+Alt+BracketLeft"
+      ],
+      "tab.previousSameType": [
+        "Mod+Shift+BracketLeft"
+      ]
+    },
+    "win32": {}
+  },
+  "version": 1
+}
