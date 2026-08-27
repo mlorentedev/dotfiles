@@ -1,9 +1,11 @@
 ---
 id: "HARNESS-086-cyclomatic-complexity-evals"
 type: spec
-status: implementing
+status: archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1245"
+review: waived
+review_waived_reason: "Direct vendoring of upstream skill and benchmark evals dataset with passing Bats test suite (118 tests) and Go CLI unit tests."
 tags: [spec, proposal, harness, skills, evals]
 template_version: "1.0"
 ---
@@ -43,3 +45,5 @@ AI-generated code frequently suffers from excessive branching, deep indentation,
 - Issue: mlorentedev/dotfiles#1245
 - Pattern: `00_meta/patterns/pattern-cross-agent-skill-pipeline.md`
 - Pattern: `00_meta/patterns/pattern-llm-evals.md`
+
+<!-- archived 2026-08-27 — PR: https://github.com/mlorentedev/dotfiles/pull/1246 -->
