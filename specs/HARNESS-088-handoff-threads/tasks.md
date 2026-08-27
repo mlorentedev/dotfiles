@@ -70,9 +70,27 @@ Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-088-handoff-th
       durable records, and it assembled a filename the skill did not share.
 - [x] Both above written test-first and mutation-checked.
 
+## The debt, now fixed
+
+- [x] **`SessionEnd` resolved the project as `filepath.Base(cwd)`** — a session in
+      a subdirectory (`cli/`, where most work here happens) resolved the wrong
+      project, found no `MEMORY.md`, and **silently archived nothing**. git is
+      authoritative now; the basename stays as a fallback so a session outside any
+      repository keeps working, because fixing a defect must not quietly narrow
+      who the function serves.
+- [x] **A thread is the BRANCH, not the worktree.** The vault is the SSOT across
+      machines, so `feat/x` continued on a second box must resolve to the SAME
+      thread rather than forking one. The hostname qualifies only `main`/`master`
+      — ambient work rather than a line of it — and a detached HEAD is named
+      `<worktree>@<host>` rather than collapsing into a plausible `main`.
+- [x] **One `RepoIdentity` feeds both.** Two derivations of one fact in one
+      package would have been the sixth divergent-parser defect found here in a
+      week, this time between my own functions.
+
 ## Found by audit, NOT fixed — recorded rather than folded in
 
-- [ ] **`SessionEnd` resolves the project as `filepath.Base(cwd)`.** A session
+- [ ] ~~**`SessionEnd` resolves the project as `filepath.Base(cwd)`.**~~ Fixed
+      above. Original note: A session
       whose working directory is a subdirectory — `cli/`, where most work in this
       repository happens — resolves the wrong project name, finds no `MEMORY.md`,
       and **silently archives nothing**. Same class as the thread-key defect, in
