@@ -412,7 +412,12 @@ if ($wingetCmd) {
     # blocks of this same setup run (otherwise Get-Command misses them until
     # the next shell start; first introduced for BUG-003 so the Copilot config
     # deploy block sees the just-installed `copilot` binary).
-    $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
+    # Keep the process PATH too: an entry that exists only in this process (a
+    # CI GITHUB_PATH addition, a shell that put a build dir on PATH for the run)
+    # was silently dropped here, and every dotf block after this line then ran
+    # against whatever the registry PATH resolved -- on the CI runner, nothing
+    # (TEST-003/#1298). Registry first so fresh winget installs still win.
+    $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH
 } else {
     Write-Warn "winget not found, skipping developer tools installation"
 }

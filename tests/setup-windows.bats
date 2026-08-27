@@ -824,3 +824,7 @@ setup() {
     [ -n "$node_line" ] && [ -n "$tools_line" ]
     [ "$node_line" -lt "$tools_line" ]
 }
+
+@test "setup-windows.ps1's PATH refresh keeps the process PATH (a GITHUB_PATH entry survived nothing before, TEST-003)" {
+    grep -qF 'GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT"
+}

@@ -295,6 +295,12 @@ jobs:
           go build -o "$bin\dotf.exe" ./cmd/dotf
           Pop-Location
           Add-Content $env:GITHUB_PATH $bin
+          # And the User PATH (as the age step does): setup-windows.ps1 refreshes
+          # PATH from the registry after its winget loop, which used to drop a
+          # process-only GITHUB_PATH entry -- Install-Dotf then could not see the
+          # source build and replaced it with the release (#1308 third run).
+          $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+          if ($userPath -notlike "*$bin*") { [Environment]::SetEnvironmentVariable('PATH', "$userPath;$bin", 'User') }
           & "$bin\dotf.exe" version
 
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
