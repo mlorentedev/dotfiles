@@ -550,65 +550,34 @@ else
 fi
 
 # Mirror the harness inputs into the deploy dir so `compile-harness.sh --check`
-# (healthcheck section 12) can verify drift offline from ~/.dotfiles. The engine
-# resolves its root from its own location, and the rootresolve regression test
-# models exactly this complete non-git copy: scripts/ (compile-harness.sh) +
-# harness/ + every file harness/manifest.json declares as an injection target.
-# This runs AFTER --refresh so the snapshot matches the refreshed repo state
-# (else the repo<->deploy drift sub-check would then see drift).
-#
-# The target list is DERIVED from the manifest, never restated here. It was a
-# hardcoded pair (AGENTS.md + ai/claude/CLAUDE.md) until #1200: adding
-# ai/orca/ORCA.md as a third target (#1176) needed a copy line nobody wrote, so
-# --check evaluated a target the mirror had never received and reported a drift
-# FAIL whose own printed remedy could not clear it — running --refresh from the
-# repo exits 0, because the repo has the file. Deriving the list means the next
-# manifest entry is mirrored by construction rather than by remembering.
-if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
-    ensure_directory "$DOTFILES_DIR/harness"
-    cp -rf "$CURRENT_DIR/harness/." "$DOTFILES_DIR/harness/" 2>/dev/null || true
-    # Resolve jq by path, not by name. The installer above downloads it to
-    # ~/.local/bin, which the rc files put on PATH but THIS process may not have
-    # — measured in the integration container, where setup logs "jq installed"
-    # and then "jq not found" 22 seconds later in the same run. A `command -v`
-    # test alone therefore skips the mirror right after a successful install.
-    _jq=""
-    if command -v jq >/dev/null 2>&1; then
-        _jq="jq"
-    elif [ -x "$HOME/.local/bin/jq" ]; then
-        _jq="$HOME/.local/bin/jq"
-    fi
-    if [ -n "$_jq" ] && [ -f "$CURRENT_DIR/harness/manifest.json" ]; then
-        # Read line by line: `for f in $(jq ...)` does not word-split in zsh,
-        # which would yield ONE target containing every path (see CLAUDE.md's
-        # prohibited-pattern table — this row fails silently).
-        "$_jq" -r '.targets[].file' "$CURRENT_DIR/harness/manifest.json" 2>/dev/null \
-        | while IFS= read -r _harness_target; do
-            [ -n "$_harness_target" ] || continue
-            # A declared target the checkout does not have is a broken checkout,
-            # and skipping it silently reproduces the very defect this block
-            # fixes: the mirror ends up incomplete and `--check` fails later on
-            # a marker count that names neither the manifest nor the missing
-            # file. Name it here, where the cause is still visible. Setup does
-            # not abort — it is idempotent and long, and one absent target must
-            # not cost a machine the rest of its provisioning — but the warning
-            # is loud and `verify-setup.bats` fails on the resulting gap.
-            if [ ! -f "$CURRENT_DIR/$_harness_target" ]; then
-                log_warning "harness/manifest.json declares a target the checkout does not have: $_harness_target — not mirrored, 'dotf doctor' will report harness drift"
-                continue
-            fi
-            _harness_target_dir="$(dirname "$DOTFILES_DIR/$_harness_target")"
-            ensure_directory "$_harness_target_dir"
-            if ! safe_copy "$CURRENT_DIR/$_harness_target" "$_harness_target_dir/" 2>/dev/null; then
-                log_warning "failed to mirror harness target $_harness_target to $_harness_target_dir — 'dotf doctor' will report harness drift"
-            fi
-        done
-        unset _harness_target _harness_target_dir
-    else
-        log_warning "jq or harness/manifest.json unavailable — harness targets not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
-    fi
-    unset _jq
+# (healthcheck section 12) and `dotf doctor` read a complete snapshot from
+# ~/.dotfiles: harness/ plus every file harness/manifest.json declares as an
+# injection target. `dotf harness mirror` is the one implementation for both
+# OSes (WIN-007/#1288). It replaced the bash+jq block that lived here, which
+# derived its target list from the manifest for the reason #1200 recorded (a
+# hardcoded pair missed the third target) and resolved jq by path because the
+# lookup raced its own install (#1202) -- both now moot in Go. Runs AFTER
+# --refresh so the snapshot matches the refreshed repo state. Idempotent
+# ("N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# A declared target the checkout lacks is named and exits non-zero after
+# mirroring the rest: setup does not abort (it is long and idempotent), but the
+# warning is loud and verify-setup.bats fails on the resulting gap.
+# Resolve dotf by path, not only by name: install_dotf placed it in ~/.local/bin,
+# which the rc files put on PATH but THIS process may not have -- the integration
+# container installs dotf and then cannot see it in the same run (#1202 was the
+# identical trap with jq, and this block inherited it the moment it moved to dotf).
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then
+    _dotf="dotf"
+elif [ -x "$HOME/.local/bin/dotf" ]; then
+    _dotf="$HOME/.local/bin/dotf"
 fi
+if [ -n "$_dotf" ]; then
+    "$_dotf" harness mirror || log_warning "dotf harness mirror reported a gap (above) -- 'dotf doctor' will report harness drift"
+else
+    log_warning "dotf not found (PATH or ~/.local/bin) -- harness not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
+fi
+unset _dotf
 
 # Claude Code
 ensure_directory "$HOME/.claude"

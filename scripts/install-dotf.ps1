@@ -141,7 +141,15 @@ function Install-Dotf {
             # the semver is correct for either. (StrictMode makes `@()[-1]` throw,
             # so never index blind.)
             $verRaw = (& dotf version 2>&1 | Out-String)
-            $current = if ($verRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
+            # `dev` is what a source build reports. A source build on PATH is
+            # deliberate (a dev box, or CI building the PR under test) and the
+            # release installer must not replace it; remove it to converge.
+            # Parity with install-dotf.sh.
+            $current = if ($verRaw -match '(\d+\.\d+\.\d+|dev)') { $Matches[1] } else { '' }
+            if ($current -eq 'dev') {
+                Write-Host "dotf is a source build (dev); leaving it in place (remove it to converge to the $Version release)"
+                return $true
+            }
             if ($current -eq $Version) {
                 Write-Host "dotf $Version already installed; skipping"
                 return $true

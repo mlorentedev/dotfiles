@@ -88,7 +88,10 @@ func TestCheckHarnessMirrorOrphans(t *testing.T) {
 		}
 	})
 
-	t.Run("windows has no separate mirror -> no-op even with an orphan present", func(t *testing.T) {
+	// The mirror is a real deploy dir on Windows too (`dotf harness mirror`
+	// writes it there, WIN-007/#1288); the check used to stay silent on the
+	// belief that Windows had none, which left an orphan unreported forever.
+	t.Run("windows: an orphan in the mirror is reported like anywhere else", func(t *testing.T) {
 		repo, mirror := setup(t)
 		mkdirAll(t, filepath.Join(mirror, "harness", "skills", "retired"))
 		cfg := &Config{DotfilesDir: mirror}
@@ -99,8 +102,8 @@ func TestCheckHarnessMirrorOrphans(t *testing.T) {
 		rep := capture(&buf)
 		checkHarnessMirrorOrphans(sys, cfg, rep, false)
 
-		if rep.Failures() != 0 || buf.Len() != 0 {
-			t.Errorf("windows should be a silent no-op\n%s", buf.String())
+		if rep.Failures() != 1 || !strings.Contains(buf.String(), "retired") {
+			t.Errorf("windows must report the orphan, not stay silent\n%s", buf.String())
 		}
 	})
 
