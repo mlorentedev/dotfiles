@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: aa1087f44d2d30af
+generated_sha: 39d465d82660be6e
 id: adversarial-review-skill
 type: skill
 status: active
@@ -188,7 +188,7 @@ The rubric is mechanically aggregable — useful when N agents review N changes 
 | **Verification** | Evidence proves each criterion with reproducible commands + outputs | Evidence covers criteria but not reproducible without context | Anecdotal or unverifiable evidence | No verification artifacts |
 | **Scope** | Diff matches proposal exactly; no creep | Diff mostly matches; minor side-changes documented | Significant unrelated changes mixed in | Diff materially diverges from proposal |
 | **Reliability** | Error paths handled, idempotent, rollback safe | Most error paths handled, partial idempotency | Several error paths unhandled / unclear | Crashes or silent failures on common errors |
-| **Maintainability** | Clear naming, ≤40-line fns, no dead code, comments explain WHY | Acceptable structure with minor smells | Confusing structure, smells, or no tests for new logic | Unreviewable; needs rewrite |
+| **Maintainability** | Clear naming, ≤40-line fns, Cyclomatic Complexity ≤10 per function (checked with `cyclomatic-complexity`), no dead code, comments explain WHY | Acceptable structure with CC ≤15 | CC >15, confusing structure, smells, or no tests for new logic | Unreviewable; needs rewrite |
 | **Handoff-readiness** | Spec updates included, lessons captured if applicable, clear next steps | Spec updates included but lesson capture deferred | Implementation only; spec stale | No spec touch; lessons lost |
 
 ### Aggregation rule (rubric → verdict)
