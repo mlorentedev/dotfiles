@@ -383,6 +383,11 @@ type BWServeDaemon struct {
 
 	Client BWServeClient // talks to the daemon once it's up
 
+	// State is where the daemon's stdout+stderr and pid land (bwserve_state.go,
+	// #1315). The zero value records nothing — tests of the HTTP half need no
+	// filesystem — and production always sets it (cmd.bwDaemonAddr).
+	State BWServeState
+
 	// newCmd is the process-construction seam, overridable in tests so
 	// Start()'s retry/timeout behavior is testable without a real bw binary.
 	// nil -> bwServeCommand.
@@ -418,8 +423,7 @@ func (d *BWServeDaemon) Start(pollTimeout time.Duration) error {
 	if d.Running() {
 		return nil
 	}
-	cmd := d.command()
-	if err := cmd.Start(); err != nil {
+	if err := d.spawn(d.command()); err != nil {
 		return fmt.Errorf("start bw serve: %w", err)
 	}
 	deadline := time.Now().Add(pollTimeout)
@@ -430,6 +434,38 @@ func (d *BWServeDaemon) Start(pollTimeout time.Duration) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("bw serve did not become reachable within %s", pollTimeout)
+}
+
+// spawn starts cmd with its stdout+stderr appended to the state log and
+// records its pid — the trace #1315 found missing. With no State it is the
+// bare cmd.Start() it used to be.
+//
+// The log is handed to the child as an *os.File on purpose: os/exec then
+// connects the descriptor directly, with no copying goroutine in THIS process,
+// which is what lets `dotf` exit while the detached daemon keeps writing. Our
+// own handle is closed once the child holds its copy.
+func (d *BWServeDaemon) spawn(cmd *exec.Cmd) error {
+	if !d.State.enabled() {
+		return cmd.Start()
+	}
+	logf, err := d.State.openLog()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = logf.Close() }()
+	cmd.Stdout = logf
+	cmd.Stderr = logf
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	pid := cmd.Process.Pid
+	markStart(logf, pid, time.Now())
+	if err := d.State.WritePID(pid); err != nil {
+		// The daemon IS running; failing here is loud rather than silent, and
+		// the log's start marker still names the pid for whoever reads it.
+		return fmt.Errorf("bw serve started (pid %d) but its trace is incomplete: %w", pid, err)
+	}
+	return nil
 }
 
 // Unlock delegates to the client — see BWServeClient.Unlock's contract.
