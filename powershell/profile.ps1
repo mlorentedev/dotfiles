@@ -11,6 +11,31 @@
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value agy
 
+# agyp: launch agy with a saved prompt, the PowerShell twin of .zsh/functions.sh's
+# agyp (PARITY-001, #764). Same contract on both sides: the prompt lives at
+# $GEMINI_DIR\prompts\<name>.md, extra words are appended after a blank line,
+# and a missing name or file is a non-terminating error (so $? is false) rather
+# than a launch with an empty prompt.
+#   agyp <prompt-name> [extra words]
+function agyp {
+    param(
+        [Parameter(Position = 0)][string]$Name,
+        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
+    )
+    if (-not $Name) {
+        Write-Error 'usage: agyp <prompt-name> [args]'
+        return
+    }
+    $geminiDir = if ($env:GEMINI_DIR) { $env:GEMINI_DIR } else { Join-Path $env:USERPROFILE '.gemini' }
+    $promptFile = Join-Path (Join-Path $geminiDir 'prompts') "$Name.md"
+    if (-not (Test-Path -LiteralPath $promptFile)) {
+        Write-Error "agyp: prompt not found at $promptFile"
+        return
+    }
+    $prompt = Get-Content -LiteralPath $promptFile -Raw
+    & agy -i ($prompt + "`n`n" + ($Rest -join ' '))
+}
+
 # AI provider endpoints -- NaN community (primary, OpenAI-compatible).
 # API key in $env:NAN_API_KEY -- injected on demand via `dotf secrets run` (wrappers below), not the ambient session.
 $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
