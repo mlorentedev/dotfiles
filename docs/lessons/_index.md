@@ -259,3 +259,4 @@ tags: [lessons, index, dotfiles]
 | [238 - Two independent defects, each sufficient for a permanent red, hide behind one symptom](lesson-238-two-independent-defects-each-sufficient-for-a-perman.md) | 2026-08-27 |  |
 | [239 - Re-measure a filed bug on the current toolchain before implementing its fix](lesson-239-re-measure-a-filed-bug-on-the-current-toolchain-before.md) | 2026-08-27 |  |
 | [240 - A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off](lesson-240-a-partial-mirror-the-code-believes-absent-the-check.md) | 2026-08-27 |  |
+| [241 - Re-running a command just to print what it already told you inherits its exit status, silently, under `pipefail`](lesson-241-re-running-a-command-just-to-print-what-it-already.md) | 2026-08-27 |  |

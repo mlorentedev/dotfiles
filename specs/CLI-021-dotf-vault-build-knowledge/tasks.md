@@ -117,11 +117,31 @@ lines against crystallize's ~200, and it carries two seams crystallize did not h
         unrelated case red, since every fixture sat comfortably inside a band. A boundary no
         fixture lands on is a boundary no test defends. With them, the same mutation goes red on
         the case named for it.
-- [ ] Port. **Exec the two backlog scripts, do not port them** — they are separate `vault`
+- [x] Port. **Exec the two backlog scripts, do not port them** — they are separate `vault`
       dispatcher subcommands (`check-tasks`, `check-merged`), outside #490's three increments, and
       they survive the CLI-023 cutover, so the exec dependency stays valid afterwards. Porting them
-      is ~240 lines of scope creep into another ticket's territory.
-- [ ] Read-only; no writes under any flag.
+      is ~240 lines of scope creep into another ticket's territory. → `cli/internal/vault/health.go`,
+      wired as `dotf vault health` in `cli/internal/cmd/vault_health.go`. Execed through the
+      resolved bash interpreter (`mem.ResolveBash()`, exported for this second caller) rather than
+      relying on the shebang + executable bit the shell uses directly — there is no `.ps1` twin for
+      either script to fall back to. `ScriptsDir` unresolved (or either script missing) FAILS
+      section 7 loudly rather than skipping it, per this section's own seam #2 above; no golden
+      exercises that path (a shell always knows its own `$SCRIPT_DIR`), so it is unit-tested instead
+      (`cli/internal/vault/health_test.go`).
+      - **Oracle defect found while porting, NOT fixed here (#1314):** the shell re-execs
+        `check-backlog-integrity.sh` a SECOND time, piped straight into `sed`, to print the failure
+        it already detected — unlike the sibling merged-check loop, which captures to a variable
+        first. Under `set -euo pipefail` that unnegated pipeline's non-zero exit aborts the WHOLE
+        SCRIPT on the FIRST drifted file: no later files in the same loop, no merged-check pass, no
+        closing footer. Reproduced faithfully (the `backlog-drift` golden's `expected/stdout` simply
+        stops mid-section) rather than "fixed while translating."
+- [x] Read-only; no writes under any flag. → `RunHealth` never calls `os.WriteFile` or exec's the
+      scripts with anything beyond the fixed `check-backlog-{integrity,merged}.sh <tasks-file>` argv
+      shape; `--verbose`/`--vault` are the only flags and both are read-only.
+- [x] Go/shell byte-parity proven on all 16 golden cases →
+      `tests/vault-health-go-parity.bats`, driven by the SAME goldens and the SAME runner
+      (`gvh_run_case`, `GVH_IMPL_MODE=go`) as the shell suite — mirrors
+      `tests/knowledge-crystallize-go-parity.bats`'s pattern from increment 1.
 
 Two twin divergences surfaced while scoping this increment — no `vault-health.ps1` exists at all,
 and the PowerShell weekly runs no health step despite its header. Both recorded in
