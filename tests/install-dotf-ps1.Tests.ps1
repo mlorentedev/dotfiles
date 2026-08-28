@@ -92,11 +92,36 @@ Describe 'Set-DotfBinary' {
         Test-Path -LiteralPath "$($script:Target).old" | Should -BeFalse
     }
 
-    It 'restores the previous binary when the source cannot be staged' {
+    It 'leaves the previous binary untouched when the source cannot be staged' {
+        # Copy-Item throws BEFORE the park step, so nothing was moved and the
+        # old binary simply survives; this case never reaches the catch block
+        # (BUG-046, #781) - the rollback itself is exercised by the next case.
         Set-Content -LiteralPath $script:Target -Value 'OLD' -NoNewline
         { Set-DotfBinary -Source (Join-Path $script:Dest 'absent.bin') -Target $script:Target } |
             Should -Throw
-        # An aborted install must never leave the user without a dotf.
         Get-Content -LiteralPath $script:Target -Raw | Should -BeExactly 'OLD'
+        Test-Path -LiteralPath "$($script:Target).old" | Should -BeFalse
+    }
+
+    It 'restores the parked binary when the staged one cannot be renamed in (the catch block)' {
+        # The park succeeds (Move-Item to .old falls through to the real cmdlet:
+        # the mock filters on the Target destination only), then the rename of
+        # the staged (.new) file onto Target throws - the exact path the catch
+        # block exists for. Pester 5 runs the original command when no parameter
+        # filter matches, so the filter names the staged source too: the restore
+        # in the catch block also moves onto Target and must fall through
+        # (BUG-046, #781).
+        Set-Content -LiteralPath $script:Target -Value 'OLD' -NoNewline
+        Mock Move-Item -ParameterFilter { $Destination -eq $script:Target -and $LiteralPath -like '*.new' } -MockWith {
+            throw [System.IO.IOException]::new('simulated: image still locked')
+        }
+        { Set-DotfBinary -Source $script:Source -Target $script:Target } | Should -Throw
+        # Never leave the user without a dotf: the parked image is back in place ...
+        Get-Content -LiteralPath $script:Target -Raw | Should -BeExactly 'OLD'
+        # ... and the park is consumed. The staged .new is removed best-effort
+        # (-ErrorAction SilentlyContinue): on the GitHub runner a scanner held the
+        # fresh file and it survived one run, so its absence is not asserted -
+        # the next upgrade overwrites it with Copy-Item -Force anyway.
+        Test-Path -LiteralPath "$($script:Target).old" | Should -BeFalse
     }
 }
