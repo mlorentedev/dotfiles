@@ -1020,8 +1020,9 @@ else
 fi
 
 # GitHub Copilot CLI (BUG-003: standalone agentic CLI, drops legacy gh-copilot
-# extension path). Linux side is detect-and-act -- no auto-install (distros vary;
-# user installs via snap/apt/curl per https://docs.github.com/copilot/how-tos/copilot-cli).
+# extension path). Since AI-038 (#1321, ADR-036) it is an npm catalog tool that
+# `dotf tools install` above converges on every OS (pin as floor in
+# packages.json); this block only deploys config when the binary is on PATH.
 # Verification string set by AI-013 (pointer-style copilot-instructions.md).
 #
 # Cleanup (idempotent): the previous setup added 'eval "$(gh copilot alias -- bash)"'
@@ -1045,7 +1046,7 @@ if command -v copilot >/dev/null 2>&1; then
     fi
     log_success "GitHub Copilot CLI configured (aliases cop/cops in .zsh/aliases.zsh)"
 else
-    log_info "GitHub Copilot CLI not installed, skipping Copilot config (install via snap/apt/curl: https://docs.github.com/copilot/how-tos/copilot-cli)"
+    log_info "GitHub Copilot CLI not installed, skipping Copilot config (re-run 'dotf tools install copilot' once Node.js is on PATH)"
 fi
 
 # SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.

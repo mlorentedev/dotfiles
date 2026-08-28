@@ -138,10 +138,9 @@ setup() {
     refute_grep_fixed "github/gh-copilot" "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 auto-installs GitHub.Copilot via winget" {
-    grep -qF "GitHub.Copilot" "$PS1_SCRIPT"
-    # In the dev tools winget block, the binary check uses `copilot`
-    grep -qE 'Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
+@test "setup-windows.ps1 no longer installs GitHub.Copilot via winget: copilot is a packages.json npm tool (AI-038, ADR-036)" {
+    refute_grep 'Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm" and .source.package == "@github/copilot")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
 @test "setup-windows.ps1 removes retired init .ps1 orphans, does not deploy them (CLI-020)" {

@@ -3,6 +3,7 @@ package tools
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -62,6 +63,20 @@ func TestChecksumsName(t *testing.T) {
 	}
 	if got := (Tool{Version: "1.0.0"}).ChecksumsName("amd64"); got != "" {
 		t.Errorf("ChecksumsName with no template = %q, want empty", got)
+	}
+}
+
+// A tool listed twice is a catalog error, not two installs: the duplicate
+// copilot entry of AI-038 (#1321) installed once and then reported "already
+// installed; skipping" for its twin, which read as idempotence.
+func TestLoad_RejectsDuplicateToolNames(t *testing.T) {
+	dup := `{"tools":[{"name":"copilot","version":"1.0.81","profile":"full","source":{"type":"npm","package":"@github/copilot"}},{"name":"copilot","version":"1.0.81","profile":"full","source":{"type":"npm","package":"@github/copilot"}}]}`
+	_, err := Load(writeCatalog(t, dup))
+	if err == nil {
+		t.Fatal("a duplicated tool name must be a load error")
+	}
+	if got := err.Error(); !strings.Contains(got, `tool "copilot" is listed more than once`) {
+		t.Fatalf("error must name the tool, got: %v", err)
 	}
 }
 
