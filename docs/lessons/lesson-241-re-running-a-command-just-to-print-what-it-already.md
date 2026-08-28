@@ -60,11 +60,14 @@ stand out when its exit code silently ended the run.
 
 **Never re-run a command a second time solely to print output you could have
 captured the first time.** If a command's own exit status is meant to be
-irrelevant at a given call site, capture its stdout into a variable — the
-assignment's own exit status is what a subsequent `printf | sed` reads, and a
-already-captured string cannot fail a pipeline. Re-executing is not "the same
-thing done twice": under `set -e -o pipefail`, it is a second, unguarded
-opportunity for that exit status to end the script.
+irrelevant at a given call site, capture its stdout into a variable instead of
+re-invoking it — `printf '%s\n' "$captured" | sed ...` then pipes an
+already-materialized STRING, whose own success has nothing to do with what
+produced it, so that pipeline cannot inherit the original command's exit
+status. Re-executing is not "the same thing done twice": under
+`set -e -o pipefail`, the second invocation is a fresh, unguarded command whose
+own non-zero exit can end the script, this time with no `!` standing in front
+of it.
 
 ## Not fixed at the source
 

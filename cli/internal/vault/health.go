@@ -405,10 +405,60 @@ func (h *healthRun) section6Tags() {
 	}
 }
 
+// resolveBacklogScripts locates the two sibling scripts under ScriptsDir. ok is
+// false when the seam cannot be satisfied — an empty ScriptsDir or either
+// script missing — which the caller turns into a loud section-wide FAIL rather
+// than a silent skip, per this file's seam #2.
+func (h *healthRun) resolveBacklogScripts() (integrity, merged string, ok bool) {
+	integrity = filepath.Join(h.opts.ScriptsDir, "check-backlog-integrity.sh")
+	merged = filepath.Join(h.opts.ScriptsDir, "check-backlog-merged.sh")
+	ok = h.opts.ScriptsDir != "" && fileExists(integrity) && fileExists(merged)
+	return integrity, merged, ok
+}
+
+// runIntegrityChecks is the FIRST of section 7's two passes. It returns
+// (code, true) the moment a file drifts — the ORACLE DEFECT (#1314): the shell
+// re-execs check-backlog-integrity.sh a SECOND time, piped straight into `sed`,
+// to print output it already has a verdict for — instead of capturing to a
+// variable first, the way runMergedChecks below correctly does. Under
+// `set -euo pipefail` that unnegated pipeline's non-zero exit (inherited from
+// the script it just reported failing) aborts the WHOLE SCRIPT right here: no
+// later file in this same loop, no merged-check pass, no closing footer.
+// Pinned by the backlog-drift golden, whose expected/stdout simply stops after
+// this file's detail. Not "fixed" here — see #1314.
+func (h *healthRun) runIntegrityChecks(matches []string, script string) (int, bool) {
+	for _, tasks := range matches {
+		out, code := h.runScript(script, tasks)
+		if code != 0 {
+			h.fail("Backlog drift in %s/11-tasks.md (duplicate IDs / status contradictions)",
+				filepath.Base(filepath.Dir(tasks)))
+			printPrefixed(h.w, out, "        ")
+			return code, true
+		}
+	}
+	h.pass("Backlog integrity: %d task file(s) clean (one ticket = one entry)", len(matches))
+	return 0, false
+}
+
+// runMergedChecks is section 7's SECOND, independent pass: semantic drift is
+// ADVISORY (warn, never fail). It captures each script's output to a variable
+// before printing, so — unlike runIntegrityChecks above — it does NOT share
+// section 7's pipefail landmine: a captured string cannot fail a pipeline.
+func (h *healthRun) runMergedChecks(matches []string, script string) {
+	for _, tasks := range matches {
+		out, code := h.runScript(script, tasks)
+		if code != 0 {
+			h.warn("Stale-merged ticks in %s/11-tasks.md — work shipped, tick still [ ]:",
+				filepath.Base(filepath.Dir(tasks)))
+			printPrefixed(h.w, out, "        ")
+		}
+	}
+}
+
 // section7Backlog returns (code, true) when the shell would have aborted the
-// entire script right here — the ORACLE DEFECT below — short-circuiting
-// everything after it, footer included, exactly like section2Connectivity's
-// two abort points.
+// entire script right here (runIntegrityChecks' oracle defect), short-
+// circuiting everything after it, footer included — exactly like
+// section2Connectivity's two abort points.
 func (h *healthRun) section7Backlog() (int, bool) {
 	h.section("7/7", "Backlog Integrity")
 
@@ -426,46 +476,17 @@ func (h *healthRun) section7Backlog() (int, bool) {
 		return 0, false
 	}
 
-	integrityScript := filepath.Join(h.opts.ScriptsDir, "check-backlog-integrity.sh")
-	mergedScript := filepath.Join(h.opts.ScriptsDir, "check-backlog-merged.sh")
-	if h.opts.ScriptsDir == "" || !fileExists(integrityScript) || !fileExists(mergedScript) {
+	integrityScript, mergedScript, ok := h.resolveBacklogScripts()
+	if !ok {
 		h.fail("Backlog integrity: cannot locate check-backlog-integrity.sh / check-backlog-merged.sh " +
 			"(scripts dir unresolved) — run from a dotfiles checkout or set DOTFILES_REPO_DIR")
 		return 0, false
 	}
 
-	for _, tasks := range matches {
-		out, code := h.runScript(integrityScript, tasks)
-		if code != 0 {
-			h.fail("Backlog drift in %s/11-tasks.md (duplicate IDs / status contradictions)",
-				filepath.Base(filepath.Dir(tasks)))
-			printPrefixed(h.w, out, "        ")
-			// ORACLE DEFECT reproduced (#1314): the shell re-execs the check a
-			// SECOND time piped straight into `sed` to print its output,
-			// instead of capturing to a variable first the way the
-			// merged-check loop below correctly does. Under `set -euo
-			// pipefail` that unnegated pipeline's non-zero exit (inherited
-			// from the script it just reported failing) aborts the WHOLE
-			// SCRIPT right here: no later files in this same loop, no
-			// merged-check pass, no closing footer. Pinned by the
-			// backlog-drift golden, whose expected/stdout simply stops after
-			// this file's detail. Not "fixed" here — see #1314.
-			return code, true
-		}
+	if code, aborted := h.runIntegrityChecks(matches, integrityScript); aborted {
+		return code, true
 	}
-	h.pass("Backlog integrity: %d task file(s) clean (one ticket = one entry)", len(matches))
-
-	// Semantic drift is ADVISORY (warn, never fail) — a second, independent
-	// pass over the same file set. This one captures to a variable before
-	// printing, so it does NOT share section 7's pipefail landmine above.
-	for _, tasks := range matches {
-		out, code := h.runScript(mergedScript, tasks)
-		if code != 0 {
-			h.warn("Stale-merged ticks in %s/11-tasks.md — work shipped, tick still [ ]:",
-				filepath.Base(filepath.Dir(tasks)))
-			printPrefixed(h.w, out, "        ")
-		}
-	}
+	h.runMergedChecks(matches, mergedScript)
 	return 0, false
 }
 

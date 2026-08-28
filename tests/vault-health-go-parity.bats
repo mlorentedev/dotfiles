@@ -33,8 +33,11 @@ _build_dotf() {
     GVH_DOTF_BIN="${BATS_FILE_TMPDIR:-/tmp}/dotf-vault-health-parity"
     export GVH_DOTF_BIN
     if [ ! -x "$GVH_DOTF_BIN" ]; then
+        # A missing toolchain skips (checked above); a toolchain that FAILS to
+        # build the CLI is a real defect and must fail the suite, not read as
+        # 16 harmless skips.
         ( cd "$BATS_TEST_DIRNAME/../cli" && go build -o "$GVH_DOTF_BIN" ./cmd/dotf ) \
-            || skip "go build failed"
+            || return 1
     fi
     export GVH_IMPL_MODE=go
 }

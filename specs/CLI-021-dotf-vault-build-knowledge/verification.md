@@ -20,11 +20,12 @@ twin and repointed every caller.
 
 **Increment 2 — `dotf vault health`:** landed — `cli/internal/vault/health.go` +
 `cli/internal/cmd/vault_health.go` (`dotf vault health`). Byte-identical to the shell oracle on all
-16 golden cases (`tests/vault-health-go-parity.bats`), including the one exit path a golden alone
-cannot exercise cleanly (an unresolved backlog-scripts location, which the port fails loudly on
-rather than silently skipping — unit-tested in `health_test.go`). Not yet cut over: the shell twin,
-its callers, and `session_start.go`'s own separate `vault-health.sh` exec (SessionStart brief) are
-untouched, per this increment's build-beside scope.
+16 golden cases (`tests/vault-health-go-parity.bats`). A golden alone cannot exercise one exit path
+— an unresolved backlog-scripts location, which the port fails loudly on rather than silently
+skipping — because a shell always knows its own `$SCRIPT_DIR`; that path is covered separately by
+`health_test.go`, not by the golden/parity suite. Not yet cut over: the shell twin, its callers, and
+`session_start.go`'s own separate `vault-health.sh` exec (SessionStart brief) are untouched, per this
+increment's build-beside scope.
 
 **Increment 3 — `dotf vault maintain`:** not started
 

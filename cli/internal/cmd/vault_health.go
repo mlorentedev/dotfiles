@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
@@ -19,11 +20,17 @@ var errVaultHealthFailed = errors.New("vault health: one or more checks failed")
 // scripts/vault-health.sh (CLI-021 / #490, increment 2). Built BESIDE the shell
 // twin: nothing repoints at this yet (that cutover is CLI-023 / #492).
 //
-// vaultDirDefault mirrors the shell's OWN cascade — $VAULT_DIR, then
-// $VAULT_PATH, then a literal ~/Projects/knowledge — deliberately NOT the
-// ADR-025 machine.json cascade `vault.ResolveVault()` uses: the shell predates
-// that cascade, and the golden corpus (tests/golden/vault-health/) pins this
-// exact fallback, so matching the oracle wins over "improving" it here.
+// The vault directory resolves $VAULT_DIR first — the shell's own internal
+// handoff variable, and what every golden case in tests/golden/vault-health/
+// sets — then falls through to the ADR-025 cascade (env.ResolvePath, which
+// already covers $VAULT_PATH, the machine.json override, and the env-contract
+// default). The shell twin only ever falls back to a literal
+// $HOME/Projects/knowledge, oblivious to machine.json — but no golden exercises
+// that fallback (VAULT_DIR is always set), and `dotf vault health` is a NEW,
+// directly-invokable entry point unlike the shell's, so a relocated vault
+// should resolve the same way it does for every other `dotf vault` subcommand
+// (vault.ResolveVault) rather than reproducing a gap the oracle only had
+// because nothing called it standalone before.
 func newVaultHealthCmd() *cobra.Command {
 	var (
 		verbose   bool
@@ -63,10 +70,10 @@ missing from PATH), 2 the GUI is unreachable.`,
 
 			dir := os.Getenv("VAULT_DIR")
 			if dir == "" {
-				dir = os.Getenv("VAULT_PATH")
+				dir = env.ResolvePath("VAULT_PATH")
 			}
 			if dir == "" {
-				if home, err := os.UserHomeDir(); err == nil {
+				if home, herr := os.UserHomeDir(); herr == nil {
 					dir = home + "/Projects/knowledge"
 				}
 			}

@@ -125,8 +125,10 @@ lines against crystallize's ~200, and it carries two seams crystallize did not h
       resolved bash interpreter (`mem.ResolveBash()`, exported for this second caller) rather than
       relying on the shebang + executable bit the shell uses directly — there is no `.ps1` twin for
       either script to fall back to. `ScriptsDir` unresolved (or either script missing) FAILS
-      section 7 loudly rather than skipping it, per this section's own seam #2 above; no golden
-      exercises that path (a shell always knows its own `$SCRIPT_DIR`), so it is unit-tested instead
+      section 7 loudly rather than skipping it — but only once a `10_projects/*/11-tasks.md` file
+      has actually been discovered; with none found, section 7 still SKIPS exactly as the shell
+      does, ScriptsDir notwithstanding. Per this section's own seam #2 above; no golden exercises
+      the fail-loud path (a shell always knows its own `$SCRIPT_DIR`), so it is unit-tested instead
       (`cli/internal/vault/health_test.go`).
       - **Oracle defect found while porting, NOT fixed here (#1314):** the shell re-execs
         `check-backlog-integrity.sh` a SECOND time, piped straight into `sed`, to print the failure
