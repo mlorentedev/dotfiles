@@ -126,7 +126,7 @@
       "$HOME/.local/bin"
     ],
     "windows": [
-      "$env:USERPROFILE\\scripts",
+      "$env:USERPROFILE\\.dotfiles\\scripts",
       "$env:USERPROFILE\\.local\\bin"
     ]
   },
