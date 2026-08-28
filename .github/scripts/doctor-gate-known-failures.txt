@@ -1,16 +1,21 @@
 # TEST-003 (#1298): runner-only doctor failures the test-windows gate accepts.
 # One regex (.NET, PowerShell -match) per entry, each preceded by a comment that
-# names the owning ticket. The gate fails on any [FAIL] not listed here AND on
-# any entry that no longer matches, so this list only shrinks as tickets close.
+# names the owning ticket and by an "# example:" line quoting the [FAIL] line it
+# was written for -- tests/doctor-gate.Tests.ps1 asserts the pattern matches its
+# example, so a regex that is valid but wrong (a "\s" meant as a backslash) cannot
+# sit here silently. The gate fails on any [FAIL] not listed here AND on any
+# entry that no longer matches, so this list only shrinks as tickets close.
 # A real-box defect never goes here: it is fixed or ticketed, and the gate stays
 # red until then.
 
 # WIN-013 (#1310): env-contract SCRIPTS_DIR defaults to ~/.dotfiles/scripts on
 # Windows, but setup-windows.ps1 deploys scripts to ~/scripts and nothing
 # creates the contract path, so the contract check fails on every fresh box.
-SCRIPTS_DIR=.*\.dotfiles\scripts \(path does not exist\)
+# example:   [FAIL] SCRIPTS_DIR=C:\Users\runneradmin\.dotfiles\scripts (path does not exist)
+SCRIPTS_DIR=.*\.dotfiles\\scripts \(path does not exist\)
 
 # TEST-005 (#1313): the runner has no Bitwarden identity, so the reach tier
 # (exposure-keyed: 28 registry entries resolve through Bitwarden) fails by its
 # own rule. Real boxes log in once; CI cannot and must not resolve real secrets.
+# example:   [FAIL] Bitwarden session is gone (`bw status`: unauthenticated) - run `bw login`, not `bw unlock`
 Bitwarden session is gone \(`bw status`: unauthenticated\)

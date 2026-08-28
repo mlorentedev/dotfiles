@@ -64,6 +64,25 @@ Describe 'Read-KnownFailures' {
         (Read-KnownFailures -Path (Join-Path $TestDrive 'nope.txt')).Count | Should -Be 0
     }
 
+    It 'every committed entry matches the example line it was written for' {
+        # A valid-but-wrong regex passed the validity check and failed the gate:
+        # "\.dotfiles\scripts" reads "\s" as whitespace. The example is the proof.
+        $known = Join-Path $PSScriptRoot '..\.github\scripts\doctor-gate-known-failures.txt'
+        $example = $null
+        $checked = 0
+        foreach ($line in @(Get-Content -LiteralPath $known)) {
+            $t = $line.Trim()
+            if (-not $t) { continue }
+            if ($t -match '^#\s*example:\s*(.+)$') { $example = $Matches[1]; continue }
+            if ($t.StartsWith('#')) { continue }
+            $example | Should -Not -BeNullOrEmpty -Because "entry '$t' needs a preceding '# example:' line"
+            $example | Should -Match $t -Because "entry '$t' must match its own example"
+            $example = $null
+            $checked++
+        }
+        $checked | Should -BeGreaterThan 0
+    }
+
     It 'every committed entry is a valid regex and names its ticket in a preceding comment' {
         $known = Join-Path $PSScriptRoot '..\.github\scripts\doctor-gate-known-failures.txt'
         $lines = @(Get-Content -LiteralPath $known)
