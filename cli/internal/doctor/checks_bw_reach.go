@@ -36,6 +36,11 @@ const (
 	bwSyncTimeout   = 45 * time.Second
 )
 
+// noIdentityEnv, when set to any non-empty value, declares that the machine
+// running doctor has no Bitwarden identity BY DESIGN — the CI runner. Only the
+// `unauthenticated` branch of checkBitwardenReach reads it; see there.
+const noIdentityEnv = "DOTFILES_DOCTOR_NO_IDENTITY"
+
 // bwState is the subset of `bw status` this check consumes. Bitwarden emits more
 // fields (serverUrl, userEmail, userId); parsing only what is used keeps the
 // check indifferent to upstream additions.
@@ -108,6 +113,24 @@ func checkBitwardenReach(sys *System, rep *Report) {
 
 	switch st.Status {
 	case "unauthenticated":
+		if sys.Getenv(noIdentityEnv) != "" {
+			// A DECLARED absence of identity, not a sniffed one (TEST-005, #1313).
+			// The CI doctor gate sets this before invoking doctor because the
+			// runner has no Bitwarden account and must never hold one that
+			// resolves real secrets; on such a machine "unauthenticated" is the
+			// designed state, not a break. The gate used to allow-list this FAIL
+			// instead, which its own contract forbids: the list is for
+			// runner-only conditions with a fix pending, and a runner that will
+			// never log in is a permanent condition, not a pending fix.
+			//
+			// Declared over sniffed (CI=true, GITHUB_ACTIONS) so a real box can
+			// never trip it by accident and a workflow cannot inherit it by
+			// accident either. Blast radius is exactly this branch: locked,
+			// unlocked, sync age and the round-trip below run unchanged with the
+			// flag set, so an identity that IS present is still verified.
+			rep.Skip("no Bitwarden identity on this runner (declared via " + noIdentityEnv + ") — reach verified on real boxes only")
+			return
+		}
 		// `bw unlock` CANNOT recover this state, and its master-password prompt
 		// makes it look like a credential problem. Naming the right verb is the
 		// whole value of the check at this point.

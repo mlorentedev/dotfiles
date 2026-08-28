@@ -478,3 +478,125 @@ func TestBWReach_UnreadableRegistryDegradesSeverity(t *testing.T) {
 		t.Fatalf("degraded severity must not FAIL; got %d\n%s", rep.Failures(), out)
 	}
 }
+
+// runBWReachWithEnv is runBWReach with an injected environment and a
+// CommandOutputBounded that can fail `bw sync` on demand — the flag's blast
+// radius is the property under test, so every branch after `unauthenticated`
+// has to be reachable with the flag on.
+func runBWReachWithEnv(t *testing.T, env map[string]string, status, lastSync string, live int, syncErr error) (string, *Report) {
+	t.Helper()
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	sys := newSys(env, []string{"bw"}, nil)
+	sys.BWBackedSecrets = func() (int, error) { return live, nil }
+	sys.CommandOutputBounded = func(_ time.Duration, _ string, args ...string) (string, string, error) {
+		if len(args) > 0 && args[0] == "status" {
+			return bwStatusJSON(status, lastSync), "", nil
+		}
+		if syncErr != nil {
+			return "", "invalid_grant", syncErr
+		}
+		return "Syncing complete.", "", nil
+	}
+	checkBitwardenReach(sys, rep)
+	rep.Summary()
+	return buf.String(), rep
+}
+
+// TEST-005 (#1313): the CI runner has no Bitwarden identity by design, and the
+// gate used to allow-list the resulting FAIL — a permanent condition on a list
+// whose contract is "runner-only failures with a fix pending". A DECLARED flag
+// turns that one state into a SKIP that says why. The table pins the blast
+// radius: only the unauthenticated branch reads the flag; a locked vault, an
+// unlocked one and a failing sync report exactly as they do without it. The
+// last row pins the other half of "declared": CI-shaped variables without the
+// flag change nothing.
+func TestBWReach_DeclaredNoIdentity(t *testing.T) {
+	declared := map[string]string{noIdentityEnv: "1"}
+	cases := []struct {
+		name     string
+		env      map[string]string // nil → the flag is declared
+		status   string
+		lastSync string
+		live     int
+		syncErr  error
+		wantFail int
+		wantWarn int
+		wantSub  string
+		notSub   string
+	}{
+		{
+			name:   "unauthenticated at exposure 28 → SKIP naming the declaration, no FAIL",
+			status: "unauthenticated", live: 28,
+			wantFail: 0, wantWarn: 0,
+			wantSub: "no Bitwarden identity on this runner (declared via " + noIdentityEnv + ")",
+			notSub:  "bw login",
+		},
+		{
+			name:   "unauthenticated at exposure 0 → SKIP, not the advisory WARN",
+			status: "unauthenticated", live: 0,
+			wantFail: 0, wantWarn: 0,
+			wantSub: "reach verified on real boxes only",
+			notSub:  "no backend:bw secret depends on it yet",
+		},
+		{
+			name:   "locked vault → unchanged: sync age evaluated, token not exercised",
+			status: "locked", lastSync: bwSyncFresh, live: 28,
+			wantFail: 0, wantWarn: 0,
+			wantSub: "token not exercised",
+			notSub:  "declared",
+		},
+		{
+			name:   "locked vault with a stale sync → the BUG-074 WARN still fires",
+			status: "locked", lastSync: bwSyncStale, live: 28,
+			wantFail: 0, wantWarn: 1,
+			wantSub: "BUG-074",
+			notSub:  "declared",
+		},
+		{
+			name:   "unlocked vault, sync fails at exposure 2 → still exactly one FAIL",
+			status: "unlocked", lastSync: bwSyncFresh, live: 2, syncErr: errors.New("exit status 1"),
+			wantFail: 1, wantWarn: 0,
+			wantSub: "invalid_grant",
+			notSub:  "declared",
+		},
+		{
+			name:   "unlocked vault, sync succeeds → reach verified as before",
+			status: "unlocked", lastSync: bwSyncFresh, live: 2,
+			wantFail: 0, wantWarn: 0,
+			wantSub: "reach verified (authenticated sync round-trip)",
+			notSub:  "declared",
+		},
+		{
+			// Declared, never sniffed: CI-shaped variables without the flag leave
+			// an unauthenticated vault at exposure FAILing, as on a real box.
+			name:   "CI=true and GITHUB_ACTIONS=true without the flag → still FAILs, nothing declared",
+			env:    map[string]string{"CI": "true", "GITHUB_ACTIONS": "true"},
+			status: "unauthenticated", live: 28,
+			wantFail: 1, wantWarn: 0,
+			wantSub: "bw login",
+			notSub:  "declared",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env := tc.env
+			if env == nil {
+				env = declared
+			}
+			out, rep := runBWReachWithEnv(t, env, tc.status, tc.lastSync, tc.live, tc.syncErr)
+			if rep.Failures() != tc.wantFail {
+				t.Fatalf("failures = %d, want %d\n%s", rep.Failures(), tc.wantFail, out)
+			}
+			if rep.Warnings() != tc.wantWarn {
+				t.Fatalf("warnings = %d, want %d\n%s", rep.Warnings(), tc.wantWarn, out)
+			}
+			if !strings.Contains(out, tc.wantSub) {
+				t.Fatalf("output missing %q\n%s", tc.wantSub, out)
+			}
+			if strings.Contains(out, tc.notSub) {
+				t.Fatalf("output must not contain %q\n%s", tc.notSub, out)
+			}
+		})
+	}
+}
