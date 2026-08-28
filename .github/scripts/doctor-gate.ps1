@@ -25,6 +25,11 @@ function Test-DoctorGate {
         [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Lines,
         [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Patterns
     )
+    # A list with no entries reaches here as $null, which [string[]] binds as
+    # one null element: it matched nothing and was reported STALE, failing the
+    # gate the moment its last row was retired (WIN-013). Zero rows is the
+    # steady state of a list that only shrinks, so drop empties up front.
+    $Patterns = @($Patterns | Where-Object { $_ })
     $failures = @($Lines | Where-Object { $_ -match '^\s*\[FAIL\]' })
     $unexpected = @($failures | Where-Object {
         $line = $_
@@ -41,7 +46,10 @@ function Test-DoctorGate {
 function Read-KnownFailures {
     param([Parameter(Mandatory)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { return @() }
-    @(Get-Content -LiteralPath $Path | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+    # `return ,$entries` hands the caller a real (possibly empty) array; a bare
+    # @(...) unrolls to nothing and arrives as $null (WIN-013 emptied the list).
+    $entries = @(Get-Content -LiteralPath $Path | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+    return ,$entries
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

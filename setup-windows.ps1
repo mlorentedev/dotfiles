@@ -76,7 +76,12 @@ $DotfilesDir = $PSScriptRoot
 $DotfilesDest = "$env:USERPROFILE\.dotfiles"
 $ClaudeHome = "$env:USERPROFILE\.claude"
 $GeminiHome = "$env:USERPROFILE\.gemini"
-$ScriptsDir = "$env:USERPROFILE\scripts"
+# SCRIPTS_DIR per env-contract.json: under the deploy dir, the same shape as
+# Linux ($HOME/.dotfiles/scripts) and what dotf doctor's contract check, the
+# profile fallback and required_path_entries all expect (WIN-013, #1310). The
+# pre-contract location is kept only to be cleaned.
+$ScriptsDir = "$DotfilesDest\scripts"
+$LegacyScriptsDir = "$env:USERPROFILE\scripts"
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -1716,6 +1721,47 @@ foreach ($initOrphan in @(
 # CLI-050: knowledge-crystallize.ps1 retired — `dotf vault crystallize` is the
 # sole implementation now, and it needs no per-machine deploy step since it
 # ships inside the dotf binary itself.
+
+# WIN-013 (#1310): every script this section deploys now lands in $ScriptsDir
+# (the contract's ~\.dotfiles\scripts). Two kinds of leftovers are removed on
+# every run, idempotently: scripts retired by earlier tickets (measured still
+# present on a real box on 2026-08-27), from both locations; and the live
+# scripts' copies in the pre-contract ~\scripts, which would otherwise shadow
+# nothing today but drift the day one of them changes. The legacy directory
+# itself and the User PATH entry that names it are left alone: pruning a User
+# PATH entry is the 2048-char hazard #148 warned about, and the directory may
+# hold the user's own scripts.
+# MEM-002: claude-mem-heal.ps1 is in this removal list on purpose (the guard
+# tests/guard-no-claude-mem.bats strips MEM-002 cleanup blocks before scanning).
+$retiredScripts = @(
+    "claude-mem-heal.ps1", "claude-session-start.ps1", "diff-check.ps1",
+    "doctor.ps1", "healthcheck.ps1", "knowledge-crystallize.ps1",
+    "session-handoff.ps1")
+$deployedScripts = @(
+    "profile-heal.ps1", "orca-hook-tune.ps1", "windows-defaults.ps1",
+    "dotfiles-sync.ps1", "obs-cli.ps1")
+$removedLeftovers = 0
+foreach ($dir in @($ScriptsDir, $LegacyScriptsDir) | Select-Object -Unique) {
+    foreach ($name in $retiredScripts) {
+        $leftover = Join-Path $dir $name
+        if (Test-Path -LiteralPath $leftover) {
+            Remove-Item -LiteralPath $leftover -Force -ErrorAction SilentlyContinue
+            $removedLeftovers++
+        }
+    }
+}
+if ($LegacyScriptsDir -ne $ScriptsDir) {
+    foreach ($name in $deployedScripts) {
+        $stale = Join-Path $LegacyScriptsDir $name
+        if (Test-Path -LiteralPath $stale) {
+            Remove-Item -LiteralPath $stale -Force -ErrorAction SilentlyContinue
+            $removedLeftovers++
+        }
+    }
+}
+if ($removedLeftovers -gt 0) {
+    Write-Info "Removed $removedLeftovers retired or relocated script(s) from $ScriptsDir / $LegacyScriptsDir (WIN-013)"
+}
 
 # CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired — both session
 # hooks now call agnostic `dotf mem` nouns directly (registered below), so there
