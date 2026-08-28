@@ -15,7 +15,12 @@
     This script detects three corruption signals:
 
       1. Size > 1 MB (healthy profile is ~7 KB; 1 MB is ~140x oversized).
-      2. More than 2 occurrences of the START or END marker.
+      2. More than 1 occurrence of the START or END marker. The SSOT contains
+         neither, so a healthy deployed profile has exactly one pair; setup's
+         splice replaces the first pair only, so a second one is the start of
+         the accumulation. `dotf doctor` flags the same two signals (#531) and
+         --fix runs this script, so the thresholds must agree or doctor would
+         flag a profile this script declines to heal.
       3. PowerShell parser errors when [Parser]::ParseFile is run against it.
 
     When any signal trips, the existing profile is copied to
@@ -114,8 +119,8 @@ function Get-ProfileCorruptionState {
             $endMarker = '# <<< DOTFILES PROFILE <<<'
             $state.StartMarkers = [regex]::Matches($raw, [regex]::Escape($startMarker)).Count
             $state.EndMarkers = [regex]::Matches($raw, [regex]::Escape($endMarker)).Count
-            if ($state.StartMarkers -gt 2 -or $state.EndMarkers -gt 2) {
-                $state.Reasons += "marker counts (start=$($state.StartMarkers), end=$($state.EndMarkers)) exceed 2"
+            if ($state.StartMarkers -gt 1 -or $state.EndMarkers -gt 1) {
+                $state.Reasons += "marker counts (start=$($state.StartMarkers), end=$($state.EndMarkers)) exceed 1"
             }
         } catch {
             $state.Reasons += "unreadable: $($_.Exception.Message)"

@@ -76,7 +76,7 @@ func Run(opts Options) (int, error) {
 		checkVersionedPaths(sys, rep)
 		checkVersionMatch(sys, cfg, rep)
 		checkSymlinks(sys, rep)
-		checkProfileFiles(sys, rep)
+		checkProfileFiles(sys, contract, rep, opts.Fix)
 		checkToolHomeEnvVars(sys, rep)
 		checkOptionalTools(sys, cfg, contract, rep)
 		checkVault(sys, rep)
