@@ -28,6 +28,7 @@ pattern triggers, and workflow integrations.`,
 	cmd.AddCommand(newHarnessResolveCapabilitiesCmd())
 	cmd.AddCommand(newHarnessResolveSkillsCmd())
 	cmd.AddCommand(newHarnessGateCmd())
+	cmd.AddCommand(newHarnessBindCmd())
 	cmd.AddCommand(newHarnessMirrorCmd())
 	return cmd
 }
