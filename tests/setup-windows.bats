@@ -247,6 +247,15 @@ setup() {
     grep -qF 'https://antigravity.google/cli/install.sh' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-windows.ps1 persists the contract variables at User scope after generating paths.ps1 (CLI-058, #1324)" {
+    # paths.ps1 only reaches profile-loading shells; Copilot's -NoProfile tool
+    # calls and Scheduled Tasks read HKCU\Environment, which setup now fills.
+    grep -qF 'dotf env persist' "$PS1_SCRIPT"
+    gen_line=$(grep -n 'dotf env generate | Out-Null' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    persist_line=$(grep -n 'dotf env persist | Out-Null' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ "$gen_line" -lt "$persist_line" ]
+}
+
 @test "setup-windows.ps1 MCP registration checks existence with claude mcp get" {
     grep -q 'claude mcp get' "$PS1_SCRIPT"
 }

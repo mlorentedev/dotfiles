@@ -1879,6 +1879,17 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     } else {
         Write-Warn "dotf env generate failed (profile.ps1 falls back to inline defaults)"
     }
+    # The same values at User scope (HKCU\Environment): paths.ps1 only reaches
+    # shells that load the profile, and Copilot runs its tool calls with
+    # -NoProfile, so DOTFILES_REPO_DIR/DOTFILES_DIR/VAULT_PATH were empty there
+    # and dotf could not find the checkout (CLI-058, #1324). Idempotent: only
+    # values that differ are written.
+    dotf env persist | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Persisted the contract variables at User scope (dotf env persist)"
+    } else {
+        Write-Warn "dotf env persist failed (profile-less processes will not see the contract variables)"
+    }
 }
 
 $syncSource = "$DotfilesDir\scripts\dotfiles-sync.ps1"

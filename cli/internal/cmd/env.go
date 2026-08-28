@@ -25,6 +25,7 @@ func newEnvCmd() *cobra.Command {
 	cmd.AddCommand(newEnvGenerateCmd())
 	cmd.AddCommand(newEnvPathCmd())
 	cmd.AddCommand(newEnvSetCmd())
+	cmd.AddCommand(newEnvPersistCmd())
 	return cmd
 }
 
