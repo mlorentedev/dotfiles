@@ -35,6 +35,16 @@ Describe 'Test-DoctorGate' {
         $r.Stale[0] | Should -Be 'eza not in PATH'
     }
 
+    It 'accepts the blank lines real doctor output carries between sections' {
+        # The sixth gate run died here: the real output, split on newlines,
+        # contains empty elements, and a Mandatory [string[]] rejected them.
+        $real = @('dotf doctor [check]', '', '[Core tools in PATH]', '  [FAIL] wget not in PATH', '', 'Results: 1 passed, 1 failed')
+        $r = Test-DoctorGate -Lines $real -Patterns @('wget not in PATH')
+        $r.Failures.Count | Should -Be 1
+        $r.Unexpected.Count | Should -Be 0
+        $r.Stale.Count | Should -Be 0
+    }
+
     It 'ignores WARN lines: only [FAIL] lines gate' {
         $r = Test-DoctorGate -Lines @('  [WARN] only advisory', 'Results: 1 passed, 0 failed, 1 warned, 0 skipped') -Patterns @()
         $r.Failures.Count | Should -Be 0

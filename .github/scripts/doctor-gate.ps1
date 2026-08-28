@@ -18,8 +18,12 @@
 # pattern matched) and Stale (patterns that matched no failure).
 function Test-DoctorGate {
     param(
-        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Lines,
-        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Patterns
+        # AllowEmptyString on top of AllowEmptyCollection: doctor output has blank
+        # lines between sections, and a Mandatory [string[]] rejects an empty
+        # ELEMENT ("Cannot bind argument ... because it is an empty string") --
+        # the gate died on that with the real output while every fixture passed.
+        [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Lines,
+        [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Patterns
     )
     $failures = @($Lines | Where-Object { $_ -match '^\s*\[FAIL\]' })
     $unexpected = @($failures | Where-Object {
