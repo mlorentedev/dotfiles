@@ -21,7 +21,7 @@ branch `fix/scripts-dir-contract`.
   FAIL lines → 0 unexpected, 0 stale.
 - [x] **AC4** → the MEM-002, CLI-019 and CLI-018 guards refute `Copy-Item.*name`
   and `&.*name` instead of any mention.
-- [ ] **AC5** → CI `test-windows` gate on the PR head (recorded in the PR).
+- [x] **AC5** → CI `test-windows` on `1076ed0` (run 33201808112): `doctor gate: 0 known runner-only FAIL(s), 0 unexpected, 0 stale`. The first run of the PR failed `integration` on the second `setup-linux.sh` run with no output; the re-run with the same setup code passed, and the test now prints the run's last 40 lines so a repeat names itself.
 
 ## Test status
 

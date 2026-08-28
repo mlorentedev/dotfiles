@@ -24,7 +24,7 @@
     "id": "WIN-013-scripts-dir-contract-f4",
     "behavior": "AC5: the test-windows doctor gate passes with 0 known runner-only FAILs",
     "verification": "gh run list --branch fix/scripts-dir-contract --workflow ci.yml --limit 1 --json conclusion --jq '.[0].conclusion' | grep -q success",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "run 33201808112 test-windows: doctor gate: 0 known runner-only FAIL(s), 0 unexpected, 0 stale (2026-08-28)"
   }
 ]
