@@ -38,7 +38,7 @@ branch `feat/copilot-npm-channel`, `dotf` built from the branch.
 
 ## Test status
 
-```
+```text
 go build ./... && go vet ./... && GOOS=windows go vet ./... && GOOS=linux go vet ./... && go test ./internal/doctor/   -> ok
 golangci-lint run ./internal/doctor/...   -> 0 issues
 bats tests/copilot-config.bats tests/setup-windows.bats tests/opencode.bats   -> all ok

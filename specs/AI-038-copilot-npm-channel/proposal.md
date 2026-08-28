@@ -29,7 +29,8 @@ floor) that `dotf tools install` converges on every OS. The winget row is gone
 from `setup-windows.ps1`; both setup scripts keep only the config-deploy block,
 which runs when the binary is on PATH. `dotf doctor` gains a
 "GitHub Copilot CLI" section: version probed once in Go, matched against the
-catalog pin (PASS at or above, FAIL below, SKIP when absent), and a leftover
+catalog pin (exact match PASS, any other version a drift WARN, SKIP when absent —
+the floor semantic belongs to `dotf tools install`, which never downgrades), and a leftover
 winget/scoop copy is reported by the existing shadowed-install WARN. ADR-036's
 table is amended with the date and the measurement.
 
@@ -62,7 +63,7 @@ table is amended with the date and the measurement.
   CLI itself ("User settings belong in settings.json. This file is managed
   automatically."), so the setting belongs to `settings.json`, which the repo
   does not deploy yet and must merge rather than copy.
-- [x] AC3 — `dotf doctor` reports copilot: PASS at/above the pin, FAIL below, WARN on a
+- [x] AC3 — `dotf doctor` reports copilot: PASS at the pin, WARN drift otherwise, WARN on a
   version-less output, SKIP when absent; one row per branch, asserted by status.
 - [x] AC4 — ADR-036's table moves `copilot` to the npm class with a dated amendment.
 - [x] AC5 — on the Windows work box: `dotf tools install` installs the npm copy,
