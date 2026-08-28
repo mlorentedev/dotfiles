@@ -1731,6 +1731,8 @@ foreach ($initOrphan in @(
 # itself and the User PATH entry that names it are left alone: pruning a User
 # PATH entry is the 2048-char hazard #148 warned about, and the directory may
 # hold the user's own scripts.
+# MEM-002: claude-mem-heal.ps1 is in this removal list on purpose (the guard
+# tests/guard-no-claude-mem.bats strips MEM-002 cleanup blocks before scanning).
 $retiredScripts = @(
     "claude-mem-heal.ps1", "claude-session-start.ps1", "diff-check.ps1",
     "doctor.ps1", "healthcheck.ps1", "knowledge-crystallize.ps1",

@@ -458,7 +458,11 @@ setup() {
     # Execute second run
     cd "$REPO_DIR"
     run bash setup-linux.sh
-    [ "$status" -eq 0 ]
+    if [ "$status" -ne 0 ]; then
+        echo "second setup-linux.sh run exited $status; last 40 lines:" >&2
+        printf '%s\n' "$output" | tail -40 >&2
+        return 1
+    fi
 
     # Collect hashes after second run
     find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
