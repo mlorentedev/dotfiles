@@ -64,6 +64,11 @@ setup() {
     [[ -n "$PI_VERSION" ]]
 }
 
+@test "versions.conf sets GIT_VERSION (git-for-windows floor read by dotf doctor, #912)" {
+    . "$VERSIONS_CONF"
+    [[ -n "$GIT_VERSION" ]]
+}
+
 @test "versions.conf all values match semver pattern" {
     while IFS= read -r line; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
