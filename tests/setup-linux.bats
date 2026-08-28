@@ -460,6 +460,23 @@ setup() {
     grep -qF '"$_dotf" harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json
+# declares. Naming one config at the call site meant a new manifest entry
+# (orca-keybindings) was deployed by neither setup until two scripts were
+# edited -- the manifest is the SSOT of what gets deployed, not the call site.
+@test "setup-linux.sh deploys agent configs with bare dotf deploy, naming no config (CLI-054)" {
+    grep -qE '"\$_dotf" deploy( \|\||$)' "$DOTFILES_DIR/setup-linux.sh"
+    # Anchored to the invocation shape (a line that RUNS dotf), not to any
+    # mention: the comment above the call names the old form on purpose.
+    refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh resolves dotf by path for the config deploy, not only by name (#1305 class)" {
+    # Same trap as the harness mirror: the integration container installs dotf
+    # into ~/.local/bin and this process's PATH does not carry it yet.
+    grep -qF '"$_dotf" deploy' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-linux.sh installs the GUARD memory-sink git-hooks (#418 deploy + wire)" {
     grep -qF '. ./scripts/install-git-hooks.sh' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'install_git_hooks' "$DOTFILES_DIR/setup-linux.sh"

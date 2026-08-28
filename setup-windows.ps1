@@ -1220,17 +1220,21 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 }
 Ensure-Directory $piAgentDir
 
-# pi's models.json is deployed by `dotf deploy` (CLI-039): one implementation for
-# every OS, replacing the copy that lived here and its twin in setup-linux.sh.
-# ADR-020 C7 keeps this script on the thin bootstrap; staging, rendering,
-# comparing and installing a config is tooling logic and belongs in the CLI.
+# Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
+# every OS, replacing the per-config copies that lived here and their twins in
+# setup-linux.sh. ADR-020 C7 keeps this script on the thin bootstrap; staging,
+# rendering, comparing and installing a config is tooling logic and belongs in
+# the CLI. The call names NO config: bare `dotf deploy` installs every entry
+# ai/deploy.json declares, so a new entry is a manifest edit and not a change to
+# two setup scripts -- `dotf deploy pi` left orca-keybindings declared and never
+# installed (CLI-054, #1301).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    & dotf deploy pi
+    & dotf deploy
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "dotf deploy pi failed -- run it again after setup, or see 'dotf doctor'"
+        Write-Warn "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
     }
 } else {
-    Write-Warn "dotf not on PATH -- skipping pi config deploy (run install-dotf.ps1, then 'dotf deploy pi')"
+    Write-Warn "dotf not on PATH -- skipping agent config deploy (run install-dotf.ps1, then 'dotf deploy')"
 }
 
 $piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'

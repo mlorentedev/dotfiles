@@ -796,6 +796,24 @@ setup() {
     grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json
+# declares. `& dotf deploy pi` left orca-keybindings declared and never
+# installed on Windows -- the manifest is the SSOT of what gets deployed, and a
+# call site that names one entry silently narrows it.
+@test "setup-windows.ps1 deploys agent configs with bare dotf deploy, naming no config (CLI-054)" {
+    # [[:space:]]*$ rather than \s*$: the .ps1 checks out CRLF everywhere
+    # (.gitattributes), and this grep has no \r escape.
+    grep -qE '^[[:space:]]*& dotf deploy[[:space:]]*$' "$PS1_SCRIPT"
+    # Anchored to the invocation shape (a line that RUNS dotf), not to any
+    # mention: the comment above the call names the old form on purpose.
+    refute_grep '^[[:space:]]*& dotf deploy [a-z]' "$PS1_SCRIPT"
+}
+
+@test "parity: neither setup names a config at its dotf deploy call site (CLI-054)" {
+    refute_grep '^[[:space:]]*& dotf deploy [a-z]' "$PS1_SCRIPT"
+    refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 writes rendered skill files and the copilot catalog through Write-Utf8LfFile, never Set-Content (WIN-008)" {
     # Set-Content joins with CRLF and rewrites the whole file, so the deployed
     # copilot-instructions.md drifted from its LF source on every run (#1289).
