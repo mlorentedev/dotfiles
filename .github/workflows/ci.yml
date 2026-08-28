@@ -334,6 +334,14 @@ jobs:
         run: |
           Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
           Import-Module Pester -MinimumVersion 5.5.0
+          # A later step inherits the runner's original PATH plus GITHUB_PATH only;
+          # the winget Links dir and npm's prefix that setup added to the User
+          # PATH are invisible here, so every suite gated on an installed tool
+          # (copilot-native-skills) computed "absent" at discovery and skipped as
+          # green on every run (TEST-006, #1320). Same helper setup uses.
+          . ./scripts/utils.ps1
+          Sync-SessionPath
+          $env:DOTFILES_CI_EXPECT_COPILOT = '1'
           Invoke-Pester -Path tests -CI
 
       - name: Run PowerShell bats subset (Git Bash, pinned bats)
