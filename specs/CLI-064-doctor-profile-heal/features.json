@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-064-doctor-profile-heal-f1",
+    "behavior": "AC1: a Windows profile over 1 MB or with more than one dotfiles marker pair FAILs naming the heal script; a healthy one PASSes",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckProfileFiles_DetectsBUG020Corruption",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (profileCorruption returns nil) fails it"
+  },
+  {
+    "id": "CLI-064-doctor-profile-heal-f2",
+    "behavior": "AC2: the heal path is <SCRIPTS_DIR>\\profile-heal.ps1 resolved from the env contract, never a literal",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckProfileFiles_HealPathFollowsTheContract",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "CLI-064-doctor-profile-heal-f3",
+    "behavior": "AC3: under --fix the heal runs through the System seam and doctor reports Fix only when the re-read profile carries no signal",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckProfileFiles_FixRunsTheHealAndVerifiesByConsequence",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (profileCorruption returns nil) fails it"
+  },
+  {
+    "id": "CLI-064-doctor-profile-heal-f4",
+    "behavior": "AC4/AC5: profile-heal.ps1 and doctor agree on the marker threshold; the non-Windows branch is unchanged",
+    "verification": "grep -q 'StartMarkers -gt 1' scripts/profile-heal.ps1 && cd cli && go test ./internal/doctor/ -run 'TestCheckProfileFiles$'",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  }
+]

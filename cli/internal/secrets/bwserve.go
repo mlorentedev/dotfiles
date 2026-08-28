@@ -71,9 +71,11 @@ type bwServeEnvelope struct {
 // undocumented behavior of a third-party CLI, not a contract this package
 // controls.
 type bwServeStatusData struct {
-	Status   string `json:"status"` // unauthenticated | locked | unlocked
+	Status   string `json:"status"`   // unauthenticated | locked | unlocked
+	LastSync string `json:"lastSync"` // RFC3339, or empty/null when never synced
 	Template *struct {
-		Status string `json:"status"`
+		Status   string `json:"status"`
+		LastSync string `json:"lastSync"`
 	} `json:"template"`
 }
 
@@ -84,6 +86,47 @@ func (d bwServeStatusData) status() string {
 		return d.Template.Status
 	}
 	return d.Status
+}
+
+// lastSync mirrors status() for the sync timestamp, same shape preference.
+func (d bwServeStatusData) lastSync() string {
+	if d.Template != nil && d.Template.LastSync != "" {
+		return d.Template.LastSync
+	}
+	return d.LastSync
+}
+
+// BWServeStatus is what /status says about the daemon: its lock state and when
+// ITS cache last pulled from the server. LastSync is the daemon's own number,
+// not `bw status`'s — the two caches are independent (BWSyncer's doc), and a
+// read served by the daemon is only as fresh as this timestamp. Zero when the
+// daemon has never synced.
+type BWServeStatus struct {
+	State    string
+	LastSync time.Time
+}
+
+// StatusDetail is Status plus the daemon's lastSync (CLI-056). It is what
+// `dotf secrets unlock` prints after syncing and what doctor's cache-age WARN
+// reads, so the number the operator sees is the one the daemon serves from.
+func (c BWServeClient) StatusDetail() (BWServeStatus, error) {
+	data, err := c.call(http.MethodGet, "/status", nil)
+	if err != nil {
+		return BWServeStatus{}, err
+	}
+	var st bwServeStatusData
+	if err := json.Unmarshal(data, &st); err != nil {
+		return BWServeStatus{}, fmt.Errorf("GET /status: unparseable data: %w", err)
+	}
+	out := BWServeStatus{State: st.status()}
+	if raw := st.lastSync(); raw != "" {
+		ts, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return out, fmt.Errorf("GET /status: lastSync %q is not RFC3339: %w", raw, err)
+		}
+		out.LastSync = ts
+	}
+	return out, nil
 }
 
 // ErrBWServeUnreachable marks a daemon that did not answer at all (not
