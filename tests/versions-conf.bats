@@ -65,8 +65,11 @@ setup() {
 }
 
 @test "versions.conf sets GIT_VERSION (git-for-windows floor read by dotf doctor, #912)" {
+    # The floor, not merely "set": a manifest carrying 2.54.0 would still pass a
+    # non-empty check while doctor's WARN names 2.55.0 (CodeRabbit on #1350).
+    unset GIT_VERSION
     . "$VERSIONS_CONF"
-    [[ -n "$GIT_VERSION" ]]
+    [[ "$GIT_VERSION" == "2.55.0" ]]
 }
 
 @test "versions.conf all values match semver pattern" {
