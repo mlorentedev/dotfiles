@@ -1,0 +1,30 @@
+[
+  {
+    "id": "WIN-013-scripts-dir-contract-f1",
+    "behavior": "AC1: the contract's Windows SCRIPTS_DIR default, required_path_entries.windows[0] and setup-windows.ps1's $ScriptsDir name the same directory",
+    "verification": "bats tests/env-contract.bats -f 'WIN-013'",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "WIN-013-scripts-dir-contract-f2",
+    "behavior": "AC2/AC4: setup removes the retired scripts and the legacy copies without touching the User PATH; the deploy guards measure Copy-Item/invocation, not mention",
+    "verification": "bats tests/setup-windows.bats -f 'WIN-013|MEM-002|CLI-019|CLI-018'",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "WIN-013-scripts-dir-contract-f3",
+    "behavior": "AC3: the gate list carries no WIN-013 row and the gate tooling accepts an empty list",
+    "verification": "! grep -q 'SCRIPTS_DIR' .github/scripts/doctor-gate-known-failures.txt && pwsh -NoProfile -Command 'Invoke-Pester -Path tests/doctor-gate.Tests.ps1 -CI'",
+    "state": "verified",
+    "evidence": "Pester 10/10 on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "WIN-013-scripts-dir-contract-f4",
+    "behavior": "AC5: the test-windows doctor gate passes with 0 known runner-only FAILs",
+    "verification": "gh run list --branch fix/scripts-dir-contract --workflow ci.yml --limit 1 --json conclusion --jq '.[0].conclusion' | grep -q success",
+    "state": "pending",
+    "evidence": ""
+  }
+]

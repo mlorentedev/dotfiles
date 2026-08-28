@@ -151,6 +151,18 @@ setup() {
     refute_grep 'Copy-Item .*init-project\.ps1' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 removes every retired script and the legacy ~\scripts copies of the live ones (WIN-013)" {
+    # Measured on a real box 2026-08-27: seven retired scripts still sat in
+    # ~\scripts because nothing ever removed them. The list is the guard.
+    for name in claude-mem-heal.ps1 claude-session-start.ps1 diff-check.ps1 doctor.ps1 healthcheck.ps1 knowledge-crystallize.ps1 session-handoff.ps1; do
+        grep -qF "\"$name\"" "$PS1_SCRIPT"
+    done
+    grep -qF '$LegacyScriptsDir = "$env:USERPROFILE\scripts"' "$PS1_SCRIPT"
+    grep -qF 'foreach ($dir in @($ScriptsDir, $LegacyScriptsDir)' "$PS1_SCRIPT"
+    # The legacy PATH entry is deliberately not pruned (2048-char hazard, #148).
+    refute_grep 'SetEnvironmentVariable\("PATH".*LegacyScriptsDir' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 no longer deploys knowledge-crystallize.ps1 (CLI-050)" {
     # dotf vault crystallize replaced it (#1269); no per-machine deploy step needed.
     refute_grep 'Copy-Item .*knowledge-crystallize\.ps1' "$PS1_SCRIPT"
@@ -164,7 +176,9 @@ setup() {
 # MEM-002: claude-mem-heal.ps1 is retired (ADR-016 Q2). setup-windows.ps1 must
 # NOT deploy it any more.
 @test "setup-windows.ps1 no longer deploys claude-mem-heal.ps1 (MEM-002)" {
-    refute_grep_fixed 'claude-mem-heal.ps1' "$PS1_SCRIPT"
+    # The name may appear in WIN-013's removal list; never in a deploy or a call.
+    refute_grep 'Copy-Item.*claude-mem-heal\.ps1' "$PS1_SCRIPT"
+    refute_grep '&.*claude-mem-heal\.ps1' "$PS1_SCRIPT"
     [ ! -f "$DOTFILES_DIR/scripts/claude-mem-heal.ps1" ]
 }
 
@@ -617,10 +631,9 @@ setup() {
 # reference diff-check.
 
 @test "CLI-019: setup-windows.ps1 no longer deploys diff-check.ps1" {
-    if grep -qF 'diff-check' "$PS1_SCRIPT"; then
-        echo "diff-check still referenced in setup-windows.ps1" >&2
-        return 1
-    fi
+    # The name may appear in WIN-013's removal list; never in a deploy or a call.
+    refute_grep 'Copy-Item.*diff-check' "$PS1_SCRIPT"
+    refute_grep '&.*diff-check' "$PS1_SCRIPT"
 }
 
 @test "CLI-019: powershell/profile.ps1 dch wraps dotf doctor" {
@@ -635,13 +648,15 @@ setup() {
 @test "CLI-019: production callers no longer reference diff-check" {
     [ ! -f "$DOTFILES_DIR/scripts/diff-check.sh" ]
     [ ! -f "$DOTFILES_DIR/scripts/diff-check.ps1" ]
-    for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
+    for f in setup-linux.sh powershell/profile.ps1 \
              .zsh/aliases.zsh .github/workflows/ci.yml; do
         if grep -qF 'diff-check' "$DOTFILES_DIR/$f"; then
             echo "diff-check still referenced in $f" >&2
             return 1
         fi
     done
+    # setup-windows.ps1 names it only in WIN-013's removal list (guarded above).
+    refute_grep 'Copy-Item.*diff-check' "$PS1_SCRIPT"
 }
 
 # --- CLI-018 (#509): healthcheck.ps1 + doctor.ps1 retired; dotf doctor owns it ---
@@ -656,13 +671,16 @@ setup() {
 }
 
 @test "CLI-018: no production caller references healthcheck.ps1 or doctor.ps1" {
-    for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
+    for f in setup-linux.sh powershell/profile.ps1 \
              .github/workflows/ci.yml; do
         if grep -qE '(healthcheck|doctor)\.ps1' "$DOTFILES_DIR/$f"; then
             echo "(healthcheck|doctor).ps1 still referenced in $f" >&2
             return 1
         fi
     done
+    # setup-windows.ps1 names them only in WIN-013's removal list: never deployed or called.
+    refute_grep 'Copy-Item.*(healthcheck|doctor)\.ps1' "$PS1_SCRIPT"
+    refute_grep '&.*(healthcheck|doctor)\.ps1' "$PS1_SCRIPT"
 }
 
 # --- CLI-018: dotf doctor as the post-setup diagnostic (replaced WIN-001) ---

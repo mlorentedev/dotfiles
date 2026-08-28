@@ -55,6 +55,20 @@ Describe 'Test-DoctorGate' {
         $r = Test-DoctorGate -Lines @('Results: 5 passed, 0 failed, 0 warned, 0 skipped') -Patterns @()
         $r.Unexpected.Count + $r.Stale.Count | Should -Be 0
     }
+
+    It 'a list file with no entries yields zero patterns, not one null that reads as stale' {
+        # The last row was retired (WIN-013) and the reader returned $null,
+        # which [string[]] bound as @($null): one pattern matching no FAIL,
+        # reported STALE, gate red on a fully healthy runner.
+        $p = Join-Path $TestDrive 'empty.txt'
+        Set-Content -Path $p -Value @('# only comments', '', '# and blanks')
+        $patterns = Read-KnownFailures -Path $p
+        @($patterns).Count | Should -Be 0
+        $r = Test-DoctorGate -Lines @('Results: 5 passed, 0 failed, 0 warned, 0 skipped') -Patterns $patterns
+        $r.Stale.Count | Should -Be 0
+        $r = Test-DoctorGate -Lines @('Results: 5 passed, 0 failed, 0 warned, 0 skipped') -Patterns $null
+        $r.Stale.Count | Should -Be 0
+    }
 }
 
 Describe 'Read-KnownFailures' {
@@ -90,7 +104,10 @@ Describe 'Read-KnownFailures' {
             $example = $null
             $checked++
         }
-        $checked | Should -BeGreaterThan 0
+        # Every entry the reader returns was checked; zero entries is a valid
+        # state of a list that only shrinks (WIN-013 + TEST-005 emptied it).
+        $entries = Read-KnownFailures -Path $known
+        $checked | Should -Be $entries.Count
     }
 
     It 'every committed entry is a valid regex and names its ticket in a preceding comment' {

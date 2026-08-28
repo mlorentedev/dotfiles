@@ -45,6 +45,18 @@ setup() {
     done
 }
 
+@test "SCRIPTS_DIR: the Windows default, required_path_entries and setup-windows.ps1 name the same directory (WIN-013)" {
+    # Four values disagreed once (contract default, required_path_entries,
+    # setup's $ScriptsDir, the profile fallback) and doctor failed on every
+    # fresh Windows box; the deploy dir is the one shape they all agree on.
+    default=$(jq -r '.env_vars[] | select(.name == "SCRIPTS_DIR") | .default.windows' "$CONTRACT")
+    entry=$(jq -r '.required_path_entries.windows[0]' "$CONTRACT")
+    [ "$default" = '$env:USERPROFILE\.dotfiles\scripts' ]
+    [ "$entry" = "$default" ]
+    grep -qF '$ScriptsDir = "$DotfilesDest\scripts"' "$BATS_TEST_DIRNAME/../setup-windows.ps1"
+    grep -qF '$DotfilesDest = "$env:USERPROFILE\.dotfiles"' "$BATS_TEST_DIRNAME/../setup-windows.ps1"
+}
+
 @test "each new var validation is path_exists" {
     for name in SCRIPTS_DIR AGY_HOME COPILOT_HOME OPENCODE_HOME; do
         validation=$(jq -r ".env_vars[] | select(.name == \"$name\") | .validation" "$CONTRACT")
