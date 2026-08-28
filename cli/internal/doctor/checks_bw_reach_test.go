@@ -479,15 +479,15 @@ func TestBWReach_UnreadableRegistryDegradesSeverity(t *testing.T) {
 	}
 }
 
-// runBWReachDeclared is runBWReach with the no-identity flag set, and a
+// runBWReachWithEnv is runBWReach with an injected environment and a
 // CommandOutputBounded that can fail `bw sync` on demand — the flag's blast
 // radius is the property under test, so every branch after `unauthenticated`
 // has to be reachable with the flag on.
-func runBWReachDeclared(t *testing.T, status, lastSync string, live int, syncErr error) (string, *Report) {
+func runBWReachWithEnv(t *testing.T, env map[string]string, status, lastSync string, live int, syncErr error) (string, *Report) {
 	t.Helper()
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	sys := newSys(map[string]string{noIdentityEnv: "1"}, []string{"bw"}, nil)
+	sys := newSys(env, []string{"bw"}, nil)
 	sys.BWBackedSecrets = func() (int, error) { return live, nil }
 	sys.CommandOutputBounded = func(_ time.Duration, _ string, args ...string) (string, string, error) {
 		if len(args) > 0 && args[0] == "status" {
@@ -508,10 +508,14 @@ func runBWReachDeclared(t *testing.T, status, lastSync string, live int, syncErr
 // whose contract is "runner-only failures with a fix pending". A DECLARED flag
 // turns that one state into a SKIP that says why. The table pins the blast
 // radius: only the unauthenticated branch reads the flag; a locked vault, an
-// unlocked one and a failing sync report exactly as they do without it.
+// unlocked one and a failing sync report exactly as they do without it. The
+// last row pins the other half of "declared": CI-shaped variables without the
+// flag change nothing.
 func TestBWReach_DeclaredNoIdentity(t *testing.T) {
+	declared := map[string]string{noIdentityEnv: "1"}
 	cases := []struct {
 		name     string
+		env      map[string]string // nil → the flag is declared
 		status   string
 		lastSync string
 		live     int
@@ -563,10 +567,24 @@ func TestBWReach_DeclaredNoIdentity(t *testing.T) {
 			wantSub: "reach verified (authenticated sync round-trip)",
 			notSub:  "declared",
 		},
+		{
+			// Declared, never sniffed: CI-shaped variables without the flag leave
+			// an unauthenticated vault at exposure FAILing, as on a real box.
+			name:   "CI=true and GITHUB_ACTIONS=true without the flag → still FAILs, nothing declared",
+			env:    map[string]string{"CI": "true", "GITHUB_ACTIONS": "true"},
+			status: "unauthenticated", live: 28,
+			wantFail: 1, wantWarn: 0,
+			wantSub: "bw login",
+			notSub:  "declared",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			out, rep := runBWReachDeclared(t, tc.status, tc.lastSync, tc.live, tc.syncErr)
+			env := tc.env
+			if env == nil {
+				env = declared
+			}
+			out, rep := runBWReachWithEnv(t, env, tc.status, tc.lastSync, tc.live, tc.syncErr)
 			if rep.Failures() != tc.wantFail {
 				t.Fatalf("failures = %d, want %d\n%s", rep.Failures(), tc.wantFail, out)
 			}
@@ -580,25 +598,5 @@ func TestBWReach_DeclaredNoIdentity(t *testing.T) {
 				t.Fatalf("output must not contain %q\n%s", tc.notSub, out)
 			}
 		})
-	}
-}
-
-// The flag is declared, never sniffed: with it unset, an unauthenticated vault
-// at exposure keeps FAILing on a real box even when CI-shaped variables are
-// present in the environment.
-func TestBWReach_NoIdentityFlagIsNotSniffedFromCI(t *testing.T) {
-	var buf bytes.Buffer
-	rep := capture(&buf)
-	sys := newSys(map[string]string{"CI": "true", "GITHUB_ACTIONS": "true"}, []string{"bw"},
-		map[string]string{"bw status": bwStatusJSON("unauthenticated", "")})
-	sys.BWBackedSecrets = func() (int, error) { return 28, nil }
-	checkBitwardenReach(sys, rep)
-	rep.Summary()
-
-	if rep.Failures() != 1 {
-		t.Fatalf("CI-shaped env without the declaration must still FAIL; got %d\n%s", rep.Failures(), buf.String())
-	}
-	if strings.Contains(buf.String(), "declared") {
-		t.Fatalf("nothing was declared; got:\n%s", buf.String())
 	}
 }
