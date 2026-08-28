@@ -11,6 +11,8 @@ setup() {
     export CFG="$DOTFILES_DIR/ai/copilot/config.json"
 }
 
+load 'lib/refute'
+
 @test "config.json is valid JSON" {
     jq -e . "$CFG" >/dev/null
 }
@@ -27,8 +29,8 @@ setup() {
 
 @test "copilot is a packages.json catalog tool (npm) and neither setup carries an install block (AI-038, ADR-036)" {
     jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm")' "$DOTFILES_DIR/packages.json" >/dev/null
-    ! grep -qE 'Id = "GitHub\.Copilot"' "$DOTFILES_DIR/setup-windows.ps1"
-    ! grep -qE '(apt|snap|curl)[^\n]*copilot' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'Id = "GitHub\.Copilot"' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep '(apt|snap|curl)[^\n]*copilot' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "config.json carries no \$schema URL (the published one 404s)" {
