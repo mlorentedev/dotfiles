@@ -429,6 +429,48 @@ if ($wingetCmd) {
 }
 
 # ============================================================================
+# 1d. AGENT BINARIES WITH AN OFFICIAL INSTALLER (AI-041, #1325)
+# ============================================================================
+# setup-linux.sh has installed Claude Code (claude.ai/install.sh) and the
+# Antigravity CLI (antigravity.google/cli/install.sh) since ADR-009; Windows
+# never did, so on a clean box every block below that gates on `claude` (MCP
+# registration, plugins, both session hooks) and the agy config deploy were
+# dead until a human installed the binaries by hand. Both vendors ship a
+# Windows installer (install.ps1); ADR-036 class 3 (official installer on every
+# OS, like uv), run in a child pwsh exactly as the uv/Bun installers are, and
+# skipped when the binary is already on PATH - the pattern-setup-script-
+# idempotence shape of the Linux blocks.
+function Install-AgentBinary {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Command,
+        [Parameter(Mandatory)][string]$InstallerUrl,
+        [Parameter(Mandatory)][string]$BinDir
+    )
+    if (Get-Command $Command -ErrorAction SilentlyContinue) {
+        Write-Info "$Name already installed"
+        return
+    }
+    Write-Info "Installing $Name via official installer..."
+    $installer = Join-Path $env:TEMP ("$Command-install.ps1")
+    try {
+        Invoke-RestMethod $InstallerUrl -OutFile $installer
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $installer 2>$null
+        Remove-Item -Path $installer -Force -ErrorAction SilentlyContinue
+        if (($env:PATH -split ';') -notcontains $BinDir) { $env:PATH = "$BinDir;$env:PATH" }
+        if (Get-Command $Command -ErrorAction SilentlyContinue) {
+            Write-Success "$Name installed"
+        } else {
+            Write-Warn "$Name installer ran but '$Command' is not on PATH -- open a new shell or install manually ($InstallerUrl)"
+        }
+    } catch {
+        Write-Warn "$Name install failed -- re-run setup or install manually ($InstallerUrl): $_"
+    }
+}
+Install-AgentBinary -Name "Claude Code" -Command "claude" -InstallerUrl "https://claude.ai/install.ps1" -BinDir "$env:USERPROFILE\.local\bin"
+Install-AgentBinary -Name "Antigravity CLI (agy)" -Command "agy" -InstallerUrl "https://antigravity.google/cli/install.ps1" -BinDir "$env:LOCALAPPDATA\agy\bin"
+
+# ============================================================================
 # 2. DEPLOY CLAUDE CONFIGURATION
 # ============================================================================
 

@@ -232,6 +232,22 @@ setup() {
 }
 
 # MCP registration must check existence before adding, not blindly retry.
+@test "setup-windows.ps1 installs Claude Code and agy via their official installers when absent (AI-041, #1325)" {
+    # setup-linux.sh provisions both; on Windows every block gating on `claude`
+    # and the agy config deploy were dead on a clean box. Child pwsh, skip when
+    # on PATH, before the MCP block that needs the binary.
+    grep -qF 'function Install-AgentBinary' "$PS1_SCRIPT"
+    grep -qF 'https://claude.ai/install.ps1' "$PS1_SCRIPT"
+    grep -qF 'https://antigravity.google/cli/install.ps1' "$PS1_SCRIPT"
+    grep -qF -- '-NoProfile -ExecutionPolicy Bypass -File $installer' "$PS1_SCRIPT"
+    install_line=$(grep -n 'Install-AgentBinary -Name "Claude Code"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -n 'claude mcp get' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ "$install_line" -lt "$mcp_line" ]
+    # parity: the Linux script installs the same two through the same vendors
+    grep -qF 'https://claude.ai/install.sh' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'https://antigravity.google/cli/install.sh' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 MCP registration checks existence with claude mcp get" {
     grep -q 'claude mcp get' "$PS1_SCRIPT"
 }
