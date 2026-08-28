@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
@@ -164,5 +165,42 @@ func TestCheckBWServeDaemon_StatusUnreadable(t *testing.T) {
 
 	if got := buf.String(); !strings.Contains(got, "boom") {
 		t.Fatalf("expected the underlying error surfaced, got: %s", got)
+	}
+}
+
+// CLI-056 (#1316): the daemon's own cache age is reported whenever the daemon
+// answers, from the seam that reads ITS /status — not `bw status`, whose cache
+// is a different one. One row per branch, asserted by status tag.
+func TestCheckBWServeDaemon_CacheAge(t *testing.T) {
+	cases := []struct {
+		name     string
+		status   string
+		lastSync time.Time
+		err      error
+		want     Status
+		needle   string
+	}{
+		{"fresh cache → PASS", "unlocked", fixedTestNow.Add(-2 * 24 * time.Hour), nil, StatusPass, "cache synced 2d ago"},
+		{"eight days old → WARN naming unlock", "unlocked", fixedTestNow.Add(-8 * 24 * time.Hour), nil, StatusWarn, "cache is 8d old"},
+		{"never synced → WARN", "unlocked", time.Time{}, nil, StatusWarn, "never synced"},
+		{"locked daemon still reports its cache", "locked", fixedTestNow.Add(-9 * 24 * time.Hour), nil, StatusWarn, "cache is 9d old"},
+		{"future stamp → WARN clock", "unlocked", fixedTestNow.Add(24 * time.Hour), nil, StatusWarn, "in the future"},
+		{"status unreadable → WARN", "unlocked", time.Time{}, errors.New("dial tcp: refused"), StatusWarn, "cache age unreadable"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dotfiles := t.TempDir()
+			writeBWServeTrace(t, dotfiles, 4242, "")
+			sys := bwServeSys(tc.status, true)
+			sys.BWServeLastSync = func() (time.Time, error) { return tc.lastSync, tc.err }
+			var buf bytes.Buffer
+			rep := capture(&buf)
+
+			checkBWServeDaemon(sys, &Config{DotfilesDir: dotfiles}, rep)
+
+			if got := statusOfLine(buf.String(), tc.needle); got != tc.want {
+				t.Fatalf("line mentioning %q: status %q, want %q\n%s", tc.needle, tagOf(got), tagOf(tc.want), buf.String())
+			}
+		})
 	}
 }

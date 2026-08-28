@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,16 +17,27 @@ import (
 // fakeBWServeHandler mirrors the internal/secrets package's fake — kept
 // local (not exported from there) since only this package's command tests
 // need an httptest double of bw serve's REST API.
-func fakeBWServeHandler(t *testing.T, status *string, unlockPassword string) http.HandlerFunc {
+func fakeBWServeHandler(t *testing.T, status *string, unlockPassword string, sync *fakeSync) http.HandlerFunc {
 	t.Helper()
+	if sync == nil {
+		sync = &fakeSync{}
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/status":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"success": true,
-				"data":    map[string]string{"status": *status},
+				"data":    map[string]string{"status": *status, "lastSync": sync.lastSync},
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/sync":
+			if sync.fail {
+				_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "sync failed: server unreachable"})
+				return
+			}
+			sync.calls++
+			sync.lastSync = fakeSyncStamp
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"object": "message", "title": "Syncing complete."}})
 		case r.Method == http.MethodPost && r.URL.Path == "/unlock":
 			var body struct {
 				Password string `json:"password"`
@@ -46,6 +58,19 @@ func fakeBWServeHandler(t *testing.T, status *string, unlockPassword string) htt
 	}
 }
 
+// fakeSync is what the fake daemon saw on POST /sync (CLI-056): unlock must
+// sync exactly once after a successful unlock and never after a failed one,
+// and a failed sync must surface as an error rather than a stale cache.
+type fakeSync struct {
+	calls    int
+	fail     bool
+	lastSync string // what /status reports; empty until the first sync
+}
+
+// fakeSyncStamp is the lastSync the fake daemon reports after a sync, so the
+// confirmation line can be asserted byte-for-byte.
+const fakeSyncStamp = "2026-08-28T02:26:00Z"
+
 // fakeDaemonPID is the pid the fake daemon's trace records, so a test can
 // assert unlock/lock print it (#1315) without a process behind it.
 const fakeDaemonPID = 4242
@@ -55,7 +80,17 @@ const fakeDaemonPID = 4242
 // leaves behind. It returns the state so tests can assert on its paths.
 func withFakeDaemon(t *testing.T, status *string, unlockPassword string) secrets.BWServeState {
 	t.Helper()
-	srv := httptest.NewServer(fakeBWServeHandler(t, status, unlockPassword))
+	state, _ := withFakeDaemonSync(t, status, unlockPassword, nil)
+	return state
+}
+
+// withFakeDaemonSync is withFakeDaemon plus the sync ledger (CLI-056).
+func withFakeDaemonSync(t *testing.T, status *string, unlockPassword string, sync *fakeSync) (secrets.BWServeState, *fakeSync) {
+	t.Helper()
+	if sync == nil {
+		sync = &fakeSync{}
+	}
+	srv := httptest.NewServer(fakeBWServeHandler(t, status, unlockPassword, sync))
 	t.Cleanup(srv.Close)
 	state := secrets.NewBWServeState(t.TempDir())
 	if err := state.WritePID(fakeDaemonPID); err != nil {
@@ -69,7 +104,7 @@ func withFakeDaemon(t *testing.T, status *string, unlockPassword string) secrets
 		}
 	}
 	t.Cleanup(func() { bwDaemonAddr = old })
-	return state
+	return state, sync
 }
 
 // assertTrace is AC3 of CLI-057: a confirmation line names the daemon's pid
@@ -222,5 +257,57 @@ func TestSecretsUnlock_NoPIDFileIsSaidNotGuessed(t *testing.T) {
 	}
 	if strings.Contains(out, "pid 4242") {
 		t.Fatalf("a removed pid file must not be reported as a pid, got: %q", out)
+	}
+}
+
+// CLI-056 (#1316): unlock syncs the daemon's vault cache, once, after a
+// successful unlock — the daemon then serves current items, not the cache it
+// booted with. Rows: correct password → one sync and the stamp in the
+// confirmation; already unlocked → still one sync (idempotent unlock, fresh
+// cache); wrong password → no sync; sync failure → an error that never carries
+// the password.
+func TestSecretsUnlock_SyncsTheDaemonCache(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     string
+		typed      string
+		syncFail   bool
+		wantErr    bool
+		wantCalls  int
+		wantSubstr string
+	}{
+		{"correct password syncs once", "locked", "hunter2", false, false, 1, "unlocked, vault cache synced at " + fakeSyncStamp},
+		{"already unlocked still syncs", "unlocked", "", false, false, 1, "already unlocked, vault cache synced at " + fakeSyncStamp},
+		{"wrong password never syncs", "locked", "wrong", false, true, 0, ""},
+		{"sync failure is an error", "locked", "hunter2", true, true, 0, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			status := tc.status
+			_, sync := withFakeDaemonSync(t, &status, "hunter2", &fakeSync{fail: tc.syncFail})
+			withFakePassword(t, tc.typed, nil)
+
+			out, errOut, err := runUnlock(t)
+
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v, wantErr %v\n%s", err, tc.wantErr, out)
+			}
+			if sync.calls != tc.wantCalls {
+				t.Errorf("POST /sync calls = %d, want %d", sync.calls, tc.wantCalls)
+			}
+			if tc.wantSubstr != "" && !strings.Contains(out, tc.wantSubstr) {
+				t.Errorf("stdout must carry %q, got %q", tc.wantSubstr, out)
+			}
+			if tc.typed != "" {
+				for _, s := range []string{out, errOut, fmt.Sprint(err)} {
+					if strings.Contains(s, tc.typed) {
+						t.Errorf("the password leaked into the output: %q", s)
+					}
+				}
+			}
+			if tc.syncFail && !strings.Contains(fmt.Sprint(err), "vault sync failed") {
+				t.Errorf("a failed sync must be named as such, got: %v", err)
+			}
+		})
 	}
 }

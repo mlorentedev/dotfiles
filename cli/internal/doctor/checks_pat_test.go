@@ -67,7 +67,7 @@ func TestCheckPATExpiry_Classification(t *testing.T) {
 		wantSubstr   string
 	}{
 		// The probe branches.
-		{"http 401 → FAIL", 401, nil, false, nil, "", 1, "token invalid or expired (HTTP 401)"},
+		{"http 401 → FAIL", 401, nil, false, nil, "", 1, "token rejected (HTTP 401)"},
 		{"expiry within threshold → WARN", 200, days(5), false, nil, "", 0, "expires in 5 day(s)"},
 		{"valid with runway → PASS", 200, days(60), false, nil, "", 0, "valid, expires in 60 day(s)"},
 		{"network error → WARN", 0, nil, true, nil, "", 0, "could not reach api.github.com"},
