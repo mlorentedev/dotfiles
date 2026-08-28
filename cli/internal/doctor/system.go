@@ -102,6 +102,12 @@ type System struct {
 	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
 	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
 	BWServeStatus func() (string, error)
+	// ProcessAlive reports whether pid names a live process (secrets.ProcessAlive
+	// in production: signal 0 on Unix, OpenProcess + GetExitCodeProcess on
+	// Windows). It is what lets the bw serve check tell "the daemon died" from
+	// "the daemon was never started": a pid file with nothing listening is the
+	// only trace a detached daemon leaves behind (#1315).
+	ProcessAlive func(pid int) bool
 	// ResolveSecret resolves ONE registry entry to its plaintext value through the
 	// same Loader `dotf secrets run` uses. It exists because the PAT-expiry check
 	// used to read its token from the ambient environment, which ADR-028
@@ -199,6 +205,7 @@ func realSystem() *System {
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
+		ProcessAlive:  secrets.ProcessAlive,
 		ResolveSecret: resolveSecret,
 		BWItemNames: func() ([]string, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemNames()
