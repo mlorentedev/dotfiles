@@ -140,8 +140,8 @@ func vaultHealth(vaultRoot, vaultName, scriptsDir string) string {
 	// `bash <script>` (no `-c`): the script path is a trusted env-contract location,
 	// not user input, and is passed as an argv element, so there is no shell-metachar
 	// injection surface. This is the faithful port of the shell's `bash "$vault_health"`.
-	// resolveBash, not a bare "bash", so Windows does not pick System32's WSL launcher.
-	cmd := exec.Command(resolveBash(), script)
+	// ResolveBash, not a bare "bash", so Windows does not pick System32's WSL launcher.
+	cmd := exec.Command(ResolveBash(), script)
 	cmd.Env = append(os.Environ(), "VAULT_DIR="+vaultRoot, "VAULT_NAME="+vaultName)
 	out, err := cmd.CombinedOutput()
 	healthExit := 0
@@ -332,8 +332,10 @@ func isExecutable(path string) bool {
 	return info.Mode()&0o111 != 0
 }
 
-// resolveBash returns the bash interpreter used to run vault-health.sh. It deliberately
-// avoids Windows' System32\bash.exe — that path is the WSL launcher, which is a broken
+// ResolveBash returns the bash interpreter used to run vault-health.sh (and,
+// via internal/vault's `dotf vault health` port, its two backlog-script
+// exec seams — CLI-021 increment 2). It deliberately avoids Windows'
+// System32\bash.exe — that path is the WSL launcher, which is a broken
 // stub when no distro is installed (it fails with "execvpe(/bin/bash) failed") and, even
 // when WSL works, cannot read a Windows-path script argument (WSL sees /mnt/c/...).
 // dotfiles installs Git Bash; that is the interpreter that can run a Windows-path script.
@@ -341,7 +343,7 @@ func isExecutable(path string) bool {
 // Resolution order: $DOTF_BASH (explicit override) → the first bash on PATH that is not
 // the System32 WSL launcher → a bare "bash" fallback (PATH resolution — Linux/macOS have
 // no System32 ambiguity, so this matches the previous behaviour there).
-func resolveBash() string {
+func ResolveBash() string {
 	if b := os.Getenv("DOTF_BASH"); b != "" {
 		return b
 	}
