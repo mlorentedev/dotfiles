@@ -57,11 +57,42 @@ def roster_rows(path: str) -> dict:
     return rows
 
 
+class UnreadableSkills(Exception):
+    """A `skills:` key this guard can see but cannot parse."""
+
+
 def definition_skills(path: str):
-    """Frontmatter only; a regex on the skills line avoids a yaml dependency."""
+    """Frontmatter only; a regex on the skills line avoids a yaml dependency.
+
+    A `skills:` key that is PRESENT but not in the inline form raises rather than
+    returning []. The two are indistinguishable downstream -- both compare an
+    empty list against the roster and both satisfy the >= SKILLS_MIN check by
+    failing it for the wrong reason -- and they mean opposite things. HARNESS-045
+    introduces a block form carrying per-skill severity:
+
+        skills:
+          - id: audit
+            enforce: block
+
+    Under the old `... if skills else []` this guard read that as "declares no
+    skills" and kept reporting exit 0, so the drift check HARNESS-046 exists to
+    provide would have been disarmed by a schema change it never noticed.
+    Measured 2026-08-27. Parsing the block form here would make this the THIRD
+    hand-rolled frontmatter reader in the repository; refusing loudly instead
+    means whoever migrates the definitions has to come back and do it once, in
+    `dotf harness resolve-skills`, where the parser already lives.
+    """
     head = open(path, encoding="utf-8").read().split("---")[1]
     kind = re.search(r"^kind:\s*(\S+)", head, re.M)
     skills = re.search(r"^skills:\s*\[(.*?)\]", head, re.M | re.S)
+    if skills is None and re.search(r"^skills:", head, re.M):
+        raise UnreadableSkills(
+            f"{path}: declares `skills:` in a form this guard cannot read "
+            "(expected the inline `skills: [a, b]`). Refusing to report it as an "
+            "empty skill list -- that would compare 'no skills' against the roster "
+            "and pass. Teach this guard the new form, or use "
+            "`dotf harness resolve-skills`."
+        )
     return (
         kind.group(1) if kind else "",
         [s.strip() for s in skills.group(1).split(",") if s.strip()] if skills else [],
@@ -78,7 +109,11 @@ def main() -> int:
         agent_md = os.path.join(defs_dir, name, "AGENT.md")
         if not os.path.isfile(agent_md):
             continue
-        kind, skills = definition_skills(agent_md)
+        try:
+            kind, skills = definition_skills(agent_md)
+        except UnreadableSkills as exc:
+            errors.append(str(exc))
+            continue
         if kind != "invocable":
             continue  # autonomous entries are cataloged separately, not in the phase table
 
