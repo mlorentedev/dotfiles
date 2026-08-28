@@ -587,6 +587,54 @@ skill_field() {
         n>=2 { exit }' "$1"
 }
 
+# Print the forced-skill list one agent record declares, or nothing.
+#
+# Same three-outcome shape as agent_model_line and agent_capability_line, and
+# delegated to `dotf` for the same reason: skill_field reads the INLINE
+# frontmatter form only, so a record declaring `skills:` as a block list returns
+# EMPTY here and the presence block renders "MUST consume: none". That is not a
+# degraded render, it is enforcement removed — on every harness at once, silently.
+# `dotf harness resolve-skills` reads both forms through the persona loader's real
+# YAML parser, so the shape lives in Go once instead of being re-hand-rolled in
+# awk. Verified byte-identical to skill_field across all 7 records, 2026-08-27.
+#
+# The degrade is where this differs from its two siblings, and the difference is
+# the whole point. A stale or absent dotf falls back to the awk read, which is
+# correct for a legacy record and CATASTROPHIC for a migrated one — it is exactly
+# the silent disarm above. So the fallback carries the block-form guard that
+# agent_capability_line established for `capabilities:`, on the identical
+# reasoning one field over: an empty skill list is not "no opinion", it is
+# "nothing enforced".
+agent_skills_line() {
+    local record="$1" rc=0 line
+    type -P dotf >/dev/null 2>&1 || rc=2
+    if [ "$rc" -eq 0 ] && ! dotf_knows_subcommand resolve-skills; then rc=2; fi
+    if [ "$rc" -eq 0 ]; then
+        line="$(dotf harness resolve-skills "$record")" || rc=1
+    fi
+    case "$rc" in
+        0) printf '%s\n' "$line" ;;
+        1) printf '[ERROR] %s declares a `skills:` list that cannot be resolved\n' "$record" >&2
+           return 1 ;;
+        2) line="$(skill_field "$record" skills)"
+           if [ -z "$line" ] && record_has_block_skills "$record"; then
+               printf '[ERROR] %s declares `skills:` in YAML block style, and dotf is absent or\n' "$record" >&2
+               printf '        predates resolve-skills, so this renderer cannot read it. Rendering\n' >&2
+               printf '        "MUST consume: none" would DISARM the persona rather than describe it\n' >&2
+               printf '        -- rebuild dotf and re-run --deploy\n' >&2
+               return 1
+           fi
+           printf '%s\n' "$line" ;;
+    esac
+}
+
+# True when a record declares `skills:` with nothing after the colon -- the YAML
+# block form. Shared by the guard above and its test; a bare `skills:` key with an
+# empty value is the one case skill_field cannot distinguish from "no key at all".
+record_has_block_skills() {
+    awk '/^---[[:space:]]*$/{n++; next} n==1 && /^skills:[[:space:]]*$/{found=1} n>=2{exit} END{exit !found}' "$1"
+}
+
 # Build a markdown skill catalog (one bullet per skill targeting <agent>), for
 # agents with no per-skill mechanism (e.g. copilot's single instructions file).
 # Deterministic order (glob sorts). Args: <record_dir> <agent>
@@ -1013,7 +1061,7 @@ build_agent_presence() {
             printf 'When acting as one, you MUST consume its skills.\n\n'
             first=0
         fi
-        skills_line="$(skill_field "$ag_dir/AGENT.md" skills)"
+        skills_line="$(agent_skills_line "$ag_dir/AGENT.md")" || return 1
         printf -- '- **%s** — MUST consume: %s\n' "$name" "${skills_line:-none}"
     done
 }

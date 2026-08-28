@@ -11,7 +11,29 @@
     "kind": { "type": "string", "enum": ["invocable", "autonomous"], "description": "invocable = no 80_agents/ state; autonomous = persona cataloged here, live state in 80_agents/<name>/." },
     "model": { "type": "string", "description": "Neutral tier (top|mid|low); resolved to this harness's model id at deploy via harness/model-map.json, and emitted into the rendered frontmatter (#1161). A tier the map cannot answer fails the render rather than dropping the field — a definition naming no model is the degrade the routing registry exists to prevent (ADR-035). Absent = rendered with no model line." },
     "capabilities": { "description": "Neutral capability vocab (e.g. [read, search, edit, shell, web]); mapped to provider tools via capability-map at compile (H-044)." },
-    "skills": { "description": "Forced-consumption skills; compiled to the harness determinism hook (presence/action/dispatch)." },
+    "skills": {
+      "description": "Forced-consumption skills; compiled to the harness determinism hook (presence/action/dispatch). TWO FORMS, both accepted during the HARNESS-045 migration: the legacy flat list carries no severity and the gate refuses to act on it, while the mapping form declares per-skill `enforce` and is what makes a persona binding rather than merely present. NOTE, measured 2026-08-27: compile-harness.sh's validate_skill_frontmatter evaluates `required` keys ONLY and does not read the constraints below, so this subschema is the SSOT for the SHAPE (cli/internal/harness.parseSkills implements it, dotf harness resolve-skills serves it) and is NOT itself an enforced guard here.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Legacy: skills: [audit, cyclomatic-complexity]. No severity, so the gate will not act on these; `dotf harness gate` reports them as unmigrated rather than defaulting, because a default of `warn` would render every gate silently inert and a default of `block` would turn every existing skill into a hard gate at once."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "enforce"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "enforce": { "type": "string", "enum": ["block", "warn"], "description": "block stops the tool call; warn emits and allows. Required: an entry declaring no severity is refused, never defaulted." }
+            },
+            "additionalProperties": false
+          },
+          "description": "Mapping form: a list of {id, enforce}. Severity is consumed by `dotf harness gate` and deliberately never reaches the presence text, which is character-capped."
+        }
+      ]
+    },
     "targets": { "description": "Optional per-agent harness allowlist (e.g. [claude]); absent = all harnesses." },
     "id": { "type": "string" },
     "type": { "type": "string" },
