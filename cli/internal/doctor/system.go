@@ -102,6 +102,20 @@ type System struct {
 	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
 	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
 	BWServeStatus func() (string, error)
+	// BWServeLastSync returns when the daemon's OWN cache last pulled from the
+	// server (secrets.BWServeClient.StatusDetail in production); zero when it
+	// never has. It is a different number from BWLastSync — `bw status` reports
+	// the CLI's cache, and the two sync independently (secrets.BWSyncer) — and
+	// it is the one that decides what a daemon-served read returns: on the
+	// Windows work box a 12-day-old daemon cache resolved a rotated PAT to its
+	// old value and doctor called the token dead (CLI-056, #1316).
+	BWServeLastSync func() (time.Time, error)
+	// ProcessAlive reports whether pid names a live process (secrets.ProcessAlive
+	// in production: signal 0 on Unix, OpenProcess + GetExitCodeProcess on
+	// Windows). It is what lets the bw serve check tell "the daemon died" from
+	// "the daemon was never started": a pid file with nothing listening is the
+	// only trace a detached daemon leaves behind (#1315).
+	ProcessAlive func(pid int) bool
 	// ResolveSecret resolves ONE registry entry to its plaintext value through the
 	// same Loader `dotf secrets run` uses. It exists because the PAT-expiry check
 	// used to read its token from the ambient environment, which ADR-028
@@ -199,6 +213,11 @@ func realSystem() *System {
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
+		BWServeLastSync: func() (time.Time, error) {
+			st, err := secrets.BWServeClient{}.StatusDetail()
+			return st.LastSync, err
+		},
+		ProcessAlive:  secrets.ProcessAlive,
 		ResolveSecret: resolveSecret,
 		BWItemNames: func() ([]string, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemNames()

@@ -71,9 +71,11 @@ type bwServeEnvelope struct {
 // undocumented behavior of a third-party CLI, not a contract this package
 // controls.
 type bwServeStatusData struct {
-	Status   string `json:"status"` // unauthenticated | locked | unlocked
+	Status   string `json:"status"`   // unauthenticated | locked | unlocked
+	LastSync string `json:"lastSync"` // RFC3339, or empty/null when never synced
 	Template *struct {
-		Status string `json:"status"`
+		Status   string `json:"status"`
+		LastSync string `json:"lastSync"`
 	} `json:"template"`
 }
 
@@ -84,6 +86,47 @@ func (d bwServeStatusData) status() string {
 		return d.Template.Status
 	}
 	return d.Status
+}
+
+// lastSync mirrors status() for the sync timestamp, same shape preference.
+func (d bwServeStatusData) lastSync() string {
+	if d.Template != nil && d.Template.LastSync != "" {
+		return d.Template.LastSync
+	}
+	return d.LastSync
+}
+
+// BWServeStatus is what /status says about the daemon: its lock state and when
+// ITS cache last pulled from the server. LastSync is the daemon's own number,
+// not `bw status`'s — the two caches are independent (BWSyncer's doc), and a
+// read served by the daemon is only as fresh as this timestamp. Zero when the
+// daemon has never synced.
+type BWServeStatus struct {
+	State    string
+	LastSync time.Time
+}
+
+// StatusDetail is Status plus the daemon's lastSync (CLI-056). It is what
+// `dotf secrets unlock` prints after syncing and what doctor's cache-age WARN
+// reads, so the number the operator sees is the one the daemon serves from.
+func (c BWServeClient) StatusDetail() (BWServeStatus, error) {
+	data, err := c.call(http.MethodGet, "/status", nil)
+	if err != nil {
+		return BWServeStatus{}, err
+	}
+	var st bwServeStatusData
+	if err := json.Unmarshal(data, &st); err != nil {
+		return BWServeStatus{}, fmt.Errorf("GET /status: unparseable data: %w", err)
+	}
+	out := BWServeStatus{State: st.status()}
+	if raw := st.lastSync(); raw != "" {
+		ts, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return out, fmt.Errorf("GET /status: lastSync %q is not RFC3339: %w", raw, err)
+		}
+		out.LastSync = ts
+	}
+	return out, nil
 }
 
 // ErrBWServeUnreachable marks a daemon that did not answer at all (not
@@ -383,6 +426,11 @@ type BWServeDaemon struct {
 
 	Client BWServeClient // talks to the daemon once it's up
 
+	// State is where the daemon's stdout+stderr and pid land (bwserve_state.go,
+	// #1315). The zero value records nothing — tests of the HTTP half need no
+	// filesystem — and production always sets it (cmd.bwDaemonAddr).
+	State BWServeState
+
 	// newCmd is the process-construction seam, overridable in tests so
 	// Start()'s retry/timeout behavior is testable without a real bw binary.
 	// nil -> bwServeCommand.
@@ -418,8 +466,7 @@ func (d *BWServeDaemon) Start(pollTimeout time.Duration) error {
 	if d.Running() {
 		return nil
 	}
-	cmd := d.command()
-	if err := cmd.Start(); err != nil {
+	if err := d.spawn(d.command()); err != nil {
 		return fmt.Errorf("start bw serve: %w", err)
 	}
 	deadline := time.Now().Add(pollTimeout)
@@ -430,6 +477,38 @@ func (d *BWServeDaemon) Start(pollTimeout time.Duration) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("bw serve did not become reachable within %s", pollTimeout)
+}
+
+// spawn starts cmd with its stdout+stderr appended to the state log and
+// records its pid — the trace #1315 found missing. With no State it is the
+// bare cmd.Start() it used to be.
+//
+// The log is handed to the child as an *os.File on purpose: os/exec then
+// connects the descriptor directly, with no copying goroutine in THIS process,
+// which is what lets `dotf` exit while the detached daemon keeps writing. Our
+// own handle is closed once the child holds its copy.
+func (d *BWServeDaemon) spawn(cmd *exec.Cmd) error {
+	if !d.State.enabled() {
+		return cmd.Start()
+	}
+	logf, err := d.State.openLog()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = logf.Close() }()
+	cmd.Stdout = logf
+	cmd.Stderr = logf
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	pid := cmd.Process.Pid
+	markStart(logf, pid, time.Now())
+	if err := d.State.WritePID(pid); err != nil {
+		// The daemon IS running; failing here is loud rather than silent, and
+		// the log's start marker still names the pid for whoever reads it.
+		return fmt.Errorf("bw serve started (pid %d) but its trace is incomplete: %w", pid, err)
+	}
+	return nil
 }
 
 // Unlock delegates to the client — see BWServeClient.Unlock's contract.

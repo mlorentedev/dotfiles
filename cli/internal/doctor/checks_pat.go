@@ -152,7 +152,10 @@ func probePATSecret(sys *System, s patSecret, warnDays int, rep *Report) {
 	case err != nil:
 		rep.Warn(fmt.Sprintf("%s: could not reach api.github.com (%v) — liveness check skipped", s.name, err))
 	case status == http.StatusUnauthorized:
-		rep.Fail(fmt.Sprintf("%s: token invalid or expired (HTTP 401) — rotate it", s.name))
+		// A 401 is also what a STALE VAULT CACHE looks like: the daemon served
+		// the token's previous value (CLI-056, #1316). Name that first — it is
+		// the cheaper and, measured once, the likelier cause.
+		rep.Fail(fmt.Sprintf("%s: token rejected (HTTP 401) — if the vault cache is stale run `dotf secrets unlock` (it syncs); otherwise rotate it", s.name))
 	case status != http.StatusOK:
 		rep.Warn(fmt.Sprintf("%s: unexpected HTTP %d from api.github.com — liveness inconclusive", s.name, status))
 	default:

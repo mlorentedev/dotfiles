@@ -260,3 +260,5 @@ tags: [lessons, index, dotfiles]
 | [239 - Re-measure a filed bug on the current toolchain before implementing its fix](lesson-239-re-measure-a-filed-bug-on-the-current-toolchain-before.md) | 2026-08-27 |  |
 | [240 - A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off](lesson-240-a-partial-mirror-the-code-believes-absent-the-check.md) | 2026-08-27 |  |
 | [241 - Re-running a command just to print what it already told you inherits its exit status, silently, under `pipefail`](lesson-241-re-running-a-command-just-to-print-what-it-already.md) | 2026-08-27 |  |
+| [242 - A process nobody can watch must leave its own trace, and the redirect has to survive the parent](lesson-242-a-process-nobody-can-watch-must-leave-its-own-trace.md) | 2026-08-27 |  |
+| [243 - A guard that reads a cache reports the cache's age as the credential's health](lesson-243-a-guard-that-reads-a-cache-reports-the-cache-not-the-credential.md) | 2026-08-28 |  |

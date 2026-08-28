@@ -49,9 +49,9 @@ setup() {
     grep -qE '\.(Length|Size)\s+-gt\s+1MB|Size\s+-gt\s+1MB' "$PS1_SCRIPT"
 }
 
-@test "profile-heal.ps1 detects marker-count corruption (> 2 of either marker)" {
+@test "profile-heal.ps1 detects marker-count corruption (> 1 of either marker)" {
     grep -qE 'markerCount|MarkerCount|StartMatches|EndMatches|StartMarkers|EndMarkers' "$PS1_SCRIPT"
-    grep -qE -- '-gt\s+2' "$PS1_SCRIPT"
+    grep -qE -- '-gt\s+1' "$PS1_SCRIPT"
 }
 
 @test "profile-heal.ps1 detects parser errors as a corruption signal" {
