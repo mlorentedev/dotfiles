@@ -404,39 +404,77 @@ func TestCheckTmux(t *testing.T) {
 	})
 }
 
-func TestCheckOptionalTools_DotfDrift(t *testing.T) {
-	cfg := &Config{Versions: map[string]string{"DOTF_VERSION": "0.2.0"}}
-	var buf bytes.Buffer
-	rep := capture(&buf)
-	checkOptionalTools(
-		newSys(nil, []string{"dotf", "gh"}, map[string]string{"dotf version": "dotf version 0.1.0"}),
-		cfg, nil, rep)
-	// FAIL, not WARN (OPS-025/#869): a stale dotf binary silently carries none of
-	// the guards merged since it was built, so drift here must be loud.
-	if rep.Failures() != 1 {
-		t.Errorf("dotf version drift must FAIL\n%s", buf.String())
+// dotf's version-pin match, one row per branch (OPS-025/#869, TEST-003/#1298).
+// The status tag is the contract, not the message: a stale RELEASE binary FAILs
+// because it silently carries none of the guards merged since it was built; a
+// source build ("dev", cli/cmd/dotf/main.go's default) SKIPs because the pin
+// exists to catch a stale release, and CI runs the PR's own build.
+func TestCheckOptionalTools_DotfVersion(t *testing.T) {
+	cases := []struct {
+		name, installed string
+		want            Status
+	}{
+		{"exact pin", "0.2.0", StatusPass},
+		{"stale release", "0.1.0", StatusFail},
+		{"source build", "dev", StatusSkip},
 	}
-	if !strings.Contains(buf.String(), "dotf version drift") {
-		t.Errorf("expected dotf drift failure\n%s", buf.String())
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &Config{Versions: map[string]string{"DOTF_VERSION": "0.2.0"}}
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkOptionalTools(
+				newSys(nil, []string{"dotf", "gh"}, map[string]string{"dotf version": "dotf version " + tc.installed}),
+				cfg, nil, rep)
+			if got := statusOfLine(buf.String(), "dotf"); got != tc.want {
+				t.Errorf("dotf %s: status %q, want %q\n%s", tc.installed, statusTag[got], statusTag[tc.want], buf.String())
+			}
+		})
 	}
 }
 
-// A source build reports "dev" (cli/cmd/dotf/main.go). It is deliberate on a
-// dev box and is what CI runs after building the PR under test; the pin exists
-// to catch a stale RELEASE, so this is a SKIP with the reason, never drift.
-func TestCheckOptionalTools_DotfSourceBuildIsNotDrift(t *testing.T) {
-	cfg := &Config{Versions: map[string]string{"DOTF_VERSION": "0.2.0"}}
-	var buf bytes.Buffer
-	rep := capture(&buf)
-	checkOptionalTools(
-		newSys(nil, []string{"dotf", "gh"}, map[string]string{"dotf version": "dotf version dev"}),
-		cfg, nil, rep)
-	if rep.Failures() != 0 {
-		t.Errorf("a dev build must not be reported as drift\n%s", buf.String())
+// The .exe probe follows the injected platform, never the test host's: a
+// JAVA_HOME holding only bin/java.exe is a real install on Windows (the GitHub
+// runner's toolcache, TEST-003/#1298) and a missing binary anywhere else.
+func TestCheckVersionedPaths_ExeFollowsInjectedGOOS(t *testing.T) {
+	home := t.TempDir()
+	writeExec(t, filepath.Join(home, "bin", "java.exe"))
+	cases := []struct {
+		goos string
+		want Status
+	}{
+		{"windows", StatusPass},
+		{"linux", StatusFail},
 	}
-	if !strings.Contains(buf.String(), "source build (dev)") {
-		t.Errorf("expected the source-build SKIP\n%s", buf.String())
+	for _, tc := range cases {
+		t.Run(tc.goos, func(t *testing.T) {
+			sys := newSys(map[string]string{"JAVA_HOME": home}, nil, nil)
+			sys.GOOS = tc.goos
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkVersionedPaths(sys, rep)
+			if got := statusOfLine(buf.String(), "JAVA_HOME"); got != tc.want {
+				t.Errorf("GOOS=%s: status %q, want %q\n%s", tc.goos, statusTag[got], statusTag[tc.want], buf.String())
+			}
+		})
 	}
+}
+
+// statusOfLine returns the Status whose tag (statusTag, report.go) marks the
+// first line mentioning needle, or -1 — the tag is the stable contract, the
+// message is prose.
+func statusOfLine(output, needle string) Status {
+	for _, line := range strings.Split(output, "\n") {
+		if !strings.Contains(line, needle) {
+			continue
+		}
+		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip} {
+			if strings.Contains(line, statusTag[s]) {
+				return s
+			}
+		}
+	}
+	return -1
 }
 
 func TestCheckHarnessDrift(t *testing.T) {

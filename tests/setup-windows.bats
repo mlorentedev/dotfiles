@@ -825,18 +825,17 @@ setup() {
     [ "$node_line" -lt "$tools_line" ]
 }
 
-@test "setup-windows.ps1's PATH refresh keeps the process PATH (a GITHUB_PATH entry survived nothing before, TEST-003)" {
-    grep -qF 'GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT"
-}
-
-@test "every registry PATH rebuild in setup-windows.ps1 keeps the process PATH (TEST-003)" {
-    # Two registry-only rebuilds dropped process-only entries: the first hid the
-    # PR's dotf from Install-Dotf, the second hid the runner's toolcache node from
-    # the pi install ("npm not available"). A rebuild must end by appending $env:PATH.
-    total=$(grep -cF '$env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT")
-    kept=$(grep -cF '$env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH' "$PS1_SCRIPT")
-    [ "$total" -ge 2 ]
-    [ "$total" -eq "$kept" ]
+@test "every registry PATH rebuild in setup-windows.ps1 goes through Sync-SessionPath (TEST-003)" {
+    # A registry-only rebuild drops entries that exist only in this process (a
+    # GITHUB_PATH addition; the runner's toolcache node), and the plain
+    # Machine+User+process concatenation that first fixed that doubled PATH on
+    # every call (153 entries, 72 duplicates, measured on #1308). One helper,
+    # deduplicated, unit-tested in tests/windows-path-sync.Tests.ps1.
+    run grep -cF 'GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT"
+    [ "$output" = "0" ]
+    calls=$(grep -cE '^\s*Sync-SessionPath\s*$' "$PS1_SCRIPT")
+    [ "$calls" -ge 2 ]
+    grep -qE '^function Sync-SessionPath' "$BATS_TEST_DIRNAME/../scripts/utils.ps1"
 }
 
 @test "setup-windows.ps1 runs the uv and Bun installers in a child pwsh, never in its own session (TEST-003)" {

@@ -412,12 +412,13 @@ if ($wingetCmd) {
     # blocks of this same setup run (otherwise Get-Command misses them until
     # the next shell start; first introduced for BUG-003 so the Copilot config
     # deploy block sees the just-installed `copilot` binary).
-    # Keep the process PATH too: an entry that exists only in this process (a
-    # CI GITHUB_PATH addition, a shell that put a build dir on PATH for the run)
-    # was silently dropped here, and every dotf block after this line then ran
-    # against whatever the registry PATH resolved -- on the CI runner, nothing
+    # Sync-SessionPath (utils.ps1) keeps the process PATH too: an entry that
+    # exists only in this process (a CI GITHUB_PATH addition, a shell that put a
+    # build dir on PATH for the run) was silently dropped by a registry-only
+    # rebuild here, and every dotf block after this line then ran against
+    # whatever the registry PATH resolved -- on the CI runner, nothing
     # (TEST-003/#1298). Registry first so fresh winget installs still win.
-    $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH
+    Sync-SessionPath
 } else {
     Write-Warn "winget not found, skipping developer tools installation"
 }
@@ -1052,10 +1053,10 @@ if (-not $obsidianCmd) {
             & npm install -g 'obsidian-cli' 2>$null | Out-Null
             # Refresh PATH so the freshly-installed binary is visible in this
             # session (same trick as the winget block in section 1c).
-            # Keep the process PATH (same rule as the refresh after the winget loop):
-            # this registry-only rebuild dropped the runner's toolcache node, so
-            # "npm not available, skipping pi install" followed it (TEST-003/#1298).
-            $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH
+            # Same helper as the refresh after the winget loop: the registry-only
+            # rebuild this replaces dropped the runner's toolcache node, so "npm
+            # not available, skipping pi install" followed it (TEST-003/#1298).
+            Sync-SessionPath
             if (Get-Command obsidian -ErrorAction SilentlyContinue) {
                 Write-Success "Obsidian CLI installed"
             } else {

@@ -3,7 +3,6 @@ package doctor
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -69,7 +68,7 @@ func checkVersionedPaths(sys *System, rep *Report) {
 		case dir == "":
 			rep.Skip(t.envVar + " (variable not set)")
 		case isExecFile(filepath.Join(dir, "bin", t.binary)),
-			runtime.GOOS == "windows" && isExecFile(filepath.Join(dir, "bin", t.binary+".exe")):
+			sys.GOOS == "windows" && isExecFile(filepath.Join(dir, "bin", t.binary+".exe")):
 			// The .exe form: a JAVA_HOME set by the GitHub runner's toolcache
 			// holds java.exe, and the extensionless probe reported it missing
 			// (TEST-003/#1298 first run).
@@ -231,7 +230,14 @@ func checkOptionalTools(sys *System, cfg *Config, c *Contract, rep *Report) {
 		}
 	}
 
-	// dotf — the CLI these twins converge into (ADR-020).
+	checkDotfVersion(sys, cfg, rep)
+}
+
+// checkDotfVersion reports dotf itself — the CLI these twins converge into
+// (ADR-020) — against the versions.conf pin. Absent → SKIP; unpinned → PASS
+// unverified; a stale release → FAIL; a source build ("dev") → SKIP, since
+// the pin exists to catch a stale release and CI runs the PR's own build.
+func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 	pin := cfg.Versions["DOTF_VERSION"]
 	switch {
 	case !sys.has("dotf"):
