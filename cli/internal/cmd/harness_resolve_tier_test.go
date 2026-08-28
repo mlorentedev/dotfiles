@@ -217,7 +217,7 @@ func TestHarnessHelpListsSubcommands(t *testing.T) {
 		t.Fatalf("harness --help failed: %v (stderr=%q)", err, stderr)
 	}
 	out := stdout + stderr
-	for _, sub := range []string{"resolve-tier", "resolve-capabilities"} {
+	for _, sub := range []string{"resolve-tier", "resolve-capabilities", "resolve-skills"} {
 		// Same shape the shell greps for: the name at the start of its line in
 		// the command list, followed by whitespace before its summary.
 		if !regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(sub) + `\s`).MatchString(out) {
