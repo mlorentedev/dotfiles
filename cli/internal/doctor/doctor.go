@@ -87,7 +87,7 @@ func Run(opts Options) (int, error) {
 		checkSecrets(sys, cfg, rep)
 		checkSecretsTooling(sys, cfg, rep)
 		checkBitwardenReach(sys, rep)
-		checkBWServeDaemon(sys, rep)
+		checkBWServeDaemon(sys, cfg, rep)
 		checkBWMapping(sys, cfg, rep)
 		checkAgentConfigSecrets(sys, rep)
 		checkHiveBackendCanServe(sys, rep)

@@ -468,7 +468,7 @@ func statusOfLine(output, needle string) Status {
 		if !strings.Contains(line, needle) {
 			continue
 		}
-		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip} {
+		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip, StatusInfo} {
 			if strings.Contains(line, statusTag[s]) {
 				return s
 			}

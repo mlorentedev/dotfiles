@@ -65,6 +65,15 @@ if ($MyInvocation.InvocationName -ne '.') {
         Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
     }
 
+    # The runner has no Bitwarden identity and must never hold one that resolves
+    # real secrets, so [Bitwarden reach] reports "unauthenticated" by design.
+    # Declare that to doctor (TEST-005, #1313) rather than allow-listing the FAIL:
+    # the known-failures list is for runner-only conditions with a fix pending,
+    # and a runner that will never log in is not a pending fix. doctor reads the
+    # flag in that one branch only; every other reach tier still runs.
+    $env:DOTFILES_DOCTOR_NO_IDENTITY = '1'
+    Write-Host "doctor gate: DOTFILES_DOCTOR_NO_IDENTITY=1 (no Bitwarden identity on this runner, declared)"
+
     $output = & dotf doctor 2>&1 | Out-String
     Write-Host $output
 

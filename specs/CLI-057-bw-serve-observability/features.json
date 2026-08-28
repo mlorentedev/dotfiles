@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-057-bw-serve-observability-f1",
+    "behavior": "Start() with a state dir appends the daemon's stdout+stderr to <state>/bw-serve.log and writes <state>/bw-serve.pid with the child's pid; no state dir writes nothing",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBWServeDaemon_Start_WritesLogAndPID|TestBWServeDaemon_Start_NoStateDirWritesNothing'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-057-bw-serve-observability-f2",
+    "behavior": "The log is bounded: over the cap it rotates to bw-serve.log.1 (replacing the previous one), and a failed rename falls back to truncation",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBWServeState_Rotate'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-057-bw-serve-observability-f3",
+    "behavior": "dotf secrets unlock and lock print the daemon pid and log path on success, and say 'pid unknown' when no pid file exists",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSecretsUnlock|TestSecretsLock'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-057-bw-serve-observability-f4",
+    "behavior": "On Windows a detached child (DETACHED_PROCESS) with redirected stdio starts through Start() and its output lands in the log",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestBWServeDaemon_Start_WritesLogAndPID' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-057-bw-serve-observability-f5",
+    "behavior": "doctor: absent daemon + dead recorded pid -> WARN 'daemon exited' with last log lines; alive recorded pid -> WARN 'alive but not answering'; no pid file -> Info as before",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckBWServeDaemon'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-057-bw-serve-observability-f6",
+    "behavior": "ProcessAlive(pid) is true for a running child and false once it is killed and reaped, on Unix and Windows",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestProcessAlive'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
