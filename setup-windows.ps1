@@ -389,7 +389,8 @@ if ($wingetCmd) {
         @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
         @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
         @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
-        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" },
+        # copilot left this list for packages.json (npm on every OS, AI-038/#1321,
+        # ADR-036): `dotf tools install` below converges it, pin as floor.
         # Node.js is the prerequisite of the npm channel (ADR-036 class 3: no
         # cross-OS channel, so winget here, nvm on Linux). It must exist before
         # `dotf tools install` runs below, or bw and opencode cannot install on
@@ -1928,10 +1929,11 @@ Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSe
 
 Write-Info "Setting up GitHub Copilot CLI..."
 
-# BUG-003: detect the new standalone `copilot` CLI (winget GitHub.Copilot,
-# agentic interface, closer to Claude Code than to the legacy gh-copilot
-# extension's suggest/explain wrappers). The dev tools winget block above
-# auto-installs it; this block deploys config when the binary is on PATH.
+# BUG-003: detect the new standalone `copilot` CLI (agentic interface, closer
+# to Claude Code than to the legacy gh-copilot extension's suggest/explain
+# wrappers). Since AI-038 (#1321, ADR-036) it is an npm catalog tool that
+# `dotf tools install` above converges on every OS; this block only deploys
+# config when the binary is on PATH.
 # Note: AWS Copilot CLI (Amazon.CopilotCLI) also exposes itself as `copilot`.
 # If both are installed, Get-Command resolves to the first on PATH. Out-of-
 # scope to disambiguate here; <1% population.
@@ -1954,7 +1956,7 @@ if ($copilotCmd) {
 
     Write-Success "GitHub Copilot CLI configured (aliases cop/cops in profile.ps1)"
 } else {
-    Write-Info "GitHub Copilot CLI not installed; the dev tools block above attempts auto-install via winget GitHub.Copilot. Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
+    Write-Info "GitHub Copilot CLI not installed; 'dotf tools install' above converges it from packages.json (npm). Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
 }
 
 # SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.
