@@ -58,8 +58,9 @@ bats tests/copilot-config.bats tests/setup-windows.bats tests/opencode.bats   ->
 - **The winget copy is removed by hand, reported by doctor.** ADR-036 §4: a second copy on PATH is a
   finding, not a state to converge silently — and while it satisfies the floor the npm copy will
   not even be installed.
-- **`autoUpdate: false`.** The pin is the floor and `dotf tools install` the updater; a
-  self-updating binary is exactly what made winget's registry lie.
+- **`autoUpdate` deferred to #1322.** The pin should own updates, but the file the
+  repo deploys (`config.json`) is CLI-managed on this version and the user file
+  (`settings.json`) must be merged, not copied, or it clobbers per-box prefs.
 
 ## Promotion candidates
 

@@ -1,7 +1,7 @@
 [
   {
     "id": "AI-038-copilot-npm-channel-f1",
-    "behavior": "AC1/AC2: copilot is a packages.json npm tool, no setup carries an install block, config.json turns autoUpdate off",
+    "behavior": "AC1: copilot is a packages.json npm tool and no setup carries an install block",
     "verification": "bats tests/copilot-config.bats tests/setup-windows.bats -f 'AI-038'",
     "state": "verified",
     "evidence": "ok on the Windows work box 2026-08-28"

@@ -15,7 +15,7 @@ created: "2026-08-28"
 
 - [x] [AC1] Failing tests: catalog entry present, winget row absent, no Linux installer line (`tests/copilot-config.bats`, `tests/setup-windows.bats`)
 - [x] [AC1] `packages.json` entry; winget row removed; both setup blocks re-worded to name the catalog
-- [x] [AC2] `ai/copilot/config.json` `autoUpdate: false` + bats guard
+- [x] [AC2] dropped: `config.json` is CLI-managed; `autoUpdate` moves to #1322 (settings.json merge)
 - [x] [AC3] Failing test `TestCheckCopilot_PinMatchByStatus` (five rows by status)
 - [x] [AC3] `checkCopilot` (semverOf + catalogPin + matchPinFrom), registered after `checkOpenCode`
 - [x] [AC4] ADR-036 table + dated amendment
