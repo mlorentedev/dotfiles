@@ -25,9 +25,9 @@ The repository already carried the right primitive: `packages.json` + `dotf tool
 
    | Tool class | Channel | Source type |
    |---|---|---|
-   | node-distributed agents and CLIs (`pi`, `opencode`, `bw`) | npm global | `npm` |
+   | node-distributed agents and CLIs (`pi`, `opencode`, `bw`, `copilot`) | npm global | `npm` |
    | static single-binary releases (`sops`, `age`, `eza`, `zoxide`, `dotf`) | GitHub release, sha256-verified | `github-release` |
-   | tools with no cross-OS channel (`git`, `gh`, `jq`, `copilot`, `uv`) | the OS package manager (`winget` / apt / official installer) | setup script |
+   | tools with no cross-OS channel (`git`, `gh`, `jq`, `uv`) | the OS package manager (`winget` / apt / official installer) | setup script |
 
    A tool in the first two classes is declared in `packages.json` and converged by `dotf tools install` on both OSes; the setup scripts stop carrying per-OS install blocks for it.
 
@@ -38,6 +38,16 @@ The repository already carried the right primitive: `packages.json` + `dotf tool
 4. **A second copy on PATH is a finding, not a state to converge silently.** `dotf doctor` WARNs when an npm catalog tool resolves from more than one PATH directory and names them; the catalog converges the copy it owns and the operator removes the other channel's. Setup never prints a manual instruction for it.
 
 5. **Migration is by the same mechanism.** Retiring a channel (winget `SST.opencode`, the opencode curl script, the `~/.opencode/bin` PATH line in the rc files) leaves the old copy where it is; the next `dotf tools install` converges the declared channel and doctor reports the leftover.
+
+## Amendment 2026-08-28 (AI-038, #1321)
+
+`copilot` was listed as "no cross-OS channel" on the day of this ADR; measured on
+the Windows work box, GitHub publishes the CLI as `@github/copilot` on npm
+(1.0.81), the binary self-updates behind winget's back (registry 1.0.78 vs
+binary 1.0.80), and Linux boxes installed nothing at all. It moves to the npm
+class: one `packages.json` entry, `dotf tools install` on every OS, the
+shadowed-install WARN for a leftover winget copy, and `"autoUpdate": false` in
+`ai/copilot/config.json` so the pin owns updates.
 
 ## Consequences
 
