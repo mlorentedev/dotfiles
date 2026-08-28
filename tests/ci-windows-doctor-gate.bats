@@ -53,7 +53,7 @@ test_windows_job() {
     # The Pester step inherits the runner's original PATH; without the refresh
     # every tool-gated suite skipped as green. The declaration turns an absent
     # copilot on the runner into a FAIL inside the suite.
-    grep -B12 'Invoke-Pester -Path tests -CI' "$CI_YML" | grep -qF '. ./scripts/utils.ps1'
+    grep -B12 'Invoke-Pester -Path tests -CI' "$CI_YML" | grep -qF "pwsh -NoProfile -Command '. ./scripts/utils.ps1; Sync-SessionPath; \$env:PATH'"
     grep -B12 'Invoke-Pester -Path tests -CI' "$CI_YML" | grep -qF 'Sync-SessionPath'
     grep -B12 'Invoke-Pester -Path tests -CI' "$CI_YML" | grep -qF "DOTFILES_CI_EXPECT_COPILOT = '1'"
     grep -qF 'DOTFILES_CI_EXPECT_COPILOT' "$BATS_TEST_DIRNAME/copilot-native-skills.Tests.ps1"
