@@ -1,7 +1,9 @@
 ---
 id: "WIN-002-windows-smoke-sweep"
 type: spec
-status: implementing # this PR ships partial closure; full clean-machine sweep remains
+status: abandoned # this PR ships partial closure; full clean-machine sweep remains
+review: waived
+review_waived_reason: "abandoned: healthcheck.ps1 retired for dotf doctor (#533); since #1308 test-windows runs setup-windows.ps1 end-to-end as admin on every PR and gates on dotf doctor"
 created: "2026-05-21"
 tags: [spec, proposal, windows, smoke-sweep, healthcheck]
 template_version: "1.0"
