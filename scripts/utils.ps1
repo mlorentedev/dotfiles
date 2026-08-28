@@ -59,6 +59,29 @@ function Write-Utf8LfFile {
 # Usage:
 #   . $PSScriptRoot\utils.ps1
 #   Deploy-File "C:\repo\.zshrc" "$env:USERPROFILE\.zshrc"
+# Sync-SessionPath: rebuild this process's PATH as Machine + User + the
+# current process PATH, first occurrence wins (case-insensitive, a trailing
+# backslash does not make a different entry). Setup calls it after every block
+# that installs into the registry PATH so the new tools resolve in this same
+# run; registry first so a fresh winget install beats a stale process entry.
+# The process PATH is kept because an entry that exists only here (a CI
+# GITHUB_PATH addition, a build dir put on PATH for the run) was silently
+# dropped by the registry-only rebuild this replaces (TEST-003/#1298), and the
+# merge is deduplicated because the plain concatenation that first fixed that
+# doubled PATH on every call -- 153 entries, 72 of them duplicates, measured on
+# the CI runner (#1308).
+function Sync-SessionPath {
+    $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $merged = foreach ($entry in @(
+            [Environment]::GetEnvironmentVariable('PATH', 'Machine'),
+            [Environment]::GetEnvironmentVariable('PATH', 'User'),
+            $env:PATH) -split ';') {
+        $e = "$entry".Trim()
+        if ($e -and $seen.Add($e.TrimEnd('\'))) { $e }
+    }
+    $env:PATH = @($merged) -join ';'
+}
+
 function Deploy-File {
     param(
         [Parameter(Mandatory)][string]$Source,

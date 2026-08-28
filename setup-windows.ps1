@@ -412,7 +412,13 @@ if ($wingetCmd) {
     # blocks of this same setup run (otherwise Get-Command misses them until
     # the next shell start; first introduced for BUG-003 so the Copilot config
     # deploy block sees the just-installed `copilot` binary).
-    $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
+    # Sync-SessionPath (utils.ps1) keeps the process PATH too: an entry that
+    # exists only in this process (a CI GITHUB_PATH addition, a shell that put a
+    # build dir on PATH for the run) was silently dropped by a registry-only
+    # rebuild here, and every dotf block after this line then ran against
+    # whatever the registry PATH resolved -- on the CI runner, nothing
+    # (TEST-003/#1298). Registry first so fresh winget installs still win.
+    Sync-SessionPath
 } else {
     Write-Warn "winget not found, skipping developer tools installation"
 }
@@ -961,7 +967,10 @@ if (-not $uvCmd) {
     try {
         $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
         Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
-        & $uvInstaller 2>$null
+        # A child process, never dot-sourced or run in this session: a remote
+        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
+        # runner lost npm right after these two (TEST-003/#1298).
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
         Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
         # Refresh PATH for current session
         $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
@@ -1004,7 +1013,7 @@ if (-not $bunCmd) {
     try {
         $bunInstaller = Join-Path $env:TEMP "bun-install.ps1"
         Invoke-RestMethod https://bun.sh/install.ps1 -OutFile $bunInstaller
-        & $bunInstaller 2>$null
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $bunInstaller 2>$null
         Remove-Item -Path $bunInstaller -Force -ErrorAction SilentlyContinue
         # Refresh PATH for current session
         $env:PATH = "$env:USERPROFILE\.bun\bin;$env:PATH"
@@ -1020,6 +1029,12 @@ if (-not $bunCmd) {
 } else {
     Write-Info "Bun already installed"
 }
+
+# What the rest of setup will see. The npm-driven blocks below (Obsidian CLI,
+# yarn, pi) each skip silently when npm is missing; naming the state here
+# turns "npm not available" into a finding with a cause.
+$npmSeen = Get-Command npm -ErrorAction SilentlyContinue
+Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
 
 # ============================================================================
 # 2c. OBSIDIAN CLI (BUG-013)
@@ -1038,7 +1053,10 @@ if (-not $obsidianCmd) {
             & npm install -g 'obsidian-cli' 2>$null | Out-Null
             # Refresh PATH so the freshly-installed binary is visible in this
             # session (same trick as the winget block in section 1c).
-            $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
+            # Same helper as the refresh after the winget loop: the registry-only
+            # rebuild this replaces dropped the runner's toolcache node, so "npm
+            # not available, skipping pi install" followed it (TEST-003/#1298).
+            Sync-SessionPath
             if (Get-Command obsidian -ErrorAction SilentlyContinue) {
                 Write-Success "Obsidian CLI installed"
             } else {

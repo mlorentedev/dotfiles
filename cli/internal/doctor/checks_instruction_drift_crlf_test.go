@@ -37,3 +37,25 @@ func TestCheckInstructionDrift_CRLFDeployedCopyIsNotDrift(t *testing.T) {
 		t.Errorf("all four targets should have been compared\n%s", buf.String())
 	}
 }
+
+// A source that ends with a blank line and a deployed copy that ends with one
+// newline are the same document. Windows' LF writer normalises the tail to a
+// single "\n"; the repo source of copilot-instructions.md ends "-->\n\n", and
+// the CI gate reported drift on nothing but that (#1308).
+func TestCheckInstructionDrift_TrailingNewlinesAreNotDrift(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	for _, tgt := range deployedInstructionTargets {
+		body := "# " + tgt.repoRel + "\n\nshared content\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n"
+		writeFile(t, filepath.Join(repo, tgt.repoRel), body+"\n")
+		writeFile(t, filepath.Join(home, tgt.homeRel), body)
+	}
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot"}, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkInstructionDrift(sys, rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("a trailing blank line must not be drift\n%s", buf.String())
+	}
+}

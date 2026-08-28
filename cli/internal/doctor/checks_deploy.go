@@ -509,7 +509,10 @@ func checkInstructionDrift(sys *System, rep *Report) {
 			continue
 		}
 		checked++
-		if stripHarnessRegions(string(dc)) != stripHarnessRegions(string(sc)) {
+		// Trailing newlines are not content either: the LF writer on Windows
+		// ends a file with exactly one, while a source may end with a blank
+		// line, and that alone read as drift on the CI runner (#1308).
+		if strings.TrimRight(stripHarnessRegions(string(dc)), "\n") != strings.TrimRight(stripHarnessRegions(string(sc)), "\n") {
 			rep.Fail("stale: " + tgt.homeRel + " has drifted from " + tgt.repoRel + " (run: compile-harness.sh --deploy)")
 			drift++
 		}
