@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -45,17 +46,39 @@ func fakeBWServeHandler(t *testing.T, status *string, unlockPassword string) htt
 	}
 }
 
-func withFakeDaemon(t *testing.T, status *string, unlockPassword string) {
+// fakeDaemonPID is the pid the fake daemon's trace records, so a test can
+// assert unlock/lock print it (#1315) without a process behind it.
+const fakeDaemonPID = 4242
+
+// withFakeDaemon points the lifecycle seam at an httptest bw serve and gives
+// it a state dir carrying a pid file, the trace a daemon started by dotf
+// leaves behind. It returns the state so tests can assert on its paths.
+func withFakeDaemon(t *testing.T, status *string, unlockPassword string) secrets.BWServeState {
 	t.Helper()
 	srv := httptest.NewServer(fakeBWServeHandler(t, status, unlockPassword))
 	t.Cleanup(srv.Close)
+	state := secrets.NewBWServeState(t.TempDir())
+	if err := state.WritePID(fakeDaemonPID); err != nil {
+		t.Fatal(err)
+	}
 	old := bwDaemonAddr
 	bwDaemonAddr = func() *secrets.BWServeDaemon {
 		return &secrets.BWServeDaemon{
 			Client: secrets.BWServeClient{BaseURL: srv.URL, HTTPClient: &http.Client{Timeout: 2 * time.Second}},
+			State:  state,
 		}
 	}
 	t.Cleanup(func() { bwDaemonAddr = old })
+	return state
+}
+
+// assertTrace is AC3 of CLI-057: a confirmation line names the daemon's pid
+// and its log path, so the operator learns where to look before it is gone.
+func assertTrace(t *testing.T, out string, state secrets.BWServeState) {
+	t.Helper()
+	if !strings.Contains(out, "pid 4242") || !strings.Contains(out, state.LogPath()) {
+		t.Fatalf("expected the pid and the log path in the confirmation, got: %q", out)
+	}
 }
 
 func withFakePassword(t *testing.T, pw string, err error) {
@@ -89,7 +112,7 @@ func runLock(t *testing.T) (string, error) {
 // succeeds, and the password never appears in stdout or stderr.
 func TestSecretsUnlock_Succeeds_PasswordNeverInOutput(t *testing.T) {
 	status := "locked"
-	withFakeDaemon(t, &status, "correct-horse-battery-staple")
+	state := withFakeDaemon(t, &status, "correct-horse-battery-staple")
 	withFakePassword(t, "correct-horse-battery-staple", nil)
 
 	out, errOut, err := runUnlock(t)
@@ -99,6 +122,7 @@ func TestSecretsUnlock_Succeeds_PasswordNeverInOutput(t *testing.T) {
 	if !strings.Contains(out, "unlocked") {
 		t.Fatalf("expected confirmation in stdout, got: %q", out)
 	}
+	assertTrace(t, out, state)
 	if strings.Contains(out, "correct-horse-battery-staple") || strings.Contains(errOut, "correct-horse-battery-staple") {
 		t.Fatal("password must never appear in command output")
 	}
@@ -144,7 +168,7 @@ func TestSecretsUnlock_Idempotent(t *testing.T) {
 // TestSecretsLock is AC6: lock re-locks a running, unlocked daemon.
 func TestSecretsLock(t *testing.T) {
 	status := "unlocked"
-	withFakeDaemon(t, &status, "")
+	state := withFakeDaemon(t, &status, "")
 
 	out, err := runLock(t)
 	if err != nil {
@@ -153,6 +177,7 @@ func TestSecretsLock(t *testing.T) {
 	if !strings.Contains(out, "locked") {
 		t.Fatalf("expected confirmation, got: %q", out)
 	}
+	assertTrace(t, out, state)
 	if status != "locked" {
 		t.Fatalf("expected the daemon to report locked, got %q", status)
 	}
@@ -174,5 +199,28 @@ func TestSecretsLock_NoDaemon(t *testing.T) {
 	}
 	if !strings.Contains(out, "no daemon running") {
 		t.Fatalf("expected a no-op message, got: %q", out)
+	}
+}
+
+// TestSecretsUnlock_NoPIDFileIsSaidNotGuessed is AC3's honest branch: a daemon
+// dotf did not start (a hand-run `bw serve`, or one started before #1315) has
+// no pid file, and the confirmation says "pid unknown" rather than inventing
+// one — while still naming the log path, which is where a future start writes.
+func TestSecretsUnlock_NoPIDFileIsSaidNotGuessed(t *testing.T) {
+	status := "unlocked"
+	state := withFakeDaemon(t, &status, "")
+	if err := os.Remove(state.PIDPath()); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := runUnlock(t)
+	if err != nil {
+		t.Fatalf("unlock: %v", err)
+	}
+	if !strings.Contains(out, "pid unknown") || !strings.Contains(out, state.LogPath()) {
+		t.Fatalf("expected 'pid unknown' and the log path, got: %q", out)
+	}
+	if strings.Contains(out, "pid 4242") {
+		t.Fatalf("a removed pid file must not be reported as a pid, got: %q", out)
 	}
 }
