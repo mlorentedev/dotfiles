@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
 
 // bwDaemonAddr is the bw serve lifecycle seam unlock/lock/doctor share,
 // overridable so their tests never spawn a real bw process or touch a real
-// terminal — the daemon analog of bwReader/bwWriter.
+// terminal — the daemon analog of bwReader/bwWriter. The daemon's trace (log
+// + pid, #1315) lands under the deploy dir resolved the same way doctor
+// resolves cfg.DotfilesDir, so the writer here and the reader there agree.
 var bwDaemonAddr = func() *secrets.BWServeDaemon {
-	return &secrets.BWServeDaemon{Client: secrets.BWServeClient{}}
+	return &secrets.BWServeDaemon{
+		Client: secrets.BWServeClient{},
+		State:  secrets.NewBWServeState(env.DotfilesDir(env.Home())),
+	}
 }
 
 // newSecretsUnlockCmd is CLI-024-secrets-bw-serve's AC1/AC6: unlock Bitwarden
@@ -43,7 +49,7 @@ func newSecretsUnlockCmd() *cobra.Command {
 				return err
 			}
 			if st == "unlocked" {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "already unlocked")
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "already unlocked (%s)\n", d.Trace())
 				return nil
 			}
 			_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Bitwarden master password: ")
@@ -56,7 +62,7 @@ func newSecretsUnlockCmd() *cobra.Command {
 			if err := d.Unlock(string(pw)); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "unlocked")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unlocked (%s)\n", d.Trace())
 			return nil
 		},
 	}
@@ -82,7 +88,7 @@ func newSecretsLockCmd() *cobra.Command {
 			if err := d.Lock(); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "locked")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "locked (%s)\n", d.Trace())
 			return nil
 		},
 	}

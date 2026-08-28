@@ -1,7 +1,9 @@
 ---
 id: "AI-021-opencode-windows-empirical-validation"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
+review: waived
+review_waived_reason: "abandoned: opencode is an npm catalog tool on every OS (ADR-036, #1311), verified on the Windows box; the gemini-cli sunset passed and agy is the Gemini path"
 created: "2026-05-27"
 tags: [spec, proposal]
 template_version: "1.0"

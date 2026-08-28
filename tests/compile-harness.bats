@@ -70,7 +70,23 @@ seed_dotf_stub() {
 # The capability probe: the render greps this for the subcommand name to decide
 # whether the binary is new enough. cli/internal/cmd pins the real help's shape.
 if [ "$1 $2" = "harness --help" ]; then
-    printf 'Available Commands:\n  resolve-tier          Resolve a neutral model tier\n  resolve-capabilities  Resolve neutral capabilities\n  triggers              x\n'
+    printf 'Available Commands:\n  resolve-tier          Resolve a neutral model tier\n  resolve-capabilities  Resolve neutral capabilities\n  resolve-skills        Print the forced-skill ids a record declares\n  triggers              x\n'
+    exit 0
+fi
+# Simulates the real subcommand's CONTRACT: both frontmatter forms in, one flow
+# sequence of ids out. Listing it in --help above means every presence test in
+# this file now exercises the delegated path rather than the awk fallback, which
+# is what makes their unchanged expectations an equivalence proof.
+if [ "$1 $2" = "harness resolve-skills" ]; then
+    inline="$(awk '/^---[[:space:]]*$/{n++; next}
+                   n==1 && /^skills:[[:space:]]*\[/ { sub(/^[^:]*:[[:space:]]*/,""); print; exit }
+                   n>=2 { exit }' "$3")"
+    if [ -n "$inline" ]; then printf '%s\n' "$inline"; exit 0; fi
+    ids="$(awk '/^---[[:space:]]*$/{n++; next}
+                n==1 && /^[[:space:]]+-[[:space:]]+id:[[:space:]]*[^[:space:]]/ {
+                    sub(/^[^:]*:[[:space:]]*/,""); printf "%s%s", sep, $0; sep=", " }
+                n>=2 { exit }' "$3")"
+    [ -n "$ids" ] && printf '[%s]\n' "$ids"
     exit 0
 fi
 if [ "$1 $2" = "harness resolve-capabilities" ]; then
@@ -1179,6 +1195,62 @@ PY
     [[ "$output" == *"block style"* ]]
     [[ "$output" == *GRANT* || "$output" == *"would GRANT"* ]]
     [ ! -f "$FAKEHOME/.claude/agents/curator.md" ]
+}
+
+@test "agents: a block-style skills list renders the real skills, not \"none\"" {
+    seed_agents_fixture
+    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
+    # HARNESS-045 AC7. skill_field reads the inline form only, so before the
+    # delegation this rendered "MUST consume: none" -- enforcement removed with
+    # no error anywhere. The presence text carries ids only: `enforce:` is what
+    # `dotf harness gate` acts on, and the doctrine payload is character-capped.
+    python3 - "$VAULT/00_meta/agents/definitions/curator/AGENT.md" <<'PY'
+import re, sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(re.sub(
+    r"^skills:.*$",
+    "skills:\n  - id: crystallize\n    enforce: block\n  - id: insights\n    enforce: warn",
+    p.read_text(), count=1, flags=re.M))
+PY
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy; [ "$status" -eq 0 ]
+    grep -q 'MUST consume: \[crystallize, insights\]' "$FAKEHOME/.claude/CLAUDE.md"
+    refute_grep_fixed 'MUST consume: none' "$FAKEHOME/.claude/CLAUDE.md"
+    # severity stays out of the prose; it belongs to the gate
+    refute_grep_fixed 'enforce' "$FAKEHOME/.claude/CLAUDE.md"
+}
+
+@test "agents: a block-style skills list fails loudly when dotf cannot read it" {
+    seed_agents_fixture
+    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
+    python3 - "$VAULT/00_meta/agents/definitions/curator/AGENT.md" <<'PY'
+import re, sys, pathlib
+p = pathlib.Path(sys.argv[1])
+p.write_text(re.sub(
+    r"^skills:.*$",
+    "skills:\n  - id: crystallize\n    enforce: block",
+    p.read_text(), count=1, flags=re.M))
+PY
+    run_refresh; [ "$status" -eq 0 ]
+    # a dotf predating resolve-skills: the fallback is the awk read, which returns
+    # EMPTY for this record. Degrading to "none" here is the silent disarm the
+    # whole acceptance criterion exists to prevent, so the fallback must refuse.
+    cat > "$STUB_BIN/dotf" <<'NOSKILLS'
+#!/usr/bin/env bash
+if [ "$1 $2" = "harness --help" ]; then
+    printf 'Available Commands:\n  resolve-tier          x\n  resolve-capabilities  x\n'
+    exit 0
+fi
+if [ "$1 $2" = "harness resolve-capabilities" ]; then printf 'tools: Read\n'; exit 0; fi
+[ "$1 $2" = "harness resolve-tier" ] || { printf 'stub: unexpected: %s\n' "$*" >&2; exit 127; }
+printf 'opus\n'
+NOSKILLS
+    chmod +x "$STUB_BIN/dotf"
+    run_deploy
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"block style"* ]]
+    [[ "$output" == *DISARM* ]]
+    refute_grep_fixed 'MUST consume: none' "$FAKEHOME/.claude/CLAUDE.md"
 }
 
 @test "agents: the unavailable-resolver warning states that it GRANTS, not denies" {
