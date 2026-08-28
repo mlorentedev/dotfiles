@@ -163,8 +163,8 @@ func TestCheckBWMapping_StaleCacheWarnsInsteadOfFails(t *testing.T) {
 	if !strings.Contains(out, "not found in local vault cache (last synced 48h0m0s ago)") {
 		t.Errorf("expected stale cache message with age, got:\n%s", out)
 	}
-	if !strings.Contains(out, "dotf secrets sync") {
-		t.Errorf("expected remediation action 'dotf secrets sync', got:\n%s", out)
+	if !strings.Contains(out, "dotf secrets unlock") {
+		t.Errorf("expected remediation action 'dotf secrets unlock', got:\n%s", out)
 	}
 }
 
@@ -196,7 +196,7 @@ func TestCheckBWMapping_UnsyncedCacheWarnsInsteadOfFails(t *testing.T) {
 	if !strings.Contains(out, "not found in local vault cache (never synced)") {
 		t.Errorf("expected never synced message, got:\n%s", out)
 	}
-	if !strings.Contains(out, "dotf secrets sync") {
-		t.Errorf("expected remediation action 'dotf secrets sync', got:\n%s", out)
+	if !strings.Contains(out, "dotf secrets unlock") {
+		t.Errorf("expected remediation action 'dotf secrets unlock', got:\n%s", out)
 	}
 }
