@@ -818,15 +818,24 @@ fi
 
 ensure_directory "$PI_AGENT_DIR"
 
-# pi's models.json is deployed by `dotf deploy` (CLI-039): one implementation for
-# every OS, replacing the copy that lived here and its twin in setup-windows.ps1.
-# ADR-020 C7 keeps this script on the thin bootstrap; staging, rendering,
-# comparing and installing a config is tooling logic and belongs in the CLI.
-if command -v dotf >/dev/null 2>&1; then
-    dotf deploy pi || log_warning "dotf deploy pi failed -- run it again after setup, or see 'dotf doctor'"
+# Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
+# every OS, replacing the per-config copies that lived here and their twins in
+# setup-windows.ps1. ADR-020 C7 keeps this script on the thin bootstrap; staging,
+# rendering, comparing and installing a config is tooling logic and belongs in
+# the CLI. The call names NO config: bare `dotf deploy` installs every entry
+# ai/deploy.json declares, so a new entry is a manifest edit and not a change to
+# two setup scripts -- `dotf deploy pi` left orca-keybindings declared and never
+# installed (CLI-054, #1301). Resolved by path as well as by name, for the same
+# reason as the harness mirror above (#1305: this process's PATH may not carry
+# ~/.local/bin yet).
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
+if [ -n "$_dotf" ]; then
+    "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
 else
-    log_warning "dotf not on PATH -- skipping pi config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy pi')"
+    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy')"
 fi
+unset _dotf
 
 PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"
 if [ -f "$AGENTS_SRC" ]; then
