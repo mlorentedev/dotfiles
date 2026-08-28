@@ -13,7 +13,9 @@ branch `feat/copilot-npm-channel`, `dotf` built from the branch.
 - [x] **AC1/AC2** → `bats tests/copilot-config.bats tests/setup-windows.bats tests/opencode.bats tests/setup-linux.bats`: all ok
   (the two `zsh` cases of setup-linux need a zsh binary this box lacks; CI carries them).
   `packages.json` declares `copilot` (npm, `@github/copilot`, 1.0.81); `setup-windows.ps1` has no
-  `Id = "GitHub.Copilot"` row; `ai/copilot/config.json` → `autoUpdate: false`.
+  `Id = "GitHub.Copilot"` row. AC2 dropped: the deployed `~/.copilot/config.json` on the box is
+  rewritten by the CLI with the header "User settings belong in settings.json. This file is
+  managed automatically." — `autoUpdate` belongs to `settings.json` (#1322).
 - [x] **AC3** → `TestCheckCopilot_PinMatchByStatus` (5 rows: at pin PASS, above WARN drift, below
   WARN drift, no semver WARN without a drift line, absent SKIP). Mutation: the `matchPinFrom`
   call replaced by `_ = catalogPin` → `--- FAIL: TestCheckCopilot_PinMatchByStatus`; restored, ok.

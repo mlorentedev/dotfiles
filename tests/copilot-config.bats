@@ -25,10 +25,6 @@ setup() {
     [ -n "$model" ]
 }
 
-@test "config.json turns autoUpdate off: the packages.json pin owns updates (AI-038, ADR-036)" {
-    [ "$(jq -r '.autoUpdate' "$CFG")" = "false" ]
-}
-
 @test "copilot is a packages.json catalog tool (npm) and neither setup carries an install block (AI-038, ADR-036)" {
     jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm")' "$DOTFILES_DIR/packages.json" >/dev/null
     ! grep -qE 'Id = "GitHub\.Copilot"' "$DOTFILES_DIR/setup-windows.ps1"

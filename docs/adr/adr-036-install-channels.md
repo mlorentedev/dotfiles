@@ -45,9 +45,11 @@ The repository already carried the right primitive: `packages.json` + `dotf tool
 the Windows work box, GitHub publishes the CLI as `@github/copilot` on npm
 (1.0.81), the binary self-updates behind winget's back (registry 1.0.78 vs
 binary 1.0.80), and Linux boxes installed nothing at all. It moves to the npm
-class: one `packages.json` entry, `dotf tools install` on every OS, the
-shadowed-install WARN for a leftover winget copy, and `"autoUpdate": false` in
-`ai/copilot/config.json` so the pin owns updates.
+class: one `packages.json` entry, `dotf tools install` on every OS, and the
+shadowed-install WARN for a leftover winget copy. Turning the CLI's own
+`autoUpdate` off belongs to its user settings file (`settings.json`, which the
+repo does not deploy yet — `config.json` is rewritten by the CLI, measured on
+the same box) and is tracked under #1322.
 
 ## Consequences
 

@@ -27,8 +27,7 @@ taken by the owner on 2026-08-27: npm on both OSes.
 `copilot` is a `packages.json` catalog tool (`npm`, `@github/copilot`, pin as
 floor) that `dotf tools install` converges on every OS. The winget row is gone
 from `setup-windows.ps1`; both setup scripts keep only the config-deploy block,
-which runs when the binary is on PATH. `ai/copilot/config.json` sets
-`"autoUpdate": false` so the pin owns updates. `dotf doctor` gains a
+which runs when the binary is on PATH. `dotf doctor` gains a
 "GitHub Copilot CLI" section: version probed once in Go, matched against the
 catalog pin (PASS at or above, FAIL below, SKIP when absent), and a leftover
 winget/scoop copy is reported by the existing shadowed-install WARN. ADR-036's
@@ -58,7 +57,11 @@ table is amended with the date and the measurement.
 - [x] AC1 — `packages.json` declares `copilot` (npm, `@github/copilot`, 1.0.81) and no
   setup script carries a copilot install block (winget row removed; Linux
   comment/message name the catalog).
-- [x] AC2 — `ai/copilot/config.json` sets `autoUpdate: false`; the bats guard pins it.
+- [x] AC2 — (dropped, moved to #1322) `autoUpdate: false` was first written into
+  `ai/copilot/config.json`; on this CLI version that file is rewritten by the
+  CLI itself ("User settings belong in settings.json. This file is managed
+  automatically."), so the setting belongs to `settings.json`, which the repo
+  does not deploy yet and must merge rather than copy.
 - [x] AC3 — `dotf doctor` reports copilot: PASS at/above the pin, FAIL below, WARN on a
   version-less output, SKIP when absent; one row per branch, asserted by status.
 - [x] AC4 — ADR-036's table moves `copilot` to the npm class with a dated amendment.
