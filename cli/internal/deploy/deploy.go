@@ -366,10 +366,18 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	if err := json.Unmarshal(srcData, &managed); err != nil {
 		return nil, false, fmt.Errorf("source is not a JSON object: %w", err)
 	}
+	if managed == nil {
+		return nil, false, errors.New("source is not a JSON object: null")
+	}
 	existing := map[string]any{}
 	if raw, err := os.ReadFile(dst); err == nil { //nolint:gosec // manifest-declared destination
 		if err := json.Unmarshal(stripLineComments(raw), &existing); err != nil {
 			return nil, false, fmt.Errorf("destination is not a JSON object: %w", err)
+		}
+		// A JSON `null` unmarshals into a nil map without error; assigning
+		// into it would panic. Reject it like any other non-object.
+		if existing == nil {
+			return nil, false, errors.New("destination is not a JSON object: null")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, false, err

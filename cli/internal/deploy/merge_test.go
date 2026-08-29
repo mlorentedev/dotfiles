@@ -179,16 +179,26 @@ func TestDeploy_MergeIsIdempotentAndDoesNotRewrite(t *testing.T) {
 }
 
 func TestDeploy_MergeRejectsANonObjectDestinationByName(t *testing.T) {
-	root := repoWithCopilotSettings(t, `{"model":"m"}`)
-	home := t.TempDir()
-	writeDst(t, home, `[1, 2, 3]`)
+	// `null` is the case that does not fail at Unmarshal: it yields a nil map,
+	// and the first assignment into it would panic rather than error.
+	for _, dst := range []string{`[1, 2, 3]`, `null`, `"text"`} {
+		t.Run(dst, func(t *testing.T) {
+			root := repoWithCopilotSettings(t, `{"model":"m"}`)
+			home := t.TempDir()
+			writeDst(t, home, dst)
 
-	_, err := Deploy(copilotSettingsConfig(), root, home, noResolve, nil, false)
-	if err == nil {
-		t.Fatal("merging into a JSON array must fail, not replace it")
+			_, err := Deploy(copilotSettingsConfig(), root, home, noResolve, nil, false)
+			if err == nil {
+				t.Fatal("merging into a non-object must fail, not replace it")
+			}
+			if !strings.Contains(err.Error(), `"copilot-settings"`) || !strings.Contains(err.Error(), "not a JSON object") {
+				t.Errorf("error must name the config and the cause: %v", err)
+			}
+		})
 	}
-	if !strings.Contains(err.Error(), `"copilot-settings"`) || !strings.Contains(err.Error(), "not a JSON object") {
-		t.Errorf("error must name the config and the cause: %v", err)
+	root := repoWithCopilotSettings(t, `null`)
+	if _, err := Deploy(copilotSettingsConfig(), root, t.TempDir(), noResolve, nil, false); err == nil || !strings.Contains(err.Error(), "source is not a JSON object") {
+		t.Errorf("a null source is not a set of managed keys: %v", err)
 	}
 }
 
