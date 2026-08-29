@@ -6,7 +6,7 @@
 # parks the live image and renames the staged one in, which Windows does allow.
 #
 # The .sh twin is covered behaviorally on Linux (tests/install-dotf.bats, real
-# ETXTBSY). install-dotf-ps1.bats only greps the source — that is why this class
+# ETXTBSY). install-dotf-ps1.bats only greps the source - that is why this class
 # of defect escaped CI on the Windows side, so the swap is exercised for real here.
 
 BeforeAll {

@@ -26,10 +26,16 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 		want   Status
 		needle string
 	}{
-		{"all persisted → PASS", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*"}, nil, StatusPass, "persisted at user scope"},
+		{"all persisted, record current → PASS", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;VAULT_PATH"}, nil, StatusPass, "persisted at user scope"},
+		// CLI-065: every variable in place but no ownership record yet (a box
+		// that persisted before the record existed) — one run writes it.
+		{"all persisted, no record yet → WARN naming the record", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*"}, nil, StatusWarn, envpkg.ManagedMarker},
 		{"one missing → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*"}, nil, StatusWarn, "VAULT_PATH"},
 		{"one different → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": `C:\elsewhere`}, nil, StatusWarn, "VAULT_PATH"},
 		{"registry unreadable → WARN", nil, errors.New("access denied"), StatusWarn, "unreadable"},
+		// CLI-065 (#1363): the marker still lists a name the contract retired.
+		{"retired name still persisted → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "OLD_NAME"},
+		{"marker in sync → PASS", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;VAULT_PATH"}, nil, StatusPass, "persisted at user scope"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

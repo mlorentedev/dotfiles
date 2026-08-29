@@ -139,11 +139,11 @@ function project-init {
 }
 
 # PowerShell resolves commands Alias -> Function -> Cmdlet -> Application, so a
-# built-in alias silently makes a same-named function unreachable — no parse
+# built-in alias silently makes a same-named function unreachable - no parse
 # error, no warning, the function is just dead (BUG-034). The four names below
 # carry over from .zsh/aliases.zsh, where they already mean exactly this;
 # cross-OS parity is the point of this profile, so clear the built-ins rather
-# than rename out of the collision. Only the *alias* is given up — each cmdlet
+# than rename out of the collision. Only the *alias* is given up - each cmdlet
 # stays reachable under its full name:
 #   gp  -> Get-ItemProperty     gl  -> Get-Location
 #   gcs -> Get-PSCallStack      gbp -> Get-PSBreakpoint

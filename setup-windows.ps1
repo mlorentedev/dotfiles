@@ -623,7 +623,7 @@ if (-not ($claudeCmd -and $npxCmd)) {
 }
 
 # dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
-# (user-space, no admin) — the PowerShell twin of setup-linux.sh sourcing
+# (user-space, no admin) - the PowerShell twin of setup-linux.sh sourcing
 # install-dotf.sh. goreleaser already publishes the Windows zip, so nothing is
 # compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
 # automatically; non-fatal, like the Linux side (`install_dotf || log_warning`).
@@ -674,7 +674,7 @@ if (Test-Path $sensitiveSource) {
     Write-Warn "Sensitive directory not found at $sensitiveSource"
 }
 
-# Deploy the secrets registry (ADR-028 §2 mapping SSOT). dotf secrets reads it
+# Deploy the secrets registry (ADR-028 section 2 mapping SSOT). dotf secrets reads it
 # from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
 # and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
 $registrySource = "$DotfilesDir\secrets\registry.yaml"
@@ -702,7 +702,7 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 }
 
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
-# tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
+# tools (currently sops) into ~/.local/bin via dotf - the same deterministic pattern
 # as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
 # offline box or a single failed download must not abort setup (parity with the
 # Install-Dotf warning above). Guarded on dotf being on PATH, mirroring the env
@@ -939,7 +939,7 @@ if (Test-Path $claudeSettings) {
 # Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
 # Scans both 10_projects/ and 50_work/ for memory directories.
 # VaultRoot honors the ADR-025 seam ($env:VAULT_PATH, set by the sourced
-# paths.ps1) with the legacy default as fallback — parity with setup-linux.sh.
+# paths.ps1) with the legacy default as fallback - parity with setup-linux.sh.
 $VaultRoot = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE "Projects\knowledge" }
 $VaultProjects = Join-Path $VaultRoot "10_projects"
 if (Test-Path $VaultRoot) {
@@ -1181,7 +1181,7 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
             Write-Warn "pi install failed - run: npm install -g --ignore-scripts $piPkg"
         }
     } else {
-        # REFACTOR-013: pin is a MINIMUM — upgrade only when installed < pin so
+        # REFACTOR-013: pin is a MINIMUM - upgrade only when installed < pin so
         # a newer pi is never downgraded by an exact-match reconcile.
         $piVerRaw = (& pi --version 2>&1 | Out-String)
         $piCurrent = if ($piVerRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
@@ -1435,7 +1435,7 @@ if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq
     # expand env vars inside JSON values, so substitution must happen here
     # before write. The path itself is by convention: $USERPROFILE\Projects\knowledge.
     # ADR-025: honor $env:VAULT_PATH (the cross-machine seam) before the legacy
-    # default — parity with setup-linux.sh:402 ${VAULT_PATH:-...}.
+    # default - parity with setup-linux.sh:402 ${VAULT_PATH:-...}.
     $vaultPath = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
     $hiveEntry = $mcpConfigJson.mcpServers."hive-vault"
     if ($hiveEntry -and $hiveEntry.env.PSObject.Properties['VAULT_PATH']) {
@@ -1569,7 +1569,7 @@ if (Test-Path $profileSource) {
             if ($existingContent -match [regex]::Escape($startMarker)) {
                 # Replace existing section using index-based split (BUG-022:
                 # PowerShell -replace with [\s\S]*? expands large strings
-                # instead of replacing — see debug-replace*.ps1 traces).
+                # instead of replacing - see debug-replace*.ps1 traces).
                 $newSection = "$startMarker`r`n$sourceContent`r`n$endMarker"
                 $markerIdx = $existingContent.IndexOf($startMarker)
                 $endIdx = $existingContent.IndexOf($endMarker, $markerIdx)
@@ -1692,7 +1692,7 @@ foreach ($initOrphan in @(
     if (Test-Path $initOrphan) { Remove-Item $initOrphan -Force -ErrorAction SilentlyContinue }
 }
 
-# CLI-050: knowledge-crystallize.ps1 retired — `dotf vault crystallize` is the
+# CLI-050: knowledge-crystallize.ps1 retired - `dotf vault crystallize` is the
 # sole implementation now, and it needs no per-machine deploy step since it
 # ships inside the dotf binary itself.
 
@@ -1737,7 +1737,7 @@ if ($removedLeftovers -gt 0) {
     Write-Info "Removed $removedLeftovers retired or relocated script(s) from $ScriptsDir / $LegacyScriptsDir (WIN-013)"
 }
 
-# CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired — both session
+# CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired - both session
 # hooks now call agnostic `dotf mem` nouns directly (registered below), so there
 # is no per-OS shim script left to deploy.
 
@@ -1857,7 +1857,7 @@ Write-Info "Applying Claude settings.json template + registering SessionStart ho
 $ClaudeSettings = "$ClaudeHome\settings.json"
 $ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
 # CLI-025: both session hooks are agnostic `dotf mem` nouns, invoked directly (no
-# pwsh -File shim — claude-session-start.ps1 + session-handoff.ps1 are deleted).
+# pwsh -File shim - claude-session-start.ps1 + session-handoff.ps1 are deleted).
 # The absolute binary path keeps them working when ~/.local/bin is off PATH (#531).
 $dotfBin = "$env:USERPROFILE\.local\bin\dotf.exe"
 $expectedHookCommand = "`"$dotfBin`" mem session-start"
@@ -1983,7 +1983,7 @@ function Convert-SkillRecord {
         # to the record, instead of stacking a second set on top. Mirrors
         # render_skill's awk rule in scripts/compile-harness.sh exactly.
         # -cmatch, not -match: PowerShell's -match is case-insensitive by
-        # default, and bash's grep/awk are not — a faithful mirror needs the
+        # default, and bash's grep/awk are not - a faithful mirror needs the
         # case-sensitive operator.
         if ($fm -eq 1 -and $line -cmatch '^generated(_from|_sha)?:') { continue }
         $out.Add($line)
