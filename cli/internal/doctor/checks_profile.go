@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // The dotfiles section of the PowerShell profile is delimited by these two
@@ -61,23 +62,51 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 		return
 	}
 
-	profile, checked := findPowerShellProfile(home)
+	profile, source := profileTarget(sys, home)
 	if profile == "" {
-		rep.Fail("PowerShell profile missing (checked: " + strings.Join(checked, ", ") + ")")
+		rep.Fail("PowerShell profile missing (" + source + ")")
 		return
 	}
 	reasons := profileCorruption(profile)
 	if len(reasons) == 0 {
-		rep.Pass("PowerShell profile exists (" + profile + ")")
+		rep.Pass("PowerShell profile exists (" + profile + "; " + source + ")")
 		return
 	}
 	heal := profileHealPath(sys, c)
 	if !fix {
-		rep.Fail(fmt.Sprintf("PowerShell profile corrupted (%s) — BUG-020; run `pwsh -NoProfile -File %s` or `dotf doctor --fix` (backs the profile up, then rebuilds the dotfiles section from powershell/profile.ps1)",
-			strings.Join(reasons, "; "), heal))
+		rep.Fail(fmt.Sprintf("PowerShell profile corrupted (%s; target %s, %s) — BUG-020; run `pwsh -NoProfile -File %s -ProfilePath %s` or `dotf doctor --fix` (backs the profile up, then rebuilds it from powershell/profile.ps1; content outside the dotfiles markers survives only in the backup)",
+			strings.Join(reasons, "; "), profile, source, heal, profile))
 		return
 	}
 	repairProfile(sys, rep, profile, heal)
+}
+
+// profileQueryTimeout bounds the `$PROFILE` question. `-NoProfile` skips the
+// profile itself, so a healthy pwsh answers in well under a second; ten seconds
+// covers a cold start on a loaded box without letting doctor hang.
+const profileQueryTimeout = 10 * time.Second
+
+// profileTarget names the file doctor measures and --fix heals, and says how
+// it was found (CLI-066, #1364).
+//
+// ONE SOURCE OF TRUTH: the heal resolves `$PROFILE` inside pwsh, so doctor asks
+// pwsh the same question and measures that answer. findPowerShellProfile
+// guesses four roots under Documents; on a box whose Documents folder is
+// redirected anywhere else it measured one file (or none) while the heal
+// rewrote another — detect and heal split, silently. The enumeration survives
+// only as the fallback for a box without pwsh on PATH (where the heal could not
+// run either) or a pwsh that does not answer, and the row says which answered.
+func profileTarget(sys *System, home string) (path, source string) {
+	if !sys.has("pwsh") {
+		p, checked := findPowerShellProfile(home)
+		return p, "enumerated, pwsh not on PATH; checked: " + strings.Join(checked, ", ")
+	}
+	out, _, err := sys.CommandOutputBounded(profileQueryTimeout, "pwsh", "-NoProfile", "-Command", "$PROFILE")
+	if p := strings.TrimSpace(firstLine(out)); err == nil && p != "" {
+		return p, "resolved by pwsh $PROFILE"
+	}
+	p, checked := findPowerShellProfile(home)
+	return p, fmt.Sprintf("enumerated, pwsh did not answer $PROFILE (%s); checked: %s", firstLineOr(out, err), strings.Join(checked, ", "))
 }
 
 // findPowerShellProfile returns the first existing $PROFILE
@@ -175,7 +204,13 @@ func contractDefault(sys *System, c *Contract, name string) string {
 // blocks a session on a transient failure), so its exit status says nothing.
 // The profile is re-measured afterwards, and only a profile that now passes
 // profileCorruption is a Fix. The heal backs the corrupted file up beside itself
-// before writing, so nothing is lost by running it.
+// before writing, so nothing is lost by running it — though only the backup
+// keeps what lived outside the dotfiles markers.
+//
+// The heal is told WHICH file (`-ProfilePath`, CLI-066): the one doctor just
+// measured, so the two cannot disagree on a box whose Documents folder is
+// redirected. It runs through the bounded seam like every other probe that
+// shells out; a heal that hangs must not hang doctor.
 func repairProfile(sys *System, rep *Report, profile, heal string) {
 	if !isRegularFile(heal) {
 		rep.Fail(fmt.Sprintf("PowerShell profile corrupted, and %s is not deployed at %s — run setup-windows.ps1 to deploy scripts/, then `dotf doctor --fix` again (BUG-020)",
@@ -186,7 +221,7 @@ func repairProfile(sys *System, rep *Report, profile, heal string) {
 		rep.Fail("PowerShell profile corrupted, and pwsh is not in PATH to run " + profileHealScript + " (BUG-020)")
 		return
 	}
-	out, err := sys.CommandOutput("pwsh", "-NoProfile", "-File", heal)
+	out, _, err := sys.CommandOutputBounded(profileHealTimeout, "pwsh", "-NoProfile", "-File", heal, "-ProfilePath", profile)
 	if err != nil {
 		rep.Fail(fmt.Sprintf("%s did not run (%s) — profile left as is", profileHealScript, firstLineOr(out, err)))
 		return
@@ -196,8 +231,12 @@ func repairProfile(sys *System, rep *Report, profile, heal string) {
 			profileHealScript, strings.Join(reasons, "; "), firstLineOr(out, nil)))
 		return
 	}
-	rep.Fix("PowerShell profile rebuilt from powershell/profile.ps1 by " + profileHealScript + " (the corrupted copy is backed up beside it; restart PowerShell)")
+	rep.Fix("PowerShell profile rebuilt from powershell/profile.ps1 by " + profileHealScript + " at " + profile + " (the corrupted copy is backed up beside it and is the only place content outside the dotfiles markers survives; restart PowerShell)")
 }
+
+// profileHealTimeout bounds the heal: it reads one file, writes a backup and a
+// rewrite — seconds, not minutes. A minute is generous on a loaded box.
+const profileHealTimeout = 60 * time.Second
 
 // firstLineOr renders a subprocess result as one line: its first line of
 // output when it produced one, else the error, else "no output".
