@@ -27,8 +27,16 @@
     "            the entry is skipped and reported. A config for a tool the box",
     "            does not carry is a file nobody reads (#843), and the integration",
     "            guard asserts ~/.copilot never appears without copilot (#1312).",
+    "  paths     native | slash: render the {VAR} tokens found inside the source's",
+    "            JSON string values (the same tokens dst uses) and write each such",
+    "            string with the OS separator (native) or with / (slash), before",
+    "            the strategy runs. Which form a tool accepts is a measured fact",
+    "            about the tool: Copilot wrote backslash trustedFolders into its own",
+    "            config on Windows; agy has read C:/... trustedWorkspaces there daily.",
+    "            Declare the observed form, never guess (AI-042, #1334).",
     "",
-    "version 2 (AI-039): strategy and requires change what an entry MEANS, so a",
+    "version 3 (AI-042): paths changes what an entry's CONTENT means. Version 2",
+    "(AI-039): strategy and requires change what an entry MEANS, so a",
     "dotf that predates them refuses this file instead of deploying every entry",
     "as replace - which would overwrite ~/.copilot/settings.json and wipe the box's",
     "own keys. Bump it again whenever a new field changes meaning: a field an old",
@@ -44,7 +52,7 @@
     "{env:VAR} itself rather than assuming it, which is the assumption that made",
     "#987 expensive."
   ],
-  "version": 2,
+  "version": 3,
   "configs": [
     {
       "name": "pi",
@@ -76,6 +84,7 @@
       "render": false,
       "mode": "0644",
       "strategy": "merge",
+      "paths": "native",
       "requires": "copilot"
     },
     {
@@ -85,6 +94,14 @@
       "render": false,
       "mode": "0644",
       "requires": "copilot"
+    },
+    {
+      "name": "agy-settings",
+      "src": "ai/agy/settings.json",
+      "dst": "{HOME}/.gemini/antigravity-cli/settings.json",
+      "render": false,
+      "mode": "0644",
+      "paths": "slash"
     }
   ]
 }

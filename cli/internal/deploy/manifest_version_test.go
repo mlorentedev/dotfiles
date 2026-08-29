@@ -14,10 +14,10 @@ import (
 func TestParseManifest_RefusesWhatItCannotFullyRead(t *testing.T) {
 	cases := []struct{ name, manifest, want string }{
 		{"older schema", `{"version":1,"configs":[]}`, "version 1 unsupported"},
-		{"newer schema", `{"version":3,"configs":[]}`, "version 3 unsupported"},
-		{"unknown entry field", `{"version":2,"configs":[{"name":"x","src":"a","dst":"b","future":true}]}`, `unknown field "future"`},
-		{"unknown top-level field", `{"version":2,"future":1,"configs":[]}`, `unknown field "future"`},
-		{"trailing document", `{"version":2,"configs":[{"name":"x","src":"a","dst":"b"}]}{"future":true}`, "trailing data"},
+		{"newer schema", `{"version":4,"configs":[]}`, "version 4 unsupported"},
+		{"unknown entry field", `{"version":3,"configs":[{"name":"x","src":"a","dst":"b","future":true}]}`, `unknown field "future"`},
+		{"unknown top-level field", `{"version":3,"future":1,"configs":[]}`, `unknown field "future"`},
+		{"trailing document", `{"version":3,"configs":[{"name":"x","src":"a","dst":"b"}]}{"future":true}`, "trailing data"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestParseManifest_RefusesWhatItCannotFullyRead(t *testing.T) {
 		})
 	}
 	// $comment is documentation, not an unknown field: the shipped manifest carries one.
-	if _, err := ParseManifest([]byte(`{"$comment":["x"],"version":2,"configs":[]}`)); err != nil {
+	if _, err := ParseManifest([]byte(`{"$comment":["x"],"version":3,"configs":[]}`)); err != nil {
 		t.Errorf("$comment must stay allowed: %v", err)
 	}
 }
