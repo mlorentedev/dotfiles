@@ -106,7 +106,7 @@ the exact orphan bug this audit exists to fix** if executed as-is:
 | Script(s) | Why it's a risk | Disposition |
 |---|---|---|
 | `session-handoff.{sh,ps1}` | LIVE twin pair — SessionEnd hook (setup-linux.sh:1244, setup-windows.ps1:1461-1467/1667). Structurally identical to session-start, which `mem` migrates, but **no noun owns it** | Add to **PR 9 (`mem`)** as a `dotf mem session-end` sibling shim |
-| `orca-tune.sh` / `orca-hook-tune.ps1` | LIVE twin pair. The plan named the `.ps1` as "floor" but **omitted the `.sh`** — the mirror image of the orphan bug | Decide as a **pair** — both floor or both ported, never split |
+| `orca-tune.sh` / `orca-hook-tune.ps1` | ~~LIVE twin pair. The plan named the `.ps1` as "floor" but **omitted the `.sh`** — the mirror image of the orphan bug~~ **Resolved as a pair, both ported (CLI-062, #1338, 2026-08-29):** `orca-tune.sh` was already `dotf orca tune` (#1274) with no caller left, deleted; `orca-hook-tune.ps1` — a different function, the DX-006 hook repair — is `dotf orca tune-hooks`, which setup and `doctor --fix` both call; script, Pester and bats deleted | Ported |
 | `session-brief.sh` | Sourced by claude-session-start.sh ("session-brief core"); would orphan when session-start is deleted | Fold into **PR 9 (`mem session-start`)** explicitly |
 | `ensure-memory-symlink.sh` | Auto-memory link logic; overlaps `mem session-start` | Fold into **PR 9** |
 | `install-git-hooks.sh`, `install-precommit.sh` | Hook installers; sourced live (setup-linux.sh:272-277) but never named as floor | Mark **floor** explicitly |
@@ -119,8 +119,8 @@ the exact orphan bug this audit exists to fix** if executed as-is:
 
 `install-dotf.{sh,ps1}`, `shell-profile.sh`, `windows-defaults.ps1`,
 `profile-heal.ps1`, `utils.{sh,ps1}`, the curl bootstrap (IDEAS-005), the
-secrets env-export shim, OS-scheduler unit files, and (pending the pair decision)
-`orca-tune.sh`/`orca-hook-tune.ps1`.
+secrets env-export shim and OS-scheduler unit files. (`orca-tune.sh` /
+`orca-hook-tune.ps1` left the floor with CLI-062: both ported, see the table.)
 
 ## Immediate next move
 

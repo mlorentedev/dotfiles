@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/orca"
 )
 
 // TestCheckOrcaHook is the DX-006 table: one row per decision branch (skip when
@@ -74,7 +76,7 @@ func TestCheckOrcaHook_Fix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if orcaTimeoutBelow(content, 30) {
+	if orca.TimeoutBelow(content, 30) {
 		t.Fatalf("expected orca.json to be tuned to >= 30, got: %s", string(content))
 	}
 }

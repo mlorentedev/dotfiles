@@ -1783,9 +1783,9 @@ foreach ($initOrphan in @(
 $retiredScripts = @(
     "claude-mem-heal.ps1", "claude-session-start.ps1", "diff-check.ps1",
     "doctor.ps1", "healthcheck.ps1", "knowledge-crystallize.ps1",
-    "session-handoff.ps1")
+    "session-handoff.ps1", "orca-hook-tune.ps1")
 $deployedScripts = @(
-    "profile-heal.ps1", "orca-hook-tune.ps1", "windows-defaults.ps1",
+    "profile-heal.ps1", "windows-defaults.ps1",
     "dotfiles-sync.ps1", "obs-cli.ps1")
 $removedLeftovers = 0
 foreach ($dir in @($ScriptsDir, $LegacyScriptsDir) | Select-Object -Unique) {
@@ -1824,22 +1824,21 @@ if (Test-Path $profileHealSource) {
     Write-Warn "profile-heal.ps1 not found at $profileHealSource"
 }
 
-# DX-006: deploy + re-apply the Orca/Copilot PreToolUse hook fix. Orca regenerates
+# DX-006: re-apply the Orca/Copilot PreToolUse hook fix. Orca regenerates
 # ~/.copilot/hooks/orca.json and ~/.orca/agent-hooks/copilot-hook.ps1 on every
 # install/upgrade, reverting the fix (timeoutSec 5 + slow Invoke-WebRequest) and
-# making every Copilot tool call fail with "hook errored". The script is idempotent
-# and skips cleanly when Orca is not installed, so it is always safe to run.
-$orcaHookTuneSource = "$DotfilesDir\scripts\orca-hook-tune.ps1"
-if (Test-Path $orcaHookTuneSource) {
-    Copy-Item $orcaHookTuneSource "$ScriptsDir\" -Force
-    Write-Success "Deployed orca-hook-tune.ps1 to $ScriptsDir\"
-    try {
-        & "$ScriptsDir\orca-hook-tune.ps1"
-    } catch {
-        Write-Warn "orca-hook-tune.ps1 failed: $($_.Exception.Message)"
+# making every Copilot tool call fail with "hook errored". `dotf orca tune-hooks`
+# (CLI-062, the port of orca-hook-tune.ps1) is idempotent and reports "nothing to
+# do" when Orca is not installed, so it is always safe to run.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    & dotf orca tune-hooks
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Orca Copilot hooks tuned (dotf orca tune-hooks)"
+    } else {
+        Write-Warn "dotf orca tune-hooks failed (exit $LASTEXITCODE) -- run it again after setup"
     }
 } else {
-    Write-Warn "orca-hook-tune.ps1 not found at $orcaHookTuneSource"
+    Write-Warn "dotf not on PATH -- skipping the Orca hook fix (run install-dotf.ps1, then 'dotf orca tune-hooks')"
 }
 
 # WIN-005: deploy the HKCU engineering-defaults script (invoked opt-in below).
