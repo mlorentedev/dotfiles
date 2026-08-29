@@ -250,8 +250,8 @@ func TestPlanConfig_RefusesARenderedConfig(t *testing.T) {
 
 func TestParseManifest_ValidatesStrategyByName(t *testing.T) {
 	cases := []struct{ name, manifest, want string }{
-		{"unknown strategy", `{"version":2,"configs":[{"name":"x","src":"a","dst":"b","strategy":"union"}]}`, `config "x": unknown strategy "union"`},
-		{"merge cannot render", `{"version":2,"configs":[{"name":"x","src":"a","dst":"b","strategy":"merge","render":true}]}`, `config "x": strategy merge cannot render`},
+		{"unknown strategy", `{"version":3,"configs":[{"name":"x","src":"a","dst":"b","strategy":"union"}]}`, `config "x": unknown strategy "union"`},
+		{"merge cannot render", `{"version":3,"configs":[{"name":"x","src":"a","dst":"b","strategy":"merge","render":true}]}`, `config "x": strategy merge cannot render`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -261,7 +261,7 @@ func TestParseManifest_ValidatesStrategyByName(t *testing.T) {
 			}
 		})
 	}
-	m, err := ParseManifest([]byte(`{"version":2,"configs":[{"name":"x","src":"a","dst":"b"},{"name":"y","src":"a","dst":"b","strategy":"merge"}]}`))
+	m, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"a","dst":"b"},{"name":"y","src":"a","dst":"b","strategy":"merge"}]}`))
 	if err != nil {
 		t.Fatalf("replace by default and merge must both parse: %v", err)
 	}

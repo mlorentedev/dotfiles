@@ -401,10 +401,9 @@ ensure_directory "$GEMINI_HOME/config"
 ensure_directory "$GEMINI_HOME/prompts"
 ensure_directory "$AGY_APP_DATA"
 
-# 1. Deploy agy settings.json + ignore file
-if [ -f "$CURRENT_DIR/ai/agy/settings.json" ]; then
-    deploy_file "$CURRENT_DIR/ai/agy/settings.json" "$AGY_APP_DATA/settings.json"
-fi
+# 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
+#    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
+#    which a verbatim copy could not do. Only the ignore file is copied here.
 if [ -f "$CURRENT_DIR/.geminiignore" ]; then
     deploy_file "$CURRENT_DIR/.geminiignore" "$GEMINI_HOME/.geminiignore"
 fi
