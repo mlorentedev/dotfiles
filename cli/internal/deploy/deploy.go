@@ -162,7 +162,7 @@ func decodeManifest(data []byte) (Manifest, error) {
 		return m, fmt.Errorf("parse deploy manifest: %w (a field this dotf does not know? rebuild or update dotf)", err)
 	}
 	if err := dec.Decode(new(json.RawMessage)); !errors.Is(err, io.EOF) {
-		return m, fmt.Errorf("parse deploy manifest: trailing data after the manifest object")
+		return m, fmt.Errorf("parse deploy manifest: trailing data after the manifest object (dotf reads one JSON document; remove what follows it)")
 	}
 	return m, nil
 }
