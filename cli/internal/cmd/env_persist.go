@@ -29,6 +29,9 @@ func newEnvPersistCmd() *cobra.Command {
 			"into the OS's per-user persistent environment, the scope a process\n" +
 			"started without a profile inherits. Idempotent: only values that differ\n" +
 			"are written. --check reports drift without writing (non-zero when drifted).\n" +
+			"The names it wrote are recorded in the store as " + env.ManagedMarker + " (';'-joined);\n" +
+			"a name that record lists and the contract no longer names is deleted on the\n" +
+			"next run (CLI-065) — a variable dotf never wrote is never touched.\n" +
 			"Where the OS has no such scope (Linux, macOS) it is a no-op: the rc files\n" +
 			"source paths.sh and unit files carry their own environment.",
 		Args:         cobra.NoArgs,
@@ -56,11 +59,23 @@ func newEnvPersistCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if len(drift) > 0 {
-					for _, v := range drift {
-						cmd.Printf("drift: %s\n", v.Name)
-					}
+				retired, err := env.Retired(store, vars)
+				if err != nil {
+					return err
+				}
+				for _, v := range drift {
+					cmd.Printf("drift: %s\n", v.Name)
+				}
+				for _, name := range retired {
+					cmd.Printf("retired: %s\n", name)
+				}
+				switch {
+				case len(drift) > 0 && len(retired) > 0:
+					return fmt.Errorf("%d variable(s) not persisted and %d retired name(s) still persisted at user scope — run `dotf env persist`", len(drift), len(retired))
+				case len(drift) > 0:
 					return fmt.Errorf("%d variable(s) not persisted at user scope — run `dotf env persist`", len(drift))
+				case len(retired) > 0:
+					return fmt.Errorf("%d retired name(s) still persisted at user scope — run `dotf env persist` to sweep them", len(retired))
 				}
 				cmd.Printf("ok: %d variable(s) persisted at user scope\n", len(vars))
 				return nil
@@ -69,14 +84,18 @@ func newEnvPersistCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			changed := 0
+			changed, removed := 0, 0
 			for _, r := range res {
-				if r.Changed {
+				switch {
+				case r.Removed:
+					removed++
+					cmd.Printf("removed %s (retired from the contract)\n", r.Name)
+				case r.Changed:
 					changed++
 					cmd.Printf("persisted %s\n", r.Name)
 				}
 			}
-			cmd.Printf("user scope: %d changed, %d unchanged\n", changed, len(res)-changed)
+			cmd.Printf("user scope: %d changed, %d unchanged, %d removed\n", changed, len(res)-changed-removed, removed)
 			return nil
 		},
 	}

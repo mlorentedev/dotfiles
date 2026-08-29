@@ -47,6 +47,22 @@ func (registryUserEnv) Set(name, value string) error {
 	return nil
 }
 
+// Delete removes a value from HKCU\Environment. An absent name is success, as
+// the interface promises: the sweep is marker-driven, and a marker may name
+// what a hand edit already removed.
+func (registryUserEnv) Delete(name string) error {
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = k.Close() }()
+	if err := k.DeleteValue(name); err != nil && !errors.Is(err, registry.ErrNotExist) {
+		return err
+	}
+	broadcastEnvironmentChange()
+	return nil
+}
+
 // broadcastEnvironmentChange tells running shells and Explorer that the user
 // environment changed (what setx does after writing the same key), so a
 // terminal opened from the taskbar afterwards sees the value without a
