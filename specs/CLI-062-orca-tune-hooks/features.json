@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-062-orca-tune-hooks-f1",
+    "behavior": "AC1: dotf orca tune-hooks raises every timeoutSec below the floor and swaps the POST, with a timestamped backup beside each changed file; a second run changes nothing",
+    "verification": "cd cli && go test ./internal/orca/ -run 'TestTuneHooks_RepairsBothFilesWithBackups|TestTuneHooks_SecondRunChangesNothing' -count=1",
+    "state": "verified",
+    "evidence": "TestTuneHooks_RepairsBothFilesWithBackups: both timeouts 5 -> 30, Invoke-WebRequest -> [System.Net.HttpWebRequest]::Create($uri) with the original indentation, two .bak.20260829-120000 files; TestTuneHooks_SecondRunChangesNothing: zero changes, no new backup. Box (AC5): 'tuned 2 fix(es) applied', backups orca.json.bak.20260829-042250 and copilot-hook.ps1.bak.20260829-042250"
+  },
+  {
+    "id": "CLI-062-orca-tune-hooks-f2",
+    "behavior": "AC2: --check exits non-zero naming the drift while either file drifts, zero once clean; a missing pair is nothing to do; a generous timeout is left as is; an unrecognised POST is reported and left alone",
+    "verification": "cd cli && go test ./internal/orca/ -run 'TestTuneHooks_CheckReportsAndWritesNothing|TestTuneHooks_NothingToDoWithoutOrca|TestTuneHooks_LeavesAGenerousTimeout|TestTuneHooks_UnrecognisedPostIsLeftAlone' -count=1",
+    "state": "verified",
+    "evidence": "the four Pester cases ported and green; box: scratch copies -> '--check' exit 1 with both drift lines, then exit 0 after the repair; real files -> 'ok: orca.json hook timeouts >= 30', 'ok: copilot-hook.ps1 uses HttpWebRequest', exit 0"
+  },
+  {
+    "id": "CLI-062-orca-tune-hooks-f3",
+    "behavior": "AC3: dotf doctor --fix repairs both DX-006 signals through the orca package, and both FAIL lines name dotf orca tune-hooks",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckOrcaHook' -count=1 && grep -q 'dotf orca tune-hooks' internal/doctor/checks_orca.go && ! grep -q 'orca-hook-tune.ps1' internal/doctor/checks_orca.go",
+    "state": "verified",
+    "evidence": "checks_orca.go reads orca.TimeoutBelow/TuneTimeout and repairs the script through orca.TuneScriptFile under --fix; the remedy lines name the command; TestCheckOrcaHook (table + fix case) green after its helper call followed the move"
+  },
+  {
+    "id": "CLI-062-orca-tune-hooks-f4",
+    "behavior": "AC4: setup-windows.ps1 invokes dotf orca tune-hooks and retires orca-hook-tune.ps1; the four files are deleted; audit-007 says ported",
+    "verification": "bats tests/setup-windows.bats -f 'CLI-062' && [ ! -e scripts/orca-hook-tune.ps1 ] && [ ! -e scripts/orca-tune.sh ] && [ ! -e tests/orca-hook-tune-ps1.bats ] && [ ! -e tests/orca-hook-tune.Tests.ps1 ] && grep -q 'Resolved as a pair, both ported (CLI-062' docs/adr/audit-007-cli-convergence-state.md",
+    "state": "verified",
+    "evidence": "bats 1/1; git rm of the four files; setup-windows.ps1 runs `& dotf orca tune-hooks` guarded on dotf, orca-hook-tune.ps1 moved from $deployedScripts to $retiredScripts; PSScriptAnalyzer 0 findings, 0 non-ASCII; audit-007 row and floor list amended"
+  },
+  {
+    "id": "CLI-062-orca-tune-hooks-f5",
+    "behavior": "AC5 (box): --check against the real files exits 0; scratch copies with timeoutSec 5 and Invoke-WebRequest are tuned through --hook-config/--hook-script and --check then passes",
+    "verification": "test \"$(uname -s | cut -c1-5)\" = MINGW && dotf orca tune-hooks --check",
+    "state": "verified",
+    "evidence": "Windows work box, 2026-08-29, binary from this branch: real files 'ok'/'ok' exit 0; scratch: check exit 1 (two drift lines) -> tune exit 0 (2 fixes, 2 backups) -> check exit 0; 'timeoutSec: 5 left: 0; HttpWebRequest lines: 1; backups: 2'"
+  }
+]

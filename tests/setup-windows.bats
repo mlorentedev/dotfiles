@@ -941,3 +941,15 @@ setup() {
     grep -qF 'dotf harness presence --repo-root "$REPO_ROOT"' "$DOTFILES_DIR/scripts/compile-harness.sh"
     refute_grep '^inject_agent_presence\(\) \{' "$DOTFILES_DIR/scripts/compile-harness.sh"
 }
+
+# CLI-062 (#1338): the DX-006 Orca hook repair is `dotf orca tune-hooks`, the
+# port of scripts/orca-hook-tune.ps1. setup-windows.ps1 calls the command where
+# it copied and ran the script, and sweeps the old deployed copy (WIN-013's
+# retired list) so a stale ~\.dotfiles\scripts\orca-hook-tune.ps1 cannot linger.
+@test "setup-windows.ps1 repairs the Orca hooks through dotf orca tune-hooks, and retires the script (CLI-062)" {
+    grep -qE '^\s*& dotf orca tune-hooks\s*$' "$PS1_SCRIPT"
+    grep -A3 '^\$retiredScripts = @(' "$PS1_SCRIPT" | grep -q '"orca-hook-tune.ps1"'
+    grep -A2 '^\$deployedScripts = @(' "$PS1_SCRIPT" | refute_grep_fixed 'orca-hook-tune.ps1' /dev/stdin
+    [ ! -e "$DOTFILES_DIR/scripts/orca-hook-tune.ps1" ]
+    [ ! -e "$DOTFILES_DIR/scripts/orca-tune.sh" ]
+}
