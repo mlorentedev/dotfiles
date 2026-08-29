@@ -206,11 +206,11 @@ func TestExpandDst_UnresolvableTokenIsAnErrorNotAnEmptySegment(t *testing.T) {
 
 func TestParseManifest_ValidatesAndNamesTheEntry(t *testing.T) {
 	for _, tt := range []struct{ name, body, want string }{
-		{"version", `{"version":2,"configs":[]}`, "version 2 unsupported"},
-		{"empty name", `{"version":1,"configs":[{"src":"a","dst":"b"}]}`, "empty name"},
-		{"duplicate", `{"version":1,"configs":[{"name":"pi","src":"a","dst":"b"},{"name":"pi","src":"c","dst":"d"}]}`, "duplicate config name"},
-		{"empty src", `{"version":1,"configs":[{"name":"pi","dst":"b"}]}`, "empty src"},
-		{"bad mode", `{"version":1,"configs":[{"name":"pi","src":"a","dst":"b","mode":"rwx"}]}`, "not octal"},
+		{"version", `{"version":9,"configs":[]}`, "version 9 unsupported"},
+		{"empty name", `{"version":2,"configs":[{"src":"a","dst":"b"}]}`, "empty name"},
+		{"duplicate", `{"version":2,"configs":[{"name":"pi","src":"a","dst":"b"},{"name":"pi","src":"c","dst":"d"}]}`, "duplicate config name"},
+		{"empty src", `{"version":2,"configs":[{"name":"pi","dst":"b"}]}`, "empty src"},
+		{"bad mode", `{"version":2,"configs":[{"name":"pi","src":"a","dst":"b","mode":"rwx"}]}`, "not octal"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParseManifest([]byte(tt.body))
