@@ -72,6 +72,10 @@ bats tests/compile-harness.bats -f 'agents:|doctrine|presence|HARNESS-092'   -> 
 - **Whole-name `targets:` match.** `Persona.AppliesTo` already matched whole names; the shell's
   substring test (`[pi]` matched `copilot`) is a latent defect, not behaviour to preserve.
 - **Doctor WARN, not FAIL.** The remedy is one idempotent command setup already runs.
+- **The AGENT-PRESENCE markers have one spelling.** `harness.PresenceBeginPrefix/EndMarker` is the
+  SSOT; doctor's mirror constants derive from it and `TestHarnessMarkerConstants` now pins that
+  plus the shell's deletion of its own `AGENT_*` copy (it used to pin the shell's copy — caught
+  after the rebase onto #1365/#1366).
 
 ## Promotion candidates
 
