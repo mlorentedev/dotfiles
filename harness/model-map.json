@@ -133,16 +133,20 @@
   "tiers": {
     "top": {
       "claude": "opus",
+      "copilot": "claude-opus-5",
       "gemini": "gemini-3.1-pro-high"
     },
     "mid": {
       "claude": "sonnet",
+      "copilot": "gpt-5.6-sol",
       "nan": "deepseek-v4-flash",
       "opencode": "qwen3.6-plus"
     },
     "low": {
       "claude": "haiku",
+      "copilot": "gpt-5.4-mini",
       "nan": "qwen3.8-flash",
+      "$comment_copilot": "copilot ids measured 2026-08-29 on the Windows work box against Copilot CLI 1.0.81 (#1170): a custom agent's .agent.md frontmatter `model:` IS read (a bogus id warns and falls back to the seat default; `--model` with a bogus id is a hard error), so render: agent-md is right; `copilot --model <id> -p` answered for claude-opus-5, claude-sonnet-5, claude-haiku-4.5, gpt-5.4-mini and gpt-5.6-sol (the seat default). Note the dotted spelling (claude-haiku-4.5), unlike the Anthropic API ids the claude pool resolves to. Seat-scoped: another seat may accept a different set; re-measure there before trusting these.",
       "$comment": "qwen3.8-flash became the interactive daily driver for pi and opencode on 2026-08-27, replacing qwen3.6. It is 1M-context, reasoning-class, and promoted from catalog-only (#1244 allocation confirmed to continue). qwen3.6 remains available in the picker but is no longer the routed default."
     }
   },
