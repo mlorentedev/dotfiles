@@ -212,20 +212,29 @@ func TestPoolEntriesAreNilWhenNoPoolExists(t *testing.T) {
 	}
 }
 
-// The default is the pool's first entry, and an explicit choice reaches any
-// member — which is what makes the fallback exercisable on purpose rather than
-// only during an outage. A fallback never chosen deliberately is never tested.
-func TestResolveReviewerDefaultsToPrimaryAndHonoursAnExplicitChoice(t *testing.T) {
+// The default is a random draw over the whole pool (HARNESS-093), so every
+// member — the provider-diverse fallback included — gets exercised in the
+// ordinary course of reviews rather than only during an outage; an explicit
+// choice still reaches any member, which is how a run is reproduced.
+func TestDrawReviewerReachesEveryMemberAndResolveHonoursAnExplicitChoice(t *testing.T) {
 	entries := []ReviewerEntry{
 		{ID: "nan/deepseek-v4-flash", Role: "primary"},
 		{ID: "agy/gemini-3.1-pro-high", Role: "fallback"},
 	}
 
-	got, err := ResolveReviewer(entries, "")
-	if err != nil || got.ID != "nan/deepseek-v4-flash" {
-		t.Fatalf("empty want must select the first entry, got %+v (%v)", got, err)
+	for i, want := range []string{"nan/deepseek-v4-flash", "agy/gemini-3.1-pro-high"} {
+		got, err := DrawReviewer(entries, func(n int) int { return i })
+		if err != nil || got.ID != want {
+			t.Fatalf("draw %d must select %s, got %+v (%v)", i, want, got, err)
+		}
 	}
-	got, err = ResolveReviewer(entries, "agy/gemini-3.1-pro-high")
+	if _, err := DrawReviewer(entries, func(n int) int { return n }); err == nil {
+		t.Fatal("an out-of-range draw must be an error, not a panic or a silent first entry")
+	}
+	if _, err := ResolveReviewer(entries, ""); err == nil {
+		t.Fatal("an empty name is not a request for the first entry any more")
+	}
+	got, err := ResolveReviewer(entries, "agy/gemini-3.1-pro-high")
 	if err != nil || got.Role != "fallback" {
 		t.Fatalf("explicit want must select that entry, got %+v (%v)", got, err)
 	}
@@ -247,7 +256,7 @@ func TestResolveReviewerRefusesAModelOutsideThePool(t *testing.T) {
 // With no pool there is nothing to run, and guessing a model would defeat the
 // whole mechanism.
 func TestResolveReviewerRefusesWhenThereIsNoPool(t *testing.T) {
-	if _, err := ResolveReviewer(nil, ""); err == nil {
+	if _, err := DrawReviewer(nil, func(int) int { return 0 }); err == nil {
 		t.Fatal("an absent pool must not resolve to a guessed default")
 	}
 }

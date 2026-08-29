@@ -15,7 +15,7 @@ import (
 func TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent(t *testing.T) {
 	repo, home := t.TempDir(), t.TempDir()
 	writeMirrorFixture(t, filepath.Join(repo, "ai", "deploy.json"), `{
-  "version": 2,
+  "version": 3,
   "configs": [
     {"name": "always", "src": "ai/always.json", "dst": "{HOME}/.always/config.json", "render": false, "mode": "0644"},
     {"name": "gated", "src": "ai/gated.json", "dst": "{HOME}/.gated/settings.json", "render": false, "mode": "0644", "strategy": "merge", "requires": "gatedtool"}

@@ -16,9 +16,8 @@
     ]
   },
   "trustedWorkspaces": [
-    "/home/manu/Projects/*",
-    "C:/Users/mlorente/Projects/*",
-    "C:/Users/mlorente/Projects/Workspace/*"
+    "{HOME}/Projects/*",
+    "{HOME}/Projects/Workspace/*"
   ],
   "workspace": {
     "autoSave": true,

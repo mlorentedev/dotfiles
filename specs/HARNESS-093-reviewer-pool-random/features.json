@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-093-reviewer-pool-random-f1",
+    "behavior": "AC1: DrawReviewer returns the member the draw selects (any index), rejects an out-of-range draw and an empty pool; ResolveReviewer honours an explicit choice and refuses an empty name",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestDrawReviewer|TestResolveReviewer' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-29"
+  },
+  {
+    "id": "HARNESS-093-reviewer-pool-random-f2",
+    "behavior": "AC2: the launch line names the chosen member and whether it was drawn or requested; --dry-run shows the drawn member's command",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSpecReviewDrawsAPoolMemberAndSaysSo|TestSpecReview' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-29"
+  },
+  {
+    "id": "HARNESS-093-reviewer-pool-random-f3",
+    "behavior": "AC3: the pool holds the four NaN reasoning models, every pi member is reasoning: true in ai/pi/models.json, the launcher and the skill say 'drawn at random'",
+    "verification": "bats tests/reviewer-pool.bats",
+    "state": "verified",
+    "evidence": "4/4 on the Windows work box 2026-08-29"
+  },
+  {
+    "id": "HARNESS-093-reviewer-pool-random-f4",
+    "behavior": "AC4 (box): repeated --dry-run launches draw different members; --reviewer names one",
+    "verification": "for i in 1 2 3 4 5 6; do dotf spec review HARNESS-093-reviewer-pool-random --dry-run | grep '^Reviewer:'; done | sort -u | wc -l | grep -qvE '^1$'",
+    "state": "verified",
+    "evidence": "six dry-runs drew agy/gemini-3.1-pro-high (1), nan/glm5.3-flash (2), nan/qwen3.8-flash (3) on the Windows work box 2026-08-29"
+  }
+]

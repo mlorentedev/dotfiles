@@ -70,7 +70,7 @@ load 'lib/refute'
 
 @test "ai/deploy.json deploys settings.json and config.json by merge, mcp-config.json by replace, all gated on copilot" {
     [ "$(jq -r '.configs[] | select(.name=="copilot-settings") | "\(.src) \(.dst) \(.strategy) \(.requires)"' "$MANIFEST")" = "ai/copilot/settings.json {HOME}/.copilot/settings.json merge copilot" ]
-    [ "$(jq -r '.configs[] | select(.name=="copilot-config") | "\(.src) \(.dst) \(.strategy) \(.requires)"' "$MANIFEST")" = "ai/copilot/config.json {HOME}/.copilot/config.json merge copilot" ]
+    [ "$(jq -r '.configs[] | select(.name=="copilot-config") | "\(.src) \(.dst) \(.strategy) \(.requires) \(.paths)"' "$MANIFEST")" = "ai/copilot/config.json {HOME}/.copilot/config.json merge copilot native" ]
     [ "$(jq -r '.configs[] | select(.name=="copilot-mcp") | "\(.src) \(.dst) \(.strategy // "replace") \(.requires)"' "$MANIFEST")" = "ai/copilot/mcp-config.json {HOME}/.copilot/mcp-config.json replace copilot" ]
 }
 
@@ -87,4 +87,30 @@ load 'lib/refute'
     jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm")' "$DOTFILES_DIR/packages.json" >/dev/null
     refute_grep 'Id = "GitHub\.Copilot"' "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep '(apt|snap|curl)[^\n]*copilot' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# AI-042 (#1334): the trust lists carried two usernames and two home roots and
+# matched nothing on any other machine. They carry {HOME} now and `dotf deploy`
+# renders them per box, in the separator form each tool has been observed to
+# accept (Copilot: the backslash form the CLI itself wrote on Windows; agy: the
+# C:/... form it has read there daily). Guarded on every JSON under ai/, not
+# on the one file the audit found first.
+@test "no JSON under ai/ carries a user or home literal (AI-042, #1334)" {
+    # refute_grep takes one file; every JSON under ai/<tool>/ is checked in turn.
+    for f in "$DOTFILES_DIR"/ai/*/*.json; do
+        refute_grep '/home/[a-z]+/|C:\\\\Users\\\\|C:/Users/' "$f"
+    done
+}
+
+@test "the Copilot and agy trust lists are {HOME} templates rendered by dotf deploy (AI-042)" {
+    [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*"]' ]
+    [ "$(jq -c '.trustedWorkspaces' "$DOTFILES_DIR/ai/agy/settings.json")" = '["{HOME}/Projects/*","{HOME}/Projects/Workspace/*"]' ]
+    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.strategy // "replace") \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json replace slash" ]
+    [ "$(jq -r '.version' "$MANIFEST")" = "3" ]
+}
+
+@test "neither setup copies ai/agy/settings.json any more: the manifest entry renders it (AI-042)" {
+    # Measured on the invocation line, not on any mention: the comments name the old form.
+    refute_grep '^[[:space:]]*deploy_file "\$CURRENT_DIR/ai/agy/settings\.json"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep '^[[:space:]]*Copy-Item \$agySettingsSrc' "$DOTFILES_DIR/setup-windows.ps1"
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"io"
 	"os"
 	"os/exec"
@@ -57,6 +58,10 @@ var runCommand = func(dir string, argv []string) error {
 	c.Stderr = os.Stderr
 	return c.Run()
 }
+
+// reviewerDraw is the randomness behind the default reviewer choice (HARNESS-093):
+// rand.IntN in production, a fixed index in tests so a launch is reproducible there.
+var reviewerDraw = rand.IntN
 
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
@@ -117,7 +122,8 @@ harness/reviewer-pool.json, and write its verdict to the spec folder.
 
 The point is that the model is not the launcher's choice, nor the caller's habit:
 it comes from the pool, and dotf spec archive refuses a review signed outside it.
-The pool's first entry is the default; --reviewer selects any other member, which
+One pool member is drawn at random by default (HARNESS-093) — the launch line
+says which, and review.md records it; --reviewer selects a member deliberately, which
 is how the fallback gets exercised deliberately rather than only in an outage.
 
 The model is always passed to the runner explicitly. Relying on a runner's own
@@ -157,7 +163,14 @@ is the only record of how.`,
 			if err != nil {
 				return err
 			}
-			chosen, err := spec.ResolveReviewer(entries, reviewer)
+			var chosen spec.ReviewerEntry
+			how := "requested"
+			if strings.TrimSpace(reviewer) == "" {
+				chosen, err = spec.DrawReviewer(entries, reviewerDraw)
+				how = "random draw"
+			} else {
+				chosen, err = spec.ResolveReviewer(entries, reviewer)
+			}
 			if err != nil {
 				return err
 			}
@@ -182,7 +195,7 @@ is the only record of how.`,
 				}
 			}
 
-			cmd.Printf("Reviewer:   %s (%s, %s)\n", chosen.ID, chosen.Runner, chosen.Role)
+			cmd.Printf("Reviewer:   %s (%s, %s)\n", chosen.ID, chosen.Runner, how)
 			cmd.Printf("Spec:       specs/%s\n", id)
 			cmd.Printf("Transcript: %s\n", transcript)
 
@@ -238,7 +251,7 @@ is the only record of how.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&reviewer, "reviewer", "", "pool member to run (default: the pool's first entry)")
+	cmd.Flags().StringVar(&reviewer, "reviewer", "", "pool member to run (default: one drawn at random from the pool)")
 	cmd.Flags().BoolVar(&foreground, "foreground", false, "run in this terminal instead of a detached tmux session")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command that would run, and exit")
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
