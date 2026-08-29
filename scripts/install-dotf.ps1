@@ -5,7 +5,7 @@
 .DESCRIPTION
     The ADR-020 bootstrap step for Windows (WIN-006): download the pinned `dotf`
     release zip from GitHub, verify its sha256 against the release checksums.txt,
-    and install dotf.exe to ~/.local/bin — user-space, no admin. The PowerShell
+    and install dotf.exe to ~/.local/bin - user-space, no admin. The PowerShell
     twin of scripts/install-dotf.sh.
 
     Dot-sourced by setup-windows.ps1 (which then calls Install-Dotf); also runnable
@@ -18,7 +18,7 @@
     line in versions.conf.
 
 .EXAMPLE
-    # One-line bootstrap — no clone, no admin:
+    # One-line bootstrap - no clone, no admin:
     irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.ps1 | iex
 
 .EXAMPLE
@@ -62,7 +62,7 @@ function Get-DotfVersion {
 # Place $Source at $Target, tolerating a *live* dotf. Windows locks a running
 # image: it refuses to overwrite or delete dotf.exe while any dotf process is
 # live, but it *does* allow renaming one. So stage the new binary beside the
-# target, park the live one, then swap — the analogue of install-dotf.sh's
+# target, park the live one, then swap - the analogue of install-dotf.sh's
 # atomic mv (BUG-037). Throws on failure, having restored the previous binary.
 function Set-DotfBinary {
     [CmdletBinding()]
@@ -104,7 +104,7 @@ function Set-DotfBinary {
 
 # Idempotently install the pinned dotf release. No-op when the pinned version is
 # already on PATH; converges on drift. Returns $true on success, $false on any
-# download/verify error (no binary left in Dest). Never throws — setup wires it
+# download/verify error (no binary left in Dest). Never throws - setup wires it
 # `if (-not (Install-Dotf)) { Write-Warn ... }`, the analogue of `|| log_warning`.
 function Install-Dotf {
     [CmdletBinding()]
@@ -115,7 +115,7 @@ function Install-Dotf {
     )
 
     # Function-scoped, so dot-sourcing this script (setup-windows.ps1 does
-    # `. install-dotf.ps1`) never leaks Stop/StrictMode into the caller's scope —
+    # `. install-dotf.ps1`) never leaks Stop/StrictMode into the caller's scope -
     # only this function's body runs strict. Also required for the try/catch below
     # to catch non-terminating errors regardless of the caller's preference.
     Set-StrictMode -Version Latest
@@ -136,7 +136,7 @@ function Install-Dotf {
         if (Get-Command dotf -ErrorAction SilentlyContinue) {
             # The stream merge (2>&1) is kept deliberately: BUG-070 (#915) fixed
             # `dotf version` to write to stdout, but this installer runs against
-            # whatever dotf is already on PATH — including binaries built before
+            # whatever dotf is already on PATH - including binaries built before
             # that fix, which answer on stderr. Merging both streams and regexing
             # the semver is correct for either. (StrictMode makes `@()[-1]` throw,
             # so never index blind.)
