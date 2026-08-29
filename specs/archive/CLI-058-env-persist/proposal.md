@@ -1,7 +1,7 @@
 ---
 id: "CLI-058-env-persist"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-28"
 issue: "mlorentedev/dotfiles#1324"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, env-contract, adr-025, windows, copilot]
@@ -74,3 +74,5 @@ or stale.
 
 - Bitácora board: #1324
 - ADR-025 (paths resolve at setup), CLI-039 (`dotf env generate`), #1323 (Copilot instructions outside repos)
+
+<!-- archived 2026-08-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1362 -->

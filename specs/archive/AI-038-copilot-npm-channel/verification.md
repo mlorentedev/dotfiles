@@ -51,6 +51,9 @@ bats tests/copilot-config.bats tests/setup-windows.bats tests/opencode.bats   ->
 
 ## Decisions made during implementation
 
+- **`tools.Load` refuses duplicate tool names.** Added in the same PR after a patch applied twice
+  shipped a duplicated `copilot` entry (caught by PR-Agent): ~12 lines in `catalog.go` plus a
+  test. Recorded here because the adversarial review found it in no spec artifact.
 - **SKIP, not FAIL, when absent.** A box may deliberately carry no Copilot and setup deploys its
   config only when the binary is present; the catalog install is the remedy the SKIP names.
 - **Exact-match PASS / drift WARN, like opencode.** The floor semantic lives in `dotf tools install`

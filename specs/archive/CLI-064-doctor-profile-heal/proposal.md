@@ -1,7 +1,7 @@
 ---
 id: "CLI-064-doctor-profile-heal"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-28"
 issue: "mlorentedev/dotfiles#531"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, doctor, windows, profile]
@@ -66,3 +66,5 @@ script declines to heal.
 - Bitácora board: #531
 - BUG-020 (profile compounding), BUG-022 (index-based splice), CLI-018 (doctor consolidation)
 - `scripts/profile-heal.ps1`, `cli/internal/doctor/checks_profile.go`
+
+<!-- archived 2026-08-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1353 -->
