@@ -74,6 +74,20 @@ bats tests/copilot-config.bats tests/antigravity.bats; bats tests/setup-{linux,w
 - **`TestDeploy_PathsComposeWithReplace`** added (round 1, Minor THEORETICAL): AC2's replace half
   had only manifest-shape bats and box evidence; it now has a named regression test beside the
   merge one.
+- **Numbers survive rendering verbatim** (round 2, `agy/gemini-3.1-pro-high`, FAIL — Blocker
+  REAL): `expandPaths` and `mergeInto` decoded into `any` / `map[string]any` with `Unmarshal`,
+  which makes every number a float64 and rounds an integer above 2^53 — an ID, a millisecond
+  timestamp — in a file that declared nothing about numbers. Both now decode through a
+  `UseNumber` decoder (`decodeJSONNumbers`, `decodeJSONObject`) and re-encode the digits they
+  read; `TestRender_PreservesLargeIntegersVerbatim` pins 1234567890123456789 through both.
+  Neither shipped config carries a number today; the fix is for the manifest feature, not
+  for a file.
+- **Only a string that begins with a token is a path** (round 2, Major THEORETICAL): `native`
+  used to run `FromSlash` over any string that carried a token anywhere, so a tokenized URL
+  would have come out with backslashes. `expandPaths` now converts separators only when the
+  token is at position 0 — `{HOME}/Projects/*` is a path, `https://host/{VAR}/x` is not — and
+  `TestExpandPaths_ConvertsOnlyStringsThatBeginWithAToken` pins the three cases. Chosen over
+  documenting the limit because a rule the code enforces beats a rule a comment asks for.
 - **Manifest version 3.** `paths` changes what an entry's content means; the frozen-schema test
   forced the bump, which is the point of that test.
 

@@ -407,8 +407,8 @@ func commit(c Config, staged, dst string, mode os.FileMode) error {
 // a JSON object is an error, because "merge" has no meaning for it and silently
 // replacing it is the data loss this strategy exists to prevent.
 func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
-	var managed map[string]any
-	if err := json.Unmarshal(srcData, &managed); err != nil {
+	managed, err := decodeJSONObject(srcData)
+	if err != nil {
 		return nil, false, fmt.Errorf("source is not a JSON object: %w", err)
 	}
 	if managed == nil {
@@ -416,7 +416,7 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	}
 	existing := map[string]any{}
 	if raw, err := os.ReadFile(dst); err == nil { //nolint:gosec // manifest-declared destination
-		if err := json.Unmarshal(stripLineComments(raw), &existing); err != nil {
+		if existing, err = decodeJSONObject(stripLineComments(raw)); err != nil {
 			return nil, false, fmt.Errorf("destination is not a JSON object: %w", err)
 		}
 		// A JSON `null` unmarshals into a nil map without error; assigning

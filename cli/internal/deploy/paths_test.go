@@ -154,6 +154,59 @@ func TestDeploy_PathsComposeWithReplace(t *testing.T) {
 	}
 }
 
+// AI-042 review round 2 (Blocker, REAL): decoding into `any` made every number
+// a float64, so an integer above 2^53 came back rounded in a file that never
+// declared an interest in numbers. Both renderers keep the digits they read.
+func TestRender_PreservesLargeIntegersVerbatim(t *testing.T) {
+	const big = `1234567890123456789`
+	src := []byte(`{"id":` + big + `,"nested":{"ts":` + big + `},"trustedFolders":["{HOME}/Projects/*"]}`)
+
+	out, err := expandPaths(src, PathsSlash, "/home/u", noResolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), big) || strings.Count(string(out), big) != 2 {
+		t.Errorf("expandPaths rounded an integer:\n%s", out)
+	}
+
+	dst := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(dst, []byte(`{"firstLaunchAt":`+big+`}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	merged, _, err := mergeInto(dst, []byte(`{"id":`+big+`}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(merged), big) != 2 {
+		t.Errorf("mergeInto rounded an integer on one side:\n%s", merged)
+	}
+}
+
+// AI-042 review round 2 (Major, THEORETICAL): `native` converted every slash
+// in any string that carried a token, so a tokenized URL would have come out
+// with backslashes. A string is a path when it BEGINS with a token; a token
+// elsewhere is expanded and the string is otherwise left alone.
+func TestExpandPaths_ConvertsOnlyStringsThatBeginWithAToken(t *testing.T) {
+	src := []byte(`{"path":"{HOME}/Projects/*","url":"https://api.example.com/{HOME}/x","plain":"a/b/c"}`)
+	out, err := expandPaths(src, PathsNative, "/home/u", noResolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.FromSlash("/home/u/Projects/*"); got["path"] != want {
+		t.Errorf("leading-token path: got %q, want %q", got["path"], want)
+	}
+	if got["url"] != "https://api.example.com//home/u/x" {
+		t.Errorf("a tokenized URL must keep its slashes under native: %q", got["url"])
+	}
+	if got["plain"] != "a/b/c" {
+		t.Errorf("a string without a token is untouched: %q", got["plain"])
+	}
+}
+
 func TestParseManifest_ValidatesPathsByName(t *testing.T) {
 	_, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"a","dst":"b","paths":"backslash"}]}`))
 	if err == nil || !strings.Contains(err.Error(), `config "x"`) || !strings.Contains(err.Error(), "paths") {
