@@ -28,6 +28,12 @@
     "            does not carry is a file nobody reads (#843), and the integration",
     "            guard asserts ~/.copilot never appears without copilot (#1312).",
     "",
+    "version 2 (AI-039): strategy and requires change what an entry MEANS, so a",
+    "dotf that predates them refuses this file instead of deploying every entry",
+    "as replace - which would overwrite ~/.copilot/settings.json and wipe the box's",
+    "own keys. Bump it again whenever a new field changes meaning: a field an old",
+    "decoder does not know is invisible to it, the version is not.",
+    "",
     "Copilot's destinations are spelled {HOME}/.copilot rather than {COPILOT_HOME}:",
     "`dotf deploy` runs before `dotf env set`/`generate` in both setups, so on a",
     "first run machine.json — which {COPILOT_HOME} needs to resolve — does not",
@@ -38,7 +44,7 @@
     "{env:VAR} itself rather than assuming it, which is the assumption that made",
     "#987 expensive."
   ],
-  "version": 1,
+  "version": 2,
   "configs": [
     {
       "name": "pi",

@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-092-harness-presence"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-28"
 issue: "mlorentedev/dotfiles#1326"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, windows, cli]
@@ -94,3 +94,5 @@ Observable outcomes. Each must be testable.
 
 - Bitácora board: #1326 (HARNESS-092); related #495 (CLI-026), #563 (HARNESS-047), #1319 (AC7 of HARNESS-045: resolve-skills delegation)
 - Related ADR: `docs/adr/adr-020-tooling-cli-go-convergence.md` (C7, strangler fig), `docs/adr/adr-027-*` (marker namespaces)
+
+<!-- archived 2026-08-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1368 -->
