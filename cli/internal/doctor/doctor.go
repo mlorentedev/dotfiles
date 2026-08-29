@@ -104,6 +104,7 @@ func Run(opts Options) (int, error) {
 		checkPiExtensions(sys, cfg, rep, opts.Fix)
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
 		checkDeployDrift(sys, cfg, rep)
+		checkDeployManifest(sys, rep)
 		checkRepoDirResolves(rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep, opts.Fix)
