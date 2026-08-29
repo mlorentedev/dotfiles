@@ -23,8 +23,8 @@
   {
     "id": "HARNESS-093-reviewer-pool-random-f4",
     "behavior": "AC4 (box): repeated --dry-run launches draw different members; --reviewer names one",
-    "verification": "for i in 1 2 3 4 5 6; do dotf spec review HARNESS-093-reviewer-pool-random --dry-run | grep '^Reviewer:'; done | sort -u | wc -l | grep -qvE '^1$'",
+    "verification": "for i in 1 2 3 4 5 6; do dotf spec review HARNESS-093-reviewer-pool-random --dry-run 2>&1 | grep '^Reviewer:'; done | sort -u | awk 'END { exit !(NR >= 2) }'",
     "state": "verified",
-    "evidence": "six dry-runs drew agy/gemini-3.1-pro-high (1), nan/glm5.3-flash (2), nan/qwen3.8-flash (3) on the Windows work box 2026-08-29"
+    "evidence": "(review round 1, glm5.3-flash, Minor REAL: the launch line is written to stderr, so the original command counted 0 lines and grep -qvE matched vacuously; 2>&1 added and the assertion made >= 2 distinct) six dry-runs drew agy/gemini-3.1-pro-high (1), nan/glm5.3-flash (2), nan/qwen3.8-flash (3) on the Windows work box 2026-08-29"
   }
 ]
