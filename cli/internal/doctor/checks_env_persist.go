@@ -47,8 +47,21 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		rep.Warn("user-scope environment unreadable (" + err.Error() + ")")
 		return
 	}
-	if len(drift) == 0 && len(retired) == 0 {
+	stale, err := envpkg.MarkerStale(reader, vars)
+	if err != nil {
+		rep.Warn("user-scope environment unreadable (" + err.Error() + ")")
+		return
+	}
+	if len(drift) == 0 && len(retired) == 0 && !stale {
 		rep.Pass(fmt.Sprintf("%d contract variable(s) persisted at user scope", len(vars)))
+		return
+	}
+	if len(drift) == 0 && len(retired) == 0 {
+		// Every variable is in place; only the ownership record lags the
+		// contract (a box that persisted before the record existed, or a
+		// leftover a hand edit removed). One run rewrites it.
+		rep.Warn(fmt.Sprintf("%d contract variable(s) persisted at user scope, but the ownership record (%s) is out of date — run `dotf env persist`",
+			len(vars), envpkg.ManagedMarker))
 		return
 	}
 	if len(drift) > 0 {

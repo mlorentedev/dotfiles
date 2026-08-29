@@ -180,12 +180,18 @@ func TestMarkerValue(t *testing.T) {
 }
 
 // Retired is the read-only mirror of the sweep for --check and doctor: it
-// names what Persist would delete, and a missing marker names nothing.
+// names what Persist would DELETE — a leftover still in the store. A name the
+// marker lists that a hand edit already removed is not "still persisted"
+// (CodeRabbit on #1378); that is a stale record, MarkerStale's business.
 func TestRetired(t *testing.T) {
 	vars := []ResolvedVar{{Name: "A", Value: "1"}}
-	got, err := Retired(&fakeUserEnv{values: map[string]string{ManagedMarker: "A;OLD"}}, vars)
+	got, err := Retired(&fakeUserEnv{values: map[string]string{ManagedMarker: "A;OLD", "OLD": "x"}}, vars)
 	if err != nil || !reflect.DeepEqual(got, []string{"OLD"}) {
 		t.Fatalf("got %v, %v; want [OLD]", got, err)
+	}
+	got, err = Retired(&fakeUserEnv{values: map[string]string{ManagedMarker: "A;OLD"}}, vars)
+	if err != nil || len(got) != 0 {
+		t.Fatalf("a leftover already gone from the store is not retired-and-persisted, got %v, %v", got, err)
 	}
 	got, err = Retired(&fakeUserEnv{values: map[string]string{}}, vars)
 	if err != nil || len(got) != 0 {
@@ -196,10 +202,76 @@ func TestRetired(t *testing.T) {
 	}
 }
 
+// MarkerStale is the marker half of the --check mirror: true with no marker,
+// true when the record lags the contract, false when it matches.
+func TestMarkerStale(t *testing.T) {
+	vars := []ResolvedVar{{Name: "B", Value: "2"}, {Name: "A", Value: "1"}}
+	cases := []struct {
+		name   string
+		values map[string]string
+		want   bool
+	}{
+		{"no marker", map[string]string{}, true},
+		{"marker lags the contract", map[string]string{ManagedMarker: "A;OLD"}, true},
+		{"marker matches", map[string]string{ManagedMarker: "A;B"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := MarkerStale(&fakeUserEnv{values: tc.values}, vars)
+			if err != nil || got != tc.want {
+				t.Fatalf("got %v, %v; want %v", got, err, tc.want)
+			}
+		})
+	}
+}
+
+// A leftover a hand edit already removed: nothing is deleted, nothing is
+// reported as removed, and the record is rewritten so the next --check is
+// clean — the mirror stays exact in both directions.
+func TestPersist_SkipsALeftoverAlreadyGone(t *testing.T) {
+	store := &fakeUserEnv{values: map[string]string{"A": "1", ManagedMarker: "A;OLD"}}
+	res, err := Persist([]ResolvedVar{{Name: "A", Value: "1"}}, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(store.deletes) != 0 {
+		t.Fatalf("nothing to delete, got %v", store.deletes)
+	}
+	for _, r := range res {
+		if r.Removed {
+			t.Fatalf("an absent name must not be reported as removed: %+v", r)
+		}
+	}
+	if store.values[ManagedMarker] != "A" {
+		t.Fatalf("record must be rewritten, got %q", store.values[ManagedMarker])
+	}
+	stale, err := MarkerStale(store, []ResolvedVar{{Name: "A", Value: "1"}})
+	if err != nil || stale {
+		t.Fatalf("record must read as current after the run, got stale=%v err=%v", stale, err)
+	}
+}
+
+// The marker cannot round-trip a name holding its separator: "A;B" would read
+// back as A and B, and the next run could delete two unrelated values
+// (CodeRabbit on #1378). Refused before anything is written.
+func TestPersist_RefusesASeparatorInAName(t *testing.T) {
+	store := &fakeUserEnv{values: map[string]string{"A": "theirs", "B": "theirs"}}
+	_, err := Persist([]ResolvedVar{{Name: "A;B", Value: "1"}}, store)
+	if err == nil || !contains(err.Error(), `"A;B"`) {
+		t.Fatalf("a separator in a name must be refused naming it, got %v", err)
+	}
+	if len(store.ops) != 0 {
+		t.Fatalf("refusal must happen before any write, got %v", store.ops)
+	}
+	if store.values["A"] != "theirs" || store.values["B"] != "theirs" {
+		t.Fatal("foreign A and B must be untouched")
+	}
+}
+
 // A delete error is surfaced with the retired name, never swallowed, and the
 // results returned so far say what was done before it.
 func TestPersist_DeleteErrorsNameTheVariable(t *testing.T) {
-	store := &fakeUserEnv{values: map[string]string{ManagedMarker: "A;OLD"}, delErr: errors.New("access denied")}
+	store := &fakeUserEnv{values: map[string]string{ManagedMarker: "A;OLD", "OLD": "x"}, delErr: errors.New("access denied")}
 	if _, err := Persist([]ResolvedVar{{Name: "A", Value: "1"}}, store); err == nil || !contains(err.Error(), "OLD") {
 		t.Fatalf("delete error must name the retired variable, got %v", err)
 	}

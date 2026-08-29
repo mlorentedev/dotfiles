@@ -22,7 +22,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - `go vet ./...` and `GOOS=windows go vet ./...` clean; `golangci-lint run ./...` (pinned 2.12.2, matches `versions.conf`) -> `0 issues`
 - Manual smoke test (AC6), binary `dotf-sweep.exe` built from this branch, `DOTFILES_REPO_DIR` switched between the real checkout and a scratch copy of the contract minus `SCRIPTS_DIR`:
 
-  ```
+  ```text
   --- 1. real contract, first run under the new binary ---
   persisted DOTF_MANAGED_ENV
   user scope: 1 changed, 11 unchanged, 0 removed

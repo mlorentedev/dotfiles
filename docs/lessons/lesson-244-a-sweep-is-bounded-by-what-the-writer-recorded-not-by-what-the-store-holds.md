@@ -52,6 +52,6 @@ construction what the write deletes.
 
 ## Refs
 
-- `specs/archive/CLI-065-env-persist-sweep/` (this change); `cli/internal/env/persist.go`
+- `specs/CLI-065-env-persist-sweep/` (this change; moves under `specs/archive/` once reviewed); `cli/internal/env/persist.go`
 - WIN-013 (#1310) — the same class on the scripts directory, solved with an allow-list because the set was seven known names
 - The shared-surface pattern in the project memory: *the writer touches only what it owns*

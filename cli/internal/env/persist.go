@@ -123,8 +123,10 @@ func namesVar(vars []ResolvedVar, name string) bool {
 	return false
 }
 
-// Retired reads the marker through reader and returns the leftovers — the
-// read-only half of the sweep, for `--check` and for doctor.
+// Retired reads the marker through reader and returns the leftovers that are
+// STILL IN THE STORE — the read-only half of the sweep, for `--check` and for
+// doctor. A name the marker lists that a hand edit already removed is not
+// "still persisted"; it is only a stale record, which MarkerStale reports.
 func Retired(reader UserEnvReader, vars []ResolvedVar) ([]string, error) {
 	cur, ok, err := reader.Get(ManagedMarker)
 	if err != nil {
@@ -133,7 +135,40 @@ func Retired(reader UserEnvReader, vars []ResolvedVar) ([]string, error) {
 	if !ok {
 		return nil, nil
 	}
-	return Leftovers(ParseMarker(cur), vars), nil
+	var present []string
+	for _, name := range Leftovers(ParseMarker(cur), vars) {
+		if _, there, err := reader.Get(name); err != nil {
+			return nil, fmt.Errorf("read persisted %s: %w", name, err)
+		} else if there {
+			present = append(present, name)
+		}
+	}
+	return present, nil
+}
+
+// MarkerStale reports whether the ownership record differs from what the
+// contract names now — the marker half of what Persist would write, so that
+// `--check` stays the exact mirror of `persist`: a run that `--check` calls
+// clean changes nothing, marker included.
+func MarkerStale(reader UserEnvReader, vars []ResolvedVar) (bool, error) {
+	cur, ok, err := reader.Get(ManagedMarker)
+	if err != nil {
+		return false, fmt.Errorf("read persisted %s: %w", ManagedMarker, err)
+	}
+	return !ok || cur != MarkerValue(vars), nil
+}
+
+// checkNames refuses a contract name the marker could not round-trip: a name
+// holding the separator would be read back as two names, and the next run
+// could delete two unrelated values. Contract names are identifiers by
+// convention; this is where the convention becomes a guarantee.
+func checkNames(vars []ResolvedVar) error {
+	for _, v := range vars {
+		if strings.Contains(v.Name, markerSep) {
+			return fmt.Errorf("contract variable name %q contains the marker separator %q and cannot be persisted", v.Name, markerSep)
+		}
+	}
+	return nil
 }
 
 // Persist brings the store in line with the contract, touching only what
@@ -154,6 +189,9 @@ func Retired(reader UserEnvReader, vars []ResolvedVar) ([]string, error) {
 // the registry would be the unbounded sweep this exists to avoid.
 func Persist(vars []ResolvedVar, store UserEnvStore) ([]PersistResult, error) {
 	out := make([]PersistResult, 0, len(vars)+1)
+	if err := checkNames(vars); err != nil {
+		return out, err
+	}
 	stored, hasMarker, err := store.Get(ManagedMarker)
 	if err != nil {
 		return out, fmt.Errorf("read persisted %s: %w", ManagedMarker, err)
@@ -163,6 +201,13 @@ func Persist(vars []ResolvedVar, store UserEnvStore) ([]PersistResult, error) {
 		owned = ParseMarker(stored)
 	}
 	for _, name := range Leftovers(owned, vars) {
+		// A leftover a hand edit already removed is not deleted and not
+		// reported as removed; the marker rewrite below retires its record.
+		if _, there, err := store.Get(name); err != nil {
+			return out, fmt.Errorf("read persisted %s: %w", name, err)
+		} else if !there {
+			continue
+		}
 		if err := store.Delete(name); err != nil {
 			return out, fmt.Errorf("remove retired %s: %w", name, err)
 		}
