@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-055-owner-only-acl-f1",
+    "behavior": "AC1: fsmode.Apply(path, 0600) on Windows leaves exactly two ACEs (the calling user and SYSTEM) on a protected DACL; on POSIX it is os.Chmod",
+    "verification": "cd cli && go test ./internal/fsmode/ -run 'TestApply_OwnerOnlyModeSetsAProtectedOwnerOnlyDACL|TestApply_IsChmodOnEveryOS|TestOwnerOnly' -count=1",
+    "state": "verified",
+    "evidence": "Windows work box: TestApply_OwnerOnlyModeSetsAProtectedOwnerOnlyDACL passes (SE_DACL_PROTECTED set, icacls lists two ACEs, no (I), SYSTEM and the token user by name); TestApply_IsChmodOnEveryOS clears the write bit on Windows; GOOS=linux go vet keeps the POSIX build compiling"
+  },
+  {
+    "id": "CLI-055-owner-only-acl-f2",
+    "behavior": "AC2: fsmode.Apply(path, 0644) on Windows keeps the inherited ACL (no DACL rewrite, not protected)",
+    "verification": "cd cli && go test ./internal/fsmode/ -run 'TestApply_SharedModeKeepsTheInheritedACL|TestNeeds_SeesAnInheritedDACLAsMissingOwnerOnly' -count=1",
+    "state": "verified",
+    "evidence": "icacls output identical before and after Apply(0644), DACL not protected; Needs(inherited, 0644) is false while Needs(inherited, 0600) is true"
+  },
+  {
+    "id": "CLI-055-owner-only-acl-f3",
+    "behavior": "AC3: the three writers go through fsmode.Apply, no os.Chmod call remains in them; an in-sync 0600 whose mode is off is fixed on the next deploy (mode fixed / would fix mode) without a content rewrite",
+    "verification": "test \"$(grep -cE 'os\\.Chmod\\(' cli/internal/deploy/deploy.go cli/internal/secrets/render.go | awk -F: '{s+=$2} END {print s}')\" = 0 && cd cli && go test ./internal/deploy/ -run 'TestDeploy_InSyncContentStillGetsItsDeclaredMode' -count=1 && go test ./internal/fsmode/ -run 'TestNeeds_MirrorsApply' -count=1",
+    "state": "verified",
+    "evidence": "grep: 0 os.Chmod( calls in the writers; TestDeploy_InSyncContentStillGetsItsDeclaredMode: dry run reports ModeFixed without touching, real run fixes and reports ModeFixed, content byte-identical, second run in sync. The gap was found on the box: the first AC4 run said 'in sync' and the inherited ACL stayed"
+  },
+  {
+    "id": "CLI-055-owner-only-acl-f4",
+    "behavior": "AC4 (box): after dotf deploy, icacls ~/.pi/agent/models.json lists the user and NT AUTHORITY\\SYSTEM only, with no (I) entries; a 0644 neighbour keeps its (I) entries; a second run is in sync",
+    "verification": "test \"$(uname -s | cut -c1-5)\" = MINGW && ! icacls \"$USERPROFILE/.pi/agent/models.json\" | grep -q '(I)' && icacls \"$USERPROFILE/.pi/agent/models.json\" | grep -q 'NT AUTHORITY\\\\SYSTEM:(F)' && dotf deploy pi | grep -q '^in sync'",
+    "state": "verified",
+    "evidence": "Windows work box, 2026-08-29, binary from this branch: 'would fix mode pi' (dry run), 'mode fixed pi', icacls -> 'TDY\\<user>:(F)' and 'NT AUTHORITY\\SYSTEM:(F)' only, second run 'in sync', ~/.gemini/antigravity-cli/settings.json (0644) keeps 3 inherited entries, the file still reads (2903 bytes)"
+  },
+  {
+    "id": "CLI-055-owner-only-acl-f5",
+    "behavior": "AC5: CI's Windows leg runs the Windows-only tests and passes under its service account (user resolved from the process token, never a name)",
+    "verification": "cd cli && GOOS=windows go vet ./internal/fsmode/ && grep -q 'OpenCurrentProcessToken' internal/fsmode/fsmode_windows.go && ! grep -qE 'USERNAME|user\\.Current' internal/fsmode/fsmode_windows.go",
+    "state": "verified",
+    "evidence": "fsmode_windows.go resolves the SID from OpenCurrentProcessToken().GetTokenUser(); no environment or username lookup; the box run under a domain account (TDY\\<user>) exercised the same path CI's service account will"
+  }
+]

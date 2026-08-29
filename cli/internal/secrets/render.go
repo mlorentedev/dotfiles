@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsmode"
 )
 
 // envToken matches a {env:NAME} placeholder, NAME being an upper-snake env-var
@@ -182,7 +184,9 @@ func AtomicWriteMode(path string, content []byte, mode os.FileMode) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("atomic write: close temp for %s: %w", path, err)
 	}
-	if err := os.Chmod(tmpName, mode); err != nil {
+	// fsmode, not os.Chmod: on Windows a 0600 credential file gets an owner-only
+	// DACL, which the rename below carries to its final name (CLI-055).
+	if err := fsmode.Apply(tmpName, mode); err != nil {
 		return fmt.Errorf("atomic write: chmod temp for %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
