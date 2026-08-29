@@ -187,7 +187,9 @@ func TestModelMapConsumerClasses(t *testing.T) {
 			t.Errorf("mid/claude = %q, want sonnet", got)
 		}
 		// A tier that does not resolve for a harness must say so, not return "".
-		if _, err := ResolveTier(m, "mid", "copilot"); err == nil {
+		// pi is an adapter (its model arrives as a launcher flag), so no tier names
+		// it by design; copilot served here until #1170 gave it tiers.
+		if _, err := ResolveTier(m, "mid", "pi"); err == nil {
 			t.Error("a tier with no entry for a harness must be a loud error, not an empty string")
 		}
 	})
@@ -722,16 +724,12 @@ func TestEnumHandlesNonComparableValues(t *testing.T) {
 // so the set can only shrink deliberately. Same idiom as EXEMPT_SUITES in
 // tests/stub-real-pairing.bats.
 //
-//	copilot  render: agent-md is CORRECT — Copilot CLI custom agents take a
-//	         `model:` string in their .agent.md frontmatter (github/copilot-cli
-//	         #2133 confirms it, and that it rejects the array form VS Code
-//	         accepts). What is missing is only WHICH ids this seat accepts, and
-//	         that is not knowable from this machine: the binary is not installed,
-//	         and copilot appears only in manifest.json's agents.presence, never
-//	         agents.deploy. Declaring guessed ids would put a route to nowhere in
-//	         the map that validates cleanly — the class ADR-035 deleted the
-//	         phantom `codex` pool to avoid. Deferred to the Windows box (#1170).
-var tierlessRenderers = map[string]bool{"copilot": true}
+//	(empty)  copilot left the set on 2026-08-29 (#1170): measured on the Windows
+//	         work box against Copilot CLI 1.0.81, a custom agent's .agent.md
+//	         `model:` IS read (a bogus id warns and falls back to the seat
+//	         default), and the seat answered `copilot --model <id> -p` for the
+//	         three ids model-map.json now names. render: agent-md stands.
+var tierlessRenderers = map[string]bool{}
 
 func TestRenderKindAgreesWithTierKeying(t *testing.T) {
 	root := repoRootForTest(t)
