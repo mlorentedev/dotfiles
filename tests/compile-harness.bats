@@ -71,6 +71,8 @@ seed_dotf_stub() {
 # whether the binary is new enough. cli/internal/cmd pins the real help's shape.
 if [ "$1 $2" = "harness --help" ]; then
     printf 'Available Commands:\n  resolve-tier          Resolve a neutral model tier\n  resolve-capabilities  Resolve neutral capabilities\n  resolve-skills        Print the forced-skill ids a record declares\n  triggers              x\n'
+    # HARNESS-092: listed unless a test simulates a dotf that predates the verb.
+    [ "${STUB_NO_PRESENCE:-0}" = "1" ] || printf '  presence              Inject the forced-skills roster into the harness files\n'
     exit 0
 fi
 # Simulates the real subcommand's CONTRACT: both frontmatter forms in, one flow
@@ -98,6 +100,32 @@ if [ "$1 $2" = "harness resolve-capabilities" ]; then
     fi
     printf 'capability "%s" is not mapped for harness "%s"\n' "$3" "$5" >&2
     exit 1
+fi
+# HARNESS-092: `harness presence` is the injector both setups call. The stub
+# records what it was asked (the contract this layer owns: call it with the
+# checkout, honour its exit status) and simulates `--render` from the records
+# the way the resolve-skills branch does, because deploy_doctrine composes the
+# compact payload from that output. The scenarios -- inject, idempotent,
+# append, targets[] -- are pinned in cli/internal/harness/presence_test.go.
+if [ "$1 $2" = "harness presence" ]; then
+    printf '%s\n' "$*" >> "${STUB_BIN_DIR:-$(dirname "$0")}/presence.argv"
+    if [ "${STUB_PRESENCE_FAIL:-0}" = "1" ]; then printf 'stub: presence failed\n' >&2; exit 1; fi
+    if [ "$3" = "--render" ]; then
+        agent="$4"; recdir=""
+        [ "$5" = "--repo-root" ] && recdir="$6/harness/agents"
+        first=1
+        for d in "$recdir"/*/; do
+            f="$d/AGENT.md"; [ -f "$f" ] || continue
+            kind="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^kind:/{sub(/^[^:]*:[[:space:]]*/,""); print; exit} n>=2{exit}' "$f")"
+            [ "$kind" = "autonomous" ] && continue
+            targets="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^targets:/{print; exit} n>=2{exit}' "$f")"
+            if [ -n "$targets" ]; then case "$targets" in *"$agent"*) ;; *) continue ;; esac; fi
+            if [ "$first" = 1 ]; then printf '## Active agent personas — forced skills\n\nWhen acting as one, you MUST consume its skills.\n\n'; first=0; fi
+            skills="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^skills:[[:space:]]*\[/{sub(/^[^:]*:[[:space:]]*/,""); print; exit} n>=2{exit}' "$f")"
+            printf -- '- **%s** — MUST consume: %s\n' "$(basename "$d")" "${skills:-none}"
+        done
+    fi
+    exit 0
 fi
 # Only the subcommands the render calls; anything else is a test bug.
 [ "$1 $2" = "harness resolve-tier" ] || { printf 'stub: unexpected: %s\n' "$*" >&2; exit 127; }
@@ -1197,13 +1225,9 @@ PY
     [ ! -f "$FAKEHOME/.claude/agents/curator.md" ]
 }
 
-@test "agents: a block-style skills list renders the real skills, not \"none\"" {
+@test "agents: a block-style skills list is never rendered as \"none\" -- a dotf too old for the verb deploys no roster at all (HARNESS-045 AC7, HARNESS-092)" {
     seed_agents_fixture
     seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
-    # HARNESS-045 AC7. skill_field reads the inline form only, so before the
-    # delegation this rendered "MUST consume: none" -- enforcement removed with
-    # no error anywhere. The presence text carries ids only: `enforce:` is what
-    # `dotf harness gate` acts on, and the doctrine payload is character-capped.
     python3 - "$VAULT/00_meta/agents/definitions/curator/AGENT.md" <<'PY'
 import re, sys, pathlib
 p = pathlib.Path(sys.argv[1])
@@ -1213,44 +1237,12 @@ p.write_text(re.sub(
     p.read_text(), count=1, flags=re.M))
 PY
     run_refresh; [ "$status" -eq 0 ]
+    export STUB_NO_PRESENCE=1
     run_deploy; [ "$status" -eq 0 ]
-    grep -q 'MUST consume: \[crystallize, insights\]' "$FAKEHOME/.claude/CLAUDE.md"
-    refute_grep_fixed 'MUST consume: none' "$FAKEHOME/.claude/CLAUDE.md"
-    # severity stays out of the prose; it belongs to the gate
-    refute_grep_fixed 'enforce' "$FAKEHOME/.claude/CLAUDE.md"
-}
-
-@test "agents: a block-style skills list fails loudly when dotf cannot read it" {
-    seed_agents_fixture
-    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
-    python3 - "$VAULT/00_meta/agents/definitions/curator/AGENT.md" <<'PY'
-import re, sys, pathlib
-p = pathlib.Path(sys.argv[1])
-p.write_text(re.sub(
-    r"^skills:.*$",
-    "skills:\n  - id: crystallize\n    enforce: block",
-    p.read_text(), count=1, flags=re.M))
-PY
-    run_refresh; [ "$status" -eq 0 ]
-    # a dotf predating resolve-skills: the fallback is the awk read, which returns
-    # EMPTY for this record. Degrading to "none" here is the silent disarm the
-    # whole acceptance criterion exists to prevent, so the fallback must refuse.
-    cat > "$STUB_BIN/dotf" <<'NOSKILLS'
-#!/usr/bin/env bash
-if [ "$1 $2" = "harness --help" ]; then
-    printf 'Available Commands:\n  resolve-tier          x\n  resolve-capabilities  x\n'
-    exit 0
-fi
-if [ "$1 $2" = "harness resolve-capabilities" ]; then printf 'tools: Read\n'; exit 0; fi
-[ "$1 $2" = "harness resolve-tier" ] || { printf 'stub: unexpected: %s\n' "$*" >&2; exit 127; }
-printf 'opus\n'
-NOSKILLS
-    chmod +x "$STUB_BIN/dotf"
-    run_deploy
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"block style"* ]]
-    [[ "$output" == *DISARM* ]]
-    refute_grep_fixed 'MUST consume: none' "$FAKEHOME/.claude/CLAUDE.md"
+    [[ "$output" == *"presence NOT deployed"* ]]
+    refute_grep_fixed 'MUST consume' "$FAKEHOME/.claude/CLAUDE.md"
+    # the real rendering of the mapping form -- ids only, no severity -- is
+    # pinned in cli/internal/harness/presence_test.go
 }
 
 @test "agents: the unavailable-resolver warning states that it GRANTS, not denies" {
@@ -1289,41 +1281,47 @@ HALF2
     fi
 }
 
-@test "agents: --deploy injects a presence region (forced skills) into every harness instructions file" {
+# HARNESS-092 (#1326): presence is rendered and injected by `dotf harness presence`
+# -- one implementation for both OSes, one sha in every begin marker. This
+# layer's contract with it: call it with the checkout as --repo-root, honour its
+# exit status, and refuse to deploy without it (a roster that quietly is not
+# deployed is the defect the port removes). The scenarios -- inject into every
+# file, idempotent, append when no markers, targets[] -- are pinned in
+# cli/internal/harness/presence_test.go, where the implementation lives.
+@test "agents: --deploy delegates presence to dotf harness presence with the checkout as --repo-root (HARNESS-092)" {
     seed_agents_fixture
     seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
-    seed_instructions_file "$FAKEHOME/.config/opencode/AGENTS.md"
-    seed_instructions_file "$FAKEHOME/.pi/agent/AGENTS.md"
-    seed_instructions_file "$FAKEHOME/.copilot/copilot-instructions.md"
     run_refresh; [ "$status" -eq 0 ]
     run_deploy; [ "$status" -eq 0 ]
-    for f in "$FAKEHOME/.claude/CLAUDE.md" "$FAKEHOME/.config/opencode/AGENTS.md" \
-             "$FAKEHOME/.pi/agent/AGENTS.md" "$FAKEHOME/.copilot/copilot-instructions.md"; do
-        # presence region present, naming the persona + its forced skills
-        grep -q 'BEGIN HARNESS AGENT-PRESENCE' "$f"
-        grep -q 'END HARNESS AGENT-PRESENCE' "$f"
-        grep -q 'curator' "$f"
-        grep -q 'vault-doctor' "$f"
-        # the pre-existing patterns region + user content survive untouched
-        grep -q 'patterns content' "$f"
-        grep -q 'user intro' "$f"
-        grep -q 'user outro' "$f"
-    done
+    grep -qF "harness presence --repo-root $REPO" "$STUB_BIN/presence.argv"
+    # the shell carries no injector of its own any more, and its renderer is the verb's --render
+    refute_grep '^inject_agent_presence\(\) \{' "$SCRIPT"
+    grep -qF 'dotf harness presence --render "$agent" --repo-root "$REPO_ROOT"' "$SCRIPT"
 }
 
-@test "agents: presence injection is idempotent and leaves the patterns region intact" {
+@test "agents: a failing dotf harness presence fails --deploy, it is not a warning (HARNESS-092)" {
     seed_agents_fixture
-    F="$FAKEHOME/.config/opencode/AGENTS.md"
-    seed_instructions_file "$F"
+    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
     run_refresh; [ "$status" -eq 0 ]
-    run_deploy; [ "$status" -eq 0 ]
-    run_deploy; [ "$status" -eq 0 ]
-    # exactly one presence region after two deploys (no accumulation)
-    [ "$(grep -c 'BEGIN HARNESS AGENT-PRESENCE' "$F")" -eq 1 ]
-    [ "$(grep -c 'END HARNESS AGENT-PRESENCE' "$F")" -eq 1 ]
-    # the patterns region is still single and intact
-    [ "$(grep -c 'BEGIN HARNESS GENERATED' "$F")" -eq 1 ]
-    grep -q 'patterns content' "$F"
+    export STUB_PRESENCE_FAIL=1
+    run_deploy
+    [ "$status" -ne 0 ]
+}
+
+@test "agents: a dotf that predates harness presence warns that presence was NOT deployed, and the deploy continues (HARNESS-092)" {
+    seed_agents_fixture
+    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
+    run_refresh; [ "$status" -eq 0 ]
+    export STUB_NO_PRESENCE=1
+    run_deploy
+    # the engine's bootstrap contract (see "an absent dotf warns ..." above):
+    # an absent or old resolver degrades loudly, it does not take the deploy down
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"dotf harness presence"* ]]
+    [[ "$output" == *"presence NOT deployed"* ]]
+    refute_grep_fixed 'AGENT-PRESENCE' "$FAKEHOME/.claude/CLAUDE.md"
+    # the agent definitions still deployed
+    [ -f "$FAKEHOME/.claude/agents/curator.md" ]
 }
 
 @test "agents: --check validates the record renders offline (no vault)" {
@@ -1353,30 +1351,3 @@ HALF2
     [ ! -f "$FAKEHOME/.claude/agents/scribe.md" ]
 }
 
-@test "agents: presence appends a fresh region when the file has no presence markers" {
-    seed_agents_fixture
-    F="$FAKEHOME/.pi/agent/AGENTS.md"
-    mkdir -p "$(dirname "$F")"
-    printf 'just user content, no markers\n' > "$F"
-    run_refresh; [ "$status" -eq 0 ]
-    run_deploy; [ "$status" -eq 0 ]
-    grep -q 'just user content' "$F"
-    grep -q 'BEGIN HARNESS AGENT-PRESENCE' "$F"
-    grep -q 'vault-doctor' "$F"
-}
-
-@test "agents: presence respects per-agent targets[] (a persona only appears for harnesses it targets)" {
-    seed_agents_fixture
-    mkdir -p "$VAULT/00_meta/agents/definitions/scribe"
-    printf -- '---\nname: scribe\ndescription: opencode only.\nkind: invocable\nskills: [docs-skill]\ntargets: [opencode]\n---\n\n# Scribe\n' > "$VAULT/00_meta/agents/definitions/scribe/AGENT.md"
-    seed_instructions_file "$FAKEHOME/.claude/CLAUDE.md"
-    seed_instructions_file "$FAKEHOME/.config/opencode/AGENTS.md"
-    run_refresh; [ "$status" -eq 0 ]
-    run_deploy; [ "$status" -eq 0 ]
-    # claude: curator targets it, scribe does not
-    grep -q 'curator' "$FAKEHOME/.claude/CLAUDE.md"
-    refute_grep_fixed 'scribe' "$FAKEHOME/.claude/CLAUDE.md"
-    # opencode: both personas target it
-    grep -q 'curator' "$FAKEHOME/.config/opencode/AGENTS.md"
-    grep -q 'scribe' "$FAKEHOME/.config/opencode/AGENTS.md"
-}

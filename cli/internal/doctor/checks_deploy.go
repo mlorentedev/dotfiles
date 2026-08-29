@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"fmt"
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -526,14 +527,16 @@ func checkInstructionDrift(sys *System, rep *Report) {
 	}
 }
 
-// Harness marker-region delimiters, mirrored from scripts/compile-harness.sh's
-// BEGIN_PREFIX/END_MARKER and AGENT_BEGIN_PREFIX/AGENT_END_MARKER constants. A
-// drift test (TestHarnessMarkerConstants) asserts they stay byte-identical.
+// Harness marker-region delimiters. The GENERATED pair mirrors
+// scripts/compile-harness.sh's BEGIN_PREFIX/END_MARKER (the shell still writes
+// that region); the AGENT-PRESENCE pair is the harness package's, which has
+// owned the presence region since HARNESS-092 (#1326) — the shell no longer
+// spells it. TestHarnessMarkerConstants pins both facts.
 const (
 	harnessBeginPrefix       = "<!-- BEGIN HARNESS GENERATED"
 	harnessEndMarker         = "<!-- END HARNESS GENERATED -->"
-	agentPresenceBeginPrefix = "<!-- BEGIN HARNESS AGENT-PRESENCE"
-	agentPresenceEndMarker   = "<!-- END HARNESS AGENT-PRESENCE -->"
+	agentPresenceBeginPrefix = harness.PresenceBeginPrefix
+	agentPresenceEndMarker   = harness.PresenceEndMarker
 )
 
 // stripHarnessRegions removes every harness-managed marker region (both the

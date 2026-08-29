@@ -908,3 +908,39 @@ setup() {
     run grep -F '& $bunInstaller' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]
 }
+
+# OPS-044 (#1361): hive-vault and pdf-modifier are `uvx` MCP servers, and the
+# registration loop skips a server whose prerequisite binary is absent. With the
+# uv installer in section 4 a clean box's first run registered neither and only
+# the second run converged -- measured on the CI runner the first time Claude
+# Code installed there (#1360). Ordering is asserted by line number of the
+# invocation, on both OSes.
+@test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
+    uv_line=$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    # The executable invocation, never a comment naming it: the block's own
+    # comments mention `claude mcp add` 40 lines above the call.
+    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+}
+
+@test "parity: both setups install uv before registering the Claude MCP servers (OPS-044)" {
+    uv_line=$(grep -n 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+}
+
+# HARNESS-092 (#1326): agent presence -- the forced-skills roster between
+# AGENT-PRESENCE markers in every harness instructions file -- reached Windows
+# through no path at all: compile-harness.sh's deploy_agent_presence had no
+# port. Both setups now call `dotf harness presence`; here it must run after
+# the base files and the skill records are deployed, or it finds nothing to
+# join. Measured on the invocation line, not on any mention.
+@test "setup-windows.ps1 injects agent presence via dotf harness presence after Deploy-SkillRecord (HARNESS-092)" {
+    grep -qE '^[[:space:]]*& dotf harness presence --repo-root \$DotfilesDir[[:space:]]*$' "$PS1_SCRIPT"
+    deploy_line=$(grep -n '^Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    presence_line=$(grep -n '& dotf harness presence' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$deploy_line" ] && [ -n "$presence_line" ] && [ "$deploy_line" -lt "$presence_line" ]
+    # parity: the Linux engine delegates to the same verb and carries no injector of its own
+    grep -qF 'dotf harness presence --repo-root "$REPO_ROOT"' "$DOTFILES_DIR/scripts/compile-harness.sh"
+    refute_grep '^inject_agent_presence\(\) \{' "$DOTFILES_DIR/scripts/compile-harness.sh"
+}

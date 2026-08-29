@@ -505,7 +505,41 @@ if (Test-Path $claudeMdSource) {
 # skill's targets[].
 Ensure-Directory "$ClaudeHome\skills"
 
-# Register MCP servers (requires Claude Code CLI, Node.js)
+# uv (provides uvx) is installed HERE, before the MCP registration below,
+# because hive-vault and pdf-modifier are `uvx` servers: registered after
+# the installer (its old place, section 4) a clean box's first run skipped
+# both with "prerequisite 'uv' not found" and only the second run
+# converged -- measured on the CI runner the day Claude Code first installed
+# there (OPS-044, #1361). Linux has always installed uv first. poetry stays
+# in section 4; it only needs uv to exist, which it now does.
+# Install uv (Python package manager -- provides uvx)
+$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+if (-not $uvCmd) {
+    Write-Info "Installing uv..."
+    try {
+        $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
+        Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
+        # A child process, never dot-sourced or run in this session: a remote
+        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
+        # runner lost npm right after these two (TEST-003/#1298).
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
+        Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
+        # Refresh PATH for current session
+        $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+        if ($uvCmd) {
+            Write-Success "uv installed"
+        } else {
+            Write-Warn "uv installation failed"
+        }
+    } catch {
+        Write-Warn "Failed to install uv: $_"
+    }
+} else {
+    Write-Info "uv already installed"
+}
+
+# Register MCP servers (requires Claude Code CLI, Node.js, uv for the uvx servers)
 # Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
 # `claude mcp get` is used to skip already-registered entries, and `add` errors
 # are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
@@ -1007,33 +1041,6 @@ if (Test-Path $VaultRoot) {
 # Python tooling. Aider was removed in chore/aider-sunset-full (2026-05-16);
 # OpenCode integration on Windows is a separate follow-up (admin-conditional,
 # not automated here).
-
-# Install uv (Python package manager -- provides uvx)
-$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-if (-not $uvCmd) {
-    Write-Info "Installing uv..."
-    try {
-        $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
-        Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
-        # A child process, never dot-sourced or run in this session: a remote
-        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
-        # runner lost npm right after these two (TEST-003/#1298).
-        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
-        Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
-        # Refresh PATH for current session
-        $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
-        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-        if ($uvCmd) {
-            Write-Success "uv installed"
-        } else {
-            Write-Warn "uv installation failed"
-        }
-    } catch {
-        Write-Warn "Failed to install uv: $_"
-    }
-} else {
-    Write-Info "uv already installed"
-}
 
 # Install poetry via uv
 $poetryCmd = Get-Command poetry -ErrorAction SilentlyContinue
@@ -2185,6 +2192,20 @@ function Deploy-SkillRecord {
 }
 
 Deploy-SkillRecord -DotfilesDir $DotfilesDir
+
+# Agent presence (HARNESS-092, #1326): the forced-skills roster every harness
+# instructions file carries between AGENT-PRESENCE markers. Linux gets it from
+# compile-harness.sh --deploy, which delegates to this same verb; Windows had
+# no port, so no harness on this OS was ever told what a persona MUST consume.
+# Runs after the base files (CLAUDE.md, AGENTS.md, copilot-instructions.md) and
+# the skill records are in place; a target file that is absent is skipped and
+# said so.
+& dotf harness presence --repo-root $DotfilesDir
+if ($LASTEXITCODE -eq 0) {
+    Write-Success "Agent presence injected into the harness instructions files (dotf harness presence)"
+} else {
+    Write-Warn "dotf harness presence failed (no harness is told which skills a persona forces; see 'dotf doctor')"
+}
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
 # Self-healing: compare existing action arguments against expected and rewrite

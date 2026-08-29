@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"os"
 	"path/filepath"
 	"strings"
@@ -291,11 +292,20 @@ func TestHarnessMarkerConstants(t *testing.T) {
 	for _, want := range []string{
 		"BEGIN_PREFIX='" + harnessBeginPrefix + "'",
 		"END_MARKER='" + harnessEndMarker + "'",
-		"AGENT_BEGIN_PREFIX='" + agentPresenceBeginPrefix + "'",
-		"AGENT_END_MARKER='" + agentPresenceEndMarker + "'",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("scripts/compile-harness.sh no longer defines %q — update the Go mirror constants", want)
+		}
+	}
+	// The AGENT-PRESENCE pair moved to the harness package with HARNESS-092
+	// (#1326): doctor must read the package's constants, and the shell must
+	// not grow a copy back — two spellings of one marker is the drift class.
+	if agentPresenceBeginPrefix != harness.PresenceBeginPrefix || agentPresenceEndMarker != harness.PresenceEndMarker {
+		t.Errorf("doctor's AGENT-PRESENCE markers differ from the harness package's")
+	}
+	for _, stale := range []string{"AGENT_BEGIN_PREFIX=", "AGENT_END_MARKER="} {
+		if strings.Contains(content, stale) {
+			t.Errorf("scripts/compile-harness.sh defines %s again; the presence markers live in cli/internal/harness", stale)
 		}
 	}
 }
