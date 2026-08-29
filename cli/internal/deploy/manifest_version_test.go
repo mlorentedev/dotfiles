@@ -17,6 +17,7 @@ func TestParseManifest_RefusesWhatItCannotFullyRead(t *testing.T) {
 		{"newer schema", `{"version":3,"configs":[]}`, "version 3 unsupported"},
 		{"unknown entry field", `{"version":2,"configs":[{"name":"x","src":"a","dst":"b","future":true}]}`, `unknown field "future"`},
 		{"unknown top-level field", `{"version":2,"future":1,"configs":[]}`, `unknown field "future"`},
+		{"trailing document", `{"version":2,"configs":[{"name":"x","src":"a","dst":"b"}]}{"future":true}`, "trailing data"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
