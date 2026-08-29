@@ -8,10 +8,15 @@ import (
 // fakeUserEnv records what Persist wrote, so the tests assert the idempotence
 // contract (touch only what differs) without a registry.
 type fakeUserEnv struct {
-	values map[string]string
-	writes []string
+	values  map[string]string
+	writes  []string
+	deletes []string
+	// ops records every write in order ("set:NAME", "del:NAME") so a test can
+	// pin the sweep-before-write order Persist depends on.
+	ops    []string
 	getErr error
 	setErr error
+	delErr error
 }
 
 func (f *fakeUserEnv) Get(name string) (string, bool, error) {
@@ -26,8 +31,25 @@ func (f *fakeUserEnv) Set(name, value string) error {
 	if f.setErr != nil {
 		return f.setErr
 	}
+	if f.values == nil {
+		f.values = map[string]string{}
+	}
 	f.values[name] = value
 	f.writes = append(f.writes, name)
+	f.ops = append(f.ops, "set:"+name)
+	return nil
+}
+
+// Delete honours the interface's promise: an absent name is success. The
+// registry store maps ErrNotExist to nil for the same reason, and
+// TestFakeUserEnv_DeleteAbsentSucceeds keeps the fake honest about it.
+func (f *fakeUserEnv) Delete(name string) error {
+	if f.delErr != nil {
+		return f.delErr
+	}
+	delete(f.values, name)
+	f.deletes = append(f.deletes, name)
+	f.ops = append(f.ops, "del:"+name)
 	return nil
 }
 
@@ -55,8 +77,9 @@ func TestPersist_TouchesOnlyWhatDiffers(t *testing.T) {
 	if !changed["DOTFILES_REPO_DIR"] || changed["DOTFILES_DIR"] || !changed["VAULT_PATH"] {
 		t.Fatalf("changed flags wrong: %+v", changed)
 	}
-	if len(store.writes) != 2 {
-		t.Fatalf("expected exactly the two differing vars to be written, got %v", store.writes)
+	// The two differing vars, then the marker recording all three (CLI-065).
+	if len(store.writes) != 3 || store.writes[2] != ManagedMarker {
+		t.Fatalf("expected exactly the two differing vars and then the marker to be written, got %v", store.writes)
 	}
 
 	// Second run: nothing differs, nothing is written.

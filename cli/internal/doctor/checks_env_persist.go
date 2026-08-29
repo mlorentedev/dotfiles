@@ -36,27 +36,55 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		rep.Warn("contract variables unresolvable (" + err.Error() + ")")
 		return
 	}
-	drift, err := envpkg.Drift(vars, userEnvAdapter{sys.UserEnv})
+	reader := userEnvAdapter{sys.UserEnv}
+	drift, err := envpkg.Drift(vars, reader)
 	if err != nil {
 		rep.Warn("user-scope environment unreadable (" + err.Error() + ")")
 		return
 	}
-	if len(drift) == 0 {
+	retired, err := envpkg.Retired(reader, vars)
+	if err != nil {
+		rep.Warn("user-scope environment unreadable (" + err.Error() + ")")
+		return
+	}
+	stale, err := envpkg.MarkerStale(reader, vars)
+	if err != nil {
+		rep.Warn("user-scope environment unreadable (" + err.Error() + ")")
+		return
+	}
+	if len(drift) == 0 && len(retired) == 0 && !stale {
 		rep.Pass(fmt.Sprintf("%d contract variable(s) persisted at user scope", len(vars)))
 		return
 	}
-	names := make([]string, 0, len(drift))
-	for _, v := range drift {
-		names = append(names, v.Name)
+	if len(drift) == 0 && len(retired) == 0 {
+		// Every variable is in place; only the ownership record lags the
+		// contract (a box that persisted before the record existed, or a
+		// leftover a hand edit removed). One run rewrites it.
+		rep.Warn(fmt.Sprintf("%d contract variable(s) persisted at user scope, but the ownership record (%s) is out of date — run `dotf env persist`",
+			len(vars), envpkg.ManagedMarker))
+		return
 	}
-	rep.Warn(fmt.Sprintf("%d contract variable(s) missing or stale at user scope (%s) — profile-less processes such as Copilot tool calls see none of them; run `dotf env persist`",
-		len(drift), strings.Join(names, ", ")))
+	if len(drift) > 0 {
+		names := make([]string, 0, len(drift))
+		for _, v := range drift {
+			names = append(names, v.Name)
+		}
+		rep.Warn(fmt.Sprintf("%d contract variable(s) missing or stale at user scope (%s) — profile-less processes such as Copilot tool calls see none of them; run `dotf env persist`",
+			len(drift), strings.Join(names, ", ")))
+	}
+	if len(retired) > 0 {
+		// CLI-065 (#1363): a name the contract retired but the ownership marker
+		// still lists — profile-less processes keep inheriting a value nothing
+		// declares. The same command sweeps it; nothing else is touched.
+		rep.Warn(fmt.Sprintf("%d retired name(s) still persisted at user scope (%s) — run `dotf env persist` to sweep them",
+			len(retired), strings.Join(retired, ", ")))
+	}
 }
 
-// userEnvAdapter lets the doctor seam (a function) satisfy env.UserEnvStore.
+// userEnvAdapter lets the doctor seam (a function) satisfy env.UserEnvReader —
+// the reader alone, so the seam never has to fake a write.
 type userEnvAdapter struct {
 	get func(name string) (string, bool, error)
 }
 
 func (a userEnvAdapter) Get(name string) (string, bool, error) { return a.get(name) }
-func (userEnvAdapter) Set(string, string) error                { return nil }
