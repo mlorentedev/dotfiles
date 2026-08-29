@@ -1038,7 +1038,11 @@ done
 if command -v copilot >/dev/null 2>&1; then
     log_info "GitHub Copilot CLI detected, deploying configuration..."
     ensure_directory "$HOME/.copilot"
-    cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
+    # Only the instructions file is copied here. settings.json, config.json and
+    # mcp-config.json are `dotf deploy` entries (ai/deploy.json, AI-039/#1322):
+    # the first two by MERGE, because the CLI writes both files itself and a
+    # verbatim copy wiped the box's own keys (allowedUrls, effortLevel, ...).
+    cp -f "$CURRENT_DIR/ai/copilot/copilot-instructions.md" "$HOME/.copilot/copilot-instructions.md" 2>/dev/null || true
     if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q 'First, read `AGENTS.md`' "$HOME/.copilot/copilot-instructions.md"; then
         log_success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
     else
