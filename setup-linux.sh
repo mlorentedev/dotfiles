@@ -647,27 +647,6 @@ if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/p
     log_success "python -> python3 symlink created"
 fi
 
-# BUG-013b: install obsidian-cli via npm global. Mirror of the
-# Windows side shipped in PR #77. The CLI provides the `obsidian` binary
-# used by obs-cli.sh and the vault-health workflow. Idempotent: skip when
-# `obsidian` is already on PATH. Gated on `npm` so machines without
-# Node.js gracefully skip with a clear hint.
-# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
-if ! command -v obsidian >/dev/null 2>&1; then
-    if command -v npm >/dev/null 2>&1; then
-        log_info "Installing Obsidian CLI (obsidian-cli) via npm..."
-        if npm install -g 'obsidian-cli' >/dev/null 2>&1; then
-            log_success "Obsidian CLI installed"
-        else
-            log_warning "Failed to install Obsidian CLI (npm install -g exited non-zero)"
-        fi
-    else
-        log_warning "npm not available, skipping Obsidian CLI install (install Node.js then re-run)"
-    fi
-else
-    log_info "Obsidian CLI already installed at $(command -v obsidian)"
-fi
-
 # Claude Code (primary AI coding agent — see ADR-009)
 log_info "Setting up Claude Code CLI..."
 if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then
@@ -741,35 +720,6 @@ if [ -f "$AGENTS_SRC" ]; then
     fi
 else
     log_warning "AGENTS.md source missing at $AGENTS_SRC"
-fi
-
-# Yarn (classic) — npm-pinned global install (TERM-002 companion).
-# Guarded on npm (same convention as pi). Reconcile-not-skip: a version drift
-# is corrected by reinstalling the pin, since npm -g yarn upgrades are safe.
-if command -v npm >/dev/null 2>&1; then
-    YARN_PINNED="${YARN_VERSION:-}"
-    if ! command -v yarn >/dev/null 2>&1; then
-        log_info "Installing yarn (yarn@${YARN_PINNED:-latest}) via npm..."
-        if npm install -g "yarn${YARN_PINNED:+@$YARN_PINNED}" >/dev/null 2>&1; then
-            log_success "yarn installed: $(yarn --version 2>/dev/null)"
-        else
-            log_warning "yarn install failed — run: npm install -g yarn${YARN_PINNED:+@$YARN_PINNED}"
-        fi
-    else
-        INSTALLED_YARN=$(yarn --version 2>/dev/null | head -1)
-        if [ -n "$YARN_PINNED" ] && ! version_gte "$INSTALLED_YARN" "$YARN_PINNED"; then
-            log_info "yarn $INSTALLED_YARN below pinned minimum $YARN_PINNED — upgrading..."
-            if npm install -g "yarn@$YARN_PINNED" >/dev/null 2>&1; then
-                log_success "yarn upgraded to $YARN_PINNED"
-            else
-                log_warning "yarn upgrade failed — run: npm install -g yarn@$YARN_PINNED"
-            fi
-        else
-            log_info "yarn already installed: $INSTALLED_YARN"
-        fi
-    fi
-else
-    log_warning "npm not found — skipping yarn install (install Node.js, then re-run setup)"
 fi
 
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two

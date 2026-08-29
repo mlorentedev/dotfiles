@@ -357,19 +357,18 @@ setup() {
     grep -q 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# BUG-013b: cross-OS parity for the Obsidian CLI install.
-# Windows side ships via npm global `obsidian-cli` (fixed from 404 @vorillaz/obsidian-cli).
-# Linux side mirrors with the same idempotent + gated-on-npm pattern.
-@test "parity: both setup scripts install Obsidian CLI via npm (BUG-013/b)" {
-    grep -qF "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-windows.ps1"
-}
-
-@test "setup-linux.sh Obsidian CLI install is gated on npm + idempotent (BUG-013b)" {
-    # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v obsidian"
-    # gating: only run if npm is available
-    grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
+# OPS-042 (#1336): obsidian-cli and yarn are packages.json tools (ADR-036),
+# converged by `dotf tools install` on both OSes; neither setup script carries
+# an npm block for them any more, and versions.conf no longer pins them.
+@test "parity: obsidian and yarn are catalog tools, not setup-script npm blocks (OPS-042)" {
+    [ "$(jq -r '.tools[] | select(.name=="obsidian") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm obsidian-cli 0.5.1" ]
+    [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
+    refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep 'npm install -g "yarn' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'npm install -g \$yarnPkg' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep '^OBSIDIAN_VERSION=' "$DOTFILES_DIR/versions.conf"
+    refute_grep '^YARN_VERSION=' "$DOTFILES_DIR/versions.conf"
 }
 
 # MEM-002: the claude-mem install-state assertions that lived in
