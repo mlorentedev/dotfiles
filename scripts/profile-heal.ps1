@@ -3,7 +3,10 @@
     Idempotently repair a corrupted PowerShell profile by reconstructing the
     dotfiles section from the SSOT (powershell/profile.ps1), after backing
     up the corrupted file. Companion to BUG-021 (setup-windows.ps1 fail-fast
-    preflight).
+    preflight). The rewrite keeps ONLY the dotfiles section: anything that
+    lived outside the START/END markers survives in the backup, not in the
+    healed profile. Heals this host's $PROFILE, or the file given as
+    -ProfilePath (what dotf doctor --fix passes, so it heals what it measured).
 
 .DESCRIPTION
     BUG-020 root cause: setup-windows.ps1 used to swallow -replace OOM errors
@@ -47,7 +50,12 @@
 
 [CmdletBinding()]
 param(
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    # The profile to heal. Empty means this host's $PROFILE, which is what a
+    # hand invocation wants; dotf doctor --fix passes the file it measured so
+    # detect and heal cannot split on a box whose Documents folder is
+    # redirected (CLI-066, #1364).
+    [string]$ProfilePath = ''
 )
 
 Set-StrictMode -Version Latest
@@ -179,7 +187,7 @@ function Repair-Profile {
 
 # --- Main ---
 
-$profilePath = $PROFILE
+$profilePath = if ($ProfilePath) { $ProfilePath } else { $PROFILE }
 $ssotPath = Resolve-SsotProfile
 
 if (-not $ssotPath) {
