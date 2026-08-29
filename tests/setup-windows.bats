@@ -917,12 +917,14 @@ setup() {
 # invocation, on both OSes.
 @test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
     uv_line=$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    mcp_line=$(grep -n 'claude mcp add' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    # The executable invocation, never a comment naming it: the block's own
+    # comments mention `claude mcp add` 40 lines above the call.
+    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
 }
 
 @test "parity: both setups install uv before registering the Claude MCP servers (OPS-044)" {
     uv_line=$(grep -n 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    mcp_line=$(grep -n 'claude mcp add' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
 }
