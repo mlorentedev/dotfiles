@@ -908,3 +908,21 @@ setup() {
     run grep -F '& $bunInstaller' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]
 }
+
+# OPS-044 (#1361): hive-vault and pdf-modifier are `uvx` MCP servers, and the
+# registration loop skips a server whose prerequisite binary is absent. With the
+# uv installer in section 4 a clean box's first run registered neither and only
+# the second run converged -- measured on the CI runner the first time Claude
+# Code installed there (#1360). Ordering is asserted by line number of the
+# invocation, on both OSes.
+@test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
+    uv_line=$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -n 'claude mcp add' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+}
+
+@test "parity: both setups install uv before registering the Claude MCP servers (OPS-044)" {
+    uv_line=$(grep -n 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -n 'claude mcp add' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+}
