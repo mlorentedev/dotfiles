@@ -205,13 +205,32 @@ func StderrPath(transcript string) string { return transcript + ".stderr" }
 // deliberately rather than only when the primary breaks: a fallback that is
 // never chosen on purpose is never exercised, and an unexercised fallback is
 // decoration.
+// DrawReviewer picks one pool member at random (HARNESS-093, #1370): draw is
+// the source of randomness (rand.IntN in production, a fixed index in tests).
+// Every member is drawn with equal weight — the pool is the allow-list, and a
+// member that should not be drawn should not be in it. The chosen id is
+// recorded in review.md and review-request.json, and --reviewer names one
+// deliberately, which is how a run is reproduced on the same model.
+func DrawReviewer(entries []ReviewerEntry, draw func(n int) int) (ReviewerEntry, error) {
+	if len(entries) == 0 {
+		return ReviewerEntry{}, fmt.Errorf("no %s in this repo — the launcher has no model to run and will not guess one", ReviewerPoolFile)
+	}
+	i := draw(len(entries))
+	if i < 0 || i >= len(entries) {
+		return ReviewerEntry{}, fmt.Errorf("reviewer draw returned %d for a pool of %d", i, len(entries))
+	}
+	return entries[i], nil
+}
+
+// ResolveReviewer selects the named pool member. Since HARNESS-093 an empty
+// name is not "the first entry" but an error: the launcher draws instead.
 func ResolveReviewer(entries []ReviewerEntry, want string) (ReviewerEntry, error) {
 	if len(entries) == 0 {
 		return ReviewerEntry{}, fmt.Errorf("no %s in this repo — the launcher has no model to run and will not guess one", ReviewerPoolFile)
 	}
 	want = strings.TrimSpace(want)
 	if want == "" {
-		return entries[0], nil
+		return ReviewerEntry{}, fmt.Errorf("no reviewer named; the launcher draws one from %s when --reviewer is absent", ReviewerPoolFile)
 	}
 	ids := make([]string, 0, len(entries))
 	for _, e := range entries {

@@ -2,8 +2,8 @@
   "$comment": [
     "Reviewer pool for /adversarial-review (HARNESS-071, #955).",
     "",
-    "Ordered allow-list of models permitted to SIGN a review.md. The first entry",
-    "is the launcher's primary; the whole array is the gate's allow-list, which",
+    "Ordered allow-list of models permitted to SIGN a review.md. Since HARNESS-093 the",
+    "launcher DRAWS one member at random; the whole array is the gate's allow-list, which",
     "dotf spec archive enforces via checkReviewGate.",
     "",
     "Standing rule: an adversarial review never runs on an Anthropic model. The",
@@ -31,7 +31,7 @@
     "model-map.json maps a neutral tier (top|mid|low) to a provider per agent — a",
     "different shape. Kept in a separate file so H-044 need not migrate this one.",
     "",
-    "Order is meaning, not arrangement: the first entry is the launcher's default and the rest are tried in sequence. The provider-diverse fallback comes BEFORE the second NaN model deliberately — it answers a NaN outage, while a sibling model only answers NaN saturation, and the weaker guarantee should not be reached for first.",
+    "Order is provenance, not precedence, since HARNESS-093 (#1370): the launcher draws one member at random, so every entry is exercised in the ordinary course of reviews and NaN's per-model concurrency buckets are spread; --reviewer names one deliberately, which is how a run is reproduced. The roles below record why each member was admitted, not who runs first.",
     "",
     "On saturation, measured 2026-08-20: NaN's concurrency limit is PER MODEL, not per API key (8 concurrent to deepseek gives 5x200 + 3x429, while mimo answers 200 during that saturation). So a spec review launched while the PR reviewer is saturating deepseek WILL fail, and falling through to another entry is the correct response rather than a bug. Do not 'fix' that by promoting the NaN sibling above the provider-diverse entry — it would trade an outage-proof fallback for a saturation-proof one and lose the stronger property. This file is read once per spec, so slow is fine; that is why availability does not outrank independence here."
   ],
@@ -62,6 +62,24 @@
       "role": "fallback",
       "why": "Admitted 2026-08-20 after the evaluation this file's bar requires, and the verdict is recorded honestly rather than as a pass. What WAS established: given the same planted-defect shell snippet, mimo returned a real, correct finding — the `((count++))` exit-1-under-set-e case from this repo's own prohibited-pattern table. It is reasoning-class by profile (1M context, reasoning chain) against qwen3.6 and gemma4's 262K, which is the line this pool draws. What was NOT established: a quality RANKING against deepseek. deepseek never produced content under the same harness — it spent 29,299 characters of reasoning and returned finish_reason=length with an EMPTY body at 8,000 output tokens, so there was nothing to compare against. That is an instrumentation result, not a capability one, and it is stated here so nobody reads this entry as 'mimo matched deepseek'. It is admitted as a SECOND fallback, after the provider-diverse one, because provider diversity remains the stronger property.",
       "operational_note": "Reasoning models here emit reasoning_content BEFORE content. Under-provisioning max_tokens returns an empty body with finish_reason=length and no error — the same shape as a review that silently did not happen (lesson 213). Provision generously and check finish_reason; deepseek did not answer within 8,000 output tokens on a small prompt."
+    },
+    {
+      "id": "nan/glm5.3-flash",
+      "runner": "pi",
+      "provider": "nan",
+      "model": "glm5.3-flash",
+      "secret_id": "NAN_API_KEY",
+      "role": "member",
+      "why": "Admitted 2026-08-29 by owner decision (HARNESS-093, #1370) to spread reviews across NaN's PER-MODEL concurrency buckets and exercise more than one model on the gate. What IS established: reasoning-class by profile — ai/pi/models.json marks glm5.3-flash reasoning: true with a 1M context, the line this pool draws (tests/reviewer-pool.bats holds it). What is NOT established: a calibration against a review of known outcome (e.g. CLI-050 round 1's real Major); recorded here so nobody reads this entry as measured equivalence to deepseek. Drawn at random like every member; --reviewer names it deliberately."
+    },
+    {
+      "id": "nan/qwen3.8-flash",
+      "runner": "pi",
+      "provider": "nan",
+      "model": "qwen3.8-flash",
+      "secret_id": "NAN_API_KEY",
+      "role": "member",
+      "why": "Admitted 2026-08-29 by owner decision (HARNESS-093, #1370) to spread reviews across NaN's PER-MODEL concurrency buckets and exercise more than one model on the gate. What IS established: reasoning-class by profile — ai/pi/models.json marks qwen3.8-flash reasoning: true with a 1M context, the line this pool draws (tests/reviewer-pool.bats holds it). What is NOT established: a calibration against a review of known outcome (e.g. CLI-050 round 1's real Major); recorded here so nobody reads this entry as measured equivalence to deepseek. Drawn at random like every member; --reviewer names it deliberately."
     }
   ]
 }
