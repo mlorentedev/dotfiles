@@ -2193,6 +2193,20 @@ function Deploy-SkillRecord {
 
 Deploy-SkillRecord -DotfilesDir $DotfilesDir
 
+# Agent presence (HARNESS-092, #1326): the forced-skills roster every harness
+# instructions file carries between AGENT-PRESENCE markers. Linux gets it from
+# compile-harness.sh --deploy, which delegates to this same verb; Windows had
+# no port, so no harness on this OS was ever told what a persona MUST consume.
+# Runs after the base files (CLAUDE.md, AGENTS.md, copilot-instructions.md) and
+# the skill records are in place; a target file that is absent is skipped and
+# said so.
+& dotf harness presence --repo-root $DotfilesDir
+if ($LASTEXITCODE -eq 0) {
+    Write-Success "Agent presence injected into the harness instructions files (dotf harness presence)"
+} else {
+    Write-Warn "dotf harness presence failed (no harness is told which skills a persona forces; see 'dotf doctor')"
+}
+
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
 # Self-healing: compare existing action arguments against expected and rewrite
 # when they diverge -- guards against stale tasks pointing at moved/renamed scripts.

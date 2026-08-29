@@ -105,6 +105,7 @@ func Run(opts Options) (int, error) {
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
 		checkDeployDrift(sys, cfg, rep)
 		checkDeployManifest(sys, rep)
+		checkAgentPresence(sys, rep)
 		checkRepoDirResolves(rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep, opts.Fix)
