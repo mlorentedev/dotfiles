@@ -50,7 +50,9 @@ setup() {
 }
 
 @test "real dotf: an unresolvable tier exits non-zero and writes nothing to stdout" {
-    run bash -c "'$DOTF' harness resolve-tier top --harness copilot --repo-root '$REPO' 2>/dev/null"
+    # pi is an adapter (its model is a launcher flag), so no tier names it by
+    # design; copilot served as the example until #1170 gave it tiers.
+    run bash -c "'$DOTF' harness resolve-tier top --harness pi --repo-root '$REPO' 2>/dev/null"
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }

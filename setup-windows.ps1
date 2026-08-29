@@ -1476,12 +1476,9 @@ $env:ANTIGRAVITY_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 $env:CLOUDCODE_URL = "https://cloudcode-pa.googleapis.com"
 $env:GEMINI_DIR = "$GeminiHome"
 
-# 1. Deploy agy settings.json (SDD-007: no legacy Gemini-CLI compat write)
-$agySettingsSrc = "$DotfilesDir\ai\agy\settings.json"
-if (Test-Path $agySettingsSrc) {
-    Copy-Item $agySettingsSrc "$AgyAppData\settings.json" -Force
-    Write-Success "Deployed agy settings.json"
-}
+# 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
+#    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
+#    which a verbatim copy could not do (SDD-007: no legacy Gemini-CLI write).
 
 # Deploy .geminiignore
 $geminiIgnoreSrc = "$DotfilesDir\.geminiignore"

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "AI-042-trusted-folders-render-f1",
+    "behavior": "AC1: paths renders {HOME}/{VAR} tokens inside JSON string values in the declared form (native | slash), leaves other strings alone, emits valid JSON, and rejects an unknown form, a non-JSON source and an unresolvable token by name",
+    "verification": "cd cli && go test ./internal/deploy/ -run 'TestExpandPaths|TestParseManifest_ValidatesPathsByName' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-29; mutation (FromSlash skipped) fails TestExpandPaths_RendersTheDeclaredForm"
+  },
+  {
+    "id": "AI-042-trusted-folders-render-f2",
+    "behavior": "AC2: paths composes with merge (source rendered, destination's unmanaged keys kept) and PlanConfig reads a rendered destination as in sync",
+    "verification": "cd cli && go test ./internal/deploy/ -run 'TestDeploy_PathsComposeWithMergeAndReportInSync' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-29; mutation (expansion after the merge) fails the in-sync assertion"
+  },
+  {
+    "id": "AI-042-trusted-folders-render-f3",
+    "behavior": "AC3: no user/home literal under ai/**/*.json; Copilot and agy trust lists are {HOME} templates; manifest v3 declares copilot-config paths native and agy-settings paths slash; neither setup copies ai/agy/settings.json",
+    "verification": "bats tests/copilot-config.bats -f 'AI-042' && cd cli && go test ./internal/deploy/ -run 'TestManifestVersion_FreezesTheFieldSet|TestParseManifest_ShippedManifestIsValid' -count=1",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-29)"
+  },
+  {
+    "id": "AI-042-trusted-folders-render-f4",
+    "behavior": "AC4 (box): dotf deploy renders Copilot's list native and agy's with /, keeps firstLaunchAt, is in sync on the second run, doctor green, copilot -p and agy answer",
+    "verification": "dotf deploy | grep -q 'in sync   copilot-config' && jq -e '.trustedFolders | length == 4' ~/.copilot/config.json >/dev/null",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-29)"
+  }
+]
