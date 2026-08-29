@@ -199,8 +199,9 @@ if (Get-Command eza -ErrorAction SilentlyContinue) {
 # ============================================================================
 # PATH AUGMENTATION (informational - actual PATH is set by setup script)
 # ============================================================================
-# The setup-windows.ps1 script adds ~/scripts to PATH at User level.
-# This ensures user scripts (hooks, helpers) are available globally.
+# The setup-windows.ps1 script adds ~\.dotfiles\scripts (the env contract's
+# SCRIPTS_DIR, WIN-013) to PATH at User level, so the deployed scripts (hooks,
+# helpers) are available globally; ~\scripts is the retired legacy location.
 
 # ============================================================================
 # PROMPT CUSTOMIZATION (optional)

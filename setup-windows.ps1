@@ -1963,7 +1963,11 @@ if ($copilotCmd) {
 
     $copilotSource = "$DotfilesDir\ai\copilot"
     if (Test-Path $copilotSource) {
-        Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
+        # Only the instructions file is copied here. settings.json, config.json
+        # and mcp-config.json are `dotf deploy` entries (ai/deploy.json,
+        # AI-039/#1322): the first two by MERGE, because the CLI writes both
+        # files itself and a verbatim copy wiped the box's own keys.
+        Copy-Item "$copilotSource\copilot-instructions.md" "$CopilotHome\copilot-instructions.md" -Force -ErrorAction SilentlyContinue
         if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
             (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet)) {
             Write-Success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"

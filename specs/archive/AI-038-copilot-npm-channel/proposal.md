@@ -1,7 +1,7 @@
 ---
 id: "AI-038-copilot-npm-channel"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-28"
 issue: "mlorentedev/dotfiles#1321"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, copilot, install-channels, adr-036]
@@ -58,7 +58,7 @@ table is amended with the date and the measurement.
 - [x] AC1 — `packages.json` declares `copilot` (npm, `@github/copilot`, 1.0.81) and no
   setup script carries a copilot install block (winget row removed; Linux
   comment/message name the catalog).
-- [x] AC2 — (dropped, moved to #1322) `autoUpdate: false` was first written into
+- [ ] AC2 — (dropped, moved to #1322) `autoUpdate: false` was first written into
   `ai/copilot/config.json`; on this CLI version that file is rewritten by the
   CLI itself ("User settings belong in settings.json. This file is managed
   automatically."), so the setting belongs to `settings.json`, which the repo
@@ -74,3 +74,5 @@ table is amended with the date and the measurement.
 
 - Bitácora board: #1321
 - ADR-036 (install channels), AI-034 (#1294, the opencode precedent), CLI-029 (`packages.json`, `dotf tools`)
+
+<!-- archived 2026-08-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1359 -->
