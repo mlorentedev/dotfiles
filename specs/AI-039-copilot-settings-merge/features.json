@@ -1,0 +1,37 @@
+[
+  {
+    "id": "AI-039-copilot-settings-merge-f1",
+    "behavior": "AC1: a merge entry writes the source's top-level keys, preserves every other destination key, creates an absent destination, reads past the CLI's // header, and a second run changes nothing (mtime)",
+    "verification": "cd cli && go test ./internal/deploy/ -run 'TestDeploy_Merge' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (merge replaces the whole destination) fails TestDeploy_MergePreservesUnmanagedKeys and TestDeploy_MergeToleratesTheCLIHeaderAndDoesNotChurnIt"
+  },
+  {
+    "id": "AI-039-copilot-settings-merge-f2",
+    "behavior": "AC2: planning or dry-running a non-rendered entry creates no destination directory; an unknown strategy and a rendered merge are rejected naming the entry",
+    "verification": "cd cli && go test ./internal/deploy/ -run 'TestPlanConfig|TestParseManifest_ValidatesStrategyByName' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (MkdirAll before the compare) fails TestPlanConfig_And_DryRun_CreateNoDestinationDirectory"
+  },
+  {
+    "id": "AI-039-copilot-settings-merge-f3",
+    "behavior": "AC3: the manifest declares the three Copilot entries (merge/merge/replace, gated on copilot), the repo files carry only documented keys with the doctrine values, and both setups copy copilot-instructions.md explicitly instead of the ai/copilot glob",
+    "verification": "bats tests/copilot-config.bats && cd cli && go test ./internal/cmd/ -run 'TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28 (11/11 bats; deploy_requires_test.go)"
+  },
+  {
+    "id": "AI-039-copilot-settings-merge-f4",
+    "behavior": "AC4: dotf doctor reports the deploy manifest by status (PASS with counts / WARN naming the entry and dotf deploy <name> / SKIP without a repo) and creates no directory while checking",
+    "verification": "grep -q 'checkDeployManifest(sys, rep)' cli/internal/doctor/doctor.go && cd cli && go test ./internal/doctor/ -run TestCheckDeployManifest_ByStatus -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "AI-039-copilot-settings-merge-f5",
+    "behavior": "AC5 (box): dotf deploy merges the managed keys into the existing settings.json with the per-box keys intact, a second run is in sync, doctor's section is green, copilot -p answers",
+    "verification": "dotf deploy | grep -q 'in sync   copilot-settings' && jq -e '.autoUpdate == false and .includeCoAuthoredBy == false and (.allowedUrls | length > 0)' ~/.copilot/settings.json >/dev/null",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-28)"
+  }
+]

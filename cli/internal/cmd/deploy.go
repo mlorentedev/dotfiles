@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
@@ -24,6 +25,13 @@ var deployRenderer = func(path string) error {
 	return err
 }
 
+// deployCommandAvailable is the PATH seam behind a manifest entry's `requires`
+// (AI-039, #1322): production asks the real PATH, a test answers for it.
+var deployCommandAvailable = func(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
 // newDeployCmd installs agent configs from the checkout to their deployed
 // locations (CLI-039, #1023).
 //
@@ -42,6 +50,10 @@ func newDeployCmd() *cobra.Command {
 			"atomically with the declared permissions.\n\n" +
 			"A config already in sync is reported and NOT rewritten, so a setup run does\n" +
 			"not churn mtimes and \"did this change?\" stays answerable.\n\n" +
+			"An entry with strategy \"merge\" writes only its top-level keys into the\n" +
+			"installed JSON and preserves every other key (a file the reading tool also\n" +
+			"writes, such as Copilot's settings.json). An entry that `requires` a command\n" +
+			"is skipped, and says so, when that command is not on PATH.\n\n" +
 			"  dotf deploy              # every declared config\n" +
 			"  dotf deploy pi           # one\n" +
 			"  dotf deploy --dry-run    # report what would change, touch nothing",
@@ -73,6 +85,10 @@ func newDeployCmd() *cobra.Command {
 
 			w := cmd.OutOrStdout()
 			for _, target := range targets {
+				if target.Requires != "" && !deployCommandAvailable(target.Requires) {
+					_, _ = fmt.Fprintf(w, "skipped   %-10s (%s not installed)\n", target.Name, target.Requires)
+					continue
+				}
 				res, err := deploy.Deploy(target, repoRoot, env.Home(), env.ResolvePath, deployRenderer, dryRun)
 				if err != nil {
 					return err
