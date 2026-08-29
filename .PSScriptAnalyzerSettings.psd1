@@ -4,7 +4,6 @@
         'PSUseApprovedVerbs',
         'PSAvoidUsingEmptyCatchBlock',
         'PSUseShouldProcessForStateChangingFunctions',
-        'PSUseBOMForUnicodeEncodedFile',
         'PSUseSingularNouns'
     )
 }

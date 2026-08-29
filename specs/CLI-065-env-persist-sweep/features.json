@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-065-env-persist-sweep-f1",
+    "behavior": "AC1: dotf env persist writes the DOTF_MANAGED_ENV marker naming every persisted variable; a second run changes nothing, marker included",
+    "verification": "cd cli && go test ./internal/env/ -run 'TestPersist_WritesTheMarkerOnce|TestPersist_TouchesOnlyWhatDiffers|TestMarkerValue' -count=1",
+    "state": "verified",
+    "evidence": "TestPersist_WritesTheMarkerOnce: marker 'A;B' after run 1, second run records zero store operations; box run 1 under the real contract: 'persisted DOTF_MANAGED_ENV / user scope: 1 changed, 11 unchanged, 0 removed', marker lists the 11 contract names"
+  },
+  {
+    "id": "CLI-065-env-persist-sweep-f2",
+    "behavior": "AC2: retiring a name from the contract and persisting again deletes that name and only it; a name dotf never wrote is never touched",
+    "verification": "cd cli && go test ./internal/env/ -run 'TestPersist_SweepsOnlyWhatTheMarkerOwns|TestPersist_DeletesBeforeItWrites|TestLeftovers' -count=1",
+    "state": "verified",
+    "evidence": "TestPersist_SweepsOnlyWhatTheMarkerOwns: removed == [B], FOREIGN untouched, third run stable; TestPersist_DeletesBeforeItWrites: a case-only rename (Foo -> FOO) is not swept and every del: precedes every set:; TestLeftovers 8 cases incl. empty marker, self-name, duplicates"
+  },
+  {
+    "id": "CLI-065-env-persist-sweep-f3",
+    "behavior": "AC3: dotf env persist --check prints retired: NAME per leftover and exits non-zero while one is persisted; persist prints removed NAME",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestEnvPersist' -count=1 && go test ./internal/env/ -run 'TestRetired' -count=1",
+    "state": "verified",
+    "evidence": "TestEnvPersist_CheckAndSweepOfARetiredName: --check fails with 'retired' and prints 'retired: OLD_NAME'; persist prints 'removed OLD_NAME' and '1 removed'; --check then prints 'ok:'. Box: 'retired: SCRIPTS_DIR' + exit 1, then 'removed SCRIPTS_DIR (retired from the contract)'"
+  },
+  {
+    "id": "CLI-065-env-persist-sweep-f4",
+    "behavior": "AC4: dotf doctor's Persisted environment (user scope) row WARNs on a leftover with the remedy dotf env persist, PASS once swept",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckPersistedEnv' -count=1",
+    "state": "verified",
+    "evidence": "TestCheckPersistedEnv_ByStatus gained 'retired name still persisted -> WARN naming it' (OLD_NAME in the marker and the store) and 'marker in sync -> PASS'; the adapter now satisfies env.UserEnvReader only, its Set no-op deleted"
+  },
+  {
+    "id": "CLI-065-env-persist-sweep-f5",
+    "behavior": "AC5: with no marker in the store nothing is deleted and the marker is written; the store's Delete of an absent name succeeds; off Windows the command stays a no-op",
+    "verification": "cd cli && go test ./internal/env/ -run 'TestPersist_NoMarkerDeletesNothing|TestFakeUserEnv_DeleteAbsentSucceeds' -count=1 && go test ./internal/cmd/ -run 'TestEnvPersist_UnsupportedScopeIsANoOp' -count=1 && GOOS=windows go vet ./internal/env/ && GOOS=linux go vet ./internal/env/",
+    "state": "verified",
+    "evidence": "TestPersist_NoMarkerDeletesNothing: STALE_FROM_2026_05 survives, marker written and reported Changed; registryUserEnv.Delete maps registry.ErrNotExist to nil (persist_windows.go), the fake mirrors it and TestFakeUserEnv_DeleteAbsentSucceeds pins the fake; vet clean under GOOS=windows and GOOS=linux"
+  },
+  {
+    "id": "CLI-065-env-persist-sweep-f6",
+    "behavior": "AC6 (box): a scratch contract that retires one name makes dotf env persist remove it from HKCU\\Environment; the next run reports nothing changed",
+    "verification": "test \"$(uname -s | cut -c1-5)\" = MINGW && dotf env persist --check && powershell -NoProfile -Command \"(Get-ItemProperty -Path 'HKCU:\\Environment' -Name DOTF_MANAGED_ENV).DOTF_MANAGED_ENV\" | grep -q 'SCRIPTS_DIR'",
+    "state": "verified",
+    "evidence": "Windows work box, 2026-08-29, binary built from this branch: real contract -> marker written (11 names); scratch contract minus SCRIPTS_DIR -> --check 'retired: SCRIPTS_DIR' exit 1; persist 'removed SCRIPTS_DIR', Get-ItemProperty HKCU:\\Environment SCRIPTS_DIR = <absent>; second run '0 changed, 11 unchanged, 0 removed'; real contract again -> 'persisted SCRIPTS_DIR', value C:\\Users\\<user>\\.dotfiles\\scripts restored, marker back to 11 names"
+  }
+]
