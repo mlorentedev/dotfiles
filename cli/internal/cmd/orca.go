@@ -97,7 +97,7 @@ func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, c
 			}
 		}
 		if rep.Drift() {
-			return fmt.Errorf("Orca's Copilot hooks need tuning — run `dotf orca tune-hooks` (DX-006)")
+			return fmt.Errorf("the Orca Copilot hooks need tuning — run `dotf orca tune-hooks` (DX-006)")
 		}
 		return nil
 	}
