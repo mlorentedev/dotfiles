@@ -110,6 +110,11 @@ type System struct {
 	// Windows work box a 12-day-old daemon cache resolved a rotated PAT to its
 	// old value and doctor called the token dead (CLI-056, #1316).
 	BWServeLastSync func() (time.Time, error)
+
+	// UserEnv reads the per-user PERSISTENT environment (Windows:
+	// HKCU\Environment), the scope a profile-less process inherits; nil where
+	// the OS has no such scope, which skips checkPersistedEnv (CLI-058, #1324).
+	UserEnv func(name string) (string, bool, error)
 	// ProcessAlive reports whether pid names a live process (secrets.ProcessAlive
 	// in production: signal 0 on Unix, OpenProcess + GetExitCodeProcess on
 	// Windows). It is what lets the bw serve check tell "the daemon died" from
@@ -213,6 +218,7 @@ func realSystem() *System {
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
+		UserEnv: userEnvReader(),
 		BWServeLastSync: func() (time.Time, error) {
 			st, err := secrets.BWServeClient{}.StatusDetail()
 			return st.LastSync, err
@@ -334,4 +340,14 @@ func (s *System) versionLine(name string) (string, error) {
 		first = out[:i]
 	}
 	return strings.TrimSpace(first), err
+}
+
+// userEnvReader adapts env.NewUserEnvStore to the seam: a reader where the OS
+// has a per-user persistent scope, nil elsewhere.
+func userEnvReader() func(name string) (string, bool, error) {
+	store, err := env.NewUserEnvStore()
+	if err != nil {
+		return nil
+	}
+	return store.Get
 }

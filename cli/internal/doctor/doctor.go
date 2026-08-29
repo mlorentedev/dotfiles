@@ -66,6 +66,7 @@ func Run(opts Options) (int, error) {
 	// the ~2.8s compile-harness drift gate.
 	if contract != nil {
 		checkContractEnvVars(sys, contract, rep, opts.Fix)
+		checkPersistedEnv(sys, cfg, rep)
 		checkContractPath(sys, contract, rep)
 		checkRequiredBinaries(sys, contract, rep)
 	}
