@@ -36,7 +36,7 @@ func twoConfigRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
 	writeMirrorFixture(t, filepath.Join(repo, "ai", "deploy.json"), `{
-  "version": 1,
+  "version": 2,
   "configs": [
     {"name": "one", "src": "ai/one.json", "dst": "{HOME}/.one/config.json", "render": false, "mode": "0644"},
     {"name": "two", "src": "ai/two.json", "dst": "{HOME}/.two/config.json", "render": false, "mode": "0644"}

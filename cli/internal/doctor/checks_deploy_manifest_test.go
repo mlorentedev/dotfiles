@@ -10,7 +10,7 @@ import (
 
 // Four entries, one per shape the check must tell apart: a merge entry, a
 // replace entry, one gated on a command, one rendered.
-const deployManifestFixture = `{"version":1,"configs":[
+const deployManifestFixture = `{"version":2,"configs":[
   {"name":"m","src":"ai/m.json","dst":"{HOME}/.m/settings.json","render":false,"mode":"0644","strategy":"merge"},
   {"name":"r","src":"ai/r.json","dst":"{HOME}/.r/config.json","render":false,"mode":"0644"},
   {"name":"g","src":"ai/g.json","dst":"{HOME}/.g/x.json","render":false,"mode":"0644","requires":"gatedtool"},

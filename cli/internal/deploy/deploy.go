@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -28,6 +29,13 @@ import (
 // registry.yaml and env-contract.json are: adding a config should be an entry,
 // not a function.
 const ManifestRel = "ai/deploy.json"
+
+// ManifestVersion is the schema this binary reads. It is bumped whenever a new
+// field changes what an entry MEANS (2: `strategy` and `requires`, AI-039), so a
+// binary that predates the field refuses the manifest instead of deploying
+// every entry the old way. The check is the version, not the field, because
+// a field an old decoder ignores is invisible to it by construction.
+const ManifestVersion = 2
 
 // Strategies. Replace installs the source as the whole destination; merge
 // writes the source's top-level keys into the destination's JSON object and
@@ -63,6 +71,7 @@ type Config struct {
 
 // Manifest is the parsed ai/deploy.json.
 type Manifest struct {
+	Comment []string `json:"$comment"` // documentation, kept so DisallowUnknownFields allows it
 	Version int      `json:"version"`
 	Configs []Config `json:"configs"`
 }
@@ -99,12 +108,12 @@ var (
 // names the offending entry: a manifest error must not surface as a deploy that
 // silently skipped something.
 func ParseManifest(data []byte) (*Manifest, error) {
-	var m Manifest
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("parse deploy manifest: %w", err)
+	m, err := decodeManifest(data)
+	if err != nil {
+		return nil, err
 	}
-	if m.Version != 1 {
-		return nil, fmt.Errorf("deploy manifest version %d unsupported (want 1)", m.Version)
+	if m.Version != ManifestVersion {
+		return nil, fmt.Errorf("deploy manifest version %d unsupported (this dotf reads %d; update dotf, or the checkout, so they agree)", m.Version, ManifestVersion)
 	}
 	seen := map[string]bool{}
 	for i := range m.Configs {
@@ -134,6 +143,28 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		seen[c.Name] = true
 	}
 	return &m, nil
+}
+
+// decodeManifest reads exactly one JSON document, strictly.
+//
+// Unknown fields are refused, not ignored: encoding/json's default drops a key
+// it has no struct field for, which is how a binary predating `strategy` and
+// `requires` read the AI-039 manifest as "replace everything" and would have
+// wiped the box's own Copilot settings — the exact loss the merge strategy
+// exists to prevent. Trailing data is refused too: Decode reads one value and
+// stops, so `{...}{...}` would otherwise deploy the first document and hide the
+// second. A manifest this binary cannot fully read is one it must not act on.
+func decodeManifest(data []byte) (Manifest, error) {
+	var m Manifest
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&m); err != nil {
+		return m, fmt.Errorf("parse deploy manifest: %w (a field this dotf does not know? rebuild or update dotf)", err)
+	}
+	if err := dec.Decode(new(json.RawMessage)); !errors.Is(err, io.EOF) {
+		return m, fmt.Errorf("parse deploy manifest: trailing data after the manifest object (dotf reads one JSON document; remove what follows it)")
+	}
+	return m, nil
 }
 
 // FileMode parses the declared octal mode, defaulting to 0644 when unset. A
