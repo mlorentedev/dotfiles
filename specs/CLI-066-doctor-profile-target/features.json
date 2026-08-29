@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-066-doctor-profile-target-f1",
+    "behavior": "AC1: with pwsh on PATH, doctor measures the file pwsh names as $PROFILE, even outside the four enumerated roots, and the row names that path",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckProfileFiles_MeasuresThePwshResolvedProfile/redirected|TestCheckProfileFiles_MeasuresThePwshResolvedProfile/pwsh_answers' -count=1",
+    "state": "verified",
+    "evidence": "TestCheckProfileFiles_MeasuresThePwshResolvedProfile: a healthy profile under <home>/Redirected/Docs/PowerShell (outside every enumerated root) passes when the fake pwsh answers its path CRLF-terminated, row says 'resolved by pwsh $PROFILE' and names the path; a pwsh answer for a file not on disk is one FAIL naming that path"
+  },
+  {
+    "id": "CLI-066-doctor-profile-target-f2",
+    "behavior": "AC2: without pwsh (or with a pwsh that does not answer) doctor falls back to the enumeration and the row says so, with the reason",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckProfileFiles_MeasuresThePwshResolvedProfile/no_pwsh|TestCheckProfileFiles_MeasuresThePwshResolvedProfile/pwsh_present_but_fails' -count=1",
+    "state": "verified",
+    "evidence": "no pwsh on PATH: pwsh is never asked, row says 'enumerated, pwsh not on PATH'; pwsh errors (exit status 1): row says 'enumerated, pwsh did not answer $PROFILE (exit status 1)'; the question is bounded by profileQueryTimeout (asserted on the seam)"
+  },
+  {
+    "id": "CLI-066-doctor-profile-target-f3",
+    "behavior": "AC3: --fix invokes pwsh -NoProfile -File <SCRIPTS_DIR>\\profile-heal.ps1 -ProfilePath <the measured file> through the bounded seam and re-measures that file; the unbounded seam is never reached",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckProfileFiles_FixRunsTheHealAndVerifiesByConsequence' -count=1",
+    "state": "verified",
+    "evidence": "the heal test's argv assertion is now [-NoProfile -File <heal> -ProfilePath <profile>]; sys.CommandOutput (unbounded) is a t.Fatalf in the harness and is never reached; the $PROFILE question is answered by the bounded fake; all five sub-cases (FIX, no-op FAIL, script absent, pwsh absent, heal error) pass"
+  },
+  {
+    "id": "CLI-066-doctor-profile-target-f4",
+    "behavior": "AC4: profile-heal.ps1 -ProfilePath heals the given file; without the parameter it targets $PROFILE as before; the script stays ASCII and analyzer-clean",
+    "verification": "bats tests/profile-heal-ps1.bats && pwsh -NoProfile -Command \"if ((Invoke-ScriptAnalyzer -Path scripts/profile-heal.ps1 -Settings .PSScriptAnalyzerSettings.psd1 -Severity Error,Warning).Count -ne 0) { exit 1 }\"",
+    "state": "verified",
+    "evidence": "bats 16/16 incl. the new 'takes -ProfilePath and defaults to $PROFILE without it'; PSScriptAnalyzer 1.25.0 on the box: 0 findings, 0 non-ASCII characters; box run: -ProfilePath against a scratch copy with two marker pairs -> 'corruption detected: marker counts (start=2, end=2) exceed 1' then 'heal complete', one pair after, backup beside it"
+  },
+  {
+    "id": "CLI-066-doctor-profile-target-f5",
+    "behavior": "AC5: a Go test reads scripts/profile-heal.ps1 and fails if its size or marker threshold literals stop matching doctor's constants, or if -ProfilePath disappears",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestProfileHealThresholdsMatchTheScript' -count=1",
+    "state": "verified",
+    "evidence": "TestProfileHealThresholdsMatchTheScript pins '$state.Size -gt 1MB' beside profileMaxBytes == 1<<20, '$state.StartMarkers -gt 1 -or $state.EndMarkers -gt 1' and the two marker strings beside doctor's rule, and the -ProfilePath parameter with its $PROFILE default"
+  },
+  {
+    "id": "CLI-066-doctor-profile-target-f6",
+    "behavior": "AC6 (box): dotf doctor names the pwsh-resolved profile path; profile-heal.ps1 -ProfilePath heals a scratch corrupted copy while the real profile is untouched",
+    "verification": "test \"$(uname -s | cut -c1-5)\" = MINGW && dotf doctor --verbose 2>/dev/null | grep -q 'PowerShell profile exists (.*resolved by pwsh'",
+    "state": "verified",
+    "evidence": "Windows work box, 2026-08-29, binary built from this branch: dotf doctor --verbose -> '[ OK ] PowerShell profile exists (C:\\Users\\<user>\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1; resolved by pwsh $PROFILE)'; scratch heal: START markers 2 -> 1, one .corrupted-*.bak beside it; SHA256 of the real $PROFILE identical before and after"
+  }
+]
