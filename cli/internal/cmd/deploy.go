@@ -96,6 +96,12 @@ func newDeployCmd() *cobra.Command {
 				switch {
 				case !res.Changed:
 					_, _ = fmt.Fprintf(w, "in sync   %-10s %s\n", res.Name, res.Dst)
+				case res.ModeFixed && dryRun:
+					_, _ = fmt.Fprintf(w, "would fix mode %-5s %s\n", res.Name, res.Dst)
+				case res.ModeFixed:
+					// Content was in sync; only the declared mode was missing on
+					// the file (CLI-055: an inherited ACL on a 0600).
+					_, _ = fmt.Fprintf(w, "mode fixed %-9s %s\n", res.Name, res.Dst)
 				case dryRun:
 					_, _ = fmt.Fprintf(w, "would deploy %-7s %s\n", res.Name, res.Dst)
 				default:

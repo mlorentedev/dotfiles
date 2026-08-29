@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsmode"
 )
 
 // ManifestRel is the declarative table of what gets deployed where, relative to
@@ -89,6 +91,10 @@ type Outcome struct {
 	Dst     string
 	Changed bool
 	DryRun  bool
+	// ModeFixed: the content was in sync but the declared mode was not on the
+	// file — a 0600 whose ACL was still inherited (CLI-055) — and the deploy
+	// applied it without rewriting the content. Changed is true alongside.
+	ModeFixed bool
 }
 
 // Plan is what a deploy of a non-rendered config would do, computed without
@@ -291,7 +297,10 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 		}
 		out.Dst = p.Dst
 		if !p.Changed {
-			return out, nil // in sync; Changed stays false and nothing is rewritten
+			// In sync by content; the mode may still be off (CLI-055: a 0600
+			// deployed by an older binary keeps its inherited ACL forever
+			// unless someone looks). Nothing is rewritten either way.
+			return ensureMode(c, out, p.Dst, mode, dryRun)
 		}
 		out.Changed = true
 		if dryRun {
@@ -328,13 +337,36 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 		return out, fmt.Errorf("config %q: re-read staged copy: %w", c.Name, err)
 	}
 	if existing, err := os.ReadFile(dst); err == nil && bytes.Equal(existing, stagedData) { //nolint:gosec // manifest-declared destination
-		return out, nil // in sync; Changed stays false and nothing is rewritten
+		return ensureMode(c, out, dst, mode, dryRun) // in sync by content; the mode may still be off
 	}
 	out.Changed = true
 	if dryRun {
 		return out, nil
 	}
 	return out, commit(c, staged, dst, mode)
+}
+
+// ensureMode is the in-sync path's last word: the content matches, so the only
+// thing left to be wrong is the mode — on Windows, the ACL a 0600 file kept
+// from its directory because an earlier binary could not express owner-only
+// (CLI-055). A dry run reports the fix it would make; a real run makes it and
+// reports it as ModeFixed, never as a content rewrite.
+func ensureMode(c Config, out Outcome, dst string, mode os.FileMode, dryRun bool) (Outcome, error) {
+	needs, err := fsmode.Needs(dst, mode)
+	if err != nil {
+		return out, fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
+	}
+	if !needs {
+		return out, nil
+	}
+	out.Changed, out.ModeFixed = true, true
+	if dryRun {
+		return out, nil
+	}
+	if err := fsmode.Apply(dst, mode); err != nil {
+		return out, fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
+	}
+	return out, nil
 }
 
 // load reads the source and resolves the destination.
@@ -376,7 +408,7 @@ func stage(c Config, dst string, data []byte, mode os.FileMode) (string, error) 
 	if err := tmp.Close(); err != nil {
 		return staged, fmt.Errorf("config %q: stage: %w", c.Name, err)
 	}
-	if err := os.Chmod(staged, mode); err != nil {
+	if err := fsmode.Apply(staged, mode); err != nil {
 		return staged, fmt.Errorf("config %q: stage mode: %w", c.Name, err)
 	}
 	return staged, nil
@@ -389,8 +421,10 @@ func commit(c Config, staged, dst string, mode os.FileMode) error {
 	}
 	// Rename preserves the staged mode, but an existing destination replaced by
 	// rename keeps the NEW inode's bits — so this is belt-and-braces for the
-	// case that matters: a 0600 config must never end up 0644.
-	if err := os.Chmod(dst, mode); err != nil {
+	// case that matters: a 0600 config must never end up 0644. On Windows the
+	// rename also carries the staged file's DACL, and fsmode re-applies the
+	// owner-only one for the same reason (CLI-055).
+	if err := fsmode.Apply(dst, mode); err != nil {
 		return fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
 	}
 	return nil
