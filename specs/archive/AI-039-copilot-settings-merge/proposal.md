@@ -1,7 +1,7 @@
 ---
 id: "AI-039-copilot-settings-merge"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-28"
 issue: "mlorentedev/dotfiles#1322"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, copilot, deploy, windows]
@@ -100,3 +100,5 @@ Observable outcomes. Each must be testable.
 - Bitácora board: #1322 (AI-039); related #1334 (AI-042), #1339 (CLI-063), #1324 (CLI-058), #1321 (AI-038)
 - Related ADR: `docs/adr/adr-020-tooling-cli-go-convergence.md` (C7, strangler fig), `docs/adr/adr-036-install-channels.md` (catalog owns the version → `autoUpdate=false`), `docs/adr/adr-025-cross-machine-paths.md`
 - Prior spec: `specs/archive/CLI-039-*` (dotf deploy), `specs/archive/CLI-054-*` (bare deploy installs every entry)
+
+<!-- archived 2026-08-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1365 -->
