@@ -46,7 +46,7 @@ For each primitive, the matrix has one of four states per agent: ✅ portable, �
 | **MCP servers** | ✅ `settings.json` MCP block | ✅ `opencode.jsonc` MCP block (mirrors mcp-servers.json) | ➖ no MCP support in Gemini CLI | ➖ no MCP support in Copilot CLI | ✅ MCP-aware | ⚠ unknown |
 | **Sub-agents** | ✅ Task tool with `subagent_type` | ⚠ `opencode agent` + agent=build/explore/plan modes (different trigger semantics) | ❌ not supported | ❌ not supported | ⚠ unknown | ⚠ unknown |
 | **Memory layer** | ✅ `claude-mem` MCP (Anthropic-specific) | ⚠ Hive vault MCP partially (lessons, not transcripts) | ❌ no memory | ❌ no memory | ⚠ unknown | ⚠ unknown |
-| **Hooks (SessionStart, PreToolUse, etc.)** | ✅ `settings.json` hooks | ⚠ `opencode plugin` (npm-distributed JS, different paradigm) | ❌ no hook surface | ❌ no hook surface | ⚠ unknown | ⚠ unknown |
+| **Hooks (SessionStart, PreToolUse, etc.)** | ✅ `settings.json` hooks | ⚠ `opencode plugin` (npm-distributed JS, different paradigm) | ✅ `~/.gemini/settings.json` hooks (BeforeAgent/BeforeTool; measured 2026-08-26, `harness/manifest.json` `bind_comment`) | ✅ `~/.copilot/hooks/*.json` (SessionStart/PreToolUse, deny by exit 2 or `permissionDecision`; measured 2026-08-29 on CLI 1.0.81 — ADR-027 amendment) | ⚠ unknown | ⚠ unknown |
 | **Status line** | ✅ `/statusline-setup` | ⚠ partial (TUI footer, not user-customisable) | ❌ no TUI | ❌ no TUI | ⚠ unknown | ⚠ unknown |
 | **Slash commands UX** | ✅ `/<name>` discovery | ✅ `/<name>` discovery | ⚠ different format | ❌ no slash commands | ⚠ unknown | ⚠ unknown |
 

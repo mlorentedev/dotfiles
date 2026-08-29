@@ -25,6 +25,42 @@ created: "2026-06-21"
 > orchestration policy §3 left open — who decides to fan out, and under what budget — is defined.
 > Everything else below stands.
 
+> **Amended 2026-08-29 (#803, HARNESS-052): Copilot's hook capability was measured on the
+> Windows work box against Copilot CLI 1.0.81, and §3's "confirmed for claude/opencode/pi;
+> agy open" is superseded on two counts.** agy was measured on 2026-08-26 and recorded in
+> `harness/manifest.json`'s `bind_comment` (`~/.gemini/settings.json` declares BeforeAgent,
+> AfterAgent, BeforeTool, AfterTool): a `command-hook` target, not a presence-only one.
+> Copilot is **capable**. Its contract is recorded here, not as a verdict, so the emission —
+> HARNESS-045 AC1, `dotf harness bind` — can write the `bind[]` entry without re-measuring:
+>
+> - **Where:** `~/.copilot/hooks/*.json`; every file in the directory is read (the probe file
+>   fired alongside Orca's `orca.json`). Ours is therefore a separate file: Orca's regeneration
+>   of its own (lesson 111) never meets it and ours never rewrites theirs — coexistence by file,
+>   with no marker to find.
+> - **Shape:** `{"version": 1, "hooks": {"<Event>": [{"type": "command", "powershell": "…",
+>   "bash": "…", "timeoutSec": N}]}}`, no `matcher` key. The OS picks the command key: Windows
+>   ran `powershell` and never `bash`; `bash` on Linux is inferred from the schema, not measured.
+> - **Events measured firing:** `SessionStart`, `PreToolUse`, `PostToolUse`, `SessionEnd`, each
+>   with JSON on stdin in Claude's shape — `hook_event_name`, `session_id`, `cwd`, and on the
+>   tool events `tool_name` + `tool_input` (`PostToolUse` adds `tool_result`). `UserPromptSubmit`
+>   and `PostToolUseFailure` are declared by `orca.json` and were not probed.
+> - **Deny:** both answers block the call and the model is told. Exit code 2 renders as
+>   "Denied by preToolUse hook: hook exited with code 2" — the hook's stderr text is **not**
+>   surfaced. `{"permissionDecision": "deny", "permissionDecisionReason": "…"}` on stdout with
+>   exit 0 renders as "Denied by preToolUse hook: <reason>". So `dotf harness gate`'s exit-code
+>   contract blocks correctly on Copilot but loses the which-skill-and-why message: the Copilot
+>   entry needs the JSON answer (a `gate` output mode, or a wrapper translating exit → JSON),
+>   which is the one way it is not a clone of Claude's. An erroring hook also denies —
+>   fail-closed, on lesson 111's evidence rather than a fresh measurement.
+> - **Timeout:** `timeoutSec` of at least 30. Lesson 111 measured 5 s plus PowerShell's cold
+>   start as intermittent "hook errored" denials.
+> - **Gate:** `requires_command: copilot`, as the presence and agents entries already carry
+>   (BUG-003: nothing creates `~/.copilot` when the binary is absent).
+>
+> Presence event `SessionStart`, action event `PreToolUse`. The emission is the open half of
+> #803 and rides on HARNESS-045 AC1; the `bind[]` entry is written there, in that command's
+> entry shape.
+
 Accepted (model). The **authoring** of definitions and the **engine** (render + offline CI) are NOT gated. Only the **cross-machine auto-deploy** step inherits ADR-026's `knowledge#120` gate. Lands via the existing `HARNESS-001` deploy-engine epic — not a new infrastructure track.
 
 ## Date
@@ -76,7 +112,7 @@ A definition's `skills:` / `enforce:` declarations are **not decorative**. At de
 - **Action (gate):** progress is blocked unless the required step ran — Claude `PreToolUse`/`Stop` (exit 2), OpenCode `tool.execute.before`, pi `tool_call` (cf. the `pi-permission-system` precedent that already gates skills).
 - **Invocation (dispatch):** a command/router spawns the role deterministically (`/review` → reviewer), not the model deciding if it remembers.
 
-Cross-provider hook capability is confirmed for claude/opencode/pi; **agy hook capability is the one open verification item**. The declaration is agnostic; the hook emission is provider-specific (Claude JSON hooks vs OpenCode/pi TS plugins) and lives in the compile layer. A hook cannot be forgotten, bypassed, or reasoned around — this is the mechanism that converts an infrautilized library into one that is impossible to skip.
+Cross-provider hook capability is confirmed for claude/opencode/pi, and — per the 2026-08-29 amendment above — for agy (measured 2026-08-26) and copilot (measured 2026-08-29, Copilot CLI 1.0.81); no harness is presence-only. The declaration is agnostic; the hook emission is provider-specific (Claude JSON hooks vs OpenCode/pi TS plugins) and lives in the compile layer. A hook cannot be forgotten, bypassed, or reasoned around — this is the mechanism that converts an infrautilized library into one that is impossible to skip.
 
 ### 4. Coexistence by `kind` — invocable vs autonomous
 
@@ -123,7 +159,7 @@ The set of agents is derived from clustering the actual `00_meta/{skills,pattern
 
 - New render kinds, including a non-trivial **MD→YAML transpose** for agy.
 - The engine grows a **hook-emission** responsibility (per-provider hook config), a new surface to maintain and drift-check.
-- **agy hook capability unverified** — open item; until confirmed, agy gets presence-level enforcement only.
+- ~~**agy hook capability unverified**~~ — closed by measurement on 2026-08-26 (`harness/manifest.json` `bind_comment`); Copilot's closed on 2026-08-29 (amendment above). Both are `command-hook` targets.
 - A third drift axis (definition ↔ render-commit) on top of ADR-026's two; needs the same ADR-012-style assertion on the committed render.
 - Library consolidation (patterns→skills, merges, deprecations) is deferred to an evidence-based pass run by `curator` after deploy — intentionally not a blocker.
 
