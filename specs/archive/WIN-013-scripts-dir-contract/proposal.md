@@ -1,7 +1,7 @@
 ---
 id: "WIN-013-scripts-dir-contract"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-28"
 issue: "mlorentedev/dotfiles#1310"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, windows, env-contract, setup]
@@ -67,3 +67,5 @@ its User PATH entry are left in place.
 - Bitácora board: #1310 (consolidates #148)
 - ADR-025 (paths resolve at setup), #1305 (`dotf harness mirror` took the same direction for the deploy dir)
 - `env-contract.json`, `setup-windows.ps1`, `.github/scripts/doctor-gate-known-failures.txt`
+
+<!-- archived 2026-08-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1356 -->
