@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // healthyProfile is a deployed profile as setup-windows.ps1 writes it: one
@@ -171,11 +172,24 @@ func TestCheckProfileFiles_FixRunsTheHealAndVerifiesByConsequence(t *testing.T) 
 		t.Helper()
 		sys := newSys(map[string]string{"HOME": fx.home, "USERPROFILE": fx.home, "SCRIPTS_DIR": filepath.Dir(fx.heal)}, onPath, nil)
 		sys.GOOS = "windows"
+		// Every shell-out of this check goes through the BOUNDED seam (CLI-066):
+		// the unbounded one must never be reached.
 		sys.CommandOutput = func(name string, args ...string) (string, error) {
+			t.Fatalf("unbounded CommandOutput reached: %s %v", name, args)
+			return "", nil
+		}
+		sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, string, error) {
 			if name != "pwsh" {
 				t.Fatalf("unexpected command %s %v", name, args)
 			}
-			return pwsh(args)
+			// The `$PROFILE` question (profileTarget) answers the fixture's
+			// path, CRLF-terminated the way pwsh prints it; the heal invocation
+			// goes to the test's pwsh fake.
+			if len(args) == 3 && args[1] == "-Command" && args[2] == "$PROFILE" {
+				return fx.profile + "\r\n", "", nil
+			}
+			out, err := pwsh(args)
+			return out, "", err
 		}
 		var buf bytes.Buffer
 		rep := capture(&buf)
@@ -183,7 +197,7 @@ func TestCheckProfileFiles_FixRunsTheHealAndVerifiesByConsequence(t *testing.T) 
 		return buf.String(), rep
 	}
 
-	t.Run("heal rewrites the profile → FIX, invoked as pwsh -NoProfile -File <SCRIPTS_DIR>\\profile-heal.ps1", func(t *testing.T) {
+	t.Run("heal rewrites the profile → FIX, invoked as pwsh -NoProfile -File <SCRIPTS_DIR>\\profile-heal.ps1 -ProfilePath <the measured file>", func(t *testing.T) {
 		fx := setup(t, true)
 		var gotArgs []string
 		out, rep := run(t, fx, []string{"pwsh"}, func(args []string) (string, error) {
@@ -193,7 +207,9 @@ func TestCheckProfileFiles_FixRunsTheHealAndVerifiesByConsequence(t *testing.T) 
 			}
 			return "[profile-heal] rewrote profile from SSOT\n", nil
 		})
-		want := []string{"-NoProfile", "-File", fx.heal}
+		// CLI-066: the heal is told the file doctor measured — the one pwsh
+		// named — so detect and heal cannot split on a redirected Documents.
+		want := []string{"-NoProfile", "-File", fx.heal, "-ProfilePath", fx.profile}
 		if strings.Join(gotArgs, " ") != strings.Join(want, " ") {
 			t.Fatalf("heal invoked as %v, want %v", gotArgs, want)
 		}
