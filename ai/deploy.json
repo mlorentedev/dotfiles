@@ -101,7 +101,7 @@
       "dst": "{HOME}/.gemini/antigravity-cli/settings.json",
       "render": false,
       "mode": "0644",
-      "paths": "slash", "requires": "agy"
+      "paths": "slash", "strategy": "merge", "requires": "agy"
     }
   ]
 }

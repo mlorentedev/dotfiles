@@ -18,7 +18,7 @@ agy 1.1.14.
 - [x] **AC2** → `TestDeploy_PathsComposeWithMergeAndReportInSync` (merge keeps `firstLaunchAt`, the
   rendered list replaces the managed key, `PlanConfig` in sync afterwards). Mutation: expansion
   moved after the merge → red; restored.
-- [x] **AC3** → `tests/copilot-config.bats` (30/30): every JSON under `ai/*/` free of `/home/<user>`,
+- [x] **AC3** → `tests/copilot-config.bats` (14/14): every JSON under `ai/*/` free of `/home/<user>`,
   `C:\Users\<user>`, `C:/Users/<user>`; both templates asserted; manifest v3 with
   `copilot-config … native` and `agy-settings … slash`; neither setup carries the copy (invocation
   line, not mention). `TestManifestVersion_FreezesTheFieldSet` extended to v3 with `paths`;
@@ -67,10 +67,29 @@ bats tests/copilot-config.bats tests/antigravity.bats; bats tests/setup-{linux,w
   added; safe because both setups install agy **before** `dotf deploy` (setup-windows.ps1 472 →
   1287, setup-linux.sh 370 → the deploy block), so a box that carries agy still gets the file on
   first run; the bats test skips where the binary is absent, the same gate the manifest applies.
-- **`replace` stands for `agy-settings`** (round 1, next step 2 — "does agy write its own
-  settings.json?"). Measured on the box: the deployed file's key set equals the source's, no key
-  added by agy after daily use; agy reads, it does not write. Copilot does write its
-  `config.json` (`firstLaunchAt`), which is why that entry is `merge`.
+- **~~`replace` stands for `agy-settings`~~ — RETRACTED in round 3.** Round 2's measurement
+  compared the deployed file's *key set* with the source's and concluded "agy reads, it does not
+  write". Round 3 (`nan/qwen3.8-flash`, FAIL — Blocker REAL) looked at the *values*: the
+  deployed file held one runtime-trusted workspace in `trustedWorkspaces` and four runtime
+  grants in `permissions.allow` that no manifest ever named. Re-measured with values: `+1`
+  workspace, `+4` grants. agy writes inside the very lists we render, so `replace` — and a
+  top-level-key `merge` — deleted the user's own grants on every deploy, and doctor would have
+  called them drift. **The merge is now granular where the tools write:** objects recurse, lists
+  UNION (the destination's entries stay in order, managed entries the destination lacks are
+  appended), scalars are managed-wins. `agy-settings` is `merge`; Copilot's `trustedFolders`
+  (which Copilot also appends to) gets the same protection. `TestMergeInto_KeepsWhatTheToolAddedAtRuntime`
+  pins the box's shape and the second run's no-op.
+- **Round 3's second Blocker — a regression from round 2.** The `UseNumber` decoders decoded one
+  document and never asked for a second, so the trailing-data refusal `Unmarshal` gave for free
+  was gone: `{"a":1} {"injected":true}` rendered as `{"a":1}`. Both decoders now refuse a second
+  document the way `decodeManifest` does (`TestRender_RefusesTrailingData`).
+- **Round 3's Majors and Minors, all applied:** numbers compare by value in the merge (`15` ==
+  `15.0` == `1e1`, `TestMergeInto_ComparesNumbersByValue`); the token rule is symmetric — a token's
+  expansion is rendered in the declared form wherever it sits, the whole string only when it
+  begins with one (`TestExpandPaths_RendersTheTokenInTheDeclaredFormWhereverItSits`), and
+  proposal.md's What § and AC1 now say exactly that; the encoder no longer HTML-escapes `<`,
+  `>`, `&` (`TestRender_DoesNotHTMLEscape`); the AC3 evidence count below reads `14/14`, which
+  is what `grep -c '^@test' tests/copilot-config.bats` reproduces.
 - **`TestDeploy_PathsComposeWithReplace`** added (round 1, Minor THEORETICAL): AC2's replace half
   had only manifest-shape bats and box evidence; it now has a named regression test beside the
   merge one.

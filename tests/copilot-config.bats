@@ -105,7 +105,9 @@ load 'lib/refute'
 @test "the Copilot and agy trust lists are {HOME} templates rendered by dotf deploy (AI-042)" {
     [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*"]' ]
     [ "$(jq -c '.trustedWorkspaces' "$DOTFILES_DIR/ai/agy/settings.json")" = '["{HOME}/Projects/*","{HOME}/Projects/Workspace/*"]' ]
-    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.strategy // "replace") \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json replace slash" ]
+    # merge, not replace (AI-042 review round 3): agy appends to trustedWorkspaces
+    # and permissions.allow at runtime; the deploy unions lists so those survive.
+    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.strategy // "replace") \(.paths) \(.requires)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json merge slash agy" ]
     [ "$(jq -r '.version' "$MANIFEST")" = "3" ]
 }
 

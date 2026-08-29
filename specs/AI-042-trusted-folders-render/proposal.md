@@ -25,8 +25,10 @@ starts with a trust prompt. `tests/antigravity.bats` guards this class for one f
 
 - `ai/deploy.json` entries gain `paths`: `native` or `slash`. When set, `dotf deploy` expands the
   `{HOME}` / `{VAR}` tokens the manifest already uses for `dst` **inside the source's JSON string
-  values**, then normalises every string that carried a token to the declared separator form
-  (`filepath.FromSlash` for `native`, `filepath.ToSlash` for `slash`), before the strategy
+  values**, rendering each token's expansion in the declared separator form wherever it sits
+  (`filepath.FromSlash` for `native`, `filepath.ToSlash` for `slash`) and, for a string that
+  **begins** with a token — a path — the whole string as well; a token elsewhere (inside a URL)
+  leaves the rest of the string untouched (review rounds 2–3), before the strategy
   (merge or replace) runs. Expansion is JSON-aware so a native Windows path is JSON-escaped by the
   encoder, never by hand. `ManifestVersion` becomes 3 (a field that changes what an entry's content
   means; the frozen-schema test forces the bump).
@@ -68,8 +70,10 @@ starts with a trust prompt. `tests/antigravity.bats` guards this class for one f
 
 Observable outcomes. Each must be testable.
 
-- [ ] AC1 — `paths: native` expands `{HOME}` inside JSON string values and renders those strings with
-  the OS separator; `paths: slash` renders them with `/`; strings without a token are untouched;
+- [ ] AC1 — `paths: native` expands `{HOME}` inside JSON string values and renders each expansion
+  with the OS separator — and the whole string when it begins with a token; `paths: slash` renders
+  them with `/`; a token inside a longer string (a URL) leaves the rest of it as written; strings
+  without a token are untouched;
   the output is valid JSON (a Windows path is escaped by the encoder); an unknown `paths` value and
   a non-JSON source with `paths` are rejected naming the entry.
 - [ ] AC2 — `paths` composes with `merge` (expansion before the merge, unmanaged destination keys

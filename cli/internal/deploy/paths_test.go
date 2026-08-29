@@ -100,9 +100,11 @@ func TestDeploy_PathsComposeWithMergeAndReportInSync(t *testing.T) {
 	if got["firstLaunchAt"] != "2026-03-11T00:00:00.000Z" {
 		t.Errorf("unmanaged key lost: %v", got)
 	}
+	// Union (review round 3): the folder Copilot itself trusted at runtime
+	// ("/old") survives, and the rendered entry is present beside it.
 	want := filepath.FromSlash(filepath.ToSlash(home) + "/Projects/*")
-	if fs := got["trustedFolders"].([]any); len(fs) != 1 || fs[0] != want {
-		t.Errorf("want rendered %q, got %v", want, fs)
+	if fs := got["trustedFolders"].([]any); len(fs) != 2 || fs[0] != "/old" || fs[1] != want {
+		t.Errorf("want [/old %q] (runtime entry kept, rendered entry added), got %v", want, fs)
 	}
 	p, err := PlanConfig(c, root, home, noResolve)
 	if err != nil {
@@ -199,8 +201,10 @@ func TestExpandPaths_ConvertsOnlyStringsThatBeginWithAToken(t *testing.T) {
 	if want := filepath.FromSlash("/home/u/Projects/*"); got["path"] != want {
 		t.Errorf("leading-token path: got %q, want %q", got["path"], want)
 	}
-	if got["url"] != "https://api.example.com//home/u/x" {
-		t.Errorf("a tokenized URL must keep its slashes under native: %q", got["url"])
+	// Round 3 made the rule symmetric: the token's expansion is rendered in the
+	// declared form wherever it sits; only the URL's own slashes are left alone.
+	if want := "https://api.example.com/" + filepath.FromSlash("/home/u") + "/x"; got["url"] != want {
+		t.Errorf("a tokenized URL keeps its own slashes under native, got %q, want %q", got["url"], want)
 	}
 	if got["plain"] != "a/b/c" {
 		t.Errorf("a string without a token is untouched: %q", got["plain"])

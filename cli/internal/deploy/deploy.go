@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -427,19 +428,129 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, false, err
 	}
+	merged, changed := deepMerge(existing, managed)
+	content, err := encodeJSON(merged)
+	if err != nil {
+		return nil, false, err
+	}
+	return content, changed, nil
+}
+
+// deepMerge folds managed into existing and reports whether anything moved.
+//
+// THE TOOL WRITES THESE FILES TOO (AI-042 review round 3, Blocker): agy adds
+// to `trustedWorkspaces` and `permissions.allow` when the user trusts a
+// workspace or grants a tool in a session — measured on the Windows box, one
+// workspace and four grants that the manifest never named. Copilot does the
+// same to `trustedFolders`. A top-level key replace, or a whole-file replace,
+// deletes every one of them on every deploy: the drift doctor would then
+// report is the user's own grants, and "fixing" it would delete them again.
+//
+// So the merge is granular where the tools write:
+//
+//   - object vs object → recurse; keys only the destination has stay;
+//   - list vs list → UNION: the destination's entries in their order, then
+//     every managed entry the destination lacks. What the manifest declares
+//     is present; what the tool added survives;
+//   - anything else → the managed value wins, compared semantically (a
+//     json.Number 15 equals 15.0 — string equality would report a change
+//     forever, round-3 Major).
+func deepMerge(existing, managed map[string]any) (map[string]any, bool) {
 	changed := false
 	for k, v := range managed {
-		if cur, ok := existing[k]; ok && reflect.DeepEqual(cur, v) {
+		cur, ok := existing[k]
+		if !ok {
+			existing[k] = v
+			changed = true
+			continue
+		}
+		switch mv := v.(type) {
+		case map[string]any:
+			if co, isObj := cur.(map[string]any); isObj {
+				merged, c := deepMerge(co, mv)
+				existing[k] = merged
+				changed = changed || c
+				continue
+			}
+		case []any:
+			if cl, isList := cur.([]any); isList {
+				merged, c := unionLists(cl, mv)
+				existing[k] = merged
+				changed = changed || c
+				continue
+			}
+		}
+		if jsonEqual(cur, v) {
 			continue
 		}
 		existing[k] = v
 		changed = true
 	}
-	content, err := json.MarshalIndent(existing, "", "  ")
-	if err != nil {
-		return nil, false, err
+	return existing, changed
+}
+
+// unionLists keeps the destination's entries in order and appends every
+// managed entry it lacks.
+func unionLists(existing, managed []any) ([]any, bool) {
+	out := existing
+	changed := false
+	for _, m := range managed {
+		found := false
+		for _, e := range existing {
+			if jsonEqual(e, m) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			out = append(out, m)
+			changed = true
+		}
 	}
-	return append(content, '\n'), changed, nil
+	return out, changed
+}
+
+// jsonEqual compares two decoded JSON values semantically: numbers by value
+// (15 == 15.0 == 1.5e1), everything else structurally.
+func jsonEqual(a, b any) bool {
+	switch av := a.(type) {
+	case json.Number:
+		bv, ok := b.(json.Number)
+		if !ok {
+			return false
+		}
+		if av == bv {
+			return true
+		}
+		ar, aok := new(big.Rat).SetString(av.String())
+		br, bok := new(big.Rat).SetString(bv.String())
+		return aok && bok && ar.Cmp(br) == 0
+	case map[string]any:
+		bv, ok := b.(map[string]any)
+		if !ok || len(av) != len(bv) {
+			return false
+		}
+		for k, x := range av {
+			y, ok := bv[k]
+			if !ok || !jsonEqual(x, y) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		bv, ok := b.([]any)
+		if !ok || len(av) != len(bv) {
+			return false
+		}
+		for i := range av {
+			if !jsonEqual(av[i], bv[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return reflect.DeepEqual(a, b)
+	}
 }
 
 // stripLineComments removes lines that are only a `//` comment — the header
