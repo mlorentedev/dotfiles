@@ -31,13 +31,11 @@ set -euo pipefail
 BEGIN_PREFIX='<!-- BEGIN HARNESS GENERATED'
 END_MARKER='<!-- END HARNESS GENERATED -->'
 
-# Distinct marker namespace for agent-presence injection (ADR-027). Kept separate
-# from BEGIN_PREFIX/END_MARKER so an agent-presence region coexists with the
-# patterns / skill-catalog region in the same always-loaded instructions file
-# without either disturbing the other (validate_markers expects exactly one
-# GENERATED pair; presence uses its own pair).
-AGENT_BEGIN_PREFIX='<!-- BEGIN HARNESS AGENT-PRESENCE'
-AGENT_END_MARKER='<!-- END HARNESS AGENT-PRESENCE -->'
+# The agent-presence region (ADR-027) uses its own marker pair, distinct from
+# BEGIN_PREFIX/END_MARKER so it coexists with the patterns / skill-catalog
+# region in the same instructions file. Those markers are owned by
+# `dotf harness presence` (cli/internal/harness/presence.go) since HARNESS-092;
+# this script no longer spells them.
 
 usage() {
     cat <<EOF
@@ -605,36 +603,9 @@ skill_field() {
 # agent_capability_line established for `capabilities:`, on the identical
 # reasoning one field over: an empty skill list is not "no opinion", it is
 # "nothing enforced".
-agent_skills_line() {
-    local record="$1" rc=0 line
-    type -P dotf >/dev/null 2>&1 || rc=2
-    if [ "$rc" -eq 0 ] && ! dotf_knows_subcommand resolve-skills; then rc=2; fi
-    if [ "$rc" -eq 0 ]; then
-        line="$(dotf harness resolve-skills "$record")" || rc=1
-    fi
-    case "$rc" in
-        0) printf '%s\n' "$line" ;;
-        1) printf '[ERROR] %s declares a `skills:` list that cannot be resolved\n' "$record" >&2
-           return 1 ;;
-        2) line="$(skill_field "$record" skills)"
-           if [ -z "$line" ] && record_has_block_skills "$record"; then
-               printf '[ERROR] %s declares `skills:` in YAML block style, and dotf is absent or\n' "$record" >&2
-               printf '        predates resolve-skills, so this renderer cannot read it. Rendering\n' >&2
-               printf '        "MUST consume: none" would DISARM the persona rather than describe it\n' >&2
-               printf '        -- rebuild dotf and re-run --deploy\n' >&2
-               return 1
-           fi
-           printf '%s\n' "$line" ;;
-    esac
-}
-
 # True when a record declares `skills:` with nothing after the colon -- the YAML
 # block form. Shared by the guard above and its test; a bare `skills:` key with an
 # empty value is the one case skill_field cannot distinguish from "no key at all".
-record_has_block_skills() {
-    awk '/^---[[:space:]]*$/{n++; next} n==1 && /^skills:[[:space:]]*$/{found=1} n>=2{exit} END{exit !found}' "$1"
-}
-
 # Build a markdown skill catalog (one bullet per skill targeting <agent>), for
 # agents with no per-skill mechanism (e.g. copilot's single instructions file).
 # Deterministic order (glob sorts). Args: <record_dir> <agent>
@@ -1024,10 +995,21 @@ deploy_agents() {
     fi
 }
 
-# Build the agent-presence block for <agent>: one line per INVOCABLE persona that
-# targets this harness, naming its forced skills. Deterministic order (glob
-# sorts). Empty output (no persona targets this harness) tells the caller to skip
-# injection.
+# Render the agent-presence block for <agent> (HARNESS-092, #1326): delegated to
+# `dotf harness presence --render`, the one renderer both OSes share, so the
+# compact doctrine payload (deploy_doctrine, agy/codex) and the injected region
+# carry the same text and the same sha. Empty output means no persona targets
+# this harness. Unlike the resolve-* helpers this has no awk fallback: a
+# roster rendered by a second parser is the drift this port removes.
+build_agent_presence() {
+    local agent="$2"
+    if ! type -P dotf >/dev/null 2>&1 || ! dotf_knows_subcommand presence; then
+        printf '[WARN] agent presence needs `dotf harness presence`; dotf is absent or predates it\n' >&2
+        printf '       the %s doctrine payload carries NO persona roster -- rebuild dotf and re-run --deploy\n' "$agent" >&2
+        return 0
+    fi
+    dotf harness presence --render "$agent" --repo-root "$REPO_ROOT"
+}
 #
 # `kind: autonomous` records are cataloged, never injected. The block's own
 # sentence is "when acting as one", and you never act as an autonomous instance:
@@ -1049,22 +1031,6 @@ deploy_agents() {
 # compacting enforcement prose by paraphrase is how a rule quietly loses its
 # teeth.
 # Args: <record_dir> <agent>
-build_agent_presence() {
-    local ag_recdir="$1" agent="$2" ag_dir name skills_line first=1
-    for ag_dir in "$ag_recdir"/*/; do
-        [[ -f "$ag_dir/AGENT.md" ]] || continue
-        name="$(basename "$ag_dir")"
-        [[ "$(skill_field "$ag_dir/AGENT.md" kind)" == "autonomous" ]] && continue
-        skill_targets_agent "$ag_dir/AGENT.md" "$agent" || continue
-        if [[ "$first" == 1 ]]; then
-            printf '## Active agent personas — forced skills\n\n'
-            printf 'When acting as one, you MUST consume its skills.\n\n'
-            first=0
-        fi
-        skills_line="$(agent_skills_line "$ag_dir/AGENT.md")" || return 1
-        printf -- '- **%s** — MUST consume: %s\n' "$name" "${skills_line:-none}"
-    done
-}
 
 # --- doctrine (HARNESS-054) ---
 # Most harnesses receive the whole cross-agent AGENTS.md (opencode, pi) or a full
@@ -1162,51 +1128,29 @@ deploy_doctrine() {
 # skill-catalog region (BEGIN_PREFIX). Replaces an existing presence region in
 # place; appends a fresh one if absent. Skips a target file that does not exist.
 # Args: <file_abs> <content_file>
-inject_agent_presence() {
-    local file="$1" content_file="$2" sha begin tmp
-    if [[ ! -f "$file" ]]; then
-        printf '[deploy] presence target absent, skipping: %s\n' "$file" >&2
-        return 1
-    fi
-    sha="$(sha_of "$content_file")"
-    begin="$AGENT_BEGIN_PREFIX (sha256:$sha) — agent presence from vault agent definitions; edit there + re-run setup, do NOT edit between markers -->"
-    tmp="$(mktemp)"
-    if grep -q "^$AGENT_BEGIN_PREFIX" "$file" && grep -qF "$AGENT_END_MARKER" "$file"; then
-        # replace the existing presence region in place (mirrors replace_region)
-        awk -v beginm="$begin" -v endm="$AGENT_END_MARKER" -v bp="$AGENT_BEGIN_PREFIX" -v cf="$content_file" '
-            index($0,bp)==1 { print beginm; while ((getline l < cf) > 0) print l; close(cf); skip=1; next }
-            $0==endm { if (skip){ print; skip=0; next } }
-            skip { next }
-            { print }
-        ' "$file" > "$tmp"
-    else
-        # append a fresh presence region at the end of the file
-        cat "$file" > "$tmp"
-        { printf '\n%s\n' "$begin"; cat "$content_file"; printf '%s\n' "$AGENT_END_MARKER"; } >> "$tmp"
-    fi
-    mv "$tmp" "$file"
-}
 
 # Presence-level determinism for every configured harness: build the persona
 # block for that harness and inject it into its instructions file. One uniform
 # mechanism (marked-region injection) across claude / opencode / pi / copilot.
+
 deploy_agent_presence() {
-    local ag_recdir="$1" agent file file_abs tmp
-    while IFS=$'\t' read -r agent file; do
-        [[ -n "$agent" ]] || continue
-        tmp="$(mktemp)"
-        build_agent_presence "$ag_recdir" "$agent" > "$tmp"
-        if [[ ! -s "$tmp" ]]; then rm -f "$tmp"; continue; fi   # no persona targets this harness
-        file_abs="$HOME/$file"
-        # inject_agent_presence returns 1 (a genuine no-op, not a set -e-worthy
-        # error) when the target file is absent -- only log success when it
-        # actually wrote something, else "presence target absent, skipping"
-        # was immediately followed by a contradicting success line.
-        if inject_agent_presence "$file_abs" "$tmp"; then
-            printf '[deploy] presence -> %s (%s)\n' "$file_abs" "$agent"
-        fi
-        rm -f "$tmp"
-    done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)"' "$MANIFEST")
+    # HARNESS-092 (#1326): the presence roster is rendered and injected by
+    # `dotf harness presence` -- one implementation for every OS, the same
+    # sha in every begin marker. This function used to hold a shell copy
+    # (build/inject_agent_presence) that setup-windows.ps1 never ported, so no
+    # harness on Windows was ever told which skills a persona forces. A dotf
+    # that is absent or predates the verb is an ERROR that fails --deploy: a
+    # presence that quietly is not deployed is exactly the defect.
+    # Absent or too old is a bootstrap state, not a failure: setup-linux.sh
+    # installs dotf best-effort and the other resolvers degrade the same way
+    # (tier, capabilities). Loud, though -- the WARN names what did NOT happen.
+    # A dotf that runs the verb and fails is a different thing and fails --deploy.
+    if ! type -P dotf >/dev/null 2>&1 || ! dotf_knows_subcommand presence; then
+        printf '[WARN] agent presence needs `dotf harness presence`; dotf is absent or predates it\n' >&2
+        printf '       presence NOT deployed to any harness -- rebuild dotf and re-run --deploy\n' >&2
+        return 0
+    fi
+    dotf harness presence --repo-root "$REPO_ROOT"
 }
 
 # --- coverage: every enforced region reaches every surface, or says why not ---
