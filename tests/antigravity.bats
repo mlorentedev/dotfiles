@@ -90,6 +90,10 @@ setup() {
 }
 
 @test "agy settings.json deployed to AGY_APP_DATA" {
+    # The manifest entry is `requires: agy` (AI-042 review round 1): on a box
+    # without the binary the file is deliberately not written — a config for a
+    # tool the box does not carry is a file nobody reads (#843, #1312).
+    command -v agy >/dev/null 2>&1 || skip "agy not installed: agy-settings is requires: agy, so nothing is deployed"
     [ -f "$AGY_APP_DATA/settings.json" ]
     [ ! -L "$AGY_APP_DATA/settings.json" ]
 }

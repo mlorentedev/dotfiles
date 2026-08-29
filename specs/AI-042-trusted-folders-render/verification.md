@@ -58,8 +58,22 @@ bats tests/copilot-config.bats tests/antigravity.bats; bats tests/setup-{linux,w
   escapes them. Key order follows the encoder (sorted), which is stable run to run, so "in sync"
   stays answerable.
 - **agy's settings move onto the manifest** rather than gaining a third render path in two shell
-  twins (ADR-020 C7). No `requires: agy`: the setups created that directory and copied the file
-  unconditionally, and `tests/antigravity.bats` asserts the file exists after setup.
+  twins (ADR-020 C7). The first merge shipped the entry **without** `requires: agy` — the setups
+  had copied the file unconditionally and `tests/antigravity.bats` asserted it exists — while
+  AC3 said `requires: agy`. Review round 1 (`nan/deepseek-v4-flash`, FAIL) caught the
+  disagreement (Major, REAL) and the consequence (Major, THEORETICAL): an ungated entry deploys
+  `~/.gemini/antigravity-cli/settings.json` onto a box without agy, the #843/#1312 class the
+  manifest's own `$comment` names. Reconciled toward the AC, not away from it: `requires: agy`
+  added; safe because both setups install agy **before** `dotf deploy` (setup-windows.ps1 472 →
+  1287, setup-linux.sh 370 → the deploy block), so a box that carries agy still gets the file on
+  first run; the bats test skips where the binary is absent, the same gate the manifest applies.
+- **`replace` stands for `agy-settings`** (round 1, next step 2 — "does agy write its own
+  settings.json?"). Measured on the box: the deployed file's key set equals the source's, no key
+  added by agy after daily use; agy reads, it does not write. Copilot does write its
+  `config.json` (`firstLaunchAt`), which is why that entry is `merge`.
+- **`TestDeploy_PathsComposeWithReplace`** added (round 1, Minor THEORETICAL): AC2's replace half
+  had only manifest-shape bats and box evidence; it now has a named regression test beside the
+  merge one.
 - **Manifest version 3.** `paths` changes what an entry's content means; the frozen-schema test
   forced the bump, which is the point of that test.
 

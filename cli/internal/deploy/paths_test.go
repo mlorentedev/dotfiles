@@ -113,6 +113,47 @@ func TestDeploy_PathsComposeWithMergeAndReportInSync(t *testing.T) {
 	}
 }
 
+// The replace half of AC2 (AI-042 review round 1, Minor): paths expansion runs
+// before the whole-file replace, so agy's entry — replace + slash — lands a
+// rendered list, reads as in sync afterwards, and a foreign key in the
+// destination does NOT survive, which is what replace means and how it differs
+// from the merge case above.
+func TestDeploy_PathsComposeWithReplace(t *testing.T) {
+	root := repoWithTrust(t, "ai/agy/settings.json", `{"trustedWorkspaces":["{HOME}/Projects/*"]}`)
+	home := t.TempDir()
+	dst := filepath.Join(home, ".gemini", "antigravity-cli", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte(`{"stale":true,"trustedWorkspaces":["/old"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := Config{Name: "agy-settings", Src: "ai/agy/settings.json", Dst: "{HOME}/.gemini/antigravity-cli/settings.json", Mode: "0644", Strategy: StrategyReplace, Paths: PathsSlash}
+
+	res, err := Deploy(c, root, home, noResolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Changed {
+		t.Fatal("a differing rendered list is a change")
+	}
+	got := readObject(t, dst)
+	if _, stale := got["stale"]; stale {
+		t.Errorf("replace must not keep a foreign key: %v", got)
+	}
+	want := filepath.ToSlash(home) + "/Projects/*"
+	if ws := got["trustedWorkspaces"].([]any); len(ws) != 1 || ws[0] != want {
+		t.Errorf("want rendered %q, got %v", want, ws)
+	}
+	p, err := PlanConfig(c, root, home, noResolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Changed {
+		t.Error("a rendered destination must read as in sync")
+	}
+}
+
 func TestParseManifest_ValidatesPathsByName(t *testing.T) {
 	_, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"a","dst":"b","paths":"backslash"}]}`))
 	if err == nil || !strings.Contains(err.Error(), `config "x"`) || !strings.Contains(err.Error(), "paths") {
