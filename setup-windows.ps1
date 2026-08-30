@@ -1946,6 +1946,31 @@ function Get-SkillField {
     return ''
 }
 
+# One frontmatter key line's fate, as a pure decision: $true keeps the line and
+# every continuation line under it, $false drops both. This is the twin of the
+# awk rule in render_skill (scripts/compile-harness.sh), and a bats parity test
+# compares the two allowlists textually, so an edit here that is not mirrored
+# there fails loudly instead of quietly deploying a skill the other OS drops.
+#
+# -cmatch, not -match: PowerShell's -match is case-insensitive by default, and
+# bash's grep/awk are not, so a faithful mirror needs the case-sensitive
+# operator.
+function Test-SkillFrontmatterKeyKept {
+    param([string]$Line, [string]$Kind)
+    # A command carries its name in its filename, not its frontmatter.
+    if ($Kind -eq 'command' -and $Line -cmatch '^name:') { return $false }
+    # The record (HARNESS-069) already carries its own generated_* fields,
+    # describing its relationship to the vault. Strip them here so deploy
+    # injects one fresh set, describing the deploy target's relationship to the
+    # record, instead of stacking a second set on top.
+    if ($Line -cmatch '^generated(_from|_sha)?:') { return $false }
+    # Native skill execution fields recognized by agent runtimes (Claude Code, AGY, OpenCode, Copilot)
+    if ($Line -cmatch '^(name|description|allowed-tools|when_to_use|model|effort|context|argument-hint|arguments|user-invocable|disable-model-invocation):') { return $true }
+    # Drop neutral/store-only keys (id, type, status, created, owner, paths, keywords, requires, targets, source, license, etc.)
+    # In particular, dropping `paths:` ensures Claude Code discovers skills as unconditional at session start.
+    return $false
+}
+
 # The injected generated_* fields are deliberately dual-referent, not a
 # single "where did this come from" answer (HARNESS-069): generated_from is
 # always the vault path in $SrcPath -- where a human edits, the SSOT -- while
@@ -1963,6 +1988,7 @@ function Convert-SkillRecord {
         return "<!-- generated: true; from: $SrcPath; sha256:$sha; edit the vault source + re-run setup -->`n`n" + $body.Trim()
     }
     $fm = 0
+    $keep = $false
     $out = New-Object System.Collections.Generic.List[string]
     foreach ($line in Get-Content -LiteralPath $RecordMd) {
         if ($line -match '^---\s*$') {
@@ -1975,16 +2001,19 @@ function Convert-SkillRecord {
             }
             continue
         }
-        if ($fm -eq 1 -and $Kind -eq 'command' -and $line -match '^name:') { continue }
-        # The record (HARNESS-069) already carries its own generated_* fields,
-        # describing its relationship to the vault. Strip them here so deploy
-        # injects one fresh set, describing the deploy target's relationship
-        # to the record, instead of stacking a second set on top. Mirrors
-        # render_skill's awk rule in scripts/compile-harness.sh exactly.
-        # -cmatch, not -match: PowerShell's -match is case-insensitive by
-        # default, and bash's grep/awk are not - a faithful mirror needs the
-        # case-sensitive operator.
-        if ($fm -eq 1 -and $line -cmatch '^generated(_from|_sha)?:') { continue }
+        if ($fm -eq 1) {
+            # A key line decides its own fate and that of the continuation
+            # lines under it: dropping `paths:` while keeping its indented list
+            # items would emit YAML no reader accepts. The flag therefore
+            # survives across lines, and starts false, so anything before the
+            # first key (a comment, say) is dropped -- which is what the awk
+            # twin does with its uninitialised keep.
+            if ($line -cmatch '^[a-zA-Z0-9_-]+:') {
+                $keep = Test-SkillFrontmatterKeyKept -Line $line -Kind $Kind
+            }
+            if ($keep) { $out.Add($line) }
+            continue
+        }
         $out.Add($line)
     }
     return ($out -join "`n")

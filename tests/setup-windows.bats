@@ -392,6 +392,22 @@ setup() {
     refute_grep '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
+# Runs setup-windows.ps1's skill renderer on <record>, writing the result to
+# <outfile>; sets $status/$output like any other `run`. Extracts the two
+# functions that carry the rule rather than dot-sourcing (and running) the whole
+# multi-hundred-line deploy script.
+_render_skill_record() {  # <kind> <record> <srcpath> <outfile>
+    local fn_body
+    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" \
+        | awk '/^function (Test-SkillFrontmatterKeyKept|Convert-SkillRecord) \{/,/^\}$/')"
+    [ -n "$fn_body" ]
+    run pwsh -NonInteractive -Command "
+        $fn_body
+        \$result = Convert-SkillRecord -Kind '$1' -RecordMd '$(_winpath "$2")' -SrcPath '$3'
+        Set-Content -LiteralPath '$(_winpath "$4")' -Value \$result -Encoding UTF8
+    "
+}
+
 @test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
     # A previous adversarial review of HARNESS-069 (bash side) found this bug
     # live on this exact function: it never got the strip-rule fix, so once a
@@ -410,19 +426,8 @@ setup() {
     printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/demo/SKILL.md\ngenerated_sha: aaaaaaaaaaaaaaaa\nname: demo\ndescription: fixture skill.\n---\n\nBody.\n' \
         > "$record"
 
-    # Extract just this function's body (CRLF-stripped) so the test exercises
-    # a script excerpt rather than dot-sourcing (and running) the whole
-    # multi-hundred-line deploy script.
-    local fn_body
-    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
-    [ -n "$fn_body" ]
-
     local out="$scratch/out.md"
-    run pwsh -NonInteractive -Command "
-        $fn_body
-        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
-        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
-    "
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
     [ "$status" -eq 0 ]
 
     [ "$(grep -c '^generated:' "$out")" -eq 1 ]
@@ -432,6 +437,72 @@ setup() {
     # stale vault path the record's own (stripped) fields carried.
     grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
     grep -q '^name: demo' "$out"
+}
+
+@test "Convert-SkillRecord drops neutral/store-only keys so Claude Code discovers the skill unconditionally (#1080 parity)" {
+    # Claude Code reads a top-level `paths:` as a conditional / path-scoped
+    # skill and holds it dormant until a matching file is touched in the
+    # session, so a deployed record that keeps `paths:` disappears from the
+    # session-start roster. compile-harness.sh was fixed for that in #1080;
+    # this function is its Windows twin and was not, which took 34 of 43
+    # skills off this box (measured 2026-08-29).
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+
+    local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
+    mkdir -p "$scratch"
+    local record="$scratch/SKILL.md"
+    # Two shapes a per-line filter gets wrong: a `paths:` value that wraps (the
+    # orphaned list item outlives its key), and a comment before the first key
+    # (the awk twin drops it, because its keep starts unset).
+    cat > "$record" <<'FIXTURE'
+---
+# store-only metadata follows
+id: demo-skill
+type: skill
+status: active
+created: 2026-08-29
+owner: manu
+name: demo
+description: fixture skill,
+  wrapped onto a second line.
+allowed-tools: Read, Grep
+targets: [claude]
+keywords: [alpha, beta]
+paths: ['**/a/**',
+  '**/b/**']
+requires: [jq]
+---
+
+Body.
+FIXTURE
+
+    local out="$scratch/out.md"
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
+    [ "$status" -eq 0 ]
+
+    # Neutral metadata is gone, and so is every line that hung off it.
+    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$out"
+    refute_grep_fixed "'**/b/**'" "$out"
+    refute_grep_fixed '# store-only metadata follows' "$out"
+    # Native execution fields survive, continuation lines included.
+    grep -q '^name: demo' "$out"
+    grep -q '^description: fixture skill,' "$out"
+    grep -q '^  wrapped onto a second line.' "$out"
+    grep -q '^allowed-tools: Read, Grep' "$out"
+    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
+}
+
+@test "the native-field allowlist is identical in setup-windows.ps1 and compile-harness.sh (cross-OS parity)" {
+    # Two renderers, one rule. Drift here is silent: each side keeps deploying,
+    # and only the agents on the other OS lose the skill.
+    local pat sh_list ps_list
+    pat='\(name\|description\|allowed-tools[^)]*\)'
+    sh_list=$(grep -oE "$pat" "$BATS_TEST_DIRNAME/../scripts/compile-harness.sh" | head -1)
+    ps_list=$(sed 's/\r$//' "$PS1_SCRIPT" | grep -oE "$pat" | head -1)
+    [ -n "$sh_list" ]
+    [ "$sh_list" = "$ps_list" ]
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
