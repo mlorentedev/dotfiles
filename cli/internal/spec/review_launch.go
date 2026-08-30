@@ -250,14 +250,25 @@ func ResolveReviewer(entries []ReviewerEntry, want string) (ReviewerEntry, error
 // is only what the skill cannot know: which spec, which repo, and the mechanical
 // constraints that keep the review from invalidating itself.
 //
+// It states the reviewer's IDENTITY, not only the string to sign with. Measured
+// 2026-08-29 (#1383): a drawn reviewer read the pool's own "never an Anthropic
+// model" note, concluded from the doctrine that it must be Anthropic, announced
+// that some other process was the real reviewer, and refused to write a verdict
+// after a 40-minute run. The launcher knew who it had drawn the whole time.
+//
 // The canonical id is stated because `reviewer:` is self-reported and the gate
 // matches it exactly — a reviewer that writes its own name a different way gets
 // refused for a mismatch rather than for a policy breach, which wastes a whole
 // review round on a string.
-func ReviewPrompt(specID, repoRoot, reviewerID, skillPath string) string {
+func ReviewPrompt(specID, repoRoot, reviewerID, runner, skillPath string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
 	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
+	fmt.Fprintf(&b, "You are running as `%s` (runner `%s`), drawn from harness/reviewer-pool.json\n"+
+		"for this review. That is your identity for this run, stated by the launcher that resolved\n"+
+		"it -- do not infer it from the doctrine you are about to read. The pool's exclusions were\n"+
+		"applied at draw time, so reading one and concluding you must be the wrong model to review\n"+
+		"this is a misreading: you are the model that was drawn.\n\n", reviewerID, runner)
 	fmt.Fprintf(&b, "Read and follow the skill at %s exactly — its workflow, its severity x reality\n"+
 		"classification, its test-traceability gate, its evaluator rubric, and its output format.\n"+
 		"Read that file first; it defines the whole deliverable.\n\n", skillPath)

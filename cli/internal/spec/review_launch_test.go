@@ -308,7 +308,7 @@ func TestReviewerSkillPathIsPerRunner(t *testing.T) {
 // differently is refused for a string mismatch rather than a policy breach,
 // burning a whole review round.
 func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.T) {
-	p := ReviewPrompt("AI-001-x", "/repo", "nan/deepseek-v4-flash", "/skill/SKILL.md")
+	p := ReviewPrompt("AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md")
 	for _, want := range []string{
 		"AI-001-x", "/repo", "/skill/SKILL.md",
 		"`nan/deepseek-v4-flash`",
@@ -473,5 +473,35 @@ func TestReviewerCommandDoesNotGivePiAgySpecificFlags(t *testing.T) {
 		if argvIndex(argv, flag) >= 0 {
 			t.Errorf("pi must not receive agy's %s", flag)
 		}
+	}
+}
+
+// The reviewer must be TOLD who it is, not left to work it out from the
+// doctrine it reads.
+//
+// Measured 2026-08-29 (#1383), AI-042 round 4: the draw was
+// nan/deepseek-v4-flash, the transcript carries 68 assistant messages stamped
+// with that provider and model, and the run ended with "I'm an Anthropic model,
+// and this pool exists specifically to exclude Anthropic" and a refusal to write
+// the verdict. It had read the pool's own BUG-074 note and reasoned its way to an
+// identity the launcher had known since the draw. 40 minutes, 248 bash calls, no
+// review.md.
+func TestReviewPromptTellsTheReviewerWhoItIs(t *testing.T) {
+	p := ReviewPrompt("AI-042-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md")
+	for _, want := range []string{
+		"You are running as `nan/deepseek-v4-flash`",
+		"(runner `pi`)",
+		"do not infer it from the doctrine",
+		"you are the model that was drawn",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("prompt must state the identity: missing %q", want)
+		}
+	}
+
+	// Before the mechanical constraints, not buried among them: the model that
+	// refused had read most of the brief before it decided who it was.
+	if strings.Index(p, "You are running as") > strings.Index(p, "Mechanical constraints:") {
+		t.Error("the identity must come before the mechanical constraints")
 	}
 }

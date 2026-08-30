@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand/v2"
 	"io"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -176,7 +176,7 @@ is the only record of how.`,
 			}
 
 			skill := spec.ReviewerSkillPath(chosen.Runner)
-			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, skill)
+			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, chosen.Runner, skill)
 			argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
 			if err != nil {
 				return err
@@ -247,7 +247,18 @@ is the only record of how.`,
 			}
 
 			cmd.Printf("\n")
-			return runForeground(repoRoot, launch, transcript)
+			// A foreground run is the one case where the launcher sees how the review
+			// ENDED rather than only that it started, so the no-verdict case is
+			// reported here, with the transcript still in hand, instead of being left
+			// for whoever next tries to archive.
+			runErr := runForeground(repoRoot, launch, transcript)
+			if err := spec.VerifyReviewProduced(specDir, transcript); err != nil {
+				if runErr != nil {
+					return fmt.Errorf("%w\nthe runner also exited with: %v", err, runErr)
+				}
+				return err
+			}
+			return runErr
 		},
 	}
 
