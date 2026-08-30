@@ -1085,47 +1085,11 @@ if (-not $bunCmd) {
     Write-Info "Bun already installed"
 }
 
-# What the rest of setup will see. The npm-driven blocks below (Obsidian CLI,
-# yarn, pi) each skip silently when npm is missing; naming the state here
+# What the rest of setup will see. The npm-driven pi block below skips silently
+# when npm is missing (obsidian and yarn moved to packages.json, OPS-042); naming the state here
 # turns "npm not available" into a finding with a cause.
 $npmSeen = Get-Command npm -ErrorAction SilentlyContinue
 Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
-
-# ============================================================================
-# 2c. OBSIDIAN CLI (BUG-013)
-# ============================================================================
-# @vorillaz/obsidian-cli provides the `obsidian` binary used by obs-cli.ps1 and
-# the vault-health workflow. npm global install writes to %APPDATA%\npm
-# (user-writable, no admin). Idempotent: skip if `obsidian` already on PATH.
-# Guarded on `npm` availability so machines without Node.js gracefully skip.
-
-$obsidianCmd = Get-Command obsidian -ErrorAction SilentlyContinue
-if (-not $obsidianCmd) {
-    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-    if ($npmCmd) {
-        Write-Info "Installing Obsidian CLI (@vorillaz/obsidian-cli) via npm..."
-        try {
-            & npm install -g 'obsidian-cli' 2>$null | Out-Null
-            # Refresh PATH so the freshly-installed binary is visible in this
-            # session (same trick as the winget block in section 1c).
-            # Same helper as the refresh after the winget loop: the registry-only
-            # rebuild this replaces dropped the runner's toolcache node, so "npm
-            # not available, skipping pi install" followed it (TEST-003/#1298).
-            Sync-SessionPath
-            if (Get-Command obsidian -ErrorAction SilentlyContinue) {
-                Write-Success "Obsidian CLI installed"
-            } else {
-                Write-Warn "Obsidian CLI install completed but binary not on PATH (restart shell)"
-            }
-        } catch {
-            Write-Warn "Failed to install Obsidian CLI: $_"
-        }
-    } else {
-        Write-Warn "npm not available, skipping Obsidian CLI install (install Node.js then re-run)"
-    }
-} else {
-    Write-Info "Obsidian CLI already installed at $($obsidianCmd.Source)"
-}
 
 # ============================================================================
 # 2d. OPENCODE CONFIG + COMMANDS (AI-014)
@@ -1186,43 +1150,6 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     }
 } else {
     Write-Warn "AGENTS.md source missing at $agentsSrc"
-}
-
-# ============================================================================
-# 2d-bis. YARN (npm-pinned global install, TERM-002 companion)
-# ============================================================================
-# Guarded on npm (same convention as pi). Reconcile-not-skip on version drift.
-$yarnVersion = $null
-if (Test-Path -LiteralPath $versionsSource) {
-    foreach ($line in Get-Content -LiteralPath $versionsSource) {
-        if ($line -match '^\s*YARN_VERSION\s*=\s*(.+?)\s*$') {
-            $yarnVersion = $Matches[1].Trim().Trim('"').Trim("'")
-            break
-        }
-    }
-}
-if (Get-Command npm -ErrorAction SilentlyContinue) {
-    $yarnPkg = if ($yarnVersion) { "yarn@$yarnVersion" } else { "yarn" }
-    if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
-        Write-Info "Installing yarn ($yarnPkg) via npm..."
-        & npm install -g $yarnPkg 2>$null | Out-Null
-        if (Get-Command yarn -ErrorAction SilentlyContinue) {
-            Write-Success "yarn installed: $(& yarn --version 2>$null)"
-        } else {
-            Write-Warn "yarn install failed - run: npm install -g $yarnPkg"
-        }
-    } else {
-        $yarnInstalled = (& yarn --version 2>$null | Select-Object -First 1)
-        if ($yarnVersion -and -not (Test-VersionAtLeast $yarnInstalled $yarnVersion)) {
-            Write-Info "yarn $yarnInstalled below pinned minimum $yarnVersion - upgrading..."
-            & npm install -g $yarnPkg 2>$null | Out-Null
-            Write-Success "yarn upgraded to $yarnVersion"
-        } else {
-            Write-Info "yarn already installed: $yarnInstalled"
-        }
-    }
-} else {
-    Write-Warn "npm not available, skipping yarn install (install Node.js then re-run)"
 }
 
 # ============================================================================
@@ -2019,6 +1946,31 @@ function Get-SkillField {
     return ''
 }
 
+# One frontmatter key line's fate, as a pure decision: $true keeps the line and
+# every continuation line under it, $false drops both. This is the twin of the
+# awk rule in render_skill (scripts/compile-harness.sh), and a bats parity test
+# compares the two allowlists textually, so an edit here that is not mirrored
+# there fails loudly instead of quietly deploying a skill the other OS drops.
+#
+# -cmatch, not -match: PowerShell's -match is case-insensitive by default, and
+# bash's grep/awk are not, so a faithful mirror needs the case-sensitive
+# operator.
+function Test-SkillFrontmatterKeyKept {
+    param([string]$Line, [string]$Kind)
+    # A command carries its name in its filename, not its frontmatter.
+    if ($Kind -eq 'command' -and $Line -cmatch '^name:') { return $false }
+    # The record (HARNESS-069) already carries its own generated_* fields,
+    # describing its relationship to the vault. Strip them here so deploy
+    # injects one fresh set, describing the deploy target's relationship to the
+    # record, instead of stacking a second set on top.
+    if ($Line -cmatch '^generated(_from|_sha)?:') { return $false }
+    # Native skill execution fields recognized by agent runtimes (Claude Code, AGY, OpenCode, Copilot)
+    if ($Line -cmatch '^(name|description|allowed-tools|when_to_use|model|effort|context|argument-hint|arguments|user-invocable|disable-model-invocation):') { return $true }
+    # Drop neutral/store-only keys (id, type, status, created, owner, paths, keywords, requires, targets, source, license, etc.)
+    # In particular, dropping `paths:` ensures Claude Code discovers skills as unconditional at session start.
+    return $false
+}
+
 # The injected generated_* fields are deliberately dual-referent, not a
 # single "where did this come from" answer (HARNESS-069): generated_from is
 # always the vault path in $SrcPath -- where a human edits, the SSOT -- while
@@ -2036,6 +1988,7 @@ function Convert-SkillRecord {
         return "<!-- generated: true; from: $SrcPath; sha256:$sha; edit the vault source + re-run setup -->`n`n" + $body.Trim()
     }
     $fm = 0
+    $keep = $false
     $out = New-Object System.Collections.Generic.List[string]
     foreach ($line in Get-Content -LiteralPath $RecordMd) {
         if ($line -match '^---\s*$') {
@@ -2048,16 +2001,19 @@ function Convert-SkillRecord {
             }
             continue
         }
-        if ($fm -eq 1 -and $Kind -eq 'command' -and $line -match '^name:') { continue }
-        # The record (HARNESS-069) already carries its own generated_* fields,
-        # describing its relationship to the vault. Strip them here so deploy
-        # injects one fresh set, describing the deploy target's relationship
-        # to the record, instead of stacking a second set on top. Mirrors
-        # render_skill's awk rule in scripts/compile-harness.sh exactly.
-        # -cmatch, not -match: PowerShell's -match is case-insensitive by
-        # default, and bash's grep/awk are not - a faithful mirror needs the
-        # case-sensitive operator.
-        if ($fm -eq 1 -and $line -cmatch '^generated(_from|_sha)?:') { continue }
+        if ($fm -eq 1) {
+            # A key line decides its own fate and that of the continuation
+            # lines under it: dropping `paths:` while keeping its indented list
+            # items would emit YAML no reader accepts. The flag therefore
+            # survives across lines, and starts false, so anything before the
+            # first key (a comment, say) is dropped -- which is what the awk
+            # twin does with its uninitialised keep.
+            if ($line -cmatch '^[a-zA-Z0-9_-]+:') {
+                $keep = Test-SkillFrontmatterKeyKept -Line $line -Kind $Kind
+            }
+            if ($keep) { $out.Add($line) }
+            continue
+        }
         $out.Add($line)
     }
     return ($out -join "`n")

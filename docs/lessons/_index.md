@@ -263,3 +263,4 @@ tags: [lessons, index, dotfiles]
 | [242 - A process nobody can watch must leave its own trace, and the redirect has to survive the parent](lesson-242-a-process-nobody-can-watch-must-leave-its-own-trace.md) | 2026-08-27 |  |
 | [243 - A guard that reads a cache reports the cache's age as the credential's health](lesson-243-a-guard-that-reads-a-cache-reports-the-cache-not-the-credential.md) | 2026-08-28 |  |
 | [244 - A sweep is bounded by what the writer recorded, not by what the store holds; and the store's name rules decide the order](lesson-244-a-sweep-is-bounded-by-what-the-writer-recorded-not-by-what-the-store-holds.md) | 2026-08-29 |  |
+| [245 - A fix applied to one of two renderers is an outage on the other OS, and nothing on the fixed side can see it](lesson-245-a-fix-to-one-of-two-renderers-is-an-outage-on-the-other-os.md) | 2026-08-29 |  |

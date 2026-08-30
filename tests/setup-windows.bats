@@ -331,22 +331,19 @@ setup() {
     grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
-# --- BUG-013: install Obsidian CLI on Windows ---
-# `obsidian-cli` (npm) provides the `obsidian` binary used by
-# obs-cli.ps1 and the vault-health workflow. setup-windows.ps1 must install
-# it idempotently via npm global (user scope, no admin), gated on npm
-# availability so machines without Node.js gracefully skip.
-# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
+# --- OPS-042 (#1336): obsidian-cli and yarn are catalog tools ---
+# `obsidian-cli` (npm) provides the `obsidian` binary used by obs-cli.ps1 and
+# the vault-health workflow; yarn is the classic npm-global. Both are
+# packages.json entries converged by `dotf tools install`, which
+# setup-windows.ps1 runs before anything needs them, so the script carries no
+# npm block and no versions.conf parser for either (BUG-013's block retired).
 
-@test "setup-windows.ps1 installs Obsidian CLI via npm (BUG-013)" {
-    grep -qF "npm install -g 'obsidian-cli'" "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 Obsidian CLI install is gated on npm + idempotent (BUG-013)" {
-    # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command obsidian"
-    # gating: only run if npm is available
-    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
+@test "setup-windows.ps1 installs obsidian and yarn through dotf tools install, not npm blocks (OPS-042)" {
+    grep -qE '^\s*dotf tools install\s*$' "$PS1_SCRIPT"
+    refute_grep 'obsidian-cli' "$PS1_SCRIPT"
+    refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
+    refute_grep 'yarnPkg' "$PS1_SCRIPT"
+    refute_grep 'YARN_VERSION' "$PS1_SCRIPT"
 }
 
 # --- AI-014: OpenCode Windows bootstrap (mirror of AI-011 Linux side) ---
@@ -395,6 +392,22 @@ setup() {
     refute_grep '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
+# Runs setup-windows.ps1's skill renderer on <record>, writing the result to
+# <outfile>; sets $status/$output like any other `run`. Extracts the two
+# functions that carry the rule rather than dot-sourcing (and running) the whole
+# multi-hundred-line deploy script.
+_render_skill_record() {  # <kind> <record> <srcpath> <outfile>
+    local fn_body
+    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" \
+        | awk '/^function (Test-SkillFrontmatterKeyKept|Convert-SkillRecord) \{/,/^\}$/')"
+    [ -n "$fn_body" ]
+    run pwsh -NonInteractive -Command "
+        $fn_body
+        \$result = Convert-SkillRecord -Kind '$1' -RecordMd '$(_winpath "$2")' -SrcPath '$3'
+        Set-Content -LiteralPath '$(_winpath "$4")' -Value \$result -Encoding UTF8
+    "
+}
+
 @test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
     # A previous adversarial review of HARNESS-069 (bash side) found this bug
     # live on this exact function: it never got the strip-rule fix, so once a
@@ -413,19 +426,8 @@ setup() {
     printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/demo/SKILL.md\ngenerated_sha: aaaaaaaaaaaaaaaa\nname: demo\ndescription: fixture skill.\n---\n\nBody.\n' \
         > "$record"
 
-    # Extract just this function's body (CRLF-stripped) so the test exercises
-    # a script excerpt rather than dot-sourcing (and running) the whole
-    # multi-hundred-line deploy script.
-    local fn_body
-    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
-    [ -n "$fn_body" ]
-
     local out="$scratch/out.md"
-    run pwsh -NonInteractive -Command "
-        $fn_body
-        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
-        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
-    "
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
     [ "$status" -eq 0 ]
 
     [ "$(grep -c '^generated:' "$out")" -eq 1 ]
@@ -435,6 +437,72 @@ setup() {
     # stale vault path the record's own (stripped) fields carried.
     grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
     grep -q '^name: demo' "$out"
+}
+
+@test "Convert-SkillRecord drops neutral/store-only keys so Claude Code discovers the skill unconditionally (#1080 parity)" {
+    # Claude Code reads a top-level `paths:` as a conditional / path-scoped
+    # skill and holds it dormant until a matching file is touched in the
+    # session, so a deployed record that keeps `paths:` disappears from the
+    # session-start roster. compile-harness.sh was fixed for that in #1080;
+    # this function is its Windows twin and was not, which took 34 of 43
+    # skills off this box (measured 2026-08-29).
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+
+    local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
+    mkdir -p "$scratch"
+    local record="$scratch/SKILL.md"
+    # Two shapes a per-line filter gets wrong: a `paths:` value that wraps (the
+    # orphaned list item outlives its key), and a comment before the first key
+    # (the awk twin drops it, because its keep starts unset).
+    cat > "$record" <<'FIXTURE'
+---
+# store-only metadata follows
+id: demo-skill
+type: skill
+status: active
+created: 2026-08-29
+owner: manu
+name: demo
+description: fixture skill,
+  wrapped onto a second line.
+allowed-tools: Read, Grep
+targets: [claude]
+keywords: [alpha, beta]
+paths: ['**/a/**',
+  '**/b/**']
+requires: [jq]
+---
+
+Body.
+FIXTURE
+
+    local out="$scratch/out.md"
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
+    [ "$status" -eq 0 ]
+
+    # Neutral metadata is gone, and so is every line that hung off it.
+    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$out"
+    refute_grep_fixed "'**/b/**'" "$out"
+    refute_grep_fixed '# store-only metadata follows' "$out"
+    # Native execution fields survive, continuation lines included.
+    grep -q '^name: demo' "$out"
+    grep -q '^description: fixture skill,' "$out"
+    grep -q '^  wrapped onto a second line.' "$out"
+    grep -q '^allowed-tools: Read, Grep' "$out"
+    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
+}
+
+@test "the native-field allowlist is identical in setup-windows.ps1 and compile-harness.sh (cross-OS parity)" {
+    # Two renderers, one rule. Drift here is silent: each side keeps deploying,
+    # and only the agents on the other OS lose the skill.
+    local pat sh_list ps_list
+    pat='\(name\|description\|allowed-tools[^)]*\)'
+    sh_list=$(grep -oE "$pat" "$BATS_TEST_DIRNAME/../scripts/compile-harness.sh" | head -1)
+    ps_list=$(sed 's/\r$//' "$PS1_SCRIPT" | grep -oE "$pat" | head -1)
+    [ -n "$sh_list" ]
+    [ "$sh_list" = "$ps_list" ]
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
@@ -893,8 +961,14 @@ setup() {
     # deduplicated, unit-tested in tests/windows-path-sync.Tests.ps1.
     run grep -cF 'GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT"
     [ "$output" = "0" ]
+    # A FLOOR, not a census: at least one call proves the helper is wired into
+    # setup, and the zero-raw-rebuild assertion above is what actually carries
+    # the invariant. The count was 2 only because two installers happened to
+    # need a refresh; OPS-042 moved obsidian-cli and yarn to packages.json and
+    # deleted one of them, which is a legitimate removal a census reads as a
+    # regression. Guards assert the invariant, never the population.
     calls=$(grep -cE '^\s*Sync-SessionPath\s*$' "$PS1_SCRIPT")
-    [ "$calls" -ge 2 ]
+    [ "$calls" -ge 1 ]
     grep -qE '^function Sync-SessionPath' "$BATS_TEST_DIRNAME/../scripts/utils.ps1"
 }
 
