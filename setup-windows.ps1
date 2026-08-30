@@ -2036,6 +2036,7 @@ function Convert-SkillRecord {
         return "<!-- generated: true; from: $SrcPath; sha256:$sha; edit the vault source + re-run setup -->`n`n" + $body.Trim()
     }
     $fm = 0
+    $keep = $true
     $out = New-Object System.Collections.Generic.List[string]
     foreach ($line in Get-Content -LiteralPath $RecordMd) {
         if ($line -match '^---\s*$') {
@@ -2048,16 +2049,37 @@ function Convert-SkillRecord {
             }
             continue
         }
-        if ($fm -eq 1 -and $Kind -eq 'command' -and $line -match '^name:') { continue }
-        # The record (HARNESS-069) already carries its own generated_* fields,
-        # describing its relationship to the vault. Strip them here so deploy
-        # injects one fresh set, describing the deploy target's relationship
-        # to the record, instead of stacking a second set on top. Mirrors
-        # render_skill's awk rule in scripts/compile-harness.sh exactly.
-        # -cmatch, not -match: PowerShell's -match is case-insensitive by
-        # default, and bash's grep/awk are not - a faithful mirror needs the
-        # case-sensitive operator.
-        if ($fm -eq 1 -and $line -cmatch '^generated(_from|_sha)?:') { continue }
+        if ($fm -eq 1) {
+            # A frontmatter key line; anything else at this depth continues the
+            # key above it and follows that key's fate. Dropping `paths:` while
+            # keeping its indented list items would emit YAML no reader accepts,
+            # so the keep flag has to survive across lines.
+            if ($line -cmatch '^[a-zA-Z0-9_-]+:') {
+                if ($Kind -eq 'command' -and $line -cmatch '^name:') { $keep = $false; continue }
+                # The record (HARNESS-069) already carries its own generated_*
+                # fields, describing its relationship to the vault. Strip them
+                # here so deploy injects one fresh set, describing the deploy
+                # target's relationship to the record, instead of stacking a
+                # second set on top.
+                # -cmatch, not -match: PowerShell's -match is case-insensitive
+                # by default, and bash's grep/awk are not, so a faithful mirror
+                # needs the case-sensitive operator.
+                if ($line -cmatch '^generated(_from|_sha)?:') { $keep = $false; continue }
+                # Native skill execution fields recognized by agent runtimes (Claude Code, AGY, OpenCode, Copilot)
+                if ($line -cmatch '^(name|description|allowed-tools|when_to_use|model|effort|context|argument-hint|arguments|user-invocable|disable-model-invocation):') {
+                    $keep = $true
+                    $out.Add($line)
+                    continue
+                }
+                # Drop neutral/store-only keys (id, type, status, created, owner, paths, keywords, requires, targets, source, license, etc.)
+                # In particular, dropping `paths:` ensures Claude Code discovers skills as unconditional at session start.
+                $keep = $false
+                continue
+            }
+            # Continuation line (indented multiline value)
+            if ($keep) { $out.Add($line) }
+            continue
+        }
         $out.Add($line)
     }
     return ($out -join "`n")

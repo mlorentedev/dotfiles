@@ -437,6 +437,77 @@ setup() {
     grep -q '^name: demo' "$out"
 }
 
+@test "Convert-SkillRecord drops neutral/store-only keys so Claude Code discovers the skill unconditionally (#1080 parity)" {
+    # Claude Code reads a top-level `paths:` as a conditional / path-scoped
+    # skill and holds it dormant until a matching file is touched in the
+    # session, so a deployed record that keeps `paths:` disappears from the
+    # session-start roster. compile-harness.sh was fixed for that in #1080;
+    # this function is its Windows twin and was not, which took 34 of 43
+    # skills off this box (measured 2026-08-29).
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+
+    local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
+    mkdir -p "$scratch"
+    local record="$scratch/SKILL.md"
+    # `paths:` wraps onto a second line on purpose: a per-line filter drops the
+    # key and leaves the orphaned list item behind, which is broken YAML.
+    cat > "$record" <<'FIXTURE'
+---
+id: demo-skill
+type: skill
+status: active
+created: 2026-08-29
+owner: manu
+name: demo
+description: fixture skill,
+  wrapped onto a second line.
+allowed-tools: Read, Grep
+targets: [claude]
+keywords: [alpha, beta]
+paths: ['**/a/**',
+  '**/b/**']
+requires: [jq]
+---
+
+Body.
+FIXTURE
+
+    local fn_body
+    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
+    [ -n "$fn_body" ]
+
+    local out="$scratch/out.md"
+    run pwsh -NonInteractive -Command "
+        $fn_body
+        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
+        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
+    "
+    [ "$status" -eq 0 ]
+
+    # Neutral metadata is gone, and so is the continuation line it owned.
+    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$out"
+    refute_grep_fixed "'**/b/**'" "$out"
+    # Native execution fields survive, continuation lines included.
+    grep -q '^name: demo' "$out"
+    grep -q '^description: fixture skill,' "$out"
+    grep -q '^  wrapped onto a second line.' "$out"
+    grep -q '^allowed-tools: Read, Grep' "$out"
+    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
+}
+
+@test "the native-field allowlist is identical in setup-windows.ps1 and compile-harness.sh (cross-OS parity)" {
+    # Two renderers, one rule. Drift here is silent: each side keeps deploying,
+    # and only the agents on the other OS lose the skill.
+    local pat sh_list ps_list
+    pat='\(name\|description\|allowed-tools[^)]*\)'
+    sh_list=$(grep -oE "$pat" "$BATS_TEST_DIRNAME/../scripts/compile-harness.sh" | head -1)
+    ps_list=$(sed 's/\r$//' "$PS1_SCRIPT" | grep -oE "$pat" | head -1)
+    [ -n "$sh_list" ]
+    [ "$sh_list" = "$ps_list" ]
+}
+
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
 # SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
 # `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that
