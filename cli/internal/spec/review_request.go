@@ -122,3 +122,46 @@ func ReadReviewRequest(specDir string) (ReviewRequest, bool, error) {
 	}
 	return req, true, nil
 }
+
+// VerifyReviewProduced reports whether the run that has just finished left a
+// verdict, and is the launcher's own half of the guard checkReviewProvenance
+// enforces later.
+//
+// Later is the problem it fixes. The archive gate answers the same question, but
+// only when somebody next tries to archive -- which can be days on, in another
+// session, with the transcript no longer in hand. A FOREGROUND run knows the
+// answer the moment the runner exits, and every Windows run is one, because tmux
+// is Linux-only.
+//
+// Measured 2026-08-29 (#1383): AI-042 round 4 ran 40 minutes, made 248 bash calls,
+// wrote no review.md, and `dotf spec review` exited 0. A review that produced no
+// file is a failed review, not a green one.
+//
+// Detached launches are out of scope by construction: the command returns while
+// the reviewer is still running, so there is nothing yet to verify.
+func VerifyReviewProduced(specDir, transcript string) error {
+	digest := fileDigest(filepath.Join(specDir, ReviewFile))
+	if digest == "" {
+		return fmt.Errorf("the reviewer exited without writing %s -- that is a failed review, not a passing one\n"+
+			"what it did instead is in the transcript: %s\n"+
+			"re-run the review (a run ended by a turn cap, a rate limit, or a reviewer that talked itself out of the job leaves exactly this state)",
+			ReviewFile, transcript)
+	}
+
+	req, found, err := ReadReviewRequest(specDir)
+	if err != nil {
+		return err
+	}
+	if !found {
+		// No sidecar means no digest to compare against. The file exists, which
+		// is all this check can honestly assert without one.
+		return nil
+	}
+	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == digest {
+		return fmt.Errorf("%s is byte-identical to what it held before this run -- the reviewer wrote no verdict\n"+
+			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
+			"the transcript of the run that wrote nothing: %s",
+			ReviewFile, transcript)
+	}
+	return nil
+}
