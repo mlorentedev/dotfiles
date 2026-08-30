@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.52.0](https://github.com/mlorentedev/dotfiles/compare/v0.51.0...v0.52.0) (2026-08-30)
+
+
+### Features
+
+* **cli:** dotf vault health, byte-identical to the shell oracle (CLI-021 increment 2) ([#1317](https://github.com/mlorentedev/dotfiles/issues/1317)) ([7a06364](https://github.com/mlorentedev/dotfiles/commit/7a06364363d36d897500f3a71a6bd6e99dfbb21d))
+* **deploy:** a 0600 file gets an owner-only ACL on Windows, and an in-sync file still gets its declared mode ([#1380](https://github.com/mlorentedev/dotfiles/issues/1380)) ([3f554ad](https://github.com/mlorentedev/dotfiles/commit/3f554ad73aa8253a09b5dc926abb26599de408c3))
+* **deploy:** ai/deploy.json learns merge and requires, and Copilot's JSON moves onto it ([#1365](https://github.com/mlorentedev/dotfiles/issues/1365)) ([3261d04](https://github.com/mlorentedev/dotfiles/commit/3261d0431f82edd09fbf6c1d078b929b21558088))
+* **deploy:** trust lists carry {HOME} and render per machine, in the form each tool is known to accept ([#1373](https://github.com/mlorentedev/dotfiles/issues/1373)) ([470fbd7](https://github.com/mlorentedev/dotfiles/commit/470fbd797a826a4bb3ee6aab99793d70c4fcdaa5)), closes [#1334](https://github.com/mlorentedev/dotfiles/issues/1334)
+* **env:** dotf env persist records what it wrote and sweeps a name the contract retired, bounded to that record ([#1378](https://github.com/mlorentedev/dotfiles/issues/1378)) ([8de1cd1](https://github.com/mlorentedev/dotfiles/commit/8de1cd19962797cf3ba2164f5f43eec37800cef6))
+* **env:** dotf env persist writes the contract variables where a profile-less process reads them ([#1362](https://github.com/mlorentedev/dotfiles/issues/1362)) ([389aaf5](https://github.com/mlorentedev/dotfiles/commit/389aaf50f3d0246b56b1e27871094694dbf44701))
+* **harness:** dotf harness mirror, one deploy-dir mirror for both OSes ([#1305](https://github.com/mlorentedev/dotfiles/issues/1305)) ([acf78b3](https://github.com/mlorentedev/dotfiles/commit/acf78b3cc37633aeac0c9548ac32944fbe7459e5))
+* **harness:** dotf harness presence injects the persona roster on every OS, so Windows finally gets it ([#1368](https://github.com/mlorentedev/dotfiles/issues/1368)) ([c4c43d6](https://github.com/mlorentedev/dotfiles/commit/c4c43d61522f6124ddbd4451d0870addae13bdfb))
+* **model-map:** copilot gets tier entries measured against the seat, and leaves tierlessRenderers ([#1374](https://github.com/mlorentedev/dotfiles/issues/1374)) ([0f2ab42](https://github.com/mlorentedev/dotfiles/commit/0f2ab42096d5d54d9635dca572a50836a626a3e8))
+* **orca:** dotf orca tune-hooks is the DX-006 repair, and the two shell twins that carried it are gone ([#1384](https://github.com/mlorentedev/dotfiles/issues/1384)) ([4718e46](https://github.com/mlorentedev/dotfiles/commit/4718e4685d3c4aab4dcbff6a400581f5c36b961f))
+* **profile:** agyp, the PowerShell twin of the zsh saved-prompt launcher ([#1355](https://github.com/mlorentedev/dotfiles/issues/1355)) ([f373597](https://github.com/mlorentedev/dotfiles/commit/f3735975d68adbff244bc2631dfea4f683d4f745))
+* **secrets:** the bw serve daemon leaves a log and a pid file, and doctor reads them when it dies ([#1348](https://github.com/mlorentedev/dotfiles/issues/1348)) ([097318e](https://github.com/mlorentedev/dotfiles/commit/097318ea4f468ed0848ba03546d9887537d5515a)), closes [#1315](https://github.com/mlorentedev/dotfiles/issues/1315)
+* **setup:** Windows installs Claude Code and agy through their official installers, as Linux has since ADR-009 ([#1360](https://github.com/mlorentedev/dotfiles/issues/1360)) ([6e2dcd2](https://github.com/mlorentedev/dotfiles/commit/6e2dcd29fbc12d4b8f32ab6c415baceb802bbcc0))
+* **spec:** dotf spec review draws one reviewer at random from a pool of five ([#1372](https://github.com/mlorentedev/dotfiles/issues/1372)) ([acca2da](https://github.com/mlorentedev/dotfiles/commit/acca2dabf3ff636eb0ea88be846166bf06c7c3fa)), closes [#1370](https://github.com/mlorentedev/dotfiles/issues/1370)
+* **tools:** copilot joins the npm catalog on every OS, and doctor reports it against the pin ([#1359](https://github.com/mlorentedev/dotfiles/issues/1359)) ([f18b69a](https://github.com/mlorentedev/dotfiles/commit/f18b69a91c236497f7b617ea434db291ea40ac52))
+* **tools:** one install channel per tool class, opencode through packages.json, dotf tools version ([#1311](https://github.com/mlorentedev/dotfiles/issues/1311)) ([016bf1a](https://github.com/mlorentedev/dotfiles/commit/016bf1a8959c85e83ebc56def8471382fe3d4baf))
+
+
+### Bug Fixes
+
+* **cli:** Windows deploy defects measured on a real box ([#1304](https://github.com/mlorentedev/dotfiles/issues/1304)) ([8680e56](https://github.com/mlorentedev/dotfiles/commit/8680e568b45c38f6287454933c55ff6202cb35f9))
+* **copilot:** config keys the CLI reads, Co-authored-by off, dead exports removed ([#1307](https://github.com/mlorentedev/dotfiles/issues/1307)) ([431220c](https://github.com/mlorentedev/dotfiles/commit/431220c87c6cca4f997fc3c46e5a17626c102e8f))
+* **deploy:** the manifest is version 2, and a dotf that cannot fully read it refuses it ([#1369](https://github.com/mlorentedev/dotfiles/issues/1369)) ([2c165fc](https://github.com/mlorentedev/dotfiles/commit/2c165fc8f9498013a71867b2b75c56f4d78e3fa5))
+* **doctor:** declare the git-for-windows floor that carries the hooksPath fix ([#1350](https://github.com/mlorentedev/dotfiles/issues/1350)) ([9ec3c60](https://github.com/mlorentedev/dotfiles/commit/9ec3c60d476ecce95ba378a4c0e5ea08570717b8))
+* **doctor:** declare the runner's missing Bitwarden identity instead of allow-listing its FAIL ([#1346](https://github.com/mlorentedev/dotfiles/issues/1346)) ([3b1f1f9](https://github.com/mlorentedev/dotfiles/commit/3b1f1f9a848af21d2daa6aeb860423aa2736dfe9)), closes [#1313](https://github.com/mlorentedev/dotfiles/issues/1313)
+* **doctor:** detect a BUG-020-corrupted PowerShell profile and heal it under --fix ([#1353](https://github.com/mlorentedev/dotfiles/issues/1353)) ([5078d49](https://github.com/mlorentedev/dotfiles/commit/5078d490d9ac2b89d0ea3aa2e21058eebcfdc44c))
+* **doctor:** the profile doctor measures is the one pwsh names, and the heal is told which file ([#1379](https://github.com/mlorentedev/dotfiles/issues/1379)) ([dab595e](https://github.com/mlorentedev/dotfiles/commit/dab595e34a72d6c304fb3335061ecda0a26297fa))
+* **harness:** read both skills: frontmatter forms when rendering presence ([#1319](https://github.com/mlorentedev/dotfiles/issues/1319)) ([4e01907](https://github.com/mlorentedev/dotfiles/commit/4e01907bdec69a508e31e194b13ba734b543c686))
+* **secrets:** unlock syncs the daemon's vault cache, and doctor reports that cache's age ([#1352](https://github.com/mlorentedev/dotfiles/issues/1352)) ([03a47ac](https://github.com/mlorentedev/dotfiles/commit/03a47ac707156fe8dc15d295b59b5abc7c7f1e72))
+* **setup-windows:** the skill renderer drops neutral frontmatter, so Claude Code discovers every skill again ([#1386](https://github.com/mlorentedev/dotfiles/issues/1386)) ([cb5d12c](https://github.com/mlorentedev/dotfiles/commit/cb5d12c898f233199d09f31a8ec3acb53d8df199))
+* **setup:** bare dotf deploy so every declared config is installed by both setups ([#1351](https://github.com/mlorentedev/dotfiles/issues/1351)) ([7a135a0](https://github.com/mlorentedev/dotfiles/commit/7a135a06b78d8f7c070beedacaf9ac8498f6d1f9)), closes [#1301](https://github.com/mlorentedev/dotfiles/issues/1301)
+* **setup:** scripts deploy to the contract's directory, and the retired ones are swept ([#1356](https://github.com/mlorentedev/dotfiles/issues/1356)) ([2d87c7b](https://github.com/mlorentedev/dotfiles/commit/2d87c7bd05fcc0beca7af5e8455ba4de25fd614d))
+* **setup:** UTF-8 console, LF deployed .md files, recursive sensitive/ mirror on Windows ([#1306](https://github.com/mlorentedev/dotfiles/issues/1306)) ([dbb9c60](https://github.com/mlorentedev/dotfiles/commit/dbb9c6066815d354cef145a727b00d6f4c722814))
+* **setup:** Windows installs uv before registering the Claude MCP servers, so a first run registers hive and pdf-modifier ([#1367](https://github.com/mlorentedev/dotfiles/issues/1367)) ([2802434](https://github.com/mlorentedev/dotfiles/commit/2802434968470a7f2df61687593aff253b1615b6))
+* **shell:** the agent-wrapper guard ran before the PATH that satisfies it ([#1283](https://github.com/mlorentedev/dotfiles/issues/1283)) ([5363a2d](https://github.com/mlorentedev/dotfiles/commit/5363a2d8685f6ad57360239f49a6f603fb4c9d30))
+* **spec:** the drawn reviewer is told who it is, and a foreground run that wrote nothing fails ([#1388](https://github.com/mlorentedev/dotfiles/issues/1388)) ([03e7bb8](https://github.com/mlorentedev/dotfiles/commit/03e7bb86f03bf2b349f3d816ae3d8d6246646e76)), closes [#1383](https://github.com/mlorentedev/dotfiles/issues/1383)
+
 ## [0.51.0](https://github.com/mlorentedev/dotfiles/compare/v0.50.0...v0.51.0) (2026-08-27)
 
 
