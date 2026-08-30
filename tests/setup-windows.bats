@@ -890,8 +890,14 @@ setup() {
     # deduplicated, unit-tested in tests/windows-path-sync.Tests.ps1.
     run grep -cF 'GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT"
     [ "$output" = "0" ]
+    # A FLOOR, not a census: at least one call proves the helper is wired into
+    # setup, and the zero-raw-rebuild assertion above is what actually carries
+    # the invariant. The count was 2 only because two installers happened to
+    # need a refresh; OPS-042 moved obsidian-cli and yarn to packages.json and
+    # deleted one of them, which is a legitimate removal a census reads as a
+    # regression. Guards assert the invariant, never the population.
     calls=$(grep -cE '^\s*Sync-SessionPath\s*$' "$PS1_SCRIPT")
-    [ "$calls" -ge 2 ]
+    [ "$calls" -ge 1 ]
     grep -qE '^function Sync-SessionPath' "$BATS_TEST_DIRNAME/../scripts/utils.ps1"
 }
 
