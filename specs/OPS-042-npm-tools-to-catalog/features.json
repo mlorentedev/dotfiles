@@ -1,0 +1,30 @@
+[
+  {
+    "id": "OPS-042-npm-tools-to-catalog-f1",
+    "behavior": "AC1: packages.json declares obsidian (npm obsidian-cli 0.5.1) and yarn (npm yarn 1.22.22); dotf tools list shows both",
+    "verification": "[ \"$(jq -r '.tools[] | select(.name==\"obsidian\") | \"\\(.source.type) \\(.source.package) \\(.version)\"' packages.json)\" = 'npm obsidian-cli 0.5.1' ] && [ \"$(jq -r '.tools[] | select(.name==\"yarn\") | \"\\(.source.type) \\(.source.package) \\(.version)\"' packages.json)\" = 'npm yarn 1.22.22' ] && bats tests/packages-json.bats",
+    "state": "verified",
+    "evidence": "Windows work box, DOTFILES_DIR at the worktree: `dotf tools list` -> 'obsidian 0.5.1 full npm:obsidian-cli' and 'yarn 1.22.22 full npm:yarn'; tests/packages-json.bats 3/3"
+  },
+  {
+    "id": "OPS-042-npm-tools-to-catalog-f2",
+    "behavior": "AC2: neither setup script carries an npm install for obsidian-cli or yarn, and setup-windows.ps1 no longer parses versions.conf for YARN_VERSION; both scripts still parse",
+    "verification": "bats tests/setup-linux.bats tests/setup-windows.bats -f 'OPS-042' && bash -n setup-linux.sh && ! grep -qE 'obsidian-cli|yarnPkg|YARN_VERSION' setup-windows.ps1 && ! grep -qE 'obsidian-cli|npm install -g \"yarn' setup-linux.sh",
+    "state": "verified",
+    "evidence": "50 lines removed from setup-linux.sh (bash -n clean), 73 from setup-windows.ps1 (PSScriptAnalyzer 0 findings); the OPS-042 bats in both files pass; the only remaining mention is the PATH-state note saying the two moved to packages.json"
+  },
+  {
+    "id": "OPS-042-npm-tools-to-catalog-f3",
+    "behavior": "AC3: versions.conf carries neither OBSIDIAN_VERSION nor YARN_VERSION; doctor's yarn row matches against packages.json",
+    "verification": "! grep -qE '^(OBSIDIAN|YARN)_VERSION=' versions.conf && cd cli && go test ./internal/doctor/ -run 'TestCheckVersionMatch' -count=1",
+    "state": "verified",
+    "evidence": "OBSIDIAN_VERSION had no consumer in the repo (git grep); YARN_VERSION's two consumers (the setup blocks) are gone and the doctor row reads catalogPin(\"yarn\"); TestCheckVersionMatch feeds a packages.json fixture and still sees 'yarn version drift' as a WARN"
+  },
+  {
+    "id": "OPS-042-npm-tools-to-catalog-f4",
+    "behavior": "AC4 (box): dotf tools install reports obsidian and yarn at pin, and dotf doctor shows yarn version matches packages.json (1.22.22)",
+    "verification": "test \"$(uname -s | cut -c1-5)\" = MINGW && dotf tools install | grep -qE '^(obsidian|yarn) .* already installed' && dotf doctor --verbose 2>/dev/null | grep -q 'yarn version matches packages.json (1.22.22)'",
+    "state": "verified",
+    "evidence": "Windows work box, 2026-08-29, binary from this branch with DOTFILES_DIR/DOTFILES_REPO_DIR at the worktree: 'obsidian 0.5.1 already installed; skipping', 'yarn 1.22.22 already installed; skipping', exit 0; doctor: '[ OK ] yarn version matches packages.json (1.22.22)'. Note: `dotf tools` reads the catalog from the deploy mirror only (DOTFILES_DIR), while doctor reads checkout-first — a precedence inconsistency to ticket, not touched here"
+  }
+]
