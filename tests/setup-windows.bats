@@ -395,6 +395,22 @@ setup() {
     refute_grep '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
+# Runs setup-windows.ps1's skill renderer on <record>, writing the result to
+# <outfile>; sets $status/$output like any other `run`. Extracts the two
+# functions that carry the rule rather than dot-sourcing (and running) the whole
+# multi-hundred-line deploy script.
+_render_skill_record() {  # <kind> <record> <srcpath> <outfile>
+    local fn_body
+    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" \
+        | awk '/^function (Test-SkillFrontmatterKeyKept|Convert-SkillRecord) \{/,/^\}$/')"
+    [ -n "$fn_body" ]
+    run pwsh -NonInteractive -Command "
+        $fn_body
+        \$result = Convert-SkillRecord -Kind '$1' -RecordMd '$(_winpath "$2")' -SrcPath '$3'
+        Set-Content -LiteralPath '$(_winpath "$4")' -Value \$result -Encoding UTF8
+    "
+}
+
 @test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
     # A previous adversarial review of HARNESS-069 (bash side) found this bug
     # live on this exact function: it never got the strip-rule fix, so once a
@@ -413,19 +429,8 @@ setup() {
     printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/demo/SKILL.md\ngenerated_sha: aaaaaaaaaaaaaaaa\nname: demo\ndescription: fixture skill.\n---\n\nBody.\n' \
         > "$record"
 
-    # Extract just this function's body (CRLF-stripped) so the test exercises
-    # a script excerpt rather than dot-sourcing (and running) the whole
-    # multi-hundred-line deploy script.
-    local fn_body
-    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
-    [ -n "$fn_body" ]
-
     local out="$scratch/out.md"
-    run pwsh -NonInteractive -Command "
-        $fn_body
-        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
-        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
-    "
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
     [ "$status" -eq 0 ]
 
     [ "$(grep -c '^generated:' "$out")" -eq 1 ]
@@ -451,10 +456,12 @@ setup() {
     local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
     mkdir -p "$scratch"
     local record="$scratch/SKILL.md"
-    # `paths:` wraps onto a second line on purpose: a per-line filter drops the
-    # key and leaves the orphaned list item behind, which is broken YAML.
+    # Two shapes a per-line filter gets wrong: a `paths:` value that wraps (the
+    # orphaned list item outlives its key), and a comment before the first key
+    # (the awk twin drops it, because its keep starts unset).
     cat > "$record" <<'FIXTURE'
 ---
+# store-only metadata follows
 id: demo-skill
 type: skill
 status: active
@@ -474,21 +481,14 @@ requires: [jq]
 Body.
 FIXTURE
 
-    local fn_body
-    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
-    [ -n "$fn_body" ]
-
     local out="$scratch/out.md"
-    run pwsh -NonInteractive -Command "
-        $fn_body
-        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
-        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
-    "
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
     [ "$status" -eq 0 ]
 
-    # Neutral metadata is gone, and so is the continuation line it owned.
+    # Neutral metadata is gone, and so is every line that hung off it.
     refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$out"
     refute_grep_fixed "'**/b/**'" "$out"
+    refute_grep_fixed '# store-only metadata follows' "$out"
     # Native execution fields survive, continuation lines included.
     grep -q '^name: demo' "$out"
     grep -q '^description: fixture skill,' "$out"

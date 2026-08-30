@@ -53,6 +53,7 @@ try {
     foreach ($functionName in @(
         'Test-SkillTargetsAgent',
         'Get-SkillField',
+        'Test-SkillFrontmatterKeyKept',
         'Convert-SkillRecord',
         'Deploy-SkillRecord'
     )) {
