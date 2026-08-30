@@ -331,22 +331,19 @@ setup() {
     grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
-# --- BUG-013: install Obsidian CLI on Windows ---
-# `obsidian-cli` (npm) provides the `obsidian` binary used by
-# obs-cli.ps1 and the vault-health workflow. setup-windows.ps1 must install
-# it idempotently via npm global (user scope, no admin), gated on npm
-# availability so machines without Node.js gracefully skip.
-# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
+# --- OPS-042 (#1336): obsidian-cli and yarn are catalog tools ---
+# `obsidian-cli` (npm) provides the `obsidian` binary used by obs-cli.ps1 and
+# the vault-health workflow; yarn is the classic npm-global. Both are
+# packages.json entries converged by `dotf tools install`, which
+# setup-windows.ps1 runs before anything needs them, so the script carries no
+# npm block and no versions.conf parser for either (BUG-013's block retired).
 
-@test "setup-windows.ps1 installs Obsidian CLI via npm (BUG-013)" {
-    grep -qF "npm install -g 'obsidian-cli'" "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 Obsidian CLI install is gated on npm + idempotent (BUG-013)" {
-    # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command obsidian"
-    # gating: only run if npm is available
-    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
+@test "setup-windows.ps1 installs obsidian and yarn through dotf tools install, not npm blocks (OPS-042)" {
+    grep -qE '^\s*dotf tools install\s*$' "$PS1_SCRIPT"
+    refute_grep 'obsidian-cli' "$PS1_SCRIPT"
+    refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
+    refute_grep 'yarnPkg' "$PS1_SCRIPT"
+    refute_grep 'YARN_VERSION' "$PS1_SCRIPT"
 }
 
 # --- AI-014: OpenCode Windows bootstrap (mirror of AI-011 Linux side) ---
@@ -893,8 +890,14 @@ setup() {
     # deduplicated, unit-tested in tests/windows-path-sync.Tests.ps1.
     run grep -cF 'GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT"
     [ "$output" = "0" ]
+    # A FLOOR, not a census: at least one call proves the helper is wired into
+    # setup, and the zero-raw-rebuild assertion above is what actually carries
+    # the invariant. The count was 2 only because two installers happened to
+    # need a refresh; OPS-042 moved obsidian-cli and yarn to packages.json and
+    # deleted one of them, which is a legitimate removal a census reads as a
+    # regression. Guards assert the invariant, never the population.
     calls=$(grep -cE '^\s*Sync-SessionPath\s*$' "$PS1_SCRIPT")
-    [ "$calls" -ge 2 ]
+    [ "$calls" -ge 1 ]
     grep -qE '^function Sync-SessionPath' "$BATS_TEST_DIRNAME/../scripts/utils.ps1"
 }
 
