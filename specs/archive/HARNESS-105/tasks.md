@@ -18,7 +18,7 @@ created: "2026-08-30"
 - [x] [AC2] Refactor `cli/internal/spec/review_launch.go` and `cli/internal/initrepo/github_test.go` to use `shellsafe.Bash`.
 - [x] [P] [AC3] Write failing test for `TerminalFailure` structured JSON output in a new file `cli/internal/errors/latch_test.go`.
 - [x] [AC3] Implement `cli/internal/errors/latch.go` defining the `TerminalFailureError` and its JSON payload struct.
-- [x] [AC4] Hook the top-level error handler in `cli/main.go` to intercept `TerminalFailureError` and output the JSON.
+- [x] [AC4] Hook the top-level error handler in `cli/cmd/dotf/main.go` to intercept `TerminalFailureError` and output the JSON.
 
 ## Closing
 

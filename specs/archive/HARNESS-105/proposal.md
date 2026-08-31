@@ -31,10 +31,10 @@ Our CLI currently relies on ad-hoc string replacements for shell quoting and pla
 
 ## Acceptance criteria
 
-- [ ] `shellsafe.Bash` and `shellsafe.PowerShell` are implemented and have 100% unit test coverage.
-- [ ] Ad-hoc replacements (e.g. in `review_launch.go`) are replaced by `shellsafe` functions.
-- [ ] A `TerminalFailure` error type exists and is correctly handled by the CLI's main execution or top-level command handlers.
-- [ ] Throwing a `TerminalFailure` results in a structured JSON output (with `schema` and `retryGuidance`) instead of standard text.
+- [x] `shellsafe.Bash` and `shellsafe.PowerShell` are implemented and have 100% unit test coverage.
+- [x] Ad-hoc replacements (e.g. in `review_launch.go`) are replaced by `shellsafe` functions.
+- [x] A `TerminalFailure` error type exists and is correctly handled by the CLI's main execution or top-level command handlers.
+- [x] Throwing a `TerminalFailure` results in a structured JSON output (with `schemaName` and `retryGuidance`) instead of standard text.
 
 ## References
 
