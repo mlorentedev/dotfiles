@@ -79,3 +79,29 @@ func TestRunSilentError(t *testing.T) {
 		t.Errorf("expected silent error output to be empty, got %q", out)
 	}
 }
+
+func TestRunWrappedTerminalFailure(t *testing.T) {
+	rootCmd := &cobra.Command{
+		Use: "testcmd",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tfe := errors.NewTerminalFailure("test terminal failure")
+			return fmt.Errorf("some wrapper context: %w", tfe)
+		},
+	}
+	rootCmd.SetArgs([]string{})
+
+	var stderr bytes.Buffer
+	code := run(rootCmd, &stderr)
+
+	if code == 0 {
+		t.Errorf("expected non-zero exit code, got %d", code)
+	}
+
+	out := stderr.String()
+	if !strings.HasPrefix(out, errors.HandoffPrefix) {
+		t.Errorf("expected output to start with %q, got %q", errors.HandoffPrefix, out)
+	}
+	if strings.Contains(out, "some wrapper context") {
+		t.Errorf("expected output to not contain wrapper text, got %q", out)
+	}
+}

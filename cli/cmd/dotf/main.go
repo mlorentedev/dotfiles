@@ -1,9 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"strings"
+	goerrors "errors"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/cmd"
 	"github.com/mlorentedev/dotfiles/cli/internal/errors"
@@ -17,27 +18,24 @@ func main() {
 	os.Exit(run(rootCmd, os.Stderr))
 }
 
-type errInterceptor struct {
-	target io.Writer
-}
-
-func (w *errInterceptor) Write(p []byte) (n int, err error) {
-	s := string(p)
-	// If Cobra is printing our TerminalFailure, it prefixes it with "Error: ".
-	// We strip that prefix so the JSON latch is the raw output.
-	if strings.HasPrefix(s, "Error: "+errors.HandoffPrefix) {
-		s = strings.TrimPrefix(s, "Error: ")
-		return w.target.Write([]byte(s))
-	}
-	return w.target.Write(p)
-}
-
 func run(rootCmd *cobra.Command, stderr io.Writer) int {
-	// Intercept Cobra's error output to strip the "Error: " prefix for TerminalFailures,
-	// while naturally respecting every subcommand's SilenceErrors configuration.
-	rootCmd.SetErr(&errInterceptor{target: stderr})
+	// We divert Cobra's automatic error printing to io.Discard.
+	// This prevents Cobra from printing wrapped TerminalFailure errors with "Error: context: ...",
+	// while keeping the subcommand's SilenceErrors property perfectly intact so we can read it.
+	rootCmd.SetErr(io.Discard)
 
-	if err := rootCmd.Execute(); err != nil {
+	executedCmd, err := rootCmd.ExecuteC()
+	if err != nil {
+		var tfe *errors.TerminalFailureError
+		if goerrors.As(err, &tfe) {
+			// Print exactly the JSON latch, without any Cobra "Error: " or wrapper prefixes.
+			_, _ = fmt.Fprintln(stderr, tfe.Error())
+		} else {
+			// If the specific command didn't request silence, print the error.
+			if !executedCmd.SilenceErrors {
+				_, _ = fmt.Fprintf(stderr, "Error: %v\n", err)
+			}
+		}
 		return cmd.ExitCode(err)
 	}
 	return 0
