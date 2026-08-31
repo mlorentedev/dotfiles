@@ -23,10 +23,10 @@ func run(rootCmd *cobra.Command, stderr io.Writer) int {
 	if err := rootCmd.Execute(); err != nil {
 		if errors.IsTerminalFailure(err) {
 			// Print exactly the JSON latch, without the Cobra "Error: " prefix
-			fmt.Fprintln(stderr, err.Error())
+			_, _ = fmt.Fprintln(stderr, err.Error())
 		} else {
 			// Standard fallback printing for other errors
-			fmt.Fprintf(stderr, "Error: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "Error: %v\n", err)
 		}
 		return cmd.ExitCode(err)
 	}
