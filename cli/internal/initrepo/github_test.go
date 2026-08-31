@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/shellsafe"
 )
 
 func TestParseOriginRepo(t *testing.T) {
@@ -160,5 +162,5 @@ func gitInit(t *testing.T, dir, originURL string) {
 }
 
 func shq(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	return shellsafe.Bash(s)
 }
