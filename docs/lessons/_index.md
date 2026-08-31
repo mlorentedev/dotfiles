@@ -265,3 +265,4 @@ tags: [lessons, index, dotfiles]
 | [244 - A sweep is bounded by what the writer recorded, not by what the store holds; and the store's name rules decide the order](lesson-244-a-sweep-is-bounded-by-what-the-writer-recorded-not-by-what-the-store-holds.md) | 2026-08-29 |  |
 | [245 - A fix applied to one of two renderers is an outage on the other OS, and nothing on the fixed side can see it](lesson-245-a-fix-to-one-of-two-renderers-is-an-outage-on-the-other-os.md) | 2026-08-29 |  |
 | [246 - A guard that reads its own evidence from a file allowed not to exist switches itself off exactly when it is needed](lesson-246-a-guard-that-reads-its-own-evidence-from-an-optional-file.md) | 2026-08-30 |  |
+- [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
