@@ -1,22 +1,27 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/cmd"
+	"github.com/mlorentedev/dotfiles/cli/internal/errors"
 )
 
-// version is overridden at release time by goreleaser via
-// -ldflags "-X main.version=<tag>". It stays in package main — not in
-// internal/cmd — so that ldflags path never silently breaks (CLI-002 R2).
 var version = "dev"
 
 func main() {
-	if err := cmd.New(version).Execute(); err != nil {
-		// Not a bare 1: `dotf agent run` distinguishes "no pool could serve
-		// this" from "the task failed", and that distinction has to survive the
-		// process boundary or a composer cannot act on it. Everything else is
-		// untagged and still exits 1.
+	rootCmd := cmd.New(version)
+	rootCmd.SilenceErrors = true // We handle printing the error
+
+	if err := rootCmd.Execute(); err != nil {
+		if errors.IsTerminalFailure(err) {
+			// Print exactly the JSON latch, without the Cobra "Error: " prefix
+			fmt.Fprintln(os.Stderr, err.Error())
+		} else {
+			// Standard fallback printing for other errors
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		}
 		os.Exit(cmd.ExitCode(err))
 	}
 }

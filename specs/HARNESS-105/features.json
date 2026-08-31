@@ -1,0 +1,23 @@
+[
+  {
+    "id": "HARNESS-105-f1",
+    "behavior": "shellsafe.Bash and shellsafe.PowerShell are implemented and have 100% unit test coverage.",
+    "verification": "cd cli && go test -v ./internal/shellsafe",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-105-f2",
+    "behavior": "Ad-hoc replacements are replaced by shellsafe functions.",
+    "verification": "cd cli && ! grep -rn 'strings.ReplaceAll.*'\\''$' ./internal/spec/review_launch.go",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-105-f3",
+    "behavior": "A TerminalFailure error type exists and is correctly handled by the CLI's main execution.",
+    "verification": "cd cli && go test -v ./internal/errors",
+    "state": "pending",
+    "evidence": ""
+  }
+]

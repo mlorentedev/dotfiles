@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/shellsafe"
 )
 
 // DefaultReviewerTimeout bounds a reviewer subprocess.
@@ -324,7 +326,7 @@ func ReviewerSkillPath(runner string) string {
 // containing backticks, quotes or newlines would be executed rather than passed.
 // The reviewer prompt contains all three.
 func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	return shellsafe.Bash(s)
 }
 
 // ShellJoin renders argv as a single POSIX-shell command string. Exported
