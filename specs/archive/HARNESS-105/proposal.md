@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-105"
 type: spec
-status: draft
+status: archived
 created: "2026-08-30"
 issue: "mlorentedev/dotfiles#1403"
 tags: [spec, proposal]
