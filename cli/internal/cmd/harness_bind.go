@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -73,6 +74,7 @@ command replaces our entry in place rather than appending a second one.`,
 			if binary == "" {
 				binary = resolveDotfPath(home)
 			}
+			binary = hookBinaryToken(binary, runtime.GOOS)
 
 			targets, err := harness.LoadBindTargets(root)
 			if err != nil {
@@ -200,8 +202,18 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, erro
 // session hooks already carried — over whatever happens to be on the PATH of the
 // process running setup. Those differ exactly when it matters: a `go run` or a
 // build-tree binary would otherwise be baked into a hook that outlives it.
+//
+// The `.exe` suffix is not cosmetic. Adoption of the entry the setup scripts
+// wrote before this command existed is by EXACT command equality (sameCommand),
+// and setup-windows.ps1 emitted `"…\dotf.exe" mem session-start`. Resolving to a
+// suffix-less path there would match nothing and append a SECOND session-start
+// hook on the first Windows run — the duplicate this merge exists to prevent.
 func resolveDotfPath(home string) string {
-	installed := filepath.Join(home, ".local", "bin", "dotf")
+	name := "dotf"
+	if runtime.GOOS == "windows" {
+		name = "dotf.exe"
+	}
+	installed := filepath.Join(home, ".local", "bin", name)
 	if _, err := os.Stat(installed); err == nil {
 		return installed
 	}
@@ -213,4 +225,23 @@ func resolveDotfPath(home string) string {
 		return p
 	}
 	return installed
+}
+
+// hookBinaryToken renders the binary path as it appears inside a hook command
+// line, quoting it where the shell that runs the hook would otherwise split it.
+//
+// goos is a parameter rather than a read of runtime.GOOS so both branches are
+// testable from either OS — the Windows leg of this behaviour cannot be
+// exercised on the machine that develops it otherwise.
+//
+// Windows is quoted unconditionally, matching byte-for-byte what
+// setup-windows.ps1 already deployed, because anything else fails to adopt that
+// entry and duplicates it. Elsewhere the path is bare — the shape setup-linux.sh
+// deployed — unless it contains a space, where quoting is the only correct
+// rendering and the unquoted entry it declines to adopt was broken anyway.
+func hookBinaryToken(path, goos string) string {
+	if goos == "windows" || strings.ContainsAny(path, " \t") {
+		return `"` + path + `"`
+	}
+	return path
 }

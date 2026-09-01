@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
@@ -37,22 +38,44 @@ const liveShapedSettings = `{
   }
 }`
 
-func bindFixture(t *testing.T, settings string) (home, dotf string) {
+// bindFixture writes the settings file in the shape THIS OS's setup script
+// deployed, and returns the command prefix bind is expected to emit.
+//
+// The two must agree or the test measures the wrong thing: setup-linux.sh wrote
+// a bare path and setup-windows.ps1 wrote a quoted one, and adoption is by exact
+// command equality. Hardcoding the bare form here would pass on Linux and, on
+// the Windows leg of CI, assert that a duplicate is correct.
+func bindFixture(t *testing.T, settings string) (home, raw, want string) {
 	t.Helper()
 	home = t.TempDir()
-	dotf = filepath.Join(home, ".local", "bin", "dotf")
+	raw = filepath.Join(home, ".local", "bin", dotfBinaryName())
+	want = hookBinaryToken(raw, runtime.GOOS)
 	if settings == "" {
-		return home, dotf
+		return home, raw, want
 	}
 	dir := filepath.Join(home, ".claude")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	body := []byte(replaceAll(settings, "DOTF", dotf))
+	// The fixture is JSON, so the quoted Windows form has to survive encoding:
+	// marshal the token and splice it in without its closing quote, which the
+	// fixture's own `DOTF mem session-start"` already supplies.
+	encoded, err := json.Marshal(want)
+	if err != nil {
+		t.Fatalf("encode dotf path: %v", err)
+	}
+	body := []byte(replaceAll(settings, `"DOTF`, string(encoded[:len(encoded)-1])))
 	if err := os.WriteFile(filepath.Join(dir, "settings.json"), body, 0o600); err != nil {
 		t.Fatalf("write settings: %v", err)
 	}
-	return home, dotf
+	return home, raw, want
+}
+
+func dotfBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "dotf.exe"
+	}
+	return "dotf"
 }
 
 func replaceAll(s, old, new string) string {
@@ -114,11 +137,11 @@ func hookCommands(t *testing.T, doc map[string]any, event string) []string {
 // so without `sameCommand`'s exact-command adoption rule, bind would APPEND a
 // second entry and every session would run `dotf mem session-start` twice.
 func TestBindAdoptsTheUnmarkedMemHookInsteadOfDuplicating(t *testing.T) {
-	home, dotf := bindFixture(t, liveShapedSettings)
+	home, raw, dotf := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
 
 	if _, _, err := captureRealStreams(t, "harness", "bind",
-		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf); err != nil {
+		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw); err != nil {
 		t.Fatalf("bind: %v", err)
 	}
 
@@ -142,14 +165,14 @@ func TestBindAdoptsTheUnmarkedMemHookInsteadOfDuplicating(t *testing.T) {
 // foreign command present before bind is present after, and the count of foreign
 // entries is unchanged.
 func TestBindNeverTouchesAForeignHook(t *testing.T) {
-	home, dotf := bindFixture(t, liveShapedSettings)
+	home, raw, dotf := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
 
 	before := readSettings(t, home)
 	beforeForeign := harness.ForeignHookCount(before)
 
 	if _, _, err := captureRealStreams(t, "harness", "bind",
-		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf); err != nil {
+		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw); err != nil {
 		t.Fatalf("bind: %v", err)
 	}
 	after := readSettings(t, home)
@@ -177,11 +200,11 @@ func TestBindNeverTouchesAForeignHook(t *testing.T) {
 // TestBindAppendsTheGateBesideOrcasPreToolUseGroup pins AC5: a new hook on an
 // event a third party already owns is a NEW group, not an edit of theirs.
 func TestBindAppendsTheGateBesideOrcasPreToolUseGroup(t *testing.T) {
-	home, dotf := bindFixture(t, liveShapedSettings)
+	home, raw, dotf := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
 
 	if _, _, err := captureRealStreams(t, "harness", "bind",
-		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf); err != nil {
+		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw); err != nil {
 		t.Fatalf("bind: %v", err)
 	}
 
@@ -197,9 +220,9 @@ func TestBindAppendsTheGateBesideOrcasPreToolUseGroup(t *testing.T) {
 // TestBindIsIdempotent is the doctrine's changed=0 on re-run, asserted on bytes
 // rather than on the command's own report.
 func TestBindIsIdempotent(t *testing.T) {
-	home, dotf := bindFixture(t, liveShapedSettings)
+	home, raw, _ := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
-	args := []string{"harness", "bind", "--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf}
+	args := []string{"harness", "bind", "--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw}
 
 	if _, _, err := captureRealStreams(t, args...); err != nil {
 		t.Fatalf("first bind: %v", err)
@@ -229,11 +252,11 @@ func TestBindIsIdempotent(t *testing.T) {
 // TestBindSkipsWhatTheManifestSaysNotToEmit pins that emit:false is honoured and
 // SAID OUT LOUD. A silent skip is how a gap stops being visible.
 func TestBindSkipsWhatTheManifestSaysNotToEmit(t *testing.T) {
-	home, dotf := bindFixture(t, liveShapedSettings)
+	home, raw, _ := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
 
 	stdout, _, err := captureRealStreams(t, "harness", "bind",
-		"--repo-root", root, "--home", home, "--dotf-path", dotf)
+		"--repo-root", root, "--home", home, "--dotf-path", raw)
 	if err != nil {
 		t.Fatalf("bind: %v", err)
 	}
@@ -250,30 +273,30 @@ func TestBindSkipsWhatTheManifestSaysNotToEmit(t *testing.T) {
 // TestBindRefusesToOverwriteUnparseableSettings: a file someone is mid-edit is
 // not a file to bootstrap over.
 func TestBindRefusesToOverwriteUnparseableSettings(t *testing.T) {
-	home, dotf := bindFixture(t, `{"hooks": {`)
+	home, raw, _ := bindFixture(t, `{"hooks": {`)
 	root := repoRootForTest(t)
 
 	_, _, err := captureRealStreams(t, "harness", "bind",
-		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf)
+		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw)
 	if err == nil {
 		t.Fatal("want an error on unparseable settings, got none")
 	}
 	if !containsSub(err.Error(), "refusing to overwrite") {
 		t.Errorf("error does not say it refused: %v", err)
 	}
-	raw, readErr := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
-	if readErr != nil || string(raw) != `{"hooks": {` {
-		t.Errorf("the unparseable file was modified: %q (%v)", raw, readErr)
+	after, readErr := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
+	if readErr != nil || string(after) != `{"hooks": {` {
+		t.Errorf("the unparseable file was modified: %q (%v)", after, readErr)
 	}
 }
 
 // TestBindBootstrapsAnAbsentFile: nothing to preserve, so writing is safe.
 func TestBindBootstrapsAnAbsentFile(t *testing.T) {
-	home, dotf := bindFixture(t, "")
+	home, raw, dotf := bindFixture(t, "")
 	root := repoRootForTest(t)
 
 	if _, _, err := captureRealStreams(t, "harness", "bind",
-		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf); err != nil {
+		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw); err != nil {
 		t.Fatalf("bind: %v", err)
 	}
 	got := hookCommands(t, readSettings(t, home), "PreToolUse")
@@ -284,7 +307,7 @@ func TestBindBootstrapsAnAbsentFile(t *testing.T) {
 
 // TestBindDryRunWritesNothing.
 func TestBindDryRunWritesNothing(t *testing.T) {
-	home, dotf := bindFixture(t, liveShapedSettings)
+	home, raw, _ := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
 	path := filepath.Join(home, ".claude", "settings.json")
 
@@ -293,7 +316,7 @@ func TestBindDryRunWritesNothing(t *testing.T) {
 		t.Fatalf("read: %v", err)
 	}
 	stdout, _, err := captureRealStreams(t, "harness", "bind", "--dry-run",
-		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", dotf)
+		"--harness", "claude", "--repo-root", root, "--home", home, "--dotf-path", raw)
 	if err != nil {
 		t.Fatalf("bind: %v", err)
 	}
@@ -329,6 +352,52 @@ func TestManifestGateEventMatchesDeclaredActionEvent(t *testing.T) {
 					tgt.Agent, h.Event, want)
 			}
 		}
+	}
+}
+
+// TestHookBinaryTokenMatchesWhatEachSetupScriptDeployed is the Windows
+// duplicate-hook defect, caught statically rather than on the Windows box.
+//
+// Adoption of the pre-bind entry is by EXACT command equality, so the token this
+// renders must equal, byte for byte, what the setup script of that OS wrote:
+//
+//	setup-linux.sh    $HOME/.local/bin/dotf mem session-start      (bare)
+//	setup-windows.ps1 "…\.local\bin\dotf.exe" mem session-start    (quoted)
+//
+// A bare token on Windows matches neither, and bind would append a SECOND
+// session-start hook on the first run there. Table-driven over goos because that
+// is the only way the Windows leg is exercised from the machine that develops it.
+func TestHookBinaryTokenMatchesWhatEachSetupScriptDeployed(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, goos, want string
+	}{
+		{"windows is quoted, matching Merge-ClaudeSettings",
+			`C:\Users\m\.local\bin\dotf.exe`, "windows", `"C:\Users\m\.local\bin\dotf.exe"`},
+		{"linux is bare, matching merge_claude_settings",
+			"/home/m/.local/bin/dotf", "linux", "/home/m/.local/bin/dotf"},
+		{"a space forces quoting even where the old entry was bare",
+			"/home/two words/.local/bin/dotf", "linux", `"/home/two words/.local/bin/dotf"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hookBinaryToken(tc.path, tc.goos); got != tc.want {
+				t.Errorf("hookBinaryToken(%q, %q) = %q, want %q", tc.path, tc.goos, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestResolveDotfPathCarriesTheWindowsSuffix pins the other half of the same
+// defect: the path itself. `dotf` and `dotf.exe` are different commands to the
+// equality check, so a suffix-less resolve on Windows duplicates just as surely
+// as missing quotes.
+func TestResolveDotfPathCarriesTheWindowsSuffix(t *testing.T) {
+	home := t.TempDir()
+	want := "dotf"
+	if runtime.GOOS == "windows" {
+		want = "dotf.exe"
+	}
+	if got := filepath.Base(resolveDotfPath(home)); got != want {
+		t.Errorf("resolveDotfPath resolves to %q, want basename %q on %s", got, want, runtime.GOOS)
 	}
 }
 

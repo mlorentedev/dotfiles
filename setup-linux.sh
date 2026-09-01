@@ -583,8 +583,8 @@ unset _dotf
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
 # Bulk copy ai/claude/* EXCEPT settings.json (SDD-002: handled by
-# merge_claude_settings below, which substitutes __HOOK_COMMAND__ and applies
-# the per-key merge policy preserving user customizations).
+# merge_claude_settings below, which applies the per-key merge policy preserving
+# user customizations; its hooks come from `dotf harness bind`).
 for _claude_src in "$CURRENT_DIR/ai/claude/"*; do
     [ "$(basename "$_claude_src")" = "settings.json" ] && continue
     cp -rf "$_claude_src" "$HOME/.claude/" 2>/dev/null || true
@@ -1376,13 +1376,17 @@ fi
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,
 # additionalDirectories, third-party hooks like GitGuardian) by only
-# touching the keys declared as "ours" in the template. The template's
-# __HOOK_COMMAND__ placeholder is replaced via jq --arg before any merge / write.
+# touching the keys declared as "ours" in the template.
+#
+# HOOKS ARE NOT THIS FUNCTION'S ANY MORE (HARNESS-045 AC1). They are emitted by
+# `dotf harness bind` below, from harness/manifest.json, and this function must
+# not gain a second hooks writer: the jq ASSIGNMENT it used to carry replaced the
+# whole SessionStart array, which DELETED a live third-party group -- measured
+# against a copy of the deployed file on 2026-08-27. A bats guard refuses the
+# literal, so do not quote it back here.
 merge_claude_settings() {
     local template_path="$1"
     local target_path="$2"
-    local hook_command="$3"
-    local session_end_command="$4"
 
     if [ ! -f "$template_path" ]; then
         log_warning "Claude settings template not found at $template_path, skipping merge"
@@ -1395,13 +1399,10 @@ merge_claude_settings() {
     fi
 
     local template_substituted
-    template_substituted=$(jq --arg cmd "$hook_command" --arg endcmd "$session_end_command" \
-        '(.hooks.SessionStart[0].hooks[0].command) = $cmd
-         | (.hooks.SessionEnd[0].hooks[0].command) = $endcmd
-         | .permissions.allow = (.permissions.allow | unique)' \
+    template_substituted=$(jq '.permissions.allow = (.permissions.allow | unique)' \
         "$template_path" 2>/dev/null)
     if [ -z "$template_substituted" ]; then
-        log_warning "Claude settings template substitution failed, skipping merge"
+        log_warning "Claude settings template is not readable as JSON, skipping merge"
         return 0
     fi
 
@@ -1414,9 +1415,9 @@ merge_claude_settings() {
 
     # Per-key merge via single jq invocation. Policy table in proposal.md:
     # model, effortLevel, outputStyle, advisorModel: template wins.
-    # permissions.allow: UNION (deduped). hooks.SessionStart: template wins
-    # (replace). enabledPlugins, env: object merge (template wins on conflict).
-    # All other keys: existing preserved.
+    # permissions.allow: UNION (deduped). enabledPlugins, env: object merge
+    # (template wins on conflict). All other keys: existing preserved.
+    # `hooks` is ABSENT from this policy on purpose -- `dotf harness bind` owns it.
     #
     # `env` carries feature flags Claude Code reads from its OWN process
     # environment -- settings.env is Object.assign'd into process.env at
@@ -1447,9 +1448,6 @@ merge_claude_settings() {
         | (if ($tmpl | has("env")) then .env = ((.env // {}) + $tmpl.env) else . end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
-        | .hooks = (.hooks // {})
-        | .hooks.SessionStart = $tmpl.hooks.SessionStart
-        | .hooks.SessionEnd = $tmpl.hooks.SessionEnd
         | .enabledPlugins = ((.enabledPlugins // {}) + $tmpl.enabledPlugins)
     ' "$target_path" 2>/dev/null)
     if [ -z "$merged" ]; then
@@ -1462,19 +1460,43 @@ merge_claude_settings() {
 }
 
 # SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
-# settings.json lives at ai/claude/settings.json. Previous inline `HOOK_ENTRY`
-# heredoc + `jq --argjson` is gone -- merge_claude_settings reads the template,
-# substitutes __HOOK_COMMAND__, applies per-key policy, bootstraps if missing.
-log_info "Applying Claude settings.json template + registering SessionStart/SessionEnd hooks..."
+# settings.json lives at ai/claude/settings.json. merge_claude_settings applies
+# the per-key policy for model/permissions/env/plugins and bootstraps if missing.
+log_info "Applying Claude settings.json template..."
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
-# CLI-025: both session hooks are agnostic `dotf mem` nouns, invoked directly (no
-# shell-twin shim — claude-session-start.{sh,ps1} + session-handoff.{sh,ps1} are
-# deleted). Absolute binary path keeps the hooks working even when ~/.local/bin is
-# off the profile PATH (the env-contract owns that invariant; see #531).
-EXPECTED_HOOK_COMMAND="$HOME/.local/bin/dotf mem session-start"
-EXPECTED_SESSION_END_COMMAND="$HOME/.local/bin/dotf mem session-end"
-merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS" "$EXPECTED_HOOK_COMMAND" "$EXPECTED_SESSION_END_COMMAND"
+merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS"
+
+# HARNESS-045 AC1: hooks are emitted by `dotf harness bind`, for every harness
+# declared in harness/manifest.json's `agents.bind` -- not just Claude's. It is
+# the ONLY writer of the `hooks` key, because the jq assignment this replaced
+# deleted whatever third-party group it did not know about.
+#
+# Gate on the CAPABILITY, never on the exit status (lesson 219): a dotf predating
+# the subcommand rejects the flags with exit 1, which is indistinguishable from a
+# genuine refusal, and a differently-stale one prints help and exits 0. The grep
+# runs against a CAPTURED variable rather than through a pipe -- `cmd | grep -q`
+# closes the pipe on first match, and under pipefail the SIGPIPE'd producer makes
+# the pipeline exit 141, reporting "too old" for a binary that just proved it is
+# current. TestHarnessHelpListsSubcommands pins the string from the Go side.
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then
+    _dotf="dotf"
+elif [ -x "$HOME/.local/bin/dotf" ]; then
+    _dotf="$HOME/.local/bin/dotf"
+fi
+if [ -z "$_dotf" ]; then
+    log_warning "dotf not found (PATH or ~/.local/bin) -- harness hooks NOT emitted; sessions run without the memory hooks and the gate"
+else
+    _harness_help="$("$_dotf" harness --help 2>/dev/null || true)"
+    if printf '%s\n' "$_harness_help" | grep -q '^[[:space:]]*bind[[:space:]]'; then
+        "$_dotf" harness bind || log_warning "dotf harness bind reported a problem (above) -- 'dotf doctor' will report hook drift"
+    else
+        log_warning "installed dotf predates 'dotf harness bind' -- harness hooks NOT emitted; rebuild/reinstall dotf and re-run setup"
+    fi
+    unset _harness_help
+fi
+unset _dotf
 
 # Deploy auto-memory symlinks (vault → Claude Code)
 # Memory lives in the knowledge vault, not in this repo (see ADR-007)

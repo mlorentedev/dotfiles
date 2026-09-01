@@ -184,20 +184,22 @@ setup() {
     grep -q 'SessionStart' "$PS1_SCRIPT"
 }
 
-# CLI-025: the SessionStart hook now invokes the `dotf mem session-start` binary
-# directly (no pwsh -File shim), via the absolute ~/.local/bin path (#531).
-@test "setup-windows.ps1 SessionStart hook command invokes dotf mem session-start" {
-    grep -qE '\$expectedHookCommand\s*=.*\$dotfBin.*mem session-start' "$PS1_SCRIPT"
+# HARNESS-045 AC1: the hook command is no longer a literal in this script. It is
+# declared in harness/manifest.json and emitted by `dotf harness bind` -- ONE Go
+# binary on both OSes rather than a per-OS shim, which is the whole point of the
+# CLI convergence (ADR-020). The quoted path and the .exe suffix are resolved
+# inside the binary and pinned by TestHookBinaryTokenMatchesWhatEachSetupScript-
+# Deployed, because getting them wrong appends a duplicate hook instead of
+# adopting the entry this script used to write.
+@test "setup-windows.ps1 emits the harness hooks by running dotf harness bind" {
+    grep -qF 'harness bind' "$PS1_SCRIPT"
 }
 
-# Hook registration must self-heal -- never trust "an entry exists" to mean
-# "the entry is correct". Post-SDD-002 (PR #51): Merge-ClaudeSettings ALWAYS
-# rewrites hooks.SessionStart from the template (with __HOOK_COMMAND__
-# substituted), which is a stronger guarantee than the previous compare-then-
-# rewrite -- self-heal runs unconditionally on every setup invocation.
-@test "setup-windows.ps1 SessionStart hook self-heals on path drift" {
-    grep -qF '$expectedHookCommand' "$PS1_SCRIPT"
-    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
+# Hook registration must self-heal -- never trust "an entry exists" to mean "the
+# entry is correct". bind runs unconditionally on every setup, behind a
+# capability probe and nothing else.
+@test "setup-windows.ps1 runs bind behind a capability probe, not a presence test" {
+    grep -qF "'(?m)^\s*bind\s'" "$PS1_SCRIPT"
 }
 
 # --- Scheduled task self-heal (same class as #20) ---
@@ -570,6 +572,10 @@ setup() {
     grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
     # The legacy inline hook hashtable must be gone
     refute_grep '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
+    # ...and so must the hook parameters: the function takes template + target
+    # only now, because hooks are `dotf harness bind`'s (HARNESS-045 AC1).
+    refute_grep_fixed '-HookCommand' "$PS1_SCRIPT"
+    refute_grep_fixed '-SessionEndCommand' "$PS1_SCRIPT"
 }
 
 @test "SDD-002: setup-windows.ps1 references the template path ai\\claude\\settings.json" {
@@ -605,9 +611,21 @@ setup() {
     grep -qF "Bootstrapping ~/.claude/settings.json from template" "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "SDD-002: parity -- both scripts substitute __HOOK_COMMAND__ placeholder" {
-    grep -qF '__HOOK_COMMAND__' "$PS1_SCRIPT"
-    grep -qF 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
+# HARNESS-045 AC1 inverted this parity guard. Both scripts used to substitute a
+# placeholder and ASSIGN to .hooks; the assignment deleted whatever third-party
+# group it did not know about, measured on the deployed file. Neither may do it
+# again -- `dotf harness bind` is the single writer, on both OSes.
+@test "HARNESS-045: parity -- neither script writes hooks itself" {
+    refute_grep_fixed '__HOOK_COMMAND__' "$PS1_SCRIPT"
+    refute_grep_fixed '__HOOK_COMMAND__' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed ".hooks.SessionStart = \$tmpl.hooks.SessionStart" "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed "\$existing['hooks']['SessionStart'] = \$template['hooks']['SessionStart']" "$PS1_SCRIPT"
+}
+
+@test "HARNESS-045: parity -- both scripts call dotf harness bind" {
+    grep -qF 'harness bind' "$PS1_SCRIPT"
+    grep -qF 'harness bind' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- CLI-019: diff-check retired; `dotf doctor` owns repo/deploy drift ---

@@ -54,32 +54,6 @@
       "Bash(gh pr diff:*)"
     ]
   },
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "__HOOK_COMMAND__",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "__SESSION_END_COMMAND__",
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  },
   "enabledPlugins": {
     "explanatory-output-style@claude-plugins-official": true,
     "learning-output-style@claude-plugins-official": true,
