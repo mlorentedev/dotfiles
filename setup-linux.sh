@@ -1638,8 +1638,24 @@ if command -v dotf >/dev/null 2>&1; then
     # resolve the real repo instead of the phantom contract default — otherwise
     # `dotf update`/`mem` no-op on a fresh machine (BUG-029/#696). Idempotent and
     # preserves any other overrides (e.g. VAULT_PATH).
-    if dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR" >/dev/null; then
-        log_success "Seeded DOTFILES_REPO_DIR=$CURRENT_DIR in machine.json"
+    # $CURRENT_DIR is where setup was INVOKED, which is not the repo when setup
+    # runs from a linked worktree — an ordinary thing to do while testing a setup
+    # change. Seeding a worktree writes a throwaway path into the machine SSOT,
+    # and every check stays green until that worktree is deleted, at which point
+    # the whole box cannot commit (measured 2026-08-31; lesson 247). Skipping the
+    # seed instead would reopen BUG-029, so resolve the canonical checkout rather
+    # than declining: --git-dir and --git-common-dir are equal in a normal
+    # checkout and differ inside a linked worktree, where the common dir IS the
+    # real repo's .git.
+    SEED_REPO_DIR="$CURRENT_DIR"
+    _seed_gd="$(git -C "$CURRENT_DIR" rev-parse --git-dir 2>/dev/null || true)"
+    _seed_gcd="$(git -C "$CURRENT_DIR" rev-parse --git-common-dir 2>/dev/null || true)"
+    if [ -n "$_seed_gcd" ] && [ "$_seed_gd" != "$_seed_gcd" ]; then
+        SEED_REPO_DIR="$(dirname "$_seed_gcd")"
+        log_warning "setup ran from a linked worktree; seeding the canonical checkout $SEED_REPO_DIR, not $CURRENT_DIR"
+    fi
+    if dotf env set DOTFILES_REPO_DIR "$SEED_REPO_DIR" >/dev/null; then
+        log_success "Seeded DOTFILES_REPO_DIR=$SEED_REPO_DIR in machine.json"
     else
         log_warning "dotf env set DOTFILES_REPO_DIR failed (update/mem fall back to the git walk-up)"
     fi

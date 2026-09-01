@@ -37,6 +37,10 @@ node_modules/
 # `go build` in cli/ leaves an untracked binary that must never be committed.
 /cli/dotf
 /cli/dotf.exe
+# `go test -coverprofile` writes here. It was tracked from #1404 until #1408
+# untracked it: a profile is a measurement of one run on one machine, so it
+# conflicts on every branch that touches cli/ and its diff says nothing.
+/cli/coverage.out
 
 # IDE/Editor files
 .vscode/
