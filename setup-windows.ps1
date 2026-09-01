@@ -256,6 +256,20 @@ function Merge-ClaudeSettings {
     if ($template.ContainsKey('effortLevel')) { $existing['effortLevel'] = $template['effortLevel'] }
     if ($template.ContainsKey('outputStyle')) { $existing['outputStyle'] = $template['outputStyle'] }
     if ($template.ContainsKey('advisorModel')) { $existing['advisorModel'] = $template['advisorModel'] }
+    if ($template.ContainsKey('crossSessionInbound')) { $existing['crossSessionInbound'] = $template['crossSessionInbound'] }
+    if ($template.ContainsKey('autoCompactEnabled')) { $existing['autoCompactEnabled'] = $template['autoCompactEnabled'] }
+    if ($template.ContainsKey('precomputeCompactionEnabled')) { $existing['precomputeCompactionEnabled'] = $template['precomputeCompactionEnabled'] }
+    if ($template.ContainsKey('autoCompactWindow')) { $existing['autoCompactWindow'] = $template['autoCompactWindow'] }
+    if ($template.ContainsKey('autoContinueAtUsageLimit')) { $existing['autoContinueAtUsageLimit'] = $template['autoContinueAtUsageLimit'] }
+    if ($template.ContainsKey('cleanupPeriodDays')) { $existing['cleanupPeriodDays'] = $template['cleanupPeriodDays'] }
+
+    # attribution: whole-object replace, NOT the per-key merge env gets below.
+    # It is dotfiles-owned policy -- the standing order is that no git or GitHub
+    # artifact carries AI attribution, and Claude Code defaults the other way
+    # (commit/pr default to the standard trailer, sessionUrl defaults to true).
+    # A per-key merge would let a stale subkey survive and quietly reinstate a
+    # trailer, so the object replaces wholesale.
+    if ($template.ContainsKey('attribution')) { $existing['attribution'] = $template['attribution'] }
 
     # env: object merge (template wins on conflict). These are feature flags
     # Claude Code reads from its OWN process environment -- settings.env is
