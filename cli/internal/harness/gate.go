@@ -45,6 +45,19 @@ type ToolCall struct {
 	// primitive but its argument could not be read, which is why IsSkillTool
 	// exists separately.
 	Skill string
+	// AgentType names the dispatched persona this call belongs to, when the
+	// harness says so. Empty on a main-thread call, which means "no persona in
+	// scope" and allows — never an error.
+	AgentType string
+	// AgentID scopes the consumption ledger to ONE dispatched persona.
+	//
+	// It matters because the harness reuses the parent's session id inside a
+	// subagent: keying consumption by session alone would let the parent's skill
+	// runs satisfy the reviewer's gate, and every persona dispatched in one
+	// session would share a ledger. Consumption is a claim about who has done
+	// what, so it is scoped to whoever the harness says is acting. Empty falls
+	// back to the session, which is right for a main-thread call.
+	AgentID string
 	// IsSkillTool reports that the tool is the harness's skill primitive,
 	// whether or not the skill's NAME was readable.
 	//
@@ -209,4 +222,32 @@ func RecordConsumed(path, skill string) error {
 		return err
 	}
 	return os.WriteFile(path, raw, 0o600)
+}
+
+// ConsumptionScope is the key a call's consumption ledger is stored under.
+//
+// The dispatched persona when the harness names one, the session otherwise. Both
+// are needed: without the agent scope, every persona dispatched in one session
+// shares a ledger and the first one's skill runs silently satisfy the rest;
+// without the session fallback, a main-thread call — which carries no agent —
+// would have no ledger at all.
+//
+// SEPARATION IS ONLY AS GOOD AS AgentID'S UNIQUENESS, which is documented as a
+// per-invocation id and NOT YET MEASURED here — the same envelope as the field
+// names themselves, raised as a distinct point by the reviewer on #1410. If the
+// harness were instead to send a value stable per persona (a name, a hash of the
+// type), two dispatches of `reviewer` in one session would share this key and
+// the second would inherit the first's consumption.
+//
+// That failure is over-permissive, never over-strict: a shared ledger can only
+// skip a gate, never raise one, so it costs enforcement and cannot block a
+// session. It is checked by the same measurement that confirms the field names —
+// dispatch one persona TWICE in a session and confirm the second is gated again
+// — and that check is a precondition of promoting any skill to `enforce: block`,
+// not of this function being correct for the single-dispatch case.
+func (c ToolCall) ConsumptionScope() string {
+	if c.AgentID != "" {
+		return c.SessionID + "-" + c.AgentID
+	}
+	return c.SessionID
 }

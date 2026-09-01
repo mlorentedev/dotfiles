@@ -63,7 +63,69 @@ created: "2026-08-27"
       Mutation-checked: neutering `sameCommand` puts two copies of the mem hook
       in SessionStart.
 
-## Not done, and deliberately so
+## Done: the enabler AC3/AC4 were waiting on (2026-08-31)
+
+- [x] **The gate learns its persona from the payload.** MEASURED: the whole chain
+      — bind, hook, gate, `Decide` — was live and enforced NOTHING. The manifest
+      emits `harness gate --harness claude` with no `--role`; `loadGatePersona`
+      returned nil on an empty role; `Decide` answered *"no persona in scope"*.
+      Every tool call was allowed whatever any skill declared, on all 35 skills.
+
+      A static `--role` in the manifest could not fix it: one hook serves the
+      whole harness, so it would pin every session to one persona. Claude
+      documents `agent_type`/`agent_id` on every hook event fired inside a
+      subagent and neither on a main-thread call, so **the harness already knew
+      what the gate was missing** — no session-state mechanism, nothing to clean
+      up on a crash, no SubagentStart/Stop lifecycle. `--role` survives as an
+      override.
+
+      **Consumption is now scoped to the acting persona, not the session.** A
+      subagent reuses the parent's session id, so keying by session alone let one
+      persona's skill runs satisfy another's gate.
+
+      Verified end to end against a record declaring severity: main-thread call
+      allows; dispatched reviewer blocks with exit 2 **naming the skill to
+      invoke**; invoking it allows the next call while still warning on the
+      unconsumed `enforce: warn` skill; a second agent in the same session does
+      not inherit that consumption.
+
+      **DOCUMENTED, NOT MEASURED on this box:** the payload field names. The gate
+      is live in no deployed settings file here. The design makes that
+      acceptable — a wrong name yields no persona, hence Allow, the pre-existing
+      behaviour — so a guess costs enforcement, never a blocked session. Confirm
+      by observing `[gate] warn` on a real dispatch **before** promoting any skill
+      to `enforce: block`.
+
+- [x] **`dotf doctor` reports unmigrated skills.** The check existed only as a
+      comment: `Decide`'s EnforceUnset branch claimed "surfaced by `dotf doctor`",
+      `UnmigratedSkills()` was written and unit-tested, and **nothing in
+      production called it**. It now answers **35 of 35**. WARN, never FAIL — an
+      unmigrated skill is a deliberate state, and failing the health command over
+      planned work trains the reader to ignore the line.
+
+- [x] **A role that does not resolve is said out loud.** `--role reviewr` exited 0
+      in silence, so a typo or a renamed record disabled enforcement while every
+      session reported health. Allowing is the right decision; silence was not.
+
+- [x] **Fixed a cross-cutting regression found on the way** (`d4ea0f5`, #1404,
+      merged the same day): `rootCmd.SetErr(io.Discard)` discarded every
+      deliberate stderr write in the CLI — 17 call sites across 9 command files,
+      all four `dotf secrets` subcommands among them. The gate blocked with exit 2
+      and NO reason. Fixed via Cobra's `SilenceErrors`, which is the mechanism for
+      suppressing only the automatic wrapper; two guards added.
+
+## Still not done, and deliberately so
+
+- [ ] **Migrate the 35 skills to declared severity.** Now the only thing between
+      the machinery and real enforcement. VAULT-SIDE: the records under
+      `harness/agents/` are generated from `00_meta/agents/definitions/`, so the
+      edit lands in the vault (direct to master) and reaches the repo through
+      `compile-harness.sh --refresh`. **`check-roster-consistency.py` raises
+      `UnreadableSkills` on the mapping form by design**, so it must be updated in
+      the same movement or HARNESS-046's declared verification goes red.
+      Roll out `reviewer` first, all four skills at `enforce: warn`, observe a
+      real dispatch, and only then promote one to `block`.
+
 
 - [ ] [AC2] Presence emission. Only the Action half is built.
 - [ ] **The pi and opencode TS wrappers.** Declared in the manifest with

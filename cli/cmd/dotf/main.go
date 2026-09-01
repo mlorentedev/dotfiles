@@ -1,10 +1,10 @@
 package main
 
 import (
+	goerrors "errors"
 	"fmt"
 	"io"
 	"os"
-	goerrors "errors"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/cmd"
 	"github.com/mlorentedev/dotfiles/cli/internal/errors"
@@ -19,10 +19,28 @@ func main() {
 }
 
 func run(rootCmd *cobra.Command, stderr io.Writer) int {
-	// We divert Cobra's automatic error printing to io.Discard.
-	// This prevents Cobra from printing wrapped TerminalFailure errors with "Error: context: ...",
-	// while keeping the subcommand's SilenceErrors property perfectly intact so we can read it.
-	rootCmd.SetErr(io.Discard)
+	// Suppress Cobra's AUTOMATIC error printing — its "Error: context: ..."
+	// wrapper around a TerminalFailure — while leaving the command's own stderr
+	// pointed at the real one.
+	//
+	// This was `rootCmd.SetErr(io.Discard)`, which achieved the first half by
+	// discarding EVERYTHING: `cmd.ErrOrStderr()` resolves through the root, so
+	// every deliberate diagnostic any subcommand writes went to the void.
+	// Measured on d4ea0f5: 16 call sites across 9 command files, including all
+	// four `dotf secrets` subcommands, `harness mirror`, `harness presence` — and
+	// `harness gate`, which then blocked a tool call with exit 2 and NO reason,
+	// leaving the operator no way to know which skill to invoke.
+	//
+	// SilenceErrors on the root is the mechanism Cobra provides for exactly this:
+	// ExecuteC checks the executed command's flag OR the root's before printing.
+	// The per-command flag stays readable below, so the "did this command ask for
+	// silence" branch is untouched.
+	// Forcing the flag on the root pollutes the "did this command ask for
+	// silence" read below whenever the root IS the executed command, so its
+	// original value is snapshotted and restored for that one case.
+	rootSilencedByAuthor := rootCmd.SilenceErrors
+	rootCmd.SilenceErrors = true
+	rootCmd.SetErr(stderr)
 
 	executedCmd, err := rootCmd.ExecuteC()
 	if err != nil {
@@ -32,7 +50,11 @@ func run(rootCmd *cobra.Command, stderr io.Writer) int {
 			_, _ = fmt.Fprintln(stderr, tfe.Error())
 		} else {
 			// If the specific command didn't request silence, print the error.
-			if !executedCmd.SilenceErrors {
+			silenced := executedCmd.SilenceErrors
+			if executedCmd == rootCmd {
+				silenced = rootSilencedByAuthor
+			}
+			if !silenced {
 				_, _ = fmt.Fprintf(stderr, "Error: %v\n", err)
 			}
 		}
