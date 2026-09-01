@@ -4,6 +4,17 @@
   "effortLevel": "xhigh",
   "advisorModel": "fable",
   "outputStyle": "Concise",
+  "crossSessionInbound": "accept",
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "autoCompactEnabled": true,
+  "precomputeCompactionEnabled": true,
+  "autoCompactWindow": 800000,
+  "autoContinueAtUsageLimit": true,
+  "cleanupPeriodDays": 90,
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL": "1"

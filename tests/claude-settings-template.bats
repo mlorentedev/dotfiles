@@ -119,6 +119,91 @@ setup() {
     esac
 }
 
+@test "template crossSessionInbound is one of the values Claude Code accepts" {
+    # The CLI validates against ["accept","hold","refuse"]. An invalid value is
+    # not a hard error -- it warns and FALLS BACK to holding every message for
+    # manual approval, so a typo here looks exactly like the default and the
+    # only symptom is peer messages quietly expiring.
+    local inbound
+    inbound="$(jq -r '.crossSessionInbound // "unset"' "$SETTINGS_TEMPLATE")"
+    case "$inbound" in
+        accept|hold|refuse) ;;
+        *) echo "crossSessionInbound '$inbound' is not an accepted value" >&2; return 1 ;;
+    esac
+}
+
+@test "template attribution hides AI attribution in commits and PRs" {
+    # Incident -> guard. The standing order is that no git or GitHub artifact
+    # carries AI attribution, and Claude Code's DEFAULTS work against it:
+    # attribution.commit/.pr default to the standard Co-Authored-By trailer and
+    # sessionUrl defaults to true (appending a Claude-Session trailer and a
+    # PR-body link). Until this template carried the key, the order was enforced
+    # only by an instruction every agent had to remember -- and an instruction
+    # that is obeyed 95% of the time still writes the trailer into permanent
+    # history. Empty string hides attribution; false drops the session link.
+    #
+    # Asserted exactly, not merely "present": a non-empty commit/pr string or a
+    # true sessionUrl re-enables the thing the order forbids, and would read as
+    # configured while doing the opposite.
+    [ "$(jq -r '.attribution.commit' "$SETTINGS_TEMPLATE")" = "" ]
+    [ "$(jq -r '.attribution.pr' "$SETTINGS_TEMPLATE")" = "" ]
+    [ "$(jq -r '.attribution.sessionUrl' "$SETTINGS_TEMPLATE")" = "false" ]
+}
+
+@test "template does NOT use the deprecated includeCoAuthoredBy key" {
+    # Claude Code's schema marks it "Deprecated: Use attribution instead".
+    # Carrying both is how the two drift apart; attribution is the one that
+    # also covers the PR body and the session link.
+    run jq -e 'has("includeCoAuthoredBy")' "$SETTINGS_TEMPLATE"
+    [ "$status" -ne 0 ]
+}
+
+@test "template keeps auto-compaction on, with the summary precomputed" {
+    # autoCompactEnabled is what stops a long session dying at the context
+    # limit; precomputeCompactionEnabled builds the summary in the background
+    # BEFORE it is needed and, per the schema, only applies when auto-compact is
+    # on -- so the pair is asserted together. Setting the second without the
+    # first is a no-op that reads as configured.
+    [ "$(jq -r '.autoCompactEnabled' "$SETTINGS_TEMPLATE")" = "true" ]
+    [ "$(jq -r '.precomputeCompactionEnabled' "$SETTINGS_TEMPLATE")" = "true" ]
+}
+
+@test "template autoCompactWindow actually caps the model it is paired with" {
+    # The window is in TOKENS, and the effective threshold is the MINIMUM of
+    # this setting and the model's own window. So the value only does anything
+    # if it is below the model's window -- pair it with a smaller model and it
+    # silently becomes a no-op that still reads as configured.
+    #
+    # Asserted as a RELATIONSHIP, not a constant: the failure this guards is
+    # someone dropping the `[1m]` suffix from `model` and leaving an 800000
+    # window behind, which then caps nothing.
+    local win model
+    win="$(jq -r '.autoCompactWindow' "$SETTINGS_TEMPLATE")"
+    model="$(jq -r '.model' "$SETTINGS_TEMPLATE")"
+    case "$win" in
+        ''|*[!0-9]*) echo "autoCompactWindow '$win' is not a positive integer" >&2; return 1 ;;
+    esac
+    [ "$win" -gt 0 ]
+    case "$model" in
+        *'[1m]')
+            [ "$win" -lt 1000000 ] \
+                || { echo "model is $model (1M window) but autoCompactWindow=$win caps nothing" >&2; return 1; } ;;
+    esac
+}
+
+@test "template retains transcripts for a bounded, explicit period" {
+    # Default is 30 days. The value is a deliberate tradeoff and is asserted so
+    # it cannot drift silently in either direction: transcripts are the fallback
+    # continuity record when a handoff is thin, and they are also a durable
+    # artifact that nothing scans for secrets. Bounded, not unbounded.
+    local days
+    days="$(jq -r '.cleanupPeriodDays' "$SETTINGS_TEMPLATE")"
+    case "$days" in
+        ''|*[!0-9]*) echo "cleanupPeriodDays '$days' is not a positive integer" >&2; return 1 ;;
+    esac
+    [ "$days" -ge 1 ]
+}
+
 @test "the merge expression survives a template that omits an optional key" {
     # jq: a condition that evaluates to `empty` makes the WHOLE if-expression
     # produce nothing, so `if ($tmpl.key // empty) then ... else . end` does not

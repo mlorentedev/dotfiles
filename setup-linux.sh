@@ -1377,7 +1377,8 @@ merge_claude_settings() {
     fi
 
     # Per-key merge via single jq invocation. Policy table in proposal.md:
-    # model, effortLevel, outputStyle, advisorModel: template wins.
+    # model, effortLevel, outputStyle, advisorModel, crossSessionInbound,
+    # attribution, autoCompactEnabled, precomputeCompactionEnabled: template wins.
     # permissions.allow: UNION (deduped). enabledPlugins, env: object merge
     # (template wins on conflict). All other keys: existing preserved.
     # `hooks` is ABSENT from this policy on purpose -- `dotf harness bind` owns it.
@@ -1402,12 +1403,37 @@ merge_claude_settings() {
     # "merge produced empty output, skipping write". A template that ever omits
     # this one optional key would then deploy NOTHING: not model, not
     # effortLevel, not permissions, not hooks.
+    #
+    # `attribution` is whole-object template-wins, NOT the per-key merge `env`
+    # gets. It is entirely dotfiles-owned policy: the standing order is that no
+    # git or GitHub artifact carries AI attribution, and Claude Code's default
+    # is the opposite -- `attribution.commit`/`.pr` default to the standard
+    # trailer and `sessionUrl` defaults to true. Until now that order was
+    # enforced only by an instruction every agent had to remember, which is the
+    # weaker half of this repo's own "a hook that fires beats an agent that
+    # remembers". Empty string hides the attribution; false drops the
+    # Claude-Session trailer and the PR-body link. A per-key merge here would
+    # let a stale subkey survive and quietly reinstate a trailer, so the object
+    # replaces wholesale.
+    #
+    # `crossSessionInbound` decides whether messages from the user's other
+    # sessions are delivered or held for manual approval. Measured on this box
+    # with four parallel sessions: 4 of 8 peer messages expired unapproved,
+    # including a reply to a peer's direct question. "accept" is what makes
+    # multi-session coordination a channel rather than a coin flip.
     local merged
     merged=$(jq --argjson tmpl "$template_substituted" '
         .model = $tmpl.model
         | .effortLevel = $tmpl.effortLevel
         | (if ($tmpl | has("outputStyle")) then .outputStyle = $tmpl.outputStyle else . end)
         | (if ($tmpl | has("advisorModel")) then .advisorModel = $tmpl.advisorModel else . end)
+        | (if ($tmpl | has("crossSessionInbound")) then .crossSessionInbound = $tmpl.crossSessionInbound else . end)
+        | (if ($tmpl | has("attribution")) then .attribution = $tmpl.attribution else . end)
+        | (if ($tmpl | has("autoCompactEnabled")) then .autoCompactEnabled = $tmpl.autoCompactEnabled else . end)
+        | (if ($tmpl | has("precomputeCompactionEnabled")) then .precomputeCompactionEnabled = $tmpl.precomputeCompactionEnabled else . end)
+        | (if ($tmpl | has("autoCompactWindow")) then .autoCompactWindow = $tmpl.autoCompactWindow else . end)
+        | (if ($tmpl | has("autoContinueAtUsageLimit")) then .autoContinueAtUsageLimit = $tmpl.autoContinueAtUsageLimit else . end)
+        | (if ($tmpl | has("cleanupPeriodDays")) then .cleanupPeriodDays = $tmpl.cleanupPeriodDays else . end)
         | (if ($tmpl | has("env")) then .env = ((.env // {}) + $tmpl.env) else . end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
