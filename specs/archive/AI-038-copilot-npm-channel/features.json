@@ -1,0 +1,30 @@
+[
+  {
+    "id": "AI-038-copilot-npm-channel-f1",
+    "behavior": "AC1: copilot is a packages.json npm tool and no setup carries an install block",
+    "verification": "bats tests/copilot-config.bats tests/setup-windows.bats tests/setup-linux.bats tests/packages-json.bats -f 'AI-038|packages.json'",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "AI-038-copilot-npm-channel-f2",
+    "behavior": "AC3: dotf doctor reports copilot against the catalog pin, one row per branch by status",
+    "verification": "grep -q 'checkCopilot(sys, cfg, rep)' cli/internal/doctor/doctor.go && cd cli && go test ./internal/doctor/ -run TestCheckCopilot_PinMatchByStatus",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "AI-038-copilot-npm-channel-f3",
+    "behavior": "AC4: ADR-036 lists copilot in the npm class with a dated amendment",
+    "verification": "grep -q 'copilot`) | npm global' docs/adr/adr-036-install-channels.md && grep -q 'Amendment 2026-08-28 (AI-038' docs/adr/adr-036-install-channels.md",
+    "state": "verified",
+    "evidence": "ok 2026-08-28"
+  },
+  {
+    "id": "AI-038-copilot-npm-channel-f4",
+    "behavior": "AC5 (box, recorded in verification.md): after the winget copy is retired, dotf tools install converges the npm copy, dotf tools version reports it, and doctor's copilot section is all ok",
+    "verification": "dotf tools version copilot && dotf doctor 2>&1 | grep -A2 'GitHub Copilot CLI' | grep -E 'all ok|copilot in PATH'",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-28)"
+  }
+]

@@ -81,8 +81,8 @@ func TestHarnessResolveTier(t *testing.T) {
 			// operator never chose.
 			name:        "a declared harness that no tier declares",
 			tier:        "top",
-			harnessName: "copilot",
-			wantErrSubs: []string{"top", "copilot"},
+			harnessName: "pi", // an adapter: tierless by design (copilot served here until #1170)
+			wantErrSubs: []string{"top", "pi"},
 		},
 		{
 			// The `top` tier deliberately has no NaN arm (ADR-032 section 4), so

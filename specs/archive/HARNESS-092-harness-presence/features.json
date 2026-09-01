@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-092-harness-presence-f1",
+    "behavior": "AC1: BuildPresence renders byte-identically to the shell (header once, name order, [ids] or none, autonomous skipped, targets by whole name) and the sha ignores line endings",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestBuildPresence|TestLoadPresence' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutations (autonomous listed; sha over raw bytes) fail TestBuildPresence_MatchesTheShellRendering"
+  },
+  {
+    "id": "HARNESS-092-harness-presence-f2",
+    "behavior": "AC2: DeployPresence injects every target once, keeps user content and the GENERATED region, appends without markers, replaces a stale region in place, is idempotent, keeps CRLF, skips an absent file, injects nothing for an empty roster",
+    "verification": "cd cli && go test ./internal/harness/ ./internal/cmd/ -run 'TestDeployPresence|TestInjectPresence|TestHarnessPresenceCmd' -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (append instead of replace) fails TestInjectPresence_ReplacesAStaleRegionInPlace"
+  },
+  {
+    "id": "HARNESS-092-harness-presence-f3",
+    "behavior": "AC3: compile-harness.sh --deploy delegates to dotf harness presence --repo-root <checkout>, fails when it fails or when dotf predates the verb, carries no injector; setup-windows.ps1 calls the verb after Deploy-SkillRecord",
+    "verification": "bats tests/compile-harness.bats -f 'HARNESS-092' && bats tests/setup-windows.bats -f 'HARNESS-092'",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-28)"
+  },
+  {
+    "id": "HARNESS-092-harness-presence-f4",
+    "behavior": "AC4: dotf doctor reports presence by status (PASS with counts / WARN missing / WARN stale / SKIP without repo), gates copilot's file on the binary, writes nothing",
+    "verification": "grep -q 'checkAgentPresence(sys, rep)' cli/internal/doctor/doctor.go && cd cli && go test ./internal/doctor/ -run TestCheckAgentPresence_ByStatus -count=1",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (stale counted as current) fails the stale row"
+  },
+  {
+    "id": "HARNESS-092-harness-presence-f5",
+    "behavior": "AC5 (box): the four instructions files carry one presence region each with the same sha, a second run reports every file current, doctor's section is green",
+    "verification": "dotf harness presence | grep -q 'presence current' && grep -c 'BEGIN HARNESS AGENT-PRESENCE' ~/.claude/CLAUDE.md | grep -qx 1",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-28: 0 regions before, 4 injected, 4 current on rerun)"
+  }
+]

@@ -48,7 +48,7 @@ requires: [verification-before-completion]
 Where the repo declares `harness/reviewer-pool.json`, there is one entry point and it does the pinning for you:
 
 ```bash
-dotf spec review <feature-id>                             # the pool's primary reviewer
+dotf spec review <feature-id>                             # a pool member drawn at random (the launch line names it)
 dotf spec review <feature-id> --reviewer <pool-id>        # a specific pool member
 dotf spec review <feature-id> --dry-run                   # print the command, run nothing
 dotf spec review <feature-id> --foreground                # no detached session

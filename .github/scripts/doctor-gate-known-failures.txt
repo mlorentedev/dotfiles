@@ -8,14 +8,3 @@
 # A real-box defect never goes here: it is fixed or ticketed, and the gate stays
 # red until then.
 
-# WIN-013 (#1310): env-contract SCRIPTS_DIR defaults to ~/.dotfiles/scripts on
-# Windows, but setup-windows.ps1 deploys scripts to ~/scripts and nothing
-# creates the contract path, so the contract check fails on every fresh box.
-# example:   [FAIL] SCRIPTS_DIR=C:\Users\runneradmin\.dotfiles\scripts (path does not exist)
-SCRIPTS_DIR=.*\.dotfiles\\scripts \(path does not exist\)
-
-# TEST-005 (#1313): the runner has no Bitwarden identity, so the reach tier
-# (exposure-keyed: 28 registry entries resolve through Bitwarden) fails by its
-# own rule. Real boxes log in once; CI cannot and must not resolve real secrets.
-# example:   [FAIL] Bitwarden session is gone (`bw status`: unauthenticated) - run `bw login`, not `bw unlock`
-Bitwarden session is gone \(`bw status`: unauthenticated\)

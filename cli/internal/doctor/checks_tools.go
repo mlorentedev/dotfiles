@@ -3,6 +3,7 @@ package doctor
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -142,20 +143,70 @@ func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 		}
 	}
 
-	// yarn is npm-global (cross-platform) — always checked.
-	pin := cfg.Versions["YARN_VERSION"]
-	switch {
-	case !sys.has("yarn"):
-		rep.Skip("yarn not installed (npm install -g yarn, or re-run setup)")
-	case pin == "":
-		rep.Skip("YARN_VERSION not set in versions.conf — version match not verified")
-	default:
+	// yarn is npm-global (cross-platform) — always checked. Its pin lives in
+	// packages.json since OPS-042 (#1336), where `dotf tools install` reads it;
+	// versions.conf no longer carries YARN_VERSION.
+	if !sys.has("yarn") {
+		rep.Skip("yarn not installed (run `dotf tools install yarn`; needs Node.js on PATH)")
+	} else {
 		got, _ := sys.versionLine("yarn")
-		if got == pin {
-			rep.Pass(fmt.Sprintf("yarn version matches versions.conf (%s)", pin))
-		} else {
-			rep.Warn(fmt.Sprintf("yarn version drift: installed=%s pinned=%s", got, pin))
+		matchPinFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), "packages.json")
+	}
+
+	checkGitWindowsFloor(sys, cfg, rep)
+}
+
+// gitFloorKey is the versions.conf pin checkGitWindowsFloor consumes. Like every
+// pin in that file it is a MINIMUM (REFACTOR-013), and unlike the others no
+// installer provisions it — git comes from the OS package manager — so doctor is
+// its only consumer.
+const gitFloorKey = "GIT_VERSION"
+
+// gitVersionRe pulls the numeric triple out of `git --version`. git-for-windows
+// reports "git version 2.55.0.windows.5", so the match is anchored on the shape
+// of the triple, not on the end of the line.
+var gitVersionRe = regexp.MustCompile(`([0-9]+\.[0-9]+\.[0-9]+)`)
+
+// checkGitWindowsFloor reports whether git-for-windows meets the floor that
+// carries the upstream fix for BUG-069 (#912).
+//
+// Measured on 2.53.0, MSYS bash could not open a hook handed to it at a `C:/`
+// drive path — the form both install-git-hooks.ps1 and checkGuardHooks write to
+// core.hooksPath — so every commit aborted with "No such file or directory".
+// Measured again on 2.55.0.windows.5 the same value works: the defect was fixed
+// by git-for-windows between the two measurements (lesson 239). What survives a
+// bug fixed upstream is not a workaround but the floor: the toolchain version
+// from which the repo's wiring is known to execute.
+//
+// A WARN, not a FAIL, for two reasons. The floor is a version heuristic
+// bracketed by two measurements, not an observed failure on this box; and
+// doctor's precedent for a tool one release behind its pin is a WARN (yarn,
+// opencode). It is Windows-only because the hooksPath defect was git-for-
+// windows', and the env contract's own git min_version already FAILs a
+// genuinely ancient git on every OS.
+func checkGitWindowsFloor(sys *System, cfg *Config, rep *Report) {
+	pin := cfg.Versions[gitFloorKey]
+	switch {
+	case sys.GOOS != "windows":
+		rep.Skip("git-for-windows floor (Windows-only; the C:/ hooksPath defect was git-for-windows', #912)")
+	case pin == "":
+		rep.Skip(gitFloorKey + " not set in versions.conf — git-for-windows floor not verified")
+	case !sys.has("git"):
+		// The env contract FAILs an absent git; repeating it here would report
+		// one defect twice.
+		rep.Skip("git not in PATH — git-for-windows floor unverifiable (the env contract owns that FAIL)")
+	default:
+		raw, _ := sys.versionLine("git")
+		m := gitVersionRe.FindStringSubmatch(raw)
+		if len(m) < 2 {
+			rep.Warn(fmt.Sprintf("git version unparseable: %q — git-for-windows floor %s not verified", raw, pin))
+			return
 		}
+		if atLeast(m[1], pin) {
+			rep.Pass(fmt.Sprintf("git %s meets the git-for-windows floor %s (#912)", m[1], pin))
+			return
+		}
+		rep.Warn(fmt.Sprintf("git %s is below the git-for-windows floor %s — before 2.55 MSYS bash could not open a C:/-form core.hooksPath, so the GUARD hooks fail on every commit; upgrade with `winget upgrade Git.Git` (#912, lesson 239)", m[1], pin))
 	}
 }
 

@@ -30,6 +30,7 @@ pattern triggers, and workflow integrations.`,
 	cmd.AddCommand(newHarnessGateCmd())
 	cmd.AddCommand(newHarnessBindCmd())
 	cmd.AddCommand(newHarnessMirrorCmd())
+	cmd.AddCommand(newHarnessPresenceCmd())
 	return cmd
 }
 

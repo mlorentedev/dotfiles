@@ -34,7 +34,8 @@ Unlike dotf init, vault is a vault-only command: a missing vault is an error
 Subcommands:
   work <family> <component>   scaffold a work-SDK entry under 50_work/45-development/
   project [path]              scaffold a personal-project entry under 10_projects/
-  crystallize [path]          maintain a project's MEMORY.md dates and health`,
+  crystallize [path]          maintain a project's MEMORY.md dates and health
+  health                      report knowledge-vault health (Obsidian, links, backlog)`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -43,6 +44,7 @@ Subcommands:
 	cmd.AddCommand(newVaultWorkCmd())
 	cmd.AddCommand(newVaultProjectCmd())
 	cmd.AddCommand(newVaultCrystallizeCmd())
+	cmd.AddCommand(newVaultHealthCmd())
 	cmd.AddCommand(newSearchCmd())
 	return cmd
 }

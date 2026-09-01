@@ -138,10 +138,9 @@ setup() {
     refute_grep_fixed "github/gh-copilot" "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 auto-installs GitHub.Copilot via winget" {
-    grep -qF "GitHub.Copilot" "$PS1_SCRIPT"
-    # In the dev tools winget block, the binary check uses `copilot`
-    grep -qE 'Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
+@test "setup-windows.ps1 no longer installs GitHub.Copilot via winget: copilot is a packages.json npm tool (AI-038, ADR-036)" {
+    refute_grep 'Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm" and .source.package == "@github/copilot")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
 @test "setup-windows.ps1 removes retired init .ps1 orphans, does not deploy them (CLI-020)" {
@@ -149,6 +148,18 @@ setup() {
     # copies, never Copy-Item them.
     grep -q 'init-repo-github-defaults.ps1' "$PS1_SCRIPT"
     refute_grep 'Copy-Item .*init-project\.ps1' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 removes every retired script and the legacy ~\scripts copies of the live ones (WIN-013)" {
+    # Measured on a real box 2026-08-27: seven retired scripts still sat in
+    # ~\scripts because nothing ever removed them. The list is the guard.
+    for name in claude-mem-heal.ps1 claude-session-start.ps1 diff-check.ps1 doctor.ps1 healthcheck.ps1 knowledge-crystallize.ps1 session-handoff.ps1; do
+        grep -qF "\"$name\"" "$PS1_SCRIPT"
+    done
+    grep -qF '$LegacyScriptsDir = "$env:USERPROFILE\scripts"' "$PS1_SCRIPT"
+    grep -qF 'foreach ($dir in @($ScriptsDir, $LegacyScriptsDir)' "$PS1_SCRIPT"
+    # The legacy PATH entry is deliberately not pruned (2048-char hazard, #148).
+    refute_grep 'SetEnvironmentVariable\("PATH".*LegacyScriptsDir' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 no longer deploys knowledge-crystallize.ps1 (CLI-050)" {
@@ -164,7 +175,9 @@ setup() {
 # MEM-002: claude-mem-heal.ps1 is retired (ADR-016 Q2). setup-windows.ps1 must
 # NOT deploy it any more.
 @test "setup-windows.ps1 no longer deploys claude-mem-heal.ps1 (MEM-002)" {
-    refute_grep_fixed 'claude-mem-heal.ps1' "$PS1_SCRIPT"
+    # The name may appear in WIN-013's removal list; never in a deploy or a call.
+    refute_grep 'Copy-Item.*claude-mem-heal\.ps1' "$PS1_SCRIPT"
+    refute_grep '&.*claude-mem-heal\.ps1' "$PS1_SCRIPT"
     [ ! -f "$DOTFILES_DIR/scripts/claude-mem-heal.ps1" ]
 }
 
@@ -220,6 +233,31 @@ setup() {
 }
 
 # MCP registration must check existence before adding, not blindly retry.
+@test "setup-windows.ps1 installs Claude Code and agy via their official installers when absent (AI-041, #1325)" {
+    # setup-linux.sh provisions both; on Windows every block gating on `claude`
+    # and the agy config deploy were dead on a clean box. Child pwsh, skip when
+    # on PATH, before the MCP block that needs the binary.
+    grep -qF 'function Install-AgentBinary' "$PS1_SCRIPT"
+    grep -qF 'https://claude.ai/install.ps1' "$PS1_SCRIPT"
+    grep -qF 'https://antigravity.google/cli/install.ps1' "$PS1_SCRIPT"
+    grep -qF -- '-NoProfile -ExecutionPolicy Bypass -File $installer' "$PS1_SCRIPT"
+    install_line=$(grep -n 'Install-AgentBinary -Name "Claude Code"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -n 'claude mcp get' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ "$install_line" -lt "$mcp_line" ]
+    # parity: the Linux script installs the same two through the same vendors
+    grep -qF 'https://claude.ai/install.sh' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'https://antigravity.google/cli/install.sh' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-windows.ps1 persists the contract variables at User scope after generating paths.ps1 (CLI-058, #1324)" {
+    # paths.ps1 only reaches profile-loading shells; Copilot's -NoProfile tool
+    # calls and Scheduled Tasks read HKCU\Environment, which setup now fills.
+    grep -qF 'dotf env persist' "$PS1_SCRIPT"
+    gen_line=$(grep -n 'dotf env generate | Out-Null' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    persist_line=$(grep -n 'dotf env persist | Out-Null' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ "$gen_line" -lt "$persist_line" ]
+}
+
 @test "setup-windows.ps1 MCP registration checks existence with claude mcp get" {
     grep -q 'claude mcp get' "$PS1_SCRIPT"
 }
@@ -295,22 +333,19 @@ setup() {
     grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
-# --- BUG-013: install Obsidian CLI on Windows ---
-# `obsidian-cli` (npm) provides the `obsidian` binary used by
-# obs-cli.ps1 and the vault-health workflow. setup-windows.ps1 must install
-# it idempotently via npm global (user scope, no admin), gated on npm
-# availability so machines without Node.js gracefully skip.
-# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
+# --- OPS-042 (#1336): obsidian-cli and yarn are catalog tools ---
+# `obsidian-cli` (npm) provides the `obsidian` binary used by obs-cli.ps1 and
+# the vault-health workflow; yarn is the classic npm-global. Both are
+# packages.json entries converged by `dotf tools install`, which
+# setup-windows.ps1 runs before anything needs them, so the script carries no
+# npm block and no versions.conf parser for either (BUG-013's block retired).
 
-@test "setup-windows.ps1 installs Obsidian CLI via npm (BUG-013)" {
-    grep -qF "npm install -g 'obsidian-cli'" "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 Obsidian CLI install is gated on npm + idempotent (BUG-013)" {
-    # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command obsidian"
-    # gating: only run if npm is available
-    grep -B10 "npm install -g 'obsidian-cli'" "$PS1_SCRIPT" | grep -q "Get-Command npm"
+@test "setup-windows.ps1 installs obsidian and yarn through dotf tools install, not npm blocks (OPS-042)" {
+    grep -qE '^\s*dotf tools install\s*$' "$PS1_SCRIPT"
+    refute_grep 'obsidian-cli' "$PS1_SCRIPT"
+    refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
+    refute_grep 'yarnPkg' "$PS1_SCRIPT"
+    refute_grep 'YARN_VERSION' "$PS1_SCRIPT"
 }
 
 # --- AI-014: OpenCode Windows bootstrap (mirror of AI-011 Linux side) ---
@@ -359,6 +394,22 @@ setup() {
     refute_grep '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
 }
 
+# Runs setup-windows.ps1's skill renderer on <record>, writing the result to
+# <outfile>; sets $status/$output like any other `run`. Extracts the two
+# functions that carry the rule rather than dot-sourcing (and running) the whole
+# multi-hundred-line deploy script.
+_render_skill_record() {  # <kind> <record> <srcpath> <outfile>
+    local fn_body
+    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" \
+        | awk '/^function (Test-SkillFrontmatterKeyKept|Convert-SkillRecord) \{/,/^\}$/')"
+    [ -n "$fn_body" ]
+    run pwsh -NonInteractive -Command "
+        $fn_body
+        \$result = Convert-SkillRecord -Kind '$1' -RecordMd '$(_winpath "$2")' -SrcPath '$3'
+        Set-Content -LiteralPath '$(_winpath "$4")' -Value \$result -Encoding UTF8
+    "
+}
+
 @test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
     # A previous adversarial review of HARNESS-069 (bash side) found this bug
     # live on this exact function: it never got the strip-rule fix, so once a
@@ -377,19 +428,8 @@ setup() {
     printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/demo/SKILL.md\ngenerated_sha: aaaaaaaaaaaaaaaa\nname: demo\ndescription: fixture skill.\n---\n\nBody.\n' \
         > "$record"
 
-    # Extract just this function's body (CRLF-stripped) so the test exercises
-    # a script excerpt rather than dot-sourcing (and running) the whole
-    # multi-hundred-line deploy script.
-    local fn_body
-    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" | awk '/^function Convert-SkillRecord \{/,/^\}$/')"
-    [ -n "$fn_body" ]
-
     local out="$scratch/out.md"
-    run pwsh -NonInteractive -Command "
-        $fn_body
-        \$result = Convert-SkillRecord -Kind 'skill' -RecordMd '$(_winpath "$record")' -SrcPath '.claude/skills/demo/SKILL.md'
-        Set-Content -LiteralPath '$(_winpath "$out")' -Value \$result -Encoding UTF8
-    "
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
     [ "$status" -eq 0 ]
 
     [ "$(grep -c '^generated:' "$out")" -eq 1 ]
@@ -399,6 +439,72 @@ setup() {
     # stale vault path the record's own (stripped) fields carried.
     grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
     grep -q '^name: demo' "$out"
+}
+
+@test "Convert-SkillRecord drops neutral/store-only keys so Claude Code discovers the skill unconditionally (#1080 parity)" {
+    # Claude Code reads a top-level `paths:` as a conditional / path-scoped
+    # skill and holds it dormant until a matching file is touched in the
+    # session, so a deployed record that keeps `paths:` disappears from the
+    # session-start roster. compile-harness.sh was fixed for that in #1080;
+    # this function is its Windows twin and was not, which took 34 of 43
+    # skills off this box (measured 2026-08-29).
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+
+    local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
+    mkdir -p "$scratch"
+    local record="$scratch/SKILL.md"
+    # Two shapes a per-line filter gets wrong: a `paths:` value that wraps (the
+    # orphaned list item outlives its key), and a comment before the first key
+    # (the awk twin drops it, because its keep starts unset).
+    cat > "$record" <<'FIXTURE'
+---
+# store-only metadata follows
+id: demo-skill
+type: skill
+status: active
+created: 2026-08-29
+owner: manu
+name: demo
+description: fixture skill,
+  wrapped onto a second line.
+allowed-tools: Read, Grep
+targets: [claude]
+keywords: [alpha, beta]
+paths: ['**/a/**',
+  '**/b/**']
+requires: [jq]
+---
+
+Body.
+FIXTURE
+
+    local out="$scratch/out.md"
+    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
+    [ "$status" -eq 0 ]
+
+    # Neutral metadata is gone, and so is every line that hung off it.
+    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$out"
+    refute_grep_fixed "'**/b/**'" "$out"
+    refute_grep_fixed '# store-only metadata follows' "$out"
+    # Native execution fields survive, continuation lines included.
+    grep -q '^name: demo' "$out"
+    grep -q '^description: fixture skill,' "$out"
+    grep -q '^  wrapped onto a second line.' "$out"
+    grep -q '^allowed-tools: Read, Grep' "$out"
+    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
+}
+
+@test "the native-field allowlist is identical in setup-windows.ps1 and compile-harness.sh (cross-OS parity)" {
+    # Two renderers, one rule. Drift here is silent: each side keeps deploying,
+    # and only the agents on the other OS lose the skill.
+    local pat sh_list ps_list
+    pat='\(name\|description\|allowed-tools[^)]*\)'
+    sh_list=$(grep -oE "$pat" "$BATS_TEST_DIRNAME/../scripts/compile-harness.sh" | head -1)
+    ps_list=$(sed 's/\r$//' "$PS1_SCRIPT" | grep -oE "$pat" | head -1)
+    [ -n "$sh_list" ]
+    [ "$sh_list" = "$ps_list" ]
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
@@ -635,10 +741,9 @@ setup() {
 # reference diff-check.
 
 @test "CLI-019: setup-windows.ps1 no longer deploys diff-check.ps1" {
-    if grep -qF 'diff-check' "$PS1_SCRIPT"; then
-        echo "diff-check still referenced in setup-windows.ps1" >&2
-        return 1
-    fi
+    # The name may appear in WIN-013's removal list; never in a deploy or a call.
+    refute_grep 'Copy-Item.*diff-check' "$PS1_SCRIPT"
+    refute_grep '&.*diff-check' "$PS1_SCRIPT"
 }
 
 @test "CLI-019: powershell/profile.ps1 dch wraps dotf doctor" {
@@ -653,13 +758,15 @@ setup() {
 @test "CLI-019: production callers no longer reference diff-check" {
     [ ! -f "$DOTFILES_DIR/scripts/diff-check.sh" ]
     [ ! -f "$DOTFILES_DIR/scripts/diff-check.ps1" ]
-    for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
+    for f in setup-linux.sh powershell/profile.ps1 \
              .zsh/aliases.zsh .github/workflows/ci.yml; do
         if grep -qF 'diff-check' "$DOTFILES_DIR/$f"; then
             echo "diff-check still referenced in $f" >&2
             return 1
         fi
     done
+    # setup-windows.ps1 names it only in WIN-013's removal list (guarded above).
+    refute_grep 'Copy-Item.*diff-check' "$PS1_SCRIPT"
 }
 
 # --- CLI-018 (#509): healthcheck.ps1 + doctor.ps1 retired; dotf doctor owns it ---
@@ -674,13 +781,16 @@ setup() {
 }
 
 @test "CLI-018: no production caller references healthcheck.ps1 or doctor.ps1" {
-    for f in setup-linux.sh setup-windows.ps1 powershell/profile.ps1 \
+    for f in setup-linux.sh powershell/profile.ps1 \
              .github/workflows/ci.yml; do
         if grep -qE '(healthcheck|doctor)\.ps1' "$DOTFILES_DIR/$f"; then
             echo "(healthcheck|doctor).ps1 still referenced in $f" >&2
             return 1
         fi
     done
+    # setup-windows.ps1 names them only in WIN-013's removal list: never deployed or called.
+    refute_grep 'Copy-Item.*(healthcheck|doctor)\.ps1' "$PS1_SCRIPT"
+    refute_grep '&.*(healthcheck|doctor)\.ps1' "$PS1_SCRIPT"
 }
 
 # --- CLI-018: dotf doctor as the post-setup diagnostic (replaced WIN-001) ---
@@ -814,6 +924,24 @@ setup() {
     grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json
+# declares. `& dotf deploy pi` left orca-keybindings declared and never
+# installed on Windows -- the manifest is the SSOT of what gets deployed, and a
+# call site that names one entry silently narrows it.
+@test "setup-windows.ps1 deploys agent configs with bare dotf deploy, naming no config (CLI-054)" {
+    # [[:space:]]*$ rather than \s*$: the .ps1 checks out CRLF everywhere
+    # (.gitattributes), and this grep has no \r escape.
+    grep -qE '^[[:space:]]*& dotf deploy[[:space:]]*$' "$PS1_SCRIPT"
+    # Anchored to the invocation shape (a line that RUNS dotf), not to any
+    # mention: the comment above the call names the old form on purpose.
+    refute_grep '^[[:space:]]*& dotf deploy [a-z]' "$PS1_SCRIPT"
+}
+
+@test "parity: neither setup names a config at its dotf deploy call site (CLI-054)" {
+    refute_grep '^[[:space:]]*& dotf deploy [a-z]' "$PS1_SCRIPT"
+    refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 @test "setup-windows.ps1 writes rendered skill files and the copilot catalog through Write-Utf8LfFile, never Set-Content (WIN-008)" {
     # Set-Content joins with CRLF and rewrites the whole file, so the deployed
     # copilot-instructions.md drifted from its LF source on every run (#1289).
@@ -851,8 +979,14 @@ setup() {
     # deduplicated, unit-tested in tests/windows-path-sync.Tests.ps1.
     run grep -cF 'GetEnvironmentVariable("PATH", "Machine")' "$PS1_SCRIPT"
     [ "$output" = "0" ]
+    # A FLOOR, not a census: at least one call proves the helper is wired into
+    # setup, and the zero-raw-rebuild assertion above is what actually carries
+    # the invariant. The count was 2 only because two installers happened to
+    # need a refresh; OPS-042 moved obsidian-cli and yarn to packages.json and
+    # deleted one of them, which is a legitimate removal a census reads as a
+    # regression. Guards assert the invariant, never the population.
     calls=$(grep -cE '^\s*Sync-SessionPath\s*$' "$PS1_SCRIPT")
-    [ "$calls" -ge 2 ]
+    [ "$calls" -ge 1 ]
     grep -qE '^function Sync-SessionPath' "$BATS_TEST_DIRNAME/../scripts/utils.ps1"
 }
 
@@ -865,4 +999,52 @@ setup() {
     [ "$status" -ne 0 ]
     run grep -F '& $bunInstaller' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]
+}
+
+# OPS-044 (#1361): hive-vault and pdf-modifier are `uvx` MCP servers, and the
+# registration loop skips a server whose prerequisite binary is absent. With the
+# uv installer in section 4 a clean box's first run registered neither and only
+# the second run converged -- measured on the CI runner the first time Claude
+# Code installed there (#1360). Ordering is asserted by line number of the
+# invocation, on both OSes.
+@test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
+    uv_line=$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    # The executable invocation, never a comment naming it: the block's own
+    # comments mention `claude mcp add` 40 lines above the call.
+    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+}
+
+@test "parity: both setups install uv before registering the Claude MCP servers (OPS-044)" {
+    uv_line=$(grep -n 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+}
+
+# HARNESS-092 (#1326): agent presence -- the forced-skills roster between
+# AGENT-PRESENCE markers in every harness instructions file -- reached Windows
+# through no path at all: compile-harness.sh's deploy_agent_presence had no
+# port. Both setups now call `dotf harness presence`; here it must run after
+# the base files and the skill records are deployed, or it finds nothing to
+# join. Measured on the invocation line, not on any mention.
+@test "setup-windows.ps1 injects agent presence via dotf harness presence after Deploy-SkillRecord (HARNESS-092)" {
+    grep -qE '^[[:space:]]*& dotf harness presence --repo-root \$DotfilesDir[[:space:]]*$' "$PS1_SCRIPT"
+    deploy_line=$(grep -n '^Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    presence_line=$(grep -n '& dotf harness presence' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$deploy_line" ] && [ -n "$presence_line" ] && [ "$deploy_line" -lt "$presence_line" ]
+    # parity: the Linux engine delegates to the same verb and carries no injector of its own
+    grep -qF 'dotf harness presence --repo-root "$REPO_ROOT"' "$DOTFILES_DIR/scripts/compile-harness.sh"
+    refute_grep '^inject_agent_presence\(\) \{' "$DOTFILES_DIR/scripts/compile-harness.sh"
+}
+
+# CLI-062 (#1338): the DX-006 Orca hook repair is `dotf orca tune-hooks`, the
+# port of scripts/orca-hook-tune.ps1. setup-windows.ps1 calls the command where
+# it copied and ran the script, and sweeps the old deployed copy (WIN-013's
+# retired list) so a stale ~\.dotfiles\scripts\orca-hook-tune.ps1 cannot linger.
+@test "setup-windows.ps1 repairs the Orca hooks through dotf orca tune-hooks, and retires the script (CLI-062)" {
+    grep -qE '^\s*& dotf orca tune-hooks\s*$' "$PS1_SCRIPT"
+    grep -A3 '^\$retiredScripts = @(' "$PS1_SCRIPT" | grep -q '"orca-hook-tune.ps1"'
+    grep -A2 '^\$deployedScripts = @(' "$PS1_SCRIPT" | refute_grep_fixed 'orca-hook-tune.ps1' /dev/stdin
+    [ ! -e "$DOTFILES_DIR/scripts/orca-hook-tune.ps1" ]
+    [ ! -e "$DOTFILES_DIR/scripts/orca-tune.sh" ]
 }

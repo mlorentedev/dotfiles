@@ -272,7 +272,7 @@ setup() {
 # Section 10: Graceful skips (optional tools not present)
 # =============================================================================
 
-@test "copilot config NOT deployed when gh-copilot extension is absent" {
+@test "copilot config NOT deployed when the copilot binary is absent (the container has no Node, so the npm catalog skips it: #1312)" {
     # Post-BUG-001 (PR #40): setup-linux.sh uses detect-and-act. The
     # gh-copilot extension is no longer auto-installed; ~/.copilot is created
     # only if the extension is genuinely present. In the integration container
@@ -458,7 +458,11 @@ setup() {
     # Execute second run
     cd "$REPO_DIR"
     run bash setup-linux.sh
-    [ "$status" -eq 0 ]
+    if [ "$status" -ne 0 ]; then
+        echo "second setup-linux.sh run exited $status; last 40 lines:" >&2
+        printf '%s\n' "$output" | tail -40 >&2
+        return 1
+    fi
 
     # Collect hashes after second run
     find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \

@@ -25,6 +25,16 @@ setup() {
     grep -q 'Set-Alias.*-Name g -Value agy' "$PROFILE_SCRIPT"
 }
 
+@test "profile.ps1 defines agyp, the PowerShell twin of .zsh/functions.sh agyp (PARITY-001, #764)" {
+    # Same contract on both sides: prompt at <gemini dir>/prompts/<name>.md,
+    # extra words appended, missing name/file fails without launching agy.
+    grep -qE '^function agyp' "$PROFILE_SCRIPT"
+    grep -q "Join-Path \$geminiDir 'prompts'" "$PROFILE_SCRIPT"
+    grep -q 'agy -i' "$PROFILE_SCRIPT"
+    grep -qE '^agyp\(\)' "$DOTFILES_DIR/.zsh/functions.sh"
+    grep -q '\.gemini/prompts' "$DOTFILES_DIR/.zsh/functions.sh"
+}
+
 # --- OpenCode alias (admin-conditional on Windows; aider sunset) ---
 
 @test "profile.ps1 defines conditional oc alias for opencode (plain, no --pure)" {

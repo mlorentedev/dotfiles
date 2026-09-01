@@ -189,3 +189,64 @@ func TestWriteReviewRequestRecordsTheDigestOfWhatWasThere(t *testing.T) {
 		}
 	})
 }
+
+// VerifyReviewProduced is the launcher's own half of the no-verdict guard, and
+// it exists because the archive gate fires too late to help: days on, in another
+// session, with the transcript no longer in hand. Every Windows run is a
+// foreground run (tmux is Linux-only), so this is the common path there.
+func TestVerifyReviewProducedCatchesARunThatWroteNoFile(t *testing.T) {
+	dir := seedProvenanceSpec(t, "")
+	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := VerifyReviewProduced(dir, "/transcripts/AI-042.jsonl")
+	if err == nil {
+		t.Fatal("a run that wrote no review.md must fail")
+	}
+	if !strings.Contains(err.Error(), "/transcripts/AI-042.jsonl") {
+		t.Errorf("the error must name the transcript, got %q", err)
+	}
+}
+
+// The AI-042 round 4 shape exactly: a review.md IS on disk, but it is the
+// previous round's, and a reader cannot tell it from a fresh verdict that
+// reached the same conclusion.
+func TestVerifyReviewProducedCatchesAnUnchangedVerdict(t *testing.T) {
+	dir := seedProvenanceSpec(t, provenanceReviewDoc)
+	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := VerifyReviewProduced(dir, "/transcripts/AI-042.jsonl")
+	if err == nil {
+		t.Fatal("an unchanged review.md must fail: the reviewer wrote nothing")
+	}
+	if !strings.Contains(err.Error(), "byte-identical") {
+		t.Errorf("the error must say the file did not move, got %q", err)
+	}
+}
+
+func TestVerifyReviewProducedAcceptsAFreshVerdict(t *testing.T) {
+	dir := seedProvenanceSpec(t, provenanceReviewDoc)
+	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(provenanceReviewDoc+"\nA new round.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := VerifyReviewProduced(dir, "/transcripts/AI-042.jsonl"); err != nil {
+		t.Errorf("a verdict written during the run must pass, got %v", err)
+	}
+}
+
+// Without a sidecar there is no digest to compare against, and the check must
+// not invent one. That the file exists is all it can honestly assert -- the same
+// posture checkReviewProvenance takes for a hand-written review.
+func TestVerifyReviewProducedIsSilentWithoutASidecar(t *testing.T) {
+	dir := seedProvenanceSpec(t, provenanceReviewDoc)
+	if err := VerifyReviewProduced(dir, "/transcripts/AI-042.jsonl"); err != nil {
+		t.Errorf("no sidecar must not be an error, got %v", err)
+	}
+}

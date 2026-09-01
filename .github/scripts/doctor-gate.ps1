@@ -25,6 +25,11 @@ function Test-DoctorGate {
         [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Lines,
         [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Patterns
     )
+    # A list with no entries reaches here as $null, which [string[]] binds as
+    # one null element: it matched nothing and was reported STALE, failing the
+    # gate the moment its last row was retired (WIN-013). Zero rows is the
+    # steady state of a list that only shrinks, so drop empties up front.
+    $Patterns = @($Patterns | Where-Object { $_ })
     $failures = @($Lines | Where-Object { $_ -match '^\s*\[FAIL\]' })
     $unexpected = @($failures | Where-Object {
         $line = $_
@@ -41,7 +46,10 @@ function Test-DoctorGate {
 function Read-KnownFailures {
     param([Parameter(Mandatory)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { return @() }
-    @(Get-Content -LiteralPath $Path | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+    # `return ,$entries` hands the caller a real (possibly empty) array; a bare
+    # @(...) unrolls to nothing and arrives as $null (WIN-013 emptied the list).
+    $entries = @(Get-Content -LiteralPath $Path | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+    return ,$entries
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
@@ -64,6 +72,15 @@ if ($MyInvocation.InvocationName -ne '.') {
         $cmd = Get-Command $probe -ErrorAction SilentlyContinue
         Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
     }
+
+    # The runner has no Bitwarden identity and must never hold one that resolves
+    # real secrets, so [Bitwarden reach] reports "unauthenticated" by design.
+    # Declare that to doctor (TEST-005, #1313) rather than allow-listing the FAIL:
+    # the known-failures list is for runner-only conditions with a fix pending,
+    # and a runner that will never log in is not a pending fix. doctor reads the
+    # flag in that one branch only; every other reach tier still runs.
+    $env:DOTFILES_DOCTOR_NO_IDENTITY = '1'
+    Write-Host "doctor gate: DOTFILES_DOCTOR_NO_IDENTITY=1 (no Bitwarden identity on this runner, declared)"
 
     $output = & dotf doctor 2>&1 | Out-String
     Write-Host $output

@@ -81,7 +81,7 @@ func TestCheckProfileFiles(t *testing.T) {
 
 			var buf bytes.Buffer
 			rep := capture(&buf)
-			checkProfileFiles(sys, rep)
+			checkProfileFiles(sys, nil, rep, false)
 
 			if rep.Failures() != tc.wantFailures {
 				t.Fatalf("failures = %d, want %d\n%s", rep.Failures(), tc.wantFailures, buf.String())

@@ -11,6 +11,31 @@
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value agy
 
+# agyp: launch agy with a saved prompt, the PowerShell twin of .zsh/functions.sh's
+# agyp (PARITY-001, #764). Same contract on both sides: the prompt lives at
+# $GEMINI_DIR\prompts\<name>.md, extra words are appended after a blank line,
+# and a missing name or file is a non-terminating error (so $? is false) rather
+# than a launch with an empty prompt.
+#   agyp <prompt-name> [extra words]
+function agyp {
+    param(
+        [Parameter(Position = 0)][string]$Name,
+        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
+    )
+    if (-not $Name) {
+        Write-Error 'usage: agyp <prompt-name> [args]'
+        return
+    }
+    $geminiDir = if ($env:GEMINI_DIR) { $env:GEMINI_DIR } else { Join-Path $env:USERPROFILE '.gemini' }
+    $promptFile = Join-Path (Join-Path $geminiDir 'prompts') "$Name.md"
+    if (-not (Test-Path -LiteralPath $promptFile)) {
+        Write-Error "agyp: prompt not found at $promptFile"
+        return
+    }
+    $prompt = Get-Content -LiteralPath $promptFile -Raw
+    & agy -i ($prompt + "`n`n" + ($Rest -join ' '))
+}
+
 # AI provider endpoints -- NaN community (primary, OpenAI-compatible).
 # API key in $env:NAN_API_KEY -- injected on demand via `dotf secrets run` (wrappers below), not the ambient session.
 $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
@@ -114,11 +139,11 @@ function project-init {
 }
 
 # PowerShell resolves commands Alias -> Function -> Cmdlet -> Application, so a
-# built-in alias silently makes a same-named function unreachable — no parse
+# built-in alias silently makes a same-named function unreachable - no parse
 # error, no warning, the function is just dead (BUG-034). The four names below
 # carry over from .zsh/aliases.zsh, where they already mean exactly this;
 # cross-OS parity is the point of this profile, so clear the built-ins rather
-# than rename out of the collision. Only the *alias* is given up — each cmdlet
+# than rename out of the collision. Only the *alias* is given up - each cmdlet
 # stays reachable under its full name:
 #   gp  -> Get-ItemProperty     gl  -> Get-Location
 #   gcs -> Get-PSCallStack      gbp -> Get-PSBreakpoint
@@ -174,8 +199,9 @@ if (Get-Command eza -ErrorAction SilentlyContinue) {
 # ============================================================================
 # PATH AUGMENTATION (informational - actual PATH is set by setup script)
 # ============================================================================
-# The setup-windows.ps1 script adds ~/scripts to PATH at User level.
-# This ensures user scripts (hooks, helpers) are available globally.
+# The setup-windows.ps1 script adds ~\.dotfiles\scripts (the env contract's
+# SCRIPTS_DIR, WIN-013) to PATH at User level, so the deployed scripts (hooks,
+# helpers) are available globally; ~\scripts is the retired legacy location.
 
 # ============================================================================
 # PROMPT CUSTOMIZATION (optional)

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-058-env-persist-f1",
+    "behavior": "AC1/AC2: Persist writes only what differs and a second run writes nothing; Drift names missing and different values; store errors name the variable",
+    "verification": "cd cli && go test ./internal/env/ -run 'TestPersist|TestDrift'",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (Persist writes everything) fails TestPersist_TouchesOnlyWhatDiffers"
+  },
+  {
+    "id": "CLI-058-env-persist-f2",
+    "behavior": "AC4: dotf doctor reports the persisted scope by status (PASS / WARN naming the variables / WARN unreadable / no section without a seam)",
+    "verification": "grep -q 'checkPersistedEnv(sys, cfg, rep)' cli/internal/doctor/doctor.go && cd cli && go test ./internal/doctor/ -run TestCheckPersistedEnv_ByStatus",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28; mutation (Drift never reports) fails the WARN rows"
+  },
+  {
+    "id": "CLI-058-env-persist-f3",
+    "behavior": "AC5: setup-windows.ps1 runs dotf env persist after dotf env generate",
+    "verification": "bats tests/setup-windows.bats -f 'CLI-058'",
+    "state": "verified",
+    "evidence": "ok on the Windows work box 2026-08-28"
+  },
+  {
+    "id": "CLI-058-env-persist-f4",
+    "behavior": "AC3/AC6 (box): persist is idempotent, --check agrees, and a process built from the registry environment sees the variables",
+    "verification": "dotf env persist --check && dotf env persist | grep -q '0 changed'",
+    "state": "verified",
+    "evidence": "see verification.md (Windows work box 2026-08-28)"
+  }
+]

@@ -15,7 +15,9 @@ import (
 // If the vault was synced within this window, a missing item is considered a
 // genuine absence (FAIL). If the vault has not been synced or is older than
 // this window, doctor emits a WARN indicating the item was not found in the
-// local cache and advising a `dotf secrets sync`.
+// local cache and advising a `dotf secrets unlock`, which syncs the daemon's
+// cache (CLI-056). The remedy used to name `dotf secrets sync`, which
+// materializes CI secrets and refreshes no cache at all.
 const bwMappingStaleSync = 24 * time.Hour
 
 // checkBWMapping asserts that every Bitwarden item the registry names actually
@@ -104,12 +106,12 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 				item, strings.Join(ids, ", ")))
 		} else if lastSync.IsZero() {
 			rep.Warn(fmt.Sprintf(
-				"%s: not found in local vault cache (never synced), named by %s — run `dotf secrets sync` to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
+				"%s: not found in local vault cache (never synced), named by %s — run `dotf secrets unlock` (syncs the daemon's cache) to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
 				item, strings.Join(ids, ", ")))
 		} else {
 			age := sys.Now().Sub(lastSync).Round(time.Minute)
 			rep.Warn(fmt.Sprintf(
-				"%s: not found in local vault cache (last synced %s ago), named by %s — run `dotf secrets sync` to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
+				"%s: not found in local vault cache (last synced %s ago), named by %s — run `dotf secrets unlock` (syncs the daemon's cache) to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
 				item, age, strings.Join(ids, ", ")))
 		}
 	}

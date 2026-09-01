@@ -76,7 +76,12 @@ $DotfilesDir = $PSScriptRoot
 $DotfilesDest = "$env:USERPROFILE\.dotfiles"
 $ClaudeHome = "$env:USERPROFILE\.claude"
 $GeminiHome = "$env:USERPROFILE\.gemini"
-$ScriptsDir = "$env:USERPROFILE\scripts"
+# SCRIPTS_DIR per env-contract.json: under the deploy dir, the same shape as
+# Linux ($HOME/.dotfiles/scripts) and what dotf doctor's contract check, the
+# profile fallback and required_path_entries all expect (WIN-013, #1310). The
+# pre-contract location is kept only to be cleaned.
+$ScriptsDir = "$DotfilesDest\scripts"
+$LegacyScriptsDir = "$env:USERPROFILE\scripts"
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -370,7 +375,8 @@ if ($wingetCmd) {
         @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
         @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
         @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
-        @{ Name = "GitHub Copilot CLI"; Cmd = "copilot"; Id = "GitHub.Copilot" },
+        # copilot left this list for packages.json (npm on every OS, AI-038/#1321,
+        # ADR-036): `dotf tools install` below converges it, pin as floor.
         # Node.js is the prerequisite of the npm channel (ADR-036 class 3: no
         # cross-OS channel, so winget here, nvm on Linux). It must exist before
         # `dotf tools install` runs below, or bw and opencode cannot install on
@@ -410,6 +416,48 @@ if ($wingetCmd) {
 }
 
 # ============================================================================
+# 1d. AGENT BINARIES WITH AN OFFICIAL INSTALLER (AI-041, #1325)
+# ============================================================================
+# setup-linux.sh has installed Claude Code (claude.ai/install.sh) and the
+# Antigravity CLI (antigravity.google/cli/install.sh) since ADR-009; Windows
+# never did, so on a clean box every block below that gates on `claude` (MCP
+# registration, plugins, both session hooks) and the agy config deploy were
+# dead until a human installed the binaries by hand. Both vendors ship a
+# Windows installer (install.ps1); ADR-036 class 3 (official installer on every
+# OS, like uv), run in a child pwsh exactly as the uv/Bun installers are, and
+# skipped when the binary is already on PATH - the pattern-setup-script-
+# idempotence shape of the Linux blocks.
+function Install-AgentBinary {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Command,
+        [Parameter(Mandatory)][string]$InstallerUrl,
+        [Parameter(Mandatory)][string]$BinDir
+    )
+    if (Get-Command $Command -ErrorAction SilentlyContinue) {
+        Write-Info "$Name already installed"
+        return
+    }
+    Write-Info "Installing $Name via official installer..."
+    $installer = Join-Path $env:TEMP ("$Command-install.ps1")
+    try {
+        Invoke-RestMethod $InstallerUrl -OutFile $installer
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $installer 2>$null
+        Remove-Item -Path $installer -Force -ErrorAction SilentlyContinue
+        if (($env:PATH -split ';') -notcontains $BinDir) { $env:PATH = "$BinDir;$env:PATH" }
+        if (Get-Command $Command -ErrorAction SilentlyContinue) {
+            Write-Success "$Name installed"
+        } else {
+            Write-Warn "$Name installer ran but '$Command' is not on PATH -- open a new shell or install manually ($InstallerUrl)"
+        }
+    } catch {
+        Write-Warn "$Name install failed -- re-run setup or install manually ($InstallerUrl): $_"
+    }
+}
+Install-AgentBinary -Name "Claude Code" -Command "claude" -InstallerUrl "https://claude.ai/install.ps1" -BinDir "$env:USERPROFILE\.local\bin"
+Install-AgentBinary -Name "Antigravity CLI (agy)" -Command "agy" -InstallerUrl "https://antigravity.google/cli/install.ps1" -BinDir "$env:LOCALAPPDATA\agy\bin"
+
+# ============================================================================
 # 2. DEPLOY CLAUDE CONFIGURATION
 # ============================================================================
 
@@ -443,7 +491,41 @@ if (Test-Path $claudeMdSource) {
 # skill's targets[].
 Ensure-Directory "$ClaudeHome\skills"
 
-# Register MCP servers (requires Claude Code CLI, Node.js)
+# uv (provides uvx) is installed HERE, before the MCP registration below,
+# because hive-vault and pdf-modifier are `uvx` servers: registered after
+# the installer (its old place, section 4) a clean box's first run skipped
+# both with "prerequisite 'uv' not found" and only the second run
+# converged -- measured on the CI runner the day Claude Code first installed
+# there (OPS-044, #1361). Linux has always installed uv first. poetry stays
+# in section 4; it only needs uv to exist, which it now does.
+# Install uv (Python package manager -- provides uvx)
+$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+if (-not $uvCmd) {
+    Write-Info "Installing uv..."
+    try {
+        $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
+        Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
+        # A child process, never dot-sourced or run in this session: a remote
+        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
+        # runner lost npm right after these two (TEST-003/#1298).
+        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
+        Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
+        # Refresh PATH for current session
+        $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+        if ($uvCmd) {
+            Write-Success "uv installed"
+        } else {
+            Write-Warn "uv installation failed"
+        }
+    } catch {
+        Write-Warn "Failed to install uv: $_"
+    }
+} else {
+    Write-Info "uv already installed"
+}
+
+# Register MCP servers (requires Claude Code CLI, Node.js, uv for the uvx servers)
 # Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
 # `claude mcp get` is used to skip already-registered entries, and `add` errors
 # are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
@@ -527,7 +609,7 @@ if (-not ($claudeCmd -and $npxCmd)) {
 }
 
 # dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
-# (user-space, no admin) — the PowerShell twin of setup-linux.sh sourcing
+# (user-space, no admin) - the PowerShell twin of setup-linux.sh sourcing
 # install-dotf.sh. goreleaser already publishes the Windows zip, so nothing is
 # compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
 # automatically; non-fatal, like the Linux side (`install_dotf || log_warning`).
@@ -578,7 +660,7 @@ if (Test-Path $sensitiveSource) {
     Write-Warn "Sensitive directory not found at $sensitiveSource"
 }
 
-# Deploy the secrets registry (ADR-028 §2 mapping SSOT). dotf secrets reads it
+# Deploy the secrets registry (ADR-028 section 2 mapping SSOT). dotf secrets reads it
 # from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
 # and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
 $registrySource = "$DotfilesDir\secrets\registry.yaml"
@@ -606,7 +688,7 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 }
 
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
-# tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
+# tools (currently sops) into ~/.local/bin via dotf - the same deterministic pattern
 # as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
 # offline box or a single failed download must not abort setup (parity with the
 # Install-Dotf warning above). Guarded on dotf being on PATH, mirroring the env
@@ -843,7 +925,7 @@ if (Test-Path $claudeSettings) {
 # Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
 # Scans both 10_projects/ and 50_work/ for memory directories.
 # VaultRoot honors the ADR-025 seam ($env:VAULT_PATH, set by the sourced
-# paths.ps1) with the legacy default as fallback — parity with setup-linux.sh.
+# paths.ps1) with the legacy default as fallback - parity with setup-linux.sh.
 $VaultRoot = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE "Projects\knowledge" }
 $VaultProjects = Join-Path $VaultRoot "10_projects"
 if (Test-Path $VaultRoot) {
@@ -946,33 +1028,6 @@ if (Test-Path $VaultRoot) {
 # OpenCode integration on Windows is a separate follow-up (admin-conditional,
 # not automated here).
 
-# Install uv (Python package manager -- provides uvx)
-$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-if (-not $uvCmd) {
-    Write-Info "Installing uv..."
-    try {
-        $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
-        Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
-        # A child process, never dot-sourced or run in this session: a remote
-        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
-        # runner lost npm right after these two (TEST-003/#1298).
-        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
-        Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
-        # Refresh PATH for current session
-        $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
-        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-        if ($uvCmd) {
-            Write-Success "uv installed"
-        } else {
-            Write-Warn "uv installation failed"
-        }
-    } catch {
-        Write-Warn "Failed to install uv: $_"
-    }
-} else {
-    Write-Info "uv already installed"
-}
-
 # Install poetry via uv
 $poetryCmd = Get-Command poetry -ErrorAction SilentlyContinue
 if (-not $poetryCmd) {
@@ -1016,47 +1071,11 @@ if (-not $bunCmd) {
     Write-Info "Bun already installed"
 }
 
-# What the rest of setup will see. The npm-driven blocks below (Obsidian CLI,
-# yarn, pi) each skip silently when npm is missing; naming the state here
+# What the rest of setup will see. The npm-driven pi block below skips silently
+# when npm is missing (obsidian and yarn moved to packages.json, OPS-042); naming the state here
 # turns "npm not available" into a finding with a cause.
 $npmSeen = Get-Command npm -ErrorAction SilentlyContinue
 Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
-
-# ============================================================================
-# 2c. OBSIDIAN CLI (BUG-013)
-# ============================================================================
-# @vorillaz/obsidian-cli provides the `obsidian` binary used by obs-cli.ps1 and
-# the vault-health workflow. npm global install writes to %APPDATA%\npm
-# (user-writable, no admin). Idempotent: skip if `obsidian` already on PATH.
-# Guarded on `npm` availability so machines without Node.js gracefully skip.
-
-$obsidianCmd = Get-Command obsidian -ErrorAction SilentlyContinue
-if (-not $obsidianCmd) {
-    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-    if ($npmCmd) {
-        Write-Info "Installing Obsidian CLI (@vorillaz/obsidian-cli) via npm..."
-        try {
-            & npm install -g 'obsidian-cli' 2>$null | Out-Null
-            # Refresh PATH so the freshly-installed binary is visible in this
-            # session (same trick as the winget block in section 1c).
-            # Same helper as the refresh after the winget loop: the registry-only
-            # rebuild this replaces dropped the runner's toolcache node, so "npm
-            # not available, skipping pi install" followed it (TEST-003/#1298).
-            Sync-SessionPath
-            if (Get-Command obsidian -ErrorAction SilentlyContinue) {
-                Write-Success "Obsidian CLI installed"
-            } else {
-                Write-Warn "Obsidian CLI install completed but binary not on PATH (restart shell)"
-            }
-        } catch {
-            Write-Warn "Failed to install Obsidian CLI: $_"
-        }
-    } else {
-        Write-Warn "npm not available, skipping Obsidian CLI install (install Node.js then re-run)"
-    }
-} else {
-    Write-Info "Obsidian CLI already installed at $($obsidianCmd.Source)"
-}
 
 # ============================================================================
 # 2d. OPENCODE CONFIG + COMMANDS (AI-014)
@@ -1120,43 +1139,6 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
 }
 
 # ============================================================================
-# 2d-bis. YARN (npm-pinned global install, TERM-002 companion)
-# ============================================================================
-# Guarded on npm (same convention as pi). Reconcile-not-skip on version drift.
-$yarnVersion = $null
-if (Test-Path -LiteralPath $versionsSource) {
-    foreach ($line in Get-Content -LiteralPath $versionsSource) {
-        if ($line -match '^\s*YARN_VERSION\s*=\s*(.+?)\s*$') {
-            $yarnVersion = $Matches[1].Trim().Trim('"').Trim("'")
-            break
-        }
-    }
-}
-if (Get-Command npm -ErrorAction SilentlyContinue) {
-    $yarnPkg = if ($yarnVersion) { "yarn@$yarnVersion" } else { "yarn" }
-    if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
-        Write-Info "Installing yarn ($yarnPkg) via npm..."
-        & npm install -g $yarnPkg 2>$null | Out-Null
-        if (Get-Command yarn -ErrorAction SilentlyContinue) {
-            Write-Success "yarn installed: $(& yarn --version 2>$null)"
-        } else {
-            Write-Warn "yarn install failed - run: npm install -g $yarnPkg"
-        }
-    } else {
-        $yarnInstalled = (& yarn --version 2>$null | Select-Object -First 1)
-        if ($yarnVersion -and -not (Test-VersionAtLeast $yarnInstalled $yarnVersion)) {
-            Write-Info "yarn $yarnInstalled below pinned minimum $yarnVersion - upgrading..."
-            & npm install -g $yarnPkg 2>$null | Out-Null
-            Write-Success "yarn upgraded to $yarnVersion"
-        } else {
-            Write-Info "yarn already installed: $yarnInstalled"
-        }
-    }
-} else {
-    Write-Warn "npm not available, skipping yarn install (install Node.js then re-run)"
-}
-
-# ============================================================================
 # 2e. PI CODING AGENT CONFIG (AI-025)
 # ============================================================================
 # Mirror of the opencode block + setup-linux.sh pi deploy so the two agents are
@@ -1185,7 +1167,7 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
             Write-Warn "pi install failed - run: npm install -g --ignore-scripts $piPkg"
         }
     } else {
-        # REFACTOR-013: pin is a MINIMUM — upgrade only when installed < pin so
+        # REFACTOR-013: pin is a MINIMUM - upgrade only when installed < pin so
         # a newer pi is never downgraded by an exact-match reconcile.
         $piVerRaw = (& pi --version 2>&1 | Out-String)
         $piCurrent = if ($piVerRaw -match '(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
@@ -1206,17 +1188,21 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 }
 Ensure-Directory $piAgentDir
 
-# pi's models.json is deployed by `dotf deploy` (CLI-039): one implementation for
-# every OS, replacing the copy that lived here and its twin in setup-linux.sh.
-# ADR-020 C7 keeps this script on the thin bootstrap; staging, rendering,
-# comparing and installing a config is tooling logic and belongs in the CLI.
+# Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
+# every OS, replacing the per-config copies that lived here and their twins in
+# setup-linux.sh. ADR-020 C7 keeps this script on the thin bootstrap; staging,
+# rendering, comparing and installing a config is tooling logic and belongs in
+# the CLI. The call names NO config: bare `dotf deploy` installs every entry
+# ai/deploy.json declares, so a new entry is a manifest edit and not a change to
+# two setup scripts -- `dotf deploy pi` left orca-keybindings declared and never
+# installed (CLI-054, #1301).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    & dotf deploy pi
+    & dotf deploy
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "dotf deploy pi failed -- run it again after setup, or see 'dotf doctor'"
+        Write-Warn "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
     }
 } else {
-    Write-Warn "dotf not on PATH -- skipping pi config deploy (run install-dotf.ps1, then 'dotf deploy pi')"
+    Write-Warn "dotf not on PATH -- skipping agent config deploy (run install-dotf.ps1, then 'dotf deploy')"
 }
 
 $piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'
@@ -1403,12 +1389,9 @@ $env:ANTIGRAVITY_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 $env:CLOUDCODE_URL = "https://cloudcode-pa.googleapis.com"
 $env:GEMINI_DIR = "$GeminiHome"
 
-# 1. Deploy agy settings.json (SDD-007: no legacy Gemini-CLI compat write)
-$agySettingsSrc = "$DotfilesDir\ai\agy\settings.json"
-if (Test-Path $agySettingsSrc) {
-    Copy-Item $agySettingsSrc "$AgyAppData\settings.json" -Force
-    Write-Success "Deployed agy settings.json"
-}
+# 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
+#    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
+#    which a verbatim copy could not do (SDD-007: no legacy Gemini-CLI write).
 
 # Deploy .geminiignore
 $geminiIgnoreSrc = "$DotfilesDir\.geminiignore"
@@ -1438,7 +1421,7 @@ if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq
     # expand env vars inside JSON values, so substitution must happen here
     # before write. The path itself is by convention: $USERPROFILE\Projects\knowledge.
     # ADR-025: honor $env:VAULT_PATH (the cross-machine seam) before the legacy
-    # default — parity with setup-linux.sh:402 ${VAULT_PATH:-...}.
+    # default - parity with setup-linux.sh:402 ${VAULT_PATH:-...}.
     $vaultPath = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
     $hiveEntry = $mcpConfigJson.mcpServers."hive-vault"
     if ($hiveEntry -and $hiveEntry.env.PSObject.Properties['VAULT_PATH']) {
@@ -1572,7 +1555,7 @@ if (Test-Path $profileSource) {
             if ($existingContent -match [regex]::Escape($startMarker)) {
                 # Replace existing section using index-based split (BUG-022:
                 # PowerShell -replace with [\s\S]*? expands large strings
-                # instead of replacing — see debug-replace*.ps1 traces).
+                # instead of replacing - see debug-replace*.ps1 traces).
                 $newSection = "$startMarker`r`n$sourceContent`r`n$endMarker"
                 $markerIdx = $existingContent.IndexOf($startMarker)
                 $endIdx = $existingContent.IndexOf($endMarker, $markerIdx)
@@ -1695,11 +1678,52 @@ foreach ($initOrphan in @(
     if (Test-Path $initOrphan) { Remove-Item $initOrphan -Force -ErrorAction SilentlyContinue }
 }
 
-# CLI-050: knowledge-crystallize.ps1 retired — `dotf vault crystallize` is the
+# CLI-050: knowledge-crystallize.ps1 retired - `dotf vault crystallize` is the
 # sole implementation now, and it needs no per-machine deploy step since it
 # ships inside the dotf binary itself.
 
-# CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired — both session
+# WIN-013 (#1310): every script this section deploys now lands in $ScriptsDir
+# (the contract's ~\.dotfiles\scripts). Two kinds of leftovers are removed on
+# every run, idempotently: scripts retired by earlier tickets (measured still
+# present on a real box on 2026-08-27), from both locations; and the live
+# scripts' copies in the pre-contract ~\scripts, which would otherwise shadow
+# nothing today but drift the day one of them changes. The legacy directory
+# itself and the User PATH entry that names it are left alone: pruning a User
+# PATH entry is the 2048-char hazard #148 warned about, and the directory may
+# hold the user's own scripts.
+# MEM-002: claude-mem-heal.ps1 is in this removal list on purpose (the guard
+# tests/guard-no-claude-mem.bats strips MEM-002 cleanup blocks before scanning).
+$retiredScripts = @(
+    "claude-mem-heal.ps1", "claude-session-start.ps1", "diff-check.ps1",
+    "doctor.ps1", "healthcheck.ps1", "knowledge-crystallize.ps1",
+    "session-handoff.ps1", "orca-hook-tune.ps1")
+$deployedScripts = @(
+    "profile-heal.ps1", "windows-defaults.ps1",
+    "dotfiles-sync.ps1", "obs-cli.ps1")
+$removedLeftovers = 0
+foreach ($dir in @($ScriptsDir, $LegacyScriptsDir) | Select-Object -Unique) {
+    foreach ($name in $retiredScripts) {
+        $leftover = Join-Path $dir $name
+        if (Test-Path -LiteralPath $leftover) {
+            Remove-Item -LiteralPath $leftover -Force -ErrorAction SilentlyContinue
+            $removedLeftovers++
+        }
+    }
+}
+if ($LegacyScriptsDir -ne $ScriptsDir) {
+    foreach ($name in $deployedScripts) {
+        $stale = Join-Path $LegacyScriptsDir $name
+        if (Test-Path -LiteralPath $stale) {
+            Remove-Item -LiteralPath $stale -Force -ErrorAction SilentlyContinue
+            $removedLeftovers++
+        }
+    }
+}
+if ($removedLeftovers -gt 0) {
+    Write-Info "Removed $removedLeftovers retired or relocated script(s) from $ScriptsDir / $LegacyScriptsDir (WIN-013)"
+}
+
+# CLI-025: claude-session-start.ps1 + session-handoff.ps1 retired - both session
 # hooks now call agnostic `dotf mem` nouns directly (registered below), so there
 # is no per-OS shim script left to deploy.
 
@@ -1713,22 +1737,21 @@ if (Test-Path $profileHealSource) {
     Write-Warn "profile-heal.ps1 not found at $profileHealSource"
 }
 
-# DX-006: deploy + re-apply the Orca/Copilot PreToolUse hook fix. Orca regenerates
+# DX-006: re-apply the Orca/Copilot PreToolUse hook fix. Orca regenerates
 # ~/.copilot/hooks/orca.json and ~/.orca/agent-hooks/copilot-hook.ps1 on every
 # install/upgrade, reverting the fix (timeoutSec 5 + slow Invoke-WebRequest) and
-# making every Copilot tool call fail with "hook errored". The script is idempotent
-# and skips cleanly when Orca is not installed, so it is always safe to run.
-$orcaHookTuneSource = "$DotfilesDir\scripts\orca-hook-tune.ps1"
-if (Test-Path $orcaHookTuneSource) {
-    Copy-Item $orcaHookTuneSource "$ScriptsDir\" -Force
-    Write-Success "Deployed orca-hook-tune.ps1 to $ScriptsDir\"
-    try {
-        & "$ScriptsDir\orca-hook-tune.ps1"
-    } catch {
-        Write-Warn "orca-hook-tune.ps1 failed: $($_.Exception.Message)"
+# making every Copilot tool call fail with "hook errored". `dotf orca tune-hooks`
+# (CLI-062, the port of orca-hook-tune.ps1) is idempotent and reports "nothing to
+# do" when Orca is not installed, so it is always safe to run.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    & dotf orca tune-hooks
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Orca Copilot hooks tuned (dotf orca tune-hooks)"
+    } else {
+        Write-Warn "dotf orca tune-hooks failed (exit $LASTEXITCODE) -- run it again after setup"
     }
 } else {
-    Write-Warn "orca-hook-tune.ps1 not found at $orcaHookTuneSource"
+    Write-Warn "dotf not on PATH -- skipping the Orca hook fix (run install-dotf.ps1, then 'dotf orca tune-hooks')"
 }
 
 # WIN-005: deploy the HKCU engineering-defaults script (invoked opt-in below).
@@ -1771,6 +1794,17 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
         if (Test-Path $pathsFile) { . $pathsFile }
     } else {
         Write-Warn "dotf env generate failed (profile.ps1 falls back to inline defaults)"
+    }
+    # The same values at User scope (HKCU\Environment): paths.ps1 only reaches
+    # shells that load the profile, and Copilot runs its tool calls with
+    # -NoProfile, so DOTFILES_REPO_DIR/DOTFILES_DIR/VAULT_PATH were empty there
+    # and dotf could not find the checkout (CLI-058, #1324). Idempotent: only
+    # values that differ are written.
+    dotf env persist | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Persisted the contract variables at User scope (dotf env persist)"
+    } else {
+        Write-Warn "dotf env persist failed (profile-less processes will not see the contract variables)"
     }
 }
 
@@ -1839,10 +1873,11 @@ if (-not $dotfPath) {
 
 Write-Info "Setting up GitHub Copilot CLI..."
 
-# BUG-003: detect the new standalone `copilot` CLI (winget GitHub.Copilot,
-# agentic interface, closer to Claude Code than to the legacy gh-copilot
-# extension's suggest/explain wrappers). The dev tools winget block above
-# auto-installs it; this block deploys config when the binary is on PATH.
+# BUG-003: detect the new standalone `copilot` CLI (agentic interface, closer
+# to Claude Code than to the legacy gh-copilot extension's suggest/explain
+# wrappers). Since AI-038 (#1321, ADR-036) it is an npm catalog tool that
+# `dotf tools install` above converges on every OS; this block only deploys
+# config when the binary is on PATH.
 # Note: AWS Copilot CLI (Amazon.CopilotCLI) also exposes itself as `copilot`.
 # If both are installed, Get-Command resolves to the first on PATH. Out-of-
 # scope to disambiguate here; <1% population.
@@ -1854,7 +1889,11 @@ if ($copilotCmd) {
 
     $copilotSource = "$DotfilesDir\ai\copilot"
     if (Test-Path $copilotSource) {
-        Copy-Item "$copilotSource\*" "$CopilotHome\" -Recurse -Force -ErrorAction SilentlyContinue
+        # Only the instructions file is copied here. settings.json, config.json
+        # and mcp-config.json are `dotf deploy` entries (ai/deploy.json,
+        # AI-039/#1322): the first two by MERGE, because the CLI writes both
+        # files itself and a verbatim copy wiped the box's own keys.
+        Copy-Item "$copilotSource\copilot-instructions.md" "$CopilotHome\copilot-instructions.md" -Force -ErrorAction SilentlyContinue
         if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
             (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet)) {
             Write-Success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
@@ -1865,7 +1904,7 @@ if ($copilotCmd) {
 
     Write-Success "GitHub Copilot CLI configured (aliases cop/cops in profile.ps1)"
 } else {
-    Write-Info "GitHub Copilot CLI not installed; the dev tools block above attempts auto-install via winget GitHub.Copilot. Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
+    Write-Info "GitHub Copilot CLI not installed; 'dotf tools install' above converges it from packages.json (npm). Re-run setup or open a new shell if the binary was just installed and PATH needs refresh."
 }
 
 # SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.
@@ -1910,6 +1949,31 @@ function Get-SkillField {
     return ''
 }
 
+# One frontmatter key line's fate, as a pure decision: $true keeps the line and
+# every continuation line under it, $false drops both. This is the twin of the
+# awk rule in render_skill (scripts/compile-harness.sh), and a bats parity test
+# compares the two allowlists textually, so an edit here that is not mirrored
+# there fails loudly instead of quietly deploying a skill the other OS drops.
+#
+# -cmatch, not -match: PowerShell's -match is case-insensitive by default, and
+# bash's grep/awk are not, so a faithful mirror needs the case-sensitive
+# operator.
+function Test-SkillFrontmatterKeyKept {
+    param([string]$Line, [string]$Kind)
+    # A command carries its name in its filename, not its frontmatter.
+    if ($Kind -eq 'command' -and $Line -cmatch '^name:') { return $false }
+    # The record (HARNESS-069) already carries its own generated_* fields,
+    # describing its relationship to the vault. Strip them here so deploy
+    # injects one fresh set, describing the deploy target's relationship to the
+    # record, instead of stacking a second set on top.
+    if ($Line -cmatch '^generated(_from|_sha)?:') { return $false }
+    # Native skill execution fields recognized by agent runtimes (Claude Code, AGY, OpenCode, Copilot)
+    if ($Line -cmatch '^(name|description|allowed-tools|when_to_use|model|effort|context|argument-hint|arguments|user-invocable|disable-model-invocation):') { return $true }
+    # Drop neutral/store-only keys (id, type, status, created, owner, paths, keywords, requires, targets, source, license, etc.)
+    # In particular, dropping `paths:` ensures Claude Code discovers skills as unconditional at session start.
+    return $false
+}
+
 # The injected generated_* fields are deliberately dual-referent, not a
 # single "where did this come from" answer (HARNESS-069): generated_from is
 # always the vault path in $SrcPath -- where a human edits, the SSOT -- while
@@ -1927,6 +1991,7 @@ function Convert-SkillRecord {
         return "<!-- generated: true; from: $SrcPath; sha256:$sha; edit the vault source + re-run setup -->`n`n" + $body.Trim()
     }
     $fm = 0
+    $keep = $false
     $out = New-Object System.Collections.Generic.List[string]
     foreach ($line in Get-Content -LiteralPath $RecordMd) {
         if ($line -match '^---\s*$') {
@@ -1939,16 +2004,19 @@ function Convert-SkillRecord {
             }
             continue
         }
-        if ($fm -eq 1 -and $Kind -eq 'command' -and $line -match '^name:') { continue }
-        # The record (HARNESS-069) already carries its own generated_* fields,
-        # describing its relationship to the vault. Strip them here so deploy
-        # injects one fresh set, describing the deploy target's relationship
-        # to the record, instead of stacking a second set on top. Mirrors
-        # render_skill's awk rule in scripts/compile-harness.sh exactly.
-        # -cmatch, not -match: PowerShell's -match is case-insensitive by
-        # default, and bash's grep/awk are not — a faithful mirror needs the
-        # case-sensitive operator.
-        if ($fm -eq 1 -and $line -cmatch '^generated(_from|_sha)?:') { continue }
+        if ($fm -eq 1) {
+            # A key line decides its own fate and that of the continuation
+            # lines under it: dropping `paths:` while keeping its indented list
+            # items would emit YAML no reader accepts. The flag therefore
+            # survives across lines, and starts false, so anything before the
+            # first key (a comment, say) is dropped -- which is what the awk
+            # twin does with its uninitialised keep.
+            if ($line -cmatch '^[a-zA-Z0-9_-]+:') {
+                $keep = Test-SkillFrontmatterKeyKept -Line $line -Kind $Kind
+            }
+            if ($keep) { $out.Add($line) }
+            continue
+        }
         $out.Add($line)
     }
     return ($out -join "`n")
@@ -2079,6 +2147,20 @@ function Deploy-SkillRecord {
 }
 
 Deploy-SkillRecord -DotfilesDir $DotfilesDir
+
+# Agent presence (HARNESS-092, #1326): the forced-skills roster every harness
+# instructions file carries between AGENT-PRESENCE markers. Linux gets it from
+# compile-harness.sh --deploy, which delegates to this same verb; Windows had
+# no port, so no harness on this OS was ever told what a persona MUST consume.
+# Runs after the base files (CLAUDE.md, AGENTS.md, copilot-instructions.md) and
+# the skill records are in place; a target file that is absent is skipped and
+# said so.
+& dotf harness presence --repo-root $DotfilesDir
+if ($LASTEXITCODE -eq 0) {
+    Write-Success "Agent presence injected into the harness instructions files (dotf harness presence)"
+} else {
+    Write-Warn "dotf harness presence failed (no harness is told which skills a persona forces; see 'dotf doctor')"
+}
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
 # Self-healing: compare existing action arguments against expected and rewrite

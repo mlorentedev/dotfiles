@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-105-f1",
+    "behavior": "shellsafe.Bash and shellsafe.PowerShell are implemented and have 100% unit test coverage.",
+    "verification": "cd cli && go test -coverprofile=coverage.out ./internal/shellsafe && go tool cover -func=coverage.out",
+    "state": "passing",
+    "evidence": "ok  \tgithub.com/mlorentedev/dotfiles/cli/internal/shellsafe\t0.003s\tcoverage: 100.0% of statements"
+  },
+  {
+    "id": "HARNESS-105-f2",
+    "behavior": "Ad-hoc replacements are replaced by shellsafe functions.",
+    "verification": "cd cli && ! grep -rn 'strings.ReplaceAll.*'\\''$' ./internal/spec/review_launch.go",
+    "state": "passing",
+    "evidence": "Exit code 0 (no output)"
+  },
+  {
+    "id": "HARNESS-105-f3",
+    "behavior": "A TerminalFailure error type exists.",
+    "verification": "cd cli && go test -v ./internal/errors",
+    "state": "passing",
+    "evidence": "PASS: TestTerminalFailure"
+  },
+  {
+    "id": "HARNESS-105-f4",
+    "behavior": "TerminalFailure is correctly handled by the CLI's main execution.",
+    "verification": "cd cli && go test -v ./cmd/dotf",
+    "state": "passing",
+    "evidence": "PASS: TestRunTerminalFailure"
+  }
+]

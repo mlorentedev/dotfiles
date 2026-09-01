@@ -49,9 +49,9 @@ setup() {
     grep -qE '\.(Length|Size)\s+-gt\s+1MB|Size\s+-gt\s+1MB' "$PS1_SCRIPT"
 }
 
-@test "profile-heal.ps1 detects marker-count corruption (> 2 of either marker)" {
+@test "profile-heal.ps1 detects marker-count corruption (> 1 of either marker)" {
     grep -qE 'markerCount|MarkerCount|StartMatches|EndMatches|StartMarkers|EndMarkers' "$PS1_SCRIPT"
-    grep -qE -- '-gt\s+2' "$PS1_SCRIPT"
+    grep -qE -- '-gt\s+1' "$PS1_SCRIPT"
 }
 
 @test "profile-heal.ps1 detects parser errors as a corruption signal" {
@@ -125,4 +125,12 @@ setup() {
     # in place is the Linux side of this contract.
     grep -qE 'deploy_file\s+"\$DOTFILES_DIR/\.bashrc"\s+"\$HOME/\.bashrc"' "$DOTFILES_DIR/setup-linux.sh"
     grep -qE 'deploy_file\s+"\$DOTFILES_DIR/\.zshrc"\s+"\$HOME/\.zshrc"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# CLI-066 (#1364): dotf doctor --fix passes the file it measured, so the script
+# takes -ProfilePath and defaults to this host's $PROFILE without it — detect
+# and heal agree on a box whose Documents folder is redirected.
+@test "profile-heal.ps1 takes -ProfilePath and defaults to \$PROFILE without it" {
+    grep -qF "[string]\$ProfilePath = ''" "$PS1_SCRIPT"
+    grep -qF '$profilePath = if ($ProfilePath) { $ProfilePath } else { $PROFILE }' "$PS1_SCRIPT"
 }

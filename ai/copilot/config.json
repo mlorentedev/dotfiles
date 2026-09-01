@@ -1,15 +1,8 @@
 {
-  "model": "gpt-5.6-sol",
-  "includeCoAuthoredBy": false,
   "trustedFolders": [
-    "/home/manu/Projects",
-    "/home/manu/Projects/*",
-    "C:\\Users\\mlorente\\Projects",
-    "C:\\Users\\mlorente\\Projects\\*",
-    "C:\\Users\\mlorente\\Projects\\Workspace",
-    "C:\\Users\\mlorente\\Projects\\Workspace\\*"
-  ],
-  "telemetry": {
-    "disabled": true
-  }
+    "{HOME}/Projects",
+    "{HOME}/Projects/*",
+    "{HOME}/Projects/Workspace",
+    "{HOME}/Projects/Workspace/*"
+  ]
 }

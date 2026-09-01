@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
 
 // bwDaemonAddr is the bw serve lifecycle seam unlock/lock/doctor share,
 // overridable so their tests never spawn a real bw process or touch a real
-// terminal — the daemon analog of bwReader/bwWriter.
+// terminal — the daemon analog of bwReader/bwWriter. The daemon's trace (log
+// + pid, #1315) lands under the deploy dir resolved the same way doctor
+// resolves cfg.DotfilesDir, so the writer here and the reader there agree.
 var bwDaemonAddr = func() *secrets.BWServeDaemon {
-	return &secrets.BWServeDaemon{Client: secrets.BWServeClient{}}
+	return &secrets.BWServeDaemon{
+		Client: secrets.BWServeClient{},
+		State:  secrets.NewBWServeState(env.DotfilesDir(env.Home())),
+	}
 }
 
 // newSecretsUnlockCmd is CLI-024-secrets-bw-serve's AC1/AC6: unlock Bitwarden
@@ -43,8 +49,7 @@ func newSecretsUnlockCmd() *cobra.Command {
 				return err
 			}
 			if st == "unlocked" {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "already unlocked")
-				return nil
+				return reportSynced(cmd, d, "already unlocked")
 			}
 			_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Bitwarden master password: ")
 			pw, err := readPassword()
@@ -56,13 +61,32 @@ func newSecretsUnlockCmd() *cobra.Command {
 			if err := d.Unlock(string(pw)); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "unlocked")
-			return nil
+			return reportSynced(cmd, d, "unlocked")
 		},
 	}
 	c.Flags().DurationVar(&startTimeout, "start-timeout", 15*time.Second,
 		"how long to wait for the daemon to become reachable after starting it")
 	return c
+}
+
+// reportSynced syncs the daemon's vault cache and prints what it now serves
+// from. "Unlock" means "the daemon serves current secrets", so the sync is part
+// of it (CLI-056, #1316): on the Windows work box a daemon whose cache was
+// twelve days old resolved a rotated token to its old value and a newer item to
+// "not found", and doctor read both as dead credentials. A failed sync is an
+// error, not a warning — a daemon that answers from a stale cache is exactly
+// the silent partial state this closes.
+func reportSynced(cmd *cobra.Command, d *secrets.BWServeDaemon, verb string) error {
+	if err := d.Sync(); err != nil {
+		return fmt.Errorf("%s, but the daemon's vault sync failed — reads would come from a stale cache: %w", verb, err)
+	}
+	st, err := d.Client.StatusDetail()
+	if err != nil {
+		return fmt.Errorf("%s and synced, but the daemon's status is unreadable: %w", verb, err)
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s, vault cache synced at %s (%s)\n",
+		verb, st.LastSync.UTC().Format(time.RFC3339), d.Trace())
+	return nil
 }
 
 // newSecretsLockCmd re-locks the daemon (AC6) without stopping the process —
@@ -82,7 +106,7 @@ func newSecretsLockCmd() *cobra.Command {
 			if err := d.Lock(); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "locked")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "locked (%s)\n", d.Trace())
 			return nil
 		},
 	}

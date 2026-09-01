@@ -259,5 +259,12 @@ tags: [lessons, index, dotfiles]
 | [238 - Two independent defects, each sufficient for a permanent red, hide behind one symptom](lesson-238-two-independent-defects-each-sufficient-for-a-perman.md) | 2026-08-27 |  |
 | [239 - Re-measure a filed bug on the current toolchain before implementing its fix](lesson-239-re-measure-a-filed-bug-on-the-current-toolchain-before.md) | 2026-08-27 |  |
 | [240 - A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off](lesson-240-a-partial-mirror-the-code-believes-absent-the-check.md) | 2026-08-27 |  |
-| [241 - A broken parser is a defect only where something reads it](lesson-241-a-broken-parser-is-a-defect-only-where-something.md) | 2026-08-27 |  |
-| [242 - Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent](lesson-242-two-scripts-writing-the-same-logical-value-in-two.md) | 2026-08-31 |  |
+| [241 - Re-running a command just to print what it already told you inherits its exit status, silently, under `pipefail`](lesson-241-re-running-a-command-just-to-print-what-it-already.md) | 2026-08-27 |  |
+| [242 - A process nobody can watch must leave its own trace, and the redirect has to survive the parent](lesson-242-a-process-nobody-can-watch-must-leave-its-own-trace.md) | 2026-08-27 |  |
+| [243 - A guard that reads a cache reports the cache's age as the credential's health](lesson-243-a-guard-that-reads-a-cache-reports-the-cache-not-the-credential.md) | 2026-08-28 |  |
+| [244 - A sweep is bounded by what the writer recorded, not by what the store holds; and the store's name rules decide the order](lesson-244-a-sweep-is-bounded-by-what-the-writer-recorded-not-by-what-the-store-holds.md) | 2026-08-29 |  |
+| [245 - A fix applied to one of two renderers is an outage on the other OS, and nothing on the fixed side can see it](lesson-245-a-fix-to-one-of-two-renderers-is-an-outage-on-the-other-os.md) | 2026-08-29 |  |
+| [246 - A guard that reads its own evidence from a file allowed not to exist switches itself off exactly when it is needed](lesson-246-a-guard-that-reads-its-own-evidence-from-an-optional-file.md) | 2026-08-30 |  |
+| [248 - A broken parser is a defect only where something reads it](lesson-248-a-broken-parser-is-a-defect-only-where-something.md) | 2026-08-27 |  |
+| [249 - Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent](lesson-249-two-scripts-writing-the-same-logical-value-in-two.md) | 2026-08-31 |  |
+- [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

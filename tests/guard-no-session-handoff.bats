@@ -18,7 +18,10 @@ setup() {
 @test "no bats test targets a session-handoff script (would break CI bats glob)" {
     # CI runs `bats tests/*.bats`; a test for the deleted script would fail. Exclude
     # this guard file, which names the script in prose.
-    run grep -rlF --exclude='guard-no-session-handoff.bats' 'session-handoff' "$REPO/tests"
+    # A test that runs it or resolves its path would break; a removal list that
+    # names it (setup-windows.bats, WIN-013) would not, so the guard measures
+    # invocation and path references, not mention.
+    run grep -rlE --exclude='guard-no-session-handoff.bats' '(run |bash |pwsh |scripts/)[^#]*session-handoff' "$REPO/tests"
     [ -z "$output" ]
 }
 

@@ -401,10 +401,9 @@ ensure_directory "$GEMINI_HOME/config"
 ensure_directory "$GEMINI_HOME/prompts"
 ensure_directory "$AGY_APP_DATA"
 
-# 1. Deploy agy settings.json + ignore file
-if [ -f "$CURRENT_DIR/ai/agy/settings.json" ]; then
-    deploy_file "$CURRENT_DIR/ai/agy/settings.json" "$AGY_APP_DATA/settings.json"
-fi
+# 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
+#    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
+#    which a verbatim copy could not do. Only the ignore file is copied here.
 if [ -f "$CURRENT_DIR/.geminiignore" ]; then
     deploy_file "$CURRENT_DIR/.geminiignore" "$GEMINI_HOME/.geminiignore"
 fi
@@ -648,27 +647,6 @@ if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/p
     log_success "python -> python3 symlink created"
 fi
 
-# BUG-013b: install obsidian-cli via npm global. Mirror of the
-# Windows side shipped in PR #77. The CLI provides the `obsidian` binary
-# used by obs-cli.sh and the vault-health workflow. Idempotent: skip when
-# `obsidian` is already on PATH. Gated on `npm` so machines without
-# Node.js gracefully skip with a clear hint.
-# Note: package was previously @vorillaz/obsidian-cli (404), fixed to obsidian-cli.
-if ! command -v obsidian >/dev/null 2>&1; then
-    if command -v npm >/dev/null 2>&1; then
-        log_info "Installing Obsidian CLI (obsidian-cli) via npm..."
-        if npm install -g 'obsidian-cli' >/dev/null 2>&1; then
-            log_success "Obsidian CLI installed"
-        else
-            log_warning "Failed to install Obsidian CLI (npm install -g exited non-zero)"
-        fi
-    else
-        log_warning "npm not available, skipping Obsidian CLI install (install Node.js then re-run)"
-    fi
-else
-    log_info "Obsidian CLI already installed at $(command -v obsidian)"
-fi
-
 # Claude Code (primary AI coding agent — see ADR-009)
 log_info "Setting up Claude Code CLI..."
 if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then
@@ -744,35 +722,6 @@ else
     log_warning "AGENTS.md source missing at $AGENTS_SRC"
 fi
 
-# Yarn (classic) — npm-pinned global install (TERM-002 companion).
-# Guarded on npm (same convention as pi). Reconcile-not-skip: a version drift
-# is corrected by reinstalling the pin, since npm -g yarn upgrades are safe.
-if command -v npm >/dev/null 2>&1; then
-    YARN_PINNED="${YARN_VERSION:-}"
-    if ! command -v yarn >/dev/null 2>&1; then
-        log_info "Installing yarn (yarn@${YARN_PINNED:-latest}) via npm..."
-        if npm install -g "yarn${YARN_PINNED:+@$YARN_PINNED}" >/dev/null 2>&1; then
-            log_success "yarn installed: $(yarn --version 2>/dev/null)"
-        else
-            log_warning "yarn install failed — run: npm install -g yarn${YARN_PINNED:+@$YARN_PINNED}"
-        fi
-    else
-        INSTALLED_YARN=$(yarn --version 2>/dev/null | head -1)
-        if [ -n "$YARN_PINNED" ] && ! version_gte "$INSTALLED_YARN" "$YARN_PINNED"; then
-            log_info "yarn $INSTALLED_YARN below pinned minimum $YARN_PINNED — upgrading..."
-            if npm install -g "yarn@$YARN_PINNED" >/dev/null 2>&1; then
-                log_success "yarn upgraded to $YARN_PINNED"
-            else
-                log_warning "yarn upgrade failed — run: npm install -g yarn@$YARN_PINNED"
-            fi
-        else
-            log_info "yarn already installed: $INSTALLED_YARN"
-        fi
-    fi
-else
-    log_warning "npm not found — skipping yarn install (install Node.js, then re-run setup)"
-fi
-
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
 # agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
 # Install pinned via npm (guarded); models.json gets the same deploy-time secret
@@ -818,15 +767,24 @@ fi
 
 ensure_directory "$PI_AGENT_DIR"
 
-# pi's models.json is deployed by `dotf deploy` (CLI-039): one implementation for
-# every OS, replacing the copy that lived here and its twin in setup-windows.ps1.
-# ADR-020 C7 keeps this script on the thin bootstrap; staging, rendering,
-# comparing and installing a config is tooling logic and belongs in the CLI.
-if command -v dotf >/dev/null 2>&1; then
-    dotf deploy pi || log_warning "dotf deploy pi failed -- run it again after setup, or see 'dotf doctor'"
+# Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
+# every OS, replacing the per-config copies that lived here and their twins in
+# setup-windows.ps1. ADR-020 C7 keeps this script on the thin bootstrap; staging,
+# rendering, comparing and installing a config is tooling logic and belongs in
+# the CLI. The call names NO config: bare `dotf deploy` installs every entry
+# ai/deploy.json declares, so a new entry is a manifest edit and not a change to
+# two setup scripts -- `dotf deploy pi` left orca-keybindings declared and never
+# installed (CLI-054, #1301). Resolved by path as well as by name, for the same
+# reason as the harness mirror above (#1305: this process's PATH may not carry
+# ~/.local/bin yet).
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
+if [ -n "$_dotf" ]; then
+    "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
 else
-    log_warning "dotf not on PATH -- skipping pi config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy pi')"
+    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy')"
 fi
+unset _dotf
 
 PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"
 if [ -f "$AGENTS_SRC" ]; then
@@ -1011,8 +969,9 @@ else
 fi
 
 # GitHub Copilot CLI (BUG-003: standalone agentic CLI, drops legacy gh-copilot
-# extension path). Linux side is detect-and-act -- no auto-install (distros vary;
-# user installs via snap/apt/curl per https://docs.github.com/copilot/how-tos/copilot-cli).
+# extension path). Since AI-038 (#1321, ADR-036) it is an npm catalog tool that
+# `dotf tools install` above converges on every OS (pin as floor in
+# packages.json); this block only deploys config when the binary is on PATH.
 # Verification string set by AI-013 (pointer-style copilot-instructions.md).
 #
 # Cleanup (idempotent): the previous setup added 'eval "$(gh copilot alias -- bash)"'
@@ -1028,7 +987,11 @@ done
 if command -v copilot >/dev/null 2>&1; then
     log_info "GitHub Copilot CLI detected, deploying configuration..."
     ensure_directory "$HOME/.copilot"
-    cp -rf "$CURRENT_DIR/ai/copilot/"* "$HOME/.copilot/" 2>/dev/null || true
+    # Only the instructions file is copied here. settings.json, config.json and
+    # mcp-config.json are `dotf deploy` entries (ai/deploy.json, AI-039/#1322):
+    # the first two by MERGE, because the CLI writes both files itself and a
+    # verbatim copy wiped the box's own keys (allowedUrls, effortLevel, ...).
+    cp -f "$CURRENT_DIR/ai/copilot/copilot-instructions.md" "$HOME/.copilot/copilot-instructions.md" 2>/dev/null || true
     if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q 'First, read `AGENTS.md`' "$HOME/.copilot/copilot-instructions.md"; then
         log_success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
     else
@@ -1036,7 +999,7 @@ if command -v copilot >/dev/null 2>&1; then
     fi
     log_success "GitHub Copilot CLI configured (aliases cop/cops in .zsh/aliases.zsh)"
 else
-    log_info "GitHub Copilot CLI not installed, skipping Copilot config (install via snap/apt/curl: https://docs.github.com/copilot/how-tos/copilot-cli)"
+    log_info "GitHub Copilot CLI not installed, skipping Copilot config (re-run 'dotf tools install copilot' once Node.js is on PATH)"
 fi
 
 # SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.

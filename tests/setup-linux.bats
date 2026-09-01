@@ -366,19 +366,18 @@ setup() {
     grep -q 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# BUG-013b: cross-OS parity for the Obsidian CLI install.
-# Windows side ships via npm global `obsidian-cli` (fixed from 404 @vorillaz/obsidian-cli).
-# Linux side mirrors with the same idempotent + gated-on-npm pattern.
-@test "parity: both setup scripts install Obsidian CLI via npm (BUG-013/b)" {
-    grep -qF "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-windows.ps1"
-}
-
-@test "setup-linux.sh Obsidian CLI install is gated on npm + idempotent (BUG-013b)" {
-    # idempotence: skip if `obsidian` already on PATH
-    grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v obsidian"
-    # gating: only run if npm is available
-    grep -B10 "npm install -g 'obsidian-cli'" "$DOTFILES_DIR/setup-linux.sh" | grep -q "command -v npm"
+# OPS-042 (#1336): obsidian-cli and yarn are packages.json tools (ADR-036),
+# converged by `dotf tools install` on both OSes; neither setup script carries
+# an npm block for them any more, and versions.conf no longer pins them.
+@test "parity: obsidian and yarn are catalog tools, not setup-script npm blocks (OPS-042)" {
+    [ "$(jq -r '.tools[] | select(.name=="obsidian") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm obsidian-cli 0.5.1" ]
+    [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
+    refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep 'npm install -g "yarn' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'npm install -g \$yarnPkg' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep '^OBSIDIAN_VERSION=' "$DOTFILES_DIR/versions.conf"
+    refute_grep '^YARN_VERSION=' "$DOTFILES_DIR/versions.conf"
 }
 
 # MEM-002: the claude-mem install-state assertions that lived in
@@ -467,6 +466,23 @@ setup() {
     # the mirror in the same run, and verify-setup.bats caught the gap (#1305).
     grep -qF '[ -x "$HOME/.local/bin/dotf" ]' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF '"$_dotf" harness mirror' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json
+# declares. Naming one config at the call site meant a new manifest entry
+# (orca-keybindings) was deployed by neither setup until two scripts were
+# edited -- the manifest is the SSOT of what gets deployed, not the call site.
+@test "setup-linux.sh deploys agent configs with bare dotf deploy, naming no config (CLI-054)" {
+    grep -qE '"\$_dotf" deploy( \|\||$)' "$DOTFILES_DIR/setup-linux.sh"
+    # Anchored to the invocation shape (a line that RUNS dotf), not to any
+    # mention: the comment above the call names the old form on purpose.
+    refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh resolves dotf by path for the config deploy, not only by name (#1305 class)" {
+    # Same trap as the harness mirror: the integration container installs dotf
+    # into ~/.local/bin and this process's PATH does not carry it yet.
+    grep -qF '"$_dotf" deploy' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh installs the GUARD memory-sink git-hooks (#418 deploy + wire)" {

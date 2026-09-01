@@ -108,10 +108,13 @@ func TestCheckVersionMatch(t *testing.T) {
 	mkdirAll(t, filepath.Join(apps, "go-1.26.0"))
 	// Java dir intentionally missing.
 	env := map[string]string{"HOME": home, "APPS_HOME": apps}
-	cfg := &Config{Versions: map[string]string{
+	// yarn's pin comes from packages.json since OPS-042 (#1336), not from
+	// versions.conf, so the fixture is a catalog in the deploy dir.
+	mirror := filepath.Join(home, ".dotfiles")
+	writeFile(t, filepath.Join(mirror, "packages.json"), `{"tools":[{"name":"yarn","version":"1.22.22","profile":"full","source":{"type":"npm","package":"yarn"}}]}`)
+	cfg := &Config{DotfilesDir: mirror, Versions: map[string]string{
 		"GO_VERSION":   "1.26.0",
 		"JAVA_VERSION": "21.0.4",
-		"YARN_VERSION": "1.22.22",
 	}}
 
 	var buf bytes.Buffer
@@ -468,7 +471,7 @@ func statusOfLine(output, needle string) Status {
 		if !strings.Contains(line, needle) {
 			continue
 		}
-		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip} {
+		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip, StatusInfo} {
 			if strings.Contains(line, statusTag[s]) {
 				return s
 			}

@@ -64,6 +64,18 @@ func Load(path string) (Catalog, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return Catalog{}, fmt.Errorf("parse package catalog %q: %w", path, err)
 	}
+	// A name listed twice installs twice and reports twice, and every reader
+	// that looks a tool up by name silently takes the first (a duplicated
+	// copilot entry shipped in a PR and read as "already installed; skipping"
+	// on the second line, AI-038/#1321). Refuse it at the one place every
+	// consumer goes through.
+	seen := make(map[string]struct{}, len(c.Tools))
+	for _, t := range c.Tools {
+		if _, dup := seen[t.Name]; dup {
+			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q is listed more than once", path, t.Name)
+		}
+		seen[t.Name] = struct{}{}
+	}
 	return c, nil
 }
 
