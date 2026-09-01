@@ -260,3 +260,4 @@ tags: [lessons, index, dotfiles]
 | [239 - Re-measure a filed bug on the current toolchain before implementing its fix](lesson-239-re-measure-a-filed-bug-on-the-current-toolchain-before.md) | 2026-08-27 |  |
 | [240 - A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off](lesson-240-a-partial-mirror-the-code-believes-absent-the-check.md) | 2026-08-27 |  |
 | [241 - A broken parser is a defect only where something reads it](lesson-241-a-broken-parser-is-a-defect-only-where-something.md) | 2026-08-27 |  |
+| [242 - Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent](lesson-242-two-scripts-writing-the-same-logical-value-in-two.md) | 2026-08-31 |  |
