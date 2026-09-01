@@ -72,7 +72,10 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			if stateDir == "" {
 				stateDir = defaultGateStateDir()
 			}
-			statePath := harness.StatePath(stateDir, call.SessionID)
+			// Scoped to the acting persona when the harness names one: a subagent
+			// reuses the parent session id, so keying by session alone would let one
+			// persona's skill runs satisfy another's gate.
+			statePath := harness.StatePath(stateDir, call.ConsumptionScope())
 
 			// A skill invocation is the act the gate exists to require: record
 			// it and get out of the way. Recording failures are ignored on
@@ -92,7 +95,7 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				return nil
 			}
 
-			persona := loadGatePersona(repoRoot, role)
+			persona := loadGatePersona(cmd.ErrOrStderr(), repoRoot, effectiveRole(role, call.AgentType))
 			result := harness.Decide(harness.GateInput{
 				Persona:  persona,
 				Call:     call,
@@ -123,8 +126,20 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 // call in a session — that is the "normal state is red" failure, and it is worse
 // than the gate being absent, because an operator disables a noisy gate and then
 // has nothing.
-func loadGatePersona(repoRoot, role string) *harness.Persona {
+//
+// BUT A ROLE THAT WAS ASKED FOR AND DID NOT RESOLVE IS SAID OUT LOUD. Failing
+// open is the right decision and silence is not: `--role reviewr` used to exit 0
+// with no output, so a typo, a renamed record or a repo-root that resolved
+// elsewhere disabled enforcement entirely while every session reported health.
+// That is the guard-fails-open shape lesson 219 named, one level down — and it
+// is the failure this whole gate exists to prevent, committed inside the gate.
+// warn takes an io.Writer rather than reaching for os.Stderr so the message is
+// assertable; a diagnostic nothing can test is the same silence with extra steps.
+func loadGatePersona(warn io.Writer, repoRoot, role string) *harness.Persona {
 	if strings.TrimSpace(role) == "" {
+		// Not asked for: the caller declared no persona, so there is nothing to
+		// fail to find. Distinct from the case below, and NOT worth a line on
+		// every tool call.
 		return nil
 	}
 	if repoRoot == "" {
@@ -133,11 +148,30 @@ func loadGatePersona(repoRoot, role string) *harness.Persona {
 			repoRoot = filepath.Join(os.Getenv("HOME"), ".dotfiles")
 		}
 	}
-	p, err := harness.LoadPersona(filepath.Join(repoRoot, "harness", "agents", role, "AGENT.md"))
+	path := filepath.Join(repoRoot, "harness", "agents", role, "AGENT.md")
+	p, err := harness.LoadPersona(path)
 	if err != nil {
+		_, _ = fmt.Fprintf(warn, "[gate] allow: role %q did not resolve (%s): %v — ENFORCEMENT IS OFF for this call\n",
+			role, path, err)
 		return nil
 	}
 	return p
+}
+
+// effectiveRole picks the persona in scope: the operator's --role when given,
+// otherwise whatever the harness said was acting.
+//
+// THE FLAG WINS ON PURPOSE, and it is the smaller of the two jobs. The manifest
+// emits one hook for the whole harness, so a static --role in it would pin every
+// session to a single persona — which is why the flag alone left the gate inert:
+// nothing passed one, `loadGatePersona` got "", and `Decide` returned "no persona
+// in scope" for all 35 skills. The payload is the real source. The flag survives
+// as an override for testing and for a harness that reports no agent at all.
+func effectiveRole(flag, fromPayload string) string {
+	if r := strings.TrimSpace(flag); r != "" {
+		return r
+	}
+	return strings.TrimSpace(fromPayload)
 }
 
 func defaultGateStateDir() string {
@@ -159,10 +193,27 @@ func defaultGateStateDir() string {
 // agy's exact FIELD names are unverified — no agy payload has been captured — so
 // a mismatch degrades to "not understood", which allows. The gate never blocks
 // on a guess.
+// AgentType and AgentID are how the gate learns WHICH persona is acting, and
+// they are the reason no session-state mechanism was built for it. Claude
+// documents both on every hook event fired inside a subagent: `agent_type`
+// carries the dispatched agent's name (`reviewer`), `agent_id` a unique id for
+// that invocation. A MAIN-THREAD call carries NEITHER — absence means "no
+// persona in scope", which is not an error and is exactly the pre-existing
+// allow.
+//
+// DOCUMENTED, NOT YET MEASURED on this box: the gate is not live in any deployed
+// settings file here, so no real payload has been captured. The design is built
+// to make that acceptable — a wrong or renamed field yields an empty AgentType,
+// hence a nil persona, hence Allow: the behaviour before this existed. A guess
+// can therefore cost enforcement, never a blocked session. Confirm it by
+// observing `[gate] warn` lines on a real dispatch before any skill is promoted
+// to `enforce: block`.
 type commandHookPayload struct {
 	SessionID string         `json:"session_id"`
 	ToolName  string         `json:"tool_name"`
 	ToolInput map[string]any `json:"tool_input"`
+	AgentType string         `json:"agent_type"`
+	AgentID   string         `json:"agent_id"`
 }
 
 // canonicalPayload is the shape THIS REPOSITORY's own generated wrappers emit.
@@ -209,7 +260,14 @@ func normaliseToolCall(harnessName string, payload []byte) (harness.ToolCall, bo
 		if json.Unmarshal(payload, &p) != nil || p.ToolName == "" {
 			return harness.ToolCall{}, false
 		}
-		return harness.ToolCall{SessionID: p.SessionID, Tool: p.ToolName, Skill: skillArg(p.ToolName, p.ToolInput), IsSkillTool: isSkillTool(p.ToolName)}, true
+		return harness.ToolCall{
+			SessionID:   p.SessionID,
+			Tool:        p.ToolName,
+			Skill:       skillArg(p.ToolName, p.ToolInput),
+			IsSkillTool: isSkillTool(p.ToolName),
+			AgentType:   strings.TrimSpace(p.AgentType),
+			AgentID:     strings.TrimSpace(p.AgentID),
+		}, true
 	}
 }
 

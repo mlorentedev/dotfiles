@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
@@ -111,5 +114,154 @@ func TestSkillArgOnlyReadsTheSkillPrimitive(t *testing.T) {
 	}
 	if got := skillArg("Skill", map[string]any{"skill": "   "}); got != "" {
 		t.Errorf("a blank skill name must yield no skill, got %q", got)
+	}
+}
+
+// TestLoadGatePersonaSaysSoWhenARoleDoesNotResolve pins the fix for a guard that
+// failed OPEN and reported health.
+//
+// Measured on the shipped binary before the fix:
+//
+//	$ printf '{"tool_name":"Bash","session_id":"t1"}' | dotf harness gate \
+//	      --harness claude --role reviewr --repo-root .
+//	$ echo $?
+//	0
+//
+// No output at all. A typo in the role, a renamed record, or a --repo-root that
+// resolved somewhere without harness/agents disabled enforcement for the whole
+// session, and nothing anywhere said so. Allowing is the correct DECISION —
+// blocking every call on a config error is the worse failure — but silence is
+// not, because it is indistinguishable from a session with enforcement working.
+//
+// Table-driven per AGENTS.md, one row per branch of the resolution.
+func TestLoadGatePersonaSaysSoWhenARoleDoesNotResolve(t *testing.T) {
+	root := repoRootForTest(t)
+
+	for _, tc := range []struct {
+		name     string
+		role     string
+		repoRoot string
+		wantNil  bool
+		wantSaid bool
+	}{
+		{
+			name: "no role asked for is silent — nothing failed to resolve",
+			role: "", repoRoot: root, wantNil: true, wantSaid: false,
+		},
+		{
+			name: "a role that does not exist is allowed AND announced",
+			role: "reviewr", repoRoot: root, wantNil: true, wantSaid: true,
+		},
+		{
+			name: "a repo root without harness/agents is allowed AND announced",
+			role: "reviewer", repoRoot: t.TempDir(), wantNil: true, wantSaid: true,
+		},
+		{
+			name: "a role that resolves is silent",
+			role: "reviewer", repoRoot: root, wantNil: false, wantSaid: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			got := loadGatePersona(&buf, tc.repoRoot, tc.role)
+
+			if (got == nil) != tc.wantNil {
+				t.Errorf("persona nil = %v, want %v", got == nil, tc.wantNil)
+			}
+			// Always allow-shaped: this function never causes a block.
+			said := buf.Len() > 0
+			if said != tc.wantSaid {
+				t.Errorf("announced = %v, want %v (stderr=%q)", said, tc.wantSaid, buf.String())
+			}
+			if tc.wantSaid && !strings.Contains(buf.String(), "ENFORCEMENT IS OFF") {
+				t.Errorf("the message does not say enforcement is off: %q", buf.String())
+			}
+		})
+	}
+}
+
+// TestGateResolvesTheRoleFromThePayload is the fix for the reason the whole
+// binding chain decided nothing.
+//
+// MEASURED 2026-08-31, before this: the manifest emits `harness gate --harness
+// claude` with NO --role. loadGatePersona returned nil on an empty role, Decide
+// answered "no persona in scope", and every tool call was allowed regardless of
+// what any skill declared. bind, the hook, the gate and Decide were all live and
+// enforced nothing.
+//
+// Claude documents `agent_type` on every hook event fired inside a subagent, and
+// nothing on a main-thread call. So the harness already knows what the gate was
+// missing, and no session-state mechanism was needed to carry it.
+func TestGateResolvesTheRoleFromThePayload(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		flag     string
+		payload  string
+		wantRole string
+	}{
+		{
+			name:     "the payload's agent_type becomes the role",
+			payload:  `{"tool_name":"Bash","session_id":"s","agent_type":"reviewer"}`,
+			wantRole: "reviewer",
+		},
+		{
+			name:     "a main-thread call names no persona, which allows",
+			payload:  `{"tool_name":"Bash","session_id":"s"}`,
+			wantRole: "",
+		},
+		{
+			name:     "--role overrides the payload, for testing and for a silent harness",
+			flag:     "builder",
+			payload:  `{"tool_name":"Bash","session_id":"s","agent_type":"reviewer"}`,
+			wantRole: "builder",
+		},
+		{
+			name:     "--role fills in when the harness reports no agent",
+			flag:     "builder",
+			payload:  `{"tool_name":"Bash","session_id":"s"}`,
+			wantRole: "builder",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			call, ok := normaliseToolCall("claude", []byte(tc.payload))
+			if !ok {
+				t.Fatal("payload not understood")
+			}
+			if got := effectiveRole(tc.flag, call.AgentType); got != tc.wantRole {
+				t.Errorf("effectiveRole = %q, want %q", got, tc.wantRole)
+			}
+		})
+	}
+}
+
+// TestConsumptionIsScopedToTheActingPersona pins that two personas dispatched in
+// ONE session do not share a consumption ledger.
+//
+// Claude reuses the parent's session_id inside a subagent, so keying the ledger
+// by session alone would let the architect's skill runs satisfy the reviewer's
+// gate — enforcement that reports success while enforcing nothing, which is the
+// exact failure this gate exists to prevent.
+func TestConsumptionIsScopedToTheActingPersona(t *testing.T) {
+	base := `{"tool_name":"Bash","session_id":"same-session","agent_type":"%s","agent_id":"%s"}`
+
+	reviewer, ok := normaliseToolCall("claude", []byte(fmt.Sprintf(base, "reviewer", "agent-1")))
+	if !ok {
+		t.Fatal("payload not understood")
+	}
+	architect, _ := normaliseToolCall("claude", []byte(fmt.Sprintf(base, "architect", "agent-2")))
+	mainThread, _ := normaliseToolCall("claude", []byte(`{"tool_name":"Bash","session_id":"same-session"}`))
+
+	if reviewer.ConsumptionScope() == architect.ConsumptionScope() {
+		t.Errorf("two personas in one session share a ledger (%q) — one's skill runs would satisfy the other's gate",
+			reviewer.ConsumptionScope())
+	}
+	if mainThread.ConsumptionScope() != "same-session" {
+		t.Errorf("a main-thread call must fall back to the session, got %q", mainThread.ConsumptionScope())
+	}
+	// And the paths they resolve to must differ, which is what actually keeps
+	// the ledgers apart on disk.
+	dir := t.TempDir()
+	if harness.StatePath(dir, reviewer.ConsumptionScope()) == harness.StatePath(dir, architect.ConsumptionScope()) {
+		t.Error("distinct scopes resolved to the same state file")
 	}
 }
