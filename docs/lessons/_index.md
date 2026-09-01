@@ -268,4 +268,5 @@ tags: [lessons, index, dotfiles]
 | [247 - A pointer into a deletable location keeps every check green until the deletion, and then the cleanup gets blamed](lesson-247-a-pointer-into-a-deletable-location-stays-green-until-the-deletion.md) | 2026-08-31 |  |
 | [248 - A broken parser is a defect only where something reads it](lesson-248-a-broken-parser-is-a-defect-only-where-something.md) | 2026-08-27 |  |
 | [249 - Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent](lesson-249-two-scripts-writing-the-same-logical-value-in-two.md) | 2026-08-31 |  |
+| [250 - A guard that refuses an anticipated schema change should name its own fix, because the person who reads the refusal is the one who caused it](lesson-250-a-guard-that-refuses-an-anticipated-schema-change.md) | 2026-08-31 |  |
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

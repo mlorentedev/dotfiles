@@ -62,41 +62,70 @@ class UnreadableSkills(Exception):
 
 
 def definition_skills(path: str):
-    """Frontmatter only; a regex on the skills line avoids a yaml dependency.
+    """`kind:` by regex (a single scalar); the skill list by asking the CLI.
 
-    A `skills:` key that is PRESENT but not in the inline form raises rather than
-    returning []. The two are indistinguishable downstream -- both compare an
-    empty list against the roster and both satisfy the >= SKILLS_MIN check by
-    failing it for the wrong reason -- and they mean opposite things. HARNESS-045
-    introduces a block form carrying per-skill severity:
+    THIS IS THE COMING-BACK THIS GUARD ASKED FOR. It used to match `skills:` with
+    `^skills:\\s*\\[(.*?)\\]` and raise on anything else, because HARNESS-045 was
+    going to introduce a mapping form carrying per-skill severity:
 
         skills:
           - id: audit
-            enforce: block
+            enforce: warn
 
-    Under the old `... if skills else []` this guard read that as "declares no
-    skills" and kept reporting exit 0, so the drift check HARNESS-046 exists to
-    provide would have been disarmed by a schema change it never noticed.
-    Measured 2026-08-27. Parsing the block form here would make this the THIRD
-    hand-rolled frontmatter reader in the repository; refusing loudly instead
-    means whoever migrates the definitions has to come back and do it once, in
-    `dotf harness resolve-skills`, where the parser already lives.
+    and the ORIGINAL `... if skills else []` read that as "declares no skills",
+    kept reporting exit 0, and would have compared an empty list against the
+    roster -- the drift check disarmed by a schema change it never noticed
+    (measured 2026-08-27). Raising was the placeholder; its own docstring said
+    the real fix was to resolve the list "in `dotf harness resolve-skills`, where
+    the parser already lives", rather than make this the third hand-rolled
+    frontmatter reader in the repository. The reviewer migration landed, so it is
+    now done: `LoadPersona` reads both forms on a real YAML parser, and this
+    guard consumes its output.
+
+    Delegation does not weaken the loud failure, it relocates it. The CLI exits
+    non-zero on a `skills:` key that is present but unparseable and writes
+    nothing to stdout, and every failure below -- non-zero exit, missing binary,
+    timeout -- raises UnreadableSkills. Nothing here can degrade to []: an
+    unreadable skill list and an empty one produce the same downstream behaviour
+    and mean opposite things, which is the whole reason this class exists.
     """
     head = open(path, encoding="utf-8").read().split("---")[1]
     kind = re.search(r"^kind:\s*(\S+)", head, re.M)
-    skills = re.search(r"^skills:\s*\[(.*?)\]", head, re.M | re.S)
-    if skills is None and re.search(r"^skills:", head, re.M):
-        raise UnreadableSkills(
-            f"{path}: declares `skills:` in a form this guard cannot read "
-            "(expected the inline `skills: [a, b]`). Refusing to report it as an "
-            "empty skill list -- that would compare 'no skills' against the roster "
-            "and pass. Teach this guard the new form, or use "
-            "`dotf harness resolve-skills`."
+    return kind.group(1) if kind else "", resolved_skills(path)
+
+
+def resolved_skills(path: str) -> list:
+    """Ask `dotf harness resolve-skills` for the ids, in either frontmatter form.
+
+    A record declaring no `skills:` key at all prints nothing and exits 0, which
+    is a genuine empty list -- the >= SKILLS_MIN check below then reports it,
+    which is the correct complaint. Only a PRESENT-but-unreadable key is an
+    exception, and the CLI, not this script, is what tells the two apart.
+    """
+    try:
+        run = subprocess.run(
+            ["dotf", "harness", "resolve-skills", path],
+            capture_output=True,
+            text=True,
+            timeout=20,
         )
-    return (
-        kind.group(1) if kind else "",
-        [s.strip() for s in skills.group(1).split(",") if s.strip()] if skills else [],
-    )
+    except Exception as exc:  # missing binary, timeout, anything else
+        raise UnreadableSkills(
+            f"{path}: could not run `dotf harness resolve-skills` ({exc}). "
+            "Refusing to report an empty skill list -- that would compare 'no "
+            "skills' against the roster and pass."
+        ) from exc
+    if run.returncode != 0:
+        raise UnreadableSkills(
+            f"{path}: `dotf harness resolve-skills` refused this record "
+            f"(exit {run.returncode}): {run.stderr.strip() or '(no stderr)'}. "
+            "If the message is about an unknown command, the `dotf` on PATH "
+            "predates the subcommand -- rebuild it rather than parsing here."
+        )
+    out = run.stdout.strip()
+    if not out:
+        return []
+    return [s.strip() for s in out.strip("[]").split(",") if s.strip()]
 
 
 def main() -> int:
