@@ -265,3 +265,28 @@ func TestConsumptionIsScopedToTheActingPersona(t *testing.T) {
 		t.Error("distinct scopes resolved to the same state file")
 	}
 }
+
+// TestConsumptionIsScopedToTheInvocationNotTheRole pins the case the previous
+// test does not reach: the SAME persona dispatched twice in one session.
+//
+// The reviewer on #1410 asked what happens if agent_id is not unique per
+// invocation. Separation there is a property of the harness's id, not of this
+// code — so what is pinned here is the contract this code owes: given distinct
+// ids, two runs of one role must not share a ledger. If the harness ever sends a
+// value stable per role, THIS test still passes and the separation is gone,
+// which is precisely why the doc comment sends that question to a measurement
+// rather than to a unit test.
+func TestConsumptionIsScopedToTheInvocationNotTheRole(t *testing.T) {
+	base := `{"tool_name":"Bash","session_id":"same-session","agent_type":"reviewer","agent_id":"%s"}`
+
+	first, ok := normaliseToolCall("claude", []byte(fmt.Sprintf(base, "agent-1")))
+	if !ok {
+		t.Fatal("payload not understood")
+	}
+	second, _ := normaliseToolCall("claude", []byte(fmt.Sprintf(base, "agent-2")))
+
+	if first.ConsumptionScope() == second.ConsumptionScope() {
+		t.Errorf("two dispatches of one role share a ledger (%q) — the second would inherit the first's consumption and go ungated",
+			first.ConsumptionScope())
+	}
+}

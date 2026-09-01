@@ -231,6 +231,20 @@ func RecordConsumed(path, skill string) error {
 // shares a ledger and the first one's skill runs silently satisfy the rest;
 // without the session fallback, a main-thread call — which carries no agent —
 // would have no ledger at all.
+//
+// SEPARATION IS ONLY AS GOOD AS AgentID'S UNIQUENESS, which is documented as a
+// per-invocation id and NOT YET MEASURED here — the same envelope as the field
+// names themselves, raised as a distinct point by the reviewer on #1410. If the
+// harness were instead to send a value stable per persona (a name, a hash of the
+// type), two dispatches of `reviewer` in one session would share this key and
+// the second would inherit the first's consumption.
+//
+// That failure is over-permissive, never over-strict: a shared ledger can only
+// skip a gate, never raise one, so it costs enforcement and cannot block a
+// session. It is checked by the same measurement that confirms the field names —
+// dispatch one persona TWICE in a session and confirm the second is gated again
+// — and that check is a precondition of promoting any skill to `enforce: block`,
+// not of this function being correct for the single-dispatch case.
 func (c ToolCall) ConsumptionScope() string {
 	if c.AgentID != "" {
 		return c.SessionID + "-" + c.AgentID
