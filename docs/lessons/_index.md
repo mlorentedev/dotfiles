@@ -269,4 +269,5 @@ tags: [lessons, index, dotfiles]
 | [248 - A broken parser is a defect only where something reads it](lesson-248-a-broken-parser-is-a-defect-only-where-something.md) | 2026-08-27 |  |
 | [249 - Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent](lesson-249-two-scripts-writing-the-same-logical-value-in-two.md) | 2026-08-31 |  |
 | [250 - Restoring a file's content is not restoring the file, and the mode is the part nobody diffs](lesson-250-restoring-a-files-content-is-not-restoring-the-file.md) | 2026-09-01 |  |
+
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

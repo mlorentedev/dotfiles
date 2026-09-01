@@ -87,3 +87,30 @@ Blanket "every `.sh` is executable" would have been the wrong guard: of 44
 tracked shell files, four are libraries that are sourced rather than executed
 (`.zsh/functions.sh`, `git-hooks/lib/board-pickup.sh`, two `tests/golden/*/lib.sh`).
 The narrow rule is the true one.
+
+## The guard's own version of the same mistake, caught in review
+
+The first version of this guard scanned all of `docs/` — **including this
+lesson**, which quotes `./setup-linux.sh` while explaining the incident. So the
+derivation fed itself from history. Measured before the fix: with every live
+invocation rewritten to `bash setup-linux.sh`, the "guard actually finds the
+bootstrap entry point" test stayed **green**, sourced entirely from this file's
+prose. The guard written to prevent a vacuous pass had a vacuous pass of its own,
+and it took a reviewer to see it.
+
+Two exclusions close it, and the distinction between them is the point:
+
+- **`docs/lessons/` is pruned; `docs/runbooks/` is not.** A runbook telling a
+  user to type `./setup-linux.sh` *is* an invocation contract — six of them do,
+  and they should keep the guard alive on their own. A lesson describing an
+  incident is history. **Evidence that mentions an invocation is not evidence
+  that one happens.**
+- **Only tracked files enter the list.** Prose also mentions placeholders like
+  `./x.sh`, which is not a script.
+
+The same reading fixed the third test: `grep -qE 'exec[[:space:]]+\./setup-linux\.sh'`
+was satisfied by a commented-out line while `bash setup-linux.sh` was the line
+that ran. Anchoring it to the start of a line was the whole repair.
+
+Verified by mutation afterwards: strip every live invocation, leave this
+lesson's single mention standing, and the meta-test now goes red.
