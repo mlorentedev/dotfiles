@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,65 +59,15 @@ command replaces our entry in place rather than appending a second one.`,
   dotf harness bind --dry-run`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			root := repoRoot
-			if root == "" {
-				root = env.ResolveHarnessRoot()
+			root, home, binary, err := resolveBindInputs(repoRoot, homeDir, dotfPath)
+			if err != nil {
+				return err
 			}
-			home := homeDir
-			if home == "" {
-				h, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("resolve home: %w", err)
-				}
-				home = h
-			}
-			binary := dotfPath
-			if binary == "" {
-				binary = resolveDotfPath(home)
-			}
-			binary = hookBinaryToken(binary, runtime.GOOS)
-
 			targets, err := harness.LoadBindTargets(root)
 			if err != nil {
 				return err
 			}
-
-			out := cmd.OutOrStdout()
-			wrote := 0
-			for _, t := range targets {
-				if harnessName != "" && t.Agent != harnessName {
-					continue
-				}
-				if !t.Emits() {
-					_, _ = fmt.Fprintf(out, "skip %s: declared emit:false (%s)\n", t.Agent, t.Format)
-					continue
-				}
-				if t.RequiresCommand != "" {
-					if _, err := exec.LookPath(t.RequiresCommand); err != nil {
-						_, _ = fmt.Fprintf(out, "skip %s: %s is not installed\n", t.Agent, t.RequiresCommand)
-						continue
-					}
-				}
-				changed, err := bindOne(t, home, binary, dryRun)
-				if err != nil {
-					return fmt.Errorf("%s: %w", t.Agent, err)
-				}
-				switch {
-				case !changed:
-					_, _ = fmt.Fprintf(out, "ok   %s: hooks already current\n", t.Agent)
-				case dryRun:
-					_, _ = fmt.Fprintf(out, "would update %s: %s\n", t.Agent, t.File)
-				default:
-					wrote++
-					_, _ = fmt.Fprintf(out, "bind %s: %s\n", t.Agent, t.File)
-				}
-			}
-			if harnessName != "" && wrote == 0 && !dryRun {
-				// Not an error: "already current" is the steady state, and the
-				// idempotence doctrine wants changed=0 on a re-run.
-				return nil
-			}
-			return nil
+			return bindTargets(cmd.OutOrStdout(), targets, harnessName, home, binary, dryRun)
 		},
 	}
 
@@ -126,6 +77,68 @@ command replaces our entry in place rather than appending a second one.`,
 	cmd.Flags().StringVar(&dotfPath, "dotf-path", "", "absolute path emitted into the hook commands (default: resolved)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change without writing")
 	return cmd
+}
+
+// resolveBindInputs settles the three ambient inputs — where the manifest is,
+// whose home to write under, and what binary path the hooks will name — so RunE
+// stays a sequence of named steps rather than a wall of defaulting.
+//
+// The dotf path is rendered through hookBinaryToken here, at the single point
+// where runtime.GOOS is read. Everything downstream takes the finished token.
+func resolveBindInputs(repoRoot, homeDir, dotfPath string) (root, home, binary string, err error) {
+	root = repoRoot
+	if root == "" {
+		root = env.ResolveHarnessRoot()
+	}
+	home = homeDir
+	if home == "" {
+		h, herr := os.UserHomeDir()
+		if herr != nil {
+			return "", "", "", fmt.Errorf("resolve home: %w", herr)
+		}
+		home = h
+	}
+	binary = dotfPath
+	if binary == "" {
+		binary = resolveDotfPath(home)
+	}
+	return root, home, hookBinaryToken(binary, runtime.GOOS), nil
+}
+
+// bindTargets emits every selected target, reporting one stable status tag per
+// line: `skip`, `ok`, `would update` or `bind`. Tests assert those tags, not the
+// prose after them.
+func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home, binary string, dryRun bool) error {
+	for _, t := range targets {
+		if harnessName != "" && t.Agent != harnessName {
+			continue
+		}
+		if !t.Emits() {
+			_, _ = fmt.Fprintf(out, "skip %s: declared emit:false (%s)\n", t.Agent, t.Format)
+			continue
+		}
+		if t.RequiresCommand != "" {
+			if _, err := exec.LookPath(t.RequiresCommand); err != nil {
+				_, _ = fmt.Fprintf(out, "skip %s: %s is not installed\n", t.Agent, t.RequiresCommand)
+				continue
+			}
+		}
+		changed, err := bindOne(t, home, binary, dryRun)
+		if err != nil {
+			return fmt.Errorf("%s: %w", t.Agent, err)
+		}
+		switch {
+		case !changed:
+			// Never an error: "already current" is the steady state the
+			// idempotence doctrine asks for (changed=0 on a re-run).
+			_, _ = fmt.Fprintf(out, "ok   %s: hooks already current\n", t.Agent)
+		case dryRun:
+			_, _ = fmt.Fprintf(out, "would update %s: %s\n", t.Agent, t.File)
+		default:
+			_, _ = fmt.Fprintf(out, "bind %s: %s\n", t.Agent, t.File)
+		}
+	}
+	return nil
 }
 
 // bindOne merges one target's hooks into its settings file.
@@ -162,38 +175,46 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, erro
 	if !changed || dryRun {
 		return changed, nil
 	}
+	if err := writeSettingsAtomically(path, merged); err != nil {
+		return false, err
+	}
+	return true, nil
+}
 
-	encoded, err := json.MarshalIndent(merged, "", "  ")
+// writeSettingsAtomically renders doc and replaces path with it in one step.
+//
+// Temp + rename IN THE SAME DIRECTORY: a rename across filesystems is not
+// atomic, and a half-written settings file is a harness that will not start.
+func writeSettingsAtomically(path string, doc map[string]any) error {
+	encoded, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		return false, fmt.Errorf("encode %s: %w", path, err)
+		return fmt.Errorf("encode %s: %w", path, err)
 	}
 	encoded = append(encoded, '\n')
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return false, fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
 	}
-	// Temp + rename IN THE SAME DIRECTORY: a rename across filesystems is not
-	// atomic, and a half-written settings file is a harness that will not start.
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".settings-*.json")
 	if err != nil {
-		return false, fmt.Errorf("create temp beside %s: %w", path, err)
+		return fmt.Errorf("create temp beside %s: %w", path, err)
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
 	if _, err := tmp.Write(encoded); err != nil {
 		_ = tmp.Close()
-		return false, fmt.Errorf("write %s: %w", tmpName, err)
+		return fmt.Errorf("write %s: %w", tmpName, err)
 	}
 	if err := tmp.Close(); err != nil {
-		return false, fmt.Errorf("close %s: %w", tmpName, err)
+		return fmt.Errorf("close %s: %w", tmpName, err)
 	}
 	if err := os.Chmod(tmpName, 0o600); err != nil {
-		return false, fmt.Errorf("chmod %s: %w", tmpName, err)
+		return fmt.Errorf("chmod %s: %w", tmpName, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		return false, fmt.Errorf("rename onto %s: %w", path, err)
+		return fmt.Errorf("rename onto %s: %w", path, err)
 	}
-	return true, nil
+	return nil
 }
 
 // resolveDotfPath picks the absolute binary path emitted into hook commands.

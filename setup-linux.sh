@@ -1453,7 +1453,14 @@ if [ -z "$_dotf" ]; then
 else
     _harness_help="$("$_dotf" harness --help 2>/dev/null || true)"
     if printf '%s\n' "$_harness_help" | grep -q '^[[:space:]]*bind[[:space:]]'; then
-        "$_dotf" harness bind || log_warning "dotf harness bind reported a problem (above) -- 'dotf doctor' will report hook drift"
+        # --repo-root is passed EXPLICITLY, not left to env.ResolveHarnessRoot.
+        # That resolver walks up from the CWD for a .git, then falls back to
+        # ~/.dotfiles. Measured under a controlled env: from a cwd outside any
+        # checkout on a machine with no ~/.dotfiles yet -- a first run invoked by
+        # absolute path -- it resolves to a directory with no manifest, and bind
+        # exits 1 having emitted no hooks. setup knows the checkout it is running
+        # from, so inferring it from ambient state is strictly worse.
+        "$_dotf" harness bind --repo-root "$CURRENT_DIR" || log_warning "dotf harness bind reported a problem (above) -- 'dotf doctor' will report hook drift"
     else
         log_warning "installed dotf predates 'dotf harness bind' -- harness hooks NOT emitted; rebuild/reinstall dotf and re-run setup"
     fi

@@ -15,6 +15,11 @@ against a record in the mapping form instead of read:
 | `compile-harness.sh:1016` | breaks | **breaks** — returns empty, renders `MUST consume: none` |
 | `check-roster-consistency.py:64` | breaks | **breaks** — returns `[]`, guard passes vacuously |
 | `doctor.readAgentFrontmatter` | breaks | **not a defect** |
+| *(the fourth)* | breaks | **does not exist** — no fourth reader was ever found |
+
+Three rows against a claim of four, because the fourth parser is the first thing
+measurement disposed of: nothing else in the tree reads `skills:`. The count had
+been inflated by one before anyone looked.
 
 The third does skip indented lines, exactly as claimed. But its only consumers
 are `fm["model"]` and `fm["targets"]`. **It never reads `skills`.** A `grep` for

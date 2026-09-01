@@ -187,6 +187,17 @@ setup() {
     return 0
 }
 
+@test "both setup scripts pass --repo-root to bind, never inferring it from the cwd" {
+    # env.ResolveHarnessRoot walks up from the CWD for a .git, then falls back to
+    # ~/.dotfiles. Measured under `env -i`: from a cwd outside any checkout, on a
+    # machine with no ~/.dotfiles yet, bind exits 1 having emitted NO hooks --
+    # a first run invoked by absolute path. Neither script may rely on that
+    # inference; both know their own checkout. Windows is the likelier victim,
+    # because a .ps1 does not change the cwd.
+    grep -qF -- 'harness bind --repo-root "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF -- 'harness bind --repo-root $DotfilesDir' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
 @test "both setup scripts call dotf harness bind behind a capability probe" {
     # The call is what makes AC1 real; the probe is what keeps a stale dotf from
     # silently emitting nothing (lesson 219 -- exit status cannot tell "I refuse"

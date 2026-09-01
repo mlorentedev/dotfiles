@@ -1858,7 +1858,11 @@ if (-not $dotfPath) {
 } else {
     $harnessHelp = (& $dotfPath harness --help 2>&1 | Out-String)
     if ($harnessHelp -match '(?m)^\s*bind\s') {
-        & $dotfPath harness bind
+        # -RepoRoot passed EXPLICITLY -- see the twin comment in setup-linux.sh.
+        # It matters more here: a PowerShell script does not change the cwd, so
+        # `PowerShell -File C:\path\to\dotfiles\setup-windows.ps1` run from
+        # anywhere else leaves the resolver with no checkout to walk up to.
+        & $dotfPath harness bind --repo-root $DotfilesDir
         if ($LASTEXITCODE -ne 0) {
             Write-Warn "dotf harness bind reported a problem (above) -- 'dotf doctor' will report hook drift"
         }

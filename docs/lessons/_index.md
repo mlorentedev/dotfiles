@@ -267,4 +267,5 @@ tags: [lessons, index, dotfiles]
 | [246 - A guard that reads its own evidence from a file allowed not to exist switches itself off exactly when it is needed](lesson-246-a-guard-that-reads-its-own-evidence-from-an-optional-file.md) | 2026-08-30 |  |
 | [248 - A broken parser is a defect only where something reads it](lesson-248-a-broken-parser-is-a-defect-only-where-something.md) | 2026-08-27 |  |
 | [249 - Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent](lesson-249-two-scripts-writing-the-same-logical-value-in-two.md) | 2026-08-31 |  |
+
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
