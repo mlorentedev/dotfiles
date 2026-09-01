@@ -109,22 +109,81 @@ created: "2026-08-27"
 
 - [x] **Fixed a cross-cutting regression found on the way** (`d4ea0f5`, #1404,
       merged the same day): `rootCmd.SetErr(io.Discard)` discarded every
-      deliberate stderr write in the CLI — 17 call sites across 9 command files,
+      deliberate stderr write in the CLI — 16 call sites across 9 command files,
       all four `dotf secrets` subcommands among them. The gate blocked with exit 2
       and NO reason. Fixed via Cobra's `SilenceErrors`, which is the mechanism for
       suppressing only the automatic wrapper; two guards added.
 
 ## Still not done, and deliberately so
 
-- [ ] **Migrate the 35 skills to declared severity.** Now the only thing between
-      the machinery and real enforcement. VAULT-SIDE: the records under
-      `harness/agents/` are generated from `00_meta/agents/definitions/`, so the
-      edit lands in the vault (direct to master) and reaches the repo through
-      `compile-harness.sh --refresh`. **`check-roster-consistency.py` raises
-      `UnreadableSkills` on the mapping form by design**, so it must be updated in
-      the same movement or HARNESS-046's declared verification goes red.
-      Roll out `reviewer` first, all four skills at `enforce: warn`, observe a
-      real dispatch, and only then promote one to `block`.
+- [~] **Migrate the 35 skills to declared severity.** CANARY LANDED, 31 REMAIN.
+      `reviewer` migrated vault-side (`c9b3181c` on knowledge master), all four
+      skills at `enforce: warn`, and `compile-harness.sh --refresh` carried it
+      into `harness/agents/reviewer/AGENT.md`. Refresh touched that record and
+      nothing else — the blast radius was the whole question, and it was measured
+      rather than assumed. `dotf doctor` moved from **35 of 35** unmigrated to
+      **31 of 35**, so the migration now has a progress meter instead of a plan.
+
+      **`check-roster-consistency.py` was updated in the same movement**, and the
+      shape is the one its own docstring prescribed: it now calls
+      `dotf harness resolve-skills` instead of growing the repository's third
+      hand-rolled frontmatter reader. Loud failure relocated, not weakened — a
+      non-zero exit, a missing binary, or a timeout all raise `UnreadableSkills`;
+      nothing degrades to `[]`. **Proof the update was necessary and not
+      cosmetic:** the pre-change guard, run from `git show HEAD:` against the
+      migrated vault, exits 1 naming the record. AC7's loud failure did exactly
+      what it was built for — it refused instead of passing silently.
+
+      Severity decided by the owner, not inferred: all four at `warn` now, and
+      **only `verification-before-completion`** is a candidate for `block` later.
+      The other three degrade a review by their absence; they do not invalidate
+      one.
+
+      Canary measured end-to-end against the migrated record, six cases:
+
+      | Case | Payload | Result |
+      |---|---|---|
+      | A | `agent_type: reviewer`, Bash | 4 `[gate] warn` lines, **exit 0** |
+      | B | no `agent_type` (main thread) | silent, exit 0 |
+      | C | `agent_type: builder` (unmigrated) | silent, exit 0 — `EnforceUnset` acts on nothing, as designed |
+      | D | `Skill` tool, `skill: audit` | consumption recorded, exit 0 |
+      | E | same `agent_id`, next Bash | 3 warns; `audit` gone |
+      | F | **same role, different `agent_id`** | all 4 warns again |
+
+      F is the reviewer finding from #1410 verified at runtime rather than only
+      in a unit test: a second dispatch of one role does not inherit the first's
+      consumption. It confirms the ledger separates by invocation **given
+      distinct ids** — it does not confirm the harness sends distinct ids, which
+      is still the open measurement.
+
+- [ ] **Confirm `agent_type` / `agent_id` against a REAL dispatch.** The canary
+      above was driven by hand-written payloads, which proves the gate's logic
+      and NOT the field names. Until `[gate] warn` lines are observed in a
+      genuine subagent dispatch, `agent_type` remains documented-not-measured,
+      and the same observation must check that two dispatches of one role carry
+      different `agent_id`s. **Precondition for promoting anything to `block`.**
+      Nothing before this point is enforcement; it is instrumentation.
+
+- [ ] **Migrate the remaining 31 skills** across `architect` (3), `builder` (9),
+      `curator` (8), `planner` (6), `shipper` (4) and `hermes-nan` (1). Blocked
+      on nothing technical — the path is proven — but each role's severities are
+      an owner decision, and the canary's evidence should be in hand first.
+
+      **Each migration corrects its own record's prose, in the same commit.**
+      Measured 2026-08-31: five definitions (`architect`, `builder`, `curator`,
+      `planner`, `shipper`) state *"Your phase's skills are enforced by hook"*
+      while every one of their skills is `EnforceUnset` — nothing enforces them
+      and nothing warns about them. The claim was false for all seven before the
+      canary; `reviewer` is now the only honest one, which is why the asymmetry
+      is visible rather than new. Raised by the PR reviewer on #1412 as a
+      documentation inconsistency, and it is the same defect class the gate
+      exists to end: doctrine that asserts an enforcement nobody performs.
+
+      It is deliberately NOT fixed here as a word swap. For an unmigrated
+      persona neither "enforced" nor "watched" is true, so the honest wording
+      differs from both and would be rewritten again at migration time. Fixing
+      it per-role, when that role's severity is decided, costs one edit instead
+      of two — and `reviewer`'s record is the pattern to copy.
 
 
 - [ ] [AC2] Presence emission. Only the Action half is built.
