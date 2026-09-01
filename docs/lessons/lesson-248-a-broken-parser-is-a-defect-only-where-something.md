@@ -1,4 +1,4 @@
-# Lesson 241 — A broken parser is a defect only where something reads it
+# Lesson 248 — A broken parser is a defect only where something reads it
 
 **Date:** 2026-08-27
 **Context:** HARNESS-045 AC7, PR #1319

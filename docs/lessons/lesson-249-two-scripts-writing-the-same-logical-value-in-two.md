@@ -1,4 +1,4 @@
-# Lesson 242 — Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent
+# Lesson 249 — Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent
 
 **Date:** 2026-08-31
 **Context:** HARNESS-045 AC1 — cutting `setup-linux.sh` and `setup-windows.ps1` over to
