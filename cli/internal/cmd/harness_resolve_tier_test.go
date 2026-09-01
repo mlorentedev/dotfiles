@@ -211,13 +211,17 @@ func TestHarnessResolveTierFailsLoudWithoutAMap(t *testing.T) {
 // silently degrading every agent render — a guard that fails OPEN and reports
 // health. This test is the tripwire, and it covers BOTH registries' consumers
 // because the shell now probes for each independently.
+//
+// `bind` joins them as the third consumer: setup-linux.sh and setup-windows.ps1
+// gate their call on this same grep, and a rename that slipped past it would
+// make every setup run skip hook emission while reporting success.
 func TestHarnessHelpListsSubcommands(t *testing.T) {
 	stdout, stderr, err := captureRealStreams(t, "harness", "--help")
 	if err != nil {
 		t.Fatalf("harness --help failed: %v (stderr=%q)", err, stderr)
 	}
 	out := stdout + stderr
-	for _, sub := range []string{"resolve-tier", "resolve-capabilities", "resolve-skills"} {
+	for _, sub := range []string{"resolve-tier", "resolve-capabilities", "resolve-skills", "bind"} {
 		// Same shape the shell greps for: the name at the start of its line in
 		// the command list, followed by whitespace before its summary.
 		if !regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(sub) + `\s`).MatchString(out) {

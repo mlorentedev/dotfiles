@@ -18,11 +18,53 @@ created: "2026-08-27"
 - [x] [AC1] `agents.bind` declared in `harness/manifest.json`, every event name
       measured against the installed harness
 
+- [x] [AC1] Wire `bind` into setup, replacing `merge_claude_settings`'s
+      positional jq paths. **Done 2026-08-31.** Both scripts call
+      `dotf harness bind` behind a `harness --help` capability probe; both merge
+      functions lost their hook parameters and assignments; the template lost its
+      `hooks` block. Measured against a COPY of the deployed files, not a
+      fixture: `~/.claude/settings.json` SessionStart stayed at 2 entries in 2
+      groups (ours adopted and marked, Orca's untouched), SessionEnd 1→1 adopted,
+      PreToolUse 1→2 (the gate appended as a NEW group), every other event
+      unchanged; `~/.gemini/settings.json` BeforeTool 1→2 with no top-level key
+      lost. A second run reported `hooks already current` on both — changed=0.
+
+      **One defect found and fixed before the cutover was safe: on Windows this
+      would have DUPLICATED the session hook.** Adoption is by exact command
+      equality, and `setup-windows.ps1` deployed `"…\dotf.exe" mem session-start`
+      — quoted, `.exe` — while `resolveDotfPath` produced neither. Fixed by
+      `hookBinaryToken(path, goos)` (goos is a PARAMETER, so the Windows branch
+      is exercised from Linux) plus the suffix in `resolveDotfPath`. Both pinned
+      by test and mutation-checked. Caught statically, so no Windows sitting was
+      needed to find it — but the first real Windows run is still the only proof.
+
+      **A correction to what this file said.** The red list named "the doctor's
+      PAT checks" and five bats files. Measured: `checks_pat.go` is GitHub token
+      expiry and touches none of this, no doctor check asserts the hook shape at
+      all, and `session-start-config.bats` only pins `session-start-config.json`'s
+      schema. FOUR bats files went red, and the fourth was not on the list:
+      `guard-no-session-handoff.bats`, which asserted the SessionEnd command as a
+      literal in each setup script. Each was rewritten to follow the SSOT to the
+      manifest rather than deleted.
+
+      **The task was mis-stated, and measurement changed its shape.** It read
+      as tidying: swap positional jq paths for a marker-based merge. Replayed on
+      2026-08-27 against a copy of the DEPLOYED `~/.claude/settings.json`, the jq
+      assignment took SessionStart from 2 groups to 1 — deleting Orca's live
+      hook. `setup-windows.ps1` carried the identical assignment for both events.
+      So it was never tidying; it removed a defect that fired on the next setup
+      run on either OS.
+
+      **The emitter (`dotf harness bind`, built 2026-08-27):** manifest-driven
+      emission over `agents.bind`, which gained `emit_hooks` (id/event/command
+      per target); atomic temp+rename; writes only when changed; refuses an
+      unparseable settings file rather than bootstrapping over someone's edit;
+      skips `emit: false` out loud and `requires_command` when absent.
+      Mutation-checked: neutering `sameCommand` puts two copies of the mem hook
+      in SessionStart.
+
 ## Not done, and deliberately so
 
-- [ ] [AC1] Wire `bind` into setup, replacing `merge_claude_settings`'s
-      positional jq paths. The merge is written and tested; nothing writes to a
-      live file yet.
 - [ ] [AC2] Presence emission. Only the Action half is built.
 - [ ] **The pi and opencode TS wrappers.** Declared in the manifest with
       `emit: false` so the gap is visible rather than remembered. They need two

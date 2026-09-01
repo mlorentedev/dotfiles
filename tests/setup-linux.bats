@@ -144,26 +144,35 @@ setup() {
     grep -qE 'sudo apt install -y tmux' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-# --- SessionStart hook registration (issue #20 prevention) ---
+# --- Session hook registration (issue #20 prevention) ---
+#
+# HARNESS-045 AC1 moved the SSOT. The hook command used to be a literal in this
+# script (EXPECTED_HOOK_COMMAND) and is now declared in harness/manifest.json,
+# emitted by `dotf harness bind`. These guards follow it: this file asserts the
+# script still RUNS the emitter on every setup, and the manifest asserts WHAT it
+# emits. Asserting a literal here again would recreate the second writer.
 
-@test "setup-linux.sh registers SessionStart hook in Claude settings" {
-    grep -q 'SessionStart' "$DOTFILES_DIR/setup-linux.sh"
+@test "setup-linux.sh emits the harness hooks by running dotf harness bind" {
+    grep -qF 'harness bind' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-# CLI-025: the SessionStart hook now invokes the `dotf mem session-start` binary
-# directly (no shell shim), via the absolute ~/.local/bin path (#531).
-@test "setup-linux.sh SessionStart hook command invokes dotf mem session-start" {
-    grep -qE 'EXPECTED_HOOK_COMMAND="\$HOME/\.local/bin/dotf mem session-start"' "$DOTFILES_DIR/setup-linux.sh"
+@test "the manifest declares the session hooks setup used to hardcode" {
+    local manifest="$DOTFILES_DIR/harness/manifest.json"
+    jq -e '.agents.bind[] | select(.agent == "claude") | .emit_hooks
+           | (map(select(.event == "SessionStart" and .command == "mem session-start")) | length == 1)
+           and (map(select(.event == "SessionEnd" and .command == "mem session-end")) | length == 1)' \
+        "$manifest"
 }
 
-# Hook registration must self-heal -- never trust "an entry exists" to mean
-# "the entry is correct". Post-SDD-002 (PR #51): merge_claude_settings ALWAYS
-# rewrites .hooks.SessionStart from the template (with __HOOK_COMMAND__
-# substituted), which is a stronger guarantee than the previous compare-then-
-# rewrite. Mirrors the Windows guard.
-@test "setup-linux.sh SessionStart hook self-heals on path drift" {
-    grep -qF 'EXPECTED_HOOK_COMMAND' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
+# Hook registration must self-heal -- never trust "an entry exists" to mean "the
+# entry is correct". bind runs unconditionally on every setup and replaces OUR
+# entry in place when its command has drifted, which is the same guarantee the
+# old unconditional rewrite gave, minus the collateral damage to third parties.
+@test "setup-linux.sh runs bind unconditionally, not only when hooks are absent" {
+    # The call sits behind a capability probe (is dotf new enough) and nothing
+    # else -- notably not behind a "does the file already have hooks" test.
+    refute_grep_fixed 'if.*hooks.*then.*harness bind' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "grep -q '^[[:space:]]*bind[[:space:]]'" "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # CLI-025 cutover guard: no deploy/registration file may deploy or invoke the

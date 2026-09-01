@@ -2,14 +2,38 @@
   "version": 1,
   "vault_subpath": "00_meta/patterns",
   "enforced": [
-    { "id": "no-attribution",      "source": "pattern-git-workflow.md#6-attribution-policy" },
-    { "id": "english-only",        "source": "pattern-git-workflow.md#8-language-policy" },
-    { "id": "no-phase-references", "source": "pattern-git-workflow.md#7-message-content-policy" },
-    { "id": "no-auto-merge",       "source": "pattern-git-workflow.md#9-merge-policy" },
-    { "id": "iac-and-idempotence", "source": "pattern-git-workflow.md#12-infrastructure-as-code-zero-manual-operations-policy" },
-    { "id": "definition-of-done",  "source": "pattern-change-lifecycle.md#definition-of-done" },
-    { "id": "pr-stewardship",      "source": "pattern-change-lifecycle.md#pr-stewardship" },
-    { "id": "secrets-never-in-output", "source": "pattern-secrets-security.md#8-never-print-a-secret" },
+    {
+      "id": "no-attribution",
+      "source": "pattern-git-workflow.md#6-attribution-policy"
+    },
+    {
+      "id": "english-only",
+      "source": "pattern-git-workflow.md#8-language-policy"
+    },
+    {
+      "id": "no-phase-references",
+      "source": "pattern-git-workflow.md#7-message-content-policy"
+    },
+    {
+      "id": "no-auto-merge",
+      "source": "pattern-git-workflow.md#9-merge-policy"
+    },
+    {
+      "id": "iac-and-idempotence",
+      "source": "pattern-git-workflow.md#12-infrastructure-as-code-zero-manual-operations-policy"
+    },
+    {
+      "id": "definition-of-done",
+      "source": "pattern-change-lifecycle.md#definition-of-done"
+    },
+    {
+      "id": "pr-stewardship",
+      "source": "pattern-change-lifecycle.md#pr-stewardship"
+    },
+    {
+      "id": "secrets-never-in-output",
+      "source": "pattern-secrets-security.md#8-never-print-a-secret"
+    },
     {
       "id": "pr-sizing",
       "source": "pattern-git-workflow.md#10-pr-sizing-policy",
@@ -25,19 +49,46 @@
       "agent": "agents",
       "kind": "native",
       "file": "AGENTS.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
+      "inject": [
+        "no-attribution",
+        "english-only",
+        "no-phase-references",
+        "no-auto-merge",
+        "iac-and-idempotence",
+        "definition-of-done",
+        "pr-stewardship",
+        "secrets-never-in-output"
+      ]
     },
     {
       "agent": "claude",
       "kind": "pointer",
       "file": "ai/claude/CLAUDE.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
+      "inject": [
+        "no-attribution",
+        "english-only",
+        "no-phase-references",
+        "no-auto-merge",
+        "iac-and-idempotence",
+        "definition-of-done",
+        "pr-stewardship",
+        "secrets-never-in-output"
+      ]
     },
     {
       "agent": "orca",
       "kind": "pointer",
       "file": "ai/orca/ORCA.md",
-      "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output"]
+      "inject": [
+        "no-attribution",
+        "english-only",
+        "no-phase-references",
+        "no-auto-merge",
+        "iac-and-idempotence",
+        "definition-of-done",
+        "pr-stewardship",
+        "secrets-never-in-output"
+      ]
     }
   ],
   "skills": {
@@ -45,17 +96,55 @@
     "record_dir": "harness/skills",
     "schema": "harness/skill-frontmatter.schema.json",
     "deploy": [
-      { "agent": "claude",   "render": "skill",   "dir": ".claude/skills" },
-      { "agent": "opencode", "render": "command", "dir": ".config/opencode/commands" },
-      { "agent": "agy",      "render": "skill",   "dir": ".gemini/skills" },
-      { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" },
-      { "agent": "copilot",  "render": "skill",   "dir": ".copilot/skills", "requires_command": "copilot" },
-      { "agent": "pi",       "render": "skill",   "dir": ".pi/agent/skills" }
+      {
+        "agent": "claude",
+        "render": "skill",
+        "dir": ".claude/skills"
+      },
+      {
+        "agent": "opencode",
+        "render": "command",
+        "dir": ".config/opencode/commands"
+      },
+      {
+        "agent": "agy",
+        "render": "skill",
+        "dir": ".gemini/skills"
+      },
+      {
+        "agent": "agy",
+        "render": "prompt",
+        "dir": ".gemini/prompts"
+      },
+      {
+        "agent": "copilot",
+        "render": "skill",
+        "dir": ".copilot/skills",
+        "requires_command": "copilot"
+      },
+      {
+        "agent": "pi",
+        "render": "skill",
+        "dir": ".pi/agent/skills"
+      }
     ],
-    "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" }
+    "catalog": {
+      "agent": "copilot",
+      "file": ".copilot/copilot-instructions.md"
+    }
   },
   "doctrine": {
-    "inject": ["no-attribution", "english-only", "no-phase-references", "no-auto-merge", "iac-and-idempotence", "definition-of-done", "pr-stewardship", "secrets-never-in-output", "pr-sizing"],
+    "inject": [
+      "no-attribution",
+      "english-only",
+      "no-phase-references",
+      "no-auto-merge",
+      "iac-and-idempotence",
+      "definition-of-done",
+      "pr-stewardship",
+      "secrets-never-in-output",
+      "pr-sizing"
+    ],
     "deploy": [
       {
         "agent": "agy",
@@ -77,13 +166,34 @@
     "record_dir": "harness/agents",
     "schema": "harness/agent-frontmatter.schema.json",
     "deploy": [
-      { "agent": "claude", "render": "agent-md", "dir": ".claude/agents" }
+      {
+        "agent": "claude",
+        "render": "agent-md",
+        "dir": ".claude/agents"
+      }
     ],
     "presence": [
-      { "agent": "claude",   "file": ".claude/CLAUDE.md",               "source": "ai/claude/CLAUDE.md" },
-      { "agent": "opencode", "file": ".config/opencode/AGENTS.md",      "source": "AGENTS.md" },
-      { "agent": "pi",       "file": ".pi/agent/AGENTS.md",             "source": "AGENTS.md" },
-      { "agent": "copilot",  "file": ".copilot/copilot-instructions.md", "source": "ai/copilot/copilot-instructions.md", "requires_command": "copilot" }
+      {
+        "agent": "claude",
+        "file": ".claude/CLAUDE.md",
+        "source": "ai/claude/CLAUDE.md"
+      },
+      {
+        "agent": "opencode",
+        "file": ".config/opencode/AGENTS.md",
+        "source": "AGENTS.md"
+      },
+      {
+        "agent": "pi",
+        "file": ".pi/agent/AGENTS.md",
+        "source": "AGENTS.md"
+      },
+      {
+        "agent": "copilot",
+        "file": ".copilot/copilot-instructions.md",
+        "source": "ai/copilot/copilot-instructions.md",
+        "requires_command": "copilot"
+      }
     ],
     "bind_comment": [
       "The third mode beside `deploy` and `presence` (HARNESS-045, #561): what a",
@@ -126,14 +236,73 @@
       "so it is visible rather than remembered. See specs/HARNESS-045-hook-emission."
     ],
     "bind": [
-      { "agent": "claude", "file": ".claude/settings.json", "format": "command-hook", "matcher": true,
-        "events": { "presence": "SessionStart", "action": "PreToolUse" } },
-      { "agent": "agy",    "file": ".gemini/settings.json", "format": "command-hook", "matcher": false,
-        "events": { "presence": "BeforeAgent", "action": "BeforeTool" }, "requires_command": "agy" },
-      { "agent": "pi",       "file": ".pi/agent/extensions/dotfiles-gate.ts",      "format": "ts-extension", "emit": false,
-        "events": { "presence": "session_start", "action": "tool_call" } },
-      { "agent": "opencode", "file": ".config/opencode/plugin/dotfiles-gate.ts",   "format": "ts-extension", "emit": false,
-        "events": { "presence": "chat.system.transform", "action": "permission.ask" } }
+      {
+        "agent": "claude",
+        "file": ".claude/settings.json",
+        "format": "command-hook",
+        "matcher": true,
+        "events": {
+          "presence": "SessionStart",
+          "action": "PreToolUse"
+        },
+        "emit_hooks": [
+          {
+            "id": "mem-session-start",
+            "event": "SessionStart",
+            "command": "mem session-start",
+            "timeout": 30
+          },
+          {
+            "id": "mem-session-end",
+            "event": "SessionEnd",
+            "command": "mem session-end",
+            "timeout": 30
+          },
+          {
+            "id": "gate",
+            "event": "PreToolUse",
+            "command": "harness gate --harness claude"
+          }
+        ]
+      },
+      {
+        "agent": "agy",
+        "file": ".gemini/settings.json",
+        "format": "command-hook",
+        "matcher": false,
+        "events": {
+          "presence": "BeforeAgent",
+          "action": "BeforeTool"
+        },
+        "requires_command": "agy",
+        "emit_hooks": [
+          {
+            "id": "gate",
+            "event": "BeforeTool",
+            "command": "harness gate --harness agy"
+          }
+        ]
+      },
+      {
+        "agent": "pi",
+        "file": ".pi/agent/extensions/dotfiles-gate.ts",
+        "format": "ts-extension",
+        "emit": false,
+        "events": {
+          "presence": "session_start",
+          "action": "tool_call"
+        }
+      },
+      {
+        "agent": "opencode",
+        "file": ".config/opencode/plugin/dotfiles-gate.ts",
+        "format": "ts-extension",
+        "emit": false,
+        "events": {
+          "presence": "chat.system.transform",
+          "action": "permission.ask"
+        }
+      }
     ]
   }
 }

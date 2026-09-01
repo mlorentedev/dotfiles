@@ -85,7 +85,7 @@ setup() {
 
     existing='{"model":"sonnet","env":{"MACHINE_LOCAL":"keep"}}'
     out="$(printf '%s' "$existing" | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{},"env":{"CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL":"1"}}' \
+        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"enabledPlugins":{},"env":{"CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL":"1"}}' \
         "$expr" 2>&1)"
     [ -n "$out" ]
     # template key arrives...
@@ -95,7 +95,7 @@ setup() {
 
     # a target with no env at all must still receive it
     out="$(printf '%s' '{"model":"sonnet"}' | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{},"env":{"A":"1"}}' \
+        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"enabledPlugins":{},"env":{"A":"1"}}' \
         "$expr" 2>&1)"
     [ "$(printf '%s' "$out" | jq -r '.env.A')" = "1" ]
 }
@@ -139,7 +139,7 @@ setup() {
 
     # a template WITHOUT the optional key must still merge everything else
     out="$(printf '%s' "$existing" | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{}}' \
+        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"enabledPlugins":{}}' \
         "$expr" 2>&1)"
     [ -n "$out" ]
     [ "$(printf '%s' "$out" | jq -r '.model')" = "opus" ]
@@ -147,7 +147,7 @@ setup() {
 
     # and a template WITH it must carry it through
     out="$(printf '%s' "$existing" | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","outputStyle":"Concise","permissions":{"allow":[]},"hooks":{},"enabledPlugins":{}}' \
+        '{"model":"opus","effortLevel":"xhigh","outputStyle":"Concise","permissions":{"allow":[]},"enabledPlugins":{}}' \
         "$expr" 2>&1)"
     [ "$(printf '%s' "$out" | jq -r '.outputStyle')" = "Concise" ]
 }
@@ -158,32 +158,72 @@ setup() {
     grep -q 'outputStyle' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# --- hooks.SessionStart with placeholder ---
+# --- hooks: NOT this template's, and NOT either merge function's (HARNESS-045) ---
 
-@test "template hooks.SessionStart contains __HOOK_COMMAND__ placeholder" {
-    [[ "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$SETTINGS_TEMPLATE")" == "__HOOK_COMMAND__" ]]
+@test "template declares no hooks at all -- dotf harness bind owns them" {
+    # Ownership moved wholly to `dotf harness bind`, which merges by marker from
+    # harness/manifest.json. Leaving a hooks block here would resurrect the second
+    # writer: the template is applied by an ALLOW-LIST merge, so a hooks key here
+    # is either dead weight or, the day someone adds it back to the policy, the
+    # positional assignment that deleted a live third-party group all over again.
+    run jq -e '.hooks' "$SETTINGS_TEMPLATE"
+    [ "$status" -ne 0 ]
 }
 
-@test "template hooks.SessionStart timeout = 30" {
-    [[ "$(jq -r '.hooks.SessionStart[0].hooks[0].timeout' "$SETTINGS_TEMPLATE")" == "30" ]]
+@test "neither merge function writes hooks (single writer: dotf harness bind)" {
+    # Scoped to the two merge BODIES, same extraction as the allow-list guard
+    # above: a mention elsewhere in either script (the bind call itself, a
+    # comment) is not a second writer.
+    local linux_merge windows_merge
+    linux_merge="$(sed -n '/^merge_claude_settings() {/,/^}/p' "$DOTFILES_DIR/setup-linux.sh")"
+    windows_merge="$(sed -n '/^function Merge-ClaudeSettings {/,/^}/p' "$DOTFILES_DIR/setup-windows.ps1")"
+    [ -n "$linux_merge" ] || { echo "could not extract merge_claude_settings from setup-linux.sh" >&2; return 1; }
+    [ -n "$windows_merge" ] || { echo "could not extract Merge-ClaudeSettings from setup-windows.ps1" >&2; return 1; }
+
+    printf '%s\n' "$linux_merge" | grep -qF '.hooks' \
+        && { echo "merge_claude_settings still writes .hooks -- bind is the only writer" >&2; return 1; }
+    printf '%s\n' "$windows_merge" | grep -qF "['hooks']" \
+        && { echo "Merge-ClaudeSettings still writes hooks -- bind is the only writer" >&2; return 1; }
+    return 0
 }
 
-@test "template hooks.SessionStart[0].hooks[0].type = command" {
-    [[ "$(jq -r '.hooks.SessionStart[0].hooks[0].type' "$SETTINGS_TEMPLATE")" == "command" ]]
+@test "both setup scripts pass --repo-root to bind, never inferring it from the cwd" {
+    # env.ResolveHarnessRoot walks up from the CWD for a .git, then falls back to
+    # ~/.dotfiles. Measured under `env -i`: from a cwd outside any checkout, on a
+    # machine with no ~/.dotfiles yet, bind exits 1 having emitted NO hooks --
+    # a first run invoked by absolute path. Neither script may rely on that
+    # inference; both know their own checkout. Windows is the likelier victim,
+    # because a .ps1 does not change the cwd.
+    grep -qF -- 'harness bind --repo-root "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF -- 'harness bind --repo-root $DotfilesDir' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# --- hooks.SessionEnd with placeholder (MEMORY-001 session bridge) ---
-
-@test "template hooks.SessionEnd contains __SESSION_END_COMMAND__ placeholder" {
-    [[ "$(jq -r '.hooks.SessionEnd[0].hooks[0].command' "$SETTINGS_TEMPLATE")" == "__SESSION_END_COMMAND__" ]]
+@test "both setup scripts call dotf harness bind behind a capability probe" {
+    # The call is what makes AC1 real; the probe is what keeps a stale dotf from
+    # silently emitting nothing (lesson 219 -- exit status cannot tell "I refuse"
+    # from "I do not understand the question").
+    grep -qF 'harness bind' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'harness bind' "$DOTFILES_DIR/setup-windows.ps1"
+    grep -qF "grep -q '^[[:space:]]*bind[[:space:]]'" "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF "'(?m)^\s*bind\s'" "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup-linux merge wires hooks.SessionEnd from template" {
-    grep -qF '.hooks.SessionEnd = $tmpl.hooks.SessionEnd' setup-linux.sh
+@test "the linux probe captures before grepping, never pipes into grep -q" {
+    # `cmd | grep -q` closes the pipe on first match; under pipefail the SIGPIPE'd
+    # producer makes the pipeline exit 141 -- "too old" for a binary that just
+    # proved it is current (measured, compile-harness.sh:369).
+    refute_grep_fixed 'harness --help 2>/dev/null | grep' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-windows merge wires hooks.SessionEnd from template" {
-    grep -qF "\$existing['hooks']['SessionEnd'] = \$template['hooks']['SessionEnd']" setup-windows.ps1
+@test "no __HOOK_COMMAND__ placeholder survives anywhere" {
+    # The substitution is gone from both scripts; a leftover placeholder would be
+    # a literal command string deployed into a hook.
+    refute_grep_fixed '__HOOK_COMMAND__' "$SETTINGS_TEMPLATE"
+    refute_grep_fixed '__HOOK_COMMAND__' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed '__HOOK_COMMAND__' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep_fixed '__SESSION_END_COMMAND__' "$SETTINGS_TEMPLATE"
+    refute_grep_fixed '__SESSION_END_COMMAND__' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed '__SESSION_END_COMMAND__' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- permissions.allow: MCP entries required, Bash/WebSearch/WebFetch/Skill allowed ---
@@ -269,21 +309,4 @@ setup() {
         ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
         refute_grep "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-windows.ps1"
     done
-}
-
-# --- Negative assertions: user/machine-specific keys MUST NOT be in template ---
-
-@test "template does NOT define hooks.PreToolUse (third-party tool surface)" {
-    run jq -e '.hooks.PreToolUse' "$SETTINGS_TEMPLATE"
-    [[ "$status" -ne 0 ]]
-}
-
-@test "template does NOT define hooks.PostToolUse (third-party tool surface)" {
-    run jq -e '.hooks.PostToolUse' "$SETTINGS_TEMPLATE"
-    [[ "$status" -ne 0 ]]
-}
-
-@test "template does NOT define hooks.Stop (third-party tool surface)" {
-    run jq -e '.hooks.Stop' "$SETTINGS_TEMPLATE"
-    [[ "$status" -ne 0 ]]
 }

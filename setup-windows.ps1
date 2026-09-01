@@ -201,9 +201,13 @@ function Register-HiveScheduledTask {
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,
 # additionalDirectories, third-party hooks like GitGuardian) by only
-# touching the keys declared as "ours" in the template. The template's
-# __HOOK_COMMAND__ placeholder is replaced with the OS-specific hook command
-# before any merge / write.
+# touching the keys declared as "ours" in the template.
+#
+# HOOKS ARE NOT THIS FUNCTION'S ANY MORE (HARNESS-045 AC1). They are emitted by
+# `dotf harness bind` below, from harness/manifest.json, and this function must
+# not gain a second hooks writer: the assignment it used to carry
+# ($existing['hooks']['SessionStart'] = $template[...]) deleted a live
+# third-party group, the identical defect measured on the Linux twin.
 function Merge-ClaudeSettings {
     [CmdletBinding()]
     # "Settings" is the canonical Claude Code config-file name (settings.json);
@@ -212,9 +216,7 @@ function Merge-ClaudeSettings {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     param(
         [Parameter(Mandatory)][string]$TemplatePath,
-        [Parameter(Mandatory)][string]$TargetPath,
-        [Parameter(Mandatory)][string]$HookCommand,
-        [Parameter(Mandatory)][string]$SessionEndCommand
+        [Parameter(Mandatory)][string]$TargetPath
     )
 
     if (-not (Test-Path $TemplatePath)) {
@@ -222,14 +224,10 @@ function Merge-ClaudeSettings {
         return
     }
 
-    # Read template, JSON-escape the hook command, substitute __HOOK_COMMAND__
-    $escapedCommand = ($HookCommand -replace '\\', '\\') -replace '"', '\"'
-    $escapedEndCommand = ($SessionEndCommand -replace '\\', '\\') -replace '"', '\"'
-    $templateRaw = (Get-Content $TemplatePath -Raw) -replace '__HOOK_COMMAND__', $escapedCommand -replace '__SESSION_END_COMMAND__', $escapedEndCommand
     try {
-        $template = $templateRaw | ConvertFrom-Json -AsHashtable
+        $template = (Get-Content $TemplatePath -Raw) | ConvertFrom-Json -AsHashtable
     } catch {
-        Write-Warn "Claude settings template is not valid JSON after placeholder substitution: $_"
+        Write-Warn "Claude settings template is not valid JSON: $_"
         return
     }
 
@@ -277,18 +275,6 @@ function Merge-ClaudeSettings {
         if (-not $existing['permissions'].ContainsKey('allow')) { $existing['permissions']['allow'] = @() }
         $merged = @(@($existing['permissions']['allow']) + @($template['permissions']['allow']) | Select-Object -Unique)
         $existing['permissions']['allow'] = $merged
-    }
-
-    # hooks.SessionStart: TEMPLATE wins (replace entire array). Other hook
-    # surfaces (PreToolUse, PostToolUse, Stop) are untouched -- third parties
-    # register there.
-    if ($template.ContainsKey('hooks') -and $template['hooks'].ContainsKey('SessionStart')) {
-        if (-not $existing.ContainsKey('hooks')) { $existing['hooks'] = @{} }
-        $existing['hooks']['SessionStart'] = $template['hooks']['SessionStart']
-    }
-    if ($template.ContainsKey('hooks') -and $template['hooks'].ContainsKey('SessionEnd')) {
-        if (-not $existing.ContainsKey('hooks')) { $existing['hooks'] = @{} }
-        $existing['hooks']['SessionEnd'] = $template['hooks']['SessionEnd']
     }
 
     # enabledPlugins: object merge (template wins on conflict). User-added
@@ -478,8 +464,8 @@ Install-AgentBinary -Name "Antigravity CLI (agy)" -Command "agy" -InstallerUrl "
 Write-Info "Deploying Claude configuration..."
 
 # Bulk copy all Claude config files EXCEPT settings.json (SDD-002: handled by
-# Merge-ClaudeSettings below, which substitutes __HOOK_COMMAND__ and applies the
-# per-key merge policy preserving user customizations).
+# Merge-ClaudeSettings below, which applies the per-key merge policy preserving
+# user customizations; its hooks come from `dotf harness bind`).
 $claudeSource = "$DotfilesDir\ai\claude"
 if (Test-Path $claudeSource) {
     Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
@@ -1846,23 +1832,44 @@ if (Test-Path $obsCliSource) {
 # 7c. REGISTER SESSIONSTART HOOK
 # ============================================================================
 
-Write-Info "Applying Claude settings.json template + registering SessionStart hook..."
+Write-Info "Applying Claude settings.json template..."
 
 # SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
-# settings.json lives at ai/claude/settings.json. The previous inline hashtable
-# for the hook entry is gone -- Merge-ClaudeSettings reads the template,
-# substitutes __HOOK_COMMAND__, and applies the per-key policy. Bootstraps a
-# fresh settings.json if missing (closes the v1 doble-paso friction).
+# settings.json lives at ai/claude/settings.json. Merge-ClaudeSettings applies
+# the per-key policy for model/permissions/env/plugins. Bootstraps a fresh
+# settings.json if missing (closes the v1 doble-paso friction).
 $ClaudeSettings = "$ClaudeHome\settings.json"
 $ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
-# CLI-025: both session hooks are agnostic `dotf mem` nouns, invoked directly (no
-# pwsh -File shim - claude-session-start.ps1 + session-handoff.ps1 are deleted).
-# The absolute binary path keeps them working when ~/.local/bin is off PATH (#531).
-$dotfBin = "$env:USERPROFILE\.local\bin\dotf.exe"
-$expectedHookCommand = "`"$dotfBin`" mem session-start"
-$expectedSessionEndCommand = "`"$dotfBin`" mem session-end"
 
-Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings -HookCommand $expectedHookCommand -SessionEndCommand $expectedSessionEndCommand
+Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings
+
+# HARNESS-045 AC1: hooks are emitted by `dotf harness bind`, for every harness
+# declared in harness/manifest.json's `agents.bind`. One Go binary on both OSes,
+# not a per-OS shim -- the emitted command (quoted path, .exe suffix) is resolved
+# inside it, so this call is byte-identical to the Linux one.
+#
+# Gate on the CAPABILITY, never on the exit status (lesson 219): a dotf predating
+# the subcommand rejects the flags with exit 1, indistinguishable from a genuine
+# refusal. TestHarnessHelpListsSubcommands pins the string from the Go side.
+$dotfBin = Get-Command dotf -ErrorAction SilentlyContinue
+$dotfPath = if ($dotfBin) { $dotfBin.Source } elseif (Test-Path "$env:USERPROFILE\.local\bin\dotf.exe") { "$env:USERPROFILE\.local\bin\dotf.exe" } else { $null }
+if (-not $dotfPath) {
+    Write-Warn "dotf not found (PATH or ~/.local/bin) -- harness hooks NOT emitted; sessions run without the memory hooks and the gate"
+} else {
+    $harnessHelp = (& $dotfPath harness --help 2>&1 | Out-String)
+    if ($harnessHelp -match '(?m)^\s*bind\s') {
+        # -RepoRoot passed EXPLICITLY -- see the twin comment in setup-linux.sh.
+        # It matters more here: a PowerShell script does not change the cwd, so
+        # `PowerShell -File C:\path\to\dotfiles\setup-windows.ps1` run from
+        # anywhere else leaves the resolver with no checkout to walk up to.
+        & $dotfPath harness bind --repo-root $DotfilesDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "dotf harness bind reported a problem (above) -- 'dotf doctor' will report hook drift"
+        }
+    } else {
+        Write-Warn "installed dotf predates 'dotf harness bind' -- harness hooks NOT emitted; rebuild/reinstall dotf and re-run setup"
+    }
+}
 
 # ============================================================================
 # 8. GITHUB COPILOT CLI
