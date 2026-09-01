@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.53.0](https://github.com/mlorentedev/dotfiles/compare/v0.52.0...v0.53.0) (2026-09-01)
+
+
+### Features
+
+* **cli:** HARNESS-105 refactor shellQuote and implement JSON Error Latches ([#1404](https://github.com/mlorentedev/dotfiles/issues/1404)) ([d4ea0f5](https://github.com/mlorentedev/dotfiles/commit/d4ea0f571e3e81daf25847b121e9d2e703e18f42))
+* **harness:** bind hooks through dotf, removing both setup scripts' hooks writers ([#1407](https://github.com/mlorentedev/dotfiles/issues/1407)) ([fdbe17c](https://github.com/mlorentedev/dotfiles/commit/fdbe17c8cdeac29837a56cddb3bc4bb60219a1a6)), closes [#561](https://github.com/mlorentedev/dotfiles/issues/561)
+* **harness:** migrate reviewer to declared severity, and teach the roster guard the new form ([#1412](https://github.com/mlorentedev/dotfiles/issues/1412)) ([cd7416f](https://github.com/mlorentedev/dotfiles/commit/cd7416ff64c99aec15f137b527c55b20455123d9))
+* **harness:** the gate resolves its persona from the payload, and doctor reports what it cannot enforce ([#1410](https://github.com/mlorentedev/dotfiles/issues/1410)) ([2dbaa06](https://github.com/mlorentedev/dotfiles/commit/2dbaa064d23ba79bc859816817bb6a8b9c7d272d))
+* **setup:** make the no-attribution order mechanical and stop holding peer messages ([#1411](https://github.com/mlorentedev/dotfiles/issues/1411)) ([a7364e1](https://github.com/mlorentedev/dotfiles/commit/a7364e1a20e7691de78359802c51ba878ffdec7a))
+
+
+### Bug Fixes
+
+* **deploy:** agy owns the settings it writes, so the deploy stops replacing them ([#1414](https://github.com/mlorentedev/dotfiles/issues/1414)) ([6e0d180](https://github.com/mlorentedev/dotfiles/commit/6e0d180ae57c24148fbe3e74af7c7f75d86c40f1))
+* **setup:** restore setup-linux.sh executable bit and guard the invocation ([#1413](https://github.com/mlorentedev/dotfiles/issues/1413)) ([fd02554](https://github.com/mlorentedev/dotfiles/commit/fd02554e3528781ecd563eaae5f2549c0dd1254d))
+
 ## [0.52.0](https://github.com/mlorentedev/dotfiles/compare/v0.51.0...v0.52.0) (2026-08-30)
 
 
