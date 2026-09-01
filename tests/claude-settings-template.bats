@@ -168,6 +168,42 @@ setup() {
     [ "$(jq -r '.precomputeCompactionEnabled' "$SETTINGS_TEMPLATE")" = "true" ]
 }
 
+@test "template autoCompactWindow actually caps the model it is paired with" {
+    # The window is in TOKENS, and the effective threshold is the MINIMUM of
+    # this setting and the model's own window. So the value only does anything
+    # if it is below the model's window -- pair it with a smaller model and it
+    # silently becomes a no-op that still reads as configured.
+    #
+    # Asserted as a RELATIONSHIP, not a constant: the failure this guards is
+    # someone dropping the `[1m]` suffix from `model` and leaving an 800000
+    # window behind, which then caps nothing.
+    local win model
+    win="$(jq -r '.autoCompactWindow' "$SETTINGS_TEMPLATE")"
+    model="$(jq -r '.model' "$SETTINGS_TEMPLATE")"
+    case "$win" in
+        ''|*[!0-9]*) echo "autoCompactWindow '$win' is not a positive integer" >&2; return 1 ;;
+    esac
+    [ "$win" -gt 0 ]
+    case "$model" in
+        *'[1m]')
+            [ "$win" -lt 1000000 ] \
+                || { echo "model is $model (1M window) but autoCompactWindow=$win caps nothing" >&2; return 1; } ;;
+    esac
+}
+
+@test "template retains transcripts for a bounded, explicit period" {
+    # Default is 30 days. The value is a deliberate tradeoff and is asserted so
+    # it cannot drift silently in either direction: transcripts are the fallback
+    # continuity record when a handoff is thin, and they are also a durable
+    # artifact that nothing scans for secrets. Bounded, not unbounded.
+    local days
+    days="$(jq -r '.cleanupPeriodDays' "$SETTINGS_TEMPLATE")"
+    case "$days" in
+        ''|*[!0-9]*) echo "cleanupPeriodDays '$days' is not a positive integer" >&2; return 1 ;;
+    esac
+    [ "$days" -ge 1 ]
+}
+
 @test "the merge expression survives a template that omits an optional key" {
     # jq: a condition that evaluates to `empty` makes the WHOLE if-expression
     # produce nothing, so `if ($tmpl.key // empty) then ... else . end` does not

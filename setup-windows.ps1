@@ -259,6 +259,9 @@ function Merge-ClaudeSettings {
     if ($template.ContainsKey('crossSessionInbound')) { $existing['crossSessionInbound'] = $template['crossSessionInbound'] }
     if ($template.ContainsKey('autoCompactEnabled')) { $existing['autoCompactEnabled'] = $template['autoCompactEnabled'] }
     if ($template.ContainsKey('precomputeCompactionEnabled')) { $existing['precomputeCompactionEnabled'] = $template['precomputeCompactionEnabled'] }
+    if ($template.ContainsKey('autoCompactWindow')) { $existing['autoCompactWindow'] = $template['autoCompactWindow'] }
+    if ($template.ContainsKey('autoContinueAtUsageLimit')) { $existing['autoContinueAtUsageLimit'] = $template['autoContinueAtUsageLimit'] }
+    if ($template.ContainsKey('cleanupPeriodDays')) { $existing['cleanupPeriodDays'] = $template['cleanupPeriodDays'] }
 
     # attribution: whole-object replace, NOT the per-key merge env gets below.
     # It is dotfiles-owned policy -- the standing order is that no git or GitHub
