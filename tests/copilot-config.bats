@@ -102,10 +102,33 @@ load 'lib/refute'
     done
 }
 
-@test "the Copilot and agy trust lists are {HOME} templates rendered by dotf deploy (AI-042)" {
+@test "the Copilot trust list is a {HOME} template rendered by dotf deploy (AI-042)" {
+    # AI-043 (#1390) superseded the agy half of this test, and the reason is
+    # worth keeping rather than silently deleting.
+    #
+    # This test used to assert two more things:
+    #
+    #   1. that ai/agy/settings.json carries `trustedWorkspaces` as a {HOME}
+    #      template, and
+    #   2. that the agy-settings manifest entry resolves to `replace`.
+    #
+    # Both had to go, and (2) is the one that matters: it PINNED the destructive
+    # behaviour. agy rewrites `trustedWorkspaces` and `permissions.allow` at
+    # runtime, so a replace deploy deleted whatever the user had trusted or
+    # granted -- measured on this box, `/home/manu/Projects/ts-bridge` gone and
+    # the live file byte-identical to the template. A suite that asserts
+    # `replace` here is asserting the data loss.
+    #
+    # (1) is now vacuous by a STRONGER claim: the template ships no
+    # `trustedWorkspaces` at all. "These paths must be {HOME} templates rather
+    # than hardcoded" was AI-042's requirement for paths we ship; it does not
+    # apply to a key we deliberately stopped shipping. `tests/antigravity.bats`
+    # asserts the absence and the merge strategy, so neither claim is lost --
+    # they moved to where the change lives.
+    #
+    # Copilot's half is untouched: `trustedFolders` is still ours to ship.
     [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*"]' ]
-    [ "$(jq -c '.trustedWorkspaces' "$DOTFILES_DIR/ai/agy/settings.json")" = '["{HOME}/Projects/*","{HOME}/Projects/Workspace/*"]' ]
-    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.strategy // "replace") \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json replace slash" ]
+    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json slash" ]
     [ "$(jq -r '.version' "$MANIFEST")" = "3" ]
 }
 

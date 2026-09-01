@@ -2,23 +2,6 @@
   "allowNonWorkspaceAccess": true,
   "model": "Gemini 3.7 Flash (High)",
   "notifications": true,
-  "permissions": {
-    "allow": [
-      "command(*)",
-      "read_file(*)",
-      "write_file(*)",
-      "read_url(*)",
-      "search_web(*)"
-    ],
-    "deny": [
-      "command(rm -rf /)",
-      "command(rm -rf ~/*)"
-    ]
-  },
-  "trustedWorkspaces": [
-    "{HOME}/Projects/*",
-    "{HOME}/Projects/Workspace/*"
-  ],
   "workspace": {
     "autoSave": true,
     "excludePatterns": [
