@@ -169,6 +169,22 @@ created: "2026-08-27"
       on nothing technical — the path is proven — but each role's severities are
       an owner decision, and the canary's evidence should be in hand first.
 
+      **Each migration corrects its own record's prose, in the same commit.**
+      Measured 2026-08-31: five definitions (`architect`, `builder`, `curator`,
+      `planner`, `shipper`) state *"Your phase's skills are enforced by hook"*
+      while every one of their skills is `EnforceUnset` — nothing enforces them
+      and nothing warns about them. The claim was false for all seven before the
+      canary; `reviewer` is now the only honest one, which is why the asymmetry
+      is visible rather than new. Raised by the PR reviewer on #1412 as a
+      documentation inconsistency, and it is the same defect class the gate
+      exists to end: doctrine that asserts an enforcement nobody performs.
+
+      It is deliberately NOT fixed here as a word swap. For an unmigrated
+      persona neither "enforced" nor "watched" is true, so the honest wording
+      differs from both and would be rewritten again at migration time. Fixing
+      it per-role, when that role's severity is decided, costs one edit instead
+      of two — and `reviewer`'s record is the pattern to copy.
+
 
 - [ ] [AC2] Presence emission. Only the Action half is built.
 - [ ] **The pi and opencode TS wrappers.** Declared in the manifest with
