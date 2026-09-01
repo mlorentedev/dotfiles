@@ -13,11 +13,26 @@ resolution — read:
 { "paths": { "DOTFILES_REPO_DIR": "/home/manu/Projects/dotfiles-wt-gentleai" } }
 ```
 
-Some earlier session had persisted its **current working directory** as the
-canonical repo dir, and that directory was a throwaway worktree. The value was
-wrong the moment it was written: a worktree for a feature branch is a temporary
-view of the repo, never the repo. Nothing detected it for as long as the
-directory happened to exist.
+The writer is `setup-linux.sh:1612`, and it is not a stray session:
+
+```sh
+# Seed DOTFILES_REPO_DIR into machine.json to the checkout setup runs from,
+# BEFORE generating the path file, so the cascade (and the generated paths.sh)
+# resolve the real repo instead of the phantom contract default [...]
+if dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR" >/dev/null; then
+```
+
+Setup records **the directory it was invoked from**. On a fresh machine that is
+exactly right, and it fixes a real defect (BUG-029/#696, where `dotf update` and
+`dotf mem` no-opped because the contract default was a phantom). It has no notion
+that a linked worktree is not the canonical checkout, so running setup from one —
+an ordinary thing to do while testing a setup change — writes a throwaway path
+into the machine's SSOT. The value was wrong the moment it was written: a
+feature-branch worktree is a temporary view of the repo, never the repo. Nothing
+detected it for as long as the directory happened to exist.
+
+This recurs by construction, which is why it is fixed in the same change rather
+than only described here.
 
 The tempting reading of the incident is "the cleanup broke the build". The
 accurate one is the reverse. `dotf doctor` already carries the right check, and
@@ -42,11 +57,12 @@ never have depended on it".
 
 Two corollaries earned the hard way in the same session:
 
-- **A write-side that accepts the caller's cwd will eventually record a
-  disposable location.** `dotf env set` takes an explicit path for exactly this
-  reason; whatever wrote the worktree path did not. A path SSOT should refuse, or
-  at least warn on, a value inside `.git/worktrees` — the repo has a canonical
-  checkout and a worktree is never it.
+- **A write-side that records "where I was invoked" will eventually record a
+  disposable location.** `dotf env set` is fine — it takes an explicit path. The
+  defect is in what setup passes it. The cheap discriminator is git's own: inside
+  a linked worktree `git rev-parse --git-dir` and `--git-common-dir` differ, and
+  they are equal in the canonical checkout. Setup now checks that and keeps the
+  existing override rather than overwriting it with a temporary view.
 - **Fix the SSOT and you have still not fixed the running processes.** The
   resolution cascade prefers the environment variable over `machine.json`, so
   after `dotf env set` + `dotf env generate` the repaired value was invisible to

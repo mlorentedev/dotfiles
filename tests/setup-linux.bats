@@ -496,3 +496,37 @@ setup() {
     [ -n "$refresh_line" ] && [ -n "$mirror_line" ]
     [ "$mirror_line" -gt "$refresh_line" ]
 }
+
+@test "setup-linux.sh seeds the canonical checkout, not the linked worktree it ran from (lesson 247)" {
+    # The mechanism, on a real repo + worktree: --git-dir and --git-common-dir are
+    # equal in a normal checkout and differ inside a linked worktree, where the
+    # common dir is the real repo's .git. Seeding $CURRENT_DIR from a worktree put
+    # a throwaway path into machine.json and blocked every commit on the box once
+    # that worktree was deleted.
+    local tmp; tmp="$(mktemp -d)"
+    git -C "$tmp" init -q main_repo
+    git -C "$tmp/main_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+    git -C "$tmp/main_repo" worktree add -q "$tmp/wt" -b side
+
+    # canonical checkout: the two agree, so the seed is CURRENT_DIR unchanged
+    local gd gcd
+    gd="$(git -C "$tmp/main_repo" rev-parse --git-dir)"
+    gcd="$(git -C "$tmp/main_repo" rev-parse --git-common-dir)"
+    [ "$gd" = "$gcd" ]
+
+    # linked worktree: they differ, and dirname(common) is the canonical checkout
+    gd="$(git -C "$tmp/wt" rev-parse --git-dir)"
+    gcd="$(git -C "$tmp/wt" rev-parse --git-common-dir)"
+    [ "$gd" != "$gcd" ]
+    [ "$(cd "$(dirname "$gcd")" && pwd -P)" = "$(cd "$tmp/main_repo" && pwd -P)" ]
+
+    git -C "$tmp/main_repo" worktree remove --force "$tmp/wt"
+    rm -rf "$tmp"
+}
+
+@test "setup-linux.sh no longer seeds DOTFILES_REPO_DIR from CURRENT_DIR directly (lesson 247)" {
+    # Wiring, not mechanism: the resolution above is worthless if the script still
+    # passes the invocation directory to `dotf env set`.
+    grep -q 'dotf env set DOTFILES_REPO_DIR "\$SEED_REPO_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+}
