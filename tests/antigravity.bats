@@ -121,3 +121,42 @@ setup() {
     [ -f "$GEMINI_HOME/.geminiignore" ]
     grep -q '^sensitive/' "$GEMINI_HOME/.geminiignore"
 }
+
+# --- AI-043 (#1390): agy writes its own settings, so the deploy must not own them ---
+# These assert REPO CONTENT only (manifest + template), so unlike the tests above
+# they run everywhere, with or without agy installed.
+
+@test "AI-043: agy-settings deploys with strategy merge, never replace" {
+    # MEASURED data loss, not a prediction. On 2026-09-01 the live file on this
+    # box went byte-identical to the template: `/home/manu/Projects/ts-bridge`,
+    # a workspace the user had trusted at runtime, was gone. Reproduced in a
+    # sandbox HOME with the same binary and only the manifest differing --
+    # `replace` destroyed a runtime-added trustedWorkspaces entry and a runtime
+    # `mcp(hive-vault/*)` grant; `merge` kept both.
+    #
+    # The trap this pins: `replace` is the DEFAULT when no strategy is declared,
+    # so the destructive setting is the one you get by writing nothing.
+    local strategy
+    strategy="$(jq -r '.configs[] | select(.name=="agy-settings") | .strategy // "replace(default)"' \
+        "$DOTFILES_DIR/ai/deploy.json")"
+    [ "$strategy" = "merge" ] \
+        || { echo "agy-settings strategy is '$strategy'; runtime state is destroyed on every deploy" >&2; return 1; }
+}
+
+@test "AI-043: the agy template ships no key agy writes at runtime" {
+    # `merge` alone is NOT sufficient and this is the half that is easy to drop.
+    # mergeInto writes whole TOP-LEVEL keys, so a template still carrying
+    # `permissions` or `trustedWorkspaces` overwrites them wholesale even under
+    # merge -- the manifest change and this removal only work as a pair.
+    #
+    # Stated cost, so nobody re-adds them thinking it is free: dotfiles no
+    # longer ships agy's `permissions.deny` defaults to a FRESH machine. The
+    # union-merge work on #1334 is what lets both coexist again; until it lands,
+    # not clobbering the user's grants is the side worth being on.
+    local key
+    for key in permissions trustedWorkspaces; do
+        run jq -e --arg k "$key" 'has($k)' "$DOTFILES_DIR/ai/agy/settings.json"
+        [ "$status" -ne 0 ] \
+            || { echo "template carries '$key', which agy rewrites at runtime; merge overwrites it wholesale" >&2; return 1; }
+    done
+}
