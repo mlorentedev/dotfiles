@@ -14,7 +14,11 @@ Every command below was executed on this branch; nothing here is asserted from r
 - [x] AC3 — blocks 8–9 absent from `setup-linux.sh` → same shape → `OK`
 - [x] AC4 — HIVE-118 and MEM-002 intact, rc exports intact → `bats tests/guard-no-claude-mem.bats` 3/3 `ok`, including *"the MEM-002 cleanup block IS present in both setup scripts (anti-regression)"*
 - [x] AC5 — C15 skip → `ok 1 … # skip no 'dotf secrets show <id>' call sites in the tree — nothing to resolve (the shell/ps1 sweep found none)`
-- [x] AC6 — `bash -n` clean; `shellcheck -S warning` clean; `bats tests/*.bats` → **ok=1526 not_ok=7 skipped=76**
+- [x] AC6 — `bash -n` clean; `shellcheck -S warning` clean; `bats tests/*.bats` → TAP plan `1..1535`, **ok=1528 (77 of them skips), not_ok=7**
+
+> **Corrected after the independent review (finding F1).** This line first read `ok=1526 not_ok=7 skipped=76`, which sums to 1609 against a plan of 1535. The counting `awk` matched `/# skip/` on lines that also matched `/^ok /`, so every skip was counted twice and the pass count was correspondingly off. The material claim — seven failures, all pre-existing — was unaffected and the reviewer reproduced it independently at the true merge base `16d8f96`, which is a stricter baseline than the `3a11d97` used here.
+>
+> **On AC6's own wording**, also per the review (F4): "passes under both bash and zsh" is not a discriminating clause, because bats re-execs its own bash and the invoking shell does not change test semantics — one run is what exists and one run is what is recorded. And **PSScriptAnalyzer was never run locally** (no `pwsh` on this box; those cases skip). It is enforced by CI at `.github/workflows/ci.yml` `lint-powershell`, which went green on #1433. That is the evidence for the PowerShell half, and it is CI's, not this session's.
 - [x] AC7 — `bats tests/guard-doctrine-target-not-deleted.bats` 2/2 `ok`
 - [x] AC8 — lessons 256 and 257 written and indexed
 
@@ -61,7 +65,9 @@ Green on this tree. The guard fails for the right reason, at the right line.
 
 ### LOC
 
-`setup-linux.sh` 1738 → 1686, `setup-windows.ps1` 2341 → 2301. **4079 → 3987, −92 net**, against 150 raw deletions — the difference is the comments left behind saying what was removed and on what evidence.
+`setup-linux.sh` 1738 → 1686 (−52), `setup-windows.ps1` 2341 → **2305** (−36, numstat 17+/53−). **4079 → 3991, −88 net.**
+
+> **Corrected after the independent review (finding F1).** This first read `2301` and `−92`. The Windows figure was measured before two later edits added explanatory comments to that file — the claude-mem reword and the CLI-020 note — and the stale number was then carried into the commit message, the PR body and the handoff without being re-measured. Re-measured here with `wc -l` and `git diff --numstat 16d8f96...HEAD`. The direction and the reason are unchanged: the gap between 88 net and 150 raw deletions is the comments left behind recording what was removed and on what evidence.
 
 ## Decisions made during implementation
 
@@ -78,9 +84,28 @@ Green on this tree. The guard fails for the right reason, at the right line.
 - [ ] ADR-worthy? No. Nothing here changes a structural decision.
 - [ ] New pattern for `00_meta/patterns/`? Candidate: "classify a cleanup by skip-cost, then probe its target" — hold until a second instance appears.
 
+## Independent review outcome
+
+**PASS** — `nan/glm5.3-flash`, drawn at random from `harness/reviewer-pool.json`, at `reviewed_sha` `d0c8b16`. Rubric: Scope A, Reliability A, Maintainability A, Correctness B, Verification B, Handoff-readiness B. No Blocker, no Major.
+
+The reviewer verified by execution rather than reading: it re-ran the `features.json` commands, re-derived the seven-failure baseline at the true merge base, and reproduced the guard fail-first with **three** mutations — including `rm -f "$HOME/.codex/AGENTS.md"`, the *second* manifest target, which proves the target list is manifest-driven rather than a hardcoded `GEMINI.md`. That is a stronger proof than the one in this file.
+
+Six findings, all Minor or Question, dispositioned:
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Recorded LOC and suite tally do not reconcile | **Fixed above.** Both were mine and both were wrong; corrections carry the reason. |
+| F2 | `rm -f "$GEMINI_HOME/config/.migrated"` (`setup-linux.sh:463`) left unclassified — one reference repo-wide, no producer, consumer or expiry | **Ticketed: #1438.** A ready-made instance of lesson 257, and pre-existing rather than introduced here. |
+| F3 | Guard matches only two removal spellings; `rm --force`, `unlink`, pwsh aliases evade it | **Ticketed: #1439.** THEORETICAL — no such form exists in the tree; the manifest wiring is proven. |
+| F4 | AC6's "both bash and zsh" cannot fail as written, and PSScriptAnalyzer is CI-only | **Fixed above**, in the AC6 note. |
+| F5 | Blocks 3/5 labelled "dead" where the operative reason is "leftovers are inert" | **Accepted, not edited.** The label is imprecise and the outcome is right; `proposal.md` is staleness-watched, so editing it post-review would invalidate this review for a wording fix. Recorded here instead. |
+| F6 | `tasks.md` "PR opened" unchecked while #1433 is merged | **Resolved by accepting #1433 as the referenced PR**, per the reviewer's own recommendation. Not ticked — that edit would post-date the review and re-trigger staleness. |
+
+Mid-review, `origin/main` advanced to `06c3b7a` as #1433 squash-merged. The reviewer verified the merged state is content-identical (`git diff origin/main HEAD` empty, both setup-script blobs matching) and recorded that the review remains valid for it.
+
 ## Archive checklist
 
+- [x] Independent adversarial review passed — reviewer `nan/glm5.3-flash`, not the implementer
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved to `specs/archive/OPS-040-dead-migration-purge/`
-- [ ] Independent adversarial review passed (`dotf spec review OPS-040-dead-migration-purge`) — the reviewer must not be the implementer
 - [ ] #1333 closed by the archiving PR (ADR-018)
