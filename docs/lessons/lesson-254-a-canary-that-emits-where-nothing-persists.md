@@ -17,13 +17,29 @@ appeared.** The obvious reading was that the payload field `agent_type` is not
 the name the gate expects, which would mean the persona resolution shipped in
 #1410 rests on a field that never arrives.
 
-That reading was wrong, and the probe could not have produced any other outcome.
-A parallel session grepped its own transcript JSONL: Claude Code records hook
-execution as entries carrying `hookCount` / `hookErrors` / `hasOutput`, and the
-entire session contained **exactly one**, of the Stop family. There is no
-`pre_tool_use_hook_summary` for any tool call. **A `PreToolUse` hook's streams on
-exit 0 are not persisted at all.** The gate emits `[gate] warn` to stderr and
-exits 0, so a warn decision was invisible however correct the field names were.
+That reading was **unsupported** — the probe could not have produced any other
+outcome either way. A parallel session grepped its own transcript JSONL: Claude
+Code records hook execution as entries carrying `hookCount` / `hookErrors` /
+`hasOutput`, and every such record in the session was Stop-family;
+`stop_hook_summary` was the only hook-bearing subtype present at all, under any
+name. **A `PreToolUse` hook's streams on exit 0 are not persisted to the session
+transcript.** The gate emits `[gate] warn` to stderr and exits 0, so a warn
+decision was invisible however correct the field names were.
+
+That began as *"we looked and found no record"*, which is the weaker claim. It
+became **evidence of absence** an hour later, when a `Skill` call in that same
+session provably fired the hook — it wrote a consumption ledger entry — and still
+left no transcript record of it. The hook demonstrably ran and the transcript
+does not know.
+
+**`agent_type` remains unmeasured, and nothing here changed that.** A later probe
+established that `agent_id` arrives on subagent events and is per-invocation, but
+it did so through the ledger, and the ledger cannot speak to `agent_type`: the
+gate records a skill consumption and `return`s at `harness_gate.go:84-87`,
+*before* `loadGatePersona` is reached. Not one ledger entry has ever exercised the
+persona-resolution path. The two are sibling fields on one payload struct and are
+documented together, so it is strong inference — and inference is what it stays
+until the decision record exists.
 
 The gate's other channel is durable but narrower than it looks. It writes a
 consumption ledger under `~/.local/state/dotfiles/gate/`, and only on a `Skill`
@@ -84,9 +100,11 @@ it is why binding the gate to a live machine was safe before any of this was
 measured. The defect is not that failure is silent to the *session*; it is that
 success is silent to the *operator*.
 
-**Nor is `--debug` the answer.** It surfaces hook streams and would break this
-particular tie once, but it depends on how a human launched the session. A canary
-cannot rest on a flag someone has to remember. What the gate needs is a decision
+**Nor is `--debug` the answer.** It is *reported* to surface hook streams and
+might break this particular tie once — where those streams actually go was never
+checked, which is the honest state of it — but either way it depends on how a
+human launched the session. A canary cannot rest on a flag someone has to
+remember. What the gate needs is a decision
 record that survives independently of stderr, of exit code, and of whether the
 persona holds the `Skill` tool — covering allow, warn, block, and the
 `role did not resolve` path, which today is the loudest thing the gate can say
