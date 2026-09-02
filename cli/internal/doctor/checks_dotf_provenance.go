@@ -130,21 +130,8 @@ func compareStampToHead(sys *System, repoDir, stamp, head string, rep *Report) {
 		return
 	}
 
-	// `:(top)cli`, not `cli`. A bare pathspec is resolved relative to git's CWD,
-	// so the same argument means `cli/` from the repo root and `cli/cli` — which
-	// does not exist — from inside cli/. Measured while verifying this check: the
-	// count read 4 from the root and 0 from cli/, and the 0 is SILENT. Relying on
-	// RepoDir always being the root would make this guard return a clean answer
-	// the day that resolution changes, which is the exact failure mode #1158 is
-	// about. The `:(top)` magic prefix is root-relative regardless of CWD.
-	out, err := gitIn(sys, repoDir, "rev-list", "--count", stamp+"..HEAD", "--", ":(top)cli")
-	if err != nil {
-		rep.Skip(fmt.Sprintf("cannot count commits between %s and HEAD (%v)", shortSHA(stamp), err))
-		return
-	}
-	behind, err := strconv.Atoi(strings.TrimSpace(out))
-	if err != nil {
-		rep.Skip(fmt.Sprintf("unexpected git rev-list output %q — provenance not established", strings.TrimSpace(out)))
+	behind, ok := countCliCommitsBehind(sys, repoDir, stamp, rep)
+	if !ok {
 		return
 	}
 
@@ -155,6 +142,31 @@ func compareStampToHead(sys *System, repoDir, stamp, head string, rep *Report) {
 	rep.Warn(fmt.Sprintf(
 		"deployed dotf is %d cli/ commit(s) behind HEAD (built %s, HEAD %s) — it may run gates this tree no longer defines, or miss checks it does; reinstall to converge",
 		behind, shortSHA(stamp), shortSHA(head)))
+}
+
+// countCliCommitsBehind asks how many commits touching cli/ separate the stamp
+// from HEAD. ok == false means the question could not be answered and the SKIP
+// was already reported — never a silent zero, which would read as "current".
+//
+// `:(top)cli`, not `cli`. A bare pathspec is resolved relative to git's CWD, so
+// the same argument means `cli/` from the repo root and `cli/cli` — which does
+// not exist — from inside cli/. Measured while verifying this check: the count
+// read 4 from the root and 0 from cli/, and the 0 is SILENT. Relying on RepoDir
+// always being the root would make this guard return a clean answer the day
+// that resolution changes, which is the exact failure mode #1158 is about. The
+// `:(top)` magic prefix is root-relative regardless of CWD.
+func countCliCommitsBehind(sys *System, repoDir, stamp string, rep *Report) (int, bool) {
+	out, err := gitIn(sys, repoDir, "rev-list", "--count", stamp+"..HEAD", "--", ":(top)cli")
+	if err != nil {
+		rep.Skip(fmt.Sprintf("cannot count commits between %s and HEAD (%v)", shortSHA(stamp), err))
+		return 0, false
+	}
+	behind, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		rep.Skip(fmt.Sprintf("unexpected git rev-list output %q — provenance not established", strings.TrimSpace(out)))
+		return 0, false
+	}
+	return behind, true
 }
 
 // isHexSHA reports whether s is plausibly a git object name: hex, and long
