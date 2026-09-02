@@ -10,6 +10,11 @@ import (
 // The opencode banner that setup-windows.ps1 parsed as the version "locked."
 // (AI-034/#1294) must not become a false drift report in doctor: the version
 // is the first semver anywhere in the output, matched against the catalog pin.
+//
+// The pin is a floor, not an exact match (matchPinFloorFrom): `dotf tools
+// install`'s decideAction never downgrades a newer install, so doctor must
+// agree that ahead-of-pin is healthy — otherwise every patch opencode ships
+// upstream between two pin bumps is a permanent false WARN.
 func TestCheckOpenCode_VersionIsTheSemverNotTheBannerToken(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "packages.json"), catalogWithOpencode)
@@ -19,6 +24,7 @@ func TestCheckOpenCode_VersionIsTheSemverNotTheBannerToken(t *testing.T) {
 		{"banner line before the number", "OpenCode locked.\n1.16.2\n", "opencode version matches packages.json (1.16.2)"},
 		{"plain version", "1.16.2\n", "opencode version matches packages.json (1.16.2)"},
 		{"older version", "1.15.0\n", "opencode version drift: installed=1.15.0 pinned=1.16.2 (packages.json)"},
+		{"newer than pin", "1.17.0\n", "opencode 1.17.0 meets the packages.json pin 1.16.2"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

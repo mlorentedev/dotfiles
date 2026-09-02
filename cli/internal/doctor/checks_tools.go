@@ -150,7 +150,7 @@ func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 		rep.Skip("yarn not installed (run `dotf tools install yarn`; needs Node.js on PATH)")
 	} else {
 		got, _ := sys.versionLine("yarn")
-		matchPinFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), "packages.json")
+		matchPinFloorFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), "packages.json")
 	}
 
 	checkGitWindowsFloor(sys, cfg, rep)
