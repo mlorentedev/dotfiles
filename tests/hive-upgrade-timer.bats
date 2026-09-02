@@ -60,17 +60,16 @@ setup() {
     [ "$enable_line" -gt "$gate_line" ]
 }
 
-# SSOT cleanup: once the timer is the owner, the legacy manual cron must go.
-@test "setup-linux.sh removes the legacy uv tool upgrade hive-vault cron" {
-    grep -qF "grep -v 'uv tool upgrade hive-vault' | crontab -" "$DOTFILES_DIR/setup-linux.sh"
-}
-
-# The cron strip must be guarded (only remove when a matching line exists) and
-# only run after a successful timer enable -- an old-hive machine that skips the
-# gate keeps its cron so it is never left with no upgrade owner.
-@test "setup-linux.sh cron strip is guarded on the line existing" {
-    grep -qF "crontab -l 2>/dev/null | grep -q 'uv tool upgrade hive-vault'" "$DOTFILES_DIR/setup-linux.sh"
-}
+# Two tests pinning the legacy-cron strip lived here until OPS-040: that setup
+# removed a `uv tool upgrade hive-vault` crontab line once the timer owned
+# upgrade policy, and that the removal was guarded on the line existing. The
+# block they pinned is gone -- probed absent from `crontab -l` on msi, which is
+# the only OS it could ever have run on, crontab being the mechanism.
+#
+# Nothing replaces them. Asserting the ABSENCE of the strip would pin a deletion
+# rather than an invariant, and the invariant that mattered -- the timer is the
+# single upgrade owner -- is already covered by the enable/version-gate tests
+# above and the non-fatal test below.
 
 @test "setup-linux.sh timer install is non-fatal (warns, never hard-exits)" {
     grep -qF 'hive-upgrade.timer enable failed (non-fatal' "$DOTFILES_DIR/setup-linux.sh"
