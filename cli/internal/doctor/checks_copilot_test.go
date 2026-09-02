@@ -10,9 +10,11 @@ const catalogWithCopilot = `{"tools":[{"name":"copilot","version":"1.0.81","prof
 
 // copilot is an npm catalog tool (AI-038, #1321): the version is the first
 // semver in `copilot --version` ("GitHub Copilot CLI 1.0.80." on the Windows
-// box) compared with the packages.json pin the way opencode is (exact match
-// PASS, otherwise a drift WARN); absent is a SKIP, not a FAIL, because a box
-// may deliberately carry no Copilot.
+// box) compared with the packages.json pin on a floor basis, the way opencode
+// is (matchPinFloorFrom) — `dotf tools install`'s decideAction never downgrades
+// a newer install, so doctor must agree that ahead-of-pin is healthy, not
+// drift; absent is a SKIP, not a FAIL, because a box may deliberately carry no
+// Copilot.
 func TestCheckCopilot_PinMatchByStatus(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "packages.json"), catalogWithCopilot)
@@ -24,7 +26,7 @@ func TestCheckCopilot_PinMatchByStatus(t *testing.T) {
 		needle  string
 	}{
 		{"at the pin → PASS", []string{"copilot"}, "GitHub Copilot CLI 1.0.81.\n", StatusPass, "matches packages.json"},
-		{"above the pin → WARN drift (doctor reports exact match; the floor is tools install's)", []string{"copilot"}, "GitHub Copilot CLI 1.0.90.\n", StatusWarn, "drift"},
+		{"above the pin → PASS, floor met", []string{"copilot"}, "GitHub Copilot CLI 1.0.90.\n", StatusPass, "meets the packages.json pin"},
 		{"below the pin → WARN drift", []string{"copilot"}, "GitHub Copilot CLI 1.0.78.\n", StatusWarn, "drift"},
 		{"no semver in the output → WARN, no drift line", []string{"copilot"}, "banner only\n", StatusWarn, "no semver"},
 		{"absent → SKIP naming the catalog", nil, "", StatusSkip, "dotf tools install copilot"},
