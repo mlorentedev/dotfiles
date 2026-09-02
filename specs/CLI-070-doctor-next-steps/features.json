@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-070-doctor-next-steps-f1",
+    "behavior": "AC1: a FAIL line with a run/re-run/recover-with/upgrade-with remedy prints a Next steps: block after Results: listing the command",
+    "verification": "cd cli && go test ./internal/doctor/... -run 'TestNextSteps$|TestRun_NextStepsBlock'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-070-doctor-next-steps-f2",
+    "behavior": "AC2: a WARN line with the same remedy pattern does not produce a Next-steps entry",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestNextSteps$",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-070-doctor-next-steps-f3",
+    "behavior": "AC3: a diagnostic-only backtick span on a FAIL line (not introduced by one of the four verbs) is not mistaken for a remedy",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestNextSteps$",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-070-doctor-next-steps-f4",
+    "behavior": "AC4: the same command repeated across FAIL lines is listed once",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestNextSteps$",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-070-doctor-next-steps-f5",
+    "behavior": "AC5: a clean run (no FAIL) prints no Next steps: block",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestNextSteps_NoFailNoBlock",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-070-doctor-next-steps-f6",
+    "behavior": "AC6: --quick mode is covered by the same logic with no special-casing",
+    "verification": "cd cli && go test ./internal/doctor/... -run TestRun_NextStepsBlock",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-070-doctor-next-steps-f7",
+    "behavior": "AC7: tee-ing the report writer into a transcript buffer does not disable ANSI color on a real terminal run",
+    "verification": "cd cli && go test ./internal/doctor/...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
