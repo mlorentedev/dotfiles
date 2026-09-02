@@ -3,6 +3,7 @@ package doctor
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -61,6 +62,11 @@ func TestCheckDotfProvenance(t *testing.T) {
 		wantSubstr string
 		wantWarn   bool
 		wantPass   bool
+		// wantLevel pins the rendered marker ("[WARN]", "[SKIP]", "[OK]").
+		// Mutation M6 survived because the rows asserted only the MESSAGE, and
+		// flipping rep.Skip to rep.Pass leaves the message identical — the level
+		// is the entire contract on a fail-safe branch, so it must be asserted.
+		wantLevel string
 	}{
 		{
 			// The case that motivated the ticket. Version-equality says "fine".
@@ -74,6 +80,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 				"rev-list":   "7\n",
 			},
 			wantSubstr: "7 cli/ commit(s) behind HEAD",
+			wantLevel:  "[WARN]",
 			wantWarn:   true,
 		},
 		{
@@ -87,6 +94,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 				"rev-list":   "0\n",
 			},
 			wantSubstr: "current with HEAD for cli/",
+			wantLevel:  "[ OK ]",
 			wantPass:   true,
 		},
 		{
@@ -103,6 +111,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 				"rev-list":   "0\n",
 			},
 			wantSubstr: "current with HEAD for cli/",
+			wantLevel:  "[ OK ]",
 			wantPass:   true,
 		},
 		{
@@ -118,6 +127,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 			},
 			gitErr:     map[string]error{"merge-base": fmt.Errorf("exit status 1")},
 			wantSubstr: "is not an ancestor of HEAD",
+			wantLevel:  "[WARN]",
 			wantWarn:   true,
 		},
 		{
@@ -128,6 +138,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 			gitErr:  map[string]error{"cat-file": fmt.Errorf("exit status 1")},
 
 			wantSubstr: "which this checkout does not contain",
+			wantLevel:  "[WARN]",
 			wantWarn:   true,
 		},
 		{
@@ -138,6 +149,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 			dotfErr:    fmt.Errorf("unknown flag: --commit"),
 			git:        map[string]string{"rev-parse": headSHA},
 			wantSubstr: "predates the build stamp",
+			wantLevel:  "[WARN]",
 			wantWarn:   true,
 		},
 		{
@@ -149,6 +161,7 @@ func TestCheckDotfProvenance(t *testing.T) {
 			dotfOut:    "\n",
 			git:        map[string]string{"rev-parse": headSHA},
 			wantSubstr: "source build carrying no commit stamp",
+			wantLevel:  "[WARN]",
 			wantWarn:   true,
 		},
 		{
@@ -156,6 +169,49 @@ func TestCheckDotfProvenance(t *testing.T) {
 			name:       "outside a checkout the check skips rather than passing",
 			repoDir:    "",
 			wantSubstr: "no HEAD to compare",
+			wantLevel:  "[SKIP]",
+		},
+		{
+			// Mutation M6 (first adversarial review, nan/qwen3.8-flash): flipping
+			// the three defensive SKIP branches to Pass left the whole suite green,
+			// so the SKIP contract was unenforced on exactly the paths that exist
+			// to avoid a false clean answer. These three rows close that.
+			name:       "an unreadable HEAD skips rather than guessing",
+			repoDir:    "/repo",
+			gitErr:     map[string]error{"rev-parse": fmt.Errorf("not a git repository")},
+			wantSubstr: "cannot read HEAD",
+			wantLevel:  "[SKIP]",
+		},
+		{
+			name:    "a failing rev-list skips rather than reporting current",
+			repoDir: "/repo",
+			dotfOut: staleSHA + "\n",
+			git:     map[string]string{"rev-parse": headSHA, "cat-file": "", "merge-base": ""},
+			gitErr:  map[string]error{"rev-list": fmt.Errorf("bad revision")},
+
+			wantSubstr: "cannot count commits between",
+			wantLevel:  "[SKIP]",
+		},
+		{
+			name:    "an unparsable count skips rather than defaulting to zero",
+			repoDir: "/repo",
+			dotfOut: staleSHA + "\n",
+			git: map[string]string{
+				"rev-parse": headSHA, "cat-file": "", "merge-base": "", "rev-list": "not-a-number\n",
+			},
+			wantSubstr: "unexpected git rev-list output",
+			wantLevel:  "[SKIP]",
+		},
+		{
+			// Second adversarial review (nan/mimo-v2.5): a whitespace-only or
+			// otherwise non-hash stamp was TrimSpace'd into the "source build"
+			// branch, sending the reader to the wrong remedy for a broken build.
+			name:       "a malformed stamp is named as such, not called a source build",
+			repoDir:    "/repo",
+			dotfOut:    "  not-a-sha  \n",
+			git:        map[string]string{"rev-parse": headSHA},
+			wantSubstr: "which is not a hash",
+			wantLevel:  "[WARN]",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -182,6 +238,11 @@ func TestCheckDotfProvenance(t *testing.T) {
 			if tc.wantPass && rep.Warnings() != 0 {
 				t.Errorf("expected a clean PASS, got a warning:\n%s", text)
 			}
+			// The level, not just the words. A fail-safe SKIP that silently
+			// became a PASS reports the same sentence and means the opposite.
+			if tc.wantLevel != "" && !strings.Contains(text, tc.wantLevel) {
+				t.Errorf("expected the line to render as %s:\n%s", tc.wantLevel, text)
+			}
 		})
 	}
 }
@@ -201,6 +262,31 @@ func TestCheckDotfProvenanceSkipsWhenDotfIsAbsent(t *testing.T) {
 	}
 	if rep.Failures() != 0 || rep.Warnings() != 0 {
 		t.Errorf("an absent dotf is not drift:\n%s", buf.String())
+	}
+}
+
+// Mutation M7 (first adversarial review): the fakes' CommandOutput ignored argv,
+// so dropping `--commit` from the probe survived the entire suite. The git
+// boundary had TestCheckDotfProvenancePassesFullSHAToGit for exactly this class;
+// the binary boundary had no analogue. Misprobing would read a stamped binary's
+// human version line as a commit — it fails safe (WARN), but it reports the
+// wrong state, and nothing said so.
+func TestCheckDotfProvenanceProbesWithTheCommitFlag(t *testing.T) {
+	var argv []string
+	sys := provenanceSys(t, staleSHA+"\n", nil, map[string]string{
+		"rev-parse": headSHA, "cat-file": "", "merge-base": "", "rev-list": "0\n",
+	}, nil)
+	sys.CommandOutput = func(_ string, args ...string) (string, error) {
+		argv = args
+		return staleSHA + "\n", nil
+	}
+
+	var buf bytes.Buffer
+	checkDotfProvenance(sys, &Config{RepoDir: "/repo"}, NewReport(&buf, true))
+
+	got := strings.Join(argv, " ")
+	if got != "version --commit" {
+		t.Fatalf("the probe must ask for the machine-readable stamp, got %q", got)
 	}
 }
 
@@ -254,5 +340,38 @@ func TestCheckDotfProvenancePassesFullSHAToGit(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), staleSHA[:12]) {
 		t.Errorf("the human-facing message should abbreviate:\n%s", buf.String())
+	}
+}
+
+// Mutation M8 (first adversarial review): deleting the
+// `checkDotfProvenance(sys, cfg, rep)` line from doctor.Run left the ENTIRE
+// suite green. Every test above drives the check function directly, so none of
+// them notices that nothing calls it — the check would simply stop running and
+// `dotf doctor` would render a clean report with the section absent.
+//
+// That is precisely the defect #1158 exists to name, reproduced one level up in
+// this check's own wiring: a report missing a section cannot be told from one
+// where the section ran and passed. Asserting on Run's OUTPUT rather than on a
+// registration list is deliberate — the output is what a human reads, and it is
+// the only artifact that proves the check actually executed.
+func TestDotfProvenanceIsRegisteredInRun(t *testing.T) {
+	home := t.TempDir()
+	dotfiles := filepath.Join(home, ".dotfiles")
+	writeFile(t, filepath.Join(dotfiles, "env-contract.json"),
+		`{"env_vars":[],"required_path_entries":{"linux":[]},"required_binaries":[],"optional_binaries":[]}`)
+	writeFile(t, filepath.Join(dotfiles, "versions.conf"), "GO_VERSION=1.26.0\n")
+
+	var buf bytes.Buffer
+	_, err := Run(Options{
+		Out:      &buf,
+		System:   newSys(map[string]string{"HOME": home, "DOTFILES_DIR": dotfiles}, nil, nil),
+		StartDir: home,
+		Verbose:  true,
+	})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "dotf provenance") {
+		t.Fatal("doctor.Run does not emit the dotf provenance section — the check is not registered")
 	}
 }

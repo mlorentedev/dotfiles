@@ -1,0 +1,132 @@
+# 255 - Truncation, not hostile input, is what made the collision guard load-bearing — and without it the measurement would have confirmed the opposite
+
+**Date:** 2026-09-01
+**Area:** harness, orchestrator gate, path construction
+
+## What happened
+
+`harness.StatePath` builds the gate's per-scope consumption ledger filename. It
+maps every character outside `[A-Za-z0-9_-]` to `_`, **truncates the result to 48
+characters**, and appends the first four bytes of `sha256(scope)` as hex:
+
+```go
+if len(safe) > 48 { safe = safe[:48] }
+sum := sha256.Sum256([]byte(sessionID))
+return filepath.Join(stateDir, "gate", safe+"-"+hex.EncodeToString(sum[:4])+".json")
+```
+
+The scope is `session_id + "-" + agent_id` when a subagent is acting. A session id
+is a 36-character UUID, so with the joining hyphen only **11 characters of the
+agent id survive the truncation**.
+
+Two subagents were dispatched in one session, **named `gate-probe-A` and
+`gate-probe-B` by the dispatcher**, to measure whether `agent_id` is
+per-invocation or stable per persona — the check the code itself names as a
+precondition for promoting any skill to `enforce: block`. Both wrote a ledger
+entry:
+
+```
+e4edd8fa-dc36-4cc5-bd73-5047c2e5b737-agate-probe-079740d4.json  {"skills":{"genre-picker":true}}
+e4edd8fa-dc36-4cc5-bd73-5047c2e5b737-agate-probe-8fb525a3.json  {"skills":{"research-prompt":true}}
+```
+
+The readable prefixes are **byte-identical, both exactly 48 characters**. The two
+files exist as separate files only because the digests differ. The measurement
+succeeded — the ids are distinct, per invocation — and it succeeded entirely on
+the strength of the appended hash.
+
+## Why this is the lesson and not just a bug
+
+The digest was added because a PR reviewer on #1272 objected to character-mapping
+alone, and the argument that carried was adversarial:
+
+> `a/b` and `a.b` both flatten to `a_b`, so one session's consumption record would
+> open another session's gate. Well-behaved harnesses send UUIDs and would never
+> hit it, but a session id is attacker-adjacent input that lands in a filesystem
+> path, and "it does not happen with well-behaved input" is not a property a path
+> builder should rely on.
+
+The reviewer was right, and right for a reason neither side stated. **No hostile
+input was required — but nor was the collision spontaneous, and the difference
+matters.** The dispatcher passed `name: gate-probe-A` and `name: gate-probe-B`,
+and the runtime agent id is derived from that name. The truncation then cut one
+character before the discriminator. An id left to auto-generation has a different
+shape entirely — `a` followed by sixteen hex characters — and two of those share
+an eleven-character prefix with negligible probability. **On the auto-generated
+path the digest is not load-bearing; these two prefixes differ at character two.**
+
+So the instrument shaped the finding, and the reading it produced is the one the
+naming guaranteed. Saying otherwise would make this lesson an instance of the
+error the sibling lesson is about.
+
+The true exposure is larger than the case the reviewer argued and smaller than
+"it happens by itself": **`agent_id` is caller-influenced.** A dispatcher's chosen
+name flows into a filesystem key that is then truncated, and an orchestrator
+naming agents by role produces exactly the shape that collides, because role names
+share prefixes by nature — `review-1` / `review-2`, `builder-api` / `builder-web`.
+That is not adversarial input and it is not exotic; it is the normal output of the
+naming convention any multi-agent system adopts. The #1272 reviewer argued
+character mapping (`a/b` versus `a.b`); the wider hazard is ordinary naming meeting
+a fixed-width cap, and it was never stated.
+
+**What makes this worth writing down is the shape of the failure it prevented.**
+Had the digest not been there, the second dispatch would have written to the first
+one's file. The directory would have shown **one** entry for two dispatches, and
+the honest reading of that evidence is *"the ledger key is shared, so the second
+dispatch inherits the first's consumption"* — which is precisely the
+over-permissive failure the code documents at `gate.go:238-247` as the thing this
+measurement exists to rule out.
+
+So the missing digest would not have produced a confusing result or an obvious
+crash. It would have produced **the exact symptom of the real defect being tested
+for**, sourced from a path-construction bug instead of the harness, and we would
+have "confirmed" it and gone off to fix a harness that was behaving correctly. A
+false negative indistinguishable from the true positive is the most expensive
+possible failure of an instrument.
+
+## What this does not license
+
+**The truncation is not itself wrong and should not be removed.** Its stated
+purpose is that the directory stays diagnosable by eye, and it achieves that: the
+session id is legible in every filename, which is how the three sessions writing
+into this ledger were traced back to their projects. The lesson is not "do not
+truncate" — it is that a truncated key is a *display* key, and correctness has to
+live in the part that is not truncated.
+
+**Nor does a passing measurement retire the concern.** Anything that later reads
+this directory by prefix — a cleanup routine, a doctor check, a human running
+`ls <session>-*` — will treat two scopes as one. The collision was defused for the
+file path and nowhere else, and under named dispatch it is **routine rather than
+rare**, which is a stronger reason to fix those readers than the original
+adversarial framing supplied.
+
+**One code defect surfaced alongside it and is worth naming**, because it is the
+plausible reason the truncation hazard survived review at all:
+
+```go
+func StatePath(stateDir, sessionID string) string
+```
+
+Every caller passes `ConsumptionScope()`, which is `session + "-" + agent_id` when
+a subagent is acting — never a bare session id. **The parameter name is a lie.** A
+reader checking the 48-character cap sees `sessionID`, knows a UUID is 36
+characters, and concludes the cap can never bite. It bites on every named subagent
+dispatch.
+
+## Rule
+
+When a defence is accepted on adversarial grounds, check whether **your own
+callers** already produce input that triggers it — not whether an attacker could.
+If they do, the defence is load-bearing and its rationale should say so, because
+an adversarial framing invites someone to trade it away later as a rare case.
+
+When a key is truncated for readability, verify the truncation preserves what
+distinguishes, and **name the parameter after what is actually passed** — a
+truncation hazard hides behind an argument called `sessionID` that never receives
+one.
+
+And when a measurement comes back confirming what you expected, check what your
+instrument contributed to the result before you write the finding down. Here the
+collision was real, the digest genuinely saved the measurement, and the reading
+*"ordinary ids collide"* was still an artefact of the names the probe chose. A
+result the instrument guaranteed is not evidence about the world.

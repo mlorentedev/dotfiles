@@ -69,6 +69,91 @@ _extensionless_tracked_files() {
     fi
 }
 
+# The other half of this file. The two tests above ask whether a RULE EXISTS;
+# this one asks whether the WORKING TREE OBEYS IT, and nothing did before.
+#
+# Measured 2026-09-01: `scripts/obs-cli.ps1` resolved `eol: crlf` and was LF on
+# disk in the main checkout, while both worktrees had it CRLF -- and
+# `git status` reported clean in all three, because the blob round-trips
+# through `text=auto` either way. git converts at CHECKOUT, never
+# retroactively, so a file authored with LF, committed normalized, and never
+# re-checked-out keeps the wrong endings indefinitely. Two clean checkouts of
+# one commit differed byte-for-byte for three and a half months.
+#
+# It surfaced only as a `dotf doctor` deploy-dir drift FAIL whose printed
+# remedy ("run setup to refresh") could not fix it, because setup deploys from
+# the tree that is already correct. A guard that proves a rule is declared, and
+# never that it is honoured, is the reason nobody saw the cause.
+_declared_eol_files() {
+    git -C "$REPO" ls-files | git -C "$REPO" check-attr --stdin text eol
+}
+
+@test "every tracked file whose eol is declared has a working tree that obeys it" {
+    cd "$REPO" || return 1
+
+    local -A eol_of text_of
+    local line path rest attr val
+    while IFS= read -r line; do
+        path="${line%%: *}"
+        rest="${line#*: }"
+        attr="${rest%%: *}"
+        val="${rest#*: }"
+        case "$attr" in
+            eol) eol_of["$path"]="$val" ;;
+            text) text_of["$path"]="$val" ;;
+        esac
+    done < <(_declared_eol_files)
+
+    local lf=() crlf=() p
+    for p in "${!eol_of[@]}"; do
+        # `binary` (text unset) is exempt: it is never converted either way.
+        [ "${text_of[$p]:-}" = "unset" ] && continue
+        [ -f "$p" ] || continue
+        case "${eol_of[$p]}" in
+            lf)   lf+=("$p") ;;
+            crlf) crlf+=("$p") ;;
+        esac
+    done
+
+    # Same fixture-drift guard as the test above: an empty set here would pass
+    # vacuously, and an empty result reading as a finding is the failure class
+    # this whole file exists to prevent.
+    [ ${#lf[@]} -gt 0 ] && [ ${#crlf[@]} -gt 0 ] || {
+        printf 'Expected both eol=lf and eol=crlf files to be tracked; found\n' >&2
+        printf 'lf=%d crlf=%d. Either .gitattributes changed or this test is\n' "${#lf[@]}" "${#crlf[@]}" >&2
+        printf 'no longer measuring what it claims.\n' >&2
+        return 1
+    }
+
+    local bad=()
+    # An eol=lf file must carry no CR at all. -U keeps grep from stripping it.
+    local hit
+    while IFS= read -r hit; do
+        [ -n "$hit" ] && bad+=("$hit (declared lf, contains CR)")
+    done < <(printf '%s\0' "${lf[@]}" | xargs -0 grep -lU $'\r' -- 2>/dev/null)
+
+    # An eol=crlf file must carry CR. Empty files are exempt: they have no line
+    # ending to be wrong about, and flagging them would be noise.
+    for p in "${crlf[@]}"; do
+        [ -s "$p" ] || continue
+        grep -qU $'\r' -- "$p" || bad+=("$p (declared crlf, contains none)")
+    done
+
+    if [ ${#bad[@]} -ne 0 ]; then
+        printf 'Working-tree line endings disagree with .gitattributes.\n' >&2
+        printf 'git may well report these CLEAN: whether it notices depends on\n' >&2
+        printf 'its stat cache, so an untouched file that was wrong at checkout\n' >&2
+        printf 'is never re-examined. That is how scripts/obs-cli.ps1 stayed\n' >&2
+        printf 'byte-wrong from 2026-05-15 to 2026-09-01. Do not conclude from a\n' >&2
+        printf 'clean `git status` that this is a false positive -- compare the\n' >&2
+        printf 'bytes:\n' >&2
+        printf '%s\n' "${bad[@]}" | sort | while IFS= read -r f; do printf '  %s\n' "$f" >&2; done
+        printf '\nFix with: git add --renormalize <path>, or remove the file and\n' >&2
+        printf '`git checkout -- <path>` to re-convert it on the way out.\n' >&2
+        return 1
+    fi
+}
+
 @test "the five GUARD-001 hook dispatchers resolve eol=lf specifically" {
     # AC1: distinct from the class guard above -- this pins the exact value,
     # not just "something explicit", for the dispatchers whose CRLF breakage
