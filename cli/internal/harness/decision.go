@@ -134,12 +134,6 @@ func RecordDecision(path string, rec DecisionRecord) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	// Size is one stat, checked before the append rather than by counting lines,
-	// because this runs on every tool call and reading the file to measure it
-	// would make the hot path grow with its own history.
-	if fi, err := os.Stat(path); err == nil && fi.Size() >= maxDecisionBytes {
-		_ = os.Rename(path, path+".1")
-	}
 	raw, err := json.Marshal(rec)
 	if err != nil {
 		return err
@@ -149,8 +143,50 @@ func RecordDecision(path string, rec DecisionRecord) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	_, err = f.Write(append(raw, '\n'))
-	return err
+
+	// ONE write of one line, on a fd opened O_APPEND. That is what keeps
+	// concurrent writers from interleaving: the kernel makes the seek-to-end and
+	// the write a single step for a regular file, and every record here is far
+	// below the size where that stops holding. Building the line in memory first
+	// is therefore load-bearing, not tidiness — two Writes could interleave.
+	//
+	// Concurrency is not hypothetical: the gate runs per tool call, and several
+	// sessions and subagents on one machine write at once. Pinned by
+	// TestConcurrentWritersLoseNoRecords.
+	if _, err := f.Write(append(raw, '\n')); err != nil {
+		return err
+	}
+
+	// ROTATION HAPPENS AFTER THE WRITE, AND FROM OUR OWN FD. Doing it first —
+	// stat the path, rename, then open — loses the record being written when
+	// another writer rotates in between, and lets a file that is not full replace
+	// the kept generation. Raised by the reviewer on #1435.
+	//
+	// fstat on the descriptor we just wrote answers about THAT file rather than
+	// about whatever the path names now, and SameFile confirms the path still
+	// refers to it before renaming.
+	//
+	// A RESIDUAL RACE REMAINS AND IS ACCEPTED. Between the SameFile check and the
+	// rename, another writer can rotate, so two writers holding the same full file
+	// can both proceed and the second may replace the generation the first just
+	// kept. Measured — an assertion on the emergent property flaked.
+	//
+	// What it can cost is bounded to OLD history: the record being written is
+	// already durable above, so nothing recent is lost, and a not-full file is no
+	// longer a plausible replacement for a full one. Closing the window entirely
+	// needs an advisory lock, and `syscall.Flock` does not exist on Windows —
+	// this package compiles for it, and a Windows-only build break is a defect
+	// this repository has already paid for once (#1075). A lock is not worth that
+	// for a diagnostic journal whose worst case is losing records nobody has
+	// asked about since they rotated.
+	fi, err := f.Stat()
+	if err != nil || fi.Size() < maxDecisionBytes {
+		return nil //nolint:nilerr // a failed stat means only that rotation is skipped; the record is already durable
+	}
+	if cur, err := os.Stat(path); err == nil && os.SameFile(fi, cur) {
+		_ = os.Rename(path, path+".1")
+	}
+	return nil
 }
 
 // LoadDecisions reads a scope's journal oldest-first.

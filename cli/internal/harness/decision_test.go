@@ -2,10 +2,12 @@ package harness
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -189,5 +191,119 @@ func TestLoadDecisionsOnAMissingJournalIsEmptyNotAnError(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("want no records, got %d", len(got))
+	}
+}
+
+// TestConcurrentWritersLoseNoRecords answers the reviewer's concern on #1435
+// with a measurement rather than with prose about O_APPEND.
+//
+// The gate runs on every tool call, and several sessions and subagents on one
+// machine write at once — so this is the normal case, not an edge one. Each
+// writer opens its own descriptor, which is what a separate process does too;
+// the kernel path exercised is the same one, so this models cross-process
+// appends faithfully for the property being asserted.
+//
+// The property: every record survives, and none is torn by another writer.
+func TestConcurrentWritersLoseNoRecords(t *testing.T) {
+	path := DecisionPath(t.TempDir(), "busy")
+	const writers, each = 24, 40
+
+	var wg sync.WaitGroup
+	for w := 0; w < writers; w++ {
+		wg.Add(1)
+		go func(w int) {
+			defer wg.Done()
+			for i := 0; i < each; i++ {
+				if err := RecordDecision(path, DecisionRecord{
+					Outcome: OutcomeAllow,
+					Tool:    "Bash",
+					Session: fmt.Sprintf("w%d-i%d", w, i),
+				}); err != nil {
+					t.Errorf("writer %d record %d: %v", w, i, err)
+					return
+				}
+			}
+		}(w)
+	}
+	wg.Wait()
+
+	recs, err := LoadDecisions(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(recs) != writers*each {
+		t.Errorf("read %d records, want %d — concurrent appends lost or tore records",
+			len(recs), writers*each)
+	}
+	// Every session id must appear exactly once. A count alone would pass if one
+	// record were duplicated while another was lost.
+	seen := map[string]int{}
+	for _, r := range recs {
+		seen[r.Session]++
+	}
+	for w := 0; w < writers; w++ {
+		for i := 0; i < each; i++ {
+			if k := fmt.Sprintf("w%d-i%d", w, i); seen[k] != 1 {
+				t.Fatalf("record %s appears %d times, want exactly 1", k, seen[k])
+			}
+		}
+	}
+}
+
+// TestTheRecordThatTriggersRotationIsInTheRotatedFile pins the ORDERING that
+// the reviewer's rotation finding on #1435 is about, deterministically.
+//
+// Two earlier attempts at this were worse and are worth recording, because both
+// failure modes are ones this repository keeps meeting:
+//
+//   - The first was single-threaded and asserted "no record is lost". The old
+//     ordering passes that: stat sees a full file, renames it, writes to a fresh
+//     one, nothing lost. It stayed green with the defect reinstated — VACUOUS,
+//     and only exposed by proving the red direction.
+//   - The second asserted the emergent property under concurrency (the kept
+//     generation is always full). That one FLAKED: it depends on goroutine
+//     interleaving, and the residual race documented in RecordDecision means it
+//     is not a property the code guarantees.
+//
+// So this asserts the ordering itself, which is what actually changed and is
+// fully deterministic. Write-then-rotate puts the triggering record in the
+// ROTATED file. Rotate-then-write puts it in a fresh live file and leaves the
+// rotated one without it.
+func TestTheRecordThatTriggersRotationIsInTheRotatedFile(t *testing.T) {
+	path := DecisionPath(t.TempDir(), "s")
+	big := strings.Repeat("x", 4096)
+
+	trigger := ""
+	for i := 0; i < 600; i++ {
+		id := fmt.Sprintf("r%d", i)
+		if err := RecordDecision(path, DecisionRecord{
+			Outcome: OutcomeAllow, Reason: big, Session: id,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(path + ".1"); err == nil {
+			trigger = id
+			break
+		}
+	}
+	if trigger == "" {
+		t.Fatal("no rotation happened, so this test asserts nothing")
+	}
+
+	rotated, err := LoadDecisions(path + ".1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, r := range rotated {
+		if r.Session == trigger {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("the record that triggered rotation (%s) is not in the rotated file. "+
+			"That means rotation ran BEFORE the write, which is the ordering that drops a "+
+			"record when another writer rotates in between", trigger)
 	}
 }
