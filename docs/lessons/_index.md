@@ -273,6 +273,7 @@ tags: [lessons, index, dotfiles]
 | [252 - A git pathspec is resolved against the CWD, so the same argument means two different things and one of them is silently empty](lesson-252-a-git-pathspec-is-resolved-against-the-cwd-so-the-same.md) | 2026-09-01 |  |
 | [254 - A canary that emits where nothing persists accumulates no evidence, and its silence reads as success](lesson-254-a-canary-that-emits-where-nothing-persists.md) | 2026-09-01 |  |
 | [255 - Truncation, not hostile input, is what made the collision guard load-bearing — and without it the measurement would have confirmed the opposite](lesson-255-truncation-not-hostile-input-made-the-digest-load-bearing.md) | 2026-09-01 |  |
-| [256 - Hooks are re-read and personas are not, and one measurement was generalised into both](lesson-256-hooks-reload-personas-do-not-and-the-difference-was-assumed-away.md) | 2026-09-02 |  |
+| [256 - A cleanup block's own description of what it deletes is not evidence that the thing is dead](lesson-256-a-cleanup-blocks-own-description-of-what-it-deletes.md) | 2026-09-02 |  |
+| [257 - A one-time migration with no removal date is indistinguishable from live code, and two of eleven turned out not to be finished](lesson-257-a-one-time-migration-with-no-removal-date-is.md) | 2026-09-02 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

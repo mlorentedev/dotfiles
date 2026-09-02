@@ -71,13 +71,17 @@ setup() {
     grep -qF 'secrets/registry.yaml' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh resolves the agy deploy-time secret via dotf, not the load-secrets twin [#587]" {
-    # agy's OPENROUTER_API_KEY is fetched via dotf (opencode/pi materialize via
-    # `dotf secrets render` over the registry, and their own runtime resolver).
-    grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$DOTFILES_DIR/setup-linux.sh"
-    # the eager-source + the old secrets_show twin API are gone
+@test "setup-linux.sh carries neither load-secrets twin, and fetches no deploy-time secret [#587, OPS-040]" {
+    # #587 migrated agy's OPENROUTER_API_KEY off the load-secrets eager
+    # dot-source onto `dotf secrets show`. OPS-040 removed the fetch entirely:
+    # the agy mcp_config cascade that consumed it was deleted by CLI-042 AC8, so
+    # setup was decrypting a credential on every run for nobody. What survives
+    # from #587 is the half that still binds -- neither retired twin API may come
+    # back -- plus the stronger statement that no deploy-time secret is resolved
+    # here at all.
     refute_grep 'load-secrets\.sh" >/dev/null 2>&1' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'secrets_show ' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'dotf secrets show OPENROUTER_API_KEY' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh installs gh if missing" {

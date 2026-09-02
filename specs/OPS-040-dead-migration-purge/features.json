@@ -1,0 +1,58 @@
+[
+  {
+    "id": "OPS-040-dead-migration-purge-f1",
+    "behavior": "Neither setup script resolves a deploy-time secret for agy; the OPENROUTER_API_KEY export is gone from both",
+    "verification": "bats tests/setup-windows.bats -f 'neither setup resolves a deploy-time secret'",
+    "state": "verified",
+    "evidence": "bats: ok 1 parity: neither setup resolves a deploy-time secret for agy [#587, OPS-040]"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f2",
+    "behavior": "Blocks 2-7 are absent from both setup scripts (endpoint exports, pre-SDD-007 mcp_config, legacy GEMINI.md, init-project.sh orphan, python symlink, Bun installer)",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && for p in 'export ANTIGRAVITY_ENDPOINT=' 'export CLOUDCODE_URL=' 'SetEnvironmentVariable(\"ANTIGRAVITY_ENDPOINT\"' 'SetEnvironmentVariable(\"CLOUDCODE_URL\"' 'Removing orphan master from pre-SDD-007 path' 'Removed legacy GEMINI.md' 'rm -f \"$HOME/.claude/init-project.sh\"' 'Creating python symlink' '-OutFile $bunInstaller'; do if grep -qF -- \"$p\" setup-linux.sh setup-windows.ps1; then echo \"STILL PRESENT: $p\"; exit 1; fi; done; echo OK",
+    "state": "verified",
+    "evidence": "loop over the nine executable forms -> OK (no match in either script)"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f3",
+    "behavior": "Blocks 8 and 9 are absent from setup-linux.sh (gh-copilot alias strip, legacy hive-vault crontab removal)",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && for p in 'Removed stale gh-copilot eval line from' 'grep -v '\\''uv tool upgrade hive-vault'\\'' | crontab -'; do if grep -qF -- \"$p\" setup-linux.sh; then echo \"STILL PRESENT: $p\"; exit 1; fi; done; echo OK",
+    "state": "verified",
+    "evidence": "loop over the two executable forms -> OK (no match in setup-linux.sh)"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f4",
+    "behavior": "The HIVE-118 and MEM-002 blocks are untouched relative to main, and the shell rc BUN_INSTALL exports are retained",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && bats tests/guard-no-claude-mem.bats && grep -qF 'HIVE-118: migrate a stale' setup-linux.sh && grep -qF 'BUN_INSTALL' .zshrc && grep -qF 'BUN_INSTALL' .bashrc && echo OK",
+    "state": "verified",
+    "evidence": "guard-no-claude-mem.bats 3/3 ok incl. 'the MEM-002 cleanup block IS present in both setup scripts'; HIVE-118 comment and both rc BUN_INSTALL exports present"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f5",
+    "behavior": "secrets-show-callsites reports a SKIP naming its reason when no call site exists, rather than a vacuous pass",
+    "verification": "bats tests/secrets-show-callsites.bats | grep -q '# skip no .dotf secrets show'",
+    "state": "verified",
+    "evidence": "ok 1 ... # skip no 'dotf secrets show <id>' call sites in the tree - nothing to resolve (the shell/ps1 sweep found none)"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f6",
+    "behavior": "The full bats suite shows no failure beyond the seven that are already red on main, and setup-linux.sh stays shellcheck-clean at warning severity",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && bash -n setup-linux.sh && shellcheck -S warning setup-linux.sh && bats tests/*.bats",
+    "state": "verified",
+    "evidence": "bash -n clean; shellcheck -S warning clean (info findings 19 on main -> 16 here); bats tests/*.bats ok=1526 not_ok=7 skipped=76, and all 7 are red on clean main (6 install-dotf fixture leakage + BUG-771/#1409)"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f7",
+    "behavior": "A guard refuses any removal in either setup script naming a file the harness manifest declares a doctrine deploy target, resolving the list from the manifest",
+    "verification": "bats tests/guard-doctrine-target-not-deleted.bats",
+    "state": "verified",
+    "evidence": "bats 2/2 ok; fail-first proven red against main's scripts at setup-linux.sh:503"
+  },
+  {
+    "id": "OPS-040-dead-migration-purge-f8",
+    "behavior": "Both lessons are written and indexed",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && test -f docs/lessons/lesson-256-a-cleanup-blocks-own-description-of-what-it-deletes.md && test -f docs/lessons/lesson-257-a-one-time-migration-with-no-removal-date-is.md && grep -q 'lesson-256' docs/lessons/_index.md && grep -q 'lesson-257' docs/lessons/_index.md && echo OK",
+    "state": "verified",
+    "evidence": "both lesson files present and indexed in docs/lessons/_index.md"
+  }
+]

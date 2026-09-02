@@ -14,6 +14,17 @@ setup() {
     cd "$DOTFILES_DIR"
     ids=$(grep -rhoE "dotf secrets show [A-Za-z0-9_-]+" --include='*.sh' --include='*.ps1' . \
         | awk '{print $NF}' | sort -u)
+
+    # C15: a check that cannot answer must SKIP saying why, never pass. OPS-040
+    # removed the last two call sites (the OPENROUTER_API_KEY export both setup
+    # scripts ran for a consumer CLI-042 AC8 had already deleted), so this loop
+    # now iterates an empty list. A pass in that state would be indistinguishable
+    # from "every call site checks out" and would stay green through the
+    # reintroduction of a typo'd one, which is the entire failure #698 describes.
+    if [ -z "$ids" ]; then
+        skip "no 'dotf secrets show <id>' call sites in the tree — nothing to resolve (the shell/ps1 sweep found none)"
+    fi
+
     missing=""
     for id in $ids; do
         grep -qE "^[[:space:]]*-[[:space:]]*id:[[:space:]]*${id}([[:space:]]|#|\$)" secrets/registry.yaml \
