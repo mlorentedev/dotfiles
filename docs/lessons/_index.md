@@ -272,4 +272,6 @@ tags: [lessons, index, dotfiles]
 | [251 - A guard that refuses an anticipated schema change should name its own fix, because the person who reads the refusal is the one who caused it](lesson-251-a-guard-that-refuses-an-anticipated-schema-change.md) | 2026-08-31 |  |
 | [254 - A canary that emits where nothing persists accumulates no evidence, and its silence reads as success](lesson-254-a-canary-that-emits-where-nothing-persists.md) | 2026-09-01 |  |
 | [255 - Truncation, not hostile input, is what made the collision guard load-bearing — and without it the measurement would have confirmed the opposite](lesson-255-truncation-not-hostile-input-made-the-digest-load-bearing.md) | 2026-09-01 |  |
+| [252 - A git pathspec is resolved against the CWD, so the same argument means two different things and one of them is silently empty](lesson-252-a-git-pathspec-is-resolved-against-the-cwd-so-the-same.md) | 2026-09-01 |  |
+
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
