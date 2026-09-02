@@ -142,8 +142,6 @@ func RecordDecision(path string, rec DecisionRecord) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
-
 	// ONE write of one line, on a fd opened O_APPEND. That is what keeps
 	// concurrent writers from interleaving: the kernel makes the seek-to-end and
 	// the write a single step for a regular file, and every record here is far
@@ -154,6 +152,25 @@ func RecordDecision(path string, rec DecisionRecord) error {
 	// sessions and subagents on one machine write at once. Pinned by
 	// TestConcurrentWritersLoseNoRecords.
 	if _, err := f.Write(append(raw, '\n')); err != nil {
+		_ = f.Close()
+		return err
+	}
+
+	// fstat while the descriptor is still open, then CLOSE BEFORE ROTATING.
+	//
+	// The close is not cleanup, it is a correctness step, and it is why there is
+	// no `defer` here. Windows refuses to rename an open file, so leaving the
+	// handle open made rotation fail silently — the error is ignored by design —
+	// and the journal grew without bound on that platform only. Measured on
+	// #1435's `test (windows-latest)`: rotation never fired, and both bounding
+	// tests failed with "no rotation happened, so this test asserts nothing".
+	//
+	// `GOOS=windows go vet` does not see this. It is runtime behaviour, not a
+	// compile error, so only running the tests on Windows catches it — and this
+	// overlap between the open handle and the rename was created by moving the
+	// rotation AFTER the write, which is otherwise the right ordering.
+	fi, statErr := f.Stat()
+	if err := f.Close(); err != nil {
 		return err
 	}
 
@@ -179,8 +196,7 @@ func RecordDecision(path string, rec DecisionRecord) error {
 	// this repository has already paid for once (#1075). A lock is not worth that
 	// for a diagnostic journal whose worst case is losing records nobody has
 	// asked about since they rotated.
-	fi, err := f.Stat()
-	if err != nil || fi.Size() < maxDecisionBytes {
+	if statErr != nil || fi.Size() < maxDecisionBytes {
 		return nil //nolint:nilerr // a failed stat means only that rotation is skipped; the record is already durable
 	}
 	if cur, err := os.Stat(path); err == nil && os.SameFile(fi, cur) {
