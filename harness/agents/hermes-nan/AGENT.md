@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/hermes-nan/AGENT.md
-generated_sha: 5aff361483cf37c1
+generated_sha: a83ef366d2d1ecd0
 id: agent-hermes-nan
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: hermes-nan
 description: Autonomous steward instance running externally on NaN. Long-running and self-reconciling — an apply/capture loop on a schedule rather than a persona you invoke. Its live state lives in 80_agents/hermes-nan/ and is never duplicated here.
 kind: autonomous
 model: mid
-capabilities: [read, search, edit, shell]
+capabilities: [read, search, edit, shell, skill]
 skills: [agent-lifecycle]
 owner: manu
 ---

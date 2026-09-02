@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/builder/AGENT.md
-generated_sha: 93ccd2139b3bc8dc
+generated_sha: ddeb950a1195917d
 id: agent-builder
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: builder
 description: Build-phase persona. Invoke to implement a change whose shape is already decided and planned — writing the code, the tests that would fail without it, and the guard for any defect class the change exposes.
 kind: invocable
 model: mid
-capabilities: [read, search, edit, shell]
+capabilities: [read, search, edit, shell, skill]
 skills: [golang-pro, async-python-patterns, cyclomatic-complexity, test, test-driven-development, mcp-builder, debug-hardware, systematic-debugging, creating-skills]
 owner: manu
 ---

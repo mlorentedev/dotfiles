@@ -45,20 +45,27 @@ type Persona struct {
 	Model       string // neutral tier: top | mid | low
 	Description string
 	Skills      []SkillBinding
-	Targets     []string // empty means every harness
-	Path        string
+	// Capabilities are the NEUTRAL verbs the record declares; the capability map
+	// turns them into one harness's native tool grant. Read here so the tie
+	// between the two frontmatter keys can be asserted: a record declaring
+	// `skills:` without the `skill` capability deploys an agent that cannot
+	// invoke the skills its own gate demands (#1420).
+	Capabilities []string
+	Targets      []string // empty means every harness
+	Path         string
 }
 
 // personaFrontmatter mirrors the YAML. `Skills` is `any` because the field has
 // two shapes during migration and telling them apart is the loader's job, not
 // the caller's.
 type personaFrontmatter struct {
-	Name        string   `yaml:"name"`
-	Kind        string   `yaml:"kind"`
-	Model       string   `yaml:"model"`
-	Description string   `yaml:"description"`
-	Targets     []string `yaml:"targets"`
-	Skills      any      `yaml:"skills"`
+	Name         string   `yaml:"name"`
+	Kind         string   `yaml:"kind"`
+	Model        string   `yaml:"model"`
+	Description  string   `yaml:"description"`
+	Targets      []string `yaml:"targets"`
+	Skills       any      `yaml:"skills"`
+	Capabilities []string `yaml:"capabilities"`
 }
 
 // LoadPersona reads and parses one agent record.
@@ -95,13 +102,14 @@ func LoadPersona(path string) (*Persona, error) {
 	}
 
 	return &Persona{
-		Name:        fm.Name,
-		Kind:        fm.Kind,
-		Model:       fm.Model,
-		Description: fm.Description,
-		Skills:      skills,
-		Targets:     fm.Targets,
-		Path:        path,
+		Name:         fm.Name,
+		Kind:         fm.Kind,
+		Model:        fm.Model,
+		Description:  fm.Description,
+		Skills:       skills,
+		Capabilities: fm.Capabilities,
+		Targets:      fm.Targets,
+		Path:         path,
 	}, nil
 }
 

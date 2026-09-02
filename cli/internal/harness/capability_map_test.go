@@ -194,6 +194,19 @@ func TestShippedCapabilityMapCoversEveryDeclaredHarness(t *testing.T) {
 	}
 	for _, name := range sortedKeys(harnesses) {
 		for _, v := range vocab {
+			// A verb the harness declared it has no equivalent for is ANSWERED,
+			// not missing, and resolving it alone would legitimately render
+			// nothing. Assert the declaration instead — the thing that must
+			// never happen is a verb that is neither mapped nor declared, and
+			// the loader already refuses to load that map at all.
+			unsup, err := UnsupportedFor(m, []string{v}, name)
+			if err != nil {
+				t.Errorf("shipped map cannot report support for %q on %q: %v", v, name, err)
+				continue
+			}
+			if len(unsup) == 1 {
+				continue
+			}
 			line, err := ResolveCapabilities(m, []string{v}, name)
 			if err != nil {
 				t.Errorf("shipped map cannot resolve %q for %q: %v", v, name, err)
@@ -203,6 +216,48 @@ func TestShippedCapabilityMapCoversEveryDeclaredHarness(t *testing.T) {
 				t.Errorf("shipped map resolves %q for %q to an empty line", v, name)
 			}
 		}
+	}
+}
+
+// TestShippedMapGrantsTheSkillCapabilityWhereItExists pins the fix for #1420 to
+// the SHIPPED map rather than a fixture. The defect was not a wrong value: it was
+// a verb that did not exist, so every persona deployed without the ability to
+// invoke a skill and none could satisfy its own gate. A fixture would have proved
+// the mechanism works while the real map still had no `skill` in it.
+func TestShippedMapGrantsTheSkillCapabilityWhereItExists(t *testing.T) {
+	m, err := LoadCapabilityMap(repoRootForTest(t))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !contains(toStrings(m["vocabulary"]), "skill") {
+		t.Fatal("the shipped vocabulary declares no `skill` verb — no persona can be granted one")
+	}
+
+	line, err := ResolveCapabilities(m, []string{"read", "skill"}, "claude")
+	if err != nil {
+		t.Fatalf("resolve skill for claude: %v", err)
+	}
+	if !strings.Contains(line, "Skill") {
+		t.Errorf("claude resolves read+skill to %q, which grants no skill invocation; claude's\n"+
+			"`tools:` is an allow-list, so a tool not named is unavailable and the persona\n"+
+			"deadlocks under enforce: block", line)
+	}
+
+	// The other half of AC2: a harness with no equivalent must be distinguishable
+	// from one nobody has mapped. It reports, and it does not grant.
+	unsup, err := UnsupportedFor(m, []string{"read", "skill"}, "opencode")
+	if err != nil {
+		t.Fatalf("unsupported for opencode: %v", err)
+	}
+	if len(unsup) != 1 || unsup[0] != "skill" {
+		t.Fatalf("opencode should declare `skill` unsupported, got %v", unsup)
+	}
+	line, err = ResolveCapabilities(m, []string{"read", "skill"}, "opencode")
+	if err != nil {
+		t.Fatalf("resolve for opencode: %v", err)
+	}
+	if strings.Contains(strings.ToLower(line), "skill") {
+		t.Errorf("opencode rendered %q — a verb declared unsupported must not appear as a grant", line)
 	}
 }
 

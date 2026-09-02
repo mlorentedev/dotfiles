@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/reviewer/AGENT.md
-generated_sha: 6e4dc91353101509
+generated_sha: 60c29ced3e3795f7
 id: agent-reviewer
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: reviewer
 description: Verify-phase persona. Invoke to check a change against what it claims — before a merge, and always before a spec archives. Reviews and refutes; never fixes, because the independence is the whole value.
 kind: invocable
 model: mid
-capabilities: [read, search, shell]
+capabilities: [read, search, shell, skill]
 skills:
   - id: audit
     enforce: warn

@@ -94,7 +94,7 @@ func checkVocabularyCoverage(doc any) error {
 		if !ok {
 			return fmt.Errorf("%s: harness %q declares no capabilities block", CapabilityMapFile, name)
 		}
-		if err := checkHarnessCoversVocabulary(name, caps, vocab); err != nil {
+		if err := checkHarnessCoversVocabulary(name, caps, vocab, toStrings(h["unsupported"])); err != nil {
 			return err
 		}
 	}
@@ -108,19 +108,43 @@ func checkVocabularyCoverage(doc any) error {
 // cleanly and then renders a definition missing exactly the tool the persona
 // asked for. The extra direction is quieter but still wrong: a mapping for a verb
 // no record can ask for reads as coverage while being unreachable.
-func checkHarnessCoversVocabulary(name string, caps map[string]any, vocab []string) error {
+func checkHarnessCoversVocabulary(name string, caps map[string]any, vocab []string, unsupported []string) error {
+	// A verb in both blocks is a contradiction, and picking a winner would make
+	// the map's meaning depend on which check ran first. Rejected before the
+	// coverage arithmetic, so the two later messages never fire on a document
+	// whose real defect is this one.
+	var both []string
+	for _, u := range unsupported {
+		if _, mapped := caps[u]; mapped {
+			both = append(both, u)
+		}
+	}
+	if len(both) > 0 {
+		sort.Strings(both)
+		return fmt.Errorf(
+			"%s: harness %q lists %s as both mapped and `unsupported` — a verb is one or the "+
+				"other, and resolving the contradiction here would hide which one was meant",
+			CapabilityMapFile, name, strings.Join(both, ", "))
+	}
+	// Coverage is satisfied by a mapping OR by an explicit declaration of no
+	// equivalent. Both are answers; only silence is a defect.
 	var missing []string
 	for _, v := range vocab {
-		if _, present := caps[v]; !present {
-			missing = append(missing, v)
+		if _, present := caps[v]; present {
+			continue
 		}
+		if contains(unsupported, v) {
+			continue
+		}
+		missing = append(missing, v)
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
 		return fmt.Errorf(
 			"%s: harness %q maps no native names for %s — every harness must cover the whole "+
 				"declared vocabulary. A partial harness validates cleanly and then renders a "+
-				"definition missing exactly the tool the persona asked for",
+				"definition missing exactly the tool the persona asked for. If this harness has "+
+				"no native equivalent, say so in `unsupported` rather than leaving it out",
 			CapabilityMapFile, name, strings.Join(missing, ", "))
 	}
 	var extra []string
@@ -135,7 +159,47 @@ func checkHarnessCoversVocabulary(name string, caps map[string]any, vocab []stri
 				"add it to `vocabulary` or drop it, but do not leave a mapping nothing can ask for",
 			CapabilityMapFile, name, strings.Join(extra, ", "))
 	}
+	// The same rule for the other block: an `unsupported` verb outside the
+	// vocabulary is a declaration about nothing, and reads as coverage.
+	var unknown []string
+	for _, u := range unsupported {
+		if !contains(vocab, u) {
+			unknown = append(unknown, u)
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return fmt.Errorf(
+			"%s: harness %q declares %s unsupported, which the vocabulary does not declare — "+
+				"a declaration about a verb nothing can ask for reads as coverage while covering nothing",
+			CapabilityMapFile, name, strings.Join(unknown, ", "))
+	}
 	return nil
+}
+
+// UnsupportedFor reports which of the requested verbs this harness has declared
+// it has no native equivalent for.
+//
+// Separate from ResolveCapabilities on purpose. Resolution renders a value; this
+// answers a question about the value it could not render, and the CALLER decides
+// what to do about it — the command writes it to stderr, a test asserts on it.
+// Folding the report into the resolver would either put I/O inside a pure
+// function or change a signature every caller shares, and the point of the
+// declaration is that it is visible, not that it is handled in one place.
+func UnsupportedFor(m map[string]any, caps []string, harness string) ([]string, error) {
+	h, err := harnessBlock(m, harness)
+	if err != nil {
+		return nil, err
+	}
+	declared := toStrings(h["unsupported"])
+	var out []string
+	for _, c := range caps {
+		c = strings.TrimSpace(c)
+		if c != "" && contains(declared, c) {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 
 func contains(hay []string, needle string) bool {
@@ -194,7 +258,7 @@ func ResolveCapabilities(m map[string]any, caps []string, harness string) (strin
 	if !ok {
 		return "", fmt.Errorf("%s: harness %q declares no capabilities block", CapabilityMapFile, harness)
 	}
-	natives, err := collectNatives(caps, table, harness)
+	natives, err := collectNatives(caps, table, harness, toStrings(h["unsupported"]))
 	if err != nil {
 		return "", err
 	}
@@ -220,7 +284,7 @@ func harnessBlock(m map[string]any, harness string) (map[string]any, error) {
 // collectNatives flattens the requested verbs into native names in declaration
 // order, deduped across the set with the first occurrence winning. Deterministic
 // so the rendered file does not churn between deploys.
-func collectNatives(caps []string, table map[string]any, harness string) ([]string, error) {
+func collectNatives(caps []string, table map[string]any, harness string, unsupported []string) ([]string, error) {
 	var natives []string
 	seen := map[string]bool{}
 	for _, c := range caps {
@@ -228,10 +292,21 @@ func collectNatives(caps []string, table map[string]any, harness string) ([]stri
 		if c == "" {
 			continue
 		}
+		// A verb the harness declared it has no equivalent for contributes no
+		// native name and is NOT an error: the map answered the question. It is
+		// dropped from the rendered value and surfaced separately through
+		// UnsupportedFor, so the omission is reported rather than silent — the
+		// distinction the `unsupported` block exists to make.
+		if contains(unsupported, c) {
+			continue
+		}
 		raw, present := table[c]
 		if !present {
 			return nil, fmt.Errorf(
-				"capability %q is not mapped for harness %q in %s (mapped: %s)",
+				"capability %q is not mapped for harness %q in %s (mapped: %s)\n"+
+					"if this harness has no native equivalent, declare it in that harness's "+
+					"`unsupported` list — an unmapped verb and one with no equivalent mean "+
+					"opposite things and must not resolve the same way",
 				c, harness, CapabilityMapFile, strings.Join(sortedKeys(table), ", "))
 		}
 		for _, n := range toStrings(raw) {

@@ -62,9 +62,21 @@ it is a definition granting nothing.`,
 			if err != nil {
 				return err
 			}
-			line, err := harness.ResolveCapabilities(m, strings.Split(args[0], ","), harnessName)
+			requested := strings.Split(args[0], ",")
+			line, err := harness.ResolveCapabilities(m, requested, harnessName)
 			if err != nil {
 				return err
+			}
+			// A capability this harness has no native equivalent for is dropped
+			// from the value and SAID SO here. Stderr, not stdout: the caller
+			// substitutes stdout into a frontmatter line, so a note there would
+			// corrupt the file it is warning about. Silence would be worse than
+			// either — it is what let a whole persona roster deploy without the
+			// ability to invoke a skill (#1420).
+			if unsupported, uerr := harness.UnsupportedFor(m, requested, harnessName); uerr == nil && len(unsupported) > 0 {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+					"[capabilities] %s declares no native equivalent for %s — omitted from the value, not granted\n",
+					harnessName, strings.Join(unsupported, ", "))
 			}
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
 			return nil
