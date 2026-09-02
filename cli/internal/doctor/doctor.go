@@ -1,9 +1,12 @@
 package doctor
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 )
 
 // Options configures a doctor run. System and StartDir are injection seams for
@@ -48,7 +51,18 @@ func Run(opts Options) (int, error) {
 		return 2, err
 	}
 
-	rep := NewReport(out, opts.Verbose)
+	// Tee the report into a transcript so Summary() can be followed by a
+	// curated Next-steps block (below) without changing Report's shape: it
+	// streams messages straight to out and keeps no record of them (CLI-070,
+	// #1442 — setup's own "Next steps" never named the FAIL doctor had just
+	// printed, e.g. `bw login`, so the reader had to go find it in the
+	// scroll). Color detection must run on the real out, not the tee:
+	// io.MultiWriter is never an *os.File, so isColorEnabled would otherwise
+	// report false on every run.
+	color := isColorEnabled(out)
+	var transcript bytes.Buffer
+	rep := NewReport(io.MultiWriter(out, &transcript), opts.Verbose)
+	rep.SetColor(color)
 	mode := "check"
 	switch {
 	case opts.Quick:
@@ -114,7 +128,45 @@ func Run(opts Options) (int, error) {
 	}
 
 	rep.Summary()
+	if steps := nextSteps(transcript.String()); len(steps) > 0 {
+		_, _ = fmt.Fprintln(out, "\nNext steps:")
+		for _, step := range steps {
+			_, _ = fmt.Fprintf(out, "  %s\n", step)
+		}
+	}
 	return rep.ExitCode(), nil
+}
+
+// failRemedyRe pulls the backtick-quoted command out of a FAIL line's remedy
+// clause. Matched against the handful of verbs FAIL messages actually use to
+// introduce one (surveyed across the package: run/re-run cover the large
+// majority, recover with/upgrade with the rest) — not every backtick span,
+// which would also catch a diagnostic reference like `bw status` that names
+// what was checked, not what to do about it.
+var failRemedyRe = regexp.MustCompile("(?:run|re-run|recover with|upgrade with) `([^`]+)`")
+
+// nextSteps scans a rendered report transcript for FAIL lines carrying a
+// remedy command and returns each one once, in first-seen order. Free text,
+// not a structured field on Report: Report streams a message to its writer
+// and keeps no record of it, and giving every check a machine-readable hint
+// would be a much larger change than one FAIL in the middle of a 30+ section
+// sweep (Bitwarden reach) actually needs surfaced at the end.
+func nextSteps(transcript string) []string {
+	seen := map[string]bool{}
+	var steps []string
+	for _, line := range strings.Split(transcript, "\n") {
+		if !strings.Contains(line, "[FAIL]") {
+			continue
+		}
+		for _, m := range failRemedyRe.FindAllStringSubmatch(line, -1) {
+			cmd := m[1]
+			if !seen[cmd] {
+				seen[cmd] = true
+				steps = append(steps, cmd)
+			}
+		}
+	}
+	return steps
 }
 
 // loadContractSection resolves + parses the contract, reporting its own status
