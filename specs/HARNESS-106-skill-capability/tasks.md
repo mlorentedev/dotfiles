@@ -1,5 +1,5 @@
 ---
-tags: [spec, tasks, templates]
+tags: [spec, tasks]
 created: "2026-09-01"
 ---
 
@@ -13,31 +13,53 @@ created: "2026-09-01"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/HARNESS-106-skill-capability`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/persona-skill-enforcement`
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
+> Two independent behaviours: the **capability** (map + resolution) and the
+> **record-level guard** (persona frontmatter). Their first test tasks carry `[P]`.
+> The decision record (AC5–AC7) is a third, sequenced last because AC4 cannot be
+> proven without it — a dispatch leaves no evidence until the gate writes one.
 
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+### The capability and its resolution
+
+- [x] [P] [AC1] Write failing test that the shipped map grants a skill verb for claude (`TestShippedMapGrantsTheSkillCapabilityWhereItExists`)
+- [x] [AC1] Add `skill` to `vocabulary` and to `claude.capabilities` in `harness/capability-map.json`; bump the map to version 2
+- [x] [AC2] Write failing loader test for a verb both mapped and declared `unsupported`, and for an `unsupported` verb outside the vocabulary
+- [x] [AC2] Add the `unsupported` property to `capability-map.schema.json` and enforce both rules in `checkHarnessCoversVocabulary`
+- [x] [AC2] Add `UnsupportedFor` as a separate exported function so `ResolveCapabilities` stays pure, and report the omission on **stderr** — stdout is substituted into a frontmatter line
+- [x] [AC2] Declare `opencode.unsupported = ["skill"]`: measured against `@opencode-ai/plugin`, its permission vocabulary has no skill concept
+
+### The record-level guard
+
+- [x] [P] [AC3] Write failing guard that every persona declaring `skills:` also declares the `skill` capability (`TestEveryPersonaDeclaringSkillsCanInvokeThem`) — it named all seven, red on the real defect
+- [x] [AC3] Read `capabilities:` in `LoadPersona` so the tie between the two frontmatter keys is assertable at all
+- [x] [AC3] Fix in the vault SSOT — `00_meta/agents/definitions/<role>/AGENT.md` ×7 — never in the generated files
+
+### Propagation and compatibility
+
+- [x] [AC8] Verify a scratch-`$HOME` deploy renders `Skill` for all seven personas, and that a second run is byte-identical (`changed=0`)
+- [x] [AC8] Make `compile-harness.sh` name its own fix when an older `dotf` rejects the v2 map — it fails closed with `NO agent deployed`, and the message blamed the (correct) map
+
+### The decision record — deferred, tracked here
+
+- [ ] [AC5] `dotf harness gate` writes a durable record for every decision, including `allow` and `role did not resolve`
+- [ ] [AC6] A `warn` decision is readable from that record after the session ends
+- [ ] [AC7] `agent_type` is carried in the record, converting the standing inference into a measurement
+- [ ] [AC4] Re-run a real dispatch and confirm a consumption record — the criterion AC5–AC7 exist to make provable
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test **or** explicitly carried as pending
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks pass (`go build`, `go vet`, `GOOS=windows go vet`)
+- [x] Lint passes (`golangci-lint`, `shellcheck`)
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder (#1428)
 
 ## Machine-readable features
 
@@ -45,16 +67,7 @@ This spec emits a sibling `features.json` (alongside this file) following [[patt
 
 **Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
 
-Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-106-skill-capability/features.json`):
-
-```json
-[
-  {
-    "id": "HARNESS-106-skill-capability-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+The nine entries map 1:1 onto the nine acceptance criteria. Five are
+`implemented` (code landed, harness has not run them); four are `pending` and
+their verification commands are red, which is the honest state for a criterion
+whose implementation is deferred — not a vacuous `exit 1`.

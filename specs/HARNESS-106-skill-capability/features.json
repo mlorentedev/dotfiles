@@ -1,9 +1,65 @@
 [
   {
     "id": "HARNESS-106-skill-capability-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "AC1 — a neutral skill-invocation verb exists in the map vocabulary and resolves to claude's native tool",
+    "verification": "cd cli && go test ./internal/harness/ -run TestShippedMapGrantsTheSkillCapabilityWhereItExists",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f2",
+    "behavior": "AC2 — a harness with no native equivalent declares it explicitly; the loader rejects a verb that is both mapped and unsupported, and one declared unsupported outside the vocabulary",
+    "verification": "cd cli && go test ./internal/harness/ -run TestCapabilityMapFailsLoudWhenUnreadable",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f3",
+    "behavior": "AC3 — every persona record declaring skills also declares the capability, asserted by a guard that fails red when one does not",
+    "verification": "cd cli && go test ./internal/harness/ -run TestEveryPersonaDeclaringSkillsCanInvokeThem",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f4",
+    "behavior": "AC4 — a dispatched persona can invoke a skill, proven by a consumption record rather than by a config file containing a key",
+    "verification": "test -n \"$(dotf harness gate-decisions --last --agent-type reviewer 2>/dev/null)\"",
     "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f5",
+    "behavior": "AC5 — the gate writes a durable record for every decision including allow and 'role did not resolve', reachable without --debug and without reading a transcript",
+    "verification": "cd cli && go test ./internal/harness/ -run TestGateRecordsEveryDecision",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f6",
+    "behavior": "AC6 — a warn decision is observable after the session ends, from the durable record alone",
+    "verification": "cd cli && go test ./internal/harness/ -run TestWarnDecisionSurvivesTheSession",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f7",
+    "behavior": "AC7 — agent_type is reported in the record, converting the standing inference into a measurement",
+    "verification": "cd cli && go test ./internal/harness/ -run TestGateRecordCarriesAgentType",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f8",
+    "behavior": "AC8 — the change propagates by deploy from the vault SSOT plus the repo map alone, and a re-run reports changed=0",
+    "verification": "S=$(mktemp -d) && mkdir -p \"$S/home\" && HOME=\"$S/home\" bash scripts/compile-harness.sh --deploy >/dev/null 2>&1 && cp -a \"$S/home\" \"$S/snap\" && HOME=\"$S/home\" bash scripts/compile-harness.sh --deploy >/dev/null 2>&1 && diff -rq \"$S/snap\" \"$S/home\"",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f9",
+    "behavior": "AC9 — every new check has a red-direction test that fails when the thing it guards is broken",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCapabilityMapFailsLoudWhenUnreadable|TestEveryPersonaDeclaringSkillsCanInvokeThem|TestShippedMapGrantsTheSkillCapabilityWhereItExists'",
+    "state": "implemented",
     "evidence": ""
   }
 ]

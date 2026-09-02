@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-106-skill-capability"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-09-01"
 issue: "mlorentedev/dotfiles#1420"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -110,14 +110,14 @@ Concretely, after this:
 
 ## Acceptance criteria
 
-- [ ] **AC1** — A neutral skill-invocation capability exists in the map's
+- [x] **AC1** — A neutral skill-invocation capability exists in the map's
       `vocabulary`, schema-valid, and `dotf harness resolve-capabilities
       --harness claude` emits the native tool for a persona declaring it.
-- [ ] **AC2** — A harness with no native equivalent is declared as such
+- [x] **AC2** — A harness with no native equivalent is declared as such
       **explicitly**. Resolution neither silently omits the capability nor falls
       back to a permissive default, and "declared inapplicable" is
       distinguishable from "unmapped" in both the schema and the failure message.
-- [ ] **AC3** — Every persona record declaring `skills:` also declares the
+- [x] **AC3** — Every persona record declaring `skills:` also declares the
       capability, asserted by a guard that fails red when one does not.
 - [ ] **AC4** — A dispatched persona **can invoke a skill**, proven by a dispatch
       that writes a consumption record — never by a config file containing a key.
@@ -129,10 +129,10 @@ Concretely, after this:
 - [ ] **AC7** — `agent_type` is reported in the record, so a real dispatch shows
       which persona the gate resolved. This is the criterion that converts the
       standing inference into a measurement.
-- [ ] **AC8** — The change propagates by deploy: the vault SSOT plus the repo map
+- [x] **AC8** — The change propagates by deploy: the vault SSOT plus the repo map
       are the only edited sources, no generated file is hand-edited, and a
       re-run reports `changed=0`.
-- [ ] **AC9** — Every new check has a red-direction test that fails when the
+- [x] **AC9** — Every new check has a red-direction test that fails when the
       thing it guards is broken.
 
 ## References
