@@ -41,6 +41,22 @@ func TestNextSteps_NoFailNoBlock(t *testing.T) {
 	}
 }
 
+// nextSteps must still find the [FAIL] tag and the remedy on a real terminal
+// run, where Report wraps each tag in ANSI color codes (coloredTag) rather
+// than printing it plain. The color codes surround the whole "[FAIL]" literal
+// — ansiRed + "[FAIL]" + ansiReset — they never land inside it, so the
+// substring search survives; this pins that down against a real color-tagged
+// line rather than asserting it from the source (PR review flagged this as a
+// theoretical risk: #1443 review comment).
+func TestNextSteps_SurvivesColoredTag(t *testing.T) {
+	line := "  " + coloredTag[StatusFail] + " Bitwarden session is gone — run `bw login`"
+	got := nextSteps(line)
+	want := []string{"bw login"}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("got %q, want %q (line: %q)", got, want, line)
+	}
+}
+
 // End-to-end: a real Run() with a FAIL that carries `bw login` renders the
 // Next-steps block after Results:, and a clean run renders neither.
 func TestRun_NextStepsBlock(t *testing.T) {

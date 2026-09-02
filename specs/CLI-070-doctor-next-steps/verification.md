@@ -31,6 +31,7 @@ created: "2026-09-02"
 
 ## Decisions made during implementation
 
+- PR review (pr-agent) flagged the `[FAIL]` substring match as a theoretical risk under ANSI color, hypothesizing the tag could be split by escape codes. Verified false: `coloredTag[StatusFail]` wraps the whole `"[FAIL]"` literal from the outside (`ansiRed + "[FAIL]" + ansiReset`), never splits it. Added `TestNextSteps_SurvivesColoredTag` to pin this down with evidence rather than leave it as an unresolved comment.
 - Split what was originally one investigation into two PRs: the pin-floor semantics fix (#1441, independent, obvious-cause, shipped under `skip-sdd`) and this feature. Bundled together they were 108 production LOC pushing an unrelated bug fix through a spec process it didn't need and diluting this feature's own spec.
 - Chose to extract remedies by scanning the *rendered transcript* for verb+backtick patterns rather than adding a structured hint field to `Report.Fail()`. Considered and rejected the structured-field approach: it would touch on the order of 100 call sites across the package for a benefit (compile-time-checked hints) that a doctor-package reviewer already gets for free, since the regex and the messages it reads live in the same package and get reviewed together.
 - Scoped strictly to FAIL lines, not WARN. `checkGitWindowsFloor`'s WARN carries a real remedy (`upgrade with \`winget upgrade Git.Git\``) that is NOT surfaced in Next steps under this design — deliberate, per `Report`'s own contract that only FAIL drives the non-zero exit Next steps exists to explain.
