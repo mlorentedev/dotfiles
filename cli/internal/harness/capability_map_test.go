@@ -164,6 +164,29 @@ func TestCapabilityMapFailsLoudWhenUnreadable(t *testing.T) {
 			},
 			wantSub: "telepathy",
 		},
+		{
+			// `unsupported` is the escape hatch this spec adds, and an escape
+			// hatch with no guard is how a permissive default gets in through
+			// the back door. Both new rejection paths get a red direction.
+			name: "a harness that both maps a verb and declares it unsupported",
+			seed: func(t *testing.T) string {
+				dir := t.TempDir()
+				writeCapFixture(t, dir, CapabilityMapSchemaFile, shippedSchema(t))
+				writeCapFixture(t, dir, CapabilityMapFile, contradictoryCapabilityMap)
+				return dir
+			},
+			wantSub: "both mapped and",
+		},
+		{
+			name: "a harness that declares a verb unsupported the vocabulary does not declare",
+			seed: func(t *testing.T) string {
+				dir := t.TempDir()
+				writeCapFixture(t, dir, CapabilityMapSchemaFile, shippedSchema(t))
+				writeCapFixture(t, dir, CapabilityMapFile, unknownUnsupportedCapabilityMap)
+				return dir
+			},
+			wantSub: "telepathy",
+		},
 	}
 
 	for _, tt := range tests {
@@ -333,6 +356,30 @@ const extraVerbCapabilityMap = `{
   "version": 1,
   "vocabulary": ["read"],
   "harnesses": {"claude": {"field": "tools", "form": "csv", "capabilities": {"read": ["Read"], "telepathy": ["Mind"]}}}
+}`
+
+// `skill` is mapped AND declared unsupported, and `shell` is uncovered. Both
+// defects are present deliberately: the contradiction must be the one reported,
+// because resolving it silently would decide the map's meaning by check order.
+const contradictoryCapabilityMap = `{
+  "$comment": ["fixture"],
+  "version": 1,
+  "vocabulary": ["read", "skill", "shell"],
+  "harnesses": {"claude": {"field": "tools", "form": "csv",
+    "capabilities": {"read": ["Read"], "skill": ["Skill"]},
+    "unsupported": ["skill"]}}
+}`
+
+// An `unsupported` verb outside the vocabulary. It satisfies the coverage
+// arithmetic while declaring nothing askable — the failure mode that would let a
+// harness look answered for a verb that does not exist.
+const unknownUnsupportedCapabilityMap = `{
+  "$comment": ["fixture"],
+  "version": 1,
+  "vocabulary": ["read"],
+  "harnesses": {"claude": {"field": "tools", "form": "csv",
+    "capabilities": {"read": ["Read"]},
+    "unsupported": ["telepathy"]}}
 }`
 
 const commaNativeCapabilityMap = `{
