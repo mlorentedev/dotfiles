@@ -277,7 +277,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	case sys.has("opencode"):
 		ver := semverOf(sys, "opencode")
 		rep.Pass("opencode in PATH: " + ver)
-		matchPinFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), "packages.json")
+		matchPinFloorFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), "packages.json")
 	case isExecFile(opencodeBin):
 		// The retired curl-script channel (ADR-036) left a copy behind and
 		// nothing on PATH resolves: the rc files no longer add ~/.opencode/bin.
@@ -308,7 +308,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	case sys.has("pi"):
 		ver := semverOf(sys, "pi")
 		rep.Pass("pi in PATH: " + ver)
-		matchPin(rep, "pi", ver, cfg.Versions["PI_VERSION"])
+		matchPinFloor(rep, "pi", ver, cfg.Versions["PI_VERSION"])
 	case isExecFile(piLocalBin):
 		rep.Fail("pi exists at " + piLocalBin + " but not in PATH (reload shell)")
 	case piConfigured:
@@ -863,12 +863,44 @@ func matchPin(rep *Report, tool, installed, pin string) {
 
 // matchPinFrom is matchPin with the pin's source named: packages.json is the
 // SSOT for catalog tools (ADR-036), versions.conf for the rest.
+//
+// Exact match by design: for the tools that call this (golangci-lint, age),
+// nothing reconciles them toward the pin on a floor policy, so any drift —
+// ahead or behind — is worth a WARN. golangci-lint in particular needs this:
+// CI lints at the exact pinned version, so a locally-newer binary still
+// diverges from CI (BUG-071).
 func matchPinFrom(rep *Report, tool, installed, pin, source string) {
 	switch {
 	case pin == "":
 		rep.Skip(tool + " version not pinned in " + source + " — match not verified")
 	case installed == pin:
 		rep.Pass(fmt.Sprintf("%s version matches %s (%s)", tool, source, pin))
+	default:
+		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s (%s)", tool, installed, pin, source))
+	}
+}
+
+func matchPinFloor(rep *Report, tool, installed, pin string) {
+	matchPinFloorFrom(rep, tool, installed, pin, "versions.conf")
+}
+
+// matchPinFloorFrom is matchPinFrom for tools whose installer reconciles on a
+// floor policy — `dotf tools install`'s decideAction (install.go, "the pin is
+// a MINIMUM, not an exact match... an exact-match reconcile would wrongly
+// downgrade") and pi's own setup-{linux,windows} install block (REFACTOR-013).
+// Doctor must agree with the installer about what the pin means: an exact-match
+// WARN here fires every time the tool's own upstream ships a patch between two
+// pin bumps, which the installer will never revert — chasing it with a pin bump
+// is a treadmill, not a signal (observed: PI_VERSION bumped to "the version
+// actually installed" in f1c20cd, then drifted again).
+func matchPinFloorFrom(rep *Report, tool, installed, pin, source string) {
+	switch {
+	case pin == "":
+		rep.Skip(tool + " version not pinned in " + source + " — match not verified")
+	case installed == pin:
+		rep.Pass(fmt.Sprintf("%s version matches %s (%s)", tool, source, pin))
+	case atLeast(installed, pin):
+		rep.Pass(fmt.Sprintf("%s %s meets the %s pin %s", tool, installed, source, pin))
 	default:
 		rep.Warn(fmt.Sprintf("%s version drift: installed=%s pinned=%s (%s)", tool, installed, pin, source))
 	}
