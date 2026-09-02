@@ -238,15 +238,37 @@ func TestMergeAgainstTheRealDeployedSettings(t *testing.T) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		t.Skipf("deployed settings unreadable: %v", err)
 	}
-	before := ForeignHookCount(doc)
+	before := foreignCommands(doc)
 	out, _, err := MergeHooks(doc, []HookCommand{gateCmd("reviewer")})
 	if err != nil {
 		t.Fatalf("merging into the real file failed: %v", err)
 	}
-	if after := ForeignHookCount(out); after != before {
-		t.Errorf("foreign hooks %d -> %d on the REAL file", before, after)
+	after := foreignCommands(out)
+
+	// A COUNT is the wrong assertion here, and it fails on any machine bound
+	// before the marker field existed. Such a machine carries an UNMARKED gate
+	// entry, which `ForeignHookCount` counts as foreign and which `isOurs`
+	// deliberately adopts by command substring — so the count drops by one while
+	// nothing was lost. Measured on this box, 15 -> 14, with no third-party hook
+	// touched.
+	//
+	// What the file actually has to promise is narrower and is the thing the
+	// Orca incident was about: no hook BELONGING TO SOMEBODY ELSE disappears.
+	// So the loss is compared per command, and the only tolerated disappearance
+	// is an entry the merge was entitled to claim.
+	for cmd, n := range before {
+		lost := n - after[cmd]
+		if lost <= 0 {
+			continue
+		}
+		if strings.Contains(cmd, "dotf harness gate") {
+			// A pre-marker entry of our own, adopted. This is the fallback
+			// working, not a hook being deleted.
+			continue
+		}
+		t.Errorf("a hook that is not ours was lost from the REAL file (%d of %d): %.120s", lost, n, cmd)
 	}
-	t.Logf("real deployed file: %d foreign hook entries, all preserved", before)
+	t.Logf("real deployed file: %d distinct foreign hook commands, none belonging to a third party lost", len(before))
 }
 
 func countOurs(doc map[string]any, event string) int {
@@ -266,4 +288,38 @@ func countOurs(doc map[string]any, event string) int {
 		}
 	}
 	return n
+}
+
+// foreignCommands is ForeignHookCount broken out per command string.
+//
+// The count alone cannot answer the question the test above asks. "Fifteen
+// became fourteen" is true both when a third party's hook was deleted and when
+// one of our own pre-marker entries was adopted, and those are opposite
+// outcomes — one is the incident that motivated the marker, the other is the
+// mechanism that prevents it.
+func foreignCommands(doc map[string]any) map[string]int {
+	out := map[string]int{}
+	hooks, _ := doc["hooks"].(map[string]any)
+	for _, v := range hooks {
+		groups, _ := v.([]any)
+		for _, g := range groups {
+			group, ok := g.(map[string]any)
+			if !ok {
+				continue
+			}
+			inner, _ := group["hooks"].([]any)
+			for _, h := range inner {
+				obj, ok := h.(map[string]any)
+				if !ok {
+					continue
+				}
+				if m, ok := obj[managedKey].(string); ok && strings.HasPrefix(m, BindMarker+":") {
+					continue
+				}
+				cmd, _ := obj["command"].(string)
+				out[cmd]++
+			}
+		}
+	}
+	return out
 }

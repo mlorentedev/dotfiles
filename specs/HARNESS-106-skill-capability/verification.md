@@ -28,12 +28,24 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
       Red/green proven against two real fixtures: this machine's pre-fix `~/.claude/agents`
       (**RED**, `checked=7`, all seven named) and a deploy from this tree (**GREEN**,
       `checked=7`). Neither is vacuous.
-- [ ] **AC4** -> deferred. Cannot be proven until AC5–AC7 land: a dispatch currently leaves no
-      durable evidence, so "the persona invoked a skill" and "the gate never saw it" are the
-      same observation.
-- [ ] **AC5** -> deferred (durable decision record).
-- [ ] **AC6** -> deferred (a `warn` decision observable after the session ends).
-- [ ] **AC7** -> deferred (`agent_type` in the record).
+- [ ] **AC4** -> **still open, with a named blocker rather than a vague one.** The deployed
+      `~/.claude/agents/reviewer.md` carries `Skill` after the deploy, and a dispatched reviewer
+      nonetheless reported its tools as `Read, Bash, advisor`. That matches the roster loaded at
+      the *dispatching session's* start, not the file on disk. **Agent definitions are frozen at
+      session start; hooks are re-read.** The earlier measurement that hooks reload does not
+      generalise to personas, and assuming it did is what made this look ready. AC4 needs a
+      session started after the deploy — nothing more, and nothing in this change.
+- [x] **AC5** -> test `TestEveryGateDecisionLeavesADurableRecord`, eight cases, one per path
+      the command can take — including the three that return before any persona is loaded and
+      the block path, which was untestable in process until it stopped calling `os.Exit`.
+      Confirmed live: 43 records on this machine across `no-role`, `warn` and `role-unresolved`.
+- [x] **AC6** -> test `TestAWarnIsReadableAfterTheSessionEnds`, and measured live. An unnamed
+      `reviewer` dispatch produced `outcome: warn` naming all four skills
+      (`adversarial-review`, `audit`, `cyclomatic-complexity`, `verification-before-completion`)
+      readable from the journal alone, with nothing but the file path shared with the writer.
+- [x] **AC7** -> test `TestGateRecordCarriesAgentType`, and **measured on a real dispatch** —
+      the criterion's whole point. `agent_type: "reviewer"` arrived, resolved to the persona,
+      and was recorded. It also immediately caught a defect nothing else could see: see below.
 - [x] **AC8** -> two consecutive `compile-harness.sh --deploy` runs into a scratch `$HOME`,
       `diff -rq` byte-identical. Only the vault SSOT (7 records) and the repo map were edited;
       no generated file was hand-edited.
@@ -76,6 +88,26 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   probes `resolve-capabilities` to tell "stale binary" from "bad map" and names its own fix.
 - **AC4 was reclassified as deferred rather than met.** A scratch deploy proves a config file
   contains a key, which is precisely what AC4 says is not proof.
+
+## What the record caught on its first day
+
+Two dispatches of the SAME persona, differing only in whether the caller supplied a name:
+
+| dispatch | payload `agent_type` | `role_resolved` | outcome |
+|---|---|---|---|
+| `subagent_type: reviewer`, no name | `reviewer` | `reviewer` | `warn`, 4 skills named |
+| `subagent_type: reviewer`, `name: gate-probe-agent-type` | `gate-probe-agent-type` | *(none)* | **`role-unresolved`** |
+
+`agent_type` carries the **caller-supplied name** when one is given, not the persona type. So
+naming a dispatch makes the role unresolvable and **turns its gate off** — allowing, exiting 0,
+and indistinguishable from health by every other means. Under `enforce: block` that is a bypass
+with a one-word opt-out. Filed as **#1434**, and it is a hard precondition on promoting any
+skill to `block`.
+
+This is the strongest available argument for the record itself: the defect was found on the day
+it shipped, by looking at it, and was invisible to the exit code, the stderr and `dotf doctor`
+alike. It also generalises lesson 255 — **both** identity fields are caller-influenced, not just
+`agent_id`.
 
 ## Promotion candidates
 

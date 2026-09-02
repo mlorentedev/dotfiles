@@ -22,30 +22,30 @@
   },
   {
     "id": "HARNESS-106-skill-capability-f4",
-    "behavior": "AC4 — a dispatched persona can invoke a skill, proven by a consumption record rather than by a config file containing a key",
-    "verification": "test -n \"$(dotf harness gate-decisions --last --agent-type reviewer 2>/dev/null)\"",
+    "behavior": "AC4 — a dispatched persona invokes a skill and the gate writes a skill-consumed record carrying agent_type",
+    "verification": "test -n \"$(grep -h skill-consumed \"${XDG_STATE_HOME:-$HOME/.local/state}\"/dotfiles/gate/*.decisions.jsonl 2>/dev/null | grep agent_type)\"",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-106-skill-capability-f5",
-    "behavior": "AC5 — the gate writes a durable record for every decision including allow and 'role did not resolve', reachable without --debug and without reading a transcript",
-    "verification": "cd cli && go test ./internal/harness/ -run TestGateRecordsEveryDecision",
-    "state": "pending",
+    "behavior": "AC5 — every gate path writes a durable record, including allow and 'role did not resolve', independent of stderr and exit code",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestEveryGateDecisionLeavesADurableRecord",
+    "state": "implemented",
     "evidence": ""
   },
   {
     "id": "HARNESS-106-skill-capability-f6",
-    "behavior": "AC6 — a warn decision is observable after the session ends, from the durable record alone",
-    "verification": "cd cli && go test ./internal/harness/ -run TestWarnDecisionSurvivesTheSession",
-    "state": "pending",
+    "behavior": "AC6 — a warn decision is readable from the record alone after the session ends, naming the skills",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAWarnIsReadableAfterTheSessionEnds",
+    "state": "implemented",
     "evidence": ""
   },
   {
     "id": "HARNESS-106-skill-capability-f7",
-    "behavior": "AC7 — agent_type is reported in the record, converting the standing inference into a measurement",
-    "verification": "cd cli && go test ./internal/harness/ -run TestGateRecordCarriesAgentType",
-    "state": "pending",
+    "behavior": "AC7 — agent_type is carried in the record, on the skill path too, separate from the role requested and the role resolved",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestGateRecordCarriesAgentType|TestTheRecordSeparatesWhatWasAskedForFromWhatResolved'",
+    "state": "implemented",
     "evidence": ""
   },
   {

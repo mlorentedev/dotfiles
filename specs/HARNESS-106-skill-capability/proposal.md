@@ -121,12 +121,12 @@ Concretely, after this:
       capability, asserted by a guard that fails red when one does not.
 - [ ] **AC4** — A dispatched persona **can invoke a skill**, proven by a dispatch
       that writes a consumption record — never by a config file containing a key.
-- [ ] **AC5** — `dotf harness gate` writes a durable record for every decision it
+- [x] **AC5** — `dotf harness gate` writes a durable record for every decision it
       takes, including `allow` and `role did not resolve`, reachable without
       `--debug` and without reading a transcript.
-- [ ] **AC6** — A `warn` decision is **observable after the session ends**, from
+- [x] **AC6** — A `warn` decision is **observable after the session ends**, from
       that record alone.
-- [ ] **AC7** — `agent_type` is reported in the record, so a real dispatch shows
+- [x] **AC7** — `agent_type` is reported in the record, so a real dispatch shows
       which persona the gate resolved. This is the criterion that converts the
       standing inference into a measurement.
 - [x] **AC8** — The change propagates by deploy: the vault SSOT plus the repo map
