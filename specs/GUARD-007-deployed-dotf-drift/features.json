@@ -1,0 +1,44 @@
+[
+  {
+    "id": "GUARD-007-deployed-dotf-drift-f1",
+    "behavior": "AC1 — the release build stamps the full commit and `dotf version --commit` prints that bare value with nothing else on the line",
+    "verification": "cd cli && grep -q 'X main.commit={{ .FullCommit }}' .goreleaser.yaml && go test ./internal/cmd/ -run TestVersionCommitFlagPrintsBareValue",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-007-deployed-dotf-drift-f2",
+    "behavior": "AC2 — default `dotf version` output stays exactly one line beginning `dotf version `, so both installers' idempotence skip is unaffected",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestVersionDefaultOutputStaysSingleLineForTheInstallers && cd .. && ~/.local/bin/bats tests/install-dotf.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-007-deployed-dotf-drift-f3",
+    "behavior": "AC3 — doctor WARNs naming the count and both SHAs when the deployed binary is behind HEAD on cli/",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckDotfProvenance$/behind_HEAD'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-007-deployed-dotf-drift-f4",
+    "behavior": "AC4 — commits missing cli/ are not staleness, and the pathspec is root-relative so the count cannot silently read 0 from a subdirectory",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckDotfProvenanceUsesRootRelativePathspec|TestCheckDotfProvenance$/commits_that_miss'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-007-deployed-dotf-drift-f5",
+    "behavior": "AC5 — branch build, unknown commit, source build and pre-stamp binary are each reported distinctly rather than collapsed into 'behind'",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckDotfProvenance$' -v 2>&1 | grep -c '^    --- PASS' | grep -qx 8",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-007-deployed-dotf-drift-f6",
+    "behavior": "AC6 — outside a checkout or with no dotf on PATH the check SKIPs rather than passing (C15), and never FAILs in any state",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckDotfProvenanceSkipsWhenDotfIsAbsent|TestCheckDotfProvenance$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

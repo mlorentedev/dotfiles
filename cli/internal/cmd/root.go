@@ -8,9 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// New builds the root command. The version is injected by cmd/dotf/main.go,
-// where goreleaser's -X main.version ldflags lands.
-func New(version string) *cobra.Command {
+// New builds the root command. The version and commit are injected by
+// cmd/dotf/main.go, where goreleaser's -X main.version / -X main.commit ldflags
+// land. commit is "" for a source build.
+func New(version, commit string) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "dotf",
 		Short: "Single entry point for the dotfiles tooling",
@@ -22,7 +23,7 @@ func New(version string) *cobra.Command {
 		},
 	}
 
-	root.AddCommand(newVersionCmd(version))
+	root.AddCommand(newVersionCmd(version, commit))
 	root.AddCommand(newReviewCmd())
 	root.AddCommand(newSpecCmd())
 	root.AddCommand(newDoctorCmd())
@@ -42,8 +43,10 @@ func New(version string) *cobra.Command {
 	return root
 }
 
-func newVersionCmd(version string) *cobra.Command {
-	return &cobra.Command{
+func newVersionCmd(version, commit string) *cobra.Command {
+	var commitOnly bool
+
+	c := &cobra.Command{
 		Use:   "version",
 		Short: "Print the dotf version",
 		Run: func(cmd *cobra.Command, _ []string) {
@@ -51,7 +54,30 @@ func newVersionCmd(version string) *cobra.Command {
 			// must reach stdout — cmd.Printf writes to OutOrStderr().
 			// Run (not RunE) — no error to return, so discard explicitly, as
 			// secrets.go does. A failed write to stdout here is not actionable.
+			//
+			// The DEFAULT output stays exactly one line, byte-identical to what
+			// it has always been. Both installers regex the merged streams for
+			// `(\d+\.\d+\.\d+|dev)` against whatever dotf is already on PATH, and
+			// their idempotence skip — the thing that decides whether a machine
+			// reinstalls on every setup run — hangs off that match. The commit
+			// goes behind a flag rather than onto a second line for that reason.
+			if commitOnly {
+				// Empty (source build) prints an empty line rather than a
+				// placeholder: the caller is a machine, and "" is the value.
+				// `dotf doctor` distinguishes empty-stamp from absent-flag, and
+				// a word like "unknown" here would collide with a real hash.
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), commit)
+				return
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "dotf version %s\n", version)
 		},
 	}
+
+	// A binary built before this flag existed answers `unknown flag: --commit`
+	// on stderr and exits non-zero. That is not an error to paper over — it is
+	// the provenance answer for a pre-stamp binary, and doctor reads it as such.
+	c.Flags().BoolVar(&commitOnly, "commit", false,
+		"print only the commit this binary was built from (empty for a source build)")
+
+	return c
 }

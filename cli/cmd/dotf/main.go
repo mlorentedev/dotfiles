@@ -13,8 +13,15 @@ import (
 
 var version = "dev"
 
+// commit is stamped by goreleaser (-X main.commit). It stays EMPTY for a source
+// build (`go build ./cmd/dotf`), and that emptiness is meaningful rather than a
+// gap: a source build has no fixed provenance — the tree it came from may have
+// moved or never been committed — so the honest answer is "unknown", not a
+// guess. `dotf doctor` reads the difference and reports the two cases apart.
+var commit = ""
+
 func main() {
-	rootCmd := cmd.New(version)
+	rootCmd := cmd.New(version, commit)
 	os.Exit(run(rootCmd, os.Stderr))
 }
 

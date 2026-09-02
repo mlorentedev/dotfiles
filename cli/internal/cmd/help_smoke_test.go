@@ -46,7 +46,7 @@ func argsFor(c *cobra.Command) []string {
 // of in a user's terminal. --help short-circuits before RunE, so this has no
 // side effects.
 func TestEveryCommandHelpRenders(t *testing.T) {
-	for _, c := range allCommands(New("dev")) {
+	for _, c := range allCommands(New("dev", "")) {
 		name := c.CommandPath()
 		t.Run(name, func(t *testing.T) {
 			stdout, stderr, err := execute(t, append(argsFor(c), "--help")...)
@@ -74,7 +74,7 @@ var docRef = regexp.MustCompile(`docs/[\w./-]+\.md`)
 func TestHelpDocReferencesExist(t *testing.T) {
 	repoRoot := filepath.Join("..", "..", "..")
 	seen := map[string]bool{}
-	for _, c := range allCommands(New("dev")) {
+	for _, c := range allCommands(New("dev", "")) {
 		text := strings.Join([]string{c.Short, c.Long, c.Example}, "\n")
 		for _, ref := range docRef.FindAllString(text, -1) {
 			if seen[ref] {

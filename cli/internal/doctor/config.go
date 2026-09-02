@@ -16,8 +16,14 @@ import (
 // a stale-copy read self-diagnosing). It mirrors how healthcheck.sh sourced
 // versions.conf and doctor.sh resolved the contract.
 type Config struct {
-	DotfilesDir  string
-	Versions     map[string]string
+	DotfilesDir string
+	Versions    map[string]string
+	// RepoDir is the resolved checkout, or "" when the run is not inside one.
+	// loadConfig has always computed this to resolve files repo-first; it was
+	// discarded afterwards. The dotf-provenance check (#1158) needs the checkout
+	// ITSELF, not a file inside it — it asks git what HEAD is — and "" is the
+	// legitimate no-checkout state that check must SKIP on rather than guess at.
+	RepoDir      string
 	ContractPath string
 	VersionsPath string
 }
@@ -41,6 +47,7 @@ func loadConfig(sys *System, startDir string) (*Config, error) {
 	cfg := &Config{
 		DotfilesDir:  dotfilesDir,
 		Versions:     map[string]string{},
+		RepoDir:      repoDir,
 		ContractPath: envpkg.ResolveRepoFirst("env-contract.json", repoDir, dotfilesDir, startDir),
 		VersionsPath: envpkg.ResolveRepoFirst("versions.conf", repoDir, dotfilesDir, startDir),
 	}

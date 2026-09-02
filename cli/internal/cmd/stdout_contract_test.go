@@ -54,7 +54,7 @@ func captureRealStreams(t *testing.T, args ...string) (stdout, stderr string, er
 			_ = outW.Close()
 			_ = errW.Close()
 		}()
-		cmd := New("dev")
+		cmd := New("dev", "")
 		cmd.SetArgs(args)
 		err = cmd.Execute()
 	}()
@@ -133,6 +133,47 @@ func TestStdoutContracts(t *testing.T) {
 // The contract is written into a temp DOTFILES_REPO_DIR rather than inherited
 // from the ambient checkout, so the case cannot degrade into a skip. A skip
 // here would be indistinguishable from a pass while silently testing nothing —
+// The table above pins that `version` REACHES stdout. It does not pin the
+// SHAPE, and the shape is load-bearing in a way that is easy to break by
+// accident: both installers regex `(\d+\.\d+\.\d+|dev)` out of the merged
+// streams to decide whether to skip the install. #1158 added a commit stamp to
+// this command, and the tempting place to put it was a second line of the
+// default output. These cases say why it is behind a flag instead — a second
+// line risks the idempotence skip that decides whether every machine reinstalls
+// dotf on every setup run, and that skip failing OPEN is silent.
+func TestVersionDefaultOutputStaysSingleLineForTheInstallers(t *testing.T) {
+	stdout, _, err := captureRealStreams(t, "version")
+	if err != nil {
+		t.Fatalf("version failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("default `dotf version` must stay ONE line (the installers regex it); got %d:\n%q", len(lines), stdout)
+	}
+	if !strings.HasPrefix(lines[0], "dotf version ") {
+		t.Errorf("the installer greps this prefix; got %q", lines[0])
+	}
+}
+
+// The stamp is machine-read by `dotf doctor`, which feeds it straight to
+// `git merge-base`. It must be the bare value with nothing else on the line —
+// no label, no "commit: " prefix — or the git call receives a non-SHA.
+func TestVersionCommitFlagPrintsBareValue(t *testing.T) {
+	stdout, _, err := captureRealStreams(t, "version", "--commit")
+	if err != nil {
+		t.Fatalf("version --commit failed: %v", err)
+	}
+	// New("dev", "") in the harness: a source build, so the stamp is empty and
+	// the command prints an empty line rather than a placeholder word that
+	// would be indistinguishable from a real hash.
+	if got := strings.TrimRight(stdout, "\n"); got != "" {
+		t.Errorf("--commit must print the bare stamp and nothing else; got %q", got)
+	}
+	if strings.Contains(stdout, "dotf version") {
+		t.Error("--commit must not print the human version line")
+	}
+}
+
 // the failure mode this whole file exists to close.
 func TestEnvGenerateStdoutFlagWritesToStdout(t *testing.T) {
 	dir := t.TempDir()
