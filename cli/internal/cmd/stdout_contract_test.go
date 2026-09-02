@@ -146,12 +146,13 @@ func TestVersionDefaultOutputStaysSingleLineForTheInstallers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version failed: %v", err)
 	}
-	lines := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
-	if len(lines) != 1 {
-		t.Fatalf("default `dotf version` must stay ONE line (the installers regex it); got %d:\n%q", len(lines), stdout)
-	}
-	if !strings.HasPrefix(lines[0], "dotf version ") {
-		t.Errorf("the installer greps this prefix; got %q", lines[0])
+	// Asserted EXACTLY, trailing newline included. Trimming first and counting
+	// lines would let "dotf version dev\n\n\n" pass as one line, which is the
+	// blank-line drift this test claims to prevent — a test that permits the
+	// thing it names is the same class of defect as the check this PR adds.
+	const want = "dotf version dev\n"
+	if stdout != want {
+		t.Fatalf("default `dotf version` must be exactly %q (the installers regex it); got %q", want, stdout)
 	}
 }
 
@@ -165,12 +166,12 @@ func TestVersionCommitFlagPrintsBareValue(t *testing.T) {
 	}
 	// New("dev", "") in the harness: a source build, so the stamp is empty and
 	// the command prints an empty line rather than a placeholder word that
-	// would be indistinguishable from a real hash.
-	if got := strings.TrimRight(stdout, "\n"); got != "" {
-		t.Errorf("--commit must print the bare stamp and nothing else; got %q", got)
-	}
-	if strings.Contains(stdout, "dotf version") {
-		t.Error("--commit must not print the human version line")
+	// would be indistinguishable from a real hash. Exact, for the same reason
+	// as above: doctor feeds this value straight to `git merge-base`, so any
+	// extra byte is a non-SHA handed to git.
+	const want = "\n"
+	if stdout != want {
+		t.Errorf("--commit must print the bare stamp and nothing else, got %q", stdout)
 	}
 }
 

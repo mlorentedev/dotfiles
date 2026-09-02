@@ -9,7 +9,7 @@
   {
     "id": "GUARD-007-deployed-dotf-drift-f2",
     "behavior": "AC2 — default `dotf version` output stays exactly one line beginning `dotf version `, so both installers' idempotence skip is unaffected",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestVersionDefaultOutputStaysSingleLineForTheInstallers && cd .. && ~/.local/bin/bats tests/install-dotf.bats",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestVersionDefaultOutputStaysSingleLineForTheInstallers && cd .. && bats tests/install-dotf.bats",
     "state": "pending",
     "evidence": ""
   },

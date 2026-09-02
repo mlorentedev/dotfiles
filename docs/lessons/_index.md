@@ -271,4 +271,5 @@ tags: [lessons, index, dotfiles]
 | [250 - Restoring a file's content is not restoring the file, and the mode is the part nobody diffs](lesson-250-restoring-a-files-content-is-not-restoring-the-file.md) | 2026-09-01 |  |
 | [251 - A guard that refuses an anticipated schema change should name its own fix, because the person who reads the refusal is the one who caused it](lesson-251-a-guard-that-refuses-an-anticipated-schema-change.md) | 2026-08-31 |  |
 | [252 - A git pathspec is resolved against the CWD, so the same argument means two different things and one of them is silently empty](lesson-252-a-git-pathspec-is-resolved-against-the-cwd-so-the-same.md) | 2026-09-01 |  |
+
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
