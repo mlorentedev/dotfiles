@@ -32,6 +32,17 @@ const gateExitBlock = 2
 // command that could exit 1 would therefore mean opposite things on two
 // harnesses. Every path here resolves to an explicit decision instead, so the
 // harness never sees an error and its error semantics never apply.
+//
+// The single non-nil return is tagged with exit 2 explicitly. An untagged error
+// would resolve to 1 through ExitCode — the one status this command must never
+// produce — so nothing here may return a bare error.
+//
+// AND EVERY PATH LEAVES A DURABLE RECORD. An exit status is not an audit trail:
+// the harness consumes and discards it, `warn` and `allow` share it, and a
+// PreToolUse hook's stderr on exit 0 is not persisted anywhere the session can
+// be asked about later. Three paths below return before any persona is loaded,
+// and before the journal they left nothing at all — so a harness whose payload
+// this cannot parse looked exactly like a harness with nothing to enforce.
 func newHarnessGateCmd() *cobra.Command {
 	var (
 		harnessName string
@@ -57,9 +68,28 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload, _ := io.ReadAll(cmd.InOrStdin())
+			if stateDir == "" {
+				stateDir = defaultGateStateDir()
+			}
+			// One closure, used by every exit below, because the requirement is
+			// that NO path returns without leaving a record. Writing it at each
+			// `return` is how the three early paths came to leave none: each was
+			// individually correct, and the omission existed only in aggregate —
+			// the same shape as the defect this spec started from.
+			record := func(scope string, rec harness.DecisionRecord) {
+				rec.Harness = harnessName
+				rec.Scope = scope
+				_ = harness.RecordDecision(harness.DecisionPath(stateDir, scope), rec)
+			}
 
 			call, understood := normaliseToolCall(harnessName, payload)
 			if !understood {
+				record(harness.UnparsedScope, harness.DecisionRecord{
+					Outcome:      harness.OutcomePayloadUnrecognised,
+					Allowed:      true,
+					Reason:       "payload not recognised",
+					PayloadBytes: len(payload),
+				})
 				// MEASURED 2026-08-26: this branch is why it exists. Without
 				// it a malformed payload produced a zero ToolCall, Decide saw
 				// a valid persona with nothing consumed, and the gate BLOCKED
@@ -69,13 +99,23 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: payload not recognised")
 				return nil
 			}
-			if stateDir == "" {
-				stateDir = defaultGateStateDir()
-			}
 			// Scoped to the acting persona when the harness names one: a subagent
 			// reuses the parent session id, so keying by session alone would let one
 			// persona's skill runs satisfy another's gate.
-			statePath := harness.StatePath(stateDir, call.ConsumptionScope())
+			scope := call.ConsumptionScope()
+			statePath := harness.StatePath(stateDir, scope)
+
+			// Every record from here carries what the harness said was acting.
+			// THIS IS WHAT CONVERTS agent_type FROM INFERRED TO MEASURED: it is
+			// read straight off the payload, before any persona lookup, so even
+			// the skill path below — which returns before that lookup — leaves
+			// evidence that the field arrived and of what it contained.
+			base := harness.DecisionRecord{
+				Session:   call.SessionID,
+				AgentType: call.AgentType,
+				AgentID:   call.AgentID,
+				Tool:      call.Tool,
+			}
 
 			// A skill invocation is the act the gate exists to require: record
 			// it and get out of the way. Recording failures are ignored on
@@ -83,6 +123,12 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			// failing here would block a session over a full disk.
 			if call.Skill != "" {
 				_ = harness.RecordConsumed(statePath, call.Skill)
+				rec := base
+				rec.Skill = call.Skill
+				rec.Outcome = harness.OutcomeSkillConsumed
+				rec.Allowed = true
+				rec.Reason = "skill invocation recorded"
+				record(scope, rec)
 				return nil
 			}
 			if call.IsSkillTool {
@@ -91,23 +137,66 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				// deadlock the session on the one action that could satisfy the
 				// gate — a well-formed payload with a missing argument, not a
 				// parse failure. Raised by the reviewer on #1272.
+				rec := base
+				rec.Outcome = harness.OutcomeSkillUnnamed
+				rec.Allowed = true
+				rec.Reason = "skill invocation with no readable name"
+				record(scope, rec)
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
 				return nil
 			}
 
-			persona := loadGatePersona(cmd.ErrOrStderr(), repoRoot, effectiveRole(role, call.AgentType))
+			requested := effectiveRole(role, call.AgentType)
+			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested)
 			result := harness.Decide(harness.GateInput{
 				Persona:  persona,
 				Call:     call,
 				Consumed: harness.LoadConsumed(statePath),
 			})
 
+			rec := base
+			rec.RoleRequested = requested
+			rec.Reason = result.Reason
+			rec.Warned = result.Warned
+			rec.Missing = result.Missing
+			rec.Allowed = result.Decision != harness.Block
+			if persona != nil {
+				rec.RoleResolved = persona.Name
+			}
+			switch {
+			case resolution == roleUnresolved:
+				// Checked BEFORE the decision, because this call allowed and a
+				// healthy allow looks identical to it. The distinction is the
+				// whole reason AC5 names this case: enforcement was off, and
+				// nothing outside this record says so.
+				rec.Outcome = harness.OutcomeRoleUnresolved
+			case resolution == roleNotAsked:
+				rec.Outcome = harness.OutcomeNoRole
+			case result.Decision == harness.Block:
+				rec.Outcome = harness.OutcomeBlock
+			case len(result.Warned) > 0:
+				rec.Outcome = harness.OutcomeWarn
+			default:
+				rec.Outcome = harness.OutcomeAllow
+			}
+			// Written before the return below, not after: the block path used to
+			// call os.Exit, which runs no defers, so a record deferred past it
+			// would be the one decision never written — the only one anybody
+			// would go looking for.
+			record(scope, rec)
+
 			for _, w := range result.Warned {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] warn: %s not consumed\n", w)
 			}
 			if result.Decision == harness.Block {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] blocked: %s\n", result.Reason)
-				os.Exit(gateExitBlock)
+				// withExitCode rather than os.Exit, which is what this called
+				// before. The status is identical — main resolves it through
+				// ExitCode — but os.Exit kills the test runner, so the ONE path
+				// that matters most could never be driven end to end in process.
+				// The command sets SilenceErrors, so main prints nothing extra
+				// and the reason a human reads is still the line above.
+				return withExitCode(gateExitBlock, fmt.Errorf("%s", result.Reason))
 			}
 			return nil
 		},
@@ -135,12 +224,30 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 // is the failure this whole gate exists to prevent, committed inside the gate.
 // warn takes an io.Writer rather than reaching for os.Stderr so the message is
 // assertable; a diagnostic nothing can test is the same silence with extra steps.
-func loadGatePersona(warn io.Writer, repoRoot, role string) *harness.Persona {
+// roleResolution separates the two ways loadGatePersona returns nil.
+//
+// They were indistinguishable to the caller, and both allow, so from outside
+// "no persona was asked for" and "a persona was asked for and enforcement is
+// therefore OFF" produced the same silence. The stderr line tells them apart for
+// a human reading a live terminal; nothing told them apart afterwards, which is
+// the gap AC5 names by calling out `role did not resolve` explicitly.
+type roleResolution int
+
+const (
+	// roleNotAsked: the caller declared no persona. A main-thread call.
+	roleNotAsked roleResolution = iota
+	// roleUnresolved: a persona was named and could not be loaded.
+	roleUnresolved
+	// roleResolved: a persona is in scope.
+	roleResolved
+)
+
+func loadGatePersona(warn io.Writer, repoRoot, role string) (*harness.Persona, roleResolution) {
 	if strings.TrimSpace(role) == "" {
 		// Not asked for: the caller declared no persona, so there is nothing to
 		// fail to find. Distinct from the case below, and NOT worth a line on
 		// every tool call.
-		return nil
+		return nil, roleNotAsked
 	}
 	if repoRoot == "" {
 		repoRoot = os.Getenv("DOTFILES_DIR")
@@ -153,9 +260,9 @@ func loadGatePersona(warn io.Writer, repoRoot, role string) *harness.Persona {
 	if err != nil {
 		_, _ = fmt.Fprintf(warn, "[gate] allow: role %q did not resolve (%s): %v — ENFORCEMENT IS OFF for this call\n",
 			role, path, err)
-		return nil
+		return nil, roleUnresolved
 	}
-	return p
+	return p, roleResolved
 }
 
 // effectiveRole picks the persona in scope: the operator's --role when given,

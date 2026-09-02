@@ -167,20 +167,31 @@ type consumedState struct {
 // happen with well-behaved input" is not a property a path builder should rely
 // on. The readable prefix is kept so the directory stays diagnosable by eye.
 func StatePath(stateDir, sessionID string) string {
+	return filepath.Join(stateDir, "gate", scopeKey(sessionID)+".json")
+}
+
+// scopeKey turns a scope into the readable-prefix-plus-digest filename stem that
+// both the consumption ledger and the decision journal are keyed by.
+//
+// It is shared rather than duplicated because the two must agree: a scope whose
+// ledger and journal disagreed would report decisions for one dispatch against
+// another's consumption, and the digest is the part that makes either of them
+// safe. Extracted when the journal landed; the behaviour is unchanged.
+func scopeKey(scope string) string {
 	safe := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
 			return r
 		}
 		return '_'
-	}, sessionID)
+	}, scope)
 	if len(safe) > 48 {
 		safe = safe[:48]
 	}
 	if safe == "" {
 		safe = "unknown"
 	}
-	sum := sha256.Sum256([]byte(sessionID))
-	return filepath.Join(stateDir, "gate", safe+"-"+hex.EncodeToString(sum[:4])+".json")
+	sum := sha256.Sum256([]byte(scope))
+	return safe + "-" + hex.EncodeToString(sum[:4])
 }
 
 // LoadConsumed reads a session's consumed skills. A missing or unreadable file
