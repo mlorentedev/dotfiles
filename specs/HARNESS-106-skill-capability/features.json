@@ -15,8 +15,8 @@
   },
   {
     "id": "HARNESS-106-skill-capability-f3",
-    "behavior": "AC3 — every persona record declaring skills also declares the capability, asserted by a guard that fails red when one does not",
-    "verification": "cd cli && go test ./internal/harness/ -run TestEveryPersonaDeclaringSkillsCanInvokeThem",
+    "behavior": "AC3 — every persona record declaring skills also declares the capability, and the deployed agent's tools: actually names Skill; both guards fail red when broken",
+    "verification": "cd cli && go test ./internal/harness/ -run TestEveryPersonaDeclaringSkillsCanInvokeThem && grep -q 'every deployed persona can invoke the skills its own gate demands' ../tests/verify-setup.bats",
     "state": "implemented",
     "evidence": ""
   },

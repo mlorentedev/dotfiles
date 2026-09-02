@@ -556,3 +556,52 @@ setup() {
     echo "$output" | grep -q 'no harness drift'
 }
 
+
+@test "every deployed persona can invoke the skills its own gate demands" {
+    # The container-level half of #1420. The Go guard asserts the RECORD declares
+    # the `skill` capability; this asserts the thing that capability exists to
+    # produce — a deployed agent whose `tools:` actually names Skill. claude's
+    # `tools:` is an ALLOW-LIST, so a tool not named is unavailable, and a persona
+    # required to consume a forced skill it cannot invoke is a hard deadlock the
+    # moment any of its skills reaches `enforce: block`.
+    #
+    # It reads the DEPLOYED file rather than the record, because every layer was
+    # individually correct when this defect shipped: the SSOT said what it meant,
+    # the map translated faithfully, and the deployed files matched the SSOT
+    # exactly. Only the relationship between two frontmatter keys was wrong, and
+    # no check spanned it.
+    agents="$HOME/.claude/agents"
+    [ -d "$agents" ] || skip "no ~/.claude/agents on this platform (deploy_agents is Linux-only, #1387)"
+
+    checked=0
+    offenders=""
+    for rec in "$DOTFILES_DIR"/harness/agents/*/AGENT.md; do
+        [ -e "$rec" ] || continue
+        name="$(basename "$(dirname "$rec")")"
+        deployed="$agents/$name.md"
+        # Only personas actually deployed here; a record targeted at another
+        # harness is not this assertion's business.
+        [ -f "$deployed" ] || continue
+        # Matches both the flat and the block form of `skills:`.
+        grep -qE '^skills:' "$rec" || continue
+        checked=$((checked + 1))
+        grep -qE '^tools:.*\bSkill\b' "$deployed" || offenders="$offenders $name"
+    done
+
+    # Fixture drift. Zero personas declaring forced skills would pass this
+    # vacuously, and an empty result reading as a clean one is precisely the
+    # failure class these guards exist to prevent.
+    [ "$checked" -gt 0 ] || {
+        echo "no deployed persona under $agents declares forced skills;"
+        echo "either the roster changed or this assertion measures nothing"
+        return 1
+    }
+
+    [ -z "$offenders" ] || {
+        echo "deployed personas declare forced skills but are granted no Skill tool:$offenders"
+        echo "the deployed agent cannot invoke the skills its own gate requires (#1420)."
+        echo "Fix in the vault SSOT — 00_meta/agents/definitions/<role>/AGENT.md — and redeploy;"
+        echo "editing ~/.claude/agents/ directly is overwritten by the next compile."
+        return 1
+    }
+}

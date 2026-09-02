@@ -18,9 +18,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
       Observed: `dotf harness resolve-capabilities read,skill --harness opencode`
       -> `permission: {list: allow, read: allow}` on stdout, and on **stderr**
       `[capabilities] opencode declares no native equivalent for skill — omitted from the value, not granted`
-- [x] **AC3** -> test `TestEveryPersonaDeclaringSkillsCanInvokeThem`. It failed red on the
-      **real** defect, not a planted one: it named all seven personas and pointed at the vault
-      SSOT rather than the generated files.
+- [x] **AC3** -> two guards, at the two layers the defect fell between.
+      `TestEveryPersonaDeclaringSkillsCanInvokeThem` asserts the **record** declares the
+      capability; it failed red on the **real** defect, not a planted one, naming all seven
+      personas and pointing at the vault SSOT rather than the generated files.
+      `verify-setup.bats` *"every deployed persona can invoke the skills its own gate demands"*
+      asserts the thing the capability exists to produce — a **deployed** agent whose `tools:`
+      names `Skill` — inside the integration container, on a fresh machine.
+      Red/green proven against two real fixtures: this machine's pre-fix `~/.claude/agents`
+      (**RED**, `checked=7`, all seven named) and a deploy from this tree (**GREEN**,
+      `checked=7`). Neither is vacuous.
 - [ ] **AC4** -> deferred. Cannot be proven until AC5–AC7 land: a dispatch currently leaves no
       durable evidence, so "the persona invoked a skill" and "the gate never saw it" are the
       same observation.
