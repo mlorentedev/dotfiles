@@ -29,7 +29,6 @@ created: "2026-09-01"
 - [ ] [AC5] Implement audio recording probe and wrapper (`sox` / `ffmpeg` / `arecord`) with guaranteed `defer os.Remove(...)` cleanup
 - [ ] [P] [AC2] [AC3] Implement push-to-talk interactive recording and window typing synthesizer (`wtype` / `ydotool` / `xdotool` / clipboard fallback)
 - [ ] [AC3] Implement `--copy` flag to copy transcription directly to clipboard without typing
-- [ ] Document desktop environment shortcut integration in dotfiles window manager configs
 
 ## Closing
 

@@ -26,13 +26,13 @@ Typing detailed prompts, architectural constraints, and task specifications into
 - **Direct file transcription mode (`dotf voice --file <path>`):** Transcribes an existing audio file and emits the transcript directly to `stdout` for scriptability.
 - **Secure credential resolution:** Resolves `$NAN_API_KEY` through the dotfiles environment/secrets pipeline (`dotf secrets` / env contract), failing fast with actionable guidance if unset.
 - **Safe lifecycle & cleanup:** All temporary recording files are strictly removed on exit or error.
-- **Desktop keybinding integration:** Documents and provides standard window manager keybindings (e.g. Hyprland, i3, Gnome) for the global push-to-talk shortcut.
 
 ## Out of scope
 
 - Running local Whisper neural network inference or downloading model weights to the client.
 - Real-time continuous streaming over WebSockets (request-response audio clip batching is sufficient for prompt dictation).
 - Text-to-Speech (TTS) audio synthesis (e.g. Kokoro) — handled in separate audio tools.
+- **Wiring the global push-to-talk shortcut into a window manager.** Issue #1426 asks for it, but the repository has no window-manager configuration surface to wire into: a sweep for `hyprland|sway|i3|wayland|keybind|hotkey` returns only application-level keybinds (the opencode TUI, the orca ADE baseline), both deployed through `ai/deploy.json`. Satisfying it means creating a new config domain — which WMs, where they live, how `deploy.json` renders them, how idempotence is asserted — which is a decision with its own blast radius, tracked in #1430. Encoding it here as an acceptance criterion would produce an AC that no command can verify, and `features.json` requires an executable verification per AC precisely so that cannot happen. `dotf voice` ships as an invocable command; the shortcut that calls it is the user's keybinding until #1430 is decided.
 
 ## Risks / open questions
 
@@ -52,5 +52,6 @@ Typing detailed prompts, architectural constraints, and task specifications into
 ## References
 
 - Bitácora board: mlorentedev/dotfiles#1426.
+- Deferred scope: mlorentedev/dotfiles#1430 (whether dotfiles owns window-manager configuration at all).
 - Knowledge pattern: [[pattern-nan-builders-gateway.md]] (`00_meta/patterns/pattern-nan-builders-gateway.md`).
 - Layered Architecture: [[pattern-layered-architecture.md]].
