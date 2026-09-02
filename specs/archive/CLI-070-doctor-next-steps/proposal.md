@@ -1,7 +1,7 @@
 ---
 id: "CLI-070-doctor-next-steps"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-02"
 issue: "mlorentedev/dotfiles#1442"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -46,3 +46,5 @@ After `Results:`, `dotf doctor` prints a `Next steps:` block listing the remedy 
 
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - Related: `PI_VERSION` / pin-floor fix landed separately as its own PR (#1441) — split out because it was an independent, obvious-cause bug fix bundled with this feature in the same investigation session; kept apart per AGENTS.md's Discipline Gate ("was this one change or two").
+
+<!-- archived 2026-09-02 — PR: https://github.com/mlorentedev/dotfiles/pull/1443 -->
