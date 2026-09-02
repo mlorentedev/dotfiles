@@ -196,3 +196,36 @@ func TestEnsure(t *testing.T) {
 		}
 	})
 }
+
+// --- createLink: path components containing a cmd.exe word delimiter -------
+
+// On Windows, mklink runs through cmd.exe's own tokenizer (createLink's
+// Windows implementation, memlink_windows.go), which treats a bare comma,
+// semicolon or equals sign as a word separator outside quotes — unlike Go's
+// ordinary argv escaping, which only quotes on space/tab/quote and so let
+// these through unquoted (HARNESS-050, #575). On POSIX this exercises
+// os.Symlink, which never had the defect; the table still documents the
+// contract and catches a regression on either OS.
+func TestCreateLink_CmdDelimiterPaths(t *testing.T) {
+	for _, name := range []string{
+		"comma,here", "semi;colon", "paren(here)", "equals=here", "space here",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			src := filepath.Join(root, "src "+name)
+			writeFile(t, filepath.Join(src, "MEMORY.md"), "content")
+			target := filepath.Join(root, "link "+name)
+
+			if err := createLink(src, target); err != nil {
+				t.Fatalf("createLink(%q, %q): %v", src, target, err)
+			}
+			got, err := os.ReadFile(filepath.Join(target, "MEMORY.md"))
+			if err != nil {
+				t.Fatalf("link did not read through: %v", err)
+			}
+			if string(got) != "content" {
+				t.Errorf("read %q through link, want %q", got, "content")
+			}
+		})
+	}
+}
