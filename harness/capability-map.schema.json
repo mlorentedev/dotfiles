@@ -68,6 +68,15 @@
           "why": {
             "type": "string"
           },
+          "unsupported": {
+            "description": "Vocabulary verbs this harness genuinely has no native equivalent for. THIS IS A DECLARATION, NOT AN OMISSION, and the distinction is the whole reason the key exists: the loader requires every harness to cover the whole vocabulary, so without a way to say `no equivalent` the only ways to add a verb are to invent a native name for a harness that lacks the concept, or to leave the verb out of the vocabulary and lose it everywhere. Both are worse than saying so. A verb listed here is skipped when resolving and REPORTED by the caller — never silently dropped, and never rendered as a grant. It must appear in `vocabulary` and must NOT also appear in `capabilities`; a verb in both is a contradiction the loader rejects rather than picks a winner for.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            }
+          },
           "capabilities": {
             "description": "Neutral verb -> the native names it needs. Deliberately generous: an allow-list that is too narrow denies silently, with no error anywhere.",
             "type": "object",

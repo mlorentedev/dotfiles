@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/curator/AGENT.md
-generated_sha: 669ffa7acb345ea6
+generated_sha: 283045d89bf80de8
 id: agent-curator
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: curator
 description: Crystallize-phase persona. Invoke after a substantial session, or when the knowledge base needs hygiene — observations have outrun what was written down, links have rotted, or memory has drifted from reality.
 kind: invocable
 model: top
-capabilities: [read, search, edit, shell]
+capabilities: [read, search, edit, shell, skill]
 skills: [vault-doctor, crystallize, insights, genre-picker, context-refresh, handoff, place-knowledge, dispose-proposals]
 owner: manu
 ---

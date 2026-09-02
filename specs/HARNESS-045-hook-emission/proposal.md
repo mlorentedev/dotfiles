@@ -87,6 +87,42 @@ Both failure modes are real and this is the only shape that avoids each: a gate 
 - [ ] **AC7** — a `skills:` key the parser cannot read is a **loud failure**, in both the schema validation and `check-roster-consistency.py`; it never resolves to an empty list.
 - [ ] **AC8** — `dotf harness gate` decides with no harness installed, exercised in Go tests.
 
+### AC3 and AC4 are falsified as written — measured 2026-09-01
+
+The gate was bound to a live machine for the first time on 2026-09-01 and
+measured. Two of the criteria above cannot be satisfied as stated, and one of
+them would **pass on a broken system**. Recorded here rather than quietly
+rewritten: the correction is HARNESS-106's subject, and this spec's archive
+review must see that these were wrong rather than find them silently adjusted.
+
+**AC4 asserts an emission through a channel that does not persist.** A `warn`
+decision is written to stderr with exit 0. A `PreToolUse` hook's streams on exit
+0 are not recorded in the session transcript — every hook-summary record in a
+measured session was Stop-family, and a `Skill` call that provably fired the hook
+(it wrote a consumption ledger entry) left no transcript record of the firing. So
+"emits" is not observable on the path AC4 names, and asserting it "on the same
+path as AC3" does not rescue it. The gate's only durable channel is the
+consumption ledger, which records **only** skill invocations.
+
+**AC3 is satisfied by the failure it exists to detect.** It asks that with a
+skill at `enforce: block` unconsumed, a tool call is blocked. No persona holds a
+skill-invocation tool — `harness/capability-map.json`'s vocabulary has no entry
+that maps to one, and claude's `tools:` is an allow-list. So under `block` a
+persona is refused on every call *and cannot reach the one action that clears
+it*: `isSkillTool`'s escape ("invoking a skill is never blocked: forbidding it
+would deadlock the session") assumes an agent able to emit a call it was never
+granted. AC3 would observe a blocked call and record a pass, on a persona that is
+permanently deadlocked.
+
+**AC2's discipline is the one that held.** *"Proven by a dispatch, never by a
+config file containing a key"* is exactly what caught this: two probes that read
+a config file would have reported success.
+
+Both are corrected in `specs/HARNESS-106-skill-capability/` — the capability that
+makes consumption possible, and the durable decision record that makes a `warn`
+observable. This spec should not archive until AC3 and AC4 are restated against
+channels that exist.
+
 ## References
 
 - Bitácora: `mlorentedev/dotfiles#561`; scoping comment 2026-08-26 carries the measurements.

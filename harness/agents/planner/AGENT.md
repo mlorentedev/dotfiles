@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/planner/AGENT.md
-generated_sha: b45300e5b9d6b94b
+generated_sha: d47c36b771742723
 id: agent-planner
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: planner
 description: Plan-phase persona. Invoke once a decision exists and the work needs shape — turning an intent, a ticket, or an ADR into a spec, a sequence of PRs, and acceptance criteria someone else could verify without asking you.
 kind: invocable
 model: mid
-capabilities: [read, search, edit, shell]
+capabilities: [read, search, edit, shell, skill]
 skills: [spec, enrich-us, writing-plans, executing-plans, prd-to-issues, new-ticket]
 owner: manu
 ---

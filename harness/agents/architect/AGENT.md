@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/architect/AGENT.md
-generated_sha: c63354c25b8a3dcd
+generated_sha: 17da1734ab7a3903
 id: agent-architect
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: architect
 description: Decide-phase persona. Invoke before a decision that will be expensive to reverse — a new component, a cross-cutting contract, a dependency that outlives the sprint — or when an existing decision no longer matches what the system does.
 kind: invocable
 model: top
-capabilities: [read, search, edit]
+capabilities: [read, search, edit, skill]
 skills: [read-all-adrs, architecture-session, pattern-loader]
 owner: manu
 ---

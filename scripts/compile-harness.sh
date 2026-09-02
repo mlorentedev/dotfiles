@@ -497,6 +497,24 @@ agent_capability_line() {
            ;;
         *) printf '[ERROR] resolving capabilities "%s" for harness "%s" failed; see the resolver error above\n' \
                "$caps" "$agent" >&2
+           # Tell the two failures apart, because they need opposite fixes and
+           # the resolver's own message cannot: it reports what IT could not
+           # understand, which reads as a defect in the map even when the map is
+           # right and the reader is stale.
+           #
+           # A binary older than the map fails on EVERY record identically, so
+           # probe with a capability every version has always mapped. If that
+           # fails too, the map is not the problem -- the reader is. Measured
+           # 2026-09-01: capability-map version 2 added `unsupported`, and a dotf
+           # predating it rejects the whole map with "opencode maps no native
+           # names for skill", which sends the reader to edit a correct file.
+           if ! dotf harness resolve-capabilities read --harness "$agent" --repo-root "$REPO_ROOT" >/dev/null 2>&1; then
+               printf '       This dotf cannot read %s/harness/capability-map.json AT ALL, so the map is\n' "$REPO_ROOT" >&2
+               printf '       newer than the binary -- do NOT edit the map. Rebuild dotf from this checkout\n' >&2
+               printf '       (cd cli && go build -o "$HOME/.local/bin/dotf" ./cmd/dotf), or install a release\n' >&2
+               printf '       that carries it, then re-run --deploy. `dotf doctor` reports the same drift\n' >&2
+               printf '       under its provenance check.\n' >&2
+           fi
            return 1 ;;
     esac
 }

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/shipper/AGENT.md
-generated_sha: 7f0ac69aeaf2e155
+generated_sha: ead9e03f1abf72e1
 id: agent-shipper
 type: agent
 status: active
@@ -10,7 +10,7 @@ name: shipper
 description: Ship-phase persona. Invoke to get a verified change into the world — branch and worktree hygiene, the PR and its triage, container and infrastructure delivery, and the release mechanics that decide what a merge actually does.
 kind: invocable
 model: mid
-capabilities: [read, search, edit, shell]
+capabilities: [read, search, edit, shell, skill]
 skills: [using-git-worktrees, docker, helm, terraform]
 owner: manu
 ---

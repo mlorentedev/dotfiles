@@ -38,15 +38,18 @@
     "vocabulary cannot be checked from this machine — the binary is not installed — and #1170 already",
     "holds the same not-verifiable-here question for its model tier. Declaring guessed native names",
     "would put a route to nowhere here that validates cleanly, which is the class ADR-035 deleted the",
-    "phantom `codex` pool to avoid."
+    "phantom `codex` pool to avoid.",
+    "SKILL, added 2026-09-01 (HARNESS-106 / #1420). Measured, not assumed: no persona could invoke a skill, so no persona could consume the forced skills its own gate demands -- harmless noise under `enforce: warn`, a hard deadlock under `block`, because dotf harness gate's escape hatch (\"invoking a skill is never blocked\") assumes an agent able to emit a call it was never granted. claude maps it to the native `Skill` tool. opencode declares it UNSUPPORTED rather than mapping it: its permission vocabulary is read/edit/glob/grep/list/bash/webfetch/websearch and it has no skill concept at all. Note this says nothing about ENFORCEMENT, which is a separate property -- ADR-027 and #561 name `tool.execute.before` as opencode's gate, and measured against the installed @opencode-ai/plugin types it is `(input, output: {args}) => Promise<void>` and CANNOT deny; opencode's blocking primitive is `permission.ask` with status `deny`.",
+    "VERSION 2 (2026-09-01): `unsupported` and the `skill` verb. A dotf older than this change REFUSES this map outright -- it enforces vocabulary coverage and knows nothing about `unsupported`, so it reports `opencode maps no native names for skill`. That refusal is correct under C15 and must not be softened: an old binary that cannot understand the map declines rather than rendering a grant it cannot compute. It does mean the binary must be updated before or with the map, which is exactly the deployed-predates-the-repo class #1158 describes and `dotf doctor`'s provenance check (#1416) now detects."
   ],
-  "version": 1,
+  "version": 2,
   "vocabulary": [
     "read",
     "search",
     "edit",
     "shell",
-    "web"
+    "web",
+    "skill"
   ],
   "harnesses": {
     "claude": {
@@ -72,6 +75,9 @@
         "web": [
           "WebFetch",
           "WebSearch"
+        ],
+        "skill": [
+          "Skill"
         ]
       }
     },
@@ -80,6 +86,9 @@
       "form": "decision-map",
       "grant": "allow",
       "why": "Agent config takes a permission object, not a tool list; `tools` is deprecated upstream. Declared here with a verified native vocabulary even though opencode is not yet an agents.deploy target, because a registry covering one harness is what makes the pipe neutral by mechanism and single-vendor by data.",
+      "unsupported": [
+        "skill"
+      ],
       "capabilities": {
         "read": [
           "read",
