@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-069-voice-nan-whisper-f1",
+    "behavior": "File transcription dotf voice --file <audio-path> outputs text to stdout",
+    "verification": "go test -v ./cli/internal/voice -run TestVoiceFileTranscription",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-069-voice-nan-whisper-f2",
+    "behavior": "Interactive push-to-talk microphone recording and typing injection into focused window",
+    "verification": "go test -v ./cli/internal/voice -run TestVoiceInteractiveTyping",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-069-voice-nan-whisper-f3",
+    "behavior": "Direct clipboard copy mode with dotf voice --copy",
+    "verification": "go test -v ./cli/internal/voice -run TestVoiceClipboardMode",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-069-voice-nan-whisper-f4",
+    "behavior": "Missing or invalid NAN_API_KEY fails cleanly with actionable advice",
+    "verification": "go test -v ./cli/internal/voice -run TestVoiceMissingCredentials",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-069-voice-nan-whisper-f5",
+    "behavior": "Temporary recording files are safely cleaned up on exit or interrupt",
+    "verification": "go test -v ./cli/internal/voice -run TestVoiceTempFileCleanup",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-069-voice-nan-whisper-f6",
+    "behavior": "NaN Whisper HTTP client multipart encoding and error status handling",
+    "verification": "go test -v ./cli/internal/voice -run TestNanWhisperClient_Transcribe",
+    "state": "pending",
+    "evidence": ""
+  }
+]
