@@ -29,6 +29,20 @@ Baselined by running the same files on a clean `main` worktree at `3a11d97`:
 
 Both are fixture-isolation defects tracked at #1409, independently observed by the session working `feat/persona-skill-enforcement`. The suite went 14 red → 7 red on this branch; the seven that remain are the baseline, not a regression.
 
+### Where the endpoint variables actually live (repo-wide sweep)
+
+The first pass grepped only the two setup scripts and called block 2 inert. A repo-wide sweep corrected that:
+
+```
+.zshrc:42-43                          export ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL   ← the live source, untouched
+tests/antigravity.bats:84             pins that .zshrc export                        ← untouched, still green
+cli/internal/doctor/checks_deploy.go:801
+                                      sys.env("ANTIGRAVITY_ENDPOINT", "https://cloudcode-pa.googleapis.com")
+.bashrc                               (no export — pre-existing parity gap, not in scope)
+```
+
+`dotf doctor` defaults to production when the variable is unset, inside a section that SKIPs when `agy` is absent, so the check reads identically before and after this change. `.zshrc` continues to export both, so a running shell is unaffected. **The deletion is a no-op outside the setup process**, which is the correct scope for it — but the reason is narrower than "these are inert", and the spec now says so.
+
 ### Fail-first proof for the new guard
 
 Ran `tests/guard-doctrine-target-not-deleted.bats` against a scratch tree holding `main`'s setup scripts plus the shipped manifest:

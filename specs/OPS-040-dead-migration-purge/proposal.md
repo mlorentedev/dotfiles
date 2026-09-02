@@ -29,7 +29,7 @@ Nine blocks leave both setup scripts. Two stay, each for a stated reason. After 
 | # | Block | Location | Why it is dead |
 |---|---|---|---|
 | 1 | `OPENROUTER_API_KEY` deploy-time export | `setup-linux.sh:282-296`, `setup-windows.ps1:690-701` | Fetched for the agy `mcp_config` cascade that CLI-042 AC8 removed. Zero readers remain: the only other repo mentions are two comments recording that the cascade is gone, and the interactive `opencode`/`pi` wrappers in `.bashrc:113-114` / `powershell/profile.ps1:297-298` resolve it independently through `dotf secrets run`. Removing it stops a decryption on every setup run. |
-| 2 | `ANTIGRAVITY_ENDPOINT` / `CLOUDCODE_URL` exports | `setup-linux.sh:390-397`, `setup-windows.ps1:1413-1418` | The block's own comment records the empirical finding: *"Setting these has no observed effect on routing"* — agy routes to a hardcoded metadata plane regardless. |
+| 2 | `ANTIGRAVITY_ENDPOINT` / `CLOUDCODE_URL` exports | `setup-linux.sh:390-397`, `setup-windows.ps1:1413-1418` | Dead **within setup**, which is all these lines reached. See the note below — they are not dead repo-wide, and nothing about the user's environment changes. |
 | 3 | SDD-007 orphan `mcp_config.json` removal | `setup-linux.sh:482-489` | Deletes a file at the pre-SDD-007 path. agy reads the canonical path; the orphan is inert. |
 | 4 | SDD-007 legacy `GEMINI.md` removal | `setup-linux.sh:500-505`, `setup-windows.ps1:1490-1497` | **Not dead — actively wrong. See below.** |
 | 5 | CLI-014 orphan `init-project.sh` removal | `setup-linux.sh:592-594` | Deletes a script retired in favour of `dotf init`. Nothing invokes it. |
@@ -49,6 +49,16 @@ Nine blocks leave both setup scripts. Two stay, each for a stated reason. After 
 |---|---|---|---|
 | 10 | HIVE-118 stale `uvx hive-vault` MCP entry | `setup-linux.sh:1073-1082`, `setup-windows.ps1:563` | Correcting, and it has a Windows twin. Skipping it leaves the `hive` MCP entry pinned to the retired `uvx` definition, and because the surrounding loop is skip-if-present, the current `hive client` definition is never re-added. Probed absent on msi; **the Windows box cannot be probed from here**, so it is deferred to the batched Windows session rather than deleted on one OS's evidence. |
 | 11 | MEM-002 claude-mem retirement | `setup-linux.sh:1305-1337`, `setup-windows.ps1:894-935` | **It has never worked.** Filed as #1431. Untouched here — the whole block, not part of it. |
+
+### Block 2 is dead inside setup only, and `.zshrc` is where the value actually comes from
+
+Stated carefully, because a first pass got it wrong by grepping only the two setup scripts. `ANTIGRAVITY_ENDPOINT` / `CLOUDCODE_URL` have three homes, and only one of them is deleted here:
+
+- **`setup-linux.sh` / `setup-windows.ps1`** — an `export` into the setup process. Nothing later in either script reads it; on Linux it cannot outlive the process. **Deleted.** On Windows the same block also wrote them to the user environment, which is the part that leaves values behind (see Out of scope).
+- **`.zshrc:42-43`** — the live source. Every interactive zsh exports them, which is why they are set in a running shell despite setup having no lasting effect. **Untouched**, and `tests/antigravity.bats:84` still pins it. (`.bashrc` does not export them — a parity gap that predates this change and is not in scope.)
+- **`cli/internal/doctor/checks_deploy.go:801`** — `dotf doctor` reads the variable, but as `sys.env("ANTIGRAVITY_ENDPOINT", "https://cloudcode-pa.googleapis.com")`, i.e. **defaulting to production when unset**, inside a section that SKIPs entirely when `agy` is not on PATH. So the check passes identically before and after.
+
+The block's own comment — *"Setting these has no observed effect on routing"* — is a statement about **agy's behaviour**, not about whether anything reads the variables. Something does. The deletion is still right, and it is a no-op for both the user's shell and `dotf doctor`; the reason is narrower than "these are inert".
 
 ### Block 4 is a defect, and removing it is the fix
 
