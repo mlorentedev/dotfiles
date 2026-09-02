@@ -74,18 +74,22 @@ setup() {
     grep -qF "PSObject.Properties['prerequisite_command']" "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 does NOT eager-source load-secrets; resolves the agy secret via dotf [#587]" {
-    # Migrated off the load-secrets eager dot-source (ADR-028). agy's
-    # OPENROUTER_API_KEY is baked into mcp_config.json via `dotf secrets show`
-    # after Install-Dotf, before the agy block (opencode/pi self-resolve).
+@test "setup-windows.ps1 does NOT eager-source load-secrets, and fetches no deploy-time secret [#587, OPS-040]" {
+    # Migrated off the load-secrets eager dot-source by #587 (ADR-028), then
+    # OPS-040 removed the `dotf secrets show` fetch itself: the agy mcp_config
+    # cascade that consumed OPENROUTER_API_KEY was deleted by CLI-042 AC8, so
+    # the decryption ran on every setup for no reader.
     refute_grep '\. \$loadSecretsDeployed' "$PS1_SCRIPT"
     refute_grep_fixed 'Eager-load secrets' "$PS1_SCRIPT"
-    grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$PS1_SCRIPT"
+    refute_grep_fixed 'dotf secrets show OPENROUTER_API_KEY' "$PS1_SCRIPT"
 }
 
-@test "parity: both setups resolve the agy deploy-time secret via dotf secrets show [#587]" {
+@test "parity: neither setup resolves a deploy-time secret for agy [#587, OPS-040]" {
+    # The parity statement inverted with the behaviour: both scripts fetched it,
+    # now neither does. Kept as parity rather than deleted, because the failure
+    # this catches is one OS reintroducing the fetch alone.
     for s in "$PS1_SCRIPT" "$DOTFILES_DIR/setup-linux.sh"; do
-        grep -qF 'dotf secrets show OPENROUTER_API_KEY' "$s"
+        refute_grep_fixed 'dotf secrets show OPENROUTER_API_KEY' "$s"
     done
 }
 
@@ -115,12 +119,17 @@ setup() {
     grep -qF 'age identity key not found' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-windows.ps1 removes legacy GEMINI.md (SDD-007 migration)" {
-    # Pre-SDD-007 setups deployed ~/.gemini/GEMINI.md. After agy replaced
-    # gemini-cli, AGY.md is the new identity file. Without explicit cleanup the
-    # orphan GEMINI.md lingers and confuses any tool that picks up either file.
-    grep -qF 'Removed legacy GEMINI.md' "$PS1_SCRIPT"
-}
+# A test asserting that setup-windows.ps1 REMOVES ~/.gemini/GEMINI.md stood here
+# until OPS-040, on the premise that the file was a pre-SDD-007 orphan. The
+# premise was false: harness/manifest.json declares .gemini/GEMINI.md as agy's
+# live doctrine deploy target -- "Antigravity reads global rules from
+# ~/.gemini/GEMINI.md", injected append-and-replace-in-place so a user's own
+# rules survive. Both setups deleted it on every run, and this test held that
+# behaviour in place. Measured on msi 2026-09-02: 12029 bytes of generated
+# doctrine at the path setup deleted.
+#
+# The inverse invariant now lives in tests/guard-doctrine-target-not-deleted.bats,
+# which resolves its targets from the manifest instead of naming this one file.
 
 @test "setup-windows.ps1 sets up GitHub Copilot CLI" {
     grep -q 'Setting up GitHub Copilot CLI' "$PS1_SCRIPT"
@@ -990,14 +999,18 @@ FIXTURE
     grep -qE '^function Sync-SessionPath' "$BATS_TEST_DIRNAME/../scripts/utils.ps1"
 }
 
-@test "setup-windows.ps1 runs the uv and Bun installers in a child pwsh, never in its own session (TEST-003)" {
+@test "setup-windows.ps1 runs downloaded installers in a child pwsh, never in its own session (TEST-003)" {
     # A downloaded installer executed in-session can rewrite the process
     # environment for the rest of setup; the runner lost npm after these two.
+    #
+    # It named uv AND Bun until OPS-040 deleted the Bun installer (it existed for
+    # the claude-mem worker, retired 2026-06-23, and nothing in the repo invokes
+    # bun). Per the note above at "Guards assert the invariant, never the
+    # population": the invariant is child-pwsh execution, not which installers
+    # happen to exist, so this asserts the surviving one rather than counting
+    # them. Any installer added later inherits the rule, not this test's silence.
     grep -qF -- '-File $uvInstaller' "$PS1_SCRIPT"
-    grep -qF -- '-File $bunInstaller' "$PS1_SCRIPT"
     run grep -F '& $uvInstaller' "$PS1_SCRIPT"
-    [ "$status" -ne 0 ]
-    run grep -F '& $bunInstaller' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]
 }
 

@@ -279,22 +279,6 @@ else
     log_warning "scripts/install-dotf.sh not found; skipping dotf install"
 fi
 
-# Deploy-time secret for the agy MCP config: agy does NOT expand env vars inside
-# JSON, so OPENROUTER_API_KEY must be baked into mcp_config.json at deploy. The
-# agy block below reads it from the environment; fetch it via the `dotf secrets`
-# facade (ADR-028) now that dotf + the registry/store are deployed above, into
-# THIS one-shot setup process only -- never the user's interactive shell (that
-# export was retired in #581). opencode/pi `{env:NAN_API_KEY}` is resolved
-# independently by `dotf secrets render` at deploy time (and opencode/pi's own
-# runtime resolver as fallback), which age-decrypt directly.
-if command -v dotf >/dev/null 2>&1; then
-    if ! OPENROUTER_API_KEY="$(dotf secrets show OPENROUTER_API_KEY 2>&1)"; then
-        log_warning "dotf secrets show OPENROUTER_API_KEY failed: $OPENROUTER_API_KEY"
-        OPENROUTER_API_KEY=""
-    fi
-    export OPENROUTER_API_KEY
-fi
-
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
 # tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
 # as install_dotf, driven by data instead of a per-OS install block. Best-effort:
@@ -387,14 +371,13 @@ fi
 log_info "Setting up Antigravity CLI configuration..."
 export GEMINI_HOME="$HOME/.gemini"
 export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
-# NOTE: ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL kept for backward compat. Empirical
-# finding (cli log 2026-05-25): agy 1.0.2 issues `loadCodeAssist` and
-# `fetchAvailableModels` calls to `daily-cloudcode-pa.googleapis.com` regardless
-# of these env vars — appears to be hardcoded metadata-plane routing. The chat
-# completion itself goes through a separate gRPC channel whose endpoint is not
-# clearly env-overridable. Setting these has no observed effect on routing.
-export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
-export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
+# ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL were exported here until OPS-040, kept
+# "for backward compat" against an empirical finding that already said they did
+# nothing (cli log 2026-05-25): agy 1.0.2 issues `loadCodeAssist` and
+# `fetchAvailableModels` to `daily-cloudcode-pa.googleapis.com` regardless of
+# them — hardcoded metadata-plane routing — and the chat completion goes through
+# a separate gRPC channel whose endpoint is not env-overridable. Two exports
+# whose own comment recorded that they had no observed effect.
 
 ensure_directory "$GEMINI_HOME"
 ensure_directory "$GEMINI_HOME/config"
@@ -479,12 +462,6 @@ fi
 [ -d "$CURRENT_DIR/.antigravitycli.bak" ] && rm -rf "$CURRENT_DIR/.antigravitycli.bak"
 rm -f "$GEMINI_HOME/config/.migrated" 2>/dev/null
 
-# SDD-007 one-time migration: drop orphan master at the pre-SDD-007 path
-# (~/.gemini/mcp_config.json). Canonical path is now ~/.gemini/config/mcp_config.json.
-if [ -f "$GEMINI_HOME/mcp_config.json" ] && [ ! -L "$GEMINI_HOME/mcp_config.json" ]; then
-    log_info "Removing orphan master from pre-SDD-007 path: $GEMINI_HOME/mcp_config.json"
-    rm -f "$GEMINI_HOME/mcp_config.json"
-fi
 # Drop the old AGY_APP_DATA symlink/copy of mcp_config.json (replaced by canonical path)
 [ -e "$AGY_APP_DATA/mcp_config.json" ] && rm -f "$AGY_APP_DATA/mcp_config.json"
 
@@ -495,14 +472,6 @@ fi
 # skill's targets[]. The single --deploy call near the end of this script does
 # this for every agent at once; no per-agent skill loop here.
 ensure_directory "$HOME/.gemini/skills"
-
-# SDD-007 one-time migration: gemini-cli -> agy. Remove the legacy
-# ~/.gemini/GEMINI.md identity file so it doesn't linger as an orphan
-# pointing to the retired binary. Safe to repeat (no-op if absent).
-if [ -f "$GEMINI_HOME/GEMINI.md" ]; then
-    rm -f "$GEMINI_HOME/GEMINI.md"
-    log_info "Removed legacy GEMINI.md (SDD-007 migration: agy replaces gemini-cli)"
-fi
 
 # Force copy master files (Neural Hive Protocol)
 rm -f "$GEMINI_HOME/AGY.md"
@@ -589,9 +558,6 @@ for _claude_src in "$CURRENT_DIR/ai/claude/"*; do
     cp -rf "$_claude_src" "$HOME/.claude/" 2>/dev/null || true
 done
 unset _claude_src
-# CLI-014: init-project.sh was retired (repo scaffolding is now `dotf init`).
-# Remove any copy a prior setup left in ~/.claude so it doesn't linger as an orphan.
-rm -f "$HOME/.claude/init-project.sh"
 # Claude skills are deployed from the vault skill records by
 # `compile-harness.sh --deploy` (SDD-008): each committed record under
 # harness/skills/ is rendered (with provenance) to ~/.claude/skills/<n>/,
@@ -637,14 +603,6 @@ if ! command -v poetry >/dev/null 2>&1; then
     fi
 else
     log_info "poetry already installed"
-fi
-
-# Create convenience symlinks for versioned-only binaries
-PYTHON_DIR=$(ls -d "$HOME/Applications"/python-* 2>/dev/null | sort -V | tail -1) || true
-if [ -n "$PYTHON_DIR" ] && [ -d "$PYTHON_DIR/bin" ] && [ ! -e "$PYTHON_DIR/bin/python" ]; then
-    log_info "Creating python symlink..."
-    ln -s python3 "$PYTHON_DIR/bin/python"
-    log_success "python -> python3 symlink created"
 fi
 
 # Claude Code (primary AI coding agent — see ADR-009)
@@ -974,15 +932,9 @@ fi
 # packages.json); this block only deploys config when the binary is on PATH.
 # Verification string set by AI-013 (pointer-style copilot-instructions.md).
 #
-# Cleanup (idempotent): the previous setup added 'eval "$(gh copilot alias -- bash)"'
-# to .zshrc/.bashrc. That subcommand does not exist in the new standalone CLI, so
-# the line errors silently on every shell startup. Strip it if present.
-for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
-    if [ -f "$rc" ] && grep -qF 'eval "$(gh copilot alias -- bash)"' "$rc"; then
-        sed -i '/eval "$(gh copilot alias -- bash)"/d' "$rc"
-        log_info "Removed stale gh-copilot eval line from $rc"
-    fi
-done
+# A loop stripping a stale 'eval "$(gh copilot alias -- bash)"' line from
+# .zshrc/.bashrc lived here until OPS-040. Probed absent from both files on the
+# only OS it ran on before removal.
 
 if command -v copilot >/dev/null 2>&1; then
     log_info "GitHub Copilot CLI detected, deploying configuration..."
@@ -1209,13 +1161,9 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
             systemctl --user daemon-reload >/dev/null 2>&1 || true
             if systemctl --user enable --now hive-upgrade.timer >/dev/null 2>&1; then
                 log_success "Enabled hive-upgrade.timer (every 15 min, systemd --user)"
-                # Single owner: retire the legacy manual cron now the timer owns
-                # the upgrade policy (only after a successful enable).
-                if crontab -l 2>/dev/null | grep -q 'uv tool upgrade hive-vault'; then
-                    if crontab -l 2>/dev/null | grep -v 'uv tool upgrade hive-vault' | crontab -; then
-                        log_info "Removed legacy 'uv tool upgrade hive-vault' cron (timer is now the single owner)"
-                    fi
-                fi
+                # A removal of the legacy 'uv tool upgrade hive-vault' crontab
+                # line ran here until OPS-040, retiring it once the timer owned
+                # upgrade policy. Probed absent from `crontab -l` before removal.
             else
                 log_warning "hive-upgrade.timer enable failed (non-fatal; setup still upgrades hive each run)"
             fi

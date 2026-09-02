@@ -686,21 +686,6 @@ if (Test-Path -LiteralPath $registrySource) {
     Write-Warn "secrets/registry.yaml not found at $registrySource"
 }
 
-# Deploy-time secret for the agy MCP config: agy does NOT expand env vars inside
-# JSON, so OPENROUTER_API_KEY must be baked into mcp_config.json at deploy. The
-# agy block below reads it from $env; fetch it via the `dotf secrets` facade
-# (ADR-028) now that dotf + the registry/store are in place, into THIS one-shot
-# setup process only -- never the user's session (that export was retired in
-# #581). opencode/pi {env:NAN_API_KEY} is resolved independently by
-# `dotf secrets render` at deploy time (and their own runtime resolver as fallback).
-if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    $env:OPENROUTER_API_KEY = (& dotf secrets show OPENROUTER_API_KEY 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warn "dotf secrets show OPENROUTER_API_KEY failed: $env:OPENROUTER_API_KEY"
-        $env:OPENROUTER_API_KEY = ""
-    }
-}
-
 # Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
 # tools (currently sops) into ~/.local/bin via dotf - the same deterministic pattern
 # as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
@@ -1061,29 +1046,12 @@ if (-not $poetryCmd) {
     Write-Info "poetry already installed"
 }
 
-# Install Bun (JS runtime used by some Claude Code plugin workers for bun:sqlite)
-$bunCmd = Get-Command bun -ErrorAction SilentlyContinue
-if (-not $bunCmd) {
-    Write-Info "Installing Bun..."
-    try {
-        $bunInstaller = Join-Path $env:TEMP "bun-install.ps1"
-        Invoke-RestMethod https://bun.sh/install.ps1 -OutFile $bunInstaller
-        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $bunInstaller 2>$null
-        Remove-Item -Path $bunInstaller -Force -ErrorAction SilentlyContinue
-        # Refresh PATH for current session
-        $env:PATH = "$env:USERPROFILE\.bun\bin;$env:PATH"
-        $bunCmd = Get-Command bun -ErrorAction SilentlyContinue
-        if ($bunCmd) {
-            Write-Success "Bun installed"
-        } else {
-            Write-Warn "Bun installation failed"
-        }
-    } catch {
-        Write-Warn "Failed to install Bun: $_"
-    }
-} else {
-    Write-Info "Bun already installed"
-}
+# Bun was installed here until OPS-040, for "some Claude Code plugin workers for
+# bun:sqlite" -- the conversation-memory plugin worker MEM-002 retired on
+# 2026-06-23. No code in this repository invokes bun, bunx or bun run, so setup
+# no longer installs a runtime nothing here uses. The shell rc files keep their
+# BUN_INSTALL PATH export: a bun the user installed themselves stays reachable,
+# setup just stops providing one.
 
 # What the rest of setup will see. The npm-driven pi block below skips silently
 # when npm is missing (obsidian and yarn moved to packages.json, OPS-042); naming the state here
@@ -1395,12 +1363,13 @@ Ensure-Directory "$GeminiHome\prompts"
 $AgyAppData = Join-Path $GeminiHome "antigravity-cli"
 Ensure-Directory $AgyAppData
 
-# Force production endpoint
-[Environment]::SetEnvironmentVariable("ANTIGRAVITY_ENDPOINT", "https://cloudcode-pa.googleapis.com", "User")
-[Environment]::SetEnvironmentVariable("CLOUDCODE_URL", "https://cloudcode-pa.googleapis.com", "User")
+# agy reads GEMINI_DIR; set it for this session and persist it for later ones.
+# ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL were set here too until OPS-040. They had
+# no observed effect on routing -- agy issues its metadata-plane calls to a
+# hardcoded host regardless -- so setup no longer sets them. Values a previous
+# run persisted to the user environment stay behind, inert; scrubbing them would
+# mean adding the kind of one-time migration OPS-040 exists to remove.
 [Environment]::SetEnvironmentVariable("GEMINI_DIR", "$GeminiHome", "User")
-$env:ANTIGRAVITY_ENDPOINT = "https://cloudcode-pa.googleapis.com"
-$env:CLOUDCODE_URL = "https://cloudcode-pa.googleapis.com"
 $env:GEMINI_DIR = "$GeminiHome"
 
 # 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
@@ -1486,15 +1455,6 @@ $projAgyCli = Join-Path $DotfilesDir ".antigravitycli"
 $projAgyBak = Join-Path $DotfilesDir ".antigravitycli.bak"
 if (Test-Path $projAgyCli) { Remove-Item -Recurse -Force $projAgyCli -ErrorAction SilentlyContinue }
 if (Test-Path $projAgyBak) { Remove-Item -Recurse -Force $projAgyBak -ErrorAction SilentlyContinue }
-
-# SDD-007 one-time migration: gemini-cli -> agy. Remove the legacy
-# ~/.gemini/GEMINI.md identity file so it doesn't linger as an orphan
-# pointing to the retired binary. Safe to repeat (no-op if absent).
-$geminiMdLegacy = Join-Path $GeminiHome 'GEMINI.md'
-if (Test-Path $geminiMdLegacy) {
-    Remove-Item -LiteralPath $geminiMdLegacy -Force -ErrorAction SilentlyContinue
-    Write-Info "Removed legacy GEMINI.md (SDD-007 migration: agy replaces gemini-cli)"
-}
 
 # Deploy AGY.md (Neural Hive Protocol pointer to AGENTS.md). Linux-parity.
 $agyMdSource = Join-Path $DotfilesDir 'ai\agy\AGY.md'
@@ -1684,7 +1644,11 @@ Write-Info "Deploying scripts..."
 
 # CLI-020: the init .ps1 were retired (repo scaffolding is now `dotf init`).
 # Remove any copy a prior setup left in ~/scripts or ~/.claude so they don't
-# linger as orphans (mirrors setup-linux.sh's init-project.sh cleanup, CLI-014).
+# linger as orphans. The Linux twin (CLI-014, one `rm -f` of init-project.sh)
+# was deleted by OPS-040 after probing its target absent on msi; this one stays
+# because the WIN-013 note below records leftovers of exactly this kind measured
+# still present on a real Windows box on 2026-08-27, and that box cannot be
+# probed from the Linux session that would delete it.
 foreach ($initOrphan in @(
         "$ScriptsDir\init-project.ps1", "$ClaudeHome\init-project.ps1",
         "$ScriptsDir\init-repo-agents.ps1", "$ClaudeHome\init-repo-agents.ps1",
