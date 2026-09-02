@@ -15,7 +15,6 @@ package memlink
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -181,18 +180,9 @@ func slugify(s string, keepSlash bool) string {
 
 // createLink makes a directory link from target to src: a junction on Windows
 // (no privilege required, unlike os.Symlink there) and a symlink on POSIX.
-func createLink(src, target string) error {
-	if runtime.GOOS == "windows" {
-		// `mklink /J <link> <existing-target>` is a cmd builtin, so it runs via
-		// `cmd /c`. Args are passed as argv elements (not concatenated into a shell
-		// string); os/exec quotes any with spaces. Both paths are CLI-resolved
-		// vault/.claude locations, not user input — no shell-metachar surface.
-		// (A path component containing a bare cmd delimiter such as a comma is a
-		// known narrow gap — see HARNESS follow-up; spaces already round-trip.)
-		return exec.Command("cmd", "/c", "mklink", "/J", target, src).Run()
-	}
-	return os.Symlink(src, target)
-}
+// Implemented per-OS in memlink_windows.go / memlink_unix.go (HARNESS-050):
+// the Windows junction needs cmd.exe-specific quoting os/exec's ordinary argv
+// escaping does not provide, which pulled it out of this shared file.
 
 // linkNoun is the OS-accurate word for the created link, used in the message.
 func linkNoun() string {
