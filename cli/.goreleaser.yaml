@@ -20,8 +20,14 @@ builds:
     goarch:
       - amd64
       - arm64
+    # main.commit is what makes provenance answerable. Between two releases the
+    # version string is CONSTANT while the source moves every merge, so
+    # version-equality is structurally blind for the one tool that IS this
+    # repository (#1158). FullCommit, not ShortCommit: the doctor check feeds it
+    # to `git merge-base --is-ancestor`, and an abbreviated hash is ambiguous in
+    # principle and unresolvable in a shallow clone.
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .FullCommit }}
 
 archives:
   - id: dotf

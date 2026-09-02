@@ -54,7 +54,7 @@ func captureRealStreams(t *testing.T, args ...string) (stdout, stderr string, er
 			_ = outW.Close()
 			_ = errW.Close()
 		}()
-		cmd := New("dev")
+		cmd := New("dev", "")
 		cmd.SetArgs(args)
 		err = cmd.Execute()
 	}()
@@ -133,6 +133,48 @@ func TestStdoutContracts(t *testing.T) {
 // The contract is written into a temp DOTFILES_REPO_DIR rather than inherited
 // from the ambient checkout, so the case cannot degrade into a skip. A skip
 // here would be indistinguishable from a pass while silently testing nothing —
+// The table above pins that `version` REACHES stdout. It does not pin the
+// SHAPE, and the shape is load-bearing in a way that is easy to break by
+// accident: both installers regex `(\d+\.\d+\.\d+|dev)` out of the merged
+// streams to decide whether to skip the install. #1158 added a commit stamp to
+// this command, and the tempting place to put it was a second line of the
+// default output. These cases say why it is behind a flag instead — a second
+// line risks the idempotence skip that decides whether every machine reinstalls
+// dotf on every setup run, and that skip failing OPEN is silent.
+func TestVersionDefaultOutputStaysSingleLineForTheInstallers(t *testing.T) {
+	stdout, _, err := captureRealStreams(t, "version")
+	if err != nil {
+		t.Fatalf("version failed: %v", err)
+	}
+	// Asserted EXACTLY, trailing newline included. Trimming first and counting
+	// lines would let "dotf version dev\n\n\n" pass as one line, which is the
+	// blank-line drift this test claims to prevent — a test that permits the
+	// thing it names is the same class of defect as the check this PR adds.
+	const want = "dotf version dev\n"
+	if stdout != want {
+		t.Fatalf("default `dotf version` must be exactly %q (the installers regex it); got %q", want, stdout)
+	}
+}
+
+// The stamp is machine-read by `dotf doctor`, which feeds it straight to
+// `git merge-base`. It must be the bare value with nothing else on the line —
+// no label, no "commit: " prefix — or the git call receives a non-SHA.
+func TestVersionCommitFlagPrintsBareValue(t *testing.T) {
+	stdout, _, err := captureRealStreams(t, "version", "--commit")
+	if err != nil {
+		t.Fatalf("version --commit failed: %v", err)
+	}
+	// New("dev", "") in the harness: a source build, so the stamp is empty and
+	// the command prints an empty line rather than a placeholder word that
+	// would be indistinguishable from a real hash. Exact, for the same reason
+	// as above: doctor feeds this value straight to `git merge-base`, so any
+	// extra byte is a non-SHA handed to git.
+	const want = "\n"
+	if stdout != want {
+		t.Errorf("--commit must print the bare stamp and nothing else, got %q", stdout)
+	}
+}
+
 // the failure mode this whole file exists to close.
 func TestEnvGenerateStdoutFlagWritesToStdout(t *testing.T) {
 	dir := t.TempDir()

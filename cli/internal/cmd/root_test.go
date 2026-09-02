@@ -8,7 +8,7 @@ import (
 
 func execute(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := New("dev")
+	cmd := New("dev", "")
 	var out, errBuf bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errBuf)

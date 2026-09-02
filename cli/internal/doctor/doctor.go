@@ -107,6 +107,7 @@ func Run(opts Options) (int, error) {
 		checkDeployManifest(sys, rep)
 		checkAgentPresence(sys, rep)
 		checkAgentSkillsMigrated(cfg, rep)
+		checkDotfProvenance(sys, cfg, rep)
 		checkRepoDirResolves(rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep, opts.Fix)
