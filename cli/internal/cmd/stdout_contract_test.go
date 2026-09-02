@@ -127,12 +127,6 @@ func TestStdoutContracts(t *testing.T) {
 	}
 }
 
-// TestEnvGenerateStdoutFlagWritesToStdout is separated because --stdout is the
-// starkest case: a flag named for the stream it was not using.
-//
-// The contract is written into a temp DOTFILES_REPO_DIR rather than inherited
-// from the ambient checkout, so the case cannot degrade into a skip. A skip
-// here would be indistinguishable from a pass while silently testing nothing —
 // The table above pins that `version` REACHES stdout. It does not pin the
 // SHAPE, and the shape is load-bearing in a way that is easy to break by
 // accident: both installers regex `(\d+\.\d+\.\d+|dev)` out of the merged
@@ -175,6 +169,12 @@ func TestVersionCommitFlagPrintsBareValue(t *testing.T) {
 	}
 }
 
+// TestEnvGenerateStdoutFlagWritesToStdout is separated because --stdout is the
+// starkest case: a flag named for the stream it was not using.
+//
+// The contract is written into a temp DOTFILES_REPO_DIR rather than inherited
+// from the ambient checkout, so the case cannot degrade into a skip. A skip
+// here would be indistinguishable from a pass while silently testing nothing —
 // the failure mode this whole file exists to close.
 func TestEnvGenerateStdoutFlagWritesToStdout(t *testing.T) {
 	dir := t.TempDir()
