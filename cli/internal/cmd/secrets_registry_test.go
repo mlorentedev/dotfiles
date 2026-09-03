@@ -51,7 +51,12 @@ func useTempRegistry(t *testing.T, body string) {
 	oldRead, oldWrite := registryPath, registryWritePath
 	registryPath = func() string { return p }
 	registryWritePath = func() (string, error) { return p, nil }
-	t.Cleanup(func() { registryPath, registryWritePath = oldRead, oldWrite })
+	oldAgent := isAgentSession
+	isAgentSession = func() bool { return false }
+	t.Cleanup(func() {
+		registryPath, registryWritePath = oldRead, oldWrite
+		isAgentSession = oldAgent
+	})
 }
 
 func TestSecretsLs_ListsIdsAndVars_NoValues(t *testing.T) {
@@ -224,6 +229,110 @@ func TestSecretsShow_EmptyValue_Errors(t *testing.T) {
 	cmd.SetArgs([]string{"bw-empty"})
 	if err := cmd.Execute(); err == nil {
 		t.Error("show must error when the secret resolves to an empty value")
+	}
+}
+
+func TestSecretsShow_RejectsAgentSession(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	oldDecrypt := ageDecryptor
+	ageDecryptor = func(_, _ string) ([]byte, error) { return []byte("secret-val\n"), nil }
+	t.Cleanup(func() { ageDecryptor = oldDecrypt })
+
+	oldAgent := isAgentSession
+	isAgentSession = func() bool { return true }
+	t.Cleanup(func() { isAgentSession = oldAgent })
+
+	cmd := newSecretsShowCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"nan-api-key"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when running in agent session")
+	}
+	if !strings.Contains(err.Error(), "refusing to print secret") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestSecretsShow_TTYMasking(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	oldDecrypt := ageDecryptor
+	ageDecryptor = func(_, _ string) ([]byte, error) { return []byte("secret-val\n"), nil }
+	t.Cleanup(func() { ageDecryptor = oldDecrypt })
+
+	oldTTY := stdoutIsTerminal
+	stdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stdoutIsTerminal = oldTTY })
+
+	var out bytes.Buffer
+	cmd := newSecretsShowCmd()
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"nan-api-key"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if strings.Contains(got, "secret-val") {
+		t.Errorf("expected secret to be masked in interactive TTY without --reveal, got %q", got)
+	}
+	if !strings.Contains(got, "••••••••••••") || !strings.Contains(got, "--reveal") {
+		t.Errorf("expected masked output and guidance, got %q", got)
+	}
+}
+
+func TestSecretsShow_RevealFlag(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	oldDecrypt := ageDecryptor
+	ageDecryptor = func(_, _ string) ([]byte, error) { return []byte("secret-val\n"), nil }
+	t.Cleanup(func() { ageDecryptor = oldDecrypt })
+
+	oldTTY := stdoutIsTerminal
+	stdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stdoutIsTerminal = oldTTY })
+
+	var out bytes.Buffer
+	cmd := newSecretsShowCmd()
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"nan-api-key", "--reveal"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "secret-val" {
+		t.Errorf("show --reveal = %q, want %q", out.String(), "secret-val")
+	}
+}
+
+func TestSecretsShow_ClipFlag(t *testing.T) {
+	useTempRegistry(t, testRegistry)
+	oldDecrypt := ageDecryptor
+	ageDecryptor = func(_, _ string) ([]byte, error) { return []byte("secret-val\n"), nil }
+	t.Cleanup(func() { ageDecryptor = oldDecrypt })
+
+	var copied string
+	oldRunner := clipboardRunner
+	clipboardRunner = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardRunner = oldRunner })
+
+	var out, errOut bytes.Buffer
+	cmd := newSecretsShowCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	cmd.SetArgs([]string{"nan-api-key", "-c"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "" {
+		t.Errorf("expected no stdout output with -c, got %q", out.String())
+	}
+	if copied != "secret-val" {
+		t.Errorf("copied to clipboard = %q, want %q", copied, "secret-val")
+	}
+	if !strings.Contains(errOut.String(), "Copied secret") {
+		t.Errorf("expected confirmation message in stderr, got %q", errOut.String())
 	}
 }
 

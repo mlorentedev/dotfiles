@@ -332,3 +332,17 @@ they live in the record, not only in conversation:
    age DR export covering everything, so a migrated secret's `.secret.age` is deleted only
    after the escrow (and its verified round-trip) is in place — never as a side effect of
    `migrate` (which keeps the age file by design).
+
+## Amendment (2026-09-02): Agent session isolation, introspection guards, and stream redaction
+
+**Context:** autonomous and semi-autonomous AI agents (Claude Code, Antigravity, Pi) execute shell commands to build and test code. Under the ADR-028 doctrine, secrets must never be dumped to stdout or recorded in transcripts (`docs/lessons/lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary.md`).
+
+Three mechanical safeguards enforce this in `dotf secrets`:
+
+1. **Introspection prevention (`dotf secrets run`):** `assertSafeChildCommand` refuses to execute `env`, `printenv`, `export`, `set`, `declare` (and normalized shell wrapper variants `sh -c 'env'`) as the child command.
+2. **Stream-level redactor (`redactWriter`):** `dotf secrets run` wraps child process `stdout` and `stderr`. Any byte sequence matching an injected secret value (len >= 6) is scrubbed in-memory to `[REDACTED:<KEY>]` before emission.
+3. **Show command hardening (`dotf secrets show`):**
+   - **Interactive TTY masking:** In a terminal, secrets are masked (`••••••••••••`) by default with guidance.
+   - **Explicit reveal:** Plaintext display requires `--reveal`.
+   - **Clipboard copy:** `-c` / `--clip` copies directly to system clipboard (`wl-copy`/`xclip`/`pbcopy`/`clip.exe`) with zero stdout footprint.
+   - **Agent session refusal:** In an agent session (`CLAUDE_CODE`, `ANTIGRAVITY_AGENT`, `AGENT_SESSION`), `dotf secrets show` categorically refuses to print to stdout, redirecting to `dotf secrets run`.
