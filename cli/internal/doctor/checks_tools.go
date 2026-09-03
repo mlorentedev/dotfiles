@@ -171,8 +171,10 @@ var gitVersionRe = regexp.MustCompile(`([0-9]+\.[0-9]+\.[0-9]+)`)
 // carries the upstream fix for BUG-069 (#912).
 //
 // Measured on 2.53.0, MSYS bash could not open a hook handed to it at a `C:/`
-// drive path — the form both install-git-hooks.ps1 and checkGuardHooks write to
+// drive path — the form both `dotf hooks install` and checkGuardHooks write to
 // core.hooksPath — so every commit aborted with "No such file or directory".
+// (The measurement predates CLI-072 and named install-git-hooks.ps1, the twin
+// `dotf hooks install` replaced; the path form it writes is unchanged.)
 // Measured again on 2.55.0.windows.5 the same value works: the defect was fixed
 // by git-for-windows between the two measurements (lesson 239). What survives a
 // bug fixed upstream is not a workaround but the floor: the toolchain version
