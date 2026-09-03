@@ -178,6 +178,30 @@ the old message had the same shape — and unwrapping `*exec.ExitError` to surfa
 `Stderr` is three lines that belong to whoever decides the error contract, not to
 a transport change.
 
+## Independent adversarial review — disposition
+
+**PASS**, `nan/deepseek-v4-flash` (random draw from `harness/reviewer-pool.json`,
+not the implementer), against `reviewed_sha` `afc9db6`. Rubric A/A/A/A/**B**/A;
+no Blocker, no Major, six Minor. Full text in `review.md`, which is the
+reviewer's artifact and is not edited here.
+
+The reviewer re-ran the build, the suite and the mutation battery independently,
+and did something the author did not: it checked that the live `exit 0` was the
+*correct* answer rather than green paint, by confirming #1419 carries a
+CodeRabbit review at `2026-09-02T02:09:11Z` and a re-triage at
+`2026-09-03T02:33:33Z`, so `Evaluate` rightly returns "triaged".
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `fetchWith` is 53 lines, over the repo's <40 guideline — the sole reason Maintainability graded B | **Applied.** Extracted `withComments`; `fetchWith` is now 21 lines and the helper 38. Behaviour-preserving: the full suite, `-race`, `GOOS=windows go vet` and `golangci-lint` all re-run green after the extraction. |
+| 2 | `tasks.md` still leaves the "PR opened" box unticked although #1457 is merged | **Applied.** Ticked. |
+| 3 | AC5 asserts observed concurrency, not a literal 5s `context.WithTimeout` deadline | **Declined**, and the reviewer says the same in its own note: *"arguably over-engineering"*. A wall-clock deadline test is exactly the assertion that gets loosened until it means nothing on a loaded runner; the real deadline is enforced in `mem.go` and the truncation guard caps the worst case. |
+| 4 | The comment-axis truncation error offers no remediation hint, unlike the PR-list axis | **Applied.** It now names `gh api <base>/issues/<n>/comments --paginate`. The asymmetry was real: one axis taught the reader how to recover and the other did not. |
+| 5 | ≥100 open PRs, or ≥100 comments on one PR, is not processable — it fails loud | **Accepted as a documented limitation.** Failing loud is the designed behaviour; pagination is a separate change and is recorded here rather than silently absorbed. |
+| 6 | `gh api pulls: exit status 1` hides gh's own stderr reason | **Declined here, already disclosed.** Pre-existing (the old message had the same shape), scoped out in this document and in the PR body before the review ran. It is an error-contract decision, not a transport one. |
+
+Four applied, two declined with reasons, nothing left silent.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? **Yes** — a seam is not a testing
