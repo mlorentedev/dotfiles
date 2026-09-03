@@ -1,7 +1,7 @@
 ---
 id: "CLI-072-dotf-hooks-install"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-09-02"
 issue: "mlorentedev/dotfiles#1460"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -136,32 +136,32 @@ embedding that input could not occur; here it is the first guard to mutation-tes
 
 ## Acceptance criteria
 
-- [ ] **AC1 — `dotf hooks install` deploys and wires**, mirroring the source
+- [x] **AC1 — `dotf hooks install` deploys and wires**, mirroring the source
       dispatcher tree to `$DOTFILES_DIR/git-hooks` and setting `core.hooksPath`,
       with the entrypoints executable.
-- [ ] **AC2 — every behaviour from both suites is covered by one Go suite**: the
+- [x] **AC2 — every behaviour from both suites is covered by one Go suite**: the
       13 bats cases and the 9 Pester cases, including the four verified on Linux
       only today and the Windows-only drive-root refusal. Each safety guard is
       mutation-tested, starting with `#695`.
-- [ ] **AC3 — no test touches the real global git config.** The 22 cases drive a
+- [x] **AC3 — no test touches the real global git config.** The 22 cases drive a
       `gitRunner` fake; the single integration test drives real `git` against a
       throwaway `GIT_CONFIG_GLOBAL`. A test that would rewire the developer's
       machine fails instead.
-- [ ] **AC4 — deployed hooks are CR-free** even from a CRLF-tainted source tree
+- [x] **AC4 — deployed hooks are CR-free** even from a CRLF-tainted source tree
       (BUG-068), the same property both twins guarantee today.
-- [ ] **AC5 — both twins and both test files are deleted**, both setups repoint to
+- [x] **AC5 — both twins and both test files are deleted**, both setups repoint to
       `dotf hooks install`, and no stale referent to the deleted scripts remains
       anywhere — including `checks_guard.go`'s user-visible FAIL remedy and
       `checks_tools.go`'s comment. Grep covers **prose**, not just callers
       (lesson 259).
-- [ ] **AC5b — on Windows the hooks step runs after `Install-Dotf`** (R6), proven
+- [x] **AC5b — on Windows the hooks step runs after `Install-Dotf`** (R6), proven
       by a guard asserting the ordering in `setup-windows.ps1` rather than by
       having read it once. Nothing in the repo spans those two call sites today,
       which is why the inversion survived.
-- [ ] **AC6 — doctor and the installer agree on the target path** by construction,
+- [x] **AC6 — doctor and the installer agree on the target path** by construction,
       asserted by a test spanning both rather than by two constants that happen
       to match.
-- [ ] **AC7 — the metric moves: twin pairs 6 → 5**, with the setup LOC delta
+- [x] **AC7 — the metric moves: twin pairs 6 → 5**, with the setup LOC delta
       recorded in `verification.md`.
 
 ## References
