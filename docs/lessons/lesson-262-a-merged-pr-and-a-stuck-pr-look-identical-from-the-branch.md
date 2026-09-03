@@ -1,5 +1,5 @@
 ---
-id: lesson-261
+id: lesson-262
 type: lesson
 status: active
 created: "2026-09-02"
