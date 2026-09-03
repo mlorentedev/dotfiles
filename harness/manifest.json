@@ -266,7 +266,8 @@
           {
             "id": "suggest-role",
             "event": "UserPromptSubmit",
-            "command": "harness suggest --from-hook"
+            "command": "harness suggest --from-hook",
+            "timeout": 5
           }
         ]
       },

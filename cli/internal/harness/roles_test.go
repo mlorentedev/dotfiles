@@ -190,6 +190,7 @@ func TestManifestEmitsPromptHook(t *testing.T) {
 					ID      string `json:"id"`
 					Event   string `json:"event"`
 					Command string `json:"command"`
+					Timeout int    `json:"timeout"`
 				} `json:"emit_hooks"`
 			} `json:"bind"`
 		} `json:"agents"`
@@ -215,9 +216,97 @@ func TestManifestEmitsPromptHook(t *testing.T) {
 			if strings.Contains(h.Command, "--prompt") {
 				t.Errorf("command = %q passes the prompt as an argument — that is the injection surface AC5 forbids", h.Command)
 			}
+			// A bounded timeout. This hook sits on the INTERACTIVE path: what a
+			// hang delays is the user's own prompt, not a background tool call.
+			// AC8 budgets 20ms, so any positive bound is enormous headroom and
+			// the point is only that the damage is bounded at all.
+			if h.Timeout <= 0 {
+				t.Errorf("timeout = %d; an unbounded hook on UserPromptSubmit can stall the user's prompt", h.Timeout)
+			}
 			return
 		}
 		t.Fatal("claude bind target has no suggest-role hook — the suggester would never fire")
 	}
 	t.Fatal("no claude bind target in the manifest")
+}
+
+// TestResolveRolesExcludesNonInvocable closes the gap the independent review
+// found by mutation: deleting the `kind: invocable` filter left every test
+// green, because `hermes-nan`'s only skill is absent from triggers.json today.
+// The filter was load-bearing for a future case and asserted by nothing, which
+// makes it exactly the kind of code a later cleanup deletes as dead.
+func TestResolveRolesExcludesNonInvocable(t *testing.T) {
+	autonomous := &Persona{
+		Name:   "hermes-nan",
+		Kind:   "autonomous",
+		Skills: []SkillBinding{{ID: "test-driven-development"}},
+	}
+	invocable := &Persona{
+		Name:   "builder",
+		Kind:   "invocable",
+		Skills: []SkillBinding{{ID: "test-driven-development"}},
+	}
+
+	got := ResolveRoles(Suggestion{Skills: []string{"test-driven-development"}},
+		[]*Persona{autonomous, invocable})
+	if len(got) != 1 || got[0] != "builder" {
+		t.Errorf("a kind:autonomous persona must never be suggested — a session cannot adopt it. got %v", got)
+	}
+
+	// And on its own it resolves to nobody rather than to itself.
+	if only := ResolveRoles(Suggestion{Skills: []string{"test-driven-development"}},
+		[]*Persona{autonomous}); len(only) != 0 {
+		t.Errorf("only a non-invocable persona matched; want no suggestion, got %v", only)
+	}
+}
+
+// TestPromptHookReachesSettingsByConsequence closes the review's third finding.
+//
+// AC4's own standard is "verify by consequence: deploy and observe — not by
+// asserting the file contains a string", and the manifest-declaration test above
+// is exactly the form the spec calls insufficient. This runs the real emission
+// path — LoadBindTargets -> HookCommands -> MergeHooks — and asserts the hook
+// lands in the settings document a deploy would write.
+func TestPromptHookReachesSettingsByConsequence(t *testing.T) {
+	targets, err := LoadBindTargets(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("LoadBindTargets: %v", err)
+	}
+
+	var claude *BindTarget
+	for i := range targets {
+		if targets[i].Agent == "claude" {
+			claude = &targets[i]
+			break
+		}
+	}
+	if claude == nil {
+		t.Fatal("no claude bind target")
+	}
+
+	cmds, err := claude.HookCommands("/opt/bin/dotf")
+	if err != nil {
+		t.Fatalf("HookCommands: %v", err)
+	}
+
+	merged, _, err := MergeHooks(map[string]any{}, cmds)
+	if err != nil {
+		t.Fatalf("MergeHooks: %v", err)
+	}
+	raw, err := json.Marshal(merged)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	settings := string(raw)
+	for _, want := range []string{"UserPromptSubmit", "/opt/bin/dotf harness suggest --from-hook"} {
+		if !strings.Contains(settings, want) {
+			t.Errorf("emitted settings lack %q — the hook would never fire.\n%s", want, settings)
+		}
+	}
+	// The binary path is absolute in the emitted command for the reason #531
+	// records: a harness runs a hook with whatever PATH it inherited.
+	if strings.Contains(settings, `"dotf harness suggest`) {
+		t.Error("the emitted command is not absolute; a hook that cannot find its binary fails silently")
+	}
 }
