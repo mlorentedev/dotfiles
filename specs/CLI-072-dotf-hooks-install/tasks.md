@@ -66,7 +66,7 @@ created: "2026-09-02"
 - [x] `golangci-lint run` at the `versions.conf` pin
 - [x] `shellcheck` + `bats tests/*.bats` (the shell layer changed)
 - [x] [AC7] Twin pairs 6 → 5 and the setup LOC delta recorded in `verification.md`
-- [x] PR opened with `Refs #1460` (not `Closes`: the spec-gate refuses a closing
+- [ ] PR opened with `Refs #1460` (not `Closes`: the spec-gate refuses a closing
       keyword on a PR that does not archive)
 
 ## Machine-readable features
