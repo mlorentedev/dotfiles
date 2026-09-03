@@ -584,15 +584,21 @@ func assertSafeChildCommand(argv []string) error {
 		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", base)
 	}
 
-	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -c "printenv"`, etc.
-	if (base == "sh" || base == "bash" || base == "zsh" || base == "dash") && len(argv) >= 3 {
-		for i := 1; i < len(argv)-1; i++ {
-			if argv[i] == "-c" {
+	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
+	if (base == "sh" || base == "bash" || base == "zsh" || base == "dash" || base == "ksh" || base == "busybox") && len(argv) >= 2 {
+		for i := 1; i < len(argv); i++ {
+			arg := argv[i]
+			isCFlag := arg == "-c" || (strings.HasPrefix(arg, "-") && strings.Contains(arg, "c"))
+			if isCFlag && i+1 < len(argv) {
 				cmdStr := strings.TrimSpace(argv[i+1])
-				for _, dangerous := range []string{"env", "printenv", "export"} {
-					pattern := `(?i)(?:^|[\s;|` + "`" + `&$()])` + regexp.QuoteMeta(dangerous) + `(?:$|[\s;|` + "`" + `&$()])`
-					matched, _ := regexp.MatchString(pattern, cmdStr)
-					if matched {
+				// Normalize by stripping quotes and backslashes that bypass regex boundaries
+				cleanCmd := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(cmdStr, "'", ""), "\"", ""), "\\", "")
+				dangerousList := []string{"env", "printenv", "export", "set", "declare"}
+				for _, dangerous := range dangerousList {
+					pattern := `(?i)(?:^|[\s;|` + "`" + `&$()=])` + regexp.QuoteMeta(dangerous) + `(?:$|[\s;|` + "`" + `&$()])`
+					matchedRaw, _ := regexp.MatchString(pattern, cmdStr)
+					matchedClean, _ := regexp.MatchString(pattern, cleanCmd)
+					if matchedRaw || matchedClean {
 						return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", dangerous)
 					}
 				}

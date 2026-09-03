@@ -64,11 +64,18 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		{"bare printenv", []string{"printenv"}, true},
 		{"bare export", []string{"export"}, true},
 		{"shell -c env", []string{"sh", "-c", "env | grep SECRET"}, true},
+		{"quoted env in sh -c", []string{"sh", "-c", "'env'"}, true},
+		{"double quoted env in sh -c", []string{"sh", "-c", "\"env\""}, true},
+		{"escaped env in sh -c", []string{"sh", "-c", "\\env"}, true},
+		{"bundled flag bash -lc", []string{"bash", "-lc", "env"}, true},
+		{"bash -c set", []string{"bash", "-c", "set"}, true},
+		{"bash -c declare -p", []string{"bash", "-c", "declare -p"}, true},
 		{"bash -c printenv", []string{"bash", "-c", "printenv FOO"}, true},
 		{"bash -c export", []string{"bash", "-c", "export -p"}, true},
 		{"allowed tool", []string{"goreleaser", "release"}, false},
 		{"allowed python", []string{"python3", "script.py"}, false},
 		{"allowed dotf review", []string{"dotf", "review"}, false},
+		{"allowed echo env word", []string{"echo", "running in safe environment"}, false},
 	}
 
 	for _, tc := range cases {
