@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-110-f1",
+    "behavior": "ResolveRoles is a pure sorted join over personas loaded via harness.LoadPersona, with no I/O and no second parse of AGENT.md",
+    "verification": "cd cli && go test ./internal/harness/ -run TestResolveRoles -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f2",
+    "behavior": "Ambiguity is returned in full and never ranked: code-complexity-and-refactor resolves to [builder reviewer] and spec-driven-development to [planner reviewer]; a rule with no skills returns empty without error",
+    "verification": "cd cli && go test ./internal/harness/ -run TestResolveRolesAmbiguity -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f3",
+    "behavior": "A Go drift guard spans triggers.json and the persona roster: red when the resolving-rule count drops below 16, and red when any persona contributes zero skills",
+    "verification": "cd cli && go test ./internal/harness/ -run TestRoleJoinDrift -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f4",
+    "behavior": "The UserPromptSubmit hook is emitted from harness/manifest.json so a deploy propagates it, rather than being hand-written into settings.json",
+    "verification": "cd cli && go test ./internal/harness/ -run TestManifestEmitsPromptHook -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f5",
+    "behavior": "The hook reads its payload from stdin; no --prompt argument exists or is accepted, because a shell-quoted user prompt is an injection surface",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSuggestFromHookReadsStdin -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f6",
+    "behavior": "Every plausible prompt-field spelling is accepted and the one that arrived is recorded; an unrecognised payload records that fact instead of guessing",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSuggestFromHookRecordsPromptField -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f7",
+    "behavior": "The hook exits 0 under every failure mode - malformed payload, empty payload, unreadable persona record, unparseable triggers.json - because exit 2 on UserPromptSubmit erases the user's prompt",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSuggestFromHookNeverExitsNonZero -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-110-f8",
+    "behavior": "The full match and join completes within the stated 20ms budget, asserted by test so a latency regression on the every-prompt path is visible",
+    "verification": "cd cli && go test ./internal/harness/ -run TestRoleJoinLatencyBudget -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

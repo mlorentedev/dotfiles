@@ -39,6 +39,8 @@ func newHarnessSuggestCmd() *cobra.Command {
 		prompt   string
 		diffMode bool
 		jsonOut  bool
+		fromHook bool
+		repoRoot string
 	)
 
 	cmd := &cobra.Command{
@@ -52,6 +54,11 @@ and suggests matching patterns and skills to load.`,
   git diff main...HEAD | dotf harness suggest --diff`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if fromHook {
+				// Returns nil unconditionally — see runSuggestFromHook.
+				return runSuggestFromHook(cmd, repoRoot)
+			}
+
 			cfg, err := harness.LoadTriggers("")
 			if err != nil {
 				return err
@@ -120,6 +127,10 @@ and suggests matching patterns and skills to load.`,
 	cmd.Flags().StringVarP(&prompt, "prompt", "p", "", "user prompt or task description to analyze")
 	cmd.Flags().BoolVarP(&diffMode, "diff", "d", false, "read unified diff from file or stdin")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "output results as a JSON object")
+	cmd.Flags().BoolVar(&fromHook, "from-hook", false,
+		"read a UserPromptSubmit hook payload from stdin and suggest the persona it implies (never exits non-zero)")
+	cmd.Flags().StringVar(&repoRoot, "repo-root", "",
+		"root containing harness/agents and harness/triggers.json (default: the deploy dir, else the checkout)")
 	return cmd
 }
 
