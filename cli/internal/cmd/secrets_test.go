@@ -51,3 +51,32 @@ func TestRunChild_LaunchFailureIsError(t *testing.T) {
 		t.Fatal("expected a launch error for a missing binary")
 	}
 }
+
+func TestAssertSafeChildCommand(t *testing.T) {
+	cases := []struct {
+		name    string
+		argv    []string
+		wantErr bool
+	}{
+		{"empty argv", []string{}, true},
+		{"bare env", []string{"env"}, true},
+		{"path to env", []string{"/usr/bin/env"}, true},
+		{"bare printenv", []string{"printenv"}, true},
+		{"bare export", []string{"export"}, true},
+		{"shell -c env", []string{"sh", "-c", "env | grep SECRET"}, true},
+		{"bash -c printenv", []string{"bash", "-c", "printenv FOO"}, true},
+		{"bash -c export", []string{"bash", "-c", "export -p"}, true},
+		{"allowed tool", []string{"goreleaser", "release"}, false},
+		{"allowed python", []string{"python3", "script.py"}, false},
+		{"allowed dotf review", []string{"dotf", "review"}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := assertSafeChildCommand(tc.argv)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("assertSafeChildCommand(%v) err = %v, wantErr = %v", tc.argv, err, tc.wantErr)
+			}
+		})
+	}
+}

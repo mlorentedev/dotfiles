@@ -24,7 +24,10 @@
       "Bash(rm -rf /:*)",
       "Bash(rm -rf ~/*:*)",
       "Bash(git push *--force*:*)",
-      "Bash(git reset --hard*:*)"
+      "Bash(git reset --hard*:*)",
+      "Bash(env:*)",
+      "Bash(printenv:*)",
+      "Bash(export -p:*)"
     ],
     "allow": [
       "mcp__hive__vault_query",

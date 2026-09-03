@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -520,8 +521,8 @@ func resolveOnly(reg *secrets.Registry, s string) (map[string]bool, error) {
 // would mean re-implementing a shell's terminal handling for a wrapper that owns
 // no terminal.
 func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	if len(argv) == 0 {
-		return 1, errors.New("no command given after --")
+	if err := assertSafeChildCommand(argv); err != nil {
+		return 1, err
 	}
 	c := exec.Command(argv[0], argv[1:]...) //nolint:gosec // argv is the user's own command
 	c.Env = environ
@@ -569,4 +570,34 @@ func ageKeyPath() string {
 		return p
 	}
 	return filepath.Join(env.Home(), ".config", "age", "key.txt")
+}
+
+// assertSafeChildCommand refuses to launch commands whose primary purpose is to dump
+// the environment or inspect secrets to standard output (e.g. `env`, `printenv`, `export`).
+// Enforces ADR-028 and cross-agent doctrine: "Never dump a secrets store to standard output".
+func assertSafeChildCommand(argv []string) error {
+	if len(argv) == 0 {
+		return errors.New("no command given after --")
+	}
+	base := strings.ToLower(filepath.Base(argv[0]))
+	if base == "env" || base == "printenv" || base == "export" {
+		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", base)
+	}
+
+	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -c "printenv"`, etc.
+	if (base == "sh" || base == "bash" || base == "zsh" || base == "dash") && len(argv) >= 3 {
+		for i := 1; i < len(argv)-1; i++ {
+			if argv[i] == "-c" {
+				cmdStr := strings.TrimSpace(argv[i+1])
+				for _, dangerous := range []string{"env", "printenv", "export"} {
+					pattern := `(?i)(?:^|[\s;|` + "`" + `&$()])` + regexp.QuoteMeta(dangerous) + `(?:$|[\s;|` + "`" + `&$()])`
+					matched, _ := regexp.MatchString(pattern, cmdStr)
+					if matched {
+						return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", dangerous)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
