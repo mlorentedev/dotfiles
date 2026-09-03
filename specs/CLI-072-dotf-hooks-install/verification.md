@@ -178,3 +178,49 @@ the repo, **comments included**, not just call sites:
 - [ ] Bitácora ticket #1460 closed with the PR link (ADR-018)
 - [ ] Independent adversarial review recorded in `review.md` with a passing verdict
 - [ ] ADR-020 §5 amendment landed
+
+## AC8 — the rule became a mechanism
+
+**The amendment this PR was going to propose already existed.** The plan was to
+add a corollary to ADR-020 §5: *when a shell function ports to `dotf`, its bats
+and Pester tests port to `go test` in the same PR and are deleted with the twin.*
+Reading §5 before writing it showed the sentence is already there, verbatim:
+
+> Port a script into `dot` only when it is next touched; **in the same PR, delete
+> the `.sh` + `.ps1` pair and their bats/Pester tests. Never leave the three
+> coexisting** (no triple-maintenance).
+
+Plus **C2 — One test suite** and decision 4, *"`go test` (table-driven) replaces
+bats + Pester for every migrated script"*. Writing the amendment would have
+duplicated a decision into two places — the drift shape this repo keeps fighting.
+
+**What was actually missing is enforcement.** OPS-043 and CLI-072 both obeyed §5
+because the agent remembered, which is not a mechanism. So
+`scripts/check-twin-test-retirement.sh` fails a PR that retires a
+`scripts/X.{sh,ps1}` pair and leaves `tests/X.{bats,Tests.ps1}` alive. Nine
+fixture-driven bats cases, run in both shells; shellcheck clean.
+
+**Diff-based, and that was measured rather than assumed.** A state-based version
+("a test whose subject script is missing") was tried first and rejected: most of
+`tests/*.bats` covers invariants, docs and CI config rather than a same-stem
+script, so it produced ~40 false positives on the current tree. §5 says *in the
+same PR*, so the PR's diff is the right unit.
+
+**The guard shipped with the bug it exists to prevent, and its own test caught
+it.** The deletion list was read as `$(deleted_paths)` inside the loop's heredoc.
+That runs in a subshell, so `exit 2` on an unreadable list — or a failing
+`git diff` on an unreachable merge-base — killed the subshell and left the outer
+script iterating an **empty** list, which exits 0. The header claimed it failed
+closed; it did not. Test 9 ("a missing deletion-list file is an error, never an
+empty list") was written before the fix and failed exactly as intended.
+
+Verified against this PR's real diff, both directions: it passes on the branch as
+it stands, and restoring the deleted `tests/install-git-hooks.bats` makes it fail
+and name the file. Reported once rather than twice — a retired pair deletes two
+scripts that resolve to the same surviving test.
+
+**Also still open and worth naming:** #672 (CLI-031) is the *planned* other half —
+golden characterization tests captured against a twin **before** porting and kept
+as the executable contract. It is open, unstarted, and its pilot (#668) shipped
+without it. Not folded in here; this guard enforces the deletion, not the
+parity.

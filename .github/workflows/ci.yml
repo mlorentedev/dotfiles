@@ -105,6 +105,26 @@ jobs:
         run: |
           ./scripts/check-doc-paths.sh
 
+      # ADR-020 section 5 enforcement (CLI-072 / #1460). The ADR has always said
+      # "in the same PR, delete the .sh + .ps1 pair AND their bats/Pester tests",
+      # and nothing checked it: OPS-043 and CLI-072 both complied because the
+      # agent remembered, which is not a mechanism.
+      #
+      # pull_request only, because the rule's unit is the PR's diff against its
+      # base. On push there is no base to diff against and the check would either
+      # be vacuous or wrong.
+      - name: Verify a retired twin took its bats/Pester tests with it
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # The three-dot diff needs the merge-base, which the default shallow
+          # checkout cannot reach -- the same constraint spec-gate documents
+          # (#686/C3). Unshallow when shallow, plain fetch otherwise.
+          git fetch --no-tags --prune --unshallow origin "$BASE_REF" 2>/dev/null \
+            || git fetch --no-tags --prune origin "$BASE_REF"
+          ./scripts/check-twin-test-retirement.sh --base "origin/$BASE_REF"
+
   lint-powershell:
     runs-on: ubuntu-latest
     timeout-minutes: 15

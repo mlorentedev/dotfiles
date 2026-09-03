@@ -163,6 +163,13 @@ embedding that input could not occur; here it is the first guard to mutation-tes
       to match.
 - [x] **AC7 — the metric moves: twin pairs 6 → 5**, with the setup LOC delta
       recorded in `verification.md`.
+- [x] **AC8 — the rule this PR obeys becomes a mechanism.** ADR-020 §5 has always
+      required a port to delete its bats/Pester tests in the same PR, and nothing
+      checked it — OPS-043 and CLI-072 both complied because the agent
+      remembered. `scripts/check-twin-test-retirement.sh` fails a PR that retires
+      a `scripts/X.{sh,ps1}` pair and leaves `tests/X.{bats,Tests.ps1}` alive.
+      Added here rather than ticketed, because this PR is the rule's first
+      deliberate instance and a guard filed for later is the debt it replaces.
 
 ## References
 
