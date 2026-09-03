@@ -119,6 +119,30 @@
         }
       ],
       "authHeader": false
+    },
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "api": "openai-completions",
+      "apiKey": "${OPENROUTER_API_KEY}",
+      "models": [
+        {
+          "id": "deepseek/deepseek-chat",
+          "name": "deepseek (OpenRouter)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 131072,
+          "maxTokens": 8192
+        }
+      ]
     }
   }
 }
