@@ -1,0 +1,44 @@
+[
+  {
+    "id": "OPS-043-setup-doctor-duplication-f1",
+    "behavior": "AC1 — dotf doctor FAILs on byte drift between a file deployed to $HOME and its ~/.dotfiles source, and PASSes when equal, for the three .zsh files check_deployed covered",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestCheckHomeDeployDrift$' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-043-setup-doctor-duplication-f2",
+    "behavior": "AC2 — .gitconfig/.zshrc/.bashrc/.profile are existence-only and never FAIL on content drift, and the stale sed -i clause in the setup NOTE is corrected",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^(TestCheckHomeDeployDrift|TestHomeDeployExemptionsAreReasoned)$' -v && ! grep -n 'sed -i' ../setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-043-setup-doctor-duplication-f3",
+    "behavior": "AC3 — every one of the 14 check_dependencies tools and 3 check_deployed files has an equal-or-stronger doctor verdict, plus the docker-compose and symlink rows",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestSetupShellParity$' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-043-setup-doctor-duplication-f4",
+    "behavior": "AC4 — removing any of the six REFACTOR-002 pre-exports from setup-linux.sh fails a guard (BUG-021)",
+    "verification": "~/.local/bin/bats tests/guard-setup-preexports-present.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-043-setup-doctor-duplication-f5",
+    "behavior": "AC5 — a deploy_file call into $HOME with no homeDeployMap entry fails a guard (the R1 join)",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestHomeDeployMapCoversSetup$' -v",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "OPS-043-setup-doctor-duplication-f6",
+    "behavior": "AC6 — setup-linux.sh no longer calls check_deployed or check_dependencies, and both layers stay green",
+    "verification": "! grep -qE '^[[:space:]]*(check_deployed|check_dependencies) ' setup-linux.sh && cd cli && go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
