@@ -49,7 +49,40 @@ created: "2026-09-02"
 - **Mutation test** (the parity claim is not vacuous): flipping
   `.zsh/functions.sh` to `contentChecked: false` turns `TestSetupShellParity`
   red with "…would lose the assertion". Reverted; `git diff` clean afterwards.
+- **Mutation test** (the ordering guard is not vacuous): moving
+  `export GEMINI_HOME=` below the `dotf doctor` handoff turns the guard red
+  naming that variable. Reverted; `git diff` clean afterwards.
+- **The join guard runs in CI, not only locally.** `TestHomeDeployMapCoversSetup`
+  reads `../../../setup-linux.sh`; `.github/workflows/cli.yml` sets
+  `working-directory: cli` over a full `actions/checkout@v7` (not sparse), and
+  both `test (ubuntu-latest)` and `test (windows-latest)` passed — so the guard
+  is exercised on both runners. Checked because a guard that only resolves on
+  the author's machine is lesson 160's class.
 - No regressions: yes.
+
+## Review disposition (commit `563ede1`)
+
+CodeRabbit produced **both** shapes on this PR — a *"Reviews paused"* notice and
+a real review with four findings. All four verified against the code before
+applying; all four were real.
+
+| Finding | Verdict | Disposition |
+|---|---|---|
+| AC2's verification command names a test that does not exist | **CONFIRMED** — `go test -run <missing>` exits 0, measured | Applied: names the two real tests; every `-run` anchored |
+| `scripts/utils.sh` comment claims the replacement "covers Windows" | **CONFIRMED** — the section skips Windows | Applied: corrected, names #1447 |
+| Ordering guard samples one variable on Linux, matches any mention on Windows | **CONFIRMED** — reproduced the reviewer's exact failing input | Applied: all six on both scripts, assignment-matched, mutation-tested |
+| `checkHomeDeployDrift` is 48 lines, over the 40-line guideline | **CONFIRMED** — measured | Applied: split; both functions now 22 |
+
+Its *Linked Issues* pre-merge check warned that keeping the six pre-exports
+contradicts #1337. That is the ticket being wrong rather than the PR — it is
+Why#5 of this proposal — but the reviewer is right that the issue itself still
+said "delete them", so #1337 was updated with the measurement instead of the
+warning being waved off.
+
+**The first finding is the one worth recording.** It is a verification command
+that could not fail, inside a spec whose own evidence section argues that a
+parity claim must be mutation-tested. The mutation testing was applied to the
+assertions and not to the commands that invoke them.
 
 ## Decisions made during implementation
 
