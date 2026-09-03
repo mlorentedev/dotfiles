@@ -44,11 +44,54 @@ Recorded here rather than discovered during AC5-AC7:
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+| AC | Proof |
+|---|---|
+| AC1 pure sorted join, consumes LoadPersona | `TestResolveRoles` — fixtures come from `LoadPersonas`, never a literal map, so the test breaks if the parse breaks |
+| AC2 ambiguity returned in full | `TestResolveRolesAmbiguity` — both rules asserted, keyed by rule id with skills read from `triggers.json` |
+| AC3 drift guard on the join | `TestRoleJoinDrift` — floor of 16 resolving rules, plus every persona contributing >=1 skill |
+| AC4 hook emitted from the manifest | `TestManifestEmitsPromptHook` + `harness/manifest.json` `agents.bind[claude].emit_hooks[suggest-role]` |
+| AC5 payload from stdin only | `TestSuggestFromHookReadsStdin` — asserts `--prompt` does not change from-hook output |
+| AC6 prompt field measured, not assumed | `TestPromptFromHookPayloadAcceptsPlausibleSpellings` (8 spellings), `...ReportsUnrecognised`, `...PrefersTheMostSpecificSpelling`, `TestSuggestFromHookRecordsPromptField` |
+| AC7 never exits non-zero | `TestSuggestFromHookNeverExitsNonZero` — 9 rows: malformed JSON, array payload, empty, no prompt field, blank prompt, no rule matched, missing harness root, unparseable triggers.json, unreadable persona record |
+| AC8 latency budget | `TestRoleJoinLatencyBudget` — 20ms per prompt over 100 iterations |
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+### End-to-end, with the built binary rather than a test
+
+```
+$ echo '{"hook_event_name":"UserPromptSubmit","prompt":"add tests for this module using TDD"}' \
+    | dotf harness suggest --from-hook --repo-root <checkout>
+[suggest] prompt arrived as "prompt"
+[persona] builder  ← pattern: pattern-testing-standards
+  skills: test, test-driven-development
+  → consider adopting `builder` and invoking test-driven-development
+exit=0
+
+$ echo '{"nonsense":' | dotf harness suggest --from-hook          # garbage
+[suggest] payload unrecognised: no known prompt field (13 bytes)
+exit=0
+
+$ cd /tmp && DOTFILES_DIR=/nonexistent dotf harness suggest --from-hook   # non-dotfiles repo
+[suggest] no personas at /nonexistent: ...no such file or directory
+exit=0
+```
+
+## Corrections made during implementation
+
+Recorded rather than silently fixed, because each was a claim that did not survive its probe:
+
+1. **AC4's parenthetical was wrong.** It said `manifest.json` had no hook-emission key and this
+   would be the first. `emit_hooks` already exists under `agents.bind[]` and carries the gate and
+   both `mem` hooks. This is a fourth entry on an existing mechanism.
+2. **The output labelled the pattern as a "rule".** The first end-to-end run printed
+   `← rule: pattern-testing-standards`. `Suggestion` carries pattern names, not trigger-rule ids —
+   `cyclomatic-complexity` matches `pattern-language-standards`, whose rule id is
+   `code-complexity-and-refactor`. Relabelled `pattern:`. A field labelled as something it does not
+   hold is the defect GUARD-009 (#1448) exists to detect, and it was caught by running the binary,
+   not by reading the code.
+3. **A test fixture asserted a claim the design never made.** `TestResolveRolesAmbiguity` first
+   asserted the skill `spec` resolves to `[planner, reviewer]`; it resolves to `[planner]` alone.
+   Ambiguity lives in the RULE, whose skills are `[spec, adversarial-review]`. The code was right
+   and the test was wrong.
 
 ## Test status
 

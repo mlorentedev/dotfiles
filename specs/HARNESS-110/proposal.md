@@ -58,20 +58,23 @@ skill to a persona updates routing for free — no new file, no new schema, no s
 ## Decisions
 
 **The suggestion shows its derivation.** Owner's call, 2026-09-02, choosing the fullest of three
-shapes: role, the rule and skills that produced it, and the action to consider.
+shapes: role, the pattern and skills that produced it, and the action to consider.
+The second field is labelled `pattern:` because that is what `Suggestion` carries — pattern names,
+not trigger-rule ids. Labelling it `rule:` would have been a name that does not describe its
+contents, the very defect #1448 tracks.
 
 ```
-[persona] builder  ← rule: testing-standards
+[persona] builder  ← pattern: pattern-testing-standards
   skills: test, test-driven-development
   → consider adopting `builder` and invoking test-driven-development
 
-[persona] builder | reviewer  ← rule: code-complexity-and-refactor
+[persona] builder | reviewer  ← pattern: pattern-language-standards
   skills: cyclomatic-complexity
   → each of these declares the matched skill; the work decides which
 ```
 
 The reasoning: a suggestion that cannot be judged is obeyed on its worst day as readily as on its
-best. Showing the matched rule and skills lets a session dismiss a bad match instead of following
+best. Showing the matched pattern and skills lets a session dismiss a bad match instead of following
 it. The cost is real and accepted — this is charged to every prompt, and it is the shape most likely
 to become noise a session learns to skip. If that happens it will show up as suggestions being
 ignored, not as an error; revisit on measurement, not on anticipation.
@@ -103,29 +106,30 @@ covers another matched skill.
 
 ## Acceptance criteria
 
-- [ ] **AC1** `harness.ResolveRoles(suggestion, personas) []string` — a pure, sorted join, no I/O.
+- [x] **AC1** `harness.ResolveRoles(suggestion, personas) []string` — a pure, sorted join, no I/O.
       Only `kind: invocable` personas are candidates: `hermes-nan` is `kind: autonomous` and cannot
       be adopted by a session.
       It consumes personas via `harness.LoadPersona`; it never re-parses `AGENT.md`. The correct
       parse exists, is documented at `persona.go:71-80`, and fails loud under C15.
-- [ ] **AC2** Ambiguity is returned in full, never ranked or narrowed. Both known ambiguous rules are
+- [x] **AC2** Ambiguity is returned in full, never ranked or narrowed. Both known ambiguous rules are
       fixtures: `code-complexity-and-refactor → [builder, reviewer]` and `spec-driven-development →
       [planner, reviewer]`. A rule with no skills returns empty, and empty is not an error.
-- [ ] **AC3** A drift guard **on the join itself**, in Go, against `LoadPersona`. Nothing today spans
+- [x] **AC3** A drift guard **on the join itself**, in Go, against `LoadPersona`. Nothing today spans
       `triggers.json` and the persona roster. It asserts the resolving-rule count **as a floor**
       (never an equality — an exact count goes red on coverage *rising*, and its only fix is to bump
       the constant, which is how a guard gets disabled) **and** that every persona contributes ≥1
       skill, so a reader returning an empty set reads red instead of silently shrinking the join.
-- [ ] **AC4** A `UserPromptSubmit` hook bound from `harness/manifest.json`, so a deploy propagates it.
-      Never hand-written into `settings.json`. (`manifest.json` has no hook-emission key today — this
-      AC adds the first one.)
-- [ ] **AC5** The hook reads its payload from **stdin**, never from a `--prompt` argument. A
+- [x] **AC4** A `UserPromptSubmit` hook bound from `harness/manifest.json`, so a deploy propagates it.
+      Never hand-written into `settings.json`. (Corrected while implementing: `emit_hooks` already
+      exists under `agents.bind[]` and carries the gate plus both `mem` hooks. This is a fourth
+      entry on an existing mechanism, not a new one — the earlier claim was wrong.)
+- [x] **AC5** The hook reads its payload from **stdin**, never from a `--prompt` argument. A
       shell-quoted user prompt on a command line is an injection surface.
-- [ ] **AC6** The field carrying the prompt text is **measured, not assumed**: accept the plausible
+- [x] **AC6** The field carrying the prompt text is **measured, not assumed**: accept the plausible
       spellings, and record which one arrived, in the defensive shape of `OutcomePayloadUnrecognised`.
-- [ ] **AC7** The hook can never exit non-zero, under any input, including a malformed payload and an
+- [x] **AC7** The hook can never exit non-zero, under any input, including a malformed payload and an
       unreadable persona record. Asserted by test, not by inspection.
-- [ ] **AC8** A stated latency budget (<20 ms) with a test asserting it.
+- [x] **AC8** A stated latency budget (<20 ms) with a test asserting it.
 
 ## References
 

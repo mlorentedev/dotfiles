@@ -36,37 +36,37 @@ created: "2026-09-02"
       red when any persona contributes zero skills.
 - [x] [AC3] Implement the guard in Go against `LoadPersona`. Not a python or shell script —
       `check-roster-consistency.py` was repaired once for exactly this class.
-- [ ] Refactor: extract anything the hook and the guard both need.
+- [x] Refactor: extract anything the hook and the guard both need.
 
 ### The hook
 
-- [ ] [P] [AC5] Failing test: the command reads its payload from **stdin**. No `--prompt` flag is
+- [x] [P] [AC5] Failing test: the command reads its payload from **stdin**. No `--prompt` flag is
       added, and none is accepted.
-- [ ] [AC5] Implement the `--from-hook` stdin mode.
-- [ ] [AC6] Failing test: each plausible prompt-field spelling is accepted, and the one that arrived
+- [x] [AC5] Implement the `--from-hook` stdin mode.
+- [x] [AC6] Failing test: each plausible prompt-field spelling is accepted, and the one that arrived
       is recorded. An unrecognised payload records that fact rather than guessing.
-- [ ] [AC6] Implement, in the shape of `OutcomePayloadUnrecognised`.
-- [ ] [AC7] Failing test: exit status is 0 for a malformed payload, an empty payload, an unreadable
+- [x] [AC6] Implement, in the shape of `OutcomePayloadUnrecognised`.
+- [x] [AC7] Failing test: exit status is 0 for a malformed payload, an empty payload, an unreadable
       persona record, and a `triggers.json` that fails to parse. **Table-driven; every branch that
       can return an error is a row.** Exit 2 erases the user's prompt — this AC is the data-loss
       guard, so it is asserted, never inspected.
-- [ ] [AC7] Make every failure path fail open.
-- [ ] [AC8] Failing test: the full match+join completes under the 20 ms budget.
-- [ ] [AC8] Meet the budget; if the naive path misses it, cache the compiled regexes rather than
+- [x] [AC7] Make every failure path fail open.
+- [x] [AC8] Failing test: the full match+join completes under the 20 ms budget.
+- [x] [AC8] Meet the budget; if the naive path misses it, cache the compiled regexes rather than
       trimming the rule set.
-- [ ] [AC4] Add the hook-emission entry to `harness/manifest.json` (first of its kind) and bind it
+- [x] [AC4] Add the hook-emission entry to `harness/manifest.json` (first of its kind) and bind it
       through the existing deploy path. Verify by consequence: deploy, start a session, observe the
       suggestion — not by asserting the file contains a string.
 
 ## Closing
 
-- [ ] Every acceptance criterion is covered by at least one test
-- [ ] Every acceptance criterion has a matching `features.json` entry with a non-vacuous command
-- [ ] `go build ./... && go vet ./... && go test ./...` pass
-- [ ] `GOOS=windows go vet ./...` passes — the Windows leg compiles the same tree
-- [ ] `golangci-lint run` passes with the pinned version from `versions.conf`
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in (its work-gate section is already written)
+- [x] Every acceptance criterion is covered by at least one test
+- [x] Every acceptance criterion has a matching `features.json` entry with a non-vacuous command
+- [x] `go build ./... && go vet ./... && go test ./...` pass
+- [x] `GOOS=windows go vet ./...` passes — the Windows leg compiles the same tree
+- [x] `golangci-lint run` passes with the pinned version from `versions.conf`
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in (its work-gate section is already written)
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features

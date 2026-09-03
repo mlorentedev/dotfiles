@@ -1,6 +1,8 @@
 package harness
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -126,7 +128,7 @@ func TestRoleJoinDrift(t *testing.T) {
 }
 
 func TestFormatSuggestion(t *testing.T) {
-	// The single-role case names the role, the rule and the skills, and states
+	// The single-role case names the role, the pattern and the skills, and states
 	// what to do — the owner's chosen shape (see proposal.md, Decisions).
 	out := FormatSuggestion([]string{"builder"}, "testing-standards",
 		[]string{"test", "test-driven-development"})
@@ -165,4 +167,57 @@ func TestRoleJoinLatencyBudget(t *testing.T) {
 	if per := time.Since(start) / 100; per > 20*time.Millisecond {
 		t.Errorf("match+join took %v per prompt, budget is 20ms", per)
 	}
+}
+
+// TestManifestEmitsPromptHook is AC4: the suggester is bound FROM THE MANIFEST,
+// so a deploy propagates it. Hand-writing it into settings.json would make it
+// present on exactly one machine and absent everywhere a deploy runs.
+//
+// `emit_hooks` is not new — the gate and both mem hooks already ride it. This
+// asserts the fourth entry exists, targets UserPromptSubmit, and invokes the
+// stdin mode rather than a --prompt argument (AC5's injection surface).
+func TestManifestEmitsPromptHook(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "harness", "manifest.json"))
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+
+	var m struct {
+		Agents struct {
+			Bind []struct {
+				Agent     string `json:"agent"`
+				EmitHooks []struct {
+					ID      string `json:"id"`
+					Event   string `json:"event"`
+					Command string `json:"command"`
+				} `json:"emit_hooks"`
+			} `json:"bind"`
+		} `json:"agents"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("parse manifest: %v", err)
+	}
+
+	for _, target := range m.Agents.Bind {
+		if target.Agent != "claude" {
+			continue
+		}
+		for _, h := range target.EmitHooks {
+			if h.ID != "suggest-role" {
+				continue
+			}
+			if h.Event != "UserPromptSubmit" {
+				t.Errorf("event = %q, want UserPromptSubmit", h.Event)
+			}
+			if !strings.Contains(h.Command, "--from-hook") {
+				t.Errorf("command = %q, must use the stdin mode", h.Command)
+			}
+			if strings.Contains(h.Command, "--prompt") {
+				t.Errorf("command = %q passes the prompt as an argument — that is the injection surface AC5 forbids", h.Command)
+			}
+			return
+		}
+		t.Fatal("claude bind target has no suggest-role hook — the suggester would never fire")
+	}
+	t.Fatal("no claude bind target in the manifest")
 }

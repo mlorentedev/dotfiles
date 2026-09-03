@@ -68,23 +68,29 @@ func ResolveRoles(s Suggestion, personas []*Persona) []string {
 // FormatSuggestion renders what the UserPromptSubmit hook writes to stdout, which
 // Claude Code adds verbatim as context the session can see and act on.
 //
-// Shape chosen by the owner (proposal.md, Decisions): role, the rule and skills
-// that caused the match, and the action to consider. The derivation is shown so a
+// Shape chosen by the owner (proposal.md, Decisions): role, the pattern and
+// skills that caused the match, and the action to consider.
+//
+// The second field is the matched PATTERN, and it is labelled as one. Suggestion
+// carries pattern names, not trigger-rule ids — `cyclomatic-complexity` matches
+// `pattern-language-standards`, whose rule id is `code-complexity-and-refactor`.
+// Calling it "rule" would be a label that does not describe what it holds, which
+// is the defect GUARD-009 (#1448) exists to detect. The derivation is shown so a
 // session can dismiss a bad match instead of obeying it — a suggestion that
 // cannot be judged is obeyed on its worst day as readily as its best.
 //
 // Zero roles prints nothing. Two of the 18 rules are pattern-only and own no
 // persona; a suggestion naming nobody would be pure noise charged to every
 // prompt.
-func FormatSuggestion(roles []string, rule string, skills []string) string {
+func FormatSuggestion(roles []string, pattern string, skills []string) string {
 	if len(roles) == 0 {
 		return ""
 	}
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "[persona] %s", strings.Join(roles, " | "))
-	if rule != "" {
-		fmt.Fprintf(&b, "  ← rule: %s", rule)
+	if pattern != "" {
+		fmt.Fprintf(&b, "  ← pattern: %s", pattern)
 	}
 	b.WriteString("\n")
 
