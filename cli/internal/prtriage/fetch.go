@@ -114,6 +114,21 @@ func fetchWith(ctx context.Context, run ghRunner, repo string, reg Registry) ([]
 		return nil, fmt.Errorf("GitHub returned %d open pull requests (a full page); the queue may be truncated — page through with `gh api %s/pulls --paginate`", prLimit, base)
 	}
 
+	prs, err := withComments(ctx, run, base, wire)
+	if err != nil {
+		return nil, err
+	}
+	return Queue(prs, reg), nil
+}
+
+// withComments resolves every pull request's conversation, overlapping the calls
+// because REST needs one per pull request where the old GraphQL query needed
+// none, and the session-start probe that calls this is bounded at five seconds.
+//
+// The fan-out is capped rather than unbounded: a burst against a rate limit is
+// the condition this package is escaping, so reproducing it here would be
+// self-defeating.
+func withComments(ctx context.Context, run ghRunner, base string, wire []restPR) ([]PR, error) {
 	prs := make([]PR, len(wire))
 	errs := make([]error, len(wire))
 	sem := make(chan struct{}, commentFanout)
@@ -149,8 +164,7 @@ func fetchWith(ctx context.Context, run ghRunner, repo string, reg Registry) ([]
 			return nil, err
 		}
 	}
-
-	return Queue(prs, reg), nil
+	return prs, nil
 }
 
 // fetchComments reads one pull request's conversation.
@@ -168,7 +182,7 @@ func fetchComments(ctx context.Context, run ghRunner, base string, number int) (
 	// untriaged PR can read as triaged, or a re-review can vanish behind an
 	// older disposition.
 	if len(wire) >= commentLimit {
-		return nil, fmt.Errorf("pull request #%d returned %d comments (a full page); its triage verdict would be computed from partial data", number, commentLimit)
+		return nil, fmt.Errorf("pull request #%d returned %d comments (a full page); its triage verdict would be computed from partial data — read them with `gh api %s/issues/%d/comments --paginate`", number, commentLimit, base, number)
 	}
 
 	comments := make([]Comment, 0, len(wire))
