@@ -392,7 +392,7 @@ func newSecretsShowCmd() *cobra.Command {
 				if err := clipboardRunner(val); err != nil {
 					return fmt.Errorf("copy to clipboard: %w", err)
 				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Copied secret %q to clipboard\n", args[0])
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Copied secret %q to clipboard\n", args[0])
 				return nil
 			}
 
@@ -402,7 +402,7 @@ func newSecretsShowCmd() *cobra.Command {
 
 			if stdoutIsTerminal() && !reveal {
 				masked := strings.Repeat("•", 12)
-				fmt.Fprintf(cmd.OutOrStdout(), "Secret %q: %s\n\nTo copy to clipboard:  dotf secrets show -c %s\nTo print in terminal:   dotf secrets show --reveal %s\nTo inject in command:   dotf secrets run -- <cmd>\n", args[0], masked, args[0], args[0])
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Secret %q: %s\n\nTo copy to clipboard:  dotf secrets show -c %s\nTo print in terminal:   dotf secrets show --reveal %s\nTo inject in command:   dotf secrets run -- <cmd>\n", args[0], masked, args[0], args[0])
 				return nil
 			}
 

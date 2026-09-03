@@ -58,6 +58,13 @@ Per-language standards live in `00_meta/patterns/pattern-language-standards.md`;
 
 Stop generation and warn on: Injection (SQL/inputs), Secrets (hardcoded credentials), Auth (broken checks), Async (blocking I/O), Concurrency (races/missing locks), Memory (unbounded buffers/leaks).
 
+### Secret Safety & ADR-028 Doctrine
+
+- **Never dump secrets to stdout:** Never run `env`, `printenv`, `export`, `set`, `declare`, or script wrappers under `dotf secrets run` (enforced by `assertSafeChildCommand` and byte-level stream redactor `redactWriter`).
+- **Never invoke `dotf secrets show` in agent sessions:** In agent sessions (`CLAUDE_CODE`, `ANTIGRAVITY_AGENT`, `AGENT_SESSION`), `dotf secrets show` refuses to print plaintext to stdout. Inject secrets strictly via `dotf secrets run -- <cmd>`.
+- **Testing isolation:** Subagents and test harnesses must **never** test against live Bitwarden/age vaults. All security and evasion testing must use synthetic, in-process mock data (`docs/lessons/lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary.md`).
+- **Human operator ergonomics:** In interactive terminals, `dotf secrets show <id>` masks secrets by default. Use `-c` / `--clip` to copy to clipboard with zero terminal exposure, or `--reveal` to print plaintext.
+
 ## Code Quality Rules
 
 | Rule | Threshold |
