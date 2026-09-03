@@ -175,3 +175,64 @@ func TestHomeDeployExemptionsAreReasoned(t *testing.T) {
 		}
 	}
 }
+
+// TestRun_HomeDeployDriftIsWiredIn closes the gap the OPS-043 adversarial review
+// found (nan/deepseek-v4-flash, PASS-WITH-GAPS finding 1): every other test in
+// this file proves the FUNCTION, and none proved that doctor.Run still CALLS it.
+// The reviewer demonstrated the gap by deleting the two invocations from
+// doctor.go and watching `go test ./internal/doctor/` stay green.
+//
+// That is precisely the defect class this spec's own verification.md complains
+// about — a check that cannot fail — so it is fixed here rather than tracked.
+// The assertion is end-to-end through Run(): a drifted file in the fixture must
+// surface in the rendered transcript AND move the exit code, since a section
+// that printed a FAIL without affecting the status would be equally useless.
+func TestRun_HomeDeployDriftIsWiredIn(t *testing.T) {
+	home := t.TempDir()
+	dotfiles := filepath.Join(home, ".dotfiles")
+	writeFile(t, filepath.Join(dotfiles, "env-contract.json"),
+		`{"env_vars":[],"required_path_entries":{"linux":[]},"required_binaries":[],"optional_binaries":[]}`)
+	writeFile(t, filepath.Join(dotfiles, "versions.conf"), "GO_VERSION=1.26.0\n")
+	env := map[string]string{"HOME": home, "DOTFILES_DIR": dotfiles}
+
+	// One content-checked entry, deployed and then drifted in $HOME.
+	writeFile(t, filepath.Join(dotfiles, ".zsh", "functions.sh"), "from the repo")
+	writeFile(t, filepath.Join(home, ".zsh", "functions.sh"), "edited in place")
+
+	var buf bytes.Buffer
+	code, err := Run(Options{Out: &buf, System: newSys(env, nil, nil), StartDir: home, Verbose: true})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, "Deploy-dir↔$HOME drift") {
+		t.Fatalf("the drift section did not run at all — is it still called from doctor.Run?\n%s", out)
+	}
+	if !strings.Contains(out, ".zsh/functions.sh has drifted") {
+		t.Errorf("want the drifted file reported by name\n%s", out)
+	}
+	if code == 0 {
+		t.Errorf("a reported drift must move the exit code; got 0")
+	}
+}
+
+// TestRun_DockerComposeIsWiredIn is the same wiring assertion for the compose
+// check, which the review's mutation removed alongside the drift section.
+func TestRun_DockerComposeIsWiredIn(t *testing.T) {
+	home := t.TempDir()
+	dotfiles := filepath.Join(home, ".dotfiles")
+	writeFile(t, filepath.Join(dotfiles, "env-contract.json"),
+		`{"env_vars":[],"required_path_entries":{"linux":[]},"required_binaries":[],"optional_binaries":[]}`)
+	writeFile(t, filepath.Join(dotfiles, "versions.conf"), "GO_VERSION=1.26.0\n")
+
+	var buf bytes.Buffer
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_DIR": dotfiles},
+		[]string{"docker"}, map[string]string{"docker compose version": "Docker Compose version v2.39.1"})
+	if _, err := Run(Options{Out: &buf, System: sys, StartDir: home, Verbose: true}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "compose v2 plugin: Docker Compose version v2.39.1") {
+		t.Fatalf("the compose check did not run — is it still called from doctor.Run?\n%s", buf.String())
+	}
+}
