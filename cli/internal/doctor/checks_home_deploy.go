@@ -75,32 +75,34 @@ func checkHomeDeployDrift(sys *System, cfg *Config, rep *Report) {
 	}
 
 	for _, e := range homeDeployMap {
-		src := filepath.Join(deploy, filepath.FromSlash(e.src))
-		dst := filepath.Join(home, filepath.FromSlash(e.dst))
+		reportHomeDeployEntry(e, deploy, home, rep)
+	}
+}
 
-		// setup guards its conditional deploys on the SOURCE existing
-		// (`[ -f "$DOTFILES_DIR/.gitconfig" ]`), so an absent source means "not
-		// provisioned on this box", never "deploy failed".
-		if !pathExists(src) {
-			rep.Skip(e.dst + " not provisioned (" + e.src + " absent from deploy-dir)")
-			continue
-		}
-		if isSymlink(dst) {
-			rep.Fail(e.dst + " is a symlink (expected a regular file since ADR-012 — re-run setup)")
-			continue
-		}
-		if !pathExists(dst) {
-			rep.Fail(e.dst + " missing at " + dst + " (run setup-linux.sh)")
-			continue
-		}
-		if !e.contentChecked {
-			rep.Pass(e.dst + " exists (content drift expected: " + e.exemptReason + ")")
-			continue
-		}
-		if filesEqual(src, dst) {
-			rep.Pass(e.dst + " matches " + e.src)
-			continue
-		}
+// reportHomeDeployEntry decides one entry's verdict. Split out to keep
+// checkHomeDeployDrift under the repository's 40-line function guideline
+// (AGENTS.md), and because the ordering of these branches is the contract:
+// unprovisioned before missing, and symlink before content, since cmp would
+// happily follow the link and report a match.
+func reportHomeDeployEntry(e homeDeployEntry, deploy, home string, rep *Report) {
+	src := filepath.Join(deploy, filepath.FromSlash(e.src))
+	dst := filepath.Join(home, filepath.FromSlash(e.dst))
+
+	switch {
+	// setup guards its conditional deploys on the SOURCE existing
+	// (`[ -f "$DOTFILES_DIR/.gitconfig" ]`), so an absent source means "not
+	// provisioned on this box", never "deploy failed".
+	case !pathExists(src):
+		rep.Skip(e.dst + " not provisioned (" + e.src + " absent from deploy-dir)")
+	case isSymlink(dst):
+		rep.Fail(e.dst + " is a symlink (expected a regular file since ADR-012 — re-run setup)")
+	case !pathExists(dst):
+		rep.Fail(e.dst + " missing at " + dst + " (run setup-linux.sh)")
+	case !e.contentChecked:
+		rep.Pass(e.dst + " exists (content drift expected: " + e.exemptReason + ")")
+	case filesEqual(src, dst):
+		rep.Pass(e.dst + " matches " + e.src)
+	default:
 		rep.Fail(e.dst + " has drifted from " + src + " (edit in repo + run setup-linux.sh)")
 	}
 }

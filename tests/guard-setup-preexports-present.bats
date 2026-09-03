@@ -77,16 +77,54 @@ EOF
     fi
 }
 
-@test "the pre-exports still precede the dotf doctor handoff in setup-linux.sh" {
+@test "every pre-export precedes the dotf doctor handoff in setup-linux.sh" {
     script="$DOTFILES_DIR/setup-linux.sh"
 
     # The exports are only useful if doctor runs AFTER them in the same shell.
-    # Reordering them below the handoff would leave the lines present and the
-    # bug reopened, which a presence-only guard would call green.
-    last_export=$(grep -nE '^export DOTFILES_REPO_DIR=' "$script" | tail -1 | cut -d: -f1)
-    doctor_call=$(grep -nE '^\s*dotf doctor' "$script" | tail -1 | cut -d: -f1)
-
-    [ -n "$last_export" ]
+    # Reordering ONE of them below the handoff leaves every line present and the
+    # bug reopened for that variable, which a presence-only guard calls green --
+    # and so does an ordering guard that samples a single variable.
+    doctor_call=$(grep -nE '^[[:space:]]*dotf doctor' "$script" | tail -1 | cut -d: -f1)
     [ -n "$doctor_call" ]
-    [ "$last_export" -lt "$doctor_call" ]
+
+    late=""
+    while IFS= read -r var; do
+        line=$(grep -nE "^export ${var}=" "$script" | tail -1 | cut -d: -f1)
+        if [ -z "$line" ] || [ "$line" -gt "$doctor_call" ]; then
+            late="$late $var"
+        fi
+    done <<EOF
+$(preexported_vars)
+EOF
+
+    if [ -n "$late" ]; then
+        printf 'these pre-exports do not precede the dotf doctor call (line %s):%s\n' "$doctor_call" "$late" >&2
+        return 1
+    fi
+}
+
+@test "every pre-export precedes the dotf doctor handoff in setup-windows.ps1" {
+    script="$DOTFILES_DIR/setup-windows.ps1"
+
+    # The Windows twin has the same ordering requirement and the same failure
+    # mode. Matching the ASSIGNMENT (`$env:VAR =`) rather than any mention of
+    # the name: GEMINI_HOME appears on the AGY_HOME line too, so a bare name
+    # match would read the wrong line number.
+    doctor_call=$(grep -nE '^[[:space:]]*& dotf doctor' "$script" | tail -1 | cut -d: -f1)
+    [ -n "$doctor_call" ]
+
+    late=""
+    while IFS= read -r var; do
+        line=$(grep -nE "\\\$env:${var}[[:space:]]*=" "$script" | tail -1 | cut -d: -f1)
+        if [ -z "$line" ] || [ "$line" -gt "$doctor_call" ]; then
+            late="$late $var"
+        fi
+    done <<EOF
+$(preexported_vars)
+EOF
+
+    if [ -n "$late" ]; then
+        printf 'these pre-exports do not precede the & dotf doctor call (line %s):%s\n' "$doctor_call" "$late" >&2
+        return 1
+    fi
 }

@@ -492,8 +492,12 @@ deploy_file() {
 # anywhere in the repo. It moved rather than being dropped: doctor's
 # `Deploy-dir<->$HOME drift` section carries the same two severities (content
 # drift and a symlink where ADR-012 expects a regular file) over eleven files
-# instead of three, and covers Windows, which never had this function's twin
-# wired to anything.
+# instead of three.
+#
+# It does NOT cover Windows: the map is derived from setup-linux.sh's deploy
+# calls, so every entry is POSIX-only and the section skips there. Windows never
+# had this function's twin wired to anything either, so nothing regressed -- but
+# that leg is unguarded on Windows and OPS-046 (#1447) is where it gets closed.
 
 # Checks if file exists and exits if not found
 # Input: $1 - file path, $2 - custom error message (optional)
