@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-071-triage-queue-transport-f1",
+    "behavior": "AC1 — the fetch path runs end to end against an injected fake, with no network and no gh on PATH; removing the seam makes it fail",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchWithRunnerDrivesTheWholePath$' | grep -q '^--- PASS: TestFetchWithRunnerDrivesTheWholePath'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f2",
+    "behavior": "AC2 — every request the seam receives is a `gh api` REST call; a reintroduced `gh pr list` is caught mechanically",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchUsesRESTOnly$' | grep -q '^--- PASS: TestFetchUsesRESTOnly'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f3",
+    "behavior": "AC3 — REST's `[bot]` login suffix folds against the registry's bare logins; deleting normaliseLogin empties the queue and fails this",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchFoldsTheBotLoginSuffix$' | grep -q '^--- PASS: TestFetchFoldsTheBotLoginSuffix'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f4",
+    "behavior": "AC4 — a full page of pull requests, and a full page of comments on any one of them, each refuse rather than answer from partial data",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchRefusesTruncationOnBothAxes$' | grep -q '^--- PASS: TestFetchRefusesTruncationOnBothAxes'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f5",
+    "behavior": "AC5 — the per-PR calls overlap and stay under the fan-out cap, so ten open PRs do not cost ten serial round-trips against the 5s session-start budget",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchFansOutConcurrently$' | grep -q '^--- PASS: TestFetchFansOutConcurrently'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f6",
+    "behavior": "AC6 — every field the renderers consume is populated identically from the REST payload, including the three REST spells differently",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchWithRunnerDrivesTheWholePath$' | grep -q '^--- PASS: TestFetchWithRunnerDrivesTheWholePath'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f7",
+    "behavior": "A failure on either axis is returned, never softened into an empty queue — the rule the whole package exists to enforce",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchReportsFailureRatherThanAnEmptyQueue$' | grep -q '^--- PASS: TestFetchReportsFailureRatherThanAnEmptyQueue'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-071-triage-queue-transport-f8",
+    "behavior": "An empty --repo still targets the current repository via gh's {owner}/{repo} placeholders, preserving the default the session-start probe relies on",
+    "verification": "cd cli && go test ./internal/prtriage/ -count=1 -v -run '^TestFetchTargetsTheCurrentRepoByDefault$' | grep -q '^--- PASS: TestFetchTargetsTheCurrentRepoByDefault'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
