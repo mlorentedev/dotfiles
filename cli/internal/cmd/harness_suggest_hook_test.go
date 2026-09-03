@@ -98,20 +98,42 @@ func TestSuggestFromHookNeverExitsNonZero(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// A root whose triggers.json is VALID but whose persona record is not. Without
+	// this the "persona record unreadable" row never reaches LoadPersonas at all:
+	// it shared brokenRoot, LoadTriggers failed first, and the row was green
+	// without exercising its branch. Fake coverage of exactly the kind this spec
+	// exists to prevent — caught by the independent review, not by me.
+	badPersonaRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(badPersonaRoot, "harness", "agents", "builder"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	validTriggers, err := os.ReadFile(filepath.Join(root, "harness", "triggers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(badPersonaRoot, "harness", "triggers.json"), validTriggers, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(badPersonaRoot, "harness", "agents", "builder", "AGENT.md"),
+		[]byte("---\nname: builder\nskills: [\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	cases := []struct {
-		name    string
-		stdin   string
-		rootDir string
+		name       string
+		stdin      string
+		rootDir    string
+		wantStderr string // the branch this row must actually reach
 	}{
-		{"malformed json payload", `{"prompt":`, root},
-		{"payload is an array", `["prompt"]`, root},
-		{"empty payload", ``, root},
-		{"no prompt field", `{"session_id":"abc"}`, root},
-		{"blank prompt", `{"prompt":"   "}`, root},
-		{"prompt matching no rule", `{"prompt":"zzzz nothing matches this at all"}`, root},
-		{"harness root missing entirely", `{"prompt":"add tests"}`, empty},
-		{"triggers.json unparseable", `{"prompt":"add tests"}`, brokenRoot},
-		{"persona record unreadable", `{"prompt":"add tests"}`, brokenRoot},
+		{"malformed json payload", `{"prompt":`, root, "unrecognised"},
+		{"payload is an array", `["prompt"]`, root, "unrecognised"},
+		{"empty payload", ``, root, "unrecognised"},
+		{"no prompt field", `{"session_id":"abc"}`, root, "unrecognised"},
+		{"blank prompt", `{"prompt":"   "}`, root, "unrecognised"},
+		{"prompt matching no rule", `{"prompt":"zzzz nothing matches this at all"}`, root, ""},
+		{"harness root missing entirely", `{"prompt":"add tests"}`, empty, "no triggers"},
+		{"triggers.json unparseable", `{"prompt":"add tests"}`, brokenRoot, "no triggers"},
+		{"persona record unreadable", `{"prompt":"add tests"}`, badPersonaRoot, "no personas"},
 	}
 
 	for _, tc := range cases {
@@ -119,6 +141,11 @@ func TestSuggestFromHookNeverExitsNonZero(t *testing.T) {
 			_, stderr, err := executeStdin(t, tc.stdin, "harness", "suggest", "--from-hook", "--repo-root", tc.rootDir)
 			if err != nil {
 				t.Errorf("exit must be 0 — a non-zero exit here ERASES THE USER'S PROMPT. got %v (stderr %s)", err, stderr)
+			}
+			// Exit 0 alone does not prove the row reached the branch it names. A
+			// row that fails earlier than intended is green and vacuous.
+			if tc.wantStderr != "" && !strings.Contains(stderr, tc.wantStderr) {
+				t.Errorf("row did not reach its branch: stderr %q does not contain %q", stderr, tc.wantStderr)
 			}
 		})
 	}

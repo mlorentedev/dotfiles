@@ -55,7 +55,7 @@ created: "2026-09-02"
 - [x] `golangci-lint run` with the pinned version from `versions.conf`
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder with `Refs #1454` (not `Closes`:
+- [x] PR opened referencing this spec folder with `Refs #1454` (not `Closes`:
       the spec-gate refuses a closing keyword on a PR that does not archive)
 
 ## Machine-readable features
