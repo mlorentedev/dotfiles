@@ -417,12 +417,25 @@ func TestInstallAgainstRealGit(t *testing.T) {
 		t.Fatalf("Install against real git: %v\n%s", err, buf.String())
 	}
 
-	got, err := os.ReadFile(cfg)
+	// Read the value back THROUGH git rather than out of the file. The config
+	// format is git's, not ours: on Windows it stores
+	// `C:\\Users\\...\\git-hooks` with the backslashes escaped, so grepping the
+	// raw text for the path finds nothing while the wiring is perfectly correct.
+	// That is what this assertion originally did, and it failed on the Windows
+	// leg while passing on Linux — measuring the file's spelling instead of the
+	// property that matters.
+	//
+	// Asking git closes the round trip: whatever escaping it applied on write,
+	// it undoes on read, which is exactly what git does for the hook it later
+	// executes.
+	out, err := execGit(context.Background(), "config", "--global", "--get", "core.hooksPath")
 	if err != nil {
-		t.Fatalf("read throwaway config: %v", err)
+		raw, _ := os.ReadFile(cfg)
+		t.Fatalf("git did not record core.hooksPath (%v); config file holds:\n%s", err, raw)
 	}
+	got := strings.TrimSpace(string(out))
 	want := filepath.Join(dotfiles, "git-hooks")
-	if !strings.Contains(string(got), "hooksPath") || !strings.Contains(string(got), filepath.ToSlash(want)) {
-		t.Fatalf("real git did not record hooksPath=%s:\n%s", want, got)
+	if !samePath(got, want) {
+		t.Fatalf("core.hooksPath = %q, want %q", got, want)
 	}
 }
