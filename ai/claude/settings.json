@@ -25,9 +25,19 @@
       "Bash(rm -rf ~/*:*)",
       "Bash(git push *--force*:*)",
       "Bash(git reset --hard*:*)",
+      "Bash(git clean -fdx*:*)",
+      "Bash(git clean -f*:*)",
+      "Bash(sudo:*)",
+      "Bash(*dotf secrets show*:*)",
       "Bash(env:*)",
       "Bash(printenv:*)",
-      "Bash(export -p:*)"
+      "Bash(export -p:*)",
+      "Bash(chmod -R 777:*)",
+      "Bash(chmod 777:*)",
+      "Bash(curl *|*sh*)",
+      "Bash(curl *|*bash*)",
+      "Bash(wget *|*sh*)",
+      "Bash(wget *|*bash*)"
     ],
     "allow": [
       "mcp__hive__vault_query",
@@ -38,7 +48,6 @@
       "Bash(find:*)",
       "WebSearch",
       "Bash(gh pr view:*)",
-      "Bash(source:*)",
       "Bash(terragrunt plan:*)",
       "Bash(gh pr comment:*)",
       "Bash(kubectl get:*)",

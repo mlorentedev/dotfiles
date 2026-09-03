@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,6 +18,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // newSecretsCmd is the `dotf secrets` noun: the on-demand (JIT) secrets path of
@@ -309,13 +311,66 @@ func newSecretsLsCmd() *cobra.Command {
 	return c
 }
 
-// newSecretsShowCmd prints one secret's decrypted value to stdout (no trailing
-// newline, for `KEY=$(dotf secrets show <id>)`). Single-env secrets only — file
-// and multi-var secrets must go through `run` (a value to stdout would be ambiguous).
+var (
+	stdoutIsTerminal = func() bool { return term.IsTerminal(int(os.Stdout.Fd())) }
+	isAgentSession   = func() bool {
+		return os.Getenv("CLAUDE_CODE") != "" ||
+			os.Getenv("ANTIGRAVITY_AGENT") != "" ||
+			os.Getenv("ANTIGRAVITY_CLI") != "" ||
+			os.Getenv("AGENT_SESSION") != ""
+	}
+	clipboardRunner = func(text string) error {
+		bin, args := clipboardCommand()
+		cmd := exec.Command(bin, args...)
+		cmd.Stdin = strings.NewReader(text)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%s: %w", bin, err)
+		}
+		return nil
+	}
+)
+
+func clipboardCommand() (string, []string) {
+	if runtime.GOOS == "darwin" {
+		return "pbcopy", nil
+	}
+	if runtime.GOOS == "windows" {
+		return "clip.exe", nil
+	}
+	if os.Getenv("WAYLAND_DISPLAY") != "" {
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			return "wl-copy", nil
+		}
+	}
+	if _, err := exec.LookPath("xclip"); err == nil {
+		return "xclip", []string{"-selection", "clipboard"}
+	}
+	if _, err := exec.LookPath("xsel"); err == nil {
+		return "xsel", []string{"--clipboard", "--input"}
+	}
+	return "wl-copy", nil
+}
+
+// newSecretsShowCmd resolves one secret's decrypted value. Supports:
+// 1. --reveal: explicitly print decrypted value to stdout.
+// 2. -c / --clip: copy to system clipboard without printing to stdout.
+// 3. TTY masking: in interactive terminals without --reveal or -c, masks the secret and guides the user.
+// 4. Agent isolation: refuses to print to stdout in AI agent sessions per ADR-028 doctrine.
 func newSecretsShowCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:          "show <id>",
-		Short:        "Print one secret's decrypted value to stdout, no trailing newline",
+	var (
+		reveal bool
+		clip   bool
+	)
+	c := &cobra.Command{
+		Use:   "show <id>",
+		Short: "Print or copy one secret's decrypted value",
+		Long: "show resolves one secret's decrypted value from its backend.\n\n" +
+			"Flags:\n" +
+			"  -c, --clip    copy the decrypted value to the system clipboard (never prints to stdout)\n" +
+			"  --reveal      explicitly print the decrypted value to stdout\n\n" +
+			"When stdout is an interactive terminal (TTY) and neither --reveal nor -c is given,\n" +
+			"show masks the secret and guides you to use -c or --reveal (1Password op style).\n" +
+			"In agent environments, printing to stdout is refused per ADR-028 doctrine.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -332,10 +387,32 @@ func newSecretsShowCmd() *cobra.Command {
 				return err
 			}
 			_, val, _ := strings.Cut(kv[0], "=") // EnvFor scrubs newlines → capture-friendly
+
+			if clip {
+				if err := clipboardRunner(val); err != nil {
+					return fmt.Errorf("copy to clipboard: %w", err)
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "Copied secret %q to clipboard\n", args[0])
+				return nil
+			}
+
+			if isAgentSession() {
+				return fmt.Errorf("refusing to print secret %q to stdout in an agent environment (ADR-028 doctrine); inject it via 'dotf secrets run -- <cmd>' instead", args[0])
+			}
+
+			if stdoutIsTerminal() && !reveal {
+				masked := strings.Repeat("•", 12)
+				fmt.Fprintf(cmd.OutOrStdout(), "Secret %q: %s\n\nTo copy to clipboard:  dotf secrets show -c %s\nTo print in terminal:   dotf secrets show --reveal %s\nTo inject in command:   dotf secrets run -- <cmd>\n", args[0], masked, args[0], args[0])
+				return nil
+			}
+
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), val)
 			return nil
 		},
 	}
+	c.Flags().BoolVarP(&clip, "clip", "c", false, "copy secret to system clipboard instead of printing")
+	c.Flags().BoolVar(&reveal, "reveal", false, "reveal decrypted secret to stdout")
+	return c
 }
 
 // newSecretsRenderCmd materializes a config file in place: it substitutes every

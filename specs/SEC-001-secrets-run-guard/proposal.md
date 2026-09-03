@@ -40,6 +40,8 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 - [x] AC6: Claude permissions deny list and Pi models catalog are updated.
 - [x] AC7: Real-time byte-level stream redactor (`redactWriter`) scrubs any injected secret value (len >= 6) from stdout/stderr, replacing with `[REDACTED:<KEY>]`.
 - [x] AC8: Post-mortem and multi-agent testing isolation lesson recorded in `docs/lessons/lesson-261-...`.
+- [x] AC9: `dotf secrets show` implements solutions 1-2-3 (`--reveal` explicit flag, `-c`/`--clip` clipboard copy, interactive TTY masking, and agent session refusal).
+- [x] AC10: `ai/claude/settings.json` permissions deny list hardened with `sudo`, `git clean`, `dotf secrets show`, and pipe-to-shell bans.
 
 ## References
 
