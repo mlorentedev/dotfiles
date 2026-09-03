@@ -202,6 +202,33 @@ CodeRabbit review at `2026-09-02T02:09:11Z` and a re-triage at
 
 Four applied, two declined with reasons, nothing left silent.
 
+### Second round — re-review after applying the above
+
+Applying a review's findings changes the tree the review describes, and
+`dotf spec archive` refused the archive twice on exactly that: first because
+`tasks.md` was dirty, then because it had changed after `reviewed_sha`. That
+refusal is correct and worth recording — the alternative, `--force-without-review`,
+would have concealed that the code changed after it was reviewed. So the review
+was re-run rather than forced.
+
+**Second verdict: PASS**, same reviewer draw (`nan/deepseek-v4-flash`),
+`reviewed_sha` `f3c4b88`, rubric **A/A/A/A/A/A** — Maintainability rose from B once
+`withComments` was extracted. No Blocker, no Major, four Minor. Three are the
+unchanged carry-overs already dispositioned above (AC5's deadline, the ≥100
+limit, gh's hidden stderr). One is new:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 7 | AC1 claims `FetchWithRegistry` runs end-to-end in a test, but every test drives `fetchWith`; the exported wrapper is covered only transitively | **Accepted as accurate, deliberately not fixed.** The wording is imprecise and the reviewer is right. Both offered fixes are worse than the imprecision: rewording AC1 edits `proposal.md`, which invalidates this review and starts a third round — a loop that does not converge — and a test driving the real `FetchWithRegistry` would either hit the network or need a fake `gh` on `$PATH`, which cannot be one artefact across both CI legs. The substance of AC1 holds: the fetch path has a seam and is tested through it. What is untested is a one-line delegation, and the live smoke test exercises it. |
+
+**On stopping here rather than iterating.** A review round that ends with only
+non-gating Minors is the signal to archive, not to go again. Applying every
+optional finding guarantees another round, because each round edits the tree the
+next one reviews. The gate encodes this by watching `proposal.md`, `tasks.md` and
+`features.json` but **not** `verification.md`: dispositions can be recorded without
+invalidating the attestation they respond to. That is the convergence mechanism,
+and using it is not the same as ignoring the finding.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? **Yes** — a seam is not a testing
