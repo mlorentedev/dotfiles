@@ -152,9 +152,13 @@ fi
 # utils.sh is sourced declaratively from .zsh/functions.sh (loaded by both
 # ~/.bashrc and ~/.zshrc), so setup no longer mutates the deployed functions.zsh
 # to append a `. utils.sh` line. That deploy-time mutation made the deployed copy
-# drift from the repo source, so the check_deployed assertion below failed. One
+# drift from the repo source, which the deploy-dir<->$HOME assertion caught. One
 # shared entrypoint gives bash AND zsh the library without ever editing a
 # deployed file (REFACTOR-010 / "presence is not convergence").
+#
+# That assertion used to be check_deployed, right below; OPS-043 moved it into
+# `dotf doctor` (checkHomeDeployDrift). The reason this comment records still
+# holds -- only the thing that would catch a regression changed name and file.
 
 # Create a bash_aliases file for bash
 log_info "Creating bash_aliases file..."
