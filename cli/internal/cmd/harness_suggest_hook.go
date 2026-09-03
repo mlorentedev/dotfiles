@@ -50,7 +50,18 @@ func runSuggestFromHook(cmd *cobra.Command, repoRoot string) error {
 
 	root := harnessRoot(repoRoot)
 
-	cfg, err := harness.LoadTriggers(root)
+	// Read the triggers file AT THE RESOLVED ROOT, deliberately not via
+	// LoadTriggers: that helper walks up from the cwd when the explicit root has
+	// no triggers.json. The hook runs with cwd set to whatever repository the
+	// user is in, so the walk-up would let the trigger rules come from one root
+	// while the personas come from another — the two halves of a join disagreeing
+	// about which harness they belong to. The gate resolves ONE root; so does this.
+	triggerData, err := os.ReadFile(filepath.Join(root, harness.TriggersFile))
+	if err != nil {
+		_, _ = fmt.Fprintf(warn, "[suggest] no triggers at %s: %v\n", root, err)
+		return nil
+	}
+	cfg, err := harness.ParseTriggers(triggerData)
 	if err != nil {
 		_, _ = fmt.Fprintf(warn, "[suggest] no triggers at %s: %v\n", root, err)
 		return nil
