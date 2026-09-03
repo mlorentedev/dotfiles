@@ -232,7 +232,15 @@ func markExecutable(dest string) error {
 	for _, name := range entrypoints {
 		p := filepath.Join(dest, name)
 		if _, err := os.Stat(p); err != nil {
-			continue
+			// Only "not there" is skippable: a dispatcher need not carry every
+			// hook type. Any OTHER stat error (a permission problem, a broken
+			// mount) means we cannot tell whether the bit was set, and swallowing
+			// it would report a successful deploy whose hooks git will refuse to
+			// run. Found by PR-Agent on #1464.
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("stat %s: %w", p, err)
 		}
 		if err := os.Chmod(p, 0o755); err != nil {
 			return fmt.Errorf("chmod %s: %w", p, err)
