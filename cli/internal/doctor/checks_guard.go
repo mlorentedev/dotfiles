@@ -25,7 +25,12 @@ func checkGuardHooks(sys *System, cfg *Config, rep *Report, fix bool) {
 	// Wiring core.hooksPath at a dir without the dispatcher would point git at a
 	// missing hook — refuse and tell the user to deploy first.
 	if !pathExists(filepath.Join(target, "pre-commit")) {
-		rep.Fail("dispatcher not found at " + target + " — run dotfiles setup to deploy git-hooks/")
+		// The remedy is a command, not an instruction to re-run everything.
+		// CLI-070 extracts FAIL remedies verbatim into doctor's "Next steps"
+		// block, so this string is user-facing twice — which is also why it had
+		// to change here rather than being left naming a setup step that no
+		// longer owns the deploy (CLI-072).
+		rep.Fail("dispatcher not found at " + target + " — run `dotf hooks install`")
 		return
 	}
 

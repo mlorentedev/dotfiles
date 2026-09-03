@@ -354,27 +354,6 @@ if (Test-Path $packagesSource) {
 }
 
 # ============================================================================
-# 1b2. GUARD-001 MEMORY-SINK HOOKS (#691)
-# ============================================================================
-# Deploy the dispatcher into the ~/.dotfiles mirror and wire core.hooksPath
-# machine-wide, so the guard that rejects MEMORY.md/memory/ outside the vault is
-# active in every repo -- parity with setup-linux.sh (which had no Windows twin).
-# The wired path (Join-Path $DotfilesDest 'git-hooks') equals the Go
-# filepath.Join(cfg.DotfilesDir, "git-hooks") that `dotf doctor` verifies.
-# Non-fatal: doctor verifies + repairs thereafter.
-$installHooksPs1 = Join-Path $PSScriptRoot 'scripts\install-git-hooks.ps1'
-if (Test-Path -LiteralPath $installHooksPs1) {
-    . $installHooksPs1
-    if (Install-GitHooks -Source (Join-Path $PSScriptRoot 'git-hooks') -DotfilesDir $DotfilesDest) {
-        Write-Success "GUARD-001 memory-sink hooks installed"
-    } else {
-        Write-Warn "GUARD-001 hooks install incomplete (continuing; run 'dotf doctor --fix')"
-    }
-} else {
-    Write-Warn "scripts\install-git-hooks.ps1 not found; skipping memory-sink guard install"
-}
-
-# ============================================================================
 # 1c. DEVELOPER TOOLS (via winget)
 # ============================================================================
 
@@ -635,6 +614,41 @@ if (Test-Path $installDotfScript) {
     }
 } else {
     Write-Warn "scripts\install-dotf.ps1 not found; skipping dotf install"
+}
+
+# ============================================================================
+# 1b2. GUARD-001 MEMORY-SINK HOOKS (#691)
+# ============================================================================
+# Deploy the dispatcher into the ~/.dotfiles mirror and wire core.hooksPath
+# machine-wide, so the guard that rejects MEMORY.md/memory/ outside the vault is
+# active in every repo -- parity with setup-linux.sh.
+#
+# CLI-072 (#1460) replaced the twin scripts\install-git-hooks.ps1 with
+# `dotf hooks install`, and MOVED THE STEP. It used to run ~270 lines above,
+# BEFORE Install-Dotf: repointing it in place would have invoked a binary that
+# did not exist yet, and the Write-Warn below would have swallowed that into a
+# silent skip of the memory-sink guard on every fresh box. The block was not
+# written expecting dotf to exist at that point, because when it was written it
+# did not need it to. The ordering is asserted by
+# tests/guard-setup-hooks-order.bats, since nothing else spans the two sites.
+#
+# The wired path (Join-Path $DotfilesDest 'git-hooks') equals the Go
+# filepath.Join(cfg.DotfilesDir, "git-hooks") that `dotf doctor` verifies.
+# Non-fatal: doctor verifies + repairs thereafter.
+$dotfExe = Get-Command dotf -ErrorAction SilentlyContinue
+if ($dotfExe) {
+    # Source and destination are named explicitly rather than left to defaults:
+    # when the repo IS the deploy dir they are the same directory, and passing
+    # both is what lets the #695 self-mirror guard see it instead of clearing
+    # its own source.
+    & $dotfExe.Source hooks install --source (Join-Path $PSScriptRoot 'git-hooks') --dotfiles-dir $DotfilesDest
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "GUARD-001 memory-sink hooks installed"
+    } else {
+        Write-Warn "GUARD-001 hooks install incomplete (continuing; run 'dotf doctor --fix')"
+    }
+} else {
+    Write-Warn "dotf not found; skipping memory-sink guard install (run 'dotf hooks install' after setup)"
 }
 
 # ============================================================================

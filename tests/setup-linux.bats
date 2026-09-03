@@ -490,8 +490,13 @@ setup() {
 }
 
 @test "setup-linux.sh installs the GUARD memory-sink git-hooks (#418 deploy + wire)" {
-    grep -qF '. ./scripts/install-git-hooks.sh' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'install_git_hooks' "$DOTFILES_DIR/setup-linux.sh"
+    # CLI-072 replaced the sourced shell twin with `dotf hooks install`. Resolved
+    # by path like the other dotf call sites, for the #1202 reason: the process
+    # may not carry ~/.local/bin on PATH yet even though install_dotf just put it
+    # there. The ordering against install_dotf, and the Windows side, are
+    # asserted in tests/guard-setup-hooks-order.bats.
+    grep -qF 'hooks install --source' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF '"$_dotf_hooks" hooks install' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh harness mirror runs AFTER compile-harness --refresh (ordering guard)" {
