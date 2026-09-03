@@ -38,6 +38,8 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 - [x] AC4: Legitimate tools (e.g. `python`, `goreleaser`, `dotf review`) run unhindered.
 - [x] AC5: Comprehensive table-driven unit tests in `cli/internal/cmd/secrets_test.go` verify safe and unsafe commands.
 - [x] AC6: Claude permissions deny list and Pi models catalog are updated.
+- [x] AC7: Real-time byte-level stream redactor (`redactWriter`) scrubs any injected secret value (len >= 6) from stdout/stderr, replacing with `[REDACTED:<KEY>]`.
+- [x] AC8: Post-mortem and multi-agent testing isolation lesson recorded in `docs/lessons/lesson-261-...`.
 
 ## References
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -418,11 +419,16 @@ func newSecretsRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			childEnv, err := buildChildEnv(reg, sel)
+			injected, err := resolveInjectedSecrets(reg, sel)
 			if err != nil {
 				return err
 			}
-			code, err := runChild(childArgv, childEnv, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+			childEnv := append(stripBackendAuth(os.Environ()), injected...)
+			stdout := newRedactWriter(cmd.OutOrStdout(), injected)
+			stderr := newRedactWriter(cmd.ErrOrStderr(), injected)
+			code, err := runChild(childArgv, childEnv, cmd.InOrStdin(), stdout, stderr)
+			_ = stdout.Flush()
+			_ = stderr.Flush()
 			if err != nil {
 				return err
 			}
@@ -436,13 +442,19 @@ func newSecretsRunCmd() *cobra.Command {
 	return c
 }
 
+// resolveInjectedSecrets evaluates the registry and returns the slice of KEY=VALUE strings
+// to be injected into the child process.
+func resolveInjectedSecrets(reg *secrets.Registry, only map[string]bool) ([]string, error) {
+	return secretLoader().EnvFor(reg.Entries(env.Home()), only)
+}
+
 // buildChildEnv flattens the registry to entries, resolves the selected secrets
 // (per-backend), and returns the child environment: the parent env with the backend
 // unlock credentials stripped, plus the granted KEY=VALUE pairs. The child gets only
 // the secrets it was granted — never the master credential that opens the whole
 // vault (defense in depth; cf. 1Password's `op run` + `env -u OP_SERVICE_ACCOUNT_TOKEN`).
 func buildChildEnv(reg *secrets.Registry, only map[string]bool) ([]string, error) {
-	injected, err := secretLoader().EnvFor(reg.Entries(env.Home()), only)
+	injected, err := resolveInjectedSecrets(reg, only)
 	if err != nil {
 		return nil, err
 	}
@@ -606,4 +618,82 @@ func assertSafeChildCommand(argv []string) error {
 		}
 	}
 	return nil
+}
+
+// redactWriter intercepts output emitted by the child process and replaces any byte sequence
+// corresponding to an injected secret value (len >= 6) with [REDACTED:<KEY>].
+// Enforces ADR-028 doctrine: "Never dump a secrets store to standard output".
+type redactWriter struct {
+	target       io.Writer
+	pairs        [][2][]byte
+	tail         []byte
+	maxSecretLen int
+	mu           sync.Mutex
+}
+
+func newRedactWriter(target io.Writer, injected []string) *redactWriter {
+	var pairs [][2][]byte
+	maxLen := 0
+	for _, kv := range injected {
+		key, val, ok := strings.Cut(kv, "=")
+		if ok && len(val) >= 6 {
+			valBytes := []byte(val)
+			repBytes := []byte("[REDACTED:" + key + "]")
+			pairs = append(pairs, [2][]byte{valBytes, repBytes})
+			if len(valBytes) > maxLen {
+				maxLen = len(valBytes)
+			}
+		}
+	}
+	return &redactWriter{
+		target:       target,
+		pairs:        pairs,
+		maxSecretLen: maxLen,
+	}
+}
+
+func (r *redactWriter) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.pairs) == 0 {
+		return r.target.Write(p)
+	}
+
+	data := p
+	if len(r.tail) > 0 {
+		data = append(r.tail, p...)
+		r.tail = nil
+	}
+
+	for _, pair := range r.pairs {
+		data = bytes.ReplaceAll(data, pair[0], pair[1])
+	}
+
+	if len(data) >= r.maxSecretLen && r.maxSecretLen > 1 {
+		split := len(data) - (r.maxSecretLen - 1)
+		toWrite := data[:split]
+		r.tail = make([]byte, len(data[split:]))
+		copy(r.tail, data[split:])
+		_, err := r.target.Write(toWrite)
+		return len(p), err
+	}
+
+	_, err := r.target.Write(data)
+	return len(p), err
+}
+
+func (r *redactWriter) Flush() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.tail) == 0 {
+		return nil
+	}
+	for _, pair := range r.pairs {
+		r.tail = bytes.ReplaceAll(r.tail, pair[0], pair[1])
+	}
+	_, err := r.target.Write(r.tail)
+	r.tail = nil
+	return err
 }

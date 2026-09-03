@@ -89,3 +89,32 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestRedactWriter_RedactsInjectedSecrets(t *testing.T) {
+	injected := []string{
+		"OPENROUTER_API_KEY=mock-openrouter-test-token-val",
+		"NAN_API_KEY=mock-nan-test-token-val",
+		"SHORT=abc", // len < 6, not redacted
+	}
+
+	var buf bytes.Buffer
+	rw := newRedactWriter(&buf, injected)
+
+	input := "Connecting with OPENROUTER_API_KEY=mock-openrouter-test-token-val and NAN_API_KEY=mock-nan-test-token-val, short is abc.\n"
+	n, err := rw.Write([]byte(input))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if n != len(input) {
+		t.Errorf("Write returned n = %d, want %d", n, len(input))
+	}
+	if err := rw.Flush(); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	got := buf.String()
+	want := "Connecting with OPENROUTER_API_KEY=[REDACTED:OPENROUTER_API_KEY] and NAN_API_KEY=[REDACTED:NAN_API_KEY], short is abc.\n"
+	if got != want {
+		t.Errorf("redacted output mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
