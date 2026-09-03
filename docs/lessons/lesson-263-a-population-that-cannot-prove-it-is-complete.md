@@ -68,6 +68,29 @@ support it — produced by the tooling written to serve that ticket, roughly an 
 argued that a defect class surviving its own authors' knowledge cannot be fixed by writing it down
 again.
 
+## The class: three shapes of it were measured on one day
+
+This is not a `gh` quirk. A parallel session hit the same defect twice the same afternoon, in
+unrelated tooling, and the three together name the class better than any one of them:
+
+| Shape | The command | What it returned | The truth |
+|---|---|---|---|
+| **A pipeline** | `bats tests/*.bats \| tail -15` | `exit code 0` | `tail`'s status, not bats'. The run was `BATS_EXIT=1` |
+| **A filter** | `go test -run '<pattern matching nothing>'` | `ok`, exit 0 | Zero tests ran. A `features.json` command naming a deleted test passes forever |
+| **A regex** | `--paginate` output split with `re.findall` | `CLI` max `= 71` | `= 72`. Pages were dropped mid-body |
+
+**In every case the failure was success.** Not a crash, not an empty result that reads as
+suspicious — a well-formed, plausible answer. Nothing downstream could tell them from a real one,
+which is why all three survived until something outside the tool contradicted them.
+
+The general rule: **when a command can return a value without doing the work, the value is not
+evidence.** Ask what this invocation would print if it silently did nothing, and if the answer is
+"the same thing", the check does not exist yet. Concretely — put the assertion on the producer's
+exit status rather than a pipeline's (`set -o pipefail`, or capture `${PIPESTATUS[0]}`), make a
+zero-match filter an error rather than a pass, and make a measurement state its population.
+
+Instances 1 and 2 are recorded with their evidence in `specs/CLI-072-dotf-hooks-install/verification.md`.
+
 ## A second finding from the same pass
 
 Renumbering a collision needs an **owner**, and `harness/skills/new-ticket/SKILL.md` said the
