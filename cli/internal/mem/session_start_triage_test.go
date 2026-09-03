@@ -42,7 +42,7 @@ func TestTriageQueueSection(t *testing.T) {
 	// If this section swallowed the error, the brief would restore exactly the
 	// blind spot the exit contract was written to close.
 	t.Run("a failure is reported, never rendered as empty", func(t *testing.T) {
-		got := triageQueue("", errors.New("gh pr list: exit status 4"))
+		got := triageQueue("", errors.New("gh api pulls: exit status 4"))
 		if got == "" {
 			t.Fatal("a queue that could not be computed must not be silent")
 		}

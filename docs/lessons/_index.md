@@ -277,5 +277,6 @@ tags: [lessons, index, dotfiles]
 | [257 - A one-time migration with no removal date is indistinguishable from live code, and two of eleven turned out not to be finished](lesson-257-a-one-time-migration-with-no-removal-date-is.md) | 2026-09-02 |  |
 | [258 - An argument passed through two independent quoting conventions is only as safe as the weaker one](lesson-258-an-argument-passed-through-two-independent-quoting-layers.md) | 2026-09-02 |  |
 | [259 - A justification outlives its mechanism as easily as a name outlives its contract, and the cleanup that taught us the first lesson left an instance of it](lesson-259-a-justification-outlives-its-mechanism.md) | 2026-09-02 |  |
+| [260 - The path with no seam is the path with no test, and it is the one that fails in production](lesson-260-the-path-with-no-seam-is-the-path-with-no-test.md) | 2026-09-02 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

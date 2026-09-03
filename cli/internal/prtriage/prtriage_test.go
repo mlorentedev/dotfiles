@@ -1,10 +1,8 @@
 package prtriage
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -147,37 +145,11 @@ func TestTheRealRegistryServesBothConsumers(t *testing.T) {
 	}
 }
 
-// 100 open PRs indicates boundary truncation on `gh pr list --limit 100`.
-// It must return a loud error rather than silently returning a truncated queue.
-func TestParseWireBoundaryLimit(t *testing.T) {
-	r := reg()
-
-	// Under 100: success
-	out99 := `[{"number": 1, "title": "t", "url": "u", "comments": [{"author": {"login": "github-actions"}, "body": "## PR Reviewer Guide\nx", "createdAt": "2026-08-20T01:00:00Z"}]}]`
-	got, err := parseWire([]byte(out99), r)
-	if err != nil {
-		t.Fatalf("parseWire with 1 PR returned unexpected error: %v", err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(got))
-	}
-
-	// 100 entries: boundary limit error
-	var sb strings.Builder
-	sb.WriteString("[")
-	for i := 1; i <= 100; i++ {
-		if i > 1 {
-			sb.WriteString(",")
-		}
-		fmt.Fprintf(&sb, `{"number": %d, "title": "t%d", "url": "u%d", "comments": []}`, i, i, i)
-	}
-	sb.WriteString("]")
-
-	_, err = parseWire([]byte(sb.String()), r)
-	if err == nil {
-		t.Fatal("expected loud error when wire returns 100 items (boundary limit), got nil")
-	}
-	if !strings.Contains(err.Error(), "hit boundary limit") || !strings.Contains(err.Error(), "100") {
-		t.Fatalf("error must cite boundary limit and count, got: %v", err)
-	}
-}
+// The boundary-truncation guard used to be tested here against `parseWire`, the
+// helper that unpacked `gh pr list --json`'s nested GraphQL shape. CLI-071
+// removed both that transport and that helper, so the test moved to
+// `TestFetchRefusesTruncationOnBothAxes` in fetch_test.go — which is strictly
+// stronger: it exercises the guard through the real fetch path rather than a
+// helper, and it covers the SECOND axis REST introduced. Comments now paginate
+// too, and a truncated comment list yields a wrong verdict rather than a
+// visibly missing pull request.
