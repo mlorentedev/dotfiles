@@ -116,7 +116,7 @@ function Ensure-Directory {
     }
 }
 
-# SDD-007: dot-source shared deploy helpers (Deploy-File / Test-FileDrift).
+# SDD-007: dot-source shared deploy helpers (Deploy-File).
 # Same SHA256-based idempotent copy pattern previously inlined throughout this
 # script; centralizing in utils.ps1 keeps cross-OS parity with scripts/utils.sh.
 $utilsPs1Path = Join-Path $PSScriptRoot 'scripts\utils.ps1'

@@ -129,40 +129,12 @@ function Deploy-File {
     }
 }
 
-# Test-FileDrift: assert DST matches SRC content (drift detection for healthcheck).
-# Parity with bash scripts/utils.sh check_deployed().
-#
-# Returns $true if files match, $false if drift detected.
-# Logs PASS/FAIL via Write-Host so callers can compose with their own counters.
-function Test-FileDrift {
-    param(
-        [Parameter(Mandatory)][string]$Source,
-        [Parameter(Mandatory)][string]$Destination,
-        [string]$DisplayName = ''
-    )
-    if (-not $DisplayName) { $DisplayName = Split-Path -Leaf $Destination }
-
-    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf)) {
-        Write-Host "[FAIL] $DisplayName missing at $Destination (run setup-windows.ps1)" -ForegroundColor Red
-        return $false
-    }
-
-    $isReparse = (Get-Item -LiteralPath $Destination -Force).Attributes -band [IO.FileAttributes]::ReparsePoint
-    if ($isReparse) {
-        Write-Host "[FAIL] $DisplayName is a reparse-point/symlink (expected regular file)" -ForegroundColor Red
-        return $false
-    }
-
-    $srcHash = (Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash
-    $dstHash = (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash
-    if ($srcHash -eq $dstHash) {
-        Write-Host "[PASS] $DisplayName deployed (matches repo)" -ForegroundColor Green
-        return $true
-    }
-
-    Write-Host "[FAIL] $DisplayName has drifted from $Source (edit in repo + re-run setup)" -ForegroundColor Red
-    return $false
-}
+# Test-FileDrift was removed by OPS-043 (#1337). It was written as parity with
+# bash check_deployed for healthcheck.ps1, and CLI-018 retired that script into
+# `dotf doctor` without removing the helper -- leaving a fully implemented
+# function with zero call sites anywhere in the repo. Its behaviour now lives in
+# doctor's `Deploy-dir<->$HOME drift` section, which is cross-compiled and so
+# needs no PowerShell twin at all.
 
 # Get-ClaudeProjectKeyEncoded: the pure encoding of a working directory into
 # Claude Code's per-project key (the directory name under ~/.claude/projects) --

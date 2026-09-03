@@ -352,24 +352,10 @@ check_command() {
     return 0
 }
 
-# Validates that all required commands are available
-# Input: array of command names
-# Output: error messages for missing commands, returns 0 if all found, 1 if any missing
-# Usage: check_dependencies "git" "curl" "jq"
-check_dependencies() {
-    local deps=("$@")
-    local missing=()
-
-    for dep in "${deps[@]}"; do
-        if ! check_command "$dep"; then
-            missing+=("$dep")
-        fi
-    done
-
-    if [ ${#missing[@]} -gt 0 ]; then
-        log_warning "Optional dependencies not found: ${missing[*]}. Some features may not work."
-    fi
-}
+# check_dependencies was removed by OPS-043 (#1337) along with its only call
+# site. `dotf doctor` reports every tool it named, at an equal-or-stronger
+# severity -- it only ever log_warning'd, so it never failed anything.
+# TestSetupShellParity holds the fourteen-row proof.
 
 # User confirmation functions
 
@@ -500,35 +486,18 @@ deploy_file() {
     return 1
 }
 
-# Asserts a deployed file matches its repo source (copy-deploy drift detection).
-# Pair of deploy_file: if the user edited ~/.zshrc directly instead of in the repo,
-# this surfaces it loudly instead of silently losing the edit on next setup-linux.sh run.
-# Input: $1 - repo source path, $2 - deployed target path, $3 - display name (optional)
-# Output: pass/fail log line, returns 0 if match, 1 if drift
-# Usage: check_deployed "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
-check_deployed() {
-    src="$1"
-    dst="$2"
-    name="${3:-$(basename "$dst")}"
-
-    if [[ ! -f "$dst" ]]; then
-        log_error "$name missing at $dst (run setup-linux.sh)"
-        return 1
-    fi
-
-    if [[ -L "$dst" ]]; then
-        log_error "$name is a symlink (expected regular file — run setup-linux.sh)"
-        return 1
-    fi
-
-    if cmp -s "$src" "$dst"; then
-        log_success "$name deployed (matches repo)"
-        return 0
-    fi
-
-    log_error "$name has drifted from $src (edit in repo + run setup-linux.sh)"
-    return 1
-}
+# check_deployed was removed by OPS-043 (#1337) along with its only call site.
+# It was deploy_file's pair -- the assertion that a file in $HOME still matches
+# the copy in ~/.dotfiles -- and it was the ONLY byte-level check on that leg
+# anywhere in the repo. It moved rather than being dropped: doctor's
+# `Deploy-dir<->$HOME drift` section carries the same two severities (content
+# drift and a symlink where ADR-012 expects a regular file) over eleven files
+# instead of three.
+#
+# It does NOT cover Windows: the map is derived from setup-linux.sh's deploy
+# calls, so every entry is POSIX-only and the section skips there. Windows never
+# had this function's twin wired to anything either, so nothing regressed -- but
+# that leg is unguarded on Windows and OPS-046 (#1447) is where it gets closed.
 
 # Checks if file exists and exits if not found
 # Input: $1 - file path, $2 - custom error message (optional)

@@ -78,32 +78,16 @@ teardown() {
     [ -f "$nested" ]
 }
 
-# --- check_deployed ---
-
-@test "check_deployed: matching content returns 0 (success)" {
-    deploy_file "$SRC" "$DST"
-    run check_deployed "$SRC" "$DST" "test-file"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"deployed (matches repo)"* ]]
-}
-
-@test "check_deployed: missing target returns 1 (drift)" {
-    run check_deployed "$SRC" "$TEST_TMPDIR/never-deployed" "test-file"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-}
-
-@test "check_deployed: symlinked target returns 1 (legacy-strategy drift)" {
-    ln -sf "$SRC" "$DST"
-    run check_deployed "$SRC" "$DST" "test-file"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"symlink"* ]]
-}
-
-@test "check_deployed: drift between repo and home returns 1" {
-    deploy_file "$SRC" "$DST"
-    echo "user-edited-in-home" > "$DST"
-    run check_deployed "$SRC" "$DST" "test-file"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"drifted"* ]]
-}
+# --- check_deployed: removed by OPS-043 (#1337) ---
+#
+# The four cases that lived here were ported one-for-one into
+# TestCheckHomeDeployDrift in cli/internal/doctor/checks_home_deploy_test.go,
+# which is where the behaviour now lives:
+#
+#   matching content returns 0        -> "checked entries agree -> pass"
+#   missing target returns 1          -> "deployed source present but $HOME copy missing -> fail"
+#   symlinked target returns 1        -> "symlink at $HOME -> fail even when content resolves equal"
+#   drift repo vs home returns 1      -> "functions.sh drift -> fail naming both paths"
+#
+# deploy_file's own tests stay above: the deployer was not migrated, only its
+# assertion pair.

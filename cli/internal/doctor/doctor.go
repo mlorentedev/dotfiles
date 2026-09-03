@@ -118,6 +118,8 @@ func Run(opts Options) (int, error) {
 		checkPiExtensions(sys, cfg, rep, opts.Fix)
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
 		checkDeployDrift(sys, cfg, rep)
+		checkHomeDeployDrift(sys, cfg, rep)
+		checkDockerCompose(sys, rep)
 		checkDeployManifest(sys, rep)
 		checkAgentPresence(sys, rep)
 		checkAgentSkillsMigrated(cfg, rep)
