@@ -36,8 +36,17 @@ created: "2026-09-02"
 - `cd cli && go test ./...` → all packages ok, no FAIL lines.
 - `golangci-lint run` with the pinned 2.12.2 (matches `versions.conf`, BUG-071
   checked before running) → **0 issues**.
-- `~/.local/bin/bats tests/*.bats` → **1534 tests, exit 0**, run against the tree
-  with the deletion already applied.
+- `~/.local/bin/bats tests/*.bats` → **1534 `ok`, exit 0** when first measured on
+  this box. **Corrected after the adversarial review** (finding 4): the suite is
+  not reproducibly green here — it exits 1 with **7 `not ok`** (install-dotf
+  629-635, plus #1198 BUG-771). The reviewer isolated the cause the right way,
+  in a temporary worktree at the merge-base `745f320`, where **the identical 7
+  fail** — so they are pre-existing and environmental (#1429 fixture leakage,
+  triggered by a `dev` build on PATH; #1409), not caused by OPS-043. The
+  OPS-043-relevant files are green: `guard-setup-preexports-present.bats` 4/4,
+  `iac-deploy.bats` 6/6, `setup-linux.bats` clean. The original figure was true
+  when measured and stopped being true when a later commit added a guard test —
+  this spec's own lesson 259, in its own evidence section.
 - `shellcheck --severity=error setup-linux.sh scripts/utils.sh` → clean (CI's
   severity; at default severity the repo is non-clean on `main` too, verified by
   stashing — this change adds nothing new).
@@ -138,3 +147,21 @@ assertions and not to the commands that invoke them.
 - [ ] Folder moved: `specs/OPS-043-setup-doctor-duplication/` -> `specs/archive/OPS-043-setup-doctor-duplication/`
 - [ ] Bitácora board ticket #1337 closed with PR link (ADR-018)
 - [ ] Lesson above written to `docs/lessons.md`
+
+## Adversarial review disposition (`review.md`, `nan/deepseek-v4-flash`, PASS-WITH-GAPS)
+
+Independent reviewer, drawn at random from `harness/reviewer-pool.json`; not the
+implementer. No Blocker, no Major. Rubric A/B/A/A/A/A. Five Minor/Question
+findings, all dispositioned:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The two new checks' **invocation** in `doctor.Run` is untested — deleting both lines from `doctor.go` left `go test ./internal/doctor/` green | **FIXED.** `TestRun_HomeDeployDriftIsWiredIn` and `TestRun_DockerComposeIsWiredIn` assert end-to-end through `Run()` that the section appears, names the drifted file, and **moves the exit code**. Mutation-tested with the reviewer's own edit: deleting the invocations now turns them red |
+| 2 | An absent deploy-dir source SKIPs even for the 8 *unconditionally* deployed files, so an incomplete deploy-dir goes unreported | **Confirmed as designed, tracked.** It matches `checkDeployDrift`'s both-sides-present rule and R4. Making it FAIL means doctor asserting that setup has run at all, which is a different check with a different failure mode — not folded in silently |
+| 3 | The join-guard regex matches only the literal `deploy_file "$DOTFILES_DIR/…" "$HOME/…"`; a `${HOME}` or variable-base call would evade it | **Accepted, tracked.** All 11 current call sites use the literal form and the `len(pairs)==0` tripwire catches a wholesale shape change. Widening the regex speculatively would loosen the guard now against a call form nobody has written |
+| 4 | `verification.md`'s "1534 tests, exit 0" is not reproducible — 7 pre-existing failures | **FIXED above**, with the reviewer's merge-base isolation recorded as the evidence that they are not this change's |
+| 5 | `ssh/config` is content-checked, so a hand-edited `~/.ssh/config` Host block reads as drift | **Confirmed as intended.** That is ADR-012's copy-deploy contract: edit in repo, re-run setup. Exempting it would silently license the edit-in-place habit the whole leg exists to catch. Worth revisiting only if it fires in practice |
+
+Findings 2, 3 and 5 are design confirmations the reviewer explicitly did not
+block on ("not blocking", "design confirmations"). They are recorded here rather
+than ticketed: each is a decision with a stated reason, not outstanding work.

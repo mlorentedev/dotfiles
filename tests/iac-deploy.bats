@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
-# SDD-007: Tests for deploy_file + check_deployed (IaC deploy strategy).
+# SDD-007: Tests for deploy_file (IaC deploy strategy). check_deployed was its
+# assertion pair until OPS-043 moved that into `dotf doctor`; see the note where
+# its four cases used to live, below.
 # Replaces ln -sf for config files. Asserts: atomic, idempotent, drift recovery.
 
 setup() {
