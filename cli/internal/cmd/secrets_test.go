@@ -68,6 +68,8 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		{"double quoted env in sh -c", []string{"sh", "-c", "\"env\""}, true},
 		{"escaped env in sh -c", []string{"sh", "-c", "\\env"}, true},
 		{"bundled flag bash -lc", []string{"bash", "-lc", "env"}, true},
+		{"interleaved flag bash -i -c", []string{"bash", "-i", "-c", "env"}, true},
+		{"long flag bash --norc -c", []string{"bash", "--norc", "-c", "env"}, true},
 		{"bash -c set", []string{"bash", "-c", "set"}, true},
 		{"bash -c declare -p", []string{"bash", "-c", "declare -p"}, true},
 		{"bash -c printenv", []string{"bash", "-c", "printenv FOO"}, true},
