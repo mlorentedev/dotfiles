@@ -44,9 +44,13 @@ go build ./...            → clean
 go vet ./...              → clean
 GOOS=windows go vet ./... → clean
 go test ./... -count=1    → all packages ok, no failures
+go test -race -count=3 ./internal/prtriage/  → clean
 golangci-lint run         → 0 issues   (v2.12.2, the versions.conf pin)
 gofmt -l internal/prtriage/ → clean
 ```
+
+The race detector is run explicitly because this change introduces the package's
+only concurrency and `golangci-lint` does not cover it. Three iterations, clean.
 
 Three files elsewhere in `cli/` are unformatted on `main`
 (`internal/errors/latch_test.go`, `internal/fsmode/fsmode.go`,
@@ -159,6 +163,20 @@ door.
 shared status as a reasoned choice. Refuting that argument is its own ticket, and
 folding it in silently would have been a public-contract change smuggled inside a
 transport fix.
+
+**Two other `gh pr list` sites were found and deliberately left alone.** The
+lesson-259 prose sweep surfaced them, so they are recorded here rather than left
+as an unstated skip: `scripts/bitacora-rollout.sh:132,196` and
+`harness/skills/catchup/SKILL.md:72`. Both carry the same GraphQL dependency this
+change removed from `prtriage`. Neither was migrated and neither was ticketed:
+they bind no doctrine, neither has been observed failing, and a vendor condition
+is not a defect in them. If GraphQL refusals recur, this note is where to start.
+
+**Also noticed, also out of scope:** `gh api pulls: exit status 1` still hides
+gh's own stderr reason (`HTTP 403`, `Not Found`). That opacity is pre-existing —
+the old message had the same shape — and unwrapping `*exec.ExitError` to surface
+`Stderr` is three lines that belong to whoever decides the error contract, not to
+a transport change.
 
 ## Promotion candidates
 
