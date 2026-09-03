@@ -19,8 +19,9 @@ All shell scripts MUST work in **both bash and zsh**. Before modifying any `.sh`
 | `for d in path/*/` where `path` may not exist | `bash -c 'shopt -s nullglob; …'`, or test the dir first | **Fails silently.** zsh's default `NOMATCH` makes an unmatched glob abort the *whole* compound command — the loop never runs and prints nothing |
 | `set -- $var` / unquoted `$var` to split into fields | read line by line, or `${=var}` in zsh | **Fails silently.** zsh does not word-split unquoted parameters: you get one field containing everything, not N |
 | `. file` (no slash) to source from the cwd | `. ./file` | **Fails silently.** A slashless argument to `.` is searched on `$PATH` only; bash also falls back to the cwd, zsh does not. In a `$(...)` the result is an empty string, not an error |
+| `${PIPESTATUS[0]}` to check a piped command | drop the pipe and use `$?`, or `set -o pipefail` when the pipe is needed | **Fails silently.** zsh spells it `$pipestatus[1]` and arrays are 1-indexed, so the bash form expands to **nothing** — `EXIT=` rather than an error. A verification that reads a pipeline's exit status is exactly where this bites: `cmd \| tail` reports `tail`'s status, so a failing `cmd` passes |
 
-> The last three rows fail **silently**: they return an empty or single-element result instead of an
+> The last four rows fail **silently**: they return an empty or single-element result instead of an
 > error, and empty reads as a finding. Every row above them breaks loudly. Before believing an
 > empty result from a shell sweep, re-run it in the other shell — see `docs/lessons.md`,
 > *"a shell incompatibility that answers wrongly beats one that fails"*.
