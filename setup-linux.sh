@@ -1580,21 +1580,18 @@ fi
 # Test if files are correctly linked
 log_success "Installation completed! Verifying file links..."
 
-check_deployed "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh" "aliases.zsh"
-check_deployed "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh" "functions.zsh"
-check_deployed "$DOTFILES_DIR/.zsh/functions.sh" "$HOME/.zsh/functions.sh" "functions.sh"
-# NOTE: .zshrc intentionally NOT under strict check_deployed -- setup-linux.sh
-# may legitimately modify it (e.g. stripping stale gh-copilot eval lines via
-# sed -i). Same rationale as .bashrc: tool installers append PATH/init lines,
-# producing legitimate drift that should not abort the bootstrap.
-# NOTE: .bashrc intentionally NOT under strict check_deployed -- tool installers
-# (opencode, bun, NVM, ggshield) append PATH/init lines to ~/.bashrc post-deploy,
-# producing legitimate drift. Just verify existence.
-[ -f "$HOME/.bashrc" ] && log_success ".bashrc exists (drift expected from installers)" || log_error ".bashrc missing (run setup-linux.sh)"
+# OPS-043: the per-file byte comparison that used to live here (check_deployed
+# x3) and the 14-tool check_dependencies sweep are now `dotf doctor`'s, which
+# runs at the tail of this same script. Both moved rather than being dropped:
+# doctor's `Deploy-dir<->$HOME drift` section carries the byte comparison AND
+# check_deployed's symlink rejection, over eleven files instead of three, and
+# every one of the fourteen tools has an equal-or-stronger verdict there --
+# asserted by TestSetupShellParity, not by this comment. setup-windows.ps1 has
+# had no such block since CLI-018; this brings Linux to the same shape.
+#
+# The exemptions the deleted NOTEs recorded now live beside the data they
+# describe, in doctor's homeDeployMap, each with its own reason.
 file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || log_error "bash_aliases issue"
-
-# Check dependencies
-check_dependencies "git" "zsh" "eza" "direnv" "node" "npm" "zoxide" "docker" "docker-compose" "kubectl" "helm" "terraform" "ansible" "pip"
 
 # Deploy env-contract.json so `dotf doctor` can find it under $DOTFILES_DIR.
 if [ -f "$CURRENT_DIR/env-contract.json" ]; then
