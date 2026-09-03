@@ -40,6 +40,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newOrcaCmd())
 	root.AddCommand(newPrCmd())
 	root.AddCommand(newSearchCmd())
+	root.AddCommand(newHooksCmd())
 	return root
 }
 

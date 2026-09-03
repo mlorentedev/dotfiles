@@ -1,0 +1,79 @@
+[
+  {
+    "id": "CLI-072-dotf-hooks-install-f1",
+    "behavior": "AC1 \u2014 dotf hooks install deploys the dispatcher to <DotfilesDir>/git-hooks, wires core.hooksPath, and makes the entrypoints executable",
+    "verification": "cd cli && go test ./internal/hooks/ -count=1 -v -run '^TestInstallHandlesAFirstInstall$|^TestInstallMakesEntrypointsExecutable$|^TestInstallWiresHooksPath$' | grep -q '^--- PASS: TestInstallWiresHooksPath'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f2",
+    "behavior": "AC2 \u2014 the destination refusals that stand between a misconfigured DOTFILES_DIR and the clean mirror's removal, including the drive-root case that existed only in Pester",
+    "verification": "cd cli && go test ./internal/hooks/ -count=1 -v -run '^TestInstallRefusesUnsafeDestinations$|^TestDeployRefusesADestinationOutsideGitHooks$' | grep -q '^--- PASS: TestInstallRefusesUnsafeDestinations'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f3",
+    "behavior": "AC2 \u2014 the #695 self-mirror guard: source == destination must not clear its own source, including the first-install case where the destination cannot be stat'd",
+    "verification": "cd cli && go test ./internal/hooks/ -count=1 -v -run '^TestInstallDoesNotDestroyItsOwnSource$' | grep -q '^--- PASS: TestInstallDoesNotDestroyItsOwnSource'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f4",
+    "behavior": "AC2 \u2014 a clean mirror, so a hook removed upstream stops firing rather than lingering as a trusted stale guard",
+    "verification": "cd cli && go test ./internal/hooks/ -count=1 -v -run '^TestInstallCleanMirrorsRatherThanMerging$' | grep -q '^--- PASS: TestInstallCleanMirrorsRatherThanMerging'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f5",
+    "behavior": "AC3 \u2014 the suite drives a git fake, and one integration test proves the fake speaks the real binary's dialect against a throwaway GIT_CONFIG_GLOBAL",
+    "verification": "cd cli && go test ./internal/hooks/ -count=1 -v -run '^TestInstallAgainstRealGit$' | grep -q '^--- PASS: TestInstallAgainstRealGit'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f6",
+    "behavior": "AC4 \u2014 deployed hooks are CR-free even from a CRLF-tainted source tree (BUG-068)",
+    "verification": "cd cli && go test ./internal/hooks/ -count=1 -v -run '^TestInstallNormalisesCRLF$' | grep -q '^--- PASS: TestInstallNormalisesCRLF'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f7",
+    "behavior": "AC1 \u2014 `dotf hooks install` resolves from the root command with both flags; the wiring gap CLI-071's review found (every test proving the function, none proving it is called)",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -v -run '^TestHooksInstallIsReachableFromRoot$' | grep -q '^--- PASS: TestHooksInstallIsReachableFromRoot'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f8",
+    "behavior": "AC5b \u2014 both setups install dotf BEFORE the hooks step, invoke `dotf hooks install`, pass both flags, and no longer invoke the retired twins",
+    "verification": "~/.local/bin/bats tests/guard-setup-hooks-order.bats | grep -q '^ok 5'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f9",
+    "behavior": "AC6 \u2014 doctor and the installer agree on the dispatcher path, asserted by running both against one deploy root rather than by comparing two constants",
+    "verification": "cd cli && go test ./internal/doctor/ -count=1 -v -run '^TestDoctorAgreesWithTheInstallerOnTheDispatcherPath$' | grep -q '^--- PASS: TestDoctorAgreesWithTheInstallerOnTheDispatcherPath'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f10",
+    "behavior": "AC5/AC7 \u2014 the twins and their test twins are gone and the metric moved: 5 twin pairs remain, down from 6",
+    "verification": "test ! -e scripts/install-git-hooks.sh && test ! -e scripts/install-git-hooks.ps1 && test ! -e tests/install-git-hooks.bats && test ! -e tests/install-git-hooks.Tests.ps1 && test \"$(ls scripts/ | sed -E 's/\\.(sh|ps1)$//' | sort | uniq -d | wc -l)\" -eq 5",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-072-dotf-hooks-install-f11",
+    "behavior": "AC8 \u2014 a PR that retires a scripts/X.{sh,ps1} pair while leaving tests/X.{bats,Tests.ps1} alive fails, and an unreadable deletion list is an error rather than a clean tree",
+    "verification": "~/.local/bin/bats tests/check-twin-test-retirement.bats | grep -q '^ok 9'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
