@@ -198,15 +198,22 @@ The mapping is a suggestion like Type — the human can override in step 3. Labe
 
 ```bash
 REPO=mlorentedev/dotfiles; AREA=HARNESS
-gh issue list --repo "$REPO" --state all --limit 800 --json title | python3 -c "
-import json,sys,re
+# REST + --paginate, one line per issue. NOT `gh issue list`: that is GraphQL and
+# fails under a secondary rate limit — which is exactly when parallel sessions are
+# filing tickets and the scan matters most.
+gh api --paginate "repos/$REPO/issues?state=all&per_page=100" \
+  --jq '.[] | select(.pull_request==null) | .title' | tee /tmp/nnn-scan.txt | python3 -c "
+import sys,re
 A='$AREA'
-ns=[int(m.group(1)) for r in json.load(sys.stdin)
-    for m in [re.match(rf'{A}-0*(\d+)', r['title'], re.I)] if m]
+ns=[int(m.group(1)) for line in sys.stdin
+    for m in [re.match(rf'{A}-0*(\d+)\b', line, re.I)] if m]
 print('%03d' % (max(ns)+1 if ns else 1))"
+wc -l < /tmp/nnn-scan.txt   # say the population out loud; a short scan is a wrong answer
 ```
 
 NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-002`). Scans both open and closed issues (forward-only, per §3 — never reuse a retired number). If the AREA also has `specs/<AREA>-NNN-*` directories that outrun the issues, cross-check and take the higher.
+
+> **Never hand-split `--paginate` output.** It concatenates one JSON array per page (`[...][...]`), and splitting them with a regex breaks on the first `]` inside an issue body — dropping pages **silently** and returning a plausible-but-low maximum. On 2026-09-02 that produced a proposal of `CLI-072`, an id another session already held, from a scan that put `TEST` at `001` when the real maximum was `008`. Let `--jq` do the paging (it is applied per page by `gh`) and keep the output line-oriented. See `docs/lessons/lesson-263-*`.
 
 ### Concurrency guard — parallel sessions race scan-then-create (2026-07-07)
 
@@ -214,7 +221,18 @@ NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-
 
 1. **Re-scan immediately before `gh issue create`** — at create time, not minutes earlier when the proposal was computed.
 2. **Scan the board's `ID` field too, not only the home repo's issue titles** — a concurrent session may have claimed `AREA-NNN` from another repo or before its issue lands in your scan window. If GraphQL is rate-limited, fall back to REST title scans (`gh api repos/<owner>/<repo>/issues`) across the bitácora repos.
-3. **Verify right after creating** — re-run the scan; if a duplicate raced in, renumber immediately. Yield rule: the ticket WITHOUT its board `ID` field set renumbers; if neither is set, the higher issue `#number` yields.
+3. **Verify right after creating** — re-run the scan; if a duplicate raced in, renumber immediately.
+
+**Yield rule — ownership evidence first, ordering only as a tie-break.** Apply in order, and stop at the first that decides:
+
+1. **A spec folder decides it.** `specs/<AREA>-NNN-*/proposal.md` names its owner in frontmatter (`issue: mlorentedev/dotfiles#1363`). That issue keeps the id; the other yields, *whatever the numbers are*. Renumbering past an active spec orphans it — manufacturing the stale-referent defect of #1448.
+2. **Otherwise, inbound references decide it.** The claimant cited from `AGENTS.md`, an ADR, a runbook or another spec's acceptance criteria keeps the id, because those citations are what a rename actually breaks.
+3. **Otherwise, the board `ID` field decides it** — the ticket without it renumbers.
+4. **Otherwise the higher issue `#number` yields.**
+
+Ordering was the whole rule until 2026-09-02, and it was wrong in 3 of 11 collisions resolved that day: `CLI-065`, `HARNESS-067` and `REFACTOR-011` were all owned by the *higher* number because a spec said so. The same reversal decided a `lesson-261` collision the same hour — the later file was cited from `AGENTS.md`, `adr-028` and an open spec, so the earlier one yielded.
+
+**Renumbering is a title-only edit.** Never touch the body, the scope or the board item, and leave a comment on the issue saying what the id was, what it became, and which rule above decided it.
 
 ## Common mistakes
 

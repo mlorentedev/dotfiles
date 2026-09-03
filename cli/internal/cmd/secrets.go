@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -15,6 +18,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // newSecretsCmd is the `dotf secrets` noun: the on-demand (JIT) secrets path of
@@ -307,13 +311,66 @@ func newSecretsLsCmd() *cobra.Command {
 	return c
 }
 
-// newSecretsShowCmd prints one secret's decrypted value to stdout (no trailing
-// newline, for `KEY=$(dotf secrets show <id>)`). Single-env secrets only — file
-// and multi-var secrets must go through `run` (a value to stdout would be ambiguous).
+var (
+	stdoutIsTerminal = func() bool { return term.IsTerminal(int(os.Stdout.Fd())) }
+	isAgentSession   = func() bool {
+		return os.Getenv("CLAUDE_CODE") != "" ||
+			os.Getenv("ANTIGRAVITY_AGENT") != "" ||
+			os.Getenv("ANTIGRAVITY_CLI") != "" ||
+			os.Getenv("AGENT_SESSION") != ""
+	}
+	clipboardRunner = func(text string) error {
+		bin, args := clipboardCommand()
+		cmd := exec.Command(bin, args...)
+		cmd.Stdin = strings.NewReader(text)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%s: %w", bin, err)
+		}
+		return nil
+	}
+)
+
+func clipboardCommand() (string, []string) {
+	if runtime.GOOS == "darwin" {
+		return "pbcopy", nil
+	}
+	if runtime.GOOS == "windows" {
+		return "clip.exe", nil
+	}
+	if os.Getenv("WAYLAND_DISPLAY") != "" {
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			return "wl-copy", nil
+		}
+	}
+	if _, err := exec.LookPath("xclip"); err == nil {
+		return "xclip", []string{"-selection", "clipboard"}
+	}
+	if _, err := exec.LookPath("xsel"); err == nil {
+		return "xsel", []string{"--clipboard", "--input"}
+	}
+	return "wl-copy", nil
+}
+
+// newSecretsShowCmd resolves one secret's decrypted value. Supports:
+// 1. --reveal: explicitly print decrypted value to stdout.
+// 2. -c / --clip: copy to system clipboard without printing to stdout.
+// 3. TTY masking: in interactive terminals without --reveal or -c, masks the secret and guides the user.
+// 4. Agent isolation: refuses to print to stdout in AI agent sessions per ADR-028 doctrine.
 func newSecretsShowCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:          "show <id>",
-		Short:        "Print one secret's decrypted value to stdout, no trailing newline",
+	var (
+		reveal bool
+		clip   bool
+	)
+	c := &cobra.Command{
+		Use:   "show <id>",
+		Short: "Print or copy one secret's decrypted value",
+		Long: "show resolves one secret's decrypted value from its backend.\n\n" +
+			"Flags:\n" +
+			"  -c, --clip    copy the decrypted value to the system clipboard (never prints to stdout)\n" +
+			"  --reveal      explicitly print the decrypted value to stdout\n\n" +
+			"When stdout is an interactive terminal (TTY) and neither --reveal nor -c is given,\n" +
+			"show masks the secret and guides you to use -c or --reveal (1Password op style).\n" +
+			"In agent environments, printing to stdout is refused per ADR-028 doctrine.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -330,10 +387,32 @@ func newSecretsShowCmd() *cobra.Command {
 				return err
 			}
 			_, val, _ := strings.Cut(kv[0], "=") // EnvFor scrubs newlines → capture-friendly
+
+			if clip {
+				if err := clipboardRunner(val); err != nil {
+					return fmt.Errorf("copy to clipboard: %w", err)
+				}
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Copied secret %q to clipboard\n", args[0])
+				return nil
+			}
+
+			if isAgentSession() {
+				return fmt.Errorf("refusing to print secret %q to stdout in an agent environment (ADR-028 doctrine); inject it via 'dotf secrets run -- <cmd>' instead", args[0])
+			}
+
+			if stdoutIsTerminal() && !reveal {
+				masked := strings.Repeat("•", 12)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Secret %q: %s\n\nTo copy to clipboard:  dotf secrets show -c %s\nTo print in terminal:   dotf secrets show --reveal %s\nTo inject in command:   dotf secrets run -- <cmd>\n", args[0], masked, args[0], args[0])
+				return nil
+			}
+
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), val)
 			return nil
 		},
 	}
+	c.Flags().BoolVarP(&clip, "clip", "c", false, "copy secret to system clipboard instead of printing")
+	c.Flags().BoolVar(&reveal, "reveal", false, "reveal decrypted secret to stdout")
+	return c
 }
 
 // newSecretsRenderCmd materializes a config file in place: it substitutes every
@@ -417,11 +496,16 @@ func newSecretsRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			childEnv, err := buildChildEnv(reg, sel)
+			injected, err := resolveInjectedSecrets(reg, sel)
 			if err != nil {
 				return err
 			}
-			code, err := runChild(childArgv, childEnv, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+			childEnv := append(stripBackendAuth(os.Environ()), injected...)
+			stdout := newRedactWriter(cmd.OutOrStdout(), injected)
+			stderr := newRedactWriter(cmd.ErrOrStderr(), injected)
+			code, err := runChild(childArgv, childEnv, cmd.InOrStdin(), stdout, stderr)
+			_ = stdout.Flush()
+			_ = stderr.Flush()
 			if err != nil {
 				return err
 			}
@@ -435,13 +519,19 @@ func newSecretsRunCmd() *cobra.Command {
 	return c
 }
 
+// resolveInjectedSecrets evaluates the registry and returns the slice of KEY=VALUE strings
+// to be injected into the child process.
+func resolveInjectedSecrets(reg *secrets.Registry, only map[string]bool) ([]string, error) {
+	return secretLoader().EnvFor(reg.Entries(env.Home()), only)
+}
+
 // buildChildEnv flattens the registry to entries, resolves the selected secrets
 // (per-backend), and returns the child environment: the parent env with the backend
 // unlock credentials stripped, plus the granted KEY=VALUE pairs. The child gets only
 // the secrets it was granted — never the master credential that opens the whole
 // vault (defense in depth; cf. 1Password's `op run` + `env -u OP_SERVICE_ACCOUNT_TOKEN`).
 func buildChildEnv(reg *secrets.Registry, only map[string]bool) ([]string, error) {
-	injected, err := secretLoader().EnvFor(reg.Entries(env.Home()), only)
+	injected, err := resolveInjectedSecrets(reg, only)
 	if err != nil {
 		return nil, err
 	}
@@ -520,8 +610,8 @@ func resolveOnly(reg *secrets.Registry, s string) (map[string]bool, error) {
 // would mean re-implementing a shell's terminal handling for a wrapper that owns
 // no terminal.
 func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	if len(argv) == 0 {
-		return 1, errors.New("no command given after --")
+	if err := assertSafeChildCommand(argv); err != nil {
+		return 1, err
 	}
 	c := exec.Command(argv[0], argv[1:]...) //nolint:gosec // argv is the user's own command
 	c.Env = environ
@@ -569,4 +659,118 @@ func ageKeyPath() string {
 		return p
 	}
 	return filepath.Join(env.Home(), ".config", "age", "key.txt")
+}
+
+// assertSafeChildCommand refuses to launch commands whose primary purpose is to dump
+// the environment or inspect secrets to standard output (e.g. `env`, `printenv`, `export`).
+// Enforces ADR-028 and cross-agent doctrine: "Never dump a secrets store to standard output".
+func assertSafeChildCommand(argv []string) error {
+	if len(argv) == 0 {
+		return errors.New("no command given after --")
+	}
+	base := strings.ToLower(filepath.Base(argv[0]))
+	if base == "env" || base == "printenv" || base == "export" {
+		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", base)
+	}
+
+	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
+	if (base == "sh" || base == "bash" || base == "zsh" || base == "dash" || base == "ksh" || base == "busybox") && len(argv) >= 2 {
+		for i := 1; i < len(argv); i++ {
+			arg := argv[i]
+			isCFlag := arg == "-c" || (strings.HasPrefix(arg, "-") && strings.Contains(arg, "c"))
+			if isCFlag && i+1 < len(argv) {
+				cmdStr := strings.TrimSpace(argv[i+1])
+				// Normalize by stripping quotes and backslashes that bypass regex boundaries
+				cleanCmd := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(cmdStr, "'", ""), "\"", ""), "\\", "")
+				dangerousList := []string{"env", "printenv", "export", "set", "declare"}
+				for _, dangerous := range dangerousList {
+					pattern := `(?i)(?:^|[\s;|` + "`" + `&$()=])` + regexp.QuoteMeta(dangerous) + `(?:$|[\s;|` + "`" + `&$()])`
+					matchedRaw, _ := regexp.MatchString(pattern, cmdStr)
+					matchedClean, _ := regexp.MatchString(pattern, cleanCmd)
+					if matchedRaw || matchedClean {
+						return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", dangerous)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// redactWriter intercepts output emitted by the child process and replaces any byte sequence
+// corresponding to an injected secret value (len >= 6) with [REDACTED:<KEY>].
+// Enforces ADR-028 doctrine: "Never dump a secrets store to standard output".
+type redactWriter struct {
+	target       io.Writer
+	pairs        [][2][]byte
+	tail         []byte
+	maxSecretLen int
+	mu           sync.Mutex
+}
+
+func newRedactWriter(target io.Writer, injected []string) *redactWriter {
+	var pairs [][2][]byte
+	maxLen := 0
+	for _, kv := range injected {
+		key, val, ok := strings.Cut(kv, "=")
+		if ok && len(val) >= 6 {
+			valBytes := []byte(val)
+			repBytes := []byte("[REDACTED:" + key + "]")
+			pairs = append(pairs, [2][]byte{valBytes, repBytes})
+			if len(valBytes) > maxLen {
+				maxLen = len(valBytes)
+			}
+		}
+	}
+	return &redactWriter{
+		target:       target,
+		pairs:        pairs,
+		maxSecretLen: maxLen,
+	}
+}
+
+func (r *redactWriter) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.pairs) == 0 {
+		return r.target.Write(p)
+	}
+
+	data := p
+	if len(r.tail) > 0 {
+		data = append(r.tail, p...)
+		r.tail = nil
+	}
+
+	for _, pair := range r.pairs {
+		data = bytes.ReplaceAll(data, pair[0], pair[1])
+	}
+
+	if len(data) >= r.maxSecretLen && r.maxSecretLen > 1 {
+		split := len(data) - (r.maxSecretLen - 1)
+		toWrite := data[:split]
+		r.tail = make([]byte, len(data[split:]))
+		copy(r.tail, data[split:])
+		_, err := r.target.Write(toWrite)
+		return len(p), err
+	}
+
+	_, err := r.target.Write(data)
+	return len(p), err
+}
+
+func (r *redactWriter) Flush() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.tail) == 0 {
+		return nil
+	}
+	for _, pair := range r.pairs {
+		r.tail = bytes.ReplaceAll(r.tail, pair[0], pair[1])
+	}
+	_, err := r.target.Write(r.tail)
+	r.tail = nil
+	return err
 }

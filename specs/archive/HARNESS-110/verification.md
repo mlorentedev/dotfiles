@@ -75,6 +75,33 @@ $ cd /tmp && DOTFILES_DIR=/nonexistent dotf harness suggest --from-hook   # non-
 exit=0
 ```
 
+## Independent adversarial review — PASS
+
+`nan/deepseek-v4-flash`, drawn from `harness/reviewer-pool.json`, not the implementer.
+Rubric: Correctness B, Verification B, Scope A, Reliability A, Maintainability A, Handoff-readiness B.
+No Blocker, no Major. Four Minor findings, dispositioned:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | REAL — the `persona_record_unreadable` row never reached its branch: it shared `brokenRoot`, so `LoadTriggers` failed first and the row was green without testing anything | **Applied.** Its own root with valid triggers, plus a `wantStderr` column so every row must prove which branch it reached |
+| 2 | THEORETICAL — the `kind: invocable` filter was asserted by nothing (mutation C: deleting it left all tests green) | **Applied.** `TestResolveRolesExcludesNonInvocable`, mutation-checked: removing the filter turns it red |
+| 3 | THEORETICAL — AC4 was asserted by "the file contains a string", the very form AC4 calls insufficient | **Applied.** `TestPromptHookReachesSettingsByConsequence` runs `LoadBindTargets → HookCommands → MergeHooks` and asserts the hook lands in the emitted settings |
+| 4 | THEORETICAL — the latency test measures match+join only, excluding the per-prompt `LoadTriggers`+`LoadPersonas` disk/YAML | **Noted, not changed.** The reviewer measured the real path at avg 7.13ms / max 9.14ms against a 20ms budget. `TestRoleJoinLatencyBudget` deliberately measures the in-memory half so a regression there is attributable; the load half is bounded by the 5s hook timeout |
+
+The reviewer also confirmed against the published docs that the prompt field really is `prompt` — the
+first of AC6's eight candidates — and that exit 2 does erase the prompt. Both were assumptions in the
+spec and are now measurements.
+
+### A fifth, found while applying finding 1
+
+Fixing the vacuous row surfaced one the review did not reach: the `harness root missing entirely`
+row also failed earlier than intended, and the reason is a real defect rather than a test artefact.
+**`LoadTriggers` walks up from the cwd when the explicit root has no `triggers.json`.** The hook runs
+with cwd set to whatever repository the user is in, so trigger rules could come from one root while
+personas came from another — the two halves of a join disagreeing about which harness they belong
+to. `runSuggestFromHook` now reads `filepath.Join(root, TriggersFile)` directly and parses it, so the
+suggester resolves exactly ONE root, the same way the gate does.
+
 ## Corrections made during implementation
 
 Recorded rather than silently fixed, because each was a claim that did not survive its probe:

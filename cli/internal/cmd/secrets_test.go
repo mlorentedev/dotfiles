@@ -51,3 +51,70 @@ func TestRunChild_LaunchFailureIsError(t *testing.T) {
 		t.Fatal("expected a launch error for a missing binary")
 	}
 }
+
+func TestAssertSafeChildCommand(t *testing.T) {
+	cases := []struct {
+		name    string
+		argv    []string
+		wantErr bool
+	}{
+		{"empty argv", []string{}, true},
+		{"bare env", []string{"env"}, true},
+		{"path to env", []string{"/usr/bin/env"}, true},
+		{"bare printenv", []string{"printenv"}, true},
+		{"bare export", []string{"export"}, true},
+		{"shell -c env", []string{"sh", "-c", "env | grep SECRET"}, true},
+		{"quoted env in sh -c", []string{"sh", "-c", "'env'"}, true},
+		{"double quoted env in sh -c", []string{"sh", "-c", "\"env\""}, true},
+		{"escaped env in sh -c", []string{"sh", "-c", "\\env"}, true},
+		{"bundled flag bash -lc", []string{"bash", "-lc", "env"}, true},
+		{"interleaved flag bash -i -c", []string{"bash", "-i", "-c", "env"}, true},
+		{"long flag bash --norc -c", []string{"bash", "--norc", "-c", "env"}, true},
+		{"bash -c set", []string{"bash", "-c", "set"}, true},
+		{"bash -c declare -p", []string{"bash", "-c", "declare -p"}, true},
+		{"bash -c printenv", []string{"bash", "-c", "printenv FOO"}, true},
+		{"bash -c export", []string{"bash", "-c", "export -p"}, true},
+		{"allowed tool", []string{"goreleaser", "release"}, false},
+		{"allowed python", []string{"python3", "script.py"}, false},
+		{"allowed dotf review", []string{"dotf", "review"}, false},
+		{"allowed echo env word", []string{"echo", "running in safe environment"}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := assertSafeChildCommand(tc.argv)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("assertSafeChildCommand(%v) err = %v, wantErr = %v", tc.argv, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestRedactWriter_RedactsInjectedSecrets(t *testing.T) {
+	injected := []string{
+		"OPENROUTER_API_KEY=mock-openrouter-test-token-val",
+		"NAN_API_KEY=mock-nan-test-token-val",
+		"SHORT=abc", // len < 6, not redacted
+	}
+
+	var buf bytes.Buffer
+	rw := newRedactWriter(&buf, injected)
+
+	input := "Connecting with OPENROUTER_API_KEY=mock-openrouter-test-token-val and NAN_API_KEY=mock-nan-test-token-val, short is abc.\n"
+	n, err := rw.Write([]byte(input))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if n != len(input) {
+		t.Errorf("Write returned n = %d, want %d", n, len(input))
+	}
+	if err := rw.Flush(); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	got := buf.String()
+	want := "Connecting with OPENROUTER_API_KEY=[REDACTED:OPENROUTER_API_KEY] and NAN_API_KEY=[REDACTED:NAN_API_KEY], short is abc.\n"
+	if got != want {
+		t.Errorf("redacted output mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
