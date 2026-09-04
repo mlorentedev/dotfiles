@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 05f103c348e50bde
+generated_sha: 9adceba0eebaff80
 id: handoff-skill
 type: skill
 status: active
@@ -156,7 +156,7 @@ several sessions running at once, these are the places two of them can collide:
 | `MEMORY.md` handoff | `dotf mem handoff-write` (never an Edit) |
 | Vault `sessions/` | the thread-scoped filename from `dotf mem thread` |
 | `~/.dotfiles` deploy dir | `setup-linux.sh` / `dotf deploy` |
-| `~/.claude/settings.json` and peers | the harness deploy path, which merges by marker |
+| Agent harness settings (`settings.json`, etc.) | the harness deploy path, which merges by marker |
 | The git stash | never bare `git stash` — see the standing order |
 
 Everything else a session touches lives inside its own worktree or its own
