@@ -47,6 +47,25 @@ the wrong thing — and neither was visible from a passing run.
    assertion failed on the *clean* tree. Fixed by slicing the reconcile block with `awk`
    before comparing.
 
+## A defect this PR's own evidence had, found in review
+
+`features.json` `f2` asserted `bats … | grep -c '^ok ' | grep -qx 22`. Adding the 23rd
+test — the derived `PI_VERSION` assertion, itself a review fix — made that command
+**fail**, and it is the command the archive gate reads as evidence.
+
+A hard-coded count is brittle in the one direction the spec is guaranteed to move:
+adding tests. Rewritten to assert the suite passes **and** that each named guarantee is
+present by name, then proven both ways:
+
+| | |
+|---|---|
+| add a 24th test | f2 still passes — no longer brittle |
+| rename a guarantee out of the file | f2 fails — not vacuous either |
+
+Surfaced by PR-Agent quoting the stale command back in its review of `46af234`. It
+reported no blocking issues and `#1478 fully compliant`; the defect was visible in what
+it quoted rather than in what it said.
+
 ## What is NOT verified here
 
 - **The Linux guard end to end.** `integration`'s container has no npm, so
