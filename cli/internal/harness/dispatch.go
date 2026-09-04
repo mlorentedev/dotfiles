@@ -138,12 +138,42 @@ func RecordDispatch(path, name, agentType string) error {
 	}
 	current[name] = agentType
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
 	raw, err := json.Marshal(dispatchState{Types: current})
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, raw, 0o600)
+
+	// WRITTEN TO A TEMPORARY FILE AND RENAMED, never truncated in place.
+	//
+	// This is a read-modify-write of the WHOLE map, so a torn write does not
+	// cost one entry — it costs the session's entire dispatch history, because
+	// LoadDispatched reads a corrupt file as empty. The gate now runs under a
+	// 5-second hook timeout that can kill it mid-write, which is the trigger the
+	// independent review named on #1471. rename(2) is atomic within a directory,
+	// so a reader sees either the previous map or the new one.
+	//
+	// The temp file is created in the SAME directory for that guarantee: a
+	// rename across filesystems is not atomic and not even permitted.
+	tmp, err := os.CreateTemp(dir, ".dispatch-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename succeeds
+	if _, err := tmp.Write(raw); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }

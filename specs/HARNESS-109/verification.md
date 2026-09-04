@@ -33,13 +33,17 @@ created: "2026-09-03"
 ### AC6, observed
 
 One named dispatch of a real persona, on the live `PreToolUse` hook, against a locally built binary
-carrying `503e04b`. The journal, verbatim, from
-`~/.local/state/dotfiles/gate/<session>-aharness109-1146ec45.decisions.jsonl`:
+carrying `503e04b`. The journal record from
+`~/.local/state/dotfiles/gate/<session>-aharness109-1146ec45.decisions.jsonl`, **with the
+`session`, `scope` and `reason` fields elided for width** — round 1 of the review was right that the
+earlier presentation of this called itself "verbatim" while eliding three fields, so the word is
+dropped rather than the reader left to discover it:
 
 ```json
 {"ts":"2026-09-04T01:30:26.166335627Z","harness":"claude","agent_type":"harness109-probe",
  "agent_id":"aharness109-probe-7d551507f3fa68b0","tool":"Bash",
  "role_requested":"harness109-probe","role_resolved":"reviewer","outcome":"warn","allowed":true,
+ "reason":"all blocking skills consumed",
  "warned":["adversarial-review","audit","cyclomatic-complexity","verification-before-completion"]}
 ```
 
@@ -54,6 +58,35 @@ Against #1434's own table, with the row this spec adds:
 The four warned skills match the unnamed row exactly, which is the claim: naming a subagent no
 longer changes its gate. `role_requested` still carries the raw name, so the record says which
 dispatch this was.
+
+### Round 1 of the independent review: FAIL, and what it changed
+
+`nan/glm5.3-flash`, drawn at random from the pool, not the implementer. It re-ran the whole matrix
+at `f42fa747`, reproduced the AC6 record independently out of the live journal, and killed five
+mutations of its own against the tests. It then returned **FAIL on two REAL Majors, both with
+reproductions it built**:
+
+- **F1, shadow name.** `Agent(name: "reviewer", subagent_type: "builder")` resolved to `reviewer`,
+  because the roster was consulted before the map. Enforcement by the shadowed persona, with a
+  journal that reads like health. Fixed by making the map outrank the payload string, with `--role`
+  outranking both — AC8, and the reasoning is now in the proposal's Decisions.
+- **F2, broken record read as a built-in.** A persona whose `AGENT.md` exists but will not load was
+  classified quiet `no-role`, where before this spec it was loud. That hides enforcement being off
+  inside the cleanup meant to surface it. Fixed by deciding persona-ness on the record DIRECTORY —
+  AC9.
+
+Also applied: F3 (the map write is now temp-file + atomic rename, since the new 5s hook timeout can
+kill the gate mid-write and a torn write costs the whole session's map), F4 (this section no longer
+claims "verbatim" while eliding three fields), F5 (the named/unnamed comparison now asserts the
+**warned list**, not just the outcome — `warn == warn` would hold with different skills), and the
+open Question (`dispatchArgs` trimmed to the one key the measurement established; a guessed key that
+mapped a name to the wrong type would resolve the WRONG persona, which is worse than resolving none).
+
+**Both fixes were mutation-checked against their own tests before re-review**, reverting each fix in
+turn: M1 (roster-first restored) → `TestADispatchNamedAfterAnotherPersonaResolvesToItsTrueType`
+fails with the reviewer's exact symptom, `role_resolved = "reviewer"`; M2 (directory check removed)
+→ `TestABrokenPersonaRecordStaysLoud` fails with `outcome = "no-role"` and empty stderr. Tree
+restored and green after each.
 
 ## Test status
 

@@ -47,5 +47,19 @@
     "verification": "cd cli && go test ./internal/harness/ -count=1 -v -run 'TestEveryInteractiveHookIsBounded' 2>&1 | grep -q -- '--- PASS: TestEveryInteractiveHookIsBounded'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f8",
+    "behavior": "AC8 - a dispatch named after another persona resolves to its DECLARED type, an operator's --role outranks the map, and an unwitnessed agent_type naming a persona still resolves to it",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -v -run 'TestADispatchNamedAfterAnotherPersonaResolvesToItsTrueType|TestAnOperatorsRoleFlagOutranksTheDispatchMap' 2>&1 | grep -c '^--- PASS: Test' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f9",
+    "behavior": "AC9 - a witnessed dispatch whose persona record exists but will not load stays loud as role-unresolved, distinct from a built-in agent with no record directory",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -v -run 'TestABrokenPersonaRecordStaysLoud' 2>&1 | grep -q -- '--- PASS: TestABrokenPersonaRecordStaysLoud'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

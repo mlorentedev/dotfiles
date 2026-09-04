@@ -93,12 +93,39 @@ before being written, so no free text can reach disk through this path.
 which is what makes the lookup work at all — and it is also what makes a *grandchild* resolve, since
 every generation shares the one key. Latest-wins on a reused name.
 
-**Resolution order, and why the roster check is half the fix.** `agent_type ∈ roster` → persona;
-else `agent_type ∈ dispatch map` → its type → (`∈ roster` ? persona : quiet `no-role`); else
-`role-unresolved`, loud. Without the roster check the map would only relabel 271 noisy records as N
-differently-noisy ones: `general-purpose` is not a persona and never will be, so a miss on it is a
-correct answer, not a fault. `LoadPersonas` (persona.go:117) is the roster enumerator and is reused
-verbatim — a second reader of `AGENT.md` is exactly the failure `roles.go` documents at its head.
+**Resolution order: the map outranks the payload's own string, and `--role` outranks both.**
+Round 1 of the independent review refuted the order this section originally specified
+(`agent_type ∈ roster` first) with a reproduction, and the correction is the more important half of
+the design. A dispatch NAME is unconstrained and may happen to equal a persona's, so consulting the
+roster first resolves `Agent(name: "reviewer", subagent_type: "builder")` to `reviewer` — enforcing
+the shadowed persona's skills on a builder, while the journal records a resolved role and reads
+exactly like health. The map has no such weakness: it is written from the dispatch's own
+`subagent_type`, so it records what the caller **declared** rather than what it happened to **call**
+something. Order, therefore:
+
+1. `--role` given → the roster alone. A human's explicit instruction is not a thing a session's
+   dispatch history may quietly override; a blunt map-first reorder would be the same bug pointing
+   the other way.
+2. Witnessed in the session's map → its recorded type is the answer.
+3. Not witnessed → the roster, which still resolves a dispatch the gate never saw whose `agent_type`
+   happens to name a persona.
+4. Neither → `role-unresolved`, loud.
+
+Nothing in the 274 observed records shadows a persona, which is precisely why this had to be found
+by argument rather than by waiting: it would have surfaced first under `enforce: block`, as
+enforcement-by-the-wrong-persona selected by one word in a caller's argument.
+
+**Persona-ness is decided by the record DIRECTORY, not by whether the file parses.** The review's
+second finding. Concluding "not a persona" from a failed `LoadPersona` conflates `general-purpose`,
+which has no record *by design*, with `reviewer` whose `AGENT.md` a bad merge just broke — and
+quieting the second hides enforcement being off inside the very cleanup meant to surface it. A
+directory that exists means the name IS a persona, so a load failure there stays loud.
+`LoadPersonas` (persona.go:117) is not reusable for this: it fails wholesale on one corrupt record,
+so it cannot answer a question about a single name.
+
+Without this classification work the map would only relabel 271 noisy records as N differently-noisy
+ones: `general-purpose` is not a persona and never will be, so a miss on it is a correct answer, not
+a fault.
 
 **`no-role` is reused rather than adding a ninth `Outcome`.** The vocabulary is closed and pinned by
 tests on purpose. "A built-in agent was acting and no persona applies" is the same *fact* as "the
@@ -167,6 +194,14 @@ is one field on the manifest's `emit_hooks` entry.
       #1434's table recorded `role-unresolved`, reproducing that table with the third row fixed.
 - [ ] **AC7** — The manifest's `emit_hooks` PreToolUse entry carries a `timeout`, verified by
       consequence on the rendered settings file rather than by string-matching the manifest.
+- [ ] **AC8** — A dispatch named after *another* persona resolves to its declared type, not to the
+      persona it shadows; an operator's `--role` still outranks the map; and an unwitnessed
+      `agent_type` that names a persona still resolves to it. *(Added after round 1 of the
+      independent review reproduced the shadow case.)*
+- [ ] **AC9** — A witnessed dispatch whose persona record EXISTS but does not load records
+      `role-unresolved` and says `ENFORCEMENT IS OFF`, distinct from a built-in agent that has no
+      record directory at all. *(Added after round 1; the conflation was the review's second
+      Major.)*
 
 ## References
 

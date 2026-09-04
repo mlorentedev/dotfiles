@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -102,6 +104,18 @@ func TestANamedDispatchIsGatedLikeAnUnnamedOne(t *testing.T) {
 	}
 	if named.Outcome != unnamed.Outcome {
 		t.Errorf("named outcome = %q, unnamed = %q — the two must be indistinguishable", named.Outcome, unnamed.Outcome)
+	}
+	// The WARNED LIST, not just the outcome. AC2 claims the resolved persona's
+	// declared enforce modes are applied, and `warn` == `warn` would hold even if
+	// the two rows warned about different skills. Raised by the independent
+	// review on #1471: until this line the equality was proven only by the live
+	// AC6 evidence, which no test re-runs.
+	if !slices.Equal(named.Warned, unnamed.Warned) {
+		t.Errorf("named warned %v, unnamed warned %v — the same persona must produce the same forced skills",
+			named.Warned, unnamed.Warned)
+	}
+	if len(named.Warned) == 0 {
+		t.Error("no skills were warned about, so this test would pass against a persona that enforces nothing")
 	}
 	// The raw name is kept, so the journal can still say WHICH dispatch this
 	// was. Resolving must not erase the caller's own identifier.
@@ -281,5 +295,118 @@ func TestOnlyTheDispatchPrimitiveIsReadForDispatchArguments(t *testing.T) {
 					tc.tool, name, agentType, tc.wantName, tc.wantType)
 			}
 		})
+	}
+}
+
+// brokenRecordRoot writes a persona DIRECTORY whose AGENT.md will not parse.
+//
+// This is the state the independent review's second finding is about, and it
+// cannot be produced from the real roster: a bad merge, a truncated write, a
+// half-applied patch. The directory exists — so the name IS a persona — and the
+// file does not load, which is a fault and must stay loud rather than be
+// mistaken for a built-in agent that has no record by design.
+func brokenRecordRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "harness", "agents", "reviewer")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// Frontmatter that opens and never closes: the shape a truncated write
+	// leaves behind, and one LoadPersona rejects rather than reads as empty.
+	if err := os.WriteFile(filepath.Join(dir, "AGENT.md"),
+		[]byte("---\nname: reviewer\nskills: [\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+// TestADispatchNamedAfterAnotherPersonaResolvesToItsTrueType is the independent
+// review's F1, end to end, as it reproduced it.
+//
+// A dispatch NAME is unconstrained and may happen to equal a persona's. With the
+// roster consulted first, `Agent(name: "reviewer", subagent_type: "builder")`
+// resolved to `reviewer` and enforced reviewer's skills on a builder — and the
+// journal read `outcome: warn` with a resolved role, which is what health looks
+// like. Nothing in the 274 observed records shadows a persona, so this would
+// have been found late, under `enforce: block`, as enforcement-by-the-wrong-
+// persona selected by one word in a caller's argument.
+func TestADispatchNamedAfterAnotherPersonaResolvesToItsTrueType(t *testing.T) {
+	root := repoRootForTest(t)
+	stateDir := t.TempDir()
+	session := "s-shadow"
+	args := []string{"--harness", "claude", "--repo-root", root, "--state-dir", stateDir}
+
+	if code, _ := runGate(t, args, dispatchPayload(session, "reviewer", "builder")); code != 0 {
+		t.Fatalf("dispatch exited %d, want 0", code)
+	}
+	if code, _ := runGate(t, args, childPayload(session, "reviewer", "areviewer-shadow")); code != 0 {
+		t.Fatalf("child exited %d, want 0", code)
+	}
+
+	rec := lastRecord(t, stateDir, session+"-areviewer-shadow")
+	if rec.RoleResolved != "builder" {
+		t.Errorf("role_resolved = %q, want builder: the map records what the caller DECLARED, the name only what it was CALLED",
+			rec.RoleResolved)
+	}
+	// The shadowed name is still what the payload said, so the journal can show
+	// the shadowing rather than hide it behind the corrected answer.
+	if rec.RoleRequested != "reviewer" || rec.AgentType != "reviewer" {
+		t.Errorf("role_requested/agent_type = %q/%q, want the raw shadowing name in both",
+			rec.RoleRequested, rec.AgentType)
+	}
+}
+
+// TestAnOperatorsRoleFlagOutranksTheDispatchMap pins the limit of the fix above.
+//
+// The map corrects a PAYLOAD string. `--role` is a human's explicit instruction
+// and the map is not about it: a blunt map-first reorder would let a session's
+// dispatch history quietly override the operator's own override, which is the
+// bug in the opposite direction.
+func TestAnOperatorsRoleFlagOutranksTheDispatchMap(t *testing.T) {
+	root := repoRootForTest(t)
+	stateDir := t.TempDir()
+	session := "s-flag"
+	args := []string{"--harness", "claude", "--repo-root", root, "--state-dir", stateDir}
+
+	if code, _ := runGate(t, args, dispatchPayload(session, "reviewer", "builder")); code != 0 {
+		t.Fatalf("dispatch exited %d", code)
+	}
+	withRole := append(append([]string{}, args...), "--role", "reviewer")
+	if code, _ := runGate(t, withRole, childPayload(session, "reviewer", "aflag-1")); code != 0 {
+		t.Fatalf("child exited %d", code)
+	}
+	rec := lastRecord(t, stateDir, session+"-aflag-1")
+	if rec.RoleResolved != "reviewer" {
+		t.Errorf("role_resolved = %q, want reviewer: --role must win over the map", rec.RoleResolved)
+	}
+}
+
+// TestABrokenPersonaRecordStaysLoud is the review's F2, end to end.
+//
+// Concluding "not a persona" from a failed load conflates `general-purpose`,
+// which has no record BY DESIGN, with `reviewer` whose AGENT.md a bad merge just
+// broke. Quieting the second hides enforcement being off inside the very cleanup
+// that exists to surface it — the defect this spec fixes, committed by the fix.
+func TestABrokenPersonaRecordStaysLoud(t *testing.T) {
+	root := brokenRecordRoot(t)
+	stateDir := t.TempDir()
+	session := "s-broken"
+	args := []string{"--harness", "claude", "--repo-root", root, "--state-dir", stateDir}
+
+	if code, _ := runGate(t, args, dispatchPayload(session, "probe", "reviewer")); code != 0 {
+		t.Fatalf("dispatch exited %d", code)
+	}
+	code, stderr := runGate(t, args, childPayload(session, "probe", "abroken-1"))
+	if code != 0 {
+		t.Fatalf("child exited %d, want 0: a broken record must never block", code)
+	}
+	rec := lastRecord(t, stateDir, session+"-abroken-1")
+	if rec.Outcome != harness.OutcomeRoleUnresolved {
+		t.Errorf("outcome = %q, want %q: a record that exists and will not load is a FAULT, not a built-in",
+			rec.Outcome, harness.OutcomeRoleUnresolved)
+	}
+	if !strings.Contains(stderr, "ENFORCEMENT IS OFF") {
+		t.Errorf("a broken persona record must be announced; stderr = %q", stderr)
 	}
 }

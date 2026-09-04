@@ -161,8 +161,14 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			}
 
 			requested := effectiveRole(role, call.AgentType)
-			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested,
-				harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID)))
+			// Whether the operator NAMED the role decides which source is
+			// authoritative below. A --role flag is a human's explicit
+			// instruction and outranks anything the payload implies; a
+			// payload-derived role is a caller-supplied string the dispatch map
+			// can correct.
+			fromFlag := strings.TrimSpace(role) != ""
+			dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
+			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested, dispatched, fromFlag)
 			result := harness.Decide(harness.GateInput{
 				Persona:  persona,
 				Call:     call,
@@ -279,19 +285,34 @@ const (
 	roleNotAPersona
 )
 
-// loadGatePersona resolves in three steps, and the second and third are the fix
-// for #1434.
+// loadGatePersona answers "who is acting" from two sources, and WHICH ONE WINS
+// is the whole of #1434 plus its shadow case.
 //
-//  1. The requested name IS a persona record. Unchanged, and still the only path
-//     an unnamed persona dispatch or a `--role` override takes.
-//  2. The requested name is in the session's dispatch map — so the gate saw the
-//     Agent call that created it and knows its true type. If that type is a
-//     persona, THAT is who is acting; if it is not, nobody is, and saying so
-//     quietly is the correct answer rather than a fault.
-//  3. Neither. Genuinely unknown, and still loud — a dispatch this gate never
-//     observed as an Agent call: a Workflow step, an agent resumed from an
-//     earlier session, an in-process teammate.
-func loadGatePersona(warn io.Writer, repoRoot, role string, dispatched map[string]string) (*harness.Persona, roleResolution) {
+// THE DISPATCH MAP OUTRANKS THE PAYLOAD'S OWN STRING. `agent_type` is
+// caller-supplied: it carries the dispatch's NAME when one was given, and a name
+// is unconstrained — it may happen to equal a persona's. So looking the payload
+// string up in the roster FIRST resolves `Agent(name: "reviewer",
+// subagent_type: "builder")` to `reviewer`, enforcing the wrong persona's skills
+// while the journal reads healthy. Found by the independent review on #1471,
+// with a reproduction; nothing in the 274 observed records shadows a persona
+// today, which is exactly why it would have been discovered late. The map does
+// not have this weakness: it was written from the dispatch's own
+// `subagent_type`, so when it has an answer, that answer is what the caller
+// DECLARED rather than what it happened to name.
+//
+// A `--role` FLAG STILL WINS OVER BOTH. It is a human's explicit instruction and
+// the map is not about it — deliberately, because a blunt map-first reorder
+// would let a session's dispatch history override the operator's own override.
+//
+// Resolution, in order:
+//
+//  1. `--role` given: the roster, and nothing else. Unresolved stays loud.
+//  2. The session's map witnessed this identity: its recorded type is the
+//     answer. A persona → that persona; not a persona → nobody, quietly.
+//  3. Not witnessed: the roster, as before. This is what still resolves a
+//     dispatch the gate never saw whose agent_type happens to name a persona.
+//  4. Neither: genuinely unknown, and loud.
+func loadGatePersona(warn io.Writer, repoRoot, role string, dispatched map[string]string, fromFlag bool) (*harness.Persona, roleResolution) {
 	if strings.TrimSpace(role) == "" {
 		// Not asked for: the caller declared no persona, so there is nothing to
 		// fail to find. Distinct from the case below, and NOT worth a line on
@@ -305,28 +326,47 @@ func loadGatePersona(warn io.Writer, repoRoot, role string, dispatched map[strin
 		}
 	}
 
-	path := filepath.Join(repoRoot, "harness", "agents", role, "AGENT.md")
+	lookup := role
+	if !fromFlag {
+		if trueType, witnessed := dispatched[role]; witnessed {
+			lookup = trueType
+		}
+	}
+
+	agentsDir := filepath.Join(repoRoot, "harness", "agents")
+	path := filepath.Join(agentsDir, lookup, "AGENT.md")
 	p, err := harness.LoadPersona(path)
 	if err == nil {
 		return p, roleResolved
 	}
-	directErr, directPath := err, path
 
-	if trueType, witnessed := dispatched[role]; witnessed && trueType != role {
-		typePath := filepath.Join(repoRoot, "harness", "agents", trueType, "AGENT.md")
-		if viaMap, mapErr := harness.LoadPersona(typePath); mapErr == nil {
-			return viaMap, roleResolved
-		}
-		return nil, roleNotAPersona
-	} else if witnessed {
-		// Witnessed under its own name — an UNNAMED dispatch — and its record
-		// did not load. The type is what the caller asked for and it is not a
-		// persona, so no persona governs it.
+	// A RECORD THAT EXISTS AND WOULD NOT LOAD IS A FAULT, NOT A BUILT-IN.
+	//
+	// The second finding of the same review: concluding "this is not a persona"
+	// from a failed load conflates `general-purpose` — which has no record BY
+	// DESIGN — with `reviewer` whose AGENT.md a bad merge just broke. The first
+	// is correctly quiet; the second is the exact fault this spec exists to make
+	// findable, and quieting it would hide enforcement being off behind the very
+	// cleanup that was supposed to surface it.
+	//
+	// Membership is decided by the DIRECTORY, not by whether the file parses,
+	// so a corrupt record still counts as a persona and stays loud.
+	// LoadPersonas is not reusable here: it fails wholesale on one bad record,
+	// so it cannot answer a question about a single name.
+	if _, statErr := os.Stat(filepath.Join(agentsDir, lookup)); statErr == nil {
+		_, _ = fmt.Fprintf(warn, "[gate] allow: role %q has a record that did not load (%s): %v — ENFORCEMENT IS OFF for this call\n",
+			lookup, path, err)
+		return nil, roleUnresolved
+	}
+
+	if lookup != role || dispatched[role] != "" {
+		// Witnessed, and its true type has no record directory at all: a
+		// built-in agent. Nobody governs it, and that is a correct answer.
 		return nil, roleNotAPersona
 	}
 
 	_, _ = fmt.Fprintf(warn, "[gate] allow: role %q did not resolve (%s): %v — ENFORCEMENT IS OFF for this call\n",
-		role, directPath, directErr)
+		role, path, err)
 	return nil, roleUnresolved
 }
 
@@ -491,7 +531,15 @@ func dispatchArgs(tool string, args map[string]any) (name, agentType string) {
 		}
 		return ""
 	}
-	return str("name"), str("subagent_type", "agent_type", "subagentType")
+	// ONE SPELLING FOR THE TYPE, because one is what was measured. The extra
+	// spellings this carried at first were belt-and-braces with nothing behind
+	// them, and the independent review on #1471 was right to ask: this spec's
+	// entire argument is that it reads a field it measured rather than one it
+	// guessed, and a guessed key in the same function undercuts it. If a rename
+	// ever happens the correct response is to measure the new name, not to have
+	// pre-guessed it — a wrong guess here would map a name onto the wrong type,
+	// which resolves the WRONG persona, and that is worse than resolving none.
+	return str("name"), str("subagent_type")
 }
 
 func skillArg(tool string, args map[string]any) string {
