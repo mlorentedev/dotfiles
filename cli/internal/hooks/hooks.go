@@ -56,6 +56,14 @@ type Options struct {
 }
 
 // Install deploys the dispatcher and wires core.hooksPath.
+//
+// The two halves are NOT transactional, and callers must not treat a returned
+// error as "nothing happened": deployment can succeed and the wiring still
+// fail, leaving the dispatcher on disk with core.hooksPath unset — which is to
+// say, with the guards installed but inert. Re-running recovers, because the
+// deploy is idempotent and the wiring retries, so the contract for a caller is
+// to surface the error and let the operator re-run. A caller that swallows it
+// turns every guard off silently, which is the one outcome worse than failing.
 func Install(ctx context.Context, o Options) error {
 	if o.homeDir == "" {
 		home, err := os.UserHomeDir()
