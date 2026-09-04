@@ -1,8 +1,50 @@
 [
   {
     "id": "HARNESS-109-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "AC1 - a dispatch call writes a name -> subagent_type entry to the session's map in the state dir, and adds nothing to the decision journal",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/harness/ -count=1 -v -run 'TestTheDispatchMapNeverStoresAnythingButTwoIdentifiers|TestRecordDispatchRoundTrips' 2>&1 | grep -c '^--- PASS: Test' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f2",
+    "behavior": "AC2 - a call with agent_type set to a dispatched NAME resolves to the same persona as the unnamed dispatch of that persona; without the preceding dispatch it still records role-unresolved",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -v -run 'TestANamedDispatchIsGatedLikeAnUnnamedOne|TestWithoutTheDispatchTheChildStillFailsOpen' 2>&1 | grep -c '^--- PASS: Test' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f3",
+    "behavior": "AC3 - an agent_type naming a persona directly still resolves without consulting the map",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -v -run 'TestLoadGatePersonaSaysSoWhenARoleDoesNotResolve' 2>&1 | grep -q -- '--- PASS: TestLoadGatePersonaSaysSoWhenARoleDoesNotResolve/a_role_that_resolves_is_silent'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f4",
+    "behavior": "AC4 - a witnessed built-in agent records no-role with no ENFORCEMENT IS OFF line, keeping the raw name in role_requested, by both the named and unnamed route",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -v -run 'TestAWitnessedBuiltInAgentIsQuietNotAFault' 2>&1 | grep -c -- '--- PASS: TestAWitnessedBuiltInAgentIsQuietNotAFault/' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f5",
+    "behavior": "AC5 - dispatch identifiers are validated against the tool's own name pattern, no other tool_input key is read or persisted, and a rejected value never blocks",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/harness/ -count=1 -v -run 'TestAnUnusableDispatchNameIsNotWritten|TestValidDispatchNameMatchesTheToolsOwnConstraint|TestOnlyTheDispatchPrimitiveIsReadForDispatchArguments|TestRecordDispatchRefusesWhatItCannotSafelyStore' 2>&1 | grep -c '^--- PASS: Test' | grep -qx 4",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f6",
+    "behavior": "AC6 - on a live named dispatch the journal records role_resolved where #1434's table recorded role-unresolved. Owner-gated: needs a real subagent dispatch, so it is verified by the recorded evidence in verification.md rather than by a command CI can run",
+    "verification": "grep -q 'role_resolved\":\"reviewer\"' specs/HARNESS-109/verification.md && grep -q 'harness109-probe' specs/HARNESS-109/verification.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-109-f7",
+    "behavior": "AC7 - every interactive hook the manifest emits carries a timeout, asserted on what MergeHooks actually writes rather than on the manifest text",
+    "verification": "cd cli && go test ./internal/harness/ -count=1 -v -run 'TestEveryInteractiveHookIsBounded' 2>&1 | grep -q -- '--- PASS: TestEveryInteractiveHookIsBounded'",
     "state": "pending",
     "evidence": ""
   }
