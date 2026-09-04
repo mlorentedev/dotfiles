@@ -23,6 +23,10 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       powershell: ${{ steps.filter.outputs.powershell }}
+      # CI-002 (#1478): the first filter that is narrower than "is this code at
+      # all". HARNESS-041 asked whether a diff needs CI; this asks which PART of
+      # CI a diff needs, which one bucket cannot answer.
+      pi: ${{ steps.filter.outputs.pi }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -62,6 +66,20 @@ jobs:
               - '**/*.psm1'
               - '.PSScriptAnalyzerSettings.psd1'
               - '.github/workflows/ci.yml'
+            # What can change what the pi package reconcile DOES: the manifest
+            # it reads, and the code in either twin that reads it. Nothing else
+            # can, because every entry is version-pinned and
+            # tests/pi-config.bats refuses an unpinned one -- so the same
+            # manifest always resolves to the same install set.
+            #
+            # Both setup scripts are listed WHOLE rather than by the reconcile
+            # block, because a filter cannot see line ranges and a guard that
+            # silently under-matches is worse than one that runs too often.
+            pi:
+              - 'ai/pi/**'
+              - 'setup-linux.sh'
+              - 'setup-windows.ps1'
+              - 'tests/pi-*.bats'
 
   lint:
     runs-on: ubuntu-latest
@@ -397,12 +415,27 @@ jobs:
       # set here, on the CI step, and NOT in setup-windows.ps1: this is a
       # property of a throwaway runner, not of a developer's machine, and the
       # bootstrap scripts stay out of it (ADR-020 C7).
+      #
+      # CI-002 (#1478): on a PR whose diff cannot change what the pi reconcile
+      # does, skip it. That block is 883-2200s of this job — four runs of the
+      # same nine pinned packages, measured 2026-09-04 — and a Go-only PR was
+      # paying all of it. `pi` is the filter above; anything it matches runs the
+      # reconcile as before.
+      #
+      # PUSHES TO main NEVER SKIP, and after this the reconcile runs ONLY there.
+      # That is deliberate and it is the whole guard: coverage does not move to
+      # a schedule nobody reads. But it does mean main is now the only place a
+      # reconcile regression can surface, so the guard's value rests entirely on
+      # a red main being noticed. Stated out loud because the alternative is
+      # leaving it as an assumption, and an unread signal is how CI-001 stayed
+      # invisible for as long as it did.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: powershell
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
           npm_config_prefer_offline: "true"
+          DOTFILES_SKIP_PI_PACKAGES: ${{ (github.event_name == 'pull_request' && needs.changes.outputs.pi != 'true') && '1' || '' }}
         run: .\setup-windows.ps1
 
       # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
