@@ -77,10 +77,12 @@ admission procedure yet. Neither is wired into `defaultModel`, `harness/model-ma
 `.pr_agent.toml` or `harness/reviewer-pool.json` — see #1244.
 
 One capability nuance for `qwen3.8-flash` specifically: Alibaba's own release notes put its
-*native* context at 262,144 tokens, extended to 1M via YaRN — the "production" NaN-served
-variant defaults to 1M, which is what's declared here, but YaRN-extended context can behave
-differently at the far end of the window than a natively-1M model (`deepseek-v4-flash`,
-`mimo-v2.5`). `glm5.3-flash`'s 1M is native per Zhipu.
+*native* context at 262,144 tokens, extended to 1M via YaRN, and YaRN-extended context can
+behave differently at the far end of the window than a natively-1M model
+(`deepseek-v4-flash`, `mimo-v2.5`). `models.json` therefore declares the **native** 262,144
+rather than the served 1M: a declared window the model degrades inside is worse than a
+smaller honest one, because nothing downstream can tell a degraded answer from a good one.
+`glm5.3-flash`'s 1M is native per Zhipu.
 
 The three paid OpenRouter models (`deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`) were
 dropped from the picker: a paid model one keystroke away in a model list is a cost you take by
@@ -91,8 +93,8 @@ pi's picker also omits the rate-limited `:free` OpenRouter tier that `opencode.j
 the two sets are curated independently. `tests/pi-config.bats` asserts this list stays equal to
 `settings.json`'s `enabledModels`.
 
-Default: `nan/qwen3.8-flash`, thinking level `high`. Change in `settings.json`. (Per-model context
-windows live in `models.json` — the one place they cannot drift from.)
+Default: `nan/deepseek-v4-flash`, thinking level `high`. Change in `settings.json`. (Per-model
+context windows live in `models.json` — the one place they cannot drift from.)
 
 ## Secret
 
