@@ -1,6 +1,6 @@
 {
   "defaultProvider": "nan",
-  "defaultModel": "qwen3.8-flash",
+  "defaultModel": "deepseek-v4-flash",
   "defaultThinkingLevel": "high",
   "temperature": 0.2,
   "enabledModels": [

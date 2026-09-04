@@ -281,5 +281,8 @@ tags: [lessons, index, dotfiles]
 | [261 - Never test secret guards against live credentials, and redact at the stream boundary](lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary.md) | 2026-09-02 |  |
 | [262 - A merged PR and a stuck PR are indistinguishable from the branch side](lesson-262-a-merged-pr-and-a-stuck-pr-look-identical-from-the-branch.md) | 2026-09-02 |  |
 | [263 - A population that cannot prove it is complete answers with a plausible number](lesson-263-a-population-that-cannot-prove-it-is-complete.md) | 2026-09-02 |  |
+| [264 - When the documentation does not name a field, read the executable — twice it decided a design](lesson-264-a-hooks-timeout-semantics-are-not-in-the-documentation.md) | 2026-09-03 |  |
+| [265 - A correct measurement answering the wrong question, three times in one session](lesson-265-a-correct-measurement-answering-the-wrong-question.md) | 2026-09-03 |  |
+| [266 - Two measurements agreeing is not reproducibility](lesson-266-two-measurements-agreeing-is-not-reproducibility.md) | 2026-09-04 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
