@@ -323,3 +323,75 @@ func foreignCommands(doc map[string]any) map[string]int {
 	}
 	return out
 }
+
+// TestEveryInteractiveHookIsBounded closes HARNESS-109's AC7.
+//
+// THE GATE HOOK SHIPPED UNBOUNDED. `harness suggest --from-hook` was given
+// `timeout: 5` by #1455's review, because an unbounded hook on the interactive
+// path delays what the user typed; `harness gate` runs on EVERY tool call on the
+// same path and carried no timeout at all. The asymmetry was invisible because
+// nothing asserted the class — only the one hook the review happened to read.
+//
+// Measured in the Claude Code 2.1.260 executable: a timed-out hook returns
+// `blocked: false` unless `timeoutFailsClosed` is set, and that flag is only set
+// for a call served to a cloud session. So locally a bound converts a long stall
+// into a fast fail-open — which is the gate's own documented contract — and
+// cannot turn into a refused tool call. Bounding is strictly safer, never a new
+// blocking risk.
+//
+// Asserted BY CONSEQUENCE on the rendered hook commands, not by string-matching
+// the manifest: bind.go omits `timeout` from the emitted JSON when it is zero,
+// so a declaration test would pass on a value that never reaches the harness.
+func TestEveryInteractiveHookIsBounded(t *testing.T) {
+	targets, err := LoadBindTargets(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("LoadBindTargets: %v", err)
+	}
+
+	// The events a human is waiting on. A session-lifecycle hook may legitimately
+	// take longer, and both already carry 30.
+	interactive := map[string]bool{
+		"PreToolUse": true, "PostToolUse": true,
+		"UserPromptSubmit": true, "BeforeTool": true,
+	}
+
+	checked := 0
+	for _, target := range targets {
+		if !target.Emits() {
+			continue
+		}
+		cmds, err := target.HookCommands("/opt/bin/dotf")
+		if err != nil {
+			t.Fatalf("HookCommands for %q: %v", target.Agent, err)
+		}
+		for _, c := range cmds {
+			if !interactive[c.Event] {
+				continue
+			}
+			checked++
+			if c.Timeout <= 0 {
+				t.Errorf("%s hook %q (%s) is unbounded: an interactive hook with no timeout stalls the user",
+					target.Agent, c.ID, c.Event)
+			}
+			// Through the REAL emission path. HookCommand's own field is not
+			// what a harness reads: bind.go writes `timeout` into the merged
+			// settings document and omits it when zero, so this is the only
+			// assertion that sees what actually reaches the file.
+			merged, _, err := MergeHooks(map[string]any{}, []HookCommand{c})
+			if err != nil {
+				t.Fatalf("MergeHooks for %q: %v", c.ID, err)
+			}
+			raw, err := json.Marshal(merged)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			if !strings.Contains(string(raw), `"timeout"`) {
+				t.Errorf("%s hook %q reaches the settings file with no timeout: %s", target.Agent, c.ID, raw)
+			}
+		}
+	}
+	// C15: zero hooks checked is not a pass. It is the manifest having moved.
+	if checked == 0 {
+		t.Fatal("no interactive hook was checked — the manifest's emit_hooks moved, and this guard silently stopped guarding")
+	}
+}

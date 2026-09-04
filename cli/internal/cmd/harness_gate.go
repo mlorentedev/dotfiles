@@ -117,6 +117,20 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				Tool:      call.Tool,
 			}
 
+			// HARNESS-109: if THIS call is a dispatch, remember what it
+			// dispatched before deciding anything about it. PreToolUse is
+			// synchronous, so this write completes before the child exists —
+			// the ordering the whole mechanism rests on, and the reason it
+			// happens here rather than on some later event. The error is
+			// ignored for RecordConsumed's reason: losing the entry costs
+			// enforcement for one subagent, while failing here would block a
+			// session over a full disk.
+			if call.DispatchType != "" {
+				_ = harness.RecordDispatch(
+					harness.DispatchPath(stateDir, call.SessionID),
+					call.DispatchName, call.DispatchType)
+			}
+
 			// A skill invocation is the act the gate exists to require: record
 			// it and get out of the way. Recording failures are ignored on
 			// purpose — losing the record costs a redundant skill run, while
@@ -147,7 +161,8 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			}
 
 			requested := effectiveRole(role, call.AgentType)
-			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested)
+			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested,
+				harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID)))
 			result := harness.Decide(harness.GateInput{
 				Persona:  persona,
 				Call:     call,
@@ -170,7 +185,12 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				// whole reason AC5 names this case: enforcement was off, and
 				// nothing outside this record says so.
 				rec.Outcome = harness.OutcomeRoleUnresolved
-			case resolution == roleNotAsked:
+			case resolution == roleNotAsked || resolution == roleNotAPersona:
+				// Deliberately one case: "nobody with forced skills is acting"
+				// is the same fact whether nobody was asked for or a witnessed
+				// dispatch turned out to be a built-in agent. RoleRequested
+				// keeps the raw name, so the journal still separates them
+				// without spending a ninth Outcome.
 				rec.Outcome = harness.OutcomeNoRole
 			case result.Decision == harness.Block:
 				rec.Outcome = harness.OutcomeBlock
@@ -240,9 +260,38 @@ const (
 	roleUnresolved
 	// roleResolved: a persona is in scope.
 	roleResolved
+	// roleNotAPersona: the gate WITNESSED this dispatch and knows what it is —
+	// a built-in agent (`general-purpose`, `Explore`, `Plan`) that no persona
+	// governs by design.
+	//
+	// It allows, quietly, and records OutcomeNoRole: it is the same FACT as a
+	// main-thread call — nobody with forced skills is acting — so it spends no
+	// slot in the Outcome vocabulary, which is closed and pinned by tests on
+	// purpose. It is a separate resolution nonetheless because the two differ
+	// in the code's terms: one was never asked, the other was asked and
+	// correctly answered "nobody". The raw name survives in RoleRequested, so
+	// the journal can still tell them apart.
+	//
+	// Before HARNESS-109 this case was reported as roleUnresolved with
+	// "ENFORCEMENT IS OFF" on stderr — a misclassification that made 271 of 274
+	// records look like faults and left the genuine faults unfindable among
+	// them.
+	roleNotAPersona
 )
 
-func loadGatePersona(warn io.Writer, repoRoot, role string) (*harness.Persona, roleResolution) {
+// loadGatePersona resolves in three steps, and the second and third are the fix
+// for #1434.
+//
+//  1. The requested name IS a persona record. Unchanged, and still the only path
+//     an unnamed persona dispatch or a `--role` override takes.
+//  2. The requested name is in the session's dispatch map — so the gate saw the
+//     Agent call that created it and knows its true type. If that type is a
+//     persona, THAT is who is acting; if it is not, nobody is, and saying so
+//     quietly is the correct answer rather than a fault.
+//  3. Neither. Genuinely unknown, and still loud — a dispatch this gate never
+//     observed as an Agent call: a Workflow step, an agent resumed from an
+//     earlier session, an in-process teammate.
+func loadGatePersona(warn io.Writer, repoRoot, role string, dispatched map[string]string) (*harness.Persona, roleResolution) {
 	if strings.TrimSpace(role) == "" {
 		// Not asked for: the caller declared no persona, so there is nothing to
 		// fail to find. Distinct from the case below, and NOT worth a line on
@@ -255,14 +304,30 @@ func loadGatePersona(warn io.Writer, repoRoot, role string) (*harness.Persona, r
 			repoRoot = filepath.Join(os.Getenv("HOME"), ".dotfiles")
 		}
 	}
+
 	path := filepath.Join(repoRoot, "harness", "agents", role, "AGENT.md")
 	p, err := harness.LoadPersona(path)
-	if err != nil {
-		_, _ = fmt.Fprintf(warn, "[gate] allow: role %q did not resolve (%s): %v — ENFORCEMENT IS OFF for this call\n",
-			role, path, err)
-		return nil, roleUnresolved
+	if err == nil {
+		return p, roleResolved
 	}
-	return p, roleResolved
+	directErr, directPath := err, path
+
+	if trueType, witnessed := dispatched[role]; witnessed && trueType != role {
+		typePath := filepath.Join(repoRoot, "harness", "agents", trueType, "AGENT.md")
+		if viaMap, mapErr := harness.LoadPersona(typePath); mapErr == nil {
+			return viaMap, roleResolved
+		}
+		return nil, roleNotAPersona
+	} else if witnessed {
+		// Witnessed under its own name — an UNNAMED dispatch — and its record
+		// did not load. The type is what the caller asked for and it is not a
+		// persona, so no persona governs it.
+		return nil, roleNotAPersona
+	}
+
+	_, _ = fmt.Fprintf(warn, "[gate] allow: role %q did not resolve (%s): %v — ENFORCEMENT IS OFF for this call\n",
+		role, directPath, directErr)
+	return nil, roleUnresolved
 }
 
 // effectiveRole picks the persona in scope: the operator's --role when given,
@@ -367,13 +432,16 @@ func normaliseToolCall(harnessName string, payload []byte) (harness.ToolCall, bo
 		if json.Unmarshal(payload, &p) != nil || p.ToolName == "" {
 			return harness.ToolCall{}, false
 		}
+		name, agentType := dispatchArgs(p.ToolName, p.ToolInput)
 		return harness.ToolCall{
-			SessionID:   p.SessionID,
-			Tool:        p.ToolName,
-			Skill:       skillArg(p.ToolName, p.ToolInput),
-			IsSkillTool: isSkillTool(p.ToolName),
-			AgentType:   strings.TrimSpace(p.AgentType),
-			AgentID:     strings.TrimSpace(p.AgentID),
+			SessionID:    p.SessionID,
+			Tool:         p.ToolName,
+			Skill:        skillArg(p.ToolName, p.ToolInput),
+			IsSkillTool:  isSkillTool(p.ToolName),
+			AgentType:    strings.TrimSpace(p.AgentType),
+			AgentID:      strings.TrimSpace(p.AgentID),
+			DispatchName: name,
+			DispatchType: agentType,
 		}, true
 	}
 }
@@ -386,6 +454,44 @@ func normaliseToolCall(harnessName string, payload []byte) (harness.ToolCall, bo
 // forbids the only action that could satisfy the gate.
 func isSkillTool(tool string) bool {
 	return strings.EqualFold(strings.TrimSpace(tool), "skill")
+}
+
+// isDispatchTool reports that the tool IS the harness's subagent-dispatch
+// primitive — the call whose arguments say which persona a subagent will be.
+//
+// Two spellings are matched because the primitive was renamed: `Task` in earlier
+// Claude Code releases, `Agent` in the ones this repository runs (all 6 dispatch
+// records in the journal read `Agent`). Accepting both costs nothing, and
+// missing the one in use costs exactly the enforcement this spec restores —
+// silently, since an unrecognised dispatch writes no map entry and the gate
+// simply behaves as it did before.
+func isDispatchTool(tool string) bool {
+	t := strings.TrimSpace(tool)
+	return strings.EqualFold(t, "Agent") || strings.EqualFold(t, "Task")
+}
+
+// dispatchArgs extracts the name and true type from a dispatch's arguments.
+//
+// THESE ARE THE ONLY TOOL-INPUT VALUES THE GATE READS besides the skill name,
+// and both are schema-bounded identifiers rather than free text — the caller's
+// own tool constrains them, and RecordDispatch validates them again before
+// anything reaches disk. Returning empty for anything unreadable degrades to no
+// map entry, hence a later fail-open, hence the behaviour that existed before
+// this function: a wrong guess about a field name can cost enforcement and can
+// never cause a block. Same containment as skillArg.
+func dispatchArgs(tool string, args map[string]any) (name, agentType string) {
+	if !isDispatchTool(tool) {
+		return "", ""
+	}
+	str := func(keys ...string) string {
+		for _, k := range keys {
+			if v, ok := args[k].(string); ok && strings.TrimSpace(v) != "" {
+				return strings.TrimSpace(v)
+			}
+		}
+		return ""
+	}
+	return str("name"), str("subagent_type", "agent_type", "subagentType")
 }
 
 func skillArg(tool string, args map[string]any) string {

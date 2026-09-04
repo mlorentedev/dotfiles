@@ -144,8 +144,12 @@ func TestLoadGatePersonaSaysSoWhenARoleDoesNotResolve(t *testing.T) {
 		name     string
 		role     string
 		repoRoot string
-		wantNil  bool
-		wantSaid bool
+		// dispatched is the session's witnessed dispatches (HARNESS-109). Nil
+		// is a session in which the gate saw no Agent call, which is every row
+		// that predates that spec.
+		dispatched map[string]string
+		wantNil    bool
+		wantSaid   bool
 		// wantRes is the part a caller can act on AFTER the call. The stderr
 		// line tells a human reading a live terminal that enforcement is off;
 		// this is what lets the decision record say so durably.
@@ -167,10 +171,45 @@ func TestLoadGatePersonaSaysSoWhenARoleDoesNotResolve(t *testing.T) {
 			name: "a role that resolves is silent",
 			role: "reviewer", repoRoot: root, wantNil: false, wantSaid: false, wantRes: roleResolved,
 		},
+		// HARNESS-109 (#1434). The first row IS the bug: before the dispatch
+		// map, a named dispatch of a real persona was the row above it —
+		// unresolved, announced, enforcement off — so naming a subagent turned
+		// its own gate off. It must now be indistinguishable from an unnamed
+		// dispatch of the same persona.
+		{
+			name: "a NAMED dispatch resolves through the map to its true persona",
+			role: "harness109-probe", repoRoot: root,
+			dispatched: map[string]string{"harness109-probe": "reviewer"},
+			wantNil:    false, wantSaid: false, wantRes: roleResolved,
+		},
+		{
+			name: "a named dispatch of a BUILT-IN agent is quiet, not a fault",
+			role: "kubelab-harness", repoRoot: root,
+			dispatched: map[string]string{"kubelab-harness": "general-purpose"},
+			wantNil:    true, wantSaid: false, wantRes: roleNotAPersona,
+		},
+		{
+			name: "an UNNAMED dispatch of a built-in agent is quiet too",
+			role: "general-purpose", repoRoot: root,
+			dispatched: map[string]string{"general-purpose": "general-purpose"},
+			wantNil:    true, wantSaid: false, wantRes: roleNotAPersona,
+		},
+		{
+			name: "a dispatch the gate never witnessed stays LOUD",
+			role: "resumed-from-another-session", repoRoot: root,
+			dispatched: map[string]string{"someone-else": "reviewer"},
+			wantNil:    true, wantSaid: true, wantRes: roleUnresolved,
+		},
+		{
+			name: "a map entry pointing at a persona whose record is gone is not a false resolve",
+			role: "harness109-probe", repoRoot: t.TempDir(),
+			dispatched: map[string]string{"harness109-probe": "reviewer"},
+			wantNil:    true, wantSaid: false, wantRes: roleNotAPersona,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			got, res := loadGatePersona(&buf, tc.repoRoot, tc.role)
+			got, res := loadGatePersona(&buf, tc.repoRoot, tc.role, tc.dispatched)
 
 			if (got == nil) != tc.wantNil {
 				t.Errorf("persona nil = %v, want %v", got == nil, tc.wantNil)
