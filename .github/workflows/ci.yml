@@ -275,29 +275,35 @@ jobs:
 
   test-windows:
     runs-on: windows-latest
-    # RUNS ON main TOO, and that is half of CI-001's fix rather than a cost.
+    # RUNS ON main TOO, because a required check that accumulates no evidence on
+    # the default branch is a latent failure with nowhere to show up until it
+    # blocks someone.
     #
-    # A GitHub Actions cache is readable from the branch that wrote it, that
-    # branch's base, and the DEFAULT branch — never from a sibling PR. So a
-    # cache populated only on PR branches warms nothing for the next PR, and the
-    # step below would have helped re-runs of one PR and nobody else. Populating
-    # it on main is what makes every PR start warm.
+    # The job was `skipped` on every push to main — measured, 6 of the last 6 —
+    # so "main is green" was never evidence about it, and the only place it
+    # genuinely ran was a PR. That is exactly how CI-001 arrived: a job nobody
+    # could see degrading until it cancelled two unrelated PRs at the ceiling.
+    # `integration`, the other heavy job, already runs on both for this reason.
     #
-    # It also closes the reason this defect stayed invisible. The job was
-    # `skipped` on every push to main — measured, 6 of the last 6 — so "main is
-    # green" was never evidence about it, and the only place it genuinely ran
-    # was a PR. A required check that accumulates no evidence on the default
-    # branch is a latent failure with nowhere to show up until it blocks
-    # someone, which is exactly how this arrived. `integration`, the other heavy
-    # job, already runs on both for the same reason.
-    # CI-001 (#1472): 45 rather than 30 as the COMPANION to the npm cache below,
-    # not as the fix. The cache removes the cost on a hit; this stops a cold
-    # cache on a slow registry night from cancelling the job before it reaches
-    # the doctor gate, the Pester suites or the bats subset — which is what
-    # happened to two unrelated PRs, and a cancelled run tells you nothing about
-    # either. Raising it alone would have been option 4 on the ticket, and was
-    # rejected there: a job that spends 27 of 30 minutes in a package manager
-    # does not get better by being given 45.
+    # CI-001 (#1472): 45 rather than 30 — and READ WHAT THIS DOES NOT DO.
+    #
+    # It fixes nothing. It converts a cancelled job into a slow one. The work
+    # takes exactly as long as it did; the ceiling merely stopped catching it.
+    # What the raise buys is the ability to OBSERVE the problem instead of
+    # having it reported as a failure of whichever PR paid for it — and a
+    # cancelled run tells you nothing about that PR.
+    #
+    # The ticket rejected raising the ceiling as "option 4" and that rejection
+    # stands: CI-001 does not close here. Measured on this branch, the pi
+    # package reconcile is ~66% of the setup step and ~57% of the job, and its
+    # cost tracks npm registry latency, which is not a property of this
+    # repository. Two runs of the SAME commit spent 1175s and >1900s in that
+    # step. The second crossed 30 minutes — not for a defect, for a slow night.
+    #
+    # So this is a margin on an undiagnosed and unbounded cost, which is a loan,
+    # not headroom: the next slow night eats 45 the way this one ate 30. It is
+    # deliberately temporary and it is not a substitute for taking the reconcile
+    # off the blocking path. Lower it again when that lands.
     timeout-minutes: 45
     needs: [changes]
     steps:
@@ -373,76 +379,62 @@ jobs:
 
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
       # the binary built above survives setup. No DOTFILES_DIR override: the
-      # CI-001 (#1472): setup reconciles the pi package manifest with one
-      # `pi install` per package, serially, and each one shells out to npm. On
-      # 2026-09-04 those eight installs took 54s to 7 MINUTES apiece and
-      # consumed 27 of this job's 30 minutes, cancelling two unrelated PRs at
-      # the ceiling. Nothing in either diff went near ai/pi/packages.json: the
-      # variable is npm registry latency, which is not a property of this
-      # repository, so the job had always been one slow night from failing.
-      #
-      # CACHED ON THE MANIFEST'S HASH because that is exactly what the install
-      # set is a function of: every entry in packages.json carries a pinned
-      # version (tests/pi-config.bats refuses an unpinned one), so the same
-      # manifest always resolves to the same tarballs. A manifest edit misses
-      # the cache and pays full price once, which is correct — that run is
-      # installing something genuinely new.
-      #
-      # The path is asked of npm rather than hardcoded. %LocalAppData%\npm-cache
-      # is today's answer on windows-latest, and a hardcoded path that stops
-      # being right caches nothing while still reporting success — the failure
-      # this repository keeps cataloguing, and one a green job would hide.
-      - name: Resolve npm's cache directory
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        id: npmcache
-        shell: pwsh
-        run: |
-          $dir = (npm config get cache).Trim()
-          if (-not $dir -or $dir -eq 'undefined') { throw "npm config get cache returned nothing" }
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "npm cache: $dir"
-
-      - uses: actions/cache@v4
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        with:
-          path: ${{ steps.npmcache.outputs.dir }}
-          key: npm-pi-${{ runner.os }}-${{ hashFiles('ai/pi/packages.json') }}
-          # A stale restore is still worth having: most of the tarballs are
-          # unchanged, and npm fetches only what is missing.
-          restore-keys: |
-            npm-pi-${{ runner.os }}-
-
       # deploy dir is the real-box default (~/.dotfiles), so the gate below
       # certifies the tree a real machine reads, not the checkout (#1298 layer 3).
       #
-      # npm_config_prefer_offline is what makes the cache above DECIDE anything.
-      # A warm cache alone still lets npm round-trip the registry for metadata on
-      # every package; prefer-offline serves what is cached and goes to the
-      # network only for what is missing, which is the whole 27 minutes. It is
-      # set here, on the CI step, and NOT in setup-windows.ps1: this is a
-      # property of a throwaway runner, not of a developer's machine, and the
-      # bootstrap scripts stay out of it (ADR-020 C7).
+      # THIS STEP IS ~87% OF THE JOB and CI-001 (#1472) does not fix it. Setup
+      # reconciles the pi package manifest with one `pi install` per package,
+      # serially. Measured 2026-09-04 across four runs, that phase took 883s,
+      # 1331s, 2201s and 2269s — the same nine pinned packages every time.
       #
-      # CI-002 (#1478): on a PR whose diff cannot change what the pi reconcile
-      # does, skip it. That block is 883-2200s of this job — four runs of the
-      # same nine pinned packages, measured 2026-09-04 — and a Go-only PR was
-      # paying all of it. `pi` is the filter above; anything it matches runs the
-      # reconcile as before.
+      # THE VARIABLE IS A ~7-MINUTE TIMEOUT, NOT A SLOW PACKAGE. Every
+      # observation of that band, across every run:
       #
-      # PUSHES TO main NEVER SKIP, and after this the reconcile runs ONLY there.
-      # That is deliberate and it is the whole guard: coverage does not move to
-      # a schedule nobody reads. But it does mean main is now the only place a
+      #   pi-rewind 421s | pi-rewind 422s | pi-plan-mode 422s
+      #   pi-plan-mode 422.0s | pi-effort 421.4s | pi-memory 421.5s
+      #   pi-cc-extensions 422.5s
+      #
+      # Seven observations at 421 ±1s on FIVE DIFFERENT PACKAGES. It lands on
+      # whichever install happens to hit it, and how many hit it per run is what
+      # moves the phase between 883s and 2201s. So "27 of 30 minutes", "22-23
+      # minutes" and "43 minutes" are the same job with a different number of
+      # timeouts in it, and any story about a particular package is attaching the
+      # constant to the wrong noun.
+      #
+      # AN NPM-DOWNLOAD CACHE WAS TRIED HERE AND REMOVED. Recorded so it is not
+      # re-derived. Keyed on the manifest hash, it restored 325 MB on a confirmed
+      # hit in 8s and the phase did not improve — so the time is not on the
+      # download leg. It was NOT shown to be harmful: the warm run's 2269s sits
+      # alongside a COLD run's 2201s, and two cold runs differ by 2.5x, so the
+      # cache's effect is not separable from run-to-run variance. It was removed
+      # for buying nothing while costing 325 MB of Actions quota per manifest
+      # hash — and for reading like npm caching is handled here, which stops the
+      # next person looking.
+      #
+      # `npm_config_prefer_offline` went with it: it existed only to make that
+      # cache decide anything, and against no cache it is a flag with nothing to
+      # prefer.
+      #
+      # Why the timeout cannot be identified from this log: both setup twins
+      # discard `pi install`'s stdout AND stderr on the package loop
+      # (setup-windows.ps1, setup-linux.sh), so the 422s window is silent by
+      # construction. Removing that redirect is task one of the follow-up.
+      #
+      # CI-002 (#1478) took the reconcile off the PR path, which is why this job
+      # is ~8 minutes on a PR that cannot change it. `pi` is the filter above;
+      # anything it matches still runs the reconcile in full.
+      #
+      # PUSHES TO main NEVER SKIP, and the reconcile now runs ONLY there. That is
+      # deliberate and it is the whole guard: coverage does not move to a
+      # schedule nobody reads. But it does mean main is the only place a
       # reconcile regression can surface, so the guard's value rests entirely on
-      # a red main being noticed. Stated out loud because the alternative is
-      # leaving it as an assumption, and an unread signal is how CI-001 stayed
-      # invisible for as long as it did.
+      # a red main being noticed. Stated out loud because an unread signal is how
+      # CI-001 stayed invisible for as long as it did.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: powershell
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
-          npm_config_prefer_offline: "true"
           DOTFILES_SKIP_PI_PACKAGES: ${{ (github.event_name == 'pull_request' && needs.changes.outputs.pi != 'true') && '1' || '' }}
         run: .\setup-windows.ps1
 
