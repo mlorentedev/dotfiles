@@ -1,0 +1,56 @@
+---
+spec: "HARNESS-109"
+verdict: "FAIL"
+reviewed_sha: "f42fa747b9eb7fdca4eec6f63e2b11b149fb37e2"
+reviewer: "nan/glm5.3-flash"
+date: "2026-09-03"
+---
+
+## Adversarial review
+
+**Scope**: HARNESS-109 (`fix/harness-109-agent-type`, commits 61b32dd → 503e04b → 74ca6b5; owner-carried commit f42fa747 touches only `ai/pi/` + lesson 264, no spec/code delta)
+**Sources**: `specs/HARNESS-109/{proposal,tasks,verification}.md`, `features.json`; diff `git diff main...HEAD`; live journal `~/.local/state/dotfiles/gate/` (AC6 record independently located and read by this review)
+
+### Spec and task alignment
+
+- All seven ACs have passing, reproducible evidence. This review re-ran the full matrix at `f42fa747`: `go build`, `go vet`, `GOOS=windows go vet` clean; `go test ./...` all ok; `golangci-lint run` at the pinned 2.12.2 → 0 issues; **all seven `features.json` verification commands pass verbatim**.
+- The implementation matches the proposal's stated design (dispatch map keyed by session, latest-wins, cap at 512, three-step resolution, `no-role` reused rather than a ninth Outcome, timeouts through the manifest). AC6's live record was independently corroborated in the journal: `agent_type: harness109-probe → role_resolved: reviewer`, warned skills identical to the unnamed row.
+- Mutation testing performed by this review (all reverted, tree left clean): killing `dispatchArgs` (M1) is caught by `TestANamedDispatchIsGatedLikeAnUnnamedOne` + both subtests of `TestAWitnessedBuiltInAgentIsQuietNotAFault`; dropping name validation (M2) caught by `TestAnUnusableDispatchNameIsNotWritten` + `TestRecordDispatchRefusesWhatItCannotSafelyStore`; removing the gate `timeout` (M3) caught by `TestEveryInteractiveHookIsBounded`; leaking a prompt into the map (M4) caught by `TestTheDispatchMapNeverStoresAnythingButTwoIdentifiers`; keying the call sites by `ConsumptionScope()` instead of session (M5) caught by the end-to-end test (the unit pinning test alone cannot see a call-site scheme change — the e2e layer earns its keep).
+- The journal-provenance claim checks out at population level: current journal holds 276 `agent_type` records (274 pre-probe + the 2 AC6 probe records), concentrated in the stated 2026-09-02 window, with exactly the two pre-fix resolving records (`reviewer`, unnamed).
+- Observation (not a finding): at review time `proposal.md` carries an uncommitted `status: draft → verifying` flip in the working tree — the expected verification-phase state; contract files must stay untouched from here to archive or the staleness gate will refuse this review.
+
+### Findings
+
+| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
+|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
+| Major | REAL | resolution-order | **A dispatch named after another persona silently resolves to the shadow persona.** `Agent(name: "reviewer", subagent_type: "builder")` produces child records `role_resolved: "reviewer"` with reviewer's warned skills: the direct roster lookup wins before the map is consulted, so the map entry `reviewer→builder` is never used and the journal reads healthy while the resolution is wrong. The proposal mandates this exact order ("`agent_type` ∈ roster → persona") without analyzing the shadow case; the code implements the spec faithfully, so this is a spec-level gap. Consequence grows when `enforce: block` is promoted — the roadmap this spec explicitly unblocks — where it becomes enforcement-per-the-wrong-persona (a one-word shaping of which enforce modes apply). None of the 4 observed dispatch names shadow a persona today. | Probe run by this review (since removed): dispatch `{name:"reviewer", subagent_type:"builder"}` → child record `role_resolved="reviewer"`, `warned=[adversarial-review, audit, cyclomatic-complexity, verification-before-completion]`. Never observed in the journal's 274 pre-probe records. | UNTESTED — no named test covers shadowing; `TestANamedDispatchIsGatedLikeAnUnnamedOne` uses a non-persona name | spec (name the edge and decide: map-entry-wins-when-the-type-differs vs. documented roster-first with containment) + tests |
+| Major | REAL | classification | **A witnessed dispatch whose persona record fails to load is classified quiet `no-role` where pre-change it was loud `role-unresolved`.** The map records presence, not persona-ness; the `else if witnessed` branch concludes "it is not a persona" from a failed `LoadPersona` without evidence, conflating "built-in by design" with "persona record missing/corrupt". Realistic trigger: a bad merge that breaks one `AGENT.md` — afterwards every named *and unnamed* dispatch of that persona journals as `no-role` with no `ENFORCEMENT IS OFF`, hiding a genuine fault in exactly the signal this spec exists to clean up (goal #3). The gate still allows either way; the defect is misclassification, the same defect shape the proposal calls out for the built-ins. Note `LoadPersonas` errors wholesale on a corrupt record, so the roster cannot currently make the distinction either. | Probe run by this review (since removed): unnamed reviewer dispatch with a healthy record, record deleted, child call → `outcome="no-role"`, no `ENFORCEMENT IS OFF` on stderr. Pre-change path for the identical event: `role-unresolved`, loud. | The table row "a map entry pointing at a persona whose record is gone" pins the *quiet* behavior (`wantSaid: false`) — the conflation is tested; the distinction is UNTESTED because it does not exist in code | code (distinguish not-exist / corrupt from absent-from-roster, e.g. directory-membership check) or spec (declare the conflation and its trigger acceptable) + a named regression test for the loud path |
+| Minor | THEORETICAL | reliability | The dispatch map write is a non-atomic read-modify-write (`LoadDispatched` → mutate → `os.WriteFile`, truncate-then-write, no lock). A torn write — e.g. the newly added `timeout: 5` killing a slow gate mid-write, or a crash — corrupts the file, and `LoadDispatched` maps corrupt → empty, losing the **whole session's** map, not one entry. Two parallel dispatches in one turn can also lose an update. Consequence is bounded (fail-open, the pre-change behavior, never a block), but the atomic pattern already exists in the same package (`decision.go`: O_APPEND single-line writes, rotate, no-defer rename). | Code read: `dispatch.go` `os.WriteFile` vs `decision.go` `OpenFile(O_APPEND)` + rotation. No repro. | `TestALostDispatchMapDegradesToTheOldBehaviour` proves corrupt → empty degrade, not torn-write *prevention* | code (write temp + rename) |
+| Minor | REAL | verification accuracy | `verification.md` presents the AC6 journal record as "verbatim", but the actual record also carries `session`, `scope` and `reason` fields that the quote elides. Semantics identical; the word "verbatim" overclaims. | Live journal `3978d1c6…-aharness109-1146ec45.decisions.jsonl` line 1 compared against the quote | n/a (doc artifact) | `verification.md` (quote the full record or drop "verbatim") |
+| Minor | THEORETICAL | tests | AC2's "applies that persona's declared `enforce` modes" is asserted at the level of `role_resolved` + `outcome` equality; the warned-skills **list** equality between the named and unnamed rows is proven only by the live AC6 evidence, not by a named test. | `TestANamedDispatchIsGatedLikeAnUnnamedOne` asserts `RoleResolved` and `Outcome` but not `Warned` | UNTESTED (list equality) | tests (one line: compare `named.Warned` to `unnamed.Warned`) |
+| Question | THEORETICAL | scope | `dispatchArgs` accepts three key spellings for the type — `str("subagent_type", "agent_type", "subagentType")` — but the payload measurement (proposal, lesson 264) established only `subagent_type`. The extra keys are harmless today (both would carry the type, never the name) but they are the one place this code trusts a key the measurement did not establish. | `dispatch.go`, `dispatchArgs` | `TestOnlyTheDispatchPrimitiveIsReadForDispatchArguments` covers tool-name gating, not key preference | none needed if intended as belt-and-braces; else trim to the measured key |
+
+### Evaluator rubric
+
+| Dimension | Grade (A-D) | Rationale (one line) |
+|-----------|-------------|----------------------|
+| Correctness        | C | Every AC as written is verified with end-to-end tests, but two repro'd negative-path gaps (shadow-name misresolution, broken-record misclassification) are substantial, not minor. |
+| Verification       | A | All 7 features.json commands reproduce verbatim at the reviewed sha; lint/build/vet/GOOS clean; AC6 independently corroborated in the live journal. |
+| Scope              | A | Diff matches the proposal exactly; the agy-timeout find is the AC7 guard working as designed; the owner-carried commit touches nothing in scope. |
+| Reliability        | B | Fail-open discipline held under every fault constructed (absent/corrupt/partial/cap/lost writes); the non-atomic map write is the remaining gap, consequence bounded. |
+| Maintainability    | B | Clear naming, small functions, 0 lint issues, WHY-comments throughout; docked for the `else if witnessed` comment asserting "it is not a persona" without evidence. |
+| Handoff-readiness  | A | Lesson 264 filed (and extended by the owner), promotions dispositioned, features.json accurate, honest open boxes in tasks.md. |
+
+### Verdict
+FAIL
+
+### Recommended next steps (before archive)
+
+The verdict is FAIL on two REAL Major findings, both with reproductions produced by this review; the rubric's one C independently floors the verdict at PASS-WITH-GAPS, and the severity axis escalates it. Minimum set to flip to PASS:
+
+1. **F1 (shadow name)** — make a decision and write it somewhere durable: either consult the map before the direct lookup when the map entry's type differs from the requested role (note: a blunt map-first reorder would break `--role` overrides — the operator's explicit role must still win), or keep roster-first and name the shadow edge in `proposal.md` as accepted with its containment. Add the named test (`TestADispatchNamedAfterAnotherPersonaResolvesToItsTrueType` or equivalent) either way. Fix location: spec + code + tests.
+2. **F2 (broken record → quiet no-role)** — either distinguish "witnessed non-persona" from "witnessed persona whose record failed to load" in code (membership-by-directory-listing, or not-exist vs. other `LoadPersona` errors — note `LoadPersonas` errors wholesale on corruption, so it is not directly reusable here), or declare the conflation in the spec with its trigger (a broken `AGENT.md` after a bad merge) and why quiet is acceptable. Add the named regression test for the loud path. Fix location: code or spec + tests.
+3. F3 (temp + rename for the map write) and F5 (warned-list equality assertion) are cheap and recommended but do not gate the verdict.
+4. F4: one-line edit to `verification.md` (full record or drop "verbatim").
+
+**Archive advisability**: `dotf spec archive` is **not advisable** in the current state — a passing `review.md` is the gate, and this review is FAIL; archiving now would record a journal-quality instrument with two repro'd mis-resolution/misclassification paths as if independently verified.
