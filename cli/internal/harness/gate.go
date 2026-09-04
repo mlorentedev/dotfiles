@@ -58,6 +58,14 @@ type ToolCall struct {
 	// what, so it is scoped to whoever the harness says is acting. Empty falls
 	// back to the session, which is right for a main-thread call.
 	AgentID string
+	// DispatchName and DispatchType are read from the Agent tool's own
+	// arguments when THIS call is a dispatch, and are how the gate learns what a
+	// named subagent really is (HARNESS-109). They are set on the PARENT's call,
+	// never on the child's, and are the only tool-input values other than Skill
+	// that the gate reads at all — both schema-bounded identifiers, validated by
+	// ValidDispatchName before anything is written. See dispatch.go.
+	DispatchName string
+	DispatchType string
 	// IsSkillTool reports that the tool is the harness's skill primitive,
 	// whether or not the skill's NAME was readable.
 	//

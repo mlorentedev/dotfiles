@@ -261,7 +261,8 @@
           {
             "id": "gate",
             "event": "PreToolUse",
-            "command": "harness gate --harness claude"
+            "command": "harness gate --harness claude",
+            "timeout": 5
           },
           {
             "id": "suggest-role",
@@ -285,7 +286,8 @@
           {
             "id": "gate",
             "event": "BeforeTool",
-            "command": "harness gate --harness agy"
+            "command": "harness gate --harness agy",
+            "timeout": 5
           }
         ]
       },

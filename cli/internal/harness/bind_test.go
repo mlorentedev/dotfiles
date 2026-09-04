@@ -323,3 +323,114 @@ func foreignCommands(doc map[string]any) map[string]int {
 	}
 	return out
 }
+
+// TestEveryInteractiveHookIsBounded closes HARNESS-109's AC7.
+//
+// THE GATE HOOK SHIPPED UNBOUNDED. `harness suggest --from-hook` was given
+// `timeout: 5` by #1455's review, because an unbounded hook on the interactive
+// path delays what the user typed; `harness gate` runs on EVERY tool call on the
+// same path and carried no timeout at all. The asymmetry was invisible because
+// nothing asserted the class — only the one hook the review happened to read.
+//
+// Measured in the Claude Code 2.1.260 executable: a timed-out hook returns
+// `blocked: false` unless `timeoutFailsClosed` is set, and that flag is only set
+// for a call served to a cloud session. So locally a bound converts a long stall
+// into a fast fail-open — which is the gate's own documented contract — and
+// cannot turn into a refused tool call. Bounding is strictly safer, never a new
+// blocking risk.
+//
+// Asserted BY CONSEQUENCE on the rendered hook commands, not by string-matching
+// the manifest: bind.go omits `timeout` from the emitted JSON when it is zero,
+// so a declaration test would pass on a value that never reaches the harness.
+func TestEveryInteractiveHookIsBounded(t *testing.T) {
+	targets, err := LoadBindTargets(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("LoadBindTargets: %v", err)
+	}
+
+	// The events a human is waiting on. A session-lifecycle hook may legitimately
+	// take longer, and both already carry 30.
+	interactive := map[string]bool{
+		"PreToolUse": true, "PostToolUse": true,
+		"UserPromptSubmit": true, "BeforeTool": true,
+	}
+
+	checked := 0
+	for _, target := range targets {
+		if !target.Emits() {
+			continue
+		}
+		cmds, err := target.HookCommands("/opt/bin/dotf")
+		if err != nil {
+			t.Fatalf("HookCommands for %q: %v", target.Agent, err)
+		}
+		for _, c := range cmds {
+			if !interactive[c.Event] {
+				continue
+			}
+			checked++
+			assertHookCarriesItsTimeout(t, target.Agent, c)
+		}
+	}
+	// C15: zero hooks checked is not a pass. It is the manifest having moved.
+	if checked == 0 {
+		t.Fatal("no interactive hook was checked — the manifest's emit_hooks moved, and this guard silently stopped guarding")
+	}
+}
+
+// assertHookCarriesItsTimeout checks one hook THROUGH THE REAL EMISSION PATH.
+//
+// HookCommand's own field is not what a harness reads: bind.go writes `timeout`
+// into the merged settings document and omits it when zero, so this is the only
+// assertion that sees what actually reaches the file.
+//
+// IT COMPARES THE VALUE, not merely the key's presence. The first version
+// asserted `strings.Contains(raw, "timeout")`, which the reviewer on #1471
+// caught: that passes on a timeout of any value, including one that disagrees
+// with the manifest, and it would also pass on the word appearing anywhere else
+// in the document. A guard that is satisfied by a substring is the same class as
+// the `grep -c` that counted subtests — green, and measuring the wrong thing.
+func assertHookCarriesItsTimeout(t *testing.T, agent string, c HookCommand) {
+	t.Helper()
+	if c.Timeout <= 0 {
+		t.Errorf("%s hook %q (%s) is unbounded: an interactive hook with no timeout stalls the user",
+			agent, c.ID, c.Event)
+		return
+	}
+	merged, _, err := MergeHooks(map[string]any{}, []HookCommand{c})
+	if err != nil {
+		t.Fatalf("MergeHooks for %q: %v", c.ID, err)
+	}
+	raw, err := json.Marshal(merged)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string `json:"command"`
+				Timeout *int   `json:"timeout"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("emitted settings for %q are not the expected shape: %v (%s)", c.ID, err, raw)
+	}
+	found := false
+	for _, group := range doc.Hooks[c.Event] {
+		for _, h := range group.Hooks {
+			if h.Command != c.Command {
+				continue
+			}
+			found = true
+			if h.Timeout == nil {
+				t.Errorf("%s hook %q reaches the settings file with no timeout: %s", agent, c.ID, raw)
+			} else if *h.Timeout != c.Timeout {
+				t.Errorf("%s hook %q emits timeout %d, manifest declares %d", agent, c.ID, *h.Timeout, c.Timeout)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("%s hook %q never reached the emitted settings at all: %s", agent, c.ID, raw)
+	}
+}
