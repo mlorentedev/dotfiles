@@ -249,14 +249,36 @@ jobs:
 
   test-windows:
     runs-on: windows-latest
-    if: github.event_name == 'pull_request'
-    timeout-minutes: 30
+    # RUNS ON main TOO, and that is half of CI-001's fix rather than a cost.
+    #
+    # A GitHub Actions cache is readable from the branch that wrote it, that
+    # branch's base, and the DEFAULT branch — never from a sibling PR. So a
+    # cache populated only on PR branches warms nothing for the next PR, and the
+    # step below would have helped re-runs of one PR and nobody else. Populating
+    # it on main is what makes every PR start warm.
+    #
+    # It also closes the reason this defect stayed invisible. The job was
+    # `skipped` on every push to main — measured, 6 of the last 6 — so "main is
+    # green" was never evidence about it, and the only place it genuinely ran
+    # was a PR. A required check that accumulates no evidence on the default
+    # branch is a latent failure with nowhere to show up until it blocks
+    # someone, which is exactly how this arrived. `integration`, the other heavy
+    # job, already runs on both for the same reason.
+    # CI-001 (#1472): 45 rather than 30 as the COMPANION to the npm cache below,
+    # not as the fix. The cache removes the cost on a hit; this stops a cold
+    # cache on a slow registry night from cancelling the job before it reaches
+    # the doctor gate, the Pester suites or the bats subset — which is what
+    # happened to two unrelated PRs, and a cancelled run tells you nothing about
+    # either. Raising it alone would have been option 4 on the ticket, and was
+    # rejected there: a job that spends 27 of 30 minutes in a package manager
+    # does not get better by being given 45.
+    timeout-minutes: 45
     needs: [changes]
     steps:
       - uses: actions/checkout@v7
 
       - name: Install age (deterministic release + registry PATH — BUG-025)
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
@@ -276,7 +298,7 @@ jobs:
           & (Join-Path $ageDir 'age-keygen.exe') --version
 
       - name: Sandbox secrets + minimal vault
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\age" | Out-Null
@@ -300,13 +322,13 @@ jobs:
       # tree; the integration container builds from source for the same
       # reason) and make it reachable by effect before setup runs.
       - uses: actions/setup-go@v7
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
 
       - name: Build dotf from this PR and put ~/.local/bin on PATH (TEST-003)
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $bin = "$env:USERPROFILE\.local\bin"
@@ -325,13 +347,62 @@ jobs:
 
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
       # the binary built above survives setup. No DOTFILES_DIR override: the
+      # CI-001 (#1472): setup reconciles the pi package manifest with one
+      # `pi install` per package, serially, and each one shells out to npm. On
+      # 2026-09-04 those eight installs took 54s to 7 MINUTES apiece and
+      # consumed 27 of this job's 30 minutes, cancelling two unrelated PRs at
+      # the ceiling. Nothing in either diff went near ai/pi/packages.json: the
+      # variable is npm registry latency, which is not a property of this
+      # repository, so the job had always been one slow night from failing.
+      #
+      # CACHED ON THE MANIFEST'S HASH because that is exactly what the install
+      # set is a function of: every entry in packages.json carries a pinned
+      # version (tests/pi-config.bats refuses an unpinned one), so the same
+      # manifest always resolves to the same tarballs. A manifest edit misses
+      # the cache and pays full price once, which is correct — that run is
+      # installing something genuinely new.
+      #
+      # The path is asked of npm rather than hardcoded. %LocalAppData%\npm-cache
+      # is today's answer on windows-latest, and a hardcoded path that stops
+      # being right caches nothing while still reporting success — the failure
+      # this repository keeps cataloguing, and one a green job would hide.
+      - name: Resolve npm's cache directory
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        id: npmcache
+        shell: pwsh
+        run: |
+          $dir = (npm config get cache).Trim()
+          if (-not $dir -or $dir -eq 'undefined') { throw "npm config get cache returned nothing" }
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "npm cache: $dir"
+
+      - uses: actions/cache@v4
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        with:
+          path: ${{ steps.npmcache.outputs.dir }}
+          key: npm-pi-${{ runner.os }}-${{ hashFiles('ai/pi/packages.json') }}
+          # A stale restore is still worth having: most of the tarballs are
+          # unchanged, and npm fetches only what is missing.
+          restore-keys: |
+            npm-pi-${{ runner.os }}-
+
       # deploy dir is the real-box default (~/.dotfiles), so the gate below
       # certifies the tree a real machine reads, not the checkout (#1298 layer 3).
+      #
+      # npm_config_prefer_offline is what makes the cache above DECIDE anything.
+      # A warm cache alone still lets npm round-trip the registry for metadata on
+      # every package; prefer-offline serves what is cached and goes to the
+      # network only for what is missing, which is the whole 27 minutes. It is
+      # set here, on the CI step, and NOT in setup-windows.ps1: this is a
+      # property of a throwaway runner, not of a developer's machine, and the
+      # bootstrap scripts stay out of it (ADR-020 C7).
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: powershell
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
+          npm_config_prefer_offline: "true"
         run: .\setup-windows.ps1
 
       # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
@@ -342,14 +413,14 @@ jobs:
       # owning ticket -- in doctor-gate-known-failures.txt, or on a listed
       # entry that no longer fires (a stale list is a failure too).
       - name: Post-setup doctor gate (TEST-003)
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
         run: pwsh -NoProfile -File .github/scripts/doctor-gate.ps1
 
       - name: Run Pester suites
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
@@ -366,7 +437,7 @@ jobs:
           Invoke-Pester -Path tests -CI
 
       - name: Run PowerShell bats subset (Git Bash, pinned bats)
-        if: needs.changes.outputs.code == 'true'
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: bash
         run: |
           source versions.conf
