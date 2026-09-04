@@ -66,19 +66,27 @@ jobs:
               - '**/*.psm1'
               - '.PSScriptAnalyzerSettings.psd1'
               - '.github/workflows/ci.yml'
-            # What can change what the pi package reconcile DOES: the manifest
-            # it reads, and the code in either twin that reads it. Nothing else
-            # can, because every entry is version-pinned and
-            # tests/pi-config.bats refuses an unpinned one -- so the same
-            # manifest always resolves to the same install set.
+            # What can change what the pi package reconcile DOES. This set is
+            # MAINTAINED BY HAND and is not proven closed — an earlier version
+            # of this comment claimed "nothing else can", and that claim is
+            # exactly what stopped `versions.conf` being noticed. Under-matching
+            # here is silent: the PR still runs test-windows, it just runs it
+            # with the reconcile skipped, and it goes green.
             #
-            # Both setup scripts are listed WHOLE rather than by the reconcile
-            # block, because a filter cannot see line ranges and a guard that
-            # silently under-matches is worse than one that runs too often.
+            # - ai/pi/**        the manifest and the deployed configs
+            # - setup-*.{sh,ps1} the code that reads them, listed WHOLE because
+            #                   a filter cannot see line ranges
+            # - versions.conf   PI_VERSION selects the pi binary that PERFORMS
+            #                   the reconcile (setup-linux.sh:722,
+            #                   setup-windows.ps1:1148). A version bump is the
+            #                   PR class that most needs nine real installs run
+            #                   by the NEW pi, and it was the one class that
+            #                   would have skipped them.
             pi:
               - 'ai/pi/**'
               - 'setup-linux.sh'
               - 'setup-windows.ps1'
+              - 'versions.conf'
               - 'tests/pi-*.bats'
 
   lint:

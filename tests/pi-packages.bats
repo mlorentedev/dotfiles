@@ -217,13 +217,46 @@ setup() {
 }
 
 @test "pi packages: the CI pi filter covers the manifest and BOTH twins" {
-    # Everything that can change what the reconcile does. A filter that misses
-    # one of these skips the reconcile on the exact PR that needed it, and the
-    # PR goes green.
+    # A filter that misses one of these skips the reconcile on the exact PR
+    # that needed it, and the PR goes green.
     CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
-    filter=$(awk '/^            pi:$/{f=1;next} /^            [a-z]/{f=0} f' "$CI")
+    # The slice STOPS AT THE FIRST NON-ENTRY, and that is load-bearing. The
+    # obvious terminator -- "stop at the next 12-space key" -- does not fire
+    # here, so the slice ran past the block and swept up unrelated lines that
+    # mention these very paths; deleting an entry then still matched. Two
+    # earlier versions of this test were green for that reason and for the
+    # comment-prose variant of it. Anchor on the LIST, never on what follows it.
+    filter=$(awk '/^            pi:$/{f=1;next} f && !/^ *- /{exit} f' "$CI")
     [ -n "$filter" ]
     echo "$filter" | grep -q "ai/pi/\*\*"
     echo "$filter" | grep -q "setup-linux.sh"
     echo "$filter" | grep -q "setup-windows.ps1"
+}
+
+@test "pi packages: the CI pi filter covers wherever PI_VERSION is DECLARED" {
+    # DERIVED, not enumerated, and that distinction is the point. The test above
+    # greps for the three entries someone already wrote, so it is green by
+    # construction against any omission — an assertion that cannot fail for the
+    # reason it exists. It was, and `versions.conf` was missing: PI_VERSION
+    # selects the pi binary that performs the reconcile
+    # (setup-linux.sh:722, setup-windows.ps1:1148), so a version bump ran
+    # test-windows with the reconcile skipped. Caught in review on #1482, not by
+    # this suite.
+    #
+    # This one asks the REPOSITORY where PI_VERSION lives and requires the
+    # answer to be in the filter, so it survives the file being renamed or the
+    # pin moving, and it fails if the filter forgets it again.
+    CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
+    REPO="$BATS_TEST_DIRNAME/.."
+    decl=$(cd "$REPO" && grep -rl '^PI_VERSION=' --include='*.conf' . | head -1)
+    [ -n "$decl" ]
+    decl=$(basename "$decl")
+    # The slice STOPS AT THE FIRST NON-ENTRY, and that is load-bearing. The
+    # obvious terminator -- "stop at the next 12-space key" -- does not fire
+    # here, so the slice ran past the block and swept up unrelated lines that
+    # mention these very paths; deleting an entry then still matched. Two
+    # earlier versions of this test were green for that reason and for the
+    # comment-prose variant of it. Anchor on the LIST, never on what follows it.
+    filter=$(awk '/^            pi:$/{f=1;next} f && !/^ *- /{exit} f' "$CI")
+    echo "$filter" | grep -q "$decl"
 }
