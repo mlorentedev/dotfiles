@@ -159,11 +159,22 @@ runs:
 | main cold | pi-memory | 421.5s |
 | main cold | pi-cc-extensions | 422.5s |
 
-**Six observations at 421 ± 1s across four distinct packages.** That is a fixed
-timeout — seven minutes exactly — landing on whichever install happens to hit it.
-How many installs hit it per run is what moves the package phase from 883s to
-2200s, and it is why "27 of 30 minutes", "22-23 minutes" and "43 minutes" are all
-descriptions of the same job.
+**Six observations at 421 ± 1s across four distinct packages.** That is strong
+evidence for a **constant**, landing on whichever install happens to hit it, and
+how many hit it per run is what moves the package phase from 883s to 2200s — which
+is why "27 of 30 minutes", "22-23 minutes" and "43 minutes" are all descriptions
+of the same job.
+
+A fixed timeout is the obvious candidate for a constant that lands on arbitrary
+work, and 421s is close enough to seven minutes to be worth checking against pi's
+and npm's fetch-retry defaults. But that is a *candidate*, not a finding: no
+artifact confirms it, and this document has already been wrong twice tonight by
+naming a mechanism a data point ahead of the evidence. It stays unnamed until the
+`pi install` redirect is removed and something can read the error text.
+
+Note also pi-goal's 405.7s in the same run, which is near the band without being
+in it. It is recorded rather than explained; a sixteen-second gap is exactly the
+kind of detail a satisfying story quietly absorbs.
 
 So the constant both sessions saw was genuine. It is a property of the
 **operation**, not of any package. The retry-ladder hypothesis was directionally
