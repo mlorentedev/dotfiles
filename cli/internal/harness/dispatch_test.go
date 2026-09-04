@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidDispatchNameMatchesTheToolsOwnConstraint(t *testing.T) {
@@ -168,5 +169,99 @@ func TestDispatchPathIsKeyedBySessionNotByScope(t *testing.T) {
 	}
 	if len(seen) != 3 {
 		t.Error("the dispatch map, the ledger and the journal must be three distinct files")
+	}
+}
+
+// TestAStrandedTempFileIsSwept covers round 2's first finding.
+//
+// The 5-second hook timeout this spec adds is enforced by KILLING the gate, and
+// a killed process runs no deferred cleanup — so every timeout mid-write leaves
+// a `.dispatch-*.tmp` behind forever. A leak rather than a fault, which is the
+// kind nobody notices until the directory is enormous.
+func TestAStrandedTempFileIsSwept(t *testing.T) {
+	dir := t.TempDir()
+	path := DispatchPath(dir, "s1")
+	gateDir := filepath.Dir(path)
+	if err := os.MkdirAll(gateDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	stranded := filepath.Join(gateDir, ".dispatch-killed.tmp")
+	if err := os.WriteFile(stranded, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(stranded, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	// A file that could still belong to a gate writing RIGHT NOW must survive:
+	// deleting it under that process turns a leak into a lost write.
+	live := filepath.Join(gateDir, ".dispatch-inflight.tmp")
+	if err := os.WriteFile(live, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// And nothing else in the directory is this function's business.
+	bystander := filepath.Join(gateDir, "s1.decisions.jsonl")
+	if err := os.WriteFile(bystander, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(bystander, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := RecordDispatch(path, "probe", "reviewer"); err != nil {
+		t.Fatalf("RecordDispatch: %v", err)
+	}
+
+	if _, err := os.Stat(stranded); !os.IsNotExist(err) {
+		t.Errorf("the abandoned temp file survived (err=%v)", err)
+	}
+	if _, err := os.Stat(live); err != nil {
+		t.Errorf("a temp file young enough to be in flight was deleted: %v", err)
+	}
+	if _, err := os.Stat(bystander); err != nil {
+		t.Errorf("the sweep removed a file that is not its business: %v", err)
+	}
+	if got := LoadDispatched(path)["probe"]; got != "reviewer" {
+		t.Errorf("probe -> %q after the sweep, want reviewer", got)
+	}
+}
+
+// TestLoadDispatchedIsBoundedInMemory covers round 2's second finding.
+//
+// LoadDispatched runs on EVERY tool call. An unbounded read turns a stray large
+// file in the state dir into an OOM in every session — the one way a gate whose
+// whole contract is fail-open can still take a session down.
+func TestLoadDispatchedIsBoundedInMemory(t *testing.T) {
+	dir := t.TempDir()
+	path := DispatchPath(dir, "s1")
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	// Valid JSON far larger than the bound: without the limit this parses and
+	// returns entries, so the assertion below distinguishes "bounded" from
+	// "happened not to read it".
+	var b strings.Builder
+	b.WriteString(`{"types":{`)
+	for i := 0; b.Len() < maxDispatchBytes*2; i++ {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `"probe-%d":"reviewer"`, i)
+	}
+	b.WriteString(`}}`)
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(path); err != nil || fi.Size() <= maxDispatchBytes {
+		t.Fatalf("fixture is not over the bound (size check err=%v)", err)
+	}
+
+	// Truncated at the limit, so it no longer parses, so it degrades to empty —
+	// the documented behaviour for anything unreadable.
+	if got := LoadDispatched(path); len(got) != 0 {
+		t.Errorf("read %d entries from an oversized file, want the bound to truncate it into an empty degrade", len(got))
 	}
 }

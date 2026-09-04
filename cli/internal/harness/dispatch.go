@@ -2,10 +2,12 @@ package harness
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // The dispatch map implements HARNESS-109 (#1434): it is how the gate learns
@@ -53,6 +55,13 @@ var dispatchNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 // nothing and the gate behaves exactly as it did before this existed.
 const maxDispatchEntries = 512
 
+// maxDispatchBytes bounds what LoadDispatched will read.
+//
+// maxDispatchEntries entries of two identifiers capped at 64 bytes each cannot
+// exceed ~70 KB even at the limit, so 1 MB is generous by more than an order of
+// magnitude and still small enough that reading it on every tool call is free.
+const maxDispatchBytes = 1 << 20
+
 // dispatchState is the on-disk shape: dispatched identity -> true agent type.
 type dispatchState struct {
 	Types map[string]string `json:"types"`
@@ -85,7 +94,21 @@ func DispatchPath(stateDir, sessionID string) string {
 // happened, and losing it must degrade to the pre-existing allow.
 func LoadDispatched(path string) map[string]string {
 	out := map[string]string{}
-	raw, err := os.ReadFile(path) // #nosec G304 -- path is built by DispatchPath from the state dir
+	f, err := os.Open(path) // #nosec G304 -- path is built by DispatchPath from the state dir
+	if err != nil {
+		return out
+	}
+	defer func() { _ = f.Close() }()
+
+	// BOUNDED, because this runs on every tool call. The map is capped at
+	// maxDispatchEntries of two short identifiers — tens of kilobytes at worst —
+	// so anything approaching the limit is not a map this code wrote. Reading it
+	// whole would then turn a stray large file in the state dir into an OOM on
+	// every tool call in every session, which is the one way a fail-open gate
+	// can still take a session down. Raised by the independent review on #1471.
+	// Truncated input fails to parse and reads as empty, which is the documented
+	// degrade.
+	raw, err := io.ReadAll(io.LimitReader(f, maxDispatchBytes))
 	if err != nil {
 		return out
 	}
@@ -158,6 +181,8 @@ func RecordDispatch(path, name, agentType string) error {
 	//
 	// The temp file is created in the SAME directory for that guarantee: a
 	// rename across filesystems is not atomic and not even permitted.
+	sweepStrandedDispatchTemps(dir)
+
 	tmp, err := os.CreateTemp(dir, ".dispatch-*.tmp")
 	if err != nil {
 		return err
@@ -177,3 +202,43 @@ func RecordDispatch(path, name, agentType string) error {
 	}
 	return os.Rename(tmpName, path)
 }
+
+// sweepStrandedDispatchTemps removes temp files a killed gate left behind.
+//
+// The 5-second hook timeout this spec also adds is enforced by killing the
+// process, and a killed process runs no deferred cleanup — so every gate that
+// times out mid-write strands one `.dispatch-*.tmp` in the state dir, forever.
+// Raised by the independent review on #1471; it is a leak rather than a fault,
+// which is exactly the kind that is never noticed until the directory is
+// enormous.
+//
+// AN AGE THRESHOLD, NOT A BLANKET SWEEP. A temp file that is seconds old may
+// belong to another gate process writing right now — two dispatches in one turn
+// — and deleting it under that process would turn a leak into a lost write.
+// Anything older than the hook could possibly still be running is nobody's.
+//
+// Every error is ignored: this is opportunistic tidying on a path whose entire
+// contract is that its own failures never reach the caller.
+func sweepStrandedDispatchTemps(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-dispatchTempTTL)
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasPrefix(name, ".dispatch-") || !strings.HasSuffix(name, ".tmp") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, name))
+	}
+}
+
+// dispatchTempTTL is how long a temp file must be untouched before it is
+// assumed abandoned. Comfortably longer than the hook timeout that would kill
+// the writer, so a live write is never swept.
+const dispatchTempTTL = 5 * time.Minute
