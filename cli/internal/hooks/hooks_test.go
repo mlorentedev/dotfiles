@@ -264,6 +264,33 @@ func TestInstallNormalisesCRLF(t *testing.T) {
 	}
 }
 
+// TestInstallLeavesNonTextFilesByteVerbatim pins the assumption that keeps the
+// CRLF fix safe. copyTree strips CR from every file in the dispatcher tree, and
+// the only thing standing between that and a corrupted binary is isText's
+// NUL-byte probe — which had no test of its own, so removing it would have been
+// caught by nothing. Today's tree is text-only; the day someone drops a
+// compiled helper or a .png into git-hooks/, this is what fails instead of the
+// hook.
+func TestInstallLeavesNonTextFilesByteVerbatim(t *testing.T) {
+	binary := "\x7fELF\x02\x01\r\n\x00\r\x00payload\r\n"
+	src := dispatcherTree(t, t.TempDir(), map[string]string{
+		"lib/probe.bin": binary,
+	})
+	dotfiles := t.TempDir()
+
+	var buf bytes.Buffer
+	if err := install(context.Background(), (&fakeGit{}).run, opts(src, dotfiles, &buf)); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dotfiles, "git-hooks", "lib", "probe.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, []byte(binary)) {
+		t.Fatalf("non-text file was rewritten in transit:\n got %q\nwant %q", got, binary)
+	}
+}
+
 // TestInstallMakesEntrypointsExecutable — git execs these directly. The bit is
 // inert on Windows, so only the Linux leg can regress silently, which is exactly
 // why it is asserted rather than assumed.
