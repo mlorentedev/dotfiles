@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-109"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-03"
 issue: "mlorentedev/dotfiles#1434"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
