@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CI-002-f1",
+    "behavior": "AC1 \u2014 both setup twins honour DOTFILES_SKIP_PI_PACKAGES",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && grep -q 'DOTFILES_SKIP_PI_PACKAGES' setup-linux.sh && grep -q 'DOTFILES_SKIP_PI_PACKAGES' setup-windows.ps1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-002-f2",
+    "behavior": "AC2/AC3/AC4/AC5 \u2014 the guard is first, loud, never set on push, and the pi filter covers the manifest, both twins and PI_VERSION's home",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats tests/pi-packages.bats >/dev/null && for t in \"honour DOTFILES_SKIP_PI_PACKAGES\" \"the FIRST branch\" \"what was NOT verified\" \"never sets the skip on a push\" \"covers the manifest and BOTH twins\" \"wherever PI_VERSION is DECLARED\"; do grep -q \"$t\" tests/pi-packages.bats || exit 1; done",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-002-f3",
+    "behavior": "The shell twin parses under BOTH shells and passes shellcheck with no new findings",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && bash -n setup-linux.sh && zsh -n setup-linux.sh && ~/.local/bin/shellcheck -S warning setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-002-f4",
+    "behavior": "The workflow is still valid YAML and the env line is guarded on pull_request",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && python3 -c \"import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml'))\" && grep -A0 'DOTFILES_SKIP_PI_PACKAGES:' .github/workflows/ci.yml | grep -q \"github.event_name == 'pull_request'\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-002-f5",
+    "behavior": "AC6 \u2014 the new assertions FAIL against a mutated tree (guard moved below the pi probe)",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && cp setup-linux.sh /tmp/ci002.bak && python3 -c \"p='setup-linux.sh'; s=open(p).read(); a='    if [ -n \\\"\\${DOTFILES_SKIP_PI_PACKAGES:-}\\\" ]; then'; b='    if [ ! -x \\\"\\$PI_BIN\\\" ]; then\\n        log_warning \\\"x\\\"\\n    elif [ -n \\\"\\${DOTFILES_SKIP_PI_PACKAGES:-}\\\" ]; then'; assert a in s; open(p,'w').write(s.replace(a,b,1))\" && ! ~/.local/bin/bats tests/pi-packages.bats >/dev/null 2>&1; rc=$?; cp /tmp/ci002.bak setup-linux.sh; exit $rc",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -850,9 +850,26 @@ fi
 # version check above already reaches for $PI_BIN for the same reason.
 #
 # Idempotent by set difference, so a second run installs nothing and says so.
+#
+# DOTFILES_SKIP_PI_PACKAGES exists for one caller: a throwaway CI runner whose
+# diff cannot change what this block does (CI-002, #1478). The reconcile is
+# 883-2200s of a 20-45 minute job — measured across four runs of the same nine
+# pinned packages — and it reinstalls the same manifest whether or not the PR
+# went near it. Set it and the block is skipped LOUDLY; the coverage does not
+# move to a schedule nobody reads, it stays on pushes to the default branch
+# where a failure is somewhere people already look.
+#
+# It is deliberately not a config key or a flag in packages.json. A durable
+# switch would let a real machine end up permanently unconverged, which is the
+# opposite of what this script is for. An environment variable is scoped to the
+# one process that sets it and dies with it.
 PI_PACKAGES_SRC="$CURRENT_DIR/ai/pi/packages.json"
 if [ -f "$PI_PACKAGES_SRC" ]; then
-    if [ ! -x "$PI_BIN" ]; then
+    if [ -n "${DOTFILES_SKIP_PI_PACKAGES:-}" ]; then
+        # Loud, and it says what was NOT verified rather than only what was
+        # skipped: a line reading "skipped" is indistinguishable from "fine".
+        log_warning "DOTFILES_SKIP_PI_PACKAGES set — pi package reconcile skipped (nothing installed, nothing verified)"
+    elif [ ! -x "$PI_BIN" ]; then
         log_warning "pi not installed — skipping pi package reconcile (re-run setup after pi installs)"
     elif ! command -v npm >/dev/null 2>&1; then
         # `pi install` shells out to npm. Without this, the loop runs and every
