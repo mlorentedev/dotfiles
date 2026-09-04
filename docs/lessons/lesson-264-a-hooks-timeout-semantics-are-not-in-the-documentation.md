@@ -77,6 +77,22 @@ nobody could justify into one with a stated reason. Measurement before design, n
   renamed. `PreToolUse` is synchronous, so the parent's hook completes before the child exists by
   construction: an ordering guarantee beats a field name every time.
 
+## The same discipline applies to the verification commands
+
+Closing this spec produced a second instance of the same mistake, one level up. Every
+`features.json` command was **run** rather than written and trusted, and one of them was wrong:
+`grep -c -- '--- PASS: Test'` also counts *indented subtest* lines, so an entry expecting 4
+top-level passes measured 18. Anchoring to `^` fixed it.
+
+**A `features.json` verification command is itself untested code, and the archive reads it as
+evidence.** It belongs to the family this repository keeps finding — `bats | tail` reporting
+`tail`'s status, `go test -run '<no-match>'` exiting 0, `${PIPESTATUS[0]}` expanding to nothing
+under zsh — and what every member shares is that **the verification command succeeds**. None of
+them crashes. A green result that measured the wrong thing is indistinguishable from a green result
+that measured the right one, which is the whole reason running them is not optional. This one was
+loud only by luck: 18 against an expected 4 is impossible to miss, and it would have been silently
+correct forever had the suite happened to hold four subtests.
+
 ## Related
 
 - `specs/HARNESS-109/proposal.md` — the refutation and the design it forced.

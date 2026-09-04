@@ -60,8 +60,8 @@
             "cacheRead": 0,
             "cacheWrite": 0
           },
-          "contextWindow": 1048576,
-          "maxTokens": 65536
+          "contextWindow": 262144,
+          "maxTokens": 16384
         },
         {
           "id": "qwen3.6",
@@ -79,7 +79,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 65536
+          "maxTokens": 16384
         },
         {
           "id": "mimo-v2.5",
@@ -88,7 +88,8 @@
           "reasoning": true,
           "input": [
             "text",
-            "image"
+            "image",
+            "audio"
           ],
           "cost": {
             "input": 0,
@@ -115,7 +116,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 65536
+          "maxTokens": 16384
         }
       ],
       "authHeader": false
