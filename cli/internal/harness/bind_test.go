@@ -369,29 +369,68 @@ func TestEveryInteractiveHookIsBounded(t *testing.T) {
 				continue
 			}
 			checked++
-			if c.Timeout <= 0 {
-				t.Errorf("%s hook %q (%s) is unbounded: an interactive hook with no timeout stalls the user",
-					target.Agent, c.ID, c.Event)
-			}
-			// Through the REAL emission path. HookCommand's own field is not
-			// what a harness reads: bind.go writes `timeout` into the merged
-			// settings document and omits it when zero, so this is the only
-			// assertion that sees what actually reaches the file.
-			merged, _, err := MergeHooks(map[string]any{}, []HookCommand{c})
-			if err != nil {
-				t.Fatalf("MergeHooks for %q: %v", c.ID, err)
-			}
-			raw, err := json.Marshal(merged)
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
-			if !strings.Contains(string(raw), `"timeout"`) {
-				t.Errorf("%s hook %q reaches the settings file with no timeout: %s", target.Agent, c.ID, raw)
-			}
+			assertHookCarriesItsTimeout(t, target.Agent, c)
 		}
 	}
 	// C15: zero hooks checked is not a pass. It is the manifest having moved.
 	if checked == 0 {
 		t.Fatal("no interactive hook was checked — the manifest's emit_hooks moved, and this guard silently stopped guarding")
+	}
+}
+
+// assertHookCarriesItsTimeout checks one hook THROUGH THE REAL EMISSION PATH.
+//
+// HookCommand's own field is not what a harness reads: bind.go writes `timeout`
+// into the merged settings document and omits it when zero, so this is the only
+// assertion that sees what actually reaches the file.
+//
+// IT COMPARES THE VALUE, not merely the key's presence. The first version
+// asserted `strings.Contains(raw, "timeout")`, which the reviewer on #1471
+// caught: that passes on a timeout of any value, including one that disagrees
+// with the manifest, and it would also pass on the word appearing anywhere else
+// in the document. A guard that is satisfied by a substring is the same class as
+// the `grep -c` that counted subtests — green, and measuring the wrong thing.
+func assertHookCarriesItsTimeout(t *testing.T, agent string, c HookCommand) {
+	t.Helper()
+	if c.Timeout <= 0 {
+		t.Errorf("%s hook %q (%s) is unbounded: an interactive hook with no timeout stalls the user",
+			agent, c.ID, c.Event)
+		return
+	}
+	merged, _, err := MergeHooks(map[string]any{}, []HookCommand{c})
+	if err != nil {
+		t.Fatalf("MergeHooks for %q: %v", c.ID, err)
+	}
+	raw, err := json.Marshal(merged)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string `json:"command"`
+				Timeout *int   `json:"timeout"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("emitted settings for %q are not the expected shape: %v (%s)", c.ID, err, raw)
+	}
+	found := false
+	for _, group := range doc.Hooks[c.Event] {
+		for _, h := range group.Hooks {
+			if h.Command != c.Command {
+				continue
+			}
+			found = true
+			if h.Timeout == nil {
+				t.Errorf("%s hook %q reaches the settings file with no timeout: %s", agent, c.ID, raw)
+			} else if *h.Timeout != c.Timeout {
+				t.Errorf("%s hook %q emits timeout %d, manifest declares %d", agent, c.ID, *h.Timeout, c.Timeout)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("%s hook %q never reached the emitted settings at all: %s", agent, c.ID, raw)
 	}
 }
