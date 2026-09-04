@@ -101,17 +101,86 @@ question about a phenomenon that was never established.
   as permission to stop.** The moment the story got compelling was the moment to
   ask whether the thing being explained was real.
 
-## What survived, and it was never the interesting part
+## The same error again, one hour later, inside this document
 
-The measurement did answer the question it was run to answer, which is the only
-reason the night was not wasted: a confirmed 310 MB cache hit made the package
-phase **2.6x slower** (882s to 2269s), nine of ten packages regressed, and the
-job was **cancelled at 45 minutes** on a ceiling the uncached run cleared by
-seven. The npm download cache does not fix CI-001; on the only warm run ever
-measured it is the difference between a job that completes and one that dies.
+The first draft of this lesson said the cache made the package phase **2.6x
+slower** — 882s cold against 2269s warm — and called it the finding that survived.
 
-Note that this conclusion never needed a mechanism, and both sessions nearly
-traded it for one.
+It does not survive. A third run settled it, and it was already on disk when that
+sentence was written: the post-merge run on `main` was **cold** (no `npm-pi` cache
+hit in its log; the main-scoped cache was created *by* that run at 03:41:27) and
+its package phase was **2201s**.
+
+| run | package phase | cache |
+|---|---:|---|
+| PR, cold | 883s | no |
+| **main, cold** | **2201s** | **no** |
+| PR, warm | 2269s | yes |
+
+**Two cold runs differ by 2.5x.** The warm run sits beside the slower cold one,
+not beyond it. So "2.6x slower with a confirmed cache hit" was n=1 against n=1
+across a distribution whose spread had never been measured — the exact error this
+lesson is about, committed in the paragraph claiming to have escaped it.
+
+What survives is narrower and needs no mechanism: **the cache produced no
+benefit, so the download leg is not where the time is**, and CI-001 does not close
+on the change. What does *not* survive is that the cache is harmful — nor the
+mechanism proposed for it (Defender scanning a 310 MB cache directory, predicting
+a slowdown proportional to cache size), which the cold `main` run refutes by
+reproducing the slowdown with no cache at all. That hypothesis was hedged at
+length, labelled explicitly as not a claim, and still wrong; the hedging bought
+nothing that the next data point did not buy outright.
+
+## The constant was real. Both sessions attached it to the wrong noun.
+
+Per-package on `main`'s cold run:
+
+| package | time |
+|---|---:|
+| **pi-effort** | **421.4s** |
+| pi-web-access | 63.5s |
+| @ayulab/pi-rewind | 122.4s |
+| @narumitw/pi-plan-mode | 53.5s |
+| @narumitw/pi-goal | 405.7s |
+| pi-subagents | 132.2s |
+| **pi-memory** | **421.5s** |
+| **pi-cc-extensions** | **422.5s** |
+| pi-add-dir | 158.2s |
+
+Four packages at ~420s in a single run. Every observation of that band across all
+runs:
+
+| run | package | time |
+|---|---|---:|
+| 2026-09-03 | pi-rewind | 421s |
+| PR cold | pi-rewind | 422s |
+| PR warm | pi-plan-mode | 422s |
+| main cold | pi-effort | 421.4s |
+| main cold | pi-memory | 421.5s |
+| main cold | pi-cc-extensions | 422.5s |
+
+**Six observations at 421 ± 1s across four distinct packages.** That is a fixed
+timeout — seven minutes exactly — landing on whichever install happens to hit it.
+How many installs hit it per run is what moves the package phase from 883s to
+2200s, and it is why "27 of 30 minutes", "22-23 minutes" and "43 minutes" are all
+descriptions of the same job.
+
+So the constant both sessions saw was genuine. It is a property of the
+**operation**, not of any package. The retry-ladder hypothesis was directionally
+right about a timeout and wrong about what it belonged to — which is not a
+vindication. It was right for a reason its author could not have known, defended
+with `npm view` evidence that was irrelevant to it, and it would have been
+abandoned entirely if the third run had not arrived.
+
+## The compounding lesson
+
+The first correction took an hour and a third data point. The second took ten
+minutes and a fourth. Both were available from the start: a CI rerun and a
+post-merge run that had already happened.
+
+**When a conclusion is expensive to be wrong about, spend the next sample before
+publishing, not after.** Every wrong claim in this document was cheap to falsify
+and none of them were falsified before they were written down.
 
 ## Coda: the instrument was blindfolded the whole time
 
