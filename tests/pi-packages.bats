@@ -156,3 +156,107 @@ setup() {
 @test "pi packages: setup-windows degrades to a warning when pi is absent" {
     grep -q 'skipping pi package reconcile' "$SETUP_PS1"
 }
+
+# --- CI-002 (#1478): DOTFILES_SKIP_PI_PACKAGES -------------------------------
+#
+# The reconcile is 883-2200s of the Windows CI job, measured across four runs of
+# the same nine pinned packages, and a PR that cannot change what it does was
+# paying all of it. The guard takes it off the PR path. These tests exist
+# because every way this can go wrong is SILENT: a guard that skips when it
+# should not, a filter that under-matches, or a skip that logs like a success.
+
+@test "pi packages: both twins honour DOTFILES_SKIP_PI_PACKAGES" {
+    grep -q 'DOTFILES_SKIP_PI_PACKAGES' "$SETUP_SH"
+    grep -q 'DOTFILES_SKIP_PI_PACKAGES' "$SETUP_PS1"
+}
+
+@test "pi packages: the skip is the FIRST branch, before the pi/npm probes" {
+    # Order is the contract, not style. The runner sets the variable precisely
+    # so the expensive block never starts; if the guard sat after the `pi` and
+    # `npm` probes, a runner that has both would run the probes' side effects
+    # and only then decide to skip.
+    # Anchor on the BRANCH, never on a mention. `grep -n | grep -v '^ *#'` does
+    # not filter comments here — grep -n prefixes a line number, so the line
+    # starts with a digit and the comment pattern never matches. That version
+    # of this test matched the explanatory comment above the block, which sits
+    # before everything, so it passed no matter where the guard actually was.
+    # Caught by mutation: moving the guard below the $PI_BIN probe did not fail
+    # it. Same genus as every other green-for-the-wrong-reason in this repo.
+    # Sliced from the RECONCILE BLOCK, not from the file. `[ ! -x "$PI_BIN" ]`
+    # also appears in pi's own install block 150 lines earlier, so a file-wide
+    # search finds that one and compares against the wrong branch.
+    sh_block=$(awk '/^PI_PACKAGES_SRC=/{f=1} f' "$SETUP_SH")
+    sh_skip=$(printf '%s\n' "$sh_block" | grep -n 'DOTFILES_SKIP_PI_PACKAGES:-' | head -1 | cut -d: -f1)
+    sh_pi=$(printf '%s\n' "$sh_block" | grep -n '\[ ! -x "\$PI_BIN" \]' | head -1 | cut -d: -f1)
+    [ -n "$sh_skip" ]
+    [ -n "$sh_pi" ]
+    [ "$sh_skip" -lt "$sh_pi" ]
+
+    ps_block=$(awk '/^\$piPackagesSrc = Join-Path/{f=1} f' "$SETUP_PS1")
+    ps_skip=$(printf '%s\n' "$ps_block" | grep -n 'env:DOTFILES_SKIP_PI_PACKAGES' | head -1 | cut -d: -f1)
+    ps_pi=$(printf '%s\n' "$ps_block" | grep -n 'Get-Command pi -ErrorAction SilentlyContinue' | head -1 | cut -d: -f1)
+    [ -n "$ps_skip" ]
+    [ -n "$ps_pi" ]
+    [ "$ps_skip" -lt "$ps_pi" ]
+}
+
+@test "pi packages: the skip says what was NOT verified, not merely that it skipped" {
+    # A line reading "skipped" is indistinguishable from "fine" when someone
+    # scans a green log. Both twins must name the consequence.
+    grep -q 'nothing installed, nothing verified' "$SETUP_SH"
+    grep -q 'nothing installed, nothing verified' "$SETUP_PS1"
+}
+
+@test "pi packages: CI never sets the skip on a push to the default branch" {
+    # The guard's entire safety property. If this expression ever evaluates
+    # truthy on `push`, the reconcile runs NOWHERE and nothing says so.
+    CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
+    run grep -n "DOTFILES_SKIP_PI_PACKAGES:" "$CI"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "github.event_name == 'pull_request'"
+}
+
+@test "pi packages: the CI pi filter covers the manifest and BOTH twins" {
+    # A filter that misses one of these skips the reconcile on the exact PR
+    # that needed it, and the PR goes green.
+    CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
+    # The slice STOPS AT THE FIRST NON-ENTRY, and that is load-bearing. The
+    # obvious terminator -- "stop at the next 12-space key" -- does not fire
+    # here, so the slice ran past the block and swept up unrelated lines that
+    # mention these very paths; deleting an entry then still matched. Two
+    # earlier versions of this test were green for that reason and for the
+    # comment-prose variant of it. Anchor on the LIST, never on what follows it.
+    filter=$(awk '/^            pi:$/{f=1;next} f && !/^ *- /{exit} f' "$CI")
+    [ -n "$filter" ]
+    echo "$filter" | grep -q "ai/pi/\*\*"
+    echo "$filter" | grep -q "setup-linux.sh"
+    echo "$filter" | grep -q "setup-windows.ps1"
+}
+
+@test "pi packages: the CI pi filter covers wherever PI_VERSION is DECLARED" {
+    # DERIVED, not enumerated, and that distinction is the point. The test above
+    # greps for the three entries someone already wrote, so it is green by
+    # construction against any omission — an assertion that cannot fail for the
+    # reason it exists. It was, and `versions.conf` was missing: PI_VERSION
+    # selects the pi binary that performs the reconcile
+    # (setup-linux.sh:722, setup-windows.ps1:1148), so a version bump ran
+    # test-windows with the reconcile skipped. Caught in review on #1482, not by
+    # this suite.
+    #
+    # This one asks the REPOSITORY where PI_VERSION lives and requires the
+    # answer to be in the filter, so it survives the file being renamed or the
+    # pin moving, and it fails if the filter forgets it again.
+    CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
+    REPO="$BATS_TEST_DIRNAME/.."
+    decl=$(cd "$REPO" && grep -rl '^PI_VERSION=' --include='*.conf' . | head -1)
+    [ -n "$decl" ]
+    decl=$(basename "$decl")
+    # The slice STOPS AT THE FIRST NON-ENTRY, and that is load-bearing. The
+    # obvious terminator -- "stop at the next 12-space key" -- does not fire
+    # here, so the slice ran past the block and swept up unrelated lines that
+    # mention these very paths; deleting an entry then still matched. Two
+    # earlier versions of this test were green for that reason and for the
+    # comment-prose variant of it. Anchor on the LIST, never on what follows it.
+    filter=$(awk '/^            pi:$/{f=1;next} f && !/^ *- /{exit} f' "$CI")
+    echo "$filter" | grep -q "$decl"
+}

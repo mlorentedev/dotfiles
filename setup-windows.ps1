@@ -1276,9 +1276,28 @@ if ((Test-Path -LiteralPath $piSettingsDst -PathType Leaf) -and (Test-Path -Lite
 # is seed-if-missing because pi owns it, and `pi install` also unpacks the
 # package under the agent's npm dir, so an entry written by hand would name a
 # package that is not on disk.
+#
+# DOTFILES_SKIP_PI_PACKAGES exists for one caller: a throwaway CI runner whose
+# diff cannot change what this block does (CI-002, #1478). The reconcile is
+# 883-2200s of a 20-45 minute job -- measured across four runs of the same nine
+# pinned packages -- and it reinstalls the same manifest whether or not the PR
+# went near it. Set it and the block is skipped LOUDLY; the coverage does not
+# move to a schedule nobody reads, it stays on pushes to the default branch
+# where a failure is somewhere people already look.
+#
+# Linux parity: the same guard in setup-linux.sh.
+#
+# It is deliberately not a config key or an entry in packages.json. A durable
+# switch would let a real machine end up permanently unconverged, which is the
+# opposite of what this script is for. An environment variable is scoped to the
+# one process that sets it and dies with it.
 $piPackagesSrc = Join-Path $DotfilesDir 'ai\pi\packages.json'
 if (Test-Path -LiteralPath $piPackagesSrc -PathType Leaf) {
-    if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
+    if ($env:DOTFILES_SKIP_PI_PACKAGES) {
+        # Loud, and it says what was NOT verified rather than only what was
+        # skipped: a line reading "skipped" is indistinguishable from "fine".
+        Write-Warn "DOTFILES_SKIP_PI_PACKAGES set - pi package reconcile skipped (nothing installed, nothing verified)"
+    } elseif (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
         Write-Warn "pi not installed - skipping pi package reconcile (re-run setup after pi installs)"
     } elseif (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
         # `pi install` shells out to npm. Without this the loop runs and every
