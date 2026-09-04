@@ -282,5 +282,6 @@ tags: [lessons, index, dotfiles]
 | [262 - A merged PR and a stuck PR are indistinguishable from the branch side](lesson-262-a-merged-pr-and-a-stuck-pr-look-identical-from-the-branch.md) | 2026-09-02 |  |
 | [263 - A population that cannot prove it is complete answers with a plausible number](lesson-263-a-population-that-cannot-prove-it-is-complete.md) | 2026-09-02 |  |
 | [264 - When the documentation does not name a field, read the executable — twice it decided a design](lesson-264-a-hooks-timeout-semantics-are-not-in-the-documentation.md) | 2026-09-03 |  |
+| [267 - A mutation harness must prove the mutation landed](lesson-267-a-mutation-harness-must-prove-the-mutation-landed.md) | 2026-09-04 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
