@@ -87,6 +87,22 @@ case-sensitive and the log lines are `[WARNING]`. The twin counts with `grep -ci
 lost the `-i`. So the guard that made the assertion unfailable was hiding a defect *in the
 assertion itself*.
 
+### 8. The SHA's check list, answering about runs that no longer matter
+
+```bash
+gh api "repos/OWNER/REPO/commits/$SHA/check-runs?per_page=100"
+```
+
+This is the REST workaround for instance 1, and it has its own version of the same flaw: it returns
+entries from **every** run on that SHA, superseded ones included. A PR showed `integration` and
+`test-windows` as `cancelled` and it read as a failed build; they were an earlier run cancelled by a
+later push, and the real run was still in progress.
+
+**`cancelled` from a superseded run and `cancelled` from a timeout are spelled identically**, and
+the field that separates them is not in the row. Read the run — `gh run view <id>` for the run you
+mean — rather than the SHA's accumulated check list. Found by the peer session on its own PR while
+this document was being written.
+
 ## The lesson
 
 **Design every query so that "no" and "I could not answer" are different outputs.** They are the
