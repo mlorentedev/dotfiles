@@ -288,5 +288,7 @@ tags: [lessons, index, dotfiles]
 | [266 - Two measurements agreeing is not reproducibility](lesson-266-two-measurements-agreeing-is-not-reproducibility.md) | 2026-09-04 |  |
 | [269 - A generated file fixed without its source is a countdown, and the drift guard says OK either way](lesson-269-a-generated-file-fixed-without-its-source-is-a-countdown.md) | 2026-09-05 |  |
 | [270 - A security wrapper that breaks the tool it protects gets routed around](lesson-270-a-security-wrapper-that-breaks-the-tool-it-protects-gets-routed-around.md) | 2026-09-05 |  |
+| [271 - Hooks are re-read, personas are not, and one measurement was generalised into both](lesson-271-hooks-reload-personas-do-not-and-the-difference-was-assumed-away.md) | 2026-09-02 |  |
+| [272 - Fail-closed worktree garbage collection requires in-tree leases and positive confirmation](lesson-272-fail-closed-worktree-garbage-collection-and-in-tree-leases.md) | 2026-09-05 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

@@ -249,7 +249,7 @@ func TestMigratedPersonasStillGateSomething(t *testing.T) {
 		byName[p.Name] = p
 	}
 
-	for _, name := range []string{"reviewer", "builder", "shipper"} {
+	for _, name := range []string{"reviewer", "builder", "shipper", "architect"} {
 		p, ok := byName[name]
 		if !ok {
 			t.Errorf("%s is missing from the roster", name)
@@ -263,6 +263,47 @@ func TestMigratedPersonasStillGateSomething(t *testing.T) {
 		}
 		if gated == 0 {
 			t.Errorf("%s has been migrated but now gates nothing — reverted to the flat form?", name)
+		}
+	}
+}
+
+// TestEveryDeclaredSkillHasARecord closes a gap found by mutation, not by
+// reading: a persona declaring a skill id that does not exist passes EVERY
+// existing check. Measured 2026-09-05 by renaming architect's `pattern-loader`
+// to `pattern-loaderZZZ-does-not-exist` —
+//
+//	compile-harness.sh --check      rc=0
+//	go test ./internal/harness/     ok
+//	bats tests/skills-pipeline.bats 23/23 ok
+//
+// Nothing was red. The id would have rendered into every harness's presence
+// block and the gate would have named an obligation no agent could satisfy,
+// because there is no such skill to invoke.
+//
+// This matters to THIS epic specifically rather than in principle: migrating a
+// persona means hand-editing skill ids in a vault record, and #1504 added
+// `pr-review-triage` to shipper by hand. That one was verified by hand too. The
+// next one will not be.
+func TestEveryDeclaredSkillHasARecord(t *testing.T) {
+	root := repoRootForTest(t)
+	personas, err := LoadPersonas(filepath.Join(root, "harness", "agents"))
+	if err != nil {
+		t.Fatalf("the shipped persona records do not load: %v", err)
+	}
+
+	for _, p := range personas {
+		for _, s := range p.Skills {
+			record := filepath.Join(root, "harness", "skills", s.ID, "SKILL.md")
+			// IsRegular, not a bare nil error: os.Stat succeeds on a directory,
+			// so the obvious form accepts `SKILL.md/` as a record. That is this
+			// guard failing in exactly the way it exists to catch — an
+			// instrument reporting green because it measured the wrong object.
+			info, err := os.Stat(record)
+			if err != nil || !info.Mode().IsRegular() {
+				t.Errorf("persona %q declares skill %q, but harness/skills/%s/SKILL.md is not a readable file "+
+					"— the presence block would render an id nothing can invoke, and the gate would "+
+					"name an obligation with no skill behind it", p.Name, s.ID, s.ID)
+			}
 		}
 	}
 }
