@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/shipper/AGENT.md
-generated_sha: 86c1ecfacc81c6fe
+generated_sha: 00ca37afa44c04ca
 id: agent-shipper
 type: agent
 status: active
@@ -54,7 +54,11 @@ They are the three that hold whatever is being shipped. Isolation applies to eve
 
 This is why the loader applies **no default severity**. Defaulting to `warn` would make an unmigrated persona *"silently inert while every check reported it as wired — presence dressed as enforcement"*; defaulting to `block` would turn every already-declared skill into a hard gate the day it shipped. So a skill is gated because someone chose to gate it, and the ungated ones are listed rather than assumed.
 
-Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona, with two dispatches of one role carrying different `agent_id`s. One blocker applies here with particular force — a *named* dispatch sends its name as `agent_type`, so its role never resolves and the gate silently turns off. Until that is fixed, read a `[gate] warn` line as the obligation it states.
+Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona **from the deployed record**, with two dispatches of one role carrying different `agent_id`s.
+
+The deployed half of that sentence is the one that bites. The gate reads the deploy directory, never your checkout, so a migration that is merged is not a migration that is in force — and the record written while it is inert is indistinguishable from the record written when everything passed. An unmigrated persona has nothing to enforce, so the gate reports `allow` with *"all blocking skills consumed"*, which is the same line a persona that satisfied every obligation produces.
+
+A named dispatch used to defeat role resolution outright; that is fixed for a **witnessed** dispatch, which the gate maps back to its true type. The residual is the unwitnessed one, which still falls through to the roster and finds no persona under its name.
 
 ## Boundaries
 
