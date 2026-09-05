@@ -1070,7 +1070,7 @@ build_agent_presence() {
 has_doctrine() { jq -e '.doctrine.deploy' "$MANIFEST" >/dev/null 2>&1; }
 
 deploy_doctrine() {
-    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars gen_chars ids
+    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars bytes gen_chars gen_bytes ids
     mapfile -t ids < <(jq -r '.doctrine.inject[]' "$MANIFEST")
     while IFS=$'\t' read -r agent file cap shadow; do
         [[ -n "$agent" ]] || continue
@@ -1082,6 +1082,52 @@ deploy_doctrine() {
             printf '\n'
             build_agent_presence "$ag_recdir" "$agent"
         } > "$payload"
+
+        # A CAPPED payload is normalised to ASCII punctuation, because a cap is
+        # only enforceable when its unit is unambiguous — and ours was not.
+        #
+        # Measured 2026-09-05: .gemini/GEMINI.md was 11974 CHARACTERS and 12047
+        # BYTES against a 12000 cap. The bats assertion reads `wc -m`, so it
+        # passed; a byte-counting consumer would have been 47 over and, per the
+        # platform's documented behaviour, would have dropped the overflow
+        # SILENTLY. The 73-byte gap was 33 em-dashes, four section signs, an
+        # accented vowel and an ellipsis.
+        #
+        # The gap also hid a second thing: persona prose costs ZERO characters
+        # (the roster renders skill ids only) and two bytes per em-dash. So the
+        # per-id budget on #1241 was tracking the measure that was not growing.
+        #
+        # This does not decide which unit the platform counts. It removes the
+        # question: an ASCII payload has bytes == chars by construction, so the
+        # guard and the platform cannot disagree however the platform counts.
+        #
+        # ONLY punctuation that does not alter the lexicon. Em/en dashes, curly
+        # quotes and the ellipsis are typographic; folding them is uglier and
+        # means exactly the same thing. Accents and section signs are NOT folded:
+        # `bitácora` -> `bitacora` changes a word, and `§4` -> `S4` changes a
+        # reference. Five such characters survive, which is why the invariant
+        # below is stated as "under the cap in both units" rather than "ASCII".
+        # The codepoints are written as \u escapes rather than as literals: a
+        # curly quote pasted into shell source is SC1112 ("this is a unicode
+        # quote"), which fails `shellcheck` and therefore CI lint. Writing them
+        # as escapes also says WHICH character is meant, where a literal in a
+        # monospace diff does not.
+        if [[ "$cap" != 0 ]]; then
+            tmp="$(mktemp)"
+            # Hex escapes, not literals: a curly quote or dash pasted into shell
+            # source is SC1112 ("this is a unicode quote"), which fails
+            # `shellcheck` and therefore CI lint. The escapes also name the exact
+            # codepoint, which a literal in a monospace diff does not.
+            LC_ALL=C sed \
+                -e 's/\xe2\x80\x94/-/g'    `# U+2014 em dash` \
+                -e 's/\xe2\x80\x93/-/g'    `# U+2013 en dash` \
+                -e "s/\xe2\x80\x99/'/g"    `# U+2019 right single quote` \
+                -e "s/\xe2\x80\x98/'/g"    `# U+2018 left single quote` \
+                -e 's/\xe2\x80\x9c/"/g'    `# U+201C left double quote` \
+                -e 's/\xe2\x80\x9d/"/g'    `# U+201D right double quote` \
+                -e 's/\xe2\x80\xa6/.../g'  `# U+2026 ellipsis` \
+                "$payload" > "$tmp" && mv "$tmp" "$payload"
+        fi
 
         # A shadow file wins over ours at read time, so a silent deploy here
         # would look successful while changing nothing the agent ever reads.
@@ -1123,9 +1169,28 @@ deploy_doctrine() {
         # its own" is OURS, and it means the next doctrine id silently pushes
         # rules past the point the agent reads. So report the generated share
         # too, and say which case this is.
+        #
+        # Both UNITS are reported, not just characters. The cap is documented in
+        # characters, but nothing here has verified that the platform counts the
+        # same way, and the two measures had already diverged past the cap before
+        # the normalisation above. A guard that tracks one unit cannot report the
+        # other one crossing — so report both and compare against the larger.
         if [[ "$cap" != 0 ]]; then
             chars="$(wc -m < "$file_abs")"
+            bytes="$(wc -c < "$file_abs")"
             gen_chars="$(wc -m < "$payload")"
+            gen_bytes="$(wc -c < "$payload")"
+            # `if`, not `(( … )) && …`: a false arithmetic test returns non-zero
+            # and takes the whole `&&` chain with it, which aborts the script
+            # under `set -e`. Prohibited-pattern table, the `((count++))` row.
+            if (( gen_bytes > gen_chars )); then
+                printf '[deploy] note %s: generated doctrine is %s chars / %s bytes; non-ASCII survives normalisation\n' \
+                    "$file_abs" "$gen_chars" "$gen_bytes" >&2
+                gen_chars="$gen_bytes"
+            fi
+            if (( bytes > chars )); then
+                chars="$bytes"
+            fi
             if (( gen_chars > cap )); then
                 printf '[deploy] WARN %s: the GENERATED doctrine alone is %s characters, over the %s cap\n' \
                     "$file_abs" "$gen_chars" "$cap" >&2
