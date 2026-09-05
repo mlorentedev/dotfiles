@@ -67,7 +67,7 @@ tags: [tag1, tag2]
 - Update `## Last Crystallized: YYYY-MM-DD` to today
 
 ### Step 7 — Stamp
-- Run: `knowledge-crystallize.sh` (or `dotf vault crystallize`)
+- Run: `dotf vault crystallize` (add `--all` to stamp every project)
 - This updates currentDate and Last Crystallized automatically
 
 ### Step 8 — Report
