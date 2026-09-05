@@ -224,6 +224,12 @@ clean git status, confirmed merged PR, and minimum age.`,
 			if !report.ProcessDiscovery {
 				c.Printf("note: no process-liveness check on this platform, so nothing can be reaped.\n")
 				c.Printf("      Gate f refuses rather than guesses; remove one deliberately with `dotf worktree done`.\n")
+			} else if report.UninspectableProcesses > 0 {
+				// A partial scan, said out loud. These are almost always other
+				// users' processes, whose cwd only they and root may read, so
+				// the scan cannot rule out that one of them is inside.
+				c.Printf("note: %d process(es) could not be inspected, so this scan was partial.\n",
+					report.UninspectableProcesses)
 			}
 
 			if opts.DryRun {

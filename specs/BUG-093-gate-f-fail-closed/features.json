@@ -8,10 +8,10 @@
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f2",
-    "behavior": "On Linux every failure path answers true (fail closed), never false",
-    "verification": "! grep -A3 'os.ReadDir(\"/proc\")' cli/internal/worktree/sweep_proc_linux.go | grep -q 'return false'",
+    "behavior": "On Linux every failure that prevents the SCAN answers true (Abs, EvalSymlinks, ReadDir); a per-process failure is three-valued and unreadable is counted, not folded into either answer",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSeesThroughASymlinkedWorktreePath|VanishedProcess|Uninspectable' -count=1",
     "state": "verified",
-    "evidence": "no `return false` follows the /proc ReadDir error branch"
+    "evidence": "symlink regression mutation-proven: removing EvalSymlinks fails TestGateFSeesThroughASymlinkedWorktreePath"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f3",
@@ -29,8 +29,8 @@
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f5",
-    "behavior": "dotf worktree sweep reports absent process discovery before its counts, so an inert sweep is distinguishable from a clean machine",
-    "verification": "grep -q 'no process-liveness check on this platform' cli/internal/cmd/worktree.go",
+    "behavior": "dotf worktree sweep reports absent process discovery, and a non-zero uninspectable count when the scan ran but could not see everything",
+    "verification": "grep -q 'no process-liveness check on this platform' cli/internal/cmd/worktree.go && grep -q 'could not be inspected, so this scan was partial' cli/internal/cmd/worktree.go",
     "state": "verified",
     "evidence": "the note is printed before the counts in newWorktreeSweepCmd"
   },
@@ -40,5 +40,12 @@
     "verification": "cd cli && go build ./... && go test ./... && GOOS=windows go vet ./... && golangci-lint run ./...",
     "state": "verified",
     "evidence": "go build / go test ./... / GOOS=windows go vet ./... / golangci-lint run 2.12.2 -> all rc=0, 0 issues"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f7",
+    "behavior": "The real /proc traversal is tested against live child processes, not only through the seam",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSees|GateFDoesNotInvent|GateFMatches|IsNumericPID|Vanished' -count=1",
+    "state": "verified",
+    "evidence": "sweep_proc_linux_test.go: 6 tests spawning real children; round-1 review found this file did not exist"
   }
 ]

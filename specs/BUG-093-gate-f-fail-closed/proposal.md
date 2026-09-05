@@ -64,13 +64,29 @@ note: no process-liveness check on this platform, so nothing can be reaped.
 
 1. `isHostProcessInside` has no single definition shared across platforms; Linux and non-Linux
    are separate build-tagged files.
-2. On Linux, every failure path (`filepath.Abs` error, `os.ReadDir("/proc")` error) answers
-   `true`, not `false`.
+2. On Linux, every failure that prevents the **scan** answers `true`, not `false`:
+   `filepath.Abs` error, `filepath.EvalSymlinks` error, `os.ReadDir("/proc")` error.
+
+   **Amended after round 1, and the amendment is the finding.** This criterion originally read
+   *"every failure path answers `true`"*, which the reviewer correctly showed the code does not
+   and must not satisfy: `os.Readlink("/proc/<pid>/cwd")` fails with EACCES for every process
+   this user does not own, `/proc/1/cwd` included, so answering `true` there would make `sweep`
+   permanently inert on Linux. The original wording described a system that cannot exist.
+   A per-process failure is therefore **three-valued** — inside, outside, or unreadable —
+   and unreadable is counted and reported rather than folded into either answer.
+
+2b. A process that has exited between the directory read and the link read counts as
+   **outside**, not unreadable: `/proc` is a snapshot, processes leave during every scan, and
+   counting them would make the partial-scan signal fire constantly and mean nothing.
+
+2c. The target path is resolved with `filepath.EvalSymlinks` before comparison, because
+   `/proc/<pid>/cwd` is already resolved by the kernel and `filepath.Abs` is not.
 3. On any non-Linux platform, `isHostProcessInside` answers `true` for every input.
 4. `processDiscoverySupported` is `false` exactly where there is no implementation.
 5. `isCandidateForReap` refuses a `StateReapable` worktree when Gate f answers `true`, and
    allows it when Gate f answers `false` — both directions driven by a test seam.
-6. `dotf worktree sweep` reports the absence of process discovery before its counts.
+6. `dotf worktree sweep` reports the absence of process discovery before its counts, and
+   reports a non-zero uninspectable count when the scan ran but could not see everything.
 7. `go build`, `go test ./...`, `golangci-lint run` and `GOOS=windows go vet ./...` are clean.
 8. The caller-side fix is mutation-proven: reverting it fails the suite, with the anchor
    asserted before the mutation is applied.

@@ -16,9 +16,17 @@ import "testing"
 
 func TestUnsupportedPlatformAnswersTrueForEveryPath(t *testing.T) {
 	for _, path := range []string{"", ".", `C:\Users\someone\Projects\repo-wt-feat`, "/tmp/repo-wt-feat"} {
-		if !isHostProcessInside(path) {
-			t.Errorf("isHostProcessInside(%q) = false on a platform with no process discovery; "+
-				"the caller deletes the worktree on a false, so the only safe answer is true", path)
+		reading := isHostProcessInside(path)
+		if !reading.Inside {
+			t.Errorf("isHostProcessInside(%q).Inside = false on a platform with no process "+
+				"discovery; the caller deletes the worktree on a false, so the only safe "+
+				"answer is true", path)
+		}
+		// Nothing was inspected, so a non-zero count would claim a scan that
+		// never ran. The absence is carried by processDiscoverySupported.
+		if reading.Uninspectable != 0 {
+			t.Errorf("isHostProcessInside(%q).Uninspectable = %d, want 0: no scan happened here",
+				path, reading.Uninspectable)
 		}
 	}
 }

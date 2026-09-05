@@ -18,8 +18,13 @@ import (
 
 func withHostProcessInside(t *testing.T, answer bool) {
 	t.Helper()
+	withGateFReading(t, GateFReading{Inside: answer})
+}
+
+func withGateFReading(t *testing.T, reading GateFReading) {
+	t.Helper()
 	original := hostProcessInside
-	hostProcessInside = func(string) bool { return answer }
+	hostProcessInside = func(string) GateFReading { return reading }
 	t.Cleanup(func() { hostProcessInside = original })
 }
 
@@ -72,5 +77,25 @@ func TestProcessDiscoveryIsReportedForThisPlatform(t *testing.T) {
 
 	if hostProcessInside == nil {
 		t.Fatal("process discovery is advertised as supported but Gate f has no implementation")
+	}
+}
+
+// A partial scan must not silently become a clean one. Uninspectable processes
+// deliberately do NOT block the reap -- refusing on them would make sweep inert
+// on Linux, since /proc/1/cwd is unreadable to every non-root caller -- so the
+// count is the only thing standing between "scanned and found nothing" and
+// "could not see several processes and found nothing among the rest".
+func TestUninspectableProcessesDoNotBlockButAreCarried(t *testing.T) {
+	withGateFReading(t, GateFReading{Inside: false, Uninspectable: 7})
+
+	reading, ok := gateF(reapableInfo(t), "/somewhere/else")
+	if !ok {
+		t.Error("unreadable processes blocked the reap; refusing on them makes sweep " +
+			"permanently inert on Linux, which is why they are reported instead")
+	}
+	if reading.Uninspectable != 7 {
+		t.Errorf("gateF dropped the uninspectable count: got %d, want 7 — a partial scan " +
+			"that reports nothing is indistinguishable from a complete one",
+			reading.Uninspectable)
 	}
 }

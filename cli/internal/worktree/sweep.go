@@ -91,27 +91,57 @@ type SweepReport struct {
 	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
 	// and those are different facts.
 	ProcessDiscovery bool `json:"process_discovery"`
+	// UninspectableProcesses is the largest number of processes any single
+	// worktree's scan could not read the cwd of — almost always another user's,
+	// since /proc/<pid>/cwd is readable only by its owner and root. Non-zero
+	// means every reap decision in this run rested on a partial scan. Reported
+	// rather than acted on: refusing on it would make sweep inert on Linux,
+	// because /proc/1/cwd is unreadable to every non-root caller.
+	UninspectableProcesses int `json:"uninspectable_processes"`
+}
+
+// GateFReading is what Gate f could actually establish about one worktree.
+//
+// It is a struct and not a bool because the scan has three outcomes, not two.
+// A process whose cwd cannot be read is neither inside nor outside: /proc/<pid>/cwd
+// is readable only by the process owner and root, so an ordinary user's scan
+// cannot see another user's cwd. Collapsing that into "not inside" is the
+// fail-open an adversarial review caught here; collapsing it into "inside"
+// would make sweep permanently inert, since /proc/1/cwd is unreadable to every
+// non-root caller. Reporting the count is the third option, and it matches what
+// ProcessDiscovery does one level up: make a partial answer legible as partial.
+type GateFReading struct {
+	Inside        bool
+	Uninspectable int
 }
 
 // hostProcessInside is Gate f. Its implementation lives in
 // sweep_proc_linux.go / sweep_proc_other.go, because it is the one gate with no
 // portable form -- see those files for why the unsupported answer is `true`.
 //
-// Indirected through a variable so a test can drive both answers on any
+// Indirected through a variable so a test can drive every answer on any
 // platform. Without the seam the refusing branch is reachable only on a machine
 // the CI does not have, which is how the defect this replaced survived review.
 var hostProcessInside = isHostProcessInside
 
 func isCandidateForReap(info Info, absCwd string) bool {
+	_, ok := gateF(info, absCwd)
+	return ok
+}
+
+// gateF returns the reading alongside the decision, so a caller that wants to
+// report how complete the scan was does not have to run it twice.
+func gateF(info Info, absCwd string) (GateFReading, bool) {
 	if info.State != StateReapable {
-		return false
+		return GateFReading{}, false
 	}
 	// Gate (f): never reap current working directory or any worktree with active host processes inside
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd || hostProcessInside(absWT) {
-		return false
+	if err != nil || absWT == absCwd {
+		return GateFReading{}, false
 	}
-	return true
+	reading := hostProcessInside(absWT)
+	return reading, !reading.Inside
 }
 
 func isDirty(path string, runner SweepRunner) bool {
@@ -153,7 +183,7 @@ func executeWorktreeReap(repoRoot string, info Info, runner SweepRunner) bool {
 func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time.Time, absCwd string) bool {
 	// TOCTOU checks under lock: host process/cwd guard, clean status, merge status, lease expiration
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd || hostProcessInside(absWT) {
+	if err != nil || absWT == absCwd || hostProcessInside(absWT).Inside {
 		return false
 	}
 	if isDirty(info.Path, runner) {
@@ -194,7 +224,11 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	absCwd, _ := filepath.Abs(cwd)
 
 	for _, info := range infos {
-		if !isCandidateForReap(info, absCwd) {
+		reading, candidate := gateF(info, absCwd)
+		if reading.Uninspectable > report.UninspectableProcesses {
+			report.UninspectableProcesses = reading.Uninspectable
+		}
+		if !candidate {
 			report.SkippedCount++
 			continue
 		}

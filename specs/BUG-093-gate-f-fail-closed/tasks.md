@@ -38,3 +38,15 @@ created: "2026-09-05"
 - [ ] Injecting the `/proc` directory read to close the second mutation gap.
 - [ ] The sibling fail-open classifications from #1515's review (zero-timestamp metadata,
       detached HEAD, `clean.go` name-based allowlist) — same family, dispositioned separately.
+
+## Round 2 (after the round-1 FAIL)
+
+- [x] Blocker: resolve the target with `filepath.EvalSymlinks` before comparing against
+      `/proc/<pid>/cwd`, which the kernel has already resolved.
+- [x] Major: make a per-process read three-valued (`inside` / `outside` / `unreadable`), count
+      the unreadable ones, and report them. A vanished process counts as outside, not unreadable.
+- [x] Major: `sweep_proc_linux_test.go` — six tests against the real `/proc` with live child
+      processes, including the symlink regression.
+- [x] Amend AC2 to state what the code can actually guarantee, and declare the amendment in
+      `verification.md` rather than letting it pass silently.
+- [x] `SweepReport.UninspectableProcesses` + the partial-scan note in the command.
