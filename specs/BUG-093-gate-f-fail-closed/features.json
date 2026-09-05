@@ -1,0 +1,51 @@
+[
+  {
+    "id": "BUG-093-gate-f-fail-closed-f1",
+    "behavior": "isHostProcessInside is build-tag split; no single definition serves every platform",
+    "verification": "test -f cli/internal/worktree/sweep_proc_linux.go && test -f cli/internal/worktree/sweep_proc_other.go && ! grep -q 'func isHostProcessInside' cli/internal/worktree/sweep.go",
+    "state": "verified",
+    "evidence": "sweep_proc_linux.go + sweep_proc_other.go exist; sweep.go carries no definition"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f2",
+    "behavior": "On Linux every failure that prevents the SCAN answers true (Abs, EvalSymlinks, ReadDir); a per-process failure is three-valued and unreadable is counted, not folded into either answer",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSeesThroughASymlinkedWorktreePath|VanishedProcess|Uninspectable' -count=1",
+    "state": "verified",
+    "evidence": "symlink regression mutation-proven: removing EvalSymlinks fails TestGateFSeesThroughASymlinkedWorktreePath"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f3",
+    "behavior": "On any non-Linux platform isHostProcessInside answers true for every input, and processDiscoverySupported is false",
+    "verification": "cd cli && GOOS=windows go vet ./internal/worktree/ && GOOS=darwin go vet ./internal/worktree/",
+    "state": "verified",
+    "evidence": "GOOS=windows and GOOS=darwin vet clean; asserted at runtime by sweep_proc_other_test.go on the Windows leg"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f4",
+    "behavior": "isCandidateForReap refuses when Gate f says a process is inside and allows when it says none is, both driven through a seam",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateF' -count=1",
+    "state": "verified",
+    "evidence": "TestGateFRefusesWhenProcessDiscoveryCannotAnswer + TestGateFAllowsAReapableWorktreeWhenNothingIsInside, both PASS"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f5",
+    "behavior": "dotf worktree sweep reports absent process discovery, and a non-zero uninspectable count when the scan ran but could not see everything",
+    "verification": "grep -q 'no process-liveness check on this platform' cli/internal/cmd/worktree.go && grep -q 'could not be inspected, so this scan was partial' cli/internal/cmd/worktree.go",
+    "state": "verified",
+    "evidence": "the note is printed before the counts in newWorktreeSweepCmd"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f6",
+    "behavior": "The full Go layer is clean on Linux and vets clean for Windows",
+    "verification": "cd cli && go build ./... && go test ./... && GOOS=windows go vet ./... && golangci-lint run ./...",
+    "state": "verified",
+    "evidence": "go build / go test ./... / GOOS=windows go vet ./... / golangci-lint run 2.12.2 -> all rc=0, 0 issues"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f7",
+    "behavior": "The real /proc traversal is tested against live child processes, not only through the seam",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSees|GateFDoesNotInvent|GateFMatches|IsNumericPID|Vanished' -count=1",
+    "state": "verified",
+    "evidence": "sweep_proc_linux_test.go: 6 tests spawning real children; round-1 review found this file did not exist"
+  }
+]
