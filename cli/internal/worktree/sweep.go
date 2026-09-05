@@ -86,52 +86,21 @@ type SweepReport struct {
 	Reaped       []Info `json:"reaped"`
 	SkippedCount int    `json:"skipped_count"`
 	DryRun       bool   `json:"dry_run"`
+	// ProcessDiscovery is false when Gate f has no implementation on this
+	// platform and is therefore refusing everything. Reported because an inert
+	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
+	// and those are different facts.
+	ProcessDiscovery bool `json:"process_discovery"`
 }
 
-// isHostProcessInside checks if any running host process has its cwd inside targetPath (Gate f, Linux /proc).
-func isHostProcessInside(targetPath string) bool {
-	absTarget, err := filepath.Abs(targetPath)
-	if err != nil {
-		return false
-	}
-	entries, err := os.ReadDir("/proc")
-	if err != nil {
-		return false
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() || !isNumericPID(entry.Name()) {
-			continue
-		}
-		if processCwdInside(entry.Name(), absTarget) {
-			return true
-		}
-	}
-	return false
-}
-
-func isNumericPID(name string) bool {
-	if len(name) == 0 {
-		return false
-	}
-	for _, r := range name {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func processCwdInside(pidName, absTarget string) bool {
-	dest, err := os.Readlink(filepath.Join("/proc", pidName, "cwd"))
-	if err != nil {
-		return false
-	}
-	absDest, err := filepath.Abs(dest)
-	if err != nil {
-		return false
-	}
-	return absDest == absTarget || strings.HasPrefix(absDest, absTarget+string(filepath.Separator))
-}
+// hostProcessInside is Gate f. Its implementation lives in
+// sweep_proc_linux.go / sweep_proc_other.go, because it is the one gate with no
+// portable form -- see those files for why the unsupported answer is `true`.
+//
+// Indirected through a variable so a test can drive both answers on any
+// platform. Without the seam the refusing branch is reachable only on a machine
+// the CI does not have, which is how the defect this replaced survived review.
+var hostProcessInside = isHostProcessInside
 
 func isCandidateForReap(info Info, absCwd string) bool {
 	if info.State != StateReapable {
@@ -139,7 +108,7 @@ func isCandidateForReap(info Info, absCwd string) bool {
 	}
 	// Gate (f): never reap current working directory or any worktree with active host processes inside
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd || isHostProcessInside(absWT) {
+	if err != nil || absWT == absCwd || hostProcessInside(absWT) {
 		return false
 	}
 	return true
@@ -184,7 +153,7 @@ func executeWorktreeReap(repoRoot string, info Info, runner SweepRunner) bool {
 func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time.Time, absCwd string) bool {
 	// TOCTOU checks under lock: host process/cwd guard, clean status, merge status, lease expiration
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd || isHostProcessInside(absWT) {
+	if err != nil || absWT == absCwd || hostProcessInside(absWT) {
 		return false
 	}
 	if isDirty(info.Path, runner) {
@@ -217,7 +186,8 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	}
 
 	report := &SweepReport{
-		DryRun: opts.DryRun,
+		DryRun:           opts.DryRun,
+		ProcessDiscovery: processDiscoverySupported,
 	}
 
 	cwd, _ := os.Getwd()
