@@ -144,9 +144,17 @@ func TestUninspectableProcessesAreCountedByTheRealScan(t *testing.T) {
 	// cwd this user may not read, and it must not silently become vacuous on a
 	// machine where that is untrue. /proc/1 is the natural witness — it is
 	// root's, and ptrace_may_access denies every non-root caller.
+	//
+	// The skip is narrow and it is LOUD, because a skip and a pass are the same
+	// colour in CI: `go test` without -v prints neither, so a test that quietly
+	// stopped running looks exactly like one that keeps passing. Whoever reads
+	// this on a machine where it skipped gets told which condition did it.
+	euid := os.Geteuid()
 	if _, err := os.Readlink("/proc/1/cwd"); err == nil {
-		t.Skip("/proc/1/cwd is readable here (running as root, or an unusual kernel policy), " +
-			"so this machine has nothing for the counter to count")
+		t.Skipf("NOT EXECUTED: /proc/1/cwd is readable at euid=%d, so every process on this "+
+			"machine is inspectable and the counter has nothing to count. This is expected "+
+			"under root and nowhere else; the CI leg that pins this behaviour runs unprivileged.",
+			euid)
 	}
 
 	// An empty directory, so the scan runs to completion instead of returning

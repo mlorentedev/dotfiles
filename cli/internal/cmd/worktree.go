@@ -237,8 +237,9 @@ clean git status, confirmed merged PR, and minimum age.`,
 				// gateF only scans worktrees that reached StateReapable, so a
 				// run with nothing to consider also produces 0, and printing a
 				// reach for a scan that never happened would be its own lie.
-				c.Printf("Gate f reach: %d process(es) belong to root or another user and cannot be inspected;\n"+
-					"              one of theirs sitting in a worktree is invisible to this scan.\n",
+				c.Printf("Gate f reach: %d process(es) could not be inspected (other users, root, or\n"+
+					"              same-user processes that opt out); one of those sitting in a\n"+
+					"              worktree is invisible to this scan.\n",
 					report.UninspectableProcesses)
 			}
 
