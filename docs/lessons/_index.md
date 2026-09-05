@@ -290,5 +290,6 @@ tags: [lessons, index, dotfiles]
 | [270 - A security wrapper that breaks the tool it protects gets routed around](lesson-270-a-security-wrapper-that-breaks-the-tool-it-protects-gets-routed-around.md) | 2026-09-05 |  |
 | [271 - Hooks are re-read, personas are not, and one measurement was generalised into both](lesson-271-hooks-reload-personas-do-not-and-the-difference-was-assumed-away.md) | 2026-09-02 |  |
 | [272 - Fail-closed worktree garbage collection requires in-tree leases and positive confirmation](lesson-272-fail-closed-worktree-garbage-collection-and-in-tree-leases.md) | 2026-09-05 |  |
+| [273 - The fix and the detector can be the same edit](lesson-273-the-fix-and-the-detector-can-be-the-same-edit.md) | 2026-09-05 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
