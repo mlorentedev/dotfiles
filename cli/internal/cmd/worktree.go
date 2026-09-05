@@ -225,10 +225,21 @@ clean git status, confirmed merged PR, and minimum age.`,
 				c.Printf("note: no process-liveness check on this platform, so nothing can be reaped.\n")
 				c.Printf("      Gate f refuses rather than guesses; remove one deliberately with `dotf worktree done`.\n")
 			} else if report.UninspectableProcesses > 0 {
-				// A partial scan, said out loud. These are almost always other
-				// users' processes, whose cwd only they and root may read, so
-				// the scan cannot rule out that one of them is inside.
-				c.Printf("note: %d process(es) could not be inspected, so this scan was partial.\n",
+				// Gate f's reach, not a warning. This number is non-zero on
+				// every Linux machine — reading /proc/<pid>/cwd is gated by
+				// ptrace_may_access, and a desktop runs hundreds of processes
+				// this user may not read (measured: 364 of 571, 20 of them the
+				// caller's own). It said "this scan was partial" before, which
+				// is a warning light wired to always-on, and a reader learns to
+				// skip those.
+				//
+				// Still gated on > 0, because 0 is ambiguous rather than good:
+				// gateF only scans worktrees that reached StateReapable, so a
+				// run with nothing to consider also produces 0, and printing a
+				// reach for a scan that never happened would be its own lie.
+				c.Printf("Gate f reach: %d process(es) could not be inspected (other users, root, or\n"+
+					"              same-user processes that opt out); one of those sitting in a\n"+
+					"              worktree is invisible to this scan.\n",
 					report.UninspectableProcesses)
 			}
 

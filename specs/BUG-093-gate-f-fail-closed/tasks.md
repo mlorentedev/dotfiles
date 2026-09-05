@@ -50,3 +50,28 @@ created: "2026-09-05"
 - [x] Amend AC2 to state what the code can actually guarantee, and declare the amendment in
       `verification.md` rather than letting it pass silently.
 - [x] `SweepReport.UninspectableProcesses` + the partial-scan note in the command.
+- [x] **Undeclared at the time, recorded here after round 3 named it:** `dab7b6e` drove the
+      `hostProcessInside` seam in five pre-existing `sweep_test.go` tests. Necessary — Gate f
+      answering `true` off Linux makes any test that expects a reap fail on the Windows leg — but
+      it was a test change made after the review launched, and it moved the reviewed sha.
+
+## Round 3 (after the round-3 FAIL — the surviving-mutation round)
+
+- [x] Reframe `Uninspectable` from partial-scan warning to Gate f **reach**: `Scope of Gate f` in
+      the proposal, new CLI wording, three code comments rewritten. Measured first, then designed:
+      the uid-filtered rescue does not work (20 of 227 same-uid processes are EACCES).
+- [x] Split the vacuous sibling test into `TestGateFMatchesAProcessInASubdirectory` and
+      `TestGateFDoesNotMatchASiblingSharingANamePrefix`, each with its own root, no `t.Skip`.
+- [x] `TestUninspectableProcessesAreCountedByTheRealScan` — drives the producer, anchored on
+      `/proc/1/cwd` being unreadable so it cannot go vacuous on a root-run machine.
+- [x] `TestSweepRefusesWhenAProcessArrivesAfterTheGate` — the under-lock re-check, via a seam that
+      answers `false` then `true`, with a call-count anchor.
+- [x] `TestProcessDiscoveryIsAdvertisedOnLinux` replaces the unfalsifiable Linux pin.
+- [x] `TestGateFRefusesWhenTheTargetCannotBeResolved` — the `EvalSymlinks` branch, which needed
+      only a nonexistent path.
+- [x] Delete `isCandidateForReap` (no production caller); move its seam tests onto `gateF`.
+- [x] `strconv.Itoa` for the hand-rolled `itoa`; document `cwdVerdict`'s permissive zero value.
+- [x] Amend AC5/AC5b/AC6/AC7 and correct three false claims in `verification.md`.
+- [x] Reproduce the mount-namespace fail-open independently; declare it in *Out of scope* and file
+      it as **#1523** rather than shipping a fix with no CI-runnable test.
+- [x] Execute the non-Linux path locally with the build-tag-flip proxy — `go vet` cannot see it.
