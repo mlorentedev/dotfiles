@@ -1,7 +1,7 @@
 ---
 id: "CLI-075-dotf-worktree-lifecycle"
 type: spec
-status: draft
+status: archived
 created: "2026-09-04"
 issue: "mlorentedev/dotfiles#1500"
 tags: [spec, proposal, worktree, gc, lifecycle]

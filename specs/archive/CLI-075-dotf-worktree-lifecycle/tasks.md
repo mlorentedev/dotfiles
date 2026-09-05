@@ -64,4 +64,4 @@ created: "2026-09-04"
 - [x] Type checks and tests pass (`go -C cli test ./...`)
 - [x] No unrelated changes in diff
 - [x] `verification.md` filled in with command outputs
-- [ ] Adversarial review passes before archive (`dotf spec review CLI-075-dotf-worktree-lifecycle`)
+- [x] Adversarial review passes before archive (`dotf spec review CLI-075-dotf-worktree-lifecycle`)

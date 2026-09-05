@@ -50,7 +50,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof:
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-075-dotf-worktree-lifecycle/` -> `specs/archive/CLI-075-dotf-worktree-lifecycle/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-075-dotf-worktree-lifecycle/` -> `specs/archive/CLI-075-dotf-worktree-lifecycle/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
