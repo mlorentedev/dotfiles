@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/architect/AGENT.md
-generated_sha: 2584c7a2f56c8493
+generated_sha: d990d292892a6ab9
 id: agent-architect
 type: agent
 status: active
@@ -48,7 +48,11 @@ Read `pattern-loader` as the peer of `read-all-adrs` rather than as an extra. AD
 
 This is why the loader applies **no default severity**. Defaulting to `warn` would make an unmigrated persona *"silently inert while every check reported it as wired — presence dressed as enforcement"*; defaulting to `block` would turn every already-declared skill into a hard gate the day it shipped. Three of three here is a choice about this persona, not a rule about personas.
 
-Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona, with two dispatches of one role carrying different `agent_id`s. One blocker applies with particular force — a *named* dispatch sends its name as `agent_type`, so its role never resolves and the gate silently turns off. Until that is fixed, read a `[gate] warn` line as the obligation it states.
+Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona **from the deployed record**, with two dispatches of one role carrying different `agent_id`s.
+
+The deployed half of that sentence is the one that bites. The gate reads the deploy directory, never your checkout, so a migration that is merged is not a migration that is in force — and the record it reads then reports `allow` with *"all blocking skills consumed"*, which is what a persona that satisfied every obligation also produces. Enforcement being off and enforcement passing are the same line in the journal.
+
+A named dispatch used to defeat role resolution outright; that is fixed for a **witnessed** dispatch, which the gate maps back to its true type. The residual is the unwitnessed one, which still falls through to the roster and finds no persona under its name.
 
 ## Boundaries
 
