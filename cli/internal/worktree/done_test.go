@@ -125,12 +125,44 @@ func TestDoneSucceedsOnCleanBranchWithoutCommits(t *testing.T) {
 	}
 }
 
+// samePath reports whether two paths name the same location, after resolving
+// the two ways one location can spell itself differently here: on Windows
+// t.TempDir() hands back the 8.3 short form (C:\Users\RUNNER~1\...) while git
+// reports the long form (C:\Users\runneradmin\...), and on macOS /var is a
+// symlink to /private/var. Comparing the raw strings passes on Linux and fails
+// on the other two for reasons that have nothing to do with the resolvers.
+func samePath(a, b string) bool {
+	return normalizePath(a) == normalizePath(b)
+}
+
+func normalizePath(path string) string {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	return filepath.Clean(resolved)
+}
+
+// assertFilepathConvention pins that a resolver answers in filepath's separator
+// convention, not git's. It has to be checked separately from samePath, which
+// runs both sides through filepath.Clean and would therefore paper over exactly
+// this: git emits forward slashes on Windows, so a resolver returning its raw
+// stdout compares equal under samePath while handing every caller a path in the
+// wrong convention. On Linux the two conventions coincide and this can only
+// pass -- the assertion earns its keep on the Windows CI leg.
+func assertFilepathConvention(t *testing.T, label, path string) {
+	t.Helper()
+	if path != filepath.Clean(path) {
+		t.Errorf("%s returned %q, which is not in filepath convention (want %q)", label, path, filepath.Clean(path))
+	}
+}
+
 func testResolveFromRoot(t *testing.T, wtDir, absRepoDir, absWTDir string) {
 	mainRoot, err := ResolveMainRepoRoot(wtDir)
 	if err != nil {
 		t.Fatalf("unexpected error resolving main repo root: %v", err)
 	}
-	if mainRoot != absRepoDir {
+	if !samePath(mainRoot, absRepoDir) {
 		t.Errorf("expected mainRoot to be %s, got %s", absRepoDir, mainRoot)
 	}
 
@@ -138,9 +170,12 @@ func testResolveFromRoot(t *testing.T, wtDir, absRepoDir, absWTDir string) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving worktree root: %v", err)
 	}
-	if wtRoot != absWTDir {
+	if !samePath(wtRoot, absWTDir) {
 		t.Errorf("expected wtRoot to be %s, got %s", absWTDir, wtRoot)
 	}
+
+	assertFilepathConvention(t, "ResolveMainRepoRoot", mainRoot)
+	assertFilepathConvention(t, "ResolveWorktreeRoot", wtRoot)
 }
 
 func testResolveFromSubdir(t *testing.T, wtDir, absRepoDir, absWTDir string) (string, string) {
@@ -151,7 +186,7 @@ func testResolveFromSubdir(t *testing.T, wtDir, absRepoDir, absWTDir string) (st
 	if err != nil {
 		t.Fatalf("unexpected error resolving main root from subDir: %v", err)
 	}
-	if subMainRoot != absRepoDir {
+	if !samePath(subMainRoot, absRepoDir) {
 		t.Errorf("expected subMainRoot to be %s, got %s", absRepoDir, subMainRoot)
 	}
 
@@ -159,9 +194,14 @@ func testResolveFromSubdir(t *testing.T, wtDir, absRepoDir, absWTDir string) (st
 	if err != nil {
 		t.Fatalf("unexpected error resolving wt root from subDir: %v", err)
 	}
-	if subWTRoot != absWTDir {
+	if !samePath(subWTRoot, absWTDir) {
 		t.Errorf("expected subWTRoot to be %s, got %s", absWTDir, subWTRoot)
 	}
+
+	assertFilepathConvention(t, "ResolveMainRepoRoot (from subdir)", subMainRoot)
+	assertFilepathConvention(t, "ResolveWorktreeRoot (from subdir)", subWTRoot)
+	// Returned unnormalised on purpose: the caller feeds these straight into
+	// Done, which is what the in-worktree CLI flow does with them.
 	return subMainRoot, subWTRoot
 }
 

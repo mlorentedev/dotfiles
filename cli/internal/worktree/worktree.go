@@ -210,5 +210,9 @@ func ResolveWorktreeRoot(dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolving worktree toplevel: %w", err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	// git reports forward slashes on every platform, Windows included, while
+	// ResolveMainRepoRoot normalises its answer through filepath. Clean here so
+	// the two resolvers speak one separator convention: on Linux they coincide,
+	// which is why the divergence only ever surfaced on the Windows CI leg.
+	return filepath.Clean(strings.TrimSpace(string(out))), nil
 }

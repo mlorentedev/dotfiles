@@ -19,9 +19,15 @@ func TestResolveSiblingPath(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got := ResolveSiblingPath(tc.repoRoot, tc.slug)
-		if got != tc.expected {
-			t.Errorf("ResolveSiblingPath(%q, %q) = %q, expected %q", tc.repoRoot, tc.slug, got, tc.expected)
+		// The table is written in slash form because it reads better, but
+		// ResolveSiblingPath answers in filepath's convention. Convert both
+		// sides rather than asserting a POSIX literal against a Windows result.
+		repoRoot := filepath.FromSlash(tc.repoRoot)
+		expected := filepath.FromSlash(tc.expected)
+
+		got := ResolveSiblingPath(repoRoot, tc.slug)
+		if got != expected {
+			t.Errorf("ResolveSiblingPath(%q, %q) = %q, expected %q", repoRoot, tc.slug, got, expected)
 		}
 	}
 }
