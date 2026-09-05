@@ -1,37 +1,58 @@
 [
   {
     "id": "SEC-002-secrets-run-pty-f1",
-    "behavior": "The child gets a pty when the parent has a terminal, and a pipe when it does not",
-    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRunChildPTY_ChildSeesATerminal|TestRunChild_ChildSeesAPipe'",
+    "behavior": "The call site selects the pty path when the parent has a terminal and the pipe path when it does not, exercising the isTerminal seam in both directions",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestWantsInteractiveChild_FollowsTheTerminalSeam",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PASS. Proven in the failing direction: inverting the condition in wantsInteractiveChild (anchor-asserted patch) fails both assertions -- 'a terminal parent did NOT select the pty path' and 'a non-terminal parent selected the pty path'. Added after the a636844 review raised the untested seam as a Major."
   },
   {
     "id": "SEC-002-secrets-run-pty-f2",
-    "behavior": "A secret routed through the pty is redacted before reaching the parent's stdout, including when split across two of the child's writes",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestRunChildPTY_RedactsASecretSplitAcrossWrites",
+    "behavior": "The child gets a real pty on the pty path and a pipe on the pipe path, as the child itself reports via `test -t 1`",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRunChildPTY_ChildSeesATerminal|TestRunChild_ChildSeesAPipe'",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PASS. Both run `sh -c 'test -t 1'` -- the same question pi asks -- and assert opposite answers on the two paths."
   },
   {
     "id": "SEC-002-secrets-run-pty-f3",
-    "behavior": "The hold-back is prefix-aware: a frame whose tail is not a proper prefix of any secret is released on the write, not withheld until the next one",
-    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRedactWriter_ReleasesFrameWithNoSecretPrefixImmediately|TestRedactWriter_HoldsBackATrailingSecretPrefix'",
+    "behavior": "A secret routed through the pty is redacted before reaching the parent's stdout, including when split across two of the child's writes",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestRunChildPTY_RedactsASecretSplitAcrossWrites",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PASS. Child emits 'mock-open' / sleep 0.2 / 'router-test-token-val', so the value genuinely crosses a write boundary."
   },
   {
     "id": "SEC-002-secrets-run-pty-f4",
-    "behavior": "The #1459 introspection guard runs on the pty path too, so the new branch is not a second way to dump the environment",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestRunChildPTY_HonoursTheIntrospectionGuard",
+    "behavior": "The hold-back is prefix-aware: a frame whose tail is not a proper prefix of any secret is released on the write rather than withheld until the next one",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRedactWriter_ReleasesFrameWithNoSecretPrefixImmediately|TestRedactWriter_HoldsBackATrailingSecretPrefix'",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PASS. Proven in the failing direction: reverting holdBack to the fixed maxSecretLen-1 window (anchor-asserted patch) turns both red; restoring returns them to green."
   },
   {
     "id": "SEC-002-secrets-run-pty-f5",
+    "behavior": "A partial secret prefix left in the tail at end-of-stream is not flushed raw, but reported as redacted material",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestRedactWriter_DoesNotFlushAPartialSecretPrefixRaw",
+    "state": "pending",
+    "evidence": "PASS. Added in response to the a636844 review's THEORETICAL redaction finding; the child dies mid-key and Flush emits the placeholder instead of the leading bytes."
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f6",
+    "behavior": "One injected secret being a proper prefix of another does not leak the longer one's suffix",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestRedactWriter_HandlesOneSecretBeingAPrefixOfAnother",
+    "state": "pending",
+    "evidence": "PASS. Pairs are now sorted longest-first in newRedactWriter; added in response to the review's SPECULATIVE prefix-collision finding."
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f7",
+    "behavior": "The #1459 introspection guard runs on the pty path too, so the new branch is not a second way to dump the environment",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestRunChildPTY_HonoursTheIntrospectionGuard",
+    "state": "pending",
+    "evidence": "PASS. runChildPTY refuses `env` with the same error as runChild."
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f8",
     "behavior": "The Windows build keeps the pipe path and compiles clean",
     "verification": "cd cli && GOOS=windows go vet ./...",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PASS, exit 0. secrets_child_windows.go returns interactiveChildSupported() == false, so wantsInteractiveChild is false there regardless of the seam."
   }
 ]

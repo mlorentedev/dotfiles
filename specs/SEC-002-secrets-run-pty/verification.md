@@ -66,6 +66,24 @@ window at 0x0 and the TUI refuses to draw, which is a false negative.
 - **Windows keeps the pipe path deliberately.** ConPTY is a different API that the Linux CI leg
   cannot prove, and a half-working pseudo-console fails the same silent way as the bug being fixed.
 
+## Adversarial review round 1 — FAIL on `a636844`, dispositions
+
+Reviewer `nan/deepseek-v4-flash` (random draw, not the implementer). Verdict **FAIL**, driven by one
+REAL Major. Its own summary: *"The code fix itself is sound and well-evidenced; the FAIL is driven by
+the missing seam test, not by a defect in the pty or redaction logic."*
+
+| # | Severity / reality | Finding | Disposition |
+|---|---|---|---|
+| 1 | **Major, REAL** | AC1 requires exercising the `isTerminal` seam; the seam existed but no test touched it. Both AC1 tests call `runChildPTY`/`runChild` directly, bypassing the call-site condition — so the one line the whole fix rests on was unverified, and an inverted condition would pass every test while silently restoring the bug. | **APPLIED.** The condition is extracted to `wantsInteractiveChild()` and `TestWantsInteractiveChild_FollowsTheTerminalSeam` drives the seam true and false, also asserting the fd consulted is **stdout** (asking about stdin would be right by accident on a dev box). Proven in the failing direction: inverting the condition fails both assertions. The finding was correct and this was the right blocker. |
+| 2 | Minor, REAL | `features.json` left every feature `pending` with empty `evidence`, so the machine-readable contract carried none of the proof `verification.md` had. | **APPLIED, with one deviation.** All eight features now carry `evidence`. `state` stays `pending`: the spec template reserves the terminal pass state for the harness after it runs `verification` and captures exit 0 — the agent writing it is precisely what that rule forbids. The reviewer asked for `state: "pass"`; I am declining that half and saying so rather than silently doing neither. |
+| 3 | Minor, THEORETICAL | A partial secret prefix at end-of-stream is flushed raw — up to `maxSecretLen-1` leading bytes of a key. | **APPLIED, not accepted as a tradeoff.** `Flush` now replaces a tail that is a proper prefix with that secret's placeholder. Those bytes are credential material and Flush is the moment the transcript closes. `TestRedactWriter_DoesNotFlushAPartialSecretPrefixRaw`. |
+| 4 | Minor, THEORETICAL | `runChildPTY` can hang if a descendant holds the pty slave, since EIO never arrives. | **DECLINED, recorded as a limitation** (proposal decision 7). A deadline would truncate a legitimately long-running TUI, which is the normal case here, and the pipe path has the same property today. Fixing it well needs a different wait strategy than this change should carry. |
+| 5 | Minor, REAL | The pty translates `\n` to `\r\n` (ONLCR) and the proposal never said so. | **APPLIED as documentation** (proposal decision 6). It follows from the pty decision rather than being a new one, but leaving it implicit was the gap. |
+| 6 | Minor, SPECULATIVE | If one injected secret is a proper prefix of another, `ReplaceAll` order can leak the longer one's suffix. | **APPLIED.** `newRedactWriter` sorts pairs longest-first. Pre-existing and vanishingly unlikely with random keys, but the order was free to fix. `TestRedactWriter_HandlesOneSecretBeingAPrefixOfAnother`. |
+
+Five of six applied, one declined with a reason, one half-declined and stated. Round 2 re-runs
+against the new head.
+
 ## Promotion candidates
 
 - [ ] Lesson for `docs/lessons/`? **yes** — "an `io.Writer` that is not an `*os.File` silently

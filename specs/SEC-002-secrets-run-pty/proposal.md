@@ -89,7 +89,18 @@ redaction hold-back from a fixed window to *only bytes that could still become a
 5. **The placeholder is a different length than the secret, which corrupts a TUI's cursor
    arithmetic.** Accepted and stated: a TUI that renders a live credential to the screen is the case
    redaction exists for, and a garbled frame is the correct outcome over a leaked key.
-6. **Raw mode via `golang.org/x/term`** (already a dependency), restored by `defer` **and** from the
+6. **The pty translates `\n` to `\r\n` (ONLCR), and that is part of decision 2.** A non-TUI child
+   run under a terminal now emits CRLF where the pipe path emitted LF. This follows from "a pty is
+   what the child gets when run directly" rather than being a separate choice, but it is a visible
+   behaviour change and stating it is the point: a caller that pipes `secrets run` into something
+   byte-sensitive is on the pipe path anyway (no terminal), so nothing that could care is affected.
+   Surfaced by the adversarial review, which was right that the proposal had left it implicit.
+7. **A child that leaves a descendant holding the pty slave can hang the parent.** `io.Copy` from the
+   master ends on EIO, which only arrives once every slave fd is closed, so a daemonising child would
+   never release it. Accepted as a known limitation rather than papered over with a timeout: a
+   deadline would truncate a legitimately long-running TUI, which is the normal case here. The pipe
+   path has the same property today. Recorded so it is a decision rather than a surprise.
+8. **Raw mode via `golang.org/x/term`** (already a dependency), restored by `defer` **and** from the
    signal handler. In raw mode the parent no longer receives Ctrl-C — the child gets `^C` through the
    pty's line discipline, which is the behaviour of running it directly. `SIGTERM` forwarding is
    kept; `SIGWINCH` is added and resizes the pty.
