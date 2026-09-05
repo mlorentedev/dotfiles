@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: d6d6cf0c738eab7d
+generated_sha: 1b585b8def0a52a1
 id: crystallize-skill
 type: skill
 status: active
@@ -67,7 +67,7 @@ tags: [tag1, tag2]
 - Update `## Last Crystallized: YYYY-MM-DD` to today
 
 ### Step 7 — Stamp
-- Run: `knowledge-crystallize.sh` (or `dotf vault crystallize`)
+- Run: `dotf vault crystallize` (add `--all` to stamp every project)
 - This updates currentDate and Last Crystallized automatically
 
 ### Step 8 — Report

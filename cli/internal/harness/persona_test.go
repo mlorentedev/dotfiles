@@ -174,3 +174,95 @@ func TestRealPersonaRecordsLoadAndReportTheirMigrationState(t *testing.T) {
 	// progress, and pinning it would make the test a chore on every persona edit.
 	t.Logf("%d personas loaded, %d skills still in the legacy flat form", len(personas), unmigrated)
 }
+
+// The MIXED list — mapping entries beside bare strings — is what makes a partial
+// migration expressible, and nothing covered it until builder used it.
+//
+// It matters because the alternative shapes are both wrong. Gating all of a
+// persona's skills means naming situational ones (debug-hardware, mcp-builder)
+// on every call, which teaches the reader to scroll past `[gate]`; gating none
+// leaves the persona inert while every check reports it as wired. The mixed form
+// is the only one that says "these two are obligations, those seven are a menu"
+// — and it is a real parse path, not a formatting preference, so it gets a test.
+func TestPersonaMixedFormGatesOnlyTheMappingEntries(t *testing.T) {
+	p, err := LoadPersona(writePersona(t, t.TempDir(), "builder", `
+name: builder
+kind: invocable
+model: mid
+skills:
+  - id: test-driven-development
+    enforce: warn
+  - id: test
+    enforce: warn
+  - golang-pro
+  - debug-hardware`))
+	if err != nil {
+		t.Fatalf("a mixed skills list must load: %v", err)
+	}
+
+	if len(p.Skills) != 4 {
+		t.Fatalf("all four entries must survive, got %d: %v", len(p.Skills), p.Skills)
+	}
+
+	gated := map[string]Enforcement{}
+	for _, s := range p.Skills {
+		if s.Enforce != EnforceUnset {
+			gated[s.ID] = s.Enforce
+		}
+	}
+	if len(gated) != 2 || gated["test"] != EnforceWarn || gated["test-driven-development"] != EnforceWarn {
+		t.Errorf("gated = %v, want exactly test and test-driven-development at warn", gated)
+	}
+
+	// The bare strings are DECLARED and ungated, and both halves are the point:
+	// UnmigratedSkills is what keeps them visible instead of silently absent.
+	unmigrated := map[string]bool{}
+	for _, s := range p.UnmigratedSkills() {
+		unmigrated[s] = true
+	}
+	if len(unmigrated) != 2 || !unmigrated["golang-pro"] || !unmigrated["debug-hardware"] {
+		t.Errorf("UnmigratedSkills() = %v, want [golang-pro debug-hardware]", p.UnmigratedSkills())
+	}
+	if got := p.Blocking(); len(got) != 0 {
+		t.Errorf("nothing is block here, got %v", got)
+	}
+}
+
+// The migrations that have actually happened, asserted by name.
+//
+// TestRealPersonaRecordsLoadAndReportTheirMigrationState deliberately only LOGS
+// the unmigrated count, so a persona silently reverting to the flat form is
+// invisible to it — and that is not hypothetical: `compile-harness.sh --refresh`
+// regenerates these records from the vault, so a checkout whose vault half is
+// stale rewrites a migrated record back to inline form and the gate goes quiet
+// with nothing red. Measured on 2026-09-05, on a different record.
+//
+// A named list rather than a count: each migration is a decision, so each costs
+// one line here, and adding an eighth persona never breaks this test.
+func TestMigratedPersonasStillGateSomething(t *testing.T) {
+	personas, err := LoadPersonas(filepath.Join(repoRootForTest(t), "harness", "agents"))
+	if err != nil {
+		t.Fatalf("the shipped persona records do not load: %v", err)
+	}
+	byName := map[string]*Persona{}
+	for _, p := range personas {
+		byName[p.Name] = p
+	}
+
+	for _, name := range []string{"reviewer", "builder", "shipper"} {
+		p, ok := byName[name]
+		if !ok {
+			t.Errorf("%s is missing from the roster", name)
+			continue
+		}
+		gated := 0
+		for _, s := range p.Skills {
+			if s.Enforce != EnforceUnset {
+				gated++
+			}
+		}
+		if gated == 0 {
+			t.Errorf("%s has been migrated but now gates nothing — reverted to the flat form?", name)
+		}
+	}
+}

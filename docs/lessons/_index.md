@@ -283,7 +283,10 @@ tags: [lessons, index, dotfiles]
 | [263 - A population that cannot prove it is complete answers with a plausible number](lesson-263-a-population-that-cannot-prove-it-is-complete.md) | 2026-09-02 |  |
 | [264 - When the documentation does not name a field, read the executable — twice it decided a design](lesson-264-a-hooks-timeout-semantics-are-not-in-the-documentation.md) | 2026-09-03 |  |
 | [267 - A mutation harness must prove the mutation landed](lesson-267-a-mutation-harness-must-prove-the-mutation-landed.md) | 2026-09-04 |  |
+| [268 - A refused question and a negative answer print the same thing](lesson-268-a-refused-question-and-a-negative-answer-print-the-same-thing.md) | 2026-09-04 |  |
+| [269 - A security wrapper that breaks the tool it protects gets routed around](lesson-269-a-security-wrapper-that-breaks-the-tool-it-protects-gets-routed-around.md) | 2026-09-05 |  |
 | [265 - A correct measurement answering the wrong question, three times in one session](lesson-265-a-correct-measurement-answering-the-wrong-question.md) | 2026-09-03 |  |
 | [266 - Two measurements agreeing is not reproducibility](lesson-266-two-measurements-agreeing-is-not-reproducibility.md) | 2026-09-04 |  |
+| [269 - A generated file fixed without its source is a countdown, and the drift guard says OK either way](lesson-269-a-generated-file-fixed-without-its-source-is-a-countdown.md) | 2026-09-05 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)

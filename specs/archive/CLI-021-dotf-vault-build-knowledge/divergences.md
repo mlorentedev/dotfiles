@@ -1,7 +1,7 @@
 ---
 id: "CLI-021-dotf-vault-build-knowledge"
 type: spec
-status: draft
+status: verifying
 created: "2026-08-09"
 issue: "mlorentedev/dotfiles#490"
 tags: [spec, divergences]
@@ -9,6 +9,10 @@ template_version: "1.0"
 ---
 
 # Twin divergences — `knowledge-crystallize.sh` vs `.ps1`
+
+> **Increment 3's divergences live in `tasks.md` §4**, under *"Recorded, not fixed"* — the header
+> timestamp shape, the `Out-File -Encoding UTF8` BOM, and the issue regex's substring over-count.
+> Noted here so a reader of this file does not conclude increment 3 had none.
 
 Task 1's last bullet: *"Enumerate every behaviour where `.sh` and `.ps1` disagree today. Linux is
 the reference; anything `.ps1`-only must be listed before it is dropped."*
