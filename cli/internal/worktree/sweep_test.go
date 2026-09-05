@@ -162,3 +162,82 @@ func TestSweepLogsSHA(t *testing.T) {
 		t.Errorf("expected branch to be deleted with recorded SHA 2222, got deleted=%v sha=%s", branchDeleted, deletedSHA)
 	}
 }
+
+func TestSweepTOCTOUDirtyErrorFailsClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	mainRepo := filepath.Join(tmpDir, "myrepo")
+	reapableWT := filepath.Join(tmpDir, "myrepo-wt-err")
+
+	_ = os.MkdirAll(mainRepo, 0o755)
+	_ = os.MkdirAll(reapableWT, 0o755)
+
+	now := time.Now()
+
+	mockPorcelain := "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
+		"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/err\n\n"
+
+	_ = SaveMetadata(reapableWT, Metadata{
+		ReapOK:         true,
+		CreatedAt:      now.Add(-2 * time.Hour),
+		LeaseExpiresAt: now.Add(-1 * time.Hour),
+	})
+
+	// First IsDirty succeeds for list, but during sweep TOCTOU check it fails
+	firstCall := true
+	runner := &MockSweepRunner{
+		MockGitRunner: MockGitRunner{
+			PorcelainOutput: mockPorcelain,
+			MergedBranches:  map[string]bool{"feat/err": true},
+		},
+		OnWorktreeRemove: func(repo, path string) error {
+			t.Fatalf("WorktreeRemove should NOT be called when IsDirty errors during TOCTOU")
+			return nil
+		},
+	}
+	// Dynamic IsDirty: first call clean (for list), second call error (for sweep TOCTOU)
+	runner.DirtyPaths = map[string]bool{}
+
+	// Overwrite IsDirty behavior via a custom runner wrapper
+	errorRunner := &toctouErrorRunner{
+		MockSweepRunner: runner,
+		failTOCTOU:      true,
+	}
+
+	opts := SweepOptions{
+		RepoRoot: mainRepo,
+		LockPath: filepath.Join(tmpDir, "sweep.lock"),
+		DryRun:   false,
+	}
+
+	report, err := SweepWithRunner(opts, errorRunner, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(report.Reaped) != 0 {
+		t.Fatalf("expected 0 reaped due to TOCTOU error, got %d", len(report.Reaped))
+	}
+	if report.SkippedCount != 2 { // mainRepo, reapableWT
+		t.Errorf("expected 2 skipped, got %d", report.SkippedCount)
+	}
+	_ = firstCall
+}
+
+type toctouErrorRunner struct {
+	*MockSweepRunner
+	failTOCTOU bool
+	callCount  int
+}
+
+func (r *toctouErrorRunner) IsDirty(path string) (bool, error) {
+	r.callCount++
+	// Call 1 is during ListWithRunner
+	if r.callCount == 1 {
+		return false, nil
+	}
+	// Call 2 is during Sweep TOCTOU check
+	if r.failTOCTOU {
+		return false, os.ErrPermission
+	}
+	return false, nil
+}

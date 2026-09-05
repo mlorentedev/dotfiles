@@ -36,6 +36,19 @@ func (r *RealGitRunner) IsDirty(worktreePath string) (bool, error) {
 	return len(strings.TrimSpace(string(out))) > 0, nil
 }
 
+// ParseGitHubSlug extracts owner/repo from SSH or HTTPS GitHub URLs.
+func ParseGitHubSlug(rawURL string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	rawURL = strings.TrimSuffix(rawURL, ".git")
+	if strings.HasPrefix(rawURL, "git@github.com:") {
+		return strings.TrimPrefix(rawURL, "git@github.com:")
+	}
+	if idx := strings.Index(rawURL, "github.com/"); idx != -1 {
+		return rawURL[idx+len("github.com/"):]
+	}
+	return ""
+}
+
 func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 	if branch == "" {
 		return false, nil
@@ -52,8 +65,20 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 		return true, nil
 	}
 
-	// Also check if GitHub PR is merged
-	ghCmd := exec.Command("gh", "pr", "view", branch, "--repo", repoRoot, "--json", "state", "--jq", ".state")
+	// Also check if GitHub PR is merged using gh CLI
+	slug := ""
+	if out, err := exec.Command("git", "-C", repoRoot, "config", "--get", "remote.origin.url").Output(); err == nil {
+		slug = ParseGitHubSlug(string(out))
+	}
+
+	var ghCmd *exec.Cmd
+	if slug != "" {
+		ghCmd = exec.Command("gh", "pr", "view", branch, "--repo", slug, "--json", "state", "--jq", ".state")
+	} else {
+		ghCmd = exec.Command("gh", "pr", "view", branch, "--json", "state", "--jq", ".state")
+		ghCmd.Dir = repoRoot
+	}
+
 	if out, err := ghCmd.Output(); err == nil {
 		state := strings.TrimSpace(string(out))
 		if state == "MERGED" {
@@ -67,6 +92,7 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 type MockGitRunner struct {
 	PorcelainOutput string
 	DirtyPaths      map[string]bool
+	DirtyErrors     map[string]error
 	MergedBranches  map[string]bool
 }
 
@@ -75,6 +101,9 @@ func (m *MockGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
 }
 
 func (m *MockGitRunner) IsDirty(worktreePath string) (bool, error) {
+	if m.DirtyErrors != nil && m.DirtyErrors[worktreePath] != nil {
+		return false, m.DirtyErrors[worktreePath]
+	}
 	return m.DirtyPaths[worktreePath], nil
 }
 
@@ -116,9 +145,17 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		absPath, _ := filepath.Abs(raw.Path)
 		isMain := (i == 0) || (absPath == absRepoRoot)
 
-		dirty, _ := runner.IsDirty(raw.Path)
+		dirty, err := runner.IsDirty(raw.Path)
+		if err != nil {
+			// Fail-closed: treat error in status check as dirty so it is never reaped (F2)
+			dirty = true
+		}
 		merged, _ := runner.IsPRMerged(repoRoot, raw.Branch)
-		meta, _ := LoadMetadata(raw.Path)
+		meta, err := LoadMetadata(raw.Path)
+		if err != nil {
+			// Fail-closed: unparseable or corrupted metadata -> nil -> refused reap (F2)
+			meta = nil
+		}
 
 		info := Info{
 			Path:       raw.Path,
@@ -142,4 +179,46 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 // List scans all worktrees for a repository using RealGitRunner.
 func List(repoRoot string) ([]Info, error) {
 	return ListWithRunner(repoRoot, &RealGitRunner{}, time.Now())
+}
+
+// ListAll scans all sibling repositories in parentDir and collects their worktrees.
+func ListAll(parentDir string) ([]Info, error) {
+	entries, err := os.ReadDir(parentDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading directory %s: %w", parentDir, err)
+	}
+
+	var all []Info
+	seen := make(map[string]bool)
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		candidate := filepath.Join(parentDir, entry.Name())
+		gitDir := filepath.Join(candidate, ".git")
+		fi, err := os.Stat(gitDir)
+		if err != nil {
+			continue
+		}
+
+		// Only inspect actual repository roots (directory .git), not worktrees (.git is a file)
+		if !fi.IsDir() {
+			continue
+		}
+
+		infos, err := List(candidate)
+		if err != nil {
+			continue
+		}
+
+		for _, info := range infos {
+			if !seen[info.Path] {
+				seen[info.Path] = true
+				all = append(all, info)
+			}
+		}
+	}
+
+	return all, nil
 }

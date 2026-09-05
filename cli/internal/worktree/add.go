@@ -121,6 +121,11 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		}
 	}
 
+	// Gate A: warn if parent repository has active auto-commit hooks/plugins
+	if warn := CheckAutoCommitHooks(opts.RepoRoot); warn != "" {
+		_, _ = fmt.Fprintln(os.Stderr, warn)
+	}
+
 	// 1. Create worktree
 	if err := runner.WorktreeAdd(opts.RepoRoot, targetPath, branchName, opts.BaseRef); err != nil {
 		return nil, err
@@ -179,4 +184,22 @@ func ensureExclude(repoRoot, pattern string) {
 		_ = os.MkdirAll(filepath.Dir(excludePath), 0o755)
 		_ = os.WriteFile(excludePath, []byte(newContent), 0o644)
 	}
+}
+
+// CheckAutoCommitHooks detects if git hooks or plugin configs specify auto-commit behavior (Gate A).
+func CheckAutoCommitHooks(repoRoot string) string {
+	hooksDir := filepath.Join(repoRoot, ".git", "hooks")
+	if out, err := exec.Command("git", "-C", repoRoot, "config", "--local", "--get", "core.hooksPath").Output(); err == nil {
+		p := strings.TrimSpace(string(out))
+		if p != "" {
+			hooksDir = p
+		}
+	}
+	postCommit := filepath.Join(hooksDir, "post-commit")
+	if data, err := os.ReadFile(postCommit); err == nil {
+		if strings.Contains(string(data), "auto-commit") || strings.Contains(string(data), "git commit") {
+			return fmt.Sprintf("warning (Gate A): active auto-commit hook detected in %s", postCommit)
+		}
+	}
+	return ""
 }

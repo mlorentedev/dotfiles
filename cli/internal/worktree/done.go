@@ -45,6 +45,15 @@ func Done(opts DoneOptions) error {
 		}
 	}
 
+	// Check if unpushed commits exist (AC7)
+	unpushedCmd := exec.Command("git", "-C", absWT, "rev-list", "@{u}..HEAD", "--count")
+	if out, err := unpushedCmd.Output(); err == nil {
+		count := strings.TrimSpace(string(out))
+		if count != "" && count != "0" && !opts.Force {
+			return fmt.Errorf("worktree has %s unpushed commit(s); push before done, or pass --force", count)
+		}
+	}
+
 	// Remove worktree
 	args := []string{"-C", absRepo, "worktree", "remove", absWT}
 	if opts.Force {

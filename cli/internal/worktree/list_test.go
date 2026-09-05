@@ -76,3 +76,68 @@ func TestListWorktrees(t *testing.T) {
 		t.Errorf("expected infos[2] to be DIRTY, got %s", infos[2].State)
 	}
 }
+
+func TestParseGitHubSlug(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"git@github.com:mlorentedev/dotfiles.git", "mlorentedev/dotfiles"},
+		{"https://github.com/mlorentedev/dotfiles.git", "mlorentedev/dotfiles"},
+		{"https://github.com/mlorentedev/dotfiles", "mlorentedev/dotfiles"},
+		{"git@github.com:org/repo", "org/repo"},
+		{"ssh://git@github.com/org/repo.git", "org/repo"},
+		{"https://gitlab.com/org/repo.git", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		got := ParseGitHubSlug(tc.input)
+		if got != tc.want {
+			t.Errorf("ParseGitHubSlug(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestListWithRunnerDirtyErrorFailsClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	mainRepo := filepath.Join(tmpDir, "myrepo")
+	wt1 := filepath.Join(tmpDir, "myrepo-wt-err")
+	_ = os.MkdirAll(mainRepo, 0o755)
+	_ = os.MkdirAll(wt1, 0o755)
+
+	meta := Metadata{
+		Creator:        "test-agent",
+		Issue:          123,
+		CreatedAt:      time.Now().Add(-2 * time.Hour),
+		LeaseExpiresAt: time.Now().Add(-1 * time.Hour),
+		ReapOK:         true,
+	}
+	_ = SaveMetadata(wt1, meta)
+
+	mockPorcelain := "worktree " + mainRepo + "\n" +
+		"HEAD 1111\n" +
+		"branch refs/heads/main\n\n" +
+		"worktree " + wt1 + "\n" +
+		"HEAD 2222\n" +
+		"branch refs/heads/feat/err\n\n"
+
+	runner := &MockGitRunner{
+		PorcelainOutput: mockPorcelain,
+		DirtyErrors:     map[string]error{wt1: os.ErrPermission},
+		MergedBranches:  map[string]bool{"feat/err": true},
+	}
+
+	infos, err := ListWithRunner(mainRepo, runner, time.Now())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(infos) != 2 {
+		t.Fatalf("expected 2 worktrees, got %d", len(infos))
+	}
+
+	// Because IsDirty errored, wt1 must be treated as dirty (fail-closed)
+	if !infos[1].Dirty || infos[1].State != StateDirty {
+		t.Errorf("expected wt1 with IsDirty error to be classified StateDirty, got %s (dirty=%v)", infos[1].State, infos[1].Dirty)
+	}
+}

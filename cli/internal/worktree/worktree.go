@@ -153,16 +153,19 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		return StateDirty, "uncommitted changes"
 	}
 
-	if info.Metadata != nil {
-		if !info.Metadata.ReapOK {
-			return StateActive, "reap hold (reap_ok=false)"
-		}
-		if info.Metadata.LeaseExpiresAt.After(now) {
-			return StateActive, fmt.Sprintf("lease active until %s", info.Metadata.LeaseExpiresAt.Format(time.RFC3339))
-		}
-		if now.Sub(info.Metadata.CreatedAt) < 15*time.Minute {
-			return StateActive, "newly created (age < 15m)"
-		}
+	// Gate (a): explicit metadata exists in .dotf-worktree.json with reap_ok: true
+	if info.Metadata == nil {
+		return StateActive, "no dotf metadata (reap refused: requires explicit reap_ok=true)"
+	}
+
+	if !info.Metadata.ReapOK {
+		return StateActive, "reap hold (reap_ok=false)"
+	}
+	if info.Metadata.LeaseExpiresAt.After(now) {
+		return StateActive, fmt.Sprintf("lease active until %s", info.Metadata.LeaseExpiresAt.Format(time.RFC3339))
+	}
+	if now.Sub(info.Metadata.CreatedAt) < 15*time.Minute {
+		return StateActive, "newly created (age < 15m)"
 	}
 
 	if !info.PRMerged {

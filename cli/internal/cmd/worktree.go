@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/tabwriter"
 	"time"
 
@@ -37,6 +38,7 @@ func newWorktreeListCmd() *cobra.Command {
 	var (
 		jsonOutput bool
 		repoDir    string
+		allRepos   bool
 	)
 
 	cmd := &cobra.Command{
@@ -53,7 +55,16 @@ func newWorktreeListCmd() *cobra.Command {
 				return fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
 			}
 
-			infos, err := worktree.List(root)
+			var (
+				infos []worktree.Info
+				err   error
+			)
+			if allRepos {
+				parentDir := filepath.Dir(root)
+				infos, err = worktree.ListAll(parentDir)
+			} else {
+				infos, err = worktree.List(root)
+			}
 			if err != nil {
 				return fmt.Errorf("listing worktrees: %w", err)
 			}
@@ -97,6 +108,7 @@ func newWorktreeListCmd() *cobra.Command {
 
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repository)")
+	cmd.Flags().BoolVar(&allRepos, "all", false, "scan all sibling repositories in parent directory")
 
 	return cmd
 }

@@ -29,11 +29,11 @@ func (r *RealSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
 }
 
 func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) {
-	// First resolve SHA for instant recovery logging
-	shaCmd := exec.Command("git", "-C", repoRoot, "rev-parse", "--short", branch)
+	// First resolve exact full SHA for instant recovery logging (AC5)
+	shaCmd := exec.Command("git", "-C", repoRoot, "rev-parse", branch)
 	shaOut, err := shaCmd.Output()
 	sha := strings.TrimSpace(string(shaOut))
-	if err != nil {
+	if err != nil || sha == "" {
 		sha = "unknown"
 	}
 
@@ -88,6 +88,47 @@ type SweepReport struct {
 	DryRun       bool   `json:"dry_run"`
 }
 
+// isHostProcessInside checks if any running host process has its cwd inside targetPath (Gate f).
+func isHostProcessInside(targetPath string) bool {
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return false
+	}
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		isNum := true
+		for _, r := range name {
+			if r < '0' || r > '9' {
+				isNum = false
+				break
+			}
+		}
+		if !isNum {
+			continue
+		}
+
+		dest, err := os.Readlink(filepath.Join("/proc", name, "cwd"))
+		if err != nil {
+			continue
+		}
+		absDest, err := filepath.Abs(dest)
+		if err != nil {
+			continue
+		}
+		if absDest == absTarget || strings.HasPrefix(absDest, absTarget+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
 func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*SweepReport, error) {
 	lockPath := opts.LockPath
 	if lockPath == "" {
@@ -114,9 +155,9 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 
 	for _, info := range infos {
 		if info.State == StateReapable {
-			// Double check: never reap current working directory
+			// Gate (f): never reap current working directory or any worktree with active host processes inside
 			absWT, _ := filepath.Abs(info.Path)
-			if absWT == absCwd {
+			if absWT == absCwd || isHostProcessInside(absWT) {
 				report.SkippedCount++
 				continue
 			}
@@ -126,9 +167,9 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 				continue
 			}
 
-			// TOCTOU check under lock: verify clean status right before removal
-			dirty, _ := runner.IsDirty(info.Path)
-			if dirty {
+			// TOCTOU check under lock: verify clean status right before removal (fail closed on error)
+			dirty, err := runner.IsDirty(info.Path)
+			if err != nil || dirty {
 				report.SkippedCount++
 				continue
 			}

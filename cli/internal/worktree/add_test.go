@@ -121,3 +121,23 @@ func (m *MockAddRunner) WorktreeAdd(repo, target, branch, base string) error {
 	}
 	return nil
 }
+
+func TestCheckAutoCommitHooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	hooksDir := filepath.Join(tmpDir, ".git", "hooks")
+	_ = os.MkdirAll(hooksDir, 0o755)
+
+	// Clean hooks directory: no warning
+	if warn := CheckAutoCommitHooks(tmpDir); warn != "" {
+		t.Errorf("expected no warning for clean repo, got: %s", warn)
+	}
+
+	// Add post-commit hook with auto-commit pattern
+	postCommit := filepath.Join(hooksDir, "post-commit")
+	_ = os.WriteFile(postCommit, []byte("#!/bin/sh\ngit commit -m 'auto-commit'\n"), 0o755)
+
+	warn := CheckAutoCommitHooks(tmpDir)
+	if warn == "" {
+		t.Errorf("expected warning when auto-commit hook exists")
+	}
+}

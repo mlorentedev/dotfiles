@@ -188,4 +188,42 @@ func TestClassify(t *testing.T) {
 			t.Errorf("expected StateUnmerged, got %s", state)
 		}
 	})
+
+	t.Run("nil metadata refuses reap (Gate a fail-closed)", func(t *testing.T) {
+		info := Info{
+			Path:     "/home/user/repo-wt-manual",
+			Branch:   "feat/manual",
+			Dirty:    false,
+			PRMerged: true,
+			Metadata: nil, // manually created worktree without .dotf-worktree.json
+		}
+		state, reason := Classify(info, now)
+		if state != StateActive {
+			t.Errorf("expected metadata-less worktree to be StateActive, got %s", state)
+		}
+		if !strings.Contains(reason, "no dotf metadata") {
+			t.Errorf("expected reason to mention missing metadata, got %q", reason)
+		}
+	})
+
+	t.Run("reap_ok false keeps worktree active", func(t *testing.T) {
+		info := Info{
+			Path:     "/home/user/repo-wt-hold",
+			Branch:   "feat/hold",
+			Dirty:    false,
+			PRMerged: true,
+			Metadata: &Metadata{
+				ReapOK:         false, // explicit hold
+				CreatedAt:      now.Add(-24 * time.Hour),
+				LeaseExpiresAt: now.Add(-1 * time.Hour),
+			},
+		}
+		state, reason := Classify(info, now)
+		if state != StateActive {
+			t.Errorf("expected reap_ok=false to be StateActive, got %s", state)
+		}
+		if !strings.Contains(reason, "reap hold") {
+			t.Errorf("expected reason to mention reap hold, got %q", reason)
+		}
+	})
 }
