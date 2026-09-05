@@ -65,12 +65,13 @@ func checkUncommittedChanges(absWT string, force bool) error {
 	if force {
 		return nil
 	}
-	out, err := exec.Command("git", "-C", absWT, "status", "--porcelain").Output()
+	runner := &RealGitRunner{}
+	dirty, err := runner.IsDirty(absWT)
 	if err != nil {
-		return fmt.Errorf("git status failed (%w); pass --force to override", err)
+		return fmt.Errorf("checking worktree status: %w; pass --force to override", err)
 	}
-	if len(strings.TrimSpace(string(out))) > 0 {
-		return fmt.Errorf("worktree has uncommitted changes (%s); commit, stash, or pass --force", absWT)
+	if dirty {
+		return fmt.Errorf("worktree has uncommitted changes or local scratchpad files (%s); commit, stash, or pass --force", absWT)
 	}
 	return nil
 }

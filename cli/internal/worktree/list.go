@@ -179,6 +179,16 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 	return os.WriteFile(metaPath, data, 0o644)
 }
 
+func isMainWorktree(path string, index int) bool {
+	// In Git architecture, the main worktree has a .git directory, while linked worktrees have a .git file.
+	fi, err := os.Stat(filepath.Join(path, ".git"))
+	if err == nil {
+		return fi.IsDir()
+	}
+	// Fallback to git worktree list --porcelain invariant (entry 0 is main)
+	return index == 0
+}
+
 // ListWithRunner lists all worktrees for a repo using the provided runner.
 func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, error) {
 	output, err := runner.WorktreeListPorcelain(repoRoot)
@@ -201,8 +211,7 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		}
 
 		absPath, _ := filepath.Abs(raw.Path)
-		// Git invariant: git worktree list --porcelain always lists the main worktree as the first entry (index 0).
-		isMain := (i == 0)
+		isMain := isMainWorktree(raw.Path, i)
 		isCurrent := (absPath == absRepoRoot)
 
 		dirty, err := runner.IsDirty(raw.Path)

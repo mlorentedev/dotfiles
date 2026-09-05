@@ -61,7 +61,7 @@ Introduces the `dotf worktree` command suite in Go under `cli/internal/worktree/
 ## Risks / open questions
 
 - **GitHub API Rate Limits**: Probing GitHub for dozens of worktrees could exhaust API quotas.
-  - *Mitigation*: Evaluate local git state first (`git branch -vv` for `gone`). Only query GitHub API for branches marked `gone` or candidate for reaping, and cache PR query results.
+  - *Mitigation*: Evaluate local git state first via fast-path (`merge-base --is-ancestor`), avoiding GitHub queries entirely for merged branches. For remaining branches, cache PR query results within each runner invocation (`prCache map[string]bool`) to eliminate duplicate API requests.
 - **Container / Sandbox Isolation**: Processes in Docker or PID namespaces are invisible to host `/proc`.
   - *Mitigation*: The lease file (`.dotf-worktree.json`) lives inside the worktree filesystem and travels with the mounted volume. The lease is the primary authoritative liveness signal; host `/proc` is a secondary floor for host shells.
 - **Concurrent Sweeps**: Multiple agents running `/handoff` or `sweep` simultaneously could race on Git metadata.
