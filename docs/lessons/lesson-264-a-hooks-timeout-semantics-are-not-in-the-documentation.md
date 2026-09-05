@@ -96,7 +96,7 @@ correct forever had the suite happened to hold four subtests.
 ## Related
 
 - `specs/HARNESS-109/proposal.md` — the refutation and the design it forced.
-- [[lesson-256-hooks-reload-personas-do-not-and-the-difference-was-assumed-away]] — the same class:
+- [[lesson-271-hooks-reload-personas-do-not-and-the-difference-was-assumed-away]] — the same class:
   a harness behaviour assumed rather than measured.
 - [[lesson-260-the-path-with-no-seam-is-the-path-with-no-test]] — why the timeout assertion had to
   run through `MergeHooks` rather than marshal the struct.

@@ -1,11 +1,11 @@
 ---
-id: 256
+id: 271
 title: "Hooks are re-read and personas are not, and one measurement was generalised into both"
 date: "2026-09-02"
 tags: [lesson, harness, orchestrator, measurement]
 ---
 
-# 256 — Hooks are re-read, personas are not, and one measurement was generalised into both
+# 271 — Hooks are re-read, personas are not, and one measurement was generalised into both
 
 ## What happened
 
