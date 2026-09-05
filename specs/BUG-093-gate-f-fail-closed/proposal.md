@@ -35,6 +35,25 @@ note: no process-liveness check on this platform, so nothing can be reaped.
 
 `SweepReport` gains `ProcessDiscovery bool` so a JSON consumer can tell the two apart too.
 
+## Scope of Gate f — what it can see, and what it never will
+
+**Gate f is the second layer, not the first.** A worktree only reaches `gateF` after it is already
+`StateReapable`, which requires on-disk metadata with `reap_ok` and an expired lease — a signal the
+tool writes and owns. Gate f is the best-effort check for "somebody is sitting in it anyway", and
+best-effort is a bound, not a hedge:
+
+- Reading `/proc/<pid>/cwd` is gated by `ptrace_may_access`. An ordinary user's scan can never read
+  root's processes, another user's, or a same-uid process that set `PR_SET_DUMPABLE=0`
+  (`systemd --user`, `ssh-agent`, browser sandboxes).
+- Measured on one ordinary desktop: **571 processes, 364 out of reach** — 344 owned by other users,
+  and 20 owned by the caller and still denied.
+
+So `UninspectableProcesses` is **non-zero on every Linux machine, by construction**. Round 3 caught
+the previous framing calling it a partial-scan *warning*: a warning that fires on every run is one
+readers learn to skip, and it was the answer to round 1's Major, so the mitigation signalled
+nothing. It is now reported as coverage — a statement of the gate's reach — and no decision is
+taken on it, because none can be: an unreadable process stays unreadable however many there are.
+
 ## Out of scope
 
 - **A real Windows implementation** (`ToolHelp32Snapshot` + per-process cwd) and a Darwin one
@@ -45,6 +64,32 @@ note: no process-liveness check on this platform, so nothing can be reaped.
   from a directory name. Same family, separate change, dispositioned in #1515's triage.
 - **Injecting the `/proc` directory read.** It would close the one mutation gap below, but it
   restructures a function this change is otherwise only moving.
+
+- **The mount-namespace fail-open, declared rather than fixed.** `/proc/<pid>/cwd` is resolved in
+  the *process's own* namespace, so a container bind-mounting the worktree reports its own view and
+  the string comparison misses it. Reproduced here, not cited:
+
+  ```
+  docker run -d -u 1000:1000 -v /tmp/wtmount-repro/repo-wt-feat:/wt-mount-target \
+             -w /wt-mount-target busybox sleep 60
+  host readlink /proc/2658284/cwd  -> /wt-mount-target
+  worktree path on host            -> /tmp/wtmount-repro/repo-wt-feat
+  dev/ino of /proc/<pid>/cwd       -> 50/992409
+  dev/ino of the worktree path     -> 50/992409     <- the same directory
+  string comparison                -> False         <- the gate says "outside"
+  ```
+
+  The same weakness produces the deleted-then-recreated case round 3 probed, and the same fix
+  retires both: identity by `dev`+`ino` (`os.SameFile`) instead of by string, walking parents for
+  the subdirectory case.
+
+  **Not fixed here because it cannot be given a test that fails in CI, and this spec's own lesson
+  is that a fix without one is worse than a declared gap.** The reproduction needs a mount
+  namespace: `unshare -Urm` is refused on the development machine
+  (`kernel.apparmor_restrict_unprivileged_userns = 1`, Ubuntu's default since 24.04), and whether
+  a GitHub `ubuntu-latest` runner permits one is not measurable from here. A test that skips on the
+  runner asserts nothing while reporting green — the exact shape of the vacuous test round 3 found
+  in this same file. **Tracked as #1523**, whose first task is that measurement rather than a patch.
 
 ## Risks / open questions
 
@@ -57,8 +102,18 @@ note: no process-liveness check on this platform, so nothing can be reaped.
   leg. Neither alone is sufficient — a seam test passes over a wrong implementation, and the
   platform test cannot see whether the caller honours the answer.
 - **`processDiscoverySupported` can drift from reality.** If a Windows implementation lands and
-  the constant is not flipped, `sweep` reports a liveness check it never performed. Pinned by a
-  test, and called out in the constant's own comment.
+  the constant is not flipped, `sweep` reports a liveness check it never performed. Pinned in
+  **both** directions, which round 3 showed it previously was not: the Linux side by
+  `TestProcessDiscoveryIsAdvertisedOnLinux` and the non-Linux side by
+  `TestUnsupportedPlatformDoesNotAdvertiseDiscovery`. The earlier Linux test skipped when the
+  constant was false and then asserted a package-level `var` was non-nil, which it cannot be — so
+  flipping the constant left the suite green.
+
+- **A green Linux suite is not evidence about Windows, and `go vet` is not either.** Round 2 shipped
+  a red `test (windows-latest)` while every local check passed: `GOOS=windows go vet` compiles the
+  non-Linux file and never runs it. Any test that expects a reap must drive the `hostProcessInside`
+  seam, because Gate f answers "occupied" unconditionally off Linux. AC7 now names the Windows
+  **test** leg, and the build-tag-flip proxy in `verification.md` executes that path locally.
 
 ## Acceptance criteria
 
@@ -83,10 +138,23 @@ note: no process-liveness check on this platform, so nothing can be reaped.
    `/proc/<pid>/cwd` is already resolved by the kernel and `filepath.Abs` is not.
 3. On any non-Linux platform, `isHostProcessInside` answers `true` for every input.
 4. `processDiscoverySupported` is `false` exactly where there is no implementation.
-5. `isCandidateForReap` refuses a `StateReapable` worktree when Gate f answers `true`, and
-   allows it when Gate f answers `false` — both directions driven by a test seam.
-6. `dotf worktree sweep` reports the absence of process discovery before its counts, and
-   reports a non-zero uninspectable count when the scan ran but could not see everything.
-7. `go build`, `go test ./...`, `golangci-lint run` and `GOOS=windows go vet ./...` are clean.
-8. The caller-side fix is mutation-proven: reverting it fails the suite, with the anchor
-   asserted before the mutation is applied.
+5. `gateF` — the function production calls — refuses a `StateReapable` worktree when Gate f
+   answers `true` and allows it when Gate f answers `false`, both directions driven by a test seam.
+
+   **Amended after round 3.** This named `isCandidateForReap`, a bool wrapper no production caller
+   used: the refusal was pinned on a function that could not prevent a deletion. The wrapper is
+   deleted.
+
+5b. The **re-check inside `reapSingleWorktree`** — the one that runs under the lock immediately
+   before removal — refuses when a process arrives after the candidate scan. This needs a seam that
+   answers `false` then `true`; a constant answer cannot reach it, because a constant `true` is
+   refused by the first call and a constant `false` never exercises the second.
+6. `dotf worktree sweep` reports the absence of process discovery before its counts, and states
+   Gate f's **reach** when the scan ran without full visibility — as coverage, not as a warning
+   (see *Scope of Gate f*).
+7. `go build`, `go test ./...`, `golangci-lint run` and `GOOS=windows go vet ./...` are clean, and
+   the **`test (windows-latest)` leg is green**. The vet is a compile check and cannot see a
+   runtime failure on that platform; round 2 proved that by shipping one. Locally this is
+   established with the build-tag-flip proxy, which runs the non-Linux implementation on Linux.
+8. Every mutation round 3 reported as surviving now fails the suite, with the anchor asserted
+   before each mutation is applied.
