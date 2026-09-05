@@ -249,7 +249,7 @@ func TestMigratedPersonasStillGateSomething(t *testing.T) {
 		byName[p.Name] = p
 	}
 
-	for _, name := range []string{"reviewer", "builder"} {
+	for _, name := range []string{"reviewer", "builder", "shipper"} {
 		p, ok := byName[name]
 		if !ok {
 			t.Errorf("%s is missing from the roster", name)
