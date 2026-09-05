@@ -68,7 +68,15 @@ if [ "$#" -eq 0 ]; then
     # Auto-discover instruction files when invoked without arguments (BUG-088, #1021).
     # Governed files: all active agent instructions and READMEs.
     # Exclusions for stated reasons:
-    #   harness/ — generated artifacts from vault; checked by compile-harness.sh --check
+    #   harness/ — rendered from the vault; compile-harness.sh --check covers it,
+    #              but ONLY for enforced-region drift and clean rendering. It does
+    #              not resolve paths named in skill prose, and #1486's session found
+    #              harness/skills/crystallize/SKILL.md telling agents to run
+    #              knowledge-crystallize.sh, deleted by #1276. Recorded because the
+    #              earlier wording here read as "harness/ is covered", full stop,
+    #              which is how that line survived. Not closed by widening this
+    #              guard: the reference is a BARE FILENAME, so the blind spot
+    #              documented above owns it, not this exclusion.
     #   specs/   — per-feature historical proposals and archived logs, not standing instructions
     #   docs/    — historical decision records/lessons mentioning retired scripts by design
     if command -v git >/dev/null 2>&1 && { [ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ]; }; then
