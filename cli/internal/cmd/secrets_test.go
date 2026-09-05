@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -116,5 +117,64 @@ func TestRedactWriter_RedactsInjectedSecrets(t *testing.T) {
 	want := "Connecting with OPENROUTER_API_KEY=[REDACTED:OPENROUTER_API_KEY] and NAN_API_KEY=[REDACTED:NAN_API_KEY], short is abc.\n"
 	if got != want {
 		t.Errorf("redacted output mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+// SEC-002. The hold-back must be PREFIX-AWARE, not a fixed window.
+//
+// The rule this replaced withheld maxSecretLen-1 bytes on every write no matter
+// what they were, so with a 49-byte token the last 48 bytes of every frame
+// stayed invisible until more output arrived. Against a pipe drained at Flush()
+// that is unobservable; against a terminal it is the whole defect -- the tail of
+// a TUI frame is its cursor positioning.
+func TestRedactWriter_ReleasesFrameWithNoSecretPrefixImmediately(t *testing.T) {
+	injected := []string{"OPENROUTER_API_KEY=mock-openrouter-test-token-val"}
+
+	var buf bytes.Buffer
+	rw := newRedactWriter(&buf, injected)
+
+	// Ordinary terminal output. Nothing here is a prefix of the secret, so all
+	// of it must reach the target on this Write -- WITHOUT a Flush.
+	frame := "\x1b[2J\x1b[H hello from the tui \x1b[10;20H"
+	if _, err := rw.Write([]byte(frame)); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if got := buf.String(); got != frame {
+		t.Errorf("frame was not released on write (this is the SEC-002 defect):\ngot:  %q\nwant: %q", got, frame)
+	}
+}
+
+// The complement: a trailing run that IS a proper prefix of a secret must still
+// be withheld, or the redaction is defeated by chunking alone.
+func TestRedactWriter_HoldsBackATrailingSecretPrefix(t *testing.T) {
+	const secret = "mock-openrouter-test-token-val"
+	injected := []string{"OPENROUTER_API_KEY=" + secret}
+
+	var buf bytes.Buffer
+	rw := newRedactWriter(&buf, injected)
+
+	// Ends mid-secret: "mock-open" is a proper prefix and must not be emitted.
+	if _, err := rw.Write([]byte("key is mock-open")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := buf.String(); got != "key is " {
+		t.Errorf("the secret prefix leaked or too much was held:\ngot:  %q\nwant: %q", got, "key is ")
+	}
+
+	// Completing it must redact the whole value, never emit it.
+	if _, err := rw.Write([]byte("router-test-token-val\n")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err := rw.Flush(); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	got := buf.String()
+	if strings.Contains(got, secret) {
+		t.Error("the secret reached the target in full after being split across two writes")
+	}
+	if want := "key is [REDACTED:OPENROUTER_API_KEY]\n"; got != want {
+		t.Errorf("split-write redaction mismatch:\ngot:  %q\nwant: %q", got, want)
 	}
 }
