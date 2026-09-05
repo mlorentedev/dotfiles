@@ -204,12 +204,27 @@ stub_copilot() {
 @test "HARNESS-056: the compact doctrine payload carries it and stays under its cap" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
-    local f cap chars
+    local f cap chars bytes
     while IFS=$'\t' read -r f cap; do
         [ -f "$FAKEHOME/$f" ]
         grep -q 'Working code is not a finished change' "$FAKEHOME/$f"
         chars="$(wc -m < "$FAKEHOME/$f")"
         [ "$chars" -lt "$cap" ] || { echo "$f is $chars chars, at or over its $cap cap"; return 1; }
+
+        # BOTH units, because asserting one was how this went unnoticed.
+        #
+        # The cap is documented in CHARACTERS and this test read `wc -m`, so on
+        # 2026-09-05 it passed at 11974 while the file was 12047 BYTES — 47 over
+        # the same cap. Nothing has verified which unit the platform counts, and
+        # the documented failure mode is that the overflow is dropped SILENTLY.
+        # A guard measuring one unit cannot report the other one crossing.
+        #
+        # deploy_doctrine now normalises typographic punctuation in a capped
+        # payload, so the two measures track each other. This assertion is what
+        # keeps that true: reintroduce a multi-byte character and the byte count
+        # separates from the character count and lands here first.
+        bytes="$(wc -c < "$FAKEHOME/$f")"
+        [ "$bytes" -lt "$cap" ] || { echo "$f is $bytes BYTES, at or over its $cap cap (chars: $chars)"; return 1; }
     done < <(jq -r '.doctrine.deploy[] | "\(.file)\t\(.char_cap)"' harness/manifest.json)
 }
 
