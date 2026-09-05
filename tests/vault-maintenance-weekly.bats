@@ -259,7 +259,15 @@ _go_log() { printf '%s/.local/share/vault-maintenance/latest.log' "$FAKE_HOME"; 
         "$DOTF_BIN" vault maintain
     [ "$status" -eq 0 ]
     [[ "$output" == *"Vault health:"* ]]
-    grep -qE 'warning|fail|action|stale' "$(_go_log)" || true
+    # No `|| true` here: an assertion that cannot fail is not an assertion. The
+    # log genuinely carries issue lines under an empty HOME (crystallize warns
+    # twice that it found no MEMORY.md), so this passes on its own merits.
+    #
+    # `-i` is load-bearing and was missing on the first draft: the twin counts
+    # with `grep -ciE` and the Go port with a `(?i)` regex, but the lines in the
+    # log are `[WARNING]` in caps. Dropping the flag made this assertion false,
+    # which the removed `|| true` had been hiding.
+    grep -qiE 'warning|fail|action|stale' "$(_go_log)"
 }
 
 @test "dotf vault maintain needs no PATH hardening under a cron-minimal PATH" {
@@ -268,8 +276,13 @@ _go_log() { printf '%s/.local/share/vault-maintenance/latest.log' "$FAKE_HOME"; 
     # line 147 above). The Go port composes IN-PROCESS, so there is no
     # subprocess whose resolution can fail — this asserts that structurally, by
     # running with a PATH that contains neither ~/.local/bin nor the build dir.
+    #
+    # $TMP stays on PATH for the notify-send stub ONLY. It is neither
+    # ~/.local/bin nor the build dir, so the structural claim is untouched, and
+    # without it /usr/bin/notify-send resolves and pops a real balloon on the
+    # developer's desktop every time this suite runs.
     _build_dotf_maintain
-    run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="/usr/bin:/bin" \
+    run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
         "$DOTF_BIN" vault maintain
     [ "$status" -eq 0 ]
     log="$(_go_log)"
