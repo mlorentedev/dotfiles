@@ -145,16 +145,27 @@ func TestUninspectableProcessesAreCountedByTheRealScan(t *testing.T) {
 	// machine where that is untrue. /proc/1 is the natural witness — it is
 	// root's, and ptrace_may_access denies every non-root caller.
 	//
-	// The skip is narrow and it is LOUD, because a skip and a pass are the same
-	// colour in CI: `go test` without -v prints neither, so a test that quietly
-	// stopped running looks exactly like one that keeps passing. Whoever reads
-	// this on a machine where it skipped gets told which condition did it.
+	// Skipping locally is right — under root the counter genuinely has nothing
+	// to count, and failing there would be a false alarm. But a skip and a pass
+	// are the same colour in CI: `go test` without -v prints neither, so a test
+	// that quietly stopped running looks exactly like one that keeps passing.
+	// A longer skip message does not fix that; it is invisible either way.
+	//
+	// So the skip is local-only. On CI this is the leg that pins the behaviour,
+	// and a skip there is a silent loss of the only coverage the producer has —
+	// which is what happens the day someone moves these tests into a root
+	// container. Fail instead, and say why.
 	euid := os.Geteuid()
 	if _, err := os.Readlink("/proc/1/cwd"); err == nil {
-		t.Skipf("NOT EXECUTED: /proc/1/cwd is readable at euid=%d, so every process on this "+
-			"machine is inspectable and the counter has nothing to count. This is expected "+
-			"under root and nowhere else; the CI leg that pins this behaviour runs unprivileged.",
-			euid)
+		if os.Getenv("CI") != "" {
+			t.Fatalf("CI is running at euid=%d with a readable /proc/1/cwd, so the "+
+				"uninspectable counter is unexercised on the one leg that pins it. Either "+
+				"the job gained privileges or the kernel policy changed; both make this "+
+				"test silently worthless, which is why it fails here instead of skipping.",
+				euid)
+		}
+		t.Skipf("not executed: /proc/1/cwd is readable at euid=%d, so every process here is "+
+			"inspectable and the counter has nothing to count", euid)
 	}
 
 	// An empty directory, so the scan runs to completion instead of returning

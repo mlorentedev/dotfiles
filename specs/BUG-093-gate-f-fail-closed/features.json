@@ -51,8 +51,8 @@
   {
     "id": "BUG-093-gate-f-fail-closed-f8",
     "behavior": "Every mutation the round-3 review reported as surviving now fails the suite, and the harness reports ANCHOR-MISS rather than a result when a patch does not land",
-    "verification": "cd cli && go test ./internal/worktree/ -count=1 && grep -q 'ANCHOR-MISS' ../specs/BUG-093-gate-f-fail-closed/verification.md",
+    "verification": "bash specs/BUG-093-gate-f-fail-closed/mutate.sh",
     "state": "verified",
-    "evidence": "7 CAUGHT (5 round-3 survivors + 2 earlier regressions), 1 SURVIVED and declared (the filepath.Abs branch, unreachable by input). Full output in verification.md"
+    "evidence": "exit 0: 7 CAUGHT (5 round-3 survivors + 2 earlier regressions), 1 declared survivor (the filepath.Abs branch, unreachable by input), 0 regressions. The harness is committed and exits non-zero if an expected-CAUGHT mutation survives - it is a check, not a report; the earlier form grepped a word in a markdown file"
   }
 ]

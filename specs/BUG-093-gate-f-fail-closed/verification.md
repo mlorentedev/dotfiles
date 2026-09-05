@@ -67,9 +67,15 @@ Every command below was executed in this session.
 
 ### Mutation results
 
-Anchors asserted before applying: the harness compares the file's checksum after the patch and
-reports **ANCHOR-MISS** rather than a result if nothing changed, so a no-op cannot be read as
-"the tests caught it" (lesson 267).
+The harness is **committed** at `specs/BUG-093-gate-f-fail-closed/mutate.sh` and is `features.json`
+f8's verification command. It exits non-zero if any expected-CAUGHT mutation survives, so it is a
+check rather than a report — the previous form asserted that this markdown file contained the
+string `ANCHOR-MISS`, which is not the same claim.
+
+Anchors asserted before applying: it compares the file's checksum after the patch and reports
+**ANCHOR-MISS** rather than a result if nothing changed, so a no-op cannot be read as "the tests
+caught it" (lesson 267). The declared survivor is declared *to the harness*, so it prints as
+expected rather than as a failure, and a mutation that starts being caught says so.
 
 ```
 === mutations the round-3 review found SURVIVING ===
@@ -144,6 +150,12 @@ and makes that measurement its first task.
   (it constructs its own `RealSweepRunner`), and adding one to assert print ordering buys less
   than it costs. The grep is honest about being a grep; `features.json` f5 tracks the new wording.
 - **Mount namespaces** — #1523, above.
+- **`TestUninspectableProcessesAreCountedByTheRealScan` skips under root**, which is correct: the
+  counter genuinely has nothing to count there. The gap that mattered was **visibility** — `go test`
+  without `-v` prints neither a skip nor a pass, so a test that stopped running is the same colour
+  as one that keeps passing, and the `test (ubuntu-latest)` log confirms it: 25KB with no PASS or
+  SKIP lines in it. A longer skip message does not fix that. It now **fails** when `CI` is set,
+  and skips only locally — so the one leg that pins the producer can never lose it silently.
 
 ## Decisions made during implementation
 
