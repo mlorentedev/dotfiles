@@ -900,6 +900,14 @@ if [ -f "$PI_PACKAGES_SRC" ]; then
             pi_pkg_added=0
             pi_pkg_failed=0
             pi_pkg_present=0
+            # A VERBOSITY threshold, not a bound. Nothing is killed for crossing
+            # it; it only decides whose captured output is worth printing. Being
+            # wrong therefore costs log lines, never a broken install — which is
+            # why it is a literal here and not a knob. Sized from the measured
+            # distribution on the Windows runner (#1486): normal installs land
+            # at 35-345s and the anomaly at 421 ±1s, so there is no clean gap to
+            # sit in, and this deliberately errs toward printing too much.
+            PI_INSTALL_SLOW_SECONDS=120
             while IFS= read -r pi_pkg; do
                 [ -n "$pi_pkg" ] || continue
                 if printf '%s\n' "$PI_PKG_PRESENT" | grep -Fxq "$pi_pkg"; then
@@ -907,11 +915,40 @@ if [ -f "$PI_PACKAGES_SRC" ]; then
                     continue
                 fi
                 log_info "Installing pi package $pi_pkg ..."
-                if "$PI_BIN" install "$pi_pkg" >/dev/null 2>&1; then
-                    pi_pkg_added=$((pi_pkg_added + 1))
+                # Both the elapsed time and the output used to be discarded here
+                # (`>/dev/null 2>&1`), and #1486 is what that cost: nine installs
+                # whose durations could only be reconstructed from GitHub's own
+                # line timestamps, and whose 421s outliers cannot be told apart
+                # from a slow success even in hindsight. The machine had the
+                # diagnostic in its hands and threw it away, then told the reader
+                # to reproduce it by hand.
+                pi_pkg_started=$(date +%s)
+                if pi_pkg_out=$("$PI_BIN" install "$pi_pkg" 2>&1); then
+                    pi_pkg_rc=0
                 else
-                    log_warning "pi install $pi_pkg failed — run \"$PI_BIN install $pi_pkg\" to see why"
+                    pi_pkg_rc=$?
+                fi
+                pi_pkg_elapsed=$(( $(date +%s) - pi_pkg_started ))
+
+                if [ "$pi_pkg_rc" -eq 0 ]; then
+                    pi_pkg_added=$((pi_pkg_added + 1))
+                    if [ "$pi_pkg_elapsed" -ge "$PI_INSTALL_SLOW_SECONDS" ]; then
+                        log_warning "pi install $pi_pkg took ${pi_pkg_elapsed}s — over the ${PI_INSTALL_SLOW_SECONDS}s diagnostic threshold, output follows"
+                    else
+                        log_info "pi package $pi_pkg installed in ${pi_pkg_elapsed}s"
+                    fi
+                else
                     pi_pkg_failed=$((pi_pkg_failed + 1))
+                    log_warning "pi install $pi_pkg failed after ${pi_pkg_elapsed}s (exit $pi_pkg_rc) — output follows"
+                fi
+
+                # Fenced, so that EMPTY output is itself legible. "The install
+                # printed nothing at all" is a finding; a bare dump makes it
+                # indistinguishable from "we never captured anything".
+                if [ "$pi_pkg_rc" -ne 0 ] || [ "$pi_pkg_elapsed" -ge "$PI_INSTALL_SLOW_SECONDS" ]; then
+                    printf '%s\n' "--- pi install $pi_pkg (exit $pi_pkg_rc, ${pi_pkg_elapsed}s) ---"
+                    printf '%s\n' "$pi_pkg_out"
+                    printf '%s\n' "--- end pi install $pi_pkg ---"
                 fi
             done <<EOF
 $PI_PKG_WANTED

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CI-003-f1",
+    "behavior": "AC1/AC2 — neither twin discards the install's output, and the call captures rather than streams it",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f \"neither twin discards\" tests/pi-packages.bats && ~/.local/bin/bats -f \"output is CAPTURED\" tests/pi-packages.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-003-f2",
+    "behavior": "AC3/AC4/AC5 — elapsed on every outcome, the failure says what happened, the captured output is fenced",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f \"elapsed time, on EVERY outcome\" tests/pi-packages.bats && ~/.local/bin/bats -f \"emits what happened\" tests/pi-packages.bats && ~/.local/bin/bats -f \"FENCED\" tests/pi-packages.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-003-f3",
+    "behavior": "AC6/AC7 — the Windows capture cannot be terminated by a noisy install, and the threshold gates verbosity only",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f \"terminated by a noisy install\" tests/pi-packages.bats && ~/.local/bin/bats -f \"VERBOSITY only\" tests/pi-packages.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-003-f4",
+    "behavior": "The shell twin parses under BOTH shells and passes shellcheck; the PowerShell twin stays ASCII-only (PSScriptAnalyzer fails CI otherwise)",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && bash -n setup-linux.sh && zsh -n setup-linux.sh && ~/.local/bin/shellcheck --severity=error setup-linux.sh && python3 -c \"import sys; sys.exit(1 if any(ord(c)>126 for c in open('setup-windows.ps1',encoding='utf-8').read()) else 0)\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-003-f5",
+    "behavior": "AC8 — every assertion FAILS against a mutated tree, and the harness proves each mutation landed inside the reconcile block before reaching a verdict",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && python3 specs/CI-003/mutate-assertions.py",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-003-f6",
+    "behavior": "The mutation harness reports a HARNESS FAULT rather than a verdict when its own target is missing — the lesson-267 property, proven by removing an anchor",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && cp specs/CI-003/mutate-assertions.py /tmp/ci003-mut.bak && python3 -c \"p='specs/CI-003/mutate-assertions.py'; s=open(p).read(); a='install \\\"\\$pi_pkg\\\" 2>&1)'; assert a in s; open(p,'w').write(s.replace(a,'THIS TARGET DOES NOT EXIST',1))\" && ! python3 specs/CI-003/mutate-assertions.py >/dev/null 2>&1; rc=$?; cp /tmp/ci003-mut.bak specs/CI-003/mutate-assertions.py; rm -f /tmp/ci003-mut.bak; exit $rc",
+    "state": "pending",
+    "evidence": ""
+  }
+]
