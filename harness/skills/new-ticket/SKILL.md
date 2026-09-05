@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: cd89b515ade938f7
+generated_sha: 1d1c81043049e6c9
 id: new-ticket-skill
 type: skill
 status: active
