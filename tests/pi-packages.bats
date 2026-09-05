@@ -19,6 +19,29 @@ setup() {
     SETUP_PS1="$REPO/setup-windows.ps1"
 }
 
+# Slice the RECONCILE BLOCK out of each twin, to a FILE. Every CI-003 assertion
+# below runs against these, never against the whole script, and that is
+# load-bearing rather than tidy: `pi install` appears in pi's OWN install block
+# ~130 lines earlier in the PowerShell twin, carrying its own
+# "run: npm install -g ..." advice, so a file-wide search compares against the
+# wrong block and reports the state of code this suite is not about. Same genus
+# as the $PI_BIN collision already documented at "the skip is the FIRST branch".
+#
+# A file and not a variable because lib/refute's negative assertions take a
+# path, and they must: `! grep` in the middle of a @test body cannot fail that
+# test (bash exempts `!` from set -e), which is the vacuous-pass this suite has
+# already been bitten by. Using the helper is not a style choice.
+slice_reconcile_blocks() {
+    SH_BLOCK="$BATS_TEST_TMPDIR/reconcile.sh.txt"
+    PS_BLOCK="$BATS_TEST_TMPDIR/reconcile.ps1.txt"
+    awk '/^PI_PACKAGES_SRC=/{f=1} f' "$SETUP_SH" > "$SH_BLOCK"
+    awk '/^\$piPackagesSrc = Join-Path/{f=1} f' "$SETUP_PS1" > "$PS_BLOCK"
+    # A slice that came back empty would make every refute_grep below pass for
+    # the wrong reason -- the exact failure lesson 267 records.
+    [ -s "$SH_BLOCK" ]
+    [ -s "$PS_BLOCK" ]
+}
+
 # --- the manifest ------------------------------------------------------------
 
 @test "pi packages: the manifest exists and is valid JSON with at least one entry" {
@@ -259,4 +282,115 @@ setup() {
     # comment-prose variant of it. Anchor on the LIST, never on what follows it.
     filter=$(awk '/^            pi:$/{f=1;next} f && !/^ *- /{exit} f' "$CI")
     echo "$filter" | grep -q "$decl"
+}
+
+
+# --- CI-003 (#1486): the reconcile must be observable ------------------------
+#
+# The whole ticket exists because both twins discarded the install's stdout AND
+# stderr and logged no elapsed time, so a 421s install could not be told apart
+# from a 42s one except by reading GitHub's own line timestamps -- and a slow
+# SUCCESS could not be told apart from a slow FAILURE at all. Those two demand
+# opposite fixes, which is why nothing could be bounded until this landed.
+
+@test "pi packages: neither twin discards the install's output" {
+    # The defect itself, asserted at the call site. `2>&1` alone is not enough:
+    # a call that merges stderr into stdout and then sends it to /dev/null is
+    # exactly as blind as the original was.
+    slice_reconcile_blocks
+    sh_call="$BATS_TEST_TMPDIR/sh_call.txt"
+    grep '"\$PI_BIN" install "\$pi_pkg"' "$SH_BLOCK" > "$sh_call"
+    [ -s "$sh_call" ]
+    refute_grep_fixed '/dev/null' "$sh_call"
+    grep -q '2>&1' "$sh_call"
+
+    ps_call="$BATS_TEST_TMPDIR/ps_call.txt"
+    grep '& pi install \$piPkgName' "$PS_BLOCK" > "$ps_call"
+    [ -s "$ps_call" ]
+    refute_grep_fixed 'Out-Null' "$ps_call"
+    refute_grep_fixed '2>$null' "$ps_call"
+    grep -q '2>&1' "$ps_call"
+}
+
+@test "pi packages: the install's output is CAPTURED, not merely streamed" {
+    # Streaming it would interleave nine installs' npm output into setup's
+    # transcript on every normal run. It is held and emitted only when it says
+    # something -- so the call must ASSIGN, not print.
+    slice_reconcile_blocks
+    grep -q 'pi_pkg_out=\$("\$PI_BIN" install' "$SH_BLOCK"
+    grep -q '\$piOut = (& pi install' "$PS_BLOCK"
+}
+
+@test "pi packages: every install logs its elapsed time, on EVERY outcome" {
+    # The single line that answers "did the 421s end in success?", which no
+    # amount of captured output answers on its own. Asserted per LEAF rather
+    # than once: a version logging elapsed only on failure, or only on the slow
+    # path, satisfies a single grep and still leaves the normal case silent --
+    # and the normal case is the one that was silent.
+    slice_reconcile_blocks
+    grep -q 'installed in \${pi_pkg_elapsed}s' "$SH_BLOCK"   # success, fast
+    grep -q 'took \${pi_pkg_elapsed}s' "$SH_BLOCK"           # success, slow
+    grep -q 'failed after \${pi_pkg_elapsed}s' "$SH_BLOCK"   # failure
+
+    grep -q 'installed in \${piElapsed}s' "$PS_BLOCK"
+    grep -q 'took \${piElapsed}s' "$PS_BLOCK"
+    grep -q 'failed after \${piElapsed}s' "$PS_BLOCK"
+}
+
+@test "pi packages: a failure emits what happened instead of telling the reader to redo it" {
+    # "run 'pi install X' to see why" asked a human to reproduce by hand, later,
+    # a failure the machine had in a variable at the time. On the Windows runner
+    # that reproduction is not available at all, so the advice was unactionable
+    # exactly where the failures happen.
+    slice_reconcile_blocks
+    refute_grep_fixed 'to see why' "$SH_BLOCK"
+    refute_grep_fixed 'to see why' "$PS_BLOCK"
+}
+
+@test "pi packages: the captured output is FENCED, so empty output is legible" {
+    # "The install printed nothing at all" is a finding. Dumped bare it is
+    # indistinguishable from "we captured nothing", which is the bug being
+    # replaced -- so the absence has to be visible, not inferred.
+    slice_reconcile_blocks
+    grep -q -- '--- pi install \$pi_pkg' "$SH_BLOCK"
+    grep -q -- '--- end pi install \$pi_pkg' "$SH_BLOCK"
+    grep -q -- '--- pi install \$piPkgName' "$PS_BLOCK"
+    grep -q -- '--- end pi install \$piPkgName' "$PS_BLOCK"
+}
+
+@test "pi packages: the slow threshold gates VERBOSITY only, never the install" {
+    # It must not become a bound by accident. Nothing may skip, kill or fail an
+    # install for crossing it: the loop still runs every package to completion,
+    # and #1486 says the real bound is chosen from the data this produces, not
+    # from a threshold picked before there was any.
+    slice_reconcile_blocks
+    grep -q 'PI_INSTALL_SLOW_SECONDS=[0-9]' "$SH_BLOCK"
+    grep -q '\$piSlowSeconds = [0-9]' "$PS_BLOCK"
+    # Whatever else the threshold is used for, it is not used to leave the loop.
+    # Anchored at the start of a STATEMENT: an unanchored word search matches
+    # the literal "exit" inside the fence's own `(exit $pi_pkg_rc, ...)` label
+    # and reports control flow that is not there -- a false finding, which is
+    # the same disease as a false pass and was this test's first draft.
+    sh_ctl="$BATS_TEST_TMPDIR/sh_ctl.txt"
+    grep -A2 'PI_INSTALL_SLOW_SECONDS"' "$SH_BLOCK" > "$sh_ctl" || true
+    [ -s "$sh_ctl" ]
+    refute_grep '^[-[:space:]]*(break|continue|exit|return)([[:space:]]|$)' "$sh_ctl"
+}
+
+@test "pi packages: the PowerShell capture cannot be terminated by a noisy install" {
+    # `2>&1` on a NATIVE command turns its stderr into ErrorRecords, and under
+    # $ErrorActionPreference = 'Stop' those TERMINATE -- so an install that
+    # writes a warning to stderr and exits 0 would abort setup. The redirect
+    # this replaced (`2>$null`) never met that hazard because it threw stderr
+    # away, so the hazard arrives WITH the fix. Pinned around the call and
+    # restored, or the change trades a blind spot for a crash.
+    # No Linux half: `sh` has no comparable coupling between stderr and control
+    # flow, and inventing a symmetric assertion would assert nothing.
+    slice_reconcile_blocks
+    grep -q "ErrorActionPreference = 'Continue'" "$PS_BLOCK"
+    grep -q '\$piPrevEap = \$ErrorActionPreference' "$PS_BLOCK"
+    grep -q '\$ErrorActionPreference = \$piPrevEap' "$PS_BLOCK"
+    # Restored on the throwing path too, or one bad install leaves every later
+    # native call in setup running under a preference it never asked for.
+    grep -q 'finally {' "$PS_BLOCK"
 }

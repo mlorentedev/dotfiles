@@ -1336,18 +1336,63 @@ if (Test-Path -LiteralPath $piPackagesSrc -PathType Leaf) {
             $piAdded = 0
             $piFailed = 0
             $piAlready = 0
+            # A VERBOSITY threshold, not a bound. Nothing is killed for crossing
+            # it; it only decides whose captured output is worth printing. Being
+            # wrong therefore costs log lines, never a broken install - which is
+            # why it is a literal here and not a knob. Sized from the measured
+            # distribution on this runner (#1486): normal installs land at
+            # 35-345s and the anomaly at 421 +/-1s, so there is no clean gap to
+            # sit in, and this deliberately errs toward printing too much.
+            $piSlowSeconds = 120
             foreach ($piPkgName in $piWanted) {
                 if ($piPresent -contains $piPkgName) {
                     $piAlready++
                     continue
                 }
                 Write-Info "Installing pi package $piPkgName ..."
-                & pi install $piPkgName 2>$null | Out-Null
-                if ($LASTEXITCODE -eq 0) {
+                # Both the elapsed time and the output used to be discarded here
+                # (`2>$null | Out-Null`), and #1486 is what that cost: nine
+                # installs whose durations could only be reconstructed from
+                # GitHub's own line timestamps, and whose 421s outliers cannot be
+                # told apart from a slow success even in hindsight. The machine
+                # had the diagnostic in its hands and threw it away, then told the
+                # reader to reproduce it by hand.
+                $piSw = [System.Diagnostics.Stopwatch]::StartNew()
+                # `2>&1` on a NATIVE command turns its stderr lines into
+                # ErrorRecords, and under $ErrorActionPreference = 'Stop' those
+                # terminate - so a noisy-but-successful install would abort setup.
+                # The redirect this replaces avoided that by discarding stderr
+                # rather than by handling it. Pinned to Continue and restored.
+                $piPrevEap = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try {
+                    $piOut = (& pi install $piPkgName 2>&1 | Out-String)
+                    $piRc = $LASTEXITCODE
+                } finally {
+                    $ErrorActionPreference = $piPrevEap
+                }
+                $piSw.Stop()
+                $piElapsed = [int][math]::Round($piSw.Elapsed.TotalSeconds)
+
+                if ($piRc -eq 0) {
                     $piAdded++
+                    if ($piElapsed -ge $piSlowSeconds) {
+                        Write-Warn "pi install $piPkgName took ${piElapsed}s - over the ${piSlowSeconds}s diagnostic threshold, output follows"
+                    } else {
+                        Write-Info "pi package $piPkgName installed in ${piElapsed}s"
+                    }
                 } else {
-                    Write-Warn "pi install $piPkgName failed - run 'pi install $piPkgName' to see why"
                     $piFailed++
+                    Write-Warn "pi install $piPkgName failed after ${piElapsed}s (exit $piRc) - output follows"
+                }
+
+                # Fenced, so that EMPTY output is itself legible. "The install
+                # printed nothing at all" is a finding; a bare dump makes it
+                # indistinguishable from "we never captured anything".
+                if ($piRc -ne 0 -or $piElapsed -ge $piSlowSeconds) {
+                    Write-Host "--- pi install $piPkgName (exit $piRc, ${piElapsed}s) ---"
+                    Write-Host $piOut
+                    Write-Host "--- end pi install $piPkgName ---"
                 }
             }
 
