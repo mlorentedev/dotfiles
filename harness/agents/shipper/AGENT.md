@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/shipper/AGENT.md
-generated_sha: ead9e03f1abf72e1
+generated_sha: 86c1ecfacc81c6fe
 id: agent-shipper
 type: agent
 status: active
@@ -11,7 +11,15 @@ description: Ship-phase persona. Invoke to get a verified change into the world 
 kind: invocable
 model: mid
 capabilities: [read, search, edit, shell, skill]
-skills: [using-git-worktrees, docker, helm, terraform]
+skills:
+  - id: using-git-worktrees
+    enforce: warn
+  - id: docker
+    enforce: warn
+  - id: pr-review-triage
+    enforce: warn
+  - helm
+  - terraform
 owner: manu
 ---
 
@@ -34,7 +42,19 @@ Land the change deliberately and leave the tree clean behind it. Shipping is the
 
 ## Forced skills
 
-Your phase's skills are enforced by hook, not left to memory: `using-git-worktrees`, `docker`, `helm`, `terraform`. Reach for the one that fits rather than improvising.
+Your phase's skills: `using-git-worktrees`, `docker`, `pr-review-triage`, `helm`, `terraform`. Reach for the one that fits rather than improvising.
+
+**Three of the five are watched by hook; two are not, and the split is deliberate.** `using-git-worktrees`, `docker` and `pr-review-triage` carry `enforce: warn` — `dotf harness gate` names them on stderr when you have not invoked them, and lets the call through.
+
+They are the three that hold whatever is being shipped. Isolation applies to every change without exception: a ship-phase change that is not in its own worktree and its own branch has already collided with whatever else is running. `pr-review-triage` is the mechanism behind *"an open PR is not finished work"* — that obligation was stated in this record's mandate long before any skill was declared for it, which is exactly how the skill ended up owned by nobody. And `docker` is gated because this repository does ship a container: `tests/Dockerfile.integration` is built by the `integration` job, and its build is where delivery actually breaks here.
+
+`helm` and `terraform` are declared as bare strings, which the loader reads as `EnforceUnset` and the gate refuses to act on. That is a recorded state, not an oversight — `dotf harness gate` and `dotf doctor` both list them as ungated, so nothing here is invisible.
+
+**The reason they are ungated is local, and you should not read it as a claim about the skills.** In this repository nothing is delivered by Helm or Terraform, so gating them would name them on every call and teach you to scroll past `[gate]` lines; the severity is worth exactly as much as the attention it still commands. In a repository that ships charts or state files, those same two skills *are* the ship phase, and the right severity there is not the right severity here. A persona travels between repositories; a severity was chosen against one.
+
+This is why the loader applies **no default severity**. Defaulting to `warn` would make an unmigrated persona *"silently inert while every check reported it as wired — presence dressed as enforcement"*; defaulting to `block` would turn every already-declared skill into a hard gate the day it shipped. So a skill is gated because someone chose to gate it, and the ungated ones are listed rather than assumed.
+
+Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona, with two dispatches of one role carrying different `agent_id`s. One blocker applies here with particular force — a *named* dispatch sends its name as `agent_type`, so its role never resolves and the gate silently turns off. Until that is fixed, read a `[gate] warn` line as the obligation it states.
 
 ## Boundaries
 
