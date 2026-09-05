@@ -1,4 +1,4 @@
-# Lesson 269 — A security wrapper that breaks the tool it protects gets routed around
+# Lesson 270 — A security wrapper that breaks the tool it protects gets routed around
 
 **Date:** 2026-09-05
 **Context:** SEC-002 (#1506) — `dotf secrets run` gave every child a pipe, so `pi` exited silently
