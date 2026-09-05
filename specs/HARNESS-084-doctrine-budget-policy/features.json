@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-084-doctrine-budget-policy-f1",
+    "behavior": "A full-only region is absent from the capped payload, present verbatim in the full surface, its markers reach neither, and content after it survives",
+    "verification": "~/.local/bin/bats tests/compile-harness.bats -f 'full-only'",
+    "state": "verified",
+    "evidence": "HARNESS-056 guard, 1..1 ok; asserts both directions because a marker dropping the region everywhere would satisfy any cap check"
+  },
+  {
+    "id": "HARNESS-084-doctrine-budget-policy-f2",
+    "behavior": "render_region returns the missing-source error status, not a pipeline's",
+    "verification": "! grep -qE 'render_region_raw \"\\$@\" \\| grep' scripts/compile-harness.sh",
+    "state": "verified",
+    "evidence": "written as a pipe first; three HARNESS-072 coverage tests went red because the function returned grep's status and swallowed return 1"
+  },
+  {
+    "id": "HARNESS-084-doctrine-budget-policy-f3",
+    "behavior": "The capped payload is under its 12000-character cap with the auto-merge exception still in AGENTS.md",
+    "verification": "~/.local/bin/bats tests/skills-pipeline.bats -f 'compact doctrine payload'",
+    "state": "verified",
+    "evidence": "HARNESS-056 cap test ok; was 12826 chars against a 12000 cap before this change"
+  },
+  {
+    "id": "HARNESS-084-doctrine-budget-policy-f4",
+    "behavior": "shellcheck reports no new findings and compile-harness bats is green",
+    "verification": "~/.local/bin/bats tests/compile-harness.bats",
+    "state": "verified",
+    "evidence": "73/73 ok; shellcheck 6 findings before and after the change, all pre-existing"
+  }
+]
