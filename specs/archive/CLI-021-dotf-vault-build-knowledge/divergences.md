@@ -1,7 +1,7 @@
 ---
 id: "CLI-021-dotf-vault-build-knowledge"
 type: spec
-status: implementing
+status: verifying
 created: "2026-08-09"
 issue: "mlorentedev/dotfiles#490"
 tags: [spec, divergences]

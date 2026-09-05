@@ -1,7 +1,7 @@
 ---
 id: "CLI-021-dotf-vault-build-knowledge"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-08"
 issue: "mlorentedev/dotfiles#490"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
