@@ -286,5 +286,6 @@ tags: [lessons, index, dotfiles]
 | [268 - A refused question and a negative answer print the same thing](lesson-268-a-refused-question-and-a-negative-answer-print-the-same-thing.md) | 2026-09-04 |  |
 | [265 - A correct measurement answering the wrong question, three times in one session](lesson-265-a-correct-measurement-answering-the-wrong-question.md) | 2026-09-03 |  |
 | [266 - Two measurements agreeing is not reproducibility](lesson-266-two-measurements-agreeing-is-not-reproducibility.md) | 2026-09-04 |  |
+| [269 - A generated file fixed without its source is a countdown, and the drift guard says OK either way](lesson-269-a-generated-file-fixed-without-its-source-is-a-countdown.md) | 2026-09-05 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
