@@ -394,3 +394,27 @@ slice_reconcile_blocks() {
     # native call in setup running under a preference it never asked for.
     grep -q 'finally {' "$PS_BLOCK"
 }
+
+@test "pi packages: an install whose outcome is unknown counts as FAILED, not as the last one's" {
+    # `$piRc` is assigned INSIDE the try. If the call throws it is never assigned,
+    # and the read after the try is then of an unassigned variable -- which under
+    # Set-StrictMode -Version Latest is a terminating error thrown OUTSIDE the try
+    # meant to contain it. Worse on iteration 2+: it is not unassigned at all, it
+    # still holds the PREVIOUS package's result, so a broken install is counted as
+    # whatever the last one did. Defaulted to failure BEFORE the try, so an unknown
+    # outcome can never read as success.
+    slice_reconcile_blocks
+    grep -q '\$piRc = 1' "$PS_BLOCK"
+    # Order is the contract: the default must precede the guarded call, or it
+    # defaults nothing. Anchored on the EAP pin, which is unique in the block --
+    # `try {` is NOT: the manifest parse ~40 lines earlier opens one, and the
+    # first draft of this assertion compared against THAT and reported the
+    # default as misplaced when it is not. A false finding is the same disease
+    # as a false pass, and it is the third time in this file.
+    n_default=$(grep -n '\$piRc = 1' "$PS_BLOCK" | head -1 | cut -d: -f1)
+    n_pin=$(grep -n "ErrorActionPreference = 'Continue'" "$PS_BLOCK" | head -1 | cut -d: -f1)
+    n_read=$(grep -n '\$piRc = \$LASTEXITCODE' "$PS_BLOCK" | head -1 | cut -d: -f1)
+    [ -n "$n_default" ] && [ -n "$n_pin" ] && [ -n "$n_read" ]
+    [ "$n_default" -lt "$n_pin" ]
+    [ "$n_pin" -lt "$n_read" ]
+}

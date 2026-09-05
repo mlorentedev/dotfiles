@@ -115,6 +115,10 @@ Make the reconcile observable, in both twins, and nothing else.
       restore in a `finally`.
 - [ ] AC7 — The verbosity threshold controls printing only: nothing skips, kills or
       fails an install for crossing it.
+- [ ] AC9 — An install whose outcome is unknown counts as **failed**: `$piRc` is
+      defaulted to failure before the guarded call, so a throw cannot leave it unassigned
+      (a terminating error under `Set-StrictMode -Version Latest`, thrown outside the
+      `try` meant to contain it) nor holding the previous package's result.
 - [ ] AC8 — Every assertion above is shown to fail against a mutated tree, with the
       mutation's own diff as evidence that it landed inside the reconcile block.
 

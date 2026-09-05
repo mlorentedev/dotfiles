@@ -6,8 +6,12 @@ created: "2026-09-04"
 # Verification — CI-003
 
 All commands run on this branch (`ci/ci-003-observable-bounded-reconcile`, off `9c2758a`),
-in this session. `features.json` entries stay `pending`: the agent may not write the
-terminal `passing` state, so the executed output lives here.
+in this session. `features.json` entries stay `pending` for two reasons, and the second
+matters to a reviewer: the agent may not write the terminal `passing` state, **and this
+build of `dotf` has no `spec check`** — `dotf spec --help` lists `init`, `archive` and
+`review` only. So nothing machine-executes `features.json`; the executed output lives
+here because there is nowhere else for it to live. Six `pending` entries with empty
+`evidence` mean "no harness ran them", not "they were never run".
 
 ## The measurement this spec answers to
 
@@ -52,7 +56,8 @@ that is precisely what is unlogged.
 | AC5 | `the captured output is FENCED, so empty output is legible` | pass |
 | AC6 | `the PowerShell capture cannot be terminated by a noisy install` | pass |
 | AC7 | `the slow threshold gates VERBOSITY only, never the install` | pass |
-| AC8 | `specs/CI-003/mutate-assertions.py` | 10/10 caught |
+| AC9 | `an install whose outcome is unknown counts as FAILED, not as the last one's` | pass |
+| AC8 | `specs/CI-003/mutate-assertions.py` | **12/12 caught** |
 
 ## AC8 — the mutation run
 
@@ -70,7 +75,14 @@ CAUGHT  AC5  FENCED                         [setup-linux.sh]
 CAUGHT  AC5  FENCED                         [setup-windows.ps1]
 CAUGHT  AC7  VERBOSITY only                 [setup-linux.sh]
 CAUGHT  AC6  terminated by a noisy install  [setup-windows.ps1]
+CAUGHT  AC9  outcome is unknown counts as FAILED  [setup-windows.ps1]   (line deleted)
+CAUGHT  AC9  outcome is unknown counts as FAILED  [setup-windows.ps1]   ($piRc = 0)
 ```
+
+AC9 carries two mutations on purpose: deleting the default, and flipping its **value** to
+`0`. The value is the guarantee — defaulted to 0, an install whose outcome is unknown is
+counted as a success, which is precisely what the line exists to prevent, and a test that
+only checks the line's presence would pass.
 
 Sample, showing the diff that makes the verdict a fact rather than a hypothesis:
 
@@ -121,6 +133,13 @@ own `(exit $pi_pkg_rc, …)` label and reported control flow that is not there �
 finding, which is the same disease as a false pass. Now anchored at the start of a
 statement, with the reason recorded in the test.
 
+**And it happened again, in the same file, on AC9.** The ordering assertion first anchored
+on `try {` — but the reconcile block opens a `try` ~40 lines earlier to parse the manifest,
+so it compared the default's position against *that* one and reported a correctly-placed
+line as misplaced. Re-anchored on `$ErrorActionPreference = 'Continue'`, which is unique in
+the block. Three occurrences of one shape in one file is why the block slices, the anchor
+uniqueness check and the harness's diff output are all load-bearing rather than ceremony.
+
 ## Shell + lint layer
 
 ```
@@ -129,8 +148,8 @@ zsh  -n setup-linux.sh                          OK
 shellcheck --severity=error setup-linux.sh      OK
 setup-windows.ps1                               ASCII-only (0 non-ASCII chars)
 git diff --check                                OK
-tests/pi-packages.bats                          30/30 pass (23 -> 30)
-tests/*.bats (full suite)                       see PR body
+tests/pi-packages.bats                          31/31 pass (23 -> 31)
+tests/*.bats (full suite)                       1549/1549 pass, exit 0
 ```
 
 The `.ps1` check is not decoration: `.gitattributes:36` marks `*.ps1 text eol=crlf`, and
@@ -143,7 +162,8 @@ PSScriptAnalyzer fails CI on a non-ASCII `.ps1` without a BOM.
   this change is therefore verified structurally and by mutation, not end to end.
 - **The Windows twin runs for real on this PR.** `setup-windows.ps1` is in the `pi`
   filter, so `test-windows` performs the full reconcile against the new code — which is
-  both the behavioural test for AC1–AC6 and the run that produces the data #1486 §What.2
-  needs. If it is cancelled at the ceiling again, the captured output up to the kill is
+  both the behavioural test for AC1–AC6/AC9 and the run that produces the data #1486
+  §What.2 needs. AC9's own path — a throw inside the guarded call — is the one thing no
+  green run can exercise, so it stays structurally verified. If it is cancelled at the ceiling again, the captured output up to the kill is
   still in the log; a cancelled run keeps its log, which is the property that made this
   spec's own measurement possible.

@@ -1363,6 +1363,16 @@ if (Test-Path -LiteralPath $piPackagesSrc -PathType Leaf) {
                 # terminate - so a noisy-but-successful install would abort setup.
                 # The redirect this replaces avoided that by discarding stderr
                 # rather than by handling it. Pinned to Continue and restored.
+                # Initialised to FAILURE, before the try, for two reasons that both
+                # end badly. If the call throws, `$piRc` is never assigned and the
+                # read below is of an unassigned variable -- which under
+                # `Set-StrictMode -Version Latest` (scripts\utils.ps1:11) is itself
+                # a terminating error, one thrown outside the try that was meant to
+                # contain it. And on any iteration after the first it would not even
+                # be unassigned: it would still hold the PREVIOUS package's result,
+                # so a broken install would be counted as whatever the last one did.
+                # An unknown outcome is a failure here, never a success.
+                $piRc = 1
                 $piPrevEap = $ErrorActionPreference
                 $ErrorActionPreference = 'Continue'
                 try {

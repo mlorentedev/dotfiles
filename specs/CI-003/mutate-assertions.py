@@ -91,6 +91,13 @@ CASES = [
           repl="continue  # mutated\n                    printf '%s\\n' \"--- pi install $pi_pkg")),
     ("AC6", "terminated by a noisy install", PS,
      dict(find='} finally {', repl='}; if ($false) {')),
+    ("AC9", "outcome is unknown counts as FAILED", PS,
+     dict(find='                $piRc = 1', repl=None, drop=True)),
+    # The default's VALUE is the guarantee, not its presence: defaulted to 0, an
+    # install whose outcome is unknown is counted as a success, which is the exact
+    # outcome the line exists to prevent.
+    ("AC9", "outcome is unknown counts as FAILED", PS,
+     dict(find='                $piRc = 1', repl='                $piRc = 0')),
 ]
 
 
