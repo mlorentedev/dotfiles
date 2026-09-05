@@ -44,8 +44,8 @@
   {
     "id": "CLI-075-dotf-worktree-lifecycle-f7",
     "behavior": "dotf worktree done validates clean push status and tears down current worktree safely",
-    "verification": "go -C cli test -v ./internal/worktree/... -run \"TestDoneTeardown|TestDoneRefusesUnpushedCommitsWithNoUpstream|TestDoneSucceedsOnCleanBranchWithoutCommits\"",
+    "verification": "go -C cli test -v ./internal/worktree/... -run \"TestDoneTeardown|TestDoneRefusesUnpushedCommitsWithNoUpstream|TestDoneSucceedsOnCleanBranchWithoutCommits|TestResolveWorktreeAndMainRepoRoot\"",
     "state": "passing",
-    "evidence": "=== RUN   TestDoneTeardown\n--- PASS: TestDoneTeardown (0.00s)\n=== RUN   TestDoneRefusesUnpushedCommitsWithNoUpstream\n--- PASS: TestDoneRefusesUnpushedCommitsWithNoUpstream (0.20s)\n=== RUN   TestDoneSucceedsOnCleanBranchWithoutCommits\n--- PASS: TestDoneSucceedsOnCleanBranchWithoutCommits (0.13s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.328s"
+    "evidence": "=== RUN   TestDoneTeardown\n--- PASS: TestDoneTeardown (0.00s)\n=== RUN   TestDoneRefusesUnpushedCommitsWithNoUpstream\n--- PASS: TestDoneRefusesUnpushedCommitsWithNoUpstream (0.19s)\n=== RUN   TestDoneSucceedsOnCleanBranchWithoutCommits\n--- PASS: TestDoneSucceedsOnCleanBranchWithoutCommits (0.14s)\n=== RUN   TestResolveWorktreeAndMainRepoRoot\n--- PASS: TestResolveWorktreeAndMainRepoRoot (0.13s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.464s"
   }
 ]

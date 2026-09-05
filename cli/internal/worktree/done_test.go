@@ -124,3 +124,60 @@ func TestDoneSucceedsOnCleanBranchWithoutCommits(t *testing.T) {
 		t.Errorf("expected worktree directory to be removed")
 	}
 }
+
+func TestResolveWorktreeAndMainRepoRoot(t *testing.T) {
+	repoDir, wtDir, _ := setupTestGitRepoAndWorktree(t)
+
+	// 1. From root of linked worktree
+	mainRoot, err := ResolveMainRepoRoot(wtDir)
+	if err != nil {
+		t.Fatalf("unexpected error resolving main repo root: %v", err)
+	}
+	absRepoDir, _ := filepath.Abs(repoDir)
+	if mainRoot != absRepoDir {
+		t.Errorf("expected mainRoot to be %s, got %s", absRepoDir, mainRoot)
+	}
+
+	wtRoot, err := ResolveWorktreeRoot(wtDir)
+	if err != nil {
+		t.Fatalf("unexpected error resolving worktree root: %v", err)
+	}
+	absWTDir, _ := filepath.Abs(wtDir)
+	if wtRoot != absWTDir {
+		t.Errorf("expected wtRoot to be %s, got %s", absWTDir, wtRoot)
+	}
+
+	// 2. From subdirectory within linked worktree
+	subDir := filepath.Join(wtDir, "sub", "nested")
+	_ = os.MkdirAll(subDir, 0o755)
+
+	subMainRoot, err := ResolveMainRepoRoot(subDir)
+	if err != nil {
+		t.Fatalf("unexpected error resolving main root from subDir: %v", err)
+	}
+	if subMainRoot != absRepoDir {
+		t.Errorf("expected subMainRoot to be %s, got %s", absRepoDir, subMainRoot)
+	}
+
+	subWTRoot, err := ResolveWorktreeRoot(subDir)
+	if err != nil {
+		t.Fatalf("unexpected error resolving wt root from subDir: %v", err)
+	}
+	if subWTRoot != absWTDir {
+		t.Errorf("expected subWTRoot to be %s, got %s", absWTDir, subWTRoot)
+	}
+
+	// 3. Teardown using the resolved roots (the in-worktree CLI flow)
+	err = Done(DoneOptions{
+		RepoRoot:     subMainRoot,
+		WorktreePath: subWTRoot,
+		Force:        false,
+	})
+	if err != nil {
+		t.Fatalf("expected Done with resolved roots to succeed, got: %v", err)
+	}
+
+	if _, statErr := os.Stat(wtDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected worktree directory to be removed after teardown")
+	}
+}

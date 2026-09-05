@@ -15,11 +15,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof:
 - [x] AC4 (fail-closed reaper with 6 gates) -> `TestSweepFailClosed`, `TestSweepTOCTOUDirtyErrorFailsClosed`, `TestSweepTOCTOUUnmergedFailsClosed` (PASS)
 - [x] AC5 (commit SHA recorded before branch deletion) -> `TestSweepLogsSHA` (PASS)
 - [x] AC6 (cross-platform file locking) -> `TestSweepFileLock` (PASS)
-- [x] AC7 (safe self-service teardown) -> `TestDoneTeardown`, `TestDoneRefusesUnpushedCommitsWithNoUpstream`, `TestDoneSucceedsOnCleanBranchWithoutCommits` (PASS)
+- [x] AC7 (safe self-service teardown) -> `TestDoneTeardown`, `TestDoneRefusesUnpushedCommitsWithNoUpstream`, `TestDoneSucceedsOnCleanBranchWithoutCommits`, `TestResolveWorktreeAndMainRepoRoot` (PASS)
 
 ## Test status
 
-- Unit test suite: `go -C cli test -v ./internal/worktree/...` -> 17/17 passing (exit 0)
+- Unit test suite: `go -C cli test -v ./internal/worktree/...` -> 21/21 top-level test functions passing (exit 0)
+- Linter: `golangci-lint run` in `cli/` -> 0 issues (exit 0)
 - Cyclomatic complexity: `gocyclo -over 9 cli/internal/worktree/*.go cli/internal/cmd/worktree.go` -> 0 functions > 9 (Grade A)
 - Cross-compilation: Windows (`amd64`) and Darwin (`arm64`) build cleanly (exit 0)
 - Regression test suite: `go -C cli test ./...` -> all packages passing (exit 0)
@@ -37,6 +38,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof:
 5. **Host Process CWD Guard (F5):** Scans `/proc/[0-9]*/cwd` on host systems to protect interactive terminal sessions from deletion.
 6. **Spec Drift Resolution (F6-F8):** Added `--all` sibling repo scanning, Gate A auto-commit detection, and unpushed commit protection in `done`.
 7. **Exact SHA Recovery (F9):** Logs full 40-character commit SHA to stderr before branch deletion for 100% undoability via `git branch <name> <sha>`.
+8. **In-Worktree Teardown Resolution (F10):** `ResolveMainRepoRoot` uses `git rev-parse --git-common-dir` to locate the superproject root, and `ResolveWorktreeRoot` uses `git rev-parse --show-toplevel`, allowing `dotf worktree done` to tear down a worktree directly from inside it or its subdirectories.
 
 ## Promotion candidates
 

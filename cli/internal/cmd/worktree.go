@@ -35,9 +35,27 @@ workstation clutter without risking data loss.`,
 	return cmd
 }
 
+func resolveCommandRepoRoot(repoDir string) (string, error) {
+	if repoDir != "" {
+		return repoDir, nil
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		if mainRoot, err := worktree.ResolveMainRepoRoot(cwd); err == nil && mainRoot != "" {
+			return mainRoot, nil
+		}
+	}
+	root := env.RepoDir()
+	if root == "" {
+		return "", fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
+	}
+	return root, nil
+}
+
 func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 	w := tabwriter.NewWriter(out, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "PATH\tBRANCH\tSTATUS\tPR\tSTATE\tREASON")
+	if _, err := fmt.Fprintln(w, "PATH\tBRANCH\tSTATUS\tPR\tSTATE\tREASON"); err != nil {
+		return err
+	}
 	for _, info := range infos {
 		status := "clean"
 		if info.Dirty {
@@ -49,14 +67,16 @@ func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 			prStatus = "merged"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			info.Path,
 			info.Branch,
 			status,
 			prStatus,
 			info.State,
 			info.StateReason,
-		)
+		); err != nil {
+			return err
+		}
 	}
 	return w.Flush()
 }
@@ -74,18 +94,12 @@ func newWorktreeListCmd() *cobra.Command {
 		Short:   "List all worktrees with their lifecycle status and fail-closed evaluation",
 		Args:    cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			root := repoDir
-			if root == "" {
-				root = env.RepoDir()
-			}
-			if root == "" {
-				return fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
+			root, err := resolveCommandRepoRoot(repoDir)
+			if err != nil {
+				return err
 			}
 
-			var (
-				infos []worktree.Info
-				err   error
-			)
+			var infos []worktree.Info
 			if allRepos {
 				parentDir := filepath.Dir(root)
 				infos, err = worktree.ListAll(parentDir)
@@ -137,12 +151,9 @@ adds it to .git/info/exclude.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			slug := args[0]
-			root := repoDir
-			if root == "" {
-				root = env.RepoDir()
-			}
-			if root == "" {
-				return fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
+			root, err := resolveCommandRepoRoot(repoDir)
+			if err != nil {
+				return err
 			}
 
 			opts := worktree.AddOptions{
@@ -192,12 +203,9 @@ worktrees that meet all positive fail-closed gates: explicit reap_ok, expired le
 clean git status, confirmed merged PR, and minimum age.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			root := repoDir
-			if root == "" {
-				root = env.RepoDir()
-			}
-			if root == "" {
-				return fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
+			root, err := resolveCommandRepoRoot(repoDir)
+			if err != nil {
+				return err
 			}
 
 			opts := worktree.SweepOptions{
@@ -232,6 +240,46 @@ clean git status, confirmed merged PR, and minimum age.`,
 	return cmd
 }
 
+func resolveDoneTarget(args []string, worktreePath string) (string, error) {
+	if len(args) > 0 {
+		target := args[0]
+		if top, err := worktree.ResolveWorktreeRoot(target); err == nil {
+			return top, nil
+		}
+		return target, nil
+	}
+	if worktreePath != "" {
+		if top, err := worktree.ResolveWorktreeRoot(worktreePath); err == nil {
+			return top, nil
+		}
+		return worktreePath, nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	top, err := worktree.ResolveWorktreeRoot(cwd)
+	if err != nil {
+		return "", fmt.Errorf("not in a git repository: %w", err)
+	}
+	return top, nil
+}
+
+func resolveDoneRepoRoot(repoDir, target string) (string, error) {
+	if repoDir != "" {
+		return repoDir, nil
+	}
+	mainRoot, err := worktree.ResolveMainRepoRoot(target)
+	if err == nil && mainRoot != "" {
+		return mainRoot, nil
+	}
+	root := env.RepoDir()
+	if root == "" {
+		return "", fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
+	}
+	return root, nil
+}
+
 func newWorktreeDoneCmd() *cobra.Command {
 	var (
 		repoDir      string
@@ -246,24 +294,14 @@ func newWorktreeDoneCmd() *cobra.Command {
 uncommitted changes unless --force is passed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			root := repoDir
-			if root == "" {
-				root = env.RepoDir()
-			}
-			if root == "" {
-				return fmt.Errorf("not in a git repository: run from inside a repo or pass --repo")
+			target, err := resolveDoneTarget(args, worktreePath)
+			if err != nil {
+				return err
 			}
 
-			target := worktreePath
-			if len(args) > 0 {
-				target = args[0]
-			}
-			if target == "" {
-				cwd, err := os.Getwd()
-				if err != nil {
-					return err
-				}
-				target = cwd
+			root, err := resolveDoneRepoRoot(repoDir, target)
+			if err != nil {
+				return err
 			}
 
 			opts := worktree.DoneOptions{
