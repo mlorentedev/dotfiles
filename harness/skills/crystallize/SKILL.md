@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: d6d6cf0c738eab7d
+generated_sha: 1b585b8def0a52a1
 id: crystallize-skill
 type: skill
 status: active
