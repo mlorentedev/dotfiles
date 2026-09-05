@@ -143,7 +143,7 @@ region_content() {
 
 # Render the expected region for a target: concat of record files, in order.
 # Args: id... . Prints to stdout. Fails if a record is missing.
-render_region() {
+render_region_raw() {
     local id
     for id in "$@"; do
         if [[ ! -f "$RECORD_DIR/$id.md" ]]; then
@@ -152,6 +152,21 @@ render_region() {
         fi
         cat "$RECORD_DIR/$id.md"
     done
+}
+
+# The full surface: every rule, with the full-only markers themselves removed.
+# The markers are machinery for the compactor, not doctrine, and a reader of
+# AGENTS.md should not have to know they exist. render_region_compact consumes
+# the RAW form, because it needs the markers to find the region.
+render_region() {
+    local out rc=0
+    # NOT a pipe. render_region_raw returns 1 for a missing source-of-record,
+    # and piping it into grep would hand back grep's status instead -- the error
+    # still prints and the failure is swallowed, which is lesson 268 exactly.
+    # Three HARNESS-072 coverage tests caught it when it was written that way.
+    out="$(render_region_raw "$@")" || rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
+    printf '%s\n' "$out" | grep -v '<!-- full-only:\(begin\|end\) -->' || true
 }
 
 # Like render_region, but for the CHARACTER-CAPPED surfaces (doctrine.deploy).
@@ -172,8 +187,28 @@ render_region() {
 # where the rules live is removed. Compacting enforcement prose by paraphrase is
 # how a rule quietly loses its teeth, so this only ever deletes lines it can
 # identify exactly.
+#
+# The second thing it drops is any region a doctrine record marks `full-only`:
+#
+#     <!-- full-only:begin -->  … <!-- full-only:end -->
+#
+# Same rule as above — an exactly identified region, never a judgement about what
+# reads as important. It exists because the budget forced a choice and "trim the
+# prose until it fits" was the wrong one: the compact payload is what agy and
+# codex receive INSTEAD of the constitution, and shaving words off a prohibition
+# is how it stops being one.
+#
+# What belongs behind the marker is narrow. A capped rules file should carry the
+# PROHIBITION; the EXCEPTION to it, with its conditions and the reasoning that
+# earned it, is a policy decision a human makes on a specific pull request, and
+# an agent that knows an exception exists may try to qualify for it. So the
+# marker is a safety boundary before it is a budget one, and the exception still
+# lives verbatim in AGENTS.md, which is where the human reads it.
 render_region_compact() {
-    render_region "$@" | awk '
+    render_region_raw "$@" | awk '
+        /<!-- full-only:begin -->/ { full_only = 1; next }
+        /<!-- full-only:end -->/   { full_only = 0; skipped = 1; next }
+        full_only { next }
         /^> Injected verbatim into every agent/ { skipped = 1; next }
         # The blank line that followed it would otherwise leave a double gap.
         skipped && /^[[:space:]]*$/ { skipped = 0; next }

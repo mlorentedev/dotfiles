@@ -1351,3 +1351,54 @@ HALF2
     [ ! -f "$FAKEHOME/.claude/agents/scribe.md" ]
 }
 
+
+# GUARD: a full-only region leaves the CAPPED payload and stays in the FULL one.
+#
+# The budget forced a choice and "trim the prose until it fits" was the wrong
+# one: the compact payload is what agy and codex receive INSTEAD of the
+# constitution, and shaving words off a prohibition is how it stops being one.
+# So the auto-merge EXCEPTION leaves the capped file while the PROHIBITION
+# stays -- a safety boundary before a budget one, since an agent that knows an
+# exception exists may try to qualify for it.
+#
+# Both directions are asserted on purpose. A marker that dropped the region from
+# BOTH renders would pass every cap check while silently deleting doctrine, and
+# from the cap's point of view that failure is indistinguishable from success.
+@test "HARNESS-056: a full-only region leaves the capped payload and stays in the full one" {
+    load 'lib/refute'
+    seed_doctrine_fixture
+    cat > "$REPO/harness/enforced/demo.md" <<'EOF'
+- rule one
+<!-- full-only:begin -->
+- the exception a human decides
+<!-- full-only:end -->
+- rule two after the region
+EOF
+    # The doctrine fixture has no UNCAPPED surface, and asserting only the
+    # capped one would pass just as happily if the marker deleted the region
+    # everywhere. Add a targets[] entry so both directions have a witness.
+    tmp="$(mktemp)"
+    jq '.targets += [{ "agent": "t", "kind": "native", "file": "TARGET.md", "inject": ["demo"] }]' \
+        "$REPO/harness/manifest.json" > "$tmp" && mv "$tmp" "$REPO/harness/manifest.json"
+    printf 'intro\n\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n\noutro\n' \
+        > "$REPO/TARGET.md"
+
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+
+    # TARGET.md is the full surface; .gemini/GEMINI.md is the capped one.
+    grep -q 'rule one'                      "$REPO/TARGET.md"
+    grep -q 'the exception a human decides' "$REPO/TARGET.md"
+
+    grep -q 'rule one'                      "$FAKEHOME/.gemini/GEMINI.md"
+    refute_grep_fixed 'the exception a human decides' "$FAKEHOME/.gemini/GEMINI.md"
+
+    # The marker closes. Without this, a missing end-marker would swallow the
+    # rest of the record and the payload would only get smaller -- which no cap
+    # assertion can tell apart from the marker working correctly.
+    grep -q 'rule two after the region' "$FAKEHOME/.gemini/GEMINI.md"
+
+    # The markers are machinery, not content: they reach no surface.
+    refute_grep_fixed 'full-only:' "$FAKEHOME/.gemini/GEMINI.md"
+    refute_grep_fixed 'full-only:' "$REPO/TARGET.md"
+}
