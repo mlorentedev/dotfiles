@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-063-dotf-deploy-claude-f1",
+    "behavior": "Claude's capabilities are declared in ai/deploy.json and reachable through `dotf deploy`, not through a new command noun",
+    "verification": "cd cli && go test ./internal/deploy/... -run TestClaudeEntriesDeclared",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f2",
+    "behavior": "ai/claude/plugins.json is the sole plugin list; the test fails if either twin's hardcoded ids drift from it",
+    "verification": "bats tests/claude-plugins-drift.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f3",
+    "behavior": "env and enabledPlugins merge nested (a box-only key survives) and permissions.allow unions deduped; each case fails under top-level replace",
+    "verification": "cd cli && go test ./internal/deploy/... -run TestPerKeyMergePolicy",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f4",
+    "behavior": "A template key absent from the declared policy errors loudly instead of being silently skipped (the outputStyle defect)",
+    "verification": "cd cli && go test ./internal/deploy/... -run TestUnknownTemplateKeyIsAnError",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f5",
+    "behavior": "ai/deploy.json version is bumped and a decoder that predates the per-key field refuses the file rather than deploying every entry as plain merge",
+    "verification": "cd cli && go test ./internal/deploy/... -run TestManifestVersionRefusal",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f6",
+    "behavior": "The Go path emits no hooks key under any input; dotf harness bind remains the only hooks writer",
+    "verification": "cd cli && go test ./internal/deploy/... -run TestNeverEmitsHooks",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f7",
+    "behavior": "A plugin is counted as added only when its install succeeded (Linux reference behaviour); #1491's Windows divergence is recorded, not silently absorbed",
+    "verification": "cd cli && go test ./internal/deploy/... -run TestPluginCountOnSuccessOnly",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f8",
+    "behavior": "No twin is deleted and no caller repointed: the diff touches nothing under setup-*.{sh,ps1} or scripts/",
+    "verification": "test -z \"$(git diff --name-only origin/main...HEAD -- 'setup-*.sh' 'setup-*.ps1' 'scripts/')\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
