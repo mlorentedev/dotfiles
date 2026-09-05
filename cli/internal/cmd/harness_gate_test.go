@@ -442,6 +442,30 @@ func blockingRepoRoot(t *testing.T) string {
 	return root
 }
 
+// A persona in the legacy flat form, so "nothing to enforce" can be exercised
+// without naming a real persona that happens not to be migrated yet.
+//
+// It used to name `builder` against the live roster, and that made this test a
+// hostage to migration progress: builder gained two `enforce: warn` skills and
+// the case went red for a reason that had nothing to do with durable records.
+// The neighbouring TestRealPersonaRecordsLoadAndReportTheirMigrationState
+// already refuses to pin the migration count for exactly this reason; a fixture
+// is the same refusal, one layer down. The block case above was already a
+// fixture — this only makes the pair consistent.
+func unmigratedRepoRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "harness", "agents", "drifter")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := "---\nname: drifter\nkind: persona\nskills: [audit, test]\n---\n\n# Drifter\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENT.md"), []byte(rec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
 // TestEveryGateDecisionLeavesADurableRecord is AC5.
 //
 // The gate's answer to the harness is an exit code, and an exit code is consumed
@@ -455,6 +479,7 @@ func blockingRepoRoot(t *testing.T) string {
 func TestEveryGateDecisionLeavesADurableRecord(t *testing.T) {
 	root := repoRootForTest(t)
 	blocking := blockingRepoRoot(t)
+	unmigrated := unmigratedRepoRoot(t)
 
 	for _, tc := range []struct {
 		name        string
@@ -515,8 +540,8 @@ func TestEveryGateDecisionLeavesADurableRecord(t *testing.T) {
 		},
 		{
 			name:      "a persona whose skills carry no severity is not enforced",
-			payload:   `{"tool_name":"Bash","session_id":"s6","agent_type":"builder","agent_id":"a3"}`,
-			repoRoot:  root,
+			payload:   `{"tool_name":"Bash","session_id":"s6","agent_type":"drifter","agent_id":"a3"}`,
+			repoRoot:  unmigrated,
 			wantScope: "s6-a3", wantOutcome: harness.OutcomeAllow,
 			wantExit: 0, wantAllowed: true,
 		},
