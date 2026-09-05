@@ -218,6 +218,20 @@ clean git status, confirmed merged PR, and minimum age.`,
 				return fmt.Errorf("sweeping worktrees: %w", err)
 			}
 
+			// Said before the counts, never after: an inert sweep prints
+			// "reaped 0" exactly like a machine with nothing to clean up, and a
+			// reader who takes the first for the second concludes the tool ran.
+			if !report.ProcessDiscovery {
+				c.Printf("note: no process-liveness check on this platform, so nothing can be reaped.\n")
+				c.Printf("      Gate f refuses rather than guesses; remove one deliberately with `dotf worktree done`.\n")
+			} else if report.UninspectableProcesses > 0 {
+				// A partial scan, said out loud. These are almost always other
+				// users' processes, whose cwd only they and root may read, so
+				// the scan cannot rule out that one of them is inside.
+				c.Printf("note: %d process(es) could not be inspected, so this scan was partial.\n",
+					report.UninspectableProcesses)
+			}
+
 			if opts.DryRun {
 				c.Printf("[DRY-RUN] Found %d reapable worktree(s), %d skipped.\n", len(report.Reaped), report.SkippedCount)
 				for _, r := range report.Reaped {

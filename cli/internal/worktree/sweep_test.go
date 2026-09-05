@@ -36,6 +36,12 @@ func TestSweepFileLock(t *testing.T) {
 }
 
 func TestSweepFailClosed(t *testing.T) {
+	// Gate f answers "a process is inside" on every platform without process
+	// discovery, so on Windows this sweep would reap nothing and the assertions
+	// below would fail for a reason that has nothing to do with what they test.
+	// Drive the seam: these exercise sweep's own gates, not the platform's.
+	withHostProcessInside(t, false)
+
 	tmpDir := t.TempDir()
 	mainRepo := filepath.Join(tmpDir, "myrepo")
 	reapableWT := filepath.Join(tmpDir, "myrepo-wt-reapable")
@@ -110,6 +116,12 @@ func TestSweepFailClosed(t *testing.T) {
 }
 
 func TestSweepLogsSHA(t *testing.T) {
+	// Gate f answers "a process is inside" on every platform without process
+	// discovery, so on Windows this sweep would reap nothing and the assertions
+	// below would fail for a reason that has nothing to do with what they test.
+	// Drive the seam: these exercise sweep's own gates, not the platform's.
+	withHostProcessInside(t, false)
+
 	tmpDir := t.TempDir()
 	mainRepo := filepath.Join(tmpDir, "myrepo")
 	reapableWT := filepath.Join(tmpDir, "myrepo-wt-reapable")
@@ -166,6 +178,12 @@ func TestSweepLogsSHA(t *testing.T) {
 }
 
 func TestSweepTOCTOUDirtyErrorFailsClosed(t *testing.T) {
+	// Gate f answers "a process is inside" on every platform without process
+	// discovery, so on Windows this sweep would reap nothing and the assertions
+	// below would fail for a reason that has nothing to do with what they test.
+	// Drive the seam: these exercise sweep's own gates, not the platform's.
+	withHostProcessInside(t, false)
+
 	tmpDir := t.TempDir()
 	mainRepo := filepath.Join(tmpDir, "myrepo")
 	reapableWT := filepath.Join(tmpDir, "myrepo-wt-err")
@@ -245,6 +263,12 @@ func (r *toctouErrorRunner) IsDirty(path string) (bool, error) {
 }
 
 func TestSweepTOCTOUUnmergedFailsClosed(t *testing.T) {
+	// Gate f answers "a process is inside" on every platform without process
+	// discovery, so on Windows this sweep would reap nothing and the assertions
+	// below would fail for a reason that has nothing to do with what they test.
+	// Drive the seam: these exercise sweep's own gates, not the platform's.
+	withHostProcessInside(t, false)
+
 	tmpDir := t.TempDir()
 	mainRepo := filepath.Join(tmpDir, "myrepo")
 	reapableWT := filepath.Join(tmpDir, "myrepo-wt-unmerged-toctou")
@@ -367,6 +391,12 @@ func testSweepDisposableReaped(t *testing.T, repoDir, wtDir, lockPath string, no
 }
 
 func TestSweepPreservesGitignoredLocalFiles(t *testing.T) {
+	// Gate f answers "a process is inside" on every platform without process
+	// discovery, so on Windows this sweep would reap nothing and the assertions
+	// below would fail for a reason that has nothing to do with what they test.
+	// Drive the seam: these exercise sweep's own gates, not the platform's.
+	withHostProcessInside(t, false)
+
 	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
 
 	// Add .gitignore with .env, node_modules, and metadata file
