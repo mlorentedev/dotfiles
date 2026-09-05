@@ -294,8 +294,13 @@ func TestEveryDeclaredSkillHasARecord(t *testing.T) {
 	for _, p := range personas {
 		for _, s := range p.Skills {
 			record := filepath.Join(root, "harness", "skills", s.ID, "SKILL.md")
-			if _, err := os.Stat(record); err != nil {
-				t.Errorf("persona %q declares skill %q, but harness/skills/%s/SKILL.md does not exist "+
+			// IsRegular, not a bare nil error: os.Stat succeeds on a directory,
+			// so the obvious form accepts `SKILL.md/` as a record. That is this
+			// guard failing in exactly the way it exists to catch — an
+			// instrument reporting green because it measured the wrong object.
+			info, err := os.Stat(record)
+			if err != nil || !info.Mode().IsRegular() {
+				t.Errorf("persona %q declares skill %q, but harness/skills/%s/SKILL.md is not a readable file "+
 					"— the presence block would render an id nothing can invoke, and the gate would "+
 					"name an obligation with no skill behind it", p.Name, s.ID, s.ID)
 			}
