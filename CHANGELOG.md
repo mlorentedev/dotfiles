@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.54.0](https://github.com/mlorentedev/dotfiles/compare/v0.53.0...v0.54.0) (2026-09-05)
+
+
+### Features
+
+* **cli:** dotf vault maintain, composing crystallize and health in-process ([#1489](https://github.com/mlorentedev/dotfiles/issues/1489)) ([52035f1](https://github.com/mlorentedev/dotfiles/commit/52035f1a174e82f3176bc458aa128ebc77909f9e)), closes [#490](https://github.com/mlorentedev/dotfiles/issues/490)
+* **cli:** dotf worktree lifecycle and fail-closed garbage collection ([#1500](https://github.com/mlorentedev/dotfiles/issues/1500)) ([#1515](https://github.com/mlorentedev/dotfiles/issues/1515)) ([a76ea18](https://github.com/mlorentedev/dotfiles/commit/a76ea184ea20f8f54903df15c7d558074f22e241))
+* **doctor:** print a Next steps block for FAILs that carry a remedy command ([#1443](https://github.com/mlorentedev/dotfiles/issues/1443)) ([1966d6d](https://github.com/mlorentedev/dotfiles/commit/1966d6da24b90e7d4517abfbe3834f83a01d9bf7))
+* **doctor:** the binary carries the commit it was built from, so a stale dotf stops reporting health it never established ([#1416](https://github.com/mlorentedev/dotfiles/issues/1416)) ([3a11d97](https://github.com/mlorentedev/dotfiles/commit/3a11d977d6c3de7cbb3f57a8063ec8c6a65d7695)), closes [#1158](https://github.com/mlorentedev/dotfiles/issues/1158)
+* **harness:** architect becomes the fourth enforceable persona, and a typo in any skill id now fails ([#1509](https://github.com/mlorentedev/dotfiles/issues/1509)) ([4e2e2c4](https://github.com/mlorentedev/dotfiles/commit/4e2e2c4d2551163a9ff633bfaac91b2c94331810))
+* **harness:** builder becomes the second enforceable persona, gating two of nine ([#1494](https://github.com/mlorentedev/dotfiles/issues/1494)) ([ca81157](https://github.com/mlorentedev/dotfiles/commit/ca8115734e08677f72f19f649ff2259587052d86)), closes [#1420](https://github.com/mlorentedev/dotfiles/issues/1420)
+* **harness:** fire the persona suggester on every prompt, failing open by construction ([#1455](https://github.com/mlorentedev/dotfiles/issues/1455)) ([fb0b7e9](https://github.com/mlorentedev/dotfiles/commit/fb0b7e9219270a8fc53f51d1757ce1a6ad2baccc))
+* **harness:** grant personas the capability to invoke the skills their gate demands ([#1428](https://github.com/mlorentedev/dotfiles/issues/1428)) ([16d8f96](https://github.com/mlorentedev/dotfiles/commit/16d8f9634732b01a1bbb1b9a8357f3532627f1e0))
+* **harness:** shipper becomes the third enforceable persona, and adopts an orphaned skill ([#1504](https://github.com/mlorentedev/dotfiles/issues/1504)) ([5cc14ba](https://github.com/mlorentedev/dotfiles/commit/5cc14bad4c1debec91b22a74f2f99e2999d3fa29)), closes [#1497](https://github.com/mlorentedev/dotfiles/issues/1497)
+* **harness:** the gate writes down every decision it takes ([#1435](https://github.com/mlorentedev/dotfiles/issues/1435)) ([8fecec6](https://github.com/mlorentedev/dotfiles/commit/8fecec6736dc34b0447e418e8808af53d9f6f0d5))
+* **hooks:** dotf hooks install, retiring the install-git-hooks twin pair and its test twins ([#1464](https://github.com/mlorentedev/dotfiles/issues/1464)) ([c375102](https://github.com/mlorentedev/dotfiles/commit/c375102a124de6f42f8fd21909e912a1ec00eb53)), closes [#1460](https://github.com/mlorentedev/dotfiles/issues/1460)
+* **secrets:** guard secrets run against environment introspection commands ([#1459](https://github.com/mlorentedev/dotfiles/issues/1459)) ([a720b9d](https://github.com/mlorentedev/dotfiles/commit/a720b9d2b40569b73c96aadc5ceadbd8a41d8f7f))
+
+
+### Bug Fixes
+
+* **cli:** make Gate f fail closed where it has no implementation ([#1518](https://github.com/mlorentedev/dotfiles/issues/1518)) ([6f9b0d9](https://github.com/mlorentedev/dotfiles/commit/6f9b0d95729efbe853e6acabefa2f67863cb94f8))
+* **docs:** give every lesson its own number, and a guard so the next one cannot land ([#1514](https://github.com/mlorentedev/dotfiles/issues/1514)) ([#1519](https://github.com/mlorentedev/dotfiles/issues/1519)) ([4d0ffa9](https://github.com/mlorentedev/dotfiles/commit/4d0ffa99f7612797add2eb9d945634ecb376cf8d))
+* **doctor:** pi/opencode/copilot/yarn version-pin checks agree with their installer's floor policy ([#1441](https://github.com/mlorentedev/dotfiles/issues/1441)) ([7a81ffe](https://github.com/mlorentedev/dotfiles/commit/7a81ffea0592df58e6bf8ae211af4d0937c4dec4))
+* **harness:** land what [#1455](https://github.com/mlorentedev/dotfiles/issues/1455) merged without, and archive the spec it closed ([#1462](https://github.com/mlorentedev/dotfiles/issues/1462)) ([0105662](https://github.com/mlorentedev/dotfiles/commit/0105662daf0c04c77f43adc9b02f588604b148c6))
+* **harness:** resolve a named dispatch through the dispatch that created it ([#1471](https://github.com/mlorentedev/dotfiles/issues/1471)) ([d99a31e](https://github.com/mlorentedev/dotfiles/commit/d99a31e230e605301da3baf4997c63bcdaf533b7)), closes [#1434](https://github.com/mlorentedev/dotfiles/issues/1434)
+* **harness:** scan ids over REST and yield on ownership, not on issue number ([#1463](https://github.com/mlorentedev/dotfiles/issues/1463)) ([fe4a4ab](https://github.com/mlorentedev/dotfiles/commit/fe4a4ab5f1649cd0bf6f47f4bca1983a2fd33f62))
+* **harness:** stamp the new-ticket record with its source's actual hash ([#1503](https://github.com/mlorentedev/dotfiles/issues/1503)) ([ecd20ef](https://github.com/mlorentedev/dotfiles/commit/ecd20efed698d4ccb82ef19c78f00c67ae4f836c))
+* **harness:** the crystallize skill told agents to run a script deleted in [#1276](https://github.com/mlorentedev/dotfiles/issues/1276) ([#1490](https://github.com/mlorentedev/dotfiles/issues/1490)) ([362783b](https://github.com/mlorentedev/dotfiles/commit/362783bb201af92f275b40f37c636f1827d8ea3c))
+* **harness:** the doctrine cap was asserted in characters while the payload was 47 bytes over it ([#1513](https://github.com/mlorentedev/dotfiles/issues/1513)) ([f028d12](https://github.com/mlorentedev/dotfiles/commit/f028d12c9458943d4c8c7976dea0855742025dd2))
+* **memlink:** quote mklink's arguments for cmd.exe's own tokenizer, not Go's argv escaping ([#1444](https://github.com/mlorentedev/dotfiles/issues/1444)) ([792912f](https://github.com/mlorentedev/dotfiles/commit/792912feb76a63ee43aca2c7903e45925e3cca7d))
+* **prtriage:** give the fetch path a seam, then move it off GraphQL ([#1457](https://github.com/mlorentedev/dotfiles/issues/1457)) ([afc9db6](https://github.com/mlorentedev/dotfiles/commit/afc9db6021763589f695c9bf9e1ecc898d4d1177)), closes [#1454](https://github.com/mlorentedev/dotfiles/issues/1454)
+* **secrets:** give an interactive child a pty, so secrets run stops breaking TUIs ([#1508](https://github.com/mlorentedev/dotfiles/issues/1508)) ([46dc9d8](https://github.com/mlorentedev/dotfiles/commit/46dc9d8b199b257f0ff1548937aa656d44e67eed))
+* **setup:** log what a pi install cost and what it printed, in both twins ([#1488](https://github.com/mlorentedev/dotfiles/issues/1488)) ([173f788](https://github.com/mlorentedev/dotfiles/commit/173f78891a08cc7939bfc8378e03596838064953)), closes [#1486](https://github.com/mlorentedev/dotfiles/issues/1486)
+
 ## [0.53.0](https://github.com/mlorentedev/dotfiles/compare/v0.52.0...v0.53.0) (2026-09-01)
 
 
