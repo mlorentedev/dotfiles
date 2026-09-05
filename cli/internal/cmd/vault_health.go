@@ -60,31 +60,7 @@ missing from PATH), 2 the GUI is unreachable.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			name := vaultName
-			if name == "" {
-				name = os.Getenv("VAULT_NAME")
-			}
-			if name == "" {
-				name = "knowledge"
-			}
-
-			dir := os.Getenv("VAULT_DIR")
-			if dir == "" {
-				dir = env.ResolvePath("VAULT_PATH")
-			}
-			if dir == "" {
-				if home, herr := os.UserHomeDir(); herr == nil {
-					dir = home + "/Projects/knowledge"
-				}
-			}
-
-			code, err := vault.RunHealth(c.OutOrStdout(), vault.HealthOptions{
-				VaultDir:   dir,
-				VaultName:  name,
-				Verbose:    verbose,
-				ScriptsDir: memScriptsDir(),
-				BashPath:   mem.ResolveBash(),
-			})
+			code, err := vault.RunHealth(c.OutOrStdout(), healthOptions(vaultName, verbose))
 			if err != nil {
 				return err
 			}
@@ -98,4 +74,36 @@ missing from PATH), 2 the GUI is unreachable.`,
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "list orphan/unresolved/tag detail (truncated)")
 	cmd.Flags().StringVar(&vaultName, "vault", "", "Obsidian vault name (default: $VAULT_NAME or \"knowledge\")")
 	return cmd
+}
+
+// healthOptions builds the HealthOptions both `vault health` and `vault
+// maintain` need. Extracted rather than duplicated when increment 3 landed: the
+// $VAULT_DIR-then-ADR-025 cascade documented above is a contract, and two
+// copies of a resolution cascade drift in exactly the way ADR-020 §5 is about.
+func healthOptions(vaultName string, verbose bool) vault.HealthOptions {
+	name := vaultName
+	if name == "" {
+		name = os.Getenv("VAULT_NAME")
+	}
+	if name == "" {
+		name = "knowledge"
+	}
+
+	dir := os.Getenv("VAULT_DIR")
+	if dir == "" {
+		dir = env.ResolvePath("VAULT_PATH")
+	}
+	if dir == "" {
+		if home, herr := os.UserHomeDir(); herr == nil {
+			dir = home + "/Projects/knowledge"
+		}
+	}
+
+	return vault.HealthOptions{
+		VaultDir:   dir,
+		VaultName:  name,
+		Verbose:    verbose,
+		ScriptsDir: memScriptsDir(),
+		BashPath:   mem.ResolveBash(),
+	}
 }
