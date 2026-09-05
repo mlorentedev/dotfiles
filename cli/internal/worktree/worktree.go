@@ -54,6 +54,8 @@ type Info struct {
 	IsBare      bool           `json:"is_bare,omitempty"`
 	IsDetached  bool           `json:"is_detached,omitempty"`
 	IsMain      bool           `json:"is_main,omitempty"`
+	IsCurrent   bool           `json:"is_current,omitempty"`
+	IsOrphan    bool           `json:"is_orphan,omitempty"`
 	Dirty       bool           `json:"dirty"`
 	PRMerged    bool           `json:"pr_merged"`
 	Metadata    *Metadata      `json:"metadata,omitempty"`
@@ -93,28 +95,8 @@ func ParsePorcelain(output string) ([]RawWorktree, error) {
 			continue
 		}
 
-		if current == nil {
-			continue
-		}
-
-		switch {
-		case strings.HasPrefix(line, "HEAD "):
-			current.HEAD = strings.TrimPrefix(line, "HEAD ")
-		case strings.HasPrefix(line, "branch "):
-			ref := strings.TrimPrefix(line, "branch ")
-			current.Branch = strings.TrimPrefix(ref, "refs/heads/")
-		case line == "bare":
-			current.Bare = true
-		case line == "detached":
-			current.Detached = true
-		case strings.HasPrefix(line, "locked"):
-			current.Locked = true
-			current.LockReason = strings.TrimSpace(strings.TrimPrefix(line, "locked"))
-		case strings.HasPrefix(line, "prunable"):
-			current.Prunable = true
-		case strings.HasPrefix(line, "gitdir "):
-			current.GitDir = strings.TrimPrefix(line, "gitdir ")
-			current.IsSubmodule = IsSubmoduleGitDir(current.GitDir)
+		if current != nil {
+			parsePorcelainLine(line, current)
 		}
 	}
 
@@ -123,6 +105,28 @@ func ParsePorcelain(output string) ([]RawWorktree, error) {
 	}
 
 	return results, scanner.Err()
+}
+
+func parsePorcelainLine(line string, current *RawWorktree) {
+	switch {
+	case strings.HasPrefix(line, "HEAD "):
+		current.HEAD = strings.TrimPrefix(line, "HEAD ")
+	case strings.HasPrefix(line, "branch "):
+		ref := strings.TrimPrefix(line, "branch ")
+		current.Branch = strings.TrimPrefix(ref, "refs/heads/")
+	case line == "bare":
+		current.Bare = true
+	case line == "detached":
+		current.Detached = true
+	case strings.HasPrefix(line, "locked"):
+		current.Locked = true
+		current.LockReason = strings.TrimSpace(strings.TrimPrefix(line, "locked"))
+	case strings.HasPrefix(line, "prunable"):
+		current.Prunable = true
+	case strings.HasPrefix(line, "gitdir "):
+		current.GitDir = strings.TrimPrefix(line, "gitdir ")
+		current.IsSubmodule = IsSubmoduleGitDir(current.GitDir)
+	}
 }
 
 // LoadMetadata reads .dotf-worktree.json from the worktree root if present.
@@ -169,6 +173,9 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 	}
 
 	if !info.PRMerged {
+		if info.IsOrphan {
+			return StateOrphan, "upstream branch gone and PR not merged"
+		}
 		return StateUnmerged, "PR not merged"
 	}
 

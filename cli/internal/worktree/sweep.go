@@ -88,7 +88,7 @@ type SweepReport struct {
 	DryRun       bool   `json:"dry_run"`
 }
 
-// isHostProcessInside checks if any running host process has its cwd inside targetPath (Gate f).
+// isHostProcessInside checks if any running host process has its cwd inside targetPath (Gate f, Linux /proc).
 func isHostProcessInside(targetPath string) bool {
 	absTarget, err := filepath.Abs(targetPath)
 	if err != nil {
@@ -99,34 +99,100 @@ func isHostProcessInside(targetPath string) bool {
 		return false
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || !isNumericPID(entry.Name()) {
 			continue
 		}
-		name := entry.Name()
-		isNum := true
-		for _, r := range name {
-			if r < '0' || r > '9' {
-				isNum = false
-				break
-			}
-		}
-		if !isNum {
-			continue
-		}
-
-		dest, err := os.Readlink(filepath.Join("/proc", name, "cwd"))
-		if err != nil {
-			continue
-		}
-		absDest, err := filepath.Abs(dest)
-		if err != nil {
-			continue
-		}
-		if absDest == absTarget || strings.HasPrefix(absDest, absTarget+string(filepath.Separator)) {
+		if processCwdInside(entry.Name(), absTarget) {
 			return true
 		}
 	}
 	return false
+}
+
+func isNumericPID(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	for _, r := range name {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func processCwdInside(pidName, absTarget string) bool {
+	dest, err := os.Readlink(filepath.Join("/proc", pidName, "cwd"))
+	if err != nil {
+		return false
+	}
+	absDest, err := filepath.Abs(dest)
+	if err != nil {
+		return false
+	}
+	return absDest == absTarget || strings.HasPrefix(absDest, absTarget+string(filepath.Separator))
+}
+
+func isCandidateForReap(info Info, absCwd string) bool {
+	if info.State != StateReapable {
+		return false
+	}
+	// Gate (f): never reap current working directory or any worktree with active host processes inside
+	absWT, err := filepath.Abs(info.Path)
+	if err != nil || absWT == absCwd || isHostProcessInside(absWT) {
+		return false
+	}
+	return true
+}
+
+func isDirty(path string, runner SweepRunner) bool {
+	dirty, err := runner.IsDirty(path)
+	return err != nil || dirty
+}
+
+func isMerged(repoRoot, branch string, runner SweepRunner) bool {
+	merged, err := runner.IsPRMerged(repoRoot, branch)
+	return err == nil && merged
+}
+
+func isLeaseExpired(path string, now time.Time) bool {
+	meta, err := LoadMetadata(path)
+	if err != nil || meta == nil {
+		return false
+	}
+	return meta.ReapOK && !meta.LeaseExpiresAt.After(now)
+}
+
+func deleteBranchIfSafe(repoRoot, branch string, isMain bool, runner SweepRunner) {
+	if branch == "" || isMain {
+		return
+	}
+	if _, err := runner.BranchDelete(repoRoot, branch); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: deleting branch %s: %v\n", branch, err)
+	}
+}
+
+func executeWorktreeReap(repoRoot string, info Info, runner SweepRunner) bool {
+	if err := runner.WorktreeRemove(repoRoot, info.Path); err != nil {
+		return false
+	}
+	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
+	_ = runner.WorktreePrune(repoRoot)
+	return true
+}
+
+func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time.Time) bool {
+	// TOCTOU checks under lock: clean status, merge status, lease expiration
+	if isDirty(info.Path, runner) {
+		return false
+	}
+	if !isMerged(repoRoot, info.Branch, runner) {
+		return false
+	}
+	if !isLeaseExpired(info.Path, now) {
+		return false
+	}
+	return executeWorktreeReap(repoRoot, info, runner)
 }
 
 func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*SweepReport, error) {
@@ -154,36 +220,17 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	absCwd, _ := filepath.Abs(cwd)
 
 	for _, info := range infos {
-		if info.State == StateReapable {
-			// Gate (f): never reap current working directory or any worktree with active host processes inside
-			absWT, _ := filepath.Abs(info.Path)
-			if absWT == absCwd || isHostProcessInside(absWT) {
-				report.SkippedCount++
-				continue
-			}
+		if !isCandidateForReap(info, absCwd) {
+			report.SkippedCount++
+			continue
+		}
 
-			if opts.DryRun {
-				report.Reaped = append(report.Reaped, info)
-				continue
-			}
+		if opts.DryRun {
+			report.Reaped = append(report.Reaped, info)
+			continue
+		}
 
-			// TOCTOU check under lock: verify clean status right before removal (fail closed on error)
-			dirty, err := runner.IsDirty(info.Path)
-			if err != nil || dirty {
-				report.SkippedCount++
-				continue
-			}
-
-			if err := runner.WorktreeRemove(opts.RepoRoot, info.Path); err != nil {
-				report.SkippedCount++
-				continue
-			}
-
-			if info.Branch != "" && !info.IsMain {
-				_, _ = runner.BranchDelete(opts.RepoRoot, info.Branch)
-			}
-
-			_ = runner.WorktreePrune(opts.RepoRoot)
+		if reapSingleWorktree(opts.RepoRoot, info, runner, now) {
 			report.Reaped = append(report.Reaped, info)
 		} else {
 			report.SkippedCount++

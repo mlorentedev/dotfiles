@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -32,6 +33,32 @@ workstation clutter without risking data loss.`,
 	cmd.AddCommand(newWorktreeSweepCmd())
 	cmd.AddCommand(newWorktreeDoneCmd())
 	return cmd
+}
+
+func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
+	w := tabwriter.NewWriter(out, 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "PATH\tBRANCH\tSTATUS\tPR\tSTATE\tREASON")
+	for _, info := range infos {
+		status := "clean"
+		if info.Dirty {
+			status = "dirty"
+		}
+
+		prStatus := "-"
+		if info.PRMerged {
+			prStatus = "merged"
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			info.Path,
+			info.Branch,
+			status,
+			prStatus,
+			info.State,
+			info.StateReason,
+		)
+	}
+	return w.Flush()
 }
 
 func newWorktreeListCmd() *cobra.Command {
@@ -80,29 +107,7 @@ func newWorktreeListCmd() *cobra.Command {
 				return nil
 			}
 
-			w := tabwriter.NewWriter(c.OutOrStdout(), 0, 0, 3, ' ', 0)
-			fmt.Fprintln(w, "PATH\tBRANCH\tSTATUS\tPR\tSTATE\tREASON")
-			for _, info := range infos {
-				status := "clean"
-				if info.Dirty {
-					status = "dirty"
-				}
-
-				prStatus := "-"
-				if info.PRMerged {
-					prStatus = "merged"
-				}
-
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					info.Path,
-					info.Branch,
-					status,
-					prStatus,
-					info.State,
-					info.StateReason,
-				)
-			}
-			return w.Flush()
+			return printWorktreeTable(c.OutOrStdout(), infos)
 		},
 	}
 

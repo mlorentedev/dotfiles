@@ -76,28 +76,39 @@ func ValidateIsolation(repoRoot, targetPath string) error {
 	return nil
 }
 
-// AddWithRunner handles worktree creation with a given AddRunner.
-func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, error) {
+func validateAddOptions(opts AddOptions) error {
 	if opts.RepoRoot == "" {
-		return nil, fmt.Errorf("repository root cannot be empty")
+		return fmt.Errorf("repository root cannot be empty")
 	}
 	if opts.Slug == "" && opts.CustomPath == "" {
-		return nil, fmt.Errorf("either slug or custom path must be specified")
+		return fmt.Errorf("either slug or custom path must be specified")
 	}
+	return nil
+}
 
-	targetPath := opts.CustomPath
-	if targetPath == "" {
-		targetPath = ResolveSiblingPath(opts.RepoRoot, opts.Slug)
+func resolveTargetPath(opts AddOptions) string {
+	if opts.CustomPath != "" {
+		return opts.CustomPath
 	}
+	return ResolveSiblingPath(opts.RepoRoot, opts.Slug)
+}
 
-	if err := ValidateIsolation(opts.RepoRoot, targetPath); err != nil {
-		return nil, err
+func resolveCreator(explicit string) string {
+	if explicit != "" {
+		return explicit
 	}
-
-	if _, err := os.Stat(targetPath); err == nil {
-		return nil, fmt.Errorf("target path already exists: %s", targetPath)
+	for _, envVar := range []string{"AGENT_NAME", "CLAUDE_CODE", "USER"} {
+		if val := os.Getenv(envVar); val != "" {
+			if envVar == "CLAUDE_CODE" {
+				return "claude-code"
+			}
+			return val
+		}
 	}
+	return "unknown"
+}
 
+func resolveAddDefaults(opts AddOptions) (string, time.Duration, string) {
 	branchName := opts.Branch
 	if branchName == "" {
 		branchName = "feat/" + opts.Slug
@@ -108,30 +119,36 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		ttl = 24 * time.Hour
 	}
 
-	creator := opts.Creator
-	if creator == "" {
-		if ag := os.Getenv("AGENT_NAME"); ag != "" {
-			creator = ag
-		} else if cc := os.Getenv("CLAUDE_CODE"); cc != "" {
-			creator = "claude-code"
-		} else if u := os.Getenv("USER"); u != "" {
-			creator = u
-		} else {
-			creator = "unknown"
-		}
+	creator := resolveCreator(opts.Creator)
+	return branchName, ttl, creator
+}
+
+// AddWithRunner handles worktree creation with a given AddRunner.
+func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, error) {
+	if err := validateAddOptions(opts); err != nil {
+		return nil, err
 	}
+
+	targetPath := resolveTargetPath(opts)
+	if err := ValidateIsolation(opts.RepoRoot, targetPath); err != nil {
+		return nil, err
+	}
+
+	if _, err := os.Stat(targetPath); err == nil {
+		return nil, fmt.Errorf("target path already exists: %s", targetPath)
+	}
+
+	branchName, ttl, creator := resolveAddDefaults(opts)
 
 	// Gate A: warn if parent repository has active auto-commit hooks/plugins
 	if warn := CheckAutoCommitHooks(opts.RepoRoot); warn != "" {
 		_, _ = fmt.Fprintln(os.Stderr, warn)
 	}
 
-	// 1. Create worktree
 	if err := runner.WorktreeAdd(opts.RepoRoot, targetPath, branchName, opts.BaseRef); err != nil {
 		return nil, err
 	}
 
-	// 2. Write metadata
 	meta := Metadata{
 		Creator:        creator,
 		Issue:          opts.Issue,
@@ -143,7 +160,6 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		return nil, fmt.Errorf("saving worktree metadata: %w", err)
 	}
 
-	// 3. Exclude metadata in repo .git/info/exclude
 	ensureExclude(opts.RepoRoot, MetadataFileName)
 
 	return &Info{

@@ -34,33 +34,38 @@ gitdir /home/manu/Projects/dotfiles/.git/modules/submodule
 		t.Fatalf("expected 4 entries, got %d", len(entries))
 	}
 
-	// Entry 0: Main
-	if entries[0].Path != "/home/manu/Projects/dotfiles" {
-		t.Errorf("expected path /home/manu/Projects/dotfiles, got %s", entries[0].Path)
+	verifyMainEntry(t, entries[0])
+	verifyFeatureEntry(t, entries[1])
+	verifyDetachedAndSubmodule(t, entries[2], entries[3])
+}
+
+func verifyMainEntry(t *testing.T, entry RawWorktree) {
+	if entry.Path != "/home/manu/Projects/dotfiles" {
+		t.Errorf("expected path /home/manu/Projects/dotfiles, got %s", entry.Path)
 	}
-	if entries[0].Branch != "main" {
-		t.Errorf("expected branch main, got %s", entries[0].Branch)
+	if entry.Branch != "main" {
+		t.Errorf("expected branch main, got %s", entry.Branch)
 	}
-	if entries[0].Detached {
+	if entry.Detached {
 		t.Errorf("expected main not to be detached")
 	}
+}
 
-	// Entry 1: Feature branch
-	if entries[1].Path != "/home/manu/Projects/dotfiles-wt-agents" {
-		t.Errorf("expected path /home/manu/Projects/dotfiles-wt-agents, got %s", entries[1].Path)
+func verifyFeatureEntry(t *testing.T, entry RawWorktree) {
+	if entry.Path != "/home/manu/Projects/dotfiles-wt-agents" {
+		t.Errorf("expected path /home/manu/Projects/dotfiles-wt-agents, got %s", entry.Path)
 	}
-	if entries[1].Branch != "feat/cli-075-dotf-worktree-lifecycle" {
-		t.Errorf("expected branch feat/cli-075-dotf-worktree-lifecycle, got %s", entries[1].Branch)
+	if entry.Branch != "feat/cli-075-dotf-worktree-lifecycle" {
+		t.Errorf("expected branch feat/cli-075-dotf-worktree-lifecycle, got %s", entry.Branch)
 	}
+}
 
-	// Entry 2: Detached
-	if !entries[2].Detached {
-		t.Errorf("expected entry 2 to be detached")
+func verifyDetachedAndSubmodule(t *testing.T, detached, submod RawWorktree) {
+	if !detached.Detached {
+		t.Errorf("expected detached entry to be detached")
 	}
-
-	// Entry 3: Submodule
-	if !entries[3].IsSubmodule {
-		t.Errorf("expected entry 3 to be detected as submodule")
+	if !submod.IsSubmodule {
+		t.Errorf("expected submodule entry to be detected as submodule")
 	}
 }
 
@@ -83,7 +88,7 @@ func TestFilterSubmodules(t *testing.T) {
 	}
 }
 
-func TestClassify(t *testing.T) {
+func TestClassifyActiveStates(t *testing.T) {
 	now := time.Now()
 
 	t.Run("main repository is always active", func(t *testing.T) {
@@ -114,24 +119,6 @@ func TestClassify(t *testing.T) {
 		}
 	})
 
-	t.Run("dirty worktree is StateDirty even if lease expired and PR merged", func(t *testing.T) {
-		info := Info{
-			Path:     "/home/user/repo-wt-feature",
-			Branch:   "feat/x",
-			Dirty:    true,
-			PRMerged: true,
-			Metadata: &Metadata{
-				ReapOK:         true,
-				CreatedAt:      now.Add(-2 * time.Hour),
-				LeaseExpiresAt: now.Add(-1 * time.Hour), // expired
-			},
-		}
-		state, _ := Classify(info, now)
-		if state != StateDirty {
-			t.Errorf("expected dirty worktree to yield StateDirty, got %s", state)
-		}
-	})
-
 	t.Run("freshly created clean branch is StateActive due to 15m minimum age guard", func(t *testing.T) {
 		info := Info{
 			Path:     "/home/user/repo-wt-feature",
@@ -150,6 +137,66 @@ func TestClassify(t *testing.T) {
 		}
 		if !strings.Contains(reason, "age < 15m") {
 			t.Errorf("expected reason to mention age guard, got %s", reason)
+		}
+	})
+
+	t.Run("nil metadata refuses reap (Gate a fail-closed)", func(t *testing.T) {
+		info := Info{
+			Path:     "/home/user/repo-wt-manual",
+			Branch:   "feat/manual",
+			Dirty:    false,
+			PRMerged: true,
+			Metadata: nil,
+		}
+		state, reason := Classify(info, now)
+		if state != StateActive {
+			t.Errorf("expected metadata-less worktree to be StateActive, got %s", state)
+		}
+		if !strings.Contains(reason, "no dotf metadata") {
+			t.Errorf("expected reason to mention missing metadata, got %q", reason)
+		}
+	})
+
+	t.Run("reap_ok false keeps worktree active", func(t *testing.T) {
+		info := Info{
+			Path:     "/home/user/repo-wt-hold",
+			Branch:   "feat/hold",
+			Dirty:    false,
+			PRMerged: true,
+			Metadata: &Metadata{
+				ReapOK:         false, // explicit hold
+				CreatedAt:      now.Add(-24 * time.Hour),
+				LeaseExpiresAt: now.Add(-1 * time.Hour),
+			},
+		}
+		state, reason := Classify(info, now)
+		if state != StateActive {
+			t.Errorf("expected reap_ok=false to be StateActive, got %s", state)
+		}
+		if !strings.Contains(reason, "reap hold") {
+			t.Errorf("expected reason to mention reap hold, got %q", reason)
+		}
+	})
+}
+
+func TestClassifyReapableAndUnmerged(t *testing.T) {
+	now := time.Now()
+
+	t.Run("dirty worktree is StateDirty even if lease expired and PR merged", func(t *testing.T) {
+		info := Info{
+			Path:     "/home/user/repo-wt-feature",
+			Branch:   "feat/x",
+			Dirty:    true,
+			PRMerged: true,
+			Metadata: &Metadata{
+				ReapOK:         true,
+				CreatedAt:      now.Add(-2 * time.Hour),
+				LeaseExpiresAt: now.Add(-1 * time.Hour), // expired
+			},
+		}
+		state, _ := Classify(info, now)
+		if state != StateDirty {
+			t.Errorf("expected dirty worktree to yield StateDirty, got %s", state)
 		}
 	})
 
@@ -189,41 +236,25 @@ func TestClassify(t *testing.T) {
 		}
 	})
 
-	t.Run("nil metadata refuses reap (Gate a fail-closed)", func(t *testing.T) {
+	t.Run("orphan unmerged branch yields StateOrphan", func(t *testing.T) {
 		info := Info{
-			Path:     "/home/user/repo-wt-manual",
-			Branch:   "feat/manual",
+			Path:     "/home/user/repo-wt-orphan",
+			Branch:   "feat/orphan",
 			Dirty:    false,
-			PRMerged: true,
-			Metadata: nil, // manually created worktree without .dotf-worktree.json
-		}
-		state, reason := Classify(info, now)
-		if state != StateActive {
-			t.Errorf("expected metadata-less worktree to be StateActive, got %s", state)
-		}
-		if !strings.Contains(reason, "no dotf metadata") {
-			t.Errorf("expected reason to mention missing metadata, got %q", reason)
-		}
-	})
-
-	t.Run("reap_ok false keeps worktree active", func(t *testing.T) {
-		info := Info{
-			Path:     "/home/user/repo-wt-hold",
-			Branch:   "feat/hold",
-			Dirty:    false,
-			PRMerged: true,
+			PRMerged: false,
+			IsOrphan: true,
 			Metadata: &Metadata{
-				ReapOK:         false, // explicit hold
+				ReapOK:         true,
 				CreatedAt:      now.Add(-24 * time.Hour),
 				LeaseExpiresAt: now.Add(-1 * time.Hour),
 			},
 		}
 		state, reason := Classify(info, now)
-		if state != StateActive {
-			t.Errorf("expected reap_ok=false to be StateActive, got %s", state)
+		if state != StateOrphan {
+			t.Errorf("expected StateOrphan, got %s", state)
 		}
-		if !strings.Contains(reason, "reap hold") {
-			t.Errorf("expected reason to mention reap hold, got %q", reason)
+		if !strings.Contains(reason, "upstream branch gone") {
+			t.Errorf("expected reason to mention upstream gone, got %q", reason)
 		}
 	})
 }

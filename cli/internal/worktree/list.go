@@ -14,6 +14,7 @@ type GitRunner interface {
 	WorktreeListPorcelain(repoRoot string) (string, error)
 	IsDirty(worktreePath string) (bool, error)
 	IsPRMerged(repoRoot, branch string) (bool, error)
+	IsOrphan(repoRoot, branch string) (bool, error)
 }
 
 type RealGitRunner struct{}
@@ -89,11 +90,26 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 	return false, nil
 }
 
+func (r *RealGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
+	if branch == "" {
+		return false, nil
+	}
+	cmd := exec.Command("git", "-C", repoRoot, "rev-parse", "--symbolic-full-name", branch+"@{u}")
+	if err := cmd.Run(); err != nil {
+		cfgCmd := exec.Command("git", "-C", repoRoot, "config", "--get", "branch."+branch+".remote")
+		if out, cfgErr := cfgCmd.Output(); cfgErr == nil && len(strings.TrimSpace(string(out))) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 type MockGitRunner struct {
 	PorcelainOutput string
 	DirtyPaths      map[string]bool
 	DirtyErrors     map[string]error
 	MergedBranches  map[string]bool
+	OrphanBranches  map[string]bool
 }
 
 func (m *MockGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
@@ -109,6 +125,10 @@ func (m *MockGitRunner) IsDirty(worktreePath string) (bool, error) {
 
 func (m *MockGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 	return m.MergedBranches[branch], nil
+}
+
+func (m *MockGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
+	return m.OrphanBranches[branch], nil
 }
 
 // SaveMetadata writes metadata to .dotf-worktree.json in target directory.
@@ -143,7 +163,8 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		}
 
 		absPath, _ := filepath.Abs(raw.Path)
-		isMain := (i == 0) || (absPath == absRepoRoot)
+		isMain := (i == 0)
+		isCurrent := (absPath == absRepoRoot)
 
 		dirty, err := runner.IsDirty(raw.Path)
 		if err != nil {
@@ -151,6 +172,7 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			dirty = true
 		}
 		merged, _ := runner.IsPRMerged(repoRoot, raw.Branch)
+		orphan, _ := runner.IsOrphan(repoRoot, raw.Branch)
 		meta, err := LoadMetadata(raw.Path)
 		if err != nil {
 			// Fail-closed: unparseable or corrupted metadata -> nil -> refused reap (F2)
@@ -164,6 +186,8 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			IsBare:     raw.Bare,
 			IsDetached: raw.Detached,
 			IsMain:     isMain,
+			IsCurrent:  isCurrent,
+			IsOrphan:   orphan,
 			Dirty:      dirty,
 			PRMerged:   merged,
 			Metadata:   meta,

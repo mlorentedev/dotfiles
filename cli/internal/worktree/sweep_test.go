@@ -241,3 +241,70 @@ func (r *toctouErrorRunner) IsDirty(path string) (bool, error) {
 	}
 	return false, nil
 }
+
+func TestSweepTOCTOUUnmergedFailsClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	mainRepo := filepath.Join(tmpDir, "myrepo")
+	reapableWT := filepath.Join(tmpDir, "myrepo-wt-unmerged-toctou")
+
+	_ = os.MkdirAll(mainRepo, 0o755)
+	_ = os.MkdirAll(reapableWT, 0o755)
+
+	now := time.Now()
+
+	mockPorcelain := "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
+		"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/toctou\n\n"
+
+	_ = SaveMetadata(reapableWT, Metadata{
+		ReapOK:         true,
+		CreatedAt:      now.Add(-2 * time.Hour),
+		LeaseExpiresAt: now.Add(-1 * time.Hour),
+	})
+
+	runner := &MockSweepRunner{
+		MockGitRunner: MockGitRunner{
+			PorcelainOutput: mockPorcelain,
+		},
+		OnWorktreeRemove: func(repo, path string) error {
+			t.Fatalf("WorktreeRemove should NOT be called when branch becomes unmerged during TOCTOU")
+			return nil
+		},
+	}
+
+	mergeRunner := &toctouMergeRunner{
+		MockSweepRunner: runner,
+	}
+
+	opts := SweepOptions{
+		RepoRoot: mainRepo,
+		LockPath: filepath.Join(tmpDir, "sweep.lock"),
+		DryRun:   false,
+	}
+
+	report, err := SweepWithRunner(opts, mergeRunner, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(report.Reaped) != 0 {
+		t.Fatalf("expected 0 reaped due to unmerged TOCTOU, got %d", len(report.Reaped))
+	}
+	if report.SkippedCount != 2 {
+		t.Errorf("expected 2 skipped, got %d", report.SkippedCount)
+	}
+}
+
+type toctouMergeRunner struct {
+	*MockSweepRunner
+	callCount int
+}
+
+func (r *toctouMergeRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
+	r.callCount++
+	// Call 1 is during ListWithRunner (simulate merged initially)
+	if r.callCount == 1 {
+		return true, nil
+	}
+	// Call 2 is during Sweep TOCTOU check under lock (simulate new commit arrived, no longer merged)
+	return false, nil
+}

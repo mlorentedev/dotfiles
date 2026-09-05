@@ -9,20 +9,22 @@ created: "2026-09-04"
 
 Map every acceptance criterion from `proposal.md` to concrete proof:
 
-- [x] AC1 (`dotf worktree list` tabular/JSON output) -> `TestListWorktrees` (PASS)
+- [x] AC1 (`dotf worktree list` tabular/JSON output) -> `TestListWorktrees`, `TestListWithRunnerFromInsideWorktreeDoesNotMarkWorktreeAsMain` (PASS)
 - [x] AC2 (submodule filtering via `modules/` check) -> `TestFilterSubmodules` (PASS)
 - [x] AC3 (standardized creation with external sibling and lease) -> `TestAddWorktreeWithRunner` (PASS)
-- [x] AC4 (fail-closed reaper with 6 gates) -> `TestSweepFailClosed` (PASS)
+- [x] AC4 (fail-closed reaper with 6 gates) -> `TestSweepFailClosed`, `TestSweepTOCTOUDirtyErrorFailsClosed`, `TestSweepTOCTOUUnmergedFailsClosed` (PASS)
 - [x] AC5 (commit SHA recorded before branch deletion) -> `TestSweepLogsSHA` (PASS)
 - [x] AC6 (cross-platform file locking) -> `TestSweepFileLock` (PASS)
-- [x] AC7 (safe self-service teardown) -> `TestDoneTeardown` (PASS)
+- [x] AC7 (safe self-service teardown) -> `TestDoneTeardown`, `TestDoneRefusesUnpushedCommitsWithNoUpstream`, `TestDoneSucceedsOnCleanBranchWithoutCommits` (PASS)
 
 ## Test status
 
-- Unit test suite: `go -C cli test -v ./internal/worktree/...` -> 14/14 passing (exit 0)
+- Unit test suite: `go -C cli test -v ./internal/worktree/...` -> 17/17 passing (exit 0)
+- Cyclomatic complexity: `gocyclo -over 9 cli/internal/worktree/*.go cli/internal/cmd/worktree.go` -> 0 functions > 9 (Grade A)
+- Cross-compilation: Windows (`amd64`) and Darwin (`arm64`) build cleanly (exit 0)
 - Regression test suite: `go -C cli test ./...` -> all packages passing (exit 0)
 - Live smoke test:
-  - `dotf worktree list` correctly discovered 7 worktrees in live repo, correctly identified `main repository` for active worktrees, flagged `DIRTY` on uncommitted branches, resolved GitHub PR status via `ParseGitHubSlug`, and handled `--json`.
+  - `dotf worktree list` correctly discovered 7 worktrees in live repo, correctly identified `main repository` strictly on entry 0 (never on linked worktrees), evaluated current worktree as `DIRTY uncommitted changes`, resolved GitHub PR status via `ParseGitHubSlug`, and handled `--json`.
   - `dotf worktree list --all` successfully scanned all sibling repositories in `~/Projects` in seconds.
   - `dotf worktree sweep --dry-run` reported `Found 0 reapable worktree(s), 6 skipped` (zero false positives).
 

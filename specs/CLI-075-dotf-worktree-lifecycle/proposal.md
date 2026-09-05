@@ -25,7 +25,7 @@ Introduces the `dotf worktree` command suite in Go under `cli/internal/worktree/
    - Rejects submodules by verifying the worktree `gitdir` does not point into a `modules/` directory.
    - Reads per-worktree metadata from `.dotf-worktree.json` located inside the worktree root.
    - Inspects git status (clean vs dirty), remote tracking (`synced`, `ahead`, `behind`, `gone`), and PR status via `gh pr view` / cached metadata.
-   - Classifies each worktree into an actionable state: `ACTIVE`, `REAPABLE`, `DIRTY`, `UNMERGED`, or `ORPHAN`.
+   - Classifies each worktree into an actionable state: `ACTIVE`, `REAPABLE`, `DIRTY`, `UNMERGED`, or `ORPHAN` (where `ORPHAN` indicates upstream branch is gone and PR is not merged).
    - Supports `--json` for machine consumption and `--all` to scan all sibling repositories in `~/Projects/`.
 
 2. **Standardized Creation (`dotf worktree add <slug> [--issue <N>] [--ttl <duration>]`):**
@@ -42,9 +42,9 @@ Introduces the `dotf worktree` command suite in Go under `cli/internal/worktree/
      a. Explicit metadata exists in `.dotf-worktree.json` with `reap_ok: true` (defaults to true on creation; operator/agent can set to false as a hold).
      b. Authoritative lease expired: current time > `lease_expires_at`. This is the primary liveness signal, protecting containerized and background agents.
      c. Working tree is 100% clean (`git status --porcelain` is empty, verified initially and re-checked under lock immediately prior to deletion).
-     d. Positive merge confirmation: branch is associated with a GitHub PR whose state is explicitly `MERGED`, OR its commit tip is an ancestor of the repository's default branch (`git merge-base --is-ancestor <branch> <base>`). If upstream is `gone` but no merged PR exists and it is not an ancestor, it is classified as `ORPHAN_UNMERGED` and refused.
+     d. Positive merge confirmation: branch is associated with a GitHub PR whose state is explicitly `MERGED`, OR its commit tip is an ancestor of the repository's default branch (`git merge-base --is-ancestor <branch> <base>`). If upstream is `gone` but no merged PR exists and it is not an ancestor, it is classified as `ORPHAN` and refused.
      e. Minimum age guard: creation time is > 15 minutes ago (eliminates the zero-diff fresh branch false positive).
-     f. Host-side defensive check: neither the sweep command's own cwd nor any host terminal process has cwd inside the target path.
+     f. Host-side defensive check: neither the sweep command's own cwd nor any host terminal process has cwd inside the target path (host process scanning supported on Linux `/proc`; sweep command cwd check enforced cross-platform).
    - Reaping action: executes `git worktree remove <path>`, logs the previous commit SHA to stderr before `git branch -D <branch>` (ensuring instant recovery of committed state via `git branch <name> <sha>`), and executes `git worktree prune`.
 
 4. **Self-Service Teardown (`dotf worktree done`):**

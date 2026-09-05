@@ -141,3 +141,49 @@ func TestListWithRunnerDirtyErrorFailsClosed(t *testing.T) {
 		t.Errorf("expected wt1 with IsDirty error to be classified StateDirty, got %s (dirty=%v)", infos[1].State, infos[1].Dirty)
 	}
 }
+
+func TestListWithRunnerFromInsideWorktreeDoesNotMarkWorktreeAsMain(t *testing.T) {
+	tmpDir := t.TempDir()
+	mainRepo := filepath.Join(tmpDir, "myrepo")
+	wt1 := filepath.Join(tmpDir, "myrepo-wt-feat1")
+	_ = os.MkdirAll(mainRepo, 0o755)
+	_ = os.MkdirAll(wt1, 0o755)
+
+	mockPorcelain := "worktree " + mainRepo + "\n" +
+		"HEAD 1111\n" +
+		"branch refs/heads/main\n\n" +
+		"worktree " + wt1 + "\n" +
+		"HEAD 2222\n" +
+		"branch refs/heads/feat/feat1\n\n"
+
+	runner := &MockGitRunner{
+		PorcelainOutput: mockPorcelain,
+		MergedBranches:  map[string]bool{"feat/feat1": false},
+	}
+
+	// Pass wt1 as repoRoot (simulating running command from inside linked worktree)
+	infos, err := ListWithRunner(wt1, runner, time.Now())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(infos) != 2 {
+		t.Fatalf("expected 2 worktrees, got %d", len(infos))
+	}
+
+	// Entry 0 is the true main worktree
+	if !infos[0].IsMain {
+		t.Errorf("expected entry 0 (%s) to be IsMain=true, got false", infos[0].Path)
+	}
+
+	// Entry 1 is the linked worktree (even though repoRoot was wt1), so it must NOT be IsMain
+	if infos[1].IsMain {
+		t.Errorf("expected entry 1 (%s) to be IsMain=false when invoked from worktree, but got true", infos[1].Path)
+	}
+	if !infos[1].IsCurrent {
+		t.Errorf("expected entry 1 (%s) to be IsCurrent=true, got false", infos[1].Path)
+	}
+	if infos[1].StateReason == "main repository" {
+		t.Errorf("expected entry 1 reason not to be 'main repository', got %q", infos[1].StateReason)
+	}
+}
