@@ -41,6 +41,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newPrCmd())
 	root.AddCommand(newSearchCmd())
 	root.AddCommand(newHooksCmd())
+	root.AddCommand(newWorktreeCmd())
 	return root
 }
 

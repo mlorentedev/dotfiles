@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f1",
+    "behavior": "dotf worktree list prints table or JSON reporting path, branch, git status, lease status, PR status, and lifecycle classification",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestListWorktrees",
+    "state": "passing",
+    "evidence": "=== RUN   TestListWorktrees\n--- PASS: TestListWorktrees (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t(cached)"
+  },
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f2",
+    "behavior": "dotf worktree list ignores submodule checkouts whose gitdir points into a modules/ directory",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestFilterSubmodules",
+    "state": "passing",
+    "evidence": "=== RUN   TestFilterSubmodules\n--- PASS: TestFilterSubmodules (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.006s"
+  },
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f3",
+    "behavior": "dotf worktree add creates external sibling worktree, writes .dotf-worktree.json and excludes it via .git/info/exclude",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestAddWorktree",
+    "state": "passing",
+    "evidence": "=== RUN   TestAddWorktreeWithRunner\n--- PASS: TestAddWorktreeWithRunner (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.007s"
+  },
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f4",
+    "behavior": "dotf worktree sweep reaps ONLY worktrees satisfying all fail-closed conditions, refusing dirty/unmerged/unexpired/young",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestSweepFailClosed",
+    "state": "passing",
+    "evidence": "=== RUN   TestSweepFailClosed\n--- PASS: TestSweepFailClosed (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.010s"
+  },
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f5",
+    "behavior": "dotf worktree sweep logs exact commit SHA before deleting branch, guaranteeing instant recovery of committed state",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestSweepLogsSHA",
+    "state": "passing",
+    "evidence": "=== RUN   TestSweepLogsSHA\n--- PASS: TestSweepLogsSHA (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.005s"
+  },
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f6",
+    "behavior": "dotf worktree sweep acquires exclusive cross-platform file lock, preventing concurrent races",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestSweepFileLock",
+    "state": "passing",
+    "evidence": "=== RUN   TestSweepFileLock\n--- PASS: TestSweepFileLock (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.005s"
+  },
+  {
+    "id": "CLI-075-dotf-worktree-lifecycle-f7",
+    "behavior": "dotf worktree done validates clean push status and tears down current worktree safely",
+    "verification": "go -C cli test -v ./internal/worktree/... -run TestDoneTeardown",
+    "state": "passing",
+    "evidence": "=== RUN   TestDoneTeardown\n--- PASS: TestDoneTeardown (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.008s"
+  }
+]
