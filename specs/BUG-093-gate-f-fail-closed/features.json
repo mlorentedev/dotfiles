@@ -9,30 +9,30 @@
   {
     "id": "BUG-093-gate-f-fail-closed-f2",
     "behavior": "On Linux every failure that prevents the SCAN answers true (Abs, EvalSymlinks, ReadDir); a per-process failure is three-valued and unreadable is counted, not folded into either answer",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSeesThroughASymlinkedWorktreePath|VanishedProcess|Uninspectable' -count=1",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSeesThroughASymlinkedWorktreePath|GateFRefusesWhenTheTargetCannotBeResolved|VanishedProcess|UninspectableProcessesAreCountedByTheRealScan' -count=1 -v 2>&1 | grep -c '^--- PASS'",
     "state": "verified",
-    "evidence": "symlink regression mutation-proven: removing EvalSymlinks fails TestGateFSeesThroughASymlinkedWorktreePath"
+    "evidence": "4 PASS; the EvalSymlinks and Uninspectable-producer branches are both mutation-proven (round 3 findings 7 and 4)"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f3",
-    "behavior": "On any non-Linux platform isHostProcessInside answers true for every input, and processDiscoverySupported is false",
+    "behavior": "On any non-Linux platform isHostProcessInside answers true for every input and processDiscoverySupported is false, and that path is EXECUTED rather than only compiled",
     "verification": "cd cli && GOOS=windows go vet ./internal/worktree/ && GOOS=darwin go vet ./internal/worktree/",
     "state": "verified",
-    "evidence": "GOOS=windows and GOOS=darwin vet clean; asserted at runtime by sweep_proc_other_test.go on the Windows leg"
+    "evidence": "vet clean for both; and the build-tag-flip proxy in verification.md RUNS sweep_proc_other.go on Linux -> rc=0. Round 3 finding 7: vet alone cannot see a runtime failure, which is how round 2 shipped a red Windows leg"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f4",
-    "behavior": "isCandidateForReap refuses when Gate f says a process is inside and allows when it says none is, both driven through a seam",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'GateF' -count=1",
+    "behavior": "gateF - the function production calls - refuses when Gate f says a process is inside and allows when it says none is; and the under-lock re-check in reapSingleWorktree refuses a process that arrives after the candidate scan",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFRefusesWhenProcessDiscoveryCannotAnswer|GateFAllowsAReapableWorktree|SweepRefusesWhenAProcessArrivesAfterTheGate|UninspectableProcessesDoNotBlock' -count=1 -v 2>&1 | grep -c '^--- PASS'",
     "state": "verified",
-    "evidence": "TestGateFRefusesWhenProcessDiscoveryCannotAnswer + TestGateFAllowsAReapableWorktreeWhenNothingIsInside, both PASS"
+    "evidence": "4 PASS. Round 3 finding 5: the previous tests pinned isCandidateForReap, which no production caller used; the wrapper is deleted and the re-check is now driven through SweepWithRunner with a false-then-true seam"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f5",
-    "behavior": "dotf worktree sweep reports absent process discovery, and a non-zero uninspectable count when the scan ran but could not see everything",
-    "verification": "grep -q 'no process-liveness check on this platform' cli/internal/cmd/worktree.go && grep -q 'could not be inspected, so this scan was partial' cli/internal/cmd/worktree.go",
+    "behavior": "dotf worktree sweep reports absent process discovery before its counts, and states Gate f's reach as coverage rather than as a partial-scan warning",
+    "verification": "grep -q 'no process-liveness check on this platform' cli/internal/cmd/worktree.go && grep -q 'Gate f reach:' cli/internal/cmd/worktree.go && ! grep -q 'so this scan was partial' cli/internal/cmd/worktree.go",
     "state": "verified",
-    "evidence": "the note is printed before the counts in newWorktreeSweepCmd"
+    "evidence": "the note precedes the counts in newWorktreeSweepCmd; the always-firing 'partial' warning is gone (round 3 finding 2). Asserted by grep knowingly - see verification.md, Accepted gaps"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f6",
@@ -43,9 +43,16 @@
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f7",
-    "behavior": "The real /proc traversal is tested against live child processes, not only through the seam",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSees|GateFDoesNotInvent|GateFMatches|IsNumericPID|Vanished' -count=1",
+    "behavior": "The real /proc traversal is tested against live child processes, including the negative half of the separator-anchored prefix check",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'GateFSees|GateFDoesNotInvent|GateFMatchesAProcessInASubdirectory|GateFDoesNotMatchASibling|IsNumericPID|Vanished|Uninspectable|ProcessDiscoveryIsAdvertised' -count=1 -v 2>&1 | grep -c '^--- PASS'",
     "state": "verified",
-    "evidence": "sweep_proc_linux_test.go: 6 tests spawning real children; round-1 review found this file did not exist"
+    "evidence": "10 PASS. Round 3 finding 3: the old sibling test asserted nothing and used t.Skip as its failure branch; it is now two tests with isolated roots and the naive-prefix mutation fails"
+  },
+  {
+    "id": "BUG-093-gate-f-fail-closed-f8",
+    "behavior": "Every mutation the round-3 review reported as surviving now fails the suite, and the harness reports ANCHOR-MISS rather than a result when a patch does not land",
+    "verification": "cd cli && go test ./internal/worktree/ -count=1 && grep -q 'ANCHOR-MISS' ../specs/BUG-093-gate-f-fail-closed/verification.md",
+    "state": "verified",
+    "evidence": "7 CAUGHT (5 round-3 survivors + 2 earlier regressions), 1 SURVIVED and declared (the filepath.Abs branch, unreachable by input). Full output in verification.md"
   }
 ]

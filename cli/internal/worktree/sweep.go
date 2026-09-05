@@ -92,26 +92,42 @@ type SweepReport struct {
 	// and those are different facts.
 	ProcessDiscovery bool `json:"process_discovery"`
 	// UninspectableProcesses is the largest number of processes any single
-	// worktree's scan could not read the cwd of — almost always another user's,
-	// since /proc/<pid>/cwd is readable only by its owner and root. Non-zero
-	// means every reap decision in this run rested on a partial scan. Reported
-	// rather than acted on: refusing on it would make sweep inert on Linux,
-	// because /proc/1/cwd is unreadable to every non-root caller.
+	// worktree's scan could not read the cwd of.
+	//
+	// It states Gate f's REACH; it is not an anomaly signal, and an earlier
+	// version of this comment claimed it was. The number is non-zero on every
+	// Linux machine by construction: /proc/<pid>/cwd is gated by
+	// ptrace_may_access, so a scan run as an ordinary user can never read
+	// root's processes, another user's, or same-uid ones that set
+	// PR_SET_DUMPABLE=0 (systemd --user, ssh-agent, browser sandboxes). One
+	// desktop measurement: 364 of 571 processes out of reach, 20 of them the
+	// caller's own. A count that can never be zero cannot warn about anything.
+	//
+	// Reported rather than acted on: refusing on it would make sweep
+	// permanently inert on Linux, which is the same trap as answering "nobody
+	// is inside" — it makes the tool useless instead of dangerous, but it makes
+	// it useless every single run.
 	UninspectableProcesses int `json:"uninspectable_processes"`
 }
 
 // GateFReading is what Gate f could actually establish about one worktree.
 //
 // It is a struct and not a bool because the scan has three outcomes, not two.
-// A process whose cwd cannot be read is neither inside nor outside: /proc/<pid>/cwd
-// is readable only by the process owner and root, so an ordinary user's scan
-// cannot see another user's cwd. Collapsing that into "not inside" is the
-// fail-open an adversarial review caught here; collapsing it into "inside"
-// would make sweep permanently inert, since /proc/1/cwd is unreadable to every
-// non-root caller. Reporting the count is the third option, and it matches what
-// ProcessDiscovery does one level up: make a partial answer legible as partial.
+// A process whose cwd cannot be read is neither inside nor outside: reading
+// /proc/<pid>/cwd is gated by ptrace_may_access, so an ordinary user's scan
+// cannot see root's cwd, another user's, or a same-uid process that made itself
+// non-dumpable. Collapsing that into "not inside" is the fail-open an
+// adversarial review caught here; collapsing it into "inside" would make sweep
+// permanently inert, since /proc/1/cwd is unreadable to every non-root caller.
+//
+// The third option is to keep the fact and be honest about what it is: a
+// statement of how far the gate can see, not a warning that something is wrong.
+// See the SweepReport field for the measurement.
 type GateFReading struct {
-	Inside        bool
+	Inside bool
+	// Uninspectable is a coverage figure, never a threshold. Nothing decides on
+	// it, because nothing can: an unreadable process stays unreadable however
+	// many of them there are.
 	Uninspectable int
 }
 
@@ -124,13 +140,14 @@ type GateFReading struct {
 // the CI does not have, which is how the defect this replaced survived review.
 var hostProcessInside = isHostProcessInside
 
-func isCandidateForReap(info Info, absCwd string) bool {
-	_, ok := gateF(info, absCwd)
-	return ok
-}
-
 // gateF returns the reading alongside the decision, so a caller that wants to
-// report how complete the scan was does not have to run it twice.
+// report how far the scan reached does not have to run it twice.
+//
+// This is the function production calls. It used to have a bool-returning
+// wrapper, isCandidateForReap, which no caller outside the tests used — so the
+// tests that pinned Gate f's refusal were pinning a function that could not
+// affect a deletion. Removed rather than kept for convenience: a test seam into
+// dead code reports coverage it does not have.
 func gateF(info Info, absCwd string) (GateFReading, bool) {
 	if info.State != StateReapable {
 		return GateFReading{}, false
