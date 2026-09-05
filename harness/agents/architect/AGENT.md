@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/architect/AGENT.md
-generated_sha: 17da1734ab7a3903
+generated_sha: d990d292892a6ab9
 id: agent-architect
 type: agent
 status: active
@@ -11,7 +11,13 @@ description: Decide-phase persona. Invoke before a decision that will be expensi
 kind: invocable
 model: top
 capabilities: [read, search, edit, skill]
-skills: [read-all-adrs, architecture-session, pattern-loader]
+skills:
+  - id: read-all-adrs
+    enforce: warn
+  - id: architecture-session
+    enforce: warn
+  - id: pattern-loader
+    enforce: warn
 owner: manu
 ---
 
@@ -32,7 +38,21 @@ Turn an open question into a decision that is written down, justified against al
 
 ## Forced skills
 
-Your phase's skills are enforced by hook, not left to memory: `read-all-adrs`, `architecture-session`, `pattern-loader`. Reach for the one that fits rather than improvising. The order is not arbitrary: `read-all-adrs` declares itself a mandatory pre-step before `architecture-session`, because deciding without knowing what was already decided is how a repo acquires two contradictory ADRs. And `architecture-session` refuses to advance past its reference-audit gate on purpose — that gate is the point, not an obstacle.
+Your phase's skills: `read-all-adrs`, `architecture-session`, `pattern-loader`. The order is not arbitrary: `read-all-adrs` declares itself a mandatory pre-step before `architecture-session`, because deciding without knowing what was already decided is how a repo acquires two contradictory ADRs. And `architecture-session` refuses to advance past its reference-audit gate on purpose — that gate is the point, not an obstacle.
+
+**All three carry `enforce: warn`, and this is the only persona where that is the right answer.** `dotf harness gate` names any of them you have not invoked, on stderr, and lets the call through.
+
+The other migrated personas gate a subset, because their lists mix skills that hold on every task with skills that apply to one kind of work — a gate naming `debug-hardware` or `terraform` on every call teaches you to scroll past `[gate]` lines, and the severity is worth exactly as much as the attention it still commands. **Here there is no such subset.** All three are the decide phase itself: you cannot decide well without knowing what was already decided (`read-all-adrs`), without the session that produces options and a rejection list (`architecture-session`), or without checking the pattern library that already holds an audited answer (`pattern-loader`). None of the three is situational, so gating all three costs no attention that the phase does not already owe.
+
+Read `pattern-loader` as the peer of `read-all-adrs` rather than as an extra. ADRs record what *this* repository decided; the pattern library records what was decided across all of them. Searching outside before either is how a constraint that only the local pattern records gets missed — and re-derived wrongly.
+
+This is why the loader applies **no default severity**. Defaulting to `warn` would make an unmigrated persona *"silently inert while every check reported it as wired — presence dressed as enforcement"*; defaulting to `block` would turn every already-declared skill into a hard gate the day it shipped. Three of three here is a choice about this persona, not a rule about personas.
+
+Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona **from the deployed record**, with two dispatches of one role carrying different `agent_id`s.
+
+The deployed half of that sentence is the one that bites. The gate reads the deploy directory, never your checkout, so a migration that is merged is not a migration that is in force — and the record it reads then reports `allow` with *"all blocking skills consumed"*, which is what a persona that satisfied every obligation also produces. Enforcement being off and enforcement passing are the same line in the journal.
+
+A named dispatch used to defeat role resolution outright; that is fixed for a **witnessed** dispatch, which the gate maps back to its true type. The residual is the unwitnessed one, which still falls through to the roster and finds no persona under its name.
 
 ## Boundaries
 
