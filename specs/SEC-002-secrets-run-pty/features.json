@@ -1,0 +1,37 @@
+[
+  {
+    "id": "SEC-002-secrets-run-pty-f1",
+    "behavior": "The child gets a pty when the parent has a terminal, and a pipe when it does not",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRunChildPTY_ChildSeesATerminal|TestRunChild_ChildSeesAPipe'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f2",
+    "behavior": "A secret routed through the pty is redacted before reaching the parent's stdout, including when split across two of the child's writes",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestRunChildPTY_RedactsASecretSplitAcrossWrites",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f3",
+    "behavior": "The hold-back is prefix-aware: a frame whose tail is not a proper prefix of any secret is released on the write, not withheld until the next one",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRedactWriter_ReleasesFrameWithNoSecretPrefixImmediately|TestRedactWriter_HoldsBackATrailingSecretPrefix'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f4",
+    "behavior": "The #1459 introspection guard runs on the pty path too, so the new branch is not a second way to dump the environment",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestRunChildPTY_HonoursTheIntrospectionGuard",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-002-secrets-run-pty-f5",
+    "behavior": "The Windows build keeps the pipe path and compiles clean",
+    "verification": "cd cli && GOOS=windows go vet ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]
