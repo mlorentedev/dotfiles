@@ -18,28 +18,43 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 CLI="$(cd "$HERE/../../cli" && pwd)"
 
+# Preflight, because the failure mode without it is a LIE rather than an error.
+# This script once used `path` as a local variable name. Under zsh `path` is a
+# special array tied to $PATH, so assigning a string to it destroyed the command
+# search path -- and every subsequent `cp` and `md5sum` vanished, which the loop
+# below reports as ANCHOR-MISS: "the pattern was not found". A broken
+# environment then reads as a mutation nobody could apply. `zsh -n` passes
+# clean, so nothing catches it but running it.
+for _cmd in md5sum cut cp mv python3 go grep sed; do
+    if ! command -v "$_cmd" >/dev/null 2>&1; then
+        printf 'PREFLIGHT FAILED: %s is not on PATH.\n' "$_cmd" >&2
+        printf 'Every result below would read as ANCHOR-MISS, which is not what happened.\n' >&2
+        exit 2
+    fi
+done
+
 pass=0
 fail=0
 expected_survivors=0
 
 run_mutation() {
     expect="$1"; label="$2"; file="$3"; from="$4"; to="$5"
-    path="$CLI/$file"
-    before="$(md5sum "$path" | cut -d' ' -f1)"
-    cp "$path" "$path.bak"
+    target="$CLI/$file"
+    before="$(md5sum "$target" | cut -d' ' -f1)"
+    cp "$target" "$target.bak"
 
-    python3 - "$path" "$from" "$to" <<'PY'
+    python3 - "$target" "$from" "$to" <<'PY'
 import sys
 p, a, b = sys.argv[1], sys.argv[2], sys.argv[3]
 s = open(p).read()
 open(p, 'w').write(s.replace(a, b, 1))
 PY
 
-    after="$(md5sum "$path" | cut -d' ' -f1)"
+    after="$(md5sum "$target" | cut -d' ' -f1)"
     if [ "$before" = "$after" ]; then
         printf '  ANCHOR-MISS  %s\n' "$label"
         printf '               the pattern was not found, so nothing was tested\n'
-        mv "$path.bak" "$path"
+        mv "$target.bak" "$target"
         fail=$((fail + 1))
         return
     fi
@@ -48,7 +63,7 @@ PY
     # verification's exit code through one is how a failing command passes.
     out="$(cd "$CLI" && go test ./internal/worktree/ -count=1 2>&1)"
     rc=$?
-    mv "$path.bak" "$path"
+    mv "$target.bak" "$target"
 
     if [ "$rc" -ne 0 ]; then
         if [ "$expect" = "CAUGHT" ]; then

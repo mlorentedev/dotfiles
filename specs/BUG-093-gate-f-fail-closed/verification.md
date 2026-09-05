@@ -150,6 +150,14 @@ and makes that measurement its first task.
   (it constructs its own `RealSweepRunner`), and adding one to assert print ordering buys less
   than it costs. The grep is honest about being a grep; `features.json` f5 tracks the new wording.
 - **Mount namespaces** — #1523, above.
+- **The mutation harness itself carried a silent zsh defect**, found by running it rather than
+  reading it: it used `path` as a local variable, and in zsh `path` is tied to `$PATH`, so every
+  `cp`/`md5sum`/`mv` inside the function vanished and all 8 mutations reported **ANCHOR-MISS** —
+  "the pattern was not found" — when the real cause was that the tools had ceased to exist. No
+  corruption resulted (`cp` failed before any `.bak` was written), which was luck and not design.
+  Renamed, and a preflight now asserts its tools exist so a broken environment exits loudly
+  instead of answering the question wrongly. Four other sites in the repo have the same defect,
+  latent; filed as **#1530** with the measurement, plus a doc row in `.claude/CLAUDE.md`.
 - **`TestUninspectableProcessesAreCountedByTheRealScan` skips under root**, which is correct: the
   counter genuinely has nothing to count there. The gap that mattered was **visibility** — `go test`
   without `-v` prints neither a skip nor a pass, so a test that stopped running is the same colour
