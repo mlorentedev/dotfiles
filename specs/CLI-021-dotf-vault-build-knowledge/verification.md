@@ -1,7 +1,7 @@
 ---
 id: "CLI-021-dotf-vault-build-knowledge"
 type: spec
-status: draft
+status: implementing
 created: "2026-08-08"
 issue: "mlorentedev/dotfiles#490"
 tags: [spec, verification]
@@ -27,16 +27,38 @@ skipping — because a shell always knows its own `$SCRIPT_DIR`; that path is co
 `session_start.go`'s own separate `vault-health.sh` exec (SessionStart brief) are untouched, per this
 increment's build-beside scope.
 
-**Increment 3 — `dotf vault maintain`:** not started
+**Increment 3 — `dotf vault maintain`:** landed — `cli/internal/vault/maintain.go` +
+`cli/internal/cmd/vault_maintain.go`. **Not golden-characterized, deliberately** (rationale at the
+head of `tasks.md` §4): the twin is a 52-line wrapper around two subcommands whose byte-parity is
+already proven by increments 1 and 2, so a third fixture scheme would re-measure the same thing.
+The wrapper's own behaviours are covered by 22 table tests
+(`cli/internal/vault/maintain_test.go`) and 4 end-to-end bats cases against the built binary
+(`tests/vault-maintenance-weekly.bats`, 17 total in the file alongside the 13 shell cases).
+
+Composition is **in-process**, which removes the twin's documented cron failure mode rather than
+reproducing it, and the fourth bats case asserts that structurally by running under
+`PATH=/usr/bin:/bin`.
+
+An end-to-end run against an empty home and an empty vault, with no `obsidian` on `PATH`, produces
+both sections in order, the GNU-`date`-shaped stamps, `Vault health: FAILED — one or more checks`
+on stdout, and **exit 0** — the exit-code decision working, not asserted.
 
 ## Test status
 
-- Golden characterization (#672 / CLI-031): captured for both crystallize and health.
+- Golden characterization (#672 / CLI-031): captured for crystallize and health. **Not** for
+  maintain, by the reasoning above — recorded as a decision, not an omission.
 - Go/shell parity suites: `tests/knowledge-crystallize-go-parity.bats` (13/13, `help` excluded —
   documented), `tests/vault-health-go-parity.bats` (16/16).
-- Table-driven units: `cli/internal/vault/crystallize_test.go`, `cli/internal/vault/health_test.go`.
-- `test-windows` CI: unchanged by this spec so far — `GOOS=windows go vet ./...` passes for both
-  increments' code, but neither has been run on an actual Windows box.
+- Table-driven units: `crystallize_test.go`, `health_test.go`, `maintain_test.go`.
+- **Mutation-verified for increment 3**, with the harness proving each mutation LANDED before
+  believing the red (lesson 267 — a mutation that silently fails to apply reads as a passing test):
+  four mutations, four kills, each by the test named for it. Detail in `tasks.md` §4.
+- `GOOS=windows go vet ./...`, `go vet ./...`, `go build ./...`, and the pinned
+  `golangci-lint` (v2.12.2, matching `versions.conf`) all clean.
+- `test-windows` CI: none of the three increments has been run on an actual Windows box. The
+  Windows log path (`%LOCALAPPDATA%`) is unit-tested from Linux via `logFileFor`, and the
+  PowerShell toast in `NotifyDesktop` is **unexercised anywhere** — it is fire-and-forget by
+  design, so a failure is silent by construction. Stated as a gap, not covered.
 
 ## The proof that matters most here
 

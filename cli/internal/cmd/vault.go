@@ -45,6 +45,7 @@ Subcommands:
 	cmd.AddCommand(newVaultProjectCmd())
 	cmd.AddCommand(newVaultCrystallizeCmd())
 	cmd.AddCommand(newVaultHealthCmd())
+	cmd.AddCommand(newVaultMaintainCmd())
 	cmd.AddCommand(newSearchCmd())
 	return cmd
 }
@@ -59,11 +60,20 @@ Subcommands:
 //
 // Built beside the twins in CLI-021, then cut over in CLI-050 (#1269): the
 // shell/PowerShell pair is deleted, every caller repoints here, and this is
-// the sole implementation. `vault health` and `vault maintain` (increments 2
-// and 3 of #490) are still unbuilt, and the rest of the cluster
-// (vault-health.sh, vault-maintenance-weekly.{sh,ps1}, obs-cli, the spec-gate
-// scripts) is still shell — that full cutover is CLI-023 (#492), blocked on
-// those plus CLI-022.
+// the sole implementation.
+//
+// All three of #490's increments are now built — crystallize (this file),
+// health (vault_health.go) and maintain (vault_maintain.go). Only crystallize
+// is CUT OVER; the other two are built beside twins that are still the
+// canonical invocation (scripts/vault-health.sh and
+// scripts/vault-maintenance-weekly.{sh,ps1}, the latter still wired to cron at
+// setup-linux.sh:1605 and to Task Scheduler at setup-windows.ps1:2185). That
+// cutover, plus the rest of the cluster (obs-cli, the spec-gate scripts), is
+// CLI-023 (#492), blocked on CLI-022.
+//
+// This comment previously said health and maintain were "still unbuilt" while
+// health was registered forty lines below it. Lessons 256/257: probe the
+// target, never trust a block's own comment about itself.
 func newVaultCrystallizeCmd() *cobra.Command {
 	var all bool
 

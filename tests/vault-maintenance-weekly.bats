@@ -174,3 +174,118 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"Log written to"* ]]
 }
+
+# --- The Go path: `dotf vault maintain` (CLI-021 increment 3, #490) ---
+#
+# BUILT BESIDE the script above, which is still what cron runs
+# (setup-linux.sh:1605) — the cutover is CLI-023 (#492). So both implementations
+# are live and both are exercised here.
+#
+# Deliberately NOT a golden-parity suite, unlike increments 1 and 2. The twin's
+# output is a timestamped log wrapping two subcommands whose byte-parity is
+# already proven by knowledge-crystallize-go-parity.bats and
+# vault-health-go-parity.bats; re-proving it through a third fixture scheme
+# would measure the same thing a third time. What is left to characterize is
+# the WRAPPER — log location, section framing, exit status — and those are
+# behaviours. The unit-level seams (issue regex, notification threshold, the
+# per-OS log path) are table-tested in cli/internal/vault/maintain_test.go.
+#
+# Skips (never fails) when the Go toolchain is absent, so a shell-only checkout
+# still runs the rest of this file — same reasoning as the two parity suites
+# (#807 / BUG-055).
+
+_build_dotf_maintain() {
+    command -v go >/dev/null 2>&1 || skip "go toolchain not installed"
+    DOTF_BIN="${BATS_FILE_TMPDIR:-$TMP}/dotf-maintain"
+    if [ ! -x "$DOTF_BIN" ]; then
+        # A missing toolchain skips (above); a toolchain that FAILS to build is
+        # a real defect and must fail, not read as harmless skips.
+        ( cd "$BATS_TEST_DIRNAME/../cli" && go build -o "$DOTF_BIN" ./cmd/dotf ) || return 1
+    fi
+    export DOTF_BIN
+    # An empty HOME: no ~/.claude/projects, so crystallize discovers nothing.
+    # An empty VAULT_DIR and no `obsidian` on PATH: health degrades exactly as
+    # it does on a headless box. No vault, no network, no desktop bus touched.
+    export FAKE_HOME="$TMP/gohome"
+    export FAKE_VAULT="$TMP/govault"
+    mkdir -p "$FAKE_HOME" "$FAKE_VAULT"
+    # A no-op notify-send FIRST on PATH, so the notification branch can never
+    # reach the real desktop bus — the leak tests/golden/vault-health guards
+    # against by replacing PATH rather than extending it.
+    cat > "$TMP/notify-send" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$TMP/notify-send"
+}
+
+_go_log() { printf '%s/.local/share/vault-maintenance/latest.log' "$FAKE_HOME"; }
+
+@test "dotf vault maintain writes the log at the twin's location and reports its path" {
+    _build_dotf_maintain
+    run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
+        "$DOTF_BIN" vault maintain
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Log written to"* ]]
+    # Same path the .sh has always written, because a human looks for the log by
+    # path and the cutover must not move it.
+    [ -f "$(_go_log)" ]
+}
+
+@test "dotf vault maintain log captures both maintenance sections in order" {
+    _build_dotf_maintain
+    run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
+        "$DOTF_BIN" vault maintain
+    [ "$status" -eq 0 ]
+    log="$(_go_log)"
+    grep -qF 'dotf vault crystallize --all' "$log"
+    grep -qF 'vault-health' "$log"
+    grep -qF '=== Done:' "$log"
+    # Order, not mere presence: health after crystallize, footer after both.
+    cryst=$(grep -n 'dotf vault crystallize --all' "$log" | head -1 | cut -d: -f1)
+    health=$(grep -n -- '--- vault-health ---' "$log" | head -1 | cut -d: -f1)
+    done_line=$(grep -n '=== Done:' "$log" | head -1 | cut -d: -f1)
+    [ "$cryst" -lt "$health" ]
+    [ "$health" -lt "$done_line" ]
+}
+
+@test "dotf vault maintain exits 0 when health reports findings (a finding is not a failure)" {
+    # No obsidian on PATH, so health cannot pass: it reports and the report
+    # lands in the log. The RUN still did its job, so the status stays 0 —
+    # otherwise cron mails the owner every week the GUI happened to be closed.
+    # This is the guard for that decision (spec tasks.md §4), not an accident.
+    _build_dotf_maintain
+    run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
+        "$DOTF_BIN" vault maintain
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Vault health:"* ]]
+    # No `|| true` here: an assertion that cannot fail is not an assertion. The
+    # log genuinely carries issue lines under an empty HOME (crystallize warns
+    # twice that it found no MEMORY.md), so this passes on its own merits.
+    #
+    # `-i` is load-bearing and was missing on the first draft: the twin counts
+    # with `grep -ciE` and the Go port with a `(?i)` regex, but the lines in the
+    # log are `[WARNING]` in caps. Dropping the flag made this assertion false,
+    # which the removed `|| true` had been hiding.
+    grep -qiE 'warning|fail|action|stale' "$(_go_log)"
+}
+
+@test "dotf vault maintain needs no PATH hardening under a cron-minimal PATH" {
+    # The .sh MUST export PATH="$HOME/.local/bin:$PATH" or its bare `dotf` call
+    # silently no-ops under `|| true` every Sunday (its lines 12-16, guarded at
+    # line 147 above). The Go port composes IN-PROCESS, so there is no
+    # subprocess whose resolution can fail — this asserts that structurally, by
+    # running with a PATH that contains neither ~/.local/bin nor the build dir.
+    #
+    # $TMP stays on PATH for the notify-send stub ONLY. It is neither
+    # ~/.local/bin nor the build dir, so the structural claim is untouched, and
+    # without it /usr/bin/notify-send resolves and pops a real balloon on the
+    # developer's desktop every time this suite runs.
+    _build_dotf_maintain
+    run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
+        "$DOTF_BIN" vault maintain
+    [ "$status" -eq 0 ]
+    log="$(_go_log)"
+    refute_grep_fixed 'command not found' "$log"
+    grep -qF '=== Done:' "$log"
+}
