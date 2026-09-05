@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,7 +18,10 @@ type GitRunner interface {
 	IsOrphan(repoRoot, branch string) (bool, error)
 }
 
-type RealGitRunner struct{}
+type RealGitRunner struct {
+	prCacheMu sync.Mutex
+	prCache   map[string]bool
+}
 
 func (r *RealGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
 	cmd := exec.Command("git", "-C", repoRoot, "worktree", "list", "--porcelain")
@@ -34,7 +38,17 @@ func (r *RealGitRunner) IsDirty(worktreePath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("git status: %w", err)
 	}
-	return len(strings.TrimSpace(string(out))) > 0, nil
+	if len(strings.TrimSpace(string(out))) > 0 {
+		return true, nil
+	}
+
+	// Fail-closed data loss guard: check for non-disposable gitignored local content (e.g. .env, scratchpad notes)
+	ignoredCmd := exec.Command("git", "-C", worktreePath, "status", "--ignored", "--porcelain")
+	ignoredOut, err := ignoredCmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("git status --ignored: %w", err)
+	}
+	return HasNonDisposableIgnored(string(ignoredOut)), nil
 }
 
 // ParseGitHubSlug extracts owner/repo from SSH or HTTPS GitHub URLs.
@@ -54,19 +68,37 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 	if branch == "" {
 		return false, nil
 	}
-	// First check git merge-base --is-ancestor <branch> origin/main (or default branch)
-	cmdBase := exec.Command("git", "-C", repoRoot, "rev-parse", "--abbrev-ref", "origin/HEAD")
-	baseRef := "origin/main"
-	if out, err := cmdBase.Output(); err == nil && len(strings.TrimSpace(string(out))) > 0 {
-		baseRef = strings.TrimSpace(string(out))
-	}
 
-	ancestorCmd := exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", branch, baseRef)
-	if ancestorCmd.Run() == nil {
+	r.prCacheMu.Lock()
+	if r.prCache != nil {
+		if merged, ok := r.prCache[branch]; ok {
+			r.prCacheMu.Unlock()
+			return merged, nil
+		}
+	}
+	r.prCacheMu.Unlock()
+
+	// Fast path: check local git merge-base --is-ancestor <branch> origin/HEAD
+	if isBranchAncestor(repoRoot, branch) {
+		r.cachePRResult(branch, true)
 		return true, nil
 	}
 
-	// Also check if GitHub PR is merged using gh CLI
+	merged := queryGHPRMerged(repoRoot, branch)
+	r.cachePRResult(branch, merged)
+	return merged, nil
+}
+
+func isBranchAncestor(repoRoot, branch string) bool {
+	baseRef := resolveBaseRef(repoRoot)
+	if baseRef == "" {
+		return false
+	}
+	ancestorCmd := exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", branch, baseRef)
+	return ancestorCmd.Run() == nil
+}
+
+func queryGHPRMerged(repoRoot, branch string) bool {
 	slug := ""
 	if out, err := exec.Command("git", "-C", repoRoot, "config", "--get", "remote.origin.url").Output(); err == nil {
 		slug = ParseGitHubSlug(string(out))
@@ -82,12 +114,18 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 
 	if out, err := ghCmd.Output(); err == nil {
 		state := strings.TrimSpace(string(out))
-		if state == "MERGED" {
-			return true, nil
-		}
+		return state == "MERGED"
 	}
+	return false
+}
 
-	return false, nil
+func (r *RealGitRunner) cachePRResult(branch string, merged bool) {
+	r.prCacheMu.Lock()
+	defer r.prCacheMu.Unlock()
+	if r.prCache == nil {
+		r.prCache = make(map[string]bool)
+	}
+	r.prCache[branch] = merged
 }
 
 func (r *RealGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
@@ -163,6 +201,7 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		}
 
 		absPath, _ := filepath.Abs(raw.Path)
+		// Git invariant: git worktree list --porcelain always lists the main worktree as the first entry (index 0).
 		isMain := (i == 0)
 		isCurrent := (absPath == absRepoRoot)
 

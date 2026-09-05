@@ -22,10 +22,10 @@
   },
   {
     "id": "CLI-075-dotf-worktree-lifecycle-f4",
-    "behavior": "dotf worktree sweep reaps ONLY worktrees satisfying all fail-closed conditions, refusing dirty/unmerged/unexpired/young",
-    "verification": "go -C cli test -v ./internal/worktree/... -run \"TestSweepFailClosed|TestSweepTOCTOU\"",
+    "behavior": "dotf worktree sweep reaps ONLY worktrees satisfying all fail-closed conditions, refusing dirty/unmerged/unexpired/young and preserving gitignored scratchpad files",
+    "verification": "go -C cli test -v ./internal/worktree/... -run \"TestSweepFailClosed|TestSweepTOCTOU|TestSweepPreservesGitignoredLocalFiles\"",
     "state": "passing",
-    "evidence": "=== RUN   TestSweepFailClosed\n--- PASS: TestSweepFailClosed (0.00s)\n=== RUN   TestSweepTOCTOUDirtyErrorFailsClosed\n--- PASS: TestSweepTOCTOUDirtyErrorFailsClosed (0.00s)\n=== RUN   TestSweepTOCTOUUnmergedFailsClosed\n--- PASS: TestSweepTOCTOUUnmergedFailsClosed (0.00s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.008s"
+    "evidence": "=== RUN   TestSweepFailClosed\n--- PASS: TestSweepFailClosed (0.00s)\n=== RUN   TestSweepTOCTOUDirtyErrorFailsClosed\n--- PASS: TestSweepTOCTOUDirtyErrorFailsClosed (0.00s)\n=== RUN   TestSweepTOCTOUUnmergedFailsClosed\n--- PASS: TestSweepTOCTOUUnmergedFailsClosed (0.00s)\n=== RUN   TestSweepPreservesGitignoredLocalFiles\n--- PASS: TestSweepPreservesGitignoredLocalFiles (0.25s)\nPASS\nok  \tgithub.com/mlorentedev/dotfiles/cli/internal/worktree\t0.260s"
   },
   {
     "id": "CLI-075-dotf-worktree-lifecycle-f5",

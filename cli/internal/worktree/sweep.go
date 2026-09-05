@@ -181,8 +181,12 @@ func executeWorktreeReap(repoRoot string, info Info, runner SweepRunner) bool {
 	return true
 }
 
-func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time.Time) bool {
-	// TOCTOU checks under lock: clean status, merge status, lease expiration
+func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time.Time, absCwd string) bool {
+	// TOCTOU checks under lock: host process/cwd guard, clean status, merge status, lease expiration
+	absWT, err := filepath.Abs(info.Path)
+	if err != nil || absWT == absCwd || isHostProcessInside(absWT) {
+		return false
+	}
 	if isDirty(info.Path, runner) {
 		return false
 	}
@@ -230,7 +234,7 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 			continue
 		}
 
-		if reapSingleWorktree(opts.RepoRoot, info, runner, now) {
+		if reapSingleWorktree(opts.RepoRoot, info, runner, now, absCwd) {
 			report.Reaped = append(report.Reaped, info)
 		} else {
 			report.SkippedCount++

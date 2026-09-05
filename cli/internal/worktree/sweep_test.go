@@ -2,7 +2,9 @@ package worktree
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -307,4 +309,114 @@ func (r *toctouMergeRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 	}
 	// Call 2 is during Sweep TOCTOU check under lock (simulate new commit arrived, no longer merged)
 	return false, nil
+}
+
+func testSweepScratchpadPreserved(t *testing.T, repoDir, wtDir, lockPath string, now time.Time) {
+	envFile := filepath.Join(wtDir, ".env")
+	if err := os.WriteFile(envFile, []byte("SECRET=precious_notes"), 0o644); err != nil {
+		t.Fatalf("writing .env: %v", err)
+	}
+
+	// Verify standard git status --porcelain is empty
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = wtDir
+	out, err := cmd.Output()
+	if err != nil || len(strings.TrimSpace(string(out))) != 0 {
+		t.Fatalf("expected git status --porcelain to be empty, got: %s", string(out))
+	}
+
+	runner := &RealSweepRunner{}
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot: repoDir,
+		LockPath: lockPath,
+	}, runner, now)
+	if err != nil {
+		t.Fatalf("sweep error: %v", err)
+	}
+
+	if len(report.Reaped) != 0 {
+		t.Fatalf("expected 0 worktrees reaped when .env is present, got %d", len(report.Reaped))
+	}
+
+	content, err := os.ReadFile(envFile)
+	if err != nil || string(content) != "SECRET=precious_notes" {
+		t.Fatalf("expected .env to be preserved, err=%v content=%s", err, string(content))
+	}
+}
+
+func testSweepDisposableReaped(t *testing.T, repoDir, wtDir, lockPath string, now time.Time) {
+	envFile := filepath.Join(wtDir, ".env")
+	_ = os.Remove(envFile)
+
+	nodeModulesDir := filepath.Join(wtDir, "node_modules")
+	_ = os.MkdirAll(nodeModulesDir, 0o755)
+	_ = os.WriteFile(filepath.Join(nodeModulesDir, "pkg.json"), []byte("{}"), 0o644)
+
+	runner := &RealSweepRunner{}
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot: repoDir,
+		LockPath: lockPath + ".2",
+	}, runner, now)
+	if err != nil {
+		t.Fatalf("second sweep error: %v", err)
+	}
+
+	if len(report.Reaped) != 1 {
+		t.Fatalf("expected worktree with disposable cache to be reaped, got %d", len(report.Reaped))
+	}
+}
+
+func TestSweepPreservesGitignoredLocalFiles(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+
+	// Add .gitignore with .env, node_modules, and metadata file
+	gitIgnorePath := filepath.Join(repoDir, ".gitignore")
+	_ = os.WriteFile(gitIgnorePath, []byte(".env\n*.tmp\nnode_modules/\n.dotf-worktree.json\n"), 0o644)
+	cmd := exec.Command("git", "add", ".gitignore")
+	cmd.Dir = repoDir
+	_ = cmd.Run()
+	cmd = exec.Command("git", "commit", "-m", "add gitignore")
+	cmd.Dir = repoDir
+	_ = cmd.Run()
+
+	// Update feat/test to include gitignore and remain ancestor of main
+	cmd = exec.Command("git", "merge", "main")
+	cmd.Dir = wtDir
+	_ = cmd.Run()
+	cmd = exec.Command("git", "merge", "feat/test")
+	cmd.Dir = repoDir
+	_ = cmd.Run()
+
+	now := time.Now()
+	_ = SaveMetadata(wtDir, Metadata{
+		ReapOK:         true,
+		CreatedAt:      now.Add(-2 * time.Hour),
+		LeaseExpiresAt: now.Add(-1 * time.Hour),
+	})
+
+	testSweepScratchpadPreserved(t, repoDir, wtDir, lockPath, now)
+	testSweepDisposableReaped(t, repoDir, wtDir, lockPath, now)
+}
+
+func TestPRQueryCache(t *testing.T) {
+	runner := &RealGitRunner{}
+	// Pre-seed cache
+	runner.cachePRResult("feat/cached", true)
+
+	merged, err := runner.IsPRMerged("/non/existent/repo", "feat/cached")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !merged {
+		t.Errorf("expected cached true value for feat/cached")
+	}
+
+	runner.cachePRResult("feat/not-merged", false)
+	merged2, err := runner.IsPRMerged("/non/existent/repo", "feat/not-merged")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if merged2 {
+		t.Errorf("expected cached false value for feat/not-merged")
+	}
 }

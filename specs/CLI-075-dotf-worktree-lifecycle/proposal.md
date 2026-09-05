@@ -41,10 +41,10 @@ Introduces the `dotf worktree` command suite in Go under `cli/internal/worktree/
    - Reaps **ONLY** worktrees that satisfy **ALL** of the following positive fail-closed gates:
      a. Explicit metadata exists in `.dotf-worktree.json` with `reap_ok: true` (defaults to true on creation; operator/agent can set to false as a hold).
      b. Authoritative lease expired: current time > `lease_expires_at`. This is the primary liveness signal, protecting containerized and background agents.
-     c. Working tree is 100% clean (`git status --porcelain` is empty, verified initially and re-checked under lock immediately prior to deletion).
-     d. Positive merge confirmation: branch is associated with a GitHub PR whose state is explicitly `MERGED`, OR its commit tip is an ancestor of the repository's default branch (`git merge-base --is-ancestor <branch> <base>`). If upstream is `gone` but no merged PR exists and it is not an ancestor, it is classified as `ORPHAN` and refused.
+     c. Working tree is 100% clean (`git status --porcelain` is empty AND no non-disposable gitignored local content exists, e.g. `.env` or scratchpad notes; verified initially and re-checked under lock immediately prior to deletion; standard disposable build caches like `node_modules/`, `target/`, `.venv/` and `.dotf-worktree.json` are permitted).
+     d. Positive merge confirmation: branch is associated with a GitHub PR whose state is explicitly `MERGED`, OR its commit tip is an ancestor of the repository's default branch (`git merge-base --is-ancestor <branch> <base>`). PR queries are cached within runner invocations. If upstream is `gone` but no merged PR exists and it is not an ancestor, it is classified as `ORPHAN` and refused.
      e. Minimum age guard: creation time is > 15 minutes ago (eliminates the zero-diff fresh branch false positive).
-     f. Host-side defensive check: neither the sweep command's own cwd nor any host terminal process has cwd inside the target path (host process scanning supported on Linux `/proc`; sweep command cwd check enforced cross-platform).
+     f. Host-side defensive check: neither the sweep command's own cwd nor any host terminal process has cwd inside the target path (host process scanning supported on Linux `/proc`; sweep command cwd check enforced cross-platform; evaluated initially and re-verified under lock).
    - Reaping action: executes `git worktree remove <path>`, logs the previous commit SHA to stderr before `git branch -D <branch>` (ensuring instant recovery of committed state via `git branch <name> <sha>`), and executes `git worktree prune`.
 
 4. **Self-Service Teardown (`dotf worktree done`):**
