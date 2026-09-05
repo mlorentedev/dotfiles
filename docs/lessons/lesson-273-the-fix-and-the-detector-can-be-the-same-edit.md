@@ -56,7 +56,7 @@ was found by reading**:
 | What | What caught it |
 |---|---|
 | `render_region` written as a pipe swallowed a `return 1` | three unrelated coverage tests |
-| Two of three `! grep -q` in a new bats test asserted nothing — bash exempts `!` from `set -e` | the repo's own `guard-bats-negation.bats` (#1034) |
+| Two of three `! grep -q` in a new bats test asserted nothing — bash exempts `!` from `set -e` | the repo's own `tests/guard-bats-negation.bats` (#1034) |
 | Changing a return type broke the `//go:build !linux` test file; `go test ./...` on Linux stayed green because it never compiles it | `GOOS=darwin go vet` |
 | A new wikilink guard reported correct state as broken — two link conventions exist, it knew one | running against the real tree, not a fixture |
 | A mitigation counter that is non-zero on **every** Linux machine, and therefore signals nothing | the round-2 adversarial reviewer |
