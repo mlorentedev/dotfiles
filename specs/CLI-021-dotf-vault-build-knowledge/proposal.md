@@ -1,7 +1,7 @@
 ---
 id: "CLI-021-dotf-vault-build-knowledge"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-08-08"
 issue: "mlorentedev/dotfiles#490"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -102,7 +102,12 @@ independently shippable and the atomic-PR cap will not hold all of them at once.
 - [ ] The HARNESS-029 invariant from BUG-060 holds in the Go implementation, proven by a test that
       fails against a deliberately naive append.
 - [ ] Table-driven unit tests for the path encode/decode and the section-insertion logic.
-- [ ] **No twin deleted, no caller repointed** — `git diff` touches only `cli/` and `specs/`.
+- [ ] **No twin deleted, no caller repointed.** Stated as "`git diff` touches only `cli/` and
+      `specs/`" when this was written, which increments 1 and 2 both broke honestly — a twin port
+      needs its characterization tests, and those live in `tests/`. Corrected to what
+      `verification.md` has actually been enforcing all along, which is the negative that matters:
+      **nothing under `scripts/`, `setup-*.{sh,ps1}`, or the vault.** Those are where the cutover
+      would leak, and the leak is what splitting PR5 from PR7 exists to prevent.
 - [ ] The shell scripts remain the canonical invocation; docs and skills unchanged.
 
 ## References
