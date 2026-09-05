@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -501,11 +502,29 @@ func newSecretsRunCmd() *cobra.Command {
 				return err
 			}
 			childEnv := append(stripBackendAuth(os.Environ()), injected...)
-			stdout := newRedactWriter(cmd.OutOrStdout(), injected)
-			stderr := newRedactWriter(cmd.ErrOrStderr(), injected)
-			code, err := runChild(childArgv, childEnv, cmd.InOrStdin(), stdout, stderr)
-			_ = stdout.Flush()
-			_ = stderr.Flush()
+
+			// SEC-002. exec.Cmd hands a child a real descriptor only when the
+			// writer's dynamic type is *os.File; a redactWriter never is, so
+			// every child got an os.Pipe and every INTERACTIVE child saw a
+			// non-TTY stdout and declined to start. Where this process actually
+			// owns a terminal, give the child a pty. Everywhere else -- CI, a
+			// pipeline, `pi -p`, the whole reviewer pool -- nothing changes.
+			var code int
+			if wantsInteractiveChild() {
+				// ONE writer on this path, because a pty merges the child's
+				// stdout and stderr onto a single stream exactly as a terminal
+				// does. Two writers would also each hold their own tail, and a
+				// secret could interleave across the boundary between them.
+				merged := newRedactWriter(cmd.OutOrStdout(), injected)
+				code, err = runChildPTY(childArgv, childEnv, merged)
+				_ = merged.Flush()
+			} else {
+				stdout := newRedactWriter(cmd.OutOrStdout(), injected)
+				stderr := newRedactWriter(cmd.ErrOrStderr(), injected)
+				code, err = runChild(childArgv, childEnv, cmd.InOrStdin(), stdout, stderr)
+				_ = stdout.Flush()
+				_ = stderr.Flush()
+			}
 			if err != nil {
 				return err
 			}
@@ -609,6 +628,30 @@ func resolveOnly(reg *secrets.Registry, s string) (map[string]bool, error) {
 // cannot be caught, and forwarding the rest (SIGHUP, SIGWINCH, job control)
 // would mean re-implementing a shell's terminal handling for a wrapper that owns
 // no terminal.
+// isTerminal decides which of the two child paths `secrets run` takes. It is a
+// package variable rather than a direct call so both branches are reachable in
+// a test: CI has no controlling terminal, so the pty branch would otherwise be
+// unreachable there and only ever exercised by hand on a developer's box --
+// which is precisely how SEC-002 shipped.
+var isTerminal = func(fd uintptr) bool { return term.IsTerminal(int(fd)) }
+
+// wantsInteractiveChild is the branch selection itself, extracted from the call
+// site so that the DECISION is testable and not merely the two branch bodies.
+//
+// This is not indirection for its own sake. Tests that call runChildPTY and
+// runChild directly prove each path works and prove nothing about which one is
+// chosen -- an inverted condition here would silently restore SEC-002 while
+// every one of those tests still passed. The adversarial review on `a636844`
+// raised exactly that as a Major, and it was right: the one line that decides
+// was the one line with no test.
+//
+// stdout is the fd consulted because stdout is what an interactive child
+// inspects before deciding whether to draw (`test -t 1`), and it is what pi
+// checks.
+func wantsInteractiveChild() bool {
+	return interactiveChildSupported() && isTerminal(os.Stdout.Fd())
+}
+
 func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	if err := assertSafeChildCommand(argv); err != nil {
 		return 1, err
@@ -722,6 +765,15 @@ func newRedactWriter(target io.Writer, injected []string) *redactWriter {
 			}
 		}
 	}
+	// Longest secret first. If one injected value is a prefix of another
+	// (`abc` and `abcdef`), replacing the shorter one first breaks the longer
+	// one's match and leaks its suffix. Vanishingly unlikely with random API
+	// keys and pre-existing, but it is a hole in redaction and the order is
+	// free to fix. Surfaced by the SEC-002 adversarial review.
+	sort.SliceStable(pairs, func(i, j int) bool {
+		return len(pairs[i][0]) > len(pairs[j][0])
+	})
+
 	return &redactWriter{
 		target:       target,
 		pairs:        pairs,
@@ -747,17 +799,49 @@ func (r *redactWriter) Write(p []byte) (int, error) {
 		data = bytes.ReplaceAll(data, pair[0], pair[1])
 	}
 
-	if len(data) >= r.maxSecretLen && r.maxSecretLen > 1 {
-		split := len(data) - (r.maxSecretLen - 1)
-		toWrite := data[:split]
-		r.tail = make([]byte, len(data[split:]))
+	// Withhold ONLY a trailing run that could still grow into a secret, never a
+	// fixed window. The previous rule held back maxSecretLen-1 bytes on every
+	// write regardless of content, which is invisible when the consumer is a
+	// pipe drained at Flush() and fatal when it is a terminal: with a 64-byte
+	// key, the last 63 bytes of every frame -- typically the cursor
+	// positioning -- stayed dark until more output happened to arrive. A TUI
+	// driven that way renders late and misplaced (SEC-002).
+	if hold, _ := r.holdBack(data); hold > 0 {
+		split := len(data) - hold
+		r.tail = make([]byte, hold)
 		copy(r.tail, data[split:])
-		_, err := r.target.Write(toWrite)
+		_, err := r.target.Write(data[:split])
 		return len(p), err
 	}
 
+	r.tail = nil
 	_, err := r.target.Write(data)
 	return len(p), err
+}
+
+// holdBack returns how many trailing bytes of data must be withheld because
+// they are a PROPER prefix of some secret -- i.e. bytes that are not a leak
+// yet but would be if the next write completed them. Zero in the common case,
+// so a frame ending in ordinary output goes out whole and immediately.
+//
+// Only a proper prefix counts: a suffix that already contains a whole secret
+// was replaced by the ReplaceAll pass above and is no longer present to match.
+func (r *redactWriter) holdBack(data []byte) (int, []byte) {
+	maxHold := r.maxSecretLen - 1
+	if maxHold > len(data) {
+		maxHold = len(data)
+	}
+	// Longest first: the held run must cover every secret it could complete,
+	// and a shorter match would release bytes that a longer one still needs.
+	for n := maxHold; n > 0; n-- {
+		suffix := data[len(data)-n:]
+		for _, pair := range r.pairs {
+			if len(suffix) < len(pair[0]) && bytes.HasPrefix(pair[0], suffix) {
+				return n, pair[1]
+			}
+		}
+	}
+	return 0, nil
 }
 
 func (r *redactWriter) Flush() error {
@@ -770,6 +854,19 @@ func (r *redactWriter) Flush() error {
 	for _, pair := range r.pairs {
 		r.tail = bytes.ReplaceAll(r.tail, pair[0], pair[1])
 	}
+
+	// What remains may still be a PROPER PREFIX of a secret -- the stream ended
+	// before the child could finish writing the value, so the ReplaceAll above
+	// found nothing to match. Those bytes are credential material: up to
+	// maxSecretLen-1 leading characters of a key. Writing them out raw is the
+	// one hole the hold-back leaves, and it leaves it at exactly the moment the
+	// transcript is closed. Replace them with the placeholder of the secret they
+	// begin, which is the honest report: material from that key was here.
+	// Surfaced by the SEC-002 adversarial review.
+	if n, rep := r.holdBack(r.tail); n > 0 {
+		r.tail = append(r.tail[:len(r.tail)-n], rep...)
+	}
+
 	_, err := r.target.Write(r.tail)
 	r.tail = nil
 	return err
