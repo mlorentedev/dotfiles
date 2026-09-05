@@ -1365,6 +1365,7 @@ HALF2
 # BOTH renders would pass every cap check while silently deleting doctrine, and
 # from the cap's point of view that failure is indistinguishable from success.
 @test "HARNESS-056: a full-only region leaves the capped payload and stays in the full one" {
+    load 'lib/refute'
     seed_doctrine_fixture
     cat > "$REPO/harness/enforced/demo.md" <<'EOF'
 - rule one
@@ -1390,7 +1391,7 @@ EOF
     grep -q 'the exception a human decides' "$REPO/TARGET.md"
 
     grep -q 'rule one'                      "$FAKEHOME/.gemini/GEMINI.md"
-    ! grep -q 'the exception a human decides' "$FAKEHOME/.gemini/GEMINI.md"
+    refute_grep_fixed 'the exception a human decides' "$FAKEHOME/.gemini/GEMINI.md"
 
     # The marker closes. Without this, a missing end-marker would swallow the
     # rest of the record and the payload would only get smaller -- which no cap
@@ -1398,6 +1399,6 @@ EOF
     grep -q 'rule two after the region' "$FAKEHOME/.gemini/GEMINI.md"
 
     # The markers are machinery, not content: they reach no surface.
-    ! grep -q 'full-only:' "$FAKEHOME/.gemini/GEMINI.md"
-    ! grep -q 'full-only:' "$REPO/TARGET.md"
+    refute_grep_fixed 'full-only:' "$FAKEHOME/.gemini/GEMINI.md"
+    refute_grep_fixed 'full-only:' "$REPO/TARGET.md"
 }
