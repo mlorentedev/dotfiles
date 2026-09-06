@@ -61,6 +61,18 @@ setup() {
     printf '%s\n' "$output" | grep -q 'any reality'
 }
 
+@test "guard: the Major severity definition defers to reality, like the verdict list" {
+    # A THIRD statement of the same rule, one section above the verdict list, and
+    # it drifted the same way: while the list sent a THEORETICAL Major to PASS
+    # WITH GAPS, this definition demanded a fix and a re-review for every Major.
+    # The tests above could not see it — they only read the verdict list. Found
+    # by review on #1543, which is why the guard now reads both halves.
+    run grep -n '^- \*\*Major\*\*:' "$SKILL"
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | grep -q 'REAL'
+    printf '%s\n' "$output" | grep -q 'THEORETICAL'
+}
+
 @test "guard: the Reality classification the verdict defers to is still present" {
     run grep -q 'severity . reality' "$SKILL"
     [ "$status" -eq 0 ]

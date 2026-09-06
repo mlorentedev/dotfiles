@@ -29,10 +29,10 @@
   },
   {
     "id": "HARNESS-111-f5",
-    "behavior": "The skill's verdict list honours the reality axis it already defines, and a Blocker still blocks at any reality",
+    "behavior": "The skill's verdict list AND its Major severity definition both honour the reality axis it already defines, and a Blocker still blocks at any reality",
     "verification": "~/.local/bin/bats tests/guard-review-verdict-honours-reality.bats",
     "state": "verified",
-    "evidence": "6/6 ok; mutation-proven — reintroducing the old unqualified FAIL line turns 3 of 6 red"
+    "evidence": "7/7 ok; mutation-proven in both halves — reintroducing the old unqualified FAIL line turns 3 of 7 red, and reverting the Major severity line to the unqualified \"fix or spec update required, and a re-review after it\" turns test 6 red. The severity definition was a third statement of the same rule that the first guard could not see, because it only read the verdict list."
   },
   {
     "id": "HARNESS-111-f6",
@@ -44,9 +44,9 @@
   {
     "id": "HARNESS-111-f7",
     "behavior": "The review skill no longer asks for contract-file edits before archive; it routes recommendations by set, and both the repo record and the vault source carry the same text",
-    "verification": "for f in harness/skills/adversarial-review/SKILL.md \"$(dotf env path VAULT_PATH)/00_meta/skills/adversarial-review/SKILL.md\"; do grep -cE 'required before archive|next steps \\(before archive\\)' \"$f\"; grep -cE 'contract set|Route every recommendation by set' \"$f\"; done",
+    "verification": "bash -c 'rc=0; for f in harness/skills/adversarial-review/SKILL.md \"$(dotf env path VAULT_PATH)/00_meta/skills/adversarial-review/SKILL.md\"; do df=$(grep -cE \"required before archive|next steps .before archive.\" \"$f\"); r=$(grep -cE \"contract set|Route every recommendation by set\" \"$f\"); echo \"$f defective=$df routing=$r\"; [ \"$df\" -eq 0 ] || rc=1; [ \"$r\" -eq 4 ] || rc=1; done; exit $rc'",
     "state": "verified",
-    "evidence": "0 defective forms and 4 routing-rule lines in each copy. A bare grep for 'before archive' still returns 3 per copy and is the wrong command: two are the skill describing when it runs, and the third is the new instruction not to use the phrase."
+    "evidence": "rc=0, printing defective=0 routing=4 for both copies. The command asserts rather than prints: the previous form ran two bare `grep -c` and discarded the first status, so the loop's exit code was the last grep's and the \"zero defective forms\" half was never checked. Mutation-proven: reinstating `next steps (before archive)` in either copy turns it rc=1. A bare grep for 'before archive' still returns 3 per copy and is the wrong pattern — two are the skill describing when it runs, the third is the new instruction not to use the phrase."
   },
   {
     "id": "HARNESS-111-f8",

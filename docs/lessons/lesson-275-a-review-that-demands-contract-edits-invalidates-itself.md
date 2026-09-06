@@ -54,8 +54,10 @@ the spec archives, or the archived artifact is internally inconsistent. Editing 
 to correct a stale number creates a worse inconsistency than the one it removes.
 
 Two other exits were also wrong: `--force-without-review` discards a review that exists and passed,
-and `review: waived` asserts no review happened. Both are lies in the opposite direction from the
-stale number.
+and `review: waived` declares the requirement does not apply at all — `checkReviewGate` returns on a
+waiver with a reason *before* it calls `FindReview`, so a passing review sitting in the folder is
+never even read. Both walk past a verdict that was earned, in the opposite direction from the stale
+number.
 
 ## What to do instead
 
