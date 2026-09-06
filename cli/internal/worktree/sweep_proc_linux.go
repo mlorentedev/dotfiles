@@ -28,8 +28,15 @@ const processDiscoverySupported = true
 // /proc/<pid>/cwd is ALREADY resolved by the kernel and filepath.Abs is not.
 // Without it a worktree reached by a symlinked path compares unequal to the
 // physical path every process reports, so the gate answers "nobody is inside"
-// while a shell sits in it — the same fail-open this file exists to remove,
-// arriving through a different door.
+// while a shell sits in it.
+//
+// That closes the symlink door and NOT the general one. This comparison is
+// still on strings, and a path is not an identity: a process in another mount
+// namespace reports its own view, so a container bind-mounting the worktree at
+// /wt-mount-target compares unequal to the host path and reads as outside while
+// it is inside. Reproduced and tracked as #1523 — the fix is dev+ino identity
+// (os.SameFile), which this change does not attempt because it cannot yet be
+// given a test that fails in CI.
 func isHostProcessInside(targetPath string) GateFReading {
 	absTarget, err := filepath.Abs(targetPath)
 	if err != nil {
@@ -72,6 +79,10 @@ func isHostProcessInside(targetPath string) GateFReading {
 type cwdVerdict int
 
 const (
+	// cwdOutside is the ZERO VALUE, and it is the permissive one: a caller that
+	// forgets a case in a switch, or reads an uninitialised cwdVerdict, gets
+	// "safe to delete". Stated here because it is the wrong default for a
+	// fail-closed gate and nothing in the type says so.
 	cwdOutside cwdVerdict = iota
 	cwdInside
 	cwdUnreadable
@@ -95,14 +106,16 @@ func isNumericPID(name string) bool {
 // snapshot, processes exit between the ReadDir and the Readlink constantly, and
 // a process that no longer exists is genuinely not in the worktree.
 //
-// EACCES is a real limitation and is reported rather than resolved.
-// /proc/<pid>/cwd is readable only by the process owner and root, so a scan run
-// as an ordinary user cannot see another user's cwd — including root's. Making
-// that answer `Inside: true` would be the fail-closed reflex and it would make
-// sweep permanently inert on Linux, since /proc/1/cwd is EACCES to every
-// non-root caller and therefore every scan would refuse. Counting them instead
-// keeps the tool useful while making a partial scan visible as a partial scan,
-// which is the same choice ProcessDiscovery makes one level up.
+// EACCES is a permanent property of the platform, not an event. Reading
+// /proc/<pid>/cwd is gated by ptrace_may_access, so an ordinary user's scan can
+// never see root's processes, another user's, or a same-uid process that set
+// PR_SET_DUMPABLE=0. Making that answer `Inside: true` would be the fail-closed
+// reflex and it would make sweep permanently inert on Linux, since /proc/1/cwd
+// is EACCES to every non-root caller and therefore every scan would refuse.
+//
+// So they are counted — but as a statement of the gate's reach, not as a
+// warning. The count is non-zero on every Linux machine, which is exactly why
+// it cannot mean "something is wrong here"; see SweepReport.UninspectableProcesses.
 func inspectProcessCwd(pidName, absTarget string) cwdVerdict {
 	dest, err := os.Readlink(filepath.Join("/proc", pidName, "cwd"))
 	if err != nil {

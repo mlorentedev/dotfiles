@@ -1,8 +1,10 @@
 package worktree
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // The refusing branch of Gate f only executes on a platform this CI does not
@@ -15,6 +17,10 @@ import (
 // Driving the seam both ways is what makes the fix checkable. The direction
 // that matters is the second one: a gate that cannot answer must not clear the
 // worktree for deletion.
+//
+// Every test here drives gateF or SweepWithRunner, never a wrapper. Round 3
+// found the previous version pinning isCandidateForReap, which production did
+// not call — a refusal proven on a function that could not prevent a deletion.
 
 func withHostProcessInside(t *testing.T, answer bool) {
 	t.Helper()
@@ -44,8 +50,7 @@ func reapableInfo(t *testing.T) Info {
 func TestGateFRefusesWhenProcessDiscoveryCannotAnswer(t *testing.T) {
 	withHostProcessInside(t, true)
 
-	info := reapableInfo(t)
-	if isCandidateForReap(info, "/somewhere/else") {
+	if _, ok := gateF(reapableInfo(t), "/somewhere/else"); ok {
 		t.Error("a worktree was cleared for reaping while Gate f reported a live process inside; " +
 			"an unanswerable gate must refuse, because the caller deletes on a false")
 	}
@@ -54,37 +59,17 @@ func TestGateFRefusesWhenProcessDiscoveryCannotAnswer(t *testing.T) {
 func TestGateFAllowsAReapableWorktreeWhenNothingIsInside(t *testing.T) {
 	withHostProcessInside(t, false)
 
-	info := reapableInfo(t)
-	if !isCandidateForReap(info, "/somewhere/else") {
+	if _, ok := gateF(reapableInfo(t), "/somewhere/else"); !ok {
 		t.Error("a reapable worktree with no process inside was refused; the gate has stopped " +
 			"discriminating and now refuses everything, which passes the test above vacuously")
 	}
 }
 
-// processDiscoverySupported is a build-tag constant, so this asserts the value
-// for the platform the test binary was built for rather than a fixed answer.
-// It pins the contract that the two files agree on the constant's meaning: it
-// is true exactly where isHostProcessInside can observe processes.
-func TestProcessDiscoveryIsReportedForThisPlatform(t *testing.T) {
-	// Linux is the only implemented platform today. If a Windows or Darwin
-	// implementation lands, this test must be updated in the same change --
-	// which is the point: the constant should never drift from reality
-	// silently, since a false one makes sweep inert and a true one makes it
-	// dangerous.
-	if !processDiscoverySupported {
-		t.Skip("no process discovery on this platform; the refusal path is covered above")
-	}
-
-	if hostProcessInside == nil {
-		t.Fatal("process discovery is advertised as supported but Gate f has no implementation")
-	}
-}
-
-// A partial scan must not silently become a clean one. Uninspectable processes
-// deliberately do NOT block the reap -- refusing on them would make sweep inert
-// on Linux, since /proc/1/cwd is unreadable to every non-root caller -- so the
-// count is the only thing standing between "scanned and found nothing" and
-// "could not see several processes and found nothing among the rest".
+// Uninspectable processes deliberately do NOT block the reap -- refusing on them
+// would make sweep inert on Linux, since /proc/1/cwd is unreadable to every
+// non-root caller. This pins that the count survives the trip to the report;
+// that the producer actually increments it is a separate test, in
+// sweep_proc_linux_test.go, because a seam cannot see its own producer.
 func TestUninspectableProcessesDoNotBlockButAreCarried(t *testing.T) {
 	withGateFReading(t, GateFReading{Inside: false, Uninspectable: 7})
 
@@ -94,8 +79,85 @@ func TestUninspectableProcessesDoNotBlockButAreCarried(t *testing.T) {
 			"permanently inert on Linux, which is why they are reported instead")
 	}
 	if reading.Uninspectable != 7 {
-		t.Errorf("gateF dropped the uninspectable count: got %d, want 7 — a partial scan " +
-			"that reports nothing is indistinguishable from a complete one",
-			reading.Uninspectable)
+		t.Errorf("gateF dropped the uninspectable count: got %d, want 7 — the report would "+
+			"then describe a reach the scan did not have", reading.Uninspectable)
+	}
+}
+
+// The gate that actually guards the deletion is the SECOND one.
+//
+// SweepWithRunner consults Gate f twice: once to select candidates, and again
+// inside reapSingleWorktree under the lock, immediately before removing the
+// worktree. The re-check exists for the window between them -- a shell that
+// cds in while the sweep is deciding -- and a seam with one constant answer can
+// never reach it, because a constant `true` is refused by the first call and a
+// constant `false` never exercises the second. Round 3 measured the
+// consequence: deleting the re-check left the whole suite green.
+//
+// So this seam answers false first and true afterwards, which is precisely the
+// TOCTOU the re-check is for.
+func TestSweepRefusesWhenAProcessArrivesAfterTheGate(t *testing.T) {
+	original := hostProcessInside
+	calls := 0
+	hostProcessInside = func(string) GateFReading {
+		calls++
+		return GateFReading{Inside: calls > 1}
+	}
+	t.Cleanup(func() { hostProcessInside = original })
+
+	tmpDir := t.TempDir()
+	mainRepo := filepath.Join(tmpDir, "myrepo")
+	reapableWT := filepath.Join(tmpDir, "myrepo-wt-reapable")
+	if err := os.MkdirAll(mainRepo, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.MkdirAll(reapableWT, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	now := time.Now()
+	if err := SaveMetadata(reapableWT, Metadata{
+		ReapOK:         true,
+		CreatedAt:      now.Add(-2 * time.Hour),
+		LeaseExpiresAt: now.Add(-1 * time.Hour),
+	}); err != nil {
+		t.Fatalf("SaveMetadata: %v", err)
+	}
+
+	removed := []string{}
+	runner := &MockSweepRunner{
+		MockGitRunner: MockGitRunner{
+			PorcelainOutput: "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
+				"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/reapable\n\n",
+			MergedBranches: map[string]bool{"feat/reapable": true},
+		},
+		OnWorktreeRemove: func(_, path string) error {
+			removed = append(removed, path)
+			return nil
+		},
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot: mainRepo,
+		LockPath: filepath.Join(tmpDir, "sweep.lock"),
+	}, runner, now)
+	if err != nil {
+		t.Fatalf("unexpected error during sweep: %v", err)
+	}
+
+	// The anchor: without it, a fixture that never became reapable would pass
+	// this test by reaping nothing for the wrong reason.
+	if calls < 2 {
+		t.Fatalf("Gate f was consulted %d time(s); the fixture never reached the re-check, "+
+			"so this test proves nothing about it", calls)
+	}
+	if len(removed) != 0 {
+		t.Errorf("a worktree was removed after Gate f reported a process had arrived inside it: %v", removed)
+	}
+	if len(report.Reaped) != 0 {
+		t.Errorf("sweep reported reaping %v despite the second gate refusing", report.Reaped)
+	}
+	if report.SkippedCount != 2 { // mainRepo + the worktree the re-check saved
+		t.Errorf("expected 2 skipped (main and the refused worktree), got %d", report.SkippedCount)
 	}
 }
