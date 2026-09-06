@@ -22,7 +22,10 @@ Every command below was executed in this session.
 - [x] **AC4** `TestReviewPromptStatesTheResolvedBase`.
 - [x] **AC5** `TestWriteReviewRequestRecordsTheBase` and
       `TestReviewRequestWithoutBaseSHAStillParses`.
-- [x] **AC6** `tests/guard-review-verdict-honours-reality.bats`, 6 assertions, mutation-proven.
+- [x] **AC6** `tests/guard-review-verdict-honours-reality.bats`, mutation-proven. **6 assertions when
+      this line was written; 7 since #1549**, which extended it to read the Major severity
+      definition and not only the verdict list. The runs quoted below are the 6-assertion ones and
+      are left verbatim as the record of what was executed then; the current count is 7/7.
 - [x] **AC7** full loop below.
 
 ## Test status
@@ -33,14 +36,15 @@ go test ./...                         rc=0   (whole module)
 GOOS=windows go vet ./...             rc=0
 GOOS=darwin  go vet ./...             rc=0
 golangci-lint run ./...               0 issues   (2.12.2, the versions.conf pin)
-bats tests/guard-review-verdict-honours-reality.bats   6/6 ok
+bats tests/guard-review-verdict-honours-reality.bats   6/6 ok   (7/7 since #1549)
 ```
 
 ### Guard mutation
 
 The guard has to fail when the contradiction returns, or it is decoration. Reintroducing the exact
 old line (`FAIL — at least one blocker or major OR rubric has at least one D`) with the anchor
-asserted before the patch:
+asserted before the patch. Quoted verbatim from the 6-assertion run; #1549 later added a seventh,
+and its own mutation proof is recorded in that PR:
 
 ```
 ok 1 guard: the adversarial-review skill exists where the gate expects it
@@ -111,11 +115,14 @@ Root 1 has no such gap: it is compiled into `dotf`.
 > `~/.pi/agent/`, `~/.gemini/` and `~/.copilot/`, each reading `routing=4 defective=0`. The count
 > was wrong here because `dotf spec review --dry-run` is what names the copy the reviewer opens —
 > this run drew a `pi` model but the dry-run before it named `~/.gemini/`, a copy nobody had
-> checked. Run the dry-run before any review for exactly that reason.
+> checked. Run the dry-run before any review for exactly that reason. The paragraph below is
+> corrected in place: it said *two* copies, and undercounting them is what let the third and fourth
+> go unverified.
 
-There is a **third** copy of this skill — the deployed one the reviewer actually opens at
-`~/.pi/agent/skills/adversarial-review/SKILL.md` and `~/.claude/skills/adversarial-review/SKILL.md`.
-Measured after the fix landed in the record and the vault, both deployed copies still read **2
+There are **four** deployed copies of this skill — the ones a reviewer actually opens, at
+`~/.claude/`, `~/.pi/agent/`, `~/.gemini/` and `~/.copilot/`. This paragraph originally said two,
+and undercounting them is the trap: which copy gets read depends on the runner the pool draws.
+Measured after the fix landed in the record and the vault, every deployed copy still read **2
 defective forms, 0 routing-rule lines**. `compile-harness.sh --deploy` must run after #1543 merges
 and before this spec's own review is launched, or round 1 of HARNESS-111 will be reviewed under the
 very template HARNESS-111 fixes — and will produce the list root 3 forbids.
