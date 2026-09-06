@@ -58,6 +58,19 @@ type restComment struct {
 	} `json:"user"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
+
+	// The field TOOL-019 (#1422) needed and could not reach. That issue
+	// concluded the fix was "not reachable through the current data source",
+	// which was true of `gh pr view --json comments` -- it exposes only
+	// `createdAt` and a timestamp-less `includesCreatedEdit` boolean. CLI-071
+	// then moved this package to REST for unrelated reasons (#1454), and REST
+	// has always carried `updated_at`. The blocker was dissolved by a change
+	// that was not trying to; nobody revisited the ticket.
+	//
+	// Neither of the options that issue proposed is needed: no GraphQL, which
+	// is the surface that hit a rate limit on 2026-08-31, and no digest in the
+	// triage comment, whose format the reviewer registry declares.
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Fetch asks GitHub for the open pull requests and returns the ones whose
@@ -188,7 +201,7 @@ func fetchComments(ctx context.Context, run ghRunner, base string, number int) (
 	comments := make([]Comment, 0, len(wire))
 	for _, w := range wire {
 		comments = append(comments, Comment{
-			Author: w.User.Login, Body: w.Body, CreatedAt: w.CreatedAt,
+			Author: w.User.Login, Body: w.Body, CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt,
 		})
 	}
 	return comments, nil
