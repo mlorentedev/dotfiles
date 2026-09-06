@@ -52,10 +52,32 @@ type Attempt struct {
 	Status Status `json:"status"`
 }
 
+// Resolution reports how the route was ARRIVED AT, which the rest of the record
+// cannot say. `tier: mid` is the same three characters whether a human typed it
+// or a persona's record declared it, and those two want different scrutiny: a
+// derived route can be wrong about the task, a dictated one cannot.
+//
+// Pattern is carried for the same reason `harness suggest` prints it. The
+// keyword matcher is substring-based (triggers.go:116), so a task mentioning
+// "docker" in passing resolves shipper — and a route that cannot be judged is
+// obeyed on its worst day as readily as its best.
+type Resolution struct {
+	// RoleFrom and TierFrom are "inferred" or "dictated".
+	RoleFrom string `json:"role_from"`
+	TierFrom string `json:"tier_from"`
+	// Pattern is the trigger rule that produced the role. Empty when the role
+	// was dictated, because then no rule was consulted.
+	Pattern string `json:"pattern,omitempty"`
+}
+
 // Record is the machine contract on stdout: one JSON object, always.
 type Record struct {
-	Status     Status `json:"status"`
-	Tier       string `json:"tier"`
+	Status Status `json:"status"`
+	Tier   string `json:"tier"`
+	// Role is the persona the task was dispatched AS. Reported since
+	// HARNESS-120: before it, the role reached only the dry-run backend's echo
+	// string, so a consumer could not tell from the record which persona ran.
+	Role       string `json:"role,omitempty"`
 	Pool       string `json:"pool"`
 	Model      string `json:"model"`
 	Exit       int    `json:"exit"`
@@ -65,8 +87,12 @@ type Record struct {
 	// Unbounded says the answering pool declares no concurrency, so no local
 	// semaphore was held. Recorded rather than inferred: a consumer must not
 	// have to guess whether a dispatch was counted.
-	Unbounded bool      `json:"unbounded,omitempty"`
-	Attempts  []Attempt `json:"attempts,omitempty"`
+	Unbounded bool `json:"unbounded,omitempty"`
+	// Resolution is attached by the command that derived the route, not by the
+	// walk: Dispatch is handed a role and a chain and has no idea which rule
+	// produced them. Absent on `agent run`, where both were supplied.
+	Resolution *Resolution `json:"resolution,omitempty"`
+	Attempts   []Attempt   `json:"attempts,omitempty"`
 }
 
 // Dispatch walks the chain and returns the record. It never returns an error:
@@ -78,7 +104,7 @@ func Dispatch(ctx context.Context, opts Options, be Backend) Record {
 		now = time.Now
 	}
 	started := now()
-	rec := Record{Tier: opts.Tier}
+	rec := Record{Tier: opts.Tier, Role: opts.Role}
 
 	// ADR-032 §4: the top tier queues or escalates, it never degrades. The rule
 	// is applied to behaviour unconditionally rather than inferred from the map

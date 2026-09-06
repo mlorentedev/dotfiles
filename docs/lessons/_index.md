@@ -282,10 +282,10 @@ tags: [lessons, index, dotfiles]
 | [262 - A merged PR and a stuck PR are indistinguishable from the branch side](lesson-262-a-merged-pr-and-a-stuck-pr-look-identical-from-the-branch.md) | 2026-09-02 |  |
 | [263 - A population that cannot prove it is complete answers with a plausible number](lesson-263-a-population-that-cannot-prove-it-is-complete.md) | 2026-09-02 |  |
 | [264 - When the documentation does not name a field, read the executable — twice it decided a design](lesson-264-a-hooks-timeout-semantics-are-not-in-the-documentation.md) | 2026-09-03 |  |
-| [267 - A mutation harness must prove the mutation landed](lesson-267-a-mutation-harness-must-prove-the-mutation-landed.md) | 2026-09-04 |  |
-| [268 - A refused question and a negative answer print the same thing](lesson-268-a-refused-question-and-a-negative-answer-print-the-same-thing.md) | 2026-09-04 |  |
 | [265 - A correct measurement answering the wrong question, three times in one session](lesson-265-a-correct-measurement-answering-the-wrong-question.md) | 2026-09-03 |  |
 | [266 - Two measurements agreeing is not reproducibility](lesson-266-two-measurements-agreeing-is-not-reproducibility.md) | 2026-09-04 |  |
+| [267 - A mutation harness must prove the mutation landed](lesson-267-a-mutation-harness-must-prove-the-mutation-landed.md) | 2026-09-04 |  |
+| [268 - A refused question and a negative answer print the same thing](lesson-268-a-refused-question-and-a-negative-answer-print-the-same-thing.md) | 2026-09-04 |  |
 | [269 - A generated file fixed without its source is a countdown, and the drift guard says OK either way](lesson-269-a-generated-file-fixed-without-its-source-is-a-countdown.md) | 2026-09-05 |  |
 | [270 - A security wrapper that breaks the tool it protects gets routed around](lesson-270-a-security-wrapper-that-breaks-the-tool-it-protects-gets-routed-around.md) | 2026-09-05 |  |
 | [271 - Hooks are re-read, personas are not, and one measurement was generalised into both](lesson-271-hooks-reload-personas-do-not-and-the-difference-was-assumed-away.md) | 2026-09-02 |  |
@@ -293,5 +293,6 @@ tags: [lessons, index, dotfiles]
 | [273 - The fix and the detector can be the same edit](lesson-273-the-fix-and-the-detector-can-be-the-same-edit.md) | 2026-09-05 |  |
 | [274 - A constant test double cannot reach a check that exists for change](lesson-274-a-constant-test-double-cannot-reach-a-check-that-exists-for-change.md) | 2026-09-05 |  |
 | [275 - A review that demands contract edits invalidates itself](lesson-275-a-review-that-demands-contract-edits-invalidates-itself.md) | 2026-09-05 |  |
-
-- [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
+| [276 - Intercepting Cobra errors without breaking `SilenceErrors`](lesson-276-intercepting-cobra-errors-without-breaking-silenceerrors.md) | 2026-08-30 |  |
+| [277 - One invalid field rejects the whole file, and the deployed copy hides it until a deploy](lesson-277-one-invalid-field-rejects-the-whole-file-and-the-deployed-copy-hides-it.md) | 2026-09-05 |  |
+| [278 - A cap asserted in one unit while the payload overflowed in another](lesson-278-a-cap-asserted-in-one-unit-while-the-platform-counts-another.md) | 2026-09-05 |  |
