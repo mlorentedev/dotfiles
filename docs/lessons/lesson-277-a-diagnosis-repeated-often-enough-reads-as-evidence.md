@@ -148,3 +148,30 @@ precisely what manufactured the confidence.
 
 That is the sharpest form of the rule. **A check that cannot fail is worse than no
 check**, because no check leaves you uncertain and a vacuous one leaves you sure.
+
+## Corollary: a right finding lends its credibility to a wrong remedy
+
+Twice in one night, from two different reviewers, on two different changes:
+
+- PR-Agent reported that a vault source was not updated alongside its record.
+  **The finding pointed at something real** — nothing verifies the two copies
+  agree, now filed as #1545. **The stated fact was false.**
+- An adversarial reviewer found that a dictated `--tier` skips the validation a
+  persona-declared tier gets, so an invalid one fails later with a thinner
+  error. **Real.** Its proposed fix was to reuse the persona path's error
+  message — which blames *a persona's record* for a value a human typed. **The
+  remedy was wrong.**
+
+The failure is not that the reviewer was wrong. It is that **a correct finding
+lends its credibility to whatever remedy is attached to it**, and the remedy is
+where a reviewer is furthest from the code: it has read the diff, not run it, and
+it is proposing a change it will not have to make work.
+
+Both get applied verbatim if you are tired, and applying them is worse than
+ignoring the finding, because the wrong fix closes the ticket.
+
+**Grade the finding and the remedy separately.** Accepting one is not accepting
+the other. In the `--tier` case the right fix was in a third place neither the
+reviewer nor the original diff had named — `ResolveChain`, where both paths
+already meet — which is the usual shape once you stop taking the suggested
+location as part of the finding.
