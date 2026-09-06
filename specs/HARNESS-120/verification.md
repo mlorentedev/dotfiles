@@ -23,21 +23,12 @@ below.
 
       $ dotf agent auto --task "open a ticket for the bitacora" \
           --backend dry-run --timeout 60s --repo-root <checkout>
-      {
-          "status": "dry_run",
-          "tier": "mid",
-          "role": "planner",
-          "pool": "claude",
-          "model": "sonnet",
-          "exit": 0,
-          "output": "would dispatch role \"planner\" to claude:sonnet (no request was sent)",
-          "resolution": {
-              "role_from": "inferred",
-              "tier_from": "inferred",
-              "pattern": "pattern-bitacora-tracking"
-          },
-          "attempts": [{"pool": "claude", "model": "sonnet", "status": "dry_run"}]
-      }
+      {"status":"dry_run","tier":"mid","role":"planner","pool":"claude","model":"sonnet","exit":0,"duration_ms":0,"output":"would dispatch role \"planner\" to claude:sonnet (no request was sent)","truncated":false,"resolution":{"role_from":"inferred","tier_from":"inferred","pattern":"pattern-bitacora-tracking"},"attempts":[{"pool":"claude","model":"sonnet","status":"dry_run"}]}
+
+      Quoted byte-exact, unpretty-printed, as the command emits it — round 2 of
+      review caught that the earlier block had been reformatted and had dropped
+      `duration_ms` and `truncated`. A quote a reader cannot diff against their
+      own run is a claim, not evidence.
 
       The matched pattern is `pattern-bitacora-tracking`, which is what
       `proposal.md` predicted before the code existed. That is the criterion
@@ -290,6 +281,53 @@ Verified after the fix, both paths now identical:
     Error: tier "colossal" has no chain in harness/model-map.json: it declares low, mid, top
     $ dotf agent run --tier colossal ...
     Error: tier "colossal" has no chain in harness/model-map.json: it declares low, mid, top
+
+## Adversarial review round 2 — PASS
+
+`nan/deepseek-v4-flash`, 2026-09-06, against `reviewed_sha` `9d3a7ee` (= HEAD of
+the contract set). Artifact: `review.md`, signed, never edited. Rubric:
+Verification A, Reliability A, Handoff-readiness A; Correctness B, Scope B,
+Maintainability B. **No Blocker, no REAL Major.**
+
+A different reviewer from round 1 — the launcher draws from the pool at random,
+so the two verdicts are independent draws rather than one model reconsidering.
+Round 2 independently reproduced AC1-AC6 at the CLI, rebuilt and re-ran the whole
+Go layer plus `GOOS=windows go vet` and `golangci-lint` at the pin, and
+**mutation-checked two of my paths itself** — the ambiguous case returning its
+first candidate, and the bare task sent instead of the preamble — confirming both
+tests fail when the behaviour is removed.
+
+Round 1's two findings are both closed: the Blocker by the real dispatch above,
+the Minor by the `ResolveChain` fix in `6d8db91`.
+
+| # | Severity / Reality | Finding | Disposition |
+|---|---|---|---|
+| 1 | Minor / REAL | The `--role` refusal cannot distinguish "not declared" from "declared but `kind: autonomous`" — `--role hermes-nan` says no such persona, and there is one | **TICKETED, #1562.** Behaviour is correct and must not change: an autonomous steward is not a dispatchable phase. The message is the defect, and it is the same shape as the vacuous allow reason #1534 removed from the gate. The `kind: autonomous` path is UNTESTED and the ticket says so |
+| 2 | Minor / REAL | AC1's quoted output was not byte-exact — reformatted, missing `duration_ms` and `truncated` | **APPLIED.** `verification.md` is outside the staleness set, so this is the one recommendation safe to act on. Re-captured raw. The finding is fair and slightly worse than cosmetic: AC7 was quoted verbatim and AC1 was not, so a reader could not tell which quotes were transcribed |
+| 3 | Minor / REAL | `resolvePersonaForTask` is ~48 lines against the repo's 40-line rule (CC 9, within limits) | **TICKETED, #1562.** Noted there that `golangci` does not enforce the 40-line rule, so `0 issues` says nothing about it |
+| 4 | Minor / SPECULATIVE | `taskDelimiter` could collide with a task or record body containing `===== TASK =====` | **TICKETED as surface-only, #1562, explicitly do-not-gate.** No repro; the delimiter was chosen for that unlikelihood. Refusing a dispatch over a string that has never occurred trades a real capability for a hypothetical one |
+| 5 | Question | Round 2 did not independently re-run the live AC7 dispatch — it verified the deterministic half by dry-run and declined to spend pool quota | **ACCEPTED as stated.** Correct restraint, and the confirmation it did perform is the load-bearing half: `--role reviewer` resolving to `mid`/`claude:sonnet` with `tier_from: inferred` is what AC7 asserts. The live run remains quoted above, from this session |
+
+**`tasks.md`'s review checkbox is left UNTICKED on purpose, and this line is
+where that is recorded.** Ticking it would edit the contract set after
+`reviewed_sha`, and the archive gate measures staleness against exactly
+`proposal.md`, `tasks.md` and `features.json` — so the act of marking the review
+done is the act that invalidates it. I staged that edit before catching it,
+having read lesson 275 an hour earlier, which is a fair measure of how natural
+the mistake is. The review's own text closes the box: *"the one unticked box is
+the adversarial review itself, which this run closes."*
+
+**The three code findings are tracked, not fixed, and that is deliberate.** The
+review passed against `9d3a7ee`; applying code changes afterwards would ship code
+no reviewer saw, using a PASS earned by different code. Only the `verification.md`
+edit was applied, which the review names as outside the contract set.
+
+**One scope observation from the reviewer worth preserving:** Scope was graded B
+rather than A because the reviewed diff carries upstream HARNESS-111 changes
+(`SKILL.md`, a bats guard, lesson 275) pulled in by the `main` merge `511c77d` —
+not authored here. That is a property of reviewing a merge commit rather than a
+defect in this change, and it is worth knowing that a `main` merge into a branch
+dilutes what the next review reads as "the diff".
 
 ## Promotion candidates
 
