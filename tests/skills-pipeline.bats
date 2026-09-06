@@ -30,6 +30,34 @@ stub_copilot() {
     chmod +x "$FAKEHOME/stub/copilot"
 }
 
+# path_without_copilot: $PATH with every directory holding a `copilot` removed.
+#
+# The absence test used to assume the absence -- its comment read "this PATH has
+# no copilot on it (true of this test suite's own environment already)", which is
+# an assumption about the developer's machine written down as a fact. It is false
+# on any box that installed Copilot: here it arrives via nvm at
+# ~/.nvm/versions/node/*/bin/copilot, the gate correctly declines to skip, and
+# the assertion fails on a clean tree (TEST-007, #1409). Measured: 1 failure with
+# it on PATH, 0 with the directory removed.
+#
+# Filtering the entries that hold it, rather than replacing PATH wholesale, keeps
+# every other tool the deploy needs reachable on machines that do not put them in
+# /usr/bin. A loop, not a single removal, because a binary can appear more than
+# once. Not named `path`: in zsh that identifier is tied to $PATH itself, and
+# assigning a string to it wipes the command search path (see the prohibited
+# pattern table in .claude/CLAUDE.md).
+path_without_copilot() {
+    _pwc_out=""
+    _pwc_ifs="$IFS"; IFS=":"
+    for _pwc_dir in $PATH; do
+        [ -n "$_pwc_dir" ] || continue
+        [ -x "$_pwc_dir/copilot" ] && continue
+        _pwc_out="${_pwc_out:+$_pwc_out:}$_pwc_dir"
+    done
+    IFS="$_pwc_ifs"
+    printf '%s' "$_pwc_out"
+}
+
 @test "AC8 smoke: /spec is discoverable for claude + opencode after deploy" {
     run env HOME="$FAKEHOME" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
@@ -158,10 +186,19 @@ stub_copilot() {
 }
 
 @test "BUG-771: copilot native skills are not deployed when the copilot binary is absent" {
-    # No stub_copilot here -- this PATH has no copilot on it (true of this
-    # test suite's own environment already, which is exactly the class of
-    # box the gate exists for: setup-linux.sh never auto-installs Copilot).
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    # No stub_copilot here, and the absence is MADE TRUE rather than assumed:
+    # this is the class of box the gate exists for (setup-linux.sh never
+    # auto-installs Copilot), but the developer running the suite may well have
+    # it. Asserting "the gate fires when the binary is absent" against a PATH
+    # that still carries the binary tests the opposite of the intent.
+    nocopilot="$(path_without_copilot)"
+
+    # Fail loudly if the fixture did not achieve the absence, instead of
+    # quietly re-testing the present-binary path and reporting a pass.
+    run env PATH="$nocopilot" sh -c 'command -v copilot'
+    [ "$status" -ne 0 ]
+
+    run env HOME="$FAKEHOME" PATH="$nocopilot" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     [ ! -e "$FAKEHOME/.copilot/skills" ]
     # The catalog injection is a separate, un-gated feature (it only edits an

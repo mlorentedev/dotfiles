@@ -43,6 +43,36 @@ _dotf_os() {
     esac
 }
 
+# _dotf_current_version: the version of the `dotf` already on PATH, or empty.
+#
+# This is a function, not the inline pipeline it used to be, because it is the
+# ONE step in this script whose answer comes from outside the script -- and a
+# test cannot control that (#1409). With the pipeline inline, six of the eight
+# tests in tests/install-dotf.bats failed on a clean tree for anyone with a
+# source-built dotf on PATH, because the `dev` branch below fired against the
+# developer's OWN binary and returned before any install happened. They were
+# carried as "fixture isolation" for about ten sessions. Bisected: 6 failures
+# with ~/.local/bin on PATH, 0 without, same commit.
+#
+# Empty on failure is deliberate and load-bearing. If `dotf version` errors, or
+# prints something with no semver in it, the caller sees "" -- which matches
+# neither `dev` nor the pinned version, so it falls through and installs. That
+# is the right answer for a broken or unrecognisable binary: converge. Do not
+# "fix" the unread pipeline status here into a hard failure; that would abort
+# the install in exactly the case where replacing the binary is the repair.
+_dotf_current_version() {
+    command_exists dotf || return 0
+
+    # The stream merge (2>&1) is kept deliberately: BUG-070 (#915) fixed
+    # `dotf version` to write to stdout, but this installer's whole job is to
+    # run against whatever dotf is already on PATH -- including binaries built
+    # before that fix, which answer on stderr. Merging both streams and regexing
+    # the semver is correct for either. Do not tighten it to stdout-only; that
+    # would silently break the idempotence skip on an old binary and reinstall
+    # on every run.
+    dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|dev' | head -n1
+}
+
 # _dotf_fetch <url> <sums_url> <artifact> <workdir>: download the artifact and
 # checksums into workdir, verify sha256, extract `dotf`. A mismatch or missing
 # entry aborts (return 1) and leaves nothing extracted.
@@ -84,31 +114,35 @@ install_dotf() {
     _dotf_osname="$(_dotf_os "$(uname -s)")" || return 1
     _dotf_archname="$(_dotf_arch "$(uname -m)")" || return 1
 
-    if command_exists dotf; then
-        # The stream merge (2>&1) is kept deliberately: BUG-070 (#915) fixed
-        # `dotf version` to write to stdout, but this installer's whole job is
-        # to run against whatever dotf is already on PATH — including binaries
-        # built before that fix, which answer on stderr. Merging both streams
-        # and regexing the semver is correct for either. Do not tighten it to
-        # stdout-only; that would silently break the idempotence skip on an old
-        # binary and reinstall on every run.
-        # `dev` is what a source build reports (cli/cmd/dotf/main.go). A source
-        # build on PATH is deliberate -- a dev box building the tree, or CI
-        # building the PR under test -- and the release installer must not
-        # replace it: the release lags the tree, and testing it certified
-        # nothing about the change (#1305: `dotf harness mirror` did not exist
-        # in 0.51.0; and setup sources versions.conf, so a DOTF_VERSION=dev
-        # env override cannot express this). Remove the binary to converge.
-        _dotf_current="$(dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|dev' | head -n1)"
-        if [ "$_dotf_current" = "dev" ]; then
-            log_info "dotf is a source build (dev); leaving it in place (remove it to converge to the $version release)"
-            return 0
-        fi
-        if [ "$_dotf_current" = "$version" ]; then
-            log_info "dotf $version already installed; skipping"
-            return 0
-        fi
-        [ -n "$_dotf_current" ] && log_info "dotf $_dotf_current drifted from pinned $version; converging"
+    # Empty means "nothing recognisable installed", which includes no dotf at
+    # all: the absence check lives inside the seam so that this function has
+    # exactly ONE line that depends on the machine it runs on, and a test that
+    # stubs it controls the whole question. It used to be two -- the seam plus
+    # an `if command_exists dotf` wrapper around this block -- and the wrapper
+    # alone was enough to make a stubbed test read the real environment again.
+    _dotf_current="$(_dotf_current_version)"
+
+    # `dev` is what a source build reports (cli/cmd/dotf/main.go). A source
+    # build on PATH is deliberate -- a dev box building the tree, or CI
+    # building the PR under test -- and the release installer must not
+    # replace it: the release lags the tree, and testing it certified
+    # nothing about the change (#1305: `dotf harness mirror` did not exist
+    # in 0.51.0; and setup sources versions.conf, so a DOTF_VERSION=dev
+    # env override cannot express this). Remove the binary to converge.
+    #
+    # This gate is FIRST, and that is why picking an impossible version could
+    # not disable it: `dev` returns before the version comparison below is ever
+    # reached. tests/install-dotf.bats assumed one gate and there were two.
+    if [ "$_dotf_current" = "dev" ]; then
+        log_info "dotf is a source build (dev); leaving it in place (remove it to converge to the $version release)"
+        return 0
+    fi
+    if [ "$_dotf_current" = "$version" ]; then
+        log_info "dotf $version already installed; skipping"
+        return 0
+    fi
+    if [ -n "$_dotf_current" ]; then
+        log_info "dotf $_dotf_current drifted from pinned $version; converging"
     fi
 
     _dotf_artifact="dotf_${version}_${_dotf_osname}_${_dotf_archname}.tar.gz"
