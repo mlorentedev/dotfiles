@@ -331,8 +331,10 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// and it was not previously on offer.
 	if stale, known, reason := checker.Stale(repoRoot, specID, review.ReviewedSHA); known && stale {
 		return fmt.Errorf("%s is stale: %s\n"+
-			"restore the contract files to reviewed_sha and record what changed as dispositions in verification.md (excluded from this check), "+
-			"re-run /adversarial-review against the current head, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
+			"  restore the contract files to reviewed_sha and record what changed as dispositions in verification.md (excluded from this check)\n"+
+			"  re-run /adversarial-review against the current head\n"+
+			"  declare `review: waived` with a reason in proposal.md\n"+
+			"  pass --force-without-review",
 			ReviewFile, reason)
 	}
 
