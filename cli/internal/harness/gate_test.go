@@ -181,3 +181,68 @@ func TestGateStatePathContainsNoTraversal(t *testing.T) {
 		}
 	}
 }
+
+// #1510: the three ALLOW states must be distinguishable from each other.
+//
+// They shared one sentence — "all blocking skills consumed" — which was
+// vacuously true (no persona carries `enforce: block`, so the predicate held in
+// all 11526 decisions ever recorded) and therefore discriminated nothing. An
+// inert gate and a passing gate wrote the same line, which is precisely what
+// architect's and shipper's shipped records cite as the reason a merged
+// migration cannot be trusted as an enforced one.
+//
+// Asserted as PAIRWISE DISTINCTNESS rather than against three literal strings:
+// the property that matters is that a reader can tell the states apart, and
+// pinning the wording would make this a chore on every rephrasing without
+// testing anything more.
+func TestGateAllowReasonsAreDistinguishable(t *testing.T) {
+	call := ToolCall{Tool: "Bash"}
+
+	nothingToEnforce := Decide(GateInput{
+		Persona:  gatePersona(SkillBinding{ID: "helm"}, SkillBinding{ID: "terraform"}),
+		Call:     call,
+		Consumed: map[string]bool{},
+	})
+	skippedEverything := Decide(GateInput{
+		Persona:  gatePersona(SkillBinding{ID: "audit", Enforce: EnforceWarn}),
+		Call:     call,
+		Consumed: map[string]bool{},
+	})
+	satisfied := Decide(GateInput{
+		Persona:  gatePersona(SkillBinding{ID: "audit", Enforce: EnforceWarn}),
+		Call:     call,
+		Consumed: map[string]bool{"audit": true},
+	})
+
+	for _, r := range []GateResult{nothingToEnforce, skippedEverything, satisfied} {
+		if r.Decision != Allow {
+			t.Fatalf("all three states allow; got %v (%s)", r.Decision, r.Reason)
+		}
+	}
+
+	seen := map[string][]string{}
+	for name, r := range map[string]GateResult{
+		"nothing to enforce": nothingToEnforce,
+		"skipped everything": skippedEverything,
+		"satisfied":          satisfied,
+	} {
+		seen[r.Reason] = append(seen[r.Reason], name)
+	}
+	for reason, names := range seen {
+		if len(names) > 1 {
+			t.Errorf("these states are indistinguishable, all reporting %q: %v — "+
+				"an inert gate reads exactly like a passing one", reason, names)
+		}
+	}
+
+	// The state that hid best, called out on its own: a persona declaring no
+	// severity enforces nothing, and the line a human reads must say so.
+	if !strings.Contains(nothingToEnforce.Reason, "nothing to enforce") {
+		t.Errorf("a persona with no severities must say enforcement is off, got %q", nothingToEnforce.Reason)
+	}
+	// And the warn state must name what was skipped, since Warned is otherwise
+	// the only record of it.
+	if !strings.Contains(skippedEverything.Reason, "audit") {
+		t.Errorf("the warn reason must name the skipped skill, got %q", skippedEverything.Reason)
+	}
+}
