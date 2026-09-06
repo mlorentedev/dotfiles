@@ -198,9 +198,20 @@ func executeWorktreeReap(repoRoot string, info Info, runner SweepRunner) bool {
 }
 
 func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time.Time, absCwd string) bool {
-	// TOCTOU checks under lock: host process/cwd guard, clean status, merge status, lease expiration
+	// TOCTOU checks under lock: clean status, merge status, lease expiration,
+	// and LAST the host-process guard.
+	//
+	// The order is the point, not a style choice. isDirty and isMerged shell out
+	// to git, so a Gate f check placed before them leaves that latency inside
+	// the window between "nobody is in there" and the removal -- a shell that
+	// cds in while git is running would be missed. Gate f goes immediately
+	// before executeWorktreeReap so the window is as narrow as this code can
+	// make it. TestGateFIsTheLastCheckBeforeRemoval pins the order.
+	//
+	// It is also the cheaper order: Gate f walks all of /proc, so running it
+	// after the cheap refusals means fewer walks, not more.
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd || hostProcessInside(absWT).Inside {
+	if err != nil || absWT == absCwd {
 		return false
 	}
 	if isDirty(info.Path, runner) {
@@ -210,6 +221,10 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 		return false
 	}
 	if !isLeaseExpired(info.Path, now) {
+		return false
+	}
+	// Last, and deliberately so: see the ordering note above.
+	if hostProcessInside(absWT).Inside {
 		return false
 	}
 	return executeWorktreeReap(repoRoot, info, runner)

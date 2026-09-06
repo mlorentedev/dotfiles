@@ -161,3 +161,105 @@ func TestSweepRefusesWhenAProcessArrivesAfterTheGate(t *testing.T) {
 		t.Errorf("expected 2 skipped (main and the refused worktree), got %d", report.SkippedCount)
 	}
 }
+
+// orderRecordingRunner notes the sequence of the checks that run under the lock,
+// so the ORDER can be asserted rather than read.
+type orderRecordingRunner struct {
+	*MockSweepRunner
+	order *[]string
+}
+
+func (r *orderRecordingRunner) IsDirty(path string) (bool, error) {
+	*r.order = append(*r.order, "dirty")
+	return r.MockSweepRunner.IsDirty(path)
+}
+
+func (r *orderRecordingRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
+	*r.order = append(*r.order, "merged")
+	return r.MockSweepRunner.IsPRMerged(repoRoot, branch)
+}
+
+// Gate f must be the LAST check before the removal, and the ordering is a
+// correctness property rather than a preference.
+//
+// isDirty and isMerged shell out to git. A Gate f check placed before them
+// leaves that latency inside the window between "nobody is in there" and the
+// directory being deleted, so a shell that cds in while git runs is missed.
+// Round 4 raised it as a widened race window; the fix is the order, and this is
+// what stops it silently reverting.
+func TestGateFIsTheLastCheckBeforeRemoval(t *testing.T) {
+	var order []string
+
+	original := hostProcessInside
+	hostProcessInside = func(string) GateFReading {
+		order = append(order, "gatef")
+		return GateFReading{Inside: false}
+	}
+	t.Cleanup(func() { hostProcessInside = original })
+
+	tmpDir := t.TempDir()
+	mainRepo := filepath.Join(tmpDir, "myrepo")
+	reapableWT := filepath.Join(tmpDir, "myrepo-wt-reapable")
+	for _, d := range []string{mainRepo, reapableWT} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+	}
+
+	now := time.Now()
+	if err := SaveMetadata(reapableWT, Metadata{
+		ReapOK:         true,
+		CreatedAt:      now.Add(-2 * time.Hour),
+		LeaseExpiresAt: now.Add(-1 * time.Hour),
+	}); err != nil {
+		t.Fatalf("SaveMetadata: %v", err)
+	}
+
+	base := &MockSweepRunner{
+		MockGitRunner: MockGitRunner{
+			PorcelainOutput: "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
+				"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/reapable\n\n",
+			MergedBranches: map[string]bool{"feat/reapable": true},
+		},
+		OnWorktreeRemove: func(_, _ string) error {
+			order = append(order, "remove")
+			return nil
+		},
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot: mainRepo,
+		LockPath: filepath.Join(tmpDir, "sweep.lock"),
+	}, &orderRecordingRunner{MockSweepRunner: base, order: &order}, now)
+	if err != nil {
+		t.Fatalf("unexpected error during sweep: %v", err)
+	}
+
+	// Anchor: if nothing was reaped, the sequence below never reached the part
+	// this test is about and every assertion on it would pass vacuously.
+	if len(report.Reaped) != 1 {
+		t.Fatalf("fixture did not reap: %v (order was %v) — the ordering assertions "+
+			"would be meaningless", report.Reaped, order)
+	}
+
+	removeAt := indexOf(order, "remove")
+	if removeAt < 1 {
+		t.Fatalf("no removal recorded in %v", order)
+	}
+	if order[removeAt-1] != "gatef" {
+		t.Errorf("the check immediately before the removal was %q, not Gate f.\n"+
+			"full order: %v\n"+
+			"Anything between Gate f and the removal is time in which a process can "+
+			"enter the worktree unseen, and isDirty/isMerged are git shell-outs.",
+			order[removeAt-1], order)
+	}
+}
+
+func indexOf(xs []string, want string) int {
+	for i, x := range xs {
+		if x == want {
+			return i
+		}
+	}
+	return -1
+}
