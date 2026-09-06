@@ -133,7 +133,7 @@ If ambiguous, ask. Do not guess.
 ### Step 2 — Load the implementation side
 
 1. If a **PR** was provided: `gh pr view <ref> --json title,body,files` + `gh pr diff <ref>`. Read the full diff scope (not only the default file ordering). Map files-and-changes to spec sections and tasks.
-2. If no PR: `git diff <base>...HEAD` against the merge base (typically `main`/`master`).
+2. If no PR: `git diff <base>...HEAD`, where `<base>` is the base **the launcher resolved and stated in your prompt**. Never substitute `main`/`master` or infer one yourself: once the spec's work has landed, `main...HEAD` is empty and the review reads a diff of nothing while reporting that it reviewed the change. That is the defect this spec exists to remove.
 3. Also check `git log <base>..HEAD` for context the diff hides (commit messages may reveal incomplete work or reverts).
 
 ### Step 3 — Adversarial pass (refute, do not rubber-stamp)
