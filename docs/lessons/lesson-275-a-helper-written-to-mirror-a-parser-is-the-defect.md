@@ -88,12 +88,28 @@ fixed the symptom and kept the defect.
 Then test the branch the shipped data cannot reach. No record in the repo has
 CRLF fences on Linux, but the Windows CI leg compiles the same tree, and a body
 split that kept the `---` of a CRLF fence would prepend three dashes to every
-dispatched instruction **on that platform only**:
+dispatched instruction **on that platform only**. So `splitRecord` is table-driven
+over four inputs, written here with `<CR>` and `<LF>` standing in for the escapes
+themselves:
 
-```go
-{"crlf", "---\r\nname: x\r\n---\r\n\r\n# Mandate\r\nDo it.\r\n", "\r\nname: x\r", "# Mandate\r\nDo it."},
-{"bom",  "\ufeff---\nname: x\n---\n\nbody\n",                    "\nname: x",     "body"},
-```
+| case | input | want front | want body |
+|---|---|---|---|
+| `lf` | `---<LF>name: x<LF>---<LF><LF># Mandate<LF>Do the thing.<LF>` | `<LF>name: x` | `# Mandate<LF>Do the thing.` |
+| `crlf` | same with `<CR><LF>` throughout | `<LF>name: x<CR>` | `# Mandate<CR><LF>Do it.` |
+| `bom` | a leading U+FEFF, then the `lf` case | `<LF>name: x` | `body` |
+| `empty body` | fences with nothing after them | `<LF>name: x` | *(empty)* |
+
+Plus two malformed inputs — no fence, and an unclosed fence — which must each
+return an **error and never an empty body**. An empty body would dispatch the
+bare task, which is the generic agent the change exists to replace, behind a
+successful exit.
+
+> Written with `<LF>` rather than the real escapes on purpose: this repo's
+> `check-md-escapes.sh` guard fails CI on a literal backslash-n followed by a
+> line-start glyph, because that is the signature of a known markdown-corruption
+> class. The first draft of this lesson tripped it. The guard was right and the
+> prose changed — a lesson about invisible characters is a poor place to argue
+> for an exception.
 
 ## The rule
 
