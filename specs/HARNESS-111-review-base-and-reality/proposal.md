@@ -53,12 +53,47 @@ merge-and-re-review cycle.
 This is not a missing policy. It is a contradiction inside one document, and the fix is to resolve
 it in favour of the rule that was already stated more precisely.
 
+### Root 3 — the skill asks for edits the archive gate then refuses
+
+Two lines of the template instruct the reviewer to demand contract-file changes before a spec
+archives:
+
+- `SKILL.md:153` — *"**Major**: likely bug or significant gap; fix or spec update required **before
+  archive**."*
+- `SKILL.md:282` — the recommendations heading itself: *"### Recommended next steps **(before
+  archive)**"*.
+
+The archive gate measures a review's staleness against `proposal.md`, `tasks.md` and
+`features.json`. So a reviewer that returns **PASS-WITH-GAPS** and heads its list "before archive"
+has asked for exactly the edits that invalidate the verdict it just issued. Applying them yields:
+
+```
+Error: review.md is stale: features.json, proposal.md changed after reviewed_sha 5a68096
+```
+
+Measured on BUG-093 (#1516) round 5: four of seven recommendations targeted the contract set, on a
+spec that had already spent four rounds.
+
+**The gate is right and the template is wrong.** A verdict is about a state; the review's own
+findings quote text that must still be on disk when the spec archives, so editing the reviewed files
+makes the review internally inconsistent — a worse defect than the stale evidence line it would
+correct. And `PASS-WITH-GAPS` already means the gaps are *tracked*, not fixed. What was missing is
+the routing rule: under FAIL, contract edits are the point and a re-review follows; under a passing
+verdict the contract set is closed and recommendations are dispositioned in `verification.md`, which
+is excluded from the staleness check for precisely this purpose.
+
+The refusal message compounds it. All three exits it named — re-review, waive, force — discard or
+bypass a verdict that is often perfectly good, so an operator reading only those reaches for an
+override while a passing review sits beside it.
+
 ## What
 
 1. `dotf spec review` resolves a base and records it as `base_sha` in `review-request.json`, then
    states it in the reviewer's prompt.
 2. The launcher **refuses** when no base resolves, or when the base is HEAD.
 3. The skill's verdict list is made consistent with its own Reality rule.
+4. The skill routes recommendations by **which set the fix lands in**, and the staleness refusal
+   offers the exit that keeps the review — first, ahead of the three overrides.
 
 ### How the base is resolved, and why not from the PR
 
@@ -118,3 +153,10 @@ The second case is the entire point: it is the one the old code got wrong by hav
    guard fails if either half regresses.
 7. `go build`, `go test ./...`, `golangci-lint run`, `GOOS=windows go vet ./...` clean; the new
    guard passes and is mutation-proven.
+8. The skill no longer heads its recommendations "(before archive)" and no longer requires a Major's
+   spec update before archive; it states which files are the contract set, and that a passing verdict
+   closes that set while `verification.md` stays open for dispositions. Both copies — the repo record
+   at `harness/skills/` and the vault source at `00_meta/skills/` — carry the same text.
+9. The staleness refusal names the exit that keeps the review (restore the contract files, record the
+   dispositions in `verification.md`) **before** the three overrides, and a guard fails if that exit
+   is dropped or demoted below any override.

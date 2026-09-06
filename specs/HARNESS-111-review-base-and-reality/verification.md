@@ -86,3 +86,43 @@ Root 1 has no such gap: it is compiled into `dotf`.
 - **The two-layer test split is deliberate**, and it is BUG-093 round 3's lesson applied: real-git
   tests prove the resolver's answer is right, seam tests prove the caller honours it. A seam test
   passes over a wrong implementation; a resolver test cannot see whether anyone acts on it.
+
+## Root 3 — what was executed
+
+- **The two defective forms are gone from both copies, and the routing rule is in both.** Run
+  verbatim, the f7 command returns `0` then `4` for the repo record and `0` then `4` for the vault
+  source. A bare `grep -c "before archive"` returns `3` per copy and is the **wrong** command: two
+  are the skill describing when it runs, and the third is the new instruction not to use the phrase.
+- **`TestStaleRefusalOffersTheExitThatKeepsTheReview` is mutation-proven.** Reverting `review.go` to
+  the previous three-exit message fails it with *"refusal must name the exit that keeps the review"*;
+  restoring returns it to PASS. It asserts three things, not one: the exit is present, it says where
+  the dispositions go, and it is offered **before** each of the three overrides.
+- **`bash scripts/compile-harness.sh --check` exits 0** — `OK: no harness drift` — so the edited
+  record is still consistent with what the harness expects to generate.
+- **The bodies of the two copies are byte-identical modulo frontmatter**, confirmed by diffing them
+  with the frontmatter stripped.
+- **Go layer clean**: `go build`, `go vet`, `go test ./...`, `GOOS=windows go vet`,
+  `GOOS=darwin go vet` all rc=0; `golangci-lint run` 0 issues on the pinned 2.12.2.
+
+### Not yet true at the time of writing, and it matters
+
+There is a **third** copy of this skill — the deployed one the reviewer actually opens at
+`~/.pi/agent/skills/adversarial-review/SKILL.md` and `~/.claude/skills/adversarial-review/SKILL.md`.
+Measured after the fix landed in the record and the vault, both deployed copies still read **2
+defective forms, 0 routing-rule lines**. `compile-harness.sh --deploy` must run after #1543 merges
+and before this spec's own review is launched, or round 1 of HARNESS-111 will be reviewed under the
+very template HARNESS-111 fixes — and will produce the list root 3 forbids.
+
+## Decisions made during implementation, root 3
+
+- **The gate is correct and the template was wrong**, and that direction was established by
+  measurement before anything was designed: of the ten lines that changed in BUG-093's contract
+  files, **zero** were acceptance criteria and **zero** were `behavior` fields — six `evidence` and
+  four `verification` strings, plus prose.
+- **Field-granular staleness was considered and rejected.** Exempting `verification` would exempt
+  the command the reviewer *ran*, opening the "get a pass, rewrite in the working tree, archive"
+  bypass that `review.go:187` already names; and `proposal.md` prose has no field structure to key
+  on. Recorded in `tasks.md` under *Not done, deliberately*, because it is the attractive wrong turn.
+- **`--force-without-review` and `review: waived` were both available and both refused.** The first
+  discards a review that exists and passed; the second asserts none happened. Each is a lie in the
+  opposite direction from the stale evidence line it would paper over.

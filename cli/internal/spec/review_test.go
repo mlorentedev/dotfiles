@@ -227,6 +227,56 @@ func TestArchiveBlocksOnStaleReview(t *testing.T) {
 	}
 }
 
+// TestStaleRefusalOffersTheExitThatKeepsTheReview: the three exits the refusal
+// used to name — re-review, waive, force — all discard or bypass a verdict that
+// may be perfectly good. The common way to reach this refusal is applying a
+// PASSing review's own recommended next steps, and there the review is fine and
+// the contract edit is the thing to undo. That exit must be on offer, and first:
+// an operator reads the list in order, and the overrides are the expensive ones.
+func TestStaleRefusalOffersTheExitThatKeepsTheReview(t *testing.T) {
+	root := t.TempDir()
+	archivableSpec(t, root, "AI-001-x", passingReview("AI-001-x"))
+
+	_, err := Archive(root, "AI-001-x", ArchiveOptions{
+		Staleness: fakeStaleness{stale: true, known: true, reason: "proposal.md changed after reviewed_sha"},
+	})
+	if err == nil {
+		t.Fatal("expected a stale review to block")
+	}
+	msg := err.Error()
+
+	restore := strings.Index(msg, "restore the contract files")
+	if restore < 0 {
+		t.Fatalf("refusal must name the exit that keeps the review, got: %s", msg)
+	}
+	if !strings.Contains(msg, "verification.md") {
+		t.Fatalf("refusal must say where the dispositions go, got: %s", msg)
+	}
+
+	// Ordering alone is not enough: an operator who does not know that the last
+	// three throw the review away will still reach for one. The message has to
+	// say which group it is reading, and the labels have to bracket the exits
+	// they describe.
+	keeps := strings.Index(msg, "keeps the review")
+	discards := strings.Index(msg, "discards it")
+	if keeps < 0 || discards < 0 {
+		t.Fatalf("refusal must label which exits keep the review and which discard it, got: %s", msg)
+	}
+	if keeps >= restore || restore >= discards {
+		t.Fatalf("the labels do not bracket the exit they describe (keeps=%d restore=%d discards=%d), got: %s",
+			keeps, restore, discards, msg)
+	}
+	for _, override := range []string{"re-run /adversarial-review", "review: waived", "--force-without-review"} {
+		at := strings.Index(msg, override)
+		if at < 0 {
+			t.Fatalf("refusal dropped the %q exit, got: %s", override, msg)
+		}
+		if at < restore {
+			t.Fatalf("%q is offered before the exit that keeps the review, got: %s", override, msg)
+		}
+	}
+}
+
 // TestArchiveProceedsWhenStalenessUnknown: outside a git work tree there is no
 // history for the review to be stale against, so the check is skipped rather
 // than guessed. Presence and verdict still applied.
