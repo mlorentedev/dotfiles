@@ -319,8 +319,20 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	if checker == nil {
 		checker = gitStaleness{}
 	}
+	// The first exit named is the one that keeps the review, and it is named
+	// first deliberately. The other three all discard or bypass a verdict that
+	// may be perfectly good, so an operator offered only those reaches for an
+	// override on a spec that has a passing review sitting right there.
+	//
+	// The common way to land here is applying a passing review's own recommended
+	// next steps, which the review skill used to head "(before archive)" — see
+	// BUG-093 (#1516), where four of them targeted the contract set. Restoring
+	// the contract and recording the dispositions is the correct answer there,
+	// and it was not previously on offer.
 	if stale, known, reason := checker.Stale(repoRoot, specID, review.ReviewedSHA); known && stale {
-		return fmt.Errorf("%s is stale: %s\nre-run /adversarial-review against the current head, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
+		return fmt.Errorf("%s is stale: %s\n"+
+			"restore the contract files to reviewed_sha and record what changed as dispositions in verification.md (excluded from this check), "+
+			"re-run /adversarial-review against the current head, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
 			ReviewFile, reason)
 	}
 

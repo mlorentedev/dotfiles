@@ -150,11 +150,22 @@ For each acceptance criterion / scenario:
 Classify each finding:
 
 - **Blocker**: incorrect behavior, security/privacy issue, or spec violation that should stop archive.
-- **Major**: likely bug or significant gap; fix or spec update required before archive.
+- **Major**: likely bug or significant gap; fix or spec update required, and a re-review after it.
 - **Minor**: clarity, maintainability, or low-risk gap; can follow up.
 - **Question / assumption**: needs human or author confirmation.
 
 For each finding, state whether the fix belongs in **code**, **tests**, **spec artifacts** (proposal/tasks/verification), or **vault** (new ADR / pattern promotion candidate).
+
+**Where the fix lands decides when it can be applied, so say which set it is in.** `proposal.md`,
+`tasks.md` and `features.json` are the **contract set**: the archive gate measures the review's
+staleness against exactly those three, so editing any of them after the review invalidates it. That
+is correct and not a defect — a verdict is about a state, and the review's own findings quote text
+that must still be there when the spec archives. Everything else — code, tests, scripts committed
+beside the spec, and `verification.md` — is outside the set and can be changed freely.
+
+So a Blocker or a REAL Major in the contract set means **fix, then re-review**: the next round is the
+mechanism, not an inconvenience. Never ask for a contract edit alongside a passing verdict; if the
+change is worth blocking on, the verdict is FAIL.
 
 ### Reality classification — REAL / THEORETICAL / SPECULATIVE (HARNESS-004)
 
@@ -279,9 +290,21 @@ The body of the file is the markdown below, unchanged.
 ### Verdict
 PASS | PASS WITH GAPS | FAIL
 
-### Recommended next steps (before archive)
+### Recommended next steps
 - ...
 ```
+
+**Route every recommendation by set, and say which.** On a **FAIL**, contract-set changes are the
+point and a re-review follows. On a **PASS** or **PASS WITH GAPS**, the contract set is closed: the
+verdict means the gaps are tracked, not fixed, and an edit to `proposal.md`, `tasks.md` or
+`features.json` would invalidate the verdict that permitted the archive. Write those recommendations
+for the implementer to disposition in `verification.md` — applied, ticketed, or declined with a
+reason — or to carry into a follow-up ticket. `verification.md` is excluded from the staleness check
+for exactly this purpose.
+
+Do not head the list "before archive". Measured on BUG-093 round 5 (#1516): a PASS-WITH-GAPS whose
+recommendations asked for four contract edits, all of which the archive gate then refused, on a spec
+that had already spent four rounds.
 
 ### Worked example (severity × reality × test coverage)
 
