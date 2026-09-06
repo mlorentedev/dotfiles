@@ -213,6 +213,17 @@ run_mutation SURVIVES "AC2: filepath.Abs error fails open (unreachable by input)
 		return GateFReading{Inside: false}
 	}'
 
+run_mutation SURVIVES "AC2: unreadable /proc fails open (needs the directory read injected)" \
+    "internal/worktree/sweep_proc_linux.go" \
+    '	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return GateFReading{Inside: true}
+	}' \
+    '	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return GateFReading{Inside: false}
+	}'
+
 printf '\n=== summary ===\n'
 printf '  caught: %d   declared survivors: %d   regressions/anchor-miss: %d\n' \
     "$pass" "$expected_survivors" "$fail"
