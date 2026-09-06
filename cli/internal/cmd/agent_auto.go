@@ -109,7 +109,7 @@ which resolves shipper for a task that merely mentions docker.`,
 
 			opts, backend, err := prepareDispatch(m, dispatchInputs{
 				role: persona.Name, task: composed, tier: res.tier, cwd: cwd,
-				backendName: backendName, repoRoot: repoRoot,
+				backendName:  backendName,
 				semaphoreDir: semaphoreDir, timeout: timeout,
 			})
 			if err != nil {

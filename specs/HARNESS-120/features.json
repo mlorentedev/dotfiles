@@ -44,8 +44,8 @@
   {
     "id": "HARNESS-120-f7",
     "behavior": "AC7 — one REAL dispatch (not dry-run) answers from a pool chosen by the persona's own declared tier, quoted verbatim in verification.md.",
-    "verification": "dotf agent auto --task \"open a ticket for the bitacora\" --timeout 5m | jq -e '.status == \"ok\" and .role == \"planner\" and .tier == \"mid\" and .resolution.tier_from == \"inferred\"'",
+    "verification": "cd cli && go run ./cmd/dotf agent auto --role reviewer --task 'Reply with the single word OK and do nothing else.' --timeout 5m | jq -e '.status == \"ok\" and .role == \"reviewer\" and .tier == \"mid\" and .resolution.tier_from == \"inferred\"'",
     "state": "blocked",
-    "evidence": "Blocked on this machine: machine.json declares no `machine.id`, so ADR-032 §8's identity gate denies every non-local pool. Declaring one is a pool-permission decision for the machine's owner, not for the implementer. See verification.md."
+    "evidence": "Blocked on this machine: machine.json declares no `machine.id`, so ADR-032 §8's identity gate denies every non-local pool. Declaring one is a pool-permission decision for the machine's owner, not for the implementer. See verification.md. NOTE the command is deliberately inert: AC7 asserts that a pool chosen by the persona's DECLARED tier answered, which `tier_from: inferred` proves, so the task is a no-op and the persona is `reviewer` (read-only by mandate). A task like \"open a ticket for the bitacora\" would prove the same thing while asking a live model to actually file one."
   }
 ]

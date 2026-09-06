@@ -53,7 +53,7 @@ var dispatchBackends = agent.DefaultBackends
 // then supplies the same struct.
 type dispatchInputs struct {
 	role, task, tier, cwd string
-	backendName, repoRoot string
+	backendName           string
 	semaphoreDir          string
 	timeout               time.Duration
 }
@@ -218,7 +218,7 @@ fails silently and in the direction nobody notices.`,
 			}
 			opts, backend, err := prepareDispatch(m, dispatchInputs{
 				role: role, task: task, tier: tier, cwd: cwd,
-				backendName: backendName, repoRoot: repoRoot,
+				backendName:  backendName,
 				semaphoreDir: semaphoreDir, timeout: timeout,
 			})
 			if err != nil {

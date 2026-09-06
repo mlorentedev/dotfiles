@@ -174,8 +174,29 @@ below.
       content is that a REAL pool answered, and the proposal's own risk section
       says the honest claim must match the criterion.
 
+      **This is not new to `auto`.** The same gate refuses `dotf agent run` on
+      this machine and always has: `machine.json` here has only ever carried a
+      `paths` block. So AC7 is blocked by a pre-existing machine state, not by
+      anything this change introduced.
+
       To close it, declare an identity in `~/.config/dotfiles/machine.json` and
-      run the command in `features.json` entry `HARNESS-120-f7`.
+      run the command in `features.json` entry `HARNESS-120-f7`:
+
+      $ cd cli && go run ./cmd/dotf agent auto --role reviewer \
+          --task 'Reply with the single word OK and do nothing else.' --timeout 5m
+
+      Two details of that command are deliberate and should not be "simplified".
+
+      **The task is inert.** AC7's claim is that a pool chosen by the persona's
+      OWN DECLARED tier answered, which `resolution.tier_from: inferred` proves;
+      the join is AC1's business, not AC7's. Running the AC1 task text against a
+      live model instead would ask a real agent to actually go and file a ticket,
+      with `--cwd` defaulting to this worktree. `reviewer` is named for the same
+      reason: it declares `mid`, and its record forbids it to edit anything.
+
+      **It is `go run ./cmd/dotf`, not `dotf`.** The `dotf` on PATH is a stale
+      dev source build (#1469) with no `auto` subcommand; running it would report
+      "unknown command" and read like the feature is missing.
 
 ## Test status
 
