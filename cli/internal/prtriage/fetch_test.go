@@ -139,6 +139,42 @@ func TestFetchWithRunnerDrivesTheWholePath(t *testing.T) {
 	}
 }
 
+// TestFetchCarriesUpdatedAtFromTheWire is TOOL-019 (#1422) at the transport
+// layer, and it is the half the domain tests cannot reach: those construct
+// Comment values directly, so UpdatedAt could be absent from the REST struct or
+// left unmapped in the conversion and every one of them would still pass.
+//
+// The fixture is the shape the defect takes in production: ONE comment created
+// before the triage and edited after it. Both reviewers here re-review by
+// growing an existing comment rather than posting a new one, so createdAt stays
+// behind and a queue reading it reports clear over unread findings.
+func TestFetchCarriesUpdatedAtFromTheWire(t *testing.T) {
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls": `[{"number":12,"title":"a re-reviewed PR","html_url":"https://github.com/o/r/pull/12"}]`,
+		"/issues/12/comments": `[{"user":{"login":"github-actions[bot]"},
+		                          "body":"## PR Reviewer Guide\nfirst, then more",
+		                          "created_at":"2026-09-02T10:00:00Z",
+		                          "updated_at":"2026-09-02T12:00:00Z"},
+		                         {"user":{"login":"manu"},
+		                          "body":"## Review triage\ndispositioned",
+		                          "created_at":"2026-09-02T11:00:00Z",
+		                          "updated_at":"2026-09-02T11:00:00Z"}]`,
+	}}
+
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("queue length = %d, want 1 — the reviewer edited its comment at 12:00, "+
+			"after the 11:00 triage, so #12 is pending\n%+v", len(got), got)
+	}
+	if want := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC); !got[0].At.Equal(want) {
+		t.Errorf("At = %v, want %v — REST spells this updated_at; reporting created_at here "+
+			"is the whole defect, because it puts the reviewer behind the triage", got[0].At, want)
+	}
+}
+
 // TestFetchUsesRESTOnly is AC2. The point of the change is that no GraphQL call
 // remains, and the only way to keep that true is to assert on the requests
 // themselves — a reintroduced `gh pr list` would otherwise pass every other test

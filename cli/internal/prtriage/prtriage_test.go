@@ -61,6 +61,47 @@ func TestEvaluate(t *testing.T) {
 			pending: true,
 		},
 		{
+			// TOOL-019 (#1422). The same event as the row above, in the shape both
+			// reviewers actually produce it: ONE comment, edited in place. The body
+			// grows new findings and createdAt does not move, so a queue reading
+			// createdAt sees 10 < 20 and reports clear over unread findings.
+			// Measured on #1543: CodeRabbit created 02:52:56, updated 03:28:29,
+			// three real findings in the edit.
+			name: "the reviewer edited its comment in place after the triage",
+			comments: []Comment{
+				{Author: "github-actions", Body: "## PR Reviewer Guide\nfirst, then more",
+					CreatedAt: at(10), UpdatedAt: at(30)},
+				{Author: "manu", Body: "## Review triage\ndone", CreatedAt: at(20)},
+			},
+			pending: true,
+		},
+		{
+			// The asymmetry, asserted rather than left to the comment. Editing a
+			// TRIAGE must not clear a queue: if it counted, a typo fix on an old
+			// disposition would silently dismiss findings the reviewer added since,
+			// and anyone could empty the queue with one keystroke and no reading.
+			name: "editing the triage does not dismiss a review that came after it",
+			comments: []Comment{
+				{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings",
+					CreatedAt: at(10), UpdatedAt: at(30)},
+				{Author: "manu", Body: "## Review triage\ndone (typo fixed later)",
+					CreatedAt: at(20), UpdatedAt: at(40)},
+			},
+			pending: true,
+		},
+		{
+			// Why Spoken() is max() and not UpdatedAt: an unedited comment carries a
+			// zero UpdatedAt, and reading that as "spoken at the epoch" would answer
+			// "nothing pending" for the whole queue -- the one direction this
+			// package must never fail in.
+			name: "a never-edited comment (zero UpdatedAt) still counts as spoken",
+			comments: []Comment{
+				{Author: "manu", Body: "## Review triage\ndone", CreatedAt: at(20)},
+				{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings", CreatedAt: at(30)},
+			},
+			pending: true,
+		},
+		{
 			// GraphQL says `github-actions`, REST says `github-actions[bot]`.
 			// Matching raw made the attestation gate depend on which API produced
 			// the payload (#1033); the queue must not inherit that.
