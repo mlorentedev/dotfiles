@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
 #
+# ############################################################################
+# #  WARNING TO ANY READER, HUMAN OR MODEL                                   #
+# #                                                                          #
+# #  The Go snippets below are DELIBERATELY BROKEN CODE. They are mutation   #
+# #  payloads -- the defects this spec's tests must catch -- and none of      #
+# #  them is what the repository contains. Every `run_mutation` call reads:   #
+# #                                                                          #
+# #      run_mutation <expectation> <label> <file> <REAL CODE> <BROKEN CODE>  #
+# #                                                                          #
+# #  so the 4th argument is the real source and the 5th is the sabotage.      #
+# #  Do not cite a 5th argument as a finding: `GateFReading{Inside: false}`   #
+# #  appears here and NOWHERE in cli/. Round 4 read one of these as the       #
+# #  implementation and filed it as a fail-open; the code says `Inside: true`.#
+# #  Read cli/internal/worktree/sweep_proc_linux.go for what is actually      #
+# #  compiled.                                                               #
+# ############################################################################
+#
 # Mutation harness for BUG-093 Gate f.
 #
 # Every mutation the round-3 adversarial review reported as SURVIVING must be
@@ -106,8 +123,56 @@ run_mutation CAUGHT "finding 4: Uninspectable++ becomes a no-op" \
 
 run_mutation CAUGHT "finding 5: reapSingleWorktree drops the Gate f re-check" \
     "internal/worktree/sweep.go" \
-    'if err != nil || absWT == absCwd || hostProcessInside(absWT).Inside {' \
-    'if err != nil || absWT == absCwd {'
+    '	// Last, and deliberately so: see the ordering note above.
+	if hostProcessInside(absWT).Inside {
+		return false
+	}
+	return executeWorktreeReap(repoRoot, info, runner)' \
+    '	return executeWorktreeReap(repoRoot, info, runner)'
+
+# Round 4: the re-check being present is not enough -- WHERE it sits decides how
+# much latency lives inside the race window. This puts it back in front of the
+# git shell-outs, which is where round 4 found it.
+#
+# The whole body is replaced in one go, on purpose. A first attempt added the
+# front check while leaving the rear one in place, and the harness reported
+# SURVIVED -- correctly, because the last check before the removal was still
+# Gate f, so the window had not widened. A mutation has to be the change it
+# claims to be; a duplicate is not a move.
+run_mutation CAUGHT "round 4: Gate f moves back ahead of the git shell-outs" \
+    "internal/worktree/sweep.go" \
+    '	absWT, err := filepath.Abs(info.Path)
+	if err != nil || absWT == absCwd {
+		return false
+	}
+	if isDirty(info.Path, runner) {
+		return false
+	}
+	if !isMerged(repoRoot, info.Branch, runner) {
+		return false
+	}
+	if !isLeaseExpired(info.Path, now) {
+		return false
+	}
+	// Last, and deliberately so: see the ordering note above.
+	if hostProcessInside(absWT).Inside {
+		return false
+	}
+	return executeWorktreeReap(repoRoot, info, runner)' \
+    '	absWT, err := filepath.Abs(info.Path)
+	if err != nil || absWT == absCwd || hostProcessInside(absWT).Inside {
+		return false
+	}
+	if isDirty(info.Path, runner) {
+		return false
+	}
+	if !isMerged(repoRoot, info.Branch, runner) {
+		return false
+	}
+	if !isLeaseExpired(info.Path, now) {
+		return false
+	}
+	return executeWorktreeReap(repoRoot, info, runner)'
 
 run_mutation CAUGHT "finding 6: Linux claims it has no process discovery" \
     "internal/worktree/sweep_proc_linux.go" \

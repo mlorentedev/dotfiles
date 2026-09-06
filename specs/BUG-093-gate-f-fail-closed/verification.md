@@ -5,6 +5,48 @@ created: "2026-09-05"
 
 # Verification - BUG-093-gate-f-fail-closed
 
+## Round 4 review: FAIL — disposition
+
+`agy/gemini-3.1-pro-high`, random draw, not the implementer, and a **different provider family**
+from round 3's `nan/qwen3.8-flash`. Reviewed `5101938` — the launch pin and `reviewed_sha` agree,
+so the provenance problem round 3 flagged is closed.
+
+Two findings, down from ten. **One applied, one refuted with evidence.**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (Major, THEORETICAL) | The TOCTOU re-check sits *before* `isDirty` and `isMerged`, which shell out to git, leaving that latency inside the race window | **Applied.** Real, and cheap to fix. Gate f now runs immediately before `executeWorktreeReap`. It is also the cheaper order: Gate f walks all of `/proc`, so running it after the cheap refusals means fewer walks. Pinned by `TestGateFIsTheLastCheckBeforeRemoval` and a new mutation |
+| 2 (Minor, SPECULATIVE) | `filepath.Abs` failure inside `isHostProcessInside` "fails OPEN (`Inside: false`)" | **REFUTED.** The code returns `GateFReading{Inside: true}` — fail *closed*. `grep -n "Inside: false" cli/internal/worktree/sweep_proc_linux.go` returns **nothing**; the string exists nowhere in `cli/`. See the cause below |
+
+### What caused the false finding, and what was done about it
+
+The only `Inside: false` strings in the repository are the **mutation payloads inside
+`specs/BUG-093-gate-f-fail-closed/mutate.sh`** — the deliberately broken code the tests must catch.
+Committing the harness (a round-3 fix, so f8 would be a check rather than a grep for a word in a
+markdown file) put sabotage into the reviewer's reading surface, and the reviewer cited a mutation
+as the implementation.
+
+**The harness defended itself against being run wrongly and not against being read wrongly.** It
+now carries a banner naming the argument order (`<real code> <broken code>`), stating that the 5th
+argument is sabotage, and naming this exact misreading. Recorded rather than dismissed as reviewer
+error: the artifact invited it.
+
+### A mutation that survived, correctly
+
+The first version of the round-4 mutation *added* the Gate f check at the front while leaving the
+rear one in place, and the harness reported **SURVIVED** — rightly, because the last check before
+the removal was still Gate f and the window had not widened. A duplicate is not a move. The
+mutation now replaces the whole function body, and is CAUGHT. The harness caught a defect in the
+harness.
+
+### Round 4 results
+
+```
+  CAUGHT   round 4: Gate f moves back ahead of the git shell-outs
+  caught: 8   declared survivors: 1   regressions/anchor-miss: 0
+  exit 0
+```
+
 ## Round 3 review: FAIL — disposition
 
 `nan/qwen3.8-flash`, random draw, not the implementer. Verdict **FAIL** against `dab7b6e`, on
