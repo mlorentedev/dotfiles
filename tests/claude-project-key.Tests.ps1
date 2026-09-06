@@ -13,6 +13,7 @@ $script:Cases = @(
     @{ Path = 'C:\Users\me\p';                                  Key = 'C--Users-me-p' }
     @{ Path = 'C:\Users\mlorente\Projects\Workspace\dotfiles';  Key = 'C--Users-mlorente-Projects-Workspace-dotfiles' }
     @{ Path = '/home/me/Projects/dotfiles';                     Key = '-home-me-Projects-dotfiles' }
+    @{ Path = '/home/manu/Projects/svqtriana.github.io';        Key = '-home-manu-Projects-svqtriana-github-io' }
 )
 
 # Probe (discovery time): does the installed dotf support `mem project-key`? A
