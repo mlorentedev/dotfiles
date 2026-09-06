@@ -144,7 +144,47 @@ func Decide(in GateInput) GateResult {
 				in.Persona.Name, plural(len(missing), "skill"), strings.Join(missing, ", ")),
 		}
 	}
-	return GateResult{Decision: Allow, Warned: warned, Reason: "all blocking skills consumed"}
+	// THREE DISTINGUISHABLE STATES SHARED ONE SENTENCE, AND IT WAS THE WRONG ONE.
+	//
+	// "all blocking skills consumed" was returned for a persona that satisfied
+	// every obligation, for one that skipped every warn-level obligation it has,
+	// and for one that declares no severities at all. It is not false — "blocking"
+	// means `enforce: block`, and no persona carries one — which is exactly the
+	// problem: the predicate is VACUOUSLY true, so it was true in all 11526
+	// decisions ever recorded and discriminated none of them.
+	//
+	// The cost is not cosmetic. Both architect's and shipper's records tell the
+	// reader that a merged migration cannot be trusted as an enforced one BECAUSE
+	// an inert gate and a passing gate write the same line. That is doctrine in
+	// two shipped persona records, and it stays true until this reads differently.
+	//
+	// Counted over the persona's declared skills rather than over `warned`,
+	// because the question "does this persona gate anything at all" is about the
+	// record, not about this call.
+	gated := 0
+	for _, s := range in.Persona.Skills {
+		if s.Enforce != EnforceUnset {
+			gated++
+		}
+	}
+
+	switch {
+	case len(warned) > 0:
+		// Reached with Decision: Allow — a warn is reported, never enforced. The
+		// reason has to say which, because `Warned` is the only other evidence and
+		// a human reads this line first.
+		return GateResult{Decision: Allow, Warned: warned, Reason: fmt.Sprintf(
+			"%s not consumed: %s", plural(len(warned), "warn-level skill"), strings.Join(warned, ", "))}
+	case gated == 0:
+		// ENFORCEMENT IS OFF FOR THIS PERSONA, and nothing else in the record says
+		// so. This is the state a stale vault half or an unmigrated record leaves
+		// behind, and the one the old sentence hid best.
+		return GateResult{Decision: Allow, Reason: fmt.Sprintf(
+			"persona %q declares no severities — nothing to enforce", in.Persona.Name)}
+	default:
+		return GateResult{Decision: Allow, Reason: fmt.Sprintf(
+			"all %s consumed", plural(gated, "gated skill"))}
+	}
 }
 
 func plural(n int, word string) string {
