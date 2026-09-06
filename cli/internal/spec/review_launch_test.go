@@ -308,7 +308,7 @@ func TestReviewerSkillPathIsPerRunner(t *testing.T) {
 // differently is refused for a string mismatch rather than a policy breach,
 // burning a whole review round.
 func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.T) {
-	p := ReviewPrompt("AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md")
+	p := ReviewPrompt("AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md", "basebasebase")
 	for _, want := range []string{
 		"AI-001-x", "/repo", "/skill/SKILL.md",
 		"`nan/deepseek-v4-flash`",
@@ -487,7 +487,7 @@ func TestReviewerCommandDoesNotGivePiAgySpecificFlags(t *testing.T) {
 // identity the launcher had known since the draw. 40 minutes, 248 bash calls, no
 // review.md.
 func TestReviewPromptTellsTheReviewerWhoItIs(t *testing.T) {
-	p := ReviewPrompt("AI-042-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md")
+	p := ReviewPrompt("AI-042-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md", "basebasebase")
 	for _, want := range []string{
 		"You are running as `nan/deepseek-v4-flash`",
 		"(runner `pi`)",
