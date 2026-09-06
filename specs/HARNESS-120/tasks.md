@@ -54,40 +54,53 @@ created: "2026-09-05"
 - [ ] Refactor: one error type carrying the candidates, so the command can
       render both cases without re-testing the string
 
-### 3. The command
+### 3. Making the persona travel
 
-- [ ] [AC1] Failing test: `dotf agent auto --task "…" --backend dry-run` with
-      neither `--role` nor `--tier` emits one JSON object whose `role` and
-      `tier` come from the join and the record
+> The measurement this rests on: `Request.Role` is set at `dispatch.go:136` and
+> read only by `dryrun.go:22`. Neither real backend sends it. So a dispatch is
+> currently generic, and this is the section that changes that.
+
+- [ ] [P] [AC6] Failing test: `PersonaPreamble` renders a persona's record —
+      body, not frontmatter — with a delimiter, and the task after it
+- [ ] [AC6] Implement, reading the body from `Persona.Path` via the existing
+      `frontmatterBlock` splitter rather than a second parser
+- [ ] [AC6] Failing test at the dispatch seam: with `--role reviewer` the
+      `Request.Task` the backend RECEIVES contains reviewer's mandate; with
+      `--role builder` it does not. Assert on the backend's received request —
+      a test reading stdout would pass on a preamble that was built and dropped
+- [ ] [AC6] Wire the preamble into the task at the command layer, not inside
+      `Dispatch` — the walk retries across pools and must send identical bytes
+      each time, so composition happens once, before the walk
+
+### 4. The command
+
+- [ ] [AC1] Failing test: `dotf agent auto --task "open a ticket for the
+      bitacora" --backend dry-run` with neither `--role` nor `--tier` reports
+      `role: planner`, `tier: mid`
 - [ ] [AC1] Implement `newAgentAutoCmd`, wiring
-      Suggest → ResolveOne → ResolveTierForPersona → `agent.Dispatch`, reusing
-      the machine-policy, semaphore and capacity setup `agent run` already does
-- [ ] Refactor: extract the shared dispatch preamble out of `newAgentRunCmd` so
-      denial, semaphore and capacity are configured in ONE place — two callers
-      of a fail-closed policy is two places it can be forgotten
+      Suggest → ResolveOne → ResolveTierForPersona → preamble →
+      `agent.Dispatch`, reusing the machine-policy, semaphore and capacity
+      setup `agent run` already does
+- [ ] Refactor: extract that shared setup out of `newAgentRunCmd` so denial,
+      semaphore and capacity are configured in ONE place — two callers of a
+      fail-closed policy is two places it can be forgotten
 - [ ] [AC5] Failing test: `--role` skips the join entirely and `--tier`
       overrides the record, with both marked in the output as dictated
-- [ ] [AC5] Implement the overrides and the `resolved_by` field
+- [ ] [AC5] Implement the overrides and the inferred/dictated reporting
 - [ ] [AC2] [AC3] Failing test: both refusals exit non-zero and dispatch
       NOTHING (assert against a backend that records its calls, not against
       stdout)
 - [ ] [AC2] [AC3] Implement
-
-### 4. Optional isolation
-
-- [ ] [AC6] Failing test: `--worktree <slug>` creates the worktree, passes a
-      cwd inside it, reports path and branch in the JSON, and the worktree
-      still exists after a FAILED dispatch
-- [ ] [AC6] Implement over `worktree.Add`, in-process — never shelling out to
-      `dotf worktree add`
-- [ ] [AC6] Guard: a test asserting `auto` calls nothing that removes a
-      worktree. The teardown is a human-authorised `dotf worktree done`, and
-      the reason is data loss, so it needs an assertion and not a convention
+- [ ] Personas and the model map load from `env.ResolveHarnessRoot()` with a
+      `--repo-root` override matching `run`'s — never the cwd, which is the
+      trap `loadGatePersona` already avoids
 
 ### 5. Evidence
 
 - [ ] [AC7] One real dispatch, quoted verbatim in `verification.md` with the
       pool that answered and the tier it came from
+- [ ] Note the `agent.Record` widening (`role`, `pattern`, inferred/dictated)
+      in the PR body: additive for JSON readers, but it is a contract change
 
 ## Closing
 
