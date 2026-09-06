@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# HARNESS-111. The adversarial-review skill states its verdict rule TWICE — once
+# HARNESS-112. The adversarial-review skill states its verdict rule TWICE — once
 # in the Reality classification and once in the Verdict list — and the two
 # drifted apart.
 #
@@ -55,7 +55,7 @@ setup() {
 
 @test "guard: a Blocker still blocks regardless of its reality tag" {
     # The softening is deliberately scoped to Majors. If this line goes, the
-    # gate has been widened past what HARNESS-111 argued for.
+    # gate has been widened past what HARNESS-112 argued for.
     run grep -n 'Blocker' "$SKILL"
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | grep -q 'any reality'

@@ -161,3 +161,20 @@ Lessons 265 and 266 are the measurement-shaped members of the same family: a cor
 answering the wrong question, and two samples agreeing read as reproducibility. The through-line
 across all four is that **the reassuring reading is always the one that requires no further work**,
 and nothing in the tooling will ever prompt for the other one.
+
+## Seen again (2026-09-05, #1534)
+
+Not a query this time but a **reason string**. The harness gate's allow path returned
+`"all blocking skills consumed"` for three states: every obligation satisfied, every warn-level
+obligation skipped, and no severities declared at all. The sentence was never false. "Blocking"
+means `enforce: block`, and no persona carries one, so the predicate held in all 11 526 decisions
+ever recorded on this machine and discriminated none of them; 123 of 123 `warn` records carried it
+beside a non-empty `warned` array.
+
+This is the same defect as instance 7 with the polarity flipped: there a guard that could not fail
+hid a broken assertion; here a reason that could not be false hid an inert gate. A vacuous truth is
+worse than a wrong answer because it survives review, and four shipped persona records had already
+built doctrine on it ("a merged migration cannot be trusted as an enforced one"). The fix is the
+same rule as above, applied to output rather than input: **every distinguishable state gets a
+distinguishable sentence**, and the test asserts pairwise distinctness rather than three literals
+(`TestGateAllowReasonsAreDistinguishable`), so a rephrasing is a chore and a collapse is a failure.

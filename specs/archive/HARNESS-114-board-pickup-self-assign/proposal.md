@@ -1,5 +1,5 @@
 ---
-id: "HARNESS-041-board-pickup-self-assign"
+id: "HARNESS-114-board-pickup-self-assign"
 type: spec
 status: archived # draft | implementing | verifying | archived
 created: "2026-06-28"
@@ -8,7 +8,7 @@ tags: [spec, proposal]
 template_version: "1.0"
 ---
 
-# HARNESS-041-board-pickup-self-assign
+# HARNESS-114-board-pickup-self-assign
 
 ## Why
 

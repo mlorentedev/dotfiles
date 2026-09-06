@@ -17,7 +17,7 @@ a real diff**, and the contrast is the point:
 
 Rubric B/B/A/B/A/A. The single Major is the bind-mount fail-open **declared out of scope and filed
 as #1523** — the reviewer honoured the declaration instead of blocking on it, which is the amended
-verdict rule (HARNESS-111) working on its first use.
+verdict rule (HARNESS-112) working on its first use.
 
 | # | Finding | Disposition |
 |---|---|---|

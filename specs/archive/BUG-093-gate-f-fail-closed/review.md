@@ -12,7 +12,7 @@ date: "2026-09-05"
 `git diff 5a81e8a118d129adfc47d29915accf60dbabb28e...HEAD` (the launcher's `base_sha`), the built
 `dotf` binary at HEAD, and 12 mutations run in this session (8 from `mutate.sh`, 4 new).
 
-The range also carries three unrelated merged specs (HARNESS-111 review-base/#1535, gate
+The range also carries three unrelated merged specs (HARNESS-112 review-base/#1535, gate
 allow-reason/#1534, persona work/#1527/#1528/#1524). Their suites pass at HEAD; they are not
 attributed to this spec, and this review's verdict is about BUG-093's acceptance criteria.
 
