@@ -88,8 +88,7 @@
           "reasoning": true,
           "input": [
             "text",
-            "image",
-            "audio"
+            "image"
           ],
           "cost": {
             "input": 0,
