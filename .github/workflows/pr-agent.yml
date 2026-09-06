@@ -133,6 +133,7 @@ jobs:
     if: >
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false
         && github.actor != 'dependabot[bot]'
+        && github.event.pull_request.head.repo.fork == false
         && !startsWith(github.event.pull_request.head.ref, 'release-please--')) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
@@ -145,6 +146,13 @@ jobs:
       # that was verified to exist and to carry an `action.yaml` (a Docker
       # action) — the first draft of this file pinned `@v0.30`, which does not
       # exist at all.
+      # Captured BEFORE PR-Agent runs so the guard below can bind its verdict to
+      # THIS run: with `persistent_comment` PR-Agent edits its earlier Guide, which
+      # moves `updated_at`; a Guide left by a previous run and never touched by
+      # this one stays older than this stamp and no longer satisfies the guard.
+      - name: Stamp run start
+        id: start
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: PR-Agent
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move `v0.42.0` decides what runs here, and what runs here holds
@@ -227,8 +235,13 @@ jobs:
       # `fallback_models` names mimo-v2.5 for CONCURRENCY (per-model limit,
       # measured), never to soften the quality bar. The marker comes from the
       # registry, over the API since this job has no checkout, at the BASE ref
-      # since a PR supplying it could redefine it. Presence, not recency:
-      # `persistent_comment` edits an existing comment. See #1107.
+      # since a PR supplying it could redefine it. Two more bindings, both
+      # measured as gaps by CodeRabbit on the yt-metrics-cli and svqtriana ports
+      # (2026-09-06): the comment must be AUTHORED by github-actions[bot] (on a
+      # public repo anyone can paste the marker text), and it must have been
+      # created or edited at or after this run's start stamp (`persistent_comment`
+      # edits the earlier Guide, which moves `updated_at`, so an untouched Guide
+      # from a previous run cannot vouch for this one). See #1107.
       - name: Fail if no review was published
         # Only the paths that actually run `/review`. An issue_comment invoking
         # `/describe` or `/improve` legitimately publishes no Guide, and failing
@@ -244,6 +257,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+          STARTED: ${{ steps.start.outputs.started }}
         run: |
           set -euo pipefail
           marker=$(gh api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=${BASE_REF}" \
@@ -254,12 +268,14 @@ jobs:
             exit 1
           fi
           found=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --paginate --jq "[.[] | select(.body | contains(\"${marker}\"))] | length")
+            --paginate --jq "[.[] | select(.user.login == \"github-actions[bot]\"
+                                          and (.updated_at >= \"${STARTED}\")
+                                          and (.body | contains(\"${marker}\")))] | length")
           if [ "$found" -gt 0 ]; then
             echo "review published (marker: ${marker})"
             exit 0
           fi
-          echo "::error::PR-Agent reported success but published no review (no comment carries \"${marker}\")."
+          echo "::error::PR-Agent reported success but published no review (no github-actions[bot] comment updated since ${STARTED} carries \"${marker}\")."
           echo "::error::Most likely cause: NaN concurrency exhaustion — the cluster allows 5 simultaneous"
           echo "::error::requests, shared with pi, qq and hive embeddings. See #1107."
           exit 1
