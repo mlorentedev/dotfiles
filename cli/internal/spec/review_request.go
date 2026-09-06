@@ -120,8 +120,11 @@ func ResolveReviewBase(repoRoot, specDir string) string {
 
 	parent, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
 	if err != nil {
-		// The adding commit is the repository's root commit: there is no parent,
-		// and the empty tree is the honest base.
+		// The adding commit is the repository's root commit, so there is no
+		// parent to diff against. Return "" — the caller reads that as "no base
+		// resolved" and refuses the review, which is the right outcome: a spec
+		// added in the root commit has no "before" to compare against, and
+		// reviewing the entire repository history is not what was asked for.
 		return ""
 	}
 	return strings.TrimSpace(string(parent))
