@@ -46,6 +46,15 @@ created: "2026-09-05"
 - [x] Name the review-preserving exit in the staleness refusal, ahead of the three overrides.
 - [x] `TestStaleRefusalOffersTheExitThatKeepsTheReview` — asserts the exit is present, says where the
       dispositions go, and is offered *before* each override. Mutation-proven against the old message.
+- [x] Qualify the **Major severity definition** by reality too. It was a third statement of the rule
+      root 2 fixed in the verdict list, and it drifted the same way: it demanded a fix and a
+      re-review for every Major while the list sent a THEORETICAL one to PASS WITH GAPS. The
+      routing paragraph already said *REAL* Major; the definition did not. Both SKILL.md copies.
+- [x] Extend `guard-review-verdict-honours-reality.bats` to read that definition, not only the
+      verdict list — the existing 6 assertions were blind to it. 7/7, mutation-proven.
+- [x] Make f7's verification command **assert** instead of print. It ran two bare `grep -c` and
+      discarded the first status, so the loop's exit code was the last grep's and the "zero
+      defective forms" half was never checked — the class `.claude/CLAUDE.md` documents.
 
 ## Not done, deliberately
 

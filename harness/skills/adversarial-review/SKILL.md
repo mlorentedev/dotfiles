@@ -150,7 +150,7 @@ For each acceptance criterion / scenario:
 Classify each finding:
 
 - **Blocker**: incorrect behavior, security/privacy issue, or spec violation that should stop archive.
-- **Major**: likely bug or significant gap; fix or spec update required, and a re-review after it.
+- **Major**: likely bug or significant gap. **Reality decides what it costs**: a REAL Major requires a fix and a re-review after it; a THEORETICAL or SPECULATIVE one is tracked with a disposition and can stand under PASS WITH GAPS. Read this with the reality axis below — severity alone never settles it.
 - **Minor**: clarity, maintainability, or low-risk gap; can follow up.
 - **Question / assumption**: needs human or author confirmation.
 
