@@ -252,6 +252,20 @@ func TestStaleRefusalOffersTheExitThatKeepsTheReview(t *testing.T) {
 	if !strings.Contains(msg, "verification.md") {
 		t.Fatalf("refusal must say where the dispositions go, got: %s", msg)
 	}
+
+	// Ordering alone is not enough: an operator who does not know that the last
+	// three throw the review away will still reach for one. The message has to
+	// say which group it is reading, and the labels have to bracket the exits
+	// they describe.
+	keeps := strings.Index(msg, "keeps the review")
+	discards := strings.Index(msg, "discards it")
+	if keeps < 0 || discards < 0 {
+		t.Fatalf("refusal must label which exits keep the review and which discard it, got: %s", msg)
+	}
+	if keeps >= restore || restore >= discards {
+		t.Fatalf("the labels do not bracket the exit they describe (keeps=%d restore=%d discards=%d), got: %s",
+			keeps, restore, discards, msg)
+	}
 	for _, override := range []string{"re-run /adversarial-review", "review: waived", "--force-without-review"} {
 		at := strings.Index(msg, override)
 		if at < 0 {
