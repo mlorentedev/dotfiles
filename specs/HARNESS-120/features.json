@@ -1,9 +1,51 @@
 [
   {
     "id": "HARNESS-120-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "AC1 — `agent auto` with neither --role nor --tier derives both from the task text and the persona's own record, and reports which rule matched.",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAgentAuto_DerivesBothRoleAndTierFromTheTask -count=1",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "HARNESS-120-f2",
+    "behavior": "AC2/AC3 — an ambiguous task and an unmatched task each dispatch NOTHING, exit non-zero, and produce refusals that differ from each other; the ambiguous one names both candidates.",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAgentAuto_BothRefusalsDispatchNothingAndDiffer -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-120-f3",
+    "behavior": "AC4 — a persona whose record declares no tier, or one the map has no chain for, is refused rather than defaulted; the refusal names the persona, the offending value and what is legal.",
+    "verification": "cd cli && go test ./internal/harness/ -run TestResolveTierForPersona -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-120-f4",
+    "behavior": "AC5 — --role skips the join and --tier overrides the record; each field is reported inferred or dictated, and overriding one does not mark the other.",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAgentAuto_OverridesAreHonouredAndReportedAsDictated -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-120-f5",
+    "behavior": "AC6 — the persona's record reaches the dispatched process. Asserted against the Request the BACKEND received, not stdout: reviewer's dispatch carries reviewer's boundary and not builder's, and vice versa.",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAgentAuto_SendsThePersonasOwnRecordToTheBackend -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-120-f6",
+    "behavior": "`agent run` is deliberately NOT given the preamble — it is the primitive that takes a route as given. Pinned by test so the two commands cannot drift into each other unnoticed.",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAgentRun_DoesNotComposeAPreamble -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-120-f7",
+    "behavior": "AC7 — one REAL dispatch (not dry-run) answers from a pool chosen by the persona's own declared tier, quoted verbatim in verification.md.",
+    "verification": "dotf agent auto --task \"open a ticket for the bitacora\" --timeout 5m | jq -e '.status == \"ok\" and .role == \"planner\" and .tier == \"mid\" and .resolution.tier_from == \"inferred\"'",
+    "state": "blocked",
+    "evidence": "Blocked on this machine: machine.json declares no `machine.id`, so ADR-032 §8's identity gate denies every non-local pool. Declaring one is a pool-permission decision for the machine's owner, not for the implementer. See verification.md."
   }
 ]

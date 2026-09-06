@@ -14,8 +14,8 @@ created: "2026-09-05"
 ## Setup
 
 - [x] Branch created from main: `feat/harness-120-agent-auto`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
@@ -27,31 +27,31 @@ created: "2026-09-05"
 
 ### 1. The missing link: a persona's declared tier
 
-- [ ] [P] [AC1] Failing test: `ResolveTierForPersona` returns `mid` for a
+- [x] [P] [AC1] Failing test: `ResolveTierForPersona` returns `mid` for a
       persona whose record says `model: mid`
-- [ ] [AC1] Implement `harness.ResolveTierForPersona` — the first reader of
+- [x] [AC1] Implement `harness.ResolveTierForPersona` — the first reader of
       `Persona.Model`, which `persona.go:107` has been writing to nobody
-- [ ] [P] [AC4] Failing test: a persona with an empty `model:`, and one with
+- [x] [P] [AC4] Failing test: a persona with an empty `model:`, and one with
       `model: enormous`, are each REFUSED with a message naming the persona,
       the value, and the three legal tiers — never defaulted
-- [ ] [AC4] Implement the refusal
+- [x] [AC4] Implement the refusal
 
 ### 2. Resolving one persona from a task, or refusing
 
-- [ ] [P] [AC1] Failing test: `ResolveOne` over a suggestion matching one
+- [x] [P] [AC1] Failing test: `ResolveOne` over a suggestion matching one
       persona returns that persona plus the pattern that matched it
-- [ ] [AC1] Implement `harness.ResolveOne` as a pure function over
+- [x] [AC1] Implement `harness.ResolveOne` as a pure function over
       `(Suggestion, []*Persona)`, reusing `ResolveRoles` — never re-deriving
       the join, per the warning at `roles.go:27-31`
-- [ ] [P] [AC2] Failing test: a suggestion resolving to `[builder, reviewer]`
+- [x] [P] [AC2] Failing test: a suggestion resolving to `[builder, reviewer]`
       returns an ambiguity error naming BOTH, and no persona
-- [ ] [AC2] Implement — the refusal is the deterministic behaviour; do not rank
+- [x] [AC2] Implement — the refusal is the deterministic behaviour; do not rank
       and do not tie-break (HARNESS-110)
-- [ ] [P] [AC3] Failing test: a suggestion matching no rule returns an error
+- [x] [P] [AC3] Failing test: a suggestion matching no rule returns an error
       distinguishable from the ambiguous one (assert the two are not equal,
       not that either has a fixed wording)
-- [ ] [AC3] Implement
-- [ ] Refactor: one error type carrying the candidates, so the command can
+- [x] [AC3] Implement
+- [x] Refactor: one error type carrying the candidates, so the command can
       render both cases without re-testing the string
 
 ### 3. Making the persona travel
@@ -60,57 +60,63 @@ created: "2026-09-05"
 > read only by `dryrun.go:22`. Neither real backend sends it. So a dispatch is
 > currently generic, and this is the section that changes that.
 
-- [ ] [P] [AC6] Failing test: `PersonaPreamble` renders a persona's record —
+- [x] [P] [AC6] Failing test: `PersonaPreamble` renders a persona's record —
       body, not frontmatter — with a delimiter, and the task after it
-- [ ] [AC6] Implement, reading the body from `Persona.Path` via the existing
+- [x] [AC6] Implement, reading the body from `Persona.Path` via the existing
       `frontmatterBlock` splitter rather than a second parser
-- [ ] [AC6] Failing test at the dispatch seam: with `--role reviewer` the
+- [x] [AC6] Failing test at the dispatch seam: with `--role reviewer` the
       `Request.Task` the backend RECEIVES contains reviewer's mandate; with
       `--role builder` it does not. Assert on the backend's received request —
       a test reading stdout would pass on a preamble that was built and dropped
-- [ ] [AC6] Wire the preamble into the task at the command layer, not inside
+- [x] [AC6] Wire the preamble into the task at the command layer, not inside
       `Dispatch` — the walk retries across pools and must send identical bytes
       each time, so composition happens once, before the walk
 
 ### 4. The command
 
-- [ ] [AC1] Failing test: `dotf agent auto --task "open a ticket for the
+- [x] [AC1] Failing test: `dotf agent auto --task "open a ticket for the
       bitacora" --backend dry-run` with neither `--role` nor `--tier` reports
       `role: planner`, `tier: mid`
-- [ ] [AC1] Implement `newAgentAutoCmd`, wiring
+- [x] [AC1] Implement `newAgentAutoCmd`, wiring
       Suggest → ResolveOne → ResolveTierForPersona → preamble →
       `agent.Dispatch`, reusing the machine-policy, semaphore and capacity
       setup `agent run` already does
-- [ ] Refactor: extract that shared setup out of `newAgentRunCmd` so denial,
+- [x] Refactor: extract that shared setup out of `newAgentRunCmd` so denial,
       semaphore and capacity are configured in ONE place — two callers of a
       fail-closed policy is two places it can be forgotten
-- [ ] [AC5] Failing test: `--role` skips the join entirely and `--tier`
+- [x] [AC5] Failing test: `--role` skips the join entirely and `--tier`
       overrides the record, with both marked in the output as dictated
-- [ ] [AC5] Implement the overrides and the inferred/dictated reporting
-- [ ] [AC2] [AC3] Failing test: both refusals exit non-zero and dispatch
+- [x] [AC5] Implement the overrides and the inferred/dictated reporting
+- [x] [AC2] [AC3] Failing test: both refusals exit non-zero and dispatch
       NOTHING (assert against a backend that records its calls, not against
       stdout)
-- [ ] [AC2] [AC3] Implement
-- [ ] Personas and the model map load from `env.ResolveHarnessRoot()` with a
+- [x] [AC2] [AC3] Implement
+- [x] Personas and the model map load from `env.ResolveHarnessRoot()` with a
       `--repo-root` override matching `run`'s — never the cwd, which is the
       trap `loadGatePersona` already avoids
 
 ### 5. Evidence
 
-- [ ] [AC7] One real dispatch, quoted verbatim in `verification.md` with the
-      pool that answered and the tier it came from
+- [ ] [AC7] **BLOCKED** — one real dispatch, quoted verbatim in
+      `verification.md` with the pool that answered and the tier it came from.
+      This machine's `machine.json` declares no `machine.id`, so ADR-032 §8's
+      identity gate denies every non-local pool. Declaring one is a
+      pool-permission decision for the machine's owner, and satisfying it with
+      a fixture would use a test fixture to step around the very gate the
+      dispatch contract exists to enforce. AC1-AC6 are closed; see
+      `verification.md`.
 - [ ] Note the `agent.Record` widening (`role`, `pattern`, inferred/dictated)
       in the PR body: additive for JSON readers, but it is a contract change
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] `cd cli && go build ./... && go vet ./... && go test ./...`
-- [ ] `GOOS=windows go vet ./...` — the Windows leg fails the whole package
-- [ ] `golangci-lint run` at the pin from `versions.conf`
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] `cd cli && go build ./... && go vet ./... && go test ./...`
+- [x] `GOOS=windows go vet ./...` — the Windows leg fails the whole package
+- [x] `golangci-lint run` at the pin from `versions.conf`
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 - [ ] Independent adversarial review before `spec archive`
 
