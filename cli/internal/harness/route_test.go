@@ -176,3 +176,33 @@ func TestResolveOneDispatchesOrRefuses(t *testing.T) {
 			"the two need opposite responses from whoever reads them", ambiguous)
 	}
 }
+
+// TestDictatedTierRefusalNamesTheLegalOnes closes the Minor from HARNESS-120's
+// adversarial review (agy/gemini-3.1-pro-high, 2026-09-06).
+//
+// A dictated --tier never reaches ResolveTierForPersona, so before this the two
+// paths told an operator different amounts about the same map: a persona's bad
+// tier was refused with the legal set listed, a human's identical typo was not.
+//
+// The reviewer proposed reusing ResolveTierForPersona's error, which would be
+// wrong — that message blames a PERSONA's record for the value, and a dictated
+// tier has no record behind it. The fix belongs in ResolveChain, where both
+// paths already meet, and it improves `agent run` for free.
+func TestDictatedTierRefusalNamesTheLegalOnes(t *testing.T) {
+	m := map[string]any{"chains": map[string]any{
+		"top": []any{"claude:opus"},
+		"mid": []any{"claude:sonnet"},
+		"low": []any{"nan:qwen3.6"},
+	}}
+
+	_, err := ResolveChain(m, "colossal")
+	if err == nil {
+		t.Fatal("a tier with no chain resolved")
+	}
+	for _, want := range []string{"colossal", "low", "mid", "top"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal omits %q: %v\n\nA refusal whose remedy the operator "+
+				"has to go and look up is one people route around", want, err)
+		}
+	}
+}

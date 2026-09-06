@@ -264,6 +264,41 @@ below.
   but it is a contract change for JSON readers and is called out in the PR body.
   `run` emits no `resolution` because it derived nothing.
 
+## Adversarial review round 1 — FAIL
+
+`agy/gemini-3.1-pro-high`, 2026-09-06, against `reviewed_sha` `7b105e1`.
+Artifact: `review.md` (signed; never edited). Rubric: Scope A, Reliability A,
+Maintainability A, Correctness B, Handoff-readiness B, Verification C.
+
+Dispositioned here rather than by editing the contract files, per
+`docs/lessons/lesson-275-a-review-that-demands-contract-edits-invalidates-itself.md`.
+Note that lesson's distinction applies in my favour only for the *second*
+finding: under a **PASS** verdict a contract edit is self-defeating, but under
+**FAIL** the sequence is explicitly fix-then-re-review, so a `proposal.md` edit
+is a legitimate exit for the Blocker if the owner chooses it.
+
+| # | Severity / Reality | Finding | Disposition |
+|---|---|---|---|
+| 1 | **Blocker / REAL** | AC7 unverified — no end-to-end dispatch against a live model | **OPEN, owner's decision.** Correctly identified, and it is the same gap this file already declared before the review ran. Two legitimate exits: supply the evidence (needs `machine.id` declared — a pool-spend decision, **#1547**), or amend AC7 in `proposal.md` and re-review. `review: waived` is NOT an exit here: lesson 275 records that `checkReviewGate` returns on a waiver *before* calling `FindReview`, so it declares the requirement inapplicable rather than satisfied |
+| 2 | Minor / SPECULATIVE | A dictated `--tier` bypasses `ResolveTierForPersona`, so an invalid one fails later in `ResolveChain` with a less descriptive error | **APPLIED, with a corrected fix.** Measured first: the old message was `tier "colossal" has no chain in harness/model-map.json` — accurate and fail-closed, but it did not list the legal tiers, which the persona path did. So the finding is real and its severity is right. **The reviewer's proposed fix was wrong** — reusing `ResolveTierForPersona`'s error would blame a *persona's record* for a value a human typed. Fixed in `ResolveChain` instead, where both paths already meet, so `agent run` gains it for free. Pinned by `TestDictatedTierRefusalNamesTheLegalOnes` |
+
+**Observation about the review run itself, recorded not ticketed** (meta-work is
+capped while opened > closed): the reviewer left a 108 KB `scratch-diff.patch` in
+the **repo root**. Nothing in this repo writes that name — `grep -rn scratch-diff`
+across Go, shell, markdown and JSON returns nothing — so the reviewing agent
+created it in the working tree itself. It is not in `.gitignore`, so a `git add -A`
+would commit it. Deleted by hand. Not worth a `.gitignore` line, because the name
+was chosen by an external agent and the next one will pick a different one; the
+real guard is the standing rule to stage by explicit path. Worth knowing before
+anyone else launches a review.
+
+Verified after the fix, both paths now identical:
+
+    $ dotf agent auto --tier colossal ...
+    Error: tier "colossal" has no chain in harness/model-map.json: it declares low, mid, top
+    $ dotf agent run --tier colossal ...
+    Error: tier "colossal" has no chain in harness/model-map.json: it declares low, mid, top
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons.md`? **Yes** — a literal U+FEFF inside a
