@@ -174,6 +174,11 @@ below.
       content is that a REAL pool answered, and the proposal's own risk section
       says the honest claim must match the criterion.
 
+      Filed as **#1547**: the gate is right, but nothing creates the identity,
+      prompts for it, or reports it missing — `dotf doctor` has no check for it,
+      and no `dotf` subcommand writes the `machine` block. The only thing that
+      reports it is a dispatch refusing at the moment you try to use it.
+
       **This is not new to `auto`.** The same gate refuses `dotf agent run` on
       this machine and always has: `machine.json` here has only ever carried a
       `paths` block. So AC7 is blocked by a pre-existing machine state, not by
@@ -227,7 +232,8 @@ below.
   with no roster at all). The residual is real and stated rather than hidden:
   **`dotf agent run --role reviewer` still dispatches a generic agent.** Pinned by
   `TestAgentRun_DoesNotComposeAPreamble` so the two cannot drift together
-  unnoticed.
+  unnoticed, and filed as **#1548** so the boundary stays revisitable rather than
+  buried here.
 
 - **`frontmatterBlock` became `splitRecord` returning both halves**, rather than
   the preamble getting its own body splitter. The duplicate had already been
