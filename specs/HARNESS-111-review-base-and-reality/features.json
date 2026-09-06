@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-111-f1",
+    "behavior": "ResolveReviewBase returns the parent of the commit that added the spec folder, and empty when no such commit exists",
+    "verification": "cd cli && go test ./internal/spec/ -run 'ResolveReviewBase' -count=1 -v 2>&1 | grep -c '^--- PASS'",
+    "state": "verified",
+    "evidence": "3 PASS against real git repositories, including the post-squash case"
+  },
+  {
+    "id": "HARNESS-111-f2",
+    "behavior": "The resolved base yields a non-empty diff on a repo where `git diff main...HEAD` is empty — the defect this spec exists for",
+    "verification": "cd cli && go test ./internal/spec/ -run 'ResolveReviewBaseGivesANonEmptyDiffOnMainAfterTheWorkLanded' -count=1",
+    "state": "verified",
+    "evidence": "passes, and asserts the naive main...HEAD diff IS empty as an anchor first, so it cannot pass on a fixture that fails to reproduce the defect"
+  },
+  {
+    "id": "HARNESS-111-f3",
+    "behavior": "dotf spec review refuses an unscopeable review (no base, or base == HEAD) and launches when a base resolves",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'SpecReviewRefusesWhenNoBase|SpecReviewRefusesWhenTheBaseIsTheHead|SpecReviewLaunchesAndStatesTheBase' -count=1 -v 2>&1 | grep -c '^--- PASS'",
+    "state": "verified",
+    "evidence": "3 PASS — two refusals plus the positive direction, so the refusals cannot pass vacuously"
+  },
+  {
+    "id": "HARNESS-111-f4",
+    "behavior": "The sidecar records base_sha, and one written before the field existed still parses",
+    "verification": "cd cli && go test ./internal/spec/ -run 'ReviewRequestWithoutBaseSHAStillParses|WriteReviewRequestRecordsTheBase' -count=1",
+    "state": "verified",
+    "evidence": "both PASS; omitempty keeps archived specs valid"
+  },
+  {
+    "id": "HARNESS-111-f5",
+    "behavior": "The skill's verdict list honours the reality axis it already defines, and a Blocker still blocks at any reality",
+    "verification": "~/.local/bin/bats tests/guard-review-verdict-honours-reality.bats",
+    "state": "verified",
+    "evidence": "6/6 ok; mutation-proven — reintroducing the old unqualified FAIL line turns 3 of 6 red"
+  },
+  {
+    "id": "HARNESS-111-f6",
+    "behavior": "The whole Go layer is clean on Linux and vets clean for Windows and Darwin",
+    "verification": "cd cli && go build ./... && go test ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./... && golangci-lint run ./...",
+    "state": "verified",
+    "evidence": "all rc=0, 0 issues on the pinned 2.12.2"
+  }
+]

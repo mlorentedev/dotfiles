@@ -206,9 +206,26 @@ The severity findings axis (Blocker/Major/Minor) can still escalate independentl
 
 End with a clear verdict:
 
+**Severity alone does not decide this — `severity × reality` does**, exactly as the Reality
+classification above states. Read the two together; they are one rule:
+
 - **PASS (adversarial)** — no blockers or majors; rubric all B or above; minors listed optionally.
-- **PASS WITH GAPS** — minors only OR rubric has at least one C (no D); both tracked.
-- **FAIL** — at least one blocker or major OR rubric has at least one D, until addressed.
+- **PASS WITH GAPS** — minors only, OR every open Major is **THEORETICAL/SPECULATIVE**, OR rubric
+  has at least one C (no D). All of them tracked, each with a disposition line.
+- **FAIL** — at least one **Blocker** (any reality), at least one **REAL** Major, or rubric has at
+  least one D, until addressed.
+
+> **Why this is spelled out twice.** This list previously read *"FAIL — at least one blocker or
+> major"*, which contradicts the Reality rule above (*"a SPECULATIVE finding cannot, by itself,
+> move the verdict below PASS"*). A reviewer following this list instead of that rule returns FAIL
+> on a Major it has itself labelled THEORETICAL — measured on BUG-093 round 4, where a
+> race-window-narrowing suggestion with no demonstrated exploit cost a full merge-and-re-review
+> cycle. The reality tag is not decoration; if a finding cannot be shown to happen, it is tracked,
+> not blocking.
+>
+> A **Blocker** is deliberately exempt from this softening: "incorrect behavior, security/privacy
+> issue, or spec violation" stops an archive whatever its reality tag, because the cost of being
+> wrong about a Blocker is the thing the gate exists to prevent.
 
 ## Output format
 

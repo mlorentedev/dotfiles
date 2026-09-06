@@ -49,7 +49,7 @@ Body.
 // the other runner's output as empty. "Did the file change?" needs no schema.
 func TestProvenanceCatchesAReviewThatWroteNothing(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
-	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash"); err != nil {
+	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 	// The reviewer writes nothing: review.md is byte-identical to launch time.
@@ -70,7 +70,7 @@ func TestProvenanceCatchesAReviewThatWroteNothing(t *testing.T) {
 // cannot become one that refuses everything.
 func TestProvenanceAcceptsAFreshVerdict(t *testing.T) {
 	dir := seedProvenanceSpec(t, "old content")
-	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash"); err != nil {
+	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 	// The reviewer overwrites review.md with a verdict on the launched sha.
@@ -92,7 +92,7 @@ func TestProvenanceAcceptsAFreshVerdict(t *testing.T) {
 // what the launcher actually pointed it at, which is a measurement.
 func TestProvenanceCatchesAVerdictOnAnotherSha(t *testing.T) {
 	dir := seedProvenanceSpec(t, "old content")
-	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash"); err != nil {
+	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(provenanceReviewDoc), 0o600); err != nil {
@@ -115,7 +115,7 @@ func TestProvenanceCatchesAVerdictOnAnotherSha(t *testing.T) {
 // see: both ids are admitted, so only the sidecar knows which one was asked.
 func TestProvenanceCatchesADifferentPoolMember(t *testing.T) {
 	dir := seedProvenanceSpec(t, "old content")
-	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "agy/gemini-3.1-pro-high"); err != nil {
+	if err := WriteReviewRequest(dir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "agy/gemini-3.1-pro-high", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(provenanceReviewDoc), 0o600); err != nil {
@@ -163,7 +163,7 @@ func TestUnparseableSidecarIsLoud(t *testing.T) {
 func TestWriteReviewRequestRecordsTheDigestOfWhatWasThere(t *testing.T) {
 	t.Run("with a previous review", func(t *testing.T) {
 		dir := seedProvenanceSpec(t, provenanceReviewDoc)
-		if err := WriteReviewRequest(dir, "sha", "r"); err != nil {
+		if err := WriteReviewRequest(dir, "sha", "r", "basebasebase"); err != nil {
 			t.Fatal(err)
 		}
 		req, found, err := ReadReviewRequest(dir)
@@ -177,7 +177,7 @@ func TestWriteReviewRequestRecordsTheDigestOfWhatWasThere(t *testing.T) {
 
 	t.Run("with no previous review", func(t *testing.T) {
 		dir := seedProvenanceSpec(t, "")
-		if err := WriteReviewRequest(dir, "sha", "r"); err != nil {
+		if err := WriteReviewRequest(dir, "sha", "r", "basebasebase"); err != nil {
 			t.Fatal(err)
 		}
 		req, _, err := ReadReviewRequest(dir)
@@ -196,7 +196,7 @@ func TestWriteReviewRequestRecordsTheDigestOfWhatWasThere(t *testing.T) {
 // foreground run (tmux is Linux-only), so this is the common path there.
 func TestVerifyReviewProducedCatchesARunThatWroteNoFile(t *testing.T) {
 	dir := seedProvenanceSpec(t, "")
-	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash"); err != nil {
+	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +214,7 @@ func TestVerifyReviewProducedCatchesARunThatWroteNoFile(t *testing.T) {
 // reached the same conclusion.
 func TestVerifyReviewProducedCatchesAnUnchangedVerdict(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
-	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash"); err != nil {
+	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,7 +229,7 @@ func TestVerifyReviewProducedCatchesAnUnchangedVerdict(t *testing.T) {
 
 func TestVerifyReviewProducedAcceptsAFreshVerdict(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
-	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash"); err != nil {
+	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(provenanceReviewDoc+"\nA new round.\n"), 0o600); err != nil {

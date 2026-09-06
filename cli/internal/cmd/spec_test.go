@@ -18,6 +18,16 @@ func makeRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
+
+	// This .git is a directory, not a repository, so the real review-base
+	// resolvers answer "" here and `spec review` would refuse every launch
+	// (HARNESS-111). Drive the seams instead; the resolvers are tested against
+	// real git histories in internal/spec.
+	prevBase, prevHead := resolveReviewBase, headSHAOf
+	resolveReviewBase = func(string, string) string { return "basebasebase" }
+	headSHAOf = func(string) string { return "headheadhead" }
+	t.Cleanup(func() { resolveReviewBase, headSHAOf = prevBase, prevHead })
+
 	return root
 }
 

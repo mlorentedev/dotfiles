@@ -63,6 +63,15 @@ var runCommand = func(dir string, argv []string) error {
 // rand.IntN in production, a fixed index in tests so a launch is reproducible there.
 var reviewerDraw = rand.IntN
 
+// resolveReviewBase and headSHAOf are seams for the review scope (HARNESS-111).
+// The command-level fixtures build a fake .git directory rather than a real
+// repository, so the production resolvers answer "" there and every launch test
+// would hit the new refusal. The resolvers themselves are tested against real
+// git histories in internal/spec — a seam proves the caller honours the answer,
+// and only a real repository proves the answer is right.
+var resolveReviewBase = spec.ResolveReviewBase
+var headSHAOf = spec.HeadSHA
+
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
 //
@@ -176,7 +185,24 @@ is the only record of how.`,
 			}
 
 			skill := spec.ReviewerSkillPath(chosen.Runner)
-			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, chosen.Runner, skill)
+			// The base the reviewer will diff against. Refusing when it cannot be
+			// resolved, or when it IS the head, is the point: a review with an
+			// empty diff does not fail, it quietly becomes a reading of the spec
+			// folder and reports findings with no execution behind them. That is
+			// worse than no review, because it arrives wearing a verdict.
+			baseSHA := resolveReviewBase(repoRoot, specDir)
+			headSHA := headSHAOf(repoRoot)
+			if baseSHA == "" {
+				return fmt.Errorf("cannot resolve a review base for specs/%s: no commit adds that folder.\n"+
+					"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
+					"call that a review. Commit the spec first", id)
+			}
+			if baseSHA == headSHA {
+				return fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
+					"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
+			}
+
+			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA)
 			argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
 			if err != nil {
 				return err
@@ -228,7 +254,7 @@ is the only record of how.`,
 			// is worse than losing the review, but refusing to launch because a
 			// sidecar could not be written would make the guard a liability the
 			// first time a spec dir is read-only.
-			if err := spec.WriteReviewRequest(specDir, spec.HeadSHA(repoRoot), chosen.ID); err != nil {
+			if err := spec.WriteReviewRequest(specDir, headSHA, chosen.ID, baseSHA); err != nil {
 				cmd.PrintErrf("[WARN] could not record the review request: %v\n", err)
 				cmd.PrintErrf("       the archive gate cannot then tell a fresh verdict from the previous one\n")
 			}

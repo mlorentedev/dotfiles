@@ -51,6 +51,21 @@ type ReviewRequest struct {
 	// review.md existed. A digest that has not moved means the reviewer wrote
 	// no verdict — the one case the launcher provably cannot observe itself.
 	ReviewDigestBefore string `json:"review_digest_before"`
+	// BaseSHA is the commit the spec's work starts FROM, so the reviewer has a
+	// diff to read instead of a folder to browse.
+	//
+	// The skill specifies the review scope as `git diff <base>...HEAD`, and
+	// until this field existed the launcher recorded no base at all: the
+	// reviewer had to guess it, guessed `main`, and a review launched on `main`
+	// after the work merged therefore diffed nothing. Measured on BUG-093 round
+	// 4 — it declared `git diff main...HEAD` as its source, that diff was empty,
+	// and both of its findings say "Code read" with nothing executed. One of the
+	// two was factually wrong, having read a mutation payload out of the spec
+	// folder as if it were the implementation.
+	//
+	// omitempty because specs archived before this field existed carry the old
+	// shape and must still validate.
+	BaseSHA string `json:"base_sha,omitempty"`
 }
 
 // HeadSHA returns the repository HEAD, or "" when repoRoot is not a checkout.
@@ -64,6 +79,52 @@ func HeadSHA(repoRoot string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// ResolveReviewBase returns the commit the spec's work starts from: the PARENT
+// of the commit that first added specDir.
+//
+// Why this and not the PR's base branch. The PR route needs the network, `gh`
+// auth and PR metadata a human can edit, and it answers differently depending
+// on which of a spec's several PRs you ask about. This is local, offline and
+// deterministic, and it is correct in BOTH of the situations that matter:
+//
+//   - review on the work branch — the adding commit is on the branch, so the
+//     parent is where the branch left main.
+//   - review on main after a squash merge — the adding commit IS the squash
+//     commit, so the parent is main immediately before the work landed.
+//
+// That second case is the whole point: it is the one the old code got wrong by
+// having no answer at all.
+//
+// Returns "" when there is no such commit (a spec folder not yet committed),
+// which the caller must treat as "cannot review", not as "review everything".
+func ResolveReviewBase(repoRoot, specDir string) string {
+	rel, err := filepath.Rel(repoRoot, specDir)
+	if err != nil {
+		rel = specDir
+	}
+	// --diff-filter=A finds the commit that ADDED the folder; the last line of
+	// a reverse-chronological log is the earliest such commit. `--` guards a
+	// path that could be read as a revision.
+	out, err := exec.Command("git", "-C", repoRoot,
+		"log", "--diff-filter=A", "--format=%H", "--", rel).Output()
+	if err != nil {
+		return ""
+	}
+	lines := strings.Fields(strings.TrimSpace(string(out)))
+	if len(lines) == 0 {
+		return ""
+	}
+	adding := lines[len(lines)-1]
+
+	parent, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
+	if err != nil {
+		// The adding commit is the repository's root commit: there is no parent,
+		// and the empty tree is the honest base.
+		return ""
+	}
+	return strings.TrimSpace(string(parent))
 }
 
 // fileDigest returns the SHA-256 of path, or "" when it does not exist.
@@ -84,12 +145,13 @@ func fileDigest(path string) string {
 //
 // Replacing rather than appending: the sidecar describes the CURRENT outstanding
 // request, and a history of requests is what the transcript is for.
-func WriteReviewRequest(specDir, reviewedSHA, reviewer string) error {
+func WriteReviewRequest(specDir, reviewedSHA, reviewer, baseSHA string) error {
 	req := ReviewRequest{
 		ReviewedSHA:        reviewedSHA,
 		Reviewer:           reviewer,
 		RequestedAt:        time.Now().UTC().Format(time.RFC3339),
 		ReviewDigestBefore: fileDigest(filepath.Join(specDir, ReviewFile)),
+		BaseSHA:            baseSHA,
 	}
 	data, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {

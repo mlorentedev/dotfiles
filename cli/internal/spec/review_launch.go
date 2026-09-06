@@ -262,10 +262,24 @@ func ResolveReviewer(entries []ReviewerEntry, want string) (ReviewerEntry, error
 // matches it exactly — a reviewer that writes its own name a different way gets
 // refused for a mismatch rather than for a policy breach, which wastes a whole
 // review round on a string.
-func ReviewPrompt(specID, repoRoot, reviewerID, runner, skillPath string) string {
+// baseSHA is stated because the skill defines the review scope as
+// `git diff <base>...HEAD` and the reviewer cannot derive the base. Left to
+// guess it, it guesses `main` — and a review launched ON main after the work
+// merged then diffs nothing and silently degrades into browsing the spec
+// folder. Measured on BUG-093 round 4: it named `git diff main...HEAD` as its
+// source, that diff was empty, and both findings read "Code read" with nothing
+// executed; one cited a string that exists nowhere in the code, having read a
+// mutation payload out of the spec folder as if it were the implementation.
+func ReviewPrompt(specID, repoRoot, reviewerID, runner, skillPath, baseSHA string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
 	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
+	if baseSHA != "" {
+		fmt.Fprintf(&b, "Review scope: `git diff %s...HEAD`. That base is the commit this spec's work\n"+
+			"starts from, resolved by the launcher; do NOT substitute `main` or guess one. It is the\n"+
+			"WHOLE change, not the delta since any previous review round — a late fix has to be\n"+
+			"judged against the early ones it may interact with.\n\n", baseSHA)
+	}
 	fmt.Fprintf(&b, "You are running as `%s` (runner `%s`), drawn from harness/reviewer-pool.json\n"+
 		"for this review. That is your identity for this run, stated by the launcher that resolved\n"+
 		"it -- do not infer it from the doctrine you are about to read. The pool's exclusions were\n"+
