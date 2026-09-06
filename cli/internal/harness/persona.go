@@ -83,13 +83,13 @@ func LoadPersona(path string) (*Persona, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read persona %s: %w", filepath.Base(path), err)
 	}
-	body, err := frontmatterBlock(raw)
+	front, _, err := splitRecord(raw)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
 	}
 
 	var fm personaFrontmatter
-	if err := yaml.Unmarshal(body, &fm); err != nil {
+	if err := yaml.Unmarshal(front, &fm); err != nil {
 		return nil, fmt.Errorf("%s: frontmatter is not valid YAML: %w", filepath.Base(path), err)
 	}
 
@@ -141,20 +141,34 @@ func LoadPersonas(dir string) ([]*Persona, error) {
 	return out, nil
 }
 
-// frontmatterBlock extracts the YAML between the leading `---` fences.
-func frontmatterBlock(raw []byte) ([]byte, error) {
-	s := string(raw)
-	s = strings.TrimPrefix(s, "\ufeff")
+// splitRecord divides a record at its frontmatter fences and returns both
+// halves: the YAML the loader parses, and the markdown body that instructs a
+// dispatched agent (HARNESS-120).
+//
+// One function returns both deliberately. A second splitter would be a second
+// idea of where a record ends, and on the day they disagree only one of them is
+// wrong while both keep returning something shaped like an answer \u2014 the same
+// failure mode that made `check-roster-consistency.py` report "no skills"
+// (persona.go:71-80). The frontmatter has one reader here for the same reason.
+func splitRecord(raw []byte) (front []byte, body string, err error) {
+	s := strings.TrimPrefix(string(raw), "\ufeff")
 	if !strings.HasPrefix(s, "---") {
-		return nil, fmt.Errorf("no frontmatter fence")
+		return nil, "", fmt.Errorf("no frontmatter fence")
 	}
 	rest := s[3:]
 	// Accept both \n and \r\n fences; a record deployed on Windows carries CRLF.
 	end := strings.Index(rest, "\n---")
 	if end < 0 {
-		return nil, fmt.Errorf("frontmatter is not closed")
+		return nil, "", fmt.Errorf("frontmatter is not closed")
 	}
-	return []byte(rest[:end]), nil
+	after := rest[end+len("\n---"):]
+	// Step over the remainder of the closing fence line, whatever its ending.
+	if nl := strings.IndexByte(after, '\n'); nl >= 0 {
+		after = after[nl+1:]
+	} else {
+		after = ""
+	}
+	return []byte(rest[:end]), strings.TrimSpace(after), nil
 }
 
 // parseSkills reads either shape:
