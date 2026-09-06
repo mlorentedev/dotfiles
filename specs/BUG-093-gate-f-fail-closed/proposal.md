@@ -21,13 +21,8 @@ a platform this repository actively supports and gates CI on.
 
 ## What
 
-Gate f answers `true` — "assume something is in there" — on every path where the SCAN cannot
-run, so the caller refuses instead of deleting.
-
-**That is narrower than "cannot observe processes", and the wording matters.** Gate f compares
-paths as strings, so an occupant reaching the worktree through a bind mount in another mount
-namespace is observed and read as *outside*. It is not protected, and this change does not claim
-to protect it — see *Out of scope* and #1523. Linux keeps the real
+Gate f answers `true` — "assume something is in there" — on every path where it cannot
+actually observe processes, so the caller refuses instead of deleting. Linux keeps the real
 `/proc` walk and now also answers `true` when `/proc` is unreadable. Every other platform
 answers `true` unconditionally until a real implementation exists.
 

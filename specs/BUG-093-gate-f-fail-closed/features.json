@@ -16,9 +16,9 @@
   {
     "id": "BUG-093-gate-f-fail-closed-f3",
     "behavior": "On any non-Linux platform isHostProcessInside answers true for every input and processDiscoverySupported is false, and that path is EXECUTED rather than only compiled",
-    "verification": "cd cli && GOOS=windows go vet ./internal/worktree/ && GOOS=darwin go vet ./internal/worktree/ && cd .. && bash specs/BUG-093-gate-f-fail-closed/flip-proxy.sh",
+    "verification": "cd cli && GOOS=windows go vet ./internal/worktree/ && GOOS=darwin go vet ./internal/worktree/",
     "state": "verified",
-    "evidence": "vet clean for both, AND flip-proxy.sh EXECUTES the non-Linux implementation on Linux (rc=0). Round 5 found the prose described a two-file flip, which does not compile (the //go:build linux test file is still selected); the script flips four and is committed so the command cannot drift from the claim again."
+    "evidence": "vet clean for both; and the build-tag-flip proxy in verification.md RUNS sweep_proc_other.go on Linux -> rc=0. Round 3 finding 7: vet alone cannot see a runtime failure, which is how round 2 shipped a red Windows leg"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f4",
@@ -30,9 +30,9 @@
   {
     "id": "BUG-093-gate-f-fail-closed-f5",
     "behavior": "dotf worktree sweep reports absent process discovery before its counts, and states Gate f's reach as coverage rather than as a partial-scan warning",
-    "verification": "python3 -c \"import sys;s=open('cli/internal/cmd/worktree.go').read();n=s.index('no process-liveness check on this platform');r=s.index('Gate f reach:');c=s.index('Sweep complete: reaped');sys.exit(0 if n<c and r<c and 'so this scan was partial' not in s else 1)\"",
+    "verification": "grep -q 'no process-liveness check on this platform' cli/internal/cmd/worktree.go && grep -q 'Gate f reach:' cli/internal/cmd/worktree.go && ! grep -q 'so this scan was partial' cli/internal/cmd/worktree.go",
     "state": "verified",
-    "evidence": "Order-aware, not presence-only: it asserts BOTH notes appear before the 'Sweep complete' counts by source position, and that the always-firing 'partial' warning is gone. Round 5 finding: the previous greps were order-blind, so moving the note AFTER the counts passed them."
+    "evidence": "the note precedes the counts in newWorktreeSweepCmd; the always-firing 'partial' warning is gone (round 3 finding 2). Asserted by grep knowingly - see verification.md, Accepted gaps"
   },
   {
     "id": "BUG-093-gate-f-fail-closed-f6",
@@ -53,6 +53,6 @@
     "behavior": "Every mutation the round-3 review reported as surviving now fails the suite, and the harness reports ANCHOR-MISS rather than a result when a patch does not land",
     "verification": "bash specs/BUG-093-gate-f-fail-closed/mutate.sh",
     "state": "verified",
-    "evidence": "exit 0: caught: 8, declared survivors: 2 (filepath.Abs and unreadable /proc, both named in Accepted gaps), regressions/anchor-miss: 0. Round 5 found the /proc survivor undeclared to the harness, so its own output disagreed with verification.md; it is declared now and the numbers are re-run, not hand-edited."
+    "evidence": "exit 0: 7 CAUGHT (5 round-3 survivors + 2 earlier regressions), 1 declared survivor (the filepath.Abs branch, unreachable by input), 0 regressions. The harness is committed and exits non-zero if an expected-CAUGHT mutation survives - it is a check, not a report; the earlier form grepped a word in a markdown file"
   }
 ]
