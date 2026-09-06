@@ -145,7 +145,10 @@ taken on it, because none can be: an unreadable process stays unreadable however
    used: the refusal was pinned on a function that could not prevent a deletion. The wrapper is
    deleted.
 
-5b. The **re-check inside `reapSingleWorktree`** — the one that runs under the lock immediately
+5b. The **re-check inside `reapSingleWorktree`** runs **last**, immediately before the removal.
+   Amended after round 4: it previously ran before `isDirty`/`isMerged`, which shell out to git,
+   so that latency sat inside the window between "nobody is in there" and the deletion. Pinned by
+   `TestGateFIsTheLastCheckBeforeRemoval`. The re-check — the one that runs under the lock immediately
    before removal — refuses when a process arrives after the candidate scan. This needs a seam that
    answers `false` then `true`; a constant answer cannot reach it, because a constant `true` is
    refused by the first call and a constant `false` never exercises the second.

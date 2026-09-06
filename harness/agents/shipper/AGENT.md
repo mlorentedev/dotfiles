@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/shipper/AGENT.md
-generated_sha: 00ca37afa44c04ca
+generated_sha: 36bf2da6871ef1c6
 id: agent-shipper
 type: agent
 status: active
@@ -56,7 +56,7 @@ This is why the loader applies **no default severity**. Defaulting to `warn` wou
 
 Raising any of these to `block` is gated on evidence, not on confidence: no severity moves until a real dispatch is observed resolving this persona **from the deployed record**, with two dispatches of one role carrying different `agent_id`s.
 
-The deployed half of that sentence is the one that bites. The gate reads the deploy directory, never your checkout, so a migration that is merged is not a migration that is in force — and the record written while it is inert is indistinguishable from the record written when everything passed. An unmigrated persona has nothing to enforce, so the gate reports `allow` with *"all blocking skills consumed"*, which is the same line a persona that satisfied every obligation produces.
+The deployed half of that sentence is the one that bites. The gate reads the deploy directory, never your checkout, so a migration that is merged is not a migration that is in force. Until #1510 the journal could not tell you which: a record written while enforcement was off and one written when every obligation was satisfied both reported `allow` with *"all blocking skills consumed"* — a sentence that was true in every decision ever recorded, because no persona carries `enforce: block` for it to be about. The gate now names the difference: a persona declaring no severities records *"declares no severities — nothing to enforce"*. So check the journal rather than trusting the merge, and know that the line means something now.
 
 A named dispatch used to defeat role resolution outright; that is fixed for a **witnessed** dispatch, which the gate maps back to its true type. The residual is the unwitnessed one, which still falls through to the roster and finds no persona under its name.
 
