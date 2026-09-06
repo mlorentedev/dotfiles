@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-111-review-base-and-reality"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 issue: "mlorentedev/dotfiles#1533"
 tags: [spec, proposal]
 template_version: "1.0"
