@@ -97,15 +97,12 @@ created: "2026-09-05"
 
 ### 5. Evidence
 
-- [ ] [AC7] **BLOCKED** — one real dispatch, quoted verbatim in
-      `verification.md` with the pool that answered and the tier it came from.
-      This machine's `machine.json` declares no `machine.id`, so ADR-032 §8's
-      identity gate denies every non-local pool. Declaring one is a
-      pool-permission decision for the machine's owner, and satisfying it with
-      a fixture would use a test fixture to step around the very gate the
-      dispatch contract exists to enforce. AC1-AC6 are closed; see
-      `verification.md`.
-- [ ] Note the `agent.Record` widening (`role`, `pattern`, inferred/dictated)
+- [x] [AC7] One real dispatch, quoted verbatim in `verification.md` with the
+      pool that answered and the tier it came from. Done 2026-09-06: `claude:sonnet`
+      off `chains.mid`, 12.7 s, `tier_from: inferred` — reviewer's own record chose
+      the tier. Unblocked by the owner declaring `machine.id`; the gap that made it
+      unrunnable is #1547
+- [x] Note the `agent.Record` widening (`role`, `pattern`, inferred/dictated)
       in the PR body: additive for JSON readers, but it is a contract change
 
 ## Closing
@@ -117,7 +114,7 @@ created: "2026-09-05"
 - [x] `golangci-lint run` at the pin from `versions.conf`
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#1546)
 - [ ] Independent adversarial review before `spec archive`
 
 ## Machine-readable features

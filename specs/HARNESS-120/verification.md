@@ -155,53 +155,45 @@ below.
 
       3219 bytes sent where the bare task is 15. The task arrives LAST and intact.
 
-- [ ] **AC7 — NOT SATISFIED. Blocked, and stated rather than substituted for.**
+- [x] **AC7 — SATISFIED.** One real dispatch, not `dry-run`, answered from the
+      pool the persona's OWN declared tier chose.
 
-      No real dispatch was performed. This machine's
-      `~/.config/dotfiles/machine.json` contains only a `paths` block and declares
-      no `machine.id`, so ADR-032 §8's identity gate denies every non-local pool:
+      Unblocked by the machine owner declaring an identity in
+      `~/.config/dotfiles/machine.json` — the decision ADR-032 §8 exists to make
+      deliberate, and the reason this sat open through round 1 of review.
 
-      Error: this machine has not declared an identity, so every non-local pool is
-      denied (ADR-032 §8)
-
-      Declaring an identity would open the pools, and that is a decision about
-      which pools this machine may spend quota on — the machine owner's, not the
-      implementer's. Satisfying it by pointing `XDG_CONFIG_HOME` at a fixture, as
-      AC1–AC6 legitimately do, would here be using a test fixture to step around
-      the exact gate the dispatch contract exists to enforce. So it is left open.
-
-      A `dry-run` quote is deliberately NOT offered in its place: AC7's whole
-      content is that a REAL pool answered, and the proposal's own risk section
-      says the honest claim must match the criterion.
-
-      Filed as **#1547**: the gate is right, but nothing creates the identity,
-      prompts for it, or reports it missing — `dotf doctor` has no check for it,
-      and no `dotf` subcommand writes the `machine` block. The only thing that
-      reports it is a dispatch refusing at the moment you try to use it.
-
-      **This is not new to `auto`.** The same gate refuses `dotf agent run` on
-      this machine and always has: `machine.json` here has only ever carried a
-      `paths` block. So AC7 is blocked by a pre-existing machine state, not by
-      anything this change introduced.
-
-      To close it, declare an identity in `~/.config/dotfiles/machine.json` and
-      run the command in `features.json` entry `HARNESS-120-f7`:
-
-      $ cd cli && go run ./cmd/dotf agent auto --role reviewer \
+      $ dotf agent auto --role reviewer \
           --task 'Reply with the single word OK and do nothing else.' --timeout 5m
+      {
+          "status": "ok",
+          "tier": "mid",
+          "role": "reviewer",
+          "pool": "claude",
+          "model": "sonnet",
+          "exit": 0,
+          "duration_ms": 12705,
+          "output": "OK\n",
+          "truncated": false,
+          "resolution": {
+              "role_from": "dictated",
+              "tier_from": "inferred"
+          },
+          "attempts": [{"pool": "claude", "model": "sonnet", "status": "ok"}]
+      }
 
-      Two details of that command are deliberate and should not be "simplified".
+      **`tier_from: inferred` is the whole criterion.** Nobody passed `--tier`.
+      `reviewer`'s record declares `model: mid`, `ResolveTierForPersona` read it,
+      and the walk took `chains.mid`'s first entry. A live model answered in
+      12.7 s with the one word it was asked for.
 
-      **The task is inert.** AC7's claim is that a pool chosen by the persona's
-      OWN DECLARED tier answered, which `resolution.tier_from: inferred` proves;
-      the join is AC1's business, not AC7's. Running the AC1 task text against a
-      live model instead would ask a real agent to actually go and file a ticket,
-      with `--cwd` defaulting to this worktree. `reviewer` is named for the same
-      reason: it declares `mid`, and its record forbids it to edit anything.
+      The task is deliberately inert and the persona is `reviewer`, which is
+      read-only by its own mandate. AC7 asserts that a pool chosen by the
+      DECLARED tier answered — the join is AC1's business — so running AC1's
+      "open a ticket for the bitacora" against a live model would have asked a
+      real agent to go and file one, with `--cwd` defaulting to this worktree.
 
-      **It is `go run ./cmd/dotf`, not `dotf`.** The `dotf` on PATH is a stale
-      dev source build (#1469) with no `auto` subcommand; running it would report
-      "unknown command" and read like the feature is missing.
+      The `features.json` command for `HARNESS-120-f7` was then run verbatim,
+      `jq -e` predicate and all: **exit 0**.
 
 ## Test status
 
