@@ -255,6 +255,7 @@ func TestMigratedPersonasStillGateSomething(t *testing.T) {
 		"shipper",
 		"architect",
 		"curator",
+		"planner",
 	} {
 		p, ok := byName[name]
 		if !ok {
