@@ -494,3 +494,20 @@ if bad:
     grep -q 'BASE_REF:' "$REPO/.github/workflows/pr-agent.yml" \
         || { echo "the guard must resolve the registry at the base ref, not the PR head" >&2; false; }
 }
+
+@test "pr-agent: fork PRs are excluded from the automatic path" {
+    # A fork PR runs with an empty secrets store and a read-only token, so the
+    # review cannot run and the guard would fail every fork PR for no reason.
+    grep -q "github.event.pull_request.head.repo.fork == false" "$WF"
+}
+
+@test "pr-agent: the guard only counts comments authored by github-actions[bot]" {
+    # On a public repository anyone can paste the marker text into a comment.
+    grep -q 'select(.user.login == \\"github-actions\[bot\]\\"' "$WF"
+}
+
+@test "pr-agent: the guard binds the marker to this run's start stamp" {
+    grep -q 'id: start' "$WF"
+    grep -q 'STARTED: \${{ steps.start.outputs.started }}' "$WF"
+    grep -q '.updated_at >= \\"\${STARTED}\\"' "$WF"
+}
