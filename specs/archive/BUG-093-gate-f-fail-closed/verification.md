@@ -5,6 +5,49 @@ created: "2026-09-05"
 
 # Verification - BUG-093-gate-f-fail-closed
 
+## Round 5 review: PASS-WITH-GAPS — disposition
+
+`nan/qwen3.8-flash`, random draw, not the implementer. Reviewed `5a68096`. **The first round with
+a real diff**, and the contrast is the point:
+
+| Round | Scope it had | Its own evidence verbs |
+|---|---|---|
+| 4 | `git diff main...HEAD` — **empty** | "Code read", "Code read"; one finding factually wrong |
+| 5 | `git diff 5a81e8a1...HEAD` (the launcher's `base_sha`) | **12 mutations run**, 8 from `mutate.sh` and 4 new |
+
+Rubric B/B/A/B/A/A. The single Major is the bind-mount fail-open **declared out of scope and filed
+as #1523** — the reviewer honoured the declaration instead of blocking on it, which is the amended
+verdict rule (HARNESS-111) working on its first use.
+
+| # | Finding | Disposition |
+|---|---|---|
+| Major, REAL | Bind-mount occupant still deleted | **Already declared.** Out of scope with a reproduction; #1523 OPEN. The proposal's *What* now carves it out explicitly rather than saying "every path where it cannot observe processes" |
+| Minor | The documented Windows proxy does not reproduce: a **two-file** flip leaves the `//go:build linux` test file selected and the package fails to compile | **Applied.** The conclusion was right and the command was wrong, which is worse than either. Committed as `flip-proxy.sh` (four files) and wired into f3, so the command cannot drift from the claim again |
+| Minor | AC6's *ordering* and the `> 0` gate were unfalsifiable — f5's greps are order-blind, so moving the note after the counts would pass | **Applied.** f5 is now position-aware and mutation-proven: renaming the reach marker so it no longer precedes the counts turns it red |
+| Minor | The `/proc`-unreadable fail-open survives and `mutate.sh` does not list it, so the harness's own output disagreed with *Accepted gaps* | **Applied.** Declared to the harness as a `SURVIVES`; it now reports `declared survivors: 2` |
+| Minor | Evidence drift: f8 said `7 CAUGHT / 1 not caught`, the harness at HEAD says `caught: 8` | **Applied by re-running, not by editing the number** — which is what the reviewer explicitly asked for |
+| Minor, THEORETICAL | `--dry-run` on Windows still prints "Found N reapable" under a note saying nothing can be reaped | **Accepted, tracked here.** Cosmetic on a platform where the command is inert by design; fixing it means threading `ProcessDiscovery` through the dry-run branch for a message nobody acts on |
+| Question | `test (windows-latest)` green at the merge commit cannot be established from Linux | **Answered by measurement**, not argument: `gh api .../commits/5a68096/check-runs` → `test (windows-latest): success`, `test-windows: success` |
+
+### The proxy script had the repo's own prohibited pattern in it
+
+`flip-proxy.sh` was first written with `for f in $FILES`. **zsh does not word-split an unquoted
+parameter**, so the loop ran once with all four names glued together, every `cp` failed, no `.bak`
+was written — and the `sed`s still flipped the tags, because they name files literally. The script
+reported success both times and left the working tree flipped.
+
+That poisoned the next thing to run: with the tags flipped, `sweep_proc_linux.go` is excluded from
+the build, so mutations against it cannot fail, and `mutate.sh` reported **five CAUGHT mutations as
+SURVIVED**. A green-looking script silently turned the mutation harness into a liar.
+
+Fixed with `set --` positional parameters, and — more importantly — the script now **verifies its
+own restore** and exits 3 if the tags are still flipped. Confirmed identical under `bash` and
+`zsh`, tree clean after both.
+
+This is the exact row this repo's `.claude/CLAUDE.md` prohibited-pattern table carries, written
+into a new script hours after that table was extended. The table was right; reading it is not the
+same as applying it.
+
 ## Round 4 review: FAIL — disposition
 
 `agy/gemini-3.1-pro-high`, random draw, not the implementer, and a **different provider family**
@@ -229,3 +272,29 @@ and makes that measurement its first task.
   OPEN**. Round 3 corrected the earlier claim that it was unfiled. Measured spellings across
   `specs/archive/`: `verified` (42), `passing` (39), `done` (15), `verifying` (15), `passed` (12),
   `implemented` (6), against 523 `pending`.
+
+## Round-5 dispositions
+
+The round-5 verdict is **PASS-WITH-GAPS**, whose meaning is that the gaps are tracked rather
+than fixed. Its "Recommended next steps (before archive)" list nonetheless asked for edits to
+`proposal.md` and `features.json` — the very files the archive gate measures staleness against,
+so applying them invalidates the review that requested them. That contradiction is not this
+spec's to resolve; it is filed against the review skill's own template (see below), and the
+dispositions here follow Definition of Done §4: applied, ticketed, or declined with a reason.
+
+The contract files archive **exactly as reviewed** at `5a68096`. Everything applied below lives
+outside the contract set, so the review still describes what is on disk.
+
+| # | Recommendation | Disposition |
+|---|---|---|
+| 1 | Confirm `test (windows-latest)` is green at the merge commit | **Verified.** `test-windows: success` at `36c27fb15a6f` (#1531), and at `195cc1887b9a` (#1526) and `6f9b0d95729e` (#1518). |
+| 2 | Fix the build-tag flip to the four-file form, or commit it and have f3 run it | **Applied** as `flip-proxy.sh` (committed, executable, non-contract). It flips all four files — both implementations and both `*_proc_*_test.go` — and exits 3 if the tree is left flipped. |
+| 3 | Re-run `mutate.sh` and refresh f8's evidence line | **Declined for this archive.** `mutate.sh` is committed and re-runnable, and the review itself records the true count. Editing `features.json` to restate a number the review already corrects would invalidate the review to fix a smaller inaccuracy than the one it creates. |
+| 4 | Add the `os.ReadDir("/proc")` fail-open as a declared `SURVIVES` | **Applied** in `mutate.sh` (non-contract). The declared-survivor list is now complete: 8 CAUGHT, 2 declared survivors, 0 regressions, exit 0. |
+| 5 | Make AC6's order and its `> 0` gate falsifiable | **Applied in code, declined in the contract.** `TestGateFIsTheLastCheckBeforeRemoval` and the `orderRecordingRunner` shipped in #1531 and run in the suite; only f5's `verification` string still names the older command. Same reasoning as item 3. |
+| 6 | Amend `proposal.md` *What* to carve out the namespace case | **Declined, deliberately.** The narrower claim is already durable in two places that outlive this spec: the review's own finding, archived beside the proposal, and **#1523**, which owns the bind-mount fail-open. Rewriting the reviewed proposal would make that finding refer to text that no longer exists. |
+| 7 | For #1523: the `os.SameFile` fixture should cover the tmpfs shape | **Ticketed.** Carried into #1523: from the host, `os.Stat("/proc/<pid>/cwd")` returned the same `dev/ino` as the worktree on a real filesystem (`64512/23873208` both), but through a docker bind mount of a **tmpfs** path the dev differed (`26/21432566` vs `50/1237841`) while the inode matched — so a pure `SameFile` test would miss it. |
+
+**Residual, stated rather than hidden:** f3, f5 and f8 carry `verification`/`evidence` strings
+naming the pre-round-5 commands and counts. The committed `flip-proxy.sh`, `mutate.sh` and the
+order test are the current truth; this table is the pointer from one to the other.
