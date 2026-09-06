@@ -293,5 +293,6 @@ tags: [lessons, index, dotfiles]
 | [273 - The fix and the detector can be the same edit](lesson-273-the-fix-and-the-detector-can-be-the-same-edit.md) | 2026-09-05 |  |
 | [274 - A constant test double cannot reach a check that exists for change](lesson-274-a-constant-test-double-cannot-reach-a-check-that-exists-for-change.md) | 2026-09-05 |  |
 | [275 - A review that demands contract edits invalidates itself](lesson-275-a-review-that-demands-contract-edits-invalidates-itself.md) | 2026-09-05 |  |
+| [277 - A diagnosis repeated often enough becomes indistinguishable from evidence](lesson-277-a-diagnosis-repeated-often-enough-reads-as-evidence.md) | 2026-09-06 |  |
 
 - [2026-08-30 Intercepting Cobra Errors without Breaking SilenceErrors](2026-08-30-cobra-silence-errors-interception.md)
