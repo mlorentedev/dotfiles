@@ -12,7 +12,20 @@ setup() {
     # shellcheck source=/dev/null
     . "$SCRIPTS_DIR/install-dotf.sh"
 
-    VERSION="9.9.9"            # no real dotf reports this -> idempotence stays off
+    # Neutralise the ONE lookup that reaches outside the fixture. Without this
+    # the tests read whatever dotf the developer has installed: a source build
+    # answers `dev`, install_dotf takes its "leave it in place" branch and
+    # returns 0 without installing, and six tests below fail on a clean tree
+    # (#1409 -- measured: 6 failures with ~/.local/bin on PATH, 0 without).
+    #
+    # Empty is the default because it means "nothing installed", which is the
+    # precondition every install test wants. Tests that care about the branches
+    # set FAKE_CURRENT; the real implementation is exercised separately, in a
+    # subshell that sources the script unstubbed -- a stub that is the only
+    # thing ever tested proves nothing about the code it stands in for.
+    _dotf_current_version() { printf '%s\n' "${FAKE_CURRENT:-}"; }
+
+    VERSION="9.9.9"
     DEST="$TMP/bin"
     FIXTURE="$TMP/release"
     BASE="file://$FIXTURE"
@@ -73,19 +86,71 @@ teardown() {
 
 @test "idempotent: a no-op when the pinned version is already on PATH" {
     ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
-    STUB="$TMP/stub"
-    mkdir -p "$STUB"
-    cat > "$STUB/dotf" <<EOF
-#!/bin/sh
-echo "dotf version $VERSION"
-EOF
-    chmod +x "$STUB/dotf"
 
-    export PATH="$STUB:$PATH"
+    FAKE_CURRENT="$VERSION"
     run install_dotf "$VERSION" "$DEST" "$BASE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"already installed"* ]]
     [ ! -e "$DEST/dotf" ]
+}
+
+@test "a source build on PATH is left alone: dev short-circuits before the version check" {
+    # THE BRANCH NOTHING EXERCISED (#1409). It sits ahead of the version check,
+    # so no choice of VERSION can reach past it -- the old comment here read
+    # "no real dotf reports 9.9.9 -> idempotence stays off", which disabled the
+    # SECOND gate while the first one fired on every developer machine. A
+    # deliberate, correct behaviour with no test read as six broken tests for
+    # about ten sessions.
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    FAKE_CURRENT="dev"
+    run install_dotf "$VERSION" "$DEST" "$BASE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"source build"* ]]
+    # The point of the branch: the release must NOT replace a source build.
+    [ ! -e "$DEST/dotf" ]
+}
+
+@test "the real version lookup parses a dotf on PATH, on stdout or stderr" {
+    # Drives the PRODUCTION _dotf_current_version, not setup()'s stub: sourced
+    # fresh in a subshell so the stub is absent. Without this the stub would be
+    # the only thing under test, and the seam could drift from the code it
+    # stands in for while every test stayed green.
+    STUB="$TMP/stub"; mkdir -p "$STUB"
+
+    # Old binaries answer on stderr (BUG-070/#915), current ones on stdout.
+    # Both must parse, which is why the call merges the streams.
+    printf '#!/bin/sh\necho "dotf version 1.2.3"\n'      > "$STUB/dotf"; chmod +x "$STUB/dotf"
+    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    [ "$output" = "1.2.3" ]
+
+    printf '#!/bin/sh\necho "dotf version dev" >&2\n'    > "$STUB/dotf"; chmod +x "$STUB/dotf"
+    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    [ "$output" = "dev" ]
+
+    # Unrecognisable output must yield empty, so the caller converges rather
+    # than matching a branch by accident.
+    printf '#!/bin/sh\necho "not a version"\n'           > "$STUB/dotf"; chmod +x "$STUB/dotf"
+    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    [ -z "$output" ]
+}
+
+@test "no dotf installed is survivable under set -euo pipefail" {
+    # setup-linux.sh runs `set -euo pipefail` and sources this script, so the
+    # version lookup executes under those flags in production. With `pipefail`,
+    # `dotf version | grep | head` fails at the FIRST element when dotf is not
+    # installed, the pipeline reports non-zero, and `set -e` aborts the whole of
+    # setup at the assignment -- on a fresh machine, which is the one path where
+    # dotf is guaranteed absent. The `command_exists` guard inside the seam is
+    # what prevents that, and it looks inert until you run it under the flags:
+    # measured identical (empty, silent) without them, fatal with them.
+    empty="$TMP/nothing"; mkdir -p "$empty"
+
+    run bash -c "set -euo pipefail; . '$SCRIPTS_DIR/install-dotf.sh'; \
+                 export PATH='$empty:/usr/bin:/bin'; \
+                 v=\$(_dotf_current_version); printf 'survived:[%s]' \"\$v\""
+    [ "$status" -eq 0 ]
+    [ "$output" = "survived:[]" ]
 }
 
 @test "converges over a running dotf: a live binary in dest is replaced, not refused" {
