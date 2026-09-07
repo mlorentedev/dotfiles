@@ -541,7 +541,6 @@ if bad:
 }
 
 @test "pr-agent: no line exceeds the fleet yamllint limit of 130 characters" {
-    ! awk 'length > 130 {exit 1}' "$WF" || true
     [ "$(awk 'length > 130' "$WF" | wc -l)" -eq 0 ]
 }
 
