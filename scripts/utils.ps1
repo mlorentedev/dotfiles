@@ -138,14 +138,15 @@ function Deploy-File {
 
 # Get-ClaudeProjectKeyEncoded: the pure encoding of a working directory into
 # Claude Code's per-project key (the directory name under ~/.claude/projects) --
-# every '/', '\' and drive ':' maps to '-' (C:\Users\me\p -> C--Users-me-p). This
+# every '/', '\', drive ':' and '.' maps to '-' (C:\Users\me\p -> C--Users-me-p,
+# svqtriana.github.io -> svqtriana-github-io, #1553). This
 # MUST stay byte-for-byte equal to memlink.ClaudeProjectKey (Go); a Pester guard
 # asserts that parity. It is the fast, no-subprocess path for hot loops (e.g. a
 # project-path decoder's filesystem scan) and the offline fallback for
 # Get-ClaudeProjectKey.
 function Get-ClaudeProjectKeyEncoded {
     param([Parameter(Mandatory)][string]$Path)
-    return $Path.Replace('/', '-').Replace('\', '-').Replace(':', '-')
+    return $Path.Replace('/', '-').Replace('\', '-').Replace(':', '-').Replace('.', '-')
 }
 
 # Get-ClaudeProjectKey: the authoritative single-shot key for a working directory.
