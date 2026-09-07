@@ -534,3 +534,13 @@ if bad:
     toml_model=$(grep -E '^model\s*=' "$REPO/.pr_agent.toml" | sed 's/.*"\(.*\)"/\1/')
     grep -q "CONFIG__MODEL: ${toml_model}" "$WF"
 }
+
+@test "pr-agent: the publication guard is skipped after a credential failure" {
+    grep -q 'id: credential' "$WF"
+    grep -q "steps.credential.outcome != 'failure'" "$WF"
+}
+
+@test "pr-agent: no line exceeds the fleet yamllint limit of 130 characters" {
+    ! awk 'length > 130 {exit 1}' "$WF" || true
+    [ "$(awk 'length > 130' "$WF" | wc -l)" -eq 0 ]
+}
