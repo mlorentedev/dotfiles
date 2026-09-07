@@ -513,7 +513,7 @@ if bad:
 }
 
 @test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
-    grep -q "secrets.NAN_API_KEY == ''" "$WF"
+    grep -q "HAS_NAN_API_KEY: \${{ secrets.NAN_API_KEY != '' }}" "$WF"
     grep -q "dotf secrets sync ci --repo" "$WF"
 }
 

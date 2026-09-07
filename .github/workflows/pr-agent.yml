@@ -158,12 +158,17 @@ jobs:
       # NaN-concurrency diagnosis that is wrong. Measured 2026-09-06 on the ten
       # repositories that received this workflow before their NAN_API_KEY was
       # synced. Fail here, with the remedy, before spending a run on it.
+      # `secrets` is not an allowed context in a step `if:` (actionlint: expression),
+      # so the presence test travels as a boolean env var; the value never does.
       - name: Fail if the reviewer has no credential
-        if: ${{ secrets.NAN_API_KEY == '' }}
+        env:
+          HAS_NAN_API_KEY: ${{ secrets.NAN_API_KEY != '' }}
         run: |
-          echo "::error::NAN_API_KEY is not set in this repository's Actions secrets, so PR-Agent cannot review."
-          echo "::error::Remedy: add ci:${GITHUB_REPOSITORY} to NAN_API_KEY's consumers in dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY}"
-          exit 1
+          if [ "${HAS_NAN_API_KEY}" != "true" ]; then
+            echo "::error::NAN_API_KEY is not set in this repository's Actions secrets, so PR-Agent cannot review."
+            echo "::error::Remedy: add ci:${GITHUB_REPOSITORY} to NAN_API_KEY's consumers in dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY}"
+            exit 1
+          fi
       - name: PR-Agent
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move `v0.42.0` decides what runs here, and what runs here holds
