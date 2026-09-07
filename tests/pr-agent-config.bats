@@ -544,3 +544,7 @@ if bad:
     ! awk 'length > 130 {exit 1}' "$WF" || true
     [ "$(awk 'length > 130' "$WF" | wc -l)" -eq 0 ]
 }
+
+@test "pr-agent: the head-ref fallback also works for issue_comment runs" {
+    grep -q 'HEAD_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$WF"
+}
