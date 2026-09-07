@@ -30,7 +30,125 @@ actually answered.`,
 		RunE:         func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	c.AddCommand(newAgentRunCmd())
+	c.AddCommand(newAgentAutoCmd())
 	return c
+}
+
+// dispatchBackends is the probe order the agent commands resolve --backend
+// against.
+//
+// It is a variable so a test can substitute a backend that RECORDS the Request
+// it received. HARNESS-120's AC6 is "the persona's record reached the dispatched
+// process", and stdout cannot answer that: DryRun echoes the role and the route
+// and never the task (dryrun.go:18-24), so a preamble that was composed and then
+// dropped would pass every assertion made on the record.
+//
+// Deliberately unexported and deliberately not a --backend value. The comment at
+// dryrun.go:13-15 states the reason: a backend name that exists to make tests
+// pass is a surface users reach by accident.
+var dispatchBackends = agent.DefaultBackends
+
+// dispatchInputs is what a caller has settled before the shared setup runs.
+// `run` takes all of it from flags; `auto` derives role, tier and task first and
+// then supplies the same struct.
+type dispatchInputs struct {
+	role, task, tier, cwd string
+	backendName           string
+	semaphoreDir          string
+	timeout               time.Duration
+}
+
+// prepareDispatch performs the setup `run` and `auto` share, in ONE place
+// deliberately. The identity gate and the deny list are fail-closed (ADR-032
+// §8): an undeclared machine denies every non-local pool, because defaulting the
+// unknown case to "allowed" fails silently and in the direction nobody notices.
+// A second command that re-derived that is a second place it can be forgotten,
+// and the forgetting would look exactly like working.
+//
+// The routing map is a parameter rather than loaded here because `auto` must
+// read it BEFORE this runs: the tier it dispatches to is the persona's declared
+// one checked against the map's chains, so the map is an input to CHOOSING the
+// tier and not only to walking it.
+func prepareDispatch(m map[string]any, in dispatchInputs) (agent.Options, agent.Backend, error) {
+	backend, err := agent.ResolveRouter(dispatchBackends(), in.backendName)
+	if err != nil {
+		return agent.Options{}, nil, err
+	}
+	chain, err := harness.ResolveChain(m, in.tier)
+	if err != nil {
+		return agent.Options{}, nil, err
+	}
+
+	policy, err := env.LoadMachinePolicy(env.MachinePath(env.Home()))
+	if err != nil {
+		return agent.Options{}, nil, err
+	}
+	if !policy.Identified {
+		return agent.Options{}, nil, fmt.Errorf(unidentifiedMachine, env.MachinePath(env.Home()))
+	}
+	if err := policy.ValidateDeny(declaredPools(m)); err != nil {
+		return agent.Options{}, nil, err
+	}
+
+	semDir := in.semaphoreDir
+	if semDir == "" {
+		// Not derived from --repo-root: the budget is a property of the
+		// MACHINE, and two checkouts of this repo draw on one NaN
+		// subscription. A per-checkout counter would bound neither.
+		if semDir, err = agent.DefaultSemaphoreDir(); err != nil {
+			return agent.Options{}, nil, err
+		}
+	}
+
+	return agent.Options{
+		Tier: in.tier, Role: in.role, Task: in.task, Cwd: in.cwd,
+		Chain: chain, Timeout: in.timeout,
+		Denied:    policy.Denies,
+		Semaphore: agent.NewSemaphore(semDir),
+		Capacity:  declaredCapacity(m),
+	}, backend, nil
+}
+
+// emitRecord writes the record and turns a non-zero status into an exit code.
+//
+// The record reaches stdout whatever the outcome: its consumer is a dispatcher,
+// and an error path that emits nothing forces that consumer to parse stderr
+// prose to learn what happened.
+func emitRecord(cmd *cobra.Command, rec agent.Record) error {
+	enc := json.NewEncoder(cmd.OutOrStdout())
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(rec); err != nil {
+		return err
+	}
+	if code := agent.ExitCode(rec.Status); code != 0 {
+		return withExitCode(code, summarise(rec))
+	}
+	return nil
+}
+
+// dispatchRoot resolves where model-map.json and the persona records live, and
+// both commands use THIS one so a task cannot be routed by one root's map while
+// being run as another root's persona.
+//
+// It is env.ResolveHarnessRoot and deliberately not the hook's harnessRoot: that
+// helper falls back to ~/.dotfiles, which is the deployed copy rather than the
+// checkout, and `run` has never resolved that way. Two idea of where the harness
+// is, is how the gate came to read one root while the suggester read another.
+func dispatchRoot(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	return env.ResolveHarnessRoot()
+}
+
+// requireTimeout is shared because ADR-032 §2 makes a bounded dispatch part of
+// the contract for every command that spends quota, not for `run` alone.
+func requireTimeout(d time.Duration) error {
+	if d <= 0 {
+		return fmt.Errorf("--timeout is required and must be positive: ADR-032 §2 makes a bounded dispatch " +
+			"part of the contract, and a backend that cannot be bounded is not eligible")
+	}
+	return nil
 }
 
 func newAgentRunCmd() *cobra.Command {
@@ -90,69 +208,31 @@ fails silently and in the direction nobody notices.`,
 				return fmt.Errorf("--tier is required (top|mid|low): the chain to walk is declared per tier in %s, "+
 					"and guessing one would route work to a model nobody chose", harness.ModelMapFile)
 			}
-			if timeout <= 0 {
-				return fmt.Errorf("--timeout is required and must be positive: ADR-032 §2 makes a bounded dispatch " +
-					"part of the contract, and a backend that cannot be bounded is not eligible")
+			if err := requireTimeout(timeout); err != nil {
+				return err
 			}
-			backend, err := agent.ResolveRouter(agent.DefaultBackends(), backendName)
+
+			m, err := harness.LoadModelMap(dispatchRoot(repoRoot))
+			if err != nil {
+				return err
+			}
+			opts, backend, err := prepareDispatch(m, dispatchInputs{
+				role: role, task: task, tier: tier, cwd: cwd,
+				backendName:  backendName,
+				semaphoreDir: semaphoreDir, timeout: timeout,
+			})
 			if err != nil {
 				return err
 			}
 
-			root := repoRoot
-			if root == "" {
-				root = env.ResolveHarnessRoot()
-			}
-			m, err := harness.LoadModelMap(root)
-			if err != nil {
-				return err
-			}
-			chain, err := harness.ResolveChain(m, tier)
-			if err != nil {
-				return err
-			}
-
-			policy, err := env.LoadMachinePolicy(env.MachinePath(env.Home()))
-			if err != nil {
-				return err
-			}
-			if !policy.Identified {
-				return fmt.Errorf(unidentifiedMachine, env.MachinePath(env.Home()))
-			}
-			if err := policy.ValidateDeny(declaredPools(m)); err != nil {
-				return err
-			}
-
-			semDir := semaphoreDir
-			if semDir == "" {
-				// Not derived from --repo-root: the budget is a property of the
-				// MACHINE, and two checkouts of this repo draw on one NaN
-				// subscription. A per-checkout counter would bound neither.
-				if semDir, err = agent.DefaultSemaphoreDir(); err != nil {
-					return err
-				}
-			}
-
-			rec := agent.Dispatch(cmd.Context(), agent.Options{
-				Tier: tier, Role: role, Task: task, Cwd: cwd,
-				Chain: chain, Timeout: timeout,
-				Denied:    policy.Denies,
-				Semaphore: agent.NewSemaphore(semDir),
-				Capacity:  declaredCapacity(m),
-			}, backend)
-
-			// The record reaches stdout whatever the outcome: its consumer is a
-			// dispatcher, and an error path that emits nothing forces that
-			// consumer to parse stderr prose to learn what happened.
-			enc := json.NewEncoder(cmd.OutOrStdout())
-			enc.SetEscapeHTML(false)
-			if err := enc.Encode(rec); err != nil {
-				return err
-			}
-			if code := agent.ExitCode(rec.Status); code != 0 {
-				return withExitCode(code, summarise(rec))
-			}
-			return nil
+			// No preamble here, deliberately. `run` is the primitive that takes a
+			// route as GIVEN — its --role is a label on a dispatch, not a lookup
+			// into the roster, and making it one would refuse a --role the roster
+			// does not name. `auto` is the layer that resolves a persona and can
+			// therefore send one. The consequence is stated in HARNESS-120's PR
+			// body rather than left implicit: `run --role reviewer` still
+			// dispatches a generic agent.
+			return emitRecord(cmd, agent.Dispatch(cmd.Context(), opts, backend))
 		},
 	}
 
