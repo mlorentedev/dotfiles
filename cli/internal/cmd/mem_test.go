@@ -66,6 +66,7 @@ func TestMemProjectKey(t *testing.T) {
 	}{
 		{"windows path", `C:\Users\me\p`, "C--Users-me-p"},
 		{"posix path", "/home/me/p", "-home-me-p"},
+		{"dotted repo name", "/home/me/svqtriana.github.io", "-home-me-svqtriana-github-io"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

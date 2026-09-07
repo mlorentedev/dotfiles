@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// HARNESS-111. A review whose diff is empty does not fail — it silently becomes
+// HARNESS-112. A review whose diff is empty does not fail — it silently becomes
 // a reading of the spec folder, and reports findings with nothing executed
 // behind them. That is worse than no review, because it arrives wearing a
 // verdict. The launcher must refuse instead.

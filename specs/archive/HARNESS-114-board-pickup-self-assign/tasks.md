@@ -1,10 +1,10 @@
 ---
-id: "HARNESS-041-board-pickup-self-assign"
+id: "HARNESS-114-board-pickup-self-assign"
 type: tasks
 template_version: "1.0"
 ---
 
-# HARNESS-041 — tasks
+# HARNESS-114 — tasks
 
 - [x] T1 — `git-hooks/post-checkout` dispatcher: background the helper, then chain the repo-local hook.
 - [x] T2 — `git-hooks/lib/board-pickup.sh`: parse `<prefix>/<issue>-<slug>`; flag/name guards; resolve current-repo → knowledge.

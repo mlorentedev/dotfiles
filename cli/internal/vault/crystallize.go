@@ -311,9 +311,9 @@ func PrintChecklist(w io.Writer) {
 // memoryFileFor is find_memory_file(): <home>/.claude/projects/<key>/memory/MEMORY.md.
 //
 // The key comes from memlink.ClaudeProjectKey rather than a local reimplementation
-// (tasks.md is explicit about this): that function also maps '\' and ':', which is
-// the #689 drive-colon fix. On the POSIX paths the shell handles, the two encodings
-// are identical.
+// (tasks.md is explicit about this): that function also maps '\', ':' and '.' —
+// the #689 drive-colon fix and the #1553 dotted-repo fix — so a repo such as
+// svqtriana.github.io resolves to the MEMORY.md Claude actually writes.
 func memoryFileFor(home, projectDir string) string {
 	return filepath.Join(memlink.ClaudeMemoryTarget(home, projectDir), "MEMORY.md")
 }

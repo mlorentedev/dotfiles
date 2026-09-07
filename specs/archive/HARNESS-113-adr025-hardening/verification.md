@@ -3,7 +3,7 @@ tags: [spec, verification]
 created: "2026-06-19"
 ---
 
-# Verification - HARNESS-027-adr025-hardening
+# Verification - HARNESS-113-adr025-hardening
 
 ## Evidence
 
@@ -50,5 +50,5 @@ created: "2026-06-19"
 ## Archive checklist
 
 - [ ] PR merged, closes #457; CI green.
-- [ ] `proposal.md` `status: archived`; folder → `specs/archive/HARNESS-027-adr025-hardening/`.
+- [ ] `proposal.md` `status: archived`; folder → `specs/archive/HARNESS-113-adr025-hardening/`.
 - [ ] Bitácora #457 → Done.

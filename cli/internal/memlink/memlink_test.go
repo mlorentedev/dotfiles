@@ -75,13 +75,21 @@ func TestResolveVaultMemory(t *testing.T) {
 // --- ClaudeProjectKey / ClaudeMemoryTarget: cross-OS encoding ----------------
 
 func TestClaudeProjectKey(t *testing.T) {
-	for in, want := range map[string]string{
-		"/home/me/Projects/dotfiles":                    "-home-me-Projects-dotfiles",
-		`C:\Users\mlorente\Projects\Workspace\dotfiles`: "C--Users-mlorente-Projects-Workspace-dotfiles",
-	} {
-		if got := ClaudeProjectKey(in); got != want {
-			t.Errorf("ClaudeProjectKey(%q) = %q, want %q", in, got, want)
-		}
+	cases := []struct {
+		name, in, want string
+	}{
+		{"posix", "/home/me/Projects/dotfiles", "-home-me-Projects-dotfiles"},
+		{"windows drive colon", `C:\Users\mlorente\Projects\Workspace\dotfiles`, "C--Users-mlorente-Projects-Workspace-dotfiles"},
+		// #1553: Claude maps '.' too; keeping it produced a key Claude never reads.
+		{"dotted repo name", "/home/manu/Projects/svqtriana.github.io", "-home-manu-Projects-svqtriana-github-io"},
+		{"dotted repo name on windows", `C:\Users\me\Projects\svqtriana.github.io`, "C--Users-me-Projects-svqtriana-github-io"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ClaudeProjectKey(tc.in); got != tc.want {
+				t.Errorf("ClaudeProjectKey(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
