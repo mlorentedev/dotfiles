@@ -494,3 +494,68 @@ if bad:
     grep -q 'BASE_REF:' "$REPO/.github/workflows/pr-agent.yml" \
         || { echo "the guard must resolve the registry at the base ref, not the PR head" >&2; false; }
 }
+
+@test "pr-agent: fork PRs are excluded from the automatic path" {
+    # A fork PR runs with an empty secrets store and a read-only token, so the
+    # review cannot run and the guard would fail every fork PR for no reason.
+    grep -q "github.event.pull_request.head.repo.fork == false" "$WF"
+}
+
+@test "pr-agent: the guard only counts comments authored by github-actions[bot]" {
+    # On a public repository anyone can paste the marker text into a comment.
+    grep -q 'select(.user.login == "github-actions\[bot\]"' "$WF"
+}
+
+@test "pr-agent: the guard binds the marker to this run's start stamp" {
+    grep -q 'id: start' "$WF"
+    grep -q 'STARTED: \${{ steps.start.outputs.started }}' "$WF"
+    grep -q '(.updated_at >= $started)' "$WF"
+}
+
+@test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
+    grep -q "HAS_NAN_API_KEY: \${{ secrets.NAN_API_KEY != '' }}" "$WF"
+    grep -q "dotf secrets sync ci --repo" "$WF"
+}
+
+@test "pr-agent: the guard reads the marker from the PR head when the base has no registry yet" {
+    grep -q 'read_marker "${BASE_REF}"' "$WF"
+    grep -q 'read_marker "${HEAD_SHA}"' "$WF"
+}
+
+@test "pr-agent: the guard counts comments across all pages, not per page" {
+    grep -q -- '--paginate \\$' "$WF"
+    grep -q 'jq -s --arg started' "$WF"
+}
+
+@test "pr-agent: the model travels in the workflow env so bootstrap PRs do not fall back to upstream defaults" {
+    grep -q 'CONFIG__MODEL: openai/mimo-v2.5' "$WF"
+    grep -q 'CONFIG__FALLBACK_MODELS:' "$WF"
+    # the toml and the env must name the same model
+    toml_model=$(grep -E '^model\s*=' "$REPO/.pr_agent.toml" | sed 's/.*"\(.*\)"/\1/')
+    grep -q "CONFIG__MODEL: ${toml_model}" "$WF"
+}
+
+@test "pr-agent: the publication guard is skipped after a credential failure" {
+    grep -q 'id: credential' "$WF"
+    grep -q "steps.credential.outcome != 'failure'" "$WF"
+}
+
+@test "pr-agent: no line exceeds the fleet yamllint limit of 130 characters" {
+    [ "$(awk 'length > 130' "$WF" | wc -l)" -eq 0 ]
+}
+
+@test "pr-agent: the head-ref fallback also works for issue_comment runs" {
+    grep -q 'HEAD_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$WF"
+}
+
+@test "pr-agent: the guard reads the registry from the default branch, never from base.ref" {
+    run grep -c 'BASE_REF: \${{ github.event.pull_request.base.ref' "$WF"
+    [ "$output" = "0" ]
+    grep -q 'BASE_REF: \${{ github.event.repository.default_branch }}' "$WF"
+}
+
+@test "pr-agent: the head-ref fallback never takes the marker text from the PR" {
+    grep -q 'marker="PR Reviewer Guide"' "$WF"
+    run grep -c 'marker=$(read_marker "${HEAD_SHA}")' "$WF"
+    [ "$output" = "0" ]
+}
