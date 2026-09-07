@@ -503,13 +503,13 @@ if bad:
 
 @test "pr-agent: the guard only counts comments authored by github-actions[bot]" {
     # On a public repository anyone can paste the marker text into a comment.
-    grep -q 'select(.user.login == \\"github-actions\[bot\]\\"' "$WF"
+    grep -q 'select(.user.login == "github-actions\[bot\]"' "$WF"
 }
 
 @test "pr-agent: the guard binds the marker to this run's start stamp" {
     grep -q 'id: start' "$WF"
     grep -q 'STARTED: \${{ steps.start.outputs.started }}' "$WF"
-    grep -q '.updated_at >= \\"\${STARTED}\\"' "$WF"
+    grep -q '(.updated_at >= $started)' "$WF"
 }
 
 @test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
@@ -546,4 +546,10 @@ if bad:
 
 @test "pr-agent: the head-ref fallback also works for issue_comment runs" {
     grep -q 'HEAD_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$WF"
+}
+
+@test "pr-agent: the guard reads the registry from the default branch, never from base.ref" {
+    run grep -c 'BASE_REF: \${{ github.event.pull_request.base.ref' "$WF"
+    [ "$output" = "0" ]
+    grep -q 'BASE_REF: \${{ github.event.repository.default_branch }}' "$WF"
 }
