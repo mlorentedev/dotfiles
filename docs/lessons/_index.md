@@ -296,3 +296,5 @@ tags: [lessons, index, dotfiles]
 | [276 - Intercepting Cobra errors without breaking `SilenceErrors`](lesson-276-intercepting-cobra-errors-without-breaking-silenceerrors.md) | 2026-08-30 |  |
 | [277 - One invalid field rejects the whole file, and the deployed copy hides it until a deploy](lesson-277-one-invalid-field-rejects-the-whole-file-and-the-deployed-copy-hides-it.md) | 2026-09-05 |  |
 | [278 - A cap asserted in one unit while the payload overflowed in another](lesson-278-a-cap-asserted-in-one-unit-while-the-platform-counts-another.md) | 2026-09-05 |  |
+| [279 - A helper written to "mirror" an existing parser is the defect; the transcription bug is only how you find out](lesson-279-a-helper-written-to-mirror-a-parser-is-the-defect.md) | 2026-09-05 |  |
+| [280 - A diagnosis repeated often enough becomes indistinguishable from evidence](lesson-280-a-diagnosis-repeated-often-enough-reads-as-evidence.md) | 2026-09-06 |  |
