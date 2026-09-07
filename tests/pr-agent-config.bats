@@ -523,5 +523,14 @@ if bad:
 }
 
 @test "pr-agent: the guard counts comments across all pages, not per page" {
-    grep -q -- '--paginate --slurp' "$WF"
+    grep -q -- '--paginate \\$' "$WF"
+    grep -q 'jq -s --arg started' "$WF"
+}
+
+@test "pr-agent: the model travels in the workflow env so bootstrap PRs do not fall back to upstream defaults" {
+    grep -q 'CONFIG__MODEL: openai/mimo-v2.5' "$WF"
+    grep -q 'CONFIG__FALLBACK_MODELS:' "$WF"
+    # the toml and the env must name the same model
+    toml_model=$(grep -E '^model\s*=' "$REPO/.pr_agent.toml" | sed 's/.*"\(.*\)"/\1/')
+    grep -q "CONFIG__MODEL: ${toml_model}" "$WF"
 }
