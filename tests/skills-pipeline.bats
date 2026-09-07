@@ -7,6 +7,11 @@
 
 load 'lib/refute'
 
+# Required for `run !` in the BUG-771 test below. Declared rather than assumed:
+# bats warns (BW02) on flag use without it, and CI resolves bats from
+# versions.conf (BATS_VERSION=1.13.0), so the floor is well under what runs.
+bats_require_minimum_version 1.5.0
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     SCRIPT="$REPO/scripts/compile-harness.sh"
@@ -195,8 +200,13 @@ path_without_copilot() {
 
     # Fail loudly if the fixture did not achieve the absence, instead of
     # quietly re-testing the present-binary path and reporting a pass.
-    run env PATH="$nocopilot" sh -c 'command -v copilot'
-    [ "$status" -ne 0 ]
+    #
+    # `run !` rather than `run` plus a status check: a bare `run` of a lookup
+    # that is SUPPOSED to fail makes bats emit a BW01 "command not found"
+    # warning on every suite run, and a warning nobody can act on is how real
+    # ones stop being read. `run -127` would silence it by pinning an exact
+    # code, which is worse -- `command -v` answers 1 or 127 depending on the sh.
+    run ! env PATH="$nocopilot" sh -c 'command -v copilot'
 
     run env HOME="$FAKEHOME" PATH="$nocopilot" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
