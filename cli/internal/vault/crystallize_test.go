@@ -332,3 +332,22 @@ func TestProcessProjectRefusesYAMLAndLeavesFileIntact(t *testing.T) {
 		t.Fatalf("got %d [ERROR] lines, want 4 (the shell prints exactly four)", n)
 	}
 }
+
+// #1553: a dotted repo name (svqtriana.github.io) encodes with the dot mapped to
+// '-', exactly as Claude writes it, so memoryFileFor lands on the MEMORY.md Claude
+// maintains and decodePath recovers the directory from that key by scanning.
+func TestDottedRepoNameEncodesLikeClaudeAndDecodes(t *testing.T) {
+	home := t.TempDir()
+	proj := filepath.Join(home, "Projects", "svqtriana.github.io")
+	if err := os.MkdirAll(proj, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(home, ".claude", "projects", memlink.ClaudeProjectKey(proj), "memory", "MEMORY.md")
+	if got := memoryFileFor(home, proj); got != want || strings.Contains(filepath.Base(filepath.Dir(filepath.Dir(got))), ".") {
+		t.Fatalf("memoryFileFor(%q) = %q, want a dot-free key: %q", proj, got, want)
+	}
+	key := memlink.ClaudeProjectKey(proj)
+	if got := decodePath(home, key); got != proj {
+		t.Fatalf("decodePath(%q) = %q, want %q", key, got, proj)
+	}
+}
