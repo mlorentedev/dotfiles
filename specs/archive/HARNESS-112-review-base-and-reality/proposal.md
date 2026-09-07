@@ -1,5 +1,5 @@
 ---
-id: "HARNESS-111-review-base-and-reality"
+id: "HARNESS-112-review-base-and-reality"
 type: spec
 status: archived # draft | implementing | verifying | archived
 issue: "mlorentedev/dotfiles#1533"
@@ -7,7 +7,7 @@ tags: [spec, proposal]
 template_version: "1.0"
 ---
 
-# HARNESS-111-review-base-and-reality
+# HARNESS-112-review-base-and-reality
 
 ## Why
 

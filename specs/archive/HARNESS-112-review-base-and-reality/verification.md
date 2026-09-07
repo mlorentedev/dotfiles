@@ -3,7 +3,7 @@ tags: [spec, verification, templates]
 created: "2026-09-05"
 ---
 
-# Verification - HARNESS-111-review-base-and-reality
+# Verification - HARNESS-112-review-base-and-reality
 
 ## Evidence
 
@@ -124,8 +124,8 @@ There are **four** deployed copies of this skill — the ones a reviewer actuall
 and undercounting them is the trap: which copy gets read depends on the runner the pool draws.
 Measured after the fix landed in the record and the vault, every deployed copy still read **2
 defective forms, 0 routing-rule lines**. `compile-harness.sh --deploy` must run after #1543 merges
-and before this spec's own review is launched, or round 1 of HARNESS-111 will be reviewed under the
-very template HARNESS-111 fixes — and will produce the list root 3 forbids.
+and before this spec's own review is launched, or round 1 of HARNESS-112 will be reviewed under the
+very template HARNESS-112 fixes — and will produce the list root 3 forbids.
 
 ## Decisions made during implementation, root 3
 

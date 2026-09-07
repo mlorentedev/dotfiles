@@ -3,7 +3,7 @@ tags: [spec, tasks]
 created: "2026-09-05"
 ---
 
-# Tasks - HARNESS-111-review-base-and-reality
+# Tasks - HARNESS-112-review-base-and-reality
 
 ## Root 1 — the review base
 

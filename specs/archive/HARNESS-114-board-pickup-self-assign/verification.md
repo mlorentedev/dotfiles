@@ -1,10 +1,10 @@
 ---
-id: "HARNESS-041-board-pickup-self-assign"
+id: "HARNESS-114-board-pickup-self-assign"
 type: verification
 template_version: "1.0"
 ---
 
-# HARNESS-041 — verification
+# HARNESS-114 — verification
 
 ## Automated
 
