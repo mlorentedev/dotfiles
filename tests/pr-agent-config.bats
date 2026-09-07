@@ -553,3 +553,9 @@ if bad:
     [ "$output" = "0" ]
     grep -q 'BASE_REF: \${{ github.event.repository.default_branch }}' "$WF"
 }
+
+@test "pr-agent: the head-ref fallback never takes the marker text from the PR" {
+    grep -q 'marker="PR Reviewer Guide"' "$WF"
+    run grep -c 'marker=$(read_marker "${HEAD_SHA}")' "$WF"
+    [ "$output" = "0" ]
+}
