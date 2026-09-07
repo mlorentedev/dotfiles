@@ -382,7 +382,20 @@ func ResolveChain(m map[string]any, tier string) ([]string, error) {
 	}
 	raw, ok := chains[tier]
 	if !ok {
-		return nil, fmt.Errorf("tier %q has no chain in %s", tier, ModelMapFile)
+		// The legal tiers are listed, not just the rejected one. A dictated
+		// --tier lands here rather than in ResolveTierForPersona, which is the
+		// only path that enumerated them, so the two refusals told an operator
+		// different amounts about the same map (HARNESS-120 review, Minor).
+		//
+		// Reusing ResolveTierForPersona's wording here would be wrong: it blames
+		// a PERSONA's record for the value, and a dictated tier has no record
+		// behind it — a human typed it.
+		declared, dErr := declaredChainTiers(m)
+		if dErr != nil {
+			return nil, dErr
+		}
+		return nil, fmt.Errorf("tier %q has no chain in %s: it declares %s",
+			tier, ModelMapFile, strings.Join(declared, ", "))
 	}
 	chain := toStrings(raw)
 	if len(chain) == 0 {
