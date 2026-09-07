@@ -153,6 +153,17 @@ jobs:
       - name: Stamp run start
         id: start
         run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      # PR-Agent swallows an authentication failure and exits green, so without
+      # this step a missing secret surfaces only as "published no review" with a
+      # NaN-concurrency diagnosis that is wrong. Measured 2026-09-06 on the ten
+      # repositories that received this workflow before their NAN_API_KEY was
+      # synced. Fail here, with the remedy, before spending a run on it.
+      - name: Fail if the reviewer has no credential
+        if: ${{ secrets.NAN_API_KEY == '' }}
+        run: |
+          echo "::error::NAN_API_KEY is not set in this repository's Actions secrets, so PR-Agent cannot review."
+          echo "::error::Remedy: add ci:${GITHUB_REPOSITORY} to NAN_API_KEY's consumers in dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY}"
+          exit 1
       - name: PR-Agent
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move `v0.42.0` decides what runs here, and what runs here holds
@@ -258,17 +269,32 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
         run: |
           set -euo pipefail
-          marker=$(gh api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=${BASE_REF}" \
-            --jq '.content' | base64 -d \
-            | jq -r '.reviewers[] | select(.login == "github-actions") | .review_markers[0]')
+          read_marker() { # $1 = ref; prints the marker or nothing; never aborts the step
+            gh api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=$1" \
+              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
+              | jq -r '.reviewers[] | select(.login == "github-actions") | .review_markers[0] // empty' 2>/dev/null || true
+          }
+          marker=$(read_marker "${BASE_REF}")
+          if [ -z "$marker" ] && [ -n "${HEAD_SHA:-}" ]; then
+            # The base has no registry (or no github-actions entry) yet: this is the PR
+            # that introduces it. Reading the marker from the PR head is safe because the
+            # comment must still be AUTHORED by github-actions[bot] after this run's
+            # start, which a PR cannot forge. Without this fallback the bootstrap PR of
+            # every repository failed with a bare "exit code 1" (gh 404 under pipefail).
+            marker=$(read_marker "${HEAD_SHA}")
+            [ -n "$marker" ] && echo "::notice::review marker read from the PR head: the base ref has no reviewer registry yet"
+          fi
           if [ -z "$marker" ] || [ "$marker" = "null" ]; then
-            echo "::error::no review marker declared for github-actions in harness/review-attestation.json"
+            echo "::error::no review marker declared for github-actions in harness/review-attestation.json (checked ${BASE_REF} and the PR head)"
             exit 1
           fi
+          # --slurp merges the pages into one array first; without it --paginate --jq
+          # prints one count per page and the comparison below reads only the first.
           found=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --paginate --jq "[.[] | select(.user.login == \"github-actions[bot]\"
+            --paginate --slurp --jq "[.[][] | select(.user.login == \"github-actions[bot]\"
                                           and (.updated_at >= \"${STARTED}\")
                                           and (.body | contains(\"${marker}\")))] | length")
           if [ "$found" -gt 0 ]; then

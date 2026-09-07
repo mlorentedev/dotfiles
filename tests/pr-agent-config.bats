@@ -511,3 +511,17 @@ if bad:
     grep -q 'STARTED: \${{ steps.start.outputs.started }}' "$WF"
     grep -q '.updated_at >= \\"\${STARTED}\\"' "$WF"
 }
+
+@test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
+    grep -q "secrets.NAN_API_KEY == ''" "$WF"
+    grep -q "dotf secrets sync ci --repo" "$WF"
+}
+
+@test "pr-agent: the guard reads the marker from the PR head when the base has no registry yet" {
+    grep -q 'read_marker "${BASE_REF}"' "$WF"
+    grep -q 'read_marker "${HEAD_SHA}"' "$WF"
+}
+
+@test "pr-agent: the guard counts comments across all pages, not per page" {
+    grep -q -- '--paginate --slurp' "$WF"
+}
