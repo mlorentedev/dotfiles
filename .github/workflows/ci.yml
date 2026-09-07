@@ -28,8 +28,8 @@ jobs:
       # CI a diff needs, which one bucket cannot answer.
       pi: ${{ steps.filter.outputs.pi }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -94,7 +94,7 @@ jobs:
     timeout-minutes: 15
     needs: [changes]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Validate shell scripts syntax
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -106,7 +106,7 @@ jobs:
 
       - name: Check for shellcheck issues (scripts/)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           scandir: './scripts'
           severity: error
@@ -156,7 +156,7 @@ jobs:
     timeout-minutes: 15
     needs: [changes]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install PSScriptAnalyzer
         if: github.event_name == 'push' || needs.changes.outputs.powershell == 'true'
@@ -192,7 +192,7 @@ jobs:
     timeout-minutes: 12 # the bats suite runs in ~3 min; a ceiling, not a budget
     needs: [changes]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install age (pinned release — honours AGE_VERSION, as Windows does)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -231,7 +231,7 @@ jobs:
 
           sudo apt-get install -y --no-install-recommends zsh
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
@@ -307,7 +307,7 @@ jobs:
     timeout-minutes: 45
     needs: [changes]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install age (deterministic release + registry PATH — BUG-025)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -353,7 +353,7 @@ jobs:
       # over a red box. Build dotf from THIS PR (the released binary lags the
       # tree; the integration container builds from source for the same
       # reason) and make it reachable by effect before setup runs.
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
@@ -488,7 +488,7 @@ jobs:
     timeout-minutes: 30
     needs: [changes, lint]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Extract versions from versions.conf
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
