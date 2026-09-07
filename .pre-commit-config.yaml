@@ -59,6 +59,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: check-lessons
+        name: Check docs/lessons numbering and index
+        entry: scripts/check-lessons.sh
+        language: script
+        pass_filenames: false
+        files: ^docs/lessons/
+        stages: [pre-commit]
+
       - id: sdd-spec-gate
         name: SDD spec-gate (Tier 4)
         # BUG-061: routed through the prepush adapter, not check-spec-gate.sh

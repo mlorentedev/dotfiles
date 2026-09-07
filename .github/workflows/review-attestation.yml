@@ -120,7 +120,7 @@ jobs:
       # repo's context, which is the standard privilege-escalation footgun. It
       # is not needed here because this job reads the PR only through the API —
       # it never builds, executes or even reads the PR's tree.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
 
