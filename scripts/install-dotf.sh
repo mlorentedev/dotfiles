@@ -58,8 +58,15 @@ _dotf_os() {
 # prints something with no semver in it, the caller sees "" -- which matches
 # neither `dev` nor the pinned version, so it falls through and installs. That
 # is the right answer for a broken or unrecognisable binary: converge. Do not
-# "fix" the unread pipeline status here into a hard failure; that would abort
-# the install in exactly the case where replacing the binary is the repair.
+# "fix" this into a hard failure; that would abort the install in exactly the
+# case where replacing the binary is the repair.
+#
+# "Empty" has to be MADE empty, though, in both directions -- an earlier form of
+# this function only got it right by luck of the caller's shell flags. The status
+# must not escape (pipefail turns a no-match into an aborted setup) and the parse
+# must not succeed on text that is not a version (an error message containing
+# `dev` read as a source build). Both are asserted in tests/install-dotf.bats
+# under `set -euo pipefail`, because neither is visible without those flags.
 _dotf_current_version() {
     command_exists dotf || return 0
 
@@ -70,7 +77,25 @@ _dotf_current_version() {
     # the semver is correct for either. Do not tighten it to stdout-only; that
     # would silently break the idempotence skip on an old binary and reinstall
     # on every run.
-    dotf version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|dev' | head -n1
+    #
+    # Capture first, parse second, and gate on the EXIT STATUS -- because the
+    # merge above is what makes an error message parseable. A binary that fails
+    # to run prints to the stream we read, and `dev` is a three-letter substring
+    # of ordinary paths: `dotf: /home/dev/x: not found` matched the source-build
+    # gate, so the installer took "leave it in place" and preserved a binary
+    # that cannot run, permanently. Measured on this branch before the fix.
+    # A non-zero `dotf version` means "nothing recognisable installed".
+    _dotf_raw="$(dotf version 2>&1)" || return 0
+
+    # `|| :` is the whole point of this line, not tidiness. setup-linux.sh
+    # sources this under `set -euo pipefail`; when the binary runs fine but
+    # prints no version, grep matches nothing and exits 1, `pipefail` promotes
+    # that to the pipeline's status, and `set -e` aborts SETUP at the caller's
+    # `_dotf_current="$(...)"`. The sibling guard on `command_exists` above
+    # covers the absent binary; this covers the present-but-unparseable one,
+    # which the flags reach identically. `|| return 0` cannot close it -- the
+    # pipeline is the last command, so its status is the function's.
+    printf '%s\n' "$_dotf_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|dev' | head -n1 || :
 }
 
 # _dotf_fetch <url> <sums_url> <artifact> <workdir>: download the artifact and

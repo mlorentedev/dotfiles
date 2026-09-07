@@ -153,6 +153,39 @@ teardown() {
     [ "$output" = "survived:[]" ]
 }
 
+@test "a present but unusable dotf survives set -euo pipefail and never reads as dev" {
+    # The sibling above covers the ABSENT binary, which `command_exists` guards.
+    # A PRESENT one reaches the same flags by a route nothing covered, and the
+    # existing "unrecognisable output yields empty" test cannot see it: that one
+    # asserts the VALUE and runs without the flags, while production asserts the
+    # PROCESS and runs with them. Measured on this branch before the fix: exit 1,
+    # `survived:` never printed — i.e. setup-linux.sh aborts.
+    unusable="$TMP/unusable"; mkdir -p "$unusable"
+
+    # Runs fine, says nothing version-shaped: grep matches nothing and exits 1,
+    # pipefail promotes that to the pipeline's status, set -e kills the caller.
+    printf '#!/bin/sh\necho "not a version"\n' > "$unusable/dotf"
+    chmod +x "$unusable/dotf"
+    run bash -c "set -euo pipefail; . '$SCRIPTS_DIR/install-dotf.sh'; \
+                 export PATH='$unusable:/usr/bin:/bin'; \
+                 v=\$(_dotf_current_version); printf 'survived:[%s]' \"\$v\""
+    [ "$status" -eq 0 ]
+    [ "$output" = "survived:[]" ]
+
+    # Cannot run at all. Its message lands on the stream this function reads --
+    # the 2>&1 merge is deliberate, for old stderr-answering builds — and `dev`
+    # is a substring of ordinary paths, so this parsed as a source build and the
+    # installer kept a binary that cannot run, permanently. Empty, not "dev".
+    printf '#!/bin/sh\necho "dotf: /home/dev/x: not found" >&2\nexit 127\n' \
+        > "$unusable/dotf"
+    chmod +x "$unusable/dotf"
+    run bash -c "set -euo pipefail; . '$SCRIPTS_DIR/install-dotf.sh'; \
+                 export PATH='$unusable:/usr/bin:/bin'; \
+                 v=\$(_dotf_current_version); printf 'survived:[%s]' \"\$v\""
+    [ "$status" -eq 0 ]
+    [ "$output" = "survived:[]" ]
+}
+
 @test "converges over a running dotf: a live binary in dest is replaced, not refused" {
     # BUG-037: writing onto a *running* binary fails with ETXTBSY, so the upgrade
     # path broke in exactly the situation dotf is in daily use — the long-lived
