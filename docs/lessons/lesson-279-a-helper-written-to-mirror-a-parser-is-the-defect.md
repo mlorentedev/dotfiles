@@ -1,5 +1,5 @@
 ---
-id: lesson-276
+id: lesson-279
 type: lesson
 status: active
 created: "2026-09-05"
@@ -7,7 +7,7 @@ owner: manu
 tags: [lesson, go, parsing, duplication, unicode, build]
 ---
 
-# 276 — A helper written to "mirror" an existing parser is the defect; the transcription bug is only how you find out
+# 279 — A helper written to "mirror" an existing parser is the defect; the transcription bug is only how you find out
 
 ## What happened
 
