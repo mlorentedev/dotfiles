@@ -1,5 +1,5 @@
 ---
-id: "HARNESS-027-adr025-hardening"
+id: "HARNESS-113-adr025-hardening"
 type: spec
 status: archived # draft | implementing | verifying | archived
 created: "2026-06-19"
@@ -8,7 +8,7 @@ tags: [spec, proposal]
 template_version: "1.0"
 ---
 
-# HARNESS-027-adr025-hardening
+# HARNESS-113-adr025-hardening
 
 > Close the cross-machine path seam end-to-end — the consumers and tooling that
 > ADR-025 shipped the mechanism for, but never wired to it.

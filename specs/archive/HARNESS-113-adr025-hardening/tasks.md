@@ -3,7 +3,7 @@ tags: [spec, tasks]
 created: "2026-06-19"
 ---
 
-# Tasks - HARNESS-027-adr025-hardening
+# Tasks - HARNESS-113-adr025-hardening
 
 > One PR off main. Closes #457. Surfaced during the ADR-025 / WIN-006 deploy.
 

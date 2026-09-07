@@ -63,7 +63,7 @@ var runCommand = func(dir string, argv []string) error {
 // rand.IntN in production, a fixed index in tests so a launch is reproducible there.
 var reviewerDraw = rand.IntN
 
-// resolveReviewBase and headSHAOf are seams for the review scope (HARNESS-111).
+// resolveReviewBase and headSHAOf are seams for the review scope (HARNESS-112).
 // The command-level fixtures build a fake .git directory rather than a real
 // repository, so the production resolvers answer "" there and every launch test
 // would hit the new refusal. The resolvers themselves are tested against real

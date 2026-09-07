@@ -44,6 +44,27 @@ type Comment struct {
 	Author    string    `json:"author"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// Spoken is when this comment last said something new.
+//
+// Both reviewers in use here EDIT THEIR COMMENT IN PLACE when they re-review
+// after a push: the body grows new findings and `createdAt` does not move
+// (TOOL-019, #1422). Measured on #1543 the night this was written --
+// CodeRabbit's comment was created 02:52:56 and updated 03:28:29, and the
+// review that arrived in that edit carried three real findings.
+//
+// max() rather than UpdatedAt alone, and that is not tidiness. A comment that
+// was never edited can carry a zero UpdatedAt -- every fixture predating this
+// field does -- and reading zero as "spoken at the epoch" would make the whole
+// queue answer "nothing pending". The wrong direction: this package exists to
+// refuse to report an empty queue it did not compute.
+func (c Comment) Spoken() time.Time {
+	if c.UpdatedAt.After(c.CreatedAt) {
+		return c.UpdatedAt
+	}
+	return c.CreatedAt
 }
 
 // PR is one open pull request and everything said on it.
@@ -105,7 +126,7 @@ func reviewOutput(pr PR, reg Registry) (Comment, string, bool) {
 				if m == "" || !strings.Contains(c.Body, m) {
 					continue
 				}
-				if !found || c.CreatedAt.After(newest.CreatedAt) {
+				if !found || c.Spoken().After(newest.Spoken()) {
 					newest, by, found = c, rv.Login, true
 				}
 			}
@@ -117,6 +138,19 @@ func reviewOutput(pr PR, reg Registry) (Comment, string, bool) {
 // lastTriage returns the newest triage record on pr. The marker is matched at
 // the start of a line so that quoting it inside prose — this package's own
 // documentation, for instance — does not read as a disposition.
+//
+// CreatedAt here, deliberately, while reviewOutput uses Spoken(). The asymmetry
+// is the safe direction of each error:
+//
+//   - A reviewer's edit is NEW OUTPUT. Missing it reports a clear queue over
+//     unread findings, so the reviewer side must count edits.
+//   - A triage's edit is not new READING. Counting it would let a typo fix on an
+//     old disposition silently clear a queue the reviewer has since added to,
+//     and would hand anyone a one-keystroke way to empty the queue without
+//     looking at it.
+//
+// So edits make the queue louder and never quieter. Both errors are possible;
+// only one of them is safe, and it is the one that costs a re-read.
 func lastTriage(pr PR, marker string) (time.Time, bool) {
 	var newest time.Time
 	found := false
@@ -152,14 +186,14 @@ func Evaluate(pr PR, reg Registry) Status {
 	}
 	triaged, any := lastTriage(pr, reg.Triage.Marker)
 	if !any {
-		return Status{PR: pr, Pending: true, Reviewer: by, At: out.CreatedAt,
+		return Status{PR: pr, Pending: true, Reviewer: by, At: out.Spoken(),
 			Reason: fmt.Sprintf("%s reviewed, never triaged", by)}
 	}
-	if out.CreatedAt.After(triaged) {
-		return Status{PR: pr, Pending: true, Reviewer: by, At: out.CreatedAt,
+	if out.Spoken().After(triaged) {
+		return Status{PR: pr, Pending: true, Reviewer: by, At: out.Spoken(),
 			Reason: fmt.Sprintf("%s reviewed again after the last triage", by)}
 	}
-	return Status{PR: pr, Reviewer: by, At: out.CreatedAt, Reason: "triaged"}
+	return Status{PR: pr, Reviewer: by, At: out.Spoken(), Reason: "triaged"}
 }
 
 // Queue evaluates every pull request and returns those awaiting a disposition.
