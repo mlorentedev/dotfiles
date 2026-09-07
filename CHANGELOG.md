@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.55.0](https://github.com/mlorentedev/dotfiles/compare/v0.54.0...v0.55.0) (2026-09-07)
+
+
+### Features
+
+* **agent:** dispatch the persona a task implies, on the tier it declares ([#1546](https://github.com/mlorentedev/dotfiles/issues/1546)) ([23ffc3c](https://github.com/mlorentedev/dotfiles/commit/23ffc3c8c25f75f60182488cd6856b035b441873)), closes [#1537](https://github.com/mlorentedev/dotfiles/issues/1537)
+* **harness:** curator becomes the fifth enforceable persona, gating two of eight ([#1527](https://github.com/mlorentedev/dotfiles/issues/1527)) ([5101938](https://github.com/mlorentedev/dotfiles/commit/5101938aa0013cb2105acedb706f2d02754580cb))
+* **harness:** planner becomes the sixth enforceable persona, gating one of six ([#1528](https://github.com/mlorentedev/dotfiles/issues/1528)) ([1b57cc0](https://github.com/mlorentedev/dotfiles/commit/1b57cc0c4b698be288590ba56743dbc89b37e2b8))
+* **spec:** give the adversarial review a base to diff against, and let the verdict use its own reality axis ([#1535](https://github.com/mlorentedev/dotfiles/issues/1535)) ([5a68096](https://github.com/mlorentedev/dotfiles/commit/5a68096fb19d9d6fb64b2abca033d8f37ce579ab))
+
+
+### Bug Fixes
+
+* **cli:** make Gate f's claims falsifiable, and stop calling a constant a signal ([#1526](https://github.com/mlorentedev/dotfiles/issues/1526)) ([195cc18](https://github.com/mlorentedev/dotfiles/commit/195cc1887b9ac1c9f121589cc609e560f730fedc))
+* **cli:** run Gate f last, immediately before the removal ([#1531](https://github.com/mlorentedev/dotfiles/issues/1531)) ([36c27fb](https://github.com/mlorentedev/dotfiles/commit/36c27fb15a6fdebbd56bac4f5daa2d7ad378b1f8))
+* **harness:** qualify the Major severity definition by reality, and make f7 assert ([#1549](https://github.com/mlorentedev/dotfiles/issues/1549)) ([53e9c84](https://github.com/mlorentedev/dotfiles/commit/53e9c846ff2f6383a93bf3288a1f916a3fe7b106))
+* **harness:** shipper's block precondition named a closed issue and the wrong risk ([#1524](https://github.com/mlorentedev/dotfiles/issues/1524)) ([43d4b0c](https://github.com/mlorentedev/dotfiles/commit/43d4b0ca85f274ce4ee1ff8c5af10c3330aa86f0)), closes [#1497](https://github.com/mlorentedev/dotfiles/issues/1497)
+* **harness:** stop the review skill asking for the edits the archive gate refuses ([#1543](https://github.com/mlorentedev/dotfiles/issues/1543)) ([39754ec](https://github.com/mlorentedev/dotfiles/commit/39754ec80efecd772570d9c2c2262dd738a3b7d2))
+* **harness:** the gate's allow reason was vacuously true, so an inert gate read like a passing one ([#1534](https://github.com/mlorentedev/dotfiles/issues/1534)) ([1fe3531](https://github.com/mlorentedev/dotfiles/commit/1fe3531798120056a75fb9b2d66741ec1635e46f)), closes [#1510](https://github.com/mlorentedev/dotfiles/issues/1510)
+* **pi:** drop an input modality pi rejects, which was taking out every model ([#1539](https://github.com/mlorentedev/dotfiles/issues/1539)) ([688db44](https://github.com/mlorentedev/dotfiles/commit/688db4482d17648196834fa2ce2e28926f80edc5))
+
 ## [0.54.0](https://github.com/mlorentedev/dotfiles/compare/v0.53.0...v0.54.0) (2026-09-05)
 
 
