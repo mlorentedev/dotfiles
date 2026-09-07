@@ -1,5 +1,5 @@
 ---
-id: lesson-277
+id: lesson-280
 type: lesson
 status: active
 created: "2026-09-06"
@@ -7,7 +7,7 @@ owner: manu
 tags: [lesson, handoff, diagnosis, testing, evidence, session-continuity]
 ---
 
-# 277 — A diagnosis repeated often enough becomes indistinguishable from evidence
+# 280 — A diagnosis repeated often enough becomes indistinguishable from evidence
 
 ## What happened
 
@@ -175,3 +175,45 @@ the other. In the `--tier` case the right fix was in a third place neither the
 reviewer nor the original diff had named — `ResolveChain`, where both paths
 already meet — which is the usual shape once you stop taking the suggested
 location as part of the finding.
+
+## Postscript: this lesson collided with itself
+
+This file was written as 277 after a 275 collision with a parallel session. Both
+of us announced our numbers to each other explicitly, in writing, and still
+raced — ninety seconds apart.
+
+Then it happened **twice more, on this file and its sibling**, and left `main`
+red:
+
+```
+not ok 1 guard: no two lesson files share a number
+#   lesson-276
+#   lesson-277
+not ok 2 guard: every lesson file is listed in _index.md
+#   lesson-276-a-helper-written-to-mirror-a-parser-is-the-defect.md
+#   lesson-277-a-diagnosis-repeated-often-enough-reads-as-evidence.md
+```
+
+Renumbered to 279 and 280. The second failure is the sharper one: different
+filenames meant no conflict on the *files*, so whichever `_index.md` merged last
+simply won, and two lesson files landed in `main` **with no index entry at all**
+— which the guard's own message names exactly: *"the index is the only surface
+anything reads, so a lesson absent from it is a lesson nobody will find."* A
+silent loss, not a noisy one.
+
+**Neither PR was wrong and both were green when they merged.** Each was green
+against a `main` that did not yet contain the other. The guard fires on the merge
+commit, and a merge commit only exists once both have landed — so for two PRs
+merging inside the same window, **there is no moment at which either could have
+seen the collision.**
+
+That is the finding worth keeping, and it generalises past lesson numbers:
+
+**A check that runs at merge time cannot prevent a same-window collision. It can
+only report one afterwards.** Detection and allocation are different jobs, and a
+guard is only the first. Four instances in one evening, two of them while
+actively coordinating about the exact hazard, is not carelessness — it is what a
+net does when the thing it is asked to do is a lock's job.
+
+Tracked as #1542, which is the same defect for `dotf spec init`'s AREA-NNN ids.
+
