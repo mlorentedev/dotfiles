@@ -101,8 +101,14 @@ func Status(cwd, target, project, vault string) LinkState {
 // become `-home-me-proj` and `C--Users-me-proj`. The retired shell twin mapped
 // only '/', silently producing the wrong key — and thus the wrong junction target
 // — on Windows (the root cause of the unlinked auto-memory dir, #551).
+//
+// '.' maps to '-' as well (#1553): Claude writes `svqtriana.github.io` as
+// `svqtriana-github-io`, so a key that kept the dot named a directory Claude
+// never reads — no vault link at session start, a second MEMORY.md, and a
+// crystallize that stamped nothing. Any further character Claude mangles is
+// unknown; this list is what has been observed.
 func ClaudeProjectKey(cwd string) string {
-	return strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(cwd)
+	return strings.NewReplacer("/", "-", `\`, "-", ":", "-", ".", "-").Replace(cwd)
 }
 
 // ClaudeMemoryTarget is the per-project auto-memory directory Claude surfaces:

@@ -123,7 +123,7 @@ gc_run_case() {
     : > "$out_dir/memory.md"
     local name mf
     for name in "${projects[@]}"; do
-        mf="$fake_home/.claude/projects/$(printf '%s' "$fake_home/Projects/$name" | tr '/' '-')/memory/MEMORY.md"
+        mf="$fake_home/.claude/projects/$(printf '%s' "$fake_home/Projects/$name" | tr '/.' '--')/memory/MEMORY.md"
         [ -f "$mf" ] || continue
         printf '===== %s =====\n' "$name" >> "$out_dir/memory.md"
         _gc_normalize "$fake_home" "$today" < "$mf" >> "$out_dir/memory.md"
@@ -134,12 +134,13 @@ gc_run_case() {
 }
 
 # Place FIXTURE as project NAME's MEMORY.md inside FAKE_HOME, using the same path
-# encoding Claude Code uses ('/' -> '-').
+# encoding Claude Code uses ('/' and '.' -> '-', #1553). mktemp's tmp.XXXXXX puts a
+# dot in every fake HOME, so a twin that only mapped '/' diverged from dotf here.
 _gc_place_project() {
     local fake_home="$1" name="$2" fixture="$3"
     local proj="$fake_home/Projects/$name" encoded mem_dir
     mkdir -p "$proj"
-    encoded=$(printf '%s' "$proj" | tr '/' '-')
+    encoded=$(printf '%s' "$proj" | tr '/.' '--')
     mem_dir="$fake_home/.claude/projects/$encoded/memory"
     mkdir -p "$mem_dir"
     [ -f "$fixture" ] && cp "$fixture" "$mem_dir/MEMORY.md"
@@ -155,7 +156,7 @@ _gc_place_project() {
 _gc_normalize() {
     local fake_home="$1" today="$2"
     local home_key
-    home_key=$(printf '%s' "$fake_home" | tr '/' '-')
+    home_key=$(printf '%s' "$fake_home" | tr '/.' '--')
     sed -e 's/\x1b\[[0-9;]*m//g' \
         -e "s|${home_key}|<HOMEKEY>|g" \
         -e "s|${fake_home}|<HOME>|g" \
