@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.55.1](https://github.com/mlorentedev/dotfiles/compare/v0.55.0...v0.55.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **harness:** new-ticket verified the board with a listing that truncates silently ([#1587](https://github.com/mlorentedev/dotfiles/issues/1587)) ([3b6a18c](https://github.com/mlorentedev/dotfiles/commit/3b6a18cd390b389aec203855c4a34dd96207fc76))
+
 ## [0.55.0](https://github.com/mlorentedev/dotfiles/compare/v0.54.0...v0.55.0) (2026-09-07)
 
 
