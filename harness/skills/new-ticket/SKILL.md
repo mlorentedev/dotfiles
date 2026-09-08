@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: 76ce6474f5bf0aab
+generated_sha: 4e93e78845c0ac41
 id: new-ticket-skill
 type: skill
 status: active
@@ -169,7 +169,7 @@ Propose `Priority` the same way Type and Labels are proposed — derived from th
 | Normal backlog — a capability, refactor, doc, or chore with **no urgency signal** | `P2` (default) |
 | Nice-to-have, speculative, **parked/undecided**, cosmetic/polish, or an `IDEAS`/`RFD` research item | `P3` |
 
-**Calibrate, don't inflate.** The board's shape, measured 2026-09-08 over its first 1500 items: **`P2` ~88%, `P3` ~7%, `P1` ~5%, `P0` zero**. Propose against those proportions.
+**Calibrate, don't inflate.** Proportions from a **sample, not the whole board** — the 516 prioritised tickets among the **oldest 1500 of 3311** items, read 2026-09-08: `P2` ~88%, `P3` ~7%, `P1` ~5%, `P0` zero. The unread 55% is newer and may skew differently, so treat these as the order of magnitude (P2 dominates, P1 is selective, P0 effectively unused), not as a distribution to match precisely.
 
 > **Do not try to re-measure this live.** This step used to run `gh project item-list --limit 1000`, which was wrong twice over: `item-list` truncates at `--limit` silently and oldest-first, so it calibrated the rubric against the oldest 30% of a **3311-item** board; and reading the board whole to fix that costs enough GraphQL to trip the secondary rate limit outright (measured 2026-09-08 — the full-board read returned `API rate limit already exceeded`). A stale-but-stated distribution beats a query that either mis-samples in silence or burns the quota the create step needs a minute later. Re-measure by hand when the board's shape has visibly moved, and update this line with the date.
 
