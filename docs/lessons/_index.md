@@ -299,3 +299,4 @@ tags: [lessons, index, dotfiles]
 | [279 - A helper written to "mirror" an existing parser is the defect; the transcription bug is only how you find out](lesson-279-a-helper-written-to-mirror-a-parser-is-the-defect.md) | 2026-09-05 |  |
 | [280 - A diagnosis repeated often enough becomes indistinguishable from evidence](lesson-280-a-diagnosis-repeated-often-enough-reads-as-evidence.md) | 2026-09-06 |  |
 | [281 - A readiness probe cheaper than the work it gates reports ready while the work is still refused](lesson-281-a-cheap-readiness-probe-reports-ready-while-the-real-query-is-refused.md) | 2026-09-07 |  |
+| [282 - A listing that truncates answers instead of failing, so the short read becomes the finding](lesson-282-a-listing-that-truncates-answers-instead-of-failing.md) | 2026-09-08 |  |
