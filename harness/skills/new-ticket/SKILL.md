@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: 1d1c81043049e6c9
+generated_sha: 4e93e78845c0ac41
 id: new-ticket-skill
 type: skill
 status: active
@@ -119,15 +119,26 @@ Set the option variable for the *confirmed* Type/Priority (resolve `O_BUG`/`O_SP
 
 ### 5. Report
 
-Print the issue URL, the `AREA-NNN-slug` ID, the home repo, and the resulting board status. If self-assigned, confirm it moved to In Progress. Confirm the fields landed (the `ID` text field surfaces under the JSON key `iD`):
+Print the issue URL, the `AREA-NNN-slug` ID, the home repo, and the resulting board status. If self-assigned, confirm it moved to In Progress. Then confirm the fields landed — **by node id, never by listing the board**:
 
 ```bash
-gh project item-list "$PROJECT_NUM" --owner "$OWNER" --format json --limit 400 | python3 -c "
-import json,sys
-for i in json.load(sys.stdin)['items']:
-    if i.get('content',{}).get('number')==int('$NUM'):
-        print(i.get('status'), i.get('priority'), i.get('type'), i.get('iD'), '·', i['content']['title']); break"
+gh api graphql -f query='
+query($item: ID!) {
+  node(id: $item) {
+    ... on ProjectV2Item {
+      content { ... on Issue { number url } }
+      fieldValues(first: 20) { nodes {
+        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2SingleSelectField { name } } }
+        ... on ProjectV2ItemFieldTextValue  { text field { ... on ProjectV2Field { name } } }
+      } }
+    }
+  }
+}' -f item="$ITEM" --jq '.data.node
+  | {issue: .content.number,
+     fields: [.fieldValues.nodes[] | select(.field.name != null) | {(.field.name): (.name // .text)}]}'
 ```
+
+> **Never verify with `gh project item-list`.** It returns oldest-first and stops at `--limit`, silently — a ticket past the cut is reported as absent, with no error. Measured 2026-09-08: the bitácora holds **3311 items**, so the `--limit 400` this step used to carry sampled 12% of the board and answered `NOT FOUND ON BOARD` for an item whose four fields had just been set successfully. `$ITEM` is already in hand from step 4.2, and a node read is exact, cheap and immune to board growth. Same class as the `--paginate` split below and the empty-read failures in the repo's shell-compatibility table: the wrong answer arrives dressed as a finding.
 
 ## Non-interactive / autonomous mode
 
@@ -158,14 +169,9 @@ Propose `Priority` the same way Type and Labels are proposed — derived from th
 | Normal backlog — a capability, refactor, doc, or chore with **no urgency signal** | `P2` (default) |
 | Nice-to-have, speculative, **parked/undecided**, cosmetic/polish, or an `IDEAS`/`RFD` research item | `P3` |
 
-**Calibrate, don't inflate.** Resolve the live distribution before proposing, so the proposal tracks how the board actually uses the scale (today: `P2` ~90%, `P1` selective ~5%, `P0` ~never, `P3` the long tail):
+**Calibrate, don't inflate.** Proportions from a **sample, not the whole board** — the 516 prioritised tickets among the **oldest 1500 of 3311** items, read 2026-09-08: `P2` ~88%, `P3` ~7%, `P1` ~5%, `P0` zero. The unread 55% is newer and may skew differently, so treat these as the order of magnitude (P2 dominates, P1 is selective, P0 effectively unused), not as a distribution to match precisely.
 
-```bash
-gh project item-list 1 --owner mlorentedev --format json --limit 1000 | python3 -c "
-import json,sys; from collections import Counter
-c=Counter(i.get('priority') for i in json.load(sys.stdin)['items'] if i.get('priority'))
-print(dict(c))"
-```
+> **Do not try to re-measure this live.** This step used to run `gh project item-list --limit 1000`, which was wrong twice over: `item-list` truncates at `--limit` silently and oldest-first, so it calibrated the rubric against the oldest 30% of a **3311-item** board; and reading the board whole to fix that costs enough GraphQL to trip the secondary rate limit outright (measured 2026-09-08 — the full-board read returned `API rate limit already exceeded`). A stale-but-stated distribution beats a query that either mis-samples in silence or burns the quota the create step needs a minute later. Re-measure by hand when the board's shape has visibly moved, and update this line with the date.
 
 When two signals tie, take the higher only if there is a concrete urgency cue (a date, a blocked dependency, a red CI); absent that, prefer `P2`. The pick is a *suggestion* like Type — the human confirms it in step 3. **Autonomous mode does NOT apply this rubric's upgrade**: an unattended `detect→ticket` run still files at `P2` and leaves prioritization to a human triage (see "Non-interactive / autonomous mode").
 
@@ -220,7 +226,7 @@ NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-
 `scan → create` is not atomic: on 2026-07-07 three parallel sessions filing tickets minutes apart produced three duplicate IDs (TOOL-017 ×2, DOCS-001 ×2, then TOOL-020 ×2 during remediation). Harden every create:
 
 1. **Re-scan immediately before `gh issue create`** — at create time, not minutes earlier when the proposal was computed.
-2. **Scan the board's `ID` field too, not only the home repo's issue titles** — a concurrent session may have claimed `AREA-NNN` from another repo or before its issue lands in your scan window. If GraphQL is rate-limited, fall back to REST title scans (`gh api repos/<owner>/<repo>/issues`) across the bitácora repos.
+2. **Scan the board's `ID` field too, not only the home repo's issue titles** — a concurrent session may have claimed `AREA-NNN` from another repo or before its issue lands in your scan window. **The paginated REST title scan above is the authoritative one.** The board `ID` scan is a cross-repo supplement and **must not be done with `gh project item-list`**: it reads the oldest N of a 3311-item board and reports a maximum far below the truth. Measured 2026-09-08 — `--limit 1000` returned `HARNESS-111` as the highest board `ID` while HARNESS-120…134 already existed, i.e. it would have proposed an id **23 numbers deep into occupied space**, and only the REST title scan caught it. Reading the board whole instead trips the GraphQL secondary rate limit. So: run the REST title scan across the bitácora repos (`gh api --paginate repos/<owner>/<repo>/issues`), and if a cross-repo claim is still a live worry, say the scan was title-only rather than reaching for a listing that answers wrongly. **A truncated board scan is worse than none, because it answers.**
 3. **Verify right after creating** — re-run the scan; if a duplicate raced in, renumber immediately.
 
 **Yield rule — ownership evidence first, ordering only as a tie-break.** Apply in order, and stop at the first that decides:
@@ -238,6 +244,7 @@ Ordering was the whole rule until 2026-09-02, and it was wrong in 3 of 11 collis
 
 - **Hardcoding field/option IDs** into the skill or a script → silent drift when the project changes. Resolve at runtime (step 4.3); runbook §2 is the human reference, not a copy to fork.
 - **Self-assigning a ticket you will not start now** — it flips Backlog → In Progress (HARNESS-010), misreporting the board. Self-assign only when you are actually starting.
+- **Verifying (or scanning) with `gh project item-list`** — it truncates at `--limit` silently, oldest-first, against a 3311-item board. Verify by node id (step 5); never conclude "not on the board" from a listing.
 - **Forgetting the `ID` text field** — the title carries `AREA-NNN` but the board's ID column stays empty, breaking the stable human ID (§3).
 - **Filing in the wrong home repo** — a harness/skill ticket belongs in `dotfiles`, vault-content in `knowledge` (§1b). The `Repository` field makes the home explicit; pick it deliberately.
 - **Creating silently in interactive mode** — always surface the proposal and get confirmation first.
