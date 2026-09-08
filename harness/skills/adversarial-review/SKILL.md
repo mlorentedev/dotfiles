@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: 4696ee5e688ab476
+generated_sha: a43a700196f36a92
 id: adversarial-review-skill
 type: skill
 status: active
