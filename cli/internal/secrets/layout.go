@@ -159,7 +159,7 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 			if !seenItem[d.Item] {
 				seenItem[d.Item] = true
 				itemF = append(itemF, LayoutFinding{
-					Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item,
+					Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item, Decl: d,
 					Detail: fmt.Sprintf("the name matches %d items, so the reader refuses it; rename or remove all but one", n),
 				})
 			}

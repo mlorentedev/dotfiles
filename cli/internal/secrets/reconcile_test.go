@@ -179,3 +179,33 @@ func TestPlanNotesNameWhatIsMissing(t *testing.T) {
 		t.Errorf("absent field: %q", absentField.Blocked[0].Detail)
 	}
 }
+
+// A declared name shared by several items is not something reconcile can resolve:
+// moving, creating or adding a field would act on an arbitrary one of them. It
+// blocks, with the remedy drift names — and it must not be silently dropped, which
+// is what an unmapped finding kind would do.
+func TestPlanBlocksAnAmbiguousDestination(t *testing.T) {
+	p := PlanReconcile(
+		[]BWDecl{decl("D", "dockerhub", "PAT", "Dotfiles/apps", false)},
+		[]ItemSummary{item("dockerhub", "", "PAT"), item("dockerhub", "Personal")},
+		[]string{"Dotfiles/apps"},
+	)
+	if len(p.Ops) != 0 || len(p.Blocked) != 1 || !strings.Contains(p.Blocked[0].Detail, "2 items") {
+		t.Fatalf("want one blocker and no ops, got ops %v blocked %+v", opKinds(p), p.Blocked)
+	}
+	// Named by its registry id, with the remedy for THIS finding — not the generic
+	// "unknown finding" fallback, which would also block but tell the operator nothing.
+	if b := p.Blocked[0]; b.Secret != "D" || !strings.Contains(b.Remedy, "duplicate") {
+		t.Errorf("the blocker must name the secret and the duplicate remedy: %+v", b)
+	}
+}
+
+// The fallback: a finding kind the planner has no case for blocks rather than
+// vanishing, so a new drift kind cannot make a store read as converged.
+func TestPlanBlocksAFindingKindItDoesNotKnow(t *testing.T) {
+	p := &planner{byName: map[string]ItemSummary{}, count: map[string]int{}, created: map[string]bool{}, seen: map[string]bool{}}
+	p.finding(LayoutFinding{Kind: "some-future-kind", Secret: "S", Item: "i", Detail: "d", Decl: decl("S", "i", "f", "", false)})
+	if len(p.plan.Blocked) != 1 || !strings.Contains(p.plan.Blocked[0].Detail, "some-future-kind") {
+		t.Fatalf("an unknown finding kind must block, got %+v", p.plan.Blocked)
+	}
+}

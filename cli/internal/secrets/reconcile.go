@@ -132,6 +132,21 @@ func (p *planner) finding(f LayoutFinding) {
 		}
 	case DriftFieldMissing:
 		p.absent(d)
+	case DriftItemAmbiguous:
+		// Every operation would act on an arbitrary one of the same-named items.
+		p.seen[d.Secret] = true
+		p.plan.Blocked = append(p.plan.Blocked, PlanNote{
+			Secret: d.Secret, Item: d.Item, Detail: f.Detail,
+			Remedy: "rename or remove the duplicate items in the vault",
+		})
+	default:
+		// A finding kind this planner does not know must not vanish: an unmapped
+		// kind silently dropped is a plan that reports the store converged while
+		// drift still disagrees.
+		p.plan.Blocked = append(p.plan.Blocked, PlanNote{
+			Secret: d.Secret, Item: d.Item, Detail: f.Kind + ": " + f.Detail,
+			Remedy: "reconcile has no operation for this finding; teach PlanReconcile before applying",
+		})
 	}
 }
 
