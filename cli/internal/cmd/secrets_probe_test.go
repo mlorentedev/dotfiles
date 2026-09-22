@@ -18,7 +18,7 @@ secrets:
   - id: NAN_API_KEY
     plane: app
     backend: bw
-    bw: { item: nan-api-key, field: api-key, folder: apps }
+    bw: { item: nan-api-key, field: api-key, folder: Dotfiles/apps }
     expose: { env: NAN_API_KEY }
   - id: SSH_KEY
     plane: app

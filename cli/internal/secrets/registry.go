@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -71,9 +72,36 @@ type BWSource struct {
 // bw: block — age-only) and so is a personal-plane folder (no taxonomy exists yet for
 // plane: personal, deferred to #586) — declaring either here would validate a
 // placement nothing can actually honour yet.
+//
+// The `Dotfiles/` prefix is part of the NAME, not a namespace Bitwarden
+// understands: it has no hierarchy, and a folder displayed as nested is simply one
+// whose name contains a slash. The prefix earns its place by grouping the ~20
+// managed items among the store's other 160-odd, and it is written out here rather
+// than prepended in code because `ResolveFolder` matches by exact name and CREATES
+// what it does not find. While these read "apps" and the live vault held
+// "Dotfiles/apps", the next `dotf secrets set` would have minted a SECOND folder and
+// split the managed items across the two — a declaration that silently disagreed
+// with the store for as long as nothing compared them (measured 2026-09-21; the
+// comparison is now `LayoutDrift`).
 var validBWFolders = map[string]bool{
-	"apps":  true,
-	"infra": true,
+	"Dotfiles/apps":  true,
+	"Dotfiles/infra": true,
+}
+
+// ratifiedFolders lists the taxonomy for an error message, sorted.
+//
+// Derived rather than spelled out: the previous message named "(apps, infra)" as a
+// literal, and the first time the taxonomy moved -- to the `Dotfiles/`-prefixed
+// names the live vault actually uses -- it went on telling operators to use the
+// two names that had just stopped being valid. A message that states a rule has to
+// read the rule.
+func ratifiedFolders() []string {
+	out := make([]string, 0, len(validBWFolders))
+	for f := range validBWFolders {
+		out = append(out, f)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // planeFolder is the required bw.folder for a plane that has one — the ratified-set
@@ -82,8 +110,8 @@ var validBWFolders = map[string]bool{
 // adversarial review, Minor finding). A plane absent here (personal, floor) has no
 // required folder and is left to the ratified-set check alone.
 var planeFolder = map[string]string{
-	"app":   "apps",
-	"infra": "infra",
+	"app":   "Dotfiles/apps",
+	"infra": "Dotfiles/infra",
 }
 
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
@@ -305,7 +333,8 @@ func checkBWFolder(s *Secret) error {
 		return nil
 	}
 	if !validBWFolders[s.BW.Folder] {
-		return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (apps, infra)", s.ID, s.BW.Folder)
+		return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (%s)",
+			s.ID, s.BW.Folder, strings.Join(ratifiedFolders(), ", "))
 	}
 	if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
 		return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)

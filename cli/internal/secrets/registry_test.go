@@ -203,18 +203,19 @@ func TestParseRegistry_BwValidation(t *testing.T) {
 
 // TestBWSource_Folder proves the registry parses bw.folder (OPS-028: ADR-028 ratified
 // a folder taxonomy the schema couldn't express) and rejects anything outside the
-// ratified set (apps, infra) — floor and personal deliberately have
-// no folder yet (#586).
+// ratified set (Dotfiles/apps, Dotfiles/infra) — floor and personal deliberately
+// have no folder yet (#586). The prefix is part of the NAME: Bitwarden has no
+// hierarchy, and the live vault's folders carry it.
 func TestBWSource_Folder(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: apps}, expose: {env: A}}\n"
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
 	reg, err := ParseRegistry([]byte(yml))
 	if err != nil {
 		t.Fatalf("ParseRegistry: %v", err)
 	}
 	s := reg.Lookup("a")
-	if s == nil || s.BW.Folder != "apps" {
-		t.Fatalf("secret = %+v, want BW.Folder = apps", s)
+	if s == nil || s.BW.Folder != "Dotfiles/apps" {
+		t.Fatalf("secret = %+v, want BW.Folder = Dotfiles/apps", s)
 	}
 }
 
@@ -259,7 +260,7 @@ func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
 // individually valid) and pass (OPS-028 adversarial review, Minor finding).
 func TestParseRegistry_BwFolder_MustMatchPlane(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: infra}, expose: {env: A}}\n"
+		"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: Dotfiles/infra}, expose: {env: A}}\n"
 	if _, err := ParseRegistry([]byte(yml)); err == nil {
 		t.Error("app-plane secret declaring infra must fail validation")
 	}
@@ -270,7 +271,7 @@ func TestParseRegistry_BwFolder_MustMatchPlane(t *testing.T) {
 // plane↔folder mismatch must fail, not just one.
 func TestParseRegistry_BwFolder_MustMatchPlane_Symmetric(t *testing.T) {
 	const yml = "version: 1\nsecrets:\n" +
-		"  - {id: a, plane: infra, backend: bw, bw: {item: it, field: password, folder: apps}, expose: {env: A}}\n"
+		"  - {id: a, plane: infra, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
 	if _, err := ParseRegistry([]byte(yml)); err == nil {
 		t.Error("infra-plane secret declaring apps must fail validation")
 	}
