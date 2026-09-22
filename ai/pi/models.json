@@ -24,8 +24,8 @@
             "cacheRead": 0,
             "cacheWrite": 0
           },
-          "contextWindow": 1048576,
-          "maxTokens": 65536
+          "contextWindow": 1000000,
+          "maxTokens": 131072
         },
         {
           "id": "deepseek-v4-flash",
@@ -42,8 +42,8 @@
             "cacheRead": 0,
             "cacheWrite": 0
           },
-          "contextWindow": 1048576,
-          "maxTokens": 65536
+          "contextWindow": 1000000,
+          "maxTokens": 384000
         },
         {
           "id": "qwen3.8-flash",
@@ -61,7 +61,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 16384
+          "maxTokens": 131072
         },
         {
           "id": "qwen3.6",
@@ -79,7 +79,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 16384
+          "maxTokens": 65536
         },
         {
           "id": "mimo-v2.5",
@@ -97,7 +97,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 1048576,
-          "maxTokens": 65536
+          "maxTokens": 131072
         },
         {
           "id": "gemma4",
@@ -115,7 +115,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 16384
+          "maxTokens": 32768
         }
       ],
       "authHeader": false
@@ -139,8 +139,8 @@
             "cacheRead": 0,
             "cacheWrite": 0
           },
-          "contextWindow": 131072,
-          "maxTokens": 8192
+          "contextWindow": 163840,
+          "maxTokens": 16384
         }
       ]
     }
