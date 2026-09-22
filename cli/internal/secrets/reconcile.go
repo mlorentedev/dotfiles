@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 )
@@ -47,6 +48,14 @@ type ReconcileOp struct {
 	FromItem, FromField string
 	// Current is where a move-item finds the item now, for the plan line.
 	Current string
+}
+
+// Target is what the operation acts on: the folder for create-folder, else the item.
+func (op ReconcileOp) Target() string {
+	if op.Kind == OpCreateFolder {
+		return op.Folder
+	}
+	return op.Item
 }
 
 // PlanNote is a finding the plan does not turn into an operation, with what to do
@@ -192,4 +201,82 @@ func (p *planner) satisfied() {
 		}
 	}
 	sort.Strings(p.plan.Satisfied)
+}
+
+// ErrPlanBlocked is returned when asked to apply a plan that carries a blocker.
+var ErrPlanBlocked = errors.New("the plan has blocked findings; nothing was applied")
+
+// ApplyReconcile performs a plan's operations in order, reporting each as it lands.
+//
+// Two phases, so a bad source costs nothing. Every value a copy needs is read
+// first, into memory only; an unreadable or EMPTY source aborts before the first
+// write. Only then are the operations performed. A failure mid-way stops at the
+// failing operation and says how far it got — every operation is additive and the
+// plan is recomputed from the store on the next run, so re-running converges.
+//
+// Each folder is resolved once and its id reused. ResolveFolder creates on miss and
+// the daemon answers from a cache, so resolving the same new folder twice in one run
+// could read it absent the second time and create a duplicate.
+func ApplyReconcile(p ReconcilePlan, r BWReader, w BWWriteClient, applied func(ReconcileOp)) error {
+	if len(p.Blocked) > 0 {
+		return fmt.Errorf("%w (%d blocked)", ErrPlanBlocked, len(p.Blocked))
+	}
+	values := make([]string, len(p.Ops))
+	for i, op := range p.Ops {
+		if op.Kind != OpCreateItem && op.Kind != OpAddField {
+			continue
+		}
+		v, err := r.Field(op.FromItem, op.FromField)
+		if err != nil {
+			return fmt.Errorf("read source %s/%s for %s (nothing written): %w", op.FromItem, op.FromField, op.Item, err)
+		}
+		if v == "" {
+			return fmt.Errorf("source %s/%s for %s is empty; refusing to create a field `verify` would report as present (nothing written)",
+				op.FromItem, op.FromField, op.Item)
+		}
+		values[i] = v
+	}
+
+	folderIDs := map[string]string{}
+	folderID := func(name string) (string, error) {
+		if id, ok := folderIDs[name]; ok {
+			return id, nil
+		}
+		id, err := w.ResolveFolder(name)
+		if err == nil {
+			folderIDs[name] = id
+		}
+		return id, err
+	}
+	for i, op := range p.Ops {
+		if err := applyOp(op, values[i], w, folderID); err != nil {
+			return fmt.Errorf("%s %s: %w (%d of %d operations applied; re-run to converge)",
+				op.Kind, op.Target(), err, i, len(p.Ops))
+		}
+		applied(op)
+	}
+	return nil
+}
+
+func applyOp(op ReconcileOp, value string, w BWWriteClient, folderID func(string) (string, error)) error {
+	switch op.Kind {
+	case OpCreateFolder:
+		_, err := folderID(op.Folder)
+		return err
+	case OpMoveItem:
+		id, err := folderID(op.Folder)
+		if err != nil {
+			return err
+		}
+		return w.MoveItem(op.Item, id)
+	case OpCreateItem:
+		id, err := folderID(op.Folder)
+		if err != nil {
+			return err
+		}
+		return w.CreateItem(op.Item, op.Field, value, id)
+	case OpAddField:
+		return w.SetField(op.Item, op.Field, value)
+	}
+	return fmt.Errorf("unknown operation %q", op.Kind)
 }

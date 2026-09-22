@@ -22,6 +22,7 @@ type fakeWriter struct {
 	created   map[string]string
 	createdIn map[string]string   // item -> folder name resolved at creation (OPS-028)
 	folders   map[string]string   // folder name -> id; absent name -> ResolveFolder creates "new-<name>"
+	moved     map[string]string   // item -> folder id it was moved to
 	tamper    func(string) string // optional: corrupt the STORED value so a read-back differs (parity tests)
 }
 
@@ -42,7 +43,13 @@ func newFakeWriter() *fakeWriter {
 		created:   map[string]string{},
 		createdIn: map[string]string{},
 		folders:   map[string]string{},
+		moved:     map[string]string{},
 	}
+}
+
+func (f *fakeWriter) MoveItem(item, folderID string) error {
+	f.moved[item] = folderID
+	return nil
 }
 
 func (f *fakeWriter) Field(item, field string) (string, error) {

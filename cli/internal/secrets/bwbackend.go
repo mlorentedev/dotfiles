@@ -191,7 +191,7 @@ func (r lockHintReader) Field(item, field string) (string, error) {
 	return v, lockHint(err, r.daemonState)
 }
 
-// lockHintWriter decorates a shellout BWWriteClient with lockHint on all three methods.
+// lockHintWriter decorates a shellout BWWriteClient with lockHint on every method.
 type lockHintWriter struct {
 	Writer      BWWriteClient
 	daemonState string
@@ -203,6 +203,10 @@ func (w lockHintWriter) SetField(item, field, value string) error {
 
 func (w lockHintWriter) CreateItem(item, field, value, folderID string) error {
 	return lockHint(w.Writer.CreateItem(item, field, value, folderID), w.daemonState)
+}
+
+func (w lockHintWriter) MoveItem(item, folderID string) error {
+	return lockHint(w.Writer.MoveItem(item, folderID), w.daemonState)
 }
 
 func (w lockHintWriter) ResolveFolder(name string) (string, error) {
