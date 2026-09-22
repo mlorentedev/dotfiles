@@ -45,6 +45,9 @@ func limitsFixture(t *testing.T, declaration, catalog string) (*System, *Config)
 	return piSys(home), &Config{RepoDir: repo, DotfilesDir: repo}
 }
 
+// limitsRun runs the check and returns both the rendered report and the status
+// totals. Assertions use the totals rather than the text: a severity assertion
+// that matches on "[FAIL]" also matches the word inside a message.
 func limitsRun(t *testing.T, sys *System, cfg *Config) (string, map[Status]int) {
 	t.Helper()
 	var buf bytes.Buffer
@@ -54,11 +57,16 @@ func limitsRun(t *testing.T, sys *System, cfg *Config) (string, map[Status]int) 
 	return buf.String(), rep.totals
 }
 
+// decl builds a one-model declaration. Written as a literal rather than marshalled
+// from a struct so a field rename in the production types cannot silently rename it
+// here too, which would make every test agree with a broken parser.
 func decl(provider, id string, ctx, out int) string {
 	return `{"providers":{"` + provider + `":{"models":[{"id":"` + id + `","contextWindow":` +
 		strconv.Itoa(ctx) + `,"maxTokens":` + strconv.Itoa(out) + `}]}}}`
 }
 
+// cat builds a one-model catalog, in models.dev's own shape: providers keyed by
+// name, models keyed by id, limits under `limit.context` / `limit.output`.
 func cat(provider, id string, ctx, out int) string {
 	return `{"` + provider + `":{"models":{"` + id + `":{"limit":{"context":` +
 		strconv.Itoa(ctx) + `,"output":` + strconv.Itoa(out) + `}}}}}`

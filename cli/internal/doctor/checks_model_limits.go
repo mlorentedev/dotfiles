@@ -56,10 +56,15 @@ type declaredModel struct {
 	MaxTokens     int    `json:"maxTokens"`
 }
 
+// declaredProvider holds one provider's models as an ARRAY, which is what pi's
+// config format uses. The catalog keys them by id instead, so the comparison is a
+// loop on this side and a map hit on the other.
 type declaredProvider struct {
 	Models []declaredModel `json:"models"`
 }
 
+// declaredCatalog is the top of ai/pi/models.json: providers keyed by name, which
+// is the level the per-provider scoping in lookupCatalogModel depends on.
 type declaredCatalog struct {
 	Providers map[string]declaredProvider `json:"providers"`
 }
@@ -70,10 +75,14 @@ type catalogLimit struct {
 	Output  int `json:"output"`
 }
 
+// catalogModel is one models.dev entry. Only `limit` is read: the catalog also
+// publishes cost and modalities, and neither changes what a request may ask for.
 type catalogModel struct {
 	Limit catalogLimit `json:"limit"`
 }
 
+// catalogProvider keys its models by id, unlike declaredProvider's array. The
+// asymmetry is the upstream formats', not a choice made here.
 type catalogProvider struct {
 	Models map[string]catalogModel `json:"models"`
 }
