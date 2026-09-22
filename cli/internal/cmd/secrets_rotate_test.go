@@ -17,12 +17,12 @@ secrets:
   - id: DOCKERHUB_TOKEN
     plane: app
     backend: bw
-    bw: { item: dockerhub, field: PAT, folder: apps }
+    bw: { item: dockerhub, field: PAT, folder: Dotfiles/apps }
     expose: { env: DOCKERHUB_TOKEN }
   - id: BITACORA_PAT
     plane: app
     backend: bw
-    bw: { item: github-bitacora-pat, field: api-token, folder: apps }
+    bw: { item: github-bitacora-pat, field: api-token, folder: Dotfiles/apps }
     expose: { env: BITACORA_PAT }
     validate: github-token
 `
