@@ -1,0 +1,395 @@
+package secrets
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+)
+
+// itemsPayload wraps item JSON in bw serve's inner list envelope.
+func itemsPayload(t *testing.T, items string) json.RawMessage {
+	t.Helper()
+	return json.RawMessage(`{"object":"list","data":[` + items + `]}`)
+}
+
+// THE TEST THIS FILE EXISTS FOR.
+//
+// The projection's whole claim is that a value cannot cross it. Asserting the
+// fields we DO want is not that claim — it passes just as well if a password
+// rides along in a struct nobody looked at. So this feeds a payload stuffed with
+// distinctive secret material, marshals the entire result back to JSON, and
+// asserts none of it survives anywhere in the output.
+//
+// Marshalling the result rather than checking named fields is deliberate: it
+// fails if someone later adds a value-bearing field to ItemSummary, which is
+// exactly the regression worth catching and exactly the one a field-by-field
+// assertion would miss.
+func TestDecodeItemsCannotCarryAValue(t *testing.T) {
+	const (
+		pw    = "PASSWORD-must-not-survive-8f3a"
+		fld   = "FIELDVALUE-must-not-survive-2b7c"
+		totp  = "TOTPSEED-must-not-survive-91de"
+		card  = "4111111111111111"
+		notes = "NOTEBODY-must-not-survive-5c0f"
+	)
+	raw := itemsPayload(t, fmt.Sprintf(`{
+	  "name":"loaded","folderId":"f1","revisionDate":"2026-09-21T10:00:00.000Z",
+	  "notes":%q,
+	  "login":{"username":"someone","password":%q,"totp":%q},
+	  "card":{"number":%q},
+	  "fields":[{"name":"api-key","value":%q}],
+	  "passwordHistory":[{"password":%q}]
+	}`, notes, pw, totp, card, fld, pw))
+
+	got, err := decodeItems(raw, map[string]string{"f1": "Dotfiles/apps"})
+	if err != nil {
+		t.Fatalf("decodeItems: %v", err)
+	}
+	blob, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{pw, fld, totp, card, notes} {
+		if strings.Contains(string(blob), secret) {
+			t.Errorf("a secret value survived the projection: %q found in %s", secret, blob)
+		}
+	}
+
+	// And the shape it DOES carry is right, or the test above passes vacuously
+	// on a decoder that returns nothing at all.
+	if len(got) != 1 {
+		t.Fatalf("want 1 item, got %d", len(got))
+	}
+	it := got[0]
+	if it.Name != "loaded" || it.Folder != "Dotfiles/apps" {
+		t.Errorf("shape lost: name=%q folder=%q", it.Name, it.Folder)
+	}
+	if !it.HasNotes || !it.HasLogin || !it.HasUsername {
+		t.Errorf("presence booleans lost: notes=%v login=%v username=%v", it.HasNotes, it.HasLogin, it.HasUsername)
+	}
+	if len(it.Fields) != 1 || it.Fields[0] != "api-key" {
+		t.Errorf("field NAMES must survive, got %v", it.Fields)
+	}
+}
+
+// An item with no login block must not read as having a username: `field:
+// username` resolving against it would fail at runtime, and the report exists to
+// say so beforehand.
+func TestDecodeItemsDistinguishesAnAbsentLogin(t *testing.T) {
+	raw := itemsPayload(t, `{"name":"noteonly","notes":"x","fields":[]}`)
+	got, err := decodeItems(raw, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].HasLogin || got[0].HasUsername {
+		t.Errorf("an item with no login block claims one: %+v", got[0])
+	}
+	if !got[0].HasNotes {
+		t.Error("a non-empty note must register")
+	}
+}
+
+// An empty username is not a username. bw returns the login block with "" for an
+// item that has only a password, and reporting that as present would send an
+// operator looking for a value that is not there.
+func TestDecodeItemsTreatsAnEmptyUsernameAsAbsent(t *testing.T) {
+	raw := itemsPayload(t, `{"name":"pwonly","login":{"username":""},"fields":[]}`)
+	got, err := decodeItems(raw, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[0].HasLogin {
+		t.Error("the login block is present and must register")
+	}
+	if got[0].HasUsername {
+		t.Error("an empty username must read as absent")
+	}
+}
+
+// An unfoldered item resolves to "", not to the literal id, so a report never
+// prints a UUID at a human.
+func TestDecodeItemsResolvesFolderNamesAndLeavesUnfolderedEmpty(t *testing.T) {
+	raw := itemsPayload(t, `{"name":"a","folderId":"f1","fields":[]},{"name":"b","fields":[]}`)
+	got, err := decodeItems(raw, map[string]string{"f1": "Dotfiles/infra"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Folder != "Dotfiles/infra" {
+		t.Errorf("folder id not resolved: %q", got[0].Folder)
+	}
+	if got[1].Folder != "" {
+		t.Errorf("unfoldered item must be empty, got %q", got[1].Folder)
+	}
+}
+
+// A malformed timestamp on one row must not abort the inventory: the report is
+// about layout, and refusing to produce it over one bad date would be the same
+// "all or nothing" failure that makes health checks get skipped.
+func TestDecodeItemsToleratesAnUnparseableRevisionDate(t *testing.T) {
+	raw := itemsPayload(t, `{"name":"a","revisionDate":"not-a-date","fields":[]}`)
+	got, err := decodeItems(raw, nil)
+	if err != nil {
+		t.Fatalf("one bad date aborted the whole inventory: %v", err)
+	}
+	if !got[0].Revised.IsZero() {
+		t.Error("an unparseable date must yield the zero time, reported as unknown")
+	}
+}
+
+// An unparseable payload reports a BYTE COUNT and never the body — this endpoint
+// answers with the entire vault, so an error string that quoted it would be the
+// leak the projection exists to prevent.
+func TestDecodeItemsErrorNeverQuotesTheBody(t *testing.T) {
+	const secret = "SECRET-must-not-appear-in-an-error"
+	_, err := decodeItems(json.RawMessage(`{"data":[{"name":`+secret+`}]}`), nil)
+	if err == nil {
+		t.Fatal("want an error for malformed item JSON")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Errorf("the error quoted the body: %v", err)
+	}
+	if !strings.Contains(err.Error(), "bytes") {
+		t.Errorf("the error must say how much it could not parse: %v", err)
+	}
+}
+
+func decl(secret, item, field, folder string, dormant bool) BWDecl {
+	return BWDecl{Secret: secret, Var: secret, Item: item, Field: field, Folder: folder, Dormant: dormant}
+}
+
+func item(name, folder string, fields ...string) ItemSummary {
+	return ItemSummary{Name: name, Folder: folder, Fields: fields}
+}
+
+func kinds(fs []LayoutFinding) []string {
+	out := make([]string, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, f.Kind)
+	}
+	return out
+}
+
+// A declared folder that no folder carries BY NAME is the finding that motivated
+// this check: ResolveFolder creates on miss, so the next `set` splits the store.
+func TestLayoutDriftReportsAFolderNameNothingCarries(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("A", "thing", "api-key", "apps", false)},
+		[]ItemSummary{item("thing", "Dotfiles/apps", "api-key")},
+		[]string{"Dotfiles/apps"},
+	)
+	if len(got) == 0 || got[0].Kind != DriftFolderMissing {
+		t.Fatalf("want folder-missing first, got %v", kinds(got))
+	}
+	if !strings.Contains(got[0].Detail, "CREATE") {
+		t.Errorf("the finding must say what happens next, got %q", got[0].Detail)
+	}
+}
+
+// The case that hid for months: a declaration the read path does not use is still
+// a declaration, and its target did not exist.
+func TestLayoutDriftChecksDormantDeclarations(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("GITHUB_PERSONAL_ACCESS_TOKEN", "github-cli-pat", "api-token", "Dotfiles/apps", true)},
+		[]ItemSummary{item("something-else", "Dotfiles/apps")},
+		[]string{"Dotfiles/apps"},
+	)
+	if len(got) != 1 || got[0].Kind != DriftItemMissing {
+		t.Fatalf("a dormant declaration must still be checked, got %v", kinds(got))
+	}
+	if !strings.Contains(got[0].Detail, "dormant") {
+		t.Errorf("the finding must say the read path does not use it yet: %q", got[0].Detail)
+	}
+}
+
+// An item in the wrong folder is reported once, naming both places.
+func TestLayoutDriftReportsAMisfiledItem(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("D", "dockerhub", "PAT", "Dotfiles/apps", false)},
+		[]ItemSummary{item("dockerhub", "", "PAT")},
+		[]string{"Dotfiles/apps"},
+	)
+	if len(got) != 1 || got[0].Kind != DriftItemMisfiled {
+		t.Fatalf("want one item-misfiled, got %v", kinds(got))
+	}
+	if !strings.Contains(got[0].Detail, "(no folder)") || !strings.Contains(got[0].Detail, "Dotfiles/apps") {
+		t.Errorf("must name where it is AND where it was declared: %q", got[0].Detail)
+	}
+}
+
+// hasField mirrors fieldFromItem's three special cases. If that dispatch ever
+// changes, this is the test that should go red — it is the pin holding the
+// deliberate duplication honest.
+func TestLayoutDriftResolvesFieldsTheWayTheReaderDoes(t *testing.T) {
+	it := ItemSummary{
+		Name: "svc", Folder: "Dotfiles/apps",
+		Fields: []string{"api-key"}, HasNotes: true, HasLogin: true, HasUsername: true,
+	}
+	for _, field := range []string{"api-key", "notes", "username", "password"} {
+		got := LayoutDrift([]BWDecl{decl("S", "svc", field, "Dotfiles/apps", false)},
+			[]ItemSummary{it}, []string{"Dotfiles/apps"})
+		if len(got) != 0 {
+			t.Errorf("field %q resolves at runtime but was reported missing: %v", field, got)
+		}
+	}
+	// And the negative side, or the above passes on a checker that never reports.
+	bare := ItemSummary{Name: "svc", Folder: "Dotfiles/apps"}
+	for _, field := range []string{"api-key", "notes", "username", "password"} {
+		got := LayoutDrift([]BWDecl{decl("S", "svc", field, "Dotfiles/apps", false)},
+			[]ItemSummary{bare}, []string{"Dotfiles/apps"})
+		if len(got) != 1 || got[0].Kind != DriftFieldMissing {
+			t.Errorf("field %q is absent and must be reported, got %v", field, kinds(got))
+		}
+	}
+}
+
+// Seven vars naming one absent item is one absent item. Reporting per var turns
+// a four-line report into a twenty-line one and buries the count.
+func TestLayoutDriftReportsOneFindingPerProblemNotPerVar(t *testing.T) {
+	var decls []BWDecl
+	for i := 0; i < 7; i++ {
+		decls = append(decls, decl(fmt.Sprintf("X_%d", i), "x-twitter-api", fmt.Sprintf("f%d", i), "Dotfiles/apps", false))
+	}
+	got := LayoutDrift(decls, nil, []string{"Dotfiles/apps"})
+	if len(got) != 1 {
+		t.Fatalf("want exactly 1 finding for 7 vars on one absent item, got %d: %v", len(got), kinds(got))
+	}
+}
+
+// A missing item swallows its field checks: its fields cannot be inspected, and
+// saying so per var would bury the one fact that matters.
+func TestLayoutDriftDoesNotReportFieldsOfAnAbsentItem(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("A", "ghost", "api-key", "Dotfiles/apps", false)},
+		nil, []string{"Dotfiles/apps"},
+	)
+	if len(got) != 1 || got[0].Kind != DriftItemMissing {
+		t.Fatalf("want only item-missing, got %v", kinds(got))
+	}
+}
+
+// Findings come out in the order they must be fixed: a folder cannot hold an item
+// before it exists, and a field cannot be checked on an item that is absent.
+func TestLayoutDriftOrdersFindingsByFixOrder(t *testing.T) {
+	got := LayoutDrift([]BWDecl{
+		decl("C", "present", "missing-field", "Dotfiles/apps", false),
+		decl("B", "absent", "api-key", "Dotfiles/apps", false),
+		decl("A", "present", "api-key", "nowhere", false),
+	}, []ItemSummary{item("present", "Dotfiles/apps", "api-key")}, []string{"Dotfiles/apps"})
+
+	// Four, not three: declaring "present" into the absent folder "nowhere" makes
+	// it misfiled as well as making the folder missing. Both are true and both are
+	// reported — what this pins is that the two ITEM findings sit together between
+	// the folder one and the field one.
+	want := []string{DriftFolderMissing, DriftItemMissing, DriftItemMisfiled, DriftFieldMissing}
+	gotKinds := kinds(got)
+	if len(gotKinds) != len(want) {
+		t.Fatalf("want %v, got %v", want, gotKinds)
+	}
+	for i := range want {
+		if gotKinds[i] != want[i] {
+			t.Fatalf("want %v, got %v", want, gotKinds)
+		}
+	}
+}
+
+// A store that matches its declaration reports nothing. Without this the whole
+// suite could pass on a function that always finds something.
+func TestLayoutDriftIsSilentOnAMatchingStore(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("A", "svc", "api-key", "Dotfiles/apps", false)},
+		[]ItemSummary{item("svc", "Dotfiles/apps", "api-key")},
+		[]string{"Dotfiles/apps"},
+	)
+	if len(got) != 0 {
+		t.Errorf("a matching store must produce no findings, got %v", got)
+	}
+}
+
+// Unmanaged items are counted, never reported as findings: a personal vault
+// legitimately holds what this repo does not manage.
+func TestUnmanagedItemsListsOnlyWhatNoDeclarationNames(t *testing.T) {
+	got := UnmanagedItems(
+		[]BWDecl{decl("A", "svc", "api-key", "Dotfiles/apps", false)},
+		[]ItemSummary{item("svc", "Dotfiles/apps"), item("bank", ""), item("airline", "")},
+	)
+	if len(got) != 2 || got[0] != "airline" || got[1] != "bank" {
+		t.Errorf("want [airline bank] sorted, got %v", got)
+	}
+}
+
+// BWDeclarations must walk age-backed secrets too. Tested through ParseRegistry
+// rather than by handing LayoutDrift a struct, because the bug this guards is in
+// the WALK: an earlier version filtered on `Backend != BackendBW` and so never
+// emitted a dormant declaration at all, while a hand-built fixture with
+// Dormant:true went on passing. Mutation testing found that hole, not review.
+func TestBWDeclarationsIncludesDormantBlocksOnAgeBackedSecrets(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: LIVE, plane: app, backend: bw, bw: {item: live-item, field: api-key, folder: Dotfiles/apps}, expose: {env: LIVE}}\n" +
+		"  - {id: DORMANT, plane: app, backend: age, age: some.blob, bw: {item: future-item, field: api-token, folder: Dotfiles/apps}, expose: {env: DORMANT}}\n" +
+		"  - {id: NOBW, plane: app, backend: age, age: other.blob, expose: {env: NOBW}}\n"
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	got := reg.BWDeclarations()
+	if len(got) != 2 {
+		t.Fatalf("want 2 declarations (the live one and the dormant one), got %d: %+v", len(got), got)
+	}
+	byItem := map[string]BWDecl{}
+	for _, d := range got {
+		byItem[d.Item] = d
+	}
+	if d, ok := byItem["live-item"]; !ok || d.Dormant {
+		t.Errorf("a bw-backed secret must be declared live, got %+v", d)
+	}
+	if d, ok := byItem["future-item"]; !ok || !d.Dormant {
+		t.Errorf("an age-backed secret's bw block must be declared DORMANT, got %+v", d)
+	}
+	if _, ok := byItem[""]; ok {
+		t.Error("a secret with no bw block must contribute no declaration")
+	}
+}
+
+// Per-var field overrides are resolved by the walk. Without this, the seven X_*
+// vars would all be checked against the secret-level field and six would be
+// reported missing on an item that carries every one of them.
+func TestBWDeclarationsResolvesPerVarFieldOverrides(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: MULTI, plane: app, backend: bw, bw: {item: multi, field: fallback, folder: Dotfiles/apps}," +
+		" expose: {env: {A: {field: a-field}, B: {}}}}\n"
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	got := reg.BWDeclarations()
+	if len(got) != 2 {
+		t.Fatalf("want one declaration per var, got %d", len(got))
+	}
+	byVar := map[string]string{}
+	for _, d := range got {
+		byVar[d.Var] = d.Field
+	}
+	if byVar["A"] != "a-field" {
+		t.Errorf("a per-var field override must win, got %q", byVar["A"])
+	}
+	if byVar["B"] != "fallback" {
+		t.Errorf("a var with no override must fall back to the secret's field, got %q", byVar["B"])
+	}
+}
+
+// Dedupe applies to MISFILED as well as MISSING. Seven vars on one item in the
+// wrong folder is one item in the wrong folder; the first version deduped only
+// the missing case and mutation testing walked straight through it.
+func TestLayoutDriftDedupesAMisfiledItemAcrossVars(t *testing.T) {
+	var decls []BWDecl
+	for i := 0; i < 7; i++ {
+		decls = append(decls, decl(fmt.Sprintf("X_%d", i), "x-twitter-api", fmt.Sprintf("f%d", i), "Dotfiles/apps", false))
+	}
+	got := LayoutDrift(decls,
+		[]ItemSummary{item("x-twitter-api", "", "f0", "f1", "f2", "f3", "f4", "f5", "f6")},
+		[]string{"Dotfiles/apps"})
+	if len(got) != 1 || got[0].Kind != DriftItemMisfiled {
+		t.Fatalf("want exactly 1 item-misfiled for 7 vars, got %d: %v", len(got), kinds(got))
+	}
+}
