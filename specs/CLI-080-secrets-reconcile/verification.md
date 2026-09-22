@@ -1,0 +1,97 @@
+---
+tags: [spec, verification, templates]
+created: "2026-09-22"
+---
+
+# Verification - CLI-080-secrets-reconcile
+
+## Evidence
+
+| AC | Proof |
+|---|---|
+| AC1 | `TestReconcilePlanWritesNothing` — zero writes, every operation printed, sync observed |
+| AC2 | `TestPlanOrdersOperationsByDependency`, `TestApplyReconcileConvergesAndASecondPlanIsEmpty`, `TestApplyReconcileAddsAFieldToAnExistingItem` |
+| AC3 | `TestApplyReconcileNeverPutsAValueInItsOutput`, `TestReconcileApplyConvergesAndPrintsNoValue` — planted values, asserted absent |
+| AC4 | `TestPlanNeverOverwritesAndReportsASatisfiedFrom` |
+| AC5 | `TestPlanBlocksWhatItCannotSource` (5 cases), `TestPlanDefersADormantItemWithNoSource`, `TestApplyReconcileRefusesABlockedPlan`, `TestApplyReconcileRefusesAnEmptySource` |
+| AC6 | `TestReconcilePlanWritesNothing` (sync observed), `TestReconcileApplyFailsWhenTheStoreDoesNotConverge` |
+| AC7 | `TestRegistryRejectsAMalformedFrom` (5 cases), `TestRegistryValidatesFromOnADormantBlock`, `TestBWDeclarationsCarryFromForFileExposedSecrets` |
+| AC8 | `TestSetItemFolderChangesOnlyTheFolder`, `TestSetItemFolderEmptyUnfiles`, `TestBWServeWriter_MoveItem_MatchesBWPutShape` |
+| AC9 | Pending the operator's go-ahead for `--apply` — see below |
+
+## Test status
+
+- `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...` — exit 0
+- `golangci-lint run` at the pinned v2.12.2 — 0 issues
+- `features.json` f1–f8 executed — 8/8 pass
+- **Live plan, read-only, 2026-09-22**, this branch's registry against the real store:
+
+  ```
+  ~ move-item      dockerhub                (no folder) -> Dotfiles/apps
+  + create-item    github-cli-pat           field "GITHUB_PERSONAL_ACCESS_TOKEN" in Dotfiles/apps, copied from GitHub/"Personal Access Token"
+  + create-item    github-release-pat       field "RELEASE_TOKEN" in Dotfiles/apps, copied from GitHub/"release-token"
+  - deferred       zoho                     … -> dotf secrets migrate ZOHO_APP_PASSWORDS
+  - deferred       zoho                     … -> dotf secrets migrate ZOHO_RECOVERY_CODE
+
+  Plan: 3 to apply, 0 blocked, 2 deferred.
+  ```
+
+### Mutation
+
+16 mutations; 15 killed, 1 equivalent.
+
+| Area | Mutation | Result |
+|---|---|---|
+| planner | create an absent shared item twice | killed |
+| planner | block a dormant declaration instead of deferring | killed |
+| planner | accept an ambiguous source | killed |
+| planner | drop the dependency sort | **survived first**, killed after the fixture's names were chosen against alphabetical order |
+| planner | report any unseen `from:` as satisfied | **equivalent** — see below |
+| registry | accept `from:` on a multi-var secret | killed |
+| registry | drop `from:` from a file-exposed declaration | **survived first**, killed by `TestBWDeclarationsCarryFromForFileExposedSecrets` |
+| apply | resolve a folder twice per run | killed (against a fake whose folder listing is stale until sync) |
+| apply | accept an empty source | killed |
+| apply | apply a blocked plan | killed |
+| apply | move-item as a no-op | killed |
+| apply | add-field as a no-op | **survived first**, killed by `TestApplyReconcileAddsAFieldToAnExistingItem` |
+| seam | unfile with `""` instead of null | killed |
+| seam | daemon MoveItem as a no-op | killed |
+| registry write | keep the age line on activation | killed |
+| drift→plan | (covered by #1600's three) | — |
+
+**The equivalent mutant.** `satisfied()` re-checks that the destination field exists.
+Every `from:` still unseen after the findings are processed has it by construction —
+an absent item or field would have produced a finding. The check stays because it
+states the definition directly rather than by inference from `LayoutDrift`'s
+completeness; if drift ever stops reporting a case, this is the line that keeps
+reconcile from calling it satisfied.
+
+## Decisions made during implementation
+
+- **Findings carry their declaration.** Reconcile maps drift's findings to operations
+  rather than re-deriving the comparison, so the two commands cannot disagree about
+  what has drifted.
+- **Two-phase apply.** Every source is read before the first write, so a bad source
+  costs nothing — not even the folder the plan would have created first.
+- **Folders resolved once per run.** `ResolveFolder` creates on miss and the daemon
+  lists from a cache; resolving a folder made moments earlier could duplicate it.
+- **The idempotence check is the command's, not only the tests'.** `--apply` syncs,
+  re-plans and fails unless the second plan is empty.
+- **The bw serve fake was made more faithful.** It answered listings with id+name
+  only, gave every created object the same id, and stored created items without
+  one — each a way for a test to pass against a daemon that does not exist.
+- **Deferred, not blocked, for dormant declarations.** Otherwise the pending `zoho`
+  migration would have stopped every other operation from ever applying.
+
+## Promotion candidates
+
+- [ ] Pattern for `00_meta/patterns/`: "declare a data migration as a record the tool
+      applies and then reports satisfied" (Terraform `moved`, applied to credentials).
+      Candidate if a second store adopts it.
+- [ ] ADR? No — this implements ADR-028 §2/§6 and records its decisions here.
+
+## Archive checklist
+
+- [ ] `proposal.md` frontmatter set to `status: archived`
+- [ ] Folder moved to `specs/archive/CLI-080-secrets-reconcile/`
+- [ ] Independent adversarial review passed (reviewer != implementer)

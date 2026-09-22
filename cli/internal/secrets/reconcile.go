@@ -143,7 +143,11 @@ func (p *planner) absent(d BWDecl) {
 	p.seen[d.Secret] = true
 
 	if d.From == nil {
-		note := PlanNote{Secret: d.Secret, Item: d.Item, Detail: fmt.Sprintf("field %q is declared but absent, and no bw.from names a source", d.Field)}
+		missing := fmt.Sprintf("field %q is declared but absent", d.Field)
+		if _, exists := p.byName[d.Item]; !exists {
+			missing = "item is declared but absent"
+		}
+		note := PlanNote{Secret: d.Secret, Item: d.Item, Detail: missing + ", and no bw.from names a source"}
 		if d.Dormant {
 			note.Remedy = "dotf secrets migrate " + d.Secret
 			p.plan.Deferred = append(p.plan.Deferred, note)

@@ -1,0 +1,65 @@
+[
+  {
+    "id": "CLI-080-secrets-reconcile-f1",
+    "behavior": "AC1 — plan mode writes nothing, prints each operation, and syncs first",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestReconcilePlanWritesNothing$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f2",
+    "behavior": "AC2 — apply performs the four operations in dependency order, and a second plan is empty",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestPlanOrdersOperationsByDependency$|^TestApplyReconcileConvergesAndASecondPlanIsEmpty$|^TestApplyReconcileAddsAFieldToAnExistingItem$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f3",
+    "behavior": "AC3 — values are copied from the declared source and never reach any output",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestApplyReconcileNeverPutsAValueInItsOutput$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1 && go test ./internal/cmd/ -run '^TestReconcileApplyConvergesAndPrintsNoValue$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f4",
+    "behavior": "AC4 — an existing field is never overwritten; a satisfied from: is reported removable",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestPlanNeverOverwritesAndReportsASatisfiedFrom$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f5",
+    "behavior": "AC5 — unsourceable findings block (or defer to migrate), and apply refuses a blocked plan or an empty source before any write",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestPlanBlocksWhatItCannotSource$|^TestPlanDefersADormantItemWithNoSource$|^TestApplyReconcileRefusesABlockedPlan$|^TestApplyReconcileRefusesAnEmptySource$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 4",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f6",
+    "behavior": "AC6 — --apply fails unless its own verifying re-plan is empty",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestReconcileApplyFailsWhenTheStoreDoesNotConverge$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f7",
+    "behavior": "AC7 — the registry rejects a malformed from:, on live and dormant blocks alike",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestRegistryRejectsAMalformedFrom$|^TestRegistryValidatesFromOnADormantBlock$|^TestBWDeclarationsCarryFromForFileExposedSecrets$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f8",
+    "behavior": "AC8 — both backends store byte-identical JSON for a folder move",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestSetItemFolderChangesOnlyTheFolder$|^TestSetItemFolderEmptyUnfiles$|^TestBWServeWriter_MoveItem_MatchesBWPutShape$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-080-secrets-reconcile-f9",
+    "behavior": "AC9 — live store converged: a fresh plan against the unlocked vault has nothing to apply and nothing blocked",
+    "verification": "cd cli && go run ./cmd/dotf secrets reconcile | grep -q '^Plan: 0 to apply, 0 blocked'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

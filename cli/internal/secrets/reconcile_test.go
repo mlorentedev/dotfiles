@@ -166,3 +166,16 @@ func TestPlanNeverMovesAnItemDeclaredWithNoFolder(t *testing.T) {
 		t.Fatalf("no operation for an ungoverned placement, got %v", opKinds(p))
 	}
 }
+
+// A note names what is actually missing: the item when the item is absent, the
+// field only when the item exists without it.
+func TestPlanNotesNameWhatIsMissing(t *testing.T) {
+	absentItem := PlanReconcile([]BWDecl{decl("L", "gone", "k", "", false)}, nil, nil)
+	absentField := PlanReconcile([]BWDecl{decl("L", "here", "k", "", false)}, []ItemSummary{{Name: "here"}}, nil)
+	if !strings.Contains(absentItem.Blocked[0].Detail, "item is declared but absent") {
+		t.Errorf("absent item: %q", absentItem.Blocked[0].Detail)
+	}
+	if !strings.Contains(absentField.Blocked[0].Detail, `field "k"`) {
+		t.Errorf("absent field: %q", absentField.Blocked[0].Detail)
+	}
+}
