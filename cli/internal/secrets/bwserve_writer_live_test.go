@@ -52,11 +52,16 @@ func TestLiveBWServeWriter_CanaryRoundTrip(t *testing.T) {
 	item := fmt.Sprintf("dotf-canary-bug084-%d", time.Now().Unix())
 
 	// --- AC2: create, including folder resolution (OPS-028 taxonomy) -------------
-	folderID, err := w.ResolveFolder("apps")
+	// The folder comes from the taxonomy, never a literal. ResolveFolder CREATES on
+	// miss, so while this read "apps" after the taxonomy moved to "Dotfiles/apps",
+	// a deliberate live run would have minted a stray folder and left it behind
+	// (cleanup deletes the item only) — CLI-078 adversarial review, round 1.
+	folder := planeFolder["app"]
+	folderID, err := w.ResolveFolder(folder)
 	if err != nil {
-		t.Fatalf("ResolveFolder(apps): %v", err)
+		t.Fatalf("ResolveFolder(%s): %v", folder, err)
 	}
-	t.Logf("resolved folder apps -> id present: %v", folderID != "")
+	t.Logf("resolved folder %s -> id present: %v", folder, folderID != "")
 
 	first := fmt.Sprintf("canary-%d-first", time.Now().UnixNano())
 	if err := w.CreateItem(item, "password", first, folderID); err != nil {

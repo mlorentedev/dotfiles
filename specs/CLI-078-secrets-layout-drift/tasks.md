@@ -35,4 +35,4 @@ created: "2026-09-21"
 - [x] `golangci-lint run` at the pinned v2.12.2 — 0 issues
 - [x] Whole module green
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#1597, merged; post-merge fixes in #1600)

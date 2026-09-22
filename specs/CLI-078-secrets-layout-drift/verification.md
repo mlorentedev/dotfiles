@@ -106,3 +106,22 @@ reverted (3 mutations, 3 killed).
 - [ ] Folder moved to `specs/archive/CLI-078-secrets-layout-drift/`
 - [ ] Bitácora `#1596` closed with the PR link (ADR-018)
 - [ ] Independent adversarial review passed (reviewer != implementer)
+
+## Adversarial review, round 1 — disposition
+
+`review.md` round 1: **FAIL**, `nan/glm5.3-flash`, reviewed `c7a8adc`. Committed
+verbatim; round 2 reviews this branch's head.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Blocker | File-exposed declarations never enter the walk (7 of 33) | **Applied** — the same defect found independently on the live run; fixed and pinned above |
+| Major | Live canary resolves the stale literal `"apps"`, so a live run would create a stray folder | **Applied** — the canary derives its folder from `planeFolder["app"]`, so it cannot go stale again |
+| Minor | `ListItems` keeps the null-id "No Folder" row | **Applied** — `folderIndex`, tested against the null-id shape bw serve emits |
+| Minor | AC8's non-zero exit has no command-level test | **Applied** — `TestDriftExitsNonZeroOnAFindingAndNamesTheSecret`, confirmed red with the exit removed |
+| Minor | `LayoutFinding.Secret` documented for the reader but never printed | **Applied** — each line ends `[<registry id>]`, confirmed red with it removed |
+| Minor | `tasks.md` "PR opened" box unticked | **Applied** — ticked |
+
+The reviewer found two of the three post-merge defects without a live vault
+(the file-expose walk and the pseudo-folder); it did not find the third
+(`folder: ""` read as "must be unfoldered"), which only shows once the other
+two are fixed.
