@@ -47,6 +47,11 @@ func newFakeWriter() *fakeWriter {
 	}
 }
 
+func (f *fakeWriter) RemoveField(item, field string) error {
+	delete(f.cur, item+"/"+field)
+	return nil
+}
+
 func (f *fakeWriter) MoveItem(item, folderID string) error {
 	f.moved[item] = folderID
 	return nil

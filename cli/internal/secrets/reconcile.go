@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"sort"
@@ -31,9 +32,12 @@ const (
 	OpMoveItem     = "move-item"
 	OpCreateItem   = "create-item"
 	OpAddField     = "add-field"
+	// OpRetireSource removes a from: source field once its destination exists and
+	// holds the same value. Last, because it is the only operation that deletes.
+	OpRetireSource = "retire-source"
 )
 
-var opRank = map[string]int{OpCreateFolder: 0, OpMoveItem: 1, OpCreateItem: 2, OpAddField: 3}
+var opRank = map[string]int{OpCreateFolder: 0, OpMoveItem: 1, OpCreateItem: 2, OpAddField: 3, OpRetireSource: 4}
 
 // ReconcileOp is one planned change. Coordinates only: the value a create-item or
 // add-field copies is read at apply time and never stored here, so a plan can be
@@ -208,18 +212,53 @@ func (p *planner) sourceProblem(f BWFrom) string {
 	return ""
 }
 
-// satisfied records every from: whose destination field already exists.
+// satisfied handles every from: whose destination field already exists: it is
+// removable, unless it asks to retire a source that is still there, in which case
+// that removal is planned and the record stays until it lands.
+//
+// Retire is planned only here, so only once the destination exists: a source is
+// never removed in the run that creates its copy.
 func (p *planner) satisfied() {
 	for _, d := range p.decls {
 		if d.From == nil || p.seen[d.Secret] {
 			continue
 		}
-		if it, ok := p.byName[d.Item]; ok && hasField(it, d.Field) {
-			p.seen[d.Secret] = true
-			p.plan.Satisfied = append(p.plan.Satisfied, d.Secret)
+		it, ok := p.byName[d.Item]
+		if !ok || !hasField(it, d.Field) {
+			continue
 		}
+		p.seen[d.Secret] = true
+		if d.From.Retire && p.sourceStillThere(d) {
+			continue
+		}
+		p.plan.Satisfied = append(p.plan.Satisfied, d.Secret)
 	}
 	sort.Strings(p.plan.Satisfied)
+}
+
+// sourceStillThere plans the retirement of d's source when it is present, blocks
+// when it is ambiguous, and reports false when there is nothing left to retire.
+func (p *planner) sourceStillThere(d BWDecl) bool {
+	src := *d.From
+	switch n := p.count[src.Item]; {
+	case n == 0:
+		return false
+	case n > 1:
+		p.plan.Blocked = append(p.plan.Blocked, PlanNote{
+			Secret: d.Secret, Item: src.Item,
+			Detail: fmt.Sprintf("cannot retire %s/%q: the name matches %d items, and removing a field from an arbitrary one could delete the wrong credential", src.Item, src.Field, n),
+			Remedy: "rename or remove the duplicate items in the vault",
+		})
+		return true
+	}
+	if !hasField(p.byName[src.Item], src.Field) {
+		return false
+	}
+	p.plan.Ops = append(p.plan.Ops, ReconcileOp{
+		Kind: OpRetireSource, Secret: d.Secret, Item: d.Item, Field: d.Field,
+		FromItem: src.Item, FromField: src.Field,
+	})
+	return true
 }
 
 // ErrPlanBlocked is returned when asked to apply a plan that carries a blocker.
@@ -242,6 +281,12 @@ func ApplyReconcile(p ReconcilePlan, r BWReader, w BWWriteClient, applied func(R
 	}
 	values := make([]string, len(p.Ops))
 	for i, op := range p.Ops {
+		if op.Kind == OpRetireSource {
+			if err := sameValue(r, op); err != nil {
+				return err
+			}
+			continue
+		}
 		if op.Kind != OpCreateItem && op.Kind != OpAddField {
 			continue
 		}
@@ -296,6 +341,30 @@ func applyOp(op ReconcileOp, value string, w BWWriteClient, folderID func(string
 		return w.CreateItem(op.Item, op.Field, value, id)
 	case OpAddField:
 		return w.SetField(op.Item, op.Field, value)
+	case OpRetireSource:
+		return w.RemoveField(op.FromItem, op.FromField)
 	}
 	return fmt.Errorf("unknown operation %q", op.Kind)
+}
+
+// sameValue verifies, before any write, that a retire's destination holds exactly
+// its source's value. If they differ, one side was rotated after the copy and the
+// tool cannot know which is the truth, so it refuses — naming the fields, never the
+// values. Compared in constant time out of habit: nothing here is a remote oracle,
+// but it costs nothing to not be the example someone copies into one.
+func sameValue(r BWReader, op ReconcileOp) error {
+	dst, err := r.Field(op.Item, op.Field)
+	if err != nil {
+		return fmt.Errorf("read %s/%s to verify before retiring its source (nothing written): %w", op.Item, op.Field, err)
+	}
+	src, err := r.Field(op.FromItem, op.FromField)
+	if err != nil {
+		return fmt.Errorf("read %s/%s to verify before retiring it (nothing written): %w", op.FromItem, op.FromField, err)
+	}
+	if dst == "" || subtle.ConstantTimeCompare([]byte(dst), []byte(src)) != 1 {
+		return fmt.Errorf("refusing to retire %s/%q: its value and %s/%q's differ, so one was rotated after the copy "+
+			"and the tool cannot tell which is current (nothing written) — settle it, then re-run",
+			op.FromItem, op.FromField, op.Item, op.Field)
+	}
+	return nil
 }

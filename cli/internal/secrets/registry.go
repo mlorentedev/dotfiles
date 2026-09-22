@@ -78,6 +78,11 @@ type BWSource struct {
 type BWFrom struct {
 	Item  string `yaml:"item"`
 	Field string `yaml:"field"`
+	// Retire removes the source field once the destination exists and holds the
+	// same value, which completes the move: one credential, one place. Without it
+	// the copy is left beside its source, and a search returns both. Declared
+	// rather than implied, because it deletes a credential.
+	Retire bool `yaml:"retire"`
 }
 
 // validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-

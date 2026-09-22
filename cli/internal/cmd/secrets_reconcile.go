@@ -124,6 +124,9 @@ func printPlan(out io.Writer, p secrets.ReconcilePlan) {
 			_, _ = fmt.Fprintf(out, "+ %-14s %s\n", op.Kind, op.Folder)
 		case secrets.OpMoveItem:
 			_, _ = fmt.Fprintf(out, "~ %-14s %-24s %s -> %s\n", op.Kind, op.Item, folderLabel(op.Current), op.Folder)
+		case secrets.OpRetireSource:
+			_, _ = fmt.Fprintf(out, "- %-14s %-24s remove %s/%q, once verified equal to %s/%q\n",
+				op.Kind, op.FromItem, op.FromItem, op.FromField, op.Item, op.Field)
 		default:
 			_, _ = fmt.Fprintf(out, "+ %-14s %-24s field %q in %s, copied from %s/%q\n",
 				op.Kind, op.Item, op.Field, folderLabel(op.Folder), op.FromItem, op.FromField)

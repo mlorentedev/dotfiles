@@ -81,9 +81,14 @@ reviewed and applied.
    then syncs, re-plans and **fails unless the second plan is empty**. Safe before
    merge: every operation is additive.
 5. **Roll consumers** that are not local: `dotf secrets sync <target>`.
-6. **Retire the record:** a satisfied `from:` is reported as removable — delete it in
-   a follow-up. The copied source fields stay in the legacy item until their
-   consumers are verified; deleting them is a separate, deliberate step.
+6. **Retire the source:** once consumers are verified on the copy, add `retire: true`
+   to the `from:` and run reconcile again. It removes the source field only if the
+   copy holds the **same** value (compared in memory, never printed); if they differ,
+   one side was rotated and it refuses. Never in the same run as the copy, and always
+   after every other operation. One credential, one place — a search no longer
+   returns two.
+7. **Delete the record:** a satisfied `from:` (source retired, or no retire asked) is
+   reported as removable — delete it in a follow-up.
 
 ## Protocol — ROTATE a secret
 

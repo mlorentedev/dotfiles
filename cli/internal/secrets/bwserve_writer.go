@@ -21,6 +21,7 @@ type BWWriteClient interface {
 	BWCreator
 	BWFolderResolver
 	BWMover
+	BWFieldRemover
 }
 
 // BWServeWriter is the serve-backed BWWriteClient: the write analog of BWServeReader,
@@ -69,6 +70,11 @@ func (w BWServeWriter) SetField(item, field, value string) error {
 // everything else about it. Same read-modify-write and same pure core as BWPut's.
 func (w BWServeWriter) MoveItem(item, folderID string) error {
 	return w.editItem(item, func(cur []byte) ([]byte, error) { return setItemFolder(cur, folderID) })
+}
+
+// RemoveField removes field from an existing item, through the same core as BWPut.
+func (w BWServeWriter) RemoveField(item, field string) error {
+	return w.editItem(item, func(cur []byte) ([]byte, error) { return removeItemField(cur, field) })
 }
 
 // editItem is the read-modify-write both edits share; see SetField for why each step

@@ -79,6 +79,14 @@ func (v *fakeVault) CreateItem(item, field, value, folderID string) error {
 	return nil
 }
 
+func (v *fakeVault) RemoveField(item, field string) error {
+	v.writes++
+	if !v.noop {
+		delete(v.fields[item], field)
+	}
+	return nil
+}
+
 func (v *fakeVault) MoveItem(item, folderID string) error {
 	v.writes++
 	if !v.noop {

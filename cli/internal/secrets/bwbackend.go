@@ -209,6 +209,10 @@ func (w lockHintWriter) MoveItem(item, folderID string) error {
 	return lockHint(w.Writer.MoveItem(item, folderID), w.daemonState)
 }
 
+func (w lockHintWriter) RemoveField(item, field string) error {
+	return lockHint(w.Writer.RemoveField(item, field), w.daemonState)
+}
+
 func (w lockHintWriter) ResolveFolder(name string) (string, error) {
 	id, err := w.Writer.ResolveFolder(name)
 	return id, lockHint(err, w.daemonState)

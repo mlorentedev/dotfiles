@@ -207,6 +207,11 @@ func (p BWPut) MoveItem(item, folderID string) error {
 	return p.editItem(item, func(cur []byte) ([]byte, error) { return setItemFolder(cur, folderID) })
 }
 
+// RemoveField removes field from an existing item, preserving the rest of it.
+func (p BWPut) RemoveField(item, field string) error {
+	return p.editItem(item, func(cur []byte) ([]byte, error) { return removeItemField(cur, field) })
+}
+
 // editItem is the read-modify-write every item edit shares: get the whole item,
 // apply one pure mutation, write the whole item back. The mutation is the only part
 // that varies, and it is the same function BWServeWriter applies, so the two
@@ -272,6 +277,53 @@ func setItemFolder(itemJSON []byte, folderID string) ([]byte, error) {
 		m["folderId"] = nil
 	} else {
 		m["folderId"] = folderID
+	}
+	return json.Marshal(m)
+}
+
+// BWFieldRemover removes one field from an existing item. Its own interface for
+// the reason BWCreator is: the callers that edit values cannot delete by accident.
+type BWFieldRemover interface {
+	RemoveField(item, field string) error
+}
+
+// removeItemField returns itemJSON without field, preserving every other key. It
+// follows the dispatch setItemField and fieldFromItem share: notes and the login
+// pair are native to the item type and are cleared; anything else is a custom field
+// and is removed from the list. A field that is not there is an error — a caller
+// that planned its removal saw it, so absence means the store changed underneath.
+func removeItemField(itemJSON []byte, field string) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(itemJSON, &m); err != nil {
+		return nil, fmt.Errorf("parse bw item JSON: %w", err)
+	}
+	switch field {
+	case "password", "username":
+		login, _ := m["login"].(map[string]any)
+		if v, _ := login[field].(string); v == "" {
+			return nil, fmt.Errorf("item carries no %s to remove", field)
+		}
+		login[field] = nil
+	case "notes":
+		if v, _ := m["notes"].(string); v == "" {
+			return nil, fmt.Errorf("item carries no notes to remove")
+		}
+		m["notes"] = nil
+	default:
+		fields, _ := m["fields"].([]any)
+		kept := make([]any, 0, len(fields))
+		for _, f := range fields {
+			if fm, ok := f.(map[string]any); ok {
+				if name, _ := fm["name"].(string); name == field {
+					continue
+				}
+			}
+			kept = append(kept, f)
+		}
+		if len(kept) == len(fields) {
+			return nil, fmt.Errorf("item carries no field %q to remove", field)
+		}
+		m["fields"] = kept
 	}
 	return json.Marshal(m)
 }
