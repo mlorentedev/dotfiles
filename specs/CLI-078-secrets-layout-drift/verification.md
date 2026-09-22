@@ -64,6 +64,30 @@ about it.
 - **Read-only is structural.** No `--fix`, no writer passed in, and a
   committed check that greps the source (comments stripped) for any write call.
 
+## Defects found after merge (2026-09-22, first run of the merged binary)
+
+Found by running `drift` against the live store while designing `reconcile`,
+not by the tests above: all three depend on the real shape of the store or the
+registry, which the fixtures did not reproduce.
+
+- **Unfoldered items read as filed in "No Folder".** `ListFolders` dropped the
+  null-id pseudo-folder; the id index `ListItems` built did not, so `""` mapped
+  to `No Folder`. Fixed by one `folderIndex` both paths share the rule of.
+- **File-exposed secrets were never checked.** `BWDeclarations` walked
+  `expose.env` only, so 8 secrets — `KUBECONFIG`, `SSH_KEY`, the recovery
+  codes — contributed no declaration. AC2 held only for env secrets. Declared
+  targets went from 27 across 16 items to 34 across 21 once fixed.
+- **`folder: ""` was read as "must be unfoldered".** The first two defects
+  masked it: fixing either alone would have reported every hand-filed personal
+  item as misfiled. `""` now means placement is not governed, which is what the
+  taxonomy says (app and infra only; personal deferred to #586).
+- **`ItemSummary.Revised` was documented as an upper bound on age; it is a
+  lower bound.** The value existed at or before the last edit. No code read it
+  yet, so only the comment changed — but the rotation slice builds on it.
+
+Each fix is pinned by a test, and each test was confirmed red with its fix
+reverted (3 mutations, 3 killed).
+
 ## Promotion candidates
 
 - [ ] Lesson for `docs/lessons/`? **Deferred, deliberately.** The candidate is

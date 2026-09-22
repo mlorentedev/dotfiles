@@ -64,7 +64,7 @@ type Secret struct {
 type BWSource struct {
 	Item   string `yaml:"item"`
 	Field  string `yaml:"field"`
-	Folder string `yaml:"folder"` // "" → unfoldered; else one of validBWFolders
+	Folder string `yaml:"folder"` // "" → placement not governed; else one of validBWFolders
 }
 
 // validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-

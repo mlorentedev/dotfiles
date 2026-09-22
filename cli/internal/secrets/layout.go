@@ -71,6 +71,11 @@ type BWDecl struct {
 // Per-var field overrides are resolved here rather than by the caller: the seven
 // X_* vars share one item and differ only by field, and a comparison that read
 // the secret-level field would report six phantom mismatches.
+//
+// A file-exposed secret contributes one declaration under its file var. Its bw
+// target is declared exactly like an env secret's; only the consumer contract
+// differs. Walking expose.env alone left eight of them — KUBECONFIG, SSH_KEY, the
+// recovery codes — never compared against the store.
 func (r *Registry) BWDeclarations() []BWDecl {
 	var out []BWDecl
 	for i := range r.Secrets {
@@ -79,6 +84,14 @@ func (r *Registry) BWDeclarations() []BWDecl {
 			continue
 		}
 		dormant := s.Backend != BackendBW
+		if f := s.Expose.File; f != nil {
+			out = append(out, BWDecl{
+				Secret: s.ID, Var: f.Var,
+				Item: s.BW.Item, Field: s.BW.Field, Folder: s.BW.Folder,
+				Dormant: dormant,
+			})
+			continue
+		}
 		for _, v := range s.Expose.Env.Vars {
 			field := v.Field
 			if field == "" {
@@ -142,19 +155,20 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 			continue
 		}
 
-		if it.Folder != d.Folder && !seenMisfiled[d.Item] {
+		// A declaration with no folder states no placement, so there is nothing
+		// for the item to be misfiled against. The taxonomy covers the app and
+		// infra planes; the personal plane's is deferred (#586), and reading "" as
+		// "must be unfoldered" would report every personal item filed by hand —
+		// and hand reconcile an instruction to unfile it.
+		if d.Folder != "" && it.Folder != d.Folder && !seenMisfiled[d.Item] {
 			seenMisfiled[d.Item] = true
 			where := it.Folder
 			if where == "" {
 				where = "(no folder)"
 			}
-			want := d.Folder
-			if want == "" {
-				want = "(no folder)"
-			}
 			itemF = append(itemF, LayoutFinding{
 				Kind: DriftItemMisfiled, Secret: d.Secret, Item: d.Item,
-				Detail: fmt.Sprintf("is in %s, declared %s", where, want),
+				Detail: fmt.Sprintf("is in %s, declared %s", where, d.Folder),
 			})
 		}
 
