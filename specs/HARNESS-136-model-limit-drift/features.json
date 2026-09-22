@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-136-model-limit-drift-f1",
+    "behavior": "AC1 — every declared model matches the limits published for its own provider",
+    "verification": "cd cli && go build -o /tmp/dotf-h136 ./cmd/dotf && DOTFILES_REPO_DIR=\"$(cd .. && pwd)\" /tmp/dotf-h136 doctor --verbose 2>&1 | awk '/^\\[Model limit drift\\]/{f=1;next} /^\\[/{f=0} f' | grep -q 'models match the provider catalog'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f2",
+    "behavior": "AC2 — a declaration above the published limit is reported as FAIL and names both numbers",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelLimitsFailsOnAnOverstatedContextWindow$' -count=1 -v | grep -q '^--- PASS:'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f3",
+    "behavior": "AC3 — a declaration below the published limit is reported as WARN and never as FAIL",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelLimitsWarnsOnAnUnderstatedOutputCap$' -count=1 -v | grep -q '^--- PASS:'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f4",
+    "behavior": "AC4 — the same model id under two providers resolves to its own provider's row",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelLimitsResolvesTheSameIdPerProvider$' -count=1 -v | grep -q '^--- PASS:'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f5",
+    "behavior": "AC5 — an absent catalog cache reports SKIP and never PASS",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelLimitsSkipsWhenTheCatalogIsNotCached$' -count=1 -v | grep -q '^--- PASS:'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f6",
+    "behavior": "AC6 — an unpublished model and an unpublished limit are not findings, and comparing nothing reports SKIP rather than a vacuous PASS",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelLimitsIgnores(AModelTheCatalogDoesNotPublish|AnUnpublishedLimit)$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f7",
+    "behavior": "AC7 — an unparseable declaration FAILS rather than reporting no drift",
+    "verification": "cd cli && go test ./internal/doctor/ -run '^TestModelLimitsFailsOnAnUnparseableDeclaration$' -count=1 -v | grep -q '^--- PASS:'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-136-model-limit-drift-f8",
+    "behavior": "AC8 — the check never writes: it takes no fix flag and calls nothing that mutates",
+    "verification": "cd cli && ! grep -nE 'os\\.(WriteFile|Create|Remove|Rename)|rep\\.Fix|fix bool' internal/doctor/checks_model_limits.go",
+    "state": "pending",
+    "evidence": ""
+  }
+]
