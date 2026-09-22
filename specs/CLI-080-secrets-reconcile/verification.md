@@ -18,6 +18,7 @@ created: "2026-09-22"
 | AC7 | `TestRegistryRejectsAMalformedFrom` (5 cases), `TestRegistryValidatesFromOnADormantBlock`, `TestBWDeclarationsCarryFromForFileExposedSecrets` |
 | AC8 | `TestSetItemFolderChangesOnlyTheFolder`, `TestSetItemFolderEmptyUnfiles`, `TestBWServeWriter_MoveItem_MatchesBWPutShape` |
 | AC9 | Live, 2026-09-22, operator-authorized — see *Live apply* below |
+| AC10 | `reconcile_retire_test.go` (11 tests) — pure core, planner, apply against the daemon fake, parity; live below |
 
 ## Test status
 
@@ -90,6 +91,27 @@ note: bw.from on RELEASE_TOKEN is satisfied; it can be removed from the registry
   the repo secret moved from 2026-06-27 to 2026-09-22T23:44. `release-please` re-run:
   the error changed from `Bad credentials` to the account's GraphQL rate limit, so the
   token now authenticates. The green re-run after the quota resets is recorded on the PR.
+
+### Second apply: retiring the sources (operator-authorized)
+
+After the operator reported the resulting duplication — searching "release" returned
+both `GitHub/release-token` and `github-release-pat` — both `from:` records gained
+`retire: true`:
+
+```
+- retire-source  GitHub   remove GitHub/"Personal Access Token", once verified equal to github-cli-pat/"GITHUB_PERSONAL_ACCESS_TOKEN"
+- retire-source  GitHub   remove GitHub/"release-token", once verified equal to github-release-pat/"RELEASE_TOKEN"
+Converged: 2 operation(s) applied, and a second plan is empty.
+```
+
+Both tokens still HTTP 200 afterwards, from their new items. The satisfied `from:`
+records were then deleted from the registry; a re-plan against the clean registry is
+`Plan: 0 to apply, 0 blocked, 2 deferred` with no pending notes.
+
+Retire mutations: 6, all killed against a tree that builds (lesson 284) —
+drop the equality check, retire without the flag, accept an ambiguous source, accept
+an absent field, remove nothing, run retire first. The last survived until
+`TestPlanPutsRetireAfterEveryOtherOperation` pinned why retire runs last.
 
 ### Found during the live apply: `sync ci` could not be scoped
 

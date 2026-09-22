@@ -29,6 +29,7 @@ created: "2026-09-22"
 - [x] Mutation — 16 mutations across planner, apply and command; see `verification.md`
 - [x] Live plan against the real store (read-only)
 - [x] [AC9] `--apply` against the live store (operator-authorized), clean re-plan, both PATs HTTP 200, `RELEASE_TOKEN` synced to its CI consumer
+- [x] [AC10] `retire`: RemoveField on both backends, planner, two-phase apply with in-memory equality; applied live to both GitHub sources, records then removed
 - [x] `sync ci [SECRET_NAME...]` scoping, found necessary during the live sync (model defect ticketed as #1603)
 
 ## Wrap-up

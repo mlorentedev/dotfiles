@@ -38,6 +38,12 @@ leaves no reviewable record of what moved where.
   idea applied to credentials: the refactor is declared in code, reviewed in a PR,
   and applied by the tool. The value is read and written inside the process and
   never printed.
+- **Retires the source when asked (`from: { …, retire: true }`).** Once the copy
+  exists, a later run removes the source field — only if both hold the same value,
+  compared in memory; if they differ it refuses. Never in the run that creates the
+  copy, always after every other operation. This is what makes it one credential in
+  one place: a copy left beside its source is the same token twice, and a search
+  returns both.
 - **Never overwrites a value.** A destination field that already exists is left
   alone whatever it holds; changing a value is `set`/`rotate`'s job. Once the
   destination exists, a `from:` is satisfied and reconcile reports it as removable.
@@ -64,10 +70,10 @@ live value to the repository secret, and the release workflow is what proves it.
   The same `add-field` operation carries it, but adopting it across ~20 items needs
   its own transition design: if the registry renames a field before `--apply`
   runs, reads break between the merge and the apply. Separate slice.
-- **Deleting the source.** The copied fields stay in the `GitHub` item. Copying is
-  additive and reversible; deleting a credential is not, and belongs after the
-  consumers are verified by consequence. The other seven credentials in that item
-  are also untouched.
+- **The other seven credentials in the `GitHub` item**, and the rest of the vault.
+  The mechanism is here; declaring them is the next slice, and the personal-plane
+  taxonomy it needs is being decided separately (architect + adversarial review, at
+  the operator's request).
 - **Rotation age.** See the decision below; this slice writes no timestamp.
 - **Age-backed absent items** (`zoho`). Their source is the age store and their
   tool is `migrate`; reconcile names that remediation rather than duplicating it.
@@ -77,6 +83,12 @@ live value to the repository secret, and the release workflow is what proves it.
 
 ## Risks / open questions
 
+- **Resolved, then revised — deleting the source.** First decided as out of scope
+  (copy is reversible, delete is not). Revised the same day by the operator after
+  the first apply: the copy beside its source is exactly the chaos this exists to
+  end — searching "release" returned `GitHub/release-token` and `github-release-pat`
+  with nothing saying which to use. Deletion stays declared (`retire`), verified
+  (equal values) and sequenced (after the copy, after every other op).
 - **Resolved — rotation age and `revisionDate`.** Bitwarden bumps `revisionDate`
   on every edit, so every `move-item` resets the only age signal the store has.
   `now − revisionDate` is a **lower** bound on a credential's age (the value
@@ -130,6 +142,9 @@ live value to the repository secret, and the release workflow is what proves it.
       equal to destination, or declared on a multi-var secret).
 - [ ] AC8 — `BWPut` and `BWServeWriter` produce byte-identical item JSON for a
       folder move, sharing one pure core as they already do for `setItemField`.
+- [ ] AC10 — `retire` removes a source field only once its destination exists and
+      holds the same value; differing values refuse with nothing written; an
+      ambiguous source blocks; retire runs after every other operation.
 - [ ] AC9 — applied to the live store: `GITHUB_PERSONAL_ACCESS_TOKEN` and
       `RELEASE_TOKEN` resolve from their new items and the GitHub API answers 200
       to each; a re-run plans zero operations; `dotf secrets sync` carries
