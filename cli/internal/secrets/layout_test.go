@@ -449,3 +449,35 @@ func TestLayoutDriftLeavesAnUndeclaredFolderUngoverned(t *testing.T) {
 		t.Errorf("an item with no declared folder must not be reported misfiled, got %v", got)
 	}
 }
+
+// Bitwarden allows two items with one name, and the reader refuses to pick between
+// them (TestBWServeReader_Field_AmbiguousNameErrors). A by-name index kept only the
+// last one, so a declared item could be judged by a same-named personal item —
+// misfiled, missing fields — while the real one sat correct. Ambiguity is its own
+// finding, raised instead of any judgement about either item (round 2, Blocker).
+func TestLayoutDriftReportsAnAmbiguousItemInsteadOfJudgingEither(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("D", "dockerhub", "PAT", "Dotfiles/apps", false)},
+		[]ItemSummary{item("dockerhub", "Dotfiles/apps", "PAT"), item("dockerhub", "Personal")},
+		[]string{"Dotfiles/apps", "Personal"},
+	)
+	if len(got) != 1 || got[0].Kind != DriftItemAmbiguous {
+		t.Fatalf("want exactly one item-ambiguous, got %v", kinds(got))
+	}
+	if !strings.Contains(got[0].Detail, "2 items") {
+		t.Errorf("the finding must say how many items share the name: %q", got[0].Detail)
+	}
+}
+
+// One finding per problem (AC5), for fields too: two vars declaring the same absent
+// field on one item are one absent field.
+func TestLayoutDriftDedupesAMissingFieldAcrossVars(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("A", "svc", "key", "", false), decl("B", "svc", "key", "", false)},
+		[]ItemSummary{item("svc", "")},
+		nil,
+	)
+	if len(got) != 1 || got[0].Kind != DriftFieldMissing {
+		t.Fatalf("want one field-missing, got %v", kinds(got))
+	}
+}

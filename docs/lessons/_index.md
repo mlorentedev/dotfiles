@@ -301,3 +301,4 @@ tags: [lessons, index, dotfiles]
 | [281 - A readiness probe cheaper than the work it gates reports ready while the work is still refused](lesson-281-a-cheap-readiness-probe-reports-ready-while-the-real-query-is-refused.md) | 2026-09-07 |  |
 | [282 - A listing that truncates answers instead of failing, so the short read becomes the finding](lesson-282-a-listing-that-truncates-answers-instead-of-failing.md) | 2026-09-08 |  |
 | [283 - `grep -q -v` is not portable, and the divergence lands on the side that lets a guard pass](lesson-283-grep-q-v-is-not-portable-and-the-divergence-favours-the-guard-passing.md) | 2026-09-21 |  |
+| [284 - A mutation "killed" by a compile error proves nothing](lesson-284-a-mutation-killed-by-a-compile-error-proves-nothing.md) | 2026-09-22 |  |

@@ -29,6 +29,9 @@ const (
 	DriftFolderMissing = "folder-missing"
 	DriftItemMissing   = "item-missing"
 	DriftItemMisfiled  = "item-misfiled"
+	// DriftItemAmbiguous: several items share the declared name. Bitwarden allows
+	// it and the reader refuses to choose, so the declaration resolves nothing.
+	DriftItemAmbiguous = "item-ambiguous"
 	DriftFieldMissing  = "field-missing"
 )
 
@@ -119,14 +122,17 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 		folderSet[f] = true
 	}
 	byName := make(map[string]ItemSummary, len(items))
+	count := make(map[string]int, len(items))
 	for _, it := range items {
 		byName[it.Name] = it
+		count[it.Name]++
 	}
 
 	var folderF, itemF, fieldF []LayoutFinding
 	// One finding per distinct problem, not per declaration: seven X_* vars
 	// naming one absent item is one absent item.
 	seenFolder, seenItem, seenMisfiled := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	seenField := map[string]bool{}
 
 	for _, d := range decls {
 		if d.Folder != "" && !folderSet[d.Folder] && !seenFolder[d.Folder] {
@@ -135,6 +141,21 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 				Kind: DriftFolderMissing, Secret: d.Secret, Item: d.Item,
 				Detail: fmt.Sprintf("no folder named %q exists; `dotf secrets set` would CREATE one rather than reuse an existing folder", d.Folder),
 			})
+		}
+
+		// Several items with the declared name: byName holds only one of them, so
+		// judging its folder or fields would be judging an arbitrary item — possibly
+		// a personal one — while the real one sits correct. The reader refuses the
+		// name outright, so say exactly that and judge neither.
+		if n := count[d.Item]; n > 1 {
+			if !seenItem[d.Item] {
+				seenItem[d.Item] = true
+				itemF = append(itemF, LayoutFinding{
+					Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item,
+					Detail: fmt.Sprintf("the name matches %d items, so the reader refuses it; rename or remove all but one", n),
+				})
+			}
+			continue
 		}
 
 		it, ok := byName[d.Item]
@@ -172,7 +193,8 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 			})
 		}
 
-		if !hasField(it, d.Field) {
+		if key := d.Item + "\x00" + d.Field; !hasField(it, d.Field) && !seenField[key] {
+			seenField[key] = true
 			fieldF = append(fieldF, LayoutFinding{
 				Kind: DriftFieldMissing, Secret: d.Secret, Item: d.Item,
 				Detail: fmt.Sprintf("field %q is declared for %s but the item does not carry it", d.Field, d.Var),

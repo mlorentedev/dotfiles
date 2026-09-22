@@ -125,3 +125,18 @@ The reviewer found two of the three post-merge defects without a live vault
 (the file-expose walk and the pseudo-folder); it did not find the third
 (`folder: ""` read as "must be unfoldered"), which only shows once the other
 two are fixed.
+
+## Adversarial review, round 2 — disposition
+
+`review.md` round 2: **FAIL**, `agy/gemini-3.1-pro-high` (a different provider
+family from round 1), reviewed `c7b912b`. Committed verbatim.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Blocker (REAL) | Duplicate item names: the by-name index kept the last one, so a declared item could be judged by a same-named personal item | **Applied** — new finding `item-ambiguous`, raised instead of any judgement about either item, matching the reader's refusal. `TestLayoutDriftReportsAnAmbiguousItemInsteadOfJudgingEither` |
+| Minor | `field-missing` not deduped across vars (AC5) | **Applied** — deduped per item and field. `TestLayoutDriftDedupesAMissingFieldAcrossVars` |
+| Minor | An empty note or username reads as missing, while `fieldFromItem` returns `""` without error | **Declined, with reason** — an empty value is not a usable secret; `verify` would resolve it to nothing. Reporting it is the useful outcome. The detail says "does not carry it", which is accurate for a field with no value |
+
+Mutation for this round: 2 mutations, 2 killed — **against a tree that builds**. The
+first run of these two reported both killed while the package failed to compile,
+which proves nothing (lesson 284).
