@@ -228,3 +228,12 @@ func TestPlanPutsRetireAfterEveryOtherOperation(t *testing.T) {
 		t.Fatalf("retire must be the last operation, got %v", opKinds(p))
 	}
 }
+
+// An applied retire names what it removed — the source field — not the copy that
+// stays. Reporting the destination read as though the new item had been touched.
+func TestRetireTargetNamesTheRemovedSource(t *testing.T) {
+	op := ReconcileOp{Kind: OpRetireSource, Item: "github-release-pat", FromItem: "GitHub", FromField: "release-token"}
+	if got := op.Target(); got != "GitHub/release-token" {
+		t.Errorf("Target() = %q, want the removed source", got)
+	}
+}

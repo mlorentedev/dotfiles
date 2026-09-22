@@ -54,10 +54,14 @@ type ReconcileOp struct {
 	Current string
 }
 
-// Target is what the operation acts on: the folder for create-folder, else the item.
+// Target is what the operation acts on: the folder for create-folder, the SOURCE
+// field for retire-source (that is what it removes), else the item.
 func (op ReconcileOp) Target() string {
-	if op.Kind == OpCreateFolder {
+	switch op.Kind {
+	case OpCreateFolder:
 		return op.Folder
+	case OpRetireSource:
+		return op.FromItem + "/" + op.FromField
 	}
 	return op.Item
 }
