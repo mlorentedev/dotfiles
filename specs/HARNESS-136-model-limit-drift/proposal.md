@@ -55,8 +55,11 @@ mean opposite things.
   repo, so a legitimately raised limit reads as an under-declaration until the
   cache updates. Accepted: that direction only WARNs, and the message names both
   numbers so a human settles it in one look.
-- **Resolved — provider scoping.** `qwen3.8-flash` is published by both `nan`
-  (262144 context) and `openrouter` (1000000). A lookup keyed on the bare model
+- **Resolved — provider scoping.** The bare id `qwen3.8-flash` is published by
+  `nan` (262144 context) and by a dozen other providers — alibaba, hyper,
+  opencode-go, requesty… — at 1000000 or 1048576. (OpenRouter keys its row
+  `qwen/qwen3.8-flash`, so it is not among them; the first version of this note
+  said it was, corrected in review round 1.) A lookup keyed on the bare model
   id reads the wrong row and reports an honest declaration as four times too
   small; the first implementation pass did exactly that. Lookup is scoped by
   provider and a test fixes it.
