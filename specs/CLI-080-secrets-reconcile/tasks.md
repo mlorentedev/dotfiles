@@ -28,9 +28,10 @@ created: "2026-09-22"
 - [x] AC1–AC8 `features.json` commands executed — 8/8 pass
 - [x] Mutation — 16 mutations across planner, apply and command; see `verification.md`
 - [x] Live plan against the real store (read-only)
-- [ ] [AC9] `--apply` against the live store, then a clean re-plan, the two PATs probed by consequence, and `dotf secrets sync` for `RELEASE_TOKEN`'s CI consumer — **needs the operator's go-ahead**
+- [x] [AC9] `--apply` against the live store (operator-authorized), clean re-plan, both PATs HTTP 200, `RELEASE_TOKEN` synced to its CI consumer
+- [x] `sync ci [SECRET_NAME...]` scoping, found necessary during the live sync (model defect ticketed as #1603)
 
 ## Wrap-up
 
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#1601)
 - [ ] Independent adversarial review before archive

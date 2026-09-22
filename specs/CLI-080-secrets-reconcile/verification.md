@@ -17,7 +17,7 @@ created: "2026-09-22"
 | AC6 | `TestReconcilePlanWritesNothing` (sync observed), `TestReconcileApplyFailsWhenTheStoreDoesNotConverge` |
 | AC7 | `TestRegistryRejectsAMalformedFrom` (5 cases), `TestRegistryValidatesFromOnADormantBlock`, `TestBWDeclarationsCarryFromForFileExposedSecrets` |
 | AC8 | `TestSetItemFolderChangesOnlyTheFolder`, `TestSetItemFolderEmptyUnfiles`, `TestBWServeWriter_MoveItem_MatchesBWPutShape` |
-| AC9 | Pending the operator's go-ahead for `--apply` — see below |
+| AC9 | Live, 2026-09-22, operator-authorized — see *Live apply* below |
 
 ## Test status
 
@@ -65,6 +65,44 @@ an absent item or field would have produced a finding. The check stays because i
 states the definition directly rather than by inference from `LayoutDrift`'s
 completeness; if drift ever stops reporting a case, this is the line that keeps
 reconcile from calling it satisfied.
+
+## Live apply (AC9)
+
+Run from this branch before merge, with the operator's authorization:
+
+```
+applied  move-item      dockerhub
+applied  create-item    github-cli-pat
+applied  create-item    github-release-pat
+
+Converged: 3 operation(s) applied, and a second plan is empty.
+note: bw.from on GITHUB_PERSONAL_ACCESS_TOKEN is satisfied; it can be removed from the registry
+note: bw.from on RELEASE_TOKEN is satisfied; it can be removed from the registry
+```
+
+- **Independent re-plan:** `Plan: 0 to apply, 0 blocked, 2 deferred` (the deferrals are
+  `zoho`, which is `migrate`'s).
+- **`drift`:** 4 findings → 1 (`zoho`, dormant). 187 items, 23 governed.
+- **By consequence:** `GET https://api.github.com/user` with each token, injected through
+  `dotf secrets run` from the new items → **HTTP 200** for both. The age blob they used
+  to read answered 401.
+- **CI consumer:** `dotf secrets sync ci --repo mlorentedev/dotfiles RELEASE_TOKEN` →
+  the repo secret moved from 2026-06-27 to 2026-09-22T23:44. `release-please` re-run:
+  the error changed from `Bad credentials` to the account's GraphQL rate limit, so the
+  token now authenticates. The green re-run after the quota resets is recorded on the PR.
+
+### Found during the live apply: `sync ci` could not be scoped
+
+A full `sync ci --dry-run` would have **created** `HIVE_WORKER_API_KEY` in this repo:
+`NAN_API_KEY`'s entry exposes two vars and `consumers` is declared per entry, so every
+var goes to every CI consumer. Pushing it would have put a second copy of the credential
+where no workflow reads it. Two responses:
+
+- **In this PR:** `sync ci [SECRET_NAME...]` scopes the upload to the named GitHub
+  secrets (env vars, not registry ids, since an id would carry both vars). A name
+  outside the selection fails before any upload. `TestSecretsSyncCi_ScopedToNamedSecrets`,
+  `TestSecretsSyncCi_UnknownScopedNameFailsBeforeUpload`.
+- **Ticketed:** the model itself, #1603. A bare `sync ci` still over-uploads.
 
 ## Decisions made during implementation
 

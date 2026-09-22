@@ -55,15 +55,17 @@ func newSecretsSyncCiCmd() *cobra.Command {
 	var dryRun bool
 	var skipVerify bool
 	c := &cobra.Command{
-		Use:   "ci",
+		Use:   "ci [SECRET_NAME...]",
 		Short: "Push a repo's ci:* secrets to its GitHub Actions secrets (age|bw agnostic)",
 		Long: "ci selects every registry secret whose consumers contains ci:<repo>, resolves\n" +
 			"each value backend-agnostically, and uploads it to the repo's GitHub Actions\n" +
 			"secrets via `gh secret set`. File, floor/offline, and GITHUB_*-prefixed secrets\n" +
-			"are excluded with a reason. --repo defaults to the current repo's origin.",
-		Args:         cobra.NoArgs,
+			"are excluded with a reason. --repo defaults to the current repo's origin.\n\n" +
+			"Naming secrets scopes the push to exactly those GitHub secret names (the env\n" +
+			"vars), and a name the repo's set does not contain fails before any upload.",
+		Args:         cobra.ArbitraryArgs,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, names []string) error {
 			reg, err := loadRegistry()
 			if err != nil {
 				return err
@@ -80,6 +82,9 @@ func newSecretsSyncCiCmd() *cobra.Command {
 			}
 
 			sel := reg.SelectCI(repo)
+			if sel.Upload, err = scopeUpload(sel.Upload, names, repo); err != nil {
+				return err
+			}
 			out := cmd.OutOrStdout()
 			for _, sk := range sel.Skipped {
 				_, _ = fmt.Fprintf(out, "skip %s: %s\n", sk.ID, sk.Reason)
@@ -137,4 +142,31 @@ func newSecretsSyncCiCmd() *cobra.Command {
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report VAR→repo without uploading (names + byte lengths, never values)")
 	c.Flags().BoolVar(&skipVerify, "skip-verify", false, "skip the github-token liveness check for entries marked validate: github-token")
 	return c
+}
+
+// scopeUpload narrows a repo's CI selection to the named GitHub secrets, or keeps it
+// whole when none are named.
+//
+// Scoped by the secret's NAME — the env var — never by registry id. One entry can
+// expose several vars (NAN_API_KEY also exposes HIVE_WORKER_API_KEY), and a scope by
+// id would push all of them to a repo whose workflows read one: a second copy of a
+// credential where nothing uses it. Every name must be in the selection, checked
+// before anything resolves or uploads, so a typo cannot read as "synced".
+func scopeUpload(upload []secrets.Entry, names []string, repo string) ([]secrets.Entry, error) {
+	if len(names) == 0 {
+		return upload, nil
+	}
+	byVar := make(map[string]secrets.Entry, len(upload))
+	for _, e := range upload {
+		byVar[e.Var] = e
+	}
+	scoped := make([]secrets.Entry, 0, len(names))
+	for _, n := range names {
+		e, ok := byVar[n]
+		if !ok {
+			return nil, fmt.Errorf("%s is not among %s's ci secrets; nothing uploaded (drop it, or add ci:%s to its consumers)", n, repo, repo)
+		}
+		scoped = append(scoped, e)
+	}
+	return scoped, nil
 }

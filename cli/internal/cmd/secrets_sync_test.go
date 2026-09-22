@@ -274,3 +274,33 @@ func TestSecretsSyncCi_UnmarkedEntrySkipsValidation(t *testing.T) {
 		t.Errorf("validator ran for unmarked entries: %v", v.calls)
 	}
 }
+
+// Scoped sync: naming secrets pushes exactly those and nothing else. Scoped by the
+// GitHub secret's NAME — the env var — not the registry id: one registry entry can
+// expose several vars (NAN_API_KEY also exposes HIVE_WORKER_API_KEY), and a scope
+// by id would push every one of them to a repo that uses only one.
+func TestSecretsSyncCi_ScopedToNamedSecrets(t *testing.T) {
+	setter := fakeSetter{}
+	_, err := syncCiExec(t, ciRegistry, setter, fakeBW{"it/f": "bw-val"},
+		map[string]string{"rel.src": "rel-val"}, "--repo", "mlorentedev/dotfiles", "RELEASE_TOKEN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(setter) != 1 || setter["mlorentedev/dotfiles|RELEASE_TOKEN"] != "rel-val" {
+		t.Errorf("a scoped sync must upload exactly the named secret, got %v", setter)
+	}
+}
+
+// A name the repo's selection does not contain fails before any upload: a typo
+// must not read as "synced", and a partial set must not land.
+func TestSecretsSyncCi_UnknownScopedNameFailsBeforeUpload(t *testing.T) {
+	setter := fakeSetter{}
+	_, err := syncCiExec(t, ciRegistry, setter, fakeBW{"it/f": "bw-val"},
+		map[string]string{"rel.src": "rel-val"}, "--repo", "mlorentedev/dotfiles", "RELEASE_TOKEN", "OTHER_TOKEN")
+	if err == nil || !strings.Contains(err.Error(), "OTHER_TOKEN") {
+		t.Fatalf("want an error naming OTHER_TOKEN, got %v", err)
+	}
+	if len(setter) != 0 {
+		t.Errorf("nothing may upload when a named secret is not selectable, got %v", setter)
+	}
+}
