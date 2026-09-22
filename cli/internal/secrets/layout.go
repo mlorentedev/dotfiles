@@ -44,6 +44,11 @@ type LayoutFinding struct {
 	Secret string // registry id, so the reader knows which line to edit
 	Item   string
 	Detail string
+	// Decl is the declaration the finding was raised against — coordinates only,
+	// like everything else here. It is what lets reconcile turn a finding into an
+	// operation without re-deriving the comparison, so the two commands cannot
+	// disagree about what has drifted.
+	Decl BWDecl
 }
 
 // BWDecl is one declared Bitwarden target, flattened per env var: a multi-var
@@ -66,6 +71,9 @@ type BWDecl struct {
 	// and `dotf secrets verify` reported OK, because resolving and working are
 	// different claims. Measured 2026-09-21.
 	Dormant bool
+	// From is the declared source of the value, for reconcile (CLI-080); nil for
+	// most declarations.
+	From *BWFrom
 }
 
 // BWDeclarations flattens every secret carrying a `bw:` block into its declared
@@ -91,7 +99,7 @@ func (r *Registry) BWDeclarations() []BWDecl {
 			out = append(out, BWDecl{
 				Secret: s.ID, Var: f.Var,
 				Item: s.BW.Item, Field: s.BW.Field, Folder: s.BW.Folder,
-				Dormant: dormant,
+				Dormant: dormant, From: s.BW.From,
 			})
 			continue
 		}
@@ -103,7 +111,7 @@ func (r *Registry) BWDeclarations() []BWDecl {
 			out = append(out, BWDecl{
 				Secret: s.ID, Var: v.Name,
 				Item: s.BW.Item, Field: field, Folder: s.BW.Folder,
-				Dormant: dormant,
+				Dormant: dormant, From: s.BW.From,
 			})
 		}
 	}
@@ -138,7 +146,7 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 		if d.Folder != "" && !folderSet[d.Folder] && !seenFolder[d.Folder] {
 			seenFolder[d.Folder] = true
 			folderF = append(folderF, LayoutFinding{
-				Kind: DriftFolderMissing, Secret: d.Secret, Item: d.Item,
+				Kind: DriftFolderMissing, Secret: d.Secret, Item: d.Item, Decl: d,
 				Detail: fmt.Sprintf("no folder named %q exists; `dotf secrets set` would CREATE one rather than reuse an existing folder", d.Folder),
 			})
 		}
@@ -151,7 +159,7 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 			if !seenItem[d.Item] {
 				seenItem[d.Item] = true
 				itemF = append(itemF, LayoutFinding{
-					Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item,
+					Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item, Decl: d,
 					Detail: fmt.Sprintf("the name matches %d items, so the reader refuses it; rename or remove all but one", n),
 				})
 			}
@@ -167,7 +175,7 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 					detail += " (dormant declaration: nothing reads it yet, so migrating this secret would fail)"
 				}
 				itemF = append(itemF, LayoutFinding{
-					Kind: DriftItemMissing, Secret: d.Secret, Item: d.Item,
+					Kind: DriftItemMissing, Secret: d.Secret, Item: d.Item, Decl: d,
 					Detail: detail,
 				})
 			}
@@ -188,7 +196,7 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 				where = "(no folder)"
 			}
 			itemF = append(itemF, LayoutFinding{
-				Kind: DriftItemMisfiled, Secret: d.Secret, Item: d.Item,
+				Kind: DriftItemMisfiled, Secret: d.Secret, Item: d.Item, Decl: d,
 				Detail: fmt.Sprintf("is in %s, declared %s", where, d.Folder),
 			})
 		}
@@ -196,7 +204,7 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 		if key := d.Item + "\x00" + d.Field; !hasField(it, d.Field) && !seenField[key] {
 			seenField[key] = true
 			fieldF = append(fieldF, LayoutFinding{
-				Kind: DriftFieldMissing, Secret: d.Secret, Item: d.Item,
+				Kind: DriftFieldMissing, Secret: d.Secret, Item: d.Item, Decl: d,
 				Detail: fmt.Sprintf("field %q is declared for %s but the item does not carry it", d.Field, d.Var),
 			})
 		}

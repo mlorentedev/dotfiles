@@ -198,6 +198,20 @@ type BWPut struct {
 
 // SetField sets field on item to value, preserving the item's other fields.
 func (p BWPut) SetField(item, field, value string) error {
+	return p.editItem(item, func(cur []byte) ([]byte, error) { return setItemField(cur, field, value) })
+}
+
+// MoveItem files an existing item under folderID ("" unfiles it), preserving
+// everything else about it.
+func (p BWPut) MoveItem(item, folderID string) error {
+	return p.editItem(item, func(cur []byte) ([]byte, error) { return setItemFolder(cur, folderID) })
+}
+
+// editItem is the read-modify-write every item edit shares: get the whole item,
+// apply one pure mutation, write the whole item back. The mutation is the only part
+// that varies, and it is the same function BWServeWriter applies, so the two
+// backends store byte-identical JSON for the same edit.
+func (p BWPut) editItem(item string, mutate func([]byte) ([]byte, error)) error {
 	cur, err := p.run(nil, "get", "item", item)
 	if err != nil {
 		if isNotFound(err.Error()) {
@@ -209,7 +223,7 @@ func (p BWPut) SetField(item, field, value string) error {
 	if err != nil {
 		return err
 	}
-	updated, err := setItemField(cur, field, value)
+	updated, err := mutate(cur)
 	if err != nil {
 		return err
 	}
@@ -238,6 +252,30 @@ type BWCreator interface {
 // double) because folder resolution and item creation are independently testable:
 // CreateItem's JSON-body test never needs a fake folder list, and ResolveFolder's
 // name→id test never needs a fake item store.
+// BWMover files an existing item under a folder. Its own interface for the same
+// reason BWCreator is: a caller that only edits fields cannot move by accident.
+type BWMover interface {
+	// MoveItem files item under folderID, an already-resolved id ("" unfiles it).
+	MoveItem(item, folderID string) error
+}
+
+// setItemFolder returns itemJSON filed under folderID, preserving every other key —
+// the move analog of setItemField, and shared by both backends for the same reason.
+// An empty id becomes null, which is how Bitwarden spells "no folder"; an empty
+// string would read as the id of a folder that does not exist.
+func setItemFolder(itemJSON []byte, folderID string) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(itemJSON, &m); err != nil {
+		return nil, fmt.Errorf("parse bw item JSON: %w", err)
+	}
+	if folderID == "" {
+		m["folderId"] = nil
+	} else {
+		m["folderId"] = folderID
+	}
+	return json.Marshal(m)
+}
+
 type BWFolderResolver interface {
 	// ResolveFolder returns "" for an empty name (no folder declared — a no-op, not
 	// an error) so callers never special-case the common unfoldered secret.

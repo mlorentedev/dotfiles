@@ -43,7 +43,7 @@ flowchart LR
 
 ## Conventions (from ADR-028)
 
-- Managed secrets live under **`{apps,infra,floor}`** in Bitwarden; the ~125 personal items are a separate tree, out of `dotf secrets`' bounds.
+- Managed secrets live in the Bitwarden folders **`Dotfiles/apps`** and **`Dotfiles/infra`** — single folders whose names contain a slash; Bitwarden has no real hierarchy. The ~160 personal items are out of `dotf secrets`' bounds.
 - The **registry** `secrets/registry.yaml` is the SSOT: `id → bw item/field → env|file → consumers → rotate`.
 - **Values never render into an unintended channel** — a log, a chat/AI conversation, a shared terminal, CI output; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`). `dotf secrets show`/`run` are the deliberate, interactive-terminal-only exceptions this convention doesn't forbid — the rule is against accidental exposure, not against the primitives that exist specifically to show or use a value.
 
@@ -52,13 +52,38 @@ flowchart LR
 When a new API key/token/credential enters the system:
 
 1. Decide the **plane**: `app` (service key) / `infra` (access) / `personal` / `floor` (needed before bw — rare).
-2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Note the folder name and the registry's `bw.folder` value are not the same set: only **`apps`** and **`infra`** are legal `bw.folder` values (`validBWFolders`); `floor` secrets carry no `bw:` block at all, and no personal-plane folder is ratified yet (#586), so entries on those planes declare no folder.
+2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Only **`Dotfiles/apps`** and **`Dotfiles/infra`** are legal `bw.folder` values (`validBWFolders`), and each plane has exactly one (`planeFolder`); `floor` secrets carry no `bw:` block at all, and no personal-plane folder is ratified yet (#586), so entries on those planes declare no folder.
    - single value → item password; multi-value → custom fields (kebab names).
-   - _manual today:_ `bw get template item | jq '.name="…" | .folderId="…" | …' | bw encode | bw create item`.
+   - `dotf secrets set <id> --yes` creates the item in its declared folder (value via stdin or hidden prompt).
 3. Add a **registry** entry: `{id, plane, backend: bw, bw:{folder,item,field}, expose:{env|file}, consumers, rotate}`.
 4. Wire consumers (env-var contract / file target).
 5. **Verify** it resolves without leaking: `dotf secrets run --only <id> -- printenv <VAR>` (never pipe the value anywhere shared).
 6. **Do NOT** add it to `sensitive/*.age` — that path is retiring; the DR escrow already covers it.
+
+## Protocol — CONVERGE the store's layout
+
+When the vault's shape disagrees with the registry — an item outside its folder, a
+declared item that does not exist, a credential still living inside a shared item
+(#321's split). Never fixed by hand in the app or web vault: the change is declared,
+reviewed and applied.
+
+1. **See the disagreement:** `dotf secrets drift` — folder, item and field findings,
+   each ending `[<registry id>]`. Exits non-zero on any finding. Reads names only.
+2. **Declare the target** in `secrets/registry.yaml`. Where the value must come from
+   somewhere else — a field of a legacy item, or the same item under an old field
+   name — declare the source:
+   `bw: { item: github-cli-pat, field: GITHUB_PERSONAL_ACCESS_TOKEN, folder: Dotfiles/apps, from: { item: GitHub, field: "Personal Access Token" } }`.
+3. **Plan:** `dotf secrets reconcile` prints `create-folder` / `move-item` /
+   `create-item` / `add-field` and changes nothing. `blocked` lines name their remedy
+   and make the plan unappliable; `deferred` lines belong to `dotf secrets migrate`.
+4. **Apply** from the reviewed branch: `dotf secrets reconcile --apply`. It copies
+   values inside the process (never printed), never overwrites an existing field,
+   then syncs, re-plans and **fails unless the second plan is empty**. Safe before
+   merge: every operation is additive.
+5. **Roll consumers** that are not local: `dotf secrets sync <target>`.
+6. **Retire the record:** a satisfied `from:` is reported as removable — delete it in
+   a follow-up. The copied source fields stay in the legacy item until their
+   consumers are verified; deleting them is a separate, deliberate step.
 
 ## Protocol — ROTATE a secret
 
@@ -136,7 +161,7 @@ restore from it.
 
 ## Maintainability (what keeps it from drifting)
 
-- `dotf doctor` checks (target): `bw`/`age` present (#577); DR-export freshness; **registry ↔ vault consistency** (flag managed items — those in `apps`/`infra` — that break the naming/registry convention).
+- `dotf doctor` checks: `bw`/`age` present (#577); DR-export freshness. **Registry ↔ vault consistency** is `dotf secrets drift` (CLI-078), and converging it is `dotf secrets reconcile` (CLI-080).
 - All adds/rotations go through the **registry** — the single map. No ad-hoc env edits, no second authoritative copy.
 
 ## References

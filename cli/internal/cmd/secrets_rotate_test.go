@@ -58,6 +58,7 @@ func (f *fakeRW) SetField(item, field, value string) error {
 
 func (f *fakeRW) CreateItem(item, field, value, folder string) error { return nil }
 func (f *fakeRW) ResolveFolder(name string) (string, error)          { return "", nil }
+func (f *fakeRW) MoveItem(item, folderID string) error               { return nil }
 
 type fakeSyncer struct {
 	calls int

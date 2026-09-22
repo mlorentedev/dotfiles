@@ -21,7 +21,7 @@
 
 | # | Logical secret | age file | Env var / file target | Plane | Consumer(s) (confirm) | Target bw item | In Bitwarden? (2026-06-28) | Flags |
 |---|---|---|---|---|---|---|---|---|
-| 1 | GitHub token (shared) | `github.token` | `GITHUB_PERSONAL_ACCESS_TOKEN` + `RELEASE_TOKEN` | app | CLI/API, goreleaser+CI release | **split** → `apps/github-cli-pat`, `apps/github-release-pat` | Yes — `GitHub` 8-in-1 (PAT, release-token) | **#321 one-token-many-uses → split per purpose; C9 `migrate --split`** |
+| 1 | GitHub token (shared) | `github.token` | `GITHUB_PERSONAL_ACCESS_TOKEN` + `RELEASE_TOKEN` | app | CLI/API, goreleaser+CI release | **split** → `apps/github-cli-pat`, `apps/github-release-pat` | Yes — `GitHub` 8-in-1 (PAT, release-token) | **#321 one-token-many-uses → split per purpose**, by `dotf secrets reconcile` copying each from its `GitHub` field (`bw.from`, CLI-080); both now bw-backed |
 | 2 | Bitácora PAT | `github.bitacora` | `BITACORA_PAT` | app | bitácora board/Project writes, 20 repos | `apps/github-bitacora-pat` | Yes — `GitHub` 8-in-1 (bitacora token) | per-purpose ✔ already split |
 | 3 | DockerHub token | `dockerhub.token` | `DOCKERHUB_TOKEN` | app | CI image push | `apps/dockerhub-token` | Yes — `DockerHub` (PAT field) | |
 | 4 | DockerHub username | `dockerhub.username` | `DOCKERHUB_USERNAME` | app | CI image push | field on `apps/dockerhub-token` | Yes — `DockerHub` (login username) | collapse into the token item |
