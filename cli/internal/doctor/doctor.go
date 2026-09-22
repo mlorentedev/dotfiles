@@ -115,6 +115,7 @@ func Run(opts Options) (int, error) {
 		checkGolangciLint(sys, cfg, rep)
 		checkModelMap(cfg, rep)
 		checkModelPins(sys, cfg, rep)
+		checkModelLimits(sys, cfg, rep)
 		checkPiExtensions(sys, cfg, rep, opts.Fix)
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
 		checkDeployDrift(sys, cfg, rep)
