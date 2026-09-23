@@ -93,51 +93,22 @@ type catalogProvider struct {
 func checkModelLimits(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Model limit drift")
 
-	repoDir := cfg.RepoDir
-	if repoDir == "" {
+	if cfg.RepoDir == "" {
 		// Without a checkout there is nothing a finding could be committed
 		// against. Skipping says that; passing would claim the comparison ran.
 		rep.Skip("not inside a checkout, so " + piModelsRelPath + " cannot be resolved")
 		return
 	}
-
-	declPath := filepath.Join(repoDir, piModelsRelPath)
-	declRaw, err := os.ReadFile(declPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			rep.Skip(piModelsRelPath + " is not in this checkout")
-			return
-		}
-		rep.Warn(fmt.Sprintf("%s unreadable: %v", piModelsRelPath, err))
+	decl, ok := readDeclaration(cfg.RepoDir, rep)
+	if !ok {
 		return
 	}
-	var decl declaredCatalog
-	if err := json.Unmarshal(declRaw, &decl); err != nil {
-		// C15 again: an unparseable declaration is not an empty one, and both
-		// would otherwise print "no drift".
-		rep.Fail(fmt.Sprintf("%s is not valid JSON, so no model could be compared: %v", piModelsRelPath, err))
-		return
-	}
-
-	catPath := filepath.Join(sys.home(), filepath.FromSlash(catalogRelPath))
-	catRaw, err := os.ReadFile(catPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			rep.Skip("opencode's model catalog is not cached on this machine (" +
-				catalogRelPath + "); run opencode once to populate it")
-			return
-		}
-		rep.Warn(fmt.Sprintf("%s unreadable: %v", catalogRelPath, err))
-		return
-	}
-	var cat map[string]catalogProvider
-	if err := json.Unmarshal(catRaw, &cat); err != nil {
-		rep.Warn(fmt.Sprintf("%s is not valid JSON, so nothing could be compared: %v", catalogRelPath, err))
+	cat, ok := readCatalog(sys.home(), rep)
+	if !ok {
 		return
 	}
 
 	compared, findings := 0, 0
-
 	// Deterministic order: a report whose lines move between runs cannot be
 	// diffed, and this one is read by a human comparing two machines.
 	provNames := make([]string, 0, len(decl.Providers))
@@ -155,35 +126,16 @@ func checkModelLimits(sys *System, cfg *Config, rep *Report) {
 				// door: absence of published truth is not a finding.
 				continue
 			}
-			compared++
-			for _, d := range []struct {
-				field            string
-				declared, actual int
-			}{
-				{"contextWindow", m.ContextWindow, entry.Limit.Context},
-				{"maxTokens", m.MaxTokens, entry.Limit.Output},
-			} {
-				if d.actual == 0 || d.declared == d.actual {
-					continue
-				}
-				findings++
-				if d.declared > d.actual {
-					rep.Fail(fmt.Sprintf(
-						"%s/%s %s is %d, above the provider's %d\n"+
-							"    The provider rejects a request this config invites.",
-						prov, m.ID, d.field, d.declared, d.actual))
-					continue
-				}
-				rep.Warn(fmt.Sprintf(
-					"%s/%s %s is %d, below the provider's %d\n"+
-						"    Capability forfeited silently; nothing breaks.",
-					prov, m.ID, d.field, d.declared, d.actual))
+			fields, found := compareModel(rep, prov, m, entry.Limit)
+			if fields > 0 {
+				compared++
 			}
+			findings += found
 		}
 	}
 
 	if compared == 0 {
-		rep.Skip("no declared model appears in the cached catalog, so nothing was compared")
+		rep.Skip("no declared model has a published limit in the cached catalog, so nothing was compared")
 		return
 	}
 	if findings == 0 {
@@ -191,14 +143,97 @@ func checkModelLimits(sys *System, cfg *Config, rep *Report) {
 	}
 }
 
+// readDeclaration loads ai/pi/models.json from the checkout. It is REPO content,
+// so failing to read it is a failure of the check: absent → SKIP (this checkout
+// does not carry it), unreadable or unparseable → FAIL. An unreadable declaration
+// used to WARN, and a WARN leaves doctor's exit at 0 — a gate reading the exit
+// status accepted a declaration nobody had read (HARNESS-136 review, round 1).
+func readDeclaration(repoDir string, rep *Report) (declaredCatalog, bool) {
+	var decl declaredCatalog
+	raw, err := os.ReadFile(filepath.Join(repoDir, piModelsRelPath))
+	switch {
+	case os.IsNotExist(err):
+		rep.Skip(piModelsRelPath + " is not in this checkout")
+		return decl, false
+	case err != nil:
+		rep.Fail(fmt.Sprintf("%s exists but cannot be read, so no model could be compared: %v", piModelsRelPath, err))
+		return decl, false
+	}
+	if err := json.Unmarshal(raw, &decl); err != nil {
+		// C15 again: an unparseable declaration is not an empty one, and both
+		// would otherwise print "no drift".
+		rep.Fail(fmt.Sprintf("%s is not valid JSON, so no model could be compared: %v", piModelsRelPath, err))
+		return decl, false
+	}
+	return decl, true
+}
+
+// readCatalog loads opencode's cached models.dev catalog. It is a per-machine
+// CACHE, not repo content, so its problems WARN: the declaration may be perfectly
+// right and this machine simply unable to say so.
+func readCatalog(home string, rep *Report) (map[string]catalogProvider, bool) {
+	raw, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(catalogRelPath)))
+	switch {
+	case os.IsNotExist(err):
+		rep.Skip("opencode's model catalog is not cached on this machine (" +
+			catalogRelPath + "); run opencode once to populate it")
+		return nil, false
+	case err != nil:
+		rep.Warn(fmt.Sprintf("%s unreadable: %v", catalogRelPath, err))
+		return nil, false
+	}
+	var cat map[string]catalogProvider
+	if err := json.Unmarshal(raw, &cat); err != nil {
+		rep.Warn(fmt.Sprintf("%s is not valid JSON, so nothing could be compared: %v", catalogRelPath, err))
+		return nil, false
+	}
+	return cat, true
+}
+
+// compareModel reports each limit that disagrees with the catalog and returns how
+// many limits were actually comparable and how many disagreed. A limit the catalog
+// does not publish (0) is not a claim that it is zero, so it is neither compared
+// nor counted — a model whose row publishes nothing was compared against nothing.
+func compareModel(rep *Report, prov string, m declaredModel, lim catalogLimit) (fields, findings int) {
+	for _, d := range []struct {
+		field            string
+		declared, actual int
+	}{
+		{"contextWindow", m.ContextWindow, lim.Context},
+		{"maxTokens", m.MaxTokens, lim.Output},
+	} {
+		if d.actual == 0 {
+			continue
+		}
+		fields++
+		if d.declared == d.actual {
+			continue
+		}
+		findings++
+		if d.declared > d.actual {
+			rep.Fail(fmt.Sprintf(
+				"%s/%s %s is %d, above the provider's %d\n"+
+					"    The provider rejects a request this config invites.",
+				prov, m.ID, d.field, d.declared, d.actual))
+			continue
+		}
+		rep.Warn(fmt.Sprintf(
+			"%s/%s %s is %d, below the provider's %d\n"+
+				"    Capability forfeited silently; nothing breaks.",
+			prov, m.ID, d.field, d.declared, d.actual))
+	}
+	return fields, findings
+}
+
 // lookupCatalogModel resolves a declared model against the catalog, scoped BY
 // PROVIDER — never by bare id.
 //
-// That scoping is the whole correctness of this check. `qwen3.8-flash` exists
-// under both `nan` (262144 context) and `openrouter` (1000000): an id-only match
-// picks whichever the map iterates first and reports the honest declaration as
-// 4x wrong, or blesses a genuinely wrong one. Measured while writing this check —
-// the unscoped version claimed nan/qwen3.8-flash should be 1M.
+// That scoping is the whole correctness of this check. The bare id `qwen3.8-flash`
+// is published by `nan` (262144 context) and by a dozen other providers — alibaba,
+// hyper, opencode-go, requesty… — at 1000000 or 1048576: an id-only match picks
+// whichever the map iterates first and reports the honest declaration as 4x wrong,
+// or blesses a genuinely wrong one. Measured while writing this check — the
+// unscoped version claimed nan/qwen3.8-flash should be 1M.
 //
 // No id rewriting is needed: an aggregator model is written `vendor/model` in the
 // declaration and keyed identically in the catalog. A provider the catalog does

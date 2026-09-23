@@ -198,3 +198,58 @@ func TestModelLimitsIgnoresAnUnpublishedLimit(t *testing.T) {
 			totals[StatusFail], totals[StatusWarn], out)
 	}
 }
+
+// AC7, its unreadable half: a declaration that exists but cannot be read is the
+// same failure as an unparseable one — the check cannot answer — and it FAILs.
+// A WARN would leave doctor's exit at 0, so a gate reading the exit status would
+// accept a declaration nobody read. HARNESS-136 adversarial review, round 1 (F1).
+func TestModelLimitsFailsOnAnUnreadableDeclaration(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root reads a mode-000 file, so unreadability cannot be staged")
+	}
+	sys, cfg := limitsFixture(t, decl("nan", "qwen3.6", 262144, 65536), cat("nan", "qwen3.6", 262144, 65536))
+	p := filepath.Join(cfg.RepoDir, "ai", "pi", "models.json")
+	if err := os.Chmod(p, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(p, 0o644) })
+	if _, err := os.ReadFile(p); err == nil {
+		t.Skip("this filesystem ignores mode 000, so unreadability cannot be staged")
+	}
+
+	out, totals := limitsRun(t, sys, cfg)
+
+	if totals[StatusFail] != 1 {
+		t.Fatalf("want a FAIL for a declaration that exists but cannot be read, got %d FAIL / %d WARN\n%s",
+			totals[StatusFail], totals[StatusWarn], out)
+	}
+}
+
+// A catalog row that publishes NO limit gives nothing to compare. Counting it as
+// compared printed "1 models match the provider catalog" — nothing compared,
+// reading as agreement, the confusion AC6 exists to forbid (F2).
+func TestModelLimitsDoesNotCountAModelWithNoPublishedLimits(t *testing.T) {
+	sys, cfg := limitsFixture(t,
+		decl("nan", "brand-new", 131072, 8192),
+		`{"nan":{"models":{"brand-new":{}}}}`)
+
+	out, totals := limitsRun(t, sys, cfg)
+
+	if totals[StatusPass] != 0 || totals[StatusSkip] != 1 {
+		t.Fatalf("a model with no published limit must SKIP, never PASS; got %d PASS / %d SKIP\n%s",
+			totals[StatusPass], totals[StatusSkip], out)
+	}
+}
+
+// Outside a checkout there is nothing to compare, and saying so is a SKIP. A PASS
+// would claim a comparison that never ran (F4: unpinned until now).
+func TestModelLimitsSkipsOutsideACheckout(t *testing.T) {
+	sys, cfg := limitsFixture(t, decl("nan", "qwen3.6", 262144, 65536), cat("nan", "qwen3.6", 262144, 65536))
+	cfg.RepoDir = ""
+
+	out, totals := limitsRun(t, sys, cfg)
+
+	if totals[StatusSkip] != 1 || totals[StatusPass] != 0 {
+		t.Fatalf("want exactly one SKIP and no PASS outside a checkout\n%s", out)
+	}
+}

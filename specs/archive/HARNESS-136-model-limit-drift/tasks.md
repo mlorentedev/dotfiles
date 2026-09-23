@@ -46,7 +46,7 @@ is the mechanism that keeps it true.
 - [x] Lint passes — `golangci-lint run` at the pinned v2.12.2, 0 issues
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#1595, merged; review fixes in the follow-up PR)
 
 ## Machine-readable features
 
