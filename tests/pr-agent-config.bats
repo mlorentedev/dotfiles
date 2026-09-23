@@ -559,3 +559,43 @@ if bad:
     run grep -c 'marker=$(read_marker "${HEAD_SHA}")' "$WF"
     [ "$output" = "0" ]
 }
+
+# #1618: a PR whose every file is in [ignore] reaches PR-Agent as an empty diff.
+# It used to fail the job with a false NaN diagnosis, on every DR escrow refresh.
+# These run the REAL matcher: the Python between `<<'PY'` and `PY` in the
+# workflow's reviewable step, fed this repository's real .pr_agent.toml.
+_reviewable_kept() { # $1 = newline-separated file list; prints how many survive [ignore]
+    local py
+    py=$(awk "/<<'PY'/{f=1; next} /^ *PY\$/{f=0} f" "$WF" | sed 's/^          //')
+    [ -n "$py" ] || { echo "the reviewable step's matcher is gone from $WF" >&2; return 1; }
+    CFG="$(cat "$CFG")" FILES="$1" python3 -c "$py"
+}
+
+@test "pr-agent: an escrow-only PR is recognised as having nothing PR-Agent may read (#1618)" {
+    run _reviewable_kept $'sensitive/dr/bitwarden-export.age\nsensitive/dr/escrow-manifest.json'
+    [ "$status" -eq 0 ] && [ "$output" = "0" ] \
+        || { echo "escrow-only PR: expected 0 reviewable files, got '$output'" >&2; false; }
+}
+
+@test "pr-agent: one reviewable file is enough to run the review (#1618)" {
+    run _reviewable_kept $'sensitive/dr/escrow-manifest.json\ncli/internal/secrets/bw.go'
+    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    run _reviewable_kept $'specs/X-1/review-transcript.jsonl\nspecs/X-1/review.md'
+    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+}
+
+@test "pr-agent: an unanswerable reviewable check falls through to running PR-Agent (#1618)" {
+    # An empty file list must not read as "nothing to review": that would skip a
+    # review on an API hiccup. The matcher refuses it and the step keeps PR-Agent on.
+    run _reviewable_kept ""
+    [ "$status" -ne 0 ]
+    grep -q 'if: steps.reviewable.outputs.reviewable != '"'false'" "$WF"
+    grep -q "steps.reviewable.outputs.reviewable != 'false'" "$WF"
+}
+
+@test "pr-agent: no ignore glob relies on negation, which PR-Agent does not implement" {
+    # fnmatch.translate makes a leading '!' a literal character, so a '!path'
+    # entry re-includes nothing and silently hides nothing either (#1618).
+    run python3 -c 'import sys,tomllib; g=tomllib.load(open(sys.argv[1],"rb"))["ignore"]["glob"]; bad=[x for x in g if x.startswith("!")]; print(bad); sys.exit(1 if bad else 0)' "$CFG"
+    [ "$status" -eq 0 ] || { echo "negated globs are inert in PR-Agent: $output" >&2; false; }
+}
