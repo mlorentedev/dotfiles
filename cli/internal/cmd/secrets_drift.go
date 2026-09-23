@@ -23,7 +23,7 @@ var bwLister secrets.BWLister
 //
 // READ-ONLY, and not merely by omission: there is no --fix, the command is never
 // handed a writer, and the comparison it calls has none. Converging the store is
-// `reconcile` (CLI-078); a report that quietly repaired things would make the
+// `reconcile` (CLI-080); a report that quietly repaired things would make the
 // repair unreviewable, and these are credentials.
 //
 // It prints coordinates, never values. The inventory it reads is projected to

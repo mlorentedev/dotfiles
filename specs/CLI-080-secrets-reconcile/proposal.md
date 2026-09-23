@@ -144,7 +144,11 @@ live value to the repository secret, and the release workflow is what proves it.
       folder move, sharing one pure core as they already do for `setItemField`.
 - [ ] AC10 — `retire` removes a source field only once its destination exists and
       holds the same value; differing values refuse with nothing written; an
-      ambiguous source blocks; retire runs after every other operation.
+      ambiguous source blocks; retire runs after every other operation. A
+      declaration that copies AND retires converges in one `--apply`: the retire
+      runs in a second pass, the only kind of operation a pass may leave behind,
+      and a folder the run creates is visible to the next resolve *(added after
+      review round 1)*.
 - [ ] AC9 — applied to the live store: `GITHUB_PERSONAL_ACCESS_TOKEN` and
       `RELEASE_TOKEN` resolve from their new items and the GitHub API answers 200
       to each; a re-run plans zero operations; `dotf secrets sync` carries

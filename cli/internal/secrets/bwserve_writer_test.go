@@ -179,6 +179,28 @@ func TestBWServeWriter_ResolveFolder(t *testing.T) {
 		}
 	})
 
+	// CLI-080 review round 1 (Minor): the daemon's folder list does not show a
+	// folder created since its last sync. Without a sync after the create, the
+	// NEXT resolve of the same new name — the next `dotf secrets set` into it —
+	// lists no such folder and creates a second one with the same name.
+	t.Run("a created folder is visible to the next resolve", func(t *testing.T) {
+		f, w, closeSrv := newWriterFake(t)
+		defer closeSrv()
+		f.staleFolders = true
+
+		first, err := w.ResolveFolder("Dotfiles/infra")
+		if err != nil {
+			t.Fatalf("first ResolveFolder: %v", err)
+		}
+		second, err := w.ResolveFolder("Dotfiles/infra")
+		if err != nil {
+			t.Fatalf("second ResolveFolder: %v", err)
+		}
+		if first != second || len(f.folders) != 1 {
+			t.Fatalf("one name must yield one folder: ids %q/%q, folders %v", first, second, f.folders)
+		}
+	})
+
 	t.Run("empty name is a no-op", func(t *testing.T) {
 		f, w, closeSrv := newWriterFake(t)
 		defer closeSrv()

@@ -143,6 +143,22 @@ where no workflow reads it. Two responses:
 - **Deferred, not blocked, for dormant declarations.** Otherwise the pending `zoho`
   migration would have stopped every other operation from ever applying.
 
+## Adversarial review, round 1 — disposition
+
+`review.md` round 1: **FAIL**, `agy/gemini-3.1-pro-high`, reviewed `f16fb2e`, committed
+verbatim. #1600 merged before this disposition was written. The fixes land in the
+follow-up PR on `fix/secrets-reconcile-review`, and round 2 reviews that state.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Blocker (REAL) | A declaration that copies and retires fails the first `--apply`'s own convergence check | **Applied.** `--apply` runs up to `maxApplyPasses = 2` passes (`applyUntilConverged`). A retire is planned only once its copy exists, and it compares the copy as the store holds it after a sync, so a pass can unlock a retire but never perform one. That invariant is kept: the retire runs in the second pass, with the full two-phase protocol. Anything other than a retire left after a pass fails where it appears, so a store that ignores writes, or a flap, cannot earn another pass. The bound is in the loop header (lesson 286). `TestReconcileApplyCopiesAndRetiresInOneRun` (red before the fix) and `TestReconcileSecondPassIsOnlyForRetires`. AC10 amended. |
+| Minor (THEORETICAL → REAL) | `ResolveFolder` creates a folder without syncing | **Applied.** Graded REAL here: the daemon's folder list does not show a folder created since its last sync, so the next resolve of the same name (the next `dotf secrets set` into it) created a **second folder with the same name**. The test double already modelled that cache (`staleFolders`), and the new subtest was red with two `Dotfiles/infra` folders. The create now calls `syncAfterWrite`, the same rule as every other write. |
+
+Mutations, on trees that build, each under a memory-capped scope: remove the retire-only
+condition, cap passes at 1, make `onlyRetires` always true, drop the folder sync.
+**4/4 killed.** (The first of these, run against the earlier body-bounded loop,
+never terminated. It is the cause of lesson 286.)
+
 ## Promotion candidates
 
 - [ ] Pattern for `00_meta/patterns/`: "declare a data migration as a record the tool

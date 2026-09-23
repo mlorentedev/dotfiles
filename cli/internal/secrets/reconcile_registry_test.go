@@ -83,3 +83,35 @@ func TestBWDeclarationsCarryFromForFileExposedSecrets(t *testing.T) {
 		}
 	}
 }
+
+// CLI-078 review round 3 (Minor): one item, one declared folder. Two declarations
+// that file the same item in different folders cannot both be satisfied: drift
+// would judge the item by whichever came first, and reconcile would move it back
+// and forth. The registry refuses the second at parse time instead.
+func TestRegistryRefusesTwoFoldersForOneItem(t *testing.T) {
+	reg := `
+version: 1
+secrets:
+  - {id: APP_ONE, plane: app, backend: bw, bw: {item: shared, field: a, folder: Dotfiles/apps}, expose: {env: APP_ONE}}
+  - {id: INFRA_ONE, plane: infra, backend: bw, bw: {item: shared, field: b, folder: Dotfiles/infra}, expose: {env: INFRA_ONE}}
+`
+	_, defects, err := ParseRegistryPartial([]byte(reg))
+	if err != nil {
+		t.Fatalf("structural parse: %v", err)
+	}
+	if len(defects) != 1 || defects[0].ID != "INFRA_ONE" || !strings.Contains(defects[0].Err.Error(), "APP_ONE") {
+		t.Fatalf("want exactly INFRA_ONE refused, naming APP_ONE's claim; got %v", defects)
+	}
+
+	// Agreeing folders, or no folder at all, are fine: neither states a conflict.
+	ok := `
+version: 1
+secrets:
+  - {id: A1, plane: app, backend: bw, bw: {item: shared, field: a, folder: Dotfiles/apps}, expose: {env: A1}}
+  - {id: A2, plane: app, backend: bw, bw: {item: shared, field: b, folder: Dotfiles/apps}, expose: {env: A2}}
+  - {id: P1, plane: personal, backend: bw, bw: {item: shared, field: c}, expose: {env: P1}}
+`
+	if _, defects, err := ParseRegistryPartial([]byte(ok)); err != nil || len(defects) != 0 {
+		t.Fatalf("agreeing or unstated folders must parse clean: err %v defects %v", err, defects)
+	}
+}

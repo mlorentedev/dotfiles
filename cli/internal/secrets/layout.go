@@ -20,7 +20,7 @@ import (
 // nobody checks is not a declaration; it is a comment that happens to be YAML.
 //
 // Read-only, by construction: this file computes findings from two inventories
-// and has no writer. Converging the store is CLI-078's `reconcile`, which needs
+// and has no writer. Converging the store is `reconcile` (CLI-080), which needs
 // this report to exist first — you cannot safely converge what you cannot see.
 
 // Drift kinds. Strings rather than an enum because they are printed, grouped and
@@ -125,95 +125,144 @@ func (r *Registry) BWDeclarations() []BWDecl {
 // and a missing field cannot be checked on an item that is absent. Reporting them
 // interleaved would read as more problems than there are.
 func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []LayoutFinding {
-	folderSet := make(map[string]bool, len(folders))
-	for _, f := range folders {
-		folderSet[f] = true
-	}
-	byName := make(map[string]ItemSummary, len(items))
-	count := make(map[string]int, len(items))
-	for _, it := range items {
-		byName[it.Name] = it
-		count[it.Name]++
-	}
-
-	var folderF, itemF, fieldF []LayoutFinding
-	// One finding per distinct problem, not per declaration: seven X_* vars
-	// naming one absent item is one absent item.
-	seenFolder, seenItem, seenMisfiled := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	seenField := map[string]bool{}
-
+	w := newDriftWalk(items, folders)
 	for _, d := range decls {
-		if d.Folder != "" && !folderSet[d.Folder] && !seenFolder[d.Folder] {
-			seenFolder[d.Folder] = true
-			folderF = append(folderF, LayoutFinding{
-				Kind: DriftFolderMissing, Secret: d.Secret, Item: d.Item, Decl: d,
-				Detail: fmt.Sprintf("no folder named %q exists; `dotf secrets set` would CREATE one rather than reuse an existing folder", d.Folder),
-			})
-		}
-
-		// Several items with the declared name: byName holds only one of them, so
-		// judging its folder or fields would be judging an arbitrary item — possibly
-		// a personal one — while the real one sits correct. The reader refuses the
-		// name outright, so say exactly that and judge neither.
-		if n := count[d.Item]; n > 1 {
-			if !seenItem[d.Item] {
-				seenItem[d.Item] = true
-				itemF = append(itemF, LayoutFinding{
-					Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item, Decl: d,
-					Detail: fmt.Sprintf("the name matches %d items, so the reader refuses it; rename or remove all but one", n),
-				})
-			}
-			continue
-		}
-
-		it, ok := byName[d.Item]
-		if !ok {
-			if !seenItem[d.Item] {
-				seenItem[d.Item] = true
-				detail := "declared but not in the vault"
-				if d.Dormant {
-					detail += " (dormant declaration: nothing reads it yet, so migrating this secret would fail)"
-				}
-				itemF = append(itemF, LayoutFinding{
-					Kind: DriftItemMissing, Secret: d.Secret, Item: d.Item, Decl: d,
-					Detail: detail,
-				})
-			}
-			// Its fields cannot be checked, and saying so per var would bury
-			// the one fact that matters.
-			continue
-		}
-
-		// A declaration with no folder states no placement, so there is nothing
-		// for the item to be misfiled against. The taxonomy covers the app and
-		// infra planes; the personal plane's is deferred (#586), and reading "" as
-		// "must be unfoldered" would report every personal item filed by hand —
-		// and hand reconcile an instruction to unfile it.
-		if d.Folder != "" && it.Folder != d.Folder && !seenMisfiled[d.Item] {
-			seenMisfiled[d.Item] = true
-			where := it.Folder
-			if where == "" {
-				where = "(no folder)"
-			}
-			itemF = append(itemF, LayoutFinding{
-				Kind: DriftItemMisfiled, Secret: d.Secret, Item: d.Item, Decl: d,
-				Detail: fmt.Sprintf("is in %s, declared %s", where, d.Folder),
-			})
-		}
-
-		if key := d.Item + "\x00" + d.Field; !hasField(it, d.Field) && !seenField[key] {
-			seenField[key] = true
-			fieldF = append(fieldF, LayoutFinding{
-				Kind: DriftFieldMissing, Secret: d.Secret, Item: d.Item, Decl: d,
-				Detail: fmt.Sprintf("field %q is declared for %s but the item does not carry it", d.Field, d.Var),
-			})
-		}
+		w.check(d)
 	}
+	sortFindings(w.folderF)
+	sortFindings(w.itemF)
+	sortFindings(w.fieldF)
+	return append(append(w.folderF, w.itemF...), w.fieldF...)
+}
 
-	sortFindings(folderF)
-	sortFindings(itemF)
-	sortFindings(fieldF)
-	return append(append(folderF, itemF...), fieldF...)
+// driftWalk is LayoutDrift's state: the store as indexed once, and the findings
+// so far in their three fix-order buckets. Split into one method per question so
+// each stays small enough to read whole (CLI-078 review round 3).
+type driftWalk struct {
+	folderSet              map[string]bool
+	byName                 map[string]ItemSummary
+	count                  map[string]int
+	seen                   map[string]bool
+	folderF, itemF, fieldF []LayoutFinding
+}
+
+func newDriftWalk(items []ItemSummary, folders []string) *driftWalk {
+	w := &driftWalk{
+		folderSet: make(map[string]bool, len(folders)),
+		byName:    make(map[string]ItemSummary, len(items)),
+		count:     make(map[string]int, len(items)),
+		seen:      map[string]bool{},
+	}
+	for _, f := range folders {
+		w.folderSet[f] = true
+	}
+	for _, it := range items {
+		w.byName[it.Name] = it
+		w.count[it.Name]++
+	}
+	return w
+}
+
+// once reports whether (kind, key) is new, and records it. One finding per
+// distinct problem, not per declaration: seven X_* vars naming one absent item
+// is one absent item.
+func (w *driftWalk) once(kind, key string) bool {
+	k := kind + "\x00" + key
+	if w.seen[k] {
+		return false
+	}
+	w.seen[k] = true
+	return true
+}
+
+func (w *driftWalk) check(d BWDecl) {
+	w.checkFolder(d)
+	it, ok := w.resolveItem(d)
+	if !ok {
+		// Its placement and fields cannot be checked, and saying so per var
+		// would bury the one fact that matters.
+		return
+	}
+	w.checkPlacement(d, it)
+	w.checkField(d, it)
+}
+
+func (w *driftWalk) checkFolder(d BWDecl) {
+	if d.Folder == "" || w.folderSet[d.Folder] || !w.once(DriftFolderMissing, d.Folder) {
+		return
+	}
+	w.folderF = append(w.folderF, LayoutFinding{
+		Kind: DriftFolderMissing, Secret: d.Secret, Item: d.Item, Decl: d,
+		Detail: fmt.Sprintf("no folder named %q exists; `dotf secrets set` would CREATE one rather than reuse an existing folder", d.Folder),
+	})
+}
+
+// resolveItem returns the one item the declaration names, or reports why there
+// is none to judge.
+//
+// Several items with the declared name: byName holds only one of them, so judging
+// its folder or fields would be judging an arbitrary item — possibly a personal
+// one — while the real one sits correct. The reader refuses the name outright, so
+// say exactly that and judge neither.
+func (w *driftWalk) resolveItem(d BWDecl) (ItemSummary, bool) {
+	if n := w.count[d.Item]; n > 1 {
+		if w.once("item", d.Item) {
+			w.itemF = append(w.itemF, LayoutFinding{
+				Kind: DriftItemAmbiguous, Secret: d.Secret, Item: d.Item, Decl: d,
+				Detail: fmt.Sprintf("the name matches %d items, so the reader refuses it; rename or remove all but one", n),
+			})
+		}
+		return ItemSummary{}, false
+	}
+	it, ok := w.byName[d.Item]
+	if !ok && w.once("item", d.Item) {
+		detail := "declared but not in the vault"
+		if d.Dormant {
+			detail += " (dormant declaration: nothing reads it yet, so migrating this secret would fail)"
+		}
+		w.itemF = append(w.itemF, LayoutFinding{Kind: DriftItemMissing, Secret: d.Secret, Item: d.Item, Decl: d, Detail: detail})
+	}
+	return it, ok
+}
+
+// checkPlacement reports an item outside its declared folder.
+//
+// A declaration with no folder states no placement, so there is nothing for the
+// item to be misfiled against. The taxonomy covers the app and infra planes; the
+// personal plane's is deferred (#586), and reading "" as "must be unfoldered"
+// would report every personal item filed by hand — and hand reconcile an
+// instruction to unfile it.
+//
+// Keyed on the item alone because the registry guarantees one declared folder per
+// item (checkOneFolderPerItem). Without that rule two declarations could pull one
+// item two ways, and reconcile would move it back and forth forever.
+func (w *driftWalk) checkPlacement(d BWDecl, it ItemSummary) {
+	if d.Folder == "" || it.Folder == d.Folder || !w.once(DriftItemMisfiled, d.Item) {
+		return
+	}
+	where := it.Folder
+	if where == "" {
+		where = "(no folder)"
+	}
+	w.itemF = append(w.itemF, LayoutFinding{
+		Kind: DriftItemMisfiled, Secret: d.Secret, Item: d.Item, Decl: d,
+		Detail: fmt.Sprintf("is in %s, declared %s", where, d.Folder),
+	})
+}
+
+// checkField reports a declared field the item does not carry — and a declaration
+// that names no field at all, which the reader refuses just the same
+// (fieldFromItem("") errors). That second case used to pass as converged: a
+// target counted and never checked (CLI-078 review round 3).
+func (w *driftWalk) checkField(d BWDecl, it ItemSummary) {
+	if hasField(it, d.Field) || !w.once(DriftFieldMissing, d.Item+"\x00"+d.Field) {
+		return
+	}
+	detail := fmt.Sprintf("field %q is declared for %s but the item does not carry it", d.Field, d.Var)
+	if d.Field == "" {
+		detail = fmt.Sprintf("no field is declared for %s, and the reader refuses an empty field, so this target resolves nothing; declare the field that carries it", d.Var)
+	}
+	w.fieldF = append(w.fieldF, LayoutFinding{Kind: DriftFieldMissing, Secret: d.Secret, Item: d.Item, Decl: d, Detail: detail})
 }
 
 // hasField reports whether the item carries the declared field.
@@ -234,8 +283,10 @@ func LayoutDrift(decls []BWDecl, items []ItemSummary, folders []string) []Layout
 // two together.
 func hasField(it ItemSummary, field string) bool {
 	if field == "" {
-		// No field declared means the item itself is the target; nothing to check.
-		return true
+		// fieldFromItem refuses an empty field, so an item never carries it.
+		// This returned true once, and certified a target the reader cannot
+		// resolve (CLI-078 review round 3).
+		return false
 	}
 	switch field {
 	case "notes":
@@ -267,8 +318,10 @@ func sortFindings(f []LayoutFinding) {
 // UnmanagedItems returns the vault items no declaration names, sorted.
 //
 // Reported as a COUNT by the command rather than a list, and never as a finding:
-// a personal vault legitimately holds things this repo does not manage — 161 of
-// 185 here. The number is the one honest answer to "how much of my store does
+// a personal vault legitimately holds things this repo does not manage — 164 of
+// 187 on 2026-09-23, counting items whose name no declaration uses. (An earlier
+// "161 of 185" subtracted every declared NAME, including three with no item yet;
+// an absent declared item does not make a present one managed.) The number is the one honest answer to "how much of my store does
 // dotfiles govern?", and inventing a finding per unmanaged item would turn a
 // health report into noise nobody reads.
 func UnmanagedItems(decls []BWDecl, items []ItemSummary) []string {
