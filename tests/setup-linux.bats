@@ -370,11 +370,18 @@ setup() {
     grep -q 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-# OPS-042 (#1336): obsidian-cli and yarn are packages.json tools (ADR-036),
-# converged by `dotf tools install` on both OSes; neither setup script carries
-# an npm block for them any more, and versions.conf no longer pins them.
-@test "parity: obsidian and yarn are catalog tools, not setup-script npm blocks (OPS-042)" {
-    [ "$(jq -r '.tools[] | select(.name=="obsidian") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm obsidian-cli 0.5.1" ]
+# OPS-042 (#1336): yarn is a packages.json tool (ADR-036), converged by
+# `dotf tools install` on both OSes; neither setup script carries an npm block
+# for it any more, and versions.conf no longer pins it.
+#
+# obsidian is deliberately NOT in the catalog (#1615). The `obsidian` that
+# `dotf vault health` drives is the CLI built into the Obsidian desktop app. The
+# npm package `obsidian-cli` is an unrelated third-party test-result importer
+# that the catalog used to `npm install -g` on every machine, after a 404 on the
+# scoped name was "fixed" by dropping the scope. The refute below keeps any
+# obsidian npm entry from returning under either name.
+@test "parity: yarn is a catalog tool and obsidian is not an npm tool (OPS-042, #1615)" {
+    [ -z "$(jq -r '.tools[] | select(.name=="obsidian" or .source.package=="obsidian-cli") | .name' "$DOTFILES_DIR/packages.json")" ]
     [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"

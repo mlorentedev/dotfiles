@@ -302,3 +302,4 @@ tags: [lessons, index, dotfiles]
 | [282 - A listing that truncates answers instead of failing, so the short read becomes the finding](lesson-282-a-listing-that-truncates-answers-instead-of-failing.md) | 2026-09-08 |  |
 | [283 - `grep -q -v` is not portable, and the divergence lands on the side that lets a guard pass](lesson-283-grep-q-v-is-not-portable-and-the-divergence-favours-the-guard-passing.md) | 2026-09-21 |  |
 | [284 - A mutation "killed" by a compile error proves nothing](lesson-284-a-mutation-killed-by-a-compile-error-proves-nothing.md) | 2026-09-22 |  |
+| [285 - A 404 "fixed" by dropping the scope installs someone else's package](lesson-285-a-404-fixed-by-dropping-the-scope-installs-someone-elses-package.md) | 2026-09-23 |  |

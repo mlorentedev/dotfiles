@@ -43,15 +43,6 @@
       }
     },
     {
-      "name": "obsidian",
-      "version": "0.5.1",
-      "profile": "full",
-      "source": {
-        "type": "npm",
-        "package": "obsidian-cli"
-      }
-    },
-    {
       "name": "yarn",
       "version": "1.22.22",
       "profile": "full",

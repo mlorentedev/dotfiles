@@ -24,3 +24,5 @@ tags: [lesson, dotfiles]
 **Solution**: Updated both setup scripts to use `npm install -g 'obsidian-cli'`. Updated all bats tests that grep for the old package name.
 
 **Rule**: Always verify npm package names exist before committing them to setup scripts. `npm view <package> name version` before using in automated install.
+
+> **Correction, 2026-09-23 (#1615, lesson 285):** the "solution" above installed the wrong software. The unscoped npm `obsidian-cli` is an unrelated 2020 third-party tool (an Obsidianqa.com test-result importer), not an Obsidian CLI. `npm view <package> name version` confirms that *a* package exists under that name; it says nothing about whether it is the package you meant. The `obsidian` this repo drives is the CLI built into the Obsidian desktop app, and the npm entry has been removed.

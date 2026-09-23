@@ -1,10 +1,10 @@
 [
   {
     "id": "OPS-042-npm-tools-to-catalog-f1",
-    "behavior": "AC1: packages.json declares obsidian (npm obsidian-cli 0.5.1) and yarn (npm yarn 1.22.22); dotf tools list shows both",
-    "verification": "[ \"$(jq -r '.tools[] | select(.name==\"obsidian\") | \"\\(.source.type) \\(.source.package) \\(.version)\"' packages.json)\" = 'npm obsidian-cli 0.5.1' ] && [ \"$(jq -r '.tools[] | select(.name==\"yarn\") | \"\\(.source.type) \\(.source.package) \\(.version)\"' packages.json)\" = 'npm yarn 1.22.22' ] && bats tests/packages-json.bats",
+    "behavior": "AC1 (amended 2026-09-23, #1615): packages.json declares yarn (npm yarn 1.22.22) and declares NO obsidian npm entry; dotf tools list shows yarn",
+    "verification": "[ \"$(jq -r '.tools[] | select(.name==\"yarn\") | \"\\(.source.type) \\(.source.package) \\(.version)\"' packages.json)\" = 'npm yarn 1.22.22' ] && [ -z \"$(jq -r '.tools[] | select(.name==\"obsidian\" or .source.package==\"obsidian-cli\") | .name' packages.json)\" ] && bats tests/packages-json.bats",
     "state": "verified",
-    "evidence": "Windows work box, DOTFILES_DIR at the worktree: `dotf tools list` -> 'obsidian 0.5.1 full npm:obsidian-cli' and 'yarn 1.22.22 full npm:yarn'; tests/packages-json.bats 3/3"
+    "evidence": "msi, 2026-09-23, worktree fix/drop-obsidian-cli-npm: yarn entry present; no obsidian entry; tests/packages-json.bats 3/3. Original evidence (Windows box) listed 'obsidian 0.5.1 full npm:obsidian-cli' - that package was the defect, see #1615"
   },
   {
     "id": "OPS-042-npm-tools-to-catalog-f2",
