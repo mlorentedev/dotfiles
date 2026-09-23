@@ -92,3 +92,13 @@ verbatim; round 2 reviews the follow-up PR's head.
 
 Mutation for this round: 3 mutations on the three behaviours the review found
 unpinned, 3 killed.
+
+## Adversarial review, round 2 — disposition
+
+`review.md` round 2: **PASS**, `nan/deepseek-v4-flash`, reviewed `65edefe`. Both
+round-1 Majors confirmed by the reviewer's own mutations. Six Minors and one Question
+remain; all are **ticketed as #1604** rather than applied after the verdict, because
+each touches code or the contract and would ship unreviewed. One correction to this
+file's round-1 table, which the reviewer measured: the refactored `checkModelLimits`
+is CC=11 / 41 non-comment lines — much improved from CC≈17 / 84, but **not** under
+AGENTS.md's <10 / <40 as the F5 row claimed. #1604 item 6.
