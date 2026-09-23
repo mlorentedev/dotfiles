@@ -78,21 +78,20 @@ func checkPATExpiry(sys *System, cfg *Config, rep *Report) {
 // `secrets_refresh`, a command retired with the login-time loader. A check that
 // cannot pass on the architecture it ships with is not a check (REFACTOR-012).
 //
-// A bw-backed secret is gated on the serve daemon's own state rather than
-// attempted optimistically: resolution against a locked vault is the ~1.5s-per-
-// secret shellout that made shell startup hang for 45 seconds (BUG-080), and
-// "locked" is a fact the daemon reports directly, so there is nothing to learn
-// from trying.
+// A bw-backed secret is gated on whether the serve daemon will serve a read,
+// rather than attempted optimistically: resolution against a locked vault is
+// the ~1.5s-per-secret shellout that made shell startup hang for 45 seconds
+// (BUG-080).
+//
+// The gate is the readability probe, never GET /status. A status call poisons
+// the daemon's item reads for a short window (#988), and this gate runs
+// immediately before the read it authorises, so a status gate here broke that
+// read, intermittently, 27 times in 40 (#1611).
 func resolvePATToken(sys *System, s patSecret, rep *Report) (string, bool) {
 	if s.entry.Backend == secrets.BackendBW {
-		state, err := sys.BWServeStatus()
-		switch {
-		case err != nil:
-			rep.Warn(fmt.Sprintf("%s: could not determine Bitwarden state (%v) — liveness check skipped", s.name, err))
-			return "", false
-		case state != "unlocked":
-			rep.Skip(fmt.Sprintf("%s (%s) is bw-backed and the vault is %s — run `dotf secrets unlock`",
-				s.name, strings.Join(s.envVars, ", "), state))
+		if state, err := sys.BWServeReadable(); state != secrets.BWServeReady {
+			rep.Skip(fmt.Sprintf("%s (%s) is bw-backed and the bw serve daemon is %s (%v) — run `dotf secrets unlock`",
+				s.name, strings.Join(s.envVars, ", "), state, err))
 			return "", false
 		}
 	}

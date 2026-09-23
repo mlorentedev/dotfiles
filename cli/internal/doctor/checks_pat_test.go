@@ -142,7 +142,7 @@ func TestCheckPATExpiry_SelectsBwBackedPAT(t *testing.T) {
 
 	sys := newSys(nil, nil, nil)
 	sys.Now = func() time.Time { return fixedTestNow }
-	sys.BWServeStatus = func() (string, error) { return "unlocked", nil }
+	sys.BWServeReadable = func() (string, error) { return secrets.BWServeReady, nil }
 	sys.ResolveSecret = resolvesTo("tok")
 
 	var calls int
@@ -173,10 +173,10 @@ func TestCheckPATExpiry_BwLockedSkipsWithoutResolving(t *testing.T) {
 	registry := "version: 1\nsecrets:\n" +
 		"  - {id: BITACORA_PAT, plane: app, backend: bw, bw: {item: github-bitacora-pat, field: api-token}, validate: github-token, expose: {env: BITACORA_PAT}}\n"
 
-	for _, state := range []string{"locked", "absent"} {
+	for _, state := range []string{secrets.BWServeRefused, secrets.BWServeAbsent} {
 		t.Run(state, func(t *testing.T) {
 			sys := newSys(nil, nil, nil)
-			sys.BWServeStatus = func() (string, error) { return state, nil }
+			sys.BWServeReadable = func() (string, error) { return state, errors.New("Vault is locked.") }
 
 			var resolved, probed int
 			sys.ResolveSecret = func(secrets.Entry) (string, error) {
@@ -208,17 +208,18 @@ func TestCheckPATExpiry_BwLockedSkipsWithoutResolving(t *testing.T) {
 	}
 }
 
-// A daemon that answers neither "unlocked" nor a clean lock state is a third
-// case: the check cannot know whether the vault is usable, so it reports the
-// uncertainty as a WARN and probes nothing. Covered because "locked" and
-// "absent" being tested is not the same as the error branch being tested — the
-// gap AC4 claims to close.
-func TestCheckPATExpiry_BwStatusErrorWarnsWithoutProbing(t *testing.T) {
+// A daemon that answers but will not serve a read can be locked, unauthenticated,
+// or failing. The probe cannot tell those apart, so the SKIP carries the daemon's
+// own reason rather than asserting one: an operator reading "Vault is locked." and
+// one reading an HTTP 500 need different next steps, and only the reason says which.
+func TestCheckPATExpiry_BwRefusalCarriesTheDaemonsReason(t *testing.T) {
 	registry := "version: 1\nsecrets:\n" +
 		"  - {id: BITACORA_PAT, plane: app, backend: bw, bw: {item: github-bitacora-pat, field: api-token}, validate: github-token, expose: {env: BITACORA_PAT}}\n"
 
 	sys := newSys(nil, nil, nil)
-	sys.BWServeStatus = func() (string, error) { return "", errors.New("unparseable envelope") }
+	sys.BWServeReadable = func() (string, error) {
+		return secrets.BWServeRefused, errors.New("GET /list/object/folders: HTTP 500")
+	}
 
 	var resolved, probed int
 	sys.ResolveSecret = func(secrets.Entry) (string, error) { resolved++; return "tok", nil }
@@ -232,13 +233,13 @@ func TestCheckPATExpiry_BwStatusErrorWarnsWithoutProbing(t *testing.T) {
 	checkPATExpiry(sys, patCfg(t, registry), rep)
 
 	if resolved != 0 || probed != 0 {
-		t.Errorf("an indeterminate vault state must resolve and probe nothing; got %d resolve(s), %d probe(s)", resolved, probed)
+		t.Errorf("a daemon that will not serve reads must resolve and probe nothing; got %d resolve(s), %d probe(s)", resolved, probed)
 	}
 	if rep.Failures() != 0 {
-		t.Errorf("an indeterminate vault state is not a setup failure; got %d\n%s", rep.Failures(), buf.String())
+		t.Errorf("a refusing daemon is not a setup failure; got %d\n%s", rep.Failures(), buf.String())
 	}
-	if !strings.Contains(buf.String(), "could not determine Bitwarden state") {
-		t.Errorf("the WARN must name the uncertainty\n%s", buf.String())
+	if !strings.Contains(buf.String(), "HTTP 500") {
+		t.Errorf("the SKIP must carry the daemon's reason\n%s", buf.String())
 	}
 }
 
@@ -306,7 +307,7 @@ func TestCheckPATExpiry_DistinctBwPATsProbedSeparately(t *testing.T) {
 
 	sys := newSys(nil, nil, nil)
 	sys.Now = func() time.Time { return fixedTestNow }
-	sys.BWServeStatus = func() (string, error) { return "unlocked", nil }
+	sys.BWServeReadable = func() (string, error) { return secrets.BWServeReady, nil }
 	sys.ResolveSecret = resolvesTo("tok")
 
 	var calls int
@@ -371,5 +372,35 @@ func TestCheckPATExpiry_NoSecrets(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "validate: github-token") {
 		t.Fatalf("expected the no-secrets SKIP to name the marker it looked for\n%s", buf.String())
+	}
+}
+
+// Guard for #1611: the PAT check must never ask the daemon for its status on the
+// way to a read. `GET /status` poisons bw serve's item reads for a short window
+// (#988, bitwarden/clients#20951), so a status gate placed immediately before
+// the read it authorises breaks exactly that read — measured at 27/40 HTTP 500s.
+// Readiness is asked the way SelectBWBackend asks it, through the readability
+// probe, which never touches /status.
+func TestCheckPATExpiry_NeverAsksStatusBeforeReading(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: BITACORA_PAT, plane: app, backend: bw, bw: {item: github-bitacora-pat, field: api-token}, validate: github-token, expose: {env: BITACORA_PAT}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.Now = func() time.Time { return fixedTestNow }
+	sys.BWServeStatus = func() (string, error) {
+		t.Fatal("the PAT check called the status seam: GET /status poisons the read that follows it (#988)")
+		return "", nil
+	}
+	sys.BWServeReadable = func() (string, error) { return secrets.BWServeReady, nil }
+	sys.ResolveSecret = resolvesTo("tok")
+	sys.HTTPGet = func(string, map[string]string) (int, http.Header, error) {
+		return http.StatusOK, http.Header{}, nil
+	}
+
+	var buf bytes.Buffer
+	checkPATExpiry(sys, patCfg(t, registry), capture(&buf))
+
+	if !strings.Contains(buf.String(), "valid") {
+		t.Errorf("a ready daemon must let the PAT resolve and be probed\n%s", buf.String())
 	}
 }

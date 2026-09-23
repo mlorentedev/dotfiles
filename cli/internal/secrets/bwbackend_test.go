@@ -210,3 +210,41 @@ func TestSelectBWBackend_NeverCallsStatus(t *testing.T) {
 		})
 	}
 }
+
+// Readable is the exported face of the same probe, for callers outside this package
+// that gate a read on the daemon (#1611). It must answer all three states without
+// ever calling GET /status, for the reason TestSelectBWBackend_NeverCallsStatus pins.
+func TestReadable_AnswersWithoutCallingStatus(t *testing.T) {
+	for st, want := range map[string]string{
+		"unlocked":        BWServeReady,
+		"locked":          BWServeRefused,
+		"unauthenticated": BWServeRefused,
+	} {
+		t.Run(st, func(t *testing.T) {
+			var statusCalls int
+			srv := httptest.NewServer(countingHandler(&statusCalls, "/status", &fakeBWServe{status: st}))
+			defer srv.Close()
+
+			got, err := BWServeClient{BaseURL: srv.URL}.Readable()
+
+			if statusCalls != 0 {
+				t.Fatalf("Readable called GET /status %d times — that poisons the read it gates (#988)", statusCalls)
+			}
+			if got != want {
+				t.Fatalf("status=%s: Readable = %q, want %q", st, got, want)
+			}
+			if (err == nil) != (want == BWServeReady) {
+				t.Fatalf("status=%s: err = %v; want nil exactly when ready", st, err)
+			}
+		})
+	}
+	t.Run("absent", func(t *testing.T) {
+		srv := httptest.NewServer(http.NotFoundHandler())
+		url := srv.URL
+		srv.Close() // nothing listening at url any more
+
+		if got, _ := (BWServeClient{BaseURL: url}).Readable(); got != BWServeAbsent {
+			t.Fatalf("an unreachable daemon: Readable = %q, want %q", got, BWServeAbsent)
+		}
+	})
+}

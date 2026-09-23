@@ -18,7 +18,7 @@ import (
 //
 // Pinning makes it unrepresentable. A caller cannot hold a daemon reader and a shellout
 // writer, because both come out of one branch of one decision. Compare the per-call
-// alternative (BWFallbackReader's own policy, which re-probes on every Field call): it
+// alternative (the policy of BWFallbackReader, removed in #1611, which re-probed on every Field call): it
 // self-heals if the daemon appears mid-run, but a daemon that LOCKS between two calls of
 // one command splits that command across two subjects — precisely this bug, in a
 // narrower window. For a multi-step mutation like `rotate` (read old → write new → read
@@ -142,6 +142,30 @@ func (c BWServeClient) probeReadable() (bwServeReadable, error) {
 		return bwServeRefused, err
 	}
 	return bwServeReady, nil
+}
+
+// The three answers Readable gives, as strings so a caller outside this package can
+// report them without importing the probe's internal type.
+const (
+	BWServeAbsent  = "absent"  // nothing listening
+	BWServeRefused = "refused" // answered, but will not serve reads (locked, unauthenticated)
+	BWServeReady   = "ready"   // answered and served
+)
+
+// Readable is probeReadable for callers outside this package that must gate a read
+// on the daemon — doctor's PAT check (#1611). It exists so that no such caller
+// reaches for Status() instead: a status call placed just before the read it
+// authorises is the #988 trigger. err carries the daemon's reason on BWServeRefused
+// and BWServeAbsent, and is nil on BWServeReady.
+func (c BWServeClient) Readable() (string, error) {
+	switch state, err := c.probeReadable(); state {
+	case bwServeReady:
+		return BWServeReady, nil
+	case bwServeRefused:
+		return BWServeRefused, err
+	default:
+		return BWServeAbsent, err
+	}
 }
 
 // shelloutBackend builds the CLI-backed pair, decorating both halves with why the

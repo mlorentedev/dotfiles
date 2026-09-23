@@ -56,7 +56,7 @@ type bwServeEnvelope struct {
 // The real shape, captured live against bw 2026.5.0 (2026-08-15, first live
 // unlock of the daemon this PR added — the OPS-021 spike's earlier probe of
 // this same endpoint was apparently misread, since it never actually drove
-// BWFallbackReader against a live daemon): the status fields are wrapped one
+// the since-removed BWFallbackReader against a live daemon): the status fields are wrapped one
 // level deeper than assumed, under "template":
 //
 //	{"success":true,"data":{"object":"template","template":{"status":"locked",...}}}
@@ -530,22 +530,4 @@ func (d *BWServeDaemon) Status() (string, error) {
 		return "absent", nil
 	}
 	return st, err
-}
-
-// BWFallbackReader is the BWReader this package's callers should default to:
-// it reads through a local bw serve daemon when one is reachable and
-// unlocked, and falls back to the CLI shellout otherwise — additively, with
-// no change to any consumer (AC2, AC3). The status check runs once per
-// Field() call — ~9ms against a running daemon (OPS-021 spike measurement),
-// effectively free against an absent one (a fast connection-refused).
-type BWFallbackReader struct {
-	Serve    BWServeReader
-	Shellout BWReader // typically BWGet{}
-}
-
-func (r BWFallbackReader) Field(item, field string) (string, error) {
-	if st, err := r.Serve.Client.Status(); err == nil && st == "unlocked" {
-		return r.Serve.Field(item, field)
-	}
-	return r.Shellout.Field(item, field)
 }
