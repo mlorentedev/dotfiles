@@ -248,12 +248,17 @@ func ParseRegistryPartial(data []byte) (*Registry, []SecretDefect, error) {
 
 	seen := make(map[string]bool, len(reg.Secrets))
 	seenVar := make(map[string]string) // var name -> first secret id that exposed it
+	itemFolder := make(map[string]folderClaim)
 	kept := make([]Secret, 0, len(reg.Secrets))
 	var defects []SecretDefect
 
 	for i := range reg.Secrets {
 		s := &reg.Secrets[i]
-		if err := validateSecret(s, i, seen, seenVar); err != nil {
+		err := validateSecret(s, i, seen, seenVar)
+		if err == nil {
+			err = checkOneFolderPerItem(s, itemFolder)
+		}
+		if err != nil {
 			defects = append(defects, SecretDefect{ID: secretLabel(s, i), Err: err})
 			continue
 		}
@@ -262,6 +267,11 @@ func ParseRegistryPartial(data []byte) (*Registry, []SecretDefect, error) {
 		seen[s.ID] = true
 		for _, v := range s.Vars() {
 			seenVar[v] = s.ID
+		}
+		if s.BW != nil && s.BW.Folder != "" {
+			if _, claimed := itemFolder[s.BW.Item]; !claimed {
+				itemFolder[s.BW.Item] = folderClaim{folder: s.BW.Folder, by: s.ID}
+			}
 		}
 		kept = append(kept, *s)
 	}
@@ -400,6 +410,28 @@ func checkBWFolder(s *Secret) error {
 	}
 	if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
 		return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
+	}
+	return nil
+}
+
+// folderClaim records which folder an item was first declared in, and by whom.
+type folderClaim struct{ folder, by string }
+
+// checkOneFolderPerItem refuses a declaration that files an item in a folder other
+// than the one an earlier declaration already filed it in. Both cannot be
+// satisfied: drift would judge the item against whichever came first, and
+// reconcile would move it back and forth with no fixpoint (CLI-078 review round
+// 3). A declaration with no folder states no placement and conflicts with nothing.
+//
+// Like checkVarNames it only READS the claims; registration is the caller's, so a
+// rejected secret never reserves an item.
+func checkOneFolderPerItem(s *Secret, claims map[string]folderClaim) error {
+	if s.BW == nil || s.BW.Folder == "" {
+		return nil
+	}
+	if c, ok := claims[s.BW.Item]; ok && c.folder != s.BW.Folder {
+		return fmt.Errorf("secret %q: bw item %q is declared in folder %q, but %q already declares it in %q; one item has one folder",
+			s.ID, s.BW.Item, s.BW.Folder, c.by, c.folder)
 	}
 	return nil
 }

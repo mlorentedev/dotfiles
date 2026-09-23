@@ -221,3 +221,50 @@ func TestReconcileBlockedPlanFailsAndApplyWritesNothing(t *testing.T) {
 		}
 	}
 }
+
+// CLI-080 review round 1, Blocker: a declaration that both copies and retires
+// must converge in ONE --apply. The retire is planned only once its destination
+// exists, and that is deliberate: it compares the copy's value as the store holds
+// it after a sync, never the value this run meant to write. So the copy and its
+// retire land in two passes of one command. The old command stopped after the
+// first pass and reported its own second pass as non-convergence.
+func TestReconcileApplyCopiesAndRetiresInOneRun(t *testing.T) {
+	reg := `
+version: 1
+secrets:
+  - {id: GITHUB_PERSONAL_ACCESS_TOKEN, plane: app, backend: bw, bw: {item: github-cli-pat, field: GITHUB_PERSONAL_ACCESS_TOKEN, folder: Dotfiles/apps, from: {item: GitHub, field: "Personal Access Token", retire: true}}, expose: {env: GITHUB_PERSONAL_ACCESS_TOKEN}}
+`
+	v := legacyVault()
+	out, err := runReconcile(t, v, reg, "--apply")
+	if err != nil {
+		t.Fatalf("copy + retire must converge in one --apply: %v\n%s", err, out)
+	}
+	if v.fields["github-cli-pat"]["GITHUB_PERSONAL_ACCESS_TOKEN"] != reconcileSecret {
+		t.Errorf("the copy did not land: %v", v.fields)
+	}
+	if _, still := v.fields["GitHub"]["Personal Access Token"]; still {
+		t.Errorf("the source field was not retired: %v", v.fields["GitHub"])
+	}
+	if !strings.Contains(out, "retire-source") || !strings.Contains(out, "Converged") {
+		t.Errorf("the second pass must be shown and convergence confirmed:\n%s", out)
+	}
+	if strings.Contains(out, "PLANTED") {
+		t.Fatal("a secret value reached the command's output")
+	}
+}
+
+// The second pass exists for what the first one unlocks, and only that. An
+// operation of any other kind after a pass is a store that did not take the
+// write, or two declarations pulling one item two ways, and one more pass would
+// only repeat it. It must still fail, in the pass it appears in.
+func TestReconcileSecondPassIsOnlyForRetires(t *testing.T) {
+	v := legacyVault()
+	v.noop = true
+	_, err := runReconcile(t, v, reconcileRegistry, "--apply")
+	if err == nil || !strings.Contains(err.Error(), "did not converge") {
+		t.Fatalf("a no-op store must still fail convergence, got %v", err)
+	}
+	if v.writes > 4 {
+		t.Errorf("a non-retire leftover must not earn another pass: %d writes", v.writes)
+	}
+}

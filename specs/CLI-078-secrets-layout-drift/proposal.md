@@ -50,7 +50,8 @@ procedural — see the design note below.
 - **Rotation age and CI staleness.** Both are in #1596 and both need this
   inventory to exist first. `ItemSummary.Revised` is carried and documented as an
   upper bound, ready for that slice; nothing reads it yet.
-- **The 169 unmanaged items.** A personal vault legitimately holds what this repo
+- **The unmanaged items** (164 of 187 on 2026-09-23: items whose name no
+  declaration uses). A personal vault legitimately holds what this repo
   does not manage. They are counted, never reported as findings.
 - **Creating the three missing items.** That is a vault write, and it belongs to
   `reconcile` rather than to a hand-run command — the standing order is that no
@@ -97,11 +98,18 @@ named in the type's doc comment as the exceptions they are.
       **dormant** declaration on an age-backed secret.
 - [x] AC3 — an item in a folder other than the declared one is reported, naming
       both places.
-- [x] AC4 — a declared field the item does not carry is reported, and field
-      resolution matches `fieldFromItem` exactly for `notes`, `username` and
-      `password`.
+- [x] AC4 — a declared field the item does not carry is reported, and so is a
+      declaration that names no field (the reader refuses an empty field). Field
+      presence agrees with `fieldFromItem` on whether the field yields a usable,
+      non-empty value, for `notes`, `username`, `password` and custom fields, with
+      two stated exceptions: an empty `password` or custom-field value reads as
+      present, because the value-free projection never decodes those values.
+      *(Amended after review round 3: it said "matches `fieldFromItem` exactly",
+      which was false for empty values and untested for the agreement itself.)*
 - [x] AC5 — one finding per problem, not per env var: seven vars naming one
-      absent or misfiled item produce one finding.
+      absent or misfiled item produce one finding. The registry refuses one item
+      declared in two folders, so keying the misfiled dedupe on the item cannot
+      hide a disagreement *(added after review round 3)*.
 - [x] AC6 — no secret value can cross the projection, proven by marshalling the
       result and asserting distinctive planted values are absent.
 - [x] AC7 — an unparseable inventory reports a byte count and never the body.

@@ -187,5 +187,12 @@ func (w BWServeWriter) ResolveFolder(name string) (string, error) {
 	if f.ID == "" {
 		return "", fmt.Errorf("bw serve create folder %q: response carried no id", name)
 	}
+	// The daemon's folder list does not show a folder created since its last sync,
+	// so without this the next resolve of the same name creates a second folder
+	// with it (CLI-080 review round 1). Same rule, and same message, as every
+	// other write here.
+	if err := w.syncAfterWrite("folder " + name); err != nil {
+		return "", err
+	}
 	return f.ID, nil
 }

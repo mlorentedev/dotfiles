@@ -140,3 +140,22 @@ family from round 1), reviewed `c7b912b`. Committed verbatim.
 Mutation for this round: 2 mutations, 2 killed — **against a tree that builds**. The
 first run of these two reported both killed while the package failed to compile,
 which proves nothing (lesson 284).
+
+## Adversarial review, round 3 — disposition
+
+`review.md` round 3: **FAIL**, `nan/deepseek-v4-flash`, reviewed `f16fb2e`, committed
+verbatim. #1600 merged before this disposition was written. The fixes land in the
+follow-up PR on `fix/secrets-reconcile-review`, and round 4 reviews that state.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Major (REAL) | A declaration naming no field is counted and never checked (`hasField("")` true, `fieldFromItem("")` refuses) | **Applied.** It is now a `field-missing` finding whose detail says no field is declared, and `hasField("")` returns false, like the reader. `TestLayoutDriftReportsADeclarationThatNamesNoField`, red before the fix. **Live:** drift went from 1 finding to 2 (zoho + `AGE-SECRET-KEY-PERSONAL`), confirming the review's probe. The registry now declares `field: notes`, verified value-free (the item is a secure note: `fields=[] notes=true login=false`). Back to 1 finding, zoho, deferred; `verify` 35/35. The finding was chosen over a parse-time rule because drift reports what the reader refuses, and the one offender is fixed in data. |
+| Major (THEORETICAL) | AC7 pinned on the outer-envelope error path only | **Applied.** `TestDecodeItemsErrorNeverQuotesTheBody` covers both paths. The review's mutation M13 (quote `inner.Data`) is now **killed**. |
+| Minor (REAL) | AC4 "matches `fieldFromItem` exactly" is false for empty values, and its test never ran the reader | **Applied, with the operator-level call made explicit.** An empty value counts as missing where the projection can see it (notes, username), because an empty secret is not usable. `TestLayoutDriftAgreesWithTheReaderOnEveryItemShape` hands one raw item to both sides across 13 shapes and requires agreement. Two divergences are declared in the table (an empty password or custom-field value reads as present: the projection never decodes those values). AC4 is reworded to match. The review's surviving mutations (invert the notes dispatch, `HasNotes: true`) and a third (`HasUsername` ignoring empty) are all **killed**. |
+| Minor (THEORETICAL) | Misfiled dedupe keyed on the item, so two declarations disagreeing on a folder yield one finding and reconcile flaps | **Applied at the source.** The registry refuses an item declared in two folders (`checkOneFolderPerItem`, registered only on success like `seenVar`), so the item-keyed dedupe cannot hide a disagreement. `TestRegistryRefusesTwoFoldersForOneItem`. The live registry parses clean. Independently, reconcile's second pass admits only retires, so a flap would fail rather than loop. |
+| Minor (REAL) | `LayoutDrift` 71 lines, CC≈18 | **Applied.** Split into a `driftWalk` with one method per question (`checkFolder`, `resolveItem`, `checkPlacement`, `checkField`); `LayoutDrift` is 10 lines. Behaviour unchanged: the full suite passes unmodified. |
+| Minor (REAL) | Comments assign `reconcile` to CLI-078; unmanaged counts unexplained; `docs/secrets-inventory.md` still `apps/<item>` | **Applied.** Both comments say CLI-080. The unmanaged count is restated as "164 of 187 on 2026-09-23, items whose name no declaration uses", with why the old "161 of 185" was wrong. The inventory uses `Dotfiles/apps/`, `Dotfiles/infra/`, and personal items name no folder (#586), with a legend line. |
+
+Mutation for this round, **on trees that build, each under a memory-capped scope**
+(lesson 286): 11 mutations, 11 killed. Four earlier sessions lost this battery to
+the OOM killer, and the cause is lesson 286.

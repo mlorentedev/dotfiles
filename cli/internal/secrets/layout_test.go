@@ -142,15 +142,25 @@ func TestDecodeItemsToleratesAnUnparseableRevisionDate(t *testing.T) {
 // leak the projection exists to prevent.
 func TestDecodeItemsErrorNeverQuotesTheBody(t *testing.T) {
 	const secret = "SECRET-must-not-appear-in-an-error"
-	_, err := decodeItems(json.RawMessage(`{"data":[{"name":`+secret+`}]}`), nil)
-	if err == nil {
-		t.Fatal("want an error for malformed item JSON")
-	}
-	if strings.Contains(err.Error(), secret) {
-		t.Errorf("the error quoted the body: %v", err)
-	}
-	if !strings.Contains(err.Error(), "bytes") {
-		t.Errorf("the error must say how much it could not parse: %v", err)
+	// Both error paths. The second one formats the byte count of the item array
+	// itself, the bytes that carry every value, and round 3 of CLI-078's review
+	// showed a mutation quoting it there survived when only the first was covered.
+	for name, body := range map[string]string{
+		"outer envelope unparseable": `{"data":[{"name":` + secret + `}]}`,
+		"item array unparseable":     `{"object":"list","data":"` + secret + `"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeItems(json.RawMessage(body), nil)
+			if err == nil {
+				t.Fatal("want an error for malformed item JSON")
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("the error quoted the body: %v", err)
+			}
+			if !strings.Contains(err.Error(), "bytes") {
+				t.Errorf("the error must say how much it could not parse: %v", err)
+			}
+		})
 	}
 }
 
@@ -479,5 +489,74 @@ func TestLayoutDriftDedupesAMissingFieldAcrossVars(t *testing.T) {
 	)
 	if len(got) != 1 || got[0].Kind != DriftFieldMissing {
 		t.Fatalf("want one field-missing, got %v", kinds(got))
+	}
+}
+
+// CLI-078 review round 3, Major: a declaration that names no field was counted
+// and never checked. hasField("") answered true while fieldFromItem("") refuses,
+// so drift certified as converged a target the reader cannot resolve. The live
+// registry carried exactly one (AGE_KEY_PERSONAL's bw copy).
+func TestLayoutDriftReportsADeclarationThatNamesNoField(t *testing.T) {
+	it := item("AGE-SECRET-KEY-PERSONAL", "")
+	it.HasNotes = true
+	got := LayoutDrift([]BWDecl{decl("AGE_KEY_PERSONAL", "AGE-SECRET-KEY-PERSONAL", "", "", true)},
+		[]ItemSummary{it}, nil)
+	if len(got) != 1 || got[0].Kind != DriftFieldMissing {
+		t.Fatalf("a field-less declaration must be a finding, got %v", kinds(got))
+	}
+	if !strings.Contains(got[0].Detail, "no field") {
+		t.Errorf("the finding must say no field is declared, not that the item lacks one: %q", got[0].Detail)
+	}
+	// And the reader really does refuse it: this is the agreement the finding rests on.
+	if _, err := fieldFromItem([]byte(`{"name":"AGE-SECRET-KEY-PERSONAL","notes":"x"}`), ""); err == nil {
+		t.Fatal("fieldFromItem accepted an empty field; the finding above would be wrong")
+	}
+}
+
+// AC4, pinned as AGREEMENT rather than as hasField alone. CLI-078 review round 3
+// showed the older test passing while fieldFromItem's notes dispatch was inverted:
+// it never ran the reader. Each row hands ONE raw item to both sides — the reader
+// that resolves values, and the value-free projection drift judges — and requires
+// them to agree on whether the field yields a usable (non-empty) value.
+//
+// Two rows diverge on purpose, and say why. The projection never decodes a
+// password or a custom field's value (that is what keeps it value-free), so an
+// empty one there reads as present. Both divergences lean the same way: drift may
+// miss an empty value, and it never reports a usable one as missing.
+func TestLayoutDriftAgreesWithTheReaderOnEveryItemShape(t *testing.T) {
+	rows := []struct {
+		raw, field string
+		exception  string // non-empty: the documented reason the two sides differ
+	}{
+		{`{"name":"svc","notes":"n"}`, "notes", ""},
+		{`{"name":"svc","notes":""}`, "notes", ""},
+		{`{"name":"svc"}`, "notes", ""},
+		{`{"name":"svc","login":{"username":"u","password":"p"}}`, "username", ""},
+		{`{"name":"svc","login":{"username":""}}`, "username", ""},
+		{`{"name":"svc"}`, "username", ""},
+		{`{"name":"svc","login":{"password":"p"}}`, "password", ""},
+		{`{"name":"svc","login":{"password":""}}`, "password", "the password is never decoded; login presence is the value-free answer"},
+		{`{"name":"svc"}`, "password", ""},
+		{`{"name":"svc","fields":[{"name":"k","value":"v"}]}`, "k", ""},
+		{`{"name":"svc","fields":[{"name":"k","value":""}]}`, "k", "custom field values are never decoded; a named field is taken as present"},
+		{`{"name":"svc"}`, "k", ""},
+		{`{"name":"svc","notes":"n"}`, "", ""},
+	}
+	for _, r := range rows {
+		value, err := fieldFromItem([]byte(r.raw), r.field)
+		usable := err == nil && value != ""
+
+		items, derr := decodeItems(json.RawMessage(`{"object":"list","data":[`+r.raw+`]}`), nil)
+		if derr != nil || len(items) != 1 {
+			t.Fatalf("%s: decode: %v", r.raw, derr)
+		}
+		present := hasField(items[0], r.field)
+
+		switch {
+		case r.exception == "" && present != usable:
+			t.Errorf("%s field %q: drift says present=%v, the reader says usable=%v", r.raw, r.field, present, usable)
+		case r.exception != "" && (!present || usable):
+			t.Errorf("%s field %q: the documented divergence (%s) no longer holds; update the row", r.raw, r.field, r.exception)
+		}
 	}
 }

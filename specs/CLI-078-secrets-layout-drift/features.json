@@ -23,14 +23,14 @@
   {
     "id": "CLI-078-secrets-layout-drift-f4",
     "behavior": "AC4 — field resolution matches fieldFromItem for notes, username and password",
-    "verification": "cd cli && go test ./internal/secrets/ -run '^TestLayoutDriftResolvesFieldsTheWayTheReaderDoes$' -count=1 -v | grep -q '^--- PASS:'",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestLayoutDriftResolvesFieldsTheWayTheReaderDoes$|^TestLayoutDriftAgreesWithTheReaderOnEveryItemShape$|^TestLayoutDriftReportsADeclarationThatNamesNoField$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-078-secrets-layout-drift-f5",
     "behavior": "AC5 — one finding per problem, not per env var",
-    "verification": "cd cli && go test ./internal/secrets/ -run '^TestLayoutDriftReportsOneFindingPerProblemNotPerVar$|^TestLayoutDriftDedupesAMisfiledItemAcrossVars$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestLayoutDriftReportsOneFindingPerProblemNotPerVar$|^TestLayoutDriftDedupesAMisfiledItemAcrossVars$|^TestRegistryRefusesTwoFoldersForOneItem$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
     "state": "pending",
     "evidence": ""
   },
