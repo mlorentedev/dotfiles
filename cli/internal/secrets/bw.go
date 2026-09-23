@@ -198,6 +198,25 @@ type BWPut struct {
 
 // SetField sets field on item to value, preserving the item's other fields.
 func (p BWPut) SetField(item, field, value string) error {
+	return p.editItem(item, func(cur []byte) ([]byte, error) { return setItemField(cur, field, value) })
+}
+
+// MoveItem files an existing item under folderID ("" unfiles it), preserving
+// everything else about it.
+func (p BWPut) MoveItem(item, folderID string) error {
+	return p.editItem(item, func(cur []byte) ([]byte, error) { return setItemFolder(cur, folderID) })
+}
+
+// RemoveField removes field from an existing item, preserving the rest of it.
+func (p BWPut) RemoveField(item, field string) error {
+	return p.editItem(item, func(cur []byte) ([]byte, error) { return removeItemField(cur, field) })
+}
+
+// editItem is the read-modify-write every item edit shares: get the whole item,
+// apply one pure mutation, write the whole item back. The mutation is the only part
+// that varies, and it is the same function BWServeWriter applies, so the two
+// backends store byte-identical JSON for the same edit.
+func (p BWPut) editItem(item string, mutate func([]byte) ([]byte, error)) error {
 	cur, err := p.run(nil, "get", "item", item)
 	if err != nil {
 		if isNotFound(err.Error()) {
@@ -209,7 +228,7 @@ func (p BWPut) SetField(item, field, value string) error {
 	if err != nil {
 		return err
 	}
-	updated, err := setItemField(cur, field, value)
+	updated, err := mutate(cur)
 	if err != nil {
 		return err
 	}
@@ -232,12 +251,83 @@ type BWCreator interface {
 }
 
 // BWFolderResolver resolves a Bitwarden folder NAME (registry bw.folder, e.g.
-// "apps") to its id, creating the folder if the vault doesn't have it yet —
+// "Dotfiles/apps") to its id, creating the folder if the vault doesn't have it yet —
 // OPS-028, closing the gap where ADR-028 ratified a folder taxonomy the write path
 // couldn't place anything into. Split from BWCreator (its own interface, its own test
 // double) because folder resolution and item creation are independently testable:
 // CreateItem's JSON-body test never needs a fake folder list, and ResolveFolder's
 // name→id test never needs a fake item store.
+// BWMover files an existing item under a folder. Its own interface for the same
+// reason BWCreator is: a caller that only edits fields cannot move by accident.
+type BWMover interface {
+	// MoveItem files item under folderID, an already-resolved id ("" unfiles it).
+	MoveItem(item, folderID string) error
+}
+
+// setItemFolder returns itemJSON filed under folderID, preserving every other key —
+// the move analog of setItemField, and shared by both backends for the same reason.
+// An empty id becomes null, which is how Bitwarden spells "no folder"; an empty
+// string would read as the id of a folder that does not exist.
+func setItemFolder(itemJSON []byte, folderID string) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(itemJSON, &m); err != nil {
+		return nil, fmt.Errorf("parse bw item JSON: %w", err)
+	}
+	if folderID == "" {
+		m["folderId"] = nil
+	} else {
+		m["folderId"] = folderID
+	}
+	return json.Marshal(m)
+}
+
+// BWFieldRemover removes one field from an existing item. Its own interface for
+// the reason BWCreator is: the callers that edit values cannot delete by accident.
+type BWFieldRemover interface {
+	RemoveField(item, field string) error
+}
+
+// removeItemField returns itemJSON without field, preserving every other key. It
+// follows the dispatch setItemField and fieldFromItem share: notes and the login
+// pair are native to the item type and are cleared; anything else is a custom field
+// and is removed from the list. A field that is not there is an error — a caller
+// that planned its removal saw it, so absence means the store changed underneath.
+func removeItemField(itemJSON []byte, field string) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(itemJSON, &m); err != nil {
+		return nil, fmt.Errorf("parse bw item JSON: %w", err)
+	}
+	switch field {
+	case "password", "username":
+		login, _ := m["login"].(map[string]any)
+		if v, _ := login[field].(string); v == "" {
+			return nil, fmt.Errorf("item carries no %s to remove", field)
+		}
+		login[field] = nil
+	case "notes":
+		if v, _ := m["notes"].(string); v == "" {
+			return nil, fmt.Errorf("item carries no notes to remove")
+		}
+		m["notes"] = nil
+	default:
+		fields, _ := m["fields"].([]any)
+		kept := make([]any, 0, len(fields))
+		for _, f := range fields {
+			if fm, ok := f.(map[string]any); ok {
+				if name, _ := fm["name"].(string); name == field {
+					continue
+				}
+			}
+			kept = append(kept, f)
+		}
+		if len(kept) == len(fields) {
+			return nil, fmt.Errorf("item carries no field %q to remove", field)
+		}
+		m["fields"] = kept
+	}
+	return json.Marshal(m)
+}
+
 type BWFolderResolver interface {
 	// ResolveFolder returns "" for an empty name (no folder declared — a no-op, not
 	// an error) so callers never special-case the common unfoldered secret.

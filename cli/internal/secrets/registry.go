@@ -64,7 +64,25 @@ type Secret struct {
 type BWSource struct {
 	Item   string `yaml:"item"`
 	Field  string `yaml:"field"`
-	Folder string `yaml:"folder"` // "" → unfoldered; else one of validBWFolders
+	Folder string `yaml:"folder"` // "" → placement not governed; else one of validBWFolders
+	// From is where `dotf secrets reconcile` copies the value from when the item or
+	// field above is absent — the only source of a value reconcile has. It is a
+	// migration record in the Terraform `moved` sense: a refactor of the store,
+	// declared in code, reviewed, and applied by the tool rather than by hand. Once
+	// the destination exists it is satisfied and can be deleted. See CLI-080.
+	From *BWFrom `yaml:"from"`
+}
+
+// BWFrom names one existing Bitwarden field by item and field. Both are required:
+// reconcile never guesses where a value lives.
+type BWFrom struct {
+	Item  string `yaml:"item"`
+	Field string `yaml:"field"`
+	// Retire removes the source field once the destination exists and holds the
+	// same value, which completes the move: one credential, one place. Without it
+	// the copy is left beside its source, and a search returns both. Declared
+	// rather than implied, because it deletes a credential.
+	Retire bool `yaml:"retire"`
 }
 
 // validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-
@@ -299,6 +317,9 @@ func validateSecret(s *Secret, i int, seen map[string]bool, seenVar map[string]s
 	if err := checkBWFolder(s); err != nil {
 		return err
 	}
+	if err := checkBWFrom(s); err != nil {
+		return err
+	}
 	return checkVarNames(s, seenVar)
 }
 
@@ -328,6 +349,47 @@ func checkExpose(s *Secret) error {
 // typo, exactly the drift this taxonomy exists to prevent (OPS-028 adversarial review,
 // Major finding). So this runs for every secret carrying a bw: block, whatever its
 // current backend.
+// checkBWFrom refuses every `from:` that would make reconcile's copy ambiguous or
+// pointless. Like checkBWFolder it runs whatever the backend: a dormant bw block is
+// the migration target, and a from: there is exactly the split this exists for.
+func checkBWFrom(s *Secret) error {
+	if s.BW == nil || s.BW.From == nil {
+		return nil
+	}
+	f := s.BW.From
+	if f.Item == "" {
+		return fmt.Errorf("secret %q: bw.from.item is required", s.ID)
+	}
+	if f.Field == "" {
+		return fmt.Errorf("secret %q: bw.from.field is required (reconcile never guesses which field holds the value)", s.ID)
+	}
+	if err := checkBwName(s.ID, "from.item", f.Item); err != nil {
+		return err
+	}
+	if err := checkBwName(s.ID, "from.field", f.Field); err != nil {
+		return err
+	}
+	// A multi-var secret declares one item and a field per var, so a single source
+	// cannot say which of them it fills.
+	if len(s.Expose.Env.Vars) > 1 {
+		return fmt.Errorf("secret %q: bw.from is not supported on a multi-var secret (one source cannot fill %d fields)",
+			s.ID, len(s.Expose.Env.Vars))
+	}
+	if f.Item == s.BW.Item && f.Field == s.bwDestField() {
+		return fmt.Errorf("secret %q: bw.from %s/%s is its own destination", s.ID, f.Item, f.Field)
+	}
+	return nil
+}
+
+// bwDestField is the field a single-target secret resolves from: a lone env var's
+// own override when it has one, else the secret-level field.
+func (s *Secret) bwDestField() string {
+	if len(s.Expose.Env.Vars) == 1 && s.Expose.Env.Vars[0].Field != "" {
+		return s.Expose.Env.Vars[0].Field
+	}
+	return s.BW.Field
+}
+
 func checkBWFolder(s *Secret) error {
 	if s.BW == nil || s.BW.Folder == "" {
 		return nil

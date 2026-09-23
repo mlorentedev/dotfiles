@@ -50,14 +50,22 @@ type fakeBWServe struct {
 	// assert what CreateItem actually put on the wire, not merely that it 200'd.
 	created []json.RawMessage
 
-	// nextID is the id handed to the next created item/folder; "" -> "generated".
-	nextID string
+	// nextID is the id handed to the next created item/folder; "" -> "generated-id",
+	// then "generated-id-2", … so several creates in one test stay distinct.
+	nextID  string
+	minted  int
 
 	// syncs counts POST /sync, so a test can assert a write made itself visible.
 	syncs int
 
 	// failSync makes POST /sync report failure, exercising the written-but-stale path.
 	failSync bool
+
+	// staleFolders models the daemon's cache for folders: one created since the last
+	// POST /sync is on the server but absent from /list/object/folders, so a second
+	// resolve-or-create of the same new name would create it again.
+	staleFolders bool
+	unsynced     map[string]bool
 
 	unlockPassword string // "" -> any password succeeds
 	failUnlock     bool
@@ -136,6 +144,7 @@ func (f *fakeBWServe) handleSync(w http.ResponseWriter) {
 		writeEnvelope(w, false, "Failed to sync.", nil)
 		return
 	}
+	f.unsynced = nil
 	writeEnvelope(w, true, "", nil)
 }
 
@@ -145,12 +154,21 @@ func (f *fakeBWServe) handleLock(w http.ResponseWriter) {
 }
 
 func (f *fakeBWServe) handleListItems(w http.ResponseWriter, r *http.Request) {
+	// The real daemon answers with every item's COMPLETE JSON — which is why
+	// bwserve_list.go projects at decode time. A fake that answered id+name only
+	// would let a layout test pass against a shape the daemon never sends.
 	search := r.URL.Query().Get("search")
-	var out []map[string]string
+	var out []map[string]any
 	for id, name := range f.names {
-		if search == "" || strings.Contains(name, search) {
-			out = append(out, map[string]string{"id": id, "name": name})
+		if search != "" && !strings.Contains(name, search) {
+			continue
 		}
+		m := map[string]any{}
+		if raw, ok := f.items[id]; ok {
+			_ = json.Unmarshal(raw, &m)
+		}
+		m["id"], m["name"] = id, name
+		out = append(out, m)
 	}
 	writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
 }
@@ -194,19 +212,25 @@ func (f *fakeBWServe) handleCreateItem(w http.ResponseWriter, r *http.Request) {
 	if f.names == nil {
 		f.names = map[string]string{}
 	}
-	f.items[id] = json.RawMessage(body)
-	var named struct {
-		Name string `json:"name"`
-	}
-	_ = json.Unmarshal(body, &named)
-	f.names[id] = named.Name
+	// Stored WITH its id, as the server assigns one: an edit reads the id back out
+	// of the item, so a stored item without one could never be edited again.
+	var m map[string]any
+	_ = json.Unmarshal(body, &m)
+	m["id"] = id
+	stored, _ := json.Marshal(m)
+	f.items[id] = json.RawMessage(stored)
+	name, _ := m["name"].(string)
+	f.names[id] = name
 	f.created = append(f.created, json.RawMessage(body))
-	writeEnvelope(w, true, "", json.RawMessage(body))
+	writeEnvelope(w, true, "", json.RawMessage(stored))
 }
 
 func (f *fakeBWServe) handleListFolders(w http.ResponseWriter) {
 	out := []map[string]string{}
 	for id, name := range f.folders {
+		if f.unsynced[id] {
+			continue
+		}
 		out = append(out, map[string]string{"id": id, "name": name})
 	}
 	writeEnvelope(w, true, "", map[string]any{"object": "list", "data": out})
@@ -222,6 +246,12 @@ func (f *fakeBWServe) handleCreateFolder(w http.ResponseWriter, r *http.Request)
 		f.folders = map[string]string{}
 	}
 	f.folders[id] = body.Name
+	if f.staleFolders {
+		if f.unsynced == nil {
+			f.unsynced = map[string]bool{}
+		}
+		f.unsynced[id] = true
+	}
 	writeEnvelope(w, true, "", map[string]string{"id": id, "name": body.Name})
 }
 
@@ -231,7 +261,11 @@ func (f *fakeBWServe) newID() string {
 	if f.nextID != "" {
 		return f.nextID
 	}
-	return "generated-id"
+	f.minted++
+	if f.minted == 1 {
+		return "generated-id"
+	}
+	return fmt.Sprintf("generated-id-%d", f.minted)
 }
 
 func writeEnvelope(w http.ResponseWriter, success bool, message string, data any) {

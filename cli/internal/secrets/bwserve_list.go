@@ -61,9 +61,11 @@ type ItemSummary struct {
 	HasLogin    bool
 	HasUsername bool
 	// Revised is the item's last-modified time. Bitwarden bumps it on ANY edit —
-	// a rename, a folder move, a note tweak — so it is an UPPER BOUND on the age
-	// of the credential, never the rotation date. Callers that report rotation
-	// age must say which one they mean.
+	// a rename, a folder move, a note tweak — and the value existed at or before
+	// that edit, so `now − Revised` is a LOWER bound on the credential's age, never
+	// its rotation date. A staleness warning built on it never fires falsely, but
+	// goes silent after any edit that did not rotate anything. Callers that report
+	// rotation age must say which one they mean.
 	Revised time.Time
 }
 
@@ -153,16 +155,30 @@ func (c BWServeClient) ListItems() ([]ItemSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	byID := make(map[string]string, len(folders))
-	for _, f := range folders {
-		byID[f.ID] = f.Name
-	}
 
 	rawItems, err := c.call("GET", "/list/object/items", nil)
 	if err != nil {
 		return nil, err
 	}
-	return decodeItems(rawItems, byID)
+	return decodeItems(rawItems, folderIndex(folders))
+}
+
+// folderIndex maps folder id to name, EXCLUDING the "No Folder" pseudo-folder.
+//
+// bw serve lists that pseudo-folder with a null id, and every unfoldered item
+// carries a null folderId, so an index that kept it would map "" to "No Folder"
+// and every unfoldered item would read as filed in a folder of that name —
+// measured on the first live run, where `dockerhub` was reported "in No Folder".
+// Same exclusion, same reason, as ListFolders.
+func folderIndex(folders []folderWire) map[string]string {
+	byID := make(map[string]string, len(folders))
+	for _, f := range folders {
+		if f.ID == "" {
+			continue
+		}
+		byID[f.ID] = f.Name
+	}
+	return byID
 }
 
 // decodeItems is separated from the HTTP call so the projection — the part that

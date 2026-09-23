@@ -67,10 +67,12 @@ func TestSetBackendBW_RealRegistry_OnlyTargetChanges(t *testing.T) {
 	if err != nil {
 		t.Skipf("registry.yaml not found: %v", err)
 	}
-	// GITHUB_PERSONAL_ACCESS_TOKEN: still backend: age (blocked on migrate --split, C9 —
-	// SetBackendBW itself has no opinion on the shared-age-source guard, that lives one
-	// layer up in migrateGuard), so it stays a stable target as other entries migrate.
-	const id = "GITHUB_PERSONAL_ACCESS_TOKEN"
+	// The target is DISCOVERED, not named: any age-backed entry with a bw: block that
+	// SetBackendBW accepts. A hardcoded id pinned GITHUB_PERSONAL_ACCESS_TOKEN "until
+	// C9", and the day that entry migrated (CLI-080, by reconcile rather than
+	// `migrate --split`) the test broke for a reason that had nothing to do with what
+	// it asserts. Every future migration would have done the same.
+	id := migratableAgeEntry(t, in)
 	out, err := SetBackendBW(in, id)
 	if err != nil {
 		t.Fatalf("SetBackendBW(%s): %v", id, err)
@@ -101,11 +103,19 @@ func TestSetBackendBW_RealRegistry_OnlyTargetChanges(t *testing.T) {
 	if !strings.Contains(block, "backend: bw") {
 		t.Errorf("backend not flipped:\n%s", block)
 	}
-	if strings.Contains(block, "age: github.token") {
-		t.Errorf("age source not dropped:\n%s", block)
-	}
-	if !strings.Contains(block, "bw: { item: github-cli-pat, field: api-token, folder: Dotfiles/apps }") {
-		t.Errorf("declared bw block not preserved in place:\n%s", block)
+	// The age line and the bw: line are read from the INPUT block, so the assertion
+	// follows whichever entry was discovered.
+	for _, ln := range inLines[start:end] {
+		switch trimmed := strings.TrimSpace(ln); {
+		case strings.HasPrefix(trimmed, "age:"):
+			if strings.Contains(block, ln) {
+				t.Errorf("age source not dropped (%q):\n%s", trimmed, block)
+			}
+		case strings.HasPrefix(trimmed, "bw:"):
+			if !strings.Contains(block, ln) {
+				t.Errorf("declared bw line not preserved in place (%q):\n%s", trimmed, block)
+			}
+		}
 	}
 }
 
@@ -188,4 +198,21 @@ secrets:
 			}
 		})
 	}
+}
+
+// migratableAgeEntry returns the first age-backed registry entry SetBackendBW accepts,
+// skipping the test when none remains — the day every entry has migrated.
+func migratableAgeEntry(t *testing.T, registry []byte) string {
+	t.Helper()
+	reg, err := ParseRegistry(registry)
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	for _, s := range reg.Secrets {
+		if s.Backend == BackendAge && s.BW != nil && assertMigratable(registry, s.ID) == nil {
+			return s.ID
+		}
+	}
+	t.Skip("no age-backed entry with a bw: target is left to activate")
+	return ""
 }

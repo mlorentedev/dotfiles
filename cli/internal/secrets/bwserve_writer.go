@@ -20,6 +20,8 @@ type BWWriteClient interface {
 	BWWriter
 	BWCreator
 	BWFolderResolver
+	BWMover
+	BWFieldRemover
 }
 
 // BWServeWriter is the serve-backed BWWriteClient: the write analog of BWServeReader,
@@ -61,14 +63,31 @@ type BWServeWriter struct {
 // which widens the window. Callers that care sync explicitly first — see
 // BWServeClient.Sync, and CLI-037's rotate.
 func (w BWServeWriter) SetField(item, field, value string) error {
+	return w.editItem(item, func(cur []byte) ([]byte, error) { return setItemField(cur, field, value) })
+}
+
+// MoveItem files an existing item under folderID ("" unfiles it), preserving
+// everything else about it. Same read-modify-write and same pure core as BWPut's.
+func (w BWServeWriter) MoveItem(item, folderID string) error {
+	return w.editItem(item, func(cur []byte) ([]byte, error) { return setItemFolder(cur, folderID) })
+}
+
+// RemoveField removes field from an existing item, through the same core as BWPut.
+func (w BWServeWriter) RemoveField(item, field string) error {
+	return w.editItem(item, func(cur []byte) ([]byte, error) { return removeItemField(cur, field) })
+}
+
+// editItem is the read-modify-write both edits share; see SetField for why each step
+// is the way it is. Only the mutation varies.
+func (w BWServeWriter) editItem(item string, mutate func([]byte) ([]byte, error)) error {
 	// Same shape, same client: the read half of this read-modify-write is literally the
 	// read backend, so a conversion keeps them provably identical (and stops compiling
 	// if the two ever diverge) rather than re-deriving one from the other.
 	cur, err := BWServeReader(w).getItemJSON(item)
 	if err != nil {
 		// getItemJSON already classifies absence as ErrBWItemNotFound; re-wrap it
-		// with the same remediation BWPut.SetField gives, so `set`'s create-absent
-		// gate keys off one sentinel regardless of which backend answered.
+		// with the same remediation BWPut gives, so `set`'s create-absent gate keys
+		// off one sentinel regardless of which backend answered.
 		if errors.Is(err, ErrBWItemNotFound) {
 			return fmt.Errorf("%w: %q (use `dotf secrets set` to create it)", ErrBWItemNotFound, item)
 		}
@@ -78,7 +97,7 @@ func (w BWServeWriter) SetField(item, field, value string) error {
 	if err != nil {
 		return err
 	}
-	updated, err := setItemField(cur, field, value)
+	updated, err := mutate(cur)
 	if err != nil {
 		return err
 	}

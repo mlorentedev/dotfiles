@@ -70,8 +70,11 @@ func newSecretsDriftCmd() *cobra.Command {
 			findings := secrets.LayoutDrift(decls, items, folders)
 			out := cmd.OutOrStdout()
 
+			// The registry id closes each line: it is the line of registry.yaml to
+			// edit, and with findings deduped per item the item name alone cannot
+			// say which of several declarations raised it.
 			for _, f := range findings {
-				_, _ = fmt.Fprintf(out, "%-14s %-24s %s\n", f.Kind, f.Item, f.Detail)
+				_, _ = fmt.Fprintf(out, "%-14s %-24s %s [%s]\n", f.Kind, f.Item, f.Detail, f.Secret)
 			}
 
 			unmanaged := secrets.UnmanagedItems(decls, items)

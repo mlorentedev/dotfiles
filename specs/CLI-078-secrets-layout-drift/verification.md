@@ -64,6 +64,30 @@ about it.
 - **Read-only is structural.** No `--fix`, no writer passed in, and a
   committed check that greps the source (comments stripped) for any write call.
 
+## Defects found after merge (2026-09-22, first run of the merged binary)
+
+Found by running `drift` against the live store while designing `reconcile`,
+not by the tests above: all three depend on the real shape of the store or the
+registry, which the fixtures did not reproduce.
+
+- **Unfoldered items read as filed in "No Folder".** `ListFolders` dropped the
+  null-id pseudo-folder; the id index `ListItems` built did not, so `""` mapped
+  to `No Folder`. Fixed by one `folderIndex` both paths share the rule of.
+- **File-exposed secrets were never checked.** `BWDeclarations` walked
+  `expose.env` only, so 8 secrets — `KUBECONFIG`, `SSH_KEY`, the recovery
+  codes — contributed no declaration. AC2 held only for env secrets. Declared
+  targets went from 27 across 16 items to 34 across 21 once fixed.
+- **`folder: ""` was read as "must be unfoldered".** The first two defects
+  masked it: fixing either alone would have reported every hand-filed personal
+  item as misfiled. `""` now means placement is not governed, which is what the
+  taxonomy says (app and infra only; personal deferred to #586).
+- **`ItemSummary.Revised` was documented as an upper bound on age; it is a
+  lower bound.** The value existed at or before the last edit. No code read it
+  yet, so only the comment changed — but the rotation slice builds on it.
+
+Each fix is pinned by a test, and each test was confirmed red with its fix
+reverted (3 mutations, 3 killed).
+
 ## Promotion candidates
 
 - [ ] Lesson for `docs/lessons/`? **Deferred, deliberately.** The candidate is
@@ -82,3 +106,37 @@ about it.
 - [ ] Folder moved to `specs/archive/CLI-078-secrets-layout-drift/`
 - [ ] Bitácora `#1596` closed with the PR link (ADR-018)
 - [ ] Independent adversarial review passed (reviewer != implementer)
+
+## Adversarial review, round 1 — disposition
+
+`review.md` round 1: **FAIL**, `nan/glm5.3-flash`, reviewed `c7a8adc`. Committed
+verbatim; round 2 reviews this branch's head.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Blocker | File-exposed declarations never enter the walk (7 of 33) | **Applied** — the same defect found independently on the live run; fixed and pinned above |
+| Major | Live canary resolves the stale literal `"apps"`, so a live run would create a stray folder | **Applied** — the canary derives its folder from `planeFolder["app"]`, so it cannot go stale again |
+| Minor | `ListItems` keeps the null-id "No Folder" row | **Applied** — `folderIndex`, tested against the null-id shape bw serve emits |
+| Minor | AC8's non-zero exit has no command-level test | **Applied** — `TestDriftExitsNonZeroOnAFindingAndNamesTheSecret`, confirmed red with the exit removed |
+| Minor | `LayoutFinding.Secret` documented for the reader but never printed | **Applied** — each line ends `[<registry id>]`, confirmed red with it removed |
+| Minor | `tasks.md` "PR opened" box unticked | **Applied** — ticked |
+
+The reviewer found two of the three post-merge defects without a live vault
+(the file-expose walk and the pseudo-folder); it did not find the third
+(`folder: ""` read as "must be unfoldered"), which only shows once the other
+two are fixed.
+
+## Adversarial review, round 2 — disposition
+
+`review.md` round 2: **FAIL**, `agy/gemini-3.1-pro-high` (a different provider
+family from round 1), reviewed `c7b912b`. Committed verbatim.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Blocker (REAL) | Duplicate item names: the by-name index kept the last one, so a declared item could be judged by a same-named personal item | **Applied** — new finding `item-ambiguous`, raised instead of any judgement about either item, matching the reader's refusal. `TestLayoutDriftReportsAnAmbiguousItemInsteadOfJudgingEither` |
+| Minor | `field-missing` not deduped across vars (AC5) | **Applied** — deduped per item and field. `TestLayoutDriftDedupesAMissingFieldAcrossVars` |
+| Minor | An empty note or username reads as missing, while `fieldFromItem` returns `""` without error | **Declined, with reason** — an empty value is not a usable secret; `verify` would resolve it to nothing. Reporting it is the useful outcome. The detail says "does not carry it", which is accurate for a field with no value |
+
+Mutation for this round: 2 mutations, 2 killed — **against a tree that builds**. The
+first run of these two reported both killed while the package failed to compile,
+which proves nothing (lesson 284).

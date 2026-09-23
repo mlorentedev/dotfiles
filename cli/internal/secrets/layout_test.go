@@ -393,3 +393,91 @@ func TestLayoutDriftDedupesAMisfiledItemAcrossVars(t *testing.T) {
 		t.Fatalf("want exactly 1 item-misfiled for 7 vars, got %d: %v", len(got), kinds(got))
 	}
 }
+
+// bw serve lists a pseudo-folder, "No Folder", with a null id, and every
+// unfoldered item carries a null folderId. Indexing folders by id without
+// skipping it maps "" to "No Folder", so every unfoldered item reads as filed in a
+// folder of that name. ListFolders already dropped it; the index ListItems built
+// did not. Measured on the first live run: `dockerhub is in No Folder`.
+func TestFolderIndexExcludesTheNoFolderPseudoFolder(t *testing.T) {
+	folders, err := decodeFolders(json.RawMessage(
+		`{"object":"list","data":[{"object":"folder","id":null,"name":"No Folder"},{"object":"folder","id":"f1","name":"Dotfiles/apps"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := decodeItems(itemsPayload(t, `{"name":"loose","folderId":null,"fields":[]}`), folderIndex(folders))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Folder != "" {
+		t.Errorf("an unfoldered item must resolve to \"\", got %q", got[0].Folder)
+	}
+}
+
+// A secret exposed as a FILE declares a bw target exactly as an env secret does;
+// only the consumer contract differs. The walk read expose.env alone, so eight
+// file-exposed secrets (KUBECONFIG, SSH_KEY, the recovery codes) were never
+// compared against the store at all.
+func TestBWDeclarationsIncludesFileExposedSecrets(t *testing.T) {
+	const yml = "version: 1\nsecrets:\n" +
+		"  - {id: KCFG, plane: infra, backend: bw, bw: {item: kube-item, field: notes, folder: Dotfiles/infra}, expose: {file: {var: KUBECONFIG, path: \"~/.kube/x\"}}}\n"
+	reg, err := ParseRegistry([]byte(yml))
+	if err != nil {
+		t.Fatalf("ParseRegistry: %v", err)
+	}
+	got := reg.BWDeclarations()
+	if len(got) != 1 {
+		t.Fatalf("want 1 declaration for the file-exposed secret, got %d: %+v", len(got), got)
+	}
+	want := BWDecl{Secret: "KCFG", Var: "KUBECONFIG", Item: "kube-item", Field: "notes", Folder: "Dotfiles/infra"}
+	if got[0] != want {
+		t.Errorf("got %+v, want %+v", got[0], want)
+	}
+}
+
+// A declaration with no folder states no placement: the taxonomy covers the app
+// and infra planes only, and the personal plane's is deferred (#586). Reading ""
+// as "must be unfoldered" would report every personal item the operator filed by
+// hand as misfiled, and hand reconcile an instruction to unfile it.
+func TestLayoutDriftLeavesAnUndeclaredFolderUngoverned(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("G", "gmail-backup-code", "notes", "", false)},
+		[]ItemSummary{{Name: "gmail-backup-code", Folder: "Personal", HasNotes: true}},
+		[]string{"Personal"},
+	)
+	if len(got) != 0 {
+		t.Errorf("an item with no declared folder must not be reported misfiled, got %v", got)
+	}
+}
+
+// Bitwarden allows two items with one name, and the reader refuses to pick between
+// them (TestBWServeReader_Field_AmbiguousNameErrors). A by-name index kept only the
+// last one, so a declared item could be judged by a same-named personal item —
+// misfiled, missing fields — while the real one sat correct. Ambiguity is its own
+// finding, raised instead of any judgement about either item (round 2, Blocker).
+func TestLayoutDriftReportsAnAmbiguousItemInsteadOfJudgingEither(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("D", "dockerhub", "PAT", "Dotfiles/apps", false)},
+		[]ItemSummary{item("dockerhub", "Dotfiles/apps", "PAT"), item("dockerhub", "Personal")},
+		[]string{"Dotfiles/apps", "Personal"},
+	)
+	if len(got) != 1 || got[0].Kind != DriftItemAmbiguous {
+		t.Fatalf("want exactly one item-ambiguous, got %v", kinds(got))
+	}
+	if !strings.Contains(got[0].Detail, "2 items") {
+		t.Errorf("the finding must say how many items share the name: %q", got[0].Detail)
+	}
+}
+
+// One finding per problem (AC5), for fields too: two vars declaring the same absent
+// field on one item are one absent field.
+func TestLayoutDriftDedupesAMissingFieldAcrossVars(t *testing.T) {
+	got := LayoutDrift(
+		[]BWDecl{decl("A", "svc", "key", "", false), decl("B", "svc", "key", "", false)},
+		[]ItemSummary{item("svc", "")},
+		nil,
+	)
+	if len(got) != 1 || got[0].Kind != DriftFieldMissing {
+		t.Fatalf("want one field-missing, got %v", kinds(got))
+	}
+}
