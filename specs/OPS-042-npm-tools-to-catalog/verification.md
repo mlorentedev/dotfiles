@@ -45,6 +45,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **`Test-VersionAtLeast` stays**: pi's block (#1294 follow-up) still calls it.
 - **Found, not fixed here:** `dotf tools list|install` resolve `packages.json` from `DOTFILES_DIR` only (`cmd/tools.go:51,126`), while `doctor` resolves checkout-first per ADR-030 (`checks_catalog.go`). A box whose mirror lags the checkout gets two answers to "what is in the catalog". Ticketed as CLI-067 (#1381).
 
+## Amendment, 2026-09-23 — the `obsidian` entry was the wrong package (#1615)
+
+The npm package `obsidian-cli` 0.5.1 that AC1 declared is **not an Obsidian CLI**. It is a 2020 third-party tool that imports test results into Obsidianqa.com, and it registers a global `obsidian` binary. It got in through a 404 on `@vorillaz/obsidian-cli`, "fixed" in #122 by dropping the scope; lesson 065 recorded that as correct. The evidence above, `obsidian --version` → `obsidian-cli v0.5.1`, parsed as a semver and so looked like proof. It only proved that *a* package answered with a version, not that it was the right one.
+
+The `obsidian` that `dotf vault health` and obs-cli drive is the CLI built into the Obsidian desktop app, which is not an npm tool. The entry is removed. AC1 and f1 now assert its absence, and `tests/setup-linux.bats` refutes any obsidian npm entry under either name.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.

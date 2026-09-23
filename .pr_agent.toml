@@ -230,8 +230,14 @@ publish_output_no_suggestions = false
 # sensitive/** is the load-bearing entry: it holds age ciphertext and the DR
 # escrow. Encrypted or not, credential material is not sent to an inference
 # endpoint to be reviewed.
+#
+# There is NO negation. PR-Agent turns each entry into `fnmatch.translate(glob)`
+# and drops a file when any pattern matches it (`pr_agent/algo/file_filter.py`),
+# so a leading `!` is a literal character. The `!sensitive/registry-example.yaml`
+# that used to sit here re-included nothing, and named a file that no longer
+# exists. A PR touching only these paths reaches PR-Agent as an empty diff, and
+# the workflow skips the run rather than reporting it as a failure (#1618).
 glob = [
   "sensitive/**",
-  "!sensitive/registry-example.yaml",
   "specs/**/review-transcript.jsonl*",
 ]

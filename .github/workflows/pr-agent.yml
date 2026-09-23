@@ -171,7 +171,61 @@ jobs:
               "dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY}"
             exit 1
           fi
+      # A PR whose every file is in `.pr_agent.toml`'s [ignore] reaches the model
+      # as an EMPTY diff. PR-Agent then logs "No PR diff fits the /review request",
+      # publishes nothing and exits green, and the guard below reported that as NaN
+      # concurrency exhaustion. It is neither transient nor NaN's doing: every DR
+      # escrow refresh (only `sensitive/**`, ignored on purpose) failed that way,
+      # three runs in a row on #1614 (#1618).
+      #
+      # So ask first, with PR-Agent's own semantics: upstream's `file_filter.py`
+      # turns each glob into `fnmatch.translate(glob)` (plus the glob without a
+      # leading `**/`) and drops a file when any pattern `re.match`es it. The
+      # config is read from the DEFAULT branch, which is where PR-Agent reads it.
+      #
+      # Skipping removes a run that could not review anything; it never grants a
+      # review. `review-attestation` still reads the PR as unreviewed until
+      # CodeRabbit or a human reviews it. Any failure to answer falls through to
+      # running PR-Agent, which is the behaviour before this step existed.
+      - name: Skip when PR-Agent would receive an empty diff
+        id: reviewable
+        if: steps.credential.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -uo pipefail
+          CFG=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.pr_agent.toml?ref=${DEFAULT_BRANCH}" \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null) || CFG=""
+          FILES=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
+            --jq '.[].filename' 2>/dev/null) || FILES=""
+          export CFG FILES
+          kept=$(python3 - <<'PY'
+          import fnmatch, os, re, tomllib
+          ignore = tomllib.loads(os.environ["CFG"]).get("ignore", {})
+          patterns = list(ignore.get("regex", []) or [])
+          for glob in ignore.get("glob", []) or []:
+              patterns.append(fnmatch.translate(glob))
+              if glob.startswith("**/"):
+                  patterns.append(fnmatch.translate(glob[3:]))
+          compiled = [re.compile(p) for p in patterns]
+          files = [f for f in os.environ["FILES"].splitlines() if f]
+          if not files:
+              raise SystemExit("no file list")
+          print(sum(1 for f in files if not any(r.match(f) for r in compiled)))
+          PY
+          ) || kept=""
+          if [ "$kept" = "0" ]; then
+            echo "::notice::every file in this PR is in .pr_agent.toml's [ignore] list, so PR-Agent" \
+              "has nothing it may read; not running it. This is not a review: review-attestation" \
+              "still needs CodeRabbit or a human (#1618)."
+            echo "reviewable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "reviewable=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: PR-Agent
+        if: steps.reviewable.outputs.reviewable != 'false'
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move `v0.42.0` decides what runs here, and what runs here holds
         # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
@@ -275,8 +329,11 @@ jobs:
         # those would teach the reader to ignore this check.
         # `always()` would also run this after the credential step failed and stack a
         # wrong NaN-concurrency diagnosis on top of the remedy; skip it in that case.
+        # And skip it when the step above found nothing PR-Agent may read: no review
+        # was possible, and the NaN diagnosis below would be false (#1618).
         if: >
           always() && steps.credential.outcome != 'failure'
+            && steps.reviewable.outputs.reviewable != 'false'
             && (github.event_name == 'pull_request'
               || (github.event_name == 'issue_comment'
                   && contains(github.event.comment.body, '/review')))
