@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-136-model-limit-drift"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-21"
 issue: "mlorentedev/dotfiles#1594"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
