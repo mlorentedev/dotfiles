@@ -1,124 +1,139 @@
 ---
 spec: "HARNESS-136-model-limit-drift"
-verdict: "FAIL"
-reviewed_sha: "c7a8adca25b9e151340d68b15d56502378c3a7bd"
-reviewer: "nan/qwen3.8-flash"
+verdict: "PASS"
+reviewed_sha: "65edefe72eb5bd40a6e2a21776c4a6e2380e16df"
+reviewer: "nan/deepseek-v4-flash"
 date: "2026-09-22"
 ---
 
 ## Adversarial review
 
-**Scope**: HARNESS-136-model-limit-drift (issue #1594, PR #1595 — merged as `c52e637`)
+**Scope**: HARNESS-136-model-limit-drift, round 2 (issue #1594, PR #1595 merged as
+`c52e637`; round-1 fixes in `65edefe`)
 **Sources**: `specs/HARNESS-136-model-limit-drift/{proposal,tasks,verification,features}.md`;
-diff `3f98705...c7a8adc` as resolved by the launcher. That range also contains three
-commits from other specs (`799ca66` = CLI-078, which carries its own spec folder; `5780215`
-and `c7a8adc`, dependabot bumps) — an artifact of the base being resolved before those
-merged, not scope creep of this change. The review judged `c52e637`'s files as this spec's
-diff: `ai/pi/models.json`, `cli/internal/doctor/checks_model_limits.go` (+_test),
-`doctor.go` registration, lesson-283, and the spec artifacts.
+diff `3f98705863f02e5ae601de91e46090eb2294ac97...HEAD`, the base the launcher resolved
+and stated. That range also contains three commits from other work (`799ca66` = CLI-078,
+which carries its own spec folder; `5780215` and `c7a8adc`, dependabot bumps) — an
+artifact of the base being resolved before those merged, not scope creep of this change.
+This round reviewed `c52e637`'s files as the spec's diff (`ai/pi/models.json`,
+`cli/internal/doctor/checks_model_limits.go` + `_test.go`, the `doctor.go`
+registration, lesson-283, the spec triad) plus `65edefe`'s fixes to the check, its tests
+and the spec artifacts. Round 1's `review.md` is preserved at `b956ead`; this file
+replaces it, and its dispositions are recorded in `verification.md`.
 
-Everything below was verified by running, not by reading claims: `go build ./...`,
-`go vet ./...`, `GOOS=windows go vet ./...` clean; `go test -count=1 ./...` green;
-all 8 `features.json` commands re-run verbatim from the repo root (f1–f8 all exit 0);
-`golangci-lint` at the pinned v2.12.2 → 0 issues; `bats tests/pi-config.bats` 18/18.
-The proof-by-consequence claim reproduces exactly: the built binary reports
-`[ OK ] 7 models match the provider catalog` against this tree and **9 findings (2 FAIL,
-7 WARN)** against the pre-fix `ai/pi/models.json` from `3f98705`. The seven corrected
-values were independently re-derived from `~/.cache/opencode/models.json` (parsed with
-python, not with the check's own parser) and cross-checked against
-<https://nan.builders/docs/models> (qwen3.8-flash 262K ctx/131K max, mimo-v2.5 1M/131K,
-contexts 1M/262K for the rest) — **AC1 is genuinely met**. The four mutations claimed by
-`verification.md` were re-run and each is killed by exactly the named test: drop provider
-scoping → `TestModelLimitsResolvesTheSameIdPerProvider` (over 25 runs), swap severities →
-both severity tests, drop the `actual == 0` guard → `TestModelLimitsIgnoresAnUnpublishedLimit`,
-absent catalog PASSes → `TestModelLimitsSkipsWhenTheCatalogIsNotCached`. AC8 holds:
-`checkModelLimits` takes no fix flag (registration passes only `sys, cfg, rep`), and a
-full read of the 214-line file finds no write syscall — only `os.ReadFile`.
-No `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` tags remain in any contract file.
+**Reviewer identity** is the one the launcher drew and stated: `nan/deepseek-v4-flash`,
+recorded here exactly as `harness/reviewer-pool.json` spells it. I did not write this
+change.
 
-What below is not claimed by the author was found by reproduction with temporary probes
-and mutations (all reverted; tree verified byte-identical afterwards).
+Everything below was verified by running, not by reading claims. `go build ./...`,
+`go vet ./...` and `GOOS=windows go vet ./...` clean; `go test -count=1 ./...` green
+across the module; `golangci-lint run` (pinned v2.12.2) 0 issues; all 8 `features.json`
+commands re-run verbatim → 8/8 exit 0; `bats tests/{pi-config,guard-pi-models-schema,reviewer-pool}.bats`
+→ 18/18, 3/3, 4/4. The consequence proof reproduces in both directions: the built binary
+prints `[ OK ] 7 models match the provider catalog` against this tree and **9 findings
+(2 FAIL, 7 WARN)** against the pre-fix `ai/pi/models.json` from `3f98705` (staged into a
+temp `DOTFILES_REPO_DIR`, so the real tree was never touched). AC1's seven values were
+re-derived independently from `~/.cache/opencode/models.json` (python, not the check's own
+parser — 7/7 match, zero mismatches) and cross-checked against
+<https://nan.builders/docs/models>, fetched live this session, which states 1M context for
+glm5.3/glm5.3-flash/deepseek-v4-flash/mimo-v2.5, 262K for qwen3.8-flash (with "Max answer
+131K"), 262K for gemma4 and 262K for qwen3.6 — consistent with the corrected declaration.
+The mutation battery was re-run: 9 of 12 mutations killed, and the 3 survivors are
+findings F2–F3 below.
 
 ### Spec and task alignment
 
-- AC1 [x] — met, verified independently above.
-- AC2/AC3 [x] — met; both directions tested, neither leaks into the other, both numbers
-  named. Mutation-killed.
-- AC4 [x] — mechanism met and test-pinned, but the motivating fact in `proposal.md` is
-  inaccurate against the catalog today (finding F3).
-- AC5/AC6 [x] — met for the paths they test; AC6's "never a vacuous PASS" is violated by
-  one untested corner (finding F2).
-- AC7 [x] — **only half implemented.** The AC names "an unreadable **or** unparseable
-  declaration"; the code FAILs on unparseable and WARNs on unreadable, and no test covers
-  the unreadable half (finding F1). `tasks.md`'s "Every acceptance criterion is covered by
-  at least one test" is therefore also overstated.
-- AC8 [x] — met.
-- `tasks.md` final box ("PR opened referencing this spec folder") is unchecked while #1595
-  merged 2026-09-22T04:09:41Z — stale bookkeeping (F7).
+- AC1 [x] — met; restored independently this session (cache parse + provider docs).
+- AC2/AC3/AC4 [x] — met; both directions and both providers pinned by named tests.
+- AC5 [x] — met.
+- AC6 [x] — met; the round-1 vacuous-PASS corner (F2) is now fixed **and** its fix is
+  genuinely pinned (mutating the new `fields > 0` guard is killed by
+  `TestModelLimitsDoesNotCountAModelWithNoPublishedLimits`).
+- AC7 [x] — **now fully met.** Round 1's REAL Major (F1: the unreadable half WARNed, so
+  doctor exited 0 on a declaration nobody read) is applied: `readDeclaration` FAILs on any
+  read error but absence, and `TestModelLimitsFailsOnAnUnreadableDeclaration` is red with
+  the FAIL mutated back to WARN — reproduced, and the test is *not* skipped here
+  (`os.Getuid() == 0` is false on this machine, and the mode-000 read genuinely fails).
+  Note the happy accident in f7's command — `grep -c '^--- PASS:' | grep -qx 2` — which
+  turns an environment where the test *skips* (root, or a filesystem ignoring mode 000)
+  into a red verification rather than a silent one.
+- AC8 [x] — met (registration passes `sys, cfg, rep` only; the file's only `os.` calls are
+  two `ReadFile`/`IsNotExist` pairs), though its verification command is weak (F5).
+- `tasks.md` closing boxes are now all ticked, the PR box included, and `features.json`
+  carries `state: "passing"` with per-feature evidence — round 1's F7 applied.
+- Round-1 dispositions in `verification.md` are honest: F1–F5 and F7 applied, F6 declined
+  with a reason. The one overstated line among them is F5's (F4 below).
+- No `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` tags remain in any contract file.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
 |----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | AC7 / `checks_model_limits.go:117-124` | AC7 requires an **unreadable** declaration to FAIL; the code emits WARN on the non-IsNotExist `ReadFile` error branch (only unparseable FAILs). A WARN does not move doctor's exit code (0 unless ≥1 FAIL, `doctor.go:24`), so a consumer gating on the exit status treats a declaration it never read as acceptable. The AC is ticked `[x]`, but its unreadable half is neither implemented nor tested. | Reproduced this session with a temporary probe: declaration chmod 000 → `FAIL=0 WARN=1`; `grep -ci 'Chmod\|permission'` over `checks_model_limits_test.go` → 0 | UNTESTED (no `TestModelLimitsFailsOnAnUnreadableDeclaration` exists) | code + tests — change the branch to Fail and name a test for it; *or* if WARN was deliberate (per-machine vs repo-content asymmetry), the contract must say so — either route ends in a re-review |
-| Major | THEORETICAL | AC6 / `compared` counter | `compared++` fires on any catalog **hit**, even a row publishing no limits at all; both fields then skip (`d.actual == 0`), findings stay 0, and the check prints `1 models match the provider catalog` — "nothing to compared" reading as agreement, the exact confusion the spec's own design rule forbids and AC6's clause names. The input shape is not exotic: 121 of 7,556 rows in today's live cache have both limits zero/absent (none under `nan`/`openrouter` yet — which is why this is THEORETICAL, not REAL). | Reproduced with a temp probe (`{"nan":{"models":{"brand-new":{}}}}` → PASS printed); survival-proved: mutating `compared++` to count only actually-comparable fields passes the entire 7-test suite (mutation M5 survives), so nothing pins the semantics either way | UNTESTED — the vacuous-PASS corner has no named test; M5 survival demonstrates the suite's blindness | code + tests |
-| Minor | REAL | AC4 motivation / spec accuracy | `proposal.md` ("Resolved — provider scoping") says `qwen3.8-flash` "is published by both `nan` … and `openrouter` (1000000)". In today's cache openrouter keys it `qwen/qwen3.8-flash` — no bare row. The real same-id collision is with 10 *other* providers (alibaba 1000000, requesty 1048576, hyper, llmgateway, vancine, opencode-go…). The mechanism AC4 protects is more load-bearing than stated (e.g. `deepseek/deepseek-chat` exists under 6 providers with limits from 128000 to 1000000), but the named example is verifiably wrong. | Cache scan this session (python, independent of the check) | n/a (documentation) | spec artifacts (contract set — this FAIL round is when to fix it); optionally the code doc-comment's "one model name … two providers" sentence |
-| Minor | THEORETICAL | test gap / "What" promise | The "not inside a checkout → SKIP, never PASS" behaviour named in the What section has no test: replacing that `rep.Skip` with a vacuous `rep.Pass` keeps all 7 tests green (mutation survived this session). Trivial branch today; unpinned regression surface for the check's core invariant. | Mutation run this session | UNTESTED | tests (one fixture with `RepoDir: ""`) |
-| Minor | REAL | Maintainability / repo rules | `checkModelLimits` is 84 non-comment lines, CC≈17 — against AGENTS.md thresholds (<40 lines, CC<10) and the rubric's B bar (CC≤15). golangci-lint's "0 issues" does not contradict this: funlen/gocyclo are not in the enabled set, so the repo rule is unenforced here, and the sibling `checkModelPins` has the same shape (101 lines, CC≈20). Following the neighbour is defensible; the mechanical rubric still lands on C. | Measured this session (comment/string-stripped CC count; `golangci-lint` v2.12.2 0 issues) | n/a (structure) | code (extract the two read-parse blocks), or a package-wide decision recorded once as a follow-up ticket — not a blocker for this PR alone |
-| Minor | SPECULATIVE | path edge / whole package | `sys.home()` can return `""` (no HOME and no USERPROFILE), making the catalog path cwd-relative — a stray `.cache/opencode/models.json` under the cwd could then satisfy the comparison. No sibling doctor check guards this either (checked `checks_deploy.go`, `checks_agentconfig.go`), so it is package-wide convention, not introduced here. Surfaced, not gated. | Code read; not reproduced (would require an environment no real shell provides) | UNTESTED | — (surface only; do not gate) |
-| Minor | REAL | Handoff / record | `features.json` still carries `state: "pending"` and `evidence: ""` for all 8 entries although `tasks.md` documents the harness filling them (`verification.md` instead asserts the runs narratively); and `tasks.md`'s closing box for "PR opened" is unchecked while PR #1595 is merged. Repo convention is mixed — 4 of 8 archived specs sampled also remain pending — so this is hygiene, not a gate. | `gh pr view 1595` + archive folder scan this session | n/a | spec artifacts (contract set) — record while the contract is open for this re-review round |
+| Minor | REAL | docs accuracy (AC4 narrative) | Round 1's F3 correction is **partial**: `proposal.md` and the code doc-comment now name the real collision partners, but `checks_model_limits_test.go:114-115` still asserts "`qwen3.8-flash` is published by BOTH nan (262144 context) and openrouter (1000000)" — openrouter keys the row `qwen/qwen3.8-flash` and publishes no bare entry. The corrected wording is also numerically loose: it says "a dozen other providers" where the cache shows **9** others (alibaba, alibaba-cn, alibaba-token-plan, alibaba-token-plan-cn, hyper, llmgateway, opencode-go, requesty, vancine). The mechanism AC4 protects is unaffected; only the prose is wrong. | Cache scan this session, independent of the check: bare `qwen3.8-flash` under 10 providers total (nan 262144; the other 9 at 1000000/1048576); `openrouter` has only `qwen/qwen3.8-flash` (1000000) | n/a (documentation) — UNTESTED | tests (free to edit, outside the staleness set); `proposal.md`'s "a dozen" is contract-set → see next steps |
+| Minor | REAL | test coverage — PASS/finding exclusivity | Nothing pins "a PASS is never printed on a run that reported a finding". Rewriting `if findings == 0 { rep.Pass(...) }` to an unconditional `rep.Pass(...)` leaves all 10 tests green, and the report would then print "1 models match the provider catalog" *and* the drift line it contradicts — the same shape of contradiction round 1's F2 was about, one branch over. The counting semantics themselves **are** pinned (the fix's own mutation is killed). | Mutation M7 this session: `*** SURVIVED ***` (all `TestModelLimits*` green) | UNTESTED | tests |
+| Minor | REAL | test coverage — the remaining "cannot compare" branches | Round 1's F4 pinned the no-checkout SKIP but not its two siblings: (a) declaration absent → SKIP (deleting the `os.IsNotExist` case and letting it FAIL survives), (b) catalog present but unreadable → WARN (swapping it to SKIP survives). Both are the check's own "a broken path must not answer 'found nothing'" doctrine. | Mutations M10, M11 this session: both `*** SURVIVED ***` | UNTESTED | tests |
+| Minor | REAL | report accuracy — PASS message overstates coverage | When the catalog publishes only one of the two limits, the model still counts and the check prints `1 models match the provider catalog`, though `maxTokens` was never compared. AC6 is not violated (something *was* compared, so this is not the vacuous PASS round 1 found), but the sentence reads as agreement about both fields. | Probe this session: catalog `{"nan":{"models":{"qwen3.6":{"limit":{"context":262144}}}}}` → `PASS` printed, `maxTokens` unexamined | UNTESTED | code + tests — but f1's verification greps this exact sentence, so a change lands with a `features.json` edit; ticket it rather than edit the contract under a passing verdict |
+| Minor | REAL | AC8's verification command is vacuous when the artifact is absent | `features.json` f8 is `! grep -nE 'os\.(WriteFile\|Create\|Remove\|Rename)\|rep\.Fix\|fix bool' internal/doctor/checks_model_limits.go`. Against a **missing** path `grep` exits 2 and `!` turns that into 0 — the command passes with the file gone, which is precisely the "an absent check read as agreement" shape `verification.md` says it fixed for AC1 and lesson-283 documents. Mitigations: f2–f7 compile the same package, so a deleted file cannot pass the suite as a whole, and the command does discriminate the positive case (`exit=1` on a file containing `os.WriteFile`). The alternation also cannot see `os.OpenFile(…, os.O_WRONLY)`, an enumeration weakness rather than a live defect. | Reproduced: absent path → `grep: … No such file` + `exit=0`; file with `os.WriteFile` → `exit=1` | UNTESTED (nothing guards f8 itself) | features.json (contract set) → follow-up ticket / `verification.md` disposition |
+| Question / assumption | REAL | coverage boundary (spec) | The spec never names the repo's **second** declaration of the same two fields: `ai/opencode/opencode.jsonc` carries `provider.nan.models[*].limit.{context,output}` for the same six models, and nothing reads it — `checkModelPins` resolves ids only, and no bats/Go test asserts those numbers (grep across `cli/`, `tests/`, `scripts/`). Its values disagree with the catalog (qwen3.8-flash context 1000000 vs 262144 — the check's own FAIL direction; qwen3.6/gemma4 256000 vs 262144; `output` 8192 throughout). They are **deliberate, not drift**: `ai/pi/README.md` documents that pi declares qwen3.8-flash's *native* 262,144 rather than the *served* 1M (YaRN), and AI-033's risks record the asymmetry. So this is a boundary question, not a blocker — but two consequences are worth a decision: (i) the spec's Out-of-scope list explains *which surface* the check reads ("a limit finding is only actionable where it can be committed, so this reads the checkout") without naming this file, and a reader may over-read an archived HARNESS-136 as covering the repo's declarations; (ii) the check treats the catalog as the ceiling, so a future declaration of the *served* window — the policy opencode.jsonc follows today — would FAIL as an over-declaration (THEORETICAL: not the state of `ai/pi/models.json` today). | `opencode.jsonc:66-67, 95-96, 124-125, 153-154, 182-183, 211-212`; `ai/pi/README.md` ("capability nuance for `qwen3.8-flash`"); `specs/archive/AI-033…/proposal.md` risks; cache scan | UNTESTED | spec (contract set — cannot be edited under a passing verdict) → ticket + `verification.md` disposition |
+| Minor | REAL | verification claim accuracy / repo rule | `verification.md`'s F5 disposition says "the orchestrator is now under the AGENTS.md bar". It is not, literally: `gocyclo` reports `checkModelLimits` CC=11 (AGENTS.md wants <10; the rubric's own B band is ≤15), and the function is 52 lines raw / 41 non-comment (AGENTS.md wants <40). The *fix* is real and large (round 1 measured CC≈17 / 84 lines) and the rubric lands on **B**, not C — but the claim overshoots the measurement. | `gocyclo ./internal/doctor/` → `11 doctor checkModelLimits checks_model_limits.go:93`; `checkModelPins` still CC=20, 101 lines, untouched | n/a (claim, not behaviour) | verification.md (excluded from the staleness check — free to correct) |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | C | AC7's unreadable half unimplemented and untested (F1, reproduced); AC6's never-vacuous-PASS rule violated by the zero-limit-row corner (F2); AC1–AC5, AC8 verified met. |
-| Verification       | B | Every claim I could re-run I re-ran and it held (8/8 feature commands, build/vet/tests/lint/bats, both-direction consequence proof, 4/4 claimed mutations killed, AC1 values independently re-derived from two sources); deductions for features.json never recording evidence and for an `[x]` AC whose second half no test covers. |
-| Scope              | B | The spec's own diff matches the proposal and the declared out-of-scope list exactly (no writes, no extra fields, no CI snapshot); the review range's three other-PR commits are a base-resolution artifact, judged as such. |
-| Reliability        | B | Loud-failure discipline on parse, deterministic provider ordering, SKIP-not-PASS on absent cache; costs are the WARN-instead-of-FAIL and vacuous-PASS corners above. |
-| Maintainability    | C | New code at CC≈17 / 84 lines breaches the repo's <10 / <40 rules and the rubric's ≤15 bar (mechanically C); comments explain WHY unusually well, and the shape follows the established sibling. |
-| Handoff-readiness  | B | Spec triad complete, two resolved risks recorded with their measurements, lesson-283 captured and indexed with the right generalisation; stale PR box and unfilled features.json evidence. |
+| Correctness        | B | AC1–AC8 all verified this session, the round-1 REAL Major (AC7's unreadable half) and Major (AC6's vacuous PASS) applied and mutation-proof; deductions for the report-accuracy residue (PASS message on a partially-compared model) and the untested declaration-shape corners (`{"provider":…}`, `null`, per-field typo → SKIP blaming the catalog / WARN claiming "0"). |
+| Verification       | B | Every claim I could re-run I re-ran and it held: 8/8 feature commands, build/vet/tests/lint/bats, both-direction consequence proof, 9 killed mutations, AC1 re-derived from two sources; deductions for f8's absent-file vacuity, two unpinned branches, and one overstated claim (CC 11 ≠ "under the bar"). |
+| Scope              | B | The spec's own diff matches the proposal and the declared out-of-scope list exactly (no `--fix`, no committed snapshot, two fields only, checkout not deployed copy) and the nine-value data correction is the whole of the non-mechanism change; the three other-PR commits in the range are the base-resolution artifact; one coverage boundary left unstated (the Question above). |
+| Reliability        | B | Loud failure on an unusable declaration, documented asymmetry (repo content FAILs, machine cache WARNs), deterministic provider ordering, absent-cache and no-checkout both SKIP-not-PASS, read-only by inspection; costs are the two unpinned branches (F3) and a SKIP whose message blames the catalog when the declaration is what declared nothing. |
+| Maintainability    | B | Split into `readDeclaration`/`readCatalog`/`compareModel` (CC 11, 5 and 4 and 4) with WHY comments that carry the round-1 reviews' reasoning; still 1 over the repo's <10 CC bar, and the sibling `checkModelPins` (CC 20) is untouched by design. |
+| Handoff-readiness  | A | `features.json` records state + evidence (round 1's F7 applied), the PR box is ticked, the round-1 dispositions are tabulated on the record, lesson-283 is captured and indexed with the right generalisation, and the next owner can re-run every claim from the feature commands alone. |
 
 ### Verdict
 
-**FAIL** — not on rubric (no D) but on severity × reality: F1 is a **REAL Major** (an
-acceptance criterion marked `[x]` is demonstrably only half-implemented, reproduced this
-session, with the missing half UNTESTED), and the rules are explicit that a REAL Major
-forces FAIL until addressed. F2 is a Major of its own kind but labelled THEORETICAL, and
-does not by itself carry the verdict — it should ride along with the fix, since both live
-in the same file the re-review will re-read.
+**PASS** — `severity × reality`. No Blocker and no REAL Major remains: round 1's two
+Majeurs are applied and I confirmed both by mutation rather than by reading the
+disposition table (`readDeclaration` FAIL→WARN reddens
+`TestModelLimitsFailsOnAnUnreadableDeclaration`; restoring the old counting shape reddens
+`TestModelLimitsDoesNotCountAModelWithNoPublishedLimits`). What is left is six tracked
+gaps — five Minor and one Question — and the rubric has no C and no D (all B or above),
+so the mechanical aggregation agrees with the severity axis rather than escalating it.
+The Question row is deliberately *not* scored as a Major: the `opencode.jsonc` values it
+concerns are deliberate and documented, so there is no live defect to block on; what is
+missing is a written boundary, and `dotf spec archive` is the wrong instrument for
+writing one. Round 1's F6 (empty `HOME` → cwd-relative catalog path) stays declined on
+the same ground the round-1 reviewer gave.
 
 ### Recommended next steps
 
-The contract set (`proposal.md`, `tasks.md`, `features.json`) is open for edits in this
-FAIL round — a passing verdict re-reviews whatever it changes, so fix both sides here
-rather than routing around them:
+This is a **PASS**, so the contract set (`proposal.md`, `tasks.md`, `features.json`) is
+closed: the gaps below are tracked, not fixed, and any edit to those three files
+invalidates this verdict and forces another round. Route each one through
+`verification.md` (excluded from the staleness check) as *applied / ticketed / declined
+with a reason*, or into a follow-up ticket — never as a contract edit.
 
-1. **code + tests (F1)**: make the declaration read-error branch `rep.Fail` (matching AC7's
-   letter and the check's own broken-path doctrine), and add a named
-   `TestModelLimitsFailsOnAnUnreadableDeclaration` (chmod-based fixture, cleanup restoring
-   the mode). If instead WARN was the deliberate choice for read errors, say so in AC7's
-   text — but either way the next round must be able to read one story from code and spec.
-2. **code + tests (F2)**: count `compared` only when at least one limit was actually
-   comparable (the M5 shape — proven invisible to the current suite), and add the
-   catalog-hit-with-zero-limits fixture asserting SKIP-not-PASS when nothing was compared.
-3. **spec (F3)**: correct the AC4 motivating example — the collision partners are
-   `alibaba`/`requesty`/`hyper`/`llmgateway`/`vancine`/`opencode-go` (10 providers, bare id),
-   not `openrouter` (which only publishes `qwen/qwen3.8-flash`); optionally refresh the
-   code doc-comment's matching sentence. The mechanism itself needs no change — today's
-   cache shows it is even more needed than argued.
-4. **tests (F4)**: one fixture with `RepoDir: ""` pinning the checkout SKIP; one test for
-   the zero-limit row covers F2's same "never vacuous PASS" rule, so 2+4 together close the
-   two untested SKIP corners.
-5. **handoff (F7 + F5)**: re-run the `features.json` harness so state/evidence are recorded
-   before archive; tick or restate the merged PR's box; and either extract the
-   read/parse helpers to bring `checkModelLimits` inside the repo's CC/length bar or file
-   the package-wide (checkModelPins shares the shape) ticket instead — do not silently
-   leave the rule unenforced *and* unacknowledged.
-6. Re-run `dotf spec review HARNESS-136-model-limit-drift` for round 2. `dotf spec
-   archive` remains correctly refused until a fresh passing review exists on the edited
-   contract files.
-
-**Advisability**: `dotf spec archive` is **not advisable** in this state — the gate itself
-will refuse (FAIL verdict + contract files will have changed). Minimum flip-to-PASS set:
-items 1 (either side of the reconcile), 2, 3, 4 — then a clean round-2 review.
+1. **tests (free to change today, no re-review) — F1+F2+F3.** Correct the test comment
+   that still names openrouter as a bare-id collision partner; add the three missing
+   pinned behaviours: an unconditional `Pass` alongside a finding, an absent declaration,
+   and an unreadable catalog. None of them touches behaviour the ACs already promise, so
+   they are cheap regression armor rather than scope.
+2. **ticket — F4 (PASS message) and F5 (f8's negated grep).** F4 changes the sentence
+   f1's verification greps, so it lands with a `features.json` edit and therefore outside
+   this round; F5 is the same file. A follow-up can make AC8's command structural
+   (`[ -f <path> ] && ! grep …`, or an assertion that the function takes no fix flag)
+   rather than enumerative.
+3. **ticket — the Question row.** Ask the owner to decide whether
+   `ai/opencode/opencode.jsonc`'s `limit.{context,output}` are in scope for limit drift
+   (extend the check, reading a second config shape) or named in a spec's Out-of-scope
+   list with the served-vs-native reason `ai/pi/README.md` already gives. Its
+   qwen3.8-flash context (1000000 vs the catalog's 262144) is the check's FAIL direction
+   and worth a conscious decision rather than an inherited one.
+4. **verification.md.** Restate the F5 disposition honestly (CC 11 / 41 code lines:
+   inside the rubric's B band, still over the repo's <10 bar) and record this round's
+   dispositions with a one-line reason each.
+5. **Archive.** `dotf spec archive HARNESS-136-model-limit-drift` is **advisable** in this
+   state: the verdict is PASS, it is fresh against `65edefe`, and I changed no contract
+   file. Before it runs, `proposal.md`'s frontmatter still says `status: implementing`
+   and the folder is still under `specs/` — the archive checklist in `verification.md`
+   lists both, and flipping that status is a contract edit, so it is the archive step's
+   own job and not a reason for another review round (the gate re-reads the contract set
+   *before* the move, per CLI-034).
