@@ -84,8 +84,10 @@ reviewed and applied.
 6. **Retire the source:** once consumers are verified on the copy, add `retire: true`
    to the `from:` and run reconcile again. It removes the source field only if the
    copy holds the **same** value (compared in memory, never printed); if they differ,
-   one side was rotated and it refuses. Never in the same run as the copy, and always
-   after every other operation. One credential, one place — a search no longer
+   one side was rotated and it refuses. Never in the same *pass* as the copy: the
+   comparison reads the copy from the store after a sync. So one `--apply` may run a
+   second pass that holds only retires, which lets you declare `retire: true`
+   together with the copy. It always runs after every other operation. One credential, one place — a search no longer
    returns two.
 7. **Delete the record:** a satisfied `from:` (source retired, or no retire asked) is
    reported as removable — delete it in a follow-up.

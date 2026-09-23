@@ -159,6 +159,23 @@ condition, cap passes at 1, make `onlyRetires` always true, drop the folder sync
 **4/4 killed.** (The first of these, run against the earlier body-bounded loop,
 never terminated. It is the cause of lesson 286.)
 
+## Adversarial review, round 2 — disposition
+
+`review.md` round 2: **PASS**, `nan/glm5.3-flash` (a different family from round 1's
+`agy/gemini-3.1-pro-high`), reviewed `5fd4de6`, which is the head #1621 merged. The
+reviewer re-ran f1–f8 and f10, corroborated f9 read-only against the live vault, and
+killed 4/4 of its own mutations. The contract set is closed by the verdict; nothing
+below edits it.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Minor (REAL) | Runbook CONVERGE step 6 says a retire is "never in the same run as the copy" | **Applied.** It now states the real invariant: never in the same *pass*, and one `--apply` may run a second pass that holds only retires. That is docs, outside the contract set. |
+| Minor (REAL) | `features.json` evidence cites runs "on top of c74675a", a commit not reachable in the repo | **Recorded, not edited**, as the reviewer advised. `c74675a` was a commit on the stacked #1601 branch. Its commits reached #1600 by cherry-pick, which gave them new SHAs. The provenance that stands is this review's re-execution of f1–f10 against `5fd4de6`. |
+| Minor (THEORETICAL) | A refused retire does not name which side to settle | **Ticketed, #1624.** The error message is code. |
+| Minor (SPECULATIVE) | `sync ci` accepts duplicate names | **Ticketed, #1624.** |
+| Minor (SPECULATIVE) | A fully retired item remains as an empty husk | **Ticketed, #1624.** |
+| Question | Plan→write TOCTOU on "never overwrite" | **Declined, accepted risk.** The proposal records it: a single operator, and concurrent writers are OPS-028. |
+
 ## Promotion candidates
 
 - [ ] Pattern for `00_meta/patterns/`: "declare a data migration as a record the tool
