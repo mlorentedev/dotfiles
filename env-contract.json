@@ -148,7 +148,7 @@
   "optional_binaries": [
     { "name": "claude", "purpose": "Claude Code CLI (MCP registration, plugins)" },
     { "name": "npx", "purpose": "MCP server stdio transports" },
-    { "name": "npm", "purpose": "Node package manager (obsidian-cli, yarn, global tooling)" },
+    { "name": "npm", "purpose": "Node package manager (yarn, global tooling)" },
     { "name": "age", "purpose": "secrets encryption" },
     { "name": "gh", "purpose": "GitHub CLI (PR/issue management; Copilot CLI is the standalone `copilot` binary, not a gh extension since BUG-003)" },
     { "name": "copilot", "purpose": "GitHub Copilot CLI (agentic assistant; winget GitHub.Copilot on Windows, manual install on Linux)" },

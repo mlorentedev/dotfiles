@@ -61,7 +61,7 @@ while the npm package is at 0.5.1: a pin that pins nothing.
 
 Observable outcomes. Each must be testable.
 
-- [x] AC1 — `packages.json` declares `obsidian` (`obsidian-cli`, 0.5.1) and `yarn` (1.22.22) as npm tools; `dotf tools list` shows both.
+- [x] AC1 — `packages.json` declares `yarn` (1.22.22) as an npm tool; `dotf tools list` shows it. *(Amended 2026-09-23, #1615: it originally also declared `obsidian` as npm `obsidian-cli` 0.5.1, which turned out to be an unrelated third-party package. See verification.md.)*
 - [x] AC2 — neither setup script contains an `npm install -g` for `obsidian-cli` or `yarn`, and `setup-windows.ps1` no longer parses `versions.conf` for `YARN_VERSION`.
 - [x] AC3 — `versions.conf` no longer carries `OBSIDIAN_VERSION` or `YARN_VERSION`; `dotf doctor`'s yarn row matches against `packages.json`.
 - [x] AC4 — on the Windows work box: `dotf tools install` reports both at pin (skip) and `dotf doctor` shows `yarn version matches packages.json (1.22.22)`.

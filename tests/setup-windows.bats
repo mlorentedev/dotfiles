@@ -342,14 +342,16 @@ setup() {
     grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
-# --- OPS-042 (#1336): obsidian-cli and yarn are catalog tools ---
-# `obsidian-cli` (npm) provides the `obsidian` binary used by obs-cli.ps1 and
-# the vault-health workflow; yarn is the classic npm-global. Both are
-# packages.json entries converged by `dotf tools install`, which
-# setup-windows.ps1 runs before anything needs them, so the script carries no
-# npm block and no versions.conf parser for either (BUG-013's block retired).
+# --- OPS-042 (#1336): yarn is a catalog tool; obsidian is not npm at all ---
+# yarn is the classic npm-global, a packages.json entry converged by
+# `dotf tools install`, which setup-windows.ps1 runs before anything needs it,
+# so the script carries no npm block and no versions.conf parser for it.
+# The `obsidian` that obs-cli.ps1 and vault health drive is the CLI built into
+# the Obsidian desktop app. The npm `obsidian-cli` this block once named is an
+# unrelated package, now gone from the catalog too (#1615), and the script
+# must not reintroduce it.
 
-@test "setup-windows.ps1 installs obsidian and yarn through dotf tools install, not npm blocks (OPS-042)" {
+@test "setup-windows.ps1 installs yarn through dotf tools install and names no obsidian npm package (OPS-042, #1615)" {
     grep -qE '^\s*dotf tools install\s*$' "$PS1_SCRIPT"
     refute_grep 'obsidian-cli' "$PS1_SCRIPT"
     refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
