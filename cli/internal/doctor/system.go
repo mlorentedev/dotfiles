@@ -102,6 +102,12 @@ type System struct {
 	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
 	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
 	BWServeStatus func() (string, error)
+	// BWServeReadable asks whether the daemon will serve a read, WITHOUT calling
+	// GET /status (secrets.BWServeClient.Readable): secrets.BWServeAbsent,
+	// BWServeRefused or BWServeReady. Any check that gates a read on the daemon
+	// must use this, never BWServeStatus — a status call just before a read
+	// poisons that read (#988, #1611).
+	BWServeReadable func() (string, error)
 	// BWServeLastSync returns when the daemon's OWN cache last pulled from the
 	// server (secrets.BWServeClient.StatusDetail in production); zero when it
 	// never has. It is a different number from BWLastSync — `bw status` reports
@@ -218,7 +224,8 @@ func realSystem() *System {
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
-		UserEnv: userEnvReader(),
+		BWServeReadable: secrets.BWServeClient{}.Readable,
+		UserEnv:         userEnvReader(),
 		BWServeLastSync: func() (time.Time, error) {
 			st, err := secrets.BWServeClient{}.StatusDetail()
 			return st.LastSync, err

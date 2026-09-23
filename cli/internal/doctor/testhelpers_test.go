@@ -83,6 +83,9 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// Default: no daemon running — the common case (nothing has run `dotf
 		// secrets unlock`). Tests exercising the daemon states inject their own.
 		BWServeStatus: func() (string, error) { return "absent", nil },
+		// Same default through the readability probe, which is what a check that
+		// gates a read must ask (#1611).
+		BWServeReadable: func() (string, error) { return secrets.BWServeAbsent, nil },
 		// Default: the daemon's cache is as fresh as the clock, so the cache-age
 		// WARN stays quiet unless a test ages it deliberately.
 		BWServeLastSync: func() (time.Time, error) { return fixedTestNow, nil },
