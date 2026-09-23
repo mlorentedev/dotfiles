@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.56.0](https://github.com/mlorentedev/dotfiles/compare/v0.55.0...v0.56.0) (2026-09-23)
+
+
+### Features
+
+* **secrets:** drift fixes, and converge the Bitwarden layout with dotf secrets reconcile ([#1600](https://github.com/mlorentedev/dotfiles/issues/1600)) ([32eb6fc](https://github.com/mlorentedev/dotfiles/commit/32eb6fc5a8060215b5cdcc252a06e902b0ecdaf8)), closes [#1596](https://github.com/mlorentedev/dotfiles/issues/1596)
+* **secrets:** report where the Bitwarden store disagrees with the registry ([#1597](https://github.com/mlorentedev/dotfiles/issues/1597)) ([799ca66](https://github.com/mlorentedev/dotfiles/commit/799ca6663a8647ff3158ff1504c60c9971c4c506))
+
+
+### Bug Fixes
+
+* **doctor:** fail on an unreadable model declaration, and stop counting nothing as a match ([#1602](https://github.com/mlorentedev/dotfiles/issues/1602)) ([33c3aa7](https://github.com/mlorentedev/dotfiles/commit/33c3aa7bf94b07a173632059371d2e1331b4c007)), closes [#1594](https://github.com/mlorentedev/dotfiles/issues/1594)
+* **harness:** new-ticket verified the board with a listing that truncates silently ([#1587](https://github.com/mlorentedev/dotfiles/issues/1587)) ([3b6a18c](https://github.com/mlorentedev/dotfiles/commit/3b6a18cd390b389aec203855c4a34dd96207fc76))
+* **pi:** align model limits with the provider catalog, and report future drift ([#1595](https://github.com/mlorentedev/dotfiles/issues/1595)) ([c52e637](https://github.com/mlorentedev/dotfiles/commit/c52e637cd2e014d5c897853f74841dbdc1061f66))
+
 ## [0.55.0](https://github.com/mlorentedev/dotfiles/compare/v0.54.0...v0.55.0) (2026-09-07)
 
 
