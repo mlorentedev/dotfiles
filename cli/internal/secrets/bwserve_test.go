@@ -58,6 +58,9 @@ type fakeBWServe struct {
 	// syncs counts POST /sync, so a test can assert a write made itself visible.
 	syncs int
 
+	// deleted records DELETE /object/item/{id} ids in arrival order.
+	deleted []string
+
 	// failSync makes POST /sync report failure, exercising the written-but-stale path.
 	failSync bool
 
@@ -109,6 +112,8 @@ func (f *fakeBWServe) dispatch(w http.ResponseWriter, r *http.Request) {
 		f.handlePutItem(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/object/item":
 		f.handleCreateItem(w, r)
+	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/object/item/"):
+		f.handleDeleteItem(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/list/object/folders":
 		f.handleListFolders(w)
 	case r.Method == http.MethodPost && r.URL.Path == "/object/folder":
@@ -197,6 +202,18 @@ func (f *fakeBWServe) handlePutItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f.items[id] = json.RawMessage(body)
 	writeEnvelope(w, true, "", json.RawMessage(body))
+}
+
+func (f *fakeBWServe) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/object/item/")
+	if _, ok := f.items[id]; !ok {
+		writeEnvelope(w, false, "Not found.", nil)
+		return
+	}
+	delete(f.items, id)
+	delete(f.names, id)
+	f.deleted = append(f.deleted, id)
+	writeEnvelope(w, true, "", nil)
 }
 
 func (f *fakeBWServe) handleCreateItem(w http.ResponseWriter, r *http.Request) {

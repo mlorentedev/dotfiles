@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-082-reconcile-dedupe-f1",
+    "behavior": "AC1 — the plan gives every retire a verdict and prints no value",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestVerifyRetiresGivesEachRetireAVerdict$|^TestReconcilePlanShowsEachRetireVerdict$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-082-reconcile-dedupe-f2",
+    "behavior": "AC2 — a retire that is not equal blocks and names how to settle it; apply re-verifies with the same exits",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestVerifyRetiresNamesHowToSettleEachBlocker$|^TestApplyRetireRefusalNamesTheExits$|^TestApplyRetireRefusesWhenTheValuesDiffer$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-082-reconcile-dedupe-f3",
+    "behavior": "AC3 — the registry validates retired: entries, including an item a declaration still names",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestRegistryValidatesRetiredItems$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-082-reconcile-dedupe-f4",
+    "behavior": "AC4 — a retired item is planned with its shape, deleted by id on both backends, and reported gone",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestPlanRetiredItems$|^TestApplyDeletesARetiredItem$|^TestBWServeWriter_DeleteItem$|^TestBWPut_DeleteItemDeletesByID$|^TestReconcileDeletesARetiredItem$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 5",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-082-reconcile-dedupe-f5",
+    "behavior": "AC5 — a retired name that matches several items blocks",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestPlanRetiredItems$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-082-reconcile-dedupe-f6",
+    "behavior": "AC6 — no planted value reaches any new plan, apply or error output",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestVerifyRetiresGivesEachRetireAVerdict$|^TestApplyRetireRefusalNamesTheExits$|^TestReconcilePlanShowsEachRetireVerdict$|^TestReconcileDeletesARetiredItem$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 4",
+    "state": "pending",
+    "evidence": ""
+  }
+]

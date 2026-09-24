@@ -287,6 +287,33 @@ type BWFieldRemover interface {
 	RemoveField(item, field string) error
 }
 
+// BWItemDeleter deletes a whole item, resolved by name to exactly one id. Only a
+// registry retired: entry reaches it (CLI-082). Bitwarden moves a deleted item to
+// its trash, recoverable for 30 days.
+type BWItemDeleter interface {
+	DeleteItem(item string) error
+}
+
+// DeleteItem resolves item to its id through the same lookup every edit uses and
+// deletes by id. Deleting by name would act on whichever item bw picked.
+func (p BWPut) DeleteItem(item string) error {
+	cur, err := p.run(nil, "get", "item", item)
+	if err != nil {
+		if isNotFound(err.Error()) {
+			return fmt.Errorf("%w: %q", ErrBWItemNotFound, item)
+		}
+		return fmt.Errorf("bw get item %q (it must exist to delete): %w", item, err)
+	}
+	id, err := itemID(cur)
+	if err != nil {
+		return err
+	}
+	if _, err := p.run(nil, "delete", "item", id); err != nil {
+		return fmt.Errorf("bw delete item %q: %w", item, err)
+	}
+	return nil
+}
+
 // removeItemField returns itemJSON without field, preserving every other key. It
 // follows the dispatch setItemField and fieldFromItem share: notes and the login
 // pair are native to the item type and are cleared; anything else is a custom field
