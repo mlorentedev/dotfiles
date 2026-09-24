@@ -32,7 +32,9 @@ func newSecretsReconcileCmd() *cobra.Command {
 			"  create-item    an absent item, copied from its declared bw.from source\n" +
 			"  add-field      an absent field, copied from its declared bw.from source\n" +
 			"  retire-source  a bw.from source with retire: true, once verified equal\n" +
-			"  delete-item    an item the registry lists under retired:, shown with its shape\n\n" +
+			"  delete-item    an item the registry lists under retired:, shown with its shape\n" +
+			"  delete-field   a field the registry lists under retired: with field:, shown with\n" +
+			"                 what the item keeps; for a dead value that no retire can verify equal\n\n" +
 			"It never invents a value (an absent item with no bw.from is BLOCKED, with its\n" +
 			"remedy), never overwrites one (an existing field is left alone), never moves an\n" +
 			"item declared with no folder, and never prints a value.\n\n" +
@@ -175,6 +177,8 @@ func printPlan(out io.Writer, p secrets.ReconcilePlan) {
 				op.Kind, op.FromItem, op.FromItem, op.FromField, op.Item, op.Field)
 		case secrets.OpDeleteItem:
 			_, _ = fmt.Fprintf(out, "- %-14s %-24s holds: %s; retired: %s\n", op.Kind, op.Item, op.Shape, op.Reason)
+		case secrets.OpDeleteField:
+			_, _ = fmt.Fprintf(out, "- %-14s %-24s field %q, keeps: %s; retired: %s\n", op.Kind, op.Item, op.Field, op.Shape, op.Reason)
 		default:
 			_, _ = fmt.Fprintf(out, "+ %-14s %-24s field %q in %s, copied from %s/%q\n",
 				op.Kind, op.Item, op.Field, folderLabel(op.Folder), op.FromItem, op.FromField)
@@ -194,8 +198,8 @@ func printSatisfied(out io.Writer, p secrets.ReconcilePlan) {
 	for _, id := range p.Satisfied {
 		_, _ = fmt.Fprintf(out, "note: bw.from on %s is satisfied; it can be removed from the registry\n", id)
 	}
-	for _, item := range p.RetiredGone {
-		_, _ = fmt.Fprintf(out, "note: retired item %s is gone; its entry can be removed from retired:\n", item)
+	for _, entry := range p.RetiredGone {
+		_, _ = fmt.Fprintf(out, "note: retired %s is gone; its entry can be removed from retired:\n", entry)
 	}
 }
 
