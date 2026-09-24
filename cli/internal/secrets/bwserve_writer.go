@@ -22,6 +22,7 @@ type BWWriteClient interface {
 	BWFolderResolver
 	BWMover
 	BWFieldRemover
+	BWItemDeleter
 }
 
 // BWServeWriter is the serve-backed BWWriteClient: the write analog of BWServeReader,
@@ -75,6 +76,26 @@ func (w BWServeWriter) MoveItem(item, folderID string) error {
 // RemoveField removes field from an existing item, through the same core as BWPut.
 func (w BWServeWriter) RemoveField(item, field string) error {
 	return w.editItem(item, func(cur []byte) ([]byte, error) { return removeItemField(cur, field) })
+}
+
+// DeleteItem resolves item to one id through the read path's lookup, deletes it,
+// then syncs so the next plan does not still list it.
+func (w BWServeWriter) DeleteItem(item string) error {
+	cur, err := BWServeReader(w).getItemJSON(item)
+	if err != nil {
+		if errors.Is(err, ErrBWItemNotFound) {
+			return fmt.Errorf("%w: %q", ErrBWItemNotFound, item)
+		}
+		return fmt.Errorf("bw serve get item %q (it must exist to delete): %w", item, err)
+	}
+	id, err := itemID(cur)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Client.call(http.MethodDelete, "/object/item/"+url.PathEscape(id), nil); err != nil {
+		return fmt.Errorf("bw serve delete item %q: %w", item, err)
+	}
+	return w.syncAfterWrite(item)
 }
 
 // editItem is the read-modify-write both edits share; see SetField for why each step

@@ -1,7 +1,6 @@
 package secrets
 
 import (
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"sort"
@@ -33,11 +32,14 @@ const (
 	OpCreateItem   = "create-item"
 	OpAddField     = "add-field"
 	// OpRetireSource removes a from: source field once its destination exists and
-	// holds the same value. Last, because it is the only operation that deletes.
+	// holds the same value. After every copy, because it deletes.
 	OpRetireSource = "retire-source"
+	// OpDeleteItem removes an item the registry lists under retired: (CLI-082).
+	// Last of all: it deletes a whole item, and only by declaration.
+	OpDeleteItem = "delete-item"
 )
 
-var opRank = map[string]int{OpCreateFolder: 0, OpMoveItem: 1, OpCreateItem: 2, OpAddField: 3, OpRetireSource: 4}
+var opRank = map[string]int{OpCreateFolder: 0, OpMoveItem: 1, OpCreateItem: 2, OpAddField: 3, OpRetireSource: 4, OpDeleteItem: 5}
 
 // ReconcileOp is one planned change. Coordinates only: the value a create-item or
 // add-field copies is read at apply time and never stored here, so a plan can be
@@ -52,6 +54,14 @@ type ReconcileOp struct {
 	FromItem, FromField string
 	// Current is where a move-item finds the item now, for the plan line.
 	Current string
+	// Verdict is a retire's plan-time comparison of source and destination
+	// (VerifyRetires): one of the Retire* constants, never anything derived from a
+	// value beyond equality.
+	Verdict string
+	// Shape and Reason describe a delete-item: what the item holds, by name only,
+	// and why the registry retired it. The plan prints both so the operator reads
+	// what goes before it goes.
+	Shape, Reason string
 }
 
 // Target is what the operation acts on: the folder for create-folder, the SOURCE
@@ -89,6 +99,9 @@ type ReconcilePlan struct {
 	// Satisfied lists secrets whose `from:` has done its job — the destination
 	// exists — so the record can be deleted from the registry.
 	Satisfied []string
+	// RetiredGone lists retired: items the vault no longer holds, so their entries
+	// can be deleted from the registry.
+	RetiredGone []string
 }
 
 // PlanReconcile maps drift findings to operations. Pure: no store, no values.
@@ -356,28 +369,18 @@ func applyOp(op ReconcileOp, value string, w BWWriteClient, folderID func(string
 		return w.SetField(op.Item, op.Field, value)
 	case OpRetireSource:
 		return w.RemoveField(op.FromItem, op.FromField)
+	case OpDeleteItem:
+		return w.DeleteItem(op.Item)
 	}
 	return fmt.Errorf("unknown operation %q", op.Kind)
 }
 
 // sameValue verifies, before any write, that a retire's destination holds exactly
-// its source's value. If they differ, one side was rotated after the copy and the
-// tool cannot know which is the truth, so it refuses — naming the fields, never the
-// values. Compared in constant time out of habit: nothing here is a remote oracle,
-// but it costs nothing to not be the example someone copies into one.
+// its source's value. It is the apply-time half of VerifyRetires: the store can
+// change between a plan and an apply, so a stale plan fails closed here.
 func sameValue(r BWReader, op ReconcileOp) error {
-	dst, err := r.Field(op.Item, op.Field)
-	if err != nil {
-		return fmt.Errorf("read %s/%s to verify before retiring its source (nothing written): %w", op.Item, op.Field, err)
-	}
-	src, err := r.Field(op.FromItem, op.FromField)
-	if err != nil {
-		return fmt.Errorf("read %s/%s to verify before retiring it (nothing written): %w", op.FromItem, op.FromField, err)
-	}
-	if dst == "" || subtle.ConstantTimeCompare([]byte(dst), []byte(src)) != 1 {
-		return fmt.Errorf("refusing to retire %s/%q: its value and %s/%q's differ, so one was rotated after the copy "+
-			"and the tool cannot tell which is current (nothing written) — settle it, then re-run",
-			op.FromItem, op.FromField, op.Item, op.Field)
+	if v := compareRetire(r, op); v.verdict != RetireEqual {
+		return fmt.Errorf("refusing to retire %s/%q: %s (nothing written) — %s", op.FromItem, op.FromField, v.detail, v.remedy)
 	}
 	return nil
 }

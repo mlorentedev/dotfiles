@@ -28,6 +28,17 @@ var (
 type Registry struct {
 	Version int      `yaml:"version"`
 	Secrets []Secret `yaml:"secrets"`
+	// Retired lists Bitwarden items to delete: reconcile plans a delete-item for
+	// each one the vault still holds (CLI-082). Declared, never inferred, because
+	// it deletes a whole item.
+	Retired []RetiredItem `yaml:"retired"`
+}
+
+// RetiredItem is one item the registry retires, and why. The reason is required:
+// an entry that deletes a credential has to say what made that safe.
+type RetiredItem struct {
+	Item   string `yaml:"item"`
+	Reason string `yaml:"reason"`
 }
 
 // Secret is one registry entry. Age is the base name under sensitive/ (no
@@ -279,8 +290,42 @@ func ParseRegistryPartial(data []byte) (*Registry, []SecretDefect, error) {
 		}
 		kept = append(kept, *s)
 	}
+	if err := checkRetired(reg.Retired, reg.Secrets); err != nil {
+		return nil, nil, err
+	}
 	reg.Secrets = kept
 	return &reg, defects, nil
+}
+
+// checkRetired refuses a retired: list that is malformed, and one that retires an
+// item a declaration still uses, as bw.item or as bw.from.item. That second
+// check is static, so it belongs here, where CI runs it, rather than in a plan.
+// It reads every declaration, defective ones included: a secret being fixed still
+// means someone intends to use its item.
+func checkRetired(retired []RetiredItem, all []Secret) error {
+	named := map[string]string{}
+	for _, s := range all {
+		if s.BW == nil {
+			continue
+		}
+		named[s.BW.Item] = s.ID
+		if s.BW.From != nil {
+			named[s.BW.From.Item] = s.ID
+		}
+	}
+	seen := map[string]bool{}
+	for i, r := range retired {
+		switch {
+		case r.Item == "" || strings.TrimSpace(r.Reason) == "":
+			return fmt.Errorf("retired[%d]: an entry needs both item and reason", i)
+		case seen[r.Item]:
+			return fmt.Errorf("retired: item %q is listed twice", r.Item)
+		case named[r.Item] != "":
+			return fmt.Errorf("retired: item %q is still used by secret %q; drop it from that declaration first", r.Item, named[r.Item])
+		}
+		seen[r.Item] = true
+	}
+	return nil
 }
 
 // secretLabel names a secret for a defect message, falling back to its position when

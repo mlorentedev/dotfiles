@@ -148,7 +148,7 @@ func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 func checkReviewerPool(repoRoot, reviewer string) error {
 	pool, err := loadReviewerPool(repoRoot)
 	if err != nil {
-		return fmt.Errorf("%w\nfix the file, or archive with --force-without-review", err)
+		return fmt.Errorf("%w\nfix the file", err)
 	}
 	if pool == nil {
 		return nil // no pool, no opinion
@@ -167,6 +167,6 @@ func checkReviewerPool(repoRoot, reviewer string) error {
 	}
 	return fmt.Errorf("%s records reviewer %q, which is not in %s\n"+
 		"the models allowed to review are: %s\n"+
-		"re-run /adversarial-review on one of them, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
+		"re-run /adversarial-review on one of them, or declare `review: waived` with a reason in proposal.md",
 		ReviewFile, shown, ReviewerPoolFile, strings.Join(pool, ", "))
 }

@@ -54,11 +54,16 @@ for target in "$@"; do
                 printf '  CORRUPTED: %s\n' "$f"
                 corrupted_count=$((corrupted_count + 1))
             fi
+        # specs/**/review.md is the adversarial reviewer's signed output, not
+        # authored markdown, and never edited afterwards. A reviewer quoting a
+        # probe such as `a\n- b` in a code span is content (#1633), the same
+        # exemption spec.ReviewStateFiles gives it in the draft-tag scan.
         done < <(find "$target" \
             -name '*.md' \
             -not -path '*/.obsidian/*' \
             -not -path '*/node_modules/*' \
             -not -path '*/.git/*' \
+            -not -path '*/specs/*/review.md' \
             -print0)
     else
         printf '  ERROR: not found or unreadable: %s\n' "$target" >&2
