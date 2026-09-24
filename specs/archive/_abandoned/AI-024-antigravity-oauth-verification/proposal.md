@@ -1,9 +1,11 @@
 ---
 id: "AI-024-antigravity-oauth-verification"
-status: draft # draft | implementing | verifying | archived
+status: abandoned # abandoned: answered by use, guard not carried forward (#1626)
 created: "2026-06-04"
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned; nothing was implemented (draft, 0/16 tasks). The empirical half is answered by use: agy/gemini-3.1-pro-high has signed pool reviews under its OAuth session after the gemini-cli sunset, five of them archived in specs/archive (HARNESS-071, OPS-032, AI-023, HARNESS-105, HARNESS-109), the latest dated 2026-09-03. The doctor guard was never built and is not carried forward: a deauthenticated agy fails loudly the moment a review runs on it, and checkAntigravity already covers the endpoint and the config. With nothing shipped there is no change to review. Swept under #1626."
 ---
 
 # AI-024-antigravity-oauth-verification

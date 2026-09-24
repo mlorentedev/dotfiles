@@ -1,11 +1,13 @@
 ---
 id: "GOV-004-agents-md-diet"
 type: spec
-status: implementing
+status: archived
 created: "2026-07-09"
 issue: "mlorentedev/dotfiles#673"   # normalised from the prose link below (SDD-041)
 tags: [spec, proposal, agents-md, governance, ssot]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Shipped in #730 (AGENTS.md from 487 to 237 lines) and #1048, which closed #673; verification.md records the move-not-delete evidence for every moved section. AC1 (at most ~200 lines) was not met: 237 lines after #730, 279 on 2026-09-23. It is not carried forward as a line target, because doctrine size is now budgeted in bytes and characters (decision D-3 on #1625, and #1241). A retroactive review cannot be meaningful: the change spans two PRs five weeks apart, and AGENTS.md has been regenerated many times since. Swept under #1626."
 ---
 
 # GOV-004-agents-md-diet
@@ -87,3 +89,5 @@ in passing.
 - Structural SSOT: `pattern-agents-md-consistency` (reader/authority map)
 - Move targets: `pattern-language-standards`, `pattern-architecture`,
   `pattern-ai-protocol`, `pattern-workflow-protocol`, `pattern-mcp-*`
+
+<!-- archived 2026-09-23 — PR: https://github.com/mlorentedev/dotfiles/pull/1048 -->
