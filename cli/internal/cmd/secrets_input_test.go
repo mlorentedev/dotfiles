@@ -54,6 +54,7 @@ func TestReadSecretValueTakesAHiddenMultiLineFileSecret(t *testing.T) {
 		{"one line stays as typed", []string{"PLANTED-code"}, false, "PLANTED-code"},
 		{"several lines keep blanks and end with a newline", []string{"PLANTED-a", "", "PLANTED-b"}, false, "PLANTED-a\n\nPLANTED-b\n"},
 		{"Ctrl-Z then Enter ends input on Windows", []string{"PLANTED-a", "PLANTED-b"}, true, "PLANTED-a\nPLANTED-b\n"},
+		{"Ctrl-Z inside a line is data, not the end of input", []string{"PLANTED-a\x1aPLANTED-b"}, false, "PLANTED-a\x1aPLANTED-b"},
 		{"nothing entered is empty, which the callers refuse", nil, false, ""},
 	}
 	for _, tc := range cases {
