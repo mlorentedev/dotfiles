@@ -142,25 +142,12 @@ func onlyRetires(p secrets.ReconcilePlan) bool {
 
 // planFromStore syncs, reads the inventory and plans.
 //
-// The sync is not optional. The daemon answers from its cache; a plan computed on a
-// stale inventory would create a duplicate of any item made elsewhere since the last
-// sync. `drift` tolerates staleness because it only reports; this command writes.
+// The sync (readInventory) is not optional: a plan computed on a stale inventory
+// would create a duplicate of any item made elsewhere since the last sync.
 func planFromStore(decls []secrets.BWDecl) (secrets.ReconcilePlan, error) {
-	if err := bwSync().Sync(); err != nil {
-		return secrets.ReconcilePlan{}, fmt.Errorf("sync before planning: %w\n"+
-			"reconcile refuses to plan against a possibly stale inventory", err)
-	}
-	lister := bwLister
-	if lister == nil {
-		lister = secrets.BWServeClient{}
-	}
-	items, err := lister.ListItems()
+	items, folders, err := readInventory()
 	if err != nil {
-		return secrets.ReconcilePlan{}, fmt.Errorf("read the vault's inventory: %w", err)
-	}
-	folders, err := lister.ListFolders()
-	if err != nil {
-		return secrets.ReconcilePlan{}, fmt.Errorf("read the vault's folders: %w", err)
+		return secrets.ReconcilePlan{}, err
 	}
 	return secrets.PlanReconcile(decls, items, folders), nil
 }

@@ -5,14 +5,14 @@
 > (a)+(b) are filled below from `secrets/registry.yaml` + `sensitive/*.secret.age`.
 > Fill column **In Bitwarden?** from: `bw list items --pretty | jq -r '.[] | (.folder // "-") + " / " + .name'` (names only — no values).
 >
-> Goal: one SSOT backend per secret (no duplication). `dotf secrets` reads the registry derived from this table.
+> Goal: one SSOT backend per secret (no duplication). The registry was derived from this table and is now the SSOT; this file is the migration's record, not a mirror of it.
 
 ## Legend
 
 - **Plane**: `app` (service API keys/tokens your apps consume) · `personal` (recovery/backup codes, app-passwords, logins) · `floor` (boot/DR — needed before you can reach Bitwarden).
 - **Target backend**: `bw` (Bitwarden — live SSOT) · `age-floor` (stays local: boot/DR root) · the age **DR export** escrows *everything* regardless.
 - **Consumers**: best-guess from the env var name — **confirm before rotating** (rotation blast radius, #321).
-- **Target bw item**: `<folder>/<item>` in the ratified taxonomy (`Dotfiles/apps`, `Dotfiles/infra`; ADR-028 §6, enforced by `checkBWFolder`). Personal-plane items name only the item: their folder is not governed until the personal taxonomy is decided (#586), and `dotf secrets drift` reads an empty `folder` as "placement not governed".
+- **Registry id**: the entry in `secrets/registry.yaml` that now owns the secret. Where it lives in Bitwarden (`bw.folder`, `bw.item`, `bw.field`) is declared there, once, and `dotf secrets drift` checks it against the store. This table named the Bitwarden items too, and they drifted from the registry unnoticed (CLI-078 review round 4), so it no longer repeats them.
 
 ## (a)+(b) dotfiles secrets
 
@@ -20,35 +20,35 @@
 > dump (no values). Vault = 152 items, still **all in "No Folder"**. Legend: `Yes — <item> (<field>)`
 > = value present · `No` = age-only, `migrate` will create the canonical item fresh · `n/a` = floor.
 
-| # | Logical secret | age file | Env var / file target | Plane | Consumer(s) (confirm) | Target bw item | In Bitwarden? (2026-06-28) | Flags |
+| # | Logical secret | age file | Env var / file target | Plane | Consumer(s) (confirm) | Registry id | In Bitwarden? (2026-06-28) | Flags |
 |---|---|---|---|---|---|---|---|---|
-| 1 | GitHub token (shared) | `github.token` | `GITHUB_PERSONAL_ACCESS_TOKEN` + `RELEASE_TOKEN` | app | CLI/API, goreleaser+CI release | **split** → `Dotfiles/apps/github-cli-pat`, `Dotfiles/apps/github-release-pat` | Yes — `GitHub` 8-in-1 (PAT, release-token) | **#321 one-token-many-uses → split per purpose**, by `dotf secrets reconcile` copying each from its `GitHub` field (`bw.from`, CLI-080); both now bw-backed |
-| 2 | Bitácora PAT | `github.bitacora` | `BITACORA_PAT` | app | bitácora board/Project writes, 20 repos | `Dotfiles/apps/github-bitacora-pat` | Yes — `GitHub` 8-in-1 (bitacora token) | per-purpose ✔ already split |
-| 3 | DockerHub token | `dockerhub.token` | `DOCKERHUB_TOKEN` | app | CI image push | `Dotfiles/apps/dockerhub-token` | Yes — `DockerHub` (PAT field) | |
-| 4 | DockerHub username | `dockerhub.username` | `DOCKERHUB_USERNAME` | app | CI image push | field on `Dotfiles/apps/dockerhub-token` | Yes — `DockerHub` (login username) | collapse into the token item |
-| 5 | Cloudflare API token | `cloudflare.api-token` | `CLOUDFLARE_API_TOKEN` | app | DNS/infra automation | `Dotfiles/infra/cloudflare-api-token` | **No** (age-only) | net-new in bw |
-| 6 | Hetzner API key | `hetzner.api-key` | `HETZNER_API_TOKEN` | app | infra provisioning | `Dotfiles/infra/hetzner-api-token` | Yes — `Hetzner` login (key field) | |
-| 7 | Hetzner SSH key | `hetzner.ssh` | `HETZNER_SSH_KEY` | floor/app | server access | `Dotfiles/infra/hetzner-ssh` (SSH Key type) | Yes — `Hetzner` (SSH Key, type 5) | native SSH Key item |
-| 8 | OpenAI API key | `chatgpt.api-key` | `OPENAI_API_KEY` | app | LLM calls | `Dotfiles/apps/openai-api-key` | **No** — only `auth.openai.com` account login | **naming drift: store says "chatgpt", service is OpenAI; good canary (net-new)** |
-| 9 | OpenRouter API key | `openrouter.api.key` | `OPENROUTER_API_KEY` | app | LLM router | `Dotfiles/apps/openrouter-api-key` | Yes — **2 entries**: `OPEN ROUTER API KEY` (note) + `openrouter.ai` (login) → **MERGE** | **naming drift: double-dot `.api.key`** |
-| 10 | NaN API key | `nan.api-key` | `NAN_API_KEY` | app | NaN cloud engine | `Dotfiles/apps/nan-api-key` | Yes — `cloud.nan.builders` (api-key field) | |
-| 11 | Stripe API key | `stripe.api-key` | `STRIPE_API_KEY` | app | payments | `Dotfiles/apps/stripe-api-key` | Partial — `Stripe` login (no explicit api-key field) | confirm where the api key lives |
-| 12 | YouTube API key | `youtube.api-key` | `YOUTUBE_API_KEY` | app | yt-metrics | `Dotfiles/apps/youtube-api-key` | **No** (age-only) | net-new in bw |
-| 13 | Beehiiv API key | `beehiiv.api-key` | `BEEHIIV_API_KEY` | app | newsletter | `Dotfiles/apps/beehiiv-api-key` | **No** (age-only) | net-new in bw |
-| 14 | Beehiiv DNS records | `beehiiv.dns-records` | `BEEHIIV_DNS_RECORDS` | app | DNS config | `Dotfiles/apps/beehiiv-dns` (Secure Note) | **No** (age-only) | not a key — reference data |
-| 15 | PyPI token | `pypi.token` | `PYPI_TOKEN` | app | package publish | `Dotfiles/apps/pypi-token` | Yes — `pypi.org` (API token field) | |
-| 16 | Tailscale auth key | `tailscale.auth-key` | `TS_AUTHKEY` | app/infra | VPN join | `Dotfiles/infra/tailscale-auth-key` | Yes — `login.tailscale.com` (auth-key field) | short-lived by nature |
-| 17 | Pollex API key | `pollex.api-key` | `POLLEX_API_KEY` | app | pollex NaN engine (#237) | `Dotfiles/apps/pollex-api-key` | Yes — `POLLEX_API_KEY` (note) | |
-| 18 | X (Twitter) credential | `x.api-key`, `x.api-key-secret`, `x.access-token`, `x.access-token-secret`, `x.bearer-token`, `x.client-id`, `x.client-secret` | `X_*` (7 vars) | app | X API | **collapse → 1 item** `Dotfiles/apps/x-twitter` (7 custom fields) | **No** — only `x.com` personal login (no API item) | **7 files → 1 item; net-new in bw** |
-| 19 | Zoho app passwords | `zoho.app-passwords` | `ZOHO_APP_PASSWORDS` | personal | mail clients | `zoho-app-passwords` | Yes — `mail.zoho.com` (app-specific passwords) | |
-| 20 | Kubelab kubeconfig | `kubelab.kubeconfig` | file → `~/.kube/kubelab.config` | app/infra | kubectl | `Dotfiles/infra/kubelab-kubeconfig` (Secure Note/attachment) | **No** — `Kubelab` note holds Slack/Gmail-Authelia only | file secret; `migrate` refuses files |
-| 21 | SSH key (id_ed25519) | `id_ed25519` | file → `~/.ssh/id_ed25519` | **floor** | git clone at bootstrap | **age-floor** (needed before bw) | n/a | keep in floor — boot dependency |
-| 22 | Gmail backup codes | `gmail.backup-code` | file → `~/.secrets/...` | personal | account recovery | `gmail` (field) | **No** — `Gmail` login exists, no codes field | file secret |
-| 23 | ChatGPT backup code | `chatgpt.backup-code` | file | personal | account recovery | `openai` (field) | **No** (age-only) | file secret |
-| 24 | ChatGPT recovery code | `chatgpt.recovery-code` | file | personal | account recovery | `openai` (field) | **No** (age-only) | collapse with #23 |
-| 25 | Stripe backup code | `stripe.backup-code` | file | personal | account recovery | `stripe` (field) | Yes — `Stripe` (backup-codes field) | file secret |
-| 26 | Zoho recovery code | `zoho.recovery-code` | file | personal | account recovery | `zoho` (field) | **No** — no recovery-code field on `mail.zoho.com` | collapse with #19 |
-| — | Ollama API key | (commented out) | `OLLAMA_API_KEY` | app | homelab LLM (VPN) | `Dotfiles/infra/ollama-api-key` | **No** (not yet encrypted) | not yet encrypted |
+| 1 | GitHub token (shared) | `github.token` | `GITHUB_PERSONAL_ACCESS_TOKEN` + `RELEASE_TOKEN` | app | CLI/API, goreleaser+CI release | `GITHUB_PERSONAL_ACCESS_TOKEN`, `RELEASE_TOKEN` | Yes — `GitHub` 8-in-1 (PAT, release-token) | **#321 one-token-many-uses → split per purpose**, by `dotf secrets reconcile` copying each from its `GitHub` field (`bw.from`, CLI-080); both now bw-backed |
+| 2 | Bitácora PAT | `github.bitacora` | `BITACORA_PAT` | app | bitácora board/Project writes, 20 repos | `BITACORA_PAT` | Yes — `GitHub` 8-in-1 (bitacora token) | per-purpose ✔ already split |
+| 3 | DockerHub token | `dockerhub.token` | `DOCKERHUB_TOKEN` | app | CI image push | `DOCKERHUB_TOKEN` | Yes — `DockerHub` (PAT field) | |
+| 4 | DockerHub username | `dockerhub.username` | `DOCKERHUB_USERNAME` | app | CI image push | `DOCKERHUB_USERNAME` | Yes — `DockerHub` (login username) | one item with `DOCKERHUB_TOKEN` |
+| 5 | Cloudflare API token | `cloudflare.api-token` | `CLOUDFLARE_API_TOKEN` | app | DNS/infra automation | `CLOUDFLARE_API_TOKEN` | **No** (age-only) | net-new in bw |
+| 6 | Hetzner API key | `hetzner.api-key` | `HETZNER_API_TOKEN` | app | infra provisioning | `HETZNER_API_TOKEN` | Yes — `Hetzner` login (key field) | |
+| 7 | Hetzner SSH key | `hetzner.ssh` | `HETZNER_SSH_KEY` | floor/app | server access | `HETZNER_SSH_KEY` | Yes — `Hetzner` (SSH Key, type 5) | native SSH Key item |
+| 8 | OpenAI API key | `chatgpt.api-key` | `OPENAI_API_KEY` | app | LLM calls | `OPENAI_API_KEY` | **No** — only `auth.openai.com` account login | **naming drift: store says "chatgpt", service is OpenAI; good canary (net-new)** |
+| 9 | OpenRouter API key | `openrouter.api.key` | `OPENROUTER_API_KEY` | app | LLM router | `OPENROUTER_API_KEY` | Yes — **2 entries**: `OPEN ROUTER API KEY` (note) + `openrouter.ai` (login) → **MERGE** | **naming drift: double-dot `.api.key`** |
+| 10 | NaN API key | `nan.api-key` | `NAN_API_KEY` | app | NaN cloud engine | `NAN_API_KEY` | Yes — `cloud.nan.builders` (api-key field) | |
+| 11 | Stripe API key | `stripe.api-key` | `STRIPE_API_KEY` | app | payments | `STRIPE_API_KEY` | Partial — `Stripe` login (no explicit api-key field) | confirm where the api key lives |
+| 12 | YouTube API key | `youtube.api-key` | `YOUTUBE_API_KEY` | app | yt-metrics | `YOUTUBE_API_KEY` | **No** (age-only) | net-new in bw |
+| 13 | Beehiiv API key | `beehiiv.api-key` | `BEEHIIV_API_KEY` | app | newsletter | `BEEHIIV_API_KEY` | **No** (age-only) | net-new in bw |
+| 14 | Beehiiv DNS records | `beehiiv.dns-records` | `BEEHIIV_DNS_RECORDS` | app | DNS config | `BEEHIIV_DNS_RECORDS` | **No** (age-only) | not a key — reference data (Secure Note) |
+| 15 | PyPI token | `pypi.token` | `PYPI_TOKEN` | app | package publish | `PYPI_TOKEN` | Yes — `pypi.org` (API token field) | |
+| 16 | Tailscale auth key | `tailscale.auth-key` | `TS_AUTHKEY` | app/infra | VPN join | `TS_AUTHKEY` | Yes — `login.tailscale.com` (auth-key field) | short-lived by nature |
+| 17 | Pollex API key | `pollex.api-key` | `POLLEX_API_KEY` | app | pollex NaN engine (#237) | `POLLEX_API_KEY` | Yes — `POLLEX_API_KEY` (note) | |
+| 18 | X (Twitter) credential | `x.api-key`, `x.api-key-secret`, `x.access-token`, `x.access-token-secret`, `x.bearer-token`, `x.client-id`, `x.client-secret` | `X_*` (7 vars) | app | X API | `X_*` (7 ids) | **No** — only `x.com` personal login (no API item) | **7 files → 1 item with 7 custom fields**; net-new in bw |
+| 19 | Zoho app passwords | `zoho.app-passwords` | `ZOHO_APP_PASSWORDS` | personal | mail clients | `ZOHO_APP_PASSWORDS` | Yes — `mail.zoho.com` (app-specific passwords) | |
+| 20 | Kubelab kubeconfig | `kubelab.kubeconfig` | file → `~/.kube/kubelab.config` | app/infra | kubectl | `KUBECONFIG` | **No** — `Kubelab` note holds Slack/Gmail-Authelia only | file secret; `migrate` refuses files |
+| 21 | SSH key (id_ed25519) | `id_ed25519` | file → `~/.ssh/id_ed25519` | **floor** | git clone at bootstrap | `SSH_KEY` | n/a | **age-floor**: keep in floor — boot dependency (needed before bw) |
+| 22 | Gmail backup codes | `gmail.backup-code` | file → `~/.secrets/...` | personal | account recovery | `GMAIL_BACKUP_CODE` | **No** — `Gmail` login exists, no codes field | file secret |
+| 23 | ChatGPT backup code | `chatgpt.backup-code` | file | personal | account recovery | `CHATGPT_BACKUP_CODE` | **No** (age-only) | file secret |
+| 24 | ChatGPT recovery code | `chatgpt.recovery-code` | file | personal | account recovery | `CHATGPT_RECOVERY_CODE` | **No** (age-only) | collapse with #23 |
+| 25 | Stripe backup code | `stripe.backup-code` | file | personal | account recovery | `STRIPE_BACKUP_CODE` | Yes — `Stripe` (backup-codes field) | file secret |
+| 26 | Zoho recovery code | `zoho.recovery-code` | file | personal | account recovery | `ZOHO_RECOVERY_CODE` | **No** — no recovery-code field on `mail.zoho.com` | collapse with #19 |
+| — | Ollama API key | (commented out) | `OLLAMA_API_KEY` | app | homelab LLM (VPN) | — (not in the registry) | **No** (not yet encrypted) | not yet encrypted |
 
 **Floor (stays local, never only-in-bw):**
 - The **age private key** (root of DR — offline backups only).
@@ -84,8 +84,8 @@
 | **SSH Key - Dell Work** | SSH Key (5) | — | infra | — | net-new |
 | **grafana/status.kubelab.live** | login | — | infra | — | dashboards |
 
-### age secrets NOT yet in bw → migrate TO bw
-`cloudflare.api-token`, `chatgpt.api-key`(→OpenAI), `youtube.api-key`, `beehiiv.api-key`+`.dns-records`, `chatgpt.backup/recovery-code`, `gmail.backup-code`, `kubelab.kubeconfig`. (Add as fields on the matching login, or as a `Dotfiles/apps/`/`Dotfiles/infra/` item.)
+### age secrets that were not in bw (June 2026) → migrated
+Done for every one listed here in June (`cloudflare.api-token`, `chatgpt.api-key`, `youtube.api-key`, `beehiiv.api-key` and `.dns-records`, the ChatGPT and Gmail codes, `kubelab.kubeconfig`): on 2026-09-23 each is `backend: bw` in the registry. Still age-backed on that date: `ZOHO_APP_PASSWORDS` and `ZOHO_RECOVERY_CODE` (personal, with dormant `bw:` blocks), and the floor. `dotf secrets ls` prints the live backend of each.
 
 ### Stays in age (floor — never only-in-bw)
 The **age private key** (offline-rooted), `bw-master-password.age`, `id_ed25519` boot key.
@@ -93,7 +93,7 @@ The **age private key** (offline-rooted), `bw-master-password.age`, `id_ed25519`
 ## Critical actions surfaced by the inventory
 
 1. 🔴 **age keys live in bw = circular DR dependency.** Authoritative copy must go OFFLINE; bw copy is convenience only.
-2. **Bitwarden has zero folders.** Introduce `Dotfiles/apps/` `Dotfiles/infra/` `` and move the ~20 dev/infra items in (leave ~125 personal as-is for now).
+2. **Bitwarden has zero folders.** Introduce `Dotfiles/apps` and `Dotfiles/infra` and move the ~20 dev/infra items in (leave ~125 personal as-is for now).
 3. **Inconsistent structure** (fields-in-login vs standalone notes). The registry must address each uniformly as `item › field` or dedicated item.
 
 ## De-duplication rule
