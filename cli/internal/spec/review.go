@@ -168,7 +168,8 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 		return false, false, ""
 	}
 	if err := exec.Command("git", "-C", repoRoot, "cat-file", "-e", reviewedSHA+"^{commit}").Run(); err != nil {
-		return true, true, fmt.Sprintf("reviewed_sha %s is not a commit in this history (rewritten by a rebase?)", reviewedSHA)
+		return true, true, fmt.Sprintf("reviewed_sha %s is not in this clone's object store (a squash-merge, a rebase or a fresh clone discards it), "+
+			"and this review predates contract digests (SDD-042), so nothing else can show the content is what was reviewed", reviewedSHA)
 	}
 
 	args := []string{"-C", repoRoot, "diff", "--name-only", reviewedSHA, "HEAD", "--"}
@@ -316,9 +317,6 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 			ReviewFile, review.Verdict)
 	}
 
-	if checker == nil {
-		checker = gitStaleness{}
-	}
 	// The first exit named is the one that keeps the review, and it is named
 	// first deliberately. The other three all discard or bypass a verdict that
 	// may be perfectly good, so an operator offered only those reaches for an
@@ -329,7 +327,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// BUG-093 (#1516), where four of them targeted the contract set. Restoring
 	// the contract and recording the dispositions is the correct answer there,
 	// and it was not previously on offer.
-	if stale, known, reason := checker.Stale(repoRoot, specID, review.ReviewedSHA); known && stale {
+	if stale, known, reason := reviewStale(repoRoot, specID, specDir, review, checker); known && stale {
 		return fmt.Errorf("%s is stale: %s\n"+
 			"keeps the review:\n"+
 			"  restore the contract files to reviewed_sha and record what changed as dispositions in verification.md (excluded from this check)\n"+
@@ -344,6 +342,42 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// what they concluded — a valid, fresh, passing review signed by the wrong
 	// model is still a self-review, and the earlier checks cannot see that.
 	return checkReviewerPool(repoRoot, review.Reviewer)
+}
+
+// reviewStale decides whether the review still describes the contract: by
+// CONTENT when the launcher recorded contract digests (SDD-042), and by the
+// legacy reviewed_sha comparison only for reviews launched before that.
+//
+// The content path consults no git history at all, which is the point: this
+// repository squash-merges, so the reviewed commit is orphaned by the normal
+// workflow, and whether its object still exists locally is a fact about
+// garbage collection, not about the review (#1566, #970). Comparing against
+// disk also keeps the uncommitted-edit bypass closed.
+func reviewStale(repoRoot, specID, specDir string, review Review, checker StalenessChecker) (stale, known bool, reason string) {
+	if req, found, err := ReadReviewRequest(specDir); err == nil && found && len(req.ContractDigests) > 0 {
+		if moved := changedContracts(specDir, req.ContractDigests); len(moved) > 0 {
+			return true, true, fmt.Sprintf("%s changed since the review was launched (its content digest differs)",
+				strings.Join(moved, ", "))
+		}
+		return false, true, ""
+	}
+	if checker == nil {
+		checker = gitStaleness{}
+	}
+	return checker.Stale(repoRoot, specID, review.ReviewedSHA)
+}
+
+// changedContracts names, in contractFiles order, every contract file whose
+// normalised digest differs from the one recorded at launch.
+func changedContracts(specDir string, recorded map[string]string) []string {
+	current := ContractDigests(specDir)
+	var moved []string
+	for _, name := range contractFiles {
+		if current[name] != recorded[name] {
+			moved = append(moved, name)
+		}
+	}
+	return moved
 }
 
 // checkReviewProvenance compares review.md against the sidecar the LAUNCHER

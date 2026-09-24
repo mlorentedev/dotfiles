@@ -518,8 +518,10 @@ func TestGitStalenessUnresolvableShaIsStale(t *testing.T) {
 	if !known || !stale {
 		t.Fatalf("an unresolvable sha must be treated as stale (known=%v stale=%v)", known, stale)
 	}
-	if !strings.Contains(reason, "not a commit") {
-		t.Errorf("reason should say the sha is unknown, got %q", reason)
+	// SDD-042: say the object is absent and why that can happen, instead of
+	// guessing "rewritten by a rebase?" — squash-merge is the common cause here.
+	if !strings.Contains(reason, "not in this clone") || strings.Contains(reason, "rebase?") {
+		t.Errorf("reason should say the object is absent from this clone, without a rebase guess, got %q", reason)
 	}
 }
 

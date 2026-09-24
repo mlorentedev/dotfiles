@@ -66,6 +66,12 @@ type ReviewRequest struct {
 	// omitempty because specs archived before this field existed carry the old
 	// shape and must still validate.
 	BaseSHA string `json:"base_sha,omitempty"`
+	// ContractDigests is the normalised SHA-256 of each contract file as the
+	// reviewer found it on disk (SDD-042). Archive recomputes them and decides
+	// freshness by content, so a squash-merge, rebase or fresh clone that
+	// discards ReviewedSHA's commit no longer decides the question (#1566).
+	// Absent on requests written before SDD-042, which keep the SHA check.
+	ContractDigests map[string]string `json:"contract_digests,omitempty"`
 }
 
 // HeadSHA returns the repository HEAD, or "" when repoRoot is not a checkout.
@@ -155,6 +161,7 @@ func WriteReviewRequest(specDir, reviewedSHA, reviewer, baseSHA string) error {
 		RequestedAt:        time.Now().UTC().Format(time.RFC3339),
 		ReviewDigestBefore: fileDigest(filepath.Join(specDir, ReviewFile)),
 		BaseSHA:            baseSHA,
+		ContractDigests:    ContractDigests(specDir),
 	}
 	data, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {
