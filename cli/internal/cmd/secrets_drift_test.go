@@ -189,3 +189,20 @@ func f() { bwWrite().MoveItem("a", "b"); _ = os.WriteFile }`, 0)
 		}
 	}
 }
+
+// The summary counted vault items that a declaration names and called them the
+// items the declarations span, so an absent item made the two numbers disagree
+// with no way to tell which was which (CLI-078 review round 4, question 4).
+func TestDriftSummaryCountsDeclaredItemsAndThoseInTheVault(t *testing.T) {
+	out, _ := runDrift(t, stubLister{folders: []string{"Dotfiles/apps"}})
+	if !strings.Contains(out, "naming 1 item(s), 0 of them in the vault") {
+		t.Errorf("an absent declared item must still be counted as declared:\n%s", out)
+	}
+	out, _ = runDrift(t, stubLister{
+		items:   []secrets.ItemSummary{{Name: "dockerhub", Folder: "Dotfiles/apps", Fields: []string{"PAT"}}, {Name: "personal-login"}},
+		folders: []string{"Dotfiles/apps"},
+	})
+	if !strings.Contains(out, "naming 1 item(s), 1 of them in the vault") || !strings.Contains(out, "1 of 2 vault items unmanaged") {
+		t.Errorf("summary miscounted:\n%s", out)
+	}
+}

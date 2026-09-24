@@ -176,6 +176,24 @@ below edits it.
 | Minor (SPECULATIVE) | A fully retired item remains as an empty husk | **Ticketed, #1624.** |
 | Question | Plan→write TOCTOU on "never overwrite" | **Declined, accepted risk.** The proposal records it: a single operator, and concurrent writers are OPS-028. |
 
+## Code changed after the PASS (CLI-078 review round 4)
+
+Two changes reached this spec's code after round 2 passed, both from CLI-078's
+round 4 findings. Neither touches this spec's contract set, so the gate still
+accepts the PASS; they are declared here so that is not the only reason it
+stands. CLI-078's round 5 reviews the diff that carries them.
+
+- **`planFromStore` reads through `readInventory`**, shared with `drift`. It
+  still syncs before planning, now through the lister's own subject (the daemon)
+  instead of the pinned backend's syncer. The inventory is only ever read from the
+  daemon, so the cache synced is now the cache read; before, a CLI-pinned backend
+  would have synced the CLI's cache and read the daemon's.
+- **A new finding, `item-folder-unknown`, has its own `Blocked` case** in
+  `PlanReconcile`: an item filed in a folder the folder list does not carry is
+  never moved. The `default` case already blocked it, but with a remedy that
+  said to teach the planner, which was the wrong advice.
+  `TestPlanBlocksAnItemWhoseFolderItCannotName`. f1–f10 re-run: 10/10.
+
 ## Promotion candidates
 
 - [ ] Pattern for `00_meta/patterns/`: "declare a data migration as a record the tool

@@ -18,8 +18,10 @@ type inventorySource interface {
 
 // bwLister is the inventory seam, a var so command tests run with no daemon and
 // no vault. Nil in production, where the inventory is read from the daemon
-// directly (secrets.BWServeClient{}): only the daemon can list, so the pinned
-// backend in bwbackend.go has no lister half, and none is chosen at runtime.
+// directly (secrets.BWServeClient{}). The pinned backend in bwbackend.go has no
+// lister half on purpose: a list answers with every item's plaintext, and the
+// value-free projection (bwserve_list.go) has exactly one implementation to
+// audit. A CLI lister would be a second one.
 var bwLister inventorySource
 
 // readInventory syncs the store, then reads its shape: every item and every
@@ -119,9 +121,10 @@ func newSecretsDriftCmd() *cobra.Command {
 				}
 			}
 
-			_, _ = fmt.Fprintf(out, "\n%d declared target(s) across %d item(s); %d finding(s); "+
+			named, present := declaredItems(decls, items)
+			_, _ = fmt.Fprintf(out, "\n%d declared target(s) naming %d item(s), %d of them in the vault; %d finding(s); "+
 				"%d of %d vault items unmanaged by this registry\n",
-				len(decls), len(items)-len(unmanaged), len(findings), len(unmanaged), len(items))
+				len(decls), named, present, len(findings), len(unmanaged), len(items))
 
 			if len(findings) > 0 {
 				// A report that exits 0 on findings cannot gate anything, and this
@@ -133,4 +136,27 @@ func newSecretsDriftCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&verbose, "verbose", false, "also list the vault items no registry entry declares (names only)")
 	return c
+}
+
+// declaredItems counts the distinct item names the declarations use, and how
+// many of those the vault holds. The summary once printed the second number as
+// the first, so an absent item shrank "the items the registry declares" instead
+// of showing up as the gap between the two (CLI-078 review round 4).
+func declaredItems(decls []secrets.BWDecl, items []secrets.ItemSummary) (named, present int) {
+	inVault := make(map[string]bool, len(items))
+	for _, it := range items {
+		inVault[it.Name] = true
+	}
+	seen := map[string]bool{}
+	for _, d := range decls {
+		if seen[d.Item] {
+			continue
+		}
+		seen[d.Item] = true
+		named++
+		if inVault[d.Item] {
+			present++
+		}
+	}
+	return named, present
 }
