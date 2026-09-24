@@ -38,10 +38,10 @@ A dedicated SSH key for a personal Windows host currently exists only on one wor
 
 ## Acceptance criteria
 
-- [ ] AC1: A replacement workstation can materialize the dedicated private key from Bitwarden at the declared path, enforce owner/SYSTEM-only ACLs, and verify its fingerprint against the committed public key without printing private material.
-- [ ] AC2: Re-running Windows OpenSSH host reconciliation installs/enables the service and firewall rule, authorizes the public key exactly once, preserves unrelated keys, and enforces the required key-file ACL.
-- [ ] AC3: Stable SSH aliases select the dedicated key and cover both mesh-name and dock-LAN access without requiring the operator to remember user, address, or identity-file details.
-- [ ] AC4: The runbook defines the one-time trust bootstrap, normal reconciliation, clean-machine recovery, rotation/revocation, DR escrow, and verification signals, with no plaintext private key in git or command arguments.
+- [x] AC1: A replacement workstation can materialize the dedicated private key from Bitwarden at the declared path, enforce owner/SYSTEM-only ACLs, and verify its fingerprint against the committed public key without printing private material.
+- [x] AC2: Re-running Windows OpenSSH host reconciliation installs/enables the service and firewall rule, authorizes the public key exactly once, preserves unrelated keys, and enforces the required key-file ACL.
+- [x] AC3: Stable SSH aliases select the dedicated key and cover both mesh-name and dock-LAN access without requiring the operator to remember user, address, or identity-file details.
+- [x] AC4: The runbook defines the one-time trust bootstrap, normal reconciliation, clean-machine recovery, rotation/revocation, DR escrow, and verification signals, with no plaintext private key in git or command arguments.
 
 ## References
 
