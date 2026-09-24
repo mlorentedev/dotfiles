@@ -23,9 +23,23 @@ created: "2026-09-02"
 - [x] [AC9] Implement secrets show solutions 1-2-3 (reveal, clip, TTY masking, agent refusal) and 4 unit tests
 - [x] [AC10] Harden ai/claude/settings.json permissions deny list
 
+## Review round 1 (2026-09-23, retroactive, FAIL)
+
+Reviewed at the landing commit `a720b9d` (#1459). Every finding's disposition is in `verification.md`.
+
+- [x] F1: pin the split-write redaction case at 1-3 byte writes (already closed on main by SEC-002's prefix-aware hold-back)
+- [x] F2: match whole shell words, so `/usr/bin/env` and `env>x` are refused, and tests pin each part of the shell's reading
+- [x] F3: fill verification.md, replace the placeholder features.json, and correct the two closing ticks below
+- [x] F7: replace the production-dead `buildChildEnv` with `childEnviron`, shared by the run path and its tests
+- [x] F8: name every agent-session marker in AGENTS.md and ADR-028, held by a test
+- [x] AC9 (found while applying F8): recognise `CLAUDECODE`, the variable Claude Code actually exports
+- [ ] Round 2 review passes before archive
+
 ## Closing
 
-- [x] Every acceptance criterion from proposal.md is covered by tests
+Two of these boxes were ticked at landing without being true: `verification.md` was an unfilled template, and `features.json` held a placeholder, so no criterion had a runnable check. Both hold after round 1's fixes. AC6, AC8 and AC10 are artifacts rather than behaviour, so they are checked by `features.json` commands, not by tests.
+
+- [x] Every acceptance criterion maps to a test or an artifact check in features.json
 - [x] Type checks and go test ./... pass
 - [x] verification.md filled in
 - [x] PR opened referencing this spec folder
