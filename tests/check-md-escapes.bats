@@ -72,6 +72,25 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
+# Reviewer output is not authored markdown, and a reviewer quoting a probe
+# like `- [ ] a\n1. [ ] b` in a code span is content, not corruption (#1633).
+# Same rule as spec.ReviewStateFiles: the review's own output is exempt,
+# everything the author writes in the same folder is still scanned.
+@test "skips reviewer output (specs/**/review.md) but still scans authored spec files" {
+    mkdir -p "$SCRATCH/repo/specs/A-001-x" "$SCRATCH/repo/specs/archive/B-002-y"
+    printf '| probe | `- [ ] a\\n- [x] b` |\n' > "$SCRATCH/repo/specs/A-001-x/review.md"
+    printf 'quoted: a\\n- b\n' > "$SCRATCH/repo/specs/archive/B-002-y/review.md"
+    printf '# clean\n' > "$SCRATCH/repo/specs/A-001-x/proposal.md"
+    run "$SCRIPTS_DIR/check-md-escapes.sh" "$SCRATCH/repo"
+    [ "$status" -eq 0 ]
+
+    printf 'merged bullets\\n- lost\n' > "$SCRATCH/repo/specs/A-001-x/proposal.md"
+    run "$SCRIPTS_DIR/check-md-escapes.sh" "$SCRATCH/repo"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"specs/A-001-x/proposal.md"* ]]
+    [[ "$output" != *"review.md"* ]]
+}
+
 # Self-test: the dotfiles repo's own markdown files MUST stay clean.
 # If a future Hive vault_patch (or any tool) corrupts a markdown file in this
 # repo, this assertion fails CI loud — catches the bug class at PR time.

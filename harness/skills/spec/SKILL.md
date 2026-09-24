@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: f5a3ab72397faaac
+generated_sha: e61d6104c7b794b0
 id: spec-skill
 type: skill
 status: active
@@ -261,14 +261,16 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 **Purpose:** Close a spec. Interactive promotion to vault, then mechanical archive.
 
-**Signature:** `/spec archive <feature-id> [--pr <url>] [--abandoned] [--force-with-drafts] [--force-without-review]`
+**Signature:** `/spec archive <feature-id> [--pr <url>] [--abandoned] [--force-with-drafts] [--force-without-review] [--reason "<why>"]`
+
+Both `--force-*` flags require `--reason`. An override is **recorded**: the archived `proposal.md` gains a `review_bypass:` line naming the flags, what the skipped check would have refused (or "nothing"), the reason and the date (SDD-042). Refusals never name the flags; they name the recovery path.
 
 **Steps:**
 
 1. **Pre-flight:**
    - Read `$REPO_ROOT/specs/<feature-id>/proposal.md`, `tasks.md`, `verification.md`.
-   - **Tag check:** scan all three files for `[AGENT-DRAFT]` or `[AGENT-SUGGESTION]` markers. If any found, REFUSE to archive unless `--force-with-drafts` is passed. Output list of files + lines with unresolved tags.
-   - **Review check (CLI-034):** the folder must contain `review.md` with a `verdict:` of `PASS` or `PASS-WITH-GAPS`, whose `spec:` matches the folder and whose `reviewed_sha` predates no change to `proposal.md` / `tasks.md` / `features.json`. A missing, malformed, failing, foreign or stale review REFUSES the archive. Produce it with `adversarial-review` — ideally from a **different session or agent** than the implementer, since independence is the point. Two declared escapes, never a judgment call in the moment: `review: waived` + a non-empty `review_waived_reason:` in `proposal.md` frontmatter, or `--force-without-review`.
+   - **Tag check:** scan all three files for `[AGENT-DRAFT]` or `[AGENT-SUGGESTION]` markers. If any found, REFUSE to archive unless `--force-with-drafts --reason "<why>"` is passed (recorded). Output list of files + lines with unresolved tags.
+   - **Review check (CLI-034):** the folder must contain `review.md` with a `verdict:` of `PASS` or `PASS-WITH-GAPS`, whose `spec:` matches the folder and whose contract (`proposal.md` / `tasks.md` / `features.json`) still matches the content digests the review launcher recorded in `review-request.json` (SDD-042). Content, not commits: a squash-merge or rebase of the reviewed commit does not stale a review, and ticking checkboxes or the harness filling `state`/`evidence` is not a contract change. Reviews launched before SDD-042 fall back to comparing against `reviewed_sha`. A missing, malformed, failing, foreign or stale review REFUSES the archive. Produce it with `adversarial-review` — ideally from a **different session or agent** than the implementer, since independence is the point. Two declared escapes, never a judgment call in the moment: `review: waived` + a non-empty `review_waived_reason:` in `proposal.md` frontmatter, or `--force-without-review --reason "<why>"`, which is recorded as `review_bypass:`.
      - The two checks answer different questions: the tag check asks whether the spec is *finished being written*; the review check asks whether anyone *independently argued against it*.
    - Count unchecked acceptance criteria. If >0, warn: "N criteria still unchecked. Continue?" Ask.
    - If `--abandoned` flag: skip step 2 entirely, mark as `status: abandoned`, route to `specs/archive/_abandoned/<id>/` in step 3.

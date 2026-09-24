@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -130,19 +131,30 @@ var statusLinePattern = regexp.MustCompile(`^(status:\s+)\S+(.*)$`)
 
 // ArchiveOptions configures Archive.
 type ArchiveOptions struct {
-	Abandoned          bool   // route to specs/archive/_abandoned/<id>; status -> abandoned
-	ForceWithDrafts    bool   // archive even with unresolved [AGENT-*] tags
-	ForceWithoutReview bool   // archive even without a passing, fresh review.md
-	PRURL              string // when set, append an archived/PR provenance comment
-	Date               string // YYYY-MM-DD for the PR comment (caller-supplied; deterministic in tests)
+	Abandoned          bool // route to specs/archive/_abandoned/<id>; status -> abandoned
+	ForceWithDrafts    bool // archive even with unresolved [AGENT-*] tags
+	ForceWithoutReview bool // archive even without a passing, fresh review.md
+	// BypassReason is required whenever either Force flag is set, and it is
+	// recorded — with what the skipped check would have refused — as a
+	// `review_bypass:` line in the archived proposal.md (SDD-042).
+	BypassReason string
+	PRURL        string // when set, append an archived/PR provenance comment
+	Date         string // YYYY-MM-DD for the PR comment (caller-supplied; deterministic in tests)
 
 	// Staleness overrides how a review's freshness is decided. nil uses the
 	// repository's git history; tests inject a fake to avoid building one.
 	Staleness StalenessChecker
 }
 
-// isReviewOutput reports whether name is a file the REVIEW machinery writes
-// into a spec folder, rather than an artifact the spec's author wrote.
+// ReviewStateFiles are the files the REVIEW machinery writes into a spec
+// folder, as opposed to artifacts the spec's author wrote. It is the one
+// declared list of review state: the draft-tag scan skips these (below), and a
+// byte-bound review (#1153, epic #1625 W3.6) must exclude them from the tree it
+// hashes. review-request.json in particular is written at launch, after
+// reviewed_sha is fixed, so hashing it would make every review stale on arrival.
+var ReviewStateFiles = []string{ReviewFile, TranscriptFile, StderrPath(TranscriptFile), ReviewRequestFile}
+
+// IsReviewState reports whether name is one of ReviewStateFiles.
 //
 // The tag scan must skip these, because scanning them makes the gate unpassable
 // by construction (#998). The adversarial-review skill instructs the reviewer
@@ -165,10 +177,11 @@ type ArchiveOptions struct {
 // guarded with no code change. That direction is deliberate and matches
 // ScanUnresolvedTags above — a deny-list errs toward refusing an archive, an
 // allow-list would silently stop guarding a file someone adds.
-func isReviewOutput(name string) bool {
-	switch name {
-	case ReviewFile, TranscriptFile, StderrPath(TranscriptFile):
-		return true
+func IsReviewState(name string) bool {
+	for _, f := range ReviewStateFiles {
+		if name == f {
+			return true
+		}
 	}
 	return false
 }
@@ -176,7 +189,7 @@ func isReviewOutput(name string) bool {
 // FindUnresolvedTags walks specDir and returns "relpath:line: text" for every
 // line carrying an [AGENT-DRAFT] or [AGENT-SUGGESTION] marker, in walk order.
 // An empty slice means the spec is clean. Files written by the review machinery
-// are skipped — see isReviewOutput.
+// are skipped — see IsReviewState.
 func FindUnresolvedTags(specDir string) ([]string, error) {
 	var hits []string
 	err := filepath.WalkDir(specDir, func(path string, d fs.DirEntry, err error) error {
@@ -186,7 +199,7 @@ func FindUnresolvedTags(specDir string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if isReviewOutput(d.Name()) {
+		if IsReviewState(d.Name()) {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -254,25 +267,13 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 		return "", fmt.Errorf("spec not found: %s", specDir)
 	}
 
-	if !opts.ForceWithDrafts {
-		tags, tagErr := FindUnresolvedTags(specDir)
-		if tagErr != nil {
-			return "", tagErr
-		}
-		if len(tags) > 0 {
-			return "", fmt.Errorf("unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags found:\n  %s\n"+
-				"resolve them (accept/edit/delete) before archiving, or use --force-with-drafts",
-				strings.Join(tags, "\n  "))
-		}
+	bypass, err := checkBypassRequest(specDir, opts)
+	if err != nil {
+		return "", err
 	}
-
-	// Second pre-flight (CLI-034): the adversarial-review verdict. The tag check
-	// above asks "is the spec finished being written"; this one asks "did anyone
-	// independently argue against it".
-	if !opts.ForceWithoutReview {
-		if err := checkReviewGate(repoRoot, id, specDir, opts.Staleness); err != nil {
-			return "", err
-		}
+	overrode, err := runPreflights(repoRoot, id, specDir, opts)
+	if err != nil {
+		return "", err
 	}
 
 	newStatus := "archived"
@@ -297,6 +298,9 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 	proposal := filepath.Join(target, "proposal.md")
 	if data, readErr := os.ReadFile(proposal); readErr == nil {
 		out := setStatus(string(data), newStatus)
+		if bypass {
+			out = withFrontmatterField(out, "review_bypass", bypassRecord(opts, overrode))
+		}
 		if opts.PRURL != "" {
 			out += fmt.Sprintf("\n<!-- archived %s — PR: %s -->\n", opts.Date, opts.PRURL)
 		}
@@ -306,4 +310,89 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 	}
 
 	return target, nil
+}
+
+// checkBypassRequest validates a bypass before anything moves: a Force flag
+// needs a stated reason, and a proposal.md to record it in. It reports whether
+// this archive is a bypass.
+func checkBypassRequest(specDir string, opts ArchiveOptions) (bool, error) {
+	if !opts.ForceWithDrafts && !opts.ForceWithoutReview {
+		return false, nil
+	}
+	if strings.TrimSpace(opts.BypassReason) == "" {
+		return true, errors.New(`--force-with-drafts and --force-without-review require --reason "<why>": ` +
+			"a bypass is recorded in the archived proposal.md as review_bypass:, and the reason is what makes it auditable")
+	}
+	if _, err := os.Stat(filepath.Join(specDir, "proposal.md")); err != nil {
+		return true, errors.New("a bypass is recorded in proposal.md, and this spec has none: add one, or satisfy the checks instead")
+	}
+	return true, nil
+}
+
+// runPreflights runs both pre-flights — the tag scan ("is the spec finished
+// being written?") and the review gate (CLI-034: "did anyone independently
+// argue against it?") — and returns the refusal of each one a Force flag
+// overrode. A bypassed check is still RUN, so the record says what was
+// overridden rather than which flag was typed: --force-without-review used to
+// be recorded, if at all, as "without review" when what it skipped was a
+// perfectly good review's freshness (#998).
+func runPreflights(repoRoot, id, specDir string, opts ArchiveOptions) ([]string, error) {
+	var overrode []string
+	tags, err := FindUnresolvedTags(specDir)
+	if err != nil {
+		return nil, err
+	}
+	if len(tags) > 0 {
+		if !opts.ForceWithDrafts {
+			return nil, fmt.Errorf("unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags found:\n  %s\n"+
+				"resolve them (accept, edit or delete each one) before archiving",
+				strings.Join(tags, "\n  "))
+		}
+		overrode = append(overrode, fmt.Sprintf("%d unresolved draft tag(s)", len(tags)))
+	}
+	if gateErr := checkReviewGate(repoRoot, id, specDir, opts.Staleness); gateErr != nil {
+		if !opts.ForceWithoutReview {
+			return nil, gateErr
+		}
+		headline, _, _ := strings.Cut(gateErr.Error(), "\n")
+		overrode = append(overrode, headline)
+	}
+	return overrode, nil
+}
+
+// bypassRecord is the one-line value of `review_bypass:`.
+func bypassRecord(opts ArchiveOptions, overrode []string) string {
+	var flags []string
+	if opts.ForceWithDrafts {
+		flags = append(flags, "force-with-drafts")
+	}
+	if opts.ForceWithoutReview {
+		flags = append(flags, "force-without-review")
+	}
+	what := "nothing (the checks would have passed)"
+	if len(overrode) > 0 {
+		what = strings.Join(overrode, " | ")
+	}
+	return fmt.Sprintf("%s; overrode: %s; reason: %s; date: %s",
+		strings.Join(flags, "+"), what, oneLine(opts.BypassReason), opts.Date)
+}
+
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// withFrontmatterField adds `key: "value"` as the last line of content's
+// frontmatter block, creating the block when the file has none. The value is
+// double-quoted with `\` and `"` escaped, so frontmatterFields reads it back
+// verbatim, `#` included.
+func withFrontmatterField(content, key, value string) string {
+	quoted := `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value) + `"`
+	line := key + ": " + quoted
+	lines := strings.Split(content, "\n")
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
+		for i := 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == "---" {
+				return strings.Join(append(lines[:i:i], append([]string{line}, lines[i:]...)...), "\n")
+			}
+		}
+	}
+	return "---\n" + line + "\n---\n" + content
 }

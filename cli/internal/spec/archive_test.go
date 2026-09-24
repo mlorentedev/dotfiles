@@ -1,6 +1,9 @@
 package spec
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -293,7 +296,7 @@ func TestArchiveForceWithDrafts(t *testing.T) {
 		"review.md":   passingReview("AI-001-x"),
 	})
 
-	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithDrafts: true}); err != nil {
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithDrafts: true, BypassReason: "test"}); err != nil {
 		t.Fatalf("force-with-drafts should archive despite tags: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "specs", "archive", "AI-001-x", "proposal.md")); err != nil {
@@ -461,5 +464,137 @@ func TestArchiveStillRefusesTheEmittedTagForm(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "AGENT-DRAFT") {
 		t.Fatalf("refusal does not name the tag: %v", err)
+	}
+}
+
+// AC-1.3 (#1625 W1.3). Every file the review machinery writes into a spec
+// folder is review STATE, not an authored artifact: the draft-tag scan skips
+// it, and W3.6's byte-bound review excludes it from the reviewed tree. One
+// declared set serves both, so the two cannot drift apart. review-request.json
+// is written at launch, after reviewed_sha is fixed; hashing it into the
+// reviewed tree would make every review stale on arrival.
+func TestDraftScanSkipsEveryReviewStateFile(t *testing.T) {
+	want := []string{ReviewFile, TranscriptFile, StderrPath(TranscriptFile), ReviewRequestFile}
+	if len(ReviewStateFiles) != len(want) {
+		t.Fatalf("ReviewStateFiles = %v, want exactly %v", ReviewStateFiles, want)
+	}
+	files := map[string]string{"proposal.md": "clean\n"}
+	for _, name := range want {
+		if !IsReviewState(name) {
+			t.Errorf("%s is written by the review machinery but is not declared review state", name)
+		}
+		files[name] = "[AGENT-DRAFT] written by the reviewer, not the author\n"
+	}
+	dir := writeSpec(t, t.TempDir(), "AI-001-x", files)
+	tags, err := FindUnresolvedTags(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("review state must never block an archive, got %v", tags)
+	}
+}
+
+// The other half of AC-1.3: excluding review state must not blind the scan to
+// the author's own contract files.
+func TestDraftTagInProposalStillBlocksAfterReview(t *testing.T) {
+	dir := writeSpec(t, t.TempDir(), "AI-001-x", map[string]string{
+		"proposal.md":     "<!-- [AGENT-DRAFT] decide the retry budget -->\n",
+		ReviewFile:        "| No [AGENT-DRAFT] tags | OK |\n",
+		ReviewRequestFile: `{"reviewer":"nan/mimo-v2.5"}` + "\n",
+	})
+	tags, err := FindUnresolvedTags(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 1 || !strings.HasPrefix(tags[0], "proposal.md:") {
+		t.Fatalf("want exactly the proposal.md hit, got %v", tags)
+	}
+	for _, name := range []string{"proposal.md", "tasks.md", "verification.md", "features.json", "design.md"} {
+		if IsReviewState(name) {
+			t.Errorf("%s is an authored artifact and must not be review state", name)
+		}
+	}
+}
+
+// ReviewStateFiles must be complete, not merely correct (PR-Agent on #1631):
+// a new file the review machinery writes into a spec folder, but forgets to
+// declare, would be scanned for draft tags and hashed into a reviewed tree,
+// failing every archive. So derive completeness from the source rather than
+// from convention. Every package constant used as a path component inside the
+// spec folder (filepath.Join(specDir, X) or filepath.Join(…, specID, X)) must
+// be declared review state, or be one of the files the author writes.
+func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, e.Name(), nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, f)
+	}
+	consts := map[string]string{} // package-level string constants
+	var joined []string           // identifiers joined under a spec folder
+	var literals []string         // string literals joined under a spec folder
+	for _, f := range files {
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch x := n.(type) {
+			case *ast.ValueSpec:
+				for i, name := range x.Names {
+					if i < len(x.Values) {
+						if lit, ok := x.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							consts[name.Name] = strings.Trim(lit.Value, "\"`")
+						}
+					}
+				}
+			case *ast.CallExpr:
+				if sel, ok := x.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Join" && len(x.Args) >= 2 {
+					underSpec := false
+					for _, a := range x.Args[:len(x.Args)-1] {
+						if id, ok := a.(*ast.Ident); ok && (id.Name == "specDir" || id.Name == "specID") {
+							underSpec = true
+						}
+					}
+					switch last := x.Args[len(x.Args)-1].(type) {
+					case *ast.Ident:
+						if underSpec {
+							joined = append(joined, last.Name)
+						}
+					case *ast.BasicLit:
+						// A path spelled as a literal must not slip past the
+						// check that a named constant would face (PR-Agent on #1631).
+						if underSpec && last.Kind == token.STRING {
+							literals = append(literals, strings.Trim(last.Value, "\"`"))
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
+	authored := map[string]bool{"proposal.md": true, "tasks.md": true, "verification.md": true, "features.json": true}
+	checked := 0
+	names := literals
+	for _, id := range joined {
+		if value, isConst := consts[id]; isConst {
+			names = append(names, value) // a loop variable or computed name is skipped
+		}
+	}
+	for _, value := range names {
+		checked++
+		if !IsReviewState(value) && !authored[value] {
+			t.Errorf("%q is joined under a spec folder but is neither review state nor an authored artifact — add it to ReviewStateFiles", value)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("found no spec-folder path constants — the source walk is broken, so this test proves nothing")
 	}
 }
