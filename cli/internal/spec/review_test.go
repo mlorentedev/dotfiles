@@ -113,6 +113,18 @@ func TestFrontmatterKeepsHashInQuotedValue(t *testing.T) {
 	}
 }
 
+// YAML opens a comment only at a `#` that begins the value or follows
+// whitespace, so an unquoted `owner/name#N` is one scalar, not a truncated one.
+func TestFrontmatterKeepsHashInsideUnquotedValue(t *testing.T) {
+	f := frontmatterFields("---\nissue: mlorentedev/hive#267 # tracker\nempty: # only a comment\n---\n")
+	if got := f["issue"]; got != "mlorentedev/hive#267" {
+		t.Errorf("unquoted value with an inner '#': got %q", got)
+	}
+	if got := f["empty"]; got != "" {
+		t.Errorf("a value that is only a comment is empty: got %q", got)
+	}
+}
+
 func TestArchiveBlocksOnFailVerdict(t *testing.T) {
 	root := t.TempDir()
 	archivableSpec(t, root, "AI-001-x", "---\nspec: \"AI-001-x\"\nverdict: \"FAIL\"\nreviewed_sha: \"abc\"\n---\n")

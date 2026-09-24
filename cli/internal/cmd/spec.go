@@ -32,6 +32,7 @@ func newSpecCmd() *cobra.Command {
 	cmd.AddCommand(newSpecInitCmd())
 	cmd.AddCommand(newSpecReviewCmd())
 	cmd.AddCommand(newSpecArchiveCmd())
+	cmd.AddCommand(newSpecAuditCmd())
 	cmd.AddCommand(newSpecTranscriptSinkCmd())
 	return cmd
 }

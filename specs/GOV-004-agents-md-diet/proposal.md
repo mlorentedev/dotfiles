@@ -3,6 +3,7 @@ id: "GOV-004-agents-md-diet"
 type: spec
 status: implementing
 created: "2026-07-09"
+issue: "mlorentedev/dotfiles#673"   # normalised from the prose link below (SDD-041)
 tags: [spec, proposal, agents-md, governance, ssot]
 template_version: "1.0"
 ---
