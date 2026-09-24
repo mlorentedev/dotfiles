@@ -1,0 +1,366 @@
+{
+  "$schema": "./branch-protection.schema.json",
+  "$comment": [
+    "Branch protection declared in git (GUARD-017, #1451). The first commit records the live state of 2026-09-23, so drift detection starts at zero; changes to it are deliberate edits that the diff shows.",
+    "Check: `dotf forge protection check`, and the `dotf doctor` branch-protection section. Repositories with neither protection nor a specs/ tree are not managed here."
+  ],
+  "policy": {
+    "required_approving_review_count": 0,
+    "rationale": "Single maintainer. GitHub does not let an author approve their own pull request, and enforce_admins is true, so requiring one or more approvals would lock the only maintainer out of every merge. The human review gate is the owner's deliberate merge (never auto-merge), backed by the required review-attestation check (decision D-1, dotfiles#1625)."
+  },
+  "repos": {
+    "mlorentedev/dotfiles": {
+      "branch": "main",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "lint",
+              "app_id": 15368
+            },
+            {
+              "context": "lint-powershell",
+              "app_id": 15368
+            },
+            {
+              "context": "review-attestation",
+              "app_id": 15368
+            },
+            {
+              "context": "test",
+              "app_id": 15368
+            },
+            {
+              "context": "test-windows",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/hive": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "check (3.12)",
+              "app_id": 15368
+            },
+            {
+              "context": "check (3.13)",
+              "app_id": 15368
+            },
+            {
+              "context": "cross_worker_lock (ubuntu-latest)",
+              "app_id": 15368
+            },
+            {
+              "context": "cross_worker_lock (windows-latest)",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/iris": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": null,
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/kubelab": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": false,
+          "checks": [
+            {
+              "context": "Detect Changes",
+              "app_id": 15368
+            },
+            {
+              "context": "Tests",
+              "app_id": 15368
+            },
+            {
+              "context": "Validate",
+              "app_id": 15368
+            },
+            {
+              "context": "review-attestation",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": true,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/pdf-modifier-mcp": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "test (3.12)",
+              "app_id": 15368
+            },
+            {
+              "context": "test (3.13)",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/pollex": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "Extension tests (unit + e2e)",
+              "app_id": 15368
+            },
+            {
+              "context": "build",
+              "app_id": 15368
+            },
+            {
+              "context": "lint",
+              "app_id": 15368
+            },
+            {
+              "context": "npm audit (site + extension)",
+              "app_id": 15368
+            },
+            {
+              "context": "test",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": null,
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/ts-bridge": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "hygiene",
+              "app_id": 15368
+            },
+            {
+              "context": "lint",
+              "app_id": 15368
+            },
+            {
+              "context": "security",
+              "app_id": 15368
+            },
+            {
+              "context": "test",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/web": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": false,
+          "checks": [
+            {
+              "context": "GitGuardian Security Checks",
+              "app_id": 46505
+            },
+            {
+              "context": "PR gate",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": true,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/yt-metrics-cli": {
+      "branch": "master",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "check (3.12)",
+              "app_id": 15368
+            },
+            {
+              "context": "check (3.13)",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
+    "mlorentedev/fae-brain": {
+      "branch": "main",
+      "state": "unavailable",
+      "reason": "private repository on the free plan: the protection API answers 403 (measured 2026-09-23); a required spec-gate needs GitHub Pro or a public repository"
+    },
+    "mlorentedev/knowledge": {
+      "branch": "master",
+      "state": "unavailable",
+      "reason": "private repository on the free plan: the protection API answers 403 (measured 2026-09-23); a required spec-gate needs GitHub Pro or a public repository"
+    },
+    "mlorentedev/openkm-brain": {
+      "branch": "main",
+      "state": "unavailable",
+      "reason": "private repository on the free plan: the protection API answers 403 (measured 2026-09-23); a required spec-gate needs GitHub Pro or a public repository"
+    },
+    "mlorentedev/garsync": {
+      "branch": "master",
+      "state": "unprotected",
+      "reason": "no protection today (measured 2026-09-23); the spec-gate rollout, W1.6 #1627, decides what it requires"
+    },
+    "mlorentedev/mail2markdown": {
+      "branch": "master",
+      "state": "unprotected",
+      "reason": "no protection today (measured 2026-09-23); the spec-gate rollout, W1.6 #1627, decides what it requires"
+    }
+  }
+}

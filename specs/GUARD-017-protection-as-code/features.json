@@ -1,0 +1,30 @@
+[
+  {
+    "id": "GUARD-017-protection-as-code-f1",
+    "behavior": "check exits 0 on matching live state and non-zero naming repo+field on drift",
+    "verification": "cd cli && out=$(go test ./internal/forge/... ./internal/cmd/... -run 'TestProtectionDiff|TestForgeProtectionCheckExit' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-017-protection-as-code-f2",
+    "behavior": "doctor branch-protection section maps drift/unavailable/unprotected/unanswerable",
+    "verification": "cd cli && out=$(go test ./internal/doctor/... -run 'TestCheckBranchProtection' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-017-protection-as-code-f3",
+    "behavior": "approvals policy value and rationale are pinned by a committed test",
+    "verification": "cd cli && out=$(go test ./internal/forge/... -run 'TestProtectionApprovalsRationalePinned' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-017-protection-as-code-f4",
+    "behavior": "apply sends a complete PUT, re-reads, reports changed=0 on re-run, refuses unreported contexts",
+    "verification": "cd cli && out=$(go test ./internal/forge/... -run 'TestProtectionApply' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  }
+]
