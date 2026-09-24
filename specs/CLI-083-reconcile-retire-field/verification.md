@@ -86,3 +86,11 @@ created: "2026-09-24"
 - [ ] Folder moved: `specs/CLI-083-reconcile-retire-field/` -> `specs/archive/CLI-083-reconcile-retire-field/`
 - [ ] Bitácora board ticket closed with the PR link (ADR-018)
 - [ ] CLI-082 archived in the same PR, which closes #1624
+
+## Review disposition
+
+Adversarial review: **PASS**, `nan/mimo-v2.5`, on `2fc33d3` (`review.md`).
+
+| Finding | Disposition |
+|---|---|
+| Minor, THEORETICAL: the blocked detail for an ambiguous field entry names `item/field` (`cannot delete "Hetzner/key"`) though the ambiguity is the item's | **Declined.** The detail names the declared entry the operator has to act on, and the same sentence gives the cause ("the name matches 2 items"). The live plan printed exactly that, and it read correctly. `PlanNote.Item` carries the bare item for anything structured. Changing the code after the verdict would stale the review for a wording preference. |
