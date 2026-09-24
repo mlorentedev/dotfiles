@@ -1,0 +1,30 @@
+[
+  {
+    "id": "SDD-041-spec-issue-state-f1",
+    "behavior": "Resolver, REST lookup and audit classification are covered by tests in internal/spec, and at least one test runs",
+    "verification": "cd cli && out=$(go test ./internal/spec/... -run 'Archive.*Issue|IssueState' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-041-spec-issue-state-f2",
+    "behavior": "A closed or unanswerable tracking issue makes dotf spec audit exit non-zero",
+    "verification": "cd cli && go test ./internal/cmd/... -run 'TestSpecAuditExitIssueState' -count=1 -v 2>&1 | grep -q '^--- PASS: TestSpecAuditExitIssueState'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-041-spec-issue-state-f3",
+    "behavior": "dotf doctor carries a spec-issue-state section whose status mapping is pinned by a test",
+    "verification": "cd cli && go test ./internal/doctor/... -run 'TestCheckSpecIssueState' -count=1 -v 2>&1 | grep -q '^--- PASS: TestCheckSpecIssueState'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-041-spec-issue-state-f4",
+    "behavior": "No active spec in this repo is linked to its issue only in prose",
+    "verification": "cd cli && go test ./internal/spec/... -run 'TestIssueStateNoActiveSpecIsProseLinked' -count=1 -v 2>&1 | grep -q '^--- PASS: TestIssueStateNoActiveSpecIsProseLinked'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
