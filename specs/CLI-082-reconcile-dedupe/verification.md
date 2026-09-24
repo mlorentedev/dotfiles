@@ -10,7 +10,7 @@ created: "2026-09-23"
 | AC | Proof |
 |---|---|
 | AC1 | `TestVerifyRetiresGivesEachRetireAVerdict` + `TestReconcilePlanShowsEachRetireVerdict` |
-| AC2 | `TestVerifyRetiresNamesHowToSettleEachBlocker` + `TestApplyRetireRefusalNamesTheExits` + `TestApplyRetireRefusesWhenTheValuesDiffer` |
+| AC2 | `TestVerifyRetiresNamesHowToSettleEachBlocker` + `TestApplyRetireRefusalNamesTheExits` (new), and `TestApplyRetireRefusesWhenTheValuesDiffer` (pre-existing from CLI-080, in `reconcile_retire_test.go`; unchanged, and it now runs through the rebuilt `sameValue`) |
 | AC3 | `TestRegistryValidatesRetiredItems` |
 | AC4 | `TestPlanRetiredItems` + `TestApplyDeletesARetiredItem` + `TestBWServeWriter_DeleteItem` + `TestBWPut_DeleteItemDeletesByID` + `TestReconcileDeletesARetiredItem` + `TestLockHintWriterForwardsEveryMethod` |
 | AC5 | `TestPlanRetiredItems` (the ambiguous name) |
