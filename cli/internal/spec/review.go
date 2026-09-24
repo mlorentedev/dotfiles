@@ -70,8 +70,8 @@ func frontmatterFields(content string) map[string]string {
 		}
 		value := strings.TrimSpace(rest)
 		if len(value) > 1 && (value[0] == '"' || value[0] == '\'') {
-			if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
-				value = value[1 : 1+end]
+			if unquoted, ok := unquoteScalar(value); ok {
+				value = unquoted
 			}
 		} else if idx := yamlCommentStart(value); idx >= 0 {
 			value = strings.TrimSpace(value[:idx])
@@ -79,6 +79,33 @@ func frontmatterFields(content string) map[string]string {
 		fields[key] = value
 	}
 	return fields
+}
+
+// unquoteScalar reads a YAML quoted scalar from the start of value, honouring
+// its escapes: `\"` and `\\` inside double quotes, and a doubled single
+// quote inside single quotes. (Not spelled out here: gofmt rewrites two
+// apostrophes in a doc comment into a typographic closing quote.)
+// Anything after the closing quote (a trailing comment) is dropped. ok is
+// false when the quote never closes, and the caller keeps the raw value.
+func unquoteScalar(value string) (string, bool) {
+	q := value[0]
+	var b strings.Builder
+	for i := 1; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case q == '"' && c == '\\' && i+1 < len(value):
+			i++
+			b.WriteByte(value[i])
+		case q == '\'' && c == '\'' && i+1 < len(value) && value[i+1] == '\'':
+			i++
+			b.WriteByte('\'')
+		case c == q:
+			return b.String(), true
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return "", false
 }
 
 // yamlCommentStart returns the index of the `#` that opens a YAML comment in
@@ -180,7 +207,8 @@ func (gitStaleness) Stale(repoRoot, specID, reviewedSHA string) (bool, bool, str
 		return false, false, ""
 	}
 	if err := exec.Command("git", "-C", repoRoot, "cat-file", "-e", reviewedSHA+"^{commit}").Run(); err != nil {
-		return true, true, fmt.Sprintf("reviewed_sha %s is not a commit in this history (rewritten by a rebase?)", reviewedSHA)
+		return true, true, fmt.Sprintf("reviewed_sha %s is not in this clone's object store (a squash-merge, a rebase or a fresh clone discards it), "+
+			"and this review predates contract digests (SDD-042), so nothing else can show the content is what was reviewed", reviewedSHA)
 	}
 
 	args := []string{"-C", repoRoot, "diff", "--name-only", reviewedSHA, "HEAD", "--"}
@@ -293,7 +321,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	if waived, reason := reviewWaiver(specDir); waived {
 		if reason == "" {
 			return fmt.Errorf("proposal.md declares `review: waived` without a reason\n" +
-				"add a non-empty `review_waived_reason:` so the waiver is auditable, or archive with --force-without-review")
+				"add a non-empty `review_waived_reason:` so the waiver is auditable")
 		}
 		return nil
 	}
@@ -301,18 +329,18 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	review, found, err := FindReview(specDir)
 	if !found {
 		return fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
-			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md, or pass --force-without-review",
+			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
 			ReviewFile)
 	}
 	if err != nil {
-		return fmt.Errorf("%w\nfix the artifact, declare `review: waived` with a reason in proposal.md, or pass --force-without-review", err)
+		return fmt.Errorf("%w\nfix the artifact, or declare `review: waived` with a reason in proposal.md", err)
 	}
 	// A review.md copied from a sibling spec would otherwise satisfy the gate
 	// while describing a different change — the copy-paste analogue of the
 	// one-line alibi SPEC_FLOOR exists to defeat in check-spec-gate.sh.
 	if review.Spec != "" && review.Spec != specID {
 		return fmt.Errorf("%s declares spec %q but lives in %q — the review describes a different change\n"+
-			"re-run /adversarial-review for this spec, or pass --force-without-review",
+			"re-run /adversarial-review for this spec",
 			ReviewFile, review.Spec, specID)
 	}
 	// Provenance before verdict, deliberately. Both later checks read the file's
@@ -324,13 +352,10 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	}
 	if review.Verdict.Blocks() {
 		return fmt.Errorf("%s records verdict %s — address the findings and re-review before archiving\n"+
-			"to override, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
+			"a FAIL is resolved by its findings: apply them in a follow-up, then re-review",
 			ReviewFile, review.Verdict)
 	}
 
-	if checker == nil {
-		checker = gitStaleness{}
-	}
 	// The first exit named is the one that keeps the review, and it is named
 	// first deliberately. The other three all discard or bypass a verdict that
 	// may be perfectly good, so an operator offered only those reaches for an
@@ -341,14 +366,13 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// BUG-093 (#1516), where four of them targeted the contract set. Restoring
 	// the contract and recording the dispositions is the correct answer there,
 	// and it was not previously on offer.
-	if stale, known, reason := checker.Stale(repoRoot, specID, review.ReviewedSHA); known && stale {
+	if stale, known, reason := reviewStale(repoRoot, specID, specDir, review, checker); known && stale {
 		return fmt.Errorf("%s is stale: %s\n"+
 			"keeps the review:\n"+
-			"  restore the contract files to reviewed_sha and record what changed as dispositions in verification.md (excluded from this check)\n"+
+			"  restore the contract files to the content the review was launched against, and record what changed as dispositions in verification.md (excluded from this check)\n"+
 			"discards it — only if the review is genuinely no longer the right one:\n"+
 			"  re-run /adversarial-review against the current head\n"+
-			"  declare `review: waived` with a reason in proposal.md\n"+
-			"  pass --force-without-review",
+			"  declare `review: waived` with a reason in proposal.md",
 			ReviewFile, reason)
 	}
 
@@ -356,6 +380,42 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// what they concluded — a valid, fresh, passing review signed by the wrong
 	// model is still a self-review, and the earlier checks cannot see that.
 	return checkReviewerPool(repoRoot, review.Reviewer)
+}
+
+// reviewStale decides whether the review still describes the contract: by
+// CONTENT when the launcher recorded contract digests (SDD-042), and by the
+// legacy reviewed_sha comparison only for reviews launched before that.
+//
+// The content path consults no git history at all, which is the point: this
+// repository squash-merges, so the reviewed commit is orphaned by the normal
+// workflow, and whether its object still exists locally is a fact about
+// garbage collection, not about the review (#1566, #970). Comparing against
+// disk also keeps the uncommitted-edit bypass closed.
+func reviewStale(repoRoot, specID, specDir string, review Review, checker StalenessChecker) (stale, known bool, reason string) {
+	if req, found, err := ReadReviewRequest(specDir); err == nil && found && len(req.ContractDigests) > 0 {
+		if moved := changedContracts(specDir, req.ContractDigests); len(moved) > 0 {
+			return true, true, fmt.Sprintf("%s changed since the review was launched (its content digest differs)",
+				strings.Join(moved, ", "))
+		}
+		return false, true, ""
+	}
+	if checker == nil {
+		checker = gitStaleness{}
+	}
+	return checker.Stale(repoRoot, specID, review.ReviewedSHA)
+}
+
+// changedContracts names, in contractFiles order, every contract file whose
+// normalised digest differs from the one recorded at launch.
+func changedContracts(specDir string, recorded map[string]string) []string {
+	current := ContractDigests(specDir)
+	var moved []string
+	for _, name := range contractFiles {
+		if current[name] != recorded[name] {
+			moved = append(moved, name)
+		}
+	}
+	return moved
 }
 
 // checkReviewProvenance compares review.md against the sidecar the LAUNCHER
@@ -369,7 +429,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 func checkReviewProvenance(specDir string, review Review) error {
 	req, found, err := ReadReviewRequest(specDir)
 	if err != nil {
-		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review, or pass --force-without-review", err)
+		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review", err)
 	}
 	if !found {
 		return nil
@@ -382,14 +442,14 @@ func checkReviewProvenance(specDir string, review Review) error {
 	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == fileDigest(filepath.Join(specDir, ReviewFile)) {
 		return fmt.Errorf("%s has not changed since the review was launched — the reviewer wrote no verdict\n"+
 			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
-			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state), or pass --force-without-review",
+			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state)",
 			ReviewFile)
 	}
 
 	if req.ReviewedSHA != "" && review.ReviewedSHA != "" && req.ReviewedSHA != review.ReviewedSHA {
 		return fmt.Errorf("%s claims reviewed_sha %s but the review was launched against %s\n"+
 			"the launcher records the head it pointed the reviewer at; the frontmatter is the reviewer's own claim about it\n"+
-			"re-run /adversarial-review against the current head, or pass --force-without-review",
+			"re-run /adversarial-review against the current head",
 			ReviewFile, short(review.ReviewedSHA), short(req.ReviewedSHA))
 	}
 
@@ -399,7 +459,7 @@ func checkReviewProvenance(specDir string, review Review) error {
 	// that check cannot see because both are admitted.
 	if req.Reviewer != "" && review.Reviewer != "" && req.Reviewer != review.Reviewer {
 		return fmt.Errorf("%s is signed by %q but %q was launched — the verdict is not from the run that was requested\n"+
-			"re-run /adversarial-review, or pass --force-without-review",
+			"re-run /adversarial-review",
 			ReviewFile, review.Reviewer, req.Reviewer)
 	}
 	return nil
