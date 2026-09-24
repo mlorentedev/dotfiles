@@ -463,3 +463,53 @@ func TestArchiveStillRefusesTheEmittedTagForm(t *testing.T) {
 		t.Fatalf("refusal does not name the tag: %v", err)
 	}
 }
+
+// AC-1.3 (#1625 W1.3). Every file the review machinery writes into a spec
+// folder is review STATE, not an authored artifact: the draft-tag scan skips
+// it, and W3.6's byte-bound review excludes it from the reviewed tree. One
+// declared set serves both, so the two cannot drift apart. review-request.json
+// is written at launch, after reviewed_sha is fixed; hashing it into the
+// reviewed tree would make every review stale on arrival.
+func TestDraftScanSkipsEveryReviewStateFile(t *testing.T) {
+	want := []string{ReviewFile, TranscriptFile, StderrPath(TranscriptFile), ReviewRequestFile}
+	if len(ReviewStateFiles) != len(want) {
+		t.Fatalf("ReviewStateFiles = %v, want exactly %v", ReviewStateFiles, want)
+	}
+	files := map[string]string{"proposal.md": "clean\n"}
+	for _, name := range want {
+		if !IsReviewState(name) {
+			t.Errorf("%s is written by the review machinery but is not declared review state", name)
+		}
+		files[name] = "[AGENT-DRAFT] written by the reviewer, not the author\n"
+	}
+	dir := writeSpec(t, t.TempDir(), "AI-001-x", files)
+	tags, err := FindUnresolvedTags(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("review state must never block an archive, got %v", tags)
+	}
+}
+
+// The other half of AC-1.3: excluding review state must not blind the scan to
+// the author's own contract files.
+func TestDraftTagInProposalStillBlocksAfterReview(t *testing.T) {
+	dir := writeSpec(t, t.TempDir(), "AI-001-x", map[string]string{
+		"proposal.md":     "<!-- [AGENT-DRAFT] decide the retry budget -->\n",
+		ReviewFile:        "| No [AGENT-DRAFT] tags | OK |\n",
+		ReviewRequestFile: `{"reviewer":"nan/mimo-v2.5"}` + "\n",
+	})
+	tags, err := FindUnresolvedTags(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 1 || !strings.HasPrefix(tags[0], "proposal.md:") {
+		t.Fatalf("want exactly the proposal.md hit, got %v", tags)
+	}
+	for _, name := range []string{"proposal.md", "tasks.md", "verification.md", "features.json", "design.md"} {
+		if IsReviewState(name) {
+			t.Errorf("%s is an authored artifact and must not be review state", name)
+		}
+	}
+}
