@@ -20,12 +20,13 @@ func TestRegistryValidatesRetiredFields(t *testing.T) {
 		"  - {item: Stripe, field: backup-codes, reason: superseded by a regeneration}\n" +
 		"  - {item: kept, field: stale, reason: no declaration reads it}\n" +
 		"  - {item: legacy, field: other, reason: the from source is legacy/old, not this}\n" +
-		"  - {item: Notes-only, field: notes, reason: a dead note}\n"
+		"  - {item: Notes-only, field: notes, reason: a dead note}\n" +
+		"  - {item: Stripe, field: other-dead, reason: a second field of one item is its own entry}\n"
 	reg, err := ParseRegistry([]byte(ok))
 	if err != nil {
 		t.Fatalf("well-formed field entries must parse: %v", err)
 	}
-	if len(reg.Retired) != 4 || reg.Retired[0].Item != "Stripe" || reg.Retired[0].Field != "backup-codes" {
+	if len(reg.Retired) != 5 || reg.Retired[0].Item != "Stripe" || reg.Retired[0].Field != "backup-codes" {
 		t.Fatalf("field entries not carried: %+v", reg.Retired)
 	}
 
