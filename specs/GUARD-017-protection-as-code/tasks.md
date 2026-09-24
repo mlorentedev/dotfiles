@@ -19,14 +19,14 @@ created: "2026-09-23"
 
 ## Implementation: PR-A (declare and detect, read-only)
 
-- [ ] [P] [AC4] Failing tests: schema rejects a repo with neither object nor state, and a state without a reason → `TestProtectionSchema*`
-- [ ] [AC4] `forge/branch-protection.schema.json` + loader in `cli/internal/forge`
-- [ ] [P] [AC1] Failing tests: GET-shape normalisation (`enabled` wrappers, `checks[]` with `app_id`) and field-by-field diff → `TestProtectionNormalise*`, `TestProtectionDiff*`
-- [ ] [AC1] Normalise + diff
-- [ ] [AC3] `TestProtectionApprovalsRationalePinned` + policy block
-- [ ] [AC1] `dotf forge protection check`, exit contract tested → `TestForgeProtectionCheckExit*`
-- [ ] [AC2] Failing test + `branch-protection` doctor section → `TestCheckBranchProtection`
-- [ ] [AC1] `forge/branch-protection.json` declaring today's live state; `check` exits 0 live
+- [x] [P] [AC4] Failing tests: schema rejects a repo with neither object nor state, and a state without a reason → `TestProtectionSchema*`
+- [x] [AC4] `forge/branch-protection.schema.json` + loader in `cli/internal/forge`
+- [x] [P] [AC1] Failing tests: GET-shape normalisation (`enabled` wrappers, `checks[]` with `app_id`) and field-by-field diff → `TestProtectionNormalise*`, `TestProtectionDiff*`
+- [x] [AC1] Normalise + diff
+- [x] [AC3] `TestProtectionApprovalsRationalePinned` + policy block
+- [x] [AC1] `dotf forge protection check`, exit contract tested → `TestForgeProtectionCheckExit*`
+- [x] [AC2] Failing test + `branch-protection` doctor section → `TestCheckBranchProtection`
+- [x] [AC1] `forge/branch-protection.json` declaring today's live state; `check` exits 0 live
 
 ## Implementation: PR-B (apply)
 

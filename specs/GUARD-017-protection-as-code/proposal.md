@@ -1,7 +1,7 @@
 ---
 id: "GUARD-017-protection-as-code"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-09-23"
 issue: "mlorentedev/dotfiles#1451"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, forge, branch-protection, iac, doctor]
@@ -122,18 +122,18 @@ repository is reviewed on its own.
 
 ## Acceptance criteria
 
-- [ ] **AC1 (PR-A).** `dotf forge protection check` exits 0 against today's
+- [x] **AC1 (PR-A).** `dotf forge protection check` exits 0 against today's
   live state for every declared repo. A test fixture that disagrees on one
   field (a dropped context, or `enforce_admins` flipped) exits non-zero and
   names the repo and the field.
-- [ ] **AC2 (PR-A).** The `dotf doctor` section `branch-protection` reports
+- [x] **AC2 (PR-A).** The `dotf doctor` section `branch-protection` reports
   PASS on today's tree. `unavailable` and `unprotected` repos appear as Skips
   with their reasons.
-- [ ] **AC3 (PR-A).** `TestProtectionApprovalsRationalePinned` passes. It fails
+- [x] **AC3 (PR-A).** `TestProtectionApprovalsRationalePinned` passes. It fails
   when the policy count changes, when the rationale changes without the test
   changing, and when a repo's count diverges from the policy without an
   override.
-- [ ] **AC4 (PR-A).** Schema validation rejects a repo that declares neither a
+- [x] **AC4 (PR-A).** Schema validation rejects a repo that declares neither a
   protection object nor a state, and a state that has no reason.
 - [ ] **AC5 (PR-B).** A test against a fake forge shows `apply` sends a
   complete PUT body (no declared field missing), re-reads, and reports
