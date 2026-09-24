@@ -72,7 +72,7 @@ The fixes for 1, 3 and 4 are code and comment changes made **after** the review 
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/SDD-042-content-bound-review/` -> `specs/archive/SDD-042-content-bound-review/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/SDD-042-content-bound-review/` -> `specs/archive/SDD-042-content-bound-review/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (none needed)

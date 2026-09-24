@@ -1,7 +1,7 @@
 ---
 id: "SDD-042-content-bound-review"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-23"
 issue: "mlorentedev/dotfiles#1566"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, sdd, archive-gate, review]
@@ -140,3 +140,5 @@ trusting commit messages.
   provenance), GUARD-010 (`features.json` state).
 - Siblings in Wave 1: SDD-041 (#1630, `dotf spec audit`) and W1.3 (#1631,
   the exported `ReviewStateFiles` list that W3.6 will reuse).
+
+<!-- archived 2026-09-23 — PR: https://github.com/mlorentedev/dotfiles/pull/1633 -->
