@@ -1,7 +1,7 @@
 ---
 id: "SDD-041-spec-issue-state"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-09-23"
 issue: "mlorentedev/dotfiles#1087"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, sdd, doctor, archive-on-merge]
@@ -105,23 +105,26 @@ sweep, sequential, would add seconds to every doctor run.
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `gorun ./internal/spec/... 'Archive.*Issue|IssueState'`
+- [x] **AC1** — `gorun ./internal/spec/... 'Archive.*Issue|IssueState'`
   passes with at least one test run. The tests cover every frontmatter form,
   every measured prose shape including the negative ones, frontmatter taking
   precedence over prose, the full classification table, and REST output
   parsing (open, closed, pull request, 404, other error).
-- [ ] **AC2** — A fixture spec whose issue is CLOSED makes the audit report
+- [x] **AC2** — A fixture spec whose issue is CLOSED makes the audit report
   FAIL and exit non-zero. A fixture whose lookup fails exits non-zero with
   "unanswerable", never with a clean result.
-- [ ] **AC3** — `dotf doctor 2>&1 | grep -i 'spec-issue-state'` shows the
-  section. On today's tree it FAILs, listing the 15 frontmatter-linked zombies
-  plus GOV-004, now normalised. A doctor unit test pins the mapping: ok →
+- [x] **AC3** — `dotf doctor 2>&1 | grep -i 'spec-issue-state'` shows the
+  section. On today's tree it FAILs and lists every active spec whose issue is
+  closed: 14 on 2026-09-23, GOV-004 included. The synthesis counted 16; CLI-078
+  and CLI-080 left the set when their shared issue #1596 was reopened. A doctor unit test pins the mapping: ok →
   PASS, FAIL → FAIL, unanswerable → WARN, `gh` absent → Skip.
-- [ ] **AC4** — GOV-004 carries `issue:` frontmatter, and
+- [x] **AC4** — GOV-004 carries `issue:` frontmatter, and
   `TestIssueStateNoActiveSpecIsProseLinked` passes. The test fails when a
   prose-only fixture is added.
-- [ ] **AC5** — `dotf spec audit`, run in `hive`, reports HIVE-267 as a
-  zombie, and FEAT-015 and HIVE-119 as prose-linked.
+- [x] **AC5** — `dotf spec audit`, run in `hive`, reports HIVE-267 as a
+  zombie, and resolves FEAT-015 and HIVE-119 through their prose links (both
+  of those issues are closed too, so they are zombies the frontmatter-only
+  count missed).
 
 ## References
 

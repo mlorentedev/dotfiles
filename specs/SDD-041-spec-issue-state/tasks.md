@@ -19,27 +19,27 @@ created: "2026-09-23"
 
 ## Implementation
 
-- [ ] [P] [AC1] Failing tests: frontmatter forms (`owner/name#N`, `name#N`, `#N`, malformed) → `TestIssueStateResolveFrontmatter`
-- [ ] [P] [AC1] Failing tests: prose shapes, positive and negative, plus frontmatter precedence → `TestIssueStateResolveProse`, `TestIssueStateFrontmatterWinsOverProse`
-- [ ] [AC1] Implement `ResolveIssueLink` in `cli/internal/spec/issuelink.go`
-- [ ] [P] [AC1] Failing test: REST output parsing (open, closed, PR, 404, other error) → `TestIssueStateGHLookup`
-- [ ] [AC1] Implement `GHIssueStateLookup`
-- [ ] [AC1] [AC2] Failing test: audit classification over a fixture tree (archive skipped, non-dirs skipped, deterministic order) → `TestIssueStateAuditClassifies`, `TestIssueStateAuditUnanswerable`
-- [ ] [AC2] Implement `AuditIssueState` with a bounded lookup pool
-- [ ] [AC2] `dotf spec audit` command, exit contract tested → `TestSpecAuditExitIssueState`
-- [ ] [AC3] Failing test: doctor `spec-issue-state` mapping (PASS/FAIL/WARN/Skip) → `TestCheckSpecIssueState`
-- [ ] [AC3] Wire `checkSpecIssueState` into the full doctor sweep
-- [ ] [AC4] Normalise GOV-004 frontmatter; `TestIssueStateNoActiveSpecIsProseLinked`
-- [ ] [AC5] Run `dotf spec audit` in hive and record the result in `verification.md`
+- [x] [P] [AC1] Failing tests: frontmatter forms (`owner/name#N`, `name#N`, `#N`, malformed) → `TestIssueStateResolveFrontmatter`
+- [x] [P] [AC1] Failing tests: prose shapes, positive and negative, plus frontmatter precedence → `TestIssueStateResolveProse`, `TestIssueStateFrontmatterWinsOverProse`
+- [x] [AC1] Implement `ResolveIssueLink` in `cli/internal/spec/issuelink.go`
+- [x] [P] [AC1] Failing test: REST output parsing (open, closed, PR, 404, other error) → `TestIssueStateGHLookup`
+- [x] [AC1] Implement `GHIssueStateLookup`
+- [x] [AC1] [AC2] Failing test: audit classification over a fixture tree (archive skipped, non-dirs skipped, deterministic order) → `TestIssueStateAuditClassifies`, `TestIssueStateAuditUnanswerable`
+- [x] [AC2] Implement `AuditIssueState` with a bounded lookup pool
+- [x] [AC2] `dotf spec audit` command, exit contract tested → `TestSpecAuditExitIssueState`
+- [x] [AC3] Failing test: doctor `spec-issue-state` mapping (PASS/FAIL/WARN/Skip) → `TestCheckSpecIssueState`
+- [x] [AC3] Wire `checkSpecIssueState` into the full doctor sweep
+- [x] [AC4] Normalise GOV-004 frontmatter; `TestIssueStateNoActiveSpecIsProseLinked`
+- [x] [AC5] Run `dotf spec audit` in hive and record the result in `verification.md`
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features
