@@ -78,8 +78,10 @@ reviewed and applied.
    and make the plan unappliable; `deferred` lines belong to `dotf secrets migrate`.
 4. **Apply** from the reviewed branch: `dotf secrets reconcile --apply`. It copies
    values inside the process (never printed), never overwrites an existing field,
-   then syncs, re-plans and **fails unless the second plan is empty**. Safe before
-   merge: every operation is additive.
+   then syncs and re-plans. A re-plan that holds only retires gets one more pass
+   (step 6); **anything else left fails the command**, and so does anything left
+   after that pass. Without `retire:` every operation is additive, so an apply is
+   safe before merge; a retire deletes the source field.
 5. **Roll consumers** that are not local: `dotf secrets sync <target>`.
 6. **Retire the source:** once consumers are verified on the copy, add `retire: true`
    to the `from:` and run reconcile again. It removes the source field only if the
@@ -87,8 +89,8 @@ reviewed and applied.
    one side was rotated and it refuses. Never in the same *pass* as the copy: the
    comparison reads the copy from the store after a sync. So one `--apply` may run a
    second pass that holds only retires, which lets you declare `retire: true`
-   together with the copy. It always runs after every other operation. One credential, one place — a search no longer
-   returns two.
+   together with the copy. It always runs after every other operation. One
+   credential, one place — a search no longer returns two.
 7. **Delete the record:** a satisfied `from:` (source retired, or no retire asked) is
    reported as removable — delete it in a follow-up.
 

@@ -141,6 +141,9 @@ func TestDecodeItemsMarksAFolderIDTheListDoesNotCarry(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]bool{"filed": false, "stale": true, "loose": false}
+	if len(got) != len(want) {
+		t.Fatalf("want %d items, got %d", len(want), len(got))
+	}
 	for _, it := range got {
 		if it.FolderUnresolved != want[it.Name] {
 			t.Errorf("%s: FolderUnresolved = %v, want %v", it.Name, it.FolderUnresolved, want[it.Name])
