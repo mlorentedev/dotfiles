@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.57.0](https://github.com/mlorentedev/dotfiles/compare/v0.56.0...v0.57.0) (2026-09-24)
+
+
+### Features
+
+* **forge:** declare branch protection in git and check every repository for drift ([#1637](https://github.com/mlorentedev/dotfiles/issues/1637)) ([da16c65](https://github.com/mlorentedev/dotfiles/commit/da16c65608ce4a56f79b9d4ca79760651218483f)), closes [#1451](https://github.com/mlorentedev/dotfiles/issues/1451)
+* **pi:** connect pi to hive and mcp servers via pi-mcp-client ([#1657](https://github.com/mlorentedev/dotfiles/issues/1657)) ([32c9fe2](https://github.com/mlorentedev/dotfiles/commit/32c9fe2c9a979dac6c154c8a49ffd93709c34261))
+* **secrets:** retire a dead field by declaration, and take bw.from on a multi-var secret over one field ([#1652](https://github.com/mlorentedev/dotfiles/issues/1652)) ([89f2646](https://github.com/mlorentedev/dotfiles/commit/89f26468d6126c7e1d139140f5f387e15d95124b))
+* **secrets:** verdicts for every retire in the reconcile plan, and retiring items by declaration ([#1634](https://github.com/mlorentedev/dotfiles/issues/1634)) ([37e3ddc](https://github.com/mlorentedev/dotfiles/commit/37e3ddccfe33f2168612991318effaa0dee56038)), closes [#1624](https://github.com/mlorentedev/dotfiles/issues/1624)
+* **spec:** audit active specs against the state of the issue they track ([#1630](https://github.com/mlorentedev/dotfiles/issues/1630)) ([2c6af81](https://github.com/mlorentedev/dotfiles/commit/2c6af81c8a4b581ace62e45c0ca824b15017f913)), closes [#1087](https://github.com/mlorentedev/dotfiles/issues/1087)
+* **spec:** decide review freshness by content, and record every archive bypass ([#1633](https://github.com/mlorentedev/dotfiles/issues/1633)) ([fced814](https://github.com/mlorentedev/dotfiles/commit/fced814ce66650e6e9d428096ebd3e4242cac401)), closes [#1566](https://github.com/mlorentedev/dotfiles/issues/1566)
+
+
+### Bug Fixes
+
+* **ci:** skip PR-Agent when every file is ignored, instead of blaming NaN ([#1619](https://github.com/mlorentedev/dotfiles/issues/1619)) ([19de983](https://github.com/mlorentedev/dotfiles/commit/19de983340e54393d088cc52bf83a5183daf20df)), closes [#1618](https://github.com/mlorentedev/dotfiles/issues/1618)
+* **doctor:** gate PAT resolution on the readability probe, not GET /status ([#1612](https://github.com/mlorentedev/dotfiles/issues/1612)) ([0642e31](https://github.com/mlorentedev/dotfiles/commit/0642e315770765d52632585dbc1f571e2fa313d2)), closes [#1611](https://github.com/mlorentedev/dotfiles/issues/1611)
+* **secrets:** converge copy+retire in one apply, and check what drift used to skip ([#1621](https://github.com/mlorentedev/dotfiles/issues/1621)) ([8a68a49](https://github.com/mlorentedev/dotfiles/commit/8a68a49c01b38bac6694eda4eb87aeb15b63e67a)), closes [#1596](https://github.com/mlorentedev/dotfiles/issues/1596)
+* **secrets:** refuse env dumps behind a path or a redirect, and detect Claude Code's real session marker ([#1655](https://github.com/mlorentedev/dotfiles/issues/1655)) ([02f9165](https://github.com/mlorentedev/dotfiles/commit/02f9165c97edcb6adb1ef8f852c64945bd3d8b6d)), closes [#1626](https://github.com/mlorentedev/dotfiles/issues/1626)
+* **secrets:** take a file secret as hidden multi-line input instead of advising a file on disk ([#1639](https://github.com/mlorentedev/dotfiles/issues/1639)) ([79b9a13](https://github.com/mlorentedev/dotfiles/commit/79b9a1301a24877c3afcedaab9201b0f524d6ee7)), closes [#1638](https://github.com/mlorentedev/dotfiles/issues/1638)
+* **spec:** declare review state as one exported list, including review-request.json ([#1631](https://github.com/mlorentedev/dotfiles/issues/1631)) ([c679d41](https://github.com/mlorentedev/dotfiles/commit/c679d41ca3b1dd1042678d162a6eeb89d5ef556a)), closes [#998](https://github.com/mlorentedev/dotfiles/issues/998)
+* **tools:** stop installing an unrelated npm package as the Obsidian CLI ([#1616](https://github.com/mlorentedev/dotfiles/issues/1616)) ([52e99a2](https://github.com/mlorentedev/dotfiles/commit/52e99a2d595d138c1b4f1197babe5772d7ceeebc)), closes [#1615](https://github.com/mlorentedev/dotfiles/issues/1615)
+
 ## [0.56.0](https://github.com/mlorentedev/dotfiles/compare/v0.55.0...v0.56.0) (2026-09-23)
 
 
