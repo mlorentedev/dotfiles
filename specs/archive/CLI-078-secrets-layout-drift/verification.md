@@ -11,19 +11,20 @@ created: "2026-09-21"
 |---|---|
 | AC1 | `TestLayoutDriftReportsAFolderNameNothingCarries` |
 | AC2 | `TestLayoutDriftChecksDormantDeclarations` + `TestBWDeclarationsIncludesDormantBlocksOnAgeBackedSecrets` |
-| AC3 | `TestLayoutDriftReportsAMisfiledItem` |
+| AC3 | `TestLayoutDriftReportsAMisfiledItem` + `TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder` |
 | AC4 | `TestLayoutDriftResolvesFieldsTheWayTheReaderDoes` (all four paths, both directions) |
 | AC5 | `TestLayoutDriftReportsOneFindingPerProblemNotPerVar` + `TestLayoutDriftDedupesAMisfiledItemAcrossVars` |
 | AC6 | `TestDecodeItemsCannotCarryAValue` |
 | AC7 | `TestDecodeItemsErrorNeverQuotesTheBody` |
-| AC8 | `features.json` f8 — the source, comments stripped, calls no writer |
+| AC8 | `TestDriftSourceCallsNoWriter` (the writer surface derived from `BWWriteClient`) + `TestDriftExitsNonZeroOnAFindingAndNamesTheSecret` |
+| AC9 | `TestDriftSyncsBeforeItReads` + `TestDriftRefusesAStoreItCannotSync` + `TestDecodeItemsMarksAFolderIDTheListDoesNotCarry` + `TestLayoutDriftSaysSoWhenItCannotNameAnItemsFolder` + `TestPlanBlocksAnItemWhoseFolderItCannotName` |
 
 ## Test status
 
 - `go build ./...`, `go vet ./...`, `GOOS=windows go vet ./...` — clean
 - `go test -count=1 ./...` — green across the module
 - `golangci-lint run` at the pinned **v2.12.2** — 0 issues
-- All eight `features.json` commands executed: **8/8 pass**
+- All nine `features.json` commands executed: **9/9 pass** (round 4)
 - **Live run against the real store** (185 items, 27 declared targets): four
   findings, each independently confirmed — `dockerhub` unfoldered, and
   `github-cli-pat`, `github-release-pat`, `zoho` absent.
@@ -102,10 +103,14 @@ reverted (3 mutations, 3 killed).
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to `specs/archive/CLI-078-secrets-layout-drift/`
-- [ ] Bitácora `#1596` closed with the PR link (ADR-018)
-- [ ] Independent adversarial review passed (reviewer != implementer)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to `specs/archive/CLI-078-secrets-layout-drift/`
+- [ ] Bitácora `#1596` closed with the PR link (ADR-018). **Deliberately not
+      closed.** This spec and CLI-080 deliver the layout half of #1596. Its
+      rotation-age and stale-CI problems are still open, so the issue was reopened
+      on 2026-09-23 and the archive PR references it without closing it.
+- [x] Independent adversarial review passed (reviewer != implementer): round 5,
+      `nan/mimo-v2.5`, reviewed `0c10f0b`
 
 ## Adversarial review, round 1 — disposition
 
@@ -159,3 +164,71 @@ follow-up PR on `fix/secrets-reconcile-review`, and round 4 reviews that state.
 Mutation for this round, **on trees that build, each under a memory-capped scope**
 (lesson 286): 11 mutations, 11 killed. Four earlier sessions lost this battery to
 the OOM killer, and the cause is lesson 286.
+
+## Adversarial review, round 4 — disposition
+
+`review.md` round 4: **FAIL**, `nan/qwen3.8-flash`, reviewed `4ef2d85`, committed
+verbatim (`7c50182`). All four round-3 fixes held against its mutations. The fixes
+below are on `chore/archive-secrets-specs`, and round 5 reviews that head. The
+contract set moved once, in one commit: AC3, AC6 and AC8 amended, AC9 added, and
+f3, f8 and f9 in `features.json`.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Major (REAL) | AC6's test plants no username, so a `Username` field on `ItemSummary` passes the suite | **Applied.** It plants a distinctive username and asserts it absent. The reviewer's compound mutation is now **killed** by `TestDecodeItemsCannotCarryAValue`. AC6's wording says what is planted: every member the projection reads, and the values it must drop. |
+| Major (THEORETICAL) | An unresolved `folderId` reads as unfoldered, and `drift` never syncs although it is gated on | **Applied, both halves.** `ItemSummary.FolderUnresolved` marks a folder id the list does not carry; drift reports it as `item-folder-unknown`, never "(no folder)", and reconcile blocks on it with its own remedy instead of planning a move against a stale list. drift now syncs first, through `readInventory`, which reconcile shares; a store that cannot sync is refused. The lister and its syncer are one seam, so the cache synced is the cache read (`rotate` records what the other way costs). AC9 added. **Live:** drift synced and reported only the known, deferred `zoho` finding. |
+| Major (THEORETICAL) | `floor`/`personal` may declare any ratified folder, and reconcile would move the item there | **Applied as a guard, not a documented permission.** A plane with no `planeFolder` entry has no legal folder: absence denies, and a plane gains a folder by being given one. The live registry still parses (none of its 7 floor/personal `bw:` blocks declares a folder). The comments on `validBWFolders` and `planeFolder`, and the runbook's ADD step 2, now say what `AGE_KEY_PERSONAL` shows: a floor secret may carry a `bw:` block, as a convenience copy with no placement. AC3 amended. |
+| Minor (REAL) | AC8's grep lists four writer methods; `MoveItem` and `RemoveField` pass it | **Applied**, as question 1 suggests: the guarantee is now a Go test. `TestDriftSourceCallsNoWriter` derives the forbidden names from `BWWriteClient` by reflection, walks drift's AST (comments are not in it), proves its scanner finds a planted `bwWrite().MoveItem`, and asserts the inventory seam has no writer method and drift has no `--fix` or `--apply`. f8 runs it. |
+| Minor (REAL) | The `field` half of the missing-field dedupe key is unpinned | **Applied.** Two distinct fields missing from one item are two findings, in `TestLayoutDriftReportsOneFindingPerProblemNotPerVar`. |
+| Minor (REAL) | The derived ratified-folder message is unpinned | **Applied.** `TestParseRegistry_BwFolder_RejectsUnratified` asserts it names both folders. |
+| Minor (REAL) | `docs/secrets-inventory.md` has drifted from the registry | **Applied, by removing the copy rather than correcting it.** The drift was wider than measured: besides the three names reported, rows 4, 19 and 22–26 also named items the registry does not use. The column now names the registry id, and the registry alone says where each lives. The "migrate TO bw" section is a dated record of what was done. Generating the table from `BWDeclarations()` is declined: with no item repeated, nothing is left to generate. |
+| Minor (REAL) | Two comments contradict the code | **Applied.** `bwLister`'s says the inventory is read from the daemon directly, and why the pinned backend has no lister half: the projection has one implementation to audit. drift's says three items were missing, not two. |
+
+Questions, answered:
+
+1. *Is a source grep the right home for AC8?* No, and it is gone (finding 4).
+2. *`ItemSummary.Revised` is never read.* It is substrate for #1596's rotation-age
+   slice, which stays open; that issue is its consumer, so no new ticket. The
+   proposal still called it an upper bound, which round 1's post-merge fix had
+   already corrected in the code; it now says lower bound.
+3. *Nothing runs drift in CI or a hook.* Deliberate for now. drift needs an
+   unlocked daemon, which CI does not have (CI receives secrets through
+   `sync ci`). "can gate" is the capability the exit code gives; a scheduled
+   run belongs with #1596's staleness slice.
+4. *Three denominators in one summary line.* **Applied.** It said "across 23
+   item(s)" for the vault items a declaration names; it now says "naming 24
+   item(s), 23 of them in the vault", so an absent item shows as the gap.
+   `TestDriftSummaryCountsDeclaredItemsAndThoseInTheVault`. A count of
+   placement-ungoverned declarations is declined: #586 will change it, and the
+   plane rule above already makes it a property of the plane.
+5. *drift reads through `BWServeClient{}`, not the pinned backend.* Deliberate.
+   `bw list items` could list through the CLI too, but it answers with the same
+   whole plaintext, and `BWLister` exists so the value-free projection has
+   exactly one implementation to audit. A CLI lister would be a second decoder
+   of every value in the vault. Now stated at the seam (finding 8).
+
+Mutation for this round, **one mutant at a time, each under a 2 GB memory cap,
+restored from `git checkout HEAD`, and counted only on a tree that vets clean**
+(lessons 284 and 286): 12 mutations, **12 killed**, each by the named test —
+the username leak, the field-less dedupe key, the empty ratified list, a folder
+on an ungoverned plane, `FolderUnresolved` never set, drift ignoring it,
+reconcile losing its case, the inventory read unsynced, a sync failure ignored,
+drift calling `MoveItem`, drift growing `--fix`, and `item-folder-unknown`
+raised for a declaration that governs no placement. The whole module, the pinned
+linter (v2.12.2, 0 issues), `GOOS=windows go vet`, CLI-078 f1–f9 (9/9) and
+CLI-080 f1–f10 (10/10) are green.
+
+## Adversarial review, round 5 — disposition
+
+`review.md` round 5: **PASS**, `nan/mimo-v2.5` (a fifth model family across five
+rounds), reviewed `0c10f0b`, committed verbatim (`c8a1acc`). It re-ran the module,
+the linter, `GOOS=windows go vet` and f1–f9 (9/9), and reopened three round-4
+defects by mutation, all killed. Its other round-4 closures were read from the
+tests rather than mutated; this file's round-4 battery (12/12) is the mutation
+evidence for those. No findings; three observations:
+
+| Observation | Disposition |
+|---|---|
+| `ItemSummary.Revised` is never read | **Declined, no ticket.** Its consumer is #1596's rotation-age slice, which is open. The review attributes it to CLI-080; that spec does not read it either. |
+| The inventory's "NOT yet in bw" heading contradicts its body | **Applied.** Now "age secrets that were not in bw (June 2026) → migrated". Docs only, after the verdict. |
+| Nothing runs `drift` in CI or a hook | **Declined**, as in round 4 (question 3): CI has no unlocked daemon, and a scheduled run belongs with #1596's staleness slice. |

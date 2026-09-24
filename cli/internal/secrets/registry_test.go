@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -241,8 +242,17 @@ func TestParseRegistry_BwFolder_RejectsUnratified(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			yml := "version: 1\nsecrets:\n" +
 				"  - {id: a, plane: app, backend: bw, bw: {item: it, field: password, folder: \"" + folder + "\"}, expose: {env: A}}\n"
-			if _, err := ParseRegistry([]byte(yml)); err == nil {
-				t.Errorf("folder %q: expected a validation error, got nil", folder)
+			_, err := ParseRegistry([]byte(yml))
+			if err == nil {
+				t.Fatalf("folder %q: expected a validation error, got nil", folder)
+			}
+			// The message is derived from the taxonomy (ratifiedFolders), and
+			// nothing pinned the derivation: returning no folders at all left the
+			// refusal intact and the remedy empty (CLI-078 review round 4).
+			for _, want := range []string{"Dotfiles/apps", "Dotfiles/infra"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("folder %q: the refusal must name the ratified folder %q, got: %v", folder, want, err)
+				}
 			}
 		})
 	}
@@ -274,6 +284,39 @@ func TestParseRegistry_BwFolder_MustMatchPlane_Symmetric(t *testing.T) {
 		"  - {id: a, plane: infra, backend: bw, bw: {item: it, field: password, folder: Dotfiles/apps}, expose: {env: A}}\n"
 	if _, err := ParseRegistry([]byte(yml)); err == nil {
 		t.Error("infra-plane secret declaring apps must fail validation")
+	}
+}
+
+// TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder closes the plane rule
+// for the planes the taxonomy does not cover. planeFolder names a folder for app
+// and infra only, and a plane missing from it used to fall through to the
+// ratified-set check, so a floor or personal secret could claim either managed
+// folder and reconcile would move its item there (CLI-078 review round 4).
+// Absence denies: a plane gets a folder by being given one, never by omission.
+func TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder(t *testing.T) {
+	cases := map[string]string{
+		"floor convenience copy": `{id: root, plane: floor, backend: file-authority, bw: {item: it, field: notes%s}, expose: {file: {var: K, path: "~/k", mode: "0600"}}}`,
+		"personal":               `{id: p, plane: personal, backend: bw, bw: {item: it, field: password%s}, expose: {env: P}}`,
+	}
+	for name, entry := range cases {
+		t.Run(name, func(t *testing.T) {
+			// The control: the same entry with no folder parses, so the refusal
+			// below is the folder's and not some other rule's.
+			if _, err := ParseRegistry([]byte("version: 1\nsecrets:\n  - " + fmt.Sprintf(entry, "") + "\n")); err != nil {
+				t.Fatalf("control without a folder must parse: %v", err)
+			}
+			for _, folder := range []string{"Dotfiles/apps", "Dotfiles/infra"} {
+				yml := "version: 1\nsecrets:\n  - " + fmt.Sprintf(entry, ", folder: "+folder) + "\n"
+				_, err := ParseRegistry([]byte(yml))
+				if err == nil {
+					t.Errorf("%s declaring %s must be refused", name, folder)
+					continue
+				}
+				if !strings.Contains(err.Error(), "has no folder") {
+					t.Errorf("the refusal must say the plane has no folder, got: %v", err)
+				}
+			}
+		})
 	}
 }
 
