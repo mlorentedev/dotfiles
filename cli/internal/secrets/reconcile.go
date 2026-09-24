@@ -37,9 +37,13 @@ const (
 	// OpDeleteItem removes an item the registry lists under retired: (CLI-082).
 	// Last of all: it deletes a whole item, and only by declaration.
 	OpDeleteItem = "delete-item"
+	// OpDeleteField removes one field the registry lists under retired: with a
+	// field: (CLI-083), a legacy value that is dead rather than equal to a copy.
+	// Last, beside delete-item: it deletes, and only by declaration.
+	OpDeleteField = "delete-field"
 )
 
-var opRank = map[string]int{OpCreateFolder: 0, OpMoveItem: 1, OpCreateItem: 2, OpAddField: 3, OpRetireSource: 4, OpDeleteItem: 5}
+var opRank = map[string]int{OpCreateFolder: 0, OpMoveItem: 1, OpCreateItem: 2, OpAddField: 3, OpRetireSource: 4, OpDeleteItem: 5, OpDeleteField: 5}
 
 // ReconcileOp is one planned change. Coordinates only: the value a create-item or
 // add-field copies is read at apply time and never stored here, so a plan can be
@@ -58,20 +62,24 @@ type ReconcileOp struct {
 	// (VerifyRetires): one of the Retire* constants, never anything derived from a
 	// value beyond equality.
 	Verdict string
-	// Shape and Reason describe a delete-item: what the item holds, by name only,
-	// and why the registry retired it. The plan prints both so the operator reads
-	// what goes before it goes.
+	// Shape and Reason describe a delete-item or delete-field: what the item
+	// holds (for a delete-field, what it keeps), by name only, and why the
+	// registry retired it. The plan prints both so the operator reads what goes
+	// before it goes.
 	Shape, Reason string
 }
 
 // Target is what the operation acts on: the folder for create-folder, the SOURCE
-// field for retire-source (that is what it removes), else the item.
+// field for retire-source (that is what it removes), the field for delete-field,
+// else the item.
 func (op ReconcileOp) Target() string {
 	switch op.Kind {
 	case OpCreateFolder:
 		return op.Folder
 	case OpRetireSource:
 		return op.FromItem + "/" + op.FromField
+	case OpDeleteField:
+		return op.Item + "/" + op.Field
 	}
 	return op.Item
 }
@@ -371,6 +379,8 @@ func applyOp(op ReconcileOp, value string, w BWWriteClient, folderID func(string
 		return w.RemoveField(op.FromItem, op.FromField)
 	case OpDeleteItem:
 		return w.DeleteItem(op.Item)
+	case OpDeleteField:
+		return w.RemoveField(op.Item, op.Field)
 	}
 	return fmt.Errorf("unknown operation %q", op.Kind)
 }

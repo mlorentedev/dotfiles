@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mlorentedev.github.io/dotfiles/branch-protection.schema.json",
+  "title": "Branch protection, declared in git (GUARD-017, #1451)",
+  "description": "What each managed repository's protected branch must require. `dotf forge protection check` and the `dotf doctor` branch-protection section diff this against the live API; `apply` (PR-B) converges it. A repository declares either a complete protection object or an explicit state with a reason — never neither, because an undeclared field is one a whole-object PUT silently clears.",
+  "type": "object",
+  "required": ["policy", "repos"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "$comment": { "type": "array", "items": { "type": "string" } },
+    "policy": {
+      "description": "Owner-wide policy (decision D-1 on #1625). Every repository's approving-review count must equal this value unless it declares approvals_override_reason.",
+      "type": "object",
+      "required": ["required_approving_review_count", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "required_approving_review_count": { "type": "integer", "minimum": 0 },
+        "rationale": { "type": "string", "minLength": 40 }
+      }
+    },
+    "repos": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+      "additionalProperties": { "$ref": "#/$defs/repo" }
+    }
+  },
+  "$defs": {
+    "repo": {
+      "type": "object",
+      "required": ["branch"],
+      "additionalProperties": false,
+      "properties": {
+        "branch": { "type": "string", "minLength": 1 },
+        "protection": { "$ref": "#/$defs/protection" },
+        "state": {
+          "description": "unavailable: the protection API cannot be used (a private repository on the free plan answers 403). unprotected: deliberately no protection.",
+          "enum": ["unavailable", "unprotected"]
+        },
+        "reason": { "type": "string", "minLength": 10 },
+        "approvals_override_reason": { "type": "string", "minLength": 10 }
+      },
+      "oneOf": [
+        { "required": ["protection"], "not": { "anyOf": [{ "required": ["state"] }, { "required": ["reason"] }] } },
+        { "required": ["state", "reason"], "not": { "required": ["protection"] } }
+      ]
+    },
+    "protection": {
+      "description": "The complete protection object in its normalised shape: the GET response with its {\"enabled\": bool} wrappers unwrapped. Every field is required, because PUT replaces the whole object.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_status_checks", "required_pull_request_reviews", "enforce_admins",
+        "required_signatures", "required_linear_history", "allow_force_pushes",
+        "allow_deletions", "block_creations", "required_conversation_resolution",
+        "lock_branch", "allow_fork_syncing"
+      ],
+      "properties": {
+        "required_status_checks": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["strict", "checks"],
+              "additionalProperties": false,
+              "properties": {
+                "strict": { "type": "boolean" },
+                "checks": {
+                  "description": "Required contexts WITH their source app. A context of the same name posted by another app would otherwise satisfy the requirement.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["context", "app_id"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "context": { "type": "string", "minLength": 1 },
+                      "app_id": { "type": ["integer", "null"] }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "description": "null means a pull request is not required at all, so direct pushes are allowed.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["required_approving_review_count", "dismiss_stale_reviews", "require_code_owner_reviews", "require_last_push_approval"],
+              "additionalProperties": false,
+              "properties": {
+                "required_approving_review_count": { "type": "integer", "minimum": 0 },
+                "dismiss_stale_reviews": { "type": "boolean" },
+                "require_code_owner_reviews": { "type": "boolean" },
+                "require_last_push_approval": { "type": "boolean" }
+              }
+            }
+          ]
+        },
+        "enforce_admins": { "type": "boolean" },
+        "required_signatures": { "type": "boolean" },
+        "required_linear_history": { "type": "boolean" },
+        "allow_force_pushes": { "type": "boolean" },
+        "allow_deletions": { "type": "boolean" },
+        "block_creations": { "type": "boolean" },
+        "required_conversation_resolution": { "type": "boolean" },
+        "lock_branch": { "type": "boolean" },
+        "allow_fork_syncing": { "type": "boolean" }
+      }
+    }
+  }
+}

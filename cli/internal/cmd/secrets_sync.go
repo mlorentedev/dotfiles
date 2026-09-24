@@ -161,7 +161,14 @@ func scopeUpload(upload []secrets.Entry, names []string, repo string) ([]secrets
 		byVar[e.Var] = e
 	}
 	scoped := make([]secrets.Entry, 0, len(names))
+	given := make(map[string]bool, len(names))
 	for _, n := range names {
+		// A name given twice uploads once (#1624): the second upload is the same
+		// value to the same secret, and only noise.
+		if given[n] {
+			continue
+		}
+		given[n] = true
 		e, ok := byVar[n]
 		if !ok {
 			return nil, fmt.Errorf("%s is not among %s's ci secrets; nothing uploaded (drop it, or add ci:%s to its consumers)", n, repo, repo)

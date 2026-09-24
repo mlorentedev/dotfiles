@@ -1,7 +1,7 @@
 ---
 id: "CI-003"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-04"
 issue: "mlorentedev/dotfiles#1486"
 tags: [spec, proposal]
@@ -130,3 +130,5 @@ Make the reconcile observable, in both twins, and nothing else.
 - #1487 — the concurrency hole found in the same measurement.
 - #1484 — the Linux reconcile has never run in CI.
 - Lesson 267 — a mutation harness must prove the mutation landed. Applied to AC8.
+
+<!-- archived 2026-09-23 — PR: https://github.com/mlorentedev/dotfiles/pull/1488 -->

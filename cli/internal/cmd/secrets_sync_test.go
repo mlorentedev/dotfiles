@@ -304,3 +304,15 @@ func TestSecretsSyncCi_UnknownScopedNameFailsBeforeUpload(t *testing.T) {
 		t.Errorf("nothing may upload when a named secret is not selectable, got %v", setter)
 	}
 }
+
+// CLI-083 AC4: a name given twice is uploaded once, in first-given order (#1624).
+func TestScopeUploadDedupesNames(t *testing.T) {
+	upload := []secrets.Entry{{Var: "A"}, {Var: "B"}}
+	got, err := scopeUpload(upload, []string{"B", "A", "B"}, "o/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Var != "B" || got[1].Var != "A" {
+		t.Fatalf("want B then A, each once, got %+v", got)
+	}
+}

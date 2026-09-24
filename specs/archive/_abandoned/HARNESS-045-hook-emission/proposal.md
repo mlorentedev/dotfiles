@@ -1,11 +1,13 @@
 ---
 id: "HARNESS-045-hook-emission"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: abandoned # abandoned: superseded by #1532
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#561"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Abandoned as superseded by #1532. Built and merged: the agnostic binding core, the gate, Claude hook emission and the skills: parser guards (#1272, #1275, #1319, #1407, #1410, #1412). Not delivered: AC2 and AC3 were never proven per harness by a dispatch, the block path has never executed, and the pi and opencode gate wrappers do not exist. #1532 re-scopes exactly these: phase 1 wants a gate decision from a non-claude harness and has the pi and opencode binds deployed or removed; phase 2 wants one skill at block, observed. AC7's schema enforcement is #1318. tasks.md itself says this spec should not archive until AC3 and AC4 are restated, and #1532 is that restatement. Persona presence already reaches all six harnesses through their deployed instruction files; a dispatch proof of it is not carried separately. Swept under #1626."
 ---
 
 # HARNESS-045-hook-emission

@@ -136,10 +136,11 @@ func TestSecretsRun_ResolvesBwBackend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := buildChildEnv(reg, sel)
+	injected, err := resolveInjectedSecrets(reg, sel)
 	if err != nil {
-		t.Fatalf("buildChildEnv: %v", err)
+		t.Fatalf("resolveInjectedSecrets: %v", err)
 	}
+	env := childEnviron(injected)
 	found := false
 	for _, kv := range env {
 		if kv == "FOO=bw-secret-value" {
@@ -166,10 +167,10 @@ func TestStripBackendAuth(t *testing.T) {
 	}
 }
 
-// TestBuildChildEnv_StripsBackendAuth proves the resolved secret reaches the child
+// TestChildEnviron_StripsBackendAuth proves the resolved secret reaches the child
 // while the backend unlock token (BW_SESSION) does not — the child gets what it was
 // granted, never the key that opens the whole vault.
-func TestBuildChildEnv_StripsBackendAuth(t *testing.T) {
+func TestChildEnviron_StripsBackendAuth(t *testing.T) {
 	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-foo, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: FOO}}\n")
 	useBwReader(t, fakeBW{"it/password": "granted-value"})
 	t.Setenv("BW_SESSION", "unlock-token-must-not-leak")
@@ -178,10 +179,11 @@ func TestBuildChildEnv_StripsBackendAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := buildChildEnv(reg, nil)
+	injected, err := resolveInjectedSecrets(reg, nil)
 	if err != nil {
-		t.Fatalf("buildChildEnv: %v", err)
+		t.Fatalf("resolveInjectedSecrets: %v", err)
 	}
+	env := childEnviron(injected)
 	var grantedFound bool
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "BW_SESSION=") {

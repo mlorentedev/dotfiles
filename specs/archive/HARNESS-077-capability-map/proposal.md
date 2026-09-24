@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-077-capability-map"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-22"
 issue: "mlorentedev/dotfiles#560"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, agents, capabilities, agnosticism]
@@ -116,3 +116,5 @@ rather than a per-capability token the render concatenates blindly.
   agents); opencode `permission:` enum `ask|allow|deny` and `tools` deprecation
   (https://opencode.ai/config.json)
 - Related: #1170 (copilot's model half, same not-verifiable-here reason), #1162 (adapter harnesses)
+
+<!-- archived 2026-09-23 — PR: https://github.com/mlorentedev/dotfiles/pull/1172 -->
