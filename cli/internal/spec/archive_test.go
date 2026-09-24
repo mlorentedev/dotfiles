@@ -1,6 +1,10 @@
 package spec
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -511,5 +515,68 @@ func TestDraftTagInProposalStillBlocksAfterReview(t *testing.T) {
 		if IsReviewState(name) {
 			t.Errorf("%s is an authored artifact and must not be review state", name)
 		}
+	}
+}
+
+// ReviewStateFiles must be complete, not merely correct (PR-Agent on #1631):
+// a new file the review machinery writes into a spec folder, but forgets to
+// declare, would be scanned for draft tags and hashed into a reviewed tree,
+// failing every archive. So derive completeness from the source rather than
+// from convention. Every package constant used as a path component inside the
+// spec folder (filepath.Join(specDir, X) or filepath.Join(…, specID, X)) must
+// be declared review state, or be one of the files the author writes.
+func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go")
+	}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	consts := map[string]string{} // package-level string constants
+	var joined []string           // identifiers joined under a spec folder
+	for _, pkg := range pkgs {
+		for _, f := range pkg.Files {
+			ast.Inspect(f, func(n ast.Node) bool {
+				switch x := n.(type) {
+				case *ast.ValueSpec:
+					for i, name := range x.Names {
+						if i < len(x.Values) {
+							if lit, ok := x.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+								consts[name.Name] = strings.Trim(lit.Value, "\"`")
+							}
+						}
+					}
+				case *ast.CallExpr:
+					if sel, ok := x.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Join" && len(x.Args) >= 2 {
+						underSpec := false
+						for _, a := range x.Args[:len(x.Args)-1] {
+							if id, ok := a.(*ast.Ident); ok && (id.Name == "specDir" || id.Name == "specID") {
+								underSpec = true
+							}
+						}
+						if last, ok := x.Args[len(x.Args)-1].(*ast.Ident); ok && underSpec {
+							joined = append(joined, last.Name)
+						}
+					}
+				}
+				return true
+			})
+		}
+	}
+	authored := map[string]bool{"proposal.md": true, "tasks.md": true, "verification.md": true, "features.json": true}
+	checked := 0
+	for _, id := range joined {
+		value, isConst := consts[id]
+		if !isConst {
+			continue // a loop variable or computed name, not a declared file
+		}
+		checked++
+		if !IsReviewState(value) && !authored[value] {
+			t.Errorf("%s (%q) is written under a spec folder but is neither review state nor an authored artifact — add it to ReviewStateFiles", id, value)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("found no spec-folder path constants — the source walk is broken, so this test proves nothing")
 	}
 }
