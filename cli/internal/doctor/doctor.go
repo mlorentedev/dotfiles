@@ -126,6 +126,7 @@ func Run(opts Options) (int, error) {
 		checkAgentSkillsMigrated(cfg, rep)
 		checkDotfProvenance(sys, cfg, rep)
 		checkRepoDirResolves(rep)
+		checkSpecIssueState(sys, rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep, opts.Fix)
 	}

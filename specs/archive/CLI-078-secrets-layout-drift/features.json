@@ -15,8 +15,8 @@
   },
   {
     "id": "CLI-078-secrets-layout-drift-f3",
-    "behavior": "AC3 — an item outside its declared folder is reported, naming both places",
-    "verification": "cd cli && go test ./internal/secrets/ -run '^TestLayoutDriftReportsAMisfiledItem$' -count=1 -v | grep -q '^--- PASS:'",
+    "behavior": "AC3 — an item outside its declared folder is reported, naming both places; a plane with no folder may declare none",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestLayoutDriftReportsAMisfiledItem$|^TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
     "state": "pending",
     "evidence": ""
   },
@@ -51,7 +51,14 @@
   {
     "id": "CLI-078-secrets-layout-drift-f8",
     "behavior": "AC8 — the command never writes and exits non-zero on findings",
-    "verification": "! ( sed 's;//.*;;' cli/internal/cmd/secrets_drift.go | grep -qE 'SetField|CreateItem|ResolveFolder|os\\.(WriteFile|Create|Remove)|\"fix\"' )",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestDriftSourceCallsNoWriter$|^TestDriftExitsNonZeroOnAFindingAndNamesTheSecret$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-078-secrets-layout-drift-f9",
+    "behavior": "AC9 — drift syncs before reading and refuses a store it cannot sync; an unresolved folder id is its own finding and reconcile blocks on it",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestDriftSyncsBeforeItReads$|^TestDriftRefusesAStoreItCannotSync$|^TestDecodeItemsMarksAFolderIDTheListDoesNotCarry$|^TestLayoutDriftSaysSoWhenItCannotNameAnItemsFolder$|^TestPlanBlocksAnItemWhoseFolderItCannotName$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 5",
     "state": "pending",
     "evidence": ""
   }

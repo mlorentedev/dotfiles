@@ -73,7 +73,7 @@ func frontmatterFields(content string) map[string]string {
 			if unquoted, ok := unquoteScalar(value); ok {
 				value = unquoted
 			}
-		} else if idx := strings.Index(value, "#"); idx >= 0 {
+		} else if idx := yamlCommentStart(value); idx >= 0 {
 			value = strings.TrimSpace(value[:idx])
 		}
 		fields[key] = value
@@ -106,6 +106,18 @@ func unquoteScalar(value string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// yamlCommentStart returns the index of the `#` that opens a YAML comment in
+// an unquoted value, or -1. A `#` opens one only at the start of the value or
+// after whitespace; `mlorentedev/hive#267` is a single scalar.
+func yamlCommentStart(value string) int {
+	for i := 0; i < len(value); i++ {
+		if value[i] == '#' && (i == 0 || value[i-1] == ' ' || value[i-1] == '\t') {
+			return i
+		}
+	}
+	return -1
 }
 
 // ParseReview reads review.md content into a Review. A missing or unrecognized
