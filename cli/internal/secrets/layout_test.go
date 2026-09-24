@@ -32,15 +32,19 @@ func TestDecodeItemsCannotCarryAValue(t *testing.T) {
 		totp  = "TOTPSEED-must-not-survive-91de"
 		card  = "4111111111111111"
 		notes = "NOTEBODY-must-not-survive-5c0f"
+		// A username is read (it answers HasUsername) and is content, not shape;
+		// the registry manages some as secrets (DOCKERHUB_USERNAME). CLI-078
+		// review round 4: it was the one read member this test never planted.
+		user = "USERNAME-must-not-survive-7e41"
 	)
 	raw := itemsPayload(t, fmt.Sprintf(`{
 	  "name":"loaded","folderId":"f1","revisionDate":"2026-09-21T10:00:00.000Z",
 	  "notes":%q,
-	  "login":{"username":"someone","password":%q,"totp":%q},
+	  "login":{"username":%q,"password":%q,"totp":%q},
 	  "card":{"number":%q},
 	  "fields":[{"name":"api-key","value":%q}],
 	  "passwordHistory":[{"password":%q}]
-	}`, notes, pw, totp, card, fld, pw))
+	}`, notes, user, pw, totp, card, fld, pw))
 
 	got, err := decodeItems(raw, map[string]string{"f1": "Dotfiles/apps"})
 	if err != nil {
@@ -50,7 +54,7 @@ func TestDecodeItemsCannotCarryAValue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, secret := range []string{pw, fld, totp, card, notes} {
+	for _, secret := range []string{pw, fld, totp, card, notes, user} {
 		if strings.Contains(string(blob), secret) {
 			t.Errorf("a secret value survived the projection: %q found in %s", secret, blob)
 		}
@@ -126,6 +130,24 @@ func TestDecodeItemsResolvesFolderNamesAndLeavesUnfolderedEmpty(t *testing.T) {
 // A malformed timestamp on one row must not abort the inventory: the report is
 // about layout, and refusing to produce it over one bad date would be the same
 // "all or nothing" failure that makes health checks get skipped.
+// A folder id the folder list does not carry is NOT "unfoldered". Both used to
+// decode to "", so drift said "is in (no folder)" about an item that is filed,
+// and reconcile read the blank as an instruction to move it. It happens when a
+// folder was made since the daemon last synced (CLI-078 review round 4).
+func TestDecodeItemsMarksAFolderIDTheListDoesNotCarry(t *testing.T) {
+	raw := itemsPayload(t, `{"name":"filed","folderId":"f1"},{"name":"stale","folderId":"F-NEW"},{"name":"loose","folderId":null}`)
+	got, err := decodeItems(raw, map[string]string{"f1": "Dotfiles/apps"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"filed": false, "stale": true, "loose": false}
+	for _, it := range got {
+		if it.FolderUnresolved != want[it.Name] {
+			t.Errorf("%s: FolderUnresolved = %v, want %v", it.Name, it.FolderUnresolved, want[it.Name])
+		}
+	}
+}
+
 func TestDecodeItemsToleratesAnUnparseableRevisionDate(t *testing.T) {
 	raw := itemsPayload(t, `{"name":"a","revisionDate":"not-a-date","fields":[]}`)
 	got, err := decodeItems(raw, nil)
@@ -255,6 +277,24 @@ func TestLayoutDriftResolvesFieldsTheWayTheReaderDoes(t *testing.T) {
 
 // Seven vars naming one absent item is one absent item. Reporting per var turns
 // a four-line report into a twenty-line one and buries the count.
+// An item whose folder the store's list cannot name is reported as exactly that,
+// never as unfoldered and never as misfiled: its placement is unknown, not wrong.
+// A declaration that governs no placement has nothing to report about it.
+func TestLayoutDriftSaysSoWhenItCannotNameAnItemsFolder(t *testing.T) {
+	stale := item("svc", "", "key")
+	stale.FolderUnresolved = true
+	got := LayoutDrift([]BWDecl{decl("A", "svc", "key", "Dotfiles/apps", false)}, []ItemSummary{stale}, []string{"Dotfiles/apps"})
+	if len(got) != 1 || got[0].Kind != DriftItemFolderUnknown {
+		t.Fatalf("want one item-folder-unknown, got %v", kinds(got))
+	}
+	if strings.Contains(got[0].Detail, "no folder") {
+		t.Errorf("an item with an unresolved folder must not be described as unfoldered: %q", got[0].Detail)
+	}
+	if got := LayoutDrift([]BWDecl{decl("A", "svc", "key", "", false)}, []ItemSummary{stale}, nil); len(got) != 0 {
+		t.Errorf("a declaration with no folder governs no placement, got %v", kinds(got))
+	}
+}
+
 func TestLayoutDriftReportsOneFindingPerProblemNotPerVar(t *testing.T) {
 	var decls []BWDecl
 	for i := 0; i < 7; i++ {
@@ -263,6 +303,25 @@ func TestLayoutDriftReportsOneFindingPerProblemNotPerVar(t *testing.T) {
 	got := LayoutDrift(decls, nil, []string{"Dotfiles/apps"})
 	if len(got) != 1 {
 		t.Fatalf("want exactly 1 finding for 7 vars on one absent item, got %d: %v", len(got), kinds(got))
+	}
+
+	// The other direction: two DIFFERENT fields missing from one present item are
+	// two problems. The dedupe key is item and field; nothing pinned the field
+	// half, and keying on the item alone reported one and hid the other (CLI-078
+	// review round 4). Four items in the live registry declare several fields.
+	two := []BWDecl{
+		decl("A", "svc", "key", "", false),
+		decl("B", "svc", "key", "", false), // same field again: still one problem
+		decl("C", "svc", "secret", "", false),
+	}
+	got = LayoutDrift(two, []ItemSummary{item("svc", "")}, nil)
+	if len(got) != 2 {
+		t.Fatalf("want 2 findings for two distinct fields missing from one item, got %d: %v", len(got), kinds(got))
+	}
+	for i, field := range []string{"key", "secret"} {
+		if got[i].Kind != DriftFieldMissing || got[i].Decl.Field != field {
+			t.Errorf("finding %d: want field-missing for %q, got %s for %q", i, field, got[i].Kind, got[i].Decl.Field)
+		}
 	}
 }
 

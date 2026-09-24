@@ -52,7 +52,7 @@ flowchart LR
 When a new API key/token/credential enters the system:
 
 1. Decide the **plane**: `app` (service key) / `infra` (access) / `personal` / `floor` (needed before bw — rare).
-2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Only **`Dotfiles/apps`** and **`Dotfiles/infra`** are legal `bw.folder` values (`validBWFolders`), and each plane has exactly one (`planeFolder`); `floor` secrets carry no `bw:` block at all, and no personal-plane folder is ratified yet (#586), so entries on those planes declare no folder.
+2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Only **`Dotfiles/apps`** and **`Dotfiles/infra`** are legal `bw.folder` values (`validBWFolders`), and each plane has exactly one (`planeFolder`); `floor` and `personal` have no folder, and the registry refuses one on either: a floor secret's `bw:` block, when it has one, is a convenience copy of an authority kept elsewhere (`AGE_KEY_PERSONAL`), and no personal-plane folder is ratified yet (#586).
    - single value → item password; multi-value → custom fields (kebab names).
    - `dotf secrets set <id> --yes` creates the item in its declared folder (value via stdin or hidden prompt).
 3. Add a **registry** entry: `{id, plane, backend: bw, bw:{folder,item,field}, expose:{env|file}, consumers, rotate}`.

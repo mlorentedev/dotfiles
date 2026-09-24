@@ -35,7 +35,8 @@ because resolving and working are different claims.
 `dotf secrets drift` compares the registry's declared layout against the vault's
 actual shape and reports each disagreement, ordered by the sequence they must be
 fixed in — folder, then item, then field. It exits non-zero on any finding, so a
-hook or CI can gate on it.
+hook or CI can gate on it, and it syncs the store before reading it, so what a
+gate reads is the server's state rather than the daemon's cache.
 
 It reads **shapes only**: item names, folder names, field names, and three
 presence booleans. No value is read, and the guarantee is structural rather than
@@ -48,8 +49,8 @@ procedural — see the design note below.
   see, and a report that quietly repaired credentials would make the repair
   unreviewable.
 - **Rotation age and CI staleness.** Both are in #1596 and both need this
-  inventory to exist first. `ItemSummary.Revised` is carried and documented as an
-  upper bound, ready for that slice; nothing reads it yet.
+  inventory to exist first. `ItemSummary.Revised` is carried and documented as a
+  lower bound on a credential's age, ready for that slice; nothing reads it yet.
 - **The unmanaged items** (164 of 187 on 2026-09-23: items whose name no
   declaration uses). A personal vault legitimately holds what this repo
   does not manage. They are counted, never reported as findings.
@@ -97,7 +98,10 @@ named in the type's doc comment as the exceptions they are.
 - [x] AC2 — a declared item absent from the vault is reported, including for a
       **dormant** declaration on an age-backed secret.
 - [x] AC3 — an item in a folder other than the declared one is reported, naming
-      both places.
+      both places. A declared folder belongs to the declaration's plane: the
+      registry refuses a folder on a plane the taxonomy gives none (`floor`,
+      `personal`), so no declaration can send an item into another plane's
+      folder *(added after review round 4)*.
 - [x] AC4 — a declared field the item does not carry is reported, and so is a
       declaration that names no field (the reader refuses an empty field). Field
       presence agrees with `fieldFromItem` on whether the field yields a usable,
@@ -111,9 +115,18 @@ named in the type's doc comment as the exceptions they are.
       declared in two folders, so keying the misfiled dedupe on the item cannot
       hide a disagreement *(added after review round 3)*.
 - [x] AC6 — no secret value can cross the projection, proven by marshalling the
-      result and asserting distinctive planted values are absent.
+      result and asserting distinctive planted values are absent: one for every
+      member the projection reads, and for the values it must drop. *(Amended
+      after review round 4: the username, a member it reads, was not planted.)*
 - [x] AC7 — an unparseable inventory reports a byte count and never the body.
-- [x] AC8 — the command never writes, and exits non-zero on any finding.
+- [x] AC8 — the command never writes, and exits non-zero on any finding. The
+      check is derived from the writer interface, so it cannot fall behind it
+      *(amended after review round 4: a literal list of four writer methods
+      missed the fifth)*.
+- [x] AC9 — the command syncs the store before reading it and refuses a store it
+      cannot sync. An item filed in a folder the folder list does not carry is
+      reported as `item-folder-unknown`, never as unfoldered, and `reconcile`
+      blocks on it instead of moving it *(added after review round 4)*.
 
 ## References
 

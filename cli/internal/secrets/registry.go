@@ -86,10 +86,12 @@ type BWFrom struct {
 }
 
 // validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-
-// managed items. floor is deliberately absent (floor secrets never carry a
-// bw: block — age-only) and so is a personal-plane folder (no taxonomy exists yet for
-// plane: personal, deferred to #586) — declaring either here would validate a
-// placement nothing can actually honour yet.
+// managed items. There is no floor folder: a floor secret's authority is off the
+// store (a file-authority root keeps it on disk), and the `bw:` block it may carry is
+// a convenience copy with no placement of its own (AGE_KEY_PERSONAL). There is no
+// personal-plane folder either, because no taxonomy exists yet for plane: personal
+// (#586). checkBWFolder refuses a folder on both planes rather than letting either
+// borrow a managed one.
 //
 // The `Dotfiles/` prefix is part of the NAME, not a namespace Bitwarden
 // understands: it has no hierarchy, and a folder displayed as nested is simply one
@@ -125,8 +127,10 @@ func ratifiedFolders() []string {
 // planeFolder is the required bw.folder for a plane that has one — the ratified-set
 // check alone (validBWFolders) would let an app-plane secret declare infra
 // and pass, since both strings are individually valid; this closes that gap (OPS-028
-// adversarial review, Minor finding). A plane absent here (personal, floor) has no
-// required folder and is left to the ratified-set check alone.
+// adversarial review, Minor finding). A plane absent here (personal, floor) has NO
+// legal folder: a declared folder is an instruction reconcile carries out, so a
+// plane falling through to the ratified-set check could move its items into another
+// plane's folder (CLI-078 review round 4). A plane gains a folder by an entry here.
 var planeFolder = map[string]string{
 	"app":   "Dotfiles/apps",
 	"infra": "Dotfiles/infra",
@@ -408,7 +412,12 @@ func checkBWFolder(s *Secret) error {
 		return fmt.Errorf("secret %q: bw.folder %q is not in the ratified taxonomy (%s)",
 			s.ID, s.BW.Folder, strings.Join(ratifiedFolders(), ", "))
 	}
-	if want := planeFolder[s.Plane]; want != "" && s.BW.Folder != want {
+	want, governed := planeFolder[s.Plane]
+	if !governed {
+		return fmt.Errorf("secret %q: plane %q has no folder in the taxonomy, so bw.folder must be empty (got %q)",
+			s.ID, s.Plane, s.BW.Folder)
+	}
+	if s.BW.Folder != want {
 		return fmt.Errorf("secret %q: bw.folder %q does not match plane %q (want %q)", s.ID, s.BW.Folder, s.Plane, want)
 	}
 	return nil
