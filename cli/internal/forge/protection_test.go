@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -245,4 +246,32 @@ func TestProtectionDeclarationLoads(t *testing.T) {
 func sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
+}
+
+// Every {enabled} wrapper must be READ, not merely unwrapped: the captured
+// fixtures happen to share most values (enforce_admins is true in all of them),
+// so a normaliser that hard-coded one would pass every other test. Flip each
+// flag in the raw response and require the normalised field to flip with it.
+func TestProtectionNormaliseReadsEveryFlag(t *testing.T) {
+	base := normalised(t, "get-dotfiles.json")
+	raw := string(fixture(t, "get-dotfiles.json"))
+	for _, field := range []string{
+		"enforce_admins", "required_signatures", "required_linear_history", "allow_force_pushes",
+		"allow_deletions", "block_creations", "required_conversation_resolution", "lock_branch", "allow_fork_syncing",
+	} {
+		was := flatten(base.Protection)[field]
+		flipped := map[string]string{"true": "false", "false": "true"}[was]
+		re := regexp.MustCompile(`("` + field + `":\s*\{\s*"enabled":\s*)` + was)
+		mutated := re.ReplaceAllString(raw, "${1}"+flipped)
+		if mutated == raw {
+			t.Fatalf("fixture: could not flip %s", field)
+		}
+		live, err := Normalise([]byte(mutated))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := flatten(live.Protection)[field]; got != flipped {
+			t.Errorf("%s: flipped to %s in the response, normalised as %s", field, flipped, got)
+		}
+	}
 }
