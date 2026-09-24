@@ -304,3 +304,4 @@ tags: [lessons, index, dotfiles]
 | [284 - A mutation "killed" by a compile error proves nothing](lesson-284-a-mutation-killed-by-a-compile-error-proves-nothing.md) | 2026-09-22 |  |
 | [285 - A 404 "fixed" by dropping the scope installs someone else's package](lesson-285-a-404-fixed-by-dropping-the-scope-installs-someone-elses-package.md) | 2026-09-23 |  |
 | [286 - A mutation that deletes a loop bound is a memory bomb, not a failing test](lesson-286-a-mutation-that-deletes-a-loop-bound-is-a-memory-bomb.md) | 2026-09-23 |  |
+| [287 - A guard that skips is a guard that passes](lesson-287-a-guard-that-skips-is-a-guard-that-passes.md) | 2026-09-23 |  |

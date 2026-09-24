@@ -32,7 +32,10 @@ const (
 	// DriftItemAmbiguous: several items share the declared name. Bitwarden allows
 	// it and the reader refuses to choose, so the declaration resolves nothing.
 	DriftItemAmbiguous = "item-ambiguous"
-	DriftFieldMissing  = "field-missing"
+	// DriftItemFolderUnknown: the item is filed in a folder the store's folder
+	// list does not carry, so its placement cannot be judged either way.
+	DriftItemFolderUnknown = "item-folder-unknown"
+	DriftFieldMissing      = "field-missing"
 )
 
 // LayoutFinding is one disagreement between the declaration and the store.
@@ -236,8 +239,25 @@ func (w *driftWalk) resolveItem(d BWDecl) (ItemSummary, bool) {
 // Keyed on the item alone because the registry guarantees one declared folder per
 // item (checkOneFolderPerItem). Without that rule two declarations could pull one
 // item two ways, and reconcile would move it back and forth forever.
+//
+// An item whose folder id the list cannot name is neither in the declared folder
+// nor out of it as far as this walk can tell, so it gets its own finding. Read as
+// "" it was reported unfoldered, and reconcile planned a move against a folder
+// list it had just shown to be stale.
 func (w *driftWalk) checkPlacement(d BWDecl, it ItemSummary) {
-	if d.Folder == "" || it.Folder == d.Folder || !w.once(DriftItemMisfiled, d.Item) {
+	if d.Folder == "" {
+		return
+	}
+	if it.FolderUnresolved {
+		if w.once(DriftItemMisfiled, d.Item) {
+			w.itemF = append(w.itemF, LayoutFinding{
+				Kind: DriftItemFolderUnknown, Secret: d.Secret, Item: d.Item, Decl: d,
+				Detail: fmt.Sprintf("is filed in a folder the store's folder list does not carry, so whether it is in %s cannot be told; the list is stale", d.Folder),
+			})
+		}
+		return
+	}
+	if it.Folder == d.Folder || !w.once(DriftItemMisfiled, d.Item) {
 		return
 	}
 	where := it.Folder

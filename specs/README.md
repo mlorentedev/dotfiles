@@ -41,4 +41,10 @@ spec's `issue:` frontmatter. This runs regardless of diff size and is not waived
 genuinely continues; the escape hatch is the `skip-archive` label + an
 `## Archive skip rationale` section.
 
+That gate only sees issues closed **by a PR**. An issue closed by hand leaves its
+spec active forever, so the net for that path is detective: `dotf spec audit`
+grades every active spec by the state of its tracking issue (a CLOSED issue is a
+zombie and FAILs), and `dotf doctor` runs the same audit as its `spec-issue-state`
+section (SDD-041, #1087).
+
 See `AGENTS.md` "Spec-Driven Development" for the full trigger criteria and workflow.
