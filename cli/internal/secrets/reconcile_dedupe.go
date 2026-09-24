@@ -83,32 +83,60 @@ func VerifyRetires(p *ReconcilePlan, r BWReader) {
 	p.Ops = kept
 }
 
-// PlanRetiredItems plans a delete-item for every retired: item the vault holds.
+// PlanRetiredItems plans a delete-item for every retired: item the vault holds,
+// and a delete-field for every retired field it holds (CLI-083).
 //
-// The registry has already refused an entry that a declaration still names
-// (checkRetired), because that is static. What depends on the store is decided
-// here: an item already gone is reported so its entry can go too, and a name
-// several items carry blocks, because deleting an arbitrary one of them could
-// delete the wrong credential. delete-item ranks last, so appending keeps order.
+// The registry has already refused an entry that a declaration still names or
+// reads (checkRetired), because that is static. What depends on the store is
+// decided here: an item or field already gone is reported so its entry can go
+// too, and a name several items carry blocks, because acting on an arbitrary one
+// of them could delete the wrong credential. Both kinds rank last, so appending
+// keeps order.
 func PlanRetiredItems(p *ReconcilePlan, retired []RetiredItem, items []ItemSummary) {
 	byName := map[string][]ItemSummary{}
 	for _, it := range items {
 		byName[it.Name] = append(byName[it.Name], it)
 	}
 	for _, ri := range retired {
-		switch found := byName[ri.Item]; len(found) {
-		case 0:
-			p.RetiredGone = append(p.RetiredGone, ri.Item)
-		case 1:
-			p.Ops = append(p.Ops, ReconcileOp{Kind: OpDeleteItem, Item: ri.Item, Shape: itemShape(found[0]), Reason: ri.Reason})
-		default:
+		found := byName[ri.Item]
+		switch {
+		case len(found) == 0:
+			p.RetiredGone = append(p.RetiredGone, ri.label())
+		case len(found) > 1:
 			p.Blocked = append(p.Blocked, PlanNote{
 				Item:   ri.Item,
-				Detail: fmt.Sprintf("cannot delete %q: the name matches %d items, and deleting an arbitrary one could delete the wrong credential", ri.Item, len(found)),
+				Detail: fmt.Sprintf("cannot delete %q: the name matches %d items, and acting on an arbitrary one could delete the wrong credential", ri.label(), len(found)),
 				Remedy: "rename or remove the duplicate items in the vault",
+			})
+		case ri.Field == "":
+			p.Ops = append(p.Ops, ReconcileOp{Kind: OpDeleteItem, Item: ri.Item, Shape: itemShape(found[0]), Reason: ri.Reason})
+		case !hasField(found[0], ri.Field):
+			p.RetiredGone = append(p.RetiredGone, ri.label())
+		default:
+			p.Ops = append(p.Ops, ReconcileOp{
+				Kind: OpDeleteField, Item: ri.Item, Field: ri.Field,
+				Shape: itemShape(withoutField(found[0], ri.Field)), Reason: ri.Reason,
 			})
 		}
 	}
+}
+
+// withoutField is the item as a delete-field would leave it, so the plan shows
+// what it keeps. The registry refuses username and password, so only a custom
+// field or the notes can be removed.
+func withoutField(it ItemSummary, field string) ItemSummary {
+	if field == "notes" {
+		it.HasNotes = false
+		return it
+	}
+	kept := make([]string, 0, len(it.Fields))
+	for _, f := range it.Fields {
+		if f != field {
+			kept = append(kept, f)
+		}
+	}
+	it.Fields = kept
+	return it
 }
 
 // itemShape describes what an item holds by name only: field names, whether it

@@ -106,6 +106,15 @@ reviewed and applied.
    what the item holds, by name only; `--apply` deletes it last, and Bitwarden keeps
    it in its trash for 30 days. Take a DR escrow (`dotf secrets backup`) before the
    apply. Once the plan reports the item gone, delete its `retired:` entry.
+9. **Retire a dead field:** a legacy value that is dead rather than a copy (rotated,
+   expired, answering 401) cannot pass step 6, because it equals nothing current.
+   Prove it dead by consequence first, then list it under `retired:` with a
+   `field:` and a reason: `{ item: Stripe, field: backup-codes, reason: ... }`. The
+   item stays. The registry refuses `username`/`password` (an account's login) and
+   any field a declaration still reads. The plan shows a `delete-field` line with
+   what the item keeps. **A removed field does not go to the trash**: an edit is
+   not a deletion, so the DR escrow taken before the apply is the only way back.
+   Once the plan reports it gone, delete the entry.
 
 ## Protocol — ROTATE a secret
 

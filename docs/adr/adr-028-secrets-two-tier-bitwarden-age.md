@@ -345,4 +345,4 @@ Three mechanical safeguards enforce this in `dotf secrets`:
    - **Interactive TTY masking:** In a terminal, secrets are masked (`••••••••••••`) by default with guidance.
    - **Explicit reveal:** Plaintext display requires `--reveal`.
    - **Clipboard copy:** `-c` / `--clip` copies directly to system clipboard (`wl-copy`/`xclip`/`pbcopy`/`clip.exe`) with zero stdout footprint.
-   - **Agent session refusal:** In an agent session (`CLAUDE_CODE`, `ANTIGRAVITY_AGENT`, `AGENT_SESSION`), `dotf secrets show` categorically refuses to print to stdout, redirecting to `dotf secrets run`.
+   - **Agent session refusal:** In an agent session (`CLAUDECODE`, `CLAUDE_CODE`, `ANTIGRAVITY_AGENT`, `ANTIGRAVITY_CLI`, `AGENT_SESSION`), `dotf secrets show` categorically refuses to print to stdout, redirecting to `dotf secrets run`.

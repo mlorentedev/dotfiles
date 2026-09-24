@@ -1,8 +1,50 @@
 [
   {
     "id": "SEC-001-secrets-run-guard-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "AC1-AC5: secrets run refuses an environment dump given directly, by path, or inside a shell snippet (path, redirect, quotes, backslashes, a line continuation, any case), and runs legitimate tools",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestAssertSafeChildCommand|TestRunChildPTY_HonoursTheIntrospectionGuard' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-001-secrets-run-guard-f2",
+    "behavior": "AC7: an injected secret never reaches stdout or stderr, whole or split across writes of any size",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestRedactWriter|TestRunChildPTY_RedactsASecretSplitAcrossWrites' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-001-secrets-run-guard-f3",
+    "behavior": "AC9: secrets show masks on a TTY, prints only with --reveal, copies with --clip, and refuses in an agent session, detected by any declared marker including CLAUDECODE",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestSecretsShow_(RejectsAgentSession|TTYMasking|RevealFlag|ClipFlag)|TestDetectAgentSession' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-001-secrets-run-guard-f4",
+    "behavior": "AC9: AGENTS.md and ADR-028 name every agent-session marker the code reads",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestAgentSessionMarkersAreDocumented' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-001-secrets-run-guard-f5",
+    "behavior": "The child gets the granted secrets and never the backend unlock credentials",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestChildEnviron_StripsBackendAuth|TestStripBackendAuth' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-001-secrets-run-guard-f6",
+    "behavior": "AC6 and AC10: the Claude settings template denies sudo, git clean, secrets show and pipe-to-shell, and the pi catalog registers openrouter",
+    "verification": "jq -e '.permissions.deny as $d | [\"Bash(sudo:*)\", \"Bash(git clean -f*:*)\", \"Bash(*dotf secrets show*:*)\", \"Bash(curl *|*sh*)\"] | all(. as $r | $d | index($r))' ai/claude/settings.json && jq -e '.providers.openrouter.baseUrl' ai/pi/models.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SEC-001-secrets-run-guard-f7",
+    "behavior": "AC8: the testing-isolation lesson is recorded",
+    "verification": "test -s docs/lessons/lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary.md",
     "state": "pending",
     "evidence": ""
   }

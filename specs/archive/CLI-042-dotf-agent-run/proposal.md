@@ -1,11 +1,13 @@
 ---
 id: "CLI-042-dotf-agent-run"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-23"
 issue: "mlorentedev/dotfiles#1190"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Shipped across eight PRs over three days (#1209, #1212, #1213, #1227, #1230, #1232, #1234, #1235; #1210 closed #1190), so no single reviewable commit exists and a range review would take in unrelated work. The one unmet criterion, AC6 (a real dispatch answers), is proven by the archived HARNESS-120 verification (its AC7: a live dispatch through dotf agent run, exit 0), which was independently reviewed before it archived. The other unticked boxes are the closing checklist, which the merged PRs satisfy. Swept under #1626."
 ---
 
 # CLI-042-dotf-agent-run
@@ -301,3 +303,5 @@ Observable outcomes. Each must be testable.
 - `harness/model-map.json`, `harness/reviewer-pool.json`, `.pr_agent.toml` — the registries this
   consumes or mirrors
 - Epic #558; #1124 (the map this consumes); #561, #562, #563 (siblings, out of scope here)
+
+<!-- archived 2026-09-23 — PR: https://github.com/mlorentedev/dotfiles/pull/1210 -->
