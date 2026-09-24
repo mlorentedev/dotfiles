@@ -127,6 +127,7 @@ func Run(opts Options) (int, error) {
 		checkDotfProvenance(sys, cfg, rep)
 		checkRepoDirResolves(rep)
 		checkSpecIssueState(sys, rep)
+		checkBranchProtection(sys, rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep, opts.Fix)
 	}
