@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 071c5ede2400634a
+generated_sha: 3d9fe0d9040d312d
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -60,6 +60,27 @@ When resolving multiple backlog items in a single session:
 - **Do not block local progress waiting for reviews.** Open each atomic PR in series and let CI and autonomous reviewers (PR-Agent) process them asynchronously in parallel.
 - Non-slash comments (`## Review triage`, conversation) are filtered out at the workflow level, so posting triage tables does not trigger review loops or consume inference quota.
 - **Batch sweep before closing:** Run `dotf pr triage-queue` to list all PRs whose reviews have finished across the batch, then iterate through each pending PR, apply needed fixes via TDD, push updates, and record `## Review triage`.
+
+### 1c. A push re-opens the question, and a merged PR is no longer a change
+
+Two ways the queue and the PR stop matching what you believe you are doing. Both measured in
+`mlorentedev/garsync` on 2026-09-23, both silent:
+
+- **A triage done before the push is already stale.** `synchronize` is precisely the event that makes an
+autonomous reviewer run again, so a disposition recorded an hour ago describes a head that no longer
+exists. Measured: PR-Agent re-reviewed the same PR three times in one session — twice after a
+*comment-only* commit — and each run put the PR back in the queue, so the queue went clear, non-zero,
+clear, non-zero. **Re-run `dotf pr triage-queue` in the same turn as the push**, and read the new output
+before calling the PR finished. A human reminding you to look is the signal that this step was skipped.
+- **A push after the merge never reaches the merge, and nothing tells you.** Fix commits pushed once
+GitHub has recorded the merge land on a branch that is already history: the PR still shows them, the queue
+still lists the PR as awaiting a disposition, and the base branch keeps the **unfixed** version. Measured:
+two verified review fixes (the `gitleaks` path allowlists removed, a too-narrow `files:` pattern widened)
+were stranded this way in `#103`, and had to be re-landed in a separate PR (ticket `#112`, PR `#113`) —
+verified work, reviewed and approved, one `gh pr view` away from being lost without anyone noticing.
+**Check `gh pr view <N> --json state` before pushing a fix.** If it is `MERGED`, open a fresh branch, say
+in the body what you are re-landing and why the original merge missed it, and file the ticket when the
+stranding itself deserves a record.
 
 ### 2. Report CI honestly
 

@@ -73,6 +73,10 @@
     {
       "source": "npm:pi-add-dir@1.3.1",
       "why": "Adds external directories to a session and loads their AGENTS.md -- the cross-repo case this multi-repo setup hits constantly."
+    },
+    {
+      "source": "npm:pi-mcp-client@0.8.0",
+      "why": "Model Context Protocol client for Pi; exposes Hive, context7, and sequential-thinking tools."
     }
   ]
 }
