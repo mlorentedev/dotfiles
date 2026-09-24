@@ -3,6 +3,7 @@ package forge
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -12,11 +13,14 @@ type ghFake struct {
 	bodies map[string]string
 	errs   map[string]string
 	calls  []string
+	mu     sync.Mutex
 }
 
 func (g *ghFake) run(args ...string) (string, string, error) {
 	path := args[len(args)-1]
+	g.mu.Lock()
 	g.calls = append(g.calls, path)
+	g.mu.Unlock()
 	if b, ok := g.bodies[path]; ok {
 		return b, "", nil
 	}

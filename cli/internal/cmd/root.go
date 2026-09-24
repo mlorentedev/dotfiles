@@ -39,6 +39,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newDeployCmd())
 	root.AddCommand(newOrcaCmd())
 	root.AddCommand(newPrCmd())
+	root.AddCommand(newForgeCmd())
 	root.AddCommand(newSearchCmd())
 	root.AddCommand(newHooksCmd())
 	root.AddCommand(newWorktreeCmd())

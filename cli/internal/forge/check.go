@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // RepoStatus grades one declared repository against the live forge.
@@ -34,12 +35,26 @@ func CheckAll(d Declaration, run Runner) []RepoResult {
 		repos = append(repos, r)
 	}
 	sort.Strings(repos)
-	results := make([]RepoResult, 0, len(repos))
-	for _, r := range repos {
-		results = append(results, CheckRepo(r, d.Repos[r], run))
+	// Bounded and index-addressed: about 15 round-trips cost one's wall time,
+	// and the output order stays the sorted one regardless of who answers first.
+	results := make([]RepoResult, len(repos))
+	sem := make(chan struct{}, checkWorkers)
+	var wg sync.WaitGroup
+	for i, r := range repos {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, r string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			results[i] = CheckRepo(r, d.Repos[r], run)
+		}(i, r)
 	}
+	wg.Wait()
 	return results
 }
+
+// checkWorkers bounds concurrent protection reads (REST budget: 5,000/h).
+const checkWorkers = 6
 
 // NeedsAttention reports whether any result is drift or unanswerable. An
 // unanswerable check counts: a question nobody could answer must not read as
