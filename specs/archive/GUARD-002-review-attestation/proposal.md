@@ -1,11 +1,13 @@
 ---
 id: "GUARD-002-review-attestation"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-16"
 issue: "mlorentedev/dotfiles#906"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "Shipped in #1019 and hardened by #1047, #1065 and #1071. review-attestation is a required status check on dotfiles main, read live from the branch protection API on 2026-09-23, so the gate has run on every PR since it landed, which is stronger evidence than a retroactive review of the first of four PRs. #906 was closed NOT_PLANNED as a duplicate: its CodeRabbit-notice remainder is carried by #1570 and #1558. The unticked boxes are the closing checklist. Swept under #1626."
 ---
 
 # GUARD-002-review-attestation
@@ -214,3 +216,5 @@ enforced everywhere.
 - `scripts/check-spec-gate.sh` — the label + body-section escape shape reused here
 - `harness/enforced/pr-stewardship.md` — the doctrine this gate mechanises
 - Related patterns: `00_meta/patterns/pattern-verification-fails-toward-unproven.md`
+
+<!-- archived 2026-09-23 — PR: https://github.com/mlorentedev/dotfiles/pull/1019 -->
