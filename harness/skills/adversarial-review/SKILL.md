@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: f04478a5fba0a622
+generated_sha: 790a327e81f690cc
 id: adversarial-review-skill
 type: skill
 status: active
@@ -76,7 +76,7 @@ When implementation looks finished — tasks ticked, tests green, a PR being dra
 
 1. **Active spec** — does `specs/<feature-id>/` exist with `status:` not yet `archived`? No spec, no proposal.
 2. **Implementation complete** — are the `tasks.md` implementation boxes ticked and `verification.md` carrying evidence? Proposing mid-implementation is the wrong phase.
-3. **No fresh review** — is `specs/<feature-id>/review.md` absent, or present with a `reviewed_sha` older than the last change to `proposal.md` / `tasks.md` / `features.json`? A fresh, passing review already meets the requirement.
+3. **No fresh review** — is `specs/<feature-id>/review.md` absent, or does the current contract (`proposal.md` / `tasks.md` / `features.json`, ignoring checkbox ticks and the harness-owned `state`/`evidence`) differ from the `contract_digests` the launcher recorded in `review-request.json` (SDD-042)? Only when the request carries no digests, fall back to comparing against `reviewed_sha` — a squash-merge orphans that commit, so it cannot be the question for a new review. A fresh, passing review already meets the requirement.
 4. **Not waived** — does `proposal.md` declare `review: waived` with a non-empty reason? A declared waiver is a decision already taken; do not re-litigate it.
 
 If 1–3 hold and 4 does not → propose.

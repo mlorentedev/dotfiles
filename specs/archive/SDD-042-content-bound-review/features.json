@@ -9,21 +9,35 @@
   {
     "id": "SDD-042-content-bound-review-f2",
     "behavior": "Checkbox ticks, harness-owned features.json fields and CRLF do not make a review stale",
-    "verification": "cd cli && go test ./internal/spec/... -run 'TestContractDigest' -count=1 -v 2>&1 | grep -q '^--- PASS: TestContractDigest'",
+    "verification": "cd cli && out=$(go test ./internal/spec/... -run 'TestContractDigest' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "SDD-042-content-bound-review-f3",
     "behavior": "A bypass flag requires --reason and leaves a review_bypass: record in the archived proposal",
-    "verification": "cd cli && go test ./internal/spec/... ./internal/cmd/... -run 'TestArchiveBypassRecorded' -count=1 -v 2>&1 | grep -q '^--- PASS: TestArchiveBypassRecorded'",
+    "verification": "cd cli && out=$(go test ./internal/spec/... ./internal/cmd/... -run 'TestArchiveBypassRecorded' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "SDD-042-content-bound-review-f4",
     "behavior": "No archive refusal names a bypass flag",
-    "verification": "cd cli && go test ./internal/spec/... -run 'TestArchiveRefusalsNameNoBypassFlag' -count=1 -v 2>&1 | grep -q '^--- PASS: TestArchiveRefusalsNameNoBypassFlag'",
+    "verification": "cd cli && out=$(go test ./internal/spec/... -run 'TestArchiveRefusalsNameNoBypassFlag' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-042-content-bound-review-f5",
+    "behavior": "A legacy review whose reviewed commit is absent is refused, naming the absent object and the missing digests",
+    "verification": "cd cli && out=$(go test ./internal/spec/... -run 'TestStaleLegacyAbsentObjectNamesTheCause' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "SDD-042-content-bound-review-f6",
+    "behavior": "The launcher records contract_digests in review-request.json",
+    "verification": "cd cli && out=$(go test ./internal/spec/... -run 'TestReviewRequestRecordsContractDigests' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
   }
