@@ -1,6 +1,8 @@
 package forge
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -191,4 +193,56 @@ func repoRoot(t *testing.T) string {
 			t.Fatalf("no %s above %s", SchemaFile, wd)
 		}
 	}
+}
+
+// D-1 (#1625), held by a test so the approvals policy cannot change quietly.
+// Raising the count to 1 or more locks the only maintainer out of every merge
+// (self-approval is impossible and enforce_admins is on). Changing either the
+// value or its rationale therefore requires editing these pins in the same
+// PR, where the diff makes the decision visible to a reviewer.
+const (
+	pinnedApprovals    = 0
+	pinnedRationaleSHA = "ba5430c813d388708685d4dab0abe0c8b788e7398c03e375205877b71914308c"
+)
+
+func TestProtectionApprovalsRationalePinned(t *testing.T) {
+	d, err := Load(repoRoot(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Policy.RequiredApprovingReviewCount != pinnedApprovals {
+		t.Errorf("policy.required_approving_review_count = %d, pinned %d — re-read D-1 on #1625, then update the rationale and this pin together",
+			d.Policy.RequiredApprovingReviewCount, pinnedApprovals)
+	}
+	if got := sha256Hex(d.Policy.Rationale); got != pinnedRationaleSHA {
+		t.Errorf("policy.rationale changed (sha256 %s, pinned %s) — a changed rationale is a changed decision; update the pin in the same PR", got, pinnedRationaleSHA)
+	}
+	checked := 0
+	for repo, r := range d.Repos {
+		if r.Protection == nil || r.Protection.RequiredPullRequestReviews == nil {
+			continue
+		}
+		checked++
+		if n := r.Protection.RequiredPullRequestReviews.RequiredApprovingReviewCount; n != d.Policy.RequiredApprovingReviewCount && r.ApprovalsOverrideReason == "" {
+			t.Errorf("%s requires %d approvals against a policy of %d, with no approvals_override_reason", repo, n, d.Policy.RequiredApprovingReviewCount)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no repository declares a review requirement — the policy check covered nothing")
+	}
+}
+
+func TestProtectionDeclarationLoads(t *testing.T) {
+	d, err := Load(repoRoot(t))
+	if err != nil {
+		t.Fatalf("%s must satisfy its schema: %v", DeclarationFile, err)
+	}
+	if _, ok := d.Repos["mlorentedev/dotfiles"]; !ok {
+		t.Fatal("the declaration must cover this repository")
+	}
+}
+
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }
