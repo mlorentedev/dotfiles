@@ -89,12 +89,22 @@ func newSecretsSetCmd() *cobra.Command {
 }
 
 // readSecretValue reads the secret value: all of stdin when piped, else a hidden
-// terminal prompt. A file/multi-line secret cannot be entered at the hidden prompt, so
-// interactive use of one is rejected with a pipe-it instruction.
+// terminal prompt. A file secret may span lines, so at the terminal it is read one
+// hidden line at a time until end of input.
+//
+// It used to refuse a file secret at the terminal and advise
+// `dotf secrets set <id> < file`, which put the secret in a file on disk to get it
+// in, and blocked a one-line backup code only because it is exposed as a file
+// (hit rotating STRIPE_BACKUP_CODE, 2026-09-23).
 func readSecretValue(cmd *cobra.Command, isFile bool) (string, error) {
 	if stdinIsTerminal() {
 		if isFile {
-			return "", fmt.Errorf("this is a multi-line/file secret; pipe the value via stdin, e.g. `dotf secrets set <id> < file`")
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Value (hidden; it may span lines; finish with Ctrl-D, or Ctrl-Z then Enter on Windows):")
+			v, err := readHiddenLines()
+			if err != nil {
+				return "", fmt.Errorf("read value from terminal: %w", err)
+			}
+			return v, nil
 		}
 		_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Value (hidden): ")
 		b, err := readPassword()
@@ -113,6 +123,29 @@ func readSecretValue(cmd *cobra.Command, isFile bool) (string, error) {
 
 // normalizeValue trims a single-line env token's trailing newline(s); a file/notes
 // value is left byte-exact so multi-line text (SSH keys, kubeconfigs) round-trips.
+// readHiddenLines reads hidden lines until end of input: io.EOF from Ctrl-D at the
+// start of a line, or a line holding only Ctrl-Z (0x1a), which is how the Windows
+// console ends input. Blank lines are kept. One line is returned as typed; several
+// end with a newline, because a multi-line secret is a text file, and OpenSSH, for
+// one, refuses a private key without its final newline.
+func readHiddenLines() (string, error) {
+	var lines []string
+	for {
+		b, err := readPassword()
+		if errors.Is(err, io.EOF) || string(b) == "\x1a" {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, string(b))
+	}
+	if len(lines) <= 1 {
+		return strings.Join(lines, ""), nil
+	}
+	return strings.Join(lines, "\n") + "\n", nil
+}
+
 func normalizeValue(value string, isFile bool) string {
 	if isFile {
 		return value
