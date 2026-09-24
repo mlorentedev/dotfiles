@@ -196,7 +196,7 @@ func TestArchiveForceWithoutReview(t *testing.T) {
 	root := t.TempDir()
 	archivableSpec(t, root, "AI-001-x", "")
 
-	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true}); err != nil {
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true, BypassReason: "test"}); err != nil {
 		t.Fatalf("force-without-review should archive despite no review: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "specs", "archive", "AI-001-x", "proposal.md")); err != nil {
@@ -210,8 +210,14 @@ func TestArchiveForceWithoutReviewOverridesFail(t *testing.T) {
 	root := t.TempDir()
 	archivableSpec(t, root, "AI-001-x", "---\nspec: \"AI-001-x\"\nverdict: \"FAIL\"\nreviewed_sha: \"abc\"\n---\n")
 
-	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true}); err != nil {
+	target, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true, BypassReason: "test"})
+	if err != nil {
 		t.Fatalf("force-without-review should override a FAIL verdict: %v", err)
+	}
+	// SDD-042: the override is recorded as what it overrode — a FAIL, not a
+	// missing review, which is what the flag's name alone would suggest.
+	if got := frontmatterFields(readProposal(t, target))["review_bypass"]; !strings.Contains(got, "FAIL") {
+		t.Errorf("the bypass record must say it overrode a FAIL verdict, got %q", got)
 	}
 }
 
@@ -588,5 +594,26 @@ func TestParseReviewAcceptsASpacedVerdict(t *testing.T) {
 	}
 	if r.Verdict.Blocks() {
 		t.Error("a passing verdict must not block the archive over punctuation")
+	}
+}
+
+// SDD-042 writes a free-text reason into `review_bypass:`, so the reader must
+// honour the escapes the writer emits: in YAML a double-quoted scalar escapes
+// `"` and `\`, and a single-quoted one doubles `'`. Without this, a reason
+// containing a quote is silently truncated at it.
+func TestFrontmatterUnescapesQuotedValues(t *testing.T) {
+	f := frontmatterFields("---\n" +
+		`dq: "said \"shipped\" in C:\\tmp # not a comment"` + "\n" +
+		`sq: 'it''s done # still not a comment'` + "\n" +
+		`plain: "no escapes"   # trailing comment` + "\n---\n")
+	cases := map[string]string{
+		"dq":    `said "shipped" in C:\tmp # not a comment`,
+		"sq":    `it's done # still not a comment`,
+		"plain": "no escapes",
+	}
+	for k, want := range cases {
+		if got := f[k]; got != want {
+			t.Errorf("%s: got %q, want %q", k, got, want)
+		}
 	}
 }

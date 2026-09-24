@@ -70,8 +70,8 @@ func frontmatterFields(content string) map[string]string {
 		}
 		value := strings.TrimSpace(rest)
 		if len(value) > 1 && (value[0] == '"' || value[0] == '\'') {
-			if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
-				value = value[1 : 1+end]
+			if unquoted, ok := unquoteScalar(value); ok {
+				value = unquoted
 			}
 		} else if idx := strings.Index(value, "#"); idx >= 0 {
 			value = strings.TrimSpace(value[:idx])
@@ -79,6 +79,31 @@ func frontmatterFields(content string) map[string]string {
 		fields[key] = value
 	}
 	return fields
+}
+
+// unquoteScalar reads a YAML quoted scalar from the start of value, honouring
+// its escapes: `\"` and `\\` inside double quotes, `”` inside single quotes.
+// Anything after the closing quote (a trailing comment) is dropped. ok is
+// false when the quote never closes, and the caller keeps the raw value.
+func unquoteScalar(value string) (string, bool) {
+	q := value[0]
+	var b strings.Builder
+	for i := 1; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case q == '"' && c == '\\' && i+1 < len(value):
+			i++
+			b.WriteByte(value[i])
+		case q == '\'' && c == '\'' && i+1 < len(value) && value[i+1] == '\'':
+			i++
+			b.WriteByte('\'')
+		case c == q:
+			return b.String(), true
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return "", false
 }
 
 // ParseReview reads review.md content into a Review. A missing or unrecognized

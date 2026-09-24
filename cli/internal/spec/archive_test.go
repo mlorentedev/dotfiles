@@ -293,7 +293,7 @@ func TestArchiveForceWithDrafts(t *testing.T) {
 		"review.md":   passingReview("AI-001-x"),
 	})
 
-	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithDrafts: true}); err != nil {
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithDrafts: true, BypassReason: "test"}); err != nil {
 		t.Fatalf("force-with-drafts should archive despite tags: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "specs", "archive", "AI-001-x", "proposal.md")); err != nil {

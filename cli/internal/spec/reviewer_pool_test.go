@@ -163,6 +163,7 @@ func TestArchiveForceOverridesThePoolCheck(t *testing.T) {
 	if _, err := Archive(root, "AI-001-x", ArchiveOptions{
 		Staleness:          fakeStaleness{},
 		ForceWithoutReview: true,
+		BypassReason:       "test",
 	}); err != nil {
 		t.Fatalf("--force-without-review must bypass the pool check too: %v", err)
 	}
