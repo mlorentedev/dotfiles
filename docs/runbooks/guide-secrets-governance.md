@@ -52,7 +52,7 @@ flowchart LR
 When a new API key/token/credential enters the system:
 
 1. Decide the **plane**: `app` (service key) / `infra` (access) / `personal` / `floor` (needed before bw — rare).
-2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Only **`Dotfiles/apps`** and **`Dotfiles/infra`** are legal `bw.folder` values (`validBWFolders`), and each plane has exactly one (`planeFolder`); `floor` secrets carry no `bw:` block at all, and no personal-plane folder is ratified yet (#586), so entries on those planes declare no folder.
+2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Only **`Dotfiles/apps`** and **`Dotfiles/infra`** are legal `bw.folder` values (`validBWFolders`), and each plane has exactly one (`planeFolder`); `floor` and `personal` have no folder, and the registry refuses one on either: a floor secret's `bw:` block, when it has one, is a convenience copy of an authority kept elsewhere (`AGE_KEY_PERSONAL`), and no personal-plane folder is ratified yet (#586).
    - single value → item password; multi-value → custom fields (kebab names).
    - `dotf secrets set <id> --yes` creates the item in its declared folder (value via stdin or hidden prompt).
 3. Add a **registry** entry: `{id, plane, backend: bw, bw:{folder,item,field}, expose:{env|file}, consumers, rotate}`.
@@ -78,15 +78,19 @@ reviewed and applied.
    and make the plan unappliable; `deferred` lines belong to `dotf secrets migrate`.
 4. **Apply** from the reviewed branch: `dotf secrets reconcile --apply`. It copies
    values inside the process (never printed), never overwrites an existing field,
-   then syncs, re-plans and **fails unless the second plan is empty**. Safe before
-   merge: every operation is additive.
+   then syncs and re-plans. A re-plan that holds only retires gets one more pass
+   (step 6); **anything else left fails the command**, and so does anything left
+   after that pass. Without `retire:` every operation is additive, so an apply is
+   safe before merge; a retire deletes the source field.
 5. **Roll consumers** that are not local: `dotf secrets sync <target>`.
 6. **Retire the source:** once consumers are verified on the copy, add `retire: true`
    to the `from:` and run reconcile again. It removes the source field only if the
    copy holds the **same** value (compared in memory, never printed); if they differ,
-   one side was rotated and it refuses. Never in the same run as the copy, and always
-   after every other operation. One credential, one place — a search no longer
-   returns two.
+   one side was rotated and it refuses. Never in the same *pass* as the copy: the
+   comparison reads the copy from the store after a sync. So one `--apply` may run a
+   second pass that holds only retires, which lets you declare `retire: true`
+   together with the copy. It always runs after every other operation. One
+   credential, one place — a search no longer returns two.
 7. **Delete the record:** a satisfied `from:` (source retired, or no retire asked) is
    reported as removable — delete it in a follow-up.
 

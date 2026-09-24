@@ -1,7 +1,7 @@
 ---
 id: "CLI-080-secrets-reconcile"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-22"
 issue: "mlorentedev/dotfiles#1596"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

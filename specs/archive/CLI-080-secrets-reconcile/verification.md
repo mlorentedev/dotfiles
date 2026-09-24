@@ -159,6 +159,41 @@ condition, cap passes at 1, make `onlyRetires` always true, drop the folder sync
 **4/4 killed.** (The first of these, run against the earlier body-bounded loop,
 never terminated. It is the cause of lesson 286.)
 
+## Adversarial review, round 2 — disposition
+
+`review.md` round 2: **PASS**, `nan/glm5.3-flash` (a different family from round 1's
+`agy/gemini-3.1-pro-high`), reviewed `5fd4de6`, which is the head #1621 merged. The
+reviewer re-ran f1–f8 and f10, corroborated f9 read-only against the live vault, and
+killed 4/4 of its own mutations. The contract set is closed by the verdict; nothing
+below edits it.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Minor (REAL) | Runbook CONVERGE step 6 says a retire is "never in the same run as the copy" | **Applied.** It now states the real invariant: never in the same *pass*, and one `--apply` may run a second pass that holds only retires. That is docs, outside the contract set. |
+| Minor (REAL) | `features.json` evidence cites runs "on top of c74675a", a commit not reachable in the repo | **Recorded, not edited**, as the reviewer advised. `c74675a` was a commit on the stacked #1601 branch. Its commits reached #1600 by cherry-pick, which gave them new SHAs. The provenance that stands is this review's re-execution of f1–f10 against `5fd4de6`. |
+| Minor (THEORETICAL) | A refused retire does not name which side to settle | **Ticketed, #1624.** The error message is code. |
+| Minor (SPECULATIVE) | `sync ci` accepts duplicate names | **Ticketed, #1624.** |
+| Minor (SPECULATIVE) | A fully retired item remains as an empty husk | **Ticketed, #1624.** |
+| Question | Plan→write TOCTOU on "never overwrite" | **Declined, accepted risk.** The proposal records it: a single operator, and concurrent writers are OPS-028. |
+
+## Code changed after the PASS (CLI-078 review round 4)
+
+Two changes reached this spec's code after round 2 passed, both from CLI-078's
+round 4 findings. Neither touches this spec's contract set, so the gate still
+accepts the PASS; they are declared here so that is not the only reason it
+stands. CLI-078's round 5 reviews the diff that carries them.
+
+- **`planFromStore` reads through `readInventory`**, shared with `drift`. It
+  still syncs before planning, now through the lister's own subject (the daemon)
+  instead of the pinned backend's syncer. The inventory is only ever read from the
+  daemon, so the cache synced is now the cache read; before, a CLI-pinned backend
+  would have synced the CLI's cache and read the daemon's.
+- **A new finding, `item-folder-unknown`, has its own `Blocked` case** in
+  `PlanReconcile`: an item filed in a folder the folder list does not carry is
+  never moved. The `default` case already blocked it, but with a remedy that
+  said to teach the planner, which was the wrong advice.
+  `TestPlanBlocksAnItemWhoseFolderItCannotName`. f1–f10 re-run: 10/10.
+
 ## Promotion candidates
 
 - [ ] Pattern for `00_meta/patterns/`: "declare a data migration as a record the tool
@@ -168,6 +203,10 @@ never terminated. It is the cause of lesson 286.)
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to `specs/archive/CLI-080-secrets-reconcile/`
-- [ ] Independent adversarial review passed (reviewer != implementer)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to `specs/archive/CLI-080-secrets-reconcile/`
+- [x] Independent adversarial review passed (reviewer != implementer): round 2,
+      `nan/glm5.3-flash`, reviewed `5fd4de6`. The code it took afterwards is
+      declared above and was reviewed within CLI-078's round 5 (PASS, `0c10f0b`).
+- [ ] #1596 closed. **Deliberately not**: it stays open for rotation age and stale
+      CI consumers, which neither spec delivers.

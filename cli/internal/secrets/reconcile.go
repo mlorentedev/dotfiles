@@ -147,6 +147,15 @@ func (p *planner) finding(f LayoutFinding) {
 			Secret: d.Secret, Item: d.Item, Detail: f.Detail,
 			Remedy: "rename or remove the duplicate items in the vault",
 		})
+	case DriftItemFolderUnknown:
+		// Its current folder is one the folder list does not carry, so the list
+		// is stale, and a move would resolve the destination against it: the
+		// same miss that makes ResolveFolder create a duplicate folder.
+		p.seen[d.Secret] = true
+		p.plan.Blocked = append(p.plan.Blocked, PlanNote{
+			Secret: d.Secret, Item: d.Item, Detail: f.Detail,
+			Remedy: "re-run once the store has synced (reconcile syncs first; if this persists, `dotf secrets unlock`)",
+		})
 	default:
 		// A finding kind this planner does not know must not vanish: an unmapped
 		// kind silently dropped is a plan that reports the store converged while

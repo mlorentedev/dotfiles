@@ -39,6 +39,12 @@ type ItemSummary struct {
 	// the item is unfoldered. A name is what a declaration compares against and
 	// what a human reads; an id is neither.
 	Folder string
+	// FolderUnresolved is set when the item names a folder id that the folder list
+	// read with it does not carry: a folder made since the daemon last synced, or
+	// between the two reads. Folder is "" then, and that "" does NOT mean
+	// unfoldered. Collapsing the two made drift call a filed item "(no folder)"
+	// and gave reconcile a move to act on (CLI-078 review round 4).
+	FolderUnresolved bool
 	// Fields are the custom field names, sorted. Names only — see the file header.
 	Fields []string
 	// HasNotes records whether the item's note is non-empty, WITHOUT reading it.
@@ -208,14 +214,16 @@ func decodeItems(raw json.RawMessage, folderByID map[string]string) ([]ItemSumma
 		// one malformed row.
 		revised, _ := time.Parse(time.RFC3339, w.RevisionDate)
 
+		folder, known := folderByID[w.FolderID]
 		out = append(out, ItemSummary{
-			Name:        w.Name,
-			Folder:      folderByID[w.FolderID],
-			Fields:      names,
-			HasNotes:    w.Notes != "",
-			HasLogin:    w.Login != nil,
-			HasUsername: w.Login != nil && w.Login.Username != "",
-			Revised:     revised,
+			Name:             w.Name,
+			Folder:           folder,
+			FolderUnresolved: w.FolderID != "" && !known,
+			Fields:           names,
+			HasNotes:         w.Notes != "",
+			HasLogin:         w.Login != nil,
+			HasUsername:      w.Login != nil && w.Login.Username != "",
+			Revised:          revised,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
