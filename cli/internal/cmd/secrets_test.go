@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -75,6 +77,17 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		{"bash -c declare -p", []string{"bash", "-c", "declare -p"}, true},
 		{"bash -c printenv", []string{"bash", "-c", "printenv FOO"}, true},
 		{"bash -c export", []string{"bash", "-c", "export -p"}, true},
+		// SEC-001 review round 1, F2: a boundary-class regex missed an absolute
+		// path (`/` was not a boundary) and a redirect with no space (`>` was not
+		// one either). Whole-token matching closes both.
+		{"absolute env in sh -c", []string{"sh", "-c", "/usr/bin/env"}, true},
+		{"absolute printenv in bash -c", []string{"bash", "-c", "/usr/bin/printenv FOO"}, true},
+		{"redirect with no space", []string{"sh", "-c", "env>x"}, true},
+		{"input redirect with no space", []string{"sh", "-c", "env<x"}, true},
+		{"relative path to env", []string{"sh", "-c", "./env"}, true},
+		{"line continuation inside env", []string{"sh", "-c", "en\\\nv"}, true},
+		{"allowed hyphenated word", []string{"sh", "-c", "run-env-check"}, false},
+		{"allowed dotenv file", []string{"sh", "-c", "cat .env.example"}, false},
 		{"allowed tool", []string{"goreleaser", "release"}, false},
 		{"allowed python", []string{"python3", "script.py"}, false},
 		{"allowed dotf review", []string{"dotf", "review"}, false},
@@ -176,5 +189,85 @@ func TestRedactWriter_HoldsBackATrailingSecretPrefix(t *testing.T) {
 	}
 	if want := "key is [REDACTED:OPENROUTER_API_KEY]\n"; got != want {
 		t.Errorf("split-write redaction mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+// SEC-001 review round 1, F1: a secret delivered in writes shorter than itself
+// must never reach the target. The reviewed commit gated its hold-back on
+// len(data) >= maxSecretLen, so 1-3 byte writes went out verbatim. SEC-002's
+// prefix-aware hold-back closed it before the retroactive review ran; this pins
+// the case the review reproduced, at every small chunk size.
+func TestRedactWriter_SecretInTinyChunksNeverLeaks(t *testing.T) {
+	const secret = "mock-openrouter-test-token-val"
+	input := "key is " + secret + " and done\n"
+	want := "key is [REDACTED:OPENROUTER_API_KEY] and done\n"
+	for size := 1; size <= 3; size++ {
+		t.Run(strconv.Itoa(size)+"-byte writes", func(t *testing.T) {
+			var buf bytes.Buffer
+			rw := newRedactWriter(&buf, []string{"OPENROUTER_API_KEY=" + secret})
+			for i := 0; i < len(input); i += size {
+				end := min(i+size, len(input))
+				if _, err := rw.Write([]byte(input[i:end])); err != nil {
+					t.Fatalf("Write: %v", err)
+				}
+				if strings.Contains(buf.String(), secret[:6]) {
+					t.Fatalf("after byte %d the target already holds the secret's first 6 bytes: %q", end, buf.String())
+				}
+			}
+			if err := rw.Flush(); err != nil {
+				t.Fatalf("Flush: %v", err)
+			}
+			if got := buf.String(); got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// SEC-001 AC9, measured 2026-09-23: Claude Code exports CLAUDECODE (and
+// CLAUDE_CODE_ENTRYPOINT), never CLAUDE_CODE, so a refusal keyed on CLAUDE_CODE
+// alone never fired in the harness it was written for (#1646). Each declared
+// marker must be sufficient on its own, and an environment carrying none must
+// not be read as an agent session.
+func TestDetectAgentSession_EachMarkerIsSufficient(t *testing.T) {
+	clear := func() {
+		for _, m := range agentSessionMarkers {
+			t.Setenv(m, "")
+		}
+	}
+	clear()
+	if detectAgentSession() {
+		t.Fatal("no marker set, yet an agent session was detected")
+	}
+	for _, m := range agentSessionMarkers {
+		clear()
+		t.Setenv(m, "1")
+		if !detectAgentSession() {
+			t.Errorf("%s=1 alone was not detected as an agent session", m)
+		}
+	}
+}
+
+func TestDetectAgentSession_KnowsTheVariableClaudeCodeActuallySets(t *testing.T) {
+	if !slices.Contains(agentSessionMarkers, "CLAUDECODE") {
+		t.Fatal("CLAUDECODE is the variable Claude Code exports; without it the refusal never fires under Claude")
+	}
+}
+
+// F8: the doctrine that tells agents about the refusal names the same markers
+// the code reads. A marker added to one and not the other is how the ADR came to
+// omit ANTIGRAVITY_CLI.
+func TestAgentSessionMarkersAreDocumented(t *testing.T) {
+	root := repoRootForTest(t)
+	for _, doc := range []string{"AGENTS.md", "docs/adr/adr-028-secrets-two-tier-bitwarden-age.md"} {
+		data, err := os.ReadFile(filepath.Join(root, doc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range agentSessionMarkers {
+			if !strings.Contains(string(data), "`"+m+"`") {
+				t.Errorf("%s does not name the agent-session marker `%s`", doc, m)
+			}
+		}
 	}
 }

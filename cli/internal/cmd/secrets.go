@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -314,15 +315,28 @@ func newSecretsLsCmd() *cobra.Command {
 	return c
 }
 
+// agentSessionMarkers are the environment variables whose presence marks the
+// process as running under a coding agent. CLAUDECODE is what Claude Code
+// actually exports; CLAUDE_CODE, the only Claude marker this list held until
+// #1646, is set by nothing, so the refusal never fired under Claude. The
+// vendor-neutral AGENT_SESSION is the one a harness deploy can set for every
+// agent (#1646). AGENTS.md and ADR-028 name each marker, held by a test.
+var agentSessionMarkers = []string{"CLAUDECODE", "CLAUDE_CODE", "ANTIGRAVITY_AGENT", "ANTIGRAVITY_CLI", "AGENT_SESSION"}
+
+// detectAgentSession reports whether any agent-session marker is set.
+func detectAgentSession() bool {
+	for _, m := range agentSessionMarkers {
+		if os.Getenv(m) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 var (
 	stdoutIsTerminal = func() bool { return term.IsTerminal(int(os.Stdout.Fd())) }
-	isAgentSession   = func() bool {
-		return os.Getenv("CLAUDE_CODE") != "" ||
-			os.Getenv("ANTIGRAVITY_AGENT") != "" ||
-			os.Getenv("ANTIGRAVITY_CLI") != "" ||
-			os.Getenv("AGENT_SESSION") != ""
-	}
-	clipboardRunner = func(text string) error {
+	isAgentSession   = detectAgentSession
+	clipboardRunner  = func(text string) error {
 		bin, args := clipboardCommand()
 		cmd := exec.Command(bin, args...)
 		cmd.Stdin = strings.NewReader(text)
@@ -503,7 +517,7 @@ func newSecretsRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			childEnv := append(stripBackendAuth(os.Environ()), injected...)
+			childEnv := childEnviron(injected)
 
 			// SEC-002. exec.Cmd hands a child a real descriptor only when the
 			// writer's dynamic type is *os.File; a redactWriter never is, so
@@ -546,17 +560,14 @@ func resolveInjectedSecrets(reg *secrets.Registry, only map[string]bool) ([]stri
 	return secretLoader().EnvFor(reg.Entries(env.Home()), only)
 }
 
-// buildChildEnv flattens the registry to entries, resolves the selected secrets
-// (per-backend), and returns the child environment: the parent env with the backend
-// unlock credentials stripped, plus the granted KEY=VALUE pairs. The child gets only
-// the secrets it was granted — never the master credential that opens the whole
-// vault (defense in depth; cf. 1Password's `op run` + `env -u OP_SERVICE_ACCOUNT_TOKEN`).
-func buildChildEnv(reg *secrets.Registry, only map[string]bool) ([]string, error) {
-	injected, err := resolveInjectedSecrets(reg, only)
-	if err != nil {
-		return nil, err
-	}
-	return append(stripBackendAuth(os.Environ()), injected...), nil
+// childEnviron is the child process's environment: the parent's, with the
+// backend unlock credentials stripped, plus the granted KEY=VALUE pairs. The
+// child gets only the secrets it was granted, never the master credential that
+// opens the whole vault (defense in depth; cf. 1Password's `op run` +
+// `env -u OP_SERVICE_ACCOUNT_TOKEN`). RunE calls it directly, because it also
+// needs the granted pairs on their own to build the redactor.
+func childEnviron(injected []string) []string {
+	return append(stripBackendAuth(os.Environ()), injected...)
 }
 
 // backendAuthVars are credentials that unlock a secret backend (the vault keys
@@ -724,22 +735,42 @@ func assertSafeChildCommand(argv []string) error {
 			arg := argv[i]
 			isCFlag := arg == "-c" || (strings.HasPrefix(arg, "-") && strings.Contains(arg, "c"))
 			if isCFlag && i+1 < len(argv) {
-				cmdStr := strings.TrimSpace(argv[i+1])
-				// Normalize by stripping quotes and backslashes that bypass regex boundaries
-				cleanCmd := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(cmdStr, "'", ""), "\"", ""), "\\", "")
-				dangerousList := []string{"env", "printenv", "export", "set", "declare"}
-				for _, dangerous := range dangerousList {
-					pattern := `(?i)(?:^|[\s;|` + "`" + `&$()=])` + regexp.QuoteMeta(dangerous) + `(?:$|[\s;|` + "`" + `&$()])`
-					matchedRaw, _ := regexp.MatchString(pattern, cmdStr)
-					matchedClean, _ := regexp.MatchString(pattern, cleanCmd)
-					if matchedRaw || matchedClean {
-						return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", dangerous)
-					}
+				if word, ok := snippetIntrospection(argv[i+1]); ok {
+					return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", word)
 				}
 			}
 		}
 	}
 	return nil
+}
+
+// introspectionWords are the commands whose purpose is to print the environment.
+var introspectionWords = []string{"env", "printenv", "export", "set", "declare"}
+
+// snippetWordSep splits a shell snippet into the words a shell could run. Only
+// letters, digits, `_`, `.` and `-` belong to a word, so a path separator or a
+// redirect ends one: `/usr/bin/env` and `env>x` both yield the word `env`, while
+// `.env.example` and `run-env-check` stay whole and are not refused.
+var snippetWordSep = regexp.MustCompile(`[^a-z0-9_.-]+`)
+
+// snippetIntrospection reports the first introspection command a `-c` snippet
+// runs as a whole word. Matching whole words replaced a boundary-class regex
+// that missed an absolute path and a redirect with no space (SEC-001 review,
+// round 1, F2). The snippet is read twice. The cleaned form is how the shell
+// sees the word: a backslash-newline continues the line, and quotes and
+// backslashes vanish, so `en\<newline>v`, `'e'nv` and `\env` all run `env`. The
+// form as written is kept too, so this never refuses less than the regex it
+// replaced did.
+func snippetIntrospection(snippet string) (string, bool) {
+	clean := strings.NewReplacer("\\\n", "", "'", "", `"`, "", `\`, "").Replace(snippet)
+	for _, form := range []string{snippet, clean} {
+		for _, word := range snippetWordSep.Split(strings.ToLower(form), -1) {
+			if slices.Contains(introspectionWords, word) {
+				return word, true
+			}
+		}
+	}
+	return "", false
 }
 
 // redactWriter intercepts output emitted by the child process and replaces any byte sequence
