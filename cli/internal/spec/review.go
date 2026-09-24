@@ -82,7 +82,9 @@ func frontmatterFields(content string) map[string]string {
 }
 
 // unquoteScalar reads a YAML quoted scalar from the start of value, honouring
-// its escapes: `\"` and `\\` inside double quotes, `”` inside single quotes.
+// its escapes: `\"` and `\\` inside double quotes, and a doubled single
+// quote inside single quotes. (Not spelled out here: gofmt rewrites two
+// apostrophes in a doc comment into a typographic closing quote.)
 // Anything after the closing quote (a trailing comment) is dropped. ok is
 // false when the quote never closes, and the caller keeps the raw value.
 func unquoteScalar(value string) (string, bool) {
@@ -338,7 +340,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	}
 	if review.Verdict.Blocks() {
 		return fmt.Errorf("%s records verdict %s — address the findings and re-review before archiving\n"+
-			"a FAIL is resolved by its findings, not overridden: apply them in a follow-up, then re-review",
+			"a FAIL is resolved by its findings: apply them in a follow-up, then re-review",
 			ReviewFile, review.Verdict)
 	}
 

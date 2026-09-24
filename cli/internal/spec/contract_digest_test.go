@@ -42,6 +42,21 @@ func TestContractDigestIgnoresCheckboxTicks(t *testing.T) {
 	}
 }
 
+// Ordered-list checkboxes are bookkeeping too: 9 occurrences across specs/
+// on 2026-09-23 (SDD-042 review, finding 1). Ticking one must not read as
+// contract drift and refuse an archive.
+func TestContractDigestIgnoresOrderedListTicks(t *testing.T) {
+	a := digestOf(t, map[string]string{"tasks.md": "1. [ ] first\n2) [ ] second\n  10. [ ] nested\n"})
+	b := digestOf(t, map[string]string{"tasks.md": "1. [x] first\n2) [X] second\n  10. [x] nested\n"})
+	if a["tasks.md"] != b["tasks.md"] {
+		t.Fatal("ticking an ordered-list checkbox changed the contract digest")
+	}
+	c := digestOf(t, map[string]string{"tasks.md": "1. [ ] first, reworded\n2) [ ] second\n  10. [ ] nested\n"})
+	if a["tasks.md"] == c["tasks.md"] {
+		t.Fatal("rewording an ordered-list task must still change the digest")
+	}
+}
+
 // The fold is for list checkboxes only: a bracketed x in running text is text.
 func TestContractDigestKeepsBracketsInProse(t *testing.T) {
 	a := digestOf(t, map[string]string{"proposal.md": "the flag [ ] means off\n"})

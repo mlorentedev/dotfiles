@@ -33,8 +33,9 @@ func ContractDigests(specDir string) map[string]string {
 	return digests
 }
 
-// listCheckbox matches the marker of a markdown list checkbox, at any depth.
-var listCheckbox = regexp.MustCompile(`(?m)^(\s*[-*+]\s+)\[[ xX]\]`)
+// listCheckbox matches the marker of a markdown list checkbox, bulleted or
+// ordered (`1.` / `1)`), at any depth.
+var listCheckbox = regexp.MustCompile(`(?m)^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\]`)
 
 // harnessFeatureFields are the features.json fields the harness writes after a
 // review (a feature's lifecycle state and the output that proved it). They are
