@@ -90,8 +90,38 @@ Nothing was applied.
       family; recorded here rather than as a new lesson.
 - [ ] ADR? No. It extends CLI-080 within ADR-028.
 
+## Adversarial review — disposition
+
+The first run (`nan/qwen3.8-flash`, launched against `3672a0d`) ended after about
+64 minutes on HTTP 429 from NaN (`max_parallel_requests` 7/7). It wrote no verdict
+and left its transient mutation harness in the worktree, which was moved out of
+the tree unread before the relaunch (#1642). The relaunch used
+`agy/gemini-3.1-pro-high`, the one pool member not on NaN, against `6d5fcf5`.
+
+`review.md`: **PASS**, `agy/gemini-3.1-pro-high`, reviewed `6d5fcf5`, committed
+verbatim. **Disclosed: it is a thin review.** It took about 3 minutes, and its text
+records no test or mutation run of its own. The mutation evidence for this spec
+is the 21/21 battery above and the read-only live plan.
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Minor (THEORETICAL) | `checkRetired` accepts a whitespace-only item name | **Ticketed** (#1624): it touches code, and code is not changed after a passing verdict. The effect is benign: the plan reports the item gone. |
+| Minor (THEORETICAL) | An empty source with an empty destination blocks as `destination empty` | **Declined.** An empty destination must never let a source be deleted, and an item left with nothing is removed through `retired:` (`delete-item`), not through a retire. |
+
+**Not archived in this PR, deliberately.** The spec gate accepts an archive only
+from a PR that closes the spec's issue (SDD-038), and #1624 stays open for its
+other items. CLI-082 archives with the PR that closes #1624.
+
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved to `specs/archive/CLI-082-reconcile-dedupe/`
 - [ ] Independent adversarial review passed (reviewer != implementer)
+
+## After merge (data)
+
+Applied on 2026-09-24 with the owner's approval per write, a DR escrow first, and plan before apply (#1648):
+- the three verified-equal retires (`OPEN ROUTER API KEY`, `POLLEX_API_KEY`, `pypi.org`), then the two items they emptied;
+- `github-cli-pat`, and the three items #1640 retired.
+
+Final plan: 0 to apply, 0 blocked, 0 deferred. The pairs that remained are CLI-083's: the NaN copy (multi-var `bw.from`), and the dead Stripe, Tailscale and Hetzner fields.

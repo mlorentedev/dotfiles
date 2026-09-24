@@ -342,8 +342,52 @@ retired:
 		t.Fatal("the retired item is still in the vault")
 	}
 	out, _ = runReconcile(t, v, reg)
-	if !strings.Contains(out, "retired item github-cli-pat is gone") {
+	if !strings.Contains(out, "retired github-cli-pat is gone") {
 		t.Errorf("a deleted retired item must be reported removable:\n%s", out)
+	}
+	if strings.Contains(out, "PLANTED") {
+		t.Fatal("a value reached the output")
+	}
+}
+
+// CLI-083 AC2 + AC5: a retired field is shown with its reason and what the item
+// keeps, removed by --apply while the item stays, and reported gone next run.
+func TestReconcileDeletesARetiredField(t *testing.T) {
+	reg := `
+version: 1
+secrets:
+  - {id: STRIPE_API_KEY, plane: app, backend: bw, bw: {item: stripe-api-key, field: api-key, folder: Dotfiles/apps}, expose: {env: STRIPE_API_KEY}}
+retired:
+  - {item: Stripe, field: backup-codes, reason: superseded by a regeneration}
+`
+	v := newFakeVault()
+	v.folders["f1"] = "Dotfiles/apps"
+	v.items["stripe-api-key"], v.items["Stripe"] = "f1", ""
+	v.fields["stripe-api-key"] = map[string]string{"api-key": "PLANTED-live"}
+	v.fields["Stripe"] = map[string]string{"backup-codes": "PLANTED-dead", "recovery": "PLANTED-kept"}
+
+	out, err := runReconcile(t, v, reg)
+	if err != nil {
+		t.Fatalf("plan: %v\n%s", err, out)
+	}
+	for _, want := range []string{"delete-field", "Stripe", `"backup-codes"`, "keeps: fields recovery", "superseded by a regeneration"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plan output missing %q:\n%s", want, out)
+		}
+	}
+	out, err = runReconcile(t, v, reg, "--apply")
+	if err != nil || !strings.Contains(out, "Converged") {
+		t.Fatalf("apply must remove the field and converge: %v\n%s", err, out)
+	}
+	if _, still := v.fields["Stripe"]["backup-codes"]; still {
+		t.Fatal("the retired field is still in the vault")
+	}
+	if _, kept := v.fields["Stripe"]["recovery"]; !kept || v.items["Stripe"] != "" {
+		t.Fatal("a field retire must leave the item and its other fields alone")
+	}
+	out, _ = runReconcile(t, v, reg)
+	if !strings.Contains(out, "retired Stripe/backup-codes is gone") {
+		t.Errorf("a removed retired field must be reported removable:\n%s", out)
 	}
 	if strings.Contains(out, "PLANTED") {
 		t.Fatal("a value reached the output")

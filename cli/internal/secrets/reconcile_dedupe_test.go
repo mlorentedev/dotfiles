@@ -120,6 +120,7 @@ func TestRegistryValidatesRetiredItems(t *testing.T) {
 	bad := map[string]string{
 		"no reason":            "retired:\n  - {item: husk}\n",
 		"no item":              "retired:\n  - {reason: why}\n",
+		"a blank item":         "retired:\n  - {item: \"  \", reason: why}\n",
 		"listed twice":         "retired:\n  - {item: husk, reason: a}\n  - {item: husk, reason: b}\n",
 		"still a bw.item":      "retired:\n  - {item: kept, reason: why}\n",
 		"still a bw.from.item": "retired:\n  - {item: legacy, reason: why}\n",

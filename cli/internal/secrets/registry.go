@@ -36,10 +36,28 @@ type Registry struct {
 
 // RetiredItem is one item the registry retires, and why. The reason is required:
 // an entry that deletes a credential has to say what made that safe.
+//
+// With a Field it retires that one field and the item stays (CLI-083): a legacy
+// value that is dead rather than equal to a copy, which retire: true cannot
+// remove because it removes only what it verified equal.
 type RetiredItem struct {
 	Item   string `yaml:"item"`
+	Field  string `yaml:"field"`
 	Reason string `yaml:"reason"`
 }
+
+// label names the entry in plan output: the item, or the item and its field.
+func (r RetiredItem) label() string {
+	if r.Field == "" {
+		return r.Item
+	}
+	return r.Item + "/" + r.Field
+}
+
+// fieldKey keys an item and field in a map. Not label(): item names may contain
+// "/" (the store holds some), so item "a/b" field "c" and item "a" field "b/c"
+// would collide on it.
+func fieldKey(item, field string) string { return item + "\x00" + field }
 
 // Secret is one registry entry. Age is the base name under sensitive/ (no
 // .secret.age) used as the source for age/age-offline backends, unless an
@@ -297,35 +315,80 @@ func ParseRegistryPartial(data []byte) (*Registry, []SecretDefect, error) {
 	return &reg, defects, nil
 }
 
-// checkRetired refuses a retired: list that is malformed, and one that retires an
-// item a declaration still uses, as bw.item or as bw.from.item. That second
-// check is static, so it belongs here, where CI runs it, rather than in a plan.
-// It reads every declaration, defective ones included: a secret being fixed still
-// means someone intends to use its item.
+// checkRetired refuses a retired: list that is malformed, and one that retires
+// what a declaration still uses: a whole item it names as bw.item or
+// bw.from.item, or a field it reads as a destination or a bw.from source. That is
+// static, so it belongs here, where CI runs it, rather than in a plan. It reads
+// every declaration, defective ones included: a secret being fixed still means
+// someone intends to use its item.
 func checkRetired(retired []RetiredItem, all []Secret) error {
-	named := map[string]string{}
-	for _, s := range all {
+	uses := declaredUses(all)
+	whole := map[string]bool{}
+	withField := map[string]bool{}
+	seen := map[string]bool{}
+	for i, r := range retired {
+		if err := checkRetiredEntry(i, r, uses); err != nil {
+			return err
+		}
+		switch {
+		case seen[fieldKey(r.Item, r.Field)]:
+			return fmt.Errorf("retired: %q is listed twice", r.label())
+		case r.Field == "" && withField[r.Item], r.Field != "" && whole[r.Item]:
+			return fmt.Errorf("retired: item %q is retired whole and by field; keep one", r.Item)
+		}
+		seen[fieldKey(r.Item, r.Field)] = true
+		if r.Field == "" {
+			whole[r.Item] = true
+		} else {
+			withField[r.Item] = true
+		}
+	}
+	return nil
+}
+
+// retiredLoginFields are refused as a retired field: they are an account's login,
+// not a legacy copy, and their presence cannot be read without the value (see
+// ItemSummary), so a plan could not show whether there is anything to remove.
+var retiredLoginFields = map[string]bool{"username": true, "password": true}
+
+// checkRetiredEntry validates one entry against what the declarations use.
+func checkRetiredEntry(i int, r RetiredItem, uses retiredUses) error {
+	switch {
+	case strings.TrimSpace(r.Item) == "" || strings.TrimSpace(r.Reason) == "":
+		return fmt.Errorf("retired[%d]: an entry needs both item and reason", i)
+	case r.Field != "" && strings.TrimSpace(r.Field) == "":
+		return fmt.Errorf("retired[%d]: field %q is blank", i, r.Field)
+	case retiredLoginFields[r.Field]:
+		return fmt.Errorf("retired: %q is an account's login, which retired: never removes", r.label())
+	case r.Field == "" && uses.items[r.Item] != "":
+		return fmt.Errorf("retired: item %q is still used by secret %q; drop it from that declaration first", r.Item, uses.items[r.Item])
+	case r.Field != "" && uses.fields[fieldKey(r.Item, r.Field)] != "":
+		return fmt.Errorf("retired: %q is still read by secret %q; drop it from that declaration first", r.label(), uses.fields[fieldKey(r.Item, r.Field)])
+	}
+	return nil
+}
+
+// retiredUses is what the declarations use, keyed for checkRetiredEntry: every
+// item they name, and every item/field they read.
+type retiredUses struct{ items, fields map[string]string }
+
+func declaredUses(all []Secret) retiredUses {
+	u := retiredUses{items: map[string]string{}, fields: map[string]string{}}
+	for i := range all {
+		s := &all[i]
 		if s.BW == nil {
 			continue
 		}
-		named[s.BW.Item] = s.ID
+		u.items[s.BW.Item] = s.ID
+		for _, f := range s.bwFields() {
+			u.fields[fieldKey(s.BW.Item, f)] = s.ID
+		}
 		if s.BW.From != nil {
-			named[s.BW.From.Item] = s.ID
+			u.items[s.BW.From.Item] = s.ID
+			u.fields[fieldKey(s.BW.From.Item, s.BW.From.Field)] = s.ID
 		}
 	}
-	seen := map[string]bool{}
-	for i, r := range retired {
-		switch {
-		case r.Item == "" || strings.TrimSpace(r.Reason) == "":
-			return fmt.Errorf("retired[%d]: an entry needs both item and reason", i)
-		case seen[r.Item]:
-			return fmt.Errorf("retired: item %q is listed twice", r.Item)
-		case named[r.Item] != "":
-			return fmt.Errorf("retired: item %q is still used by secret %q; drop it from that declaration first", r.Item, named[r.Item])
-		}
-		seen[r.Item] = true
-	}
-	return nil
+	return u
 }
 
 // secretLabel names a secret for a defect message, falling back to its position when
@@ -428,25 +491,41 @@ func checkBWFrom(s *Secret) error {
 	if err := checkBwName(s.ID, "from.field", f.Field); err != nil {
 		return err
 	}
-	// A multi-var secret declares one item and a field per var, so a single source
-	// cannot say which of them it fills.
-	if len(s.Expose.Env.Vars) > 1 {
-		return fmt.Errorf("secret %q: bw.from is not supported on a multi-var secret (one source cannot fill %d fields)",
-			s.ID, len(s.Expose.Env.Vars))
+	// A multi-var secret declares one item and a field per var. When the vars read
+	// different fields, a single source cannot say which of them it fills. When
+	// they all read one field (NAN_API_KEY and HIVE_WORKER_API_KEY), there is one
+	// field to fill, and the planner plans it once per secret (CLI-083).
+	fields := s.bwFields()
+	if len(fields) > 1 {
+		return fmt.Errorf("secret %q: bw.from is not supported on a multi-var secret whose vars read different fields (one source cannot fill %d fields)",
+			s.ID, len(fields))
 	}
-	if f.Item == s.BW.Item && f.Field == s.bwDestField() {
+	if f.Item == s.BW.Item && f.Field == fields[0] {
 		return fmt.Errorf("secret %q: bw.from %s/%s is its own destination", s.ID, f.Item, f.Field)
 	}
 	return nil
 }
 
-// bwDestField is the field a single-target secret resolves from: a lone env var's
-// own override when it has one, else the secret-level field.
-func (s *Secret) bwDestField() string {
-	if len(s.Expose.Env.Vars) == 1 && s.Expose.Env.Vars[0].Field != "" {
-		return s.Expose.Env.Vars[0].Field
+// bwFields is the set of fields a secret's vars resolve from, in declaration
+// order: the secret-level field unless a var overrides it, and the secret-level
+// field for a file secret.
+func (s *Secret) bwFields() []string {
+	if s.Expose.File != nil || len(s.Expose.Env.Vars) == 0 {
+		return []string{s.BW.Field}
 	}
-	return s.BW.Field
+	var out []string
+	seen := map[string]bool{}
+	for _, v := range s.Expose.Env.Vars {
+		f := v.Field
+		if f == "" {
+			f = s.BW.Field
+		}
+		if !seen[f] {
+			seen[f] = true
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 func checkBWFolder(s *Secret) error {
