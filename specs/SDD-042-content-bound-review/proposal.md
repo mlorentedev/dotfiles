@@ -1,7 +1,7 @@
 ---
 id: "SDD-042-content-bound-review"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-09-23"
 issue: "mlorentedev/dotfiles#1566"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, sdd, archive-gate, review]
@@ -108,25 +108,25 @@ trusting commit messages.
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `gorun ./internal/spec/... 'Stale|Squash|Rebase'` passes with
+- [x] **AC1** — `gorun ./internal/spec/... 'Stale|Squash|Rebase'` passes with
   at least one test run. Real-git fixtures, each built from a review launched
   on a branch commit:
   - a squash landing on `main`, the branch deleted and its objects pruned, is **accepted**;
   - a rebase landing is **accepted**;
   - a merge-commit landing is **accepted**;
   - a post-review edit to an acceptance criterion's text is **refused**, naming `proposal.md`.
-- [ ] **AC2** — Ticking checkboxes in `proposal.md`/`tasks.md` and the harness
+- [x] **AC2** — Ticking checkboxes in `proposal.md`/`tasks.md` and the harness
   setting `state`/`evidence` in `features.json` after the review leave it
   **fresh**. A CRLF-only difference leaves it fresh.
-- [ ] **AC3** — A legacy review (no `contract_digests`) whose `reviewed_sha` is
+- [x] **AC3** — A legacy review (no `contract_digests`) whose `reviewed_sha` is
   absent from the object store is refused with a message naming the absent
   object and the missing digests, distinct from the "file changed" message.
-- [ ] **AC4** — `--force-without-review` or `--force-with-drafts` without
+- [x] **AC4** — `--force-without-review` or `--force-with-drafts` without
   `--reason` is refused. With `--reason`, the archived `proposal.md` carries
   exactly one `review_bypass:` line naming the flags, what the gate would have
   refused (or "nothing"), the reason and the date, and
   `grep -l '^review_bypass:'` finds it.
-- [ ] **AC5** — No refusal from the tag pre-flight or the review gate names
+- [x] **AC5** — No refusal from the tag pre-flight or the review gate names
   `--force-without-review` or `--force-with-drafts`. A test asserts this over
   every refusal path.
 - [ ] **AC6** — `dotf spec review` writes `contract_digests` into
