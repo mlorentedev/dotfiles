@@ -84,7 +84,7 @@
 | **SSH Key - Dell Work** | SSH Key (5) | — | infra | — | net-new |
 | **grafana/status.kubelab.live** | login | — | infra | — | dashboards |
 
-### age secrets NOT yet in bw → migrate TO bw
+### age secrets that were not in bw (June 2026) → migrated
 Done for every one listed here in June (`cloudflare.api-token`, `chatgpt.api-key`, `youtube.api-key`, `beehiiv.api-key` and `.dns-records`, the ChatGPT and Gmail codes, `kubelab.kubeconfig`): on 2026-09-23 each is `backend: bw` in the registry. Still age-backed on that date: `ZOHO_APP_PASSWORDS` and `ZOHO_RECOVERY_CODE` (personal, with dormant `bw:` blocks), and the floor. `dotf secrets ls` prints the live backend of each.
 
 ### Stays in age (floor — never only-in-bw)

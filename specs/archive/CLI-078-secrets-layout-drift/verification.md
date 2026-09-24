@@ -103,10 +103,14 @@ reverted (3 mutations, 3 killed).
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to `specs/archive/CLI-078-secrets-layout-drift/`
-- [ ] Bitácora `#1596` closed with the PR link (ADR-018)
-- [ ] Independent adversarial review passed (reviewer != implementer)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to `specs/archive/CLI-078-secrets-layout-drift/`
+- [ ] Bitácora `#1596` closed with the PR link (ADR-018). **Deliberately not
+      closed.** This spec and CLI-080 deliver the layout half of #1596. Its
+      rotation-age and stale-CI problems are still open, so the issue was reopened
+      on 2026-09-23 and the archive PR references it without closing it.
+- [x] Independent adversarial review passed (reviewer != implementer): round 5,
+      `nan/mimo-v2.5`, reviewed `0c10f0b`
 
 ## Adversarial review, round 1 — disposition
 
@@ -213,3 +217,18 @@ drift calling `MoveItem`, drift growing `--fix`, and `item-folder-unknown`
 raised for a declaration that governs no placement. The whole module, the pinned
 linter (v2.12.2, 0 issues), `GOOS=windows go vet`, CLI-078 f1–f9 (9/9) and
 CLI-080 f1–f10 (10/10) are green.
+
+## Adversarial review, round 5 — disposition
+
+`review.md` round 5: **PASS**, `nan/mimo-v2.5` (a fifth model family across five
+rounds), reviewed `0c10f0b`, committed verbatim (`c8a1acc`). It re-ran the module,
+the linter, `GOOS=windows go vet` and f1–f9 (9/9), and reopened three round-4
+defects by mutation, all killed. Its other round-4 closures were read from the
+tests rather than mutated; this file's round-4 battery (12/12) is the mutation
+evidence for those. No findings; three observations:
+
+| Observation | Disposition |
+|---|---|
+| `ItemSummary.Revised` is never read | **Declined, no ticket.** Its consumer is #1596's rotation-age slice, which is open. The review attributes it to CLI-080; that spec does not read it either. |
+| The inventory's "NOT yet in bw" heading contradicts its body | **Applied.** Now "age secrets that were not in bw (June 2026) → migrated". Docs only, after the verdict. |
+| Nothing runs `drift` in CI or a hook | **Declined**, as in round 4 (question 3): CI has no unlocked daemon, and a scheduled run belongs with #1596's staleness slice. |

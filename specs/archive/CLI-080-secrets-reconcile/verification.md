@@ -203,6 +203,10 @@ stands. CLI-078's round 5 reviews the diff that carries them.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to `specs/archive/CLI-080-secrets-reconcile/`
-- [ ] Independent adversarial review passed (reviewer != implementer)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to `specs/archive/CLI-080-secrets-reconcile/`
+- [x] Independent adversarial review passed (reviewer != implementer): round 2,
+      `nan/glm5.3-flash`, reviewed `5fd4de6`. The code it took afterwards is
+      declared above and was reviewed within CLI-078's round 5 (PASS, `0c10f0b`).
+- [ ] #1596 closed. **Deliberately not**: it stays open for rotation age and stale
+      CI consumers, which neither spec delivers.
