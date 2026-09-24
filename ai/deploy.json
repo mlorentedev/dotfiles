@@ -62,6 +62,14 @@
       "mode": "0600"
     },
     {
+      "name": "pi-mcp",
+      "src": "ai/pi/mcp.json",
+      "dst": "{HOME}/.pi/agent/mcp.json",
+      "render": false,
+      "mode": "0644",
+      "requires": "pi"
+    },
+    {
       "name": "orca-keybindings",
       "src": "ai/orca/keybindings.json",
       "dst": "{HOME}/.orca/keybindings.json",

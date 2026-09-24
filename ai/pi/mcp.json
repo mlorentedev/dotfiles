@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "hive": {
+      "command": "hive",
+      "args": [
+        "client"
+      ]
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking@2026.8.31"
+      ]
+    }
+  }
+}
