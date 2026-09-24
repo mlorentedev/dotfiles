@@ -200,6 +200,25 @@ func TestPlanBlocksAnAmbiguousDestination(t *testing.T) {
 	}
 }
 
+// An item whose current folder the store cannot name is never moved. Moving it
+// would act on a stale folder list, and the move's ResolveFolder could create a
+// second folder of a name that already exists (CLI-078 review round 4).
+func TestPlanBlocksAnItemWhoseFolderItCannotName(t *testing.T) {
+	stale := item("dockerhub", "", "PAT")
+	stale.FolderUnresolved = true
+	p := PlanReconcile(
+		[]BWDecl{decl("D", "dockerhub", "PAT", "Dotfiles/apps", false)},
+		[]ItemSummary{stale},
+		[]string{"Dotfiles/apps"},
+	)
+	if len(p.Ops) != 0 || len(p.Blocked) != 1 {
+		t.Fatalf("want one blocker and no ops, got ops %v blocked %+v", opKinds(p), p.Blocked)
+	}
+	if b := p.Blocked[0]; b.Secret != "D" || !strings.Contains(b.Remedy, "sync") {
+		t.Errorf("the blocker must name the secret and say to sync: %+v", b)
+	}
+}
+
 // The fallback: a finding kind the planner has no case for blocks rather than
 // vanishing, so a new drift kind cannot make a store read as converged.
 func TestPlanBlocksAFindingKindItDoesNotKnow(t *testing.T) {

@@ -24,13 +24,15 @@ created: "2026-09-21"
       resolution paths
 - [x] [AC5] One finding per problem, deduped for both missing and misfiled
 - [x] [AC8] `dotf secrets drift`, read-only, non-zero on findings
+- [x] [AC9] Sync before reading, shared with `reconcile`; an unresolved folder id
+      is its own finding, and reconcile blocks on it (review round 4)
 - [x] Derive the ratified-taxonomy error message from the set instead of repeating
       it — it named "(apps, infra)" and went on saying so after the set moved
 
 ## Closing
 
 - [x] Every AC covered by at least one test
-- [x] Every AC has a `features.json` entry with a non-vacuous command; 8/8 run green
+- [x] Every AC has a `features.json` entry with a non-vacuous command; 9/9 run green
 - [x] `go build` / `go vet` / `GOOS=windows go vet` clean
 - [x] `golangci-lint run` at the pinned v2.12.2 — 0 issues
 - [x] Whole module green
