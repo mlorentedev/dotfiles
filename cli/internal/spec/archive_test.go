@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -526,43 +525,50 @@ func TestDraftTagInProposalStillBlocksAfterReview(t *testing.T) {
 // spec folder (filepath.Join(specDir, X) or filepath.Join(…, specID, X)) must
 // be declared review state, or be one of the files the author writes.
 func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, e.Name(), nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, f)
+	}
 	consts := map[string]string{} // package-level string constants
 	var joined []string           // identifiers joined under a spec folder
-	for _, pkg := range pkgs {
-		for _, f := range pkg.Files {
-			ast.Inspect(f, func(n ast.Node) bool {
-				switch x := n.(type) {
-				case *ast.ValueSpec:
-					for i, name := range x.Names {
-						if i < len(x.Values) {
-							if lit, ok := x.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
-								consts[name.Name] = strings.Trim(lit.Value, "\"`")
-							}
-						}
-					}
-				case *ast.CallExpr:
-					if sel, ok := x.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Join" && len(x.Args) >= 2 {
-						underSpec := false
-						for _, a := range x.Args[:len(x.Args)-1] {
-							if id, ok := a.(*ast.Ident); ok && (id.Name == "specDir" || id.Name == "specID") {
-								underSpec = true
-							}
-						}
-						if last, ok := x.Args[len(x.Args)-1].(*ast.Ident); ok && underSpec {
-							joined = append(joined, last.Name)
+	for _, f := range files {
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch x := n.(type) {
+			case *ast.ValueSpec:
+				for i, name := range x.Names {
+					if i < len(x.Values) {
+						if lit, ok := x.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							consts[name.Name] = strings.Trim(lit.Value, "\"`")
 						}
 					}
 				}
-				return true
-			})
-		}
+			case *ast.CallExpr:
+				if sel, ok := x.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Join" && len(x.Args) >= 2 {
+					underSpec := false
+					for _, a := range x.Args[:len(x.Args)-1] {
+						if id, ok := a.(*ast.Ident); ok && (id.Name == "specDir" || id.Name == "specID") {
+							underSpec = true
+						}
+					}
+					if last, ok := x.Args[len(x.Args)-1].(*ast.Ident); ok && underSpec {
+						joined = append(joined, last.Name)
+					}
+				}
+			}
+			return true
+		})
 	}
 	authored := map[string]bool{"proposal.md": true, "tasks.md": true, "verification.md": true, "features.json": true}
 	checked := 0
