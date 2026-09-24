@@ -117,3 +117,11 @@ other items. CLI-082 archives with the PR that closes #1624.
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved to `specs/archive/CLI-082-reconcile-dedupe/`
 - [ ] Independent adversarial review passed (reviewer != implementer)
+
+## After merge (data)
+
+Applied on 2026-09-24 with the owner's approval per write, a DR escrow first, and plan before apply (#1648):
+- the three verified-equal retires (`OPEN ROUTER API KEY`, `POLLEX_API_KEY`, `pypi.org`), then the two items they emptied;
+- `github-cli-pat`, and the three items #1640 retired.
+
+Final plan: 0 to apply, 0 blocked, 0 deferred. The pairs that remained are CLI-083's: the NaN copy (multi-var `bw.from`), and the dead Stripe, Tailscale and Hetzner fields.

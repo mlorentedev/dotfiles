@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-083-reconcile-retire-field-f1",
+    "behavior": "AC1 — the registry accepts a retired field and refuses blank names, login fields, a field a declaration reads, duplicates, and a field on an item retired whole",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestRegistryValidatesRetiredItems$|^TestRegistryValidatesRetiredFields$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-083-reconcile-retire-field-f2",
+    "behavior": "AC2 — a retired field is planned last with its reason and what the item keeps, reported gone when absent, blocked when ambiguous, and removed on apply",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestPlanRetiredFields$|^TestApplyDeletesARetiredField$|^TestReconcileDeletesARetiredField$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 3",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-083-reconcile-retire-field-f3",
+    "behavior": "AC3 — bw.from is accepted on a multi-var secret over one field and plans one operation; refused when the fields differ",
+    "verification": "cd cli && go test ./internal/secrets/ -run '^TestBWFromOnAMultiVarSecret$|^TestPlanMultiVarFromPlansOnce$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-083-reconcile-retire-field-f4",
+    "behavior": "AC4 — sync ci uploads a name given twice only once",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestScopeUploadDedupesNames$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-083-reconcile-retire-field-f5",
+    "behavior": "AC5 — no planted value reaches the plan or apply output on the delete-field path",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestPlanRetiredFields$|^TestReconcileDeletesARetiredField$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  }
+]

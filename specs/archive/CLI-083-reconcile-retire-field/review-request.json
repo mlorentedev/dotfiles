@@ -1,0 +1,12 @@
+{
+  "reviewed_sha": "2fc33d35605a84f75546a351bfeba179512ceb85",
+  "reviewer": "nan/mimo-v2.5",
+  "requested_at": "2026-09-24T03:29:13Z",
+  "review_digest_before": "",
+  "base_sha": "ee533070f4af65b2340907d3ba07ece30535bdee",
+  "contract_digests": {
+    "features.json": "76a3ab890bf9c4ce3a89bd58e924d13bbdeca170e62af1051b60faa83c827fd5",
+    "proposal.md": "1f14234e07ecda7b254853f0a4504d00f4b5f58d67167d7af4c21b9629c3620b",
+    "tasks.md": "b54c932ab83aa9729226969d307a7bccc40e4c262d77f73566ec1b72620e3200"
+  }
+}
