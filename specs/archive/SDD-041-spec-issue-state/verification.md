@@ -58,6 +58,18 @@ Live audit of this repo (`dotf spec audit`, 2.3 s wall): 42 active specs, 27 ok,
   - #1358 (CLI-073): doctor calls a worktree "not a git checkout" because `.git` is a file there. Seen when running the dev doctor against this worktree.
   - #1251 (DX-010): `git checkout -- <file>` runs pre-commit, which stashes and restores unstaged edits.
 
+## Review dispositions
+
+The reviewer was `nan/mimo-v2.5`, drawn from the pool by `dotf spec review`. It reviewed `721195b` and returned **PASS**, with 3 Minor findings, all THEORETICAL.
+
+- **Disclosure: the review is shallow.** It took about two minutes. The reviewer ran the build, vet, the targeted and full test suites and the pinned linter, and it read the production files and tests. It ran **no mutation of its own**. Its "12/12 killed" is copied from this file, not re-measured. Its evidence therefore confirms the suite passes. It does not independently test whether the suite can fail. Reviewer calibration is an §8.2 follow-up of #1625.
+
+| # | Finding | Disposition | Reason |
+|---|---|---|---|
+| M1 | `issueRefPattern` accepts dots in owner and repo names | skip | GitHub repo names allow dots (`user.github.io`), so `[\w.-]+` is correct for the repo segment. A dotted owner cannot exist, and a ref with one fails the owner filter (prose) or returns 404 (frontmatter), both of which surface. |
+| M2 | Two timeout constants (20 s audit, 15 s doctor) | skip | Intentional. Doctor ends `setup-linux.sh` and has a tighter budget than the standalone command. Each constant is documented where it is declared. |
+| M3 | Doctor maps unanswerable to WARN while the audit exits non-zero | skip | Intentional, and pinned by `TestCheckSpecIssueState/an_unanswerable_lookup_is_a_WARN,_never_a_PASS`. Both are "never PASS". Doctor keeps FAIL for answers that are bad, and the audit's exit code is its whole contract. |
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? **yes**: lesson-287, "a guard that skips is a guard that passes" (the vacuous `RepoRoot(".")` skip, next to the `gorun` rule).
@@ -66,7 +78,7 @@ Live audit of this repo (`dotf spec audit`, 2.3 s wall): 42 active specs, 27 ok,
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/SDD-041-spec-issue-state/` -> `specs/archive/SDD-041-spec-issue-state/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/SDD-041-spec-issue-state/` -> `specs/archive/SDD-041-spec-issue-state/`
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018) — happens on merge, via `Closes #1087`
+- [x] Promotions above executed (lesson-287, in this PR)
