@@ -38,9 +38,14 @@ func TestArchiveBlocksOnMissingReview(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected a missing review.md to block the archive")
 	}
-	// The error must name the artifact and BOTH declared escapes, so the human
-	// never has to read the source to learn how to proceed.
-	for _, want := range []string{"review.md", "review: waived", "--force-without-review"} {
+	// The error must name the artifact and the declared recovery path, so the
+	// human never has to read the source to learn how to proceed — and, since
+	// SDD-042, never the bypass flag, which --help documents and the archive
+	// records (TestArchiveRefusalsNameNoBypassFlag).
+	if strings.Contains(err.Error(), "--force-without-review") {
+		t.Errorf("a refusal must not advertise the bypass flag, got: %v", err)
+	}
+	for _, want := range []string{"review.md", "review: waived"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should mention %q, got: %v", want, err)
 		}
@@ -208,7 +213,7 @@ func TestArchiveForceWithoutReview(t *testing.T) {
 	root := t.TempDir()
 	archivableSpec(t, root, "AI-001-x", "")
 
-	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true}); err != nil {
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true, BypassReason: "test"}); err != nil {
 		t.Fatalf("force-without-review should archive despite no review: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "specs", "archive", "AI-001-x", "proposal.md")); err != nil {
@@ -222,8 +227,14 @@ func TestArchiveForceWithoutReviewOverridesFail(t *testing.T) {
 	root := t.TempDir()
 	archivableSpec(t, root, "AI-001-x", "---\nspec: \"AI-001-x\"\nverdict: \"FAIL\"\nreviewed_sha: \"abc\"\n---\n")
 
-	if _, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true}); err != nil {
+	target, err := Archive(root, "AI-001-x", ArchiveOptions{ForceWithoutReview: true, BypassReason: "test"})
+	if err != nil {
 		t.Fatalf("force-without-review should override a FAIL verdict: %v", err)
+	}
+	// SDD-042: the override is recorded as what it overrode — a FAIL, not a
+	// missing review, which is what the flag's name alone would suggest.
+	if got := frontmatterFields(readProposal(t, target))["review_bypass"]; !strings.Contains(got, "FAIL") {
+		t.Errorf("the bypass record must say it overrode a FAIL verdict, got %q", got)
 	}
 }
 
@@ -278,7 +289,10 @@ func TestStaleRefusalOffersTheExitThatKeepsTheReview(t *testing.T) {
 		t.Fatalf("the labels do not bracket the exit they describe (keeps=%d restore=%d discards=%d), got: %s",
 			keeps, restore, discards, msg)
 	}
-	for _, override := range []string{"re-run /adversarial-review", "review: waived", "--force-without-review"} {
+	if strings.Contains(msg, "--force-without-review") {
+		t.Fatalf("SDD-042: the refusal must not advertise the bypass flag, got: %s", msg)
+	}
+	for _, override := range []string{"re-run /adversarial-review", "review: waived"} {
 		at := strings.Index(msg, override)
 		if at < 0 {
 			t.Fatalf("refusal dropped the %q exit, got: %s", override, msg)
@@ -530,8 +544,10 @@ func TestGitStalenessUnresolvableShaIsStale(t *testing.T) {
 	if !known || !stale {
 		t.Fatalf("an unresolvable sha must be treated as stale (known=%v stale=%v)", known, stale)
 	}
-	if !strings.Contains(reason, "not a commit") {
-		t.Errorf("reason should say the sha is unknown, got %q", reason)
+	// SDD-042: say the object is absent and why that can happen, instead of
+	// guessing "rewritten by a rebase?" — squash-merge is the common cause here.
+	if !strings.Contains(reason, "not in this clone") || strings.Contains(reason, "rebase?") {
+		t.Errorf("reason should say the object is absent from this clone, without a rebase guess, got %q", reason)
 	}
 }
 
@@ -598,5 +614,26 @@ func TestParseReviewAcceptsASpacedVerdict(t *testing.T) {
 	}
 	if r.Verdict.Blocks() {
 		t.Error("a passing verdict must not block the archive over punctuation")
+	}
+}
+
+// SDD-042 writes a free-text reason into `review_bypass:`, so the reader must
+// honour the escapes the writer emits: in YAML a double-quoted scalar escapes
+// `"` and `\`, and a single-quoted one doubles `'`. Without this, a reason
+// containing a quote is silently truncated at it.
+func TestFrontmatterUnescapesQuotedValues(t *testing.T) {
+	f := frontmatterFields("---\n" +
+		`dq: "said \"shipped\" in C:\\tmp # not a comment"` + "\n" +
+		`sq: 'it''s done # still not a comment'` + "\n" +
+		`plain: "no escapes"   # trailing comment` + "\n---\n")
+	cases := map[string]string{
+		"dq":    `said "shipped" in C:\tmp # not a comment`,
+		"sq":    `it's done # still not a comment`,
+		"plain": "no escapes",
+	}
+	for k, want := range cases {
+		if got := f[k]; got != want {
+			t.Errorf("%s: got %q, want %q", k, got, want)
+		}
 	}
 }

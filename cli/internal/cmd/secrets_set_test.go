@@ -52,6 +52,9 @@ func (f *fakeWriter) RemoveField(item, field string) error {
 	return nil
 }
 
+// DeleteItem is never reached by set, migrate or rotate: only reconcile deletes.
+func (f *fakeWriter) DeleteItem(item string) error { panic("unexpected DeleteItem " + item) }
+
 func (f *fakeWriter) MoveItem(item, folderID string) error {
 	f.moved[item] = folderID
 	return nil

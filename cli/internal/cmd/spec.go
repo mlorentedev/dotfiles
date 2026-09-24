@@ -512,6 +512,7 @@ func newSpecArchiveCmd() *cobra.Command {
 		abandoned     bool
 		forceDrafts   bool
 		forceNoReview bool
+		reason        string
 	)
 
 	cmd := &cobra.Command{
@@ -521,10 +522,17 @@ func newSpecArchiveCmd() *cobra.Command {
 under --abandoned) and rewrite the proposal status to archived/abandoned.
 
 Mechanical only — the Go twin of scripts/archive-spec.sh. A pre-flight refuses to
-archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain (override
-with --force-with-drafts). A second pre-flight refuses without a fresh, passing
-review.md from /adversarial-review (override with --force-without-review, or
-declare "review: waived" with a reason in proposal.md). Vault promotion
+archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain. A second
+pre-flight refuses without a fresh, passing review.md from /adversarial-review, or
+a "review: waived" declaration with a reason in proposal.md. Freshness is decided
+by the content digests the review launcher recorded, so a squash-merge or rebase
+of the reviewed commit does not stale a review (SDD-042).
+
+--force-with-drafts and --force-without-review override those checks. Both
+require --reason, and an override is RECORDED: the archived proposal.md gains a
+review_bypass: line naming the flags, what the skipped check would have refused,
+the reason and the date. The checks still run, so the record says what was
+overridden, not merely which flag was typed. Vault promotion
 (lessons/ADR/pattern) and any backlog tick stay interactive via "/spec archive"
 in an agent.`,
 		Example:      "  dotf spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
@@ -546,6 +554,7 @@ in an agent.`,
 				Abandoned:          abandoned,
 				ForceWithDrafts:    forceDrafts,
 				ForceWithoutReview: forceNoReview,
+				BypassReason:       reason,
 				PRURL:              prURL,
 				Date:               now().Format("2006-01-02"),
 			})
@@ -574,7 +583,8 @@ in an agent.`,
 
 	cmd.Flags().StringVar(&prURL, "pr", "", "record this PR URL in proposal.md (informational)")
 	cmd.Flags().BoolVar(&abandoned, "abandoned", false, "route to specs/archive/_abandoned/ and set status abandoned")
-	cmd.Flags().BoolVar(&forceDrafts, "force-with-drafts", false, "archive even with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags")
-	cmd.Flags().BoolVar(&forceNoReview, "force-without-review", false, "archive even without a fresh, passing review.md")
+	cmd.Flags().BoolVar(&forceDrafts, "force-with-drafts", false, "archive even with unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags (requires --reason; recorded)")
+	cmd.Flags().BoolVar(&forceNoReview, "force-without-review", false, "archive even without a fresh, passing review.md (requires --reason; recorded)")
+	cmd.Flags().StringVar(&reason, "reason", "", "why a --force-* override is justified; recorded as review_bypass: in the archived proposal.md")
 	return cmd
 }

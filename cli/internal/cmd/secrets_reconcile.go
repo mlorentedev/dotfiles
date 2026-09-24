@@ -30,10 +30,14 @@ func newSecretsReconcileCmd() *cobra.Command {
 			"  create-folder  a declared folder no folder carries\n" +
 			"  move-item      an item outside its declared folder\n" +
 			"  create-item    an absent item, copied from its declared bw.from source\n" +
-			"  add-field      an absent field, copied from its declared bw.from source\n\n" +
+			"  add-field      an absent field, copied from its declared bw.from source\n" +
+			"  retire-source  a bw.from source with retire: true, once verified equal\n" +
+			"  delete-item    an item the registry lists under retired:, shown with its shape\n\n" +
 			"It never invents a value (an absent item with no bw.from is BLOCKED, with its\n" +
 			"remedy), never overwrites one (an existing field is left alone), never moves an\n" +
 			"item declared with no folder, and never prints a value.\n\n" +
+			"The plan reads the two values of every retire into memory to compare them,\n" +
+			"and prints only the verdict. A retire that is not verified equal blocks.\n\n" +
 			"A blocked finding makes the plan unappliable, whole. A dormant declaration\n" +
 			"with no source is DEFERRED to `dotf secrets migrate` and blocks nothing.\n\n" +
 			"--apply syncs, applies, syncs again and re-plans. A retire-source is planned\n" +
@@ -50,7 +54,7 @@ func newSecretsReconcileCmd() *cobra.Command {
 			decls := reg.BWDeclarations()
 			out := cmd.OutOrStdout()
 
-			plan, err := planFromStore(decls)
+			plan, err := planFromStore(decls, reg.Retired)
 			if err != nil {
 				return err
 			}
@@ -68,7 +72,7 @@ func newSecretsReconcileCmd() *cobra.Command {
 				return nil
 			}
 
-			return applyUntilConverged(out, decls, plan)
+			return applyUntilConverged(out, decls, reg.Retired, plan)
 		},
 	}
 	c.Flags().BoolVar(&apply, "apply", false, "perform the plan (default: print it and change nothing)")
@@ -98,7 +102,7 @@ const maxApplyPasses = 2
 // mutation that deleted that one condition turned a store that never converges
 // into an infinite loop: the test binary grew to 9 GB and the OOM killer took the
 // terminal host with it (lesson 286). A header bound survives any edit to the body.
-func applyUntilConverged(out io.Writer, decls []secrets.BWDecl, plan secrets.ReconcilePlan) error {
+func applyUntilConverged(out io.Writer, decls []secrets.BWDecl, retired []secrets.RetiredItem, plan secrets.ReconcilePlan) error {
 	applied := 0
 	for pass := 1; pass <= maxApplyPasses; pass++ {
 		_, _ = fmt.Fprintln(out)
@@ -110,7 +114,7 @@ func applyUntilConverged(out io.Writer, decls []secrets.BWDecl, plan secrets.Rec
 		}
 		applied += len(plan.Ops)
 
-		again, err := planFromStore(decls)
+		again, err := planFromStore(decls, retired)
 		if err != nil {
 			return fmt.Errorf("applied, but the verifying re-plan failed: %w", err)
 		}
@@ -143,13 +147,18 @@ func onlyRetires(p secrets.ReconcilePlan) bool {
 // planFromStore syncs, reads the inventory and plans.
 //
 // The sync (readInventory) is not optional: a plan computed on a stale inventory
-// would create a duplicate of any item made elsewhere since the last sync.
-func planFromStore(decls []secrets.BWDecl) (secrets.ReconcilePlan, error) {
+// would create a duplicate of any item made elsewhere since the last sync. Every
+// retire is then verified against the store's values (CLI-082), so the plan says
+// what the apply would do rather than leaving it to refuse.
+func planFromStore(decls []secrets.BWDecl, retired []secrets.RetiredItem) (secrets.ReconcilePlan, error) {
 	items, folders, err := readInventory()
 	if err != nil {
 		return secrets.ReconcilePlan{}, err
 	}
-	return secrets.PlanReconcile(decls, items, folders), nil
+	plan := secrets.PlanReconcile(decls, items, folders)
+	secrets.VerifyRetires(&plan, bwRead())
+	secrets.PlanRetiredItems(&plan, retired, items)
+	return plan, nil
 }
 
 // printPlan writes one line per operation and per note. Coordinates only: a plan
@@ -162,8 +171,10 @@ func printPlan(out io.Writer, p secrets.ReconcilePlan) {
 		case secrets.OpMoveItem:
 			_, _ = fmt.Fprintf(out, "~ %-14s %-24s %s -> %s\n", op.Kind, op.Item, folderLabel(op.Current), op.Folder)
 		case secrets.OpRetireSource:
-			_, _ = fmt.Fprintf(out, "- %-14s %-24s remove %s/%q, once verified equal to %s/%q\n",
+			_, _ = fmt.Fprintf(out, "- %-14s %-24s remove %s/%q, verified equal to %s/%q\n",
 				op.Kind, op.FromItem, op.FromItem, op.FromField, op.Item, op.Field)
+		case secrets.OpDeleteItem:
+			_, _ = fmt.Fprintf(out, "- %-14s %-24s holds: %s; retired: %s\n", op.Kind, op.Item, op.Shape, op.Reason)
 		default:
 			_, _ = fmt.Fprintf(out, "+ %-14s %-24s field %q in %s, copied from %s/%q\n",
 				op.Kind, op.Item, op.Field, folderLabel(op.Folder), op.FromItem, op.FromField)
@@ -182,6 +193,9 @@ func printPlan(out io.Writer, p secrets.ReconcilePlan) {
 func printSatisfied(out io.Writer, p secrets.ReconcilePlan) {
 	for _, id := range p.Satisfied {
 		_, _ = fmt.Fprintf(out, "note: bw.from on %s is satisfied; it can be removed from the registry\n", id)
+	}
+	for _, item := range p.RetiredGone {
+		_, _ = fmt.Fprintf(out, "note: retired item %s is gone; its entry can be removed from retired:\n", item)
 	}
 }
 

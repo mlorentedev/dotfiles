@@ -68,9 +68,33 @@ func TestSpecArchiveBlocksOnDrafts(t *testing.T) {
 		t.Errorf("archive must not be created when blocked")
 	}
 
-	// --force-with-drafts overrides.
-	if _, _, err := execute(t, "spec", "archive", "AI-001-x", "--force-with-drafts"); err != nil {
+	// --force-with-drafts overrides, and since SDD-042 only with a recorded
+	// reason: see TestArchiveBypassRecordedViaCLI.
+	if _, _, err := execute(t, "spec", "archive", "AI-001-x", "--force-with-drafts", "--reason", "test"); err != nil {
 		t.Errorf("force-with-drafts should archive: %v", err)
+	}
+}
+
+// SDD-042 AC4, end to end: the flag without --reason is refused and moves
+// nothing; with it, the archived proposal.md carries the review_bypass: record.
+func TestArchiveBypassRecordedViaCLI(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: draft\n---\n<!-- [AGENT-DRAFT] todo -->\n")
+
+	if _, _, err := execute(t, "spec", "archive", "AI-001-x", "--force-with-drafts"); err == nil || !strings.Contains(err.Error(), "--reason") {
+		t.Fatalf("a bypass without --reason must be refused, naming --reason: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "specs", "AI-001-x")); err != nil {
+		t.Fatalf("a refused bypass must move nothing: %v", err)
+	}
+
+	if _, _, err := execute(t, "spec", "archive", "AI-001-x", "--force-with-drafts", "--reason", "abandoned scaffold"); err != nil {
+		t.Fatalf("a reasoned bypass should archive: %v", err)
+	}
+	got := readFile(t, filepath.Join(root, "specs", "archive", "AI-001-x", "proposal.md"))
+	if !strings.Contains(got, "review_bypass: \"force-with-drafts; overrode: 1 unresolved draft tag(s); reason: abandoned scaffold; date: ") {
+		t.Errorf("archived proposal.md should carry the bypass record:\n%s", got)
 	}
 }
 
