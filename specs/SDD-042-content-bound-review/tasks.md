@@ -28,7 +28,7 @@ created: "2026-09-23"
 - [x] [AC4] Implement `BypassReason`, capture of the skipped check's refusal, frontmatter write; CLI `--reason`
 - [x] [AC5] Failing test: no refusal names a bypass flag → `TestArchiveRefusalsNameNoBypassFlag`; rewrite the messages
 - [x] Update `dotf spec archive --help`, and the skill signature (vault SSOT + `harness/skills/` render)
-- [ ] [AC6] Launch this spec's own review; its archive runs through the digest path
+- [x] [AC6] Launch this spec's own review; its archive runs through the digest path
 
 ## Closing
 

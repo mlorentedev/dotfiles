@@ -129,7 +129,7 @@ trusting commit messages.
 - [x] **AC5** — No refusal from the tag pre-flight or the review gate names
   `--force-without-review` or `--force-with-drafts`. A test asserts this over
   every refusal path.
-- [ ] **AC6** — `dotf spec review` writes `contract_digests` into
+- [x] **AC6** — `dotf spec review` writes `contract_digests` into
   `review-request.json`, and this spec's own archive is decided by them.
 
 ## References

@@ -24,7 +24,7 @@ All commands were run on 2026-09-23 in `dotfiles-wt-squash-aware-staleness` (bra
   - The test parses every string literal in the package (the one allowed site is `checkBypassRequest`) and also checks 5 real refusals by behaviour.
   - Red before the rewrite: 16 violations, 12 in the source and 4 by behaviour.
   - Three older tests encoded the previous contract ("the refusal names every escape"). They were updated deliberately to assert that the flag is absent.
-- [ ] **AC6**: see "Review" below. The review of this spec is launched through the new launcher, and its archive is decided by the digests.
+- [x] **AC6**: the review was launched with this branch's dev build (`go build ./cmd/dotf`). Its `review-request.json` records `contract_digests`, and the reviewer verified them key for key against a recomputation from disk. This spec's archive, run with the same build, is decided by those digests.
 
 ## Test status
 
@@ -46,6 +46,23 @@ All commands were run on 2026-09-23 in `dotfiles-wt-squash-aware-staleness` (bra
 - **Skill SSOT.** `harness/skills/{spec,adversarial-review}/SKILL.md` are generated (`generated_from: 00_meta/skills/…`). The edit went into the vault (knowledge `2db025b6`, direct to `master`), and the repo copies are the `compile-harness.sh --refresh` render.
 - **Merge order.** This branch is based on `main`. It will conflict with #1630 in `frontmatterFields`: #1630 adds `yamlCommentStart` to the unquoted branch, and this change edits the quoted branch. Resolve by keeping both.
 - **Out of scope, already ticketed:** #1154. `gofmt -l` lists 4 files on `main` (`internal/orca/orca.go`, …) and no linter enforces formatting. Re-measured and commented there.
+
+## Review dispositions
+
+The reviewer was `nan/glm5.3-flash`, drawn from the pool by this branch's launcher. It reviewed `12d3755` in about 15 minutes and returned **PASS**: no Blockers, 5 Minors, 1 Question.
+
+This review is substantive. It re-ran the build, vet, the full suite, lint and the 52 bats, and re-counted `tests_run=17`. It applied **4 compiling mutants of its own**, all killed, and it probed the normalisation with inputs of its own.
+
+| # | Finding | Disposition | Reason |
+|---|---|---|---|
+| 1 | Ordered-list checkboxes (`1. [ ]`) are not folded, so ticking one reads as drift | **apply** | Measured: 9 ordered-list checkboxes across `specs/`, so this is reachable, not theoretical. `listCheckbox` now also matches `\d+[.)]`. `TestContractDigestIgnoresOrderedListTicks` went red first, and it also pins that rewording an ordered task still changes the digest. |
+| 2 | Widening `contractFiles` (W3.6) would stale every digest-carrying review, and the message would misdescribe why | **defer to W3.6** (#1153) | This is a design decision for that spec: the policy for a missing key, and a message along the lines of "no recorded digest for this file". Carried into #1153 verbatim. |
+| 3 | The FAIL refusal says "not overridden", yet a recorded `--force-without-review` does override it | **apply** | The message is now "a FAIL is resolved by its findings: apply them in a follow-up, then re-review". It still names no bypass flag (AC5 test). |
+| 4 | The `unquoteScalar` comment shows a typographic quote | **apply** | Root cause: **gofmt** (Go ≥ 1.19) rewrites two apostrophes in a doc comment into `”`. The comment now describes the escape in words. |
+| 5 | `review-request.json` is untracked | **apply** | Committed together with `review.md`. |
+| Q | `--reason` without a `--force-*` flag is accepted silently | **skip** | A stray `--reason` grants nothing and records nothing, so rejecting it would add a refusal with no safety value. |
+
+The fixes for 1, 3 and 4 are code and comment changes made **after** the review (`fix(spec): fold ordered-list checkboxes too…`). Freshness is decided by the contract files, which none of the three touch.
 
 ## Promotion candidates
 
