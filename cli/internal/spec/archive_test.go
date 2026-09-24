@@ -543,6 +543,7 @@ func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
 	}
 	consts := map[string]string{} // package-level string constants
 	var joined []string           // identifiers joined under a spec folder
+	var literals []string         // string literals joined under a spec folder
 	for _, f := range files {
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch x := n.(type) {
@@ -562,8 +563,17 @@ func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
 							underSpec = true
 						}
 					}
-					if last, ok := x.Args[len(x.Args)-1].(*ast.Ident); ok && underSpec {
-						joined = append(joined, last.Name)
+					switch last := x.Args[len(x.Args)-1].(type) {
+					case *ast.Ident:
+						if underSpec {
+							joined = append(joined, last.Name)
+						}
+					case *ast.BasicLit:
+						// A path spelled as a literal must not slip past the
+						// check that a named constant would face (PR-Agent on #1631).
+						if underSpec && last.Kind == token.STRING {
+							literals = append(literals, strings.Trim(last.Value, "\"`"))
+						}
 					}
 				}
 			}
@@ -572,14 +582,16 @@ func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
 	}
 	authored := map[string]bool{"proposal.md": true, "tasks.md": true, "verification.md": true, "features.json": true}
 	checked := 0
+	names := literals
 	for _, id := range joined {
-		value, isConst := consts[id]
-		if !isConst {
-			continue // a loop variable or computed name, not a declared file
+		if value, isConst := consts[id]; isConst {
+			names = append(names, value) // a loop variable or computed name is skipped
 		}
+	}
+	for _, value := range names {
 		checked++
 		if !IsReviewState(value) && !authored[value] {
-			t.Errorf("%s (%q) is written under a spec folder but is neither review state nor an authored artifact — add it to ReviewStateFiles", id, value)
+			t.Errorf("%q is joined under a spec folder but is neither review state nor an authored artifact — add it to ReviewStateFiles", value)
 		}
 	}
 	if checked == 0 {
