@@ -756,18 +756,16 @@ var snippetWordSep = regexp.MustCompile(`[^a-z0-9_.-]+`)
 // snippetIntrospection reports the first introspection command a `-c` snippet
 // runs as a whole word. Matching whole words replaced a boundary-class regex
 // that missed an absolute path and a redirect with no space (SEC-001 review,
-// round 1, F2). The snippet is read twice. The cleaned form is how the shell
-// sees the word: a backslash-newline continues the line, and quotes and
-// backslashes vanish, so `en\<newline>v`, `'e'nv` and `\env` all run `env`. The
-// form as written is kept too, so this never refuses less than the regex it
-// replaced did.
+// round 1, F2). The snippet is read as the shell reads a word: a backslash-
+// newline continues the line, and quotes and backslashes vanish, so
+// `en\<newline>v`, `'e'nv` and `\env` all run `env`. Neither ever separates two
+// words, so reading the snippet as written as well would only refuse commands
+// the shell does not run.
 func snippetIntrospection(snippet string) (string, bool) {
-	clean := strings.NewReplacer("\\\n", "", "'", "", `"`, "", `\`, "").Replace(snippet)
-	for _, form := range []string{snippet, clean} {
-		for _, word := range snippetWordSep.Split(strings.ToLower(form), -1) {
-			if slices.Contains(introspectionWords, word) {
-				return word, true
-			}
+	shellForm := strings.NewReplacer("\\\n", "", "'", "", `"`, "", `\`, "").Replace(snippet)
+	for _, word := range snippetWordSep.Split(strings.ToLower(shellForm), -1) {
+		if slices.Contains(introspectionWords, word) {
+			return word, true
 		}
 	}
 	return "", false
