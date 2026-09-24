@@ -32,8 +32,8 @@ created: "2026-09-23"
 - [x] `go build` / `go vet` / `GOOS=windows go vet` clean; `golangci-lint` at the pin, 0 issues
 - [x] Whole module green
 - [x] Read-only plan against the live store
-- [ ] Mutation battery, one mutant at a time under a memory cap
-- [ ] `verification.md` filled in
+- [x] Mutation battery, one mutant at a time under a memory cap (21/21)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 - [ ] Independent adversarial review passed
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -248,3 +249,43 @@ func TestReadable_AnswersWithoutCallingStatus(t *testing.T) {
 		}
 	})
 }
+
+// The lock-hint wrapper decorates errors and must never swallow a call. Every
+// method of BWWriteClient is called through it by reflection, so a method added
+// to the interface and forwarded wrongly, or not at all, fails here by name. The
+// delete path made this necessary: a wrapper that dropped DeleteItem would report
+// a deletion that never happened (CLI-082).
+func TestLockHintWriterForwardsEveryMethod(t *testing.T) {
+	rec := &forwardRecorder{}
+	w := reflect.ValueOf(lockHintWriter{Writer: rec, daemonState: "absent"})
+	iface := reflect.TypeOf((*BWWriteClient)(nil)).Elem()
+	for i := 0; i < iface.NumMethod(); i++ {
+		name := iface.Method(i).Name
+		m := w.MethodByName(name)
+		args := make([]reflect.Value, m.Type().NumIn())
+		for j := range args {
+			args[j] = reflect.Zero(m.Type().In(j))
+		}
+		rec.last = ""
+		m.Call(args)
+		if rec.last != name {
+			t.Errorf("lockHintWriter.%s did not reach the wrapped writer (it reached %q)", name, rec.last)
+		}
+	}
+}
+
+// forwardRecorder is a BWWriteClient that records which method was called last.
+type forwardRecorder struct{ last string }
+
+func (r *forwardRecorder) SetField(string, string, string) error { r.last = "SetField"; return nil }
+func (r *forwardRecorder) CreateItem(string, string, string, string) error {
+	r.last = "CreateItem"
+	return nil
+}
+func (r *forwardRecorder) ResolveFolder(string) (string, error) {
+	r.last = "ResolveFolder"
+	return "", nil
+}
+func (r *forwardRecorder) MoveItem(string, string) error    { r.last = "MoveItem"; return nil }
+func (r *forwardRecorder) RemoveField(string, string) error { r.last = "RemoveField"; return nil }
+func (r *forwardRecorder) DeleteItem(string) error          { r.last = "DeleteItem"; return nil }

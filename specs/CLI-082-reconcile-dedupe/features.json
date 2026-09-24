@@ -23,7 +23,7 @@
   {
     "id": "CLI-082-reconcile-dedupe-f4",
     "behavior": "AC4 — a retired item is planned with its shape, deleted by id on both backends, and reported gone",
-    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestPlanRetiredItems$|^TestApplyDeletesARetiredItem$|^TestBWServeWriter_DeleteItem$|^TestBWPut_DeleteItemDeletesByID$|^TestReconcileDeletesARetiredItem$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 5",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/secrets/ -run '^TestPlanRetiredItems$|^TestApplyDeletesARetiredItem$|^TestBWServeWriter_DeleteItem$|^TestBWPut_DeleteItemDeletesByID$|^TestReconcileDeletesARetiredItem$|^TestLockHintWriterForwardsEveryMethod$' -count=1 -v | grep -c '^--- PASS:' | grep -qx 6",
     "state": "pending",
     "evidence": ""
   },
