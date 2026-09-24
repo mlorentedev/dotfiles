@@ -1,6 +1,9 @@
 package spec
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,4 +137,71 @@ func readProposal(t *testing.T, dir string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+// SDD-042 AC5 ([QW] R-2): a refusal names the recovery path, never the bypass.
+// During the W1.4 sweep the bypass flags are banned, and a refusal that
+// advertises one invites exactly the move the sweep forbids. The flags stay
+// documented in `dotf spec archive --help`, which also says they are recorded.
+//
+// Checked at the source, so every refusal path is covered — including ones no
+// fixture below happens to reach. The single allowed site is the message that
+// names the flags because the operator just typed them.
+func TestArchiveRefusalsNameNoBypassFlag(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	checked := 0
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, e.Name(), nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Name.Name == "checkBypassRequest" {
+				continue
+			}
+			ast.Inspect(fn, func(n ast.Node) bool {
+				lit, ok := n.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					return true
+				}
+				checked++
+				if strings.Contains(lit.Value, "--force-with") {
+					t.Errorf("%s: %s names a bypass flag in a message: %s", fset.Position(lit.Pos()), fn.Name.Name, lit.Value)
+				}
+				return true
+			})
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no string literal was inspected — the source walk is broken")
+	}
+
+	// And by behaviour, on the refusals the sweep will actually meet.
+	cases := map[string]map[string]string{
+		"draft tags":         {"proposal.md": "<!-- [AGENT-DRAFT] x -->\n"},
+		"no review":          {"proposal.md": "---\nstatus: verifying\n---\n"},
+		"FAIL verdict":       {"proposal.md": "x\n", ReviewFile: "---\nspec: \"AI-001-x\"\nverdict: \"FAIL\"\nreviewed_sha: \"abc\"\n---\n"},
+		"reasonless waiver":  {"proposal.md": "---\nreview: waived\n---\n"},
+		"wrong spec in file": {"proposal.md": "x\n", ReviewFile: "---\nspec: \"B-002-y\"\nverdict: \"PASS\"\nreviewed_sha: \"abc\"\n---\n"},
+	}
+	for name, files := range cases {
+		root := t.TempDir()
+		writeSpec(t, root, "AI-001-x", files)
+		_, err := Archive(root, "AI-001-x", ArchiveOptions{Staleness: fakeStaleness{known: true}})
+		if err == nil {
+			t.Errorf("%s: expected a refusal", name)
+			continue
+		}
+		if strings.Contains(err.Error(), "--force") {
+			t.Errorf("%s: the refusal advertises a bypass flag:\n%s", name, err)
+		}
+	}
 }

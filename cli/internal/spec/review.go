@@ -307,7 +307,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	if waived, reason := reviewWaiver(specDir); waived {
 		if reason == "" {
 			return fmt.Errorf("proposal.md declares `review: waived` without a reason\n" +
-				"add a non-empty `review_waived_reason:` so the waiver is auditable, or archive with --force-without-review")
+				"add a non-empty `review_waived_reason:` so the waiver is auditable")
 		}
 		return nil
 	}
@@ -315,18 +315,18 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	review, found, err := FindReview(specDir)
 	if !found {
 		return fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
-			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md, or pass --force-without-review",
+			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
 			ReviewFile)
 	}
 	if err != nil {
-		return fmt.Errorf("%w\nfix the artifact, declare `review: waived` with a reason in proposal.md, or pass --force-without-review", err)
+		return fmt.Errorf("%w\nfix the artifact, or declare `review: waived` with a reason in proposal.md", err)
 	}
 	// A review.md copied from a sibling spec would otherwise satisfy the gate
 	// while describing a different change — the copy-paste analogue of the
 	// one-line alibi SPEC_FLOOR exists to defeat in check-spec-gate.sh.
 	if review.Spec != "" && review.Spec != specID {
 		return fmt.Errorf("%s declares spec %q but lives in %q — the review describes a different change\n"+
-			"re-run /adversarial-review for this spec, or pass --force-without-review",
+			"re-run /adversarial-review for this spec",
 			ReviewFile, review.Spec, specID)
 	}
 	// Provenance before verdict, deliberately. Both later checks read the file's
@@ -338,7 +338,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	}
 	if review.Verdict.Blocks() {
 		return fmt.Errorf("%s records verdict %s — address the findings and re-review before archiving\n"+
-			"to override, declare `review: waived` with a reason in proposal.md, or pass --force-without-review",
+			"a FAIL is resolved by its findings, not overridden: apply them in a follow-up, then re-review",
 			ReviewFile, review.Verdict)
 	}
 
@@ -355,11 +355,10 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	if stale, known, reason := reviewStale(repoRoot, specID, specDir, review, checker); known && stale {
 		return fmt.Errorf("%s is stale: %s\n"+
 			"keeps the review:\n"+
-			"  restore the contract files to reviewed_sha and record what changed as dispositions in verification.md (excluded from this check)\n"+
+			"  restore the contract files to the content the review was launched against, and record what changed as dispositions in verification.md (excluded from this check)\n"+
 			"discards it — only if the review is genuinely no longer the right one:\n"+
 			"  re-run /adversarial-review against the current head\n"+
-			"  declare `review: waived` with a reason in proposal.md\n"+
-			"  pass --force-without-review",
+			"  declare `review: waived` with a reason in proposal.md",
 			ReviewFile, reason)
 	}
 
@@ -416,7 +415,7 @@ func changedContracts(specDir string, recorded map[string]string) []string {
 func checkReviewProvenance(specDir string, review Review) error {
 	req, found, err := ReadReviewRequest(specDir)
 	if err != nil {
-		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review, or pass --force-without-review", err)
+		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review", err)
 	}
 	if !found {
 		return nil
@@ -429,14 +428,14 @@ func checkReviewProvenance(specDir string, review Review) error {
 	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == fileDigest(filepath.Join(specDir, ReviewFile)) {
 		return fmt.Errorf("%s has not changed since the review was launched — the reviewer wrote no verdict\n"+
 			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
-			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state), or pass --force-without-review",
+			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state)",
 			ReviewFile)
 	}
 
 	if req.ReviewedSHA != "" && review.ReviewedSHA != "" && req.ReviewedSHA != review.ReviewedSHA {
 		return fmt.Errorf("%s claims reviewed_sha %s but the review was launched against %s\n"+
 			"the launcher records the head it pointed the reviewer at; the frontmatter is the reviewer's own claim about it\n"+
-			"re-run /adversarial-review against the current head, or pass --force-without-review",
+			"re-run /adversarial-review against the current head",
 			ReviewFile, short(review.ReviewedSHA), short(req.ReviewedSHA))
 	}
 
@@ -446,7 +445,7 @@ func checkReviewProvenance(specDir string, review Review) error {
 	// that check cannot see because both are admitted.
 	if req.Reviewer != "" && review.Reviewer != "" && req.Reviewer != review.Reviewer {
 		return fmt.Errorf("%s is signed by %q but %q was launched — the verdict is not from the run that was requested\n"+
-			"re-run /adversarial-review, or pass --force-without-review",
+			"re-run /adversarial-review",
 			ReviewFile, review.Reviewer, req.Reviewer)
 	}
 	return nil

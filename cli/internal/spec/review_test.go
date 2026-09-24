@@ -38,9 +38,14 @@ func TestArchiveBlocksOnMissingReview(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected a missing review.md to block the archive")
 	}
-	// The error must name the artifact and BOTH declared escapes, so the human
-	// never has to read the source to learn how to proceed.
-	for _, want := range []string{"review.md", "review: waived", "--force-without-review"} {
+	// The error must name the artifact and the declared recovery path, so the
+	// human never has to read the source to learn how to proceed — and, since
+	// SDD-042, never the bypass flag, which --help documents and the archive
+	// records (TestArchiveRefusalsNameNoBypassFlag).
+	if strings.Contains(err.Error(), "--force-without-review") {
+		t.Errorf("a refusal must not advertise the bypass flag, got: %v", err)
+	}
+	for _, want := range []string{"review.md", "review: waived"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should mention %q, got: %v", want, err)
 		}
@@ -272,7 +277,10 @@ func TestStaleRefusalOffersTheExitThatKeepsTheReview(t *testing.T) {
 		t.Fatalf("the labels do not bracket the exit they describe (keeps=%d restore=%d discards=%d), got: %s",
 			keeps, restore, discards, msg)
 	}
-	for _, override := range []string{"re-run /adversarial-review", "review: waived", "--force-without-review"} {
+	if strings.Contains(msg, "--force-without-review") {
+		t.Fatalf("SDD-042: the refusal must not advertise the bypass flag, got: %s", msg)
+	}
+	for _, override := range []string{"re-run /adversarial-review", "review: waived"} {
 		at := strings.Index(msg, override)
 		if at < 0 {
 			t.Fatalf("refusal dropped the %q exit, got: %s", override, msg)

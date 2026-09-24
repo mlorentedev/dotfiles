@@ -51,11 +51,13 @@ func TestArchiveBlocksReviewerOutsideThePool(t *testing.T) {
 		}
 	}
 	// Same contract as every other refusal in this gate: name the declared
-	// escapes rather than leaving the human to guess or to force blindly.
-	for _, want := range []string{"review: waived", "--force-without-review"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error must name the escape %q, got: %v", want, err)
-		}
+	// recovery path rather than leaving the human to guess — and, since
+	// SDD-042, never the bypass flag.
+	if !strings.Contains(err.Error(), "review: waived") {
+		t.Errorf("error must name the declared recovery %q, got: %v", "review: waived", err)
+	}
+	if strings.Contains(err.Error(), "--force-without-review") {
+		t.Errorf("a refusal must not advertise the bypass flag, got: %v", err)
 	}
 	if _, statErr := os.Stat(filepath.Join(root, "specs", "archive", "AI-001-x")); !os.IsNotExist(statErr) {
 		t.Error("target must not be created when blocked")
