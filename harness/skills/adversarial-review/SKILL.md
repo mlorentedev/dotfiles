@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: a43a700196f36a92
+generated_sha: f04478a5fba0a622
 id: adversarial-review-skill
 type: skill
 status: active
@@ -90,7 +90,7 @@ State the evidence, name the consequence, and name the command. Where a pool exi
 Without a pool, the choice is still the human's, and the older phrasing applies: offer to run `/adversarial-review <feature-id>` in a separate session, with a deliberately thin prompt.
 
 - **Say which session you are.** If you implemented the change, that fact is what makes the proposal necessary; leading with it is the evidence, not a disclaimer.
-- **Name the escapes honestly.** If the review genuinely does not fit, the declared paths are `review: waived` + a reason in `proposal.md`, or `--force-without-review`. Surface them; never take one unilaterally.
+- **Name the escapes honestly.** If the review genuinely does not fit, the declared paths are `review: waived` + a reason in `proposal.md`, or `--force-without-review --reason "<why>"` (recorded in the archived `proposal.md` as `review_bypass:`). Surface them; never take one unilaterally.
 - **Once per change.** If the user declines, proceed and do not re-propose for the same spec.
 
 ### When NOT to propose
