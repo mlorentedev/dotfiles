@@ -87,6 +87,15 @@ func (v *fakeVault) RemoveField(item, field string) error {
 	return nil
 }
 
+func (v *fakeVault) DeleteItem(item string) error {
+	v.writes++
+	if !v.noop {
+		delete(v.items, item)
+		delete(v.fields, item)
+	}
+	return nil
+}
+
 func (v *fakeVault) MoveItem(item, folderID string) error {
 	v.writes++
 	if !v.noop {
@@ -266,5 +275,77 @@ func TestReconcileSecondPassIsOnlyForRetires(t *testing.T) {
 	}
 	if v.writes > 4 {
 		t.Errorf("a non-retire leftover must not earn another pass: %d writes", v.writes)
+	}
+}
+
+// CLI-082 AC1 + AC2: the plan compares every retire before anything applies. An
+// equal one is shown verified; a differing one blocks and says how to settle it.
+// Nothing is written, and no value reaches the output.
+func TestReconcilePlanShowsEachRetireVerdict(t *testing.T) {
+	reg := `
+version: 1
+secrets:
+  - {id: SAME, plane: app, backend: bw, bw: {item: same-dst, field: k, folder: Dotfiles/apps, from: {item: legacy, field: same, retire: true}}, expose: {env: SAME}}
+  - {id: DIFF, plane: app, backend: bw, bw: {item: diff-dst, field: k, folder: Dotfiles/apps, from: {item: legacy, field: diff, retire: true}}, expose: {env: DIFF}}
+`
+	v := newFakeVault()
+	v.folders["f1"] = "Dotfiles/apps"
+	v.items["legacy"], v.items["same-dst"], v.items["diff-dst"] = "", "f1", "f1"
+	v.fields["legacy"] = map[string]string{"same": "PLANTED-same", "diff": "PLANTED-old"}
+	v.fields["same-dst"] = map[string]string{"k": "PLANTED-same"}
+	v.fields["diff-dst"] = map[string]string{"k": "PLANTED-new"}
+
+	out, err := runReconcile(t, v, reg)
+	if err == nil || !strings.Contains(err.Error(), "blocked") {
+		t.Fatalf("a differing retire must block the plan, got %v\n%s", err, out)
+	}
+	for _, want := range []string{"legacy/\"same\"", "verified equal", "differs", "dotf secrets rotate DIFF"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plan output missing %q:\n%s", want, out)
+		}
+	}
+	if v.writes != 0 || strings.Contains(out, "PLANTED") {
+		t.Fatalf("a plan must write nothing and print no value (writes %d):\n%s", v.writes, out)
+	}
+}
+
+// CLI-082 AC4: a retired item is shown with its shape and reason, deleted by
+// --apply, and reported gone on the next run.
+func TestReconcileDeletesARetiredItem(t *testing.T) {
+	reg := `
+version: 1
+secrets:
+  - {id: DOCKERHUB_TOKEN, plane: app, backend: bw, bw: {item: dockerhub, field: PAT, folder: Dotfiles/apps}, expose: {env: DOCKERHUB_TOKEN}}
+retired:
+  - {item: github-cli-pat, reason: its registry entry was retired and the token revoked}
+`
+	v := newFakeVault()
+	v.folders["f1"] = "Dotfiles/apps"
+	v.items["dockerhub"], v.items["github-cli-pat"] = "f1", "f1"
+	v.fields["dockerhub"] = map[string]string{"PAT": "d"}
+	v.fields["github-cli-pat"] = map[string]string{"GITHUB_PERSONAL_ACCESS_TOKEN": "PLANTED-revoked"}
+
+	out, err := runReconcile(t, v, reg)
+	if err != nil {
+		t.Fatalf("plan: %v\n%s", err, out)
+	}
+	for _, want := range []string{"delete-item", "github-cli-pat", "fields GITHUB_PERSONAL_ACCESS_TOKEN", "token revoked"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plan output missing %q:\n%s", want, out)
+		}
+	}
+	out, err = runReconcile(t, v, reg, "--apply")
+	if err != nil || !strings.Contains(out, "Converged") {
+		t.Fatalf("apply must delete and converge: %v\n%s", err, out)
+	}
+	if _, still := v.items["github-cli-pat"]; still {
+		t.Fatal("the retired item is still in the vault")
+	}
+	out, _ = runReconcile(t, v, reg)
+	if !strings.Contains(out, "retired item github-cli-pat is gone") {
+		t.Errorf("a deleted retired item must be reported removable:\n%s", out)
+	}
+	if strings.Contains(out, "PLANTED") {
+		t.Fatal("a value reached the output")
 	}
 }

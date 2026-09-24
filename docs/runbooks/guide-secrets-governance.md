@@ -74,8 +74,12 @@ reviewed and applied.
    name — declare the source:
    `bw: { item: github-cli-pat, field: GITHUB_PERSONAL_ACCESS_TOKEN, folder: Dotfiles/apps, from: { item: GitHub, field: "Personal Access Token" } }`.
 3. **Plan:** `dotf secrets reconcile` prints `create-folder` / `move-item` /
-   `create-item` / `add-field` and changes nothing. `blocked` lines name their remedy
-   and make the plan unappliable; `deferred` lines belong to `dotf secrets migrate`.
+   `create-item` / `add-field` / `retire-source` / `delete-item` and changes
+   nothing. `blocked` lines name their remedy and make the plan unappliable;
+   `deferred` lines belong to `dotf secrets migrate`. Every retire is compared at
+   plan time and printed `verified equal`, or blocked with its verdict (`differs`,
+   `destination empty`, `unreadable`). The plan reads the two values into memory to
+   do that, and prints only the verdict.
 4. **Apply** from the reviewed branch: `dotf secrets reconcile --apply`. It copies
    values inside the process (never printed), never overwrites an existing field,
    then syncs and re-plans. A re-plan that holds only retires gets one more pass
@@ -86,13 +90,22 @@ reviewed and applied.
 6. **Retire the source:** once consumers are verified on the copy, add `retire: true`
    to the `from:` and run reconcile again. It removes the source field only if the
    copy holds the **same** value (compared in memory, never printed); if they differ,
-   one side was rotated and it refuses. Never in the same *pass* as the copy: the
+   one side was rotated and the plan blocks, naming the two ways out: rotate the
+   declared secret to the source's value if the source is current, or drop
+   `retire:` to keep both while it is settled. Never in the same *pass* as the copy: the
    comparison reads the copy from the store after a sync. So one `--apply` may run a
    second pass that holds only retires, which lets you declare `retire: true`
    together with the copy. It always runs after every other operation. One
    credential, one place — a search no longer returns two.
 7. **Delete the record:** a satisfied `from:` (source retired, or no retire asked) is
    reported as removable — delete it in a follow-up.
+8. **Retire an item:** an item that a retire left empty, or one whose registry
+   entry was retired, is listed under the registry's top-level `retired:` with a
+   reason. The registry refuses the entry while any declaration still names the
+   item (drop the `from:` record first). The plan shows a `delete-item` line with
+   what the item holds, by name only; `--apply` deletes it last, and Bitwarden keeps
+   it in its trash for 30 days. Take a DR escrow (`dotf secrets backup`) before the
+   apply. Once the plan reports the item gone, delete its `retired:` entry.
 
 ## Protocol — ROTATE a secret
 
