@@ -119,3 +119,26 @@ func TestProtectionCheckAllIsSortedAndAttentive(t *testing.T) {
 		t.Error("drift and unanswerable both need attention")
 	}
 }
+
+// PR-Agent on #1637: matching gh's stderr wording is fragile. gh also leaves
+// the API's JSON error body on stdout, whose status and message are GitHub's
+// REST contract rather than gh's formatting — so that is read first, and an
+// unfamiliar stderr no longer decides the question.
+func TestProtectionCheckReadsTheStructuredErrorBody(t *testing.T) {
+	body := `{"message":"Branch not protected","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"404"}`
+	run := func(...string) (string, string, error) {
+		return body, "some future gh wording\n", errors.New("exit status 1")
+	}
+	d := RepoDecl{Branch: "main", State: StateUnprotected, Reason: "not protected on purpose"}
+	if r := CheckRepo("mlorentedev/dotfiles", d, run); r.Status != StatusState {
+		t.Fatalf("a structured 404 'Branch not protected' must be read even when stderr is unfamiliar: %+v", r)
+	}
+	// A different 404 (the branch itself is gone) is not "unprotected".
+	gone := `{"message":"Branch not found","status":"404"}`
+	run = func(...string) (string, string, error) {
+		return gone, "gh: Branch not found (HTTP 404)\n", errors.New("exit status 1")
+	}
+	if r := CheckRepo("mlorentedev/dotfiles", d, run); r.Status != StatusUnanswerable {
+		t.Fatalf("a missing branch is not an unprotected one: %+v", r)
+	}
+}

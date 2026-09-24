@@ -1,6 +1,7 @@
 package forge
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -77,7 +78,7 @@ func CheckRepo(repo string, d RepoDecl, run Runner) RepoResult {
 		return res
 	}
 	out, errOut, err := run("api", fmt.Sprintf("repos/%s/branches/%s/protection", repo, d.Branch))
-	notProtected := err != nil && strings.Contains(errOut, "HTTP 404") && strings.Contains(errOut, "Branch not protected")
+	notProtected := err != nil && isNotProtected(out, errOut)
 	switch {
 	case err != nil && !notProtected:
 		res.Status, res.Detail = StatusUnanswerable, unanswerable(errOut, err)
@@ -93,6 +94,22 @@ func CheckRepo(repo string, d RepoDecl, run Runner) RepoResult {
 		res = compareLive(res, d, out)
 	}
 	return res
+}
+
+// isNotProtected recognises GitHub's "this branch has no protection" answer.
+// The API's JSON error body, which gh leaves on stdout, is read first: its
+// status and message are GitHub's REST contract, not gh's formatting. gh's
+// stderr line is only a fallback for a gh that prints no body. A different 404
+// (the branch itself is gone) is deliberately not this answer.
+func isNotProtected(stdout, stderr string) bool {
+	var body struct {
+		Message string `json:"message"`
+		Status  string `json:"status"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(stdout)), &body) == nil && body.Status != "" {
+		return body.Status == "404" && body.Message == "Branch not protected"
+	}
+	return strings.Contains(stderr, "HTTP 404") && strings.Contains(stderr, "Branch not protected")
 }
 
 func compareLive(res RepoResult, d RepoDecl, body string) RepoResult {
