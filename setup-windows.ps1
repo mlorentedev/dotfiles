@@ -1211,17 +1211,6 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     }
 }
 
-$piMcpSrc = Join-Path $DotfilesDir 'ai\pi\mcp.json'
-$piMcpDst = Join-Path $piAgentDir 'mcp.json'
-if (Test-Path -LiteralPath $piMcpSrc -PathType Leaf) {
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $piMcpSrc -Destination $piMcpDst)
-    } else {
-        Copy-Item -LiteralPath $piMcpSrc -Destination $piMcpDst -Force
-        Write-Success "Deployed mcp.json to $piMcpDst (fallback)"
-    }
-}
-
 # settings.json is SEED-IF-MISSING (Linux parity: setup-linux.sh pi settings
 # block). pi rewrites this file at runtime -- lastChangelogVersion, theme, the
 # model picked in the TUI -- so a "copy unless identical" check can never match

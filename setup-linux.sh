@@ -777,17 +777,6 @@ if [ -f "$AGENTS_SRC" ]; then
     fi
 fi
 
-PI_MCP_SRC="$CURRENT_DIR/ai/pi/mcp.json"
-PI_MCP_DST="$PI_AGENT_DIR/mcp.json"
-if [ -f "$PI_MCP_SRC" ]; then
-    if [ -f "$PI_MCP_DST" ] && cmp -s "$PI_MCP_SRC" "$PI_MCP_DST"; then
-        log_info "mcp.json (pi) already in sync"
-    else
-        cp "$PI_MCP_SRC" "$PI_MCP_DST"
-        log_success "Deployed mcp.json to $PI_MCP_DST"
-    fi
-fi
-
 # settings.json is SEED-IF-MISSING, unlike models.json/tui.json above: pi
 # rewrites this file at runtime (lastChangelogVersion, theme, the model picked
 # in the TUI), so it is the one deployed config the user's own tool edits.
