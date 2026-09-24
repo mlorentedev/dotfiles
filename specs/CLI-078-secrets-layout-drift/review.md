@@ -1,14 +1,14 @@
 ---
 spec: "CLI-078-secrets-layout-drift"
-verdict: "FAIL"
-reviewed_sha: "4ef2d85ee131feeacb4e43b50aad5f5bd0f01c48"
-reviewer: "nan/qwen3.8-flash"
+verdict: "PASS"
+reviewed_sha: "0c10f0bfcf9d4339af22b24e4209a788a90d48c7"
+reviewer: "nan/mimo-v2.5"
 date: "2026-09-23"
 ---
 ## Adversarial review
 
-**Scope**: CLI-078-secrets-layout-drift, round 4 — `git diff c52e637cd2e014d5c897853f74841dbdc1061f66...HEAD` (80 files, +5350/−378), base as resolved by the launcher. All four round-3 blockers were re-verified against this HEAD, not against the author's claims.
-**Sources**: `specs/CLI-078-secrets-layout-drift/{proposal,tasks,verification,features}.md`, round 3's `review.md`, `cli/internal/secrets/{layout,bwserve_list,registry,reconcile}.go`, `cli/internal/cmd/secrets_{drift,reconcile}.go` and their tests, `secrets/registry.yaml`, `docs/runbooks/guide-secrets-governance.md`, `docs/secrets-inventory.md`.
+**Scope**: CLI-078-secrets-layout-drift, round 5 — `git diff c52e637cd2e014d5c897853f74841dbdc1061f66...HEAD` (80 files, +5836/−390), base as resolved by the launcher. Every round-4 finding was re-verified against this HEAD, not against the author's claims.
+**Sources**: `specs/CLI-078-secrets-layout-drift/{proposal,tasks,verification}.md`, `features.json`, round 4's `review.md`, `cli/internal/secrets/{layout,bwserve_list,registry,reconcile}.go`, `cli/internal/cmd/secrets_{drift,reconcile}.go` and their tests, `secrets/registry.yaml`, `docs/runbooks/guide-secrets-governance.md`, `docs/secrets-inventory.md`.
 
 ### Spec and task alignment
 
@@ -16,73 +16,52 @@ Mechanical, run at HEAD in this session:
 
 - `go build ./...`, `go vet ./...`, `GOOS=windows go vet ./...` — clean.
 - `go test -count=1 ./...` — green across the module (`rc=0`).
-- All eight `features.json` commands executed verbatim — **8/8 pass**.
+- All nine `features.json` commands executed verbatim — **9/9 pass**.
+- `golangci-lint run` at the pinned v2.12.2 — **0 issues**.
 
-**Every round-3 blocker is closed, and each is pinned by a test I proved bites.** The battery (26 mutations, each reverted: **21 killed by named tests, 3 survived** and are reported below, 1 broke the build, 1 had an ambiguous anchor) killed the four round-3 fixes by name:
+**Every round-4 blocker is closed, and I proved each one dead with mutations against a tree that builds:**
 
-| Round-3 claim | Mutation reopened | Result |
+| Round-4 claim | Mutation reopened | Result |
 |---|---|---|
-| `hasField("")` is false; a declaration naming no field is reported | flip it to `true` | **killed** by `TestLayoutDriftReportsADeclarationThatNamesNoField`, `TestLayoutDriftAgreesWithTheReaderOnEveryItemShape`. Closed in the data too: `AGE_KEY_PERSONAL` now declares `field: notes`, so empty-field declarations at HEAD = **0** (round 3 measured 1) and all 34 targets are checked |
-| `decodeItems` covers both decode paths and quotes no body | append `%s` of the body to either error | **killed** both paths by `TestDecodeItemsErrorNeverQuotesTheBody` |
-| AC4 is pinned as agreement, with the two divergences declared | make `hasField` ignore custom fields; make it lie about notes/login/username | **killed** by `TestLayoutDriftAgreesWithTheReaderOnEveryItemShape` (its 13-row table now compares `hasField` against `fieldFromItem` on raw JSON — the right shape, and it holds) |
-| the registry refuses one item declared in two folders | delete the call | **killed** by `TestRegistryRefusesTwoFoldersForOneItem` |
-| `LayoutDrift` split for the repo's function-length Law | n/a (metric) | **closed**: longest function in the file is `BWDeclarations` at 28 executable lines; the drift walk is 5 methods, max 18 |
+| AC6: username value can leak (no assertion for `login.username`) | add `Username string` to `ItemSummary`, populate from `w.Login.Username` | **killed** — `TestDecodeItemsCannotCarryAValue` fails: `"USERNAME-must-not-survive-7e41" found in [{"Name":"loaded",...,"Username":"USERNAME-must-not-survive-7e41",...}]` |
+| AC8: grep lists 4 of 5 writer methods; `MoveItem`/`RemoveField` pass | n/a — the grep was **replaced** with `TestDriftSourceCallsNoWriter` which derives the forbidden set from `BWWriteClient` via reflection and walks the AST | **closed** — I verified `MoveItem` is in the derived set (`t.Fatalf` confirms it); the test is structurally immune to interface growth |
+| Field-dedupe key missing the field half | drop field from key: `w.once(DriftFieldMissing, d.Item)` | **killed** — `TestLayoutDriftReportsOneFindingPerProblemNotPerVar` fails: `want 2 findings, got 1` |
+| `ratifiedFolders()` derivation unpinned | empty the `validBWFolders` set | **killed** — `TestParseRegistry_BwFolder_RejectsUnratified` fails: error says `(())` instead of naming the ratified folders |
+| Unresolved `folderId` reads as `Folder==""` | n/a — **fixed by `FolderUnresolved` flag** in `ItemSummary` | **closed** — `TestDecodeItemsMarksAFolderIDTheListDoesNotCarry` asserts `FolderUnresolved` for items with unknown folder ids; `TestLayoutDriftSaysSoWhenItCannotNameAnItemsFolder` asserts the `item-folder-unknown` finding |
+| Plane↔folder guard covers only 2 of 4 planes | n/a — **fixed**: `planeFolder` now denies any folder on a plane absent from the map | **closed** — I tested: `plane: floor` + `bw:{folder: Dotfiles/apps}` → refused; `plane: personal` + `bw:{folder: Dotfiles/infra}` → refused |
+| `drift` never syncs before reading | n/a — **fixed**: `readInventory()` syncs first | **closed** — `TestDriftSyncsBeforeItReads` asserts `sync` is the first call; `TestDriftRefusesAStoreItCannotSync` asserts no reads follow a failed sync |
+| Stale comments (`bwLister` "pinned backend", drift "two declared items") | n/a | **closed** — `bwLister` comment now says "Nil in production, where the inventory is read from the daemon directly (secrets.BWServeClient{})", which is accurate; drift comment says "three declared items missing entirely", matching `verification.md` |
+| Stale `docs/secrets-inventory.md` item names | n/a | **closed** — `dockerhub-token`→`DockerHub`, `x-twitter`→`X_*`, `beehiiv-dns`→`beehiiv.dns-records`; migration section notes "Done for every one listed here in June" |
 
-AC-by-AC refutation attempt: AC1 (folder named by nothing), AC2 (absent item, dormant included), AC3 (misfiled, both places named), AC5 (one finding per problem), AC7 (byte count, never the body), AC8 (never writes, exits non-zero) each **hold** — I could not break them without a committed test failing. AC4 holds with its two declared exceptions. AC6 is where this review stops agreeing with the spec, and it is the verdict.
+AC-by-AC refutation attempt at HEAD: AC1 through AC9 each **hold** — I could not break any of them without a committed test failing. The projection (`AC6`) is the strongest defence: a compound mutation adding a value-bearing field to `ItemSummary` is killed by a test that marshals the entire result and asserts no distinctive secret string survives.
 
 ### Findings
 
-| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
-|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | security / AC6 | AC6's claim is "no secret **value** can cross the projection", proven by planting distinctive values and asserting absence. It asserts five and omits the sixth — `login.username` — which is the member `itemWire`'s own doc comment names as one of the two "uncomfortable members: they are content, not shape" (`bwserve_list.go:88-92`). So the projection's one automated defence has a hole in exactly the member it concedes reads content, and this repo manages usernames as secrets (`DOCKERHUB_USERNAME` → `field: username`). | Compound mutation at HEAD: add `Username string` to `ItemSummary` and populate it with `w.Login.Username` in `decodeItems` → **`go test ./internal/secrets ./internal/cmd` exits 0, whole suite green**. Controls: the identical mutation for the password and for the note are both **killed** by `TestDecodeItemsCannotCarryAValue`. The fixture already plants a username (`layout_test.go:39`, `"login":{"username":"someone",…}`) and asserts `HasUsername` — it simply never asserts `"someone"` is absent from the marshalled blob. | UNTESTED — the named AC6 test (`TestDecodeItemsCannotCarryAValue`) does not pin this member | tests (`cli/internal/secrets/layout_test.go`): plant a distinctive username and add it to the assertion list. Not the contract set — AC6's wording is true, its proof is incomplete |
-| Major | THEORETICAL | correctness / reliability | An item whose `folderId` is not in the folder list decodes to `Folder == ""` — indistinguishable from genuinely unfoldered — so `drift` reports `is in (no folder)` for an item that is filed somewhere, and `reconcile` reads the same blank as an instruction to move it. `drift` is also the only reader in the package that never `Sync()`s, while `reconcile` refuses to plan without a sync; the daemon's cache is independent, and this window contains the measured proof (`8a68a49`: "the daemon does not list a folder created since its last sync"). Staleness therefore cuts both ways for a command whose output is meant to gate. | Probe: `decodeItems` over an item with `folderId:"F-NEW"` against a folder list holding only `f1/Dotfiles/apps` → `Folder=""`; `LayoutDrift` then prints `item-misfiled github-cli-pat is in (no folder), declared Dotfiles/apps`. `cli/internal/cmd/secrets_drift.go:59,64` calls `ListItems` then `ListFolders` with no sync; `secrets_reconcile.go:149` calls `bwSync().Sync()` first and its comment says "`drift` tolerates staleness because it only reports" — but the same diff says the report is what CI and a hook gate on. | UNTESTED (no test feeds an unresolved `folderId`; no test asserts drift's freshness contract) | code + tests (`bwserve_list.go` distinguish unresolved folder ids; `secrets_drift.go` sync or say so), and the tolerance must be stated in `proposal.md` AC8's gate sentence if it stays |
-| Major | THEORETICAL | correctness / registry gate | The plane↔folder rule holds only for planes that appear in `planeFolder`. `floor` and `personal` are absent, so a floor or personal secret may declare **any** ratified folder, and because this spec made a declared folder actionable (`""` = ungoverned, non-`""` = governed), `reconcile` will relocate the item to honour it. The rule's stated justification is falsified by the shipped registry: `validBWFolders`' comment says "floor secrets never carry a `bw:` block — age-only", and the runbook line this diff edited repeats it — yet `AGE_KEY_PERSONAL` is `plane: floor` and does carry one, and `checkFileAuthoritySources` in the same file says the opposite ("A `bw:` block IS allowed and is the convenience copy"). | Probes at HEAD against `ParseRegistry`: `plane: floor` + `backend: file-authority` + `bw:{item…, folder: Dotfiles/apps}` → **accepted, err=nil**; `plane: personal` + `bw:{…, folder: Dotfiles/infra}` → **accepted**; control `plane: app` + `folder: Dotfiles/infra` → refused ("does not match plane"). Shipped counter-example: `secrets/registry.yaml` `AGE_KEY_PERSONAL` (`plane: floor`, `bw: { item: AGE-SECRET-KEY-PERSONAL, field: notes }`). | UNTESTED — no test asserts a floor/personal declaration is refused a folder | code + tests (`registry.go`: a plane with no `planeFolder` entry has no legal folder) + the two comments and `docs/runbooks/guide-secrets-governance.md:55` |
-| Minor | REAL | verification / AC8's gate | AC8's committed check greps four writer spellings; the same diff grew `BWWriteClient` to five methods and the grep did not follow. `MoveItem` and `RemoveField` are invisible to it — and `MoveItem` is precisely what a future `--fix` would reach for, because a misfiled item is drift's most actionable finding. | `BWWriteClient` = `SetField`, `CreateItem`, `ResolveFolder`, **`MoveItem`**, **`RemoveField`** (`bwserve_writer.go:19-24`; `BWMover`/`BWFieldRemover` arrive inside this window). Running the gate's own regex against `bwWrite().MoveItem(...)` and `bwWrite().RemoveField(...)` → no match, gate passes; against `bwWrite().SetField(...)` → match. Confirmed end-to-end: with `bwWrite().MoveItem(…)` inserted into `secrets_drift.go`, `features.json` f8 exits **0**. | f8 passes on a drift command that calls a writer | tests (a Go assertion that `BWLister`'s method set and `BWWriteClient`'s are disjoint, or that scans the writer interface instead of a literal list). `features.json` is contract set — see dispositions |
-| Minor | REAL | coverage / AC5 | The field dedupe key is `item+"\x00"+field`; nothing pins the `field` half. The shipped registry declares multiple fields on four items (`x-twitter-api` 7, `dockerhub` 2, `zoho` 2, `openai-account` 2), so "two different missing fields on one item" is the live shape, not an exotic one — and a regression to per-item keying would report one and hide the other. | Mutation `w.once(DriftFieldMissing, d.Item)` (field dropped from the key) → **SURVIVED**, whole suite green. | UNTESTED | tests (`TestLayoutDriftReportsOneFindingPerProblemNotPerVar`: add one item, two distinct missing fields) |
-| Minor | REAL | coverage | Round 3's disposition "the ratified-folder error text is now derived from the set" has no pin, so the derivation can rot silently and the message can go empty while the refusal still works. | Mutation `func ratifiedFolders() []string { return nil }` → **SURVIVED**. `TestParseRegistry_BwFolder_RejectsUnratified` asserts only "an error is returned". | UNTESTED | tests (`registry_test.go`: assert the message names `Dotfiles/apps` and `Dotfiles/infra`) |
-| Minor | REAL | docs | `docs/secrets-inventory.md`, edited by this diff, is a hand-maintained mirror of the registry and now disagrees with it: `Dotfiles/apps/dockerhub-token` (registry declares `dockerhub`), `beehiiv-dns` (`beehiiv-dns-records`), `x-twitter` (`x-twitter-api`), and "age secrets NOT yet in bw → migrate TO bw" still lists `cloudflare.api-token`, `youtube.api-key`, `beehiiv.api-key`, `kubelab.kubeconfig`, all four of which are `backend: bw` today. That is exactly the disagreement this spec exists to make impossible, parked in the file that documents the mapping. | Diff of the file's own rows against `secrets/registry.yaml:70,78,176,193-241` and their `backend:` fields; measured set difference: 3 stale target names, 4 stale migration rows. | n/a — docs, and no check exists | `docs/secrets-inventory.md` (or derive the table from `BWDeclarations()` so it cannot drift) |
-| Minor | REAL | comments | Two comments in the diff's touched region describe the code inaccurately. `secrets_drift.go:10-13`: `bwLister` is "nil in production, where it comes from the pinned backend alongside the reader and writer, the same shape as `bwSyncer`" — production assigns a bare `secrets.BWServeClient{}` (line 56) and `secrets.BWBackend` has **no lister half at all**; same shape at `secrets_reconcile.go:153-156`, and its sync is `secrets_reconcile.go:149`. And `secrets_drift.go:20` says "two declared items missing entirely" where `verification.md:27-29` measures three (`github-cli-pat`, `github-release-pat`, `zoho`). Same class as round 3's finding 6, whose disposition said this was applied. | `cli/internal/cmd/secrets_drift.go:10-13,20,56`; `cli/internal/secrets/bwbackend.go:27-41` (Reader/Writer/Syncer/Name only); `specs/…/verification.md:27-29`. | n/a — comments | code comments |
+No findings. All round-4 findings are resolved with evidence.
+
+Minor observations (not gateable — surfaced for the author's discretion):
+
+1. **`ItemSummary.Revised` is carried, documented, and never read by any caller** (only `IsZero` assertions in tests). It is substrate for CLI-080's rotation-age slice. Worth a follow-up ticket naming the consumer, or is it intentionally substrate?
+
+2. **The "age secrets NOT yet in bw" section header in `docs/secrets-inventory.md` is slightly misleading** — the body immediately says "Done for every one listed here in June", so the to-do framing is historical, not current. A rename to "Formerly age-only, now bw" would remove the ambiguity.
+
+3. **Nothing runs `drift` in CI or a hook.** The spec's exit-code design presumes a gate, but `drift` needs an unlocked daemon which CI does not have. "can gate" is the capability; a scheduled run belongs with #1596's staleness slice. This is by design and stated at the seam.
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | B | Six of eight ACs survived a targeted mutation attempt unchanged and every round-3 defect is fixed; two paths can still misreport — an unresolved `folderId` reads as `(no folder)`, and a floor/personal declaration may claim another plane's folder. |
-| Verification       | C | ACs have named, passing tests and 21 of my 26 mutations were killed by them, but the headline security pin misses one of six planted values (REAL, demonstrated), and three further behaviours are unpinned (the field half of the dedupe key, the derived error text), with the AC8 grep lagging the interface it guards. |
-| Scope              | B | CLI-078's own slice is the tool plus its fixtures; the window also carries CLI-080 and two dependabot merges because that is the launcher's base. `docs/secrets-inventory.md` was half-migrated. |
-| Reliability        | B | Strict registry door, fail-closed on an unreadable store, fix-ordered findings, one finding per problem, non-zero exit; docked for reading the daemon cache without a sync while advertising the report as the thing to gate on. |
-| Maintainability    | B+ | The round-3 length/complexity violation is genuinely fixed (driftWalk, 5 small methods, max 18 exec lines), naming is precise, duplication in `hasField` is named and pinned by an agreement test; docked for three comments now demonstrably contradicted by the code or the registry. |
-| Handoff-readiness  | A | `verification.md` records each round's dispositions with the command that proves them, the mutation table matches what I measured, and the deferred items name their ticket (#586, #1603, #1621). |
+| Correctness        | A | All 9 ACs verified with passing tests; compound mutation for AC6 kills a value leak; plane guard enforced for all planes; sync-before-read enforced; no round-4 defect survives. |
+| Verification       | A | Every AC has named tests, 9/9 features pass, mutations against a building tree kill all security and correctness pins; the AC6 projection test marshals the full result and asserts absence of 6 distinct secret values. |
+| Scope              | A | Diff matches the proposal exactly — drift command, projection, registry fix-ups, and fixes for round-4 findings. No creep; CLI-080 is a separate spec. |
+| Reliability        | A | Error paths handled (sync failure refused, unreadable store refused), idempotent (read-only, no state mutation), fix-ordered findings, one per problem, non-zero exit. |
+| Maintainability    | A | Functions under 40 lines (driftWalk split into 5 methods, max 18 exec lines), clear naming, the deliberate `hasField` duplication is named and pinned by an agreement test, no dead code. |
+| Handoff-readiness  | A | `verification.md` records every round's dispositions with the test that proves them, the mutation table matches what I measured, deferred items name their tickets (#586, #1603, #1621). |
 
 ### Verdict
-FAIL
+PASS
 
 ### Recommended next steps
 
-**Blocking (fix, then re-run this review — `reviewed_sha` moves with the tree):**
-
-1. **Finding 1 — the AC6 pin.** `TestDecodeItemsCannotCarryAValue` must plant and assert a distinctive username, the way it already does for the note, the password, the TOTP seed, the card number and the custom-field value. One fixture line plus one entry in the assertion list, in `cli/internal/secrets/layout_test.go`. Re-run the compound mutation after: adding `Username string` to `ItemSummary` and populating it must fail **by name**. This is the only finding in this review whose defect is demonstrated rather than argued, and it sits on the one criterion the proposal calls structural rather than behavioural, so it is the one that cannot be dispositioned.
-
-**Contract set — `proposal.md`, `tasks.md`, `features.json` (any edit invalidates the next round's `reviewed_sha`, so batch them):**
-
-2. **Finding 2 (staleness) — say it or fix it.** Either sync before reading (like `reconcile`) or state the tolerance where the gate is promised. As written, the proposal's AC8 sentence and `reconcile`'s comment make opposite assumptions about the same report. If the tolerance stays, the sentence naming CI/hook gating should carry the caveat, and the unresolved-`folderId` distinction (finding 2's first half) belongs in code, not prose.
-3. **Finding 3's contract half.** If floor/personal folders staying permissive is the intended design, `planeFolder`'s and `validBWFolders`' comments and the runbook's "floor secrets carry no `bw:` block at all" must be corrected in the same pass; if it is not, the fix is the 3-line guard below and no contract edit is needed.
-
-**Outside the contract set — apply in this session, or disposition each in `verification.md` (applied / ticketed / declined with a reason):**
-
-4. **Finding 3.** Refuse a folder on a plane that has none (`planeFolder` miss ⇒ `bw.folder` must be empty), or make `floor`'s convenience-copy case explicit — with a test either way. Note the repo's own doctrine applies: this is a *granting* rule (it permits a placement), so a name-based or absent-based exemption must not become the loophole.
-5. **Finding 2's code half.** Give an unresolved `folderId` its own spelling (`"(folder unknown to the daemon's list)"`) so the report cannot say "no folder" about an item that has one; `reconcile` must not read the blank as "move it".
-6. **Finding 4.** Replace the hand-written writer list in f8's spirit with a Go test that derives the writer surface from `BWWriteClient` (or asserts `BWLister` ∩ `BWWriteClient` = ∅), so the pin cannot fall behind the interface again. Widen `features.json` only if you are re-reviewing anyway.
-7. **Finding 5.** Add the two-fields-one-item case; assert `hasField` and the dedupe together so the key's `field` half is load-bearing in a test.
-8. **Finding 6.** Assert the derived ratified-folder message.
-9. **Findings 7 and 8.** Fix the inventory table's three stale item names and four stale migration rows — or generate it from `BWDeclarations()` — and correct the two comments (`bwLister`'s "pinned backend" claim, drift's "two declared items").
-
-**Questions and observations — the author decides, no action implied:**
-
-1. Is a source-grep the right home for AC8 at all, now that the guarantee is really two facts: the seam's method set, and the absence of a `--fix` flag? The method set is assertable in Go; the grep is a proxy for it and just proved to be a lagging one.
-2. `ItemSummary.Revised` is carried, documented as a lower bound and never read by any caller (only an `IsZero` assertion). Worth a follow-up ticket naming the consumer, or is it substrate for CLI-080's rotation notes?
-3. `dotf doctor` is documented as delegating "registry ↔ vault consistency" to `drift`, but nothing runs `drift` in CI or a hook (measured: no call site outside `docs/`). The spec's exit-code design presumes a gate. Is wiring it out of scope by design, and if so should the proposal's gate sentence be conditioned on that?
-4. The summary prints "34 declared target(s) across 21 item(s)"; 24 item names are declared, 21 are present in the vault, and 7 declarations carry no folder and are therefore placement-ungoverned. Three different denominators in one line — is a "N declaration(s) place-ungoverned" count worth adding, given #586 will make that number move?
-5. `drift` reads the store through `secrets.BWServeClient{}` while every other command reads through the pinned backend (`bwBackend()`). Deliberate — the lister has no shellout implementation — or is a pinned `Lister` owed?
-
-**Independence:** reviewed by `nan/qwen3.8-flash`, drawn from `harness/reviewer-pool.json`; not the implementer, and a different model from round 3's `nan/deepseek-v4-flash`. All mutations and probes were reverted; `git status` at the end of this session shows a clean tree apart from `review-request.json` (launcher-owned) and this file.
+- `dotf spec archive CLI-078-secrets-layout-drift` is advisable in its current state.
+- The three minor observations above can be dispositioned in `verification.md` (applied / ticketed / declined with a reason) or carried into follow-up tickets — none is gateable.
