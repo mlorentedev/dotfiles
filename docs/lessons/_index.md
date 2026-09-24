@@ -305,3 +305,4 @@ tags: [lessons, index, dotfiles]
 | [285 - A 404 "fixed" by dropping the scope installs someone else's package](lesson-285-a-404-fixed-by-dropping-the-scope-installs-someone-elses-package.md) | 2026-09-23 |  |
 | [286 - A mutation that deletes a loop bound is a memory bomb, not a failing test](lesson-286-a-mutation-that-deletes-a-loop-bound-is-a-memory-bomb.md) | 2026-09-23 |  |
 | [287 - A guard that skips is a guard that passes](lesson-287-a-guard-that-skips-is-a-guard-that-passes.md) | 2026-09-23 |  |
+| [288 - An inventory is a hypothesis until each row is probed](lesson-288-an-inventory-is-a-hypothesis-until-each-row-is-probed.md) | 2026-09-23 |  |
