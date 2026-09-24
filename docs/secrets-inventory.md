@@ -94,7 +94,7 @@ Applied with `dotf secrets reconcile` (CLI-082), each step planned, escrowed and
 - **`pypi.org`**: its `API token` field equalled `PYPI_TOKEN` and was retired. The item stays, because it is the account login and holds the recovery codes.
 - **Deleted as retired registry entries:** `github-cli-pat` (#1632), and `tailscale-auth-key`, `hetzner-api-token`, `hetzner-ssh` (#1640).
 
-Still two copies, and why:
+Credentials still held in two places (a legacy field beside the canonical item), and why each remains:
 - **`cloud.nan.builders`** (`api-key` field) beside `NAN_API_KEY`: `bw.from` refuses a multi-var secret, and `NAN_API_KEY` exposes two variables (#1624).
 - **`Stripe`** (`backup-codes`), **`login.tailscale.com`** (`auth-key`), **`Hetzner`** (`key`): the legacy values are dead (rotated, expired, or 401), so they differ from nothing current, and a retire cannot verify them equal. Removing a dead value needs a field-level retire (#1624).
 - **The two items named `Hetzner`**: the SSH key one is orphaned (it opens neither the VPS nor GitHub), and deleting it needs the name disambiguated first.
