@@ -11,6 +11,7 @@ SSOT (see root `AGENTS.md`).
 | `models.json` | `~/.pi/agent/models.json` | NaN custom provider. `apiKey` is `{env:NAN_API_KEY}` in source; `setup-{linux,windows}` inject the literal at deploy time (SDD-009 pattern) so the deployed config is self-contained cross-OS and the key is never committed. |
 | `settings.json` | `~/.pi/agent/settings.json` | UX defaults + curated `enabledModels`. **Seed-if-missing**: pi mutates this file at runtime (`lastChangelogVersion`), so setup deploys it only when absent and never clobbers local edits. |
 | `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup installs the difference against the live `settings.json` on every run, through `pi install`. See below. |
+| `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Tools load on-demand via `pi-mcp-client` meta-tool (`mcp_tools`). Note: `context7` routes context over HTTPS to an external API. |
 | (canonical `AGENTS.md`) | `~/.pi/agent/AGENTS.md` | Cross-agent SSOT system prompt, deployed verbatim (same as opencode). |
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
@@ -47,6 +48,15 @@ Adding one by hand (`pi install npm:pkg@1.2.3`) works and writes the live array,
 but nothing else will ever know about it — put it in `packages.json` instead.
 
 Docs: <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
+
+## MCP (Model Context Protocol)
+
+Pi integrates MCP servers via `npm:pi-mcp-client@0.8.0` (`packages.json`) and `mcp.json` (`ai/deploy.json`, `requires: "pi"`):
+- `hive`: stdio client (`hive client`), connects to the supervised `hive.service` daemon for vault access (`/home/manu/Projects/knowledge`).
+- `context7`: remote HTTP endpoint (`https://mcp.context7.com/mcp`).
+- `sequential-thinking`: pinned calver package (`@modelcontextprotocol/server-sequential-thinking@2026.8.31`).
+
+`pi-mcp-client` uses deferred tool loading: it injects a single `mcp_tools` meta-tool into the initial prompt (~350 tokens) rather than eagerly loading all schemas. Models discover tools via `mcp_tools({ query: "..." })` and activate them via `mcp_tools({ activate: ["hive.vault_query"] })`. Once activated, tools are callable under their namespaced prefix `mcp__<server>__<tool>`.
 
 ## Install
 
