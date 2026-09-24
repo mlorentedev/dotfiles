@@ -87,6 +87,18 @@
 ### age secrets that were not in bw (June 2026) → migrated
 Done for every one listed here in June (`cloudflare.api-token`, `chatgpt.api-key`, `youtube.api-key`, `beehiiv.api-key` and `.dns-records`, the ChatGPT and Gmail codes, `kubelab.kubeconfig`): on 2026-09-23 each is `backend: bw` in the registry. Still age-backed on that date: `ZOHO_APP_PASSWORDS` and `ZOHO_RECOVERY_CODE` (personal, with dormant `bw:` blocks), and the floor. `dotf secrets ls` prints the live backend of each.
 
+### Legacy copies deduplicated (2026-09-24)
+Applied with `dotf secrets reconcile` (CLI-082), each step planned, escrowed and approved before it ran. Every retire was compared at plan time and verified equal; no value was printed.
+
+- **`OPEN ROUTER API KEY`** and **`POLLEX_API_KEY`** (notes): each note equalled the canonical `OPENROUTER_API_KEY` / `POLLEX_API_KEY` value. The note was retired, then the emptied item was deleted. `openrouter.ai` stays: it is the account login, not a copy.
+- **`pypi.org`**: its `API token` field equalled `PYPI_TOKEN` and was retired. The item stays, because it is the account login and holds the recovery codes.
+- **Deleted as retired registry entries:** `github-cli-pat` (#1632), and `tailscale-auth-key`, `hetzner-api-token`, `hetzner-ssh` (#1640).
+
+Still two copies, and why:
+- **`cloud.nan.builders`** (`api-key` field) beside `NAN_API_KEY`: `bw.from` refuses a multi-var secret, and `NAN_API_KEY` exposes two variables (#1624).
+- **`Stripe`** (`backup-codes`), **`login.tailscale.com`** (`auth-key`), **`Hetzner`** (`key`): the legacy values are dead (rotated, expired, or 401), so they differ from nothing current, and a retire cannot verify them equal. Removing a dead value needs a field-level retire (#1624).
+- **The two items named `Hetzner`**: the SSH key one is orphaned (it opens neither the VPS nor GitHub), and deleting it needs the name disambiguated first.
+
 ### Stays in age (floor — never only-in-bw)
 The **age private key** (offline-rooted), `bw-master-password.age`, `id_ed25519` boot key.
 
