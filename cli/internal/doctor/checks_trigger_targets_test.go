@@ -119,3 +119,34 @@ func TestCheckTriggerTargets_UnparseableTriggersFail(t *testing.T) {
 		t.Fatalf("unparseable triggers must FAIL, got failures=%d: %s", rep.Failures(), buf.String())
 	}
 }
+
+// HARNESS-148: a deployed document that names no pattern has shown nothing about
+// its targets, so the check SKIPS instead of reporting "all 0 triggers name a
+// pattern the vault has". That line was a PASS with nothing checked, the
+// vacuous-pass shape lessons 287 and 292 name. All three ways of naming nothing
+// are covered: no rules, every pattern empty, and no pattern key at all.
+func TestCheckTriggerTargets_NamingNoPatternSkipsRatherThanPasses(t *testing.T) {
+	for name, doc := range map[string]string{
+		"no rules":       `{"version":1,"triggers":[]}`,
+		"empty patterns": `{"version":1,"triggers":[{"id":"a","pattern":"","globs":["*.a"]}]}`,
+		"no pattern key": `{"version":1,"triggers":[{"id":"a","globs":["*.a"]}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			sys, cfg := triggerTargetsFixture(t, doc, "pattern-language-standards")
+			var buf bytes.Buffer
+			rep := capture(&buf)
+
+			checkTriggerTargets(sys, cfg, rep)
+
+			if rep.Failures() != 0 {
+				t.Fatalf("naming no pattern must not FAIL, got %d\n%s", rep.Failures(), buf.String())
+			}
+			if strings.Contains(buf.String(), "name a pattern the vault has") {
+				t.Errorf("a document naming no pattern must not read as sound, got: %s", buf.String())
+			}
+			if !strings.Contains(buf.String(), "unchecked") {
+				t.Errorf("want a SKIP saying the targets were not checked, got: %s", buf.String())
+			}
+		})
+	}
+}

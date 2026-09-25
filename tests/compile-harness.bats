@@ -1540,3 +1540,26 @@ seed_triggers() {
     [[ "$output" == *'trigger "demo-trigger" names pattern "pattern-does-not-exist"'* ]]
     [ ! -f "$REPO/harness/enforced/demo.md" ]
 }
+
+# HARNESS-148: the guard must not report green when it examined nothing. jq
+# runs inside a process substitution, so its parse error never reached the
+# loop's status: an unreadable file iterated zero times and printed the
+# "every pattern exists" line, exit 0. So did a file naming no pattern.
+@test "triggers: --refresh refuses a triggers file it cannot read, and writes nothing" {
+    printf '{ this is not json' > "$REPO/harness/triggers.json"
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"harness/triggers.json"*"cannot be read"* ]]
+    printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/refresh.out"
+    refute_grep_fixed 'every pattern named in harness/triggers.json exists' "$BATS_TEST_TMPDIR/refresh.out"
+    [ ! -f "$REPO/harness/enforced/demo.md" ]
+}
+
+@test "triggers: --refresh refuses a triggers file that names no pattern" {
+    printf '{"version":1,"triggers":[]}\n' > "$REPO/harness/triggers.json"
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"names no pattern"* ]]
+    printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/refresh.out"
+    refute_grep_fixed 'every pattern named in harness/triggers.json exists' "$BATS_TEST_TMPDIR/refresh.out"
+}
