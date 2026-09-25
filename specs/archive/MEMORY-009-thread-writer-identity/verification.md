@@ -69,7 +69,7 @@ Verdict **PASS-WITH-GAPS**, from nan/glm5.3-flash on 2026-09-25. The review ran 
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/MEMORY-009-thread-writer-identity/` -> `specs/archive/MEMORY-009-thread-writer-identity/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/MEMORY-009-thread-writer-identity/` -> `specs/archive/MEMORY-009-thread-writer-identity/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): the archive PR carries `Closes #1690`
+- [x] Promotions above executed (if any): none, since all three were decided no
