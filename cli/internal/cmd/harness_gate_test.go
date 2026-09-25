@@ -859,3 +859,55 @@ func TestSessionsWithNoIDShareNoLedger(t *testing.T) {
 		})
 	}
 }
+
+// `_unscoped` is where calls with NO session are journaled, so a payload that
+// claims it as its session id must be read as having none. Honouring it made a
+// named session whose history was the sessionless journal (raised on review of
+// the ledger fix), and with a persona in scope it was gated as a real session
+// whose ledger nothing could ever satisfy.
+func TestTheReservedJournalNameIsNotASession(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		extraArgs []string
+		payload   string
+	}{
+		{
+			name:    "the payload names the reserved id and a persona",
+			payload: `{"tool_name":"Bash","session_id":"_unscoped","agent_type":"gatekeeper","agent_id":"a1"}`,
+		},
+		{
+			name:      "the operator names the persona and the payload names the reserved id",
+			extraArgs: []string{"--role", "gatekeeper"},
+			payload:   `{"tool_name":"Bash","session_id":"_unscoped"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			blocking := blockingRepoRoot(t)
+			stateDir := t.TempDir()
+			args := append([]string{"--harness", "claude", "--repo-root", blocking, "--state-dir", stateDir}, tc.extraArgs...)
+
+			code, stderr := runGate(t, args, tc.payload)
+			if code != 0 {
+				t.Fatalf("a payload claiming the reserved id names no real session, so there is nothing to enforce and the call must be allowed; exit = %d (%s)", code, stderr)
+			}
+			if !strings.Contains(stderr, "no session") {
+				t.Errorf("the allow must say enforcement was off, got stderr %q", stderr)
+			}
+
+			entries, err := os.ReadDir(filepath.Join(stateDir, "gate"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range entries {
+				if !strings.HasSuffix(e.Name(), ".decisions.jsonl") {
+					t.Errorf("state file %s was written for a call with no real session", e.Name())
+				}
+			}
+
+			recs := readJournal(t, stateDir, harness.UnscopedScope)
+			if len(recs) != 1 || recs[0].Outcome != harness.OutcomeSessionUnscoped || !recs[0].Allowed {
+				t.Fatalf("the sessionless journal holds %+v, want one allowed %q record", recs, harness.OutcomeSessionUnscoped)
+			}
+		})
+	}
+}

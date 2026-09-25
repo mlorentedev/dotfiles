@@ -232,6 +232,10 @@ func TestConsumptionScopeNeedsASession(t *testing.T) {
 		{"an agent but no session", ToolCall{AgentID: "a1"}, ""},
 		{"a session alone", ToolCall{SessionID: "s1"}, "s1"},
 		{"a session and an agent", ToolCall{SessionID: "s1", AgentID: "a1"}, "s1-a1"},
+		// `_unscoped` is where calls with NO session are journaled, so a payload that
+		// claims it as its session id names no session at all.
+		{"the id reserved for the sessionless journal", ToolCall{SessionID: UnscopedScope}, ""},
+		{"the reserved id with an agent", ToolCall{SessionID: UnscopedScope, AgentID: "a1"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.call.ConsumptionScope(); got != tc.want {

@@ -323,8 +323,15 @@ func RecordConsumed(path, skill string) error {
 // could ever find again. The empty scope means "consumption cannot be recorded
 // for this call", and every caller treats it as such rather than as a key - see
 // StatePath.
+//
+// THE ID RESERVED FOR THE SESSIONLESS JOURNAL IS NOT A SESSION EITHER.
+// UnscopedScope is where calls with no session are journaled, and its leading
+// underscore was meant to keep it out of the space of real session ids. A payload
+// can still claim it, and honouring the claim would name a session whose journal
+// is the sessionless one. It is read as naming no session, so it gets the same
+// treatment as an absent one: allowed, and journaled as such.
 func (c ToolCall) ConsumptionScope() string {
-	if c.SessionID == "" {
+	if c.SessionID == "" || c.SessionID == UnscopedScope {
 		return ""
 	}
 	if c.AgentID != "" {
