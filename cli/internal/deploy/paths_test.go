@@ -101,7 +101,7 @@ func TestDeploy_PathsComposeWithMergeAndReportInSync(t *testing.T) {
 		t.Errorf("unmanaged key lost: %v", got)
 	}
 	want := filepath.FromSlash(filepath.ToSlash(home) + "/Projects/*")
-	if fs := got["trustedFolders"].([]any); len(fs) != 1 || fs[0] != want {
+	if fs := got["trustedFolders"].([]any); len(fs) != 2 || fs[0] != "/old" || fs[1] != want {
 		t.Errorf("want rendered %q, got %v", want, fs)
 	}
 	p, err := PlanConfig(c, root, home, noResolve)
