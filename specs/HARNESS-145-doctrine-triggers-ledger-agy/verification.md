@@ -26,7 +26,11 @@ Each slice PR fills its own section below and nothing else.
 
 ## S2 evidence
 
-_Filled by the S2 PR._
+- `go build`, `go vet` (linux and windows), `go test -count=1 ./...` (25 packages), `golangci-lint`, `shellcheck --severity=error`, `compile-harness.sh --check`, `check-bats-names.sh` and `check-doc-paths.sh`: all pass, on top of the merged S1.
+- `bats tests/*.bats`: 1599 run, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine.
+- AC2: `triggers: --refresh fails naming the trigger and pattern, and writes nothing` and `TestCheckTriggerTargets_DanglingTriggerFailsAndIsNamed` pass. `TestSuggestSharedPatternDoesNotCrossLinkSkills` and `TestMatchPathsNeverReportsAnEmptyPattern` pin the two linking defects, and `TestCheckTriggerTargets_NoVaultSkipsRatherThanPasses` keeps the doctor check honest on a machine without the vault.
+- Expected transitional effect: on a machine whose deploy dir has not mirrored the repaired `harness/triggers.json`, the new doctor check FAILs until `dotf harness mirror` runs. That is the check doing its job.
+- Executable production lines: +87 / -10 across `checks_trigger_targets.go`, `checks_deploy.go`, `triggers.go` and `compile-harness.sh` (comments and blank lines excluded).
 
 ## S3 evidence
 

@@ -1508,3 +1508,35 @@ EOF
     [ "$(LC_ALL=C tr -d '\000-\177' < "$f" | wc -c | tr -d ' ')" -eq 0 ] || { echo "GEMINI.md is not pure ASCII"; return 1; }
     [ "$chars" -lt 8000 ] || { echo "GEMINI.md is $chars characters; the budget is 8000 (platform cap 12000)"; return 1; }
 }
+
+
+# GUARD: --refresh refuses a trigger whose pattern the vault does not have.
+#
+# Measured 2026-09-24: 8 of the 18 shipped triggers named patterns that were
+# never written or had been renamed. Each still fired and routed work, and the
+# prompt hook printed the missing name as its evidence, so a session went looking
+# for a file that did not exist. Nothing said so, because the file is only read by
+# code that treats the name as an opaque string.
+#
+# --refresh is the one mode that has the vault, which makes it the only place
+# this can be checked; --check is offline and CI has no vault. It fails BEFORE
+# writing anything: a refresh that stopped halfway would leave the records fresh
+# and the targets stale, which is the drift --check exists to catch.
+seed_triggers() {
+    printf '{"version":1,"triggers":[{"id":"demo-trigger","pattern":"%s","globs":["*.demo"],"skills":["x"]}]}\n' "$1" \
+        > "$REPO/harness/triggers.json"
+}
+
+@test "triggers: --refresh passes when every trigger names a pattern the vault has" {
+    seed_triggers test-pattern
+    run_refresh; [ "$status" -eq 0 ]
+    [[ "$output" == *"every pattern named in harness/triggers.json exists in the vault"* ]]
+}
+
+@test "triggers: --refresh fails naming the trigger and pattern, and writes nothing" {
+    seed_triggers pattern-does-not-exist
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'trigger "demo-trigger" names pattern "pattern-does-not-exist"'* ]]
+    [ ! -f "$REPO/harness/enforced/demo.md" ]
+}

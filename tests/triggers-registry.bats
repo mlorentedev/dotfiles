@@ -25,6 +25,12 @@
 # harness/model-map.json both and records that this sets a precedent the other
 # four registries do not meet, and that whether they follow is a separate
 # decision. This closes the guard gap, not that decision.
+#
+# One narrower check has since been added and is NOT that decision: `dotf doctor`
+# verifies that every pattern a trigger names exists in the vault
+# (checkTriggerTargets, 2026-09-24), because 8 of 18 did not and nothing said so.
+# That is a reference-integrity check against the vault, gated on the vault being
+# present. It says nothing about the registry's schema, which is still unguarded.
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."

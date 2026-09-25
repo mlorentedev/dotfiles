@@ -341,6 +341,56 @@ name: skill2
 	}
 }
 
+// TestSuggestSharedPatternDoesNotCrossLinkSkills pins that skills follow the rule
+// that matched, not the pattern it names.
+//
+// Two rules can name one pattern (the Go rule and the complexity rule both point
+// at the language standards). Linking by pattern made a Python refactor prompt
+// suggest golang-pro, because the sibling rule's pattern had been "triggered".
+// Both entry points are covered: a keyword match and a path match reach the
+// skills by different routes.
+func TestSuggestSharedPatternDoesNotCrossLinkSkills(t *testing.T) {
+	rules := []TriggerRule{
+		{ID: "complexity", Pattern: "pattern-language-standards", Globs: []string{"*.py"},
+			Keywords: []string{"refactor"}, Skills: []string{"cyclomatic-complexity"}},
+		{ID: "golang", Pattern: "pattern-language-standards", Globs: []string{"*.go"},
+			Keywords: []string{"goroutine"}, Skills: []string{"golang-pro"}},
+	}
+
+	tests := []struct {
+		name   string
+		prompt string
+		paths  []string
+		want   []string
+	}{
+		{"a prompt matching one rule", "refactor this", nil, []string{"cyclomatic-complexity"}},
+		{"a prompt matching the other rule", "a goroutine leak", nil, []string{"golang-pro"}},
+		{"a path matching one rule", "", []string{"main.py"}, []string{"cyclomatic-complexity"}},
+		{"a path matching the other rule", "", []string{"main.go"}, []string{"golang-pro"}},
+		{"paths matching both rules", "", []string{"a.py", "b.go"}, []string{"cyclomatic-complexity", "golang-pro"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SuggestWithDeps(rules, tt.prompt, tt.paths, map[string][]string{})
+			if !reflect.DeepEqual(got.Skills, tt.want) {
+				t.Errorf("Skills = %v; want %v", got.Skills, tt.want)
+			}
+			if !reflect.DeepEqual(got.Patterns, []string{"pattern-language-standards"}) {
+				t.Errorf("Patterns = %v; want the shared pattern reported once", got.Patterns)
+			}
+		})
+	}
+}
+
+// TestMatchPathsNeverReportsAnEmptyPattern: a rule with no pattern must not put
+// "" into the result, where a caller would print it as a pattern name.
+func TestMatchPathsNeverReportsAnEmptyPattern(t *testing.T) {
+	rules := []TriggerRule{{ID: "bare", Globs: []string{"*.tf"}, Skills: []string{"terraform"}}}
+	if got := MatchPaths(rules, []string{"main.tf"}); len(got) != 0 {
+		t.Errorf("MatchPaths() = %q; want no patterns", got)
+	}
+}
+
 // TestRealTriggersFileValid guards harness/triggers.json against silent rot or schema deviation (GUARD #1137).
 func TestRealTriggersFileValid(t *testing.T) {
 	cfg, err := ParseTriggers(defaultTriggersJSON)
