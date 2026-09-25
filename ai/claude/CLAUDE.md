@@ -13,7 +13,7 @@
 ## Claude Code Tooling Notes
 
 * **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
-<!-- BEGIN HARNESS GENERATED (sha256:52410c1f732546d0) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:9267b05eab30898c) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -32,7 +32,7 @@
 - **Strict IaC & Idempotence:** Every configuration or environment change MUST be codified as reproducible IaC (Ansible, Terraform, K8s manifests, dotfiles) and verified idempotent (`changed=0` on re-run).
 - **In-flight documentation & zero debt:** Lessons, ADRs, and issues must be recorded in real-time (`docs/lessons/`, `docs/adr/`), never deferred.
 
-> Injected verbatim into every agent's instructions (harness `enforced` id `definition-of-done`) and executed by the `verification-before-completion` skill. It **binds** existing standing orders to the moment of closing; it does not restate them.
+> Injected verbatim into every agent's instructions (harness `enforced` id `definition-of-done`) and executed by the closing pass of the `adversarial-review` skill. It **binds** existing standing orders to the moment of closing; it does not restate them.
 
 Working code is not a finished change. Before saying done, each of these is true:
 

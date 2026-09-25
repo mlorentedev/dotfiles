@@ -57,10 +57,12 @@ assert 'docker' in data['skills']
 
 @test "harness suggest: resolves transitive skill dependencies" {
     cd "$CLI"
-    run go run ./cmd/dotf harness suggest specs/FEATURE-1/proposal.md
+    run go run ./cmd/dotf harness suggest docs/adr/adr-001-example.md
     [ "$status" -eq 0 ]
-    [[ "$output" == *"spec"* ]]
+    # The ADR trigger names architecture-session; spec is its dependency and
+    # adversarial-review is spec's, so the last is reached two levels down.
+    [[ "$output" == *"architecture-session"* ]]
+    [[ "$output" == *"- spec"* ]]
     [[ "$output" == *"adversarial-review"* ]]
-    [[ "$output" == *"verification-before-completion"* ]]
 }
 

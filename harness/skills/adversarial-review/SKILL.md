@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: 790a327e81f690cc
+generated_sha: 9ffbc7976b3db0f4
 id: adversarial-review-skill
 type: skill
 status: active
@@ -12,13 +12,16 @@ description: Independent red-team verification pass on a spec-driven change BEFO
   archiving. Triggers on /adversarial-review, "red-team this", "devil's advocate AI-001",
   "independent verification before archive". Reads `specs/<feature-id>/{proposal,tasks,verification}.md`
   + diff/PR, refutes acceptance criteria, classifies findings Blocker/Major/Minor,
-  issues PASS/PASS-WITH-GAPS/FAIL verdict. Pairs with /spec archive lock. Ported and
-  adapted from LIDR-academy/lidr-specboot.
+  issues PASS/PASS-WITH-GAPS/FAIL verdict. Pairs with /spec archive lock. Also holds
+  the evidence rule and the Definition of Done closing pass that anyone runs before
+  claiming work is done, and the code-level security checklist. Ported and adapted
+  from LIDR-academy/lidr-specboot.
 allowed-tools: [Bash, Read, Grep, mcp__hive__vault_query, mcp__hive__vault_search]
 keywords: [adversarial review, red team, devils advocate, review spec, independent
-    verification, review gate, revisar spec]
-paths: [specs/**/review.md, specs/**/verification.md]
-requires: [verification-before-completion]
+    verification, review gate, revisar spec, verification, definition of done, evidence
+    before assertions, comprobar antes de cerrar, security audit, vulnerability scan,
+    auditar codigo]
+paths: [specs/**/review.md, specs/**/verification.md, '**/security/**', '**/auth/**']
 ---
 # Adversarial Review (Red-Team Gate)
 
@@ -38,9 +41,9 @@ requires: [verification-before-completion]
 
 ## When NOT to use
 
-- During implementation (use `enrich-us` or `/spec fill` instead — wrong phase).
+- During implementation (use `/spec fill`, or the enrich step of `new-ticket` for a thin backlog item, instead — wrong phase).
 - For trivial changes that bypassed SDD per Skip rules.
-- As a single-agent self-review (the value is *independence* — different session/agent from the implementer).
+- As a single-agent self-review (the value is *independence* — different session/agent from the implementer). The two closing sections, "Evidence before claims" and "Closing pass", are the exception: they bind whoever claims a change is done, the implementer included.
 - On a model outside the repo's reviewer pool, where one exists. Not merely discouraged: `dotf spec archive` refuses such a review, so it is wasted work.
 
 ## Launching a review
@@ -144,6 +147,16 @@ For each acceptance criterion / scenario:
 2. Check **negative and abuse cases**: validation bypass strings, IDOR-style access patterns, replay, conflict handling, command injection if shell-adjacent, SSRF if URL-adjacent.
 3. Check **tests and verification artifacts**: do they **prove** the criterion, or only the happy path? Lack of negative tests is a Major finding by default.
 4. Record **spec vs code mismatches** (spec says X, code does Y) as first-class findings — never silently accept code overriding spec.
+5. Walk the **code-level checklist** over the diff. Each hit is a finding in the table below, not a separate report:
+
+   | Category | What to look for |
+   |----------|------------------|
+   | Injection | SQL built by concatenation, XSS, command injection, path traversal |
+   | Secrets | Hardcoded credentials, API keys in code, a committed `.env` |
+   | Auth | Missing validation, broken access control, CSRF |
+   | Performance | N+1 queries, unbounded loops, blocking calls in async code |
+   | Resilience | Unhandled errors, missing timeouts, race conditions |
+   | Quality | Cyclomatic complexity above 10 (measure with `cyclomatic-complexity`), deep nesting, magic numbers, missing types, dead code |
 
 ## Severity and recommendations
 
@@ -329,3 +342,43 @@ that had already spent four rounds.
 2. Always end with: (a) the verdict, (b) whether `dotf spec archive` / `/spec archive` is **advisable** in the current state, (c) if FAIL, the minimum set of actions that would flip it to PASS.
 
 If the change genuinely does not warrant a review, do not skip silently — the archive will refuse. Declare it in `proposal.md` frontmatter as `review: waived` with a non-empty `review_waived_reason:`, so the decision is auditable in the diff rather than invisible in a habit.
+
+## Evidence before claims
+
+This section and the next bind anyone about to say a change is done, fixed or passing: the implementer before committing, opening a PR or closing a task, and the reviewer before issuing a verdict.
+
+**No completion claim without fresh verification evidence.** If the command that proves a claim has not run in this session, the claim is not yet made.
+
+1. **Identify** the command that proves the claim.
+2. **Run** it in full, fresh.
+3. **Read** the whole output: exit code, failure count.
+4. **Compare** it with the claim. If it does not confirm it, state the actual status with the evidence.
+5. Only then make the claim, with the evidence beside it.
+
+| Claim | Requires | Not sufficient |
+|-------|----------|----------------|
+| Tests pass | The test command's output: 0 failures | A previous run, "should pass" |
+| Linter clean | The linter's output: 0 errors | A partial check, extrapolation |
+| Build succeeds | The build command: exit 0 | A clean linter, logs that look fine |
+| Bug fixed | The original symptom, re-run: passes | Code changed, assumed fixed |
+| Regression test works | Red-green verified: fails with the fix reverted, passes with it | Passes once |
+| Agent completed | The VCS diff shows the change | The agent reports "success" |
+| Requirements met | A line-by-line check against the spec | Tests passing |
+
+"Should", "probably" and "seems to" are the signs that a claim is running ahead of its evidence.
+
+## Closing pass (Definition of Done)
+
+Evidence is one of five checks a finished change owes. Before claiming done, walk the Definition of Done (the harness injects it verbatim into every agent's instructions; it is authored in `pattern-change-lifecycle.md`) and give a verdict per item, not a feeling:
+
+| Check | What to do | Unmet means |
+|---|---|---|
+| **Debt** | List every defect you noticed and did not fix. | Fix it in scope, or file a ticket with its root cause. A mention in chat is not an exit. |
+| **Knowledge** | Name what you learned that the diff does not show. | Write it where it belongs, in this session: repo `docs/` for build and operate detail, the store for cross-project insight. |
+| **Board** | Read the ticket's real status. | Move it: picked up when you start, blocked when blocked, closed by the change that closed it. |
+| **Review** | Check whether an open PR has checks or comments waiting. | Triage them: each comment applied, ticketed, or declined with a reason. |
+| **Evidence** | "Evidence before claims" above. | Run the command. |
+
+1. **Report the verdict, not the intention.** "Filed as #123" and "no debt found" are verdicts; "I should ticket that" is not.
+2. **A skip is a stated decision.** Any of the five may be skipped when it does not apply; say which and why. Silence is not a skip.
+3. **Do not paraphrase the standing orders.** This table binds them to a moment; it is not a second source of truth. When they disagree, the standing order wins.

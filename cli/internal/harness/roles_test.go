@@ -48,12 +48,13 @@ func TestResolveRoles(t *testing.T) {
 	// which is exactly why nothing was red. Asserting the skill ALONE is what
 	// distinguishes "the rule resolves" from "this skill has an owner"; only the
 	// second is what changed. See #1499 for the guard that cannot tell them apart.
-	if got := ResolveRoles(Suggestion{Skills: []string{"pr-review-triage"}}, personas); len(got) != 1 || got[0] != "shipper" {
-		t.Errorf("pr-review-triage should resolve to [shipper], got %v", got)
+	// SKILL-001 gave it to reviewer as well, to judge other reviewers' findings.
+	if got := ResolveRoles(Suggestion{Skills: []string{"pr-review-triage"}}, personas); strings.Join(got, ",") != "reviewer,shipper" {
+		t.Errorf("pr-review-triage should resolve to [reviewer shipper], got %v", got)
 	}
 
 	// Sorted output is the determinism contract: same input, same bytes.
-	multi := ResolveRoles(Suggestion{Skills: []string{"terraform", "audit", "read-all-adrs"}}, personas)
+	multi := ResolveRoles(Suggestion{Skills: []string{"terraform", "adversarial-review", "read-all-adrs"}}, personas)
 	for i := 1; i < len(multi); i++ {
 		if multi[i-1] > multi[i] {
 			t.Errorf("roles are not sorted: %v", multi)

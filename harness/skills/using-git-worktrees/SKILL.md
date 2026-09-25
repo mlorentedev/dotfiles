@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: c138ea5fd9f93613
+generated_sha: d2a1b78a8da3f1b9
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -195,7 +195,7 @@ git worktree prune
 
 **Called by:**
 - **brainstorming** (Phase 4) — REQUIRED when design is approved and implementation follows
-- **subagent-driven-development** / **executing-plans** — REQUIRED before executing tasks
+- **subagent-driven-development** / **spec** ("Executing the tasks") — REQUIRED before executing tasks
 - Any skill needing an isolated workspace
 
 **Pairs with:**
