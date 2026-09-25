@@ -133,7 +133,7 @@ Verdict **PASS-WITH-GAPS**, from nan/glm5.3-flash on 2026-09-25. It is the first
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/SKILL-001-portfolio-consolidation/` -> `specs/archive/SKILL-001-portfolio-consolidation/`
-- [ ] Bitácora board ticket moved to Done / closed with the closing PR (ADR-018)
-- [ ] Promotions above executed
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/SKILL-001-portfolio-consolidation/` -> `specs/archive/SKILL-001-portfolio-consolidation/`
+- [x] Bitácora board ticket moved to Done / closed with the closing PR (ADR-018): the archive PR carries `Closes #1692`
+- [x] Promotions above executed: none, since all three were decided no
