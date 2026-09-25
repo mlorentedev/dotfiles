@@ -1,7 +1,7 @@
 ---
 id: "AI-042-trusted-folders-render"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-29"
 issue: "mlorentedev/dotfiles#1334"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, copilot, agy, deploy, windows]
