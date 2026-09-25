@@ -40,8 +40,10 @@ starts with a trust prompt. `tests/antigravity.bats` guards this class for one f
 - `ai/copilot/config.json` → four templated entries (`{HOME}/Projects`, `{HOME}/Projects/*`,
   `{HOME}/Projects/Workspace`, `{HOME}/Projects/Workspace/*`), one list for both OSes.
   `ai/agy/settings.json` → two templated `trustedWorkspaces`, and the file becomes a manifest entry
-  (`agy-settings`, replace, `paths: slash`, `requires: agy`) instead of a `deploy_file` /
-  `Copy-Item` in each setup — the third twin ADR-020 says to collapse on touch.
+  (`agy-settings`, merge, `paths: slash`, `requires: agy`) instead of a `deploy_file` /
+  `Copy-Item` in each setup. Its nested objects and lists merge without removing
+  agy's runtime-created trust and permission entries — the third twin ADR-020
+  says to collapse on touch.
 - `tests/copilot-config.bats` (renamed scope: Copilot + agy trust lists) refutes any `/home/<user>`,
   `C:\Users\<user>` or `C:/Users/<user>` literal across `ai/**/*.json`, and asserts the templates.
 - `dotf doctor`'s manifest check needs nothing new: `PlanConfig` expands before comparing.
