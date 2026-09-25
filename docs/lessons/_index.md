@@ -310,3 +310,4 @@ tags: [lessons, index, dotfiles]
 | [290 - A guard that predicts what an interpreter runs should fail closed, not emulate it](lesson-290-a-guard-that-predicts-what-an-interpreter-runs-should-fail-closed.md) | 2026-09-24 |  |
 | [292 - The file that declares an event describes its owner, not the tool you bind](lesson-292-the-file-that-declares-an-event-describes-its-owner-not-the-tool-you-bind.md) | 2026-09-24 |  |
 | [293 - An empty key is still a key: define it as no storage, never as a bucket](lesson-293-an-empty-key-is-a-key-so-define-it-as-no-storage.md) | 2026-09-24 |  |
+| [294 - A Windows worktree is not automatically readable by POSIX Git](lesson-294-a-worktree-is-not-a-posix-git-directory.md) | 2026-09-25 |  |
