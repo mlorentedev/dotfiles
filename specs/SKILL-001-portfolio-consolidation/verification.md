@@ -12,7 +12,7 @@ created: "2026-09-25"
 - [x] AC3 -> `dotf harness resolve-skills` on the three records, and the `enforce: warn` count in each record's frontmatter
 - [x] AC4 -> the folded sections in the `adversarial-review`, `spec` and `new-ticket` records
 - [x] AC5 -> build, vet, `go test ./...`, lint, `--check`, full bats
-- [ ] AC6 -> after merge: `--deploy`, then every deploy target and the Copilot catalog read clean
+- [x] AC6 -> after merge: `--deploy`, then every deploy target and the Copilot catalog read clean
 
 ## Test status
 
@@ -23,6 +23,17 @@ created: "2026-09-25"
 - TDD: `TestEverySkillTheRouterNamesHasARecord` was written first and failed, naming `project-maturation`, `writing-plans`, `audit`, `verification-before-completion`, `executing-plans` (all in `DefaultSkillDependencies`) and `enrich-us` (trigger `task-and-ticket-tracking`). It passed after the remap.
 - `TestRoleJoinDrift` (HARNESS-110) went red on the slimmed builder roster: 12 of 18 rules resolved, against a floor of 16. See the first decision below; after it, 16 of 18 resolve again. `TestResolveRoles` now expects `pr-review-triage` to resolve to reviewer and shipper.
 - Prompt hook, run against this branch's records (`DOTFILES_DIR=<worktree> dotf harness suggest --from-hook`): prompts about Go, firmware, an MCP server and asyncio still print `[persona] builder` and name the domain skill first (`golang-pro`, `debug-hardware`, `mcp-builder`, `async-python-patterns`). Control run with the new rosters and main's triggers: no output at all for the Go prompt.
+
+## Deploy evidence (AC6)
+
+Run on 2026-09-25 from `~/Projects/dotfiles` at main `3c2e393` (#1694 merged). Every live peer was told before and after.
+
+- **Before.** The eight retired skills appeared 68 times: 48 rendered copies (8 skills in 6 targets) and 20 lines naming them in the Copilot catalog and the persona presence lines.
+- **Mirror.** `dotf harness mirror`: 18 updated, 50 unchanged.
+- **Deploy.** `compile-harness.sh --deploy`: exit 0, 48 `pruned stale` lines. `~/.gemini/GEMINI.md` is 7,653 characters and 7,653 bytes, down from 7,798.
+- **Orphan records.** The mirror does not prune, so the eight retired records stayed in `~/.dotfiles/harness/skills` and doctor reported them as orphans. `dotf doctor --fix` applied exactly eight fix actions, one per orphan.
+- **After.** f6 exits 0: no retired skill in any deploy target, the Copilot catalog or a presence line. `dotf harness resolve-skills` on the deployed builder, planner and reviewer records prints the slimmed rosters. Doctor's unset-severity warning reads 13 of 27 persona skills, down from 21 of 36.
+- **What doctor still reports.** 172 passed, 12 failed, none from this change: six zombie specs (#1626), and deploy-dir drift that only setup refreshes. The drift covers the four known files plus `.bashrc` and `.zshrc`, whose comments this change edited.
 
 ## Size of what a persona is told to consume
 
