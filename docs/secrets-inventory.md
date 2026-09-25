@@ -93,10 +93,16 @@ Applied with `dotf secrets reconcile` (CLI-082), each step planned, escrowed and
 - **`OPEN ROUTER API KEY`** and **`POLLEX_API_KEY`** (notes): each note equalled the canonical `OPENROUTER_API_KEY` / `POLLEX_API_KEY` value. The note was retired, then the emptied item was deleted. `openrouter.ai` stays: it is the account login, not a copy.
 - **`pypi.org`**: its `API token` field equalled `PYPI_TOKEN` and was retired. The item stays, because it is the account login and holds the recovery codes.
 - **Deleted as retired registry entries:** `github-cli-pat` (#1632), and `tailscale-auth-key`, `hetzner-api-token`, `hetzner-ssh` (#1640).
+- **`cloud.nan.builders`**: its `api-key` field equalled `NAN_API_KEY` and was retired through `bw.from`, which accepts a multi-var secret over one field since CLI-083 (#1624). The item stays: it is the account entry, not a copy.
+
+### Dead legacy fields removed (2026-09-24)
+Applied with `dotf secrets reconcile` (CLI-083) as field-level `retired:` entries, after a DR escrow. A dead value is equal to nothing current, so no retire can verify it. The field is removed by name, with the reason in the plan. A removed field does not go to Bitwarden's trash; the escrow is the only copy.
+
+- **`Stripe`** (`backup-codes`): Stripe issues one backup code, and regenerating it invalidates the old one. The owner regenerated and rotated it on 2026-09-23, and `stripe-backup-code` holds the current code. The item keeps its login.
+- **`login.tailscale.com`** (`auth-key`): created in 2026-05 or earlier, and Tailscale expires auth keys after at most 90 days. Nothing consumes one (`TS_AUTHKEY` was retired in #1640). The item keeps its login.
 
 Credentials still held in two places (a legacy field beside the canonical item), and why each remains:
-- **`cloud.nan.builders`** (`api-key` field) beside `NAN_API_KEY`: `bw.from` refuses a multi-var secret, and `NAN_API_KEY` exposes two variables (#1624).
-- **`Stripe`** (`backup-codes`), **`login.tailscale.com`** (`auth-key`), **`Hetzner`** (`key`): the legacy values are dead (rotated, expired, or 401), so they differ from nothing current, and a retire cannot verify them equal. Removing a dead value needs a field-level retire (#1624).
+- **`Hetzner`** (`key`): dead (401), but two items are named `Hetzner`, so a delete by name is blocked as ambiguous until an item can be renamed.
 - **The two items named `Hetzner`**: the SSH key one is orphaned (it opens neither the VPS nor GitHub), and deleting it needs the name disambiguated first.
 
 ### Stays in age (floor — never only-in-bw)
