@@ -72,13 +72,13 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	got := readObject(t, dst)
 
 	ws, _ := got["trustedWorkspaces"].([]any)
-	if len(ws) != 1 || ws[0] != "/home/u/Projects/ts-bridge" {
+	if len(ws) != 3 || ws[0] != "/home/u/Projects/ts-bridge" {
 		t.Errorf("the runtime-trusted workspace was destroyed: %v", got["trustedWorkspaces"])
 	}
 
 	perms, _ := got["permissions"].(map[string]any)
 	allow, _ := perms["allow"].([]any)
-	if len(allow) != 1 || allow[0] != "mcp(hive-vault/*)" {
+	if len(allow) != 6 || allow[0] != "mcp(hive-vault/*)" {
 		t.Errorf("the runtime-granted permission was destroyed: %v", perms)
 	}
 

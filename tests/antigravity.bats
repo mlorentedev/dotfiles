@@ -143,20 +143,9 @@ setup() {
         || { echo "agy-settings strategy is '$strategy'; runtime state is destroyed on every deploy" >&2; return 1; }
 }
 
-@test "AI-043: the agy template ships no key agy writes at runtime" {
-    # `merge` alone is NOT sufficient and this is the half that is easy to drop.
-    # mergeInto writes whole TOP-LEVEL keys, so a template still carrying
-    # `permissions` or `trustedWorkspaces` overwrites them wholesale even under
-    # merge -- the manifest change and this removal only work as a pair.
-    #
-    # Stated cost, so nobody re-adds them thinking it is free: dotfiles no
-    # longer ships agy's `permissions.deny` defaults to a FRESH machine. The
-    # union-merge work on #1334 is what lets both coexist again; until it lands,
-    # not clobbering the user's grants is the side worth being on.
-    local key
-    for key in permissions trustedWorkspaces; do
-        run jq -e --arg k "$key" 'has($k)' "$DOTFILES_DIR/ai/agy/settings.json"
-        [ "$status" -ne 0 ] \
-            || { echo "template carries '$key', which agy rewrites at runtime; merge overwrites it wholesale" >&2; return 1; }
-    done
+@test "AI-042: the agy template restores managed lists through merge union" {
+    [ "$(jq -c '.trustedWorkspaces' "$DOTFILES_DIR/ai/agy/settings.json")" = \
+        '["{HOME}/Projects/*","{HOME}/Projects/Workspace/*"]' ]
+    [ "$(jq -c '.permissions.deny' "$DOTFILES_DIR/ai/agy/settings.json")" = \
+        '["command(rm -rf /)","command(rm -rf ~/*)"]' ]
 }
