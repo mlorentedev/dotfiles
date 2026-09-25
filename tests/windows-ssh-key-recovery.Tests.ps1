@@ -206,12 +206,14 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
 
             Enable-WindowsOpenSshServer
 
-            Assert-MockCalled Add-WindowsCapability -Times 1 -Exactly
-            Assert-MockCalled Set-Service -Times 1 -Exactly -ParameterFilter {
+            Should -Invoke -CommandName Add-WindowsCapability -Times 1 -Exactly -Scope It
+            Should -Invoke -CommandName Set-Service -Times 1 -Exactly -Scope It -ParameterFilter {
                 $Name -eq 'sshd' -and $StartupType -eq 'Automatic'
             }
-            Assert-MockCalled Start-Service -Times 1 -Exactly -ParameterFilter { $Name -eq 'sshd' }
-            Assert-MockCalled New-NetFirewallRule -Times 1 -Exactly -ParameterFilter {
+            Should -Invoke -CommandName Start-Service -Times 1 -Exactly -Scope It -ParameterFilter {
+                $Name -eq 'sshd'
+            }
+            Should -Invoke -CommandName New-NetFirewallRule -Times 1 -Exactly -Scope It -ParameterFilter {
                 $Name -eq 'OpenSSH-Server-In-TCP' -and $LocalPort -eq 22
             }
         }
@@ -228,7 +230,7 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             Invoke-OpenSshHostReconciliation -PublicKeyPath $script:PublicKey `
                 -AuthorizedKeysPath $authorized
 
-            Assert-MockCalled Restart-Service -Times 0 -Exactly
+            Should -Invoke -CommandName Restart-Service -Times 0 -Exactly -Scope It
         }
     }
 
