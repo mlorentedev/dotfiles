@@ -113,26 +113,8 @@ was being got wrong, and it belongs where it can be tested.`,
 				_, _ = fmt.Fprint(cmd.OutOrStdout(), updated)
 				return nil
 			}
-			// Written through a temp file in the same directory: a half-written
-			// MEMORY.md is the one outcome worse than a clobbered one, and the
-			// file is read at the start of every session.
-			tmp, err := os.CreateTemp(filepath.Dir(memoryPath), ".handoff-*")
-			if err != nil {
-				return fmt.Errorf("stage the write: %w", err)
-			}
-			tmpName := tmp.Name()
-			if _, err := tmp.WriteString(updated); err != nil {
-				_ = tmp.Close()
-				_ = os.Remove(tmpName)
-				return fmt.Errorf("stage the write: %w", err)
-			}
-			if err := tmp.Close(); err != nil {
-				_ = os.Remove(tmpName)
-				return fmt.Errorf("stage the write: %w", err)
-			}
-			if err := os.Rename(tmpName, memoryPath); err != nil {
-				_ = os.Remove(tmpName)
-				return fmt.Errorf("replace %s: %w", memoryPath, err)
+			if err := replaceMemoryFile(memoryPath, updated); err != nil {
+				return err
 			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, memoryPath)
 			return nil
@@ -144,6 +126,39 @@ was being got wrong, and it belongs where it can be tested.`,
 	cmd.Flags().StringVar(&agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the result instead of writing it")
 	return cmd
+}
+
+// replaceMemoryFile writes content over path through a temp file in the same
+// directory: a half-written MEMORY.md is the one outcome worse than a clobbered
+// one, and the file is read at the start of every session.
+//
+// The file keeps the mode it had. os.CreateTemp makes the temp file 0600, and
+// renaming it over MEMORY.md used to narrow every file this command wrote; a
+// file shared with other tools is not ours to re-permission, the rule harness
+// bind follows for settings files.
+func replaceMemoryFile(path, content string) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".handoff-*")
+	if err != nil {
+		return fmt.Errorf("stage the write: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("stage the write: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("stage the write: %w", err)
+	}
+	if fi, err := os.Stat(path); err == nil {
+		if err := os.Chmod(tmpName, fi.Mode().Perm()); err != nil {
+			return fmt.Errorf("stage the write: %w", err)
+		}
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("replace %s: %w", path, err)
+	}
+	return nil
 }
 
 // newMemThreadCmd prints this session's thread key and journal filename, so a
