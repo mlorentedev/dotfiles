@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: e61d6104c7b794b0
+generated_sha: 0b08115b7a5da034
 id: spec-skill
 type: skill
 status: active
@@ -13,14 +13,15 @@ description: 'Manage Spec-Driven Development per-feature artifacts. Triggers on 
   for X", "check/lint spec X", "archive spec X". Five subcommands: init (scaffold,
   gated on an open GitHub issue per ADR-018), bootstrap (optional 4-section substrate
   contract), fill (Socratic 5-question proposal), check (pre-implementation consistency
-  lint), archive (move + selective vault promotion). Cross-OS Linux/Windows, cross-agent
+  lint), archive (move + selective vault promotion). Also plans tasks.md as bite-sized
+  TDD steps and executes them in reviewed batches. Cross-OS Linux/Windows, cross-agent
   Claude/Copilot via AGENTS.md indirection.'
 allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vault_search,
   mcp__hive__vault_write, mcp__hive__vault_patch]
 keywords: [spec, sdd, rdd, spec init, spec fill, spec check, spec archive, scaffold
-    spec]
+    spec, implementation plan, writing plans, execute plan, crear plan, ejecutar plan]
 paths: [specs/**]
-requires: [adversarial-review, verification-before-completion]
+requires: [adversarial-review]
 ---
 # Spec Workflow
 
@@ -39,7 +40,7 @@ requires: [adversarial-review, verification-before-completion]
 ## When NOT to use
 
 - Trivial change (typo, comment-only, mechanical rename) — per pattern's "Skip SDD" rules.
-- Strategic planning across milestones -> use `/writing-plans`.
+- Strategic planning across milestones -> that belongs on the board (epics, milestones), not in a spec.
 - If you cannot point to ANY work-gate justifying this spec (open GitHub issue, ADR, roadmap) — don't run the skill yet; open the bitácora issue first.
 
 ---
@@ -257,6 +258,28 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 ---
 
+## Planning the tasks
+
+`tasks.md` is the plan. Write it after `fill` and before `check`, for an engineer with no context on the codebase:
+
+- **One step is one action of 2-5 minutes:** write the failing test, run it and watch it fail, write the minimal code, run it and watch it pass, commit. Each behavior follows red-green-refactor; `test-driven-development` holds the full discipline.
+- **Name exact paths** for every file to create, modify or test.
+- **Give exact commands with their expected output** ("Expected: FAIL with `function not defined`"), never "add validation".
+- **Tag each task** with the criterion it serves (`[AC<n>]`), so `check` maps coverage deterministically, and with `[P]` when it depends on no unchecked task.
+- DRY, YAGNI, frequent commits. A plan that needs its own `docs/plans/` file is a spec that has not been written yet.
+
+## Executing the tasks
+
+1. **Review the plan critically before starting.** Raise any concern with the human first; do not start on a plan you doubt.
+2. **Work in batches** (three tasks by default): follow each task's steps exactly, run the verification it names, tick it in `tasks.md`.
+3. **Report after each batch** — what was implemented and the verification output — then wait for feedback before the next one.
+4. **Stop at once** when blocked mid-batch (a missing dependency, a failing test, an unclear instruction), when the plan has a critical gap, or when a verification keeps failing. Ask; do not guess.
+5. **Finish** with the full test suite and the closing pass in `adversarial-review`, then report completion with the evidence.
+
+Never start on `main`/`master` without explicit consent.
+
+---
+
 ## Subcommand: archive
 
 **Purpose:** Close a spec. Interactive promotion to vault, then mechanical archive.
@@ -306,7 +329,7 @@ Both `--force-*` flags require `--reason`. An override is **recorded**: the arch
 ## Integration with existing skills
 
 - **Pre-implementation:** run `/spec check` to lint criteria↔task coverage before coding. `adversarial-review` is the heavier *post*-implementation gate (before archive) — the two sit at opposite ends of the same correctness axis.
-- **Pre-archive:** recommend invoking `verification-before-completion` for evidence audit.
+- **Pre-archive:** run the closing pass in `adversarial-review` ("Evidence before claims", "Closing pass") before claiming the spec is done.
 - **Post-archive deeper crystallization:** `crystallize` can promote a lesson further to a pattern if recurrence detected.
 - **Independent of** `code-review`, `commit-commands:commit-push-pr`, `pr-review-toolkit:*` — those are pre/post-merge gates, separate axis.
 

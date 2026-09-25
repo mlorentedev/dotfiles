@@ -165,8 +165,8 @@ env var  →  ~/.config/dotfiles/machine.json (per-machine override)  →  env-c
 ```bash
 dotf init my-project --stack python  # Scaffold a new fully-practiced repo
 claude                               # Start Claude Code session
-> /audit src/auth.py                 # Use skills via slash commands
-agyp audit "$(cat src/main.py)"     # Gemini saved-prompt helper (~/.gemini/prompts/audit.md)
+> /test src/auth.py                  # Use skills via slash commands
+agyp test "$(cat src/main.py)"      # Gemini saved-prompt helper (~/.gemini/prompts/test.md)
 oc                                   # OpenCode TUI (Go subscription; default model in ai/opencode/opencode.jsonc)
 qq por que tardas tanto?             # one-shot question (no quotes needed in zsh), ES-friendly
 qf explain the C10k problem         # one-shot question, faster/more technical model

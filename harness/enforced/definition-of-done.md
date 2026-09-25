@@ -1,5 +1,5 @@
 
-> Injected verbatim into every agent's instructions (harness `enforced` id `definition-of-done`) and executed by the `verification-before-completion` skill. It **binds** existing standing orders to the moment of closing; it does not restate them.
+> Injected verbatim into every agent's instructions (harness `enforced` id `definition-of-done`) and executed by the closing pass of the `adversarial-review` skill. It **binds** existing standing orders to the moment of closing; it does not restate them.
 
 Working code is not a finished change. Before saying done, each of these is true:
 

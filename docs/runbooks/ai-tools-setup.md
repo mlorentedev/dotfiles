@@ -110,7 +110,7 @@ Skills are `SKILL.md` files with YAML frontmatter that Claude Code loads automat
 
 ```bash
 claude
-> /audit src/auth.py
+> /adversarial-review AUTH-001
 > /refactor this function
 > /test generate tests for the user service
 > /doc document this module
@@ -207,7 +207,7 @@ superseded by a built-in or a vault-native skill, see `docs/lessons.md`):
 `compile-harness.sh`), `ralph-loop` (-> built-in `loop` skill), `code-review`
 plugin (-> built-in `/code-review`), `commit-commands` (-> AGENTS.md git
 Standing Orders), `pr-review-toolkit` (-> `/code-review` + `/security-review`),
-`feature-dev` (-> `architecture-session` + `writing-plans` + `executing-plans`).
+`feature-dev` (-> `architecture-session` + `spec`).
 Also dropped the unmanaged duplicate `ralph-wiggum@claude-code-plugins` (never
 declared here, installed out-of-band, identical to `ralph-loop`).
 
@@ -252,7 +252,7 @@ The `claude-mem` plugin provides persistent memory across sessions.
 
 1. **Start session:** `cd my-project && claude`
 2. **Review context:** Claude reads `CLAUDE.md` + `tasks/todo.md` + `tasks/lessons.md`
-3. **Work:** Use slash commands (`/audit`, `/test`, `/refactor`)
+3. **Work:** Use slash commands (`/spec`, `/test`, `/adversarial-review`)
 4. **Update tracking:** Mark completed items, record lessons
 
 ## Syncing Across Machines
