@@ -20,7 +20,7 @@ An audit of the harness reported defects; re-measured on 2026-09-24, four were r
 
 - The compact doctrine is derived from the vault sections and fits every capped surface with room to spare (under 8,000 characters against agy's 12,000). It is pure ASCII, so the character count equals the byte count, and a test on the committed records pins the budget.
 - Every trigger names a pattern that exists. `--refresh` refuses a dangling one before writing anything, and `dotf doctor` reports one on a machine that has the vault. Skill linking follows the rules that matched, not the patterns they share.
-- A hook payload with no session id has no ledger: the call is allowed and journaled as `session-unscoped`, and nothing is stored under a shared key.
+- A hook payload with no session id has no consumption or dispatch state. The call is allowed, and journaled as `session-unscoped` when it would otherwise have enforced a persona or recorded a skill consumption (a Skill call with no readable name is still `skill-unnamed`). Nothing is stored under a shared key, and a payload that claims the reserved journal name `_unscoped` as its session id is read as naming none.
 - agy's own payload is parsed and answered in its protocol (`ask` or `deny`, never `allow`), and the gate is bound in `~/.gemini/config/hooks.json` with the stale `settings.json` entry retired. The new bind format lives under `agents.bind_named`, which older binaries never read.
 
 ## Out of scope
@@ -41,7 +41,7 @@ An audit of the harness reported defects; re-measured on 2026-09-24, four were r
 
 - [ ] **AC1** — the compact doctrine is under 8,000 characters and pure ASCII on every capped surface, and the deployed `GEMINI.md` has `wc -m` equal to `wc -c`. Pinned by a bats test that reads only committed records.
 - [ ] **AC2** — `compile-harness.sh --refresh` fails, naming the trigger and the pattern, when a trigger's pattern is absent, and writes nothing. `dotf doctor` reports the same, and skill linking follows matched rules.
-- [ ] **AC3** — two payloads with no session id share no ledger, proven by an end-to-end test that fails on the old code.
+- [ ] **AC3** — two payloads with no session id share no ledger, and a payload that claims the reserved journal name is read as naming none, proven by end-to-end tests that fail on the old code.
 - [ ] **AC4** — an agy payload is parsed and answered in agy's protocol, the gate is bound in `hooks.json` with the stale entry retired, and an older binary given the manifest emits nothing wrong.
 - [ ] **AC5** — after all four merge: mirror, install a binary that carries the agy parser, `dotf harness bind`, and one real agy tool call leaves an `agy` record with a real conversation id under `~/.local/state/dotfiles/gate/`.
 

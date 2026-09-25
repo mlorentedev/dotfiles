@@ -31,8 +31,9 @@ created: "2026-09-25"
 
 ## S3 - ledger (AC3)
 
-- [ ] [AC3] Failing end-to-end test: two payloads with no session id share one ledger
-- [ ] [AC3] No session id means no storage: allow and journal `session-unscoped`
+- [x] [AC3] Failing end-to-end test: two payloads with no session id share one ledger
+- [x] [AC3] No session id means no consumption or dispatch state: allow, and journal `session-unscoped` when a persona would have been enforced or a skill consumption recorded
+- [x] [AC3] Reserve the `_unscoped` journal name: a session id equal to it is read as naming no session
 
 ## S4 - agy (AC4), after S3
 

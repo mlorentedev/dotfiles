@@ -15,8 +15,8 @@
   },
   {
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f3",
-    "behavior": "Two payloads with no session id share no ledger",
-    "verification": "cd cli && go test ./internal/cmd -run TestSessionsWithNoIDShareNoLedger",
+    "behavior": "Two payloads with no session id share no ledger, and a payload that claims the reserved journal name is read as naming no session",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestSessionsWithNoIDShareNoLedger|TestTheReservedJournalNameIsNotASession'",
     "state": "pending",
     "evidence": ""
   },
@@ -29,8 +29,8 @@
   },
   {
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f5",
-    "behavior": "A real agy tool call leaves a decision record with a recognised payload",
-    "verification": "grep -h '\"harness\":\"agy\"' ~/.local/state/dotfiles/gate/*.decisions.jsonl | grep -qv '\"outcome\":\"payload-unrecognised\"'",
+    "behavior": "A real agy tool call leaves a recognised decision record that names a conversation id",
+    "verification": "grep -h '\"harness\":\"agy\"' ~/.local/state/dotfiles/gate/*.decisions.jsonl | grep '\"session\":\"[^\"]\\+\"' | grep -qv '\"outcome\":\"payload-unrecognised\"'",
     "state": "pending",
     "evidence": ""
   }
