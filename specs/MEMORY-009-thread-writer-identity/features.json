@@ -1,0 +1,37 @@
+[
+  {
+    "id": "MEMORY-009-thread-writer-identity-f1",
+    "behavior": "A block written by agent A, stamped or attributed by its Journal line, is never replaced by agent B; B's write lands in <key>+B",
+    "verification": "out=$(cd cli && go test ./internal/mem -run '^(TestAnotherAgentsStampedBlockIsForkedNotReplaced|TestAnUnstampedBlockIsAttributedByItsJournalLine)$' -count=1 -v) && [ \"$(printf '%s\\n' \"$out\" | grep -c '^--- PASS: ')\" -eq 2 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-009-thread-writer-identity-f2",
+    "behavior": "The fork is announced on stderr, naming the key and both agents",
+    "verification": "out=$(cd cli && go test ./internal/cmd -run '^TestMemHandoffWriteAnnouncesAFork$' -count=1 -v) && printf '%s\\n' \"$out\" | grep -q '^--- PASS: TestMemHandoffWriteAnnouncesAFork '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-009-thread-writer-identity-f3",
+    "behavior": "A rewrite by the same agent, or of a block with no known writer, replaces it in place and stamps the writer",
+    "verification": "out=$(cd cli && go test ./internal/mem -run '^(TestTheSameAgentRewritesItsOwnBlockInPlace|TestABlockWithNoKnownWriterIsReplacedAndStamped)$' -count=1 -v) && [ \"$(printf '%s\\n' \"$out\" | grep -c '^--- PASS: ')\" -eq 2 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-009-thread-writer-identity-f4",
+    "behavior": "Without --agent the output is byte-identical to the command's output before this change",
+    "verification": "out=$(cd cli && go test ./internal/mem -run '^TestAWriteWithNoAgentIsUnchanged$' -count=1 -v) && printf '%s\\n' \"$out\" | grep -q '^--- PASS: TestAWriteWithNoAgentIsUnchanged '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-009-thread-writer-identity-f5",
+    "behavior": "The handoff skill's command passes --agent",
+    "verification": "grep -qE 'dotf mem handoff-write .*--agent' harness/skills/handoff/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]

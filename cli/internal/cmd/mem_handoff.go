@@ -27,6 +27,7 @@ func newMemHandoffWriteCmd() *cobra.Command {
 	var (
 		memoryPath string
 		thread     string
+		agent      string
 		dryRun     bool
 	)
 
@@ -49,6 +50,13 @@ Run from a repository that is not the project --memory belongs to (the vault
 checkout writing a project's MEMORY.md), the current branch names no line of work
 there, so handoff-write refuses without --thread and names the key it would have
 used (#1606).
+
+Pass --agent to name the writer. It is stamped into the heading as
+"(writer: <agent>)", and a block another agent wrote under the same key is kept:
+this write goes to <thread>+<agent> instead, and stderr names both agents and the
+key. An unstamped block's writer is read from its Journal line; a block nothing
+attributes is replaced as before. Without --agent nothing is stamped or forked
+(#1690).
 
 Skills should call this instead of instructing an Edit: the merge is the part that
 was being got wrong, and it belongs where it can be tested.`,
@@ -78,12 +86,19 @@ was being got wrong, and it belongs where it can be tested.`,
 				return fmt.Errorf("read %s: %w", memoryPath, err)
 			}
 
-			updated, changed, err := mem.WriteThread(string(current), thread, string(body))
+			res, err := mem.WriteThreadAs(string(current), thread, agent, string(body))
 			if err != nil {
 				return err
 			}
-			if !changed {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", thread)
+			updated := res.Content
+			// The one outcome where the handoff is not where its writer asked,
+			// so it is said every time, written or unchanged (#1690).
+			if res.Kept != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
+					thread, res.Kept, agent, res.Key)
+			}
+			if !res.Changed {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
 				return nil
 			}
 			// A block nobody wrote this session moves, so say so (#1651). On stderr,
@@ -116,13 +131,14 @@ was being got wrong, and it belongs where it can be tested.`,
 				_ = os.Remove(tmpName)
 				return fmt.Errorf("replace %s: %w", memoryPath, err)
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", thread, memoryPath)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, memoryPath)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&memoryPath, "memory", "", "path to the project's MEMORY.md")
 	cmd.Flags().StringVar(&thread, "thread", "", "thread key (default: this checkout's branch)")
+	cmd.Flags().StringVar(&agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the result instead of writing it")
 	return cmd
 }
