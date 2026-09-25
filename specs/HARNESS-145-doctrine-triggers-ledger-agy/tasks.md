@@ -37,10 +37,10 @@ created: "2026-09-25"
 
 ## S4 - agy (AC4), after S3
 
-- [ ] [AC4] Parse agy's payload and answer in its protocol (`ask` or `deny`, never `allow`)
-- [ ] [AC4] `hooks-json` bind format under `agents.bind_named`, with the loader refusing a format in the wrong key
-- [ ] [AC4] Retire the stale `settings.json` entry; keep a person's disable switch
-- [ ] [AC4] Lessons 292 and 293, ADR-027 amendment, ADR-010 row
+- [x] [AC4] Parse agy's payload and answer in its protocol (`ask` or `deny`, never `allow`)
+- [x] [AC4] `hooks-json` bind format under `agents.bind_named`, with the loader refusing a format in the wrong key
+- [x] [AC4] Retire the stale `settings.json` entry; keep a person's disable switch
+- [x] [AC4] Lessons 292 and 293, ADR-027 amendment, ADR-010 row
 
 ## Operational tail (AC5)
 
