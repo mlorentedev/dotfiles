@@ -96,6 +96,16 @@ Entertainment
 >
 > **Two different sets, easy to conflate — and easier now that the prefix is gone.** The folders that *exist in the vault* are `apps`, `infra`, `floor` (above). The folders a *registry entry may declare* in `bw.folder` are only `apps` and `infra` — `validBWFolders` in `cli/internal/secrets/registry.go` rejects anything else. `floor` is absent because floor secrets are age-only and carry no `bw:` block at all; a personal-plane folder is absent because none is ratified yet (deferred to #586). So "`<plane>` names a vault folder" holds for organizing the vault by hand, and does **not** mean every plane is a legal `bw.folder` value. Before the flattening, `Dotfiles/<plane>` read unmistakably as a vault path; `<plane>` alone reads like a registry value, which is why the distinction is now written down rather than left to a code comment.
 
+> **Amendment (2026-09-24): the `Dotfiles/` prefix is back, and the personal plane gets `Dotfiles/personal`. Folder = plane.**
+>
+> The prefix drop above never reached the store. The live vault held `Dotfiles/apps` and `Dotfiles/infra`, and `ResolveFolder` matches a folder by exact name and creates what it does not find. So the unprefixed names would have minted a second folder beside each real one and split the managed items across the two (measured 2026-09-21). The code went back to the prefixed names (`validBWFolders`), and this records it. The prefix also has a use of its own: it groups the managed items among the ~160 personal logins in the Bitwarden UI.
+>
+> **One rule: each plane that has a Bitwarden placement has exactly one folder, named after it.** `app` → `Dotfiles/apps`, `infra` → `Dotfiles/infra`, `personal` → `Dotfiles/personal` (`planeFolder`). `floor` has none, because its authority is off the store. The personal plane had no folder until now, which left its six secrets in no folder at all.
+>
+> **Rejected: the domain split proposed in #1596** (`identity/` and `finance/` beside `apps/` and `infra/`, sorted by what breaks if a secret leaks). Against the registry on 2026-09-24, all six personal-plane secrets are account access: backup codes, recovery codes and app passwords, including Stripe's backup code. The only payment credential, `STRIPE_API_KEY`, is on the app plane. `finance/` would be empty, and a second classification by domain is one more rule to keep in step with the plane the registry already declares.
+>
+> `Dotfiles/personal` holds the personal-*plane* secrets the registry declares. The ~125 personal logins it does not declare stay outside `dotf secrets`' bounds, and the optional personal tree above (`Finance`, `Travel`, …) is unchanged.
+
 ### Item & field naming
 
 - **Item:** `<service>-<purpose>`, kebab-case — `openai-api-key`, `github-release-pat`, `hetzner-api-token`, `x-twitter-api`, `cloudflare-api-token`.

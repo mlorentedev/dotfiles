@@ -231,10 +231,8 @@ func (w *driftWalk) resolveItem(d BWDecl) (ItemSummary, bool) {
 // checkPlacement reports an item outside its declared folder.
 //
 // A declaration with no folder states no placement, so there is nothing for the
-// item to be misfiled against. The taxonomy covers the app and infra planes; the
-// personal plane's is deferred (#586), and reading "" as "must be unfoldered"
-// would report every personal item filed by hand — and hand reconcile an
-// instruction to unfile it.
+// item to be misfiled against. Reading "" as "must be unfoldered" would report
+// every item filed by hand, and hand reconcile an instruction to unfile it.
 //
 // Keyed on the item alone because the registry guarantees one declared folder per
 // item (checkOneFolderPerItem). Without that rule two declarations could pull one
