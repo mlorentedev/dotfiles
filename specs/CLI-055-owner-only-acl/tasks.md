@@ -19,7 +19,24 @@ created: "2026-08-29"
 - [x] [AC3] The three writers — `deploy.stage`, `deploy.commit`, `secrets.AtomicWriteMode` — call `fsmode.Apply`; no `os.Chmod(` call remains in them.
 - [x] [AC3] `fsmode.Needs(path, mode)` — the read-only question — and `Deploy`'s two in-sync returns ask it: content in sync but mode off (an inherited DACL on a 0600 deployed by an older binary) is reported `mode fixed` (`would fix mode` on `--dry-run`) and applied without a content rewrite. Found on the box: the first AC4 run said `in sync` and left the inherited ACL in place.
 - [x] [AC4] Box: `dotf deploy pi` with the branch binary → `icacls ~/.pi/agent/models.json` lists the user and SYSTEM only, no `(I)`; the 0644 neighbour keeps its `(I)` entries; a second run is `in sync`.
-- [x] [AC5] The Windows-only tests resolve the user from the process token, so CI's service account passes them; `GOOS=linux go vet` keeps the POSIX build honest from the Windows box.
+- [x] [AC5] The Windows-only tests resolve the user from the process token, so they pass under whatever account runs them (an administrator on CI's hosted runner); `GOOS=linux go vet` keeps the POSIX build honest from the Windows box.
+
+## Review round 1 (2026-09-24, retroactive, FAIL)
+
+Reviewed at the landing commit `3f554ad` (#1380) by `nan/deepseek-v4-flash`. Every finding's disposition is in `verification.md`.
+
+- [x] F1: `features.json` f5 names the call the code makes, `OpenProcessToken(CurrentProcess())` + `GetTokenUser()`, and the proposal's AC5 risk note says the same
+- [x] F3: the proposal's What names the in-sync mode fix `Deploy` gained
+- [x] Round 2 review ran (FAIL, below); it did not pass
+
+## Review round 2 (2026-09-24, FAIL)
+
+`nan/deepseek-v4-flash` at `8a110d7`.
+
+- [x] F1: every verifier that names a Windows-only test runs it on Windows and, elsewhere, requires it to exist and compile, so a missing test fails the verifier
+- [x] f4 names its platform, and says why it exits 1 elsewhere
+- [x] F7: the account premise matches CI (an administrator on the hosted runner, a domain account on the box)
+- [x] Round 3 review passes before archive (PASS WITH GAPS, `nan/glm5.3-flash`)
 
 ## Closing
 

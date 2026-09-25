@@ -33,7 +33,11 @@ silently does not deliver.
   Defender, the services that already read every profile), inheritance from
   the directory cut (`PROTECTED_DACL`). A mode with group/other bits leaves the
   inherited ACL alone — there is nothing owner-only to express.
-- The three writers call it instead of `os.Chmod`; nothing else changes shape.
+- The three writers call it instead of `os.Chmod`.
+- `dotf deploy` also applies the declared mode to a file whose content is
+  already in sync (`Outcome.ModeFixed`), and reports it as `mode fixed`, or
+  `would fix mode` under `--dry-run`. An in-sync file with the wrong mode is
+  therefore modified, where before it was left untouched.
 - A Windows-only test proves the consequence with the tool an administrator
   would use: `icacls` on a file written at `0600` lists exactly the user and
   SYSTEM and no inherited entries, and `GetNamedSecurityInfo` reports
@@ -56,10 +60,11 @@ silently does not deliver.
   home; an error is returned, never swallowed, naming the path.
 - Removing inherited ACEs strips Administrators' entry. RESOLVED, deliberate:
   that is what 0600 means, and Administrators keep `SeTakeOwnershipPrivilege`.
-- CI's Windows leg runs as a service account: the test must resolve the
-  current user's SID from the token, never from a username, so it holds for
-  any account. RESOLVED by construction (`OpenCurrentProcessToken` +
-  `GetTokenUser`).
+- The test must hold for any account: CI's hosted Windows runner runs as an
+  administrator, and the box as a domain account. So it resolves the current
+  user's SID from the process token, never from a username. RESOLVED by construction (`OpenProcessToken(CurrentProcess())`
+  + `GetTokenUser`; the pinned `golang.org/x/sys` marks the
+  `OpenCurrentProcessToken` shorthand deprecated).
 
 ## Acceptance criteria
 
@@ -69,7 +74,7 @@ Observable outcomes. Each must be testable.
 - [x] AC2 — `fsmode.Apply(path, 0o644)` on Windows keeps the inherited ACL (no DACL rewrite) and sets the read-only attribute as `os.Chmod` did.
 - [x] AC3 — `dotf deploy` of a `mode: 0600` entry and `secrets.AtomicWriteMode(…, 0o600)` both go through `fsmode.Apply`; no `os.Chmod` call remains in the writers.
 - [x] AC4 — on the Windows work box: after `dotf deploy`, `icacls ~/.pi/agent/models.json` lists the user and `NT AUTHORITY\SYSTEM` only, with no `(I)` entries; a `0644` neighbour keeps its `(I)` entries.
-- [x] AC5 — CI's Windows leg runs the Windows-only test and passes under its service account.
+- [x] AC5 — CI's Windows leg runs the Windows-only tests and they pass under whatever account runs them (the user comes from the process token).
 
 ## References
 
