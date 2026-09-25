@@ -470,9 +470,11 @@ setup() {
          -type f ! -path "*/.git/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum > "$snap2"
     sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config" >> "$snap2"
 
-    # Assert diff is empty
+    # Assert diff is empty. On failure, print it: bats shows only the failed line,
+    # so without this the file that changed between the two runs, which is the
+    # actual non-idempotence, never reached the log (TEST-012).
     run diff -u "$snap1" "$snap2"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || { printf 'files whose hash changed between the two setup runs:\n%s\n' "$output"; return 1; }
     [ -z "$output" ]
 
     rm -f "$snap1" "$snap2"
