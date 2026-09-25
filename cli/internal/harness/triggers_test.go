@@ -436,3 +436,43 @@ func TestTriggersEmbeddedMatchesDiskSSOT(t *testing.T) {
 		t.Errorf("embedded triggers.json drifted from %s; re-sync copies", diskPath)
 	}
 }
+
+// TestEverySkillTheRouterNamesHasARecord is TestEveryDeclaredSkillHasARecord's
+// sibling for the two other places a skill id is typed by hand: a trigger rule's
+// `skills` and DefaultSkillDependencies. Retiring a skill drops its record under
+// harness/skills/, and neither list was checked against the records, so a retired
+// id would go on being suggested by `dotf harness suggest` and the prompt hook: a
+// skill name that nothing can invoke. SKILL-001 retired eight skills that both
+// lists still named.
+func TestEverySkillTheRouterNamesHasARecord(t *testing.T) {
+	root := repoRootForTest(t)
+	cfg, err := ParseTriggers(defaultTriggersJSON)
+	if err != nil {
+		t.Fatalf("the embedded triggers do not parse: %v", err)
+	}
+
+	named := map[string]string{}
+	for _, rule := range cfg.Triggers {
+		for _, s := range rule.Skills {
+			named[s] = "trigger " + rule.ID
+		}
+	}
+	for skill, deps := range DefaultSkillDependencies {
+		named[skill] = "DefaultSkillDependencies"
+		for _, d := range deps {
+			named[d] = "DefaultSkillDependencies[" + skill + "]"
+		}
+	}
+	if len(named) == 0 {
+		t.Fatal("neither the triggers nor the dependency map name a skill; nothing was checked")
+	}
+
+	for skill, where := range named {
+		// IsRegular, as in the persona guard: os.Stat also succeeds on a directory.
+		info, err := os.Stat(filepath.Join(root, "harness", "skills", skill, "SKILL.md"))
+		if err != nil || !info.Mode().IsRegular() {
+			t.Errorf("%s names skill %q, but harness/skills/%s/SKILL.md is not a readable file: "+
+				"the router would suggest a skill nothing can invoke", where, skill, skill)
+		}
+	}
+}
