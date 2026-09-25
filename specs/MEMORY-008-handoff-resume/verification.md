@@ -19,10 +19,34 @@ Each slice PR fills its own section below and nothing else.
 ## Slice 0 evidence (prerequisite bugs, each on its own issue)
 
 - #1620, `session-end` replaced an authored journal: PR #1701. `TestSessionEndLeavesAnAuthoredJournalByteIdentical` fails on main and passes with the fix.
-- #1606, `handoff-write` keyed a thread from another repository: branch `fix/handoff-thread-from-project`. `TestHandoffThreadRefusesAKeyFromAnotherRepository` and `TestMemHandoffWriteFromAnotherRepositoryTouchesNoThread` fail on main (the first cannot build there, the second finds the other session's thread replaced) and pass with the fix.
-- #1651, the legacy block stays in front: pending.
+- #1606, `handoff-write` keyed a thread from another repository: PR #1702. `TestHandoffThreadRefusesAKeyFromAnotherRepository` and `TestMemHandoffWriteFromAnotherRepositoryTouchesNoThread` fail on main (the first cannot build there, the second finds the other session's thread replaced) and pass with the fix.
+- #1651, the legacy block stays in front: PR #1703. `TestWriteThreadMovesTheUnthreadedBlockIntoALegacyThread`, `TestWriteThreadMigratesEvenWhenItsOwnThreadIsUnchanged`, `TestWriteThreadNamesAnUndatedLegacyBlockAndNeverCollides` and `TestMemHandoffWriteDryRunShowsTheLegacyMigration`.
 
 ## Slice 1 evidence
+
+- `ParseThread` and `ThreadLabels` in `cli/internal/mem/thread.go`.
+  - `TestParseThreadReadsEveryCanonicalLabel`: all eight labels are read.
+  - `TestParseThreadReadsTheImprovisedLabelsAsTheirFields`: `Verify at start` is read as `Verify`, and `Judgment calls left open` as `Awaiting Manu`.
+  - `TestParseThreadKeepsAnUnknownLabel`: an unknown label is kept. A qualified canonical label counts as unknown, because its qualifier is content.
+  - `TestParseThreadDropsNoLine`.
+  - `TestParseThreadReadsEitherFormOfTheDateAndJournal`.
+- `handoff-write` names a missing or empty `Next action`, and every unknown label, on stderr. It still writes the body. Tests: `TestThreadWarningsNameOnlyWhatIsMissingOrUnknown`, `TestMemHandoffWriteNamesWhatTheBodyLacksAndStillWrites`.
+- **Mutation checks**, each reverted:
+
+  | Mutation | Test that went red |
+  |---|---|
+  | aliases ignored | the improvised-labels test |
+  | continuation lines dropped | two tests |
+  | an empty `Next action` accepted | the warnings test |
+
+- **Found along the way: `handoff-write` narrowed the mode of the file it replaced.** `os.CreateTemp` creates the temp file 0600, and the rename carried that mode onto MEMORY.md. On 2026-09-25, 9 of the vault's 21 MEMORY.md files were 0600, the ones this command had written; the rest were 0664.
+  - Fix: the temp file takes the replaced file's mode before the rename, as `harness bind` does for settings files. Test: `TestMemHandoffWriteKeepsTheFileMode`, which failed at 600 before the fix.
+  - The write now lives in `replaceMemoryFile`. That brings `newMemHandoffWriteCmd` from 17 (after #1711 and this slice's warnings) down to 14.
+- Rebased onto #1711. Its `TestMemHandoffWriteWithoutAgentSaysWhatItAlwaysSaid` expected an empty stderr with a body that has no `Next action`, which this slice now warns about. The test now passes a body with one, so it still checks only what `--agent` could add.
+- **Probe over every thread in the vault's `10_projects/*/memory/MEMORY.md`** (a throwaway test, not committed):
+  - 34 threads parsed, with 0 lines lost.
+  - 1 thread has no `Next action`.
+  - 9 fields carry one of 7 labels outside the set. The most frequent are `Trap` and `Decisions (Manu, 2026-09-24)`, twice each. These are what the new warning will name.
 
 ## Slice 2 evidence
 
