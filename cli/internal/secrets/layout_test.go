@@ -507,10 +507,9 @@ func TestBWDeclarationsIncludesFileExposedSecrets(t *testing.T) {
 	}
 }
 
-// A declaration with no folder states no placement: the taxonomy covers the app
-// and infra planes only, and the personal plane's is deferred (#586). Reading ""
-// as "must be unfoldered" would report every personal item the operator filed by
-// hand as misfiled, and hand reconcile an instruction to unfile it.
+// A declaration with no folder states no placement. Reading "" as "must be
+// unfoldered" would report every item the operator filed by hand as misfiled, and
+// hand reconcile an instruction to unfile it.
 func TestLayoutDriftLeavesAnUndeclaredFolderUngoverned(t *testing.T) {
 	got := LayoutDrift(
 		[]BWDecl{decl("G", "gmail-backup-code", "notes", "", false)},

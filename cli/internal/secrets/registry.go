@@ -117,10 +117,11 @@ type BWFrom struct {
 // validBWFolders is ADR-028's ratified Bitwarden folder taxonomy for dotf-secrets-
 // managed items. There is no floor folder: a floor secret's authority is off the
 // store (a file-authority root keeps it on disk), and the `bw:` block it may carry is
-// a convenience copy with no placement of its own (AGE_KEY_PERSONAL). There is no
-// personal-plane folder either, because no taxonomy exists yet for plane: personal
-// (#586). checkBWFolder refuses a folder on both planes rather than letting either
-// borrow a managed one.
+// a convenience copy with no placement of its own (AGE_KEY_PERSONAL). checkBWFolder
+// refuses a folder on that plane rather than letting it borrow a managed one. Every
+// other plane has exactly one folder, named after it (ADR-028 §6, amended
+// 2026-09-24): folder = plane is one rule, where a second classification by domain
+// would be one more thing to keep in step.
 //
 // The `Dotfiles/` prefix is part of the NAME, not a namespace Bitwarden
 // understands: it has no hierarchy, and a folder displayed as nested is simply one
@@ -133,8 +134,9 @@ type BWFrom struct {
 // with the store for as long as nothing compared them (measured 2026-09-21; the
 // comparison is now `LayoutDrift`).
 var validBWFolders = map[string]bool{
-	"Dotfiles/apps":  true,
-	"Dotfiles/infra": true,
+	"Dotfiles/apps":     true,
+	"Dotfiles/infra":    true,
+	"Dotfiles/personal": true,
 }
 
 // ratifiedFolders lists the taxonomy for an error message, sorted.
@@ -156,13 +158,14 @@ func ratifiedFolders() []string {
 // planeFolder is the required bw.folder for a plane that has one — the ratified-set
 // check alone (validBWFolders) would let an app-plane secret declare infra
 // and pass, since both strings are individually valid; this closes that gap (OPS-028
-// adversarial review, Minor finding). A plane absent here (personal, floor) has NO
+// adversarial review, Minor finding). A plane absent here (floor) has NO
 // legal folder: a declared folder is an instruction reconcile carries out, so a
 // plane falling through to the ratified-set check could move its items into another
 // plane's folder (CLI-078 review round 4). A plane gains a folder by an entry here.
 var planeFolder = map[string]string{
-	"app":   "Dotfiles/apps",
-	"infra": "Dotfiles/infra",
+	"app":      "Dotfiles/apps",
+	"infra":    "Dotfiles/infra",
+	"personal": "Dotfiles/personal",
 }
 
 // Expose is the consumer contract: exactly one of env (one or many vars) or file.
