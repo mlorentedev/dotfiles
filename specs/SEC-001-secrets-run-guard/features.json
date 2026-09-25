@@ -1,8 +1,8 @@
 [
   {
     "id": "SEC-001-secrets-run-guard-f1",
-    "behavior": "AC1-AC5: secrets run refuses an environment dump before decrypting anything, whether given directly, by path (POSIX or Windows, with or without .exe), through busybox, or inside a shell snippet found the way the shell parses its options (`--`, `+c`, clusters, option arguments), whatever its spelling (path, redirect, quotes, backslashes, a line continuation, any case), and runs legitimate tools",
-    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestAssertSafeChildCommand|TestRunChildPTY_HonoursTheIntrospectionGuard|TestSecretsRun_RefusesBeforeResolvingSecrets|TestShellCommandString_AgreesWithRealShells' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "behavior": "AC1-AC5: secrets run refuses an environment dump before decrypting anything, whether given directly, by path (POSIX or Windows, with or without .exe), through busybox, or inside a shell snippet anywhere after the c flag (fail closed), whatever its spelling (path, redirect, quotes, backslashes, a line continuation, any case), and runs legitimate tools",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestAssertSafeChildCommand|TestRunChildPTY_HonoursTheIntrospectionGuard|TestSecretsRun_RefusesBeforeResolvingSecrets|TestSnippetGuard_RefusesEveryShapeTheRealShellRuns' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
   },

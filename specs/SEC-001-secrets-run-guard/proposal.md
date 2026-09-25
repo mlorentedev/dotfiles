@@ -38,7 +38,7 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 
 - [x] AC1: `dotf secrets run -- env` exits non-zero and refuses to run with a clear ADR-028 error message.
 - [x] AC2: `dotf secrets run -- printenv` and `dotf secrets run -- /usr/bin/env` are similarly refused.
-- [x] AC3: Shell wrappers like `sh -c "env | grep..."` are detected and refused, with the command string found the way the shell parses its own options: `--`, `+c`, `c` inside a cluster, and options that take an argument.
+- [x] AC3: Shell wrappers like `sh -c "env | grep..."` are detected and refused. Once any argument sets the c flag (`-c`, `+c`, or a c inside a cluster), every argument after it is inspected, because which one a shell runs depends on its own option grammar (fail closed).
 - [x] AC4: Legitimate tools (e.g. `python`, `goreleaser`, `dotf review`) run unhindered.
 - [x] AC5: Comprehensive table-driven unit tests in `cli/internal/cmd/secrets_test.go` verify safe and unsafe commands.
 - [x] AC6: The Claude settings template (`ai/claude/settings.json`) denies `Bash(env:*)`, `Bash(printenv:*)` and `Bash(export -p:*)`, and the Pi models catalog registers `openrouter`. Template-scoped: the deploy is #1339 (see Out of scope).

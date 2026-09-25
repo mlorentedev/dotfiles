@@ -762,7 +762,7 @@ func assertSafeChildCommand(argv []string) error {
 
 	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
 	if slices.Contains(inspectedShells, base) {
-		if snippet, ok := shellCommandString(argv[1:]); ok {
+		for _, snippet := range shellSnippets(argv[1:]) {
 			if word, ok := snippetIntrospection(snippet); ok {
 				return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", word)
 			}
@@ -771,47 +771,28 @@ func assertSafeChildCommand(argv []string) error {
 	return nil
 }
 
-// shellLongOptionsWithArg are the long options of the inspected shells that
-// consume the next argument, so it is neither a flag nor the command string.
-var shellLongOptionsWithArg = []string{"--rcfile", "--init-file"}
-
-// shellCommandString returns the command string a POSIX shell runs for args
-// (its argv after the shell's own name), read the way the shell reads its
-// options. They end at `--`, `-` or the first operand. The c flag may be set as
-// `-c` or `+c` and may sit anywhere in a cluster (`-ec`, `+xc`). `-o` and `-O`
-// consume one argument per letter, and so do the long options above. With the c
-// flag set, the first operand is the command string. Without it the shell runs
-// a script file or reads stdin, which the guard does not inspect. This replaced
-// "the argument after anything containing c" (SEC-001 review round 3), which
-// read `--` in `bash -c -- env` as the snippet and missed `+c` entirely.
-func shellCommandString(args []string) (string, bool) {
-	cFlag := false
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch {
-		case arg == "--" || arg == "-":
-			return commandOperand(args, i+1, cFlag)
-		case slices.Contains(shellLongOptionsWithArg, arg):
-			i++
-		case strings.HasPrefix(arg, "--"):
-			// Every other long option takes no argument.
-		case len(arg) > 1 && (arg[0] == '-' || arg[0] == '+'):
-			flags := arg[1:]
-			cFlag = cFlag || strings.ContainsRune(flags, 'c')
-			i += strings.Count(flags, "o") + strings.Count(flags, "O")
-		default:
-			return commandOperand(args, i, cFlag)
+// shellSnippets returns every argument a POSIX shell might run as its command
+// string: all of them after the first argument that sets the c flag. Which one
+// the shell actually runs depends on its own option grammar, and bash, zsh and
+// dash differ: zsh bundles `-o`'s argument into the flag (`-ovi`), bash skips a
+// bare `+`. Two review rounds found a new case each time the guard emulated a
+// grammar, so it no longer decides. It fails closed and inspects them all. That
+// refuses an introspection word the shell would only pass on as `$1` or to a
+// script, which the tripwire model accepts (SEC-001 review rounds 3 and 4).
+func shellSnippets(args []string) []string {
+	for i, arg := range args {
+		if setsCFlag(arg) {
+			return args[i+1:]
 		}
 	}
-	return "", false
+	return nil
 }
 
-// commandOperand is the command string at args[i] when the c flag is set.
-func commandOperand(args []string, i int, cFlag bool) (string, bool) {
-	if !cFlag || i >= len(args) {
-		return "", false
-	}
-	return args[i], true
+// setsCFlag reports whether a shell argument may set the c flag: `-c`, `+c`, or
+// a cluster holding a c (`-ec`, `+xc`, `-oc`). A long option that contains a c
+// (`--rcfile`) counts too; over-reading it only inspects more arguments.
+func setsCFlag(arg string) bool {
+	return (strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "+")) && strings.ContainsRune(arg, 'c')
 }
 
 // inspectedShells are the POSIX shells whose `-c` snippet is read. Others

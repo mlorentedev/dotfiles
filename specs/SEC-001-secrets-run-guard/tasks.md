@@ -55,7 +55,15 @@ Reviewed at the landing commit `a720b9d` (#1459). Every finding's disposition is
 - [x] F1, F2: find the command string the way the shell parses its options, instead of taking the argument after anything that contains `c`; hold the parser to the real shells with a differential test
 - [x] F3: `typeset` is an introspection word
 - [x] State the tripwire model under Out of scope (owner decision): the redactor, not the guard, keeps values out of the output
-- [ ] Round 4 review passes before archive
+- [x] Round 4 review ran (FAIL, below); it did not pass
+
+## Review round 4 (2026-09-24, FAIL)
+
+`agy/gemini-3.1-pro-high` at `7466833`. Every finding's disposition is in `verification.md`.
+
+- [x] F1, F2: fail closed (owner decision). Once an argument sets the c flag, inspect every argument after it; the option parser is removed
+- [x] The differential test asserts that the guard refuses every shape the real shell runs
+- [ ] Round 5 review passes before archive
 
 ## Closing
 

@@ -5,16 +5,16 @@ created: "2026-09-02"
 
 # Verification - SEC-001-secrets-run-guard
 
-This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfilled template. It was filled on 2026-09-23 after a retroactive review, run at the landing commit, failed it (round 1, below). Round 1's fixes merged in #1655. Round 2 failed them, and round 3 failed round 2's fixes (`d8f8b11`); both sets of fixes are on `fix/sec001-round3`. Every check in `features.json` is a runnable command, and each one exits 0 on this branch.
+This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfilled template. It was filled on 2026-09-23 after a retroactive review, run at the landing commit, failed it (round 1, below). Round 1's fixes merged in #1655. Rounds 2, 3 and 4 each failed the previous round's fixes, and all their fixes are on `fix/sec001-round3`. Every check in `features.json` is a runnable command, and each one exits 0 on this branch.
 
 ## Evidence
 
 | AC | Proof | Where |
 |---|---|---|
 | AC1, AC2 | `TestAssertSafeChildCommand`: the `bare env`, `path to env`, `bare printenv` and `bare export` rows, and since round 3 a Windows path, an `.exe` suffix in either case, and `busybox <applet>`. `TestRunChildPTY_HonoursTheIntrospectionGuard` drives the real run path. `TestSecretsRun_RefusesBeforeResolvingSecrets` counts the secret reads of a refused command: zero, so "without decrypting" holds. | `a720b9d`, round 3 |
-| AC3 | `TestAssertSafeChildCommand` shell rows: an absolute path, a redirect with no space, quotes and a backslash inside the word, a line continuation, upper case, and since round 4 the shell's own option grammar (`--`, `+c`, a cluster, `-o`/`-O`/`--rcfile` arguments, a script operand). `TestShellCommandString_AgreesWithRealShells` runs each argv shape through the real bash, zsh, sh and dash and requires them to execute the operand the parser names. | `a720b9d`, then `60d2251`, `3ed6de0`, round 4 |
+| AC3 | `TestAssertSafeChildCommand` shell rows: an absolute path, a redirect with no space, quotes and a backslash inside the word, a line continuation, upper case, and every argv shape rounds 3 and 4 found (`--`, `+c`, a cluster, `-o` with its argument separate or bundled, a bare `+`). Since round 5 the guard fails closed and inspects every argument after the c flag. `TestSnippetGuard_RefusesEveryShapeTheRealShellRuns` runs each shape through the real bash, zsh, sh and dash, requires the shell to execute the marked operand, and then requires the guard to refuse the same shape with `env` in its place. | `a720b9d`, then `60d2251`, `3ed6de0`, rounds 4 and 5 |
 | AC4 | The `allowed ...` rows (`goreleaser`, `python3`, `dotf review`, `echo ... environment`, `run-env-check`, `cat .env.example`) | `a720b9d`, `60d2251` |
-| AC5 | `TestAssertSafeChildCommand`: 55 rows, 44 refused and 11 allowed | `cli/internal/cmd/secrets_test.go` |
+| AC5 | `TestAssertSafeChildCommand`: 62 rows, 51 refused and 11 allowed | `cli/internal/cmd/secrets_test.go` |
 | AC6 | `ai/claude/settings.json` denies `Bash(env:*)`, `Bash(printenv:*)` and `Bash(export -p:*)`, and `ai/pi/models.json` registers `providers.openrouter`: features.json f6, which checks all three entries since round 3. Template-scoped (see the next paragraph). | `a720b9d`, round 3 |
 | AC7 | `TestRedactWriter_*`, including `TestRedactWriter_SecretInTinyChunksNeverLeaks` (writes of 1-3 bytes), and `TestRunChildPTY_RedactsASecretSplitAcrossWrites` | `a720b9d`, SEC-002, `60d2251` |
 | AC8 | `docs/lessons/lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary.md` (f7) | `a720b9d` |
@@ -26,7 +26,7 @@ This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfill
 ## Test status
 
 - `go build ./...`, `go vet ./...` and `GOOS=windows go vet ./...`: clean.
-- `go test ./... -count=1`: 25 packages ok, 0 failed (round 4).
+- `go test ./... -count=1`: 25 packages ok, 0 failed (round 5).
 - `golangci-lint run` on the pinned 2.12.2: 0 issues.
 - Round 3 mutation run, one compiling mutant at a time, restored after each: **10 of 10 killed**. Each of `AI_AGENT`, `PI_CODING_AGENT`, `OPENCODE` and `COPILOT_CLI` dropped from the list; the early guard in `run` removed; `.exe` kept; `\` not treated as a separator; case kept; `busybox` not unwrapped; `ash` not inspected.
 - Mutation run against the final code, one compiling mutant at a time, restored after each run. **10 of 10 killed.** The mutants:
@@ -41,7 +41,8 @@ This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfill
 
   A build-error mutant was redone as a compiling one; it does not count (lesson 284). On the intermediate code (`60d2251`), one mutant **survived**: reading the cleaned form only. It showed that the as-written pass caught nothing the shell runs, so that pass was deleted (`3ed6de0`) rather than kept untested.
 - Round 4 mutation run on the shell-argv parser, one compiling mutant at a time. The script first asserts that the unmutated suite passes, and counts a mutant only when its tests compile (`go vet`). **10 of 10 killed**: `--` not an end of options; the operand after `--` off by one; `+c` not a flag; `-o` or `-O` consuming nothing (two mutants); a long option's argument not consumed; a later flag resetting c; `typeset` dropped; the first operand off by one; an operand read without the c flag. The first run of that set reported kills while the test file did not compile. That is how the baseline and compile checks came to be added. It was rerun before any count was recorded.
-- Every `features.json` verifier exits 0 (round 4). Two negative controls exit 1: a `-run` pattern that matches no test, and a deny rule that is not in the file.
+- Round 5 mutation run on the fail-closed guard, with the same baseline and compile checks: **7 of 7 killed**. The mutants: `+` not a flag prefix; only an exact `-c` setting c; only the next argument inspected; only the last; arguments before the c flag inspected; arguments inspected without a c flag; `typeset` dropped. Two of them first failed to compile, so they were rewritten to compile and rerun; neither counted as a kill.
+- Every `features.json` verifier exits 0 (round 5). Two negative controls exit 1: a `-run` pattern that matches no test, and a deny rule that is not in the file.
 
 ## Review round 1 — dispositions
 
@@ -80,11 +81,22 @@ This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfill
 
 | # | Finding | Disposition |
 |---|---|---|
-| F1 | Blocker: `bash -c -- env` and `bash -c -i env` run the snippet uninspected, because the guard read the argument after `-c` | **Applied.** `shellCommandString` reads the shell's options the way the shell does, and the command string is the first operand once they end. Each of the argv shapes was run through the real bash, zsh, sh and dash before the test was written, and `TestShellCommandString_AgreesWithRealShells` keeps them honest in CI. |
+| F1 | Blocker: `bash -c -- env` and `bash -c -i env` run the snippet uninspected, because the guard read the argument after `-c` | **Applied** in round 3 as an option parser (`shellCommandString`). Round 4 superseded it with the fail-closed rule below. Each of the argv shapes was run through the real bash, zsh, sh and dash before the test was written, and they live on in `TestSnippetGuard_RefusesEveryShapeTheRealShellRuns`. |
 | F2 | Blocker: `sh +c env` runs the snippet uninspected | **Applied** by the same parser: `+c` sets the c flag. |
 | F3 | Major: `typeset` prints the environment like `declare` | **Applied**: it is an introspection word. |
 
 **Why three rounds found three sets of bypasses (owner decision, 2026-09-24).** A lexical guard over shell syntax cannot be complete, and AC4 requires interpreters that can print the environment to run. The owner chose to fix these with a real option parser, not another heuristic, and to state the threat model the ACs had left implicit. The guard is a tripwire for the accidental shapes; the redactor (AC7) is what protects the values. It is now under Out of scope, so a later review measures the guard against the boundary it claims. The severities above assume the guard is a boundary: what a bypass lets through is the injected keys' names and any value under 6 bytes, not the values themselves.
+
+## Review round 4 — dispositions
+
+`agy/gemini-3.1-pro-high`, verdict FAIL, reviewed at `7466833`.
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Blocker: `zsh -ovi -c env`. zsh bundles `-o`'s argument into the flag, so the parser read the `-c` after it as `-o`'s argument | **Applied, by failing closed (owner decision, 2026-09-24).** The option parser round 3 introduced is removed. Once any argument sets the c flag, every argument after it is inspected, so no shell's grammar has to be emulated. |
+| F2 | Blocker: `bash -c + env`. bash skips a bare `+`, which the parser took as the command string | **Applied** by the same change. |
+
+**Why the design changed again.** Round 3's fix emulated a POSIX option grammar, and round 4 showed that bash and zsh do not share one. Every emulation leaves the next dialect's rule to find. Failing closed removes the question of which argument the shell runs: the guard inspects all of them, and the differential test now asserts the property that matters, that the guard refuses every shape the real shell runs. The cost is over-blocking an introspection word that the shell would only pass on as `$1` or to a script. That is pinned by two table rows, and accepted under the tripwire model.
 
 ## Decisions made during implementation
 
@@ -93,12 +105,12 @@ This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfill
 
 ## Promotion candidates
 
-- [x] Lesson? Round 1: no new one, since the CLAUDECODE miss is lesson 287's class. Round 3: **lesson 289**, a list tested by looping over itself cannot see a missing member, with how to measure what a harness exports.
+- [x] Lesson? Round 1: no new one, since the CLAUDECODE miss is lesson 287's class. Round 3: **lesson 289**, a list tested by looping over itself cannot see a missing member, with how to measure what a harness exports. Round 5: **lesson 290**, a guard that predicts what an interpreter will run should fail closed, not emulate it.
 - [x] ADR? No. ADR-028's marker list is corrected in place.
 - [x] Pattern? No.
 
 ## Archive checklist
 
-- [ ] Round 4 review passes
+- [ ] Round 5 review passes
 - [ ] `dotf spec archive SEC-001-secrets-run-guard`
 - [ ] #1626 records the disposition
