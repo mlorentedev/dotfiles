@@ -1,0 +1,44 @@
+[
+  {
+    "id": "MEMORY-008-handoff-resume-f1",
+    "behavior": "resume output is a pure function of the thread file; two runs are identical",
+    "verification": "cd cli && go test ./internal/mem -run '^TestResumeIsAPureRenderOfTheThreadFile$' -count=1 -v | grep -q '^--- PASS: TestResumeIsAPureRenderOfTheThreadFile '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-008-handoff-resume-f2",
+    "behavior": "A thread with Verify and Awaiting Manu renders both, and an ambiguous working directory lists the candidates instead of choosing",
+    "verification": "cd cli && go test ./internal/mem -run '^(TestResumeRendersVerifyAndAwaiting|TestResumeListsCandidatesWhenTheThreadIsAmbiguous)$' -count=1 -v | grep -c '^--- PASS: ' | grep -qx 2",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-008-handoff-resume-f3",
+    "behavior": "SessionStart output begins with the resume block for source=compact and source=clear, and resume and fork get one line",
+    "verification": "cd cli && go test ./internal/mem -run '^TestSessionStartResumeBySource$' -count=1 -v | grep -q '^--- PASS: TestSessionStartResumeBySource '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-008-handoff-resume-f4",
+    "behavior": "A fixture copy of the real dotfiles MEMORY.md stays at or under 25,000 bytes after the new fields are added",
+    "verification": "cd cli && go test ./internal/mem -run '^TestTheRealDotfilesMemoryStaysUnderBudgetWithTheNewFields$' -count=1 -v | grep -q '^--- PASS: TestTheRealDotfilesMemoryStaysUnderBudgetWithTheNewFields '",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-008-handoff-resume-f5",
+    "behavior": "The handoff skill points at dotf mem resume and catchup step 1 runs it",
+    "verification": "grep -q 'dotf mem resume' harness/skills/handoff/SKILL.md && awk '/^### Step 1/,/^### Step 2/' harness/skills/catchup/SKILL.md | grep -q 'dotf mem resume'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-008-handoff-resume-f6",
+    "behavior": "The fallback sentence is in the compiled doctrine, which passes --check and stays under the 8,000-character budget",
+    "verification": "grep -rq 'dotf mem resume' harness/enforced/ && ./scripts/compile-harness.sh --check && bats tests/compile-harness.bats --filter 'committed records keep the capped agy surface under 8000 characters'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
