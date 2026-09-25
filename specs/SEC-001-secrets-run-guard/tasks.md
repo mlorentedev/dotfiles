@@ -46,7 +46,16 @@ Reviewed at the landing commit `a720b9d` (#1459). Every finding's disposition is
 - [x] F5: a Windows path or `.exe` suffix, and `busybox <applet>`, name the command they run
 - [x] F6: state the indirection boundary under Out of scope
 - [x] F7: update #1646, whose premise this round makes obsolete
-- [ ] Round 3 review passes before archive
+- [x] Round 3 review ran (FAIL, below); it did not pass
+
+## Review round 3 (2026-09-24, FAIL)
+
+`agy/gemini-3.1-pro-high` at `d8f8b11`. Every finding's disposition is in `verification.md`.
+
+- [x] F1, F2: find the command string the way the shell parses its options, instead of taking the argument after anything that contains `c`; hold the parser to the real shells with a differential test
+- [x] F3: `typeset` is an introspection word
+- [x] State the tripwire model under Out of scope (owner decision): the redactor, not the guard, keeps values out of the output
+- [ ] Round 4 review passes before archive
 
 ## Closing
 

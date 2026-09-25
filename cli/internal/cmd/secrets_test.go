@@ -2,14 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
@@ -108,6 +112,27 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		{"busybox shell snippet", []string{"busybox", "sh", "-c", "env"}, true},
 		{"busybox ash snippet", []string{"busybox", "ash", "-c", "env"}, true},
 		{"allowed busybox applet", []string{"busybox", "ls", "-la"}, false},
+		// SEC-001 review round 3: the snippet is the first operand once the
+		// shell's options end, not whatever follows -c. Options end at `--`, `-`
+		// or the first operand; `+c` sets the same flag as `-c`; `-o`, `-O`,
+		// `--rcfile` and `--init-file` consume the next argument.
+		{"end of options between -c and the snippet", []string{"bash", "-c", "--", "env"}, true},
+		{"snippet after -- that starts with a dash", []string{"bash", "-c", "--", "-x; env"}, true},
+		{"another option between -c and the snippet", []string{"bash", "-c", "-i", "env"}, true},
+		{"plus-c form", []string{"bash", "+c", "env"}, true},
+		{"plus-c in zsh", []string{"zsh", "+c", "printenv"}, true},
+		{"c inside a cluster", []string{"sh", "-ec", "env"}, true},
+		{"option argument before -c", []string{"bash", "-o", "pipefail", "-c", "env"}, true},
+		{"option argument after -c", []string{"bash", "-c", "-o", "pipefail", "env"}, true},
+		{"o and c in one cluster", []string{"bash", "-oc", "pipefail", "env"}, true},
+		{"long option taking an argument", []string{"bash", "--rcfile", "/dev/null", "-c", "env"}, true},
+		{"typeset prints the environment", []string{"bash", "-c", "typeset"}, true},
+		{"shopt option argument before -c", []string{"bash", "-O", "extglob", "-c", "env"}, true},
+		// Without the c flag there is no command string: `bash set` runs a script file.
+		{"allowed script operand without -c", []string{"bash", "set"}, false},
+		{"allowed option argument that is an introspection word", []string{"bash", "-o", "set", "-c", "echo ok"}, false},
+		// After the first operand, -c is the script's own argument, not the shell's.
+		{"allowed script taking its own -c", []string{"bash", "deploy.sh", "-c", "env"}, false},
 		{"allowed tool", []string{"goreleaser", "release"}, false},
 		{"allowed python", []string{"python3", "script.py"}, false},
 		{"allowed dotf review", []string{"dotf", "review"}, false},
@@ -380,5 +405,64 @@ func TestSecretsRun_RefusesBeforeResolvingSecrets(t *testing.T) {
 	}
 	if reads == 0 {
 		t.Fatal("countingBW recorded no read for a real resolution; the assertion above proves nothing")
+	}
+}
+
+// SEC-001 review round 3. The parser's reading of a shell's argv is checked
+// against the shells themselves rather than against a belief about them. For
+// each vector, the operand the parser names as the command string is replaced
+// by an echo, and the real shell must run it. The last vector is the negative
+// case: after a script operand, -c is the script's own argument, so the shell
+// must not run it. A shell that is not installed is skipped, never assumed.
+func TestShellCommandString_AgreesWithRealShells(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// `bash` there may resolve to WSL's launcher rather than a shell. The
+		// parser is platform-independent, so the Linux leg is where it is held.
+		t.Skip("the POSIX shells are checked where they are native")
+	}
+	const marker = "shell-parser-marker"
+	vectors := []struct {
+		argv    []string
+		snippet bool
+		run     string // what replaces X; an echo of the marker when empty
+	}{
+		{[]string{"bash", "-c", "--", "X"}, true, ""},
+		{[]string{"bash", "+c", "X"}, true, ""},
+		{[]string{"zsh", "+c", "X"}, true, ""},
+		{[]string{"sh", "-ec", "X"}, true, ""},
+		{[]string{"bash", "-o", "pipefail", "-c", "X"}, true, ""},
+		{[]string{"bash", "-c", "-o", "pipefail", "X"}, true, ""},
+		{[]string{"bash", "-oc", "pipefail", "X"}, true, ""},
+		{[]string{"bash", "--rcfile", "/dev/null", "-c", "X"}, true, ""},
+		{[]string{"bash", "-O", "extglob", "-c", "X"}, true, ""},
+		{[]string{"zsh", "-c", "--", "X"}, true, ""},
+		{[]string{"dash", "-c", "--", "X"}, true, ""},
+		// After --, an operand that starts with a dash is still the command string.
+		{[]string{"bash", "-c", "--", "X"}, true, "-x; echo " + marker},
+		{[]string{"bash", "/nonexistent/script.sh", "-c", "X"}, false, ""},
+	}
+	for _, v := range vectors {
+		t.Run(strings.Join(v.argv, " ")+" "+v.run, func(t *testing.T) {
+			shell, err := exec.LookPath(v.argv[0])
+			if err != nil {
+				t.Skipf("%s is not installed", v.argv[0])
+			}
+			got, ok := shellCommandString(v.argv[1:])
+			if ok != v.snippet || (ok && got != "X") {
+				t.Fatalf("parser read (%q, %v), want (X, %v)", got, ok, v.snippet)
+			}
+			args := slices.Clone(v.argv[1:])
+			run := v.run
+			if run == "" {
+				run = "echo " + marker
+			}
+			args[slices.Index(args, "X")] = run
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			out, _ := exec.CommandContext(ctx, shell, args...).Output()
+			if ran := strings.Contains(string(out), marker); ran != v.snippet {
+				t.Errorf("real %s ran the operand: %v; the parser says it is the command string: %v", v.argv[0], ran, v.snippet)
+			}
+		})
 	}
 }

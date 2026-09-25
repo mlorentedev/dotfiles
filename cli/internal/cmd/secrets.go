@@ -761,18 +761,57 @@ func assertSafeChildCommand(argv []string) error {
 	}
 
 	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
-	if slices.Contains(inspectedShells, base) && len(argv) >= 2 {
-		for i := 1; i < len(argv); i++ {
-			arg := argv[i]
-			isCFlag := arg == "-c" || (strings.HasPrefix(arg, "-") && strings.Contains(arg, "c"))
-			if isCFlag && i+1 < len(argv) {
-				if word, ok := snippetIntrospection(argv[i+1]); ok {
-					return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", word)
-				}
+	if slices.Contains(inspectedShells, base) {
+		if snippet, ok := shellCommandString(argv[1:]); ok {
+			if word, ok := snippetIntrospection(snippet); ok {
+				return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", word)
 			}
 		}
 	}
 	return nil
+}
+
+// shellLongOptionsWithArg are the long options of the inspected shells that
+// consume the next argument, so it is neither a flag nor the command string.
+var shellLongOptionsWithArg = []string{"--rcfile", "--init-file"}
+
+// shellCommandString returns the command string a POSIX shell runs for args
+// (its argv after the shell's own name), read the way the shell reads its
+// options. They end at `--`, `-` or the first operand. The c flag may be set as
+// `-c` or `+c` and may sit anywhere in a cluster (`-ec`, `+xc`). `-o` and `-O`
+// consume one argument per letter, and so do the long options above. With the c
+// flag set, the first operand is the command string. Without it the shell runs
+// a script file or reads stdin, which the guard does not inspect. This replaced
+// "the argument after anything containing c" (SEC-001 review round 3), which
+// read `--` in `bash -c -- env` as the snippet and missed `+c` entirely.
+func shellCommandString(args []string) (string, bool) {
+	cFlag := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--" || arg == "-":
+			return commandOperand(args, i+1, cFlag)
+		case slices.Contains(shellLongOptionsWithArg, arg):
+			i++
+		case strings.HasPrefix(arg, "--"):
+			// Every other long option takes no argument.
+		case len(arg) > 1 && (arg[0] == '-' || arg[0] == '+'):
+			flags := arg[1:]
+			cFlag = cFlag || strings.ContainsRune(flags, 'c')
+			i += strings.Count(flags, "o") + strings.Count(flags, "O")
+		default:
+			return commandOperand(args, i, cFlag)
+		}
+	}
+	return "", false
+}
+
+// commandOperand is the command string at args[i] when the c flag is set.
+func commandOperand(args []string, i int, cFlag bool) (string, bool) {
+	if !cFlag || i >= len(args) {
+		return "", false
+	}
+	return args[i], true
 }
 
 // inspectedShells are the POSIX shells whose `-c` snippet is read. Others
@@ -792,7 +831,7 @@ func commandName(arg string) string {
 }
 
 // introspectionWords are the commands whose purpose is to print the environment.
-var introspectionWords = []string{"env", "printenv", "export", "set", "declare"}
+var introspectionWords = []string{"env", "printenv", "export", "set", "declare", "typeset"}
 
 // snippetWordSep splits a shell snippet into the words a shell could run. Only
 // letters, digits, `_`, `.` and `-` belong to a word, so a path separator or a

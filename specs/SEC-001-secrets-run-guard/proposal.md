@@ -24,6 +24,7 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 ## Out of scope
 
 - Arbitrary binary payload content inspection (we block by binary and shell arguments, not inspecting arbitrary external scripts).
+- **A caller who means to print the environment (owner decision, 2026-09-24, after review round 3).** The guard is a tripwire for the accidental shapes of an environment dump, the ones an agent types without thinking. It is not a boundary against deliberate printing: any interpreter AC4 lets run can print the environment (`python3 -c`, `awk`'s `ENVIRON`, `cat /proc/self/environ`), and so can `eval` or a script file. What keeps the values out of the output is the redactor (AC7), which scrubs every injected value of 6 bytes or more whatever printed it.
 - Indirection a lexical guard cannot see (review round 2, F6): a command run by another command (`nice env`, `timeout 5 env`, `xargs env`), a snippet read from stdin (`sh -s`) or from a script file, and a command name assembled at run time (`en$'v'`, `e=en; ${e}v`). The redactor still scrubs every injected value of 6 bytes or more from what such a command prints.
 - Shells outside the POSIX family (`pwsh`, `cmd`, `fish`): #1650.
 - **Deploying the Claude deny list to an existing installation.** `merge_claude_settings` merges `permissions.allow` and not `permissions.deny`, so AC6 and AC10 hold for the template only. The Go port of the Claude settings deploy owns the deploy (#1339). Decided by the owner on 2026-09-24, after review round 2 (F2).
@@ -37,7 +38,7 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 
 - [x] AC1: `dotf secrets run -- env` exits non-zero and refuses to run with a clear ADR-028 error message.
 - [x] AC2: `dotf secrets run -- printenv` and `dotf secrets run -- /usr/bin/env` are similarly refused.
-- [x] AC3: Shell wrappers like `sh -c "env | grep..."` are detected and refused.
+- [x] AC3: Shell wrappers like `sh -c "env | grep..."` are detected and refused, with the command string found the way the shell parses its own options: `--`, `+c`, `c` inside a cluster, and options that take an argument.
 - [x] AC4: Legitimate tools (e.g. `python`, `goreleaser`, `dotf review`) run unhindered.
 - [x] AC5: Comprehensive table-driven unit tests in `cli/internal/cmd/secrets_test.go` verify safe and unsafe commands.
 - [x] AC6: The Claude settings template (`ai/claude/settings.json`) denies `Bash(env:*)`, `Bash(printenv:*)` and `Bash(export -p:*)`, and the Pi models catalog registers `openrouter`. Template-scoped: the deploy is #1339 (see Out of scope).
