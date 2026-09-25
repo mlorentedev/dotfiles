@@ -216,6 +216,10 @@ func TestBackup_NilExporter_Errors(t *testing.T) {
 // Export is the one write-side operation with no daemon equivalent, so its locked-vault
 // error must NOT send the operator to `dotf secrets unlock` (which unlocks the daemon and
 // leaves the escrow failing). It must name the BW_SESSION form, and say why.
+//
+// It names the prefix, not a command line: this package cannot see the invocation's
+// flags, and a fixed `dotf secrets backup` here dropped --out (#1647). The command
+// layer renders the line (TestSecretsBackup_LockedBw_RemedyRerunsTheInvocation).
 func TestExportLockHint_NamesTheOnlyInvocationThatWorks(t *testing.T) {
 	got := exportLockHint(errors.New("Vault is locked."))
 	if !errors.Is(got, ErrBWVaultLocked) {
@@ -223,12 +227,15 @@ func TestExportLockHint_NamesTheOnlyInvocationThatWorks(t *testing.T) {
 	}
 	msg := got.Error()
 	for _, want := range []string{
-		`BW_SESSION="$(bw unlock --raw)" dotf secrets backup`,
+		`BW_SESSION="$(bw unlock --raw)"`,
 		"no export endpoint",
 	} {
 		if !strings.Contains(msg, want) {
 			t.Fatalf("export lock error must contain %q, got: %s", want, msg)
 		}
+	}
+	if strings.Contains(msg, "dotf secrets backup") {
+		t.Fatalf("a fixed command line here loses the invocation's flags: %s", msg)
 	}
 	// The critical negative: it must not teach the fix that cannot work here.
 	if strings.Contains(msg, "run `dotf secrets unlock`") {
