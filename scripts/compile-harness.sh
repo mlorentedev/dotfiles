@@ -689,16 +689,28 @@ build_skill_catalog() {
 # Checked BEFORE anything is written, so a dangling trigger fails the refresh
 # whole instead of leaving records refreshed and the targets not.
 check_trigger_targets() {
-    local pat_dir="$1" triggers="$REPO_ROOT/harness/triggers.json" id pat dangling=0
+    local pat_dir="$1" triggers="$REPO_ROOT/harness/triggers.json" id pat rows dangling=0 named=0
     [[ -f "$triggers" ]] || return 0
+    # Read first, then loop (HARNESS-148). Inside `< <(jq ...)` a parse error never
+    # reached this function's status: the loop ran zero times and the success line
+    # below claimed every pattern exists after nothing was examined.
+    if ! rows="$(jq -r '.triggers[] | "\(.id)\t\(.pattern // "")"' "$triggers")"; then
+        printf '[ERROR] harness/triggers.json cannot be read as trigger rules (%s)\n' "$triggers" >&2
+        return 1
+    fi
     while IFS=$'\t' read -r id pat; do
         [[ -n "$pat" ]] || continue
+        named=$((named + 1))
         if [[ ! -f "$pat_dir/$pat.md" ]]; then
             printf '[ERROR] harness/triggers.json: trigger "%s" names pattern "%s", which is not in the vault (%s)\n' \
                 "$id" "$pat" "$pat_dir" >&2
             dangling=1
         fi
-    done < <(jq -r '.triggers[] | "\(.id)\t\(.pattern // "")"' "$triggers")
+    done <<< "$rows"
+    if (( named == 0 )); then
+        printf '[ERROR] harness/triggers.json names no pattern, so nothing was checked (%s)\n' "$triggers" >&2
+        return 1
+    fi
     if (( dangling )); then
         printf '        point the trigger at a pattern that exists, or remove it, then re-run --refresh\n' >&2
         return 1
