@@ -257,12 +257,14 @@ func TestMatchPrompt(t *testing.T) {
 }
 
 func TestResolveDependencies(t *testing.T) {
+	// Synthetic ids: the resolver is blind to names, and a real skill's name here
+	// reads as a live dependency, which is how retired names outlived SKILL-001.
 	deps := map[string][]string{
-		"spec":            {"adversarial-review", "verification-before-completion"},
-		"writing-plans":   {"executing-plans"},
-		"executing-plans": {"systematic-debugging", "test-driven-development"},
-		"cycle-a":         {"cycle-b"},
-		"cycle-b":         {"cycle-a"},
+		"root":    {"dep-a", "dep-b"},
+		"chain-1": {"chain-2"},
+		"chain-2": {"leaf-x", "leaf-y"},
+		"cycle-a": {"cycle-b"},
+		"cycle-b": {"cycle-a"},
 	}
 
 	tests := []struct {
@@ -272,13 +274,13 @@ func TestResolveDependencies(t *testing.T) {
 	}{
 		{
 			name:     "single skill with direct dependencies",
-			initial:  []string{"spec"},
-			expected: []string{"adversarial-review", "spec", "verification-before-completion"},
+			initial:  []string{"root"},
+			expected: []string{"dep-a", "dep-b", "root"},
 		},
 		{
 			name:     "multi-level transitive dependencies",
-			initial:  []string{"writing-plans"},
-			expected: []string{"executing-plans", "systematic-debugging", "test-driven-development", "writing-plans"},
+			initial:  []string{"chain-1"},
+			expected: []string{"chain-1", "chain-2", "leaf-x", "leaf-y"},
 		},
 		{
 			name:     "cycle protection",
@@ -463,8 +465,21 @@ func TestEverySkillTheRouterNamesHasARecord(t *testing.T) {
 			named[d] = "DefaultSkillDependencies[" + skill + "]"
 		}
 	}
+	// The records' own requires:, read with the YAML parser, so the block form
+	// (`requires:` then `- audit`) is covered as well as the flow form. The
+	// round-3 review of SKILL-001 slipped a block-form retired name past every
+	// guard.
+	recorded, err := LoadSkillDependencies(filepath.Join(root, "harness", "skills"))
+	if err != nil {
+		t.Fatalf("the skill records' requires: cannot be read: %v", err)
+	}
+	for skill, deps := range recorded {
+		for _, d := range deps {
+			named[d] = "harness/skills/" + skill + " requires:"
+		}
+	}
 	if len(named) == 0 {
-		t.Fatal("neither the triggers nor the dependency map name a skill; nothing was checked")
+		t.Fatal("neither the triggers, the dependency map nor the records name a skill; nothing was checked")
 	}
 
 	for skill, where := range named {

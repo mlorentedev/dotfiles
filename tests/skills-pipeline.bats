@@ -228,6 +228,25 @@ path_without_copilot() {
     [ ! -d "$FAKEHOME/.copilot/skills/stale-skill" ]
 }
 
+# SKILL-001 review: a retired skill's name is not ours alone. Another tool put a
+# skill named `audit` into the same directories, and a check that read only the
+# name went red. Deploy removes what it rendered, which carries the vault source
+# it came from, and a foreign skill of the same name survives it.
+@test "SKILL-001: deploy prunes a retired skill it rendered and keeps a foreign one of the same name" {
+    mkdir -p "$FAKEHOME/.claude/skills/audit" "$FAKEHOME/.pi/agent/skills/enrich-us" "$FAKEHOME/.gemini/prompts"
+    printf -- '---\nname: audit\ndescription: another tool installed this\n---\nforeign\n' \
+        > "$FAKEHOME/.claude/skills/audit/SKILL.md"
+    printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/enrich-us/SKILL.md\nname: enrich-us\n---\nours\n' \
+        > "$FAKEHOME/.pi/agent/skills/enrich-us/SKILL.md"
+    printf '<!-- generated: true; from: 00_meta/skills/writing-plans/SKILL.md; sha256:0 -->\nours\n' \
+        > "$FAKEHOME/.gemini/prompts/writing-plans.md"
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    grep -q '^foreign$' "$FAKEHOME/.claude/skills/audit/SKILL.md"
+    [ ! -e "$FAKEHOME/.pi/agent/skills/enrich-us" ]
+    [ ! -e "$FAKEHOME/.gemini/prompts/writing-plans.md" ]
+}
+
 # HARNESS-056: the Definition of Done is doctrine, so it must reach EVERY
 # surface, not only the ones whose instruction file happens to be convenient.
 # These assert the real records, not a fixture.

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "SKILL-001-portfolio-consolidation-f1",
+    "behavior": "The eight retired skills live under vault 90_archive/skills/ with status archived and are gone from 00_meta/skills/",
+    "verification": "v=${VAULT_PATH:-$HOME/Projects/knowledge}; for s in dispatching-parallel-agents project-maturation research-prompt verification-before-completion audit writing-plans executing-plans enrich-us; do grep -q '^status: archived' \"$v/90_archive/skills/$s/SKILL.md\" && [ ! -e \"$v/00_meta/skills/$s\" ] || exit 1; done",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 217ea68: against the vault at 8ed998cd and later: all eight under 90_archive/skills with status archived, none left in 00_meta/skills"
+  },
+  {
+    "id": "SKILL-001-portfolio-consolidation-f2",
+    "behavior": "No record, trigger, dependency-map entry, requires field or persona roster names a retired skill",
+    "verification": "for s in dispatching-parallel-agents project-maturation research-prompt verification-before-completion audit writing-plans executing-plans enrich-us; do [ ! -e harness/skills/$s ] || exit 1; done; ! grep -qE '^requires:.*\\b(dispatching-parallel-agents|project-maturation|research-prompt|verification-before-completion|audit|writing-plans|executing-plans|enrich-us)\\b' harness/skills/*/SKILL.md && cd cli && go test ./internal/harness -run '^(TestEverySkillTheRouterNamesHasARecord|TestEveryDeclaredSkillHasARecord)$' -count=1 -v | grep -c '^--- PASS: ' | grep -qx 2",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 217ea68: no record or requires: names a retired skill, and the router guard, which now also reads the records' requires:, passes"
+  },
+  {
+    "id": "SKILL-001-portfolio-consolidation-f3",
+    "behavior": "The reviewer, planner and builder rosters are the slimmed ones, every existing severity is preserved, and at least 16 of 18 trigger rules still resolve to a persona",
+    "verification": "cd cli && [ \"$(go run ./cmd/dotf harness resolve-skills ../harness/agents/reviewer/AGENT.md)\" = '[adversarial-review, cyclomatic-complexity, pr-review-triage]' ] && [ \"$(go run ./cmd/dotf harness resolve-skills ../harness/agents/planner/AGENT.md)\" = '[spec, new-ticket, prd-to-issues]' ] && [ \"$(go run ./cmd/dotf harness resolve-skills ../harness/agents/builder/AGENT.md)\" = '[test-driven-development, test, systematic-debugging, cyclomatic-complexity]' ] && [ \"$(awk 'NR>1 && /^---$/{exit} NR>1' ../harness/agents/reviewer/AGENT.md | grep -c 'enforce: warn')\" -eq 3 ] && [ \"$(awk 'NR>1 && /^---$/{exit} NR>1' ../harness/agents/planner/AGENT.md | grep -c 'enforce: warn')\" -eq 1 ] && [ \"$(awk 'NR>1 && /^---$/{exit} NR>1' ../harness/agents/builder/AGENT.md | grep -c 'enforce: warn')\" -eq 2 ] && go test ./internal/harness -run '^TestRoleJoinDrift$' -count=1 -v | grep -q '^--- PASS: TestRoleJoinDrift '",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 217ea68: resolve-skills prints the three slimmed rosters, and the warn counts are 3, 1 and 2"
+  },
+  {
+    "id": "SKILL-001-portfolio-consolidation-f4",
+    "behavior": "adversarial-review, spec and new-ticket carry each folded section and a load-bearing rule from its body",
+    "verification": "grep -q '^## Evidence before claims' harness/skills/adversarial-review/SKILL.md && grep -qF 'No completion claim without fresh verification evidence' harness/skills/adversarial-review/SKILL.md && grep -q '^## Closing pass (Definition of Done)' harness/skills/adversarial-review/SKILL.md && grep -qF 'A skip is a stated decision.' harness/skills/adversarial-review/SKILL.md && grep -q 'code-level checklist' harness/skills/adversarial-review/SKILL.md && grep -qF 'command injection, path traversal' harness/skills/adversarial-review/SKILL.md && grep -q '^## Planning the tasks' harness/skills/spec/SKILL.md && grep -qF 'Name exact paths' harness/skills/spec/SKILL.md && grep -qF 'Give exact commands with their expected output' harness/skills/spec/SKILL.md && grep -q '^## Executing the tasks' harness/skills/spec/SKILL.md && grep -qF 'Stop at once' harness/skills/spec/SKILL.md && grep -q '^## Enrich a thin item' harness/skills/new-ticket/SKILL.md && grep -qF 'Never replace the issue body' harness/skills/new-ticket/SKILL.md && grep -qF 'post-hoc spec' harness/skills/new-ticket/SKILL.md",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 217ea68: each folded section and a load-bearing rule from its body are present in the records"
+  },
+  {
+    "id": "SKILL-001-portfolio-consolidation-f5",
+    "behavior": "go test, compile-harness --check, the doctrine budget test and the bats files this change touches pass",
+    "verification": "(cd cli && go test ./... -count=1 >/dev/null) && ./scripts/compile-harness.sh --check >/dev/null && bats tests/compile-harness.bats tests/agents-md.bats tests/skills-pipeline.bats tests/harness-suggest.bats tests/check-retired-skills.bats tests/check-retired-skills-real.bats >/dev/null",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 217ea68: go test ./..., compile-harness.sh --check, and the six bats files this change touches, the doctrine budget test included"
+  },
+  {
+    "id": "SKILL-001-portfolio-consolidation-f6",
+    "behavior": "After deploy, no copy of a retired skill that this pipeline rendered remains in any skills.deploy target of the manifest, and no instruction file the manifest declares (presence, catalog, doctrine) names one; a same-named skill another tool installed is left alone",
+    "verification": "./scripts/check-retired-skills.sh dispatching-parallel-agents project-maturation research-prompt verification-before-completion audit writing-plans executing-plans enrich-us",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 217ea68: the fail-closed check-retired-skills.sh against this machine's real HOME at 16:00: no marked copy in the six deploy targets, no roster or catalog line in the six instruction files or the rendered agent definitions"
+  }
+]
