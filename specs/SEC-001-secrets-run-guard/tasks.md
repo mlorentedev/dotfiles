@@ -63,7 +63,7 @@ Reviewed at the landing commit `a720b9d` (#1459). Every finding's disposition is
 
 - [x] F1, F2: fail closed (owner decision). Once an argument sets the c flag, inspect every argument after it; the option parser is removed
 - [x] The differential test asserts that the guard refuses every shape the real shell runs
-- [ ] Round 5 review passes before archive
+- [x] Round 5 review passes before archive
 
 ## Closing
 

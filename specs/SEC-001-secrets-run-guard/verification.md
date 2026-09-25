@@ -98,6 +98,17 @@ This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfill
 
 **Why the design changed again.** Round 3's fix emulated a POSIX option grammar, and round 4 showed that bash and zsh do not share one. Every emulation leaves the next dialect's rule to find. Failing closed removes the question of which argument the shell runs: the guard inspects all of them, and the differential test now asserts the property that matters, that the guard refuses every shape the real shell runs. The cost is over-blocking an introspection word that the shell would only pass on as `$1` or to a script. That is pinned by two table rows, and accepted under the tripwire model.
 
+## Review round 5 — dispositions
+
+`nan/mimo-v2.5`, verdict **PASS**, reviewed at `5897b82`.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Minor, THEORETICAL: `setsCFlag` counts any `-`/`+` argument holding a `c`, so `--color` or `--rcfile` makes the guard inspect the arguments after it | **Declined, by design.** It is the fail-closed rule's documented cost, and an over-read only inspects more. |
+| 2 | Minor, THEORETICAL: `bash -c 'set -x'` and `bash -c 'echo env'` are refused | **Declined, by design** (round 1, F4): failing closed is the tripwire's bias. |
+
+**Disclosed after the review, outside its scope.** `rbash` and `rzsh` exist wherever bash and zsh do, and they run `-c` (measured on msi, 2026-09-24). They are not in `inspectedShells`, so their snippets are not read. It is the same class as the non-POSIX shells, and it goes to #1650 with them. The redactor still scrubs their output.
+
 ## Decisions made during implementation
 
 - Whole-word matching over a longer boundary class. The class kept missing separators (`/`, `>`, `<`, a newline after a backslash). Splitting on everything that cannot be part of a command word closes the class of misses, not the instances.
@@ -111,6 +122,6 @@ This spec landed in #1459 (`a720b9d`, 2026-09-02) with this file still an unfill
 
 ## Archive checklist
 
-- [ ] Round 5 review passes
+- [x] Round 5 review passes (`nan/mimo-v2.5`, PASS, `5897b82`)
 - [ ] `dotf spec archive SEC-001-secrets-run-guard`
 - [ ] #1626 records the disposition
