@@ -12,13 +12,13 @@ created: "2026-09-25"
 - [x] AC3 -> `dotf harness resolve-skills` on the three records, and the `enforce: warn` count in each record's frontmatter
 - [x] AC4 -> the folded sections in the `adversarial-review`, `spec` and `new-ticket` records
 - [x] AC5 -> build, vet, `go test ./...`, lint, `--check`, full bats
-- [x] AC6 -> after merge: `--deploy`, then no copy this pipeline rendered is left in any deploy target, and the Copilot catalog reads clean. The `skills-pipeline.bats` test "SKILL-001: deploy prunes a retired skill it rendered and keeps a foreign one of the same name" pins the difference
+- [x] AC6 -> after merge: `--deploy`, then no copy this pipeline rendered is left in any deploy target, and the Copilot catalog reads clean. The `skills-pipeline.bats` test "SKILL-001: deploy prunes a retired skill it rendered and keeps a foreign one of the same name" pins the difference. f6 runs `scripts/check-retired-skills.sh`, which reads every target from the manifest, and `tests/check-retired-skills.bats` seeds each target the manifest declares
 
 ## Test status
 
 - `go build ./...`, `go vet ./...` (linux and windows), `go test -count=1 ./...`: pass.
 - `golangci-lint run ./...` (0 issues), `shellcheck --severity=error scripts/compile-harness.sh`, `compile-harness.sh --check` (no harness drift), `check-bats-names.sh`, `check-doc-paths.sh`, `check-md-escapes.sh`: all pass.
-- `bats tests/*.bats`, serial: 1,599 run, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine. The five files this change touches were re-run on the final tree: 192 run, 0 failures (`verify-setup.bats` skips outside its integration container, so CI's container job is where its edited assertions run).
+- `bats tests/*.bats`, serial: 1,600 run, 1,599 pass, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine. The five files this change touches were re-run on the final tree: 192 run, 0 failures (`verify-setup.bats` skips outside its integration container, so CI's container job is where its edited assertions run).
 - Vault: `vault-validate.py` reports the same 65 issues on master and on this change; none is new.
 - TDD: `TestEverySkillTheRouterNamesHasARecord` was written first and failed, naming `project-maturation`, `writing-plans`, `audit`, `verification-before-completion`, `executing-plans` (all in `DefaultSkillDependencies`) and `enrich-us` (trigger `task-and-ticket-tracking`). It passed after the remap.
 - `TestRoleJoinDrift` (HARNESS-110) went red on the slimmed builder roster: 12 of 18 rules resolved, against a floor of 16. See the first decision below; after it, 16 of 18 resolve again. `TestResolveRoles` now expects `pr-review-triage` to resolve to reviewer and shipper.
@@ -27,6 +27,12 @@ created: "2026-09-25"
   - a foreign `audit` added: 0 (the old f6 returned 1);
   - our retired copies seeded in two targets: 1;
   - after a redeploy: 0, with ours pruned and the foreign one kept.
+- Round 2 follow-up: `tests/check-retired-skills.bats` passes all 3 tests, and the check exits 0 against the real HOME. Each of these mutations of the script turns the test red:
+  - dropping the doctrine files from its target list;
+  - dropping the `command` render type, which also makes the script exit 2 on an unknown type;
+  - dropping the `from:` marker of flat prompts.
+
+  `shellcheck` is clean.
 - Prompt hook, run against this branch's records (`DOTFILES_DIR=<worktree> dotf harness suggest --from-hook`): prompts about Go, firmware, an MCP server and asyncio still print `[persona] builder` and name the domain skill first (`golang-pro`, `debug-hardware`, `mcp-builder`, `async-python-patterns`). Control run with the new rosters and main's triggers: no output at all for the Go prompt.
 
 ## Deploy evidence (AC6)
@@ -68,6 +74,25 @@ Verdict **FAIL**, from nan/qwen3.8-flash on 2026-09-25. The review ran from 10:2
 
 One more residue, outside AC6's deploy targets: the prompt hook kept suggesting `verification-before-completion`. The installed `dotf` (0.58.0) compiles the dependency map in, and the map still carried the retired name. A binary built from main no longer names it, and the 0.59.0 release clears it. Recorded on HARNESS-147 (#1693).
 
+## Independent review, round 2
+
+Verdict **FAIL**, from nan/deepseek-v4-flash on 2026-09-25. The review ran from 12:11 to 12:42, and its verdict rested on one REAL Major. Manu approved the dispositions below on 2026-09-25.
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | **Major, REAL.** f6 hand-listed its targets. It read three of the six instruction files the harness writes, so a forced roster naming a retired skill in `~/.config/opencode/AGENTS.md` or `~/.pi/agent/AGENTS.md` left it at exit 0. | **Applied.** `scripts/check-retired-skills.sh` reads every target from `harness/manifest.json`: the six `skills.deploy` directories, and every file in `agents.presence`, `skills.catalog` and `doctrine.deploy` (opencode, pi and Codex included). f6 calls it. `tests/check-retired-skills.bats` walks the manifest too and seeds each target in turn, so a harness added there is tested without editing either file, and an unknown render type fails the test. |
+| F2 | Minor. The full-suite count read 1,599 run; it was 1,600. | **Applied.** |
+| F3 | Minor. The fold said "has not run in this session", which is looser than the original "in this message" and contradicted its own table ("A previous run" is not sufficient). | **Applied** (vault `8ed998cd`, record refreshed). It now reads "has not run since the last change it covers", and the table says "A run from before the last change". This is consistent with the Definition of Done's "in this session". |
+| F4 | Minor. `pattern-architecture.md` still named `enrich-us` as a consumer. | **Applied** (vault `8ed998cd`). It now names the enrich step of `new-ticket`. |
+| F5 | Minor. f4 checked only headings, so a folded section emptied to one line kept it green. | **Applied.** f4 also checks one load-bearing rule from each fold's body. |
+| F6 | Minor. The lesson candidate was left undecided. | **Declined**, with the reason in the promotion candidates below. |
+| F7 | Minor. AC5 named the full bats suite, which f5 does not run and which carries one environmental failure. | **Applied.** AC5 now names what f5 runs: Go, `--check`, the doctrine budget test and the bats files this change touches. The full-suite run stays as supporting evidence above. |
+
+Not findings, but the review recorded two points:
+
+- Only f3's warn counts guard against a flat roster entry disarming the gate. That is a disclosed risk, and doctor reports unset entries.
+- The reviewer's roster grows by 32%, which is also disclosed.
+
 ## Decisions made during implementation
 
 - **Four domain triggers gained a discipline skill from the builder's roster.** A prompt's persona is derived from `trigger.skills ∩ persona.skills` (HARNESS-110). With the domain skills off the builder's roster, the Go, Python, hardware and MCP rules resolved to no persona, and a rule with no persona prints nothing, not even its domain skill. That contradicts "available when their domain is detected". `golang-engineering`, `python-cli` and `mcp-tool-design` now also name `test`, and `hardware-and-embedded-debug` names `systematic-debugging`. Each is on the builder's roster, and none changes which skill the hook names first. The principled alternative is a persona key for associated skills that the join reads but the gate does not. It is a schema change, offered on the PR rather than made here.
@@ -77,7 +102,7 @@ One more residue, outside AC6's deploy targets: the prompt hook kept suggesting 
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`? Candidate: a forced roster is also a routing table (HARNESS-110), so slimming it silently unroutes prompts unless a guard counts resolving rules.
+- [x] Lesson for the repo's `docs/lessons/`? **No.** The candidate: a forced roster is also a routing table (HARNESS-110), so slimming it silently unroutes prompts unless a guard counts resolving rules. It is already recorded where it acts: in this proposal's Risks, in HARNESS-154's problem statement (#1713), and in `TestRoleJoinDrift`, whose floor of 16 enforces it. A separate lesson would be a fourth copy (round-2 finding F6, declined).
 - [ ] ADR-worthy decision for the repo's `docs/adr/`? no
 - [ ] New pattern candidate for `00_meta/patterns/`? no
 

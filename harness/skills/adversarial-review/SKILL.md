@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: d7882b101d038524
+generated_sha: 43859027293c2ef3
 id: adversarial-review-skill
 type: skill
 status: active
@@ -347,7 +347,7 @@ If the change genuinely does not warrant a review, do not skip silently — the 
 
 This section and the next bind anyone about to say a change is done, fixed or passing: the implementer before committing, opening a PR or closing a task, and the reviewer before issuing a verdict.
 
-**No completion claim without fresh verification evidence.** If the command that proves a claim has not run in this session, the claim is not yet made. A claim that keeps this rule's letter while dodging its intent breaks it.
+**No completion claim without fresh verification evidence.** If the command that proves a claim has not run since the last change it covers, the claim is not yet made. A claim that keeps this rule's letter while dodging its intent breaks it.
 
 1. **Identify** the command that proves the claim.
 2. **Run** it in full, fresh.
@@ -357,7 +357,7 @@ This section and the next bind anyone about to say a change is done, fixed or pa
 
 | Claim | Requires | Not sufficient |
 |-------|----------|----------------|
-| Tests pass | The test command's output: 0 failures | A previous run, "should pass" |
+| Tests pass | The test command's output: 0 failures | A run from before the last change, "should pass" |
 | Linter clean | The linter's output: 0 errors | A partial check, extrapolation |
 | Build succeeds | The build command: exit 0 | A clean linter, logs that look fine |
 | Bug fixed | The original symptom, re-run: passes | Code changed, assumed fixed |

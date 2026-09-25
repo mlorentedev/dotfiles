@@ -22,22 +22,22 @@
   },
   {
     "id": "SKILL-001-portfolio-consolidation-f4",
-    "behavior": "adversarial-review, spec and new-ticket carry the folded rules",
-    "verification": "grep -q '^## Evidence before claims' harness/skills/adversarial-review/SKILL.md && grep -q '^## Closing pass (Definition of Done)' harness/skills/adversarial-review/SKILL.md && grep -q 'code-level checklist' harness/skills/adversarial-review/SKILL.md && grep -q '^## Planning the tasks' harness/skills/spec/SKILL.md && grep -q '^## Executing the tasks' harness/skills/spec/SKILL.md && grep -q '^## Enrich a thin item' harness/skills/new-ticket/SKILL.md",
+    "behavior": "adversarial-review, spec and new-ticket carry each folded section and a load-bearing rule from its body",
+    "verification": "grep -q '^## Evidence before claims' harness/skills/adversarial-review/SKILL.md && grep -qF 'No completion claim without fresh verification evidence' harness/skills/adversarial-review/SKILL.md && grep -q '^## Closing pass (Definition of Done)' harness/skills/adversarial-review/SKILL.md && grep -qF 'A skip is a stated decision.' harness/skills/adversarial-review/SKILL.md && grep -q 'code-level checklist' harness/skills/adversarial-review/SKILL.md && grep -qF 'command injection, path traversal' harness/skills/adversarial-review/SKILL.md && grep -q '^## Planning the tasks' harness/skills/spec/SKILL.md && grep -qF 'Name exact paths' harness/skills/spec/SKILL.md && grep -qF 'Give exact commands with their expected output' harness/skills/spec/SKILL.md && grep -q '^## Executing the tasks' harness/skills/spec/SKILL.md && grep -qF 'Stop at once' harness/skills/spec/SKILL.md && grep -q '^## Enrich a thin item' harness/skills/new-ticket/SKILL.md && grep -qF 'Never replace the issue body' harness/skills/new-ticket/SKILL.md && grep -qF 'post-hoc spec' harness/skills/new-ticket/SKILL.md",
     "state": "passing",
     "evidence": "exit 0 on 2026-09-25 at d80127a: the folded sections are present in the refreshed adversarial-review, spec and new-ticket records"
   },
   {
     "id": "SKILL-001-portfolio-consolidation-f5",
-    "behavior": "go test, compile-harness --check, the doctrine budget test and the suites this change touches pass",
-    "verification": "(cd cli && go test ./... -count=1 >/dev/null) && ./scripts/compile-harness.sh --check >/dev/null && bats tests/compile-harness.bats tests/agents-md.bats tests/skills-pipeline.bats tests/harness-suggest.bats >/dev/null",
+    "behavior": "go test, compile-harness --check, the doctrine budget test and the bats files this change touches pass",
+    "verification": "(cd cli && go test ./... -count=1 >/dev/null) && ./scripts/compile-harness.sh --check >/dev/null && bats tests/compile-harness.bats tests/agents-md.bats tests/skills-pipeline.bats tests/harness-suggest.bats tests/check-retired-skills.bats >/dev/null",
     "state": "passing",
     "evidence": "exit 0 on 2026-09-25 at d80127a: go test ./..., compile-harness.sh --check, and the four bats files, the new SKILL-001 prune test included"
   },
   {
     "id": "SKILL-001-portfolio-consolidation-f6",
-    "behavior": "After deploy, no copy of a retired skill that this pipeline rendered (marked with its vault source) remains in any deploy target, and neither the Copilot catalog nor a forced roster names one; a same-named skill another tool installed is left alone",
-    "verification": "m() { grep -qsE \"(^generated_from: |; from: )00_meta/skills/$1/SKILL\\.md\" \"$2\"; }; for s in dispatching-parallel-agents project-maturation research-prompt verification-before-completion audit writing-plans executing-plans enrich-us; do for f in \"$HOME/.claude/skills/$s/SKILL.md\" \"$HOME/.gemini/skills/$s/SKILL.md\" \"$HOME/.pi/agent/skills/$s/SKILL.md\" \"$HOME/.copilot/skills/$s/SKILL.md\" \"$HOME/.config/opencode/commands/$s.md\" \"$HOME/.gemini/prompts/$s.md\"; do ! m \"$s\" \"$f\" || exit 1; done; done; ! grep -qE '^- \\*\\*(dispatching-parallel-agents|project-maturation|research-prompt|verification-before-completion|audit|writing-plans|executing-plans|enrich-us)\\*\\*|MUST consume: \\[.*\\b(dispatching-parallel-agents|project-maturation|research-prompt|verification-before-completion|audit|writing-plans|executing-plans|enrich-us)\\b' \"$HOME/.copilot/copilot-instructions.md\" \"$HOME/.claude/CLAUDE.md\" \"$HOME/.gemini/GEMINI.md\"",
+    "behavior": "After deploy, no copy of a retired skill that this pipeline rendered remains in any skills.deploy target of the manifest, and no instruction file the manifest declares (presence, catalog, doctrine) names one; a same-named skill another tool installed is left alone",
+    "verification": "./scripts/check-retired-skills.sh dispatching-parallel-agents project-maturation research-prompt verification-before-completion audit writing-plans executing-plans enrich-us",
     "state": "passing",
     "evidence": "exit 0 on 2026-09-25 at d80127a: run on this machine's real HOME at 12:07: no copy marked as rendered from a retired skill's vault source in any of the six targets, and no catalog or roster line naming one"
   }

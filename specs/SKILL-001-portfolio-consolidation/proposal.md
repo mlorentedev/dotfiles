@@ -55,7 +55,7 @@ The vault carried 39 skills, and the persona rosters told every agent to consume
 - [ ] **AC2** — `harness/skills/` has no record for a retired skill, and no trigger, dependency-map entry, `requires:` field or persona roster names one (`TestEverySkillTheRouterNamesHasARecord`, `TestEveryDeclaredSkillHasARecord`).
 - [ ] **AC3** — the reviewer, planner and builder rosters are as listed above, with every existing severity preserved, and at least 16 of the 18 trigger rules still resolve to a persona (`TestRoleJoinDrift`).
 - [ ] **AC4** — `adversarial-review`, `spec` and `new-ticket` carry the folded rules.
-- [ ] **AC5** — `go test ./...`, the full bats suite, `compile-harness.sh --check` and the 8,000-character doctrine budget test pass.
+- [ ] **AC5** — `go test ./...`, `compile-harness.sh --check`, the 8,000-character doctrine budget test and the bats files this change touches pass.
 - [ ] **AC6** — after merge and `compile-harness.sh --deploy`, no copy of a retired skill that this pipeline rendered remains in any deploy target of `harness/manifest.json`, and neither the Copilot catalog nor a forced roster names one. A same-named skill another tool installed is left alone.
 
 ## References
