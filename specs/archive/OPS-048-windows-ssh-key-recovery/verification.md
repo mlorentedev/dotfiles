@@ -32,6 +32,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Server host identity is verified through an authenticated console/RDP fingerprint before either alias is accepted, and recovery checks require public-key authentication in batch mode.
 - The first independent review (`agy/gemini-3.1-pro-high`, `bdda316`) correctly rejected restarting `sshd` after key writes: new authorizations take effect without severing an active administrative SSH session. Replacement files now receive the administrator/SYSTEM ACL before content is written, and the reconciliation preserves an already-authorized key's order.
 - Declined the review's theoretical offline-capability follow-up: a host without the OpenSSH capability cannot reconcile safely without a servicing source, so surfacing that failure is preferable to a success-shaped fallback. `Get-WindowsCapability -Online` only inspects local servicing state; no demonstrated installed-host failure warrants a scope expansion.
+- The fresh independent review (`agy/gemini-3.1-pro-high`, `3bc1708`) returned PASS WITH GAPS. `BUG-103` (#1720) tracks its two theoretical ACL edge cases: locking a newly created host-key directory and accepting an orphaned SID owner during ACL repair. The contract set remains unchanged.
 
 ## Promotion candidates
 

@@ -1,7 +1,7 @@
 ---
 id: "OPS-048-windows-ssh-key-recovery"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-24"
 issue: "mlorentedev/dotfiles#1658"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
