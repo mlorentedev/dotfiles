@@ -43,7 +43,12 @@ Each slice PR fills its own section below and nothing else.
 
 ## S4 evidence
 
-_Filled by the S4 PR._
+- `go build`, `go vet` (linux and windows), `go test -count=1 ./...` (25 packages), `golangci-lint`, `shellcheck --severity=error`, `compile-harness.sh --check`, `check-bats-names.sh` and `check-doc-paths.sh`: all pass, on top of the merged S3.
+- `bats tests/*.bats`: 1597 run, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine.
+- AC4: `TestAgyAnswersInItsOwnProtocol`, `TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry`, `TestBindKeyHoldsOnlyFormatsAnOlderBinaryUnderstands` and `TestLoadBindTargetsRefusesAFormatInTheWrongKey` pass.
+- The manifest and binary skew was measured, not assumed: dotf 0.57.0, given the agy target under `agents.bind`, wrote a top-level `hooks` key with a `_managed` sidecar into a copy of the real `hooks.json`. Under `agents.bind_named` the same binary emits nothing.
+- The agy payload is documentation-derived (workspace hooks never loaded headless), so AC5 stays open until a real call after `dotf harness bind`.
+- Executable production lines: +245 / -28 across `harness_bind.go`, `harness_gate.go`, `bind.go` and `bind_manifest.go` (comments and blank lines excluded).
 
 ## Decisions made during implementation
 

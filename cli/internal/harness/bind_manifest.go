@@ -34,12 +34,13 @@ type EmitHook struct {
 type BindTarget struct {
 	Agent string `json:"agent"`
 	File  string `json:"file"`
-	// Format is the emission kind. Only "command-hook" is emitted today;
+	// Format is the emission kind. "command-hook" is claude's shape (a `hooks`
+	// key of events); "hooks-json" is a document of NAMED hooks, agy's; and
 	// "ts-extension" needs a generated-code template and is declared with
 	// emit:false so the gap is visible rather than remembered.
 	Format string `json:"format"`
 	// Matcher records whether this harness's groups carry a `matcher` key.
-	// Claude's do; agy's — measured against ~/.gemini/settings.json — do not.
+	// Claude's do, and so do agy's hooks.json groups for the tool events.
 	Matcher bool `json:"matcher"`
 	// Emit absent means true. A pointer distinguishes "not declared" from
 	// "declared false", so a target that forgets the key emits rather than
@@ -49,6 +50,18 @@ type BindTarget struct {
 	RequiresCommand string            `json:"requires_command"`
 	Events          map[string]string `json:"events"`
 	EmitHooks       []EmitHook        `json:"emit_hooks"`
+	// Retire lists hooks this repository USED to emit and no longer does, so a
+	// move to another file does not leave the old entry behind. Each is removed
+	// from its file by marker, never by position.
+	Retire []RetiredHook `json:"retire"`
+}
+
+// RetiredHook names one hook to remove: the settings file it sat in, the event,
+// and the ID it was emitted under.
+type RetiredHook struct {
+	File  string `json:"file"`
+	Event string `json:"event"`
+	ID    string `json:"id"`
 }
 
 // Emits reports whether this target is emitted at all.
@@ -80,12 +93,26 @@ func (t BindTarget) HookCommands(dotfPath string) ([]HookCommand, error) {
 	return out, nil
 }
 
-// LoadBindTargets reads `agents.bind` from the manifest.
+// LoadBindTargets reads `agents.bind` and `agents.bind_named` from the manifest.
+//
+// THE TWO KEYS EXIST BECAUSE THE MANIFEST AND THE BINARY SHIP SEPARATELY. Setup
+// mirrors the manifest the moment it merges; a released binary arrives on its own
+// schedule. A binary from before a format existed reads `bind`, ignores every key
+// it does not know, and treats each target in `bind` as claude's shape. A target
+// in a new format placed there is therefore emitted WRONG by every older binary
+// rather than skipped: the agy target, in `bind`, would have made dotf 0.57.0 write
+// a top-level `hooks` key with a `_managed` sidecar into agy's hooks.json (a file
+// agy decodes as protojson and shares with Orca). Measured 2026-09-24 against a
+// copy of the real file.
+//
+// So a format an older binary does not know lives under `bind_named`, which such a
+// binary never reads, and its effect is nothing, the status quo. This is enforced
+// here, where the manifest loads, so a target cannot drift into the wrong key.
 //
 // An absent or empty `bind` is an ERROR rather than an empty slice, on C15: a
 // caller that asked for the bind targets and got none cannot tell "this repo
 // declares no binding" from "the manifest moved and nobody noticed", and the
-// two would produce the same silence — a setup run that writes no hooks and
+// two would produce the same silence - a setup run that writes no hooks and
 // reports success.
 func LoadBindTargets(root string) ([]BindTarget, error) {
 	path := filepath.Join(root, filepath.FromSlash(ManifestFile))
@@ -95,7 +122,8 @@ func LoadBindTargets(root string) ([]BindTarget, error) {
 	}
 	var doc struct {
 		Agents struct {
-			Bind []BindTarget `json:"bind"`
+			Bind      []BindTarget `json:"bind"`
+			BindNamed []BindTarget `json:"bind_named"`
 		} `json:"agents"`
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -104,5 +132,17 @@ func LoadBindTargets(root string) ([]BindTarget, error) {
 	if len(doc.Agents.Bind) == 0 {
 		return nil, fmt.Errorf("%s declares no agents.bind targets", ManifestFile)
 	}
-	return doc.Agents.Bind, nil
+	for _, t := range doc.Agents.Bind {
+		if t.Format == NamedHooksFormat {
+			return nil, fmt.Errorf("%s: agents.bind target %q uses format %q, which older binaries do not know; "+
+				"declare it under agents.bind_named, which they never read", ManifestFile, t.Agent, t.Format)
+		}
+	}
+	for _, t := range doc.Agents.BindNamed {
+		if t.Format != NamedHooksFormat {
+			return nil, fmt.Errorf("%s: agents.bind_named target %q has format %q, want %q",
+				ManifestFile, t.Agent, t.Format, NamedHooksFormat)
+		}
+	}
+	return append(doc.Agents.Bind, doc.Agents.BindNamed...), nil
 }

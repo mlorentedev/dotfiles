@@ -61,6 +61,19 @@ created: "2026-06-21"
 > #803 and rides on HARNESS-045 AC1; the `bind[]` entry is written there, in that command's
 > entry shape.
 
+> **Amended 2026-09-24: the agy measurement above was of Gemini CLI's file, and agy does not
+> read it.** `~/.gemini/settings.json` declares `BeforeAgent`, `AfterAgent`, `BeforeTool` and
+> `AfterTool` because Orca writes it for Gemini CLI. agy reads its hooks from
+> `~/.gemini/config/hooks.json`: a document of named hooks (`{"<name>": {"PreToolUse": [...]}}`),
+> events `PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation` and `Stop`, a camelCase
+> payload (`conversationId`, `toolCall.name`, `toolCall.args`), and a JSON decision on stdout
+> (`allow`, `deny`, `ask`, `force_ask`) that it reads in place of an exit code. Read from the
+> schema the binary embeds and from its log ("loaded N named hooks from N hooks.json file(s)").
+> Two consequences: agy IS a `command-hook`-style target but in its own format (`hooks-json`),
+> and `dotf harness gate --harness agy` answers `ask`, never `allow`, which agy documents as
+> approving the call without asking anyone. agy sends no agent type, so the binding is
+> measurement plumbing until a persona source exists. Lesson 292 has the story.
+
 Accepted (model). The **authoring** of definitions and the **engine** (render + offline CI) are NOT gated. Only the **cross-machine auto-deploy** step inherits ADR-026's `knowledge#120` gate. Lands via the existing `HARNESS-001` deploy-engine epic — not a new infrastructure track.
 
 ## Date

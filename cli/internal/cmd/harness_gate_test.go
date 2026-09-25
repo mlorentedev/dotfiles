@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -53,12 +54,14 @@ func TestNormaliseReportsWhetherThePayloadWasUnderstood(t *testing.T) {
 			wantOK:    true,
 			wantTool:  "skill",
 			wantSkill: "audit", wantS: "s2"},
-		// agy uses claude's command-hook shape: ~/.gemini/settings.json declares
-		// BeforeTool in that exact format, so it takes the default branch.
-		{name: "agy command hook", harnessName: "agy",
-			payload:  `{"session_id":"s4","tool_name":"Bash","tool_input":{}}`,
+		// agy's own PreToolUse payload, taken from the hook documentation its
+		// binary embeds: camelCase, the session is `conversationId`, the call is
+		// `toolCall`. It is NOT claude's shape - reading it that way made every
+		// agy call "payload not recognised".
+		{name: "agy PreToolUse payload", harnessName: "agy",
+			payload:  `{"toolCall":{"name":"run_command","args":{"CommandLine":"npm test"}},"stepIdx":19,"conversationId":"ec33ebf9","workspacePaths":["/w"],"modelName":"auto"}`,
 			wantOK:   true,
-			wantTool: "Bash", wantS: "s4"},
+			wantTool: "run_command", wantS: "ec33ebf9"},
 
 		// Every one of these must report NOT understood, so the caller allows.
 		{name: "not json", harnessName: "claude", payload: `not json at all`},
@@ -67,6 +70,10 @@ func TestNormaliseReportsWhetherThePayloadWasUnderstood(t *testing.T) {
 		{name: "command shape sent to a wrapper harness", harnessName: "pi", payload: `{"session_id":"s1","tool_name":"Bash"}`},
 		{name: "canonical shape sent to a command harness", harnessName: "claude", payload: `{"session":"s1","tool":"bash"}`},
 		{name: "json array", harnessName: "claude", payload: `[1,2,3]`},
+		// The two shapes are not interchangeable in either direction.
+		{name: "claude's shape sent to agy", harnessName: "agy", payload: `{"session_id":"s4","tool_name":"Bash","tool_input":{}}`},
+		{name: "agy's shape sent to claude", harnessName: "claude", payload: `{"toolCall":{"name":"run_command"},"conversationId":"c1"}`},
+		{name: "agy payload with no tool name", harnessName: "agy", payload: `{"conversationId":"c1","toolCall":{}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			call, ok := normaliseToolCall(tc.harnessName, []byte(tc.payload))
@@ -410,6 +417,19 @@ func runGate(t *testing.T, args []string, payload string) (int, string) {
 	c.SetErr(&errb)
 	c.SetArgs(args)
 	return ExitCode(c.Execute()), errb.String()
+}
+
+// runGateOut is runGate with stdout captured, for the harness whose answer IS
+// its stdout (agy): an exit code says nothing there.
+func runGateOut(t *testing.T, args []string, payload string) (code int, stdout, stderr string) {
+	t.Helper()
+	c := newHarnessGateCmd()
+	var outb, errb bytes.Buffer
+	c.SetIn(strings.NewReader(payload))
+	c.SetOut(&outb)
+	c.SetErr(&errb)
+	c.SetArgs(args)
+	return ExitCode(c.Execute()), outb.String(), errb.String()
 }
 
 func readJournal(t *testing.T, stateDir, scope string) []harness.DecisionRecord {
@@ -909,5 +929,103 @@ func TestTheReservedJournalNameIsNotASession(t *testing.T) {
 				t.Fatalf("the sessionless journal holds %+v, want one allowed %q record", recs, harness.OutcomeSessionUnscoped)
 			}
 		})
+	}
+}
+
+// agyGatePayload is agy's PreToolUse payload as its own documentation shows it.
+const agyGatePayload = `{"toolCall":{"name":"run_command","args":{"CommandLine":"npm test"}},"stepIdx":19,"conversationId":"conv-1","workspacePaths":["/w"],"transcriptPath":"/w/t.jsonl","artifactDirectoryPath":"/w/a","modelName":"auto"}`
+
+// TestAgyAnswersInItsOwnProtocol pins what agy reads from a PreToolUse hook: a
+// JSON decision on STDOUT, from a command that exits 0. An exit code means
+// nothing to it, and an empty stdout is not a decision.
+//
+// The value that matters most is the one it must never print. agy documents
+// "allow" as "Automatically allow the tool execution", so a gate that answered
+// allow whenever it had no objection would approve every call past agy's own
+// permission prompt. The neutral answer is "ask".
+func TestAgyAnswersInItsOwnProtocol(t *testing.T) {
+	root := repoRootForTest(t)
+	blocking := blockingRepoRoot(t)
+
+	for _, tc := range []struct {
+		name         string
+		args         []string
+		payload      string
+		wantDecision string
+		wantReason   bool
+		wantOutcome  harness.Outcome
+		wantScope    string
+	}{
+		{name: "a call the gate has no objection to is answered ask",
+			args:    []string{"--repo-root", root},
+			payload: agyGatePayload, wantDecision: "ask",
+			wantOutcome: harness.OutcomeNoRole, wantScope: "conv-1"},
+		{name: "a blocked call is denied, with the reason",
+			args:    []string{"--repo-root", blocking, "--role", "gatekeeper"},
+			payload: agyGatePayload, wantDecision: "deny", wantReason: true,
+			wantOutcome: harness.OutcomeBlock, wantScope: "conv-1"},
+		{name: "a payload it cannot read is answered ask, never left empty",
+			args:    []string{"--repo-root", root},
+			payload: `not json at all`, wantDecision: "ask",
+			wantOutcome: harness.OutcomePayloadUnrecognised, wantScope: harness.UnparsedScope},
+		{name: "a call with no conversation is allowed and journaled as unscoped",
+			args:    []string{"--repo-root", blocking, "--role", "gatekeeper"},
+			payload: `{"toolCall":{"name":"run_command"}}`, wantDecision: "ask",
+			wantOutcome: harness.OutcomeSessionUnscoped, wantScope: harness.UnscopedScope},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stateDir := t.TempDir()
+			args := append([]string{"--harness", "agy", "--state-dir", stateDir}, tc.args...)
+			code, stdout, _ := runGateOut(t, args, tc.payload)
+
+			if code != 0 {
+				t.Errorf("agy hooks answer on stdout and exit 0; exit = %d", code)
+			}
+			var got struct {
+				Decision string `json:"decision"`
+				Reason   string `json:"reason"`
+			}
+			if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &got); err != nil {
+				t.Fatalf("stdout must be one JSON object, got %q: %v", stdout, err)
+			}
+			if got.Decision != tc.wantDecision {
+				t.Errorf("decision = %q, want %q", got.Decision, tc.wantDecision)
+			}
+			if got.Decision == "allow" {
+				t.Error("the gate must never answer allow: agy reads it as approval without asking anyone")
+			}
+			if tc.wantReason && got.Reason == "" {
+				t.Error("a deny must say why")
+			}
+			if !tc.wantReason && got.Reason != "" {
+				t.Errorf("a neutral answer carries no reason, got %q", got.Reason)
+			}
+
+			recs := readJournal(t, stateDir, tc.wantScope)
+			if len(recs) != 1 {
+				t.Fatalf("journal for scope %q holds %d records, want 1", tc.wantScope, len(recs))
+			}
+			if recs[0].Outcome != tc.wantOutcome {
+				t.Errorf("outcome = %q, want %q", recs[0].Outcome, tc.wantOutcome)
+			}
+			if recs[0].Harness != "agy" {
+				t.Errorf("harness = %q, want agy", recs[0].Harness)
+			}
+			if recs[0].Tool != "" && recs[0].Tool != "run_command" {
+				t.Errorf("tool = %q, want run_command", recs[0].Tool)
+			}
+		})
+	}
+}
+
+// The other harnesses answer with an exit code and nothing on stdout: a JSON
+// line there would be read as something it is not.
+func TestOtherHarnessesStillAnswerWithAnExitCodeAndSilence(t *testing.T) {
+	root := repoRootForTest(t)
+	stateDir := t.TempDir()
+	code, stdout, _ := runGateOut(t, []string{"--harness", "claude", "--repo-root", root, "--state-dir", stateDir},
+		`{"tool_name":"Bash","session_id":"s1"}`)
+	if code != 0 || stdout != "" {
+		t.Errorf("claude: exit = %d, stdout = %q; want exit 0 and no output", code, stdout)
 	}
 }
