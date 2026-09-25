@@ -43,7 +43,7 @@ assert 'docker' in data['skills']
     cd "$CLI"
     run go run ./cmd/dotf harness suggest --prompt "create terraform module for EKS cluster"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-terraform-standards"* ]]
+    [[ "$output" == *"pattern-git-workflow"* ]]
     [[ "$output" == *"terraform"* ]]
 }
 
@@ -51,7 +51,7 @@ assert 'docker' in data['skills']
     cd "$CLI"
     run go run ./cmd/dotf harness suggest Chart.yaml
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-kubernetes-packaging"* ]]
+    [[ "$output" == *"pattern-container-workflow"* ]]
     [[ "$output" == *"helm"* ]]
 }
 

@@ -380,6 +380,7 @@ func checkHarnessDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	checkDeployedSkillSymlinks(sys, cfg, rep)
 	checkInstructionDrift(sys, rep)
 	checkDeployedDoctrine(sys, cfg, rep)
+	checkTriggerTargets(sys, cfg, rep)
 }
 
 var enforcedRegionMarkers = map[string]string{

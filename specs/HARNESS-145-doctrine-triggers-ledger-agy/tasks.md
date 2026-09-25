@@ -24,10 +24,10 @@ created: "2026-09-25"
 
 ## S2 - triggers (AC2), after S1
 
-- [ ] [AC2] Failing test: a shared pattern must not cross-link skills; an empty pattern is never reported
-- [ ] [AC2] Point every trigger at a pattern that exists; repair the `pattern-loader` record
-- [ ] [AC2] `--refresh` refuses a dangling trigger and writes nothing
-- [ ] [AC2] `dotf doctor` reports a trigger that names an absent pattern
+- [x] [AC2] Failing test: a shared pattern must not cross-link skills; an empty pattern is never reported
+- [x] [AC2] Point every trigger at a pattern that exists; repair the `pattern-loader` record
+- [x] [AC2] `--refresh` refuses a dangling trigger and writes nothing
+- [x] [AC2] `dotf doctor` reports a trigger that names an absent pattern
 
 ## S3 - ledger (AC3)
 

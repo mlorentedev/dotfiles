@@ -675,6 +675,37 @@ build_skill_catalog() {
 
 # --- modes ---
 
+# Every pattern a trigger names must exist in the vault.
+#
+# A trigger whose pattern is missing still fires and routes work: the prompt hook
+# prints "<- pattern: pattern-terraform-standards" and a session goes looking for
+# it. Measured 2026-09-24, 8 of the 18 triggers named patterns that were never
+# written or had been renamed, and nothing said so, because the file is only read
+# by code that treats the name as an opaque string. --refresh is the one mode that
+# has the vault, so it is where this can be checked at all: --check runs offline,
+# and CI has no vault. A pattern renamed in the vault later is caught by the next
+# --refresh, and by `dotf doctor` on a machine that has the vault.
+#
+# Checked BEFORE anything is written, so a dangling trigger fails the refresh
+# whole instead of leaving records refreshed and the targets not.
+check_trigger_targets() {
+    local pat_dir="$1" triggers="$REPO_ROOT/harness/triggers.json" id pat dangling=0
+    [[ -f "$triggers" ]] || return 0
+    while IFS=$'\t' read -r id pat; do
+        [[ -n "$pat" ]] || continue
+        if [[ ! -f "$pat_dir/$pat.md" ]]; then
+            printf '[ERROR] harness/triggers.json: trigger "%s" names pattern "%s", which is not in the vault (%s)\n' \
+                "$id" "$pat" "$pat_dir" >&2
+            dangling=1
+        fi
+    done < <(jq -r '.triggers[] | "\(.id)\t\(.pattern // "")"' "$triggers")
+    if (( dangling )); then
+        printf '        point the trigger at a pattern that exists, or remove it, then re-run --refresh\n' >&2
+        return 1
+    fi
+    printf '[refresh] triggers: every pattern named in harness/triggers.json exists in the vault\n'
+}
+
 do_refresh() {
     require_tools
     local vsub pat_dir
@@ -688,6 +719,8 @@ do_refresh() {
 EOF
         exit 2
     fi
+
+    check_trigger_targets "$pat_dir" || exit 1
 
     mkdir -p "$RECORD_DIR"
 
