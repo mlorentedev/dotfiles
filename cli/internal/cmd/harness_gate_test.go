@@ -766,3 +766,148 @@ func TestAnUnparsedPayloadRecordsItsSizeNotItsContent(t *testing.T) {
 		t.Fatal("the unparsed payload's content was written to disk")
 	}
 }
+
+// TestSessionsWithNoIDShareNoLedger is the end-to-end proof that a payload which
+// names no session cannot satisfy anyone's gate.
+//
+// scopeKey("") is the digest of the empty string, so every such payload used to
+// share one ledger: a skill invoked by any of them was consumed for all of them,
+// permanently. It was latent when measured, because it needs a persona in scope
+// and a skill promoted to `enforce: block` at once, but agy's payload spells the
+// session field differently from claude's and would have arrived exactly so.
+//
+// The persona is the blocking fixture, the only way to drive the block path.
+// What is asserted is the consequence, not the mechanism: the gated call must NOT
+// read as "the skill was consumed", no file that could gate a later call may
+// exist, and the journal must say enforcement was off rather than pass for
+// healthy. Two payload shapes reach the empty scope, and they failed differently:
+// with --role and no agent id both calls shared the empty ledger (the poisoning),
+// while a bare agent id with no session made a per-dispatch file nothing could
+// find again and BLOCKED for good.
+func TestSessionsWithNoIDShareNoLedger(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		extraArgs   []string
+		skillCall   string
+		gatedCall   string
+		wantStderr  string
+		wantRecords int
+	}{
+		{
+			name:        "the operator names the persona and both calls carry no session or agent",
+			extraArgs:   []string{"--role", "gatekeeper"},
+			skillCall:   `{"tool_name":"Skill","tool_input":{"skill":"audit"}}`,
+			gatedCall:   `{"tool_name":"Bash"}`,
+			wantStderr:  "no session",
+			wantRecords: 2,
+		},
+		{
+			name:        "the payload names an agent but no session",
+			skillCall:   `{"tool_name":"Skill","tool_input":{"skill":"audit"}}`,
+			gatedCall:   `{"tool_name":"Bash","agent_type":"gatekeeper","agent_id":"a1"}`,
+			wantStderr:  "no session",
+			wantRecords: 2,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			blocking := blockingRepoRoot(t)
+			stateDir := t.TempDir()
+			args := append([]string{"--harness", "claude", "--repo-root", blocking, "--state-dir", stateDir}, tc.extraArgs...)
+
+			if code, _ := runGate(t, args, tc.skillCall); code != 0 {
+				t.Fatalf("a skill invocation must always be allowed, exit = %d", code)
+			}
+			code, stderr := runGate(t, args, tc.gatedCall)
+			if code != 0 {
+				t.Fatalf("with no session there is nothing to enforce, so the call must be allowed; exit = %d (%s)", code, stderr)
+			}
+			if !strings.Contains(stderr, tc.wantStderr) {
+				t.Errorf("the allow must say enforcement was off, got stderr %q", stderr)
+			}
+
+			// Nothing that could gate a later call was written: only journals exist.
+			entries, err := os.ReadDir(filepath.Join(stateDir, "gate"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range entries {
+				if !strings.HasSuffix(e.Name(), ".decisions.jsonl") {
+					t.Errorf("state file %s was written for a call with no session; a ledger or dispatch map keyed by nothing is shared by every such call", e.Name())
+				}
+				if strings.HasPrefix(e.Name(), "unknown-") {
+					t.Errorf("%s: the digest of the empty string named a file", e.Name())
+				}
+			}
+
+			recs := readJournal(t, stateDir, harness.UnscopedScope)
+			if len(recs) != tc.wantRecords {
+				t.Fatalf("the %q journal holds %d records, want %d", harness.UnscopedScope, len(recs), tc.wantRecords)
+			}
+			for i, rec := range recs {
+				if rec.Outcome != harness.OutcomeSessionUnscoped || !rec.Allowed {
+					t.Errorf("record %d: outcome %q allowed %v, want %q and allowed", i, rec.Outcome, rec.Allowed, harness.OutcomeSessionUnscoped)
+				}
+			}
+
+			// And the fix must not have switched enforcement off for sessions that DO
+			// name themselves: the earlier unscoped skill run must not have satisfied this one.
+			named := append([]string{"--harness", "claude", "--repo-root", blocking, "--state-dir", stateDir},
+				tc.extraArgs...)
+			if code, _ := runGate(t, named, `{"tool_name":"Bash","session_id":"real","agent_type":"gatekeeper","agent_id":"a1"}`); code != gateExitBlock {
+				t.Errorf("a session that names itself must still be gated, exit = %d, want %d", code, gateExitBlock)
+			}
+		})
+	}
+}
+
+// `_unscoped` is where calls with NO session are journaled, so a payload that
+// claims it as its session id must be read as having none. Honouring it made a
+// named session whose history was the sessionless journal (raised on review of
+// the ledger fix), and with a persona in scope it was gated as a real session
+// whose ledger nothing could ever satisfy.
+func TestTheReservedJournalNameIsNotASession(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		extraArgs []string
+		payload   string
+	}{
+		{
+			name:    "the payload names the reserved id and a persona",
+			payload: `{"tool_name":"Bash","session_id":"_unscoped","agent_type":"gatekeeper","agent_id":"a1"}`,
+		},
+		{
+			name:      "the operator names the persona and the payload names the reserved id",
+			extraArgs: []string{"--role", "gatekeeper"},
+			payload:   `{"tool_name":"Bash","session_id":"_unscoped"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			blocking := blockingRepoRoot(t)
+			stateDir := t.TempDir()
+			args := append([]string{"--harness", "claude", "--repo-root", blocking, "--state-dir", stateDir}, tc.extraArgs...)
+
+			code, stderr := runGate(t, args, tc.payload)
+			if code != 0 {
+				t.Fatalf("a payload claiming the reserved id names no real session, so there is nothing to enforce and the call must be allowed; exit = %d (%s)", code, stderr)
+			}
+			if !strings.Contains(stderr, "no session") {
+				t.Errorf("the allow must say enforcement was off, got stderr %q", stderr)
+			}
+
+			entries, err := os.ReadDir(filepath.Join(stateDir, "gate"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range entries {
+				if !strings.HasSuffix(e.Name(), ".decisions.jsonl") {
+					t.Errorf("state file %s was written for a call with no real session", e.Name())
+				}
+			}
+
+			recs := readJournal(t, stateDir, harness.UnscopedScope)
+			if len(recs) != 1 || recs[0].Outcome != harness.OutcomeSessionUnscoped || !recs[0].Allowed {
+				t.Fatalf("the sessionless journal holds %+v, want one allowed %q record", recs, harness.OutcomeSessionUnscoped)
+			}
+		})
+	}
+}
