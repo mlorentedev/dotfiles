@@ -1,12 +1,12 @@
 {
-  "reviewed_sha": "d8f8b115275e8a71ac6cc34f1d4fdaa98e5ea308",
+  "reviewed_sha": "746683376d9f9af8d31e816bcc6292fe9f914298",
   "reviewer": "agy/gemini-3.1-pro-high",
-  "requested_at": "2026-09-25T00:57:38Z",
-  "review_digest_before": "6241c979bb902696dca286be86a5415607ad3658c3ef0f7c1700e843990b3836",
+  "requested_at": "2026-09-25T01:53:37Z",
+  "review_digest_before": "1511de9d95ca8a68a250e07346e3e8be689e76cb0711f9e5ff46620df61c73ed",
   "base_sha": "0105662daf0c04c77f43adc9b02f588604b148c6",
   "contract_digests": {
-    "features.json": "b40c5bac83afd99dfa9bd764c623eeee8253db8b1a6dabaeecdaec7a38f24d19",
-    "proposal.md": "4063f78f9f5c235129d41fe66592eba826d10a46e88eaf8e87ca20e6617b6657",
-    "tasks.md": "745aad6e1e135fe650d556ffb6867b051643728f2e01ffa8e0d4b522b7c630b9"
+    "features.json": "5527497c6096aeffb474191a5a5d80aa592adf98e799733296f4f8167861ec2e",
+    "proposal.md": "79e52075268be9e3294ee8a8ff44092ac46eee014f744aa86f692d162cca2b96",
+    "tasks.md": "7ab0295776ee29105b7e57e8d2ec50c70b2c6f9c796b45565b85b1da7a5e139d"
   }
 }
