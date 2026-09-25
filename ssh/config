@@ -154,3 +154,21 @@ Host jetson-office
     ServerAliveInterval 15
     ServerAliveCountMax 3
 # --- OFFICE-JETSON-END ---
+
+# --- ACEMAGIC-OFFICE-START ---
+Host acemagic-office
+    HostName acemagic-office
+    User manu
+    IdentityFile ~/.ssh/id_ed25519_ts_bridge_acemagic
+    IdentitiesOnly yes
+    ServerAliveInterval 15
+    ServerAliveCountMax 3
+
+Host acemagic-office-lan
+    HostName 192.168.137.245
+    User manu
+    IdentityFile ~/.ssh/id_ed25519_ts_bridge_acemagic
+    IdentitiesOnly yes
+    ServerAliveInterval 15
+    ServerAliveCountMax 3
+# --- ACEMAGIC-OFFICE-END ---

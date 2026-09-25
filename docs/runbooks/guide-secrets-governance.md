@@ -198,4 +198,5 @@ restore from it.
 ## References
 
 - [ADR-028](../adr/adr-028-secrets-two-tier-bitwarden-age.md) (decision + structure), `docs/secrets-inventory.md` (the map), [ADR-002](../adr/adr-002-age-over-gpg.md) (age).
+- [Windows SSH Key Recovery](windows-ssh-key-recovery.md) (dedicated Windows host identity lifecycle).
 - Tickets: #378, #493, #321, #518, #257, #454, #577.

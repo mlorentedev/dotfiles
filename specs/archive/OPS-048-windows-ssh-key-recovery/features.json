@@ -1,0 +1,30 @@
+[
+  {
+    "id": "OPS-048-windows-ssh-key-recovery-f1",
+    "behavior": "The Bitwarden-backed private key materializes to a stable path and is fingerprint/ACL validated without disclosure.",
+    "verification": "pwsh -NoProfile -Command \"if (-not $IsWindows) { throw 'Windows required'; }; Import-Module Pester -MinimumVersion 5.5.0; $result = Invoke-Pester -Path tests/windows-ssh-key-recovery.Tests.ps1 -CI -PassThru; if ($result.PassedCount -lt 1) { throw 'No Pester tests passed'; }\"",
+    "state": "pending",
+    "evidence": "Pester client-key tests passed; live Bitwarden materialization reported SHA256:LqJwbtpkPE85CRuaqMuZkcHhA13NSguZvZmMUg5G618 without displaying private material."
+  },
+  {
+    "id": "OPS-048-windows-ssh-key-recovery-f2",
+    "behavior": "Windows OpenSSH reconciliation is duplicate-free, preserves unrelated keys, and protects the administrator key store.",
+    "verification": "pwsh -NoProfile -Command \"if (-not $IsWindows) { throw 'Windows required'; }; Import-Module Pester -MinimumVersion 5.5.0; $result = Invoke-Pester -Path tests/windows-ssh-key-recovery.Tests.ps1 -CI -PassThru; if ($result.PassedCount -lt 1) { throw 'No Pester tests passed'; }\"",
+    "state": "pending",
+    "evidence": "Pester host-reconciliation tests passed; live rotated-key SSH returned WIN-9KP9GOBAT8N."
+  },
+  {
+    "id": "OPS-048-windows-ssh-key-recovery-f3",
+    "behavior": "Stable SSH aliases cover both mesh-name and dock-LAN access with the dedicated identity.",
+    "verification": "pwsh -NoProfile -Command \"if (-not $IsWindows) { throw 'Windows required'; }; Import-Module Pester -MinimumVersion 5.5.0; $result = Invoke-Pester -Path tests/windows-ssh-key-recovery.Tests.ps1 -CI -PassThru; if ($result.PassedCount -lt 1) { throw 'No Pester tests passed'; }\"",
+    "state": "pending",
+    "evidence": "Alias structure test passed; live acemagic-office-lan SSH returned WIN-9KP9GOBAT8N."
+  },
+  {
+    "id": "OPS-048-windows-ssh-key-recovery-f4",
+    "behavior": "The runbook documents bootstrap, reconciliation, recovery, rotation, DR, and verification without unsafe secret handling.",
+    "verification": "pwsh -NoProfile -Command \"if (-not $IsWindows) { throw 'Windows required'; }; Import-Module Pester -MinimumVersion 5.5.0; $result = Invoke-Pester -Path tests/windows-ssh-key-recovery.Tests.ps1 -CI -PassThru; if ($result.PassedCount -lt 1) { throw 'No Pester tests passed'; }\"",
+    "state": "pending",
+    "evidence": "Runbook lifecycle and secret-safety structural test passed."
+  }
+]
