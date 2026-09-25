@@ -175,15 +175,23 @@ setup() {
     # silently becomes a no-op that still reads as configured.
     #
     # Asserted as a RELATIONSHIP, not a constant: the failure this guards is
-    # someone dropping the `[1m]` suffix from `model` and leaving an 800000
-    # window behind, which then caps nothing.
+    # someone dropping the `[1m]` suffix from `model` and leaving a 1M-sized
+    # window behind, which then caps nothing. The documented range is 100000 to
+    # 1000000 (code.claude.com/docs/en/settings-reference#autocompactwindow); a
+    # value outside it is not what the file says it is.
+    #
+    # The value itself (300000, 2026-09-24) is an owner choice. It is just above
+    # the 256K bucket where Anthropic's published long-context scores are near
+    # ceiling and well below the 1M bucket where they drop, and CLAUDE.md is
+    # re-injected from disk at every compaction. The evidence is in the PR that set it.
     local win model
     win="$(jq -r '.autoCompactWindow' "$SETTINGS_TEMPLATE")"
     model="$(jq -r '.model' "$SETTINGS_TEMPLATE")"
     case "$win" in
         ''|*[!0-9]*) echo "autoCompactWindow '$win' is not a positive integer" >&2; return 1 ;;
     esac
-    [ "$win" -gt 0 ]
+    [ "$win" -ge 100000 ] && [ "$win" -le 1000000 ] \
+        || { echo "autoCompactWindow=$win is outside the documented 100000-1000000 range" >&2; return 1; }
     case "$model" in
         *'[1m]')
             [ "$win" -lt 1000000 ] \
