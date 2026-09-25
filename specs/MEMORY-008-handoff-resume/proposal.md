@@ -19,7 +19,7 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 ## What
 
 - A thread has one canonical field set, defined once in Go: `Updated`, `Last task`, `Decisions`, `Open threads`, `Next action`, `Verify`, `Awaiting Manu` and `Journal`. The labels sessions already improvise (`Verify at start`, `Judgment calls left open`) are read as aliases, so no existing block needs migrating by hand.
-- The per-thread file `memory/threads/<key>.md` is the source. The entry in `MEMORY.md` is derived from it and capped at about 350 B (updated, writer, one-line next action, how many items await Manu, pointer), not the 1.5 KB block of today. Old blocks stay readable and move to the new shape on their next write.
+- The per-thread file `memory/threads/<key>.md` is the source. The entry in `MEMORY.md` is derived from it and capped at about 350 B (updated, one-line next action, how many items await Manu, pointer, and the writer once MEMORY-009 stamps it), not the 1.5 KB block of today. Old blocks stay readable and move to the new shape on their next write.
 - `dotf mem resume [--thread K] [--format prompt|context]` renders the thread. The output depends only on the thread file. When the working directory names no single thread for this agent, it lists the candidates rather than picking one.
 - Claude's `SessionStart` hook injects the resume keyed on `source`: the full resume for `startup`, `clear` and `compact`, one line for `resume` and `fork`, where the conversation already holds the history.
 - Harnesses with no session hook get one sentence in the compact doctrine: run `dotf mem resume` and follow it.
@@ -48,7 +48,7 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 - [ ] **AC1** — `resume` output is a pure function of the thread file (golden test); two runs are identical.
 - [ ] **AC2** — a thread with `Verify:` and `Awaiting Manu:` renders both, and an ambiguous working directory lists the candidate threads instead of choosing one.
 - [ ] **AC3** — `SessionStart` output begins with the resume block for `source=compact` and `source=clear` (golden fixture per source), and `resume` and `fork` get one line.
-- [ ] **AC4** — no `MEMORY.md` in a fixture copy of the real dotfiles file exceeds 25,000 B after the new fields are added.
+- [ ] **AC4** — no `MEMORY.md` in a fixture copy of the real dotfiles file exceeds 25,000 B after the new fields are added, and a write that would cross the budget fails instead of truncating.
 - [ ] **AC5** — the handoff skill points the next session at `dotf mem resume` instead of a hand-typed prompt, and catchup step 1 is `dotf mem resume`.
 - [ ] **AC6** — the fallback sentence is in the compiled doctrine, `compile-harness.sh --check` passes, and the doctrine stays under the 8,000-character budget.
 
