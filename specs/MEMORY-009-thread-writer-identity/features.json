@@ -31,7 +31,7 @@
     "id": "MEMORY-009-thread-writer-identity-f5",
     "behavior": "The handoff skill's command passes --agent",
     "verification": "grep -qE 'dotf mem handoff-write .*--agent' harness/skills/handoff/SKILL.md",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 280af58: the refreshed handoff record passes --agent to handoff-write (vault 27a2c9c8)"
   }
 ]

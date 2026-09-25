@@ -11,7 +11,9 @@ created: "2026-09-25"
 - [x] **AC2** -> commit `f6dc6f6`, test `TestMemHandoffWriteAnnouncesAFork` (f2): stderr names `"master@msi"`, pi, claude and `"master@msi+claude"`; stdout names the thread actually written.
 - [x] **AC3** -> commit `f6dc6f6`, tests `TestTheSameAgentRewritesItsOwnBlockInPlace` (its own stamp, and an unstamped block whose journal names the writer) and `TestABlockWithNoKnownWriterIsReplacedAndStamped` (f3).
 - [x] **AC4** -> commit `f6dc6f6`, test `TestAWriteWithNoAgentIsUnchanged` (f4): four documents and three keys, compared with `WriteThread`; `TestMemHandoffWriteWithoutAgentSaysWhatItAlwaysSaid` pins the command's words.
-- [ ] **AC5** -> slice 2, after a release carrying `--agent` is installed (see proposal, Risks).
+- [x] **AC5** -> slice 2, after 0.59.0 (which carries `--agent`) was installed on 2026-09-25. Vault `27a2c9c8`; the `harness/skills/handoff` record was refreshed (f5).
+  - The skill's `handoff-write` command passes `--agent <agent>`, with the agent's own harness name, and says what a fork means.
+  - The same edit fixes the skill's other agent-specific line: `dotf mem thread … --agent claude` became `--agent <agent>`. Before it, a pi, agy, Copilot, opencode or Codex session following the skill named its journal as claude's, and its `Journal:` line then attributed its block to claude, which is the attribution this spec reads.
 
 ## Test status
 
