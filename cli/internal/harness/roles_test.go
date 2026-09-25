@@ -142,7 +142,7 @@ func TestFormatSuggestion(t *testing.T) {
 	// The single-role case names the role, the pattern and the skills, and states
 	// what to do — the owner's chosen shape (see proposal.md, Decisions).
 	out := FormatSuggestion([]string{"builder"}, "testing-standards",
-		[]string{"test", "test-driven-development"})
+		[]string{"test", "test-driven-development"}, DefaultSkillDependencies)
 	for _, want := range []string{"builder", "testing-standards", "test-driven-development"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output should name %q, got:\n%s", want, out)
@@ -152,14 +152,14 @@ func TestFormatSuggestion(t *testing.T) {
 	// Ambiguity must read as two paths, not as indecision, and must never
 	// present one role as the answer.
 	amb := FormatSuggestion([]string{"builder", "reviewer"}, "code-complexity-and-refactor",
-		[]string{"cyclomatic-complexity"})
+		[]string{"cyclomatic-complexity"}, DefaultSkillDependencies)
 	if !strings.Contains(amb, "builder") || !strings.Contains(amb, "reviewer") {
 		t.Errorf("both roles must appear, got:\n%s", amb)
 	}
 
 	// Zero roles prints nothing: two of the 18 rules are pattern-only and have no
 	// owner, and a suggestion naming nobody is pure noise on every prompt.
-	if got := FormatSuggestion(nil, "shell-standards", nil); got != "" {
+	if got := FormatSuggestion(nil, "shell-standards", nil, DefaultSkillDependencies); got != "" {
 		t.Errorf("no roles should print nothing, got %q", got)
 	}
 }
