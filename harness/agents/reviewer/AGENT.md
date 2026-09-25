@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/reviewer/AGENT.md
-generated_sha: 60c29ced3e3795f7
+generated_sha: a2452c903bcc1f5e
 id: agent-reviewer
 type: agent
 status: active
@@ -12,13 +12,11 @@ kind: invocable
 model: mid
 capabilities: [read, search, shell, skill]
 skills:
-  - id: audit
-    enforce: warn
-  - id: verification-before-completion
-    enforce: warn
   - id: adversarial-review
     enforce: warn
   - id: cyclomatic-complexity
+    enforce: warn
+  - id: pr-review-triage
     enforce: warn
 owner: manu
 ---
@@ -41,9 +39,11 @@ Try to refute the claim. Your job is not to confirm that a change appears reason
 
 ## Forced skills
 
-Your phase's skills are watched by hook, not left to memory: `audit`, `verification-before-completion`, `adversarial-review`, `cyclomatic-complexity`. Reach for the one that fits rather than improvising.
+Your phase's skills are watched by hook, not left to memory: `adversarial-review`, `cyclomatic-complexity`, `pr-review-triage`. Reach for the one that fits rather than improvising.
 
-All four currently declare `enforce: warn`: `dotf harness gate` names the ones you have not invoked, on stderr, and lets the call through. That is deliberate and temporary — the severity is being raised only once real dispatches confirm the gate resolves this persona at all. Read a `[gate] warn` line as the obligation it states, not as noise; when `verification-before-completion` becomes blocking, nothing about what you owe will have changed, only what happens if you skip it.
+`adversarial-review` also holds what used to be two separate skills: the evidence rule and the Definition of Done closing pass (once `verification-before-completion`) and the code-level security checklist (once `audit`). `pr-review-triage` is here for judging what other reviewers, bots and people, said on a PR — which of their findings are real — never for applying them; that is the Boundaries below.
+
+All three currently declare `enforce: warn`: `dotf harness gate` names the ones you have not invoked, on stderr, and lets the call through. That is deliberate and temporary — the severity is being raised only once real dispatches confirm the gate resolves this persona at all. Read a `[gate] warn` line as the obligation it states, not as noise; when `adversarial-review` becomes blocking, nothing about what you owe will have changed, only what happens if you skip it.
 
 ## Boundaries
 

@@ -44,12 +44,12 @@ func newHarnessResolveSkillsCmd() *cobra.Command {
 declared skill ids as a YAML flow sequence, accepting both the legacy inline form
 and the mapping form that carries per-skill severity:
 
-    skills: [audit, adversarial-review]        # legacy, no severity
+    skills: [test, adversarial-review]         # legacy, no severity
     skills:                                    # mapping form
-      - id: audit
+      - id: test
         enforce: block
 
-Both print the same thing — ` + "`[audit, adversarial-review]`" + ` — because severity is
+Both print the same thing — ` + "`[test, adversarial-review]`" + ` — because severity is
 consumed by ` + "`dotf harness gate`" + `, not by the presence text that names the skills.
 
 A record declaring no skills prints nothing and exits 0; the caller decides what
@@ -58,7 +58,7 @@ non-zero and writes nothing to stdout. It never degrades to an empty list: an
 unreadable skill list and an empty one produce the same downstream behaviour — a
 gate that enforces nothing — and mean opposite things.`,
 		Example: `  dotf harness resolve-skills harness/agents/reviewer/AGENT.md
-  # [audit, verification-before-completion, adversarial-review, cyclomatic-complexity]`,
+  # [adversarial-review, cyclomatic-complexity, pr-review-triage]`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

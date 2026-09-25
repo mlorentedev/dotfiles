@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: a4c1087e5315ac0b
+generated_sha: ed021a823ecf003f
 id: architecture-session-skill
 type: skill
 status: active
@@ -213,7 +213,7 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 
 - **Downstream `/spec init`.** If the new ADR creates feature-level work, propose `/spec init <feature-id>` for the first task at the end of Phase E. The ADR is the "Why" upstream of the spec.
 - **Downstream `/adversarial-review`.** When the implementation of the ADR's decision lands, run `/adversarial-review` before archiving the spec -- this catches drift between ADR intent and code reality.
-- **Upstream `enrich-us`.** If a backlog entry that motivates this session is too thin, run `enrich-us` BEFORE Phase A -- avoids re-asking what should already be in the ticket.
+- **Upstream enrichment.** If a backlog entry that motivates this session is too thin, run the enrich step of `new-ticket` BEFORE Phase A -- avoids re-asking what should already be in the ticket.
 - **Sibling `/crystallize`.** Architecture sessions can surface lesson-promotion candidates. Use `capture_lesson` in Phase E or queue a `/crystallize` for next session.
 
 ## Cross-OS notes
@@ -250,5 +250,5 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 - Template: `$VAULT_PATH/00_meta/templates/system-design.md`
 - Sibling skill: `$VAULT_PATH/00_meta/skills/spec/SKILL.md`
 - Sibling skill: `$VAULT_PATH/00_meta/skills/adversarial-review/SKILL.md`
-- Sibling skill: `$VAULT_PATH/00_meta/skills/enrich-us/SKILL.md`
+- Sibling skill: `$VAULT_PATH/00_meta/skills/new-ticket/SKILL.md` ("Enrich a thin item")
 - Origin and dogfood: ADR-019 (python-sensor-sdk-platform) -- this skill adopted for the platform project.

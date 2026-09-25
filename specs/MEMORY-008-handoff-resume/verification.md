@@ -10,7 +10,7 @@ created: "2026-09-25"
 - [ ] AC1 -> slice 3: `TestResumeIsAPureRenderOfTheThreadFile`
 - [ ] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
 - [ ] AC3 -> slice 4: `TestSessionStartResumeBySource`
-- [ ] AC4 -> slice 2: `TestTheRealDotfilesMemoryStaysUnderBudgetWithTheNewFields`
+- [ ] AC4 -> slice 2: `TestTheRealDotfilesMemoryStaysUnderBudgetWithTheNewFields`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`
 - [ ] AC5 -> slice 5: the `handoff` and `catchup` records
 - [ ] AC6 -> slice 5: the compiled doctrine, `--check` and the 8,000-character budget test
 

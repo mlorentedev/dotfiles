@@ -311,12 +311,12 @@ setup() {
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
     [ "$count" -eq "$expected" ]
-    # Spot check: audit.md present (portable), crystallize.md absent (targets:[claude]).
-    [ -f "$HOME/.config/opencode/commands/audit.md" ]
+    # Spot check: spec.md present (portable), crystallize.md absent (targets:[claude]).
+    [ -f "$HOME/.config/opencode/commands/spec.md" ]
     [ ! -f "$HOME/.config/opencode/commands/crystallize.md" ]
     # rendered command carries provenance + drops name: (opencode keys off filename)
-    grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/audit.md"
-    refute_grep '^name:' "$HOME/.config/opencode/commands/audit.md"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/spec.md"
+    refute_grep '^name:' "$HOME/.config/opencode/commands/spec.md"
 }
 
 @test "no MCP servers registered (claude CLI absent)" {

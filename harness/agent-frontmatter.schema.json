@@ -17,7 +17,7 @@
         {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "description": "Legacy: skills: [audit, cyclomatic-complexity]. No severity, so the gate will not act on these; `dotf harness gate` reports them as unmigrated rather than defaulting, because a default of `warn` would render every gate silently inert and a default of `block` would turn every existing skill into a hard gate at once."
+          "description": "Legacy: skills: [adversarial-review, cyclomatic-complexity]. No severity, so the gate will not act on these; `dotf harness gate` reports them as unmigrated rather than defaulting, because a default of `warn` would render every gate silently inert and a default of `block` would turn every existing skill into a hard gate at once."
         },
         {
           "type": "array",

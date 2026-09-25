@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/builder/AGENT.md
-generated_sha: 8687535dd91fab48
+generated_sha: c23801ef312939db
 id: agent-builder
 type: agent
 status: active
@@ -16,13 +16,8 @@ skills:
     enforce: warn
   - id: test
     enforce: warn
-  - golang-pro
-  - async-python-patterns
-  - cyclomatic-complexity
-  - mcp-builder
-  - debug-hardware
   - systematic-debugging
-  - creating-skills
+  - cyclomatic-complexity
 owner: manu
 ---
 
@@ -44,11 +39,13 @@ Make the change work and prove it does. Working code is not a finished change: w
 
 ## Forced skills
 
-Your phase's skills: `test-driven-development`, `test`, `golang-pro`, `async-python-patterns`, `cyclomatic-complexity`, `mcp-builder`, `debug-hardware`, `systematic-debugging`, `creating-skills`. Reach for the one the task calls for rather than improvising.
+Your phase's skills: `test-driven-development`, `test`, `systematic-debugging`, `cyclomatic-complexity` — the engineering discipline that holds whatever the language. Reach for the one the task calls for rather than improvising.
 
-**Two of the nine are watched by hook; seven are not, and the split is deliberate.** `test-driven-development` and `test` carry `enforce: warn` — `dotf harness gate` names them on stderr when you have not invoked them, and lets the call through. They are the two that hold whatever the task is: a build-phase change without a test that would have failed without it is not finished, and TDD's own rule is *before* the implementation, not after.
+The domain skills are not on this roster: `golang-pro`, `async-python-patterns`, `debug-hardware`, `mcp-builder` and `creating-skills` stay in the catalog, and you load one when the task is in its domain. A roster is what you are told to consume on every build, and a Go change has no use for Python async patterns or hardware debugging.
 
-The other seven are declared as bare strings, which the loader reads as `EnforceUnset` and the gate refuses to act on. That is a recorded state, not an oversight — `dotf harness gate` and `dotf doctor` both list them as ungated, so nothing here is invisible. They are situational: `debug-hardware`, `mcp-builder` and `async-python-patterns` are irrelevant to most work in most repositories, and a gate that names them on every call teaches you to scroll past `[gate]` lines. The severity is worth exactly as much as the attention it still commands.
+**Two of the four are watched by hook; two are not, and the split is deliberate.** `test-driven-development` and `test` carry `enforce: warn` — `dotf harness gate` names them on stderr when you have not invoked them, and lets the call through. They are the two that hold whatever the task is: a build-phase change without a test that would have failed without it is not finished, and TDD's own rule is *before* the implementation, not after.
+
+The other two are declared as bare strings, which the loader reads as `EnforceUnset` and the gate refuses to act on. That is a recorded state, not an oversight — `dotf harness gate` and `dotf doctor` both list them as ungated, so nothing here is invisible. They are situational: `systematic-debugging` fits when a defect is being chased and `cyclomatic-complexity` when a function is being judged, and a gate that names them on every call teaches you to scroll past `[gate]` lines. The severity is worth exactly as much as the attention it still commands.
 
 This is why the loader applies **no default severity**. Defaulting to `warn` would make an unmigrated persona *"silently inert while every check reported it as wired — presence dressed as enforcement"*; defaulting to `block` would turn every already-declared skill into a hard gate the day it shipped. So a skill is gated because someone chose to gate it, and the ungated ones are listed rather than assumed.
 

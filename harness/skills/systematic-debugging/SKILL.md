@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/systematic-debugging/SKILL.md
-generated_sha: cc1a04bb89eb2d75
+generated_sha: bc7ab673f1816184
 id: systematic-debugging-skill
 type: skill
 status: active
@@ -302,7 +302,7 @@ These techniques are part of systematic debugging and available in this director
 
 **Related skills:**
 - **superpowers:test-driven-development** - For creating failing test case (Phase 4, Step 1)
-- **superpowers:verification-before-completion** - Verify fix worked before claiming success
+- **adversarial-review** ("Evidence before claims") - Verify fix worked before claiming success
 
 ## Real-World Impact
 

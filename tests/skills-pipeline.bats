@@ -277,8 +277,10 @@ path_without_copilot() {
 
 @test "HARNESS-056: the checklist binds the standing orders instead of restating them" {
     # a second source of truth is the failure mode this change exists to avoid
-    grep -q 'not a second source of truth' harness/skills/verification-before-completion/SKILL.md
-    grep -q 'The Closing Pass' harness/skills/verification-before-completion/SKILL.md
+    # the closing pass moved into adversarial-review when SKILL-001 retired
+    # verification-before-completion
+    grep -q 'not a second source of truth' harness/skills/adversarial-review/SKILL.md
+    grep -q '^## Closing pass (Definition of Done)' harness/skills/adversarial-review/SKILL.md
 }
 
 # HERMES-018: one frontmatter contract for the whole library, enforced by the
@@ -306,7 +308,7 @@ path_without_copilot() {
 }
 
 @test "HERMES-018: --check rejects a record that drops a required key" {
-    local victim="harness/skills/audit/SKILL.md" backup
+    local victim="harness/skills/test/SKILL.md" backup
     backup="$(mktemp)"
     cp "$victim" "$backup"
     sed -i '/^owner: /d' "$victim"

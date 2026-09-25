@@ -65,8 +65,9 @@ func TestEmbeddedTemplatesMatchVault(t *testing.T) {
 //
 // In-repo copies are always checked. The vault copies skip when the vault is
 // absent (ADR-013), same rationale as TestEmbeddedTemplatesMatchVault above.
-// The enrich-us skill deliberately carries a SUBSET (no dated-slug alternative,
-// since a dated slug is not a backlog id) and is therefore not listed here.
+// The enrich step of the new-ticket skill (once the enrich-us skill) deliberately
+// carries a SUBSET (no dated-slug alternative, since a dated slug is not a backlog
+// id) and is therefore not listed here.
 func TestIDPatternProseMatchesCode(t *testing.T) {
 	want := idPattern.String()
 
