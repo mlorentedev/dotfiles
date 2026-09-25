@@ -108,3 +108,64 @@ func TestContractDigestMalformedFeaturesStillDigests(t *testing.T) {
 		t.Fatalf("malformed features.json must still digest by its bytes: %q vs %q", a["features.json"], b["features.json"])
 	}
 }
+
+// HARNESS-151: `dotf spec archive` writes `status: archived` AFTER the freshness
+// check passes, so if the digest read that line, every archived proposal would
+// stop matching the review that permitted its archive, and a later reader could
+// not re-verify it (CodeRabbit flagged HARNESS-145's archive PR as stale for
+// exactly this). The frontmatter status is lifecycle, not contract: it folds
+// like a checkbox tick, through the same setStatus the archive uses.
+func TestContractDigestIgnoresTheLifecycleStatus(t *testing.T) {
+	proposal := "---\nid: \"X-001-y\"\ntype: spec\nstatus: implementing # draft | implementing | verifying | archived\n---\n\n# X\n\n- [ ] **AC1** — refuses\n"
+	before := digestOf(t, map[string]string{"proposal.md": proposal})
+	for _, status := range []string{"archived", "abandoned", "verifying"} {
+		after := digestOf(t, map[string]string{"proposal.md": setStatus(proposal, status)})
+		if before["proposal.md"] != after["proposal.md"] {
+			t.Errorf("setting status %q changed the contract digest", status)
+		}
+	}
+}
+
+// The fold is the frontmatter's status line only: a `status:` line in the body
+// is prose, and changing it is a contract change like any other.
+func TestContractDigestSeesAStatusLineInTheBody(t *testing.T) {
+	fm := "---\nid: \"X-001-y\"\nstatus: draft\n---\n\n"
+	a := digestOf(t, map[string]string{"proposal.md": fm + "status: the endpoint returns 200\n"})
+	b := digestOf(t, map[string]string{"proposal.md": fm + "status: the endpoint returns 404\n"})
+	if a["proposal.md"] == b["proposal.md"] {
+		t.Error("a status line in the body was folded away")
+	}
+}
+
+// A review launched before HARNESS-151 recorded its digests with the status line
+// in them. An unchanged spec must stay fresh after the upgrade instead of
+// demanding a re-review, a review recorded in the new form must survive the
+// archive's own status write, and a real edit must still stale either.
+func TestReviewFreshnessAcceptsBothDigestForms(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "proposal.md")
+	proposal := "---\nid: \"X-001-y\"\nstatus: implementing\n---\n\n- [ ] **AC1** — refuses\n"
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(proposal)
+	legacy, current := legacyContractDigests(dir), ContractDigests(dir)
+	if moved := changedContracts(dir, legacy); len(moved) != 0 {
+		t.Errorf("a review recorded in the legacy form went stale on an unchanged spec: %v", moved)
+	}
+
+	write(setStatus(proposal, "archived"))
+	if moved := changedContracts(dir, current); len(moved) != 0 {
+		t.Errorf("the archive's own status write staled a review recorded in the new form: %v", moved)
+	}
+
+	write(setStatus(proposal, "archived") + "- [ ] **AC2** — a criterion added after the review\n")
+	for form, recorded := range map[string]map[string]string{"legacy": legacy, "new": current} {
+		if moved := changedContracts(dir, recorded); len(moved) != 1 || moved[0] != "proposal.md" {
+			t.Errorf("a new criterion must stale a review recorded in the %s form, got %v", form, moved)
+		}
+	}
+}
