@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-145-doctrine-triggers-ledger-agy-f1",
+    "behavior": "The committed records keep the capped agy surface under 8000 characters and pure ASCII",
+    "verification": "bats tests/compile-harness.bats --filter 'committed records keep the capped agy surface under 8000 characters'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-145-doctrine-triggers-ledger-agy-f2",
+    "behavior": "A trigger naming an absent pattern is refused at refresh and reported by doctor",
+    "verification": "bats tests/compile-harness.bats --filter 'refresh fails naming the trigger and pattern' && (cd cli && go test ./internal/doctor -run TestCheckTriggerTargets_DanglingTriggerFailsAndIsNamed)",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-145-doctrine-triggers-ledger-agy-f3",
+    "behavior": "Two payloads with no session id share no ledger",
+    "verification": "cd cli && go test ./internal/cmd -run TestSessionsWithNoIDShareNoLedger",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-145-doctrine-triggers-ledger-agy-f4",
+    "behavior": "An agy payload is parsed, answered in agy's protocol and bound in hooks.json; an older binary emits nothing wrong",
+    "verification": "cd cli && go test ./internal/cmd ./internal/harness -run 'TestAgyAnswersInItsOwnProtocol|TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry|TestBindKeyHoldsOnlyFormatsAnOlderBinaryUnderstands'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-145-doctrine-triggers-ledger-agy-f5",
+    "behavior": "A real agy tool call leaves a decision record with a recognised payload",
+    "verification": "grep -h '\"harness\":\"agy\"' ~/.local/state/dotfiles/gate/*.decisions.jsonl | grep -qv '\"outcome\":\"payload-unrecognised\"'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
