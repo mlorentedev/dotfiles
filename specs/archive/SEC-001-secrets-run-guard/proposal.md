@@ -1,7 +1,7 @@
 ---
 id: "SEC-001-secrets-run-guard"
 type: spec
-status: implementing
+status: archived
 created: "2026-09-02"
 issue: "mlorentedev/dotfiles#1458"
 tags: [spec, proposal, secrets, security]
@@ -53,3 +53,5 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 - Retroactive review and its follow-ups: #1626 (sweep), #1646 (agent-session markers), #1650 (non-POSIX shells), #1339 (deny-list deploy)
 - ADR-028: On-demand secrets delivery and process injection
 - Global doctrine: Non-negotiable rules on secret store dumps
+
+<!-- archived 2026-09-24 — PR: https://github.com/mlorentedev/dotfiles/pull/1677 -->
