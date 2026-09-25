@@ -30,7 +30,7 @@
   {
     "id": "SKILL-001-portfolio-consolidation-f5",
     "behavior": "go test, compile-harness --check, the doctrine budget test and the bats files this change touches pass",
-    "verification": "(cd cli && go test ./... -count=1 >/dev/null) && ./scripts/compile-harness.sh --check >/dev/null && bats tests/compile-harness.bats tests/agents-md.bats tests/skills-pipeline.bats tests/harness-suggest.bats tests/check-retired-skills.bats >/dev/null",
+    "verification": "(cd cli && go test ./... -count=1 >/dev/null) && ./scripts/compile-harness.sh --check >/dev/null && bats tests/compile-harness.bats tests/agents-md.bats tests/skills-pipeline.bats tests/harness-suggest.bats tests/check-retired-skills.bats tests/check-retired-skills-real.bats >/dev/null",
     "state": "passing",
     "evidence": "exit 0 on 2026-09-25 at e90b1ca: go test ./..., compile-harness.sh --check, and the five bats files this change touches, the doctrine budget test included"
   },

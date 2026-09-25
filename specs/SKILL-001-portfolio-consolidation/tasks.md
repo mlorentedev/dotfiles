@@ -36,7 +36,7 @@ created: "2026-09-25"
 ## After merge
 
 - [x] [AC6] Announce, then `compile-harness.sh --deploy` from main; confirm no retired skill this pipeline rendered remains in any deploy target, and none is named in the Copilot catalog
-- [x] [AC6] `scripts/check-retired-skills.sh` reads every deploy and instruction target from `harness/manifest.json`, with `tests/check-retired-skills.bats` seeding each one (independent review, round 2)
+- [x] [AC6] `scripts/check-retired-skills.sh` reads every deploy and instruction target from `harness/manifest.json`, with `tests/check-retired-skills-real.bats` seeding each one (independent review, round 2), and failing closed when it could not look, with the CRLF case in `tests/check-retired-skills.bats` (round 3)
 
 ## Closing
 

@@ -18,7 +18,7 @@ created: "2026-09-25"
 
 - `go build ./...`, `go vet ./...` (linux and windows), `go test -count=1 ./...`: pass.
 - `golangci-lint run ./...` (0 issues), `shellcheck --severity=error scripts/compile-harness.sh`, `compile-harness.sh --check` (no harness drift), `check-bats-names.sh`, `check-doc-paths.sh`, `check-md-escapes.sh`: all pass.
-- `bats tests/*.bats`, serial: 1,600 run, 1,599 pass, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine. The five files this change touches were re-run on the final tree: 192 run, 0 failures (`verify-setup.bats` skips outside its integration container, so CI's container job is where its edited assertions run).
+- `bats tests/*.bats`, serial, re-run after the round-3 fixes: 1,607 run, 1,606 pass, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine. The five files this change touches were re-run on the final tree: 192 run, 0 failures (`verify-setup.bats` skips outside its integration container, so CI's container job is where its edited assertions run).
 - Vault: `vault-validate.py` reports the same 65 issues on master and on this change; none is new.
 - TDD: `TestEverySkillTheRouterNamesHasARecord` was written first and failed, naming `project-maturation`, `writing-plans`, `audit`, `verification-before-completion`, `executing-plans` (all in `DefaultSkillDependencies`) and `enrich-us` (trigger `task-and-ticket-tracking`). It passed after the remap.
 - `TestRoleJoinDrift` (HARNESS-110) went red on the slimmed builder roster: 12 of 18 rules resolved, against a floor of 16. See the first decision below; after it, 16 of 18 resolve again. `TestResolveRoles` now expects `pr-review-triage` to resolve to reviewer and shipper.
@@ -44,7 +44,7 @@ Run on 2026-09-25 from `~/Projects/dotfiles` at main `3c2e393` (#1694 merged). E
 - **Deploy.** `compile-harness.sh --deploy`: exit 0, 48 `pruned stale` lines. `~/.gemini/GEMINI.md` is 7,653 characters and 7,653 bytes, down from 7,798.
 - **Orphan records.** The mirror does not prune, so the eight retired records stayed in `~/.dotfiles/harness/skills` and doctor reported them as orphans. `dotf doctor --fix` applied exactly eight fix actions, one per orphan.
 - **After.** f6 exits 0: no retired skill in any deploy target, the Copilot catalog or a presence line. `dotf harness resolve-skills` on the deployed builder, planner and reviewer records prints the slimmed rosters. Doctor's unset-severity warning reads 13 of 27 persona skills, down from 21 of 36.
-- **What doctor still reports.** 172 passed, 12 failed, none from this change: six zombie specs (#1626), and deploy-dir drift that only setup refreshes. The drift covers the four known files plus `.bashrc` and `.zshrc`, whose comments this change edited.
+- **What doctor still reports.** Re-run at the round-3 fixes: 172 passed, 13 failed, 7 warned, 8 skipped. None of the failures comes from this change. Six are zombie specs (#1626). Seven are deploy-dir drift that only setup refreshes: the four known files, `.bashrc` and `.zshrc` (whose comments this change edited), and `ssh/config` (from #1659, merged the same day).
 
 ## Size of what a persona is told to consume
 
@@ -92,6 +92,21 @@ Not findings, but the review recorded two points:
 
 - Only f3's warn counts guard against a flat roster entry disarming the gate. That is a disclosed risk, and doctor reports unset entries.
 - The reviewer's roster grows by 32%, which is also disclosed.
+
+## Independent review, round 3
+
+Verdict **FAIL**, from nan/qwen3.8-flash on 2026-09-25. The review ran from 14:19 to 15:29, and its verdict rested on one REAL Major. The review found the retirement itself complete: no live router, record, pattern or deployed surface still names a retired skill. Manu approved the dispositions below on 2026-09-25. None of them touches the contract files.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **Major, REAL.** `check-retired-skills.sh` failed open. With a copy of ours present, it still exited 0 in three cases: when jq emits CRLF (the winget build on Windows), when `.skills.deploy` is empty, and when the manifest cannot be read. | **Applied.** The script requires jq and a readable manifest, strips CR from jq's output as `compile-harness.sh` does, and exits 2 when a target list is empty or the manifest is not JSON. One bats case per arm; all three were red before the fix. The CRLF case shadows jq on PATH, so it lives alone in `check-retired-skills.bats`, and every real-jq case moved to `check-retired-skills-real.bats`: the repo's `stub-real-pairing.bats` guard flagged the shadow until the suite had a real sibling. f5 names both files. |
+| 2 | Minor, REAL. f2 reads only flow-style `requires:`, and no Go guard read the records' `requires:` at all. A block-form retired name passed everything. | **Applied.** `TestEverySkillTheRouterNamesHasARecord` also reads every record's `requires:` through the YAML parser. The review's own mutation (a block-form `- audit` in `pattern-loader`) now fails it. f2 is unchanged, since it is in the contract set. |
+| 3 | Minor, THEORETICAL. Rendered agent definitions (`agents.deploy`, render `agent-md`) carry the roster and were not read. | **Applied.** The script also reads every `*.md` under each `agent-md` directory. A bats case seeds one. |
+| 4 | Minor, REAL. The counts in this file and the deploy evidence no longer described the head. | **Applied** to the counts below. The deployed copies of `adversarial-review` predate the round-2 wording, so they get a redeploy from main after the archive merges, recorded then. |
+| 5 | Minor, REAL. The FAIL verdicts left no artifact: `review.md` is overwritten each round, and the transcripts are gitignored. | **Applied and ticketed.** The three verdicts are kept beside the spec as `review-round-1.md` to `review-round-3.md`. Rounds 1 and 2 were copied aside before each relaunch. Keeping every round by design is HARNESS-157 (#1722). |
+| 6 | Minor, THEORETICAL. `pr-review-triage` at `enforce: warn` on the reviewer warns even when there is no PR to triage. | **Kept, as AC3 specifies.** Flattening it would switch off the gate on the reviewer's third duty, and a warning is not a block, so a surplus warning costs a line of output. |
+| 7 | Question. The routing guard counts how many rules resolve, not which ones. | **Accepted.** The schema-level exit is HARNESS-154 (#1713). |
+| 8 | Minor, SPECULATIVE. The hook names the domain skill first only because it sorts first. | **Recorded, no change.** The entry skill is advisory. Since HARNESS-147 (#1714) it is chosen through the prerequisites, and the alphabetical fallback is documented in `entrySkill`. |
 
 ## Decisions made during implementation
 
