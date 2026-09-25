@@ -64,6 +64,13 @@ func checkTriggerTargets(sys *System, cfg *Config, rep *Report) {
 		}
 	}
 
+	if named == 0 {
+		// A document that names no pattern has shown nothing about its targets.
+		// Reporting "all 0 triggers name a pattern" was a PASS with nothing
+		// checked (HARNESS-148), so it skips like the other cannot-look paths.
+		rep.Skip("the triggers at " + triggersPath + " name no pattern - trigger targets unchecked")
+		return
+	}
 	if len(dangling) == 0 {
 		rep.Pass(fmt.Sprintf("all %d triggers name a pattern the vault has", named))
 		return
