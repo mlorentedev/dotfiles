@@ -308,3 +308,4 @@ tags: [lessons, index, dotfiles]
 | [288 - An inventory is a hypothesis until each row is probed](lesson-288-an-inventory-is-a-hypothesis-until-each-row-is-probed.md) | 2026-09-23 |  |
 | [289 - A list tested by looping over itself cannot see a missing member](lesson-289-a-list-tested-by-looping-over-itself-cannot-see-a-missing-member.md) | 2026-09-24 |  |
 | [290 - A guard that predicts what an interpreter runs should fail closed, not emulate it](lesson-290-a-guard-that-predicts-what-an-interpreter-runs-should-fail-closed.md) | 2026-09-24 |  |
+| [291 - A registry is read by the released binary, not by the code beside it](lesson-291-a-registry-is-read-by-the-released-binary-not-the-code-beside-it.md) | 2026-09-24 |  |
