@@ -900,6 +900,17 @@ func TestTheReservedJournalNameIsNotASession(t *testing.T) {
 			extraArgs: []string{"--role", "gatekeeper"},
 			payload:   `{"tool_name":"Bash","session_id":"_unscoped"}`,
 		},
+		// HARNESS-149: `_unparsed` journals the payloads the gate could not read,
+		// so a payload claiming it names no session either.
+		{
+			name:    "the payload names the unparsed journal's id and a persona",
+			payload: `{"tool_name":"Bash","session_id":"_unparsed","agent_type":"gatekeeper","agent_id":"a1"}`,
+		},
+		{
+			name:      "the operator names the persona and the payload names the unparsed journal's id",
+			extraArgs: []string{"--role", "gatekeeper"},
+			payload:   `{"tool_name":"Bash","session_id":"_unparsed"}`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			blocking := blockingRepoRoot(t)
