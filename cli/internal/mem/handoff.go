@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -58,6 +59,18 @@ func WriteThread(content, threadKey, body string) (string, bool, error) {
 		return "", false, fmt.Errorf("no %q section — refusing to invent one, because a handoff written where nothing reads it is worse than none", HandoffHeading)
 	}
 
+	// Text written before threads existed has no owner, so no write would ever
+	// replace it, and it sits first under the heading, where the next session
+	// reads it as the handoff (#1651). It is lifted out here and re-appended as
+	// a thread of its own once this write is done.
+	var legacy []string
+	legacyKey, migrating := "", false
+	if ls, le, ok := legacyBlock(lines, start, end); ok {
+		legacy, legacyKey, migrating = trimBlankEdges(lines[ls:le]), legacyThreadKey(lines, start, end, ls, le), true
+		lines = append(append(append([]string{}, lines[:start+1]...), ""), lines[le:]...)
+		start, end = handoffSection(lines)
+	}
+
 	want := renderThread(threadKey, body)
 	tStart, tEnd := threadSpan(lines, start, end, threadKey)
 
@@ -65,7 +78,10 @@ func WriteThread(content, threadKey, body string) (string, bool, error) {
 	switch {
 	case tStart >= 0:
 		if equalBlocks(lines[tStart:tEnd], want) {
-			return content, false, nil
+			if !migrating {
+				return content, false, nil
+			}
+			return appendThread(lines, legacyKey, strings.Join(legacy, "\n")), true, nil
 		}
 		out = append(out, lines[:tStart]...)
 		out = append(out, want...)
@@ -82,7 +98,79 @@ func WriteThread(content, threadKey, body string) (string, bool, error) {
 		out = append(out, want...)
 		out = append(out, lines[at:]...)
 	}
+	if migrating {
+		return appendThread(out, legacyKey, strings.Join(legacy, "\n")), true, nil
+	}
 	return strings.Join(out, "\n"), true, nil
+}
+
+// appendThread adds one thread at the end of the handoff section, the same way
+// a new thread is placed, and returns the joined document.
+func appendThread(lines []string, key, body string) string {
+	start, end := handoffSection(lines)
+	at := trimTrailingBlank(lines, start+1, end)
+	out := append([]string{}, lines[:at]...)
+	if at > start+1 {
+		out = append(out, "")
+	}
+	out = append(out, renderThread(key, body)...)
+	out = append(out, lines[at:]...)
+	return strings.Join(out, "\n")
+}
+
+// updatedDate reads the `> Updated: YYYY-MM-DD` line a handoff block opens with.
+var updatedDate = regexp.MustCompile(`^>\s*Updated:\s*(\d{4}-\d{2}-\d{2})`)
+
+// LegacyThreadKey reports the thread an un-threaded handoff block would be moved
+// into by the next write, or false when the section has none (#1651).
+func LegacyThreadKey(content string) (string, bool) {
+	lines := strings.Split(content, "\n")
+	start, end := handoffSection(lines)
+	if start < 0 {
+		return "", false
+	}
+	ls, le, ok := legacyBlock(lines, start, end)
+	if !ok {
+		return "", false
+	}
+	return legacyThreadKey(lines, start, end, ls, le), true
+}
+
+// legacyBlock returns the span between the section heading and its first marked
+// thread when that span holds any non-blank text.
+func legacyBlock(lines []string, start, end int) (int, int, bool) {
+	first := end
+	for i := start + 1; i < end; i++ {
+		if _, ok := threadHeadingKey(lines[i]); ok {
+			first = i
+			break
+		}
+	}
+	for i := start + 1; i < first; i++ {
+		if strings.TrimSpace(lines[i]) != "" {
+			return start + 1, first, true
+		}
+	}
+	return 0, 0, false
+}
+
+// legacyThreadKey names the moved block by its own Updated date, so the thread
+// says when it was written, and never reuses the key of a thread that exists.
+func legacyThreadKey(lines []string, start, end, ls, le int) string {
+	date := "undated"
+	for _, l := range lines[ls:le] {
+		if m := updatedDate.FindStringSubmatch(strings.TrimSpace(l)); m != nil {
+			date = m[1]
+			break
+		}
+	}
+	key := "legacy-" + date
+	for n := 2; ; n++ {
+		if s, _ := threadSpan(lines, start, end, key); s < 0 {
+			return key
+		}
+		key = fmt.Sprintf("legacy-%s-%d", date, n)
+	}
 }
 
 // handoffSection returns the line range of the section body, exclusive of the
