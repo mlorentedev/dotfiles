@@ -44,16 +44,16 @@ created: "2026-09-25"
 
 ## Operational tail (AC5)
 
-- [ ] [AC5] `dotf harness mirror` from a main checkout, install a binary that carries the agy parser, `dotf harness bind`
-- [ ] [AC5] One real agy tool call; read `~/.local/state/dotfiles/gate/` for an `agy` record with a real conversation id
+- [x] [AC5] `dotf harness mirror` from a main checkout, install a binary that carries the agy parser, `dotf harness bind`
+- [x] [AC5] One real agy tool call; read `~/.local/state/dotfiles/gate/` for an `agy` record with a real conversation id
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks and lint pass
-- [ ] No unrelated changes in any slice
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test (AC5 by the live check its feature runs)
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks and lint pass
+- [x] No unrelated changes in any slice
+- [x] `verification.md` filled in
 - [ ] Independent review before archiving (a change that closes a spec)
 
 ## Machine-readable features

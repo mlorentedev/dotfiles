@@ -39,11 +39,11 @@ An audit of the harness reported defects; re-measured on 2026-09-24, four were r
 
 ## Acceptance criteria
 
-- [ ] **AC1** — the compact doctrine is under 8,000 characters and pure ASCII on every capped surface, and the deployed `GEMINI.md` has `wc -m` equal to `wc -c`. Pinned by a bats test that reads only committed records.
-- [ ] **AC2** — `compile-harness.sh --refresh` fails, naming the trigger and the pattern, when a trigger's pattern is absent, and writes nothing. `dotf doctor` reports the same, and skill linking follows matched rules.
-- [ ] **AC3** — two payloads with no session id share no ledger, and a payload that claims the reserved journal name is read as naming none, proven by end-to-end tests that fail on the old code.
-- [ ] **AC4** — an agy payload is parsed and answered in agy's protocol, the gate is bound in `hooks.json` with the stale entry retired, and an older binary given the manifest emits nothing wrong.
-- [ ] **AC5** — after all four merge: mirror, install a binary that carries the agy parser, `dotf harness bind`, and one real agy tool call leaves an `agy` record with a real conversation id under `~/.local/state/dotfiles/gate/`.
+- [x] **AC1** — the compact doctrine is under 8,000 characters and pure ASCII on every capped surface, and the deployed `GEMINI.md` has `wc -m` equal to `wc -c`. Pinned by a bats test that reads only committed records.
+- [x] **AC2** — `compile-harness.sh --refresh` fails, naming the trigger and the pattern, when a trigger's pattern is absent, and writes nothing. `dotf doctor` reports the same, and skill linking follows matched rules.
+- [x] **AC3** — two payloads with no session id share no ledger, and a payload that claims the reserved journal name is read as naming none, proven by end-to-end tests that fail on the old code.
+- [x] **AC4** — an agy payload is parsed and answered in agy's protocol, the gate is bound in `hooks.json` with the stale entry retired, and an older binary given the manifest emits nothing wrong.
+- [x] **AC5** — after all four merge: mirror, install a binary that carries the agy parser, `dotf harness bind`, and one real agy tool call leaves an `agy` record with a real conversation id under `~/.local/state/dotfiles/gate/`.
 
 ## References
 
