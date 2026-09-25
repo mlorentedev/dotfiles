@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 53ba3167e982edb0
+generated_sha: ff6047f74e5bcbcc
 id: handoff-skill
 type: skill
 status: active
@@ -18,6 +18,7 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
   mcp__hive__vault_write, mcp__hive__vault_patch]
 keywords: [handoff, wrap up, session handoff, close session, cerrar sesion, haz handoff]
 paths: ['**/MEMORY.md', sessions/**]
+requires: [adversarial-review]
 ---
 # Handoff Workflow
 

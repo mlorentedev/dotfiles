@@ -82,7 +82,10 @@ func ResolveRoles(s Suggestion, personas []*Persona) []string {
 // Zero roles prints nothing. Two of the 18 rules are pattern-only and own no
 // persona; a suggestion naming nobody would be pure noise charged to every
 // prompt.
-func FormatSuggestion(roles []string, pattern string, skills []string) string {
+//
+// deps is the dependency map the suggestion was resolved with, so the entry
+// point is chosen from the same prerequisites that produced the skill list.
+func FormatSuggestion(roles []string, pattern string, skills []string, deps map[string][]string) string {
 	if len(roles) == 0 {
 		return ""
 	}
@@ -102,7 +105,7 @@ func FormatSuggestion(roles []string, pattern string, skills []string) string {
 	// must never present one role as the answer.
 	if len(roles) > 1 {
 		b.WriteString("  → each of these declares the matched skill; the work decides which\n")
-	} else if entry := entrySkill(skills); entry != "" {
+	} else if entry := entrySkill(skills, deps); entry != "" {
 		fmt.Fprintf(&b, "  → consider adopting `%s` and invoking %s\n", roles[0], entry)
 	} else {
 		fmt.Fprintf(&b, "  → consider adopting `%s`\n", roles[0])
@@ -118,7 +121,7 @@ func FormatSuggestion(roles []string, pattern string, skills []string) string {
 // `test-driven-development`, the composite that pulls it in. Prefer a skill whose
 // declared dependency closure covers another matched skill, so the suggestion
 // names the thing worth invoking rather than its ingredient.
-func entrySkill(skills []string) string {
+func entrySkill(skills []string, deps map[string][]string) string {
 	if len(skills) == 0 {
 		return ""
 	}
@@ -127,7 +130,7 @@ func entrySkill(skills []string) string {
 		matched[s] = struct{}{}
 	}
 	for _, s := range skills {
-		for _, dep := range DefaultSkillDependencies[s] {
+		for _, dep := range deps[s] {
 			if _, ok := matched[dep]; ok {
 				return s
 			}
