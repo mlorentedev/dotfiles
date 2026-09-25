@@ -12,7 +12,7 @@ created: "2026-09-25"
 - [x] AC3 -> `dotf harness resolve-skills` on the three records, and the `enforce: warn` count in each record's frontmatter
 - [x] AC4 -> the folded sections in the `adversarial-review`, `spec` and `new-ticket` records
 - [x] AC5 -> build, vet, `go test ./...`, lint, `--check`, full bats
-- [x] AC6 -> after merge: `--deploy`, then every deploy target and the Copilot catalog read clean
+- [x] AC6 -> after merge: `--deploy`, then no copy this pipeline rendered is left in any deploy target, and the Copilot catalog reads clean. The `skills-pipeline.bats` test "SKILL-001: deploy prunes a retired skill it rendered and keeps a foreign one of the same name" pins the difference
 
 ## Test status
 
@@ -22,6 +22,11 @@ created: "2026-09-25"
 - Vault: `vault-validate.py` reports the same 65 issues on master and on this change; none is new.
 - TDD: `TestEverySkillTheRouterNamesHasARecord` was written first and failed, naming `project-maturation`, `writing-plans`, `audit`, `verification-before-completion`, `executing-plans` (all in `DefaultSkillDependencies`) and `enrich-us` (trigger `task-and-ticket-tracking`). It passed after the remap.
 - `TestRoleJoinDrift` (HARNESS-110) went red on the slimmed builder roster: 12 of 18 rules resolved, against a floor of 16. See the first decision below; after it, 16 of 18 resolve again. `TestResolveRoles` now expects `pr-review-triage` to resolve to reviewer and shipper.
+- Round 1 follow-up. The new `skills-pipeline.bats` test passes. It fails when its seeded copy of ours loses the mark, because deploy then leaves the copy in place. The new f6 was run in a throwaway HOME:
+  - a clean deploy: 0;
+  - a foreign `audit` added: 0 (the old f6 returned 1);
+  - our retired copies seeded in two targets: 1;
+  - after a redeploy: 0, with ours pruned and the foreign one kept.
 - Prompt hook, run against this branch's records (`DOTFILES_DIR=<worktree> dotf harness suggest --from-hook`): prompts about Go, firmware, an MCP server and asyncio still print `[persona] builder` and name the domain skill first (`golang-pro`, `debug-hardware`, `mcp-builder`, `async-python-patterns`). Control run with the new rosters and main's triggers: no output at all for the Go prompt.
 
 ## Deploy evidence (AC6)
@@ -45,6 +50,23 @@ Sum of the roster's `SKILL.md` files; tokens estimated at 4 characters each. Ref
 | planner | 6 skills, 61,859 B, about 15.4k tokens | 3 skills, 56,782 B, about 14.1k tokens (-8%) |
 | reviewer | 4 skills, 36,955 B, about 9.2k tokens | 3 skills, 48,782 B, about 12.1k tokens (+32%: `pr-review-triage` joined, and `adversarial-review` absorbed two skills) |
 | all active skills | 39, 304,054 B, about 75.6k tokens | 31, 282,514 B, about 70.2k tokens (-7%) |
+
+## Independent review, round 1
+
+Verdict **FAIL**, from nan/qwen3.8-flash on 2026-09-25. The review ran from 10:29 to 11:08, and its verdict rested on one REAL Major. Manu approved the dispositions below on 2026-09-25.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **Major, REAL.** f6 tested only that a retired skill's name was absent. A skill named `audit` that another tool installed turned it red twice during the review (10:47 and 10:50). The review showed by size that the copy was not ours: 1,892 B against a 1,551 B record, and renders are smaller than records. It then left, and f6 went green at 11:02 with nothing of ours changed. | **Applied.** f6 now counts a retired skill as present only when the copy carries this pipeline's mark (`generated_from: 00_meta/skills/<name>/SKILL.md`, or the `from:` comment in gemini prompts). AC6 and f6's behavior say so. A new bats test pins the distinction. |
+| 2 | Minor, REAL. The folds dropped verification-before-completion's letter-and-spirit clause, its "Red Flags" list and its "Rationalization Prevention" table, and enrich-us's "item already done" case. | **Partly applied.** The clause is back in `adversarial-review`, and the done-item case in `new-ticket` (vault `cee00c1f`, records refreshed). The two lists are declined: they persuade rather than rule, the rule itself is the Iron Law gate and the claims table, and the reviewer's roster already grew 32%. |
+| 3 | Minor, REAL. AC5 names the full bats suite, while f5 runs four files. | **Recorded.** The full suite's one failure is the oh-my-zsh snapshot test (#1641). The review reproduced it on plain main as well, so it is environmental and outside this change. |
+| 4 | Minor, REAL. The README and rc files changed the example `/audit src/auth.py` to `/test src/auth.py`. | **Declined.** The line shows the syntax of a slash command, and `/test <file>` is a correct use of `test`. `adversarial-review` reviews a change, not a file. |
+| 5 | Minor, SPECULATIVE. `TestResolveDependencies` spelled retired names in its synthetic fixture. | **Applied.** The fixture now uses synthetic ids. |
+| 6 | Minor, SPECULATIVE. A research note in iris pointed at the retired `dispatching-parallel-agents`. | **Applied.** The note says the skill was retired and where it went (vault `cee00c1f`). The session log that also names it is history and stays. |
+| 7 | Question. Four worktrees still carried the eight records, and a deploy from any of them reinstalls them. | **Coordinated and ticketed.** The live peers were told to rebase before deploying, and harness-hardening fast-forwarded. The general hazard is HARNESS-153 (#1712). |
+| 8 | Question. Keep the data-level routing fix, or add a persona key? | **Data fix kept**, as the review recommended. The persona key is HARNESS-154 (#1713). |
+
+One more residue, outside AC6's deploy targets: the prompt hook kept suggesting `verification-before-completion`. The installed `dotf` (0.58.0) compiles the dependency map in, and the map still carried the retired name. A binary built from main no longer names it, and the 0.59.0 release clears it. Recorded on HARNESS-147 (#1693).
 
 ## Decisions made during implementation
 

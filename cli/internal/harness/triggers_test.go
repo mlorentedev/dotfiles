@@ -257,12 +257,14 @@ func TestMatchPrompt(t *testing.T) {
 }
 
 func TestResolveDependencies(t *testing.T) {
+	// Synthetic ids: the resolver is blind to names, and a real skill's name here
+	// reads as a live dependency, which is how retired names outlived SKILL-001.
 	deps := map[string][]string{
-		"spec":            {"adversarial-review", "verification-before-completion"},
-		"writing-plans":   {"executing-plans"},
-		"executing-plans": {"systematic-debugging", "test-driven-development"},
-		"cycle-a":         {"cycle-b"},
-		"cycle-b":         {"cycle-a"},
+		"root":    {"dep-a", "dep-b"},
+		"chain-1": {"chain-2"},
+		"chain-2": {"leaf-x", "leaf-y"},
+		"cycle-a": {"cycle-b"},
+		"cycle-b": {"cycle-a"},
 	}
 
 	tests := []struct {
@@ -272,13 +274,13 @@ func TestResolveDependencies(t *testing.T) {
 	}{
 		{
 			name:     "single skill with direct dependencies",
-			initial:  []string{"spec"},
-			expected: []string{"adversarial-review", "spec", "verification-before-completion"},
+			initial:  []string{"root"},
+			expected: []string{"dep-a", "dep-b", "root"},
 		},
 		{
 			name:     "multi-level transitive dependencies",
-			initial:  []string{"writing-plans"},
-			expected: []string{"executing-plans", "systematic-debugging", "test-driven-development", "writing-plans"},
+			initial:  []string{"chain-1"},
+			expected: []string{"chain-1", "chain-2", "leaf-x", "leaf-y"},
 		},
 		{
 			name:     "cycle protection",

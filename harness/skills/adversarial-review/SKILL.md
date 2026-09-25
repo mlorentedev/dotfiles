@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: 9ffbc7976b3db0f4
+generated_sha: d7882b101d038524
 id: adversarial-review-skill
 type: skill
 status: active
@@ -347,7 +347,7 @@ If the change genuinely does not warrant a review, do not skip silently — the 
 
 This section and the next bind anyone about to say a change is done, fixed or passing: the implementer before committing, opening a PR or closing a task, and the reviewer before issuing a verdict.
 
-**No completion claim without fresh verification evidence.** If the command that proves a claim has not run in this session, the claim is not yet made.
+**No completion claim without fresh verification evidence.** If the command that proves a claim has not run in this session, the claim is not yet made. A claim that keeps this rule's letter while dodging its intent breaks it.
 
 1. **Identify** the command that proves the claim.
 2. **Run** it in full, fresh.

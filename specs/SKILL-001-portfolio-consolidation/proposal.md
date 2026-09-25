@@ -45,6 +45,8 @@ The vault carried 39 skills, and the persona rosters told every agent to consume
 - **A forced roster is also a routing table.** Taking the domain skills off the builder's roster unrouted four trigger rules, and `TestRoleJoinDrift` caught it (12 of 18 resolving, floor 16). The data fix above restores 16 of 18. The schema-level alternative, a persona key for associated skills that the join reads but the gate does not, is left for the review of this PR to choose.
 - **The rules must survive the move.** Each fold is a condensed rewrite, not a copy, so a rule could be lost in the rewrite. The archived originals stay in the vault with a banner pointing at the new section, and the review compares them.
 - **Vault and repo land separately.** The vault commit lands when this PR opens; until it merges, a `--refresh` from another branch drops the same eight records. Peers were told, and the drop is the same change this PR carries.
+- **The deploy targets are shared, and the last deploy wins.** After the merge, a `--deploy` from a worktree whose branch predates it renders the eight records back into `$HOME` for every session. The live peers were told to rebase before deploying. The general hazard, a deploy from a branch behind main undoing what main retired, is its own ticket.
+- **A retired name is not ours alone.** Other tools install skills into the same directories, and one named `audit` turned the first form of the AC6 check red during the independent review. Deploy only removes what it rendered, which carries `generated_from: 00_meta/skills/<name>/SKILL.md` (a `from:` comment in gemini prompts). So the check reads that mark rather than the name.
 - **`pr-review-triage` on the reviewer** is a skill for dispositioning reviewer output, and the reviewer never edits. Its persona body scopes it to judging other reviewers' findings, never applying them.
 
 ## Acceptance criteria
@@ -54,7 +56,7 @@ The vault carried 39 skills, and the persona rosters told every agent to consume
 - [ ] **AC3** — the reviewer, planner and builder rosters are as listed above, with every existing severity preserved, and at least 16 of the 18 trigger rules still resolve to a persona (`TestRoleJoinDrift`).
 - [ ] **AC4** — `adversarial-review`, `spec` and `new-ticket` carry the folded rules.
 - [ ] **AC5** — `go test ./...`, the full bats suite, `compile-harness.sh --check` and the 8,000-character doctrine budget test pass.
-- [ ] **AC6** — after merge and `compile-harness.sh --deploy`, no retired skill remains in any deploy target of `harness/manifest.json` or in the Copilot catalog.
+- [ ] **AC6** — after merge and `compile-harness.sh --deploy`, no copy of a retired skill that this pipeline rendered remains in any deploy target of `harness/manifest.json`, and neither the Copilot catalog nor a forced roster names one. A same-named skill another tool installed is left alone.
 
 ## References
 

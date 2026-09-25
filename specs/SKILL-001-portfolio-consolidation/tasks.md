@@ -35,7 +35,7 @@ created: "2026-09-25"
 
 ## After merge
 
-- [x] [AC6] Announce, then `compile-harness.sh --deploy` from main; confirm no retired skill remains in any deploy target or the Copilot catalog
+- [x] [AC6] Announce, then `compile-harness.sh --deploy` from main; confirm no retired skill this pipeline rendered remains in any deploy target, and none is named in the Copilot catalog
 
 ## Closing
 

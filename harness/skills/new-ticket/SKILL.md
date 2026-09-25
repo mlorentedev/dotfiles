@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: 5578b2b4829bfc27
+generated_sha: e5d46cfad104b1c5
 id: new-ticket-skill
 type: skill
 status: active
@@ -169,6 +169,7 @@ A single-shot rewrite of a backlog item or a pasted user story into an implement
 **Output** two sections, in this order: `## Original` (the input verbatim, fenced if multi-line) and `## Enhanced` (the rewrite, in the same voice and constraint level: no invented scope, no softened directives). With `--write-back` on an id, add the marker comment `<!-- enriched YYYY-MM-DD -->` to the issue with `gh issue comment`. Never replace the issue body: it stays terse, and the enhanced version belongs in `proposal.md` once the spec exists.
 
 - **Ambiguous input** (a short reference with no id and no body): ask whether to read an issue or take a pasted story. Do not guess.
+- **An item already done** (`[x]`, or a closed issue): still allowed. The enrichment becomes a post-hoc spec for audit; say so in the `## Enhanced` heading.
 - **No matching pattern:** proceed without citing one, never invent a pattern name, and flag the gap as a pattern candidate.
 - **Not Socratic** (that is `/spec fill`), not a redirection of the user's intent, and no pattern bodies pasted into the output: cite them by name.
 
