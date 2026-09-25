@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -41,7 +42,7 @@ func TestMergeInto_KeepsWhatTheToolAddedAtRuntime(t *testing.T) {
 	for _, keep := range []string{
 		`"C:/Users/u/Projects/Workspace/fae-onboarding"`, // runtime-trusted workspace survives
 		`"mcp(hive-vault/vault_query)"`,                  // runtime grant survives
-		`"theme": "dark"`,                                 // a key only the destination has survives
+		`"theme": "dark"`,                                // a key only the destination has survives
 	} {
 		if !strings.Contains(got, keep) {
 			t.Errorf("runtime state lost: %s missing from\n%s", keep, got)
@@ -127,11 +128,7 @@ func TestRender_DoesNotHTMLEscape(t *testing.T) {
 	}
 }
 
-// Round-3 Minor: the token rule is symmetric. Under slash, a native home
-// inside a longer string is rendered with forward slashes; under native, a
-// slash home inside a longer string is rendered with the OS separator. Only a
-// string that begins with a token has the rest of it converted too.
-func TestExpandPaths_RendersTheTokenInTheDeclaredFormWhereverItSits(t *testing.T) {
+func TestExpandPaths_LeavesEmbeddedTokenURLSeparatorsUntouched(t *testing.T) {
 	nativeHome := filepath.FromSlash("/Users/u")
 	if runtime.GOOS == "windows" {
 		nativeHome = `C:\Users\u`
@@ -140,11 +137,14 @@ func TestExpandPaths_RendersTheTokenInTheDeclaredFormWhereverItSits(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(out)
-	if !strings.Contains(s, `"https://h/`+filepath.ToSlash(nativeHome)+`/x"`) {
-		t.Errorf("slash form must render the token with forward slashes inside a URL:\n%s", s)
+	var got map[string]string
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
 	}
-	if runtime.GOOS == "windows" && strings.Contains(s, `\\`) {
-		t.Errorf("slash form must leave no backslash in a leading-token path:\n%s", s)
+	if got["url"] != "https://h/"+nativeHome+"/x" {
+		t.Errorf("embedded token URL must keep its separators: %q", got["url"])
+	}
+	if got["p"] != filepath.ToSlash(nativeHome)+"/a/b" {
+		t.Errorf("leading-token path must render in slash form: %q", got["p"])
 	}
 }

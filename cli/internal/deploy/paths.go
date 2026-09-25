@@ -56,6 +56,7 @@ func expandPaths(src []byte, form, home string, resolve func(string) string) ([]
 		if !tokenRe.MatchString(s) {
 			return s
 		}
+		isPath := tokenRe.FindStringIndex(s)[0] == 0
 		expanded := tokenRe.ReplaceAllStringFunc(s, func(tok string) string {
 			name := tok[1 : len(tok)-1]
 			if name == "HOME" {
@@ -67,6 +68,9 @@ func expandPaths(src []byte, form, home string, resolve func(string) string) ([]
 			bad = append(bad, name)
 			return tok
 		})
+		if !isPath {
+			return expanded
+		}
 		if form == PathsNative {
 			return filepath.FromSlash(expanded)
 		}

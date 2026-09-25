@@ -70,8 +70,9 @@ starts with a trust prompt. `tests/antigravity.bats` guards this class for one f
 
 Observable outcomes. Each must be testable.
 
-- [ ] AC1 — `paths: native` expands `{HOME}` inside JSON string values and renders those strings with
-  the OS separator; `paths: slash` renders them with `/`; strings without a token are untouched;
+- [ ] AC1 — `paths: native` expands `{HOME}` inside JSON string values and renders strings that
+  begin with a token with the OS separator; `paths: slash` renders those paths with `/`; tokens in
+  longer strings such as URLs expand without converting the surrounding separators; strings without a token are untouched;
   the output is valid JSON (a Windows path is escaped by the encoder); an unknown `paths` value and
   a non-JSON source with `paths` are rejected naming the entry.
 - [ ] AC2 — `paths` composes with `merge` (expansion before the merge, unmanaged destination keys
