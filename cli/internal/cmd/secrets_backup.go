@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/mlorentedev/dotfiles/cli/internal/shellsafe"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Backup seams as overridable vars so command tests inject fakes (no bw, no age key, no
@@ -55,6 +59,9 @@ func newSecretsBackupCmd() *cobra.Command {
 				KeyPath:   ageKeyPath(),
 				DestDir:   destDir,
 			})
+			if errors.Is(err, secrets.ErrBWVaultLocked) {
+				return fmt.Errorf("%w\nRun:\n    BW_SESSION=\"$(bw unlock --raw)\" %s", err, rerunLine(cmd))
+			}
 			if err != nil {
 				return err
 			}
@@ -71,4 +78,22 @@ func newSecretsBackupCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&out, "out", "", "destination dir for the escrow (default: <checkout>/sensitive/dr)")
 	return c
+}
+
+// rerunLine renders the invocation that failed as a line to paste: the command path
+// and every flag the operator set, each value shell-quoted. A remedy is copied
+// verbatim, so it has to reproduce the command rather than a default one; a fixed
+// line dropped --out and put an escrow in the wrong checkout (#1647).
+func rerunLine(cmd *cobra.Command) string {
+	parts := []string{cmd.CommandPath()}
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		values := []string{f.Value.String()}
+		if s, ok := f.Value.(pflag.SliceValue); ok {
+			values = s.GetSlice() // String() renders "[a,b]", which does not parse back
+		}
+		for _, v := range values {
+			parts = append(parts, "--"+f.Name+"="+shellsafe.Bash(v))
+		}
+	})
+	return strings.Join(parts, " ")
 }
