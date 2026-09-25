@@ -104,6 +104,14 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			// persona's skill runs satisfy another's gate.
 			scope := call.ConsumptionScope()
 			statePath := harness.StatePath(stateDir, scope)
+			// A payload that named no session has no scope: nothing durable may be
+			// keyed by it (StatePath and DispatchPath hand back no path), and the
+			// journal files it under its own name instead of the digest of "".
+			unscoped := scope == ""
+			journalScope := scope
+			if unscoped {
+				journalScope = harness.UnscopedScope
+			}
 
 			// Every record from here carries what the harness said was acting.
 			// THIS IS WHAT CONVERTS agent_type FROM INFERRED TO MEASURED: it is
@@ -136,13 +144,20 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			// purpose — losing the record costs a redundant skill run, while
 			// failing here would block a session over a full disk.
 			if call.Skill != "" {
-				_ = harness.RecordConsumed(statePath, call.Skill)
 				rec := base
 				rec.Skill = call.Skill
-				rec.Outcome = harness.OutcomeSkillConsumed
 				rec.Allowed = true
-				rec.Reason = "skill invocation recorded"
-				record(scope, rec)
+				if unscoped {
+					// Recording it would file the consumption under a key every
+					// session with no id shares, and satisfy their gates too.
+					rec.Outcome = harness.OutcomeSessionUnscoped
+					rec.Reason = "skill invocation not recorded: the payload named no session to scope it to"
+				} else {
+					_ = harness.RecordConsumed(statePath, call.Skill)
+					rec.Outcome = harness.OutcomeSkillConsumed
+					rec.Reason = "skill invocation recorded"
+				}
+				record(journalScope, rec)
 				return nil
 			}
 			if call.IsSkillTool {
@@ -155,7 +170,7 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				rec.Outcome = harness.OutcomeSkillUnnamed
 				rec.Allowed = true
 				rec.Reason = "skill invocation with no readable name"
-				record(scope, rec)
+				record(journalScope, rec)
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
 				return nil
 			}
@@ -169,6 +184,24 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			fromFlag := strings.TrimSpace(role) != ""
 			dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
 			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested, dispatched, fromFlag)
+
+			// A persona is in scope and the payload named no session: there is no
+			// ledger to consult, and consulting an empty one would BLOCK - a blocked
+			// call can never record the skill that would satisfy it, so the persona
+			// would be stuck for good. Enforcement is impossible here, so allow, and
+			// say so in the journal and on stderr rather than passing for healthy.
+			if unscoped && persona != nil {
+				rec := base
+				rec.RoleRequested = requested
+				rec.RoleResolved = persona.Name
+				rec.Outcome = harness.OutcomeSessionUnscoped
+				rec.Allowed = true
+				rec.Reason = fmt.Sprintf("persona %q in scope but the payload named no session: nothing to scope consumption to, so nothing is enforced", persona.Name)
+				record(journalScope, rec)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] allow: %s\n", rec.Reason)
+				return nil
+			}
+
 			result := harness.Decide(harness.GateInput{
 				Persona:  persona,
 				Call:     call,
@@ -209,7 +242,7 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			// call os.Exit, which runs no defers, so a record deferred past it
 			// would be the one decision never written — the only one anybody
 			// would go looking for.
-			record(scope, rec)
+			record(journalScope, rec)
 
 			for _, w := range result.Warned {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] warn: %s not consumed\n", w)

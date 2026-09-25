@@ -214,7 +214,19 @@ type consumedState struct {
 // attacker-adjacent input that lands in a filesystem path, and "it does not
 // happen with well-behaved input" is not a property a path builder should rely
 // on. The readable prefix is kept so the directory stays diagnosable by eye.
+//
+// AN EMPTY SCOPE HAS NO PATH, and that is the point. scopeKey("") is
+// "unknown-e3b0c442" - the digest of the empty string - so every payload that
+// named no session shared ONE ledger: the first skill any of them invoked would
+// satisfy the gate for all the rest, permanently. It was latent when measured
+// (2026-09-24: the ledger did not exist yet, only its journal), because it needs
+// a payload with no session id, a persona in scope, and a skill promoted to
+// `enforce: block` at once; but agy's payload, which spells the field
+// conversationId, was exactly how the first of those would have arrived.
 func StatePath(stateDir, sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
 	return filepath.Join(stateDir, "gate", scopeKey(sessionID)+".json")
 }
 
@@ -265,7 +277,7 @@ func LoadConsumed(path string) map[string]bool {
 
 // RecordConsumed adds a skill to the session's set.
 func RecordConsumed(path, skill string) error {
-	if skill == "" {
+	if path == "" || skill == "" {
 		return nil
 	}
 	current := LoadConsumed(path)
@@ -304,7 +316,17 @@ func RecordConsumed(path, skill string) error {
 // dispatch one persona TWICE in a session and confirm the second is gated again
 // — and that check is a precondition of promoting any skill to `enforce: block`,
 // not of this function being correct for the single-dispatch case.
+//
+// A CALL THAT NAMES NO SESSION HAS NO SCOPE, whatever else it carries. The agent
+// id is unique per invocation, not per session, so it cannot stand in for the
+// session: a ledger keyed by it alone would be one file per dispatch that nothing
+// could ever find again. The empty scope means "consumption cannot be recorded
+// for this call", and every caller treats it as such rather than as a key - see
+// StatePath.
 func (c ToolCall) ConsumptionScope() string {
+	if c.SessionID == "" {
+		return ""
+	}
 	if c.AgentID != "" {
 		return c.SessionID + "-" + c.AgentID
 	}

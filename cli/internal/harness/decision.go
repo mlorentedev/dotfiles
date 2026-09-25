@@ -53,6 +53,16 @@ const (
 	OutcomeWarn Outcome = "warn"
 	// OutcomeBlock is a refused tool call.
 	OutcomeBlock Outcome = "block"
+	// OutcomeSessionUnscoped is a call whose payload named no session, so there
+	// was nothing to scope consumption to and NOTHING WAS ENFORCED.
+	//
+	// It allows, like role-unresolved, and for the same reason it needs its own
+	// value: from outside it is identical to a healthy pass. It is only recorded
+	// when something would have been enforced or written - a persona was in
+	// scope, or a skill invocation could not be recorded - so a count of these
+	// is a count of calls the gate could not police, not of calls that lacked an
+	// id.
+	OutcomeSessionUnscoped Outcome = "session-unscoped"
 )
 
 // UnparsedScope is the ledger scope for a payload with no readable session.
@@ -62,6 +72,17 @@ const (
 // harness observed here sends a UUID — so a genuine session can never land in
 // this file and make an unparsed pile look like healthy traffic.
 const UnparsedScope = "_unparsed"
+
+// UnscopedScope is the journal scope for a payload that parsed but named no
+// session. Same reasoning as UnparsedScope: it has to go somewhere, and the
+// leading underscore keeps it out of the space of real session ids.
+//
+// It is JOURNAL ONLY. Before it existed these records landed in
+// unknown-e3b0c442, the digest of the empty string - harmless for a log, which
+// is why only the state that gates a call (the ledger, the dispatch map) had to
+// stop sharing that key, and why the journal keeps a single well-named home
+// instead.
+const UnscopedScope = "_unscoped"
 
 // maxDecisionBytes caps one scope's journal before it rotates to a single `.1`
 // generation, bounding a scope at twice this. The gate runs on EVERY tool call,
@@ -118,6 +139,9 @@ type DecisionRecord struct {
 // worse in the specific way that matters: this file is the instrument, so a
 // collision corrupts the measurement rather than announcing itself.
 func DecisionPath(stateDir, scope string) string {
+	if scope == "" {
+		scope = UnscopedScope
+	}
 	return filepath.Join(stateDir, "gate", scopeKey(scope)+".decisions.jsonl")
 }
 
