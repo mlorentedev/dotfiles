@@ -1,0 +1,20 @@
+# golangci-lint v2, pinned in versions.conf. Only what differs from the default
+# ("standard") linter set lives here.
+version: "2"
+
+linters:
+  enable:
+    - gocyclo
+  settings:
+    gocyclo:
+      # HARNESS-150. The largest function in internal/cmd today is
+      # newSpecReviewCmd at 22, so anything that grows past it fails lint. The
+      # line only moves down, one extraction at a time.
+      min-complexity: 22
+  exclusions:
+    rules:
+      # Scoped to internal/cmd, where the command closures grow. Other packages
+      # hold older outliers, up to 32, that this change does not take on.
+      - path-except: internal/cmd/
+        linters:
+          - gocyclo

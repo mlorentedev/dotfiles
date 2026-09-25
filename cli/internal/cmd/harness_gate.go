@@ -88,18 +88,9 @@ A blocked call is answered "deny" with the reason.`,
 				_ = harness.RecordDecision(harness.DecisionPath(stateDir, scope), rec)
 			}
 
-			// The ONE place a decision leaves this command, so the two answer
-			// protocols cannot drift apart path by path. Every return below goes
-			// through it; a path that returned nil directly would answer agy with an
-			// empty stdout, which is not a decision.
+			// Every return below goes through gateAnswer; see there.
 			finish := func(block bool, reason string) error {
-				if harnessName == harnessAgy {
-					return writeAgyVerdict(cmd.OutOrStdout(), block, reason)
-				}
-				if block {
-					return withExitCode(gateExitBlock, fmt.Errorf("%s", reason))
-				}
-				return nil
+				return gateAnswer(cmd.OutOrStdout(), harnessName, block, reason)
 			}
 
 			call, understood := normaliseToolCall(harnessName, payload)
@@ -159,39 +150,11 @@ A blocked call is answered "deny" with the reason.`,
 					call.DispatchName, call.DispatchType)
 			}
 
-			// A skill invocation is the act the gate exists to require: record
-			// it and get out of the way. Recording failures are ignored on
-			// purpose — losing the record costs a redundant skill run, while
-			// failing here would block a session over a full disk.
-			if call.Skill != "" {
-				rec := base
-				rec.Skill = call.Skill
-				rec.Allowed = true
-				if unscoped {
-					// Recording it would file the consumption under a key every
-					// session with no id shares, and satisfy their gates too.
-					rec.Outcome = harness.OutcomeSessionUnscoped
-					rec.Reason = "skill invocation not recorded: the payload named no session to scope it to"
-				} else {
-					_ = harness.RecordConsumed(statePath, call.Skill)
-					rec.Outcome = harness.OutcomeSkillConsumed
-					rec.Reason = "skill invocation recorded"
+			if rec, ok := skillCallRecord(call, base, unscoped, statePath); ok {
+				record(journalScope, rec)
+				if rec.Outcome == harness.OutcomeSkillUnnamed {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
 				}
-				record(journalScope, rec)
-				return finish(false, "")
-			}
-			if call.IsSkillTool {
-				// The tool IS the skill primitive but its argument was
-				// unreadable. There is nothing to record, and blocking would
-				// deadlock the session on the one action that could satisfy the
-				// gate — a well-formed payload with a missing argument, not a
-				// parse failure. Raised by the reviewer on #1272.
-				rec := base
-				rec.Outcome = harness.OutcomeSkillUnnamed
-				rec.Allowed = true
-				rec.Reason = "skill invocation with no readable name"
-				record(journalScope, rec)
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
 				return finish(false, "")
 			}
 
@@ -237,27 +200,7 @@ A blocked call is answered "deny" with the reason.`,
 			if persona != nil {
 				rec.RoleResolved = persona.Name
 			}
-			switch {
-			case resolution == roleUnresolved:
-				// Checked BEFORE the decision, because this call allowed and a
-				// healthy allow looks identical to it. The distinction is the
-				// whole reason AC5 names this case: enforcement was off, and
-				// nothing outside this record says so.
-				rec.Outcome = harness.OutcomeRoleUnresolved
-			case resolution == roleNotAsked || resolution == roleNotAPersona:
-				// Deliberately one case: "nobody with forced skills is acting"
-				// is the same fact whether nobody was asked for or a witnessed
-				// dispatch turned out to be a built-in agent. RoleRequested
-				// keeps the raw name, so the journal still separates them
-				// without spending a ninth Outcome.
-				rec.Outcome = harness.OutcomeNoRole
-			case result.Decision == harness.Block:
-				rec.Outcome = harness.OutcomeBlock
-			case len(result.Warned) > 0:
-				rec.Outcome = harness.OutcomeWarn
-			default:
-				rec.Outcome = harness.OutcomeAllow
-			}
+			rec.Outcome = gateOutcome(resolution, result)
 			// Written before the return below, not after: the block path used to
 			// call os.Exit, which runs no defers, so a record deferred past it
 			// would be the one decision never written — the only one anybody
@@ -286,6 +229,80 @@ A blocked call is answered "deny" with the reason.`,
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "root containing harness/agents (default: the deploy dir, else the checkout)")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "where per-session consumption is recorded")
 	return cmd
+}
+
+// gateAnswer is the ONE place a decision leaves the gate, so the two answer
+// protocols cannot drift apart path by path. Every return in the gate goes
+// through it; a path that returned nil directly would answer agy with an empty
+// stdout, which is not a decision.
+func gateAnswer(w io.Writer, harnessName string, block bool, reason string) error {
+	if harnessName == harnessAgy {
+		return writeAgyVerdict(w, block, reason)
+	}
+	if block {
+		return withExitCode(gateExitBlock, fmt.Errorf("%s", reason))
+	}
+	return nil
+}
+
+// skillCallRecord is the journal record for a call that invokes a skill, and
+// false for any other call. Such a call is always allowed.
+//
+// A skill invocation is the act the gate exists to require: record it and get
+// out of the way. Recording failures are ignored on purpose — losing the record
+// costs a redundant skill run, while failing here would block a session over a
+// full disk.
+func skillCallRecord(call harness.ToolCall, base harness.DecisionRecord, unscoped bool, statePath string) (harness.DecisionRecord, bool) {
+	rec := base
+	rec.Allowed = true
+	switch {
+	case call.Skill != "" && unscoped:
+		// Recording it would file the consumption under a key every session
+		// with no id shares, and satisfy their gates too.
+		rec.Skill = call.Skill
+		rec.Outcome = harness.OutcomeSessionUnscoped
+		rec.Reason = "skill invocation not recorded: the payload named no session to scope it to"
+	case call.Skill != "":
+		_ = harness.RecordConsumed(statePath, call.Skill)
+		rec.Skill = call.Skill
+		rec.Outcome = harness.OutcomeSkillConsumed
+		rec.Reason = "skill invocation recorded"
+	case call.IsSkillTool:
+		// The tool IS the skill primitive but its argument was unreadable.
+		// There is nothing to record, and blocking would deadlock the session on
+		// the one action that could satisfy the gate — a well-formed payload with
+		// a missing argument, not a parse failure. Raised by the reviewer on
+		// #1272.
+		rec.Outcome = harness.OutcomeSkillUnnamed
+		rec.Reason = "skill invocation with no readable name"
+	default:
+		return harness.DecisionRecord{}, false
+	}
+	return rec, true
+}
+
+// gateOutcome names why the gate decided what it decided, for the journal.
+func gateOutcome(resolution roleResolution, result harness.GateResult) harness.Outcome {
+	switch {
+	case resolution == roleUnresolved:
+		// Checked BEFORE the decision, because this call allowed and a healthy
+		// allow looks identical to it. The distinction is the whole reason AC5
+		// names this case: enforcement was off, and nothing outside this record
+		// says so.
+		return harness.OutcomeRoleUnresolved
+	case resolution == roleNotAsked || resolution == roleNotAPersona:
+		// Deliberately one case: "nobody with forced skills is acting" is the
+		// same fact whether nobody was asked for or a witnessed dispatch turned
+		// out to be a built-in agent. RoleRequested keeps the raw name, so the
+		// journal still separates them without spending a ninth Outcome.
+		return harness.OutcomeNoRole
+	case result.Decision == harness.Block:
+		return harness.OutcomeBlock
+	case len(result.Warned) > 0:
+		return harness.OutcomeWarn
+	default:
+		return harness.OutcomeAllow
+	}
 }
 
 // loadGatePersona resolves the persona, returning nil rather than an error.
