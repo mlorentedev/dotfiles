@@ -329,9 +329,11 @@ func RecordConsumed(path, skill string) error {
 // underscore was meant to keep it out of the space of real session ids. A payload
 // can still claim it, and honouring the claim would name a session whose journal
 // is the sessionless one. It is read as naming no session, so it gets the same
-// treatment as an absent one: allowed, and journaled as such.
+// treatment as an absent one: allowed, and journaled as such. UnparsedScope, the
+// journal of payloads the gate could not read, is reserved the same way
+// (HARNESS-149): claiming it put a session's decisions in that journal.
 func (c ToolCall) ConsumptionScope() string {
-	if c.SessionID == "" || c.SessionID == UnscopedScope {
+	if c.SessionID == "" || c.SessionID == UnscopedScope || c.SessionID == UnparsedScope {
 		return ""
 	}
 	if c.AgentID != "" {

@@ -236,6 +236,10 @@ func TestConsumptionScopeNeedsASession(t *testing.T) {
 		// claims it as its session id names no session at all.
 		{"the id reserved for the sessionless journal", ToolCall{SessionID: UnscopedScope}, ""},
 		{"the reserved id with an agent", ToolCall{SessionID: UnscopedScope, AgentID: "a1"}, ""},
+		// `_unparsed` is the journal for payloads the gate could not read, so it is
+		// reserved the same way (HARNESS-149).
+		{"the id reserved for unreadable payloads", ToolCall{SessionID: UnparsedScope}, ""},
+		{"the unparsed id with an agent", ToolCall{SessionID: UnparsedScope, AgentID: "a1"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.call.ConsumptionScope(); got != tc.want {

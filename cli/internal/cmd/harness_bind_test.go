@@ -217,6 +217,45 @@ func TestBindAppendsTheGateBesideOrcasPreToolUseGroup(t *testing.T) {
 	}
 }
 
+// HARNESS-149: the bind keeps the mode of a Claude settings file it rewrites. S4
+// stopped forcing 0600 on every write, because every target is also written by
+// another tool: Claude Code and Orca write ~/.claude/settings.json. Only agy's
+// case was pinned, so a regression on this target would have passed.
+func TestBindKeepsTheModeOfTheClaudeSettingsItRewrites(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	home, raw, _ := bindFixture(t, liveShapedSettings)
+	path := filepath.Join(home, ".claude", "settings.json")
+	if err := os.Chmod(path, 0o664); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := captureRealStreams(t, "harness", "bind",
+		"--harness", "claude", "--repo-root", repoRootForTest(t), "--home", home, "--dotf-path", raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) == string(before) {
+		t.Fatal("the fixture needed no change, so the write path was never exercised")
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o664 {
+		t.Errorf("the bind re-permissioned a settings file other tools also write: mode %v, want 0664", got)
+	}
+}
+
 // TestBindIsIdempotent is the doctrine's changed=0 on re-run, asserted on bytes
 // rather than on the command's own report.
 func TestBindIsIdempotent(t *testing.T) {
