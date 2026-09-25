@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
 // TestHelperProcess is not a real test: when re-exec'd with GO_WANT_HELPER_PROCESS=1
@@ -91,6 +94,20 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		{"upper case, as a case-insensitive filesystem runs it", []string{"sh", "-c", "/usr/bin/ENV"}, true},
 		{"allowed hyphenated word", []string{"sh", "-c", "run-env-check"}, false},
 		{"allowed dotenv file", []string{"sh", "-c", "cat .env.example"}, false},
+		// SEC-001 review round 2, F5: naming the file instead of the command.
+		// A Windows executable suffix was kept, and a backslash path is not a path
+		// to filepath.Base on Linux, so `env.exe` and `C:\...\env.exe` ran.
+		{"windows executable suffix", []string{"env.exe"}, true},
+		{"windows path to env.exe", []string{`C:\Program Files\Git\usr\bin\env.exe`}, true},
+		{"upper-case windows suffix", []string{"PRINTENV.EXE"}, true},
+		{"allowed executable that only starts with env", []string{"envoy.exe"}, false},
+		// busybox is a multi-call binary: its first argument is the command it
+		// runs, so `busybox env` is `env`, and `busybox sh -c` is a shell.
+		{"busybox applet env", []string{"busybox", "env"}, true},
+		{"busybox applet by path", []string{"/bin/busybox", "printenv"}, true},
+		{"busybox shell snippet", []string{"busybox", "sh", "-c", "env"}, true},
+		{"busybox ash snippet", []string{"busybox", "ash", "-c", "env"}, true},
+		{"allowed busybox applet", []string{"busybox", "ls", "-la"}, false},
 		{"allowed tool", []string{"goreleaser", "release"}, false},
 		{"allowed python", []string{"python3", "script.py"}, false},
 		{"allowed dotf review", []string{"dotf", "review"}, false},
@@ -272,5 +289,96 @@ func TestAgentSessionMarkersAreDocumented(t *testing.T) {
 				t.Errorf("%s does not name the agent-session marker `%s`", doc, m)
 			}
 		}
+	}
+}
+
+// SEC-001 review round 2, F1: pi exports AI_AGENT and PI_CODING_AGENT, which
+// the list did not know, so `secrets show` printed plaintext in a pi session.
+// TestDetectAgentSession_EachMarkerIsSufficient loops over the list itself and
+// cannot notice an absent member; this table holds the facts independently. Each
+// harness harness/model-map.json declares must have a row, so a harness added
+// there without its marker fails here instead of shipping a refusal that never
+// fires in it.
+func TestAgentSessionMarkers_CoverEveryHarness(t *testing.T) {
+	known := map[string]struct {
+		markers  []string
+		evidence string
+	}{
+		"claude":   {[]string{"CLAUDECODE", "AI_AGENT"}, "measured in a live Claude Code 2.1 session, 2026-09-24"},
+		"pi":       {[]string{"AI_AGENT", "PI_CODING_AGENT"}, "pi 0.87.1 sets both at its CLI and RPC entry points, and documents that children inherit them"},
+		"opencode": {[]string{"OPENCODE"}, "measured live under `opencode run`, 2026-09-24"},
+		"copilot":  {[]string{"COPILOT_CLI"}, "measured live under `copilot -p`, 2026-09-24"},
+		"agy":      {[]string{"ANTIGRAVITY_AGENT"}, "measured live under `agy --print`, 2026-09-24"},
+		"codex":    {[]string{"CODEX_THREAD_ID", "CODEX_SANDBOX"}, "std-env's agent-detection table; Codex is not installed where this was written"},
+	}
+	for h, k := range known {
+		for _, m := range k.markers {
+			if !slices.Contains(agentSessionMarkers, m) {
+				t.Errorf("%s exports %s (%s), but agentSessionMarkers does not list it", h, m, k.evidence)
+			}
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(repoRootForTest(t), harness.ModelMapFile))
+	if err != nil {
+		t.Fatalf("read %s: %v", harness.ModelMapFile, err)
+	}
+	var doc struct {
+		Harnesses map[string]json.RawMessage `json:"harnesses"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse %s: %v", harness.ModelMapFile, err)
+	}
+	if len(doc.Harnesses) == 0 {
+		t.Fatalf("%s declares no harnesses; this test would pass vacuously", harness.ModelMapFile)
+	}
+	for h := range doc.Harnesses {
+		if _, ok := known[h]; !ok {
+			t.Errorf("%s declares harness %q, but no session marker is known for it: measure what it exports, then add it here and to agentSessionMarkers", harness.ModelMapFile, h)
+		}
+	}
+}
+
+// countingBW records how many secret values were read through it.
+type countingBW struct {
+	fakeBW
+	reads *int
+}
+
+func (c countingBW) Field(item, field string) (string, error) {
+	*c.reads++
+	return c.fakeBW.Field(item, field)
+}
+
+// SEC-001 review round 2, F4: AC1 says a refused command exits "without
+// decrypting or launching". The guard ran inside runChild, after every mapped
+// secret had been resolved, so a refused `env` still decrypted the store.
+func TestSecretsRun_RefusesBeforeResolvingSecrets(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-foo, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: FOO}}\n")
+	reads := 0
+	useBwReader(t, countingBW{fakeBW{"it/password": "synthetic-value"}, &reads})
+
+	c := newSecretsRunCmd()
+	c.SetArgs([]string{"--", "env"})
+	c.SetOut(io.Discard)
+	c.SetErr(io.Discard)
+	err := c.Execute()
+	if err == nil || !strings.Contains(err.Error(), "refusing") {
+		t.Fatalf("secrets run -- env: got %v, want a refusal", err)
+	}
+	if reads != 0 {
+		t.Errorf("the refused command read %d secret value(s) before being refused", reads)
+	}
+
+	// Positive control: the counter does count a resolution.
+	reg, err := loadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveInjectedSecrets(reg, nil); err != nil {
+		t.Fatal(err)
+	}
+	if reads == 0 {
+		t.Fatal("countingBW recorded no read for a real resolution; the assertion above proves nothing")
 	}
 }

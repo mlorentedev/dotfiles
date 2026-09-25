@@ -33,7 +33,20 @@ Reviewed at the landing commit `a720b9d` (#1459). Every finding's disposition is
 - [x] F7: replace the production-dead `buildChildEnv` with `childEnviron`, shared by the run path and its tests
 - [x] F8: name every agent-session marker in AGENTS.md and ADR-028, held by a test
 - [x] AC9 (found while applying F8): recognise `CLAUDECODE`, the variable Claude Code actually exports
-- [ ] Round 2 review passes before archive
+- [x] Round 2 review ran (FAIL, below); it did not pass
+
+## Review round 2 (2026-09-23, FAIL)
+
+`nan/deepseek-v4-flash` at `1a03ae6` (#1655). Every finding's disposition is in `verification.md`.
+
+- [x] F1: recognise the markers of every harness `harness/model-map.json` declares (pi's `AI_AGENT` and `PI_CODING_AGENT`, plus opencode, Copilot and Codex), measured rather than assumed, and a {harness -> marker} test that fails on an absent marker
+- [x] F2: restate AC6 and AC10 as template-scoped; the deny-list deploy is #1339 (owner decision, 2026-09-24)
+- [x] F3: `features.json` f6 checks AC6's three deny entries
+- [x] F4: refuse before resolving any secret, and a test that counts the reads
+- [x] F5: a Windows path or `.exe` suffix, and `busybox <applet>`, name the command they run
+- [x] F6: state the indirection boundary under Out of scope
+- [x] F7: update #1646, whose premise this round makes obsolete
+- [ ] Round 3 review passes before archive
 
 ## Closing
 

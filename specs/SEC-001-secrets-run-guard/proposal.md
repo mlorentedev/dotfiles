@@ -24,6 +24,9 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 ## Out of scope
 
 - Arbitrary binary payload content inspection (we block by binary and shell arguments, not inspecting arbitrary external scripts).
+- Indirection a lexical guard cannot see (review round 2, F6): a command run by another command (`nice env`, `timeout 5 env`, `xargs env`), a snippet read from stdin (`sh -s`) or from a script file, and a command name assembled at run time (`en$'v'`, `e=en; ${e}v`). The redactor still scrubs every injected value of 6 bytes or more from what such a command prints.
+- Shells outside the POSIX family (`pwsh`, `cmd`, `fish`): #1650.
+- **Deploying the Claude deny list to an existing installation.** `merge_claude_settings` merges `permissions.allow` and not `permissions.deny`, so AC6 and AC10 hold for the template only. The Go port of the Claude settings deploy owns the deploy (#1339). Decided by the owner on 2026-09-24, after review round 2 (F2).
 
 ## Risks / open questions
 
@@ -37,14 +40,15 @@ Commands like `dotf secrets run -- env` or `printenv` execute an introspection b
 - [x] AC3: Shell wrappers like `sh -c "env | grep..."` are detected and refused.
 - [x] AC4: Legitimate tools (e.g. `python`, `goreleaser`, `dotf review`) run unhindered.
 - [x] AC5: Comprehensive table-driven unit tests in `cli/internal/cmd/secrets_test.go` verify safe and unsafe commands.
-- [x] AC6: Claude permissions deny list and Pi models catalog are updated.
+- [x] AC6: The Claude settings template (`ai/claude/settings.json`) denies `Bash(env:*)`, `Bash(printenv:*)` and `Bash(export -p:*)`, and the Pi models catalog registers `openrouter`. Template-scoped: the deploy is #1339 (see Out of scope).
 - [x] AC7: Real-time byte-level stream redactor (`redactWriter`) scrubs any injected secret value (len >= 6) from stdout/stderr, replacing with `[REDACTED:<KEY>]`.
 - [x] AC8: Post-mortem and multi-agent testing isolation lesson recorded in `docs/lessons/lesson-261-...`.
-- [x] AC9: `dotf secrets show` implements solutions 1-2-3 (`--reveal` explicit flag, `-c`/`--clip` clipboard copy, interactive TTY masking, and agent session refusal).
-- [x] AC10: `ai/claude/settings.json` permissions deny list hardened with `sudo`, `git clean`, `dotf secrets show`, and pipe-to-shell bans.
+- [x] AC9: `dotf secrets show` implements solutions 1-2-3 (`--reveal` explicit flag, `-c`/`--clip` clipboard copy, interactive TTY masking, and agent session refusal). The refusal recognises a marker exported by every harness `harness/model-map.json` declares.
+- [x] AC10: The Claude settings template (`ai/claude/settings.json`) deny list is hardened with `sudo`, `git clean`, `dotf secrets show`, and pipe-to-shell bans. Template-scoped: the deploy is #1339 (see Out of scope).
 
 ## References
 
 - Issue: mlorentedev/dotfiles#1458
+- Retroactive review and its follow-ups: #1626 (sweep), #1646 (agent-session markers), #1650 (non-POSIX shells), #1339 (deny-list deploy)
 - ADR-028: On-demand secrets delivery and process injection
 - Global doctrine: Non-negotiable rules on secret store dumps

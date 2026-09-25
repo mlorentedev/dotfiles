@@ -316,12 +316,32 @@ func newSecretsLsCmd() *cobra.Command {
 }
 
 // agentSessionMarkers are the environment variables whose presence marks the
-// process as running under a coding agent. CLAUDECODE is what Claude Code
-// actually exports; CLAUDE_CODE, the only Claude marker this list held until
-// #1646, is set by nothing, so the refusal never fired under Claude. The
-// vendor-neutral AGENT_SESSION is the one a harness deploy can set for every
-// agent (#1646). AGENTS.md and ADR-028 name each marker, held by a test.
-var agentSessionMarkers = []string{"CLAUDECODE", "CLAUDE_CODE", "ANTIGRAVITY_AGENT", "ANTIGRAVITY_CLI", "AGENT_SESSION"}
+// process as running under a coding agent. Each harness exports its own, and
+// they were measured, not assumed (SEC-001 review rounds 1 and 2):
+//
+//	claude    CLAUDECODE, and the generic AI_AGENT
+//	pi        AI_AGENT and PI_CODING_AGENT
+//	opencode  OPENCODE
+//	copilot   COPILOT_CLI
+//	agy       ANTIGRAVITY_AGENT
+//	codex     CODEX_THREAD_ID, CODEX_SANDBOX (from std-env's agent table)
+//
+// AI_AGENT is the vendor-neutral one; a harness that adopts it is covered with
+// no change here. CLAUDE_CODE, ANTIGRAVITY_CLI and AGENT_SESSION are kept
+// although no harness measured today sets them, since a marker nobody sets
+// costs nothing and dropping one an older release sets reopens the leak.
+// TestAgentSessionMarkers_CoverEveryHarness requires a marker for every harness
+// in harness/model-map.json, and AGENTS.md and ADR-028 name each one.
+var agentSessionMarkers = []string{
+	"AI_AGENT",
+	"CLAUDECODE", "CLAUDE_CODE",
+	"PI_CODING_AGENT",
+	"OPENCODE",
+	"COPILOT_CLI",
+	"ANTIGRAVITY_AGENT", "ANTIGRAVITY_CLI",
+	"CODEX_THREAD_ID", "CODEX_SANDBOX",
+	"AGENT_SESSION",
+}
 
 // detectAgentSession reports whether any agent-session marker is set.
 func detectAgentSession() bool {
@@ -504,6 +524,12 @@ func newSecretsRunCmd() *cobra.Command {
 				return errors.New("usage: dotf secrets run [--only VAR,...] -- <cmd> [args...]")
 			}
 			childArgv := args[dash:]
+			// Refuse before anything is decrypted: a command that will not be
+			// launched must not cost a resolution of the store (review round 2, F4).
+			// runChild and runChildPTY check again, for their other callers.
+			if err := assertSafeChildCommand(childArgv); err != nil {
+				return err
+			}
 
 			reg, err := loadRegistry()
 			if err != nil {
@@ -724,13 +750,18 @@ func assertSafeChildCommand(argv []string) error {
 	if len(argv) == 0 {
 		return errors.New("no command given after --")
 	}
-	base := strings.ToLower(filepath.Base(argv[0]))
+	base := commandName(argv[0])
 	if base == "env" || base == "printenv" || base == "export" {
 		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", base)
 	}
+	// busybox is a multi-call binary whose first argument is the command it runs,
+	// so `busybox env` is `env` and `busybox sh -c` is a shell (round 2, F5).
+	if base == "busybox" && len(argv) >= 2 {
+		return assertSafeChildCommand(argv[1:])
+	}
 
 	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
-	if (base == "sh" || base == "bash" || base == "zsh" || base == "dash" || base == "ksh" || base == "busybox") && len(argv) >= 2 {
+	if slices.Contains(inspectedShells, base) && len(argv) >= 2 {
 		for i := 1; i < len(argv); i++ {
 			arg := argv[i]
 			isCFlag := arg == "-c" || (strings.HasPrefix(arg, "-") && strings.Contains(arg, "c"))
@@ -742,6 +773,22 @@ func assertSafeChildCommand(argv []string) error {
 		}
 	}
 	return nil
+}
+
+// inspectedShells are the POSIX shells whose `-c` snippet is read. Others
+// (pwsh, cmd, fish) need their own vocabulary: #1650.
+var inspectedShells = []string{"sh", "bash", "zsh", "dash", "ksh", "ash"}
+
+// commandName is the command a path names, as the OS resolves it: the last
+// element under either separator, lower-cased, without a Windows executable
+// suffix. filepath.Base alone splits on `\` only on Windows, and it kept `.exe`,
+// so `env.exe` and `C:\...\env.exe` passed the guard (round 2, F5).
+func commandName(arg string) string {
+	name := strings.ToLower(arg)
+	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
+		name = name[i+1:]
+	}
+	return strings.TrimSuffix(name, ".exe")
 }
 
 // introspectionWords are the commands whose purpose is to print the environment.
@@ -760,7 +807,9 @@ var snippetWordSep = regexp.MustCompile(`[^a-z0-9_.-]+`)
 // newline continues the line, and quotes and backslashes vanish, so
 // `en\<newline>v`, `'e'nv` and `\env` all run `env`. Neither ever separates two
 // words, so reading the snippet as written as well would only refuse commands
-// the shell does not run.
+// the shell does not run. The accepted over-block: a word that is only printed
+// is refused too (`echo env`), because failing closed is the intended bias for a
+// tripwire (round 1, F4, declined).
 func snippetIntrospection(snippet string) (string, bool) {
 	shellForm := strings.NewReplacer("\\\n", "", "'", "", `"`, "", `\`, "").Replace(snippet)
 	for _, word := range snippetWordSep.Split(strings.ToLower(shellForm), -1) {
