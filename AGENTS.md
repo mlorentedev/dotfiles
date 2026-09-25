@@ -61,7 +61,7 @@ Stop generation and warn on: Injection (SQL/inputs), Secrets (hardcoded credenti
 ### Secret Safety & ADR-028 Doctrine
 
 - **Never dump secrets to stdout:** Never run `env`, `printenv`, `export`, `set`, `declare`, or script wrappers under `dotf secrets run` (enforced by `assertSafeChildCommand` and byte-level stream redactor `redactWriter`).
-- **Never invoke `dotf secrets show` in agent sessions:** In agent sessions (`CLAUDECODE`, `CLAUDE_CODE`, `ANTIGRAVITY_AGENT`, `ANTIGRAVITY_CLI`, `AGENT_SESSION`), `dotf secrets show` refuses to print plaintext to stdout. Inject secrets strictly via `dotf secrets run -- <cmd>`.
+- **Never invoke `dotf secrets show` in agent sessions:** In agent sessions (any of `AI_AGENT`, `CLAUDECODE`, `CLAUDE_CODE`, `PI_CODING_AGENT`, `OPENCODE`, `COPILOT_CLI`, `ANTIGRAVITY_AGENT`, `ANTIGRAVITY_CLI`, `CODEX_THREAD_ID`, `CODEX_SANDBOX`, `AGENT_SESSION`; every harness in `harness/model-map.json` must export one), `dotf secrets show` refuses to print plaintext to stdout. Inject secrets strictly via `dotf secrets run -- <cmd>`.
 - **Testing isolation:** Subagents and test harnesses must **never** test against live Bitwarden/age vaults. All security and evasion testing must use synthetic, in-process mock data (`docs/lessons/lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary.md`).
 - **Human operator ergonomics:** In interactive terminals, `dotf secrets show <id>` masks secrets by default. Use `-c` / `--clip` to copy to clipboard with zero terminal exposure, or `--reveal` to print plaintext.
 
