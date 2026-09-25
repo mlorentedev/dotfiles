@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.58.0](https://github.com/mlorentedev/dotfiles/compare/v0.57.0...v0.58.0) (2026-09-25)
+
+
+### Features
+
+* **harness:** read agy's own hook payload and register its gate where agy reads it ([#1688](https://github.com/mlorentedev/dotfiles/issues/1688)) ([cd619b5](https://github.com/mlorentedev/dotfiles/commit/cd619b59121287a1665096eb4d17ac2c259c8dd9))
+* **secrets:** give the personal plane its folder, Dotfiles/personal, one folder per plane ([#1673](https://github.com/mlorentedev/dotfiles/issues/1673)) ([08b8e19](https://github.com/mlorentedev/dotfiles/commit/08b8e19268a462972b46bd7e39f1cfd4167b130d)), closes [#586](https://github.com/mlorentedev/dotfiles/issues/586)
+
+
+### Bug Fixes
+
+* **harness:** point every trigger at a pattern that exists and refuse a dangling one ([#1687](https://github.com/mlorentedev/dotfiles/issues/1687)) ([1f833f4](https://github.com/mlorentedev/dotfiles/commit/1f833f4afb8cbb991094bbef108b624e5bedf1d0))
+* **harness:** slim the enforced doctrine and fold every capped surface to ASCII ([#1685](https://github.com/mlorentedev/dotfiles/issues/1685)) ([ebc2e20](https://github.com/mlorentedev/dotfiles/commit/ebc2e20c3eacb53730f9f50eb1986a38bcd8c0fe))
+* **harness:** stop payloads with no session id sharing one gate ledger ([#1683](https://github.com/mlorentedev/dotfiles/issues/1683)) ([3a8e52a](https://github.com/mlorentedev/dotfiles/commit/3a8e52aa936880b3fc745d1fc38aa41615fda848))
+* **secrets:** recognise every harness's session marker, refuse before decrypting, and fail closed on shell snippets ([#1677](https://github.com/mlorentedev/dotfiles/issues/1677)) ([bfcc072](https://github.com/mlorentedev/dotfiles/commit/bfcc072239941f3dd54c9051b2761fa549afeff4))
+* **secrets:** render the locked-vault backup remedy from the invocation that failed ([#1662](https://github.com/mlorentedev/dotfiles/issues/1662)) ([be68b63](https://github.com/mlorentedev/dotfiles/commit/be68b63e7f47abb7071896b5ba4f857fa1602f69)), closes [#1647](https://github.com/mlorentedev/dotfiles/issues/1647)
+
 ## [0.57.0](https://github.com/mlorentedev/dotfiles/compare/v0.56.0...v0.57.0) (2026-09-24)
 
 

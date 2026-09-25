@@ -306,3 +306,7 @@ tags: [lessons, index, dotfiles]
 | [286 - A mutation that deletes a loop bound is a memory bomb, not a failing test](lesson-286-a-mutation-that-deletes-a-loop-bound-is-a-memory-bomb.md) | 2026-09-23 |  |
 | [287 - A guard that skips is a guard that passes](lesson-287-a-guard-that-skips-is-a-guard-that-passes.md) | 2026-09-23 |  |
 | [288 - An inventory is a hypothesis until each row is probed](lesson-288-an-inventory-is-a-hypothesis-until-each-row-is-probed.md) | 2026-09-23 |  |
+| [289 - A list tested by looping over itself cannot see a missing member](lesson-289-a-list-tested-by-looping-over-itself-cannot-see-a-missing-member.md) | 2026-09-24 |  |
+| [290 - A guard that predicts what an interpreter runs should fail closed, not emulate it](lesson-290-a-guard-that-predicts-what-an-interpreter-runs-should-fail-closed.md) | 2026-09-24 |  |
+| [292 - The file that declares an event describes its owner, not the tool you bind](lesson-292-the-file-that-declares-an-event-describes-its-owner-not-the-tool-you-bind.md) | 2026-09-24 |  |
+| [293 - An empty key is still a key: define it as no storage, never as a bucket](lesson-293-an-empty-key-is-a-key-so-define-it-as-no-storage.md) | 2026-09-24 |  |

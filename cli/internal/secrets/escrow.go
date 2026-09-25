@@ -63,15 +63,19 @@ func (e BWExport) Export() ([]byte, error) {
 // unlocks the daemon, the escrow still fails, and the message has taught them a fix that
 // cannot work. This is why the DR escrow silently never existed until 2026-08-15 (#997):
 // the failure was real, but nothing it printed pointed anywhere useful.
+//
+// It names the BW_SESSION prefix but not the command line: this package does not know
+// the invocation's flags, and a fixed line here dropped --out (#1647). The command layer
+// appends the exact line to re-run.
 func exportLockHint(err error) error {
 	if !isVaultLocked(err) {
 		return err
 	}
 	return fmt.Errorf("%w: the escrow cannot go through the bw serve daemon — `bw serve` "+
 		"exposes no export endpoint, so this is the one `dotf secrets` operation that needs "+
-		"the bw CLI's own session. `dotf secrets unlock` will NOT fix it. Run:\n"+
-		"    BW_SESSION=\"$(bw unlock --raw)\" dotf secrets backup\n"+
-		"which confines the session to that one process rather than exporting it: %w",
+		"the bw CLI's own session. `dotf secrets unlock` will NOT fix it. Re-run the command "+
+		"prefixed with BW_SESSION=\"$(bw unlock --raw)\", which confines the session to that "+
+		"one process rather than exporting it: %w",
 		ErrBWVaultLocked, err)
 }
 

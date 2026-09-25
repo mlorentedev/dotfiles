@@ -173,12 +173,79 @@ func TestGateStatePathDoesNotCollideAcrossDistinctSessions(t *testing.T) {
 // filesystem path.
 func TestGateStatePathContainsNoTraversal(t *testing.T) {
 	dir := t.TempDir()
-	for _, sid := range []string{"../../etc/passwd", "a/b", "", "..", "x\x00y"} {
+	for _, sid := range []string{"../../etc/passwd", "a/b", "..", "x\x00y"} {
 		got := StatePath(dir, sid)
 		rel, err := filepath.Rel(dir, got)
 		if err != nil || filepath.IsAbs(rel) || strings.Contains(rel, "..") {
 			t.Errorf("session id %q escaped the state dir: %s", sid, got)
 		}
+	}
+}
+
+// TestAnEmptyScopeHasNoStateFile pins the fix for the shared ledger.
+//
+// scopeKey("") is "unknown-e3b0c442", the digest of the empty string, so every
+// payload that named no session used to share ONE consumption ledger and ONE
+// dispatch map. The first skill any of them invoked would then satisfy the gate
+// for all the rest, and a dispatch recorded by one would answer another's
+// lookup. Nothing durable that gates a call may be keyed by nothing, so the empty
+// scope has no path, and writing through it is a no-op rather than an error or a
+// file.
+func TestAnEmptyScopeHasNoStateFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if got := StatePath(dir, ""); got != "" {
+		t.Errorf("StatePath for an empty scope = %q, want no path", got)
+	}
+	if got := DispatchPath(dir, ""); got != "" {
+		t.Errorf("DispatchPath for an empty session = %q, want no path", got)
+	}
+
+	if err := RecordConsumed(StatePath(dir, ""), "audit"); err != nil {
+		t.Errorf("recording through the empty path must be a quiet no-op, got %v", err)
+	}
+	if err := RecordDispatch(DispatchPath(dir, ""), "n", "reviewer"); err != nil {
+		t.Errorf("recording a dispatch through the empty path must be a quiet no-op, got %v", err)
+	}
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+		t.Errorf("nothing may be written for an empty scope, found %v (err %v)", entries, err)
+	}
+
+	if got := LoadConsumed(StatePath(dir, "")); len(got) != 0 {
+		t.Errorf("nothing can be read back through the empty path, got %v", got)
+	}
+	if got := LoadDispatched(DispatchPath(dir, "")); len(got) != 0 {
+		t.Errorf("no dispatch can be read back through the empty path, got %v", got)
+	}
+}
+
+// The agent id is unique per invocation, not per session, so it cannot stand in
+// for a session that is missing: a ledger keyed by it alone would be one file per
+// dispatch that nothing could ever find again.
+func TestConsumptionScopeNeedsASession(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call ToolCall
+		want string
+	}{
+		{"no session and no agent", ToolCall{}, ""},
+		{"an agent but no session", ToolCall{AgentID: "a1"}, ""},
+		{"a session alone", ToolCall{SessionID: "s1"}, "s1"},
+		{"a session and an agent", ToolCall{SessionID: "s1", AgentID: "a1"}, "s1-a1"},
+		// `_unscoped` is where calls with NO session are journaled, so a payload that
+		// claims it as its session id names no session at all.
+		{"the id reserved for the sessionless journal", ToolCall{SessionID: UnscopedScope}, ""},
+		{"the reserved id with an agent", ToolCall{SessionID: UnscopedScope, AgentID: "a1"}, ""},
+		// `_unparsed` is the journal for payloads the gate could not read, so it is
+		// reserved the same way (HARNESS-149).
+		{"the id reserved for unreadable payloads", ToolCall{SessionID: UnparsedScope}, ""},
+		{"the unparsed id with an agent", ToolCall{SessionID: UnparsedScope, AgentID: "a1"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.call.ConsumptionScope(); got != tc.want {
+				t.Errorf("ConsumptionScope() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

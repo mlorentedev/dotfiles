@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 9adceba0eebaff80
+generated_sha: ff6047f74e5bcbcc
 id: handoff-skill
 type: skill
 status: active
@@ -18,6 +18,7 @@ allowed-tools: [Bash, Read, Edit, Write, mcp__hive__vault_query, mcp__hive__vaul
   mcp__hive__vault_write, mcp__hive__vault_patch]
 keywords: [handoff, wrap up, session handoff, close session, cerrar sesion, haz handoff]
 paths: ['**/MEMORY.md', sessions/**]
+requires: [adversarial-review]
 ---
 # Handoff Workflow
 
@@ -155,8 +156,9 @@ several sessions running at once, these are the places two of them can collide:
 |---|---|
 | `MEMORY.md` handoff | `dotf mem handoff-write` (never an Edit) |
 | Vault `sessions/` | the thread-scoped filename from `dotf mem thread` |
-| `~/.dotfiles` deploy dir | `setup-linux.sh` / `dotf deploy` |
+| `~/.dotfiles` deploy dir and the per-agent skill dirs | `setup-linux.sh`, or `dotf harness mirror` then `compile-harness.sh --deploy` from the checkout that holds the change (`dotf deploy` installs only the `ai/deploy.json` configs; the deploy dir is not a git checkout, never edit it) |
 | Agent harness settings (`settings.json`, etc.) | the harness deploy path, which merges by marker |
+| The agent's **pending-work surface** (`SCRATCHPAD.md`, the harness memory tool) | the harness's own memory command — never a manual edit of a memory file |
 | The git stash | never bare `git stash` — see the standing order |
 
 Everything else a session touches lives inside its own worktree or its own
@@ -190,6 +192,14 @@ Every issue touched this session must match board reality ([Project #1](https://
   gh issue view <N> --json state,assignees,title
   ```
 - *Best-effort:* If `gh project` query fails due to sandbox/auth, note the pending status in **Open threads**.
+
+### 2c. Pending-work reconciliation — the always-on surface
+
+The board (2b) is not the only place a promise can hide, and it is not the one that fails first. The surface the next session reads **without looking for it** is the agent's own pending-work list — and it is the one surface a handoff has never reconciled. So:
+
+- Every open thread, blocked measurement and deferred decision named in this handoff must exist in the always-on pending list, **not only** in the journal or the continuity block: *narrated in the archive is not persisted.* The journal is history; the pending list is what a session sees before it knows to look. The incident that produced this step: two deferred items were written into the continuity block, the session record and a repo spec, and the next question — "is that well persisted?" — answered itself no, because the always-on surface held neither.
+- Answer "is it persisted?" by checking each surface, never from recollection: the continuity block, the session record, the repo/spec when the finding is build-or-operate knowledge, the board, and the pending-work list.
+- A deferral that needs a ticket is not persisted until the ticket exists (Standing Order #4), and its number is written into every surface that promised it. A spec's Out-of-scope list saying "needs its own ticket" is a verbal promise wearing a file's clothes.
 
 ### 3. Repo / worktree / branch state & housekeeping
 

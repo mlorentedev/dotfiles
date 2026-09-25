@@ -48,12 +48,13 @@ func TestResolveRoles(t *testing.T) {
 	// which is exactly why nothing was red. Asserting the skill ALONE is what
 	// distinguishes "the rule resolves" from "this skill has an owner"; only the
 	// second is what changed. See #1499 for the guard that cannot tell them apart.
-	if got := ResolveRoles(Suggestion{Skills: []string{"pr-review-triage"}}, personas); len(got) != 1 || got[0] != "shipper" {
-		t.Errorf("pr-review-triage should resolve to [shipper], got %v", got)
+	// SKILL-001 gave it to reviewer as well, to judge other reviewers' findings.
+	if got := ResolveRoles(Suggestion{Skills: []string{"pr-review-triage"}}, personas); strings.Join(got, ",") != "reviewer,shipper" {
+		t.Errorf("pr-review-triage should resolve to [reviewer shipper], got %v", got)
 	}
 
 	// Sorted output is the determinism contract: same input, same bytes.
-	multi := ResolveRoles(Suggestion{Skills: []string{"terraform", "audit", "read-all-adrs"}}, personas)
+	multi := ResolveRoles(Suggestion{Skills: []string{"terraform", "adversarial-review", "read-all-adrs"}}, personas)
 	for i := 1; i < len(multi); i++ {
 		if multi[i-1] > multi[i] {
 			t.Errorf("roles are not sorted: %v", multi)
@@ -141,7 +142,7 @@ func TestFormatSuggestion(t *testing.T) {
 	// The single-role case names the role, the pattern and the skills, and states
 	// what to do — the owner's chosen shape (see proposal.md, Decisions).
 	out := FormatSuggestion([]string{"builder"}, "testing-standards",
-		[]string{"test", "test-driven-development"})
+		[]string{"test", "test-driven-development"}, DefaultSkillDependencies)
 	for _, want := range []string{"builder", "testing-standards", "test-driven-development"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output should name %q, got:\n%s", want, out)
@@ -151,14 +152,14 @@ func TestFormatSuggestion(t *testing.T) {
 	// Ambiguity must read as two paths, not as indecision, and must never
 	// present one role as the answer.
 	amb := FormatSuggestion([]string{"builder", "reviewer"}, "code-complexity-and-refactor",
-		[]string{"cyclomatic-complexity"})
+		[]string{"cyclomatic-complexity"}, DefaultSkillDependencies)
 	if !strings.Contains(amb, "builder") || !strings.Contains(amb, "reviewer") {
 		t.Errorf("both roles must appear, got:\n%s", amb)
 	}
 
 	// Zero roles prints nothing: two of the 18 rules are pattern-only and have no
 	// owner, and a suggestion naming nobody is pure noise on every prompt.
-	if got := FormatSuggestion(nil, "shell-standards", nil); got != "" {
+	if got := FormatSuggestion(nil, "shell-standards", nil, DefaultSkillDependencies); got != "" {
 		t.Errorf("no roles should print nothing, got %q", got)
 	}
 }

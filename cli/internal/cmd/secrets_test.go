@@ -2,13 +2,20 @@ package cmd
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
 // TestHelperProcess is not a real test: when re-exec'd with GO_WANT_HELPER_PROCESS=1
@@ -91,6 +98,47 @@ func TestAssertSafeChildCommand(t *testing.T) {
 		{"upper case, as a case-insensitive filesystem runs it", []string{"sh", "-c", "/usr/bin/ENV"}, true},
 		{"allowed hyphenated word", []string{"sh", "-c", "run-env-check"}, false},
 		{"allowed dotenv file", []string{"sh", "-c", "cat .env.example"}, false},
+		// SEC-001 review round 2, F5: naming the file instead of the command.
+		// A Windows executable suffix was kept, and a backslash path is not a path
+		// to filepath.Base on Linux, so `env.exe` and `C:\...\env.exe` ran.
+		{"windows executable suffix", []string{"env.exe"}, true},
+		{"windows path to env.exe", []string{`C:\Program Files\Git\usr\bin\env.exe`}, true},
+		{"upper-case windows suffix", []string{"PRINTENV.EXE"}, true},
+		{"allowed executable that only starts with env", []string{"envoy.exe"}, false},
+		// busybox is a multi-call binary: its first argument is the command it
+		// runs, so `busybox env` is `env`, and `busybox sh -c` is a shell.
+		{"busybox applet env", []string{"busybox", "env"}, true},
+		{"busybox applet by path", []string{"/bin/busybox", "printenv"}, true},
+		{"busybox shell snippet", []string{"busybox", "sh", "-c", "env"}, true},
+		{"busybox ash snippet", []string{"busybox", "ash", "-c", "env"}, true},
+		{"allowed busybox applet", []string{"busybox", "ls", "-la"}, false},
+		// SEC-001 review rounds 3 and 4: which argument a shell runs as its command
+		// string depends on its own option grammar, and bash, zsh and dash differ.
+		// So once an argument sets the c flag, every argument after it is inspected.
+		{"end of options between -c and the snippet", []string{"bash", "-c", "--", "env"}, true},
+		{"snippet after -- that starts with a dash", []string{"bash", "-c", "--", "-x; env"}, true},
+		{"another option between -c and the snippet", []string{"bash", "-c", "-i", "env"}, true},
+		{"plus-c form", []string{"bash", "+c", "env"}, true},
+		{"plus-c in zsh", []string{"zsh", "+c", "printenv"}, true},
+		{"c inside a cluster", []string{"sh", "-ec", "env"}, true},
+		{"option argument before -c", []string{"bash", "-o", "pipefail", "-c", "env"}, true},
+		{"option argument after -c", []string{"bash", "-c", "-o", "pipefail", "env"}, true},
+		{"o and c in one cluster", []string{"bash", "-oc", "pipefail", "env"}, true},
+		{"long option taking an argument", []string{"bash", "--rcfile", "/dev/null", "-c", "env"}, true},
+		{"zsh bundles -o's argument into the flag", []string{"zsh", "-ovi", "-c", "env"}, true},
+		{"bare plus between -c and the snippet", []string{"bash", "-c", "+", "env"}, true},
+		{"bare plus in sh", []string{"sh", "-c", "+", "printenv"}, true},
+		{"plus-o before -c", []string{"bash", "+o", "vi", "-c", "env"}, true},
+		{"typeset prints the environment", []string{"bash", "-c", "typeset"}, true},
+		{"snippet followed by positional parameters", []string{"bash", "-c", "env", "_", "x"}, true},
+		{"shopt option argument before -c", []string{"bash", "-O", "extglob", "-c", "env"}, true},
+		// Failing closed over-blocks what the shell would only pass on as $1 or to a
+		// script. That is the accepted cost of a tripwire.
+		{"a script's own -c, refused by failing closed", []string{"bash", "deploy.sh", "-c", "env"}, true},
+		{"a positional parameter, refused by failing closed", []string{"bash", "-c", "echo \"$1\"", "_", "env"}, true},
+		{"allowed option argument before -c that is an introspection word", []string{"bash", "-o", "set", "-c", "echo ok"}, false},
+		{"allowed script operand without -c", []string{"bash", "set"}, false},
+		{"allowed secret piped by a snippet", []string{"sh", "-c", "printf %s \"$NAN_API_KEY\" | sops --encrypt /dev/stdin"}, false},
 		{"allowed tool", []string{"goreleaser", "release"}, false},
 		{"allowed python", []string{"python3", "script.py"}, false},
 		{"allowed dotf review", []string{"dotf", "review"}, false},
@@ -272,5 +320,160 @@ func TestAgentSessionMarkersAreDocumented(t *testing.T) {
 				t.Errorf("%s does not name the agent-session marker `%s`", doc, m)
 			}
 		}
+	}
+}
+
+// SEC-001 review round 2, F1: pi exports AI_AGENT and PI_CODING_AGENT, which
+// the list did not know, so `secrets show` printed plaintext in a pi session.
+// TestDetectAgentSession_EachMarkerIsSufficient loops over the list itself and
+// cannot notice an absent member; this table holds the facts independently. Each
+// harness harness/model-map.json declares must have a row, so a harness added
+// there without its marker fails here instead of shipping a refusal that never
+// fires in it.
+func TestAgentSessionMarkers_CoverEveryHarness(t *testing.T) {
+	known := map[string]struct {
+		markers  []string
+		evidence string
+	}{
+		"claude":   {[]string{"CLAUDECODE", "AI_AGENT"}, "measured in a live Claude Code 2.1 session, 2026-09-24"},
+		"pi":       {[]string{"AI_AGENT", "PI_CODING_AGENT"}, "pi 0.87.1 sets both at its CLI and RPC entry points, and documents that children inherit them"},
+		"opencode": {[]string{"OPENCODE"}, "measured live under `opencode run`, 2026-09-24"},
+		"copilot":  {[]string{"COPILOT_CLI"}, "measured live under `copilot -p`, 2026-09-24"},
+		"agy":      {[]string{"ANTIGRAVITY_AGENT"}, "measured live under `agy --print`, 2026-09-24"},
+		"codex":    {[]string{"CODEX_THREAD_ID", "CODEX_SANDBOX"}, "std-env's agent-detection table; Codex is not installed where this was written"},
+	}
+	for h, k := range known {
+		for _, m := range k.markers {
+			if !slices.Contains(agentSessionMarkers, m) {
+				t.Errorf("%s exports %s (%s), but agentSessionMarkers does not list it", h, m, k.evidence)
+			}
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(repoRootForTest(t), harness.ModelMapFile))
+	if err != nil {
+		t.Fatalf("read %s: %v", harness.ModelMapFile, err)
+	}
+	var doc struct {
+		Harnesses map[string]json.RawMessage `json:"harnesses"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse %s: %v", harness.ModelMapFile, err)
+	}
+	if len(doc.Harnesses) == 0 {
+		t.Fatalf("%s declares no harnesses; this test would pass vacuously", harness.ModelMapFile)
+	}
+	for h := range doc.Harnesses {
+		if _, ok := known[h]; !ok {
+			t.Errorf("%s declares harness %q, but no session marker is known for it: measure what it exports, then add it here and to agentSessionMarkers", harness.ModelMapFile, h)
+		}
+	}
+}
+
+// countingBW records how many secret values were read through it.
+type countingBW struct {
+	fakeBW
+	reads *int
+}
+
+func (c countingBW) Field(item, field string) (string, error) {
+	*c.reads++
+	return c.fakeBW.Field(item, field)
+}
+
+// SEC-001 review round 2, F4: AC1 says a refused command exits "without
+// decrypting or launching". The guard ran inside runChild, after every mapped
+// secret had been resolved, so a refused `env` still decrypted the store.
+func TestSecretsRun_RefusesBeforeResolvingSecrets(t *testing.T) {
+	useTempRegistry(t, "version: 1\nsecrets:\n  - {id: bw-foo, plane: app, backend: bw, bw: {item: it, field: password}, expose: {env: FOO}}\n")
+	reads := 0
+	useBwReader(t, countingBW{fakeBW{"it/password": "synthetic-value"}, &reads})
+
+	c := newSecretsRunCmd()
+	c.SetArgs([]string{"--", "env"})
+	c.SetOut(io.Discard)
+	c.SetErr(io.Discard)
+	err := c.Execute()
+	if err == nil || !strings.Contains(err.Error(), "refusing") {
+		t.Fatalf("secrets run -- env: got %v, want a refusal", err)
+	}
+	if reads != 0 {
+		t.Errorf("the refused command read %d secret value(s) before being refused", reads)
+	}
+
+	// Positive control: the counter does count a resolution.
+	reg, err := loadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveInjectedSecrets(reg, nil); err != nil {
+		t.Fatal(err)
+	}
+	if reads == 0 {
+		t.Fatal("countingBW recorded no read for a real resolution; the assertion above proves nothing")
+	}
+}
+
+// SEC-001 review rounds 3 and 4. The guard is held to the shells themselves,
+// not to a belief about them. For each argv shape, the real shell must run the
+// operand marked X, which shows the shape is a live way to run a command
+// string. The guard must then refuse the same shape with X set to `env`. Two
+// rounds found shapes an emulated option parser missed, so this list is where
+// the next shape goes. A shell that is not installed is skipped, never assumed.
+func TestSnippetGuard_RefusesEveryShapeTheRealShellRuns(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// `bash` there may resolve to WSL's launcher rather than a shell. The
+		// guard is platform-independent, so the Linux leg is where it is held.
+		t.Skip("the POSIX shells are checked where they are native")
+	}
+	const marker = "shell-guard-marker"
+	shapes := []struct {
+		argv []string
+		run  string // what replaces X when the real shell runs it; an echo of the marker when empty
+	}{
+		{[]string{"bash", "-c", "X"}, ""},
+		{[]string{"bash", "-c", "X", "_", "positional"}, ""},
+		{[]string{"bash", "-c", "--", "X"}, ""},
+		{[]string{"bash", "-c", "--", "X"}, "-x; echo " + marker},
+		{[]string{"bash", "+c", "X"}, ""},
+		{[]string{"zsh", "+c", "X"}, ""},
+		{[]string{"sh", "-ec", "X"}, ""},
+		{[]string{"bash", "-o", "pipefail", "-c", "X"}, ""},
+		{[]string{"bash", "-c", "-o", "pipefail", "X"}, ""},
+		{[]string{"bash", "-oc", "pipefail", "X"}, ""},
+		{[]string{"bash", "--rcfile", "/dev/null", "-c", "X"}, ""},
+		{[]string{"bash", "-O", "extglob", "-c", "X"}, ""},
+		{[]string{"zsh", "-ovi", "-c", "X"}, ""},
+		{[]string{"bash", "-c", "+", "X"}, ""},
+		{[]string{"sh", "-c", "+", "X"}, ""},
+		{[]string{"bash", "+o", "vi", "-c", "X"}, ""},
+		{[]string{"zsh", "-c", "--", "X"}, ""},
+		{[]string{"dash", "-c", "--", "X"}, ""},
+	}
+	for _, v := range shapes {
+		t.Run(strings.Join(v.argv, " ")+" "+v.run, func(t *testing.T) {
+			shell, err := exec.LookPath(v.argv[0])
+			if err != nil {
+				t.Skipf("%s is not installed", v.argv[0])
+			}
+			x := slices.Index(v.argv, "X")
+			run := v.run
+			if run == "" {
+				run = "echo " + marker
+			}
+			args := slices.Clone(v.argv[1:])
+			args[x-1] = run
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			out, _ := exec.CommandContext(ctx, shell, args...).Output()
+			if !strings.Contains(string(out), marker) {
+				t.Fatalf("the real %s did not run the X operand, so this shape proves nothing: %q", v.argv[0], out)
+			}
+			dump := slices.Clone(v.argv)
+			dump[x] = strings.Replace(run, "echo "+marker, "env", 1)
+			if err := assertSafeChildCommand(dump); err == nil {
+				t.Errorf("%q runs its command string in the real %s, but the guard let it through", dump, v.argv[0])
+			}
+		})
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/spf13/cobra"
 )
 
 // fakeExp is the cmd-package BWExporter fake (the secrets-package fake lives in another
@@ -112,6 +113,37 @@ func TestSecretsBackup_LockedBw_Errors(t *testing.T) {
 	}
 }
 
+// TestSecretsBackup_LockedBw_RemedyRerunsTheInvocation is #1647. The remedy is
+// pasted verbatim, so it must re-run the command that failed. It was a fixed
+// string that dropped --out, and the escrow landed in the shared checkout instead
+// of the worktree the operator named.
+func TestSecretsBackup_LockedBw_RemedyRerunsTheInvocation(t *testing.T) {
+	dir := t.TempDir()
+	stubBackupSeams(t, fakeExp{err: fmt.Errorf("bw export: %w", secrets.ErrBWVaultLocked)})
+	useRepoSensitiveDir(t, dir, nil)
+	const session = `BW_SESSION="$(bw unlock --raw)" `
+
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"default destination": {nil, session + "dotf secrets backup\n"},
+		"--out survives":      {[]string{"--out", "/wt/sensitive/dr"}, session + "dotf secrets backup --out='/wt/sensitive/dr'"},
+		"a value is quoted":   {[]string{"--out=/my wt/it's"}, session + `dotf secrets backup --out='/my wt/it'\''s'`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := New("dev", "")
+			root.SetOut(io.Discard)
+			root.SetErr(io.Discard)
+			root.SetArgs(append([]string{"secrets", "backup"}, tc.args...))
+			err := root.Execute()
+			if err == nil || !strings.Contains(err.Error()+"\n", tc.want) {
+				t.Fatalf("the remedy must re-run the failed invocation\nwant: %s\ngot:  %v", tc.want, err)
+			}
+		})
+	}
+}
+
 func TestSecretsBackup_NoCheckout_FailsLoud(t *testing.T) {
 	stubBackupSeams(t, fakeExp{data: []byte(`{"items":[]}`)})
 	useRepoSensitiveDir(t, "", fmt.Errorf("no dotfiles checkout found"))
@@ -121,5 +153,24 @@ func TestSecretsBackup_NoCheckout_FailsLoud(t *testing.T) {
 	cmd.SetErr(io.Discard)
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected a fail-loud refusal when no checkout is found (never the deployed copy)")
+	}
+}
+
+// rerunLine must render every flag kind so the line parses back to the same
+// invocation: a slice flag's String() is "[a,b]", which does not.
+func TestRerunLine_RendersFlagsThatParseBack(t *testing.T) {
+	c := &cobra.Command{Use: "x", Run: func(*cobra.Command, []string) {}}
+	var tags []string
+	var apply bool
+	var out string
+	c.Flags().StringSliceVar(&tags, "tag", nil, "")
+	c.Flags().BoolVar(&apply, "apply", false, "")
+	c.Flags().StringVar(&out, "out", "", "")
+	if err := c.ParseFlags([]string{"--tag", "a", "--tag", "b c", "--apply"}); err != nil {
+		t.Fatal(err)
+	}
+	want := `x --apply='true' --tag='a' --tag='b c'`
+	if got := rerunLine(c); got != want {
+		t.Fatalf("want %s\ngot  %s", want, got)
 	}
 }

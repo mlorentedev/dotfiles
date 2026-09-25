@@ -173,9 +173,9 @@ func splitRecord(raw []byte) (front []byte, body string, err error) {
 
 // parseSkills reads either shape:
 //
-//	skills: [audit, verification-before-completion]      # legacy, no severity
+//	skills: [adversarial-review, cyclomatic-complexity]  # legacy, no severity
 //	skills:                                              # this spec's form
-//	  - id: audit
+//	  - id: adversarial-review
 //	    enforce: block
 //
 // A string entry yields EnforceUnset rather than a default. An entry that is

@@ -43,7 +43,7 @@ flowchart LR
 
 ## Conventions (from ADR-028)
 
-- Managed secrets live in the Bitwarden folders **`Dotfiles/apps`** and **`Dotfiles/infra`** — single folders whose names contain a slash; Bitwarden has no real hierarchy. The ~160 personal items are out of `dotf secrets`' bounds.
+- Managed secrets live in the Bitwarden folders **`Dotfiles/apps`**, **`Dotfiles/infra`** and **`Dotfiles/personal`**, one per plane. Each is a single folder whose name contains a slash; Bitwarden has no real hierarchy. The ~160 personal logins the registry does not declare are out of `dotf secrets`' bounds.
 - The **registry** `secrets/registry.yaml` is the SSOT: `id → bw item/field → env|file → consumers → rotate`.
 - **Values never render into an unintended channel** — a log, a chat/AI conversation, a shared terminal, CI output; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`). `dotf secrets show`/`run` are the deliberate, interactive-terminal-only exceptions this convention doesn't forbid — the rule is against accidental exposure, not against the primitives that exist specifically to show or use a value.
 
@@ -52,7 +52,7 @@ flowchart LR
 When a new API key/token/credential enters the system:
 
 1. Decide the **plane**: `app` (service key) / `infra` (access) / `personal` / `floor` (needed before bw — rare).
-2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). Only **`Dotfiles/apps`** and **`Dotfiles/infra`** are legal `bw.folder` values (`validBWFolders`), and each plane has exactly one (`planeFolder`); `floor` and `personal` have no folder, and the registry refuses one on either: a floor secret's `bw:` block, when it has one, is a convenience copy of an authority kept elsewhere (`AGE_KEY_PERSONAL`), and no personal-plane folder is ratified yet (#586).
+2. Create the Bitwarden item under the folder for that plane, named `<service>-<purpose>` (kebab). The legal `bw.folder` values are **`Dotfiles/apps`**, **`Dotfiles/infra`** and **`Dotfiles/personal`** (`validBWFolders`), and each plane has exactly the one named after it (`planeFolder`). `floor` has no folder, and the registry refuses one: a floor secret's `bw:` block, when it has one, is a convenience copy of an authority kept elsewhere (`AGE_KEY_PERSONAL`).
    - single value → item password; multi-value → custom fields (kebab names).
    - `dotf secrets set <id> --yes` creates the item in its declared folder (value via stdin or hidden prompt).
 3. Add a **registry** entry: `{id, plane, backend: bw, bw:{folder,item,field}, expose:{env|file}, consumers, rotate}`.

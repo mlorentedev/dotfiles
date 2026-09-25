@@ -85,7 +85,14 @@ func ValidDispatchName(s string) bool {
 // the journal, for the reason documented there: character-mapping alone
 // collides, and a collision here would answer one session's lookup with another
 // session's dispatch — a wrong persona, which is worse than none.
+//
+// A session with no id has no map, for the reason StatePath gives: the empty
+// scope would otherwise be one shared file, and a dispatch recorded by one
+// session would answer another's lookup with a persona it never dispatched.
 func DispatchPath(stateDir, sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
 	return filepath.Join(stateDir, "gate", scopeKey(sessionID)+".dispatch.json")
 }
 
@@ -138,6 +145,9 @@ func LoadDispatched(path string) map[string]string {
 // Latest-wins on a reused name: the most recent dispatch is the one whose calls
 // are arriving.
 func RecordDispatch(path, name, agentType string) error {
+	if path == "" {
+		return nil
+	}
 	name = strings.TrimSpace(name)
 	agentType = strings.TrimSpace(agentType)
 	if agentType == "" {

@@ -84,3 +84,43 @@ func TestMemProjectKey(t *testing.T) {
 		})
 	}
 }
+
+// #1606 end to end: run from the vault checkout with a project's MEMORY.md and no
+// --thread, handoff-write must refuse and leave every thread byte-identical,
+// including the one whose key the vault's branch would have produced.
+func TestMemHandoffWriteFromAnotherRepositoryTouchesNoThread(t *testing.T) {
+	vault := filepath.Join(t.TempDir(), "knowledge")
+	if err := os.MkdirAll(filepath.Join(vault, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vault, ".git", "HEAD"), []byte("ref: refs/heads/master\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	memory := filepath.Join(vault, "10_projects", "dotfiles", "memory", "MEMORY.md")
+	if err := os.MkdirAll(filepath.Dir(memory), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	host, _ := os.Hostname()
+	host, _, _ = strings.Cut(strings.ToLower(host), ".")
+	before := "# M\n\n## Session Handoff\n\n### thread: master@" + host + "\n\nanother session's block\n"
+	if err := os.WriteFile(memory, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(vault)
+
+	cmd := newMemCmd()
+	cmd.SetArgs([]string{"handoff-write", "--memory", memory})
+	cmd.SetIn(bytes.NewBufferString("**Next action:** this session's handoff\n"))
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	if err := cmd.Execute(); err == nil {
+		t.Error("handoff-write keyed a dotfiles thread from the vault's branch; want a refusal naming --thread")
+	}
+	after, err := os.ReadFile(memory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != before {
+		t.Errorf("MEMORY.md changed:\n--- got ---\n%s\n--- want ---\n%s", after, before)
+	}
+}

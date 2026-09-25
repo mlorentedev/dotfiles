@@ -53,7 +53,12 @@ It is the only writer of the ` + "`hooks`" + ` key. A setup script that also ass
 it will delete whatever it does not know about, which is what this replaced.
 
 Re-running is idempotent: an unchanged file is not rewritten, and a CHANGED
-command replaces our entry in place rather than appending a second one.`,
+command replaces our entry in place rather than appending a second one.
+
+A target whose format is hooks-json (agy) is a document of NAMED hooks. It is
+owned by name rather than by marker, and only that one name is ever written.
+A target can also retire a hook it used to emit into another file, so moving a
+hook does not leave the old entry firing where it no longer parses.`,
 		Example: `  dotf harness bind
   dotf harness bind --harness claude
   dotf harness bind --dry-run`,
@@ -123,7 +128,7 @@ func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home,
 				continue
 			}
 		}
-		changed, err := bindOne(t, home, binary, dryRun)
+		changed, retired, err := bindOne(t, home, binary, dryRun)
 		if err != nil {
 			return fmt.Errorf("%s: %w", t.Agent, err)
 		}
@@ -137,18 +142,101 @@ func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home,
 		default:
 			_, _ = fmt.Fprintf(out, "bind %s: %s\n", t.Agent, t.File)
 		}
+		for _, r := range retired {
+			verb := "retire"
+			if dryRun {
+				verb = "would retire"
+			}
+			_, _ = fmt.Fprintf(out, "%s %s: %s (%s on %s)\n", verb, t.Agent, r.File, r.ID, r.Event)
+		}
 	}
 	return nil
 }
 
-// bindOne merges one target's hooks into its settings file.
-func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, error) {
+// bindOne merges one target's hooks into its settings file, then retires the
+// hooks the target says it no longer emits. It reports whether the file changed
+// and which retirements took effect.
+//
+// The new home is written BEFORE the old entry is retired. The other order would
+// leave a harness with no hook at all if the write failed halfway, and a gate that
+// is briefly doubled is the smaller harm than one that is briefly absent.
+func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, []harness.RetiredHook, error) {
 	cmds, err := t.HookCommands(binary)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	path := filepath.Join(home, filepath.FromSlash(t.File))
 
+	doc, err := readSettingsDoc(path)
+	if err != nil {
+		return false, nil, err
+	}
+
+	var (
+		merged  map[string]any
+		changed bool
+	)
+	// STRICT, with no default arm that falls back to claude's shape. That fallback
+	// is exactly how a format this code did not know would be written into a file
+	// of a different shape, and an unknown format is a refusal, not a guess.
+	switch t.Format {
+	case "command-hook", "":
+		merged, changed, err = harness.MergeHooks(doc, cmds)
+	case harness.NamedHooksFormat:
+		merged, changed, err = harness.MergeNamedHooks(doc, harness.BindMarker, cmds)
+	default:
+		return false, nil, fmt.Errorf("unsupported bind format %q for %s", t.Format, t.Agent)
+	}
+	if err != nil {
+		return false, nil, err
+	}
+	if changed && !dryRun {
+		if err := writeSettingsAtomically(path, merged); err != nil {
+			return false, nil, err
+		}
+	}
+
+	var retired []harness.RetiredHook
+	for _, r := range t.Retire {
+		did, err := retireOne(home, r, dryRun)
+		if err != nil {
+			return changed, retired, err
+		}
+		if did {
+			retired = append(retired, r)
+		}
+	}
+	return changed, retired, nil
+}
+
+// retireOne removes one retired hook from its file, reporting whether it was
+// there. An absent file is nothing to retire and is NOT created: retiring must
+// never bring a file into being.
+func retireOne(home string, r harness.RetiredHook, dryRun bool) (bool, error) {
+	path := filepath.Join(home, filepath.FromSlash(r.File))
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("stat %s: %w", path, err)
+	}
+	doc, err := readSettingsDoc(path)
+	if err != nil {
+		return false, err
+	}
+	pruned, changed := harness.RetireHooks(doc, r.Event, r.ID)
+	if !changed || dryRun {
+		return changed, nil
+	}
+	if err := writeSettingsAtomically(path, pruned); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// readSettingsDoc decodes a settings file. An absent or blank file is an empty
+// document: there is nothing to preserve, so bootstrapping is fine.
+func readSettingsDoc(path string) (map[string]any, error) {
 	doc := map[string]any{}
 	raw, readErr := os.ReadFile(path) // #nosec G304 -- path comes from the manifest's own declaration
 	switch {
@@ -157,28 +245,17 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, erro
 			if err := json.Unmarshal(raw, &doc); err != nil {
 				// Refuse rather than bootstrap over it. A settings file that is
 				// present but unparseable is a file someone is editing, and
-				// replacing it loses their work — the opposite of the merge's
+				// replacing it loses their work - the opposite of the merge's
 				// whole purpose.
-				return false, fmt.Errorf("%s is not valid JSON, refusing to overwrite it: %w", path, err)
+				return nil, fmt.Errorf("%s is not valid JSON, refusing to overwrite it: %w", path, err)
 			}
 		}
 	case os.IsNotExist(readErr):
 		// Bootstrapping an absent file is fine: there is nothing to preserve.
 	default:
-		return false, fmt.Errorf("read %s: %w", path, readErr)
+		return nil, fmt.Errorf("read %s: %w", path, readErr)
 	}
-
-	merged, changed, err := harness.MergeHooks(doc, cmds)
-	if err != nil {
-		return false, err
-	}
-	if !changed || dryRun {
-		return changed, nil
-	}
-	if err := writeSettingsAtomically(path, merged); err != nil {
-		return false, err
-	}
-	return true, nil
+	return doc, nil
 }
 
 // writeSettingsAtomically renders doc and replaces path with it in one step.
@@ -208,7 +285,14 @@ func writeSettingsAtomically(path string, doc map[string]any) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close %s: %w", tmpName, err)
 	}
-	if err := os.Chmod(tmpName, 0o600); err != nil {
+	// An existing file keeps its mode: a file we share with another tool (agy's
+	// hooks.json is written by Orca too) is not ours to re-permission. A new one
+	// starts private.
+	mode := os.FileMode(0o600)
+	if fi, statErr := os.Stat(path); statErr == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
 		return fmt.Errorf("chmod %s: %w", tmpName, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {

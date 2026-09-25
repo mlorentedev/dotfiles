@@ -1402,3 +1402,164 @@ EOF
     refute_grep_fixed 'full-only:' "$FAKEHOME/.gemini/GEMINI.md"
     refute_grep_fixed 'full-only:' "$REPO/TARGET.md"
 }
+
+
+# GUARD: a capped surface receives pure ASCII, so the cap's unit cannot matter.
+#
+# The first normaliser folded typographic punctuation and deliberately left the
+# section sign and the accent alone, on the ground that folding them "changes a
+# word". Measured 2026-09-24 that left 7 non-ASCII characters in a file sitting 23
+# characters under its cap: `wc -m` and `wc -c` disagreed, and a consumer that
+# counts bytes against the platform's 12000 would have been over it. An ASCII
+# file has bytes == chars by construction, so this asserts the ASCII property
+# itself rather than either count.
+#
+# The whole FILE is asserted, not just the payload: the BEGIN marker and the
+# preamble are written by the script after the payload is folded, and they were
+# where the last two characters hid.
+@test "doctrine: a capped surface is folded to pure ASCII, marker and preamble included" {
+    seed_doctrine_fixture
+    # Hex escapes: this file stays ASCII too. section sign, a-acute, em dash,
+    # curly double quotes, ellipsis, arrow.
+    printf -- '- see \xc2\xa74 and \xc2\xa71 for bit\xc3\xa1cora \xe2\x80\x94 not \xe2\x80\x9cquoted\xe2\x80\x9d\xe2\x80\xa6 \xe2\x86\x92 next\n' \
+        > "$REPO/harness/enforced/demo.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+
+    local f="$FAKEHOME/.gemini/GEMINI.md"
+    grep -qF 'see Section 4 and Section 1 for bitacora -- not "quoted"... -> next' "$f"
+    # No byte outside ASCII anywhere in the file, which is what makes the two
+    # counts agree whatever locale the consumer measures in.
+    [ "$(LC_ALL=C tr -d '\000-\177' < "$f" | wc -c | tr -d ' ')" -eq 0 ]
+    [ "$(LC_ALL=C wc -c < "$f" | tr -d ' ')" -eq "$(LC_ALL=C wc -m < "$f" | tr -d ' ')" ]
+}
+
+# GUARD: what the fold does not know is reported, never guessed at.
+#
+# A catch-all that replaced unknown bytes with `?` would corrupt a word silently
+# and pass every size check. Leaving the character in place and naming it by its
+# bytes lets a human extend the table on purpose.
+@test "doctrine: a character the fold does not know survives and is reported by its bytes" {
+    seed_doctrine_fixture
+    printf -- '- tick \xe2\x9c\x93 done\n' > "$REPO/harness/enforced/demo.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+    [[ "$output" == *"non-ASCII survives the fold"* ]]
+    [[ "$output" == *"e29c93"* ]]
+    grep -q 'tick' "$FAKEHOME/.gemini/GEMINI.md"
+}
+
+# GUARD: the line this script used to write into a new rules file is ASCII now,
+# in files it already wrote, and nothing else in them is touched.
+#
+# The file is created once and then belongs to the user, so it is never rewritten
+# wholesale. But a line that is byte-for-byte what the script wrote is the
+# script's, and leaving it keeps the file from being ASCII. Exact-line adoption,
+# the same rule bind uses for a hook it did not mark: a user's own line that only
+# resembles it must survive.
+@test "doctrine: the old em-dash preamble is migrated to ASCII and the user's own lines are left alone" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    mkdir -p "$FAKEHOME/.gemini"
+    printf '# Global rules\n\n> Cross-agent doctrine. The marked region is generated \xe2\x80\x94 edit the vault pattern and re-run setup.\n\nmy rule \xe2\x80\x94 with a dash of my own\n> Cross-agent doctrine. The marked region is generated \xe2\x80\x94 edit the vault pattern and re-run setup, my variant.\n' \
+        > "$FAKEHOME/.gemini/GEMINI.md"
+    run_deploy; [ "$status" -eq 0 ]
+
+    local f="$FAKEHOME/.gemini/GEMINI.md" dash
+    dash="$(printf '\xe2\x80\x94')"
+    grep -qxF '> Cross-agent doctrine. The marked region is generated; edit the vault pattern and re-run setup.' "$f"
+    # the exact legacy line is gone; the user's near-copy and their own rule stay
+    refute_grep_fixed "> Cross-agent doctrine. The marked region is generated $dash edit the vault pattern and re-run setup." "$f"
+    grep -qF "my rule $dash with a dash of my own" "$f"
+    grep -qF "re-run setup, my variant." "$f"
+
+    # and a second run changes nothing
+    local before; before="$(md5sum < "$f")"
+    run_deploy; [ "$status" -eq 0 ]
+    [ "$(md5sum < "$f")" = "$before" ]
+}
+
+# GUARD: the committed doctrine leaves the capped agy surface real headroom.
+#
+# The platform caps GEMINI.md at 12000 characters and the warning only fires
+# ABOVE the cap, so a file 23 characters under it was a green build sitting on
+# the edge. 8000 keeps 4000 characters in hand for the user's own rules and for
+# growth. This runs the COMMITTED records and the COMMITTED persona roster through
+# the real deploy, so a new doctrine id, a longer record or a new persona that
+# spends the headroom fails in the change that did it, not on a machine after
+# setup. Shorten the largest record (`wc -m harness/enforced/*.md | sort -rn`), or
+# fence its exceptions and rationale with full-only markers: they stay in
+# AGENTS.md and leave the capped surface.
+@test "doctrine: the committed records keep the capped agy surface under 8000 characters" {
+    seed_doctrine_fixture
+    local real="$BATS_TEST_DIRNAME/.." tmp
+    rm -f "$REPO/harness/enforced/demo.md"
+    cp "$real"/harness/enforced/*.md "$REPO/harness/enforced/"
+    rm -rf "$REPO/harness/agents"
+    cp -r "$real/harness/agents" "$REPO/harness/agents"
+    tmp="$(mktemp)"
+    jq --slurpfile real "$real/harness/manifest.json" '.doctrine = $real[0].doctrine' \
+        "$REPO/harness/manifest.json" > "$tmp" && mv "$tmp" "$REPO/harness/manifest.json"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+
+    local f="$FAKEHOME/.gemini/GEMINI.md" chars
+    chars="$(LC_ALL=C wc -m < "$f" | tr -d ' ')"
+    [ "$(LC_ALL=C tr -d '\000-\177' < "$f" | wc -c | tr -d ' ')" -eq 0 ] || { echo "GEMINI.md is not pure ASCII"; return 1; }
+    [ "$chars" -lt 8000 ] || { echo "GEMINI.md is $chars characters; the budget is 8000 (platform cap 12000)"; return 1; }
+}
+
+
+# GUARD: --refresh refuses a trigger whose pattern the vault does not have.
+#
+# Measured 2026-09-24: 8 of the 18 shipped triggers named patterns that were
+# never written or had been renamed. Each still fired and routed work, and the
+# prompt hook printed the missing name as its evidence, so a session went looking
+# for a file that did not exist. Nothing said so, because the file is only read by
+# code that treats the name as an opaque string.
+#
+# --refresh is the one mode that has the vault, which makes it the only place
+# this can be checked; --check is offline and CI has no vault. It fails BEFORE
+# writing anything: a refresh that stopped halfway would leave the records fresh
+# and the targets stale, which is the drift --check exists to catch.
+seed_triggers() {
+    printf '{"version":1,"triggers":[{"id":"demo-trigger","pattern":"%s","globs":["*.demo"],"skills":["x"]}]}\n' "$1" \
+        > "$REPO/harness/triggers.json"
+}
+
+@test "triggers: --refresh passes when every trigger names a pattern the vault has" {
+    seed_triggers test-pattern
+    run_refresh; [ "$status" -eq 0 ]
+    [[ "$output" == *"every pattern named in harness/triggers.json exists in the vault"* ]]
+}
+
+@test "triggers: --refresh fails naming the trigger and pattern, and writes nothing" {
+    seed_triggers pattern-does-not-exist
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'trigger "demo-trigger" names pattern "pattern-does-not-exist"'* ]]
+    [ ! -f "$REPO/harness/enforced/demo.md" ]
+}
+
+# HARNESS-148: the guard must not report green when it examined nothing. jq
+# runs inside a process substitution, so its parse error never reached the
+# loop's status: an unreadable file iterated zero times and printed the
+# "every pattern exists" line, exit 0. So did a file naming no pattern.
+@test "triggers: --refresh refuses a triggers file it cannot read, and writes nothing" {
+    printf '{ this is not json' > "$REPO/harness/triggers.json"
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"harness/triggers.json"*"cannot be read"* ]]
+    printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/refresh.out"
+    refute_grep_fixed 'every pattern named in harness/triggers.json exists' "$BATS_TEST_TMPDIR/refresh.out"
+    [ ! -f "$REPO/harness/enforced/demo.md" ]
+}
+
+@test "triggers: --refresh refuses a triggers file that names no pattern" {
+    printf '{"version":1,"triggers":[]}\n' > "$REPO/harness/triggers.json"
+    run_refresh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"names no pattern"* ]]
+    printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/refresh.out"
+    refute_grep_fixed 'every pattern named in harness/triggers.json exists' "$BATS_TEST_TMPDIR/refresh.out"
+}

@@ -217,6 +217,45 @@ func TestBindAppendsTheGateBesideOrcasPreToolUseGroup(t *testing.T) {
 	}
 }
 
+// HARNESS-149: the bind keeps the mode of a Claude settings file it rewrites. S4
+// stopped forcing 0600 on every write, because every target is also written by
+// another tool: Claude Code and Orca write ~/.claude/settings.json. Only agy's
+// case was pinned, so a regression on this target would have passed.
+func TestBindKeepsTheModeOfTheClaudeSettingsItRewrites(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	home, raw, _ := bindFixture(t, liveShapedSettings)
+	path := filepath.Join(home, ".claude", "settings.json")
+	if err := os.Chmod(path, 0o664); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := captureRealStreams(t, "harness", "bind",
+		"--harness", "claude", "--repo-root", repoRootForTest(t), "--home", home, "--dotf-path", raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) == string(before) {
+		t.Fatal("the fixture needed no change, so the write path was never exercised")
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o664 {
+		t.Errorf("the bind re-permissioned a settings file other tools also write: mode %v, want 0664", got)
+	}
+}
+
 // TestBindIsIdempotent is the doctrine's changed=0 on re-run, asserted on bytes
 // rather than on the command's own report.
 func TestBindIsIdempotent(t *testing.T) {
@@ -411,3 +450,260 @@ func contains(hay []string, needle string) bool {
 }
 
 func containsSub(s, sub string) bool { return indexOf(s, sub) >= 0 }
+
+// liveShapedAgyHooks mirrors ~/.gemini/config/hooks.json as measured 2026-09-24:
+// Orca's group and nothing else. It is the file agy reads its hooks from; agy's
+// own log reports it on every start ("loaded 1 named hooks from 1 hooks.json
+// file(s)").
+const liveShapedAgyHooks = `{
+  "orca-status": {
+    "PreInvocation":  [{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}],
+    "PostInvocation": [{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}],
+    "Stop":           [{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}],
+    "PreToolUse":     [{"matcher":"*","hooks":[{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}]}],
+    "PostToolUse":    [{"matcher":"*","hooks":[{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}]}]
+  }
+}
+`
+
+// liveShapedGeminiSettings is what ~/.gemini/settings.json held before the agy
+// binding moved: Orca's Gemini CLI hooks, plus the gate the first binding wrote
+// there on the belief that agy reads this file. It does not; Gemini CLI does.
+const liveShapedGeminiSettings = `{
+  "hooks": {
+    "BeforeTool": [
+      {"hooks":[{"type":"command","command":"sh /o/gemini-hook.sh","timeout":10000}]},
+      {"hooks":[{"_managed":"dotfiles-harness:gate","command":"DOTF harness gate --harness agy","timeout":5,"type":"command"}]}
+    ],
+    "AfterTool": [{"hooks":[{"type":"command","command":"sh /o/gemini-hook.sh","timeout":10000}]}]
+  },
+  "theme": "dark"
+}
+`
+
+// agyBindFixture lays out a home the way the measured machine looked and puts a
+// stand-in `agy` on PATH: the target is emitted only when the binary is
+// installed, and a test that needs the real one would pass on one machine only.
+func agyBindFixture(t *testing.T, hooksJSON, settings string) (home, dotf string) {
+	t.Helper()
+	home = t.TempDir()
+	raw := filepath.Join(home, ".local", "bin", dotfBinaryName())
+	dotf = hookBinaryToken(raw, runtime.GOOS)
+
+	write := func(rel, body string, mode os.FileMode) {
+		p := filepath.Join(home, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), mode); err != nil {
+			t.Fatal(err)
+		}
+		// WriteFile honours the umask; the mode under test has to be exact.
+		if err := os.Chmod(p, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if hooksJSON != "" {
+		write(".gemini/config/hooks.json", hooksJSON, 0o664)
+	}
+	if settings != "" {
+		encoded, err := json.Marshal(dotf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		write(".gemini/settings.json", replaceAll(settings, `"DOTF`, string(encoded[:len(encoded)-1])), 0o600)
+	}
+
+	bin := t.TempDir()
+	name := "agy"
+	if runtime.GOOS == "windows" {
+		name = "agy.exe"
+	}
+	if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return home, raw
+}
+
+func readJSONFile(t *testing.T, path string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("%s is not valid JSON after bind: %v", path, err)
+	}
+	return doc
+}
+
+func bindAgy(t *testing.T, home, raw string, extra ...string) (string, error) {
+	t.Helper()
+	args := append([]string{"harness", "bind", "--harness", "agy", "--repo-root", repoRootForTest(t),
+		"--home", home, "--dotf-path", raw}, extra...)
+	stdout, _, err := captureRealStreams(t, args...)
+	return stdout, err
+}
+
+// TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry is the defect the
+// audit found, end to end on the shape of the measured files.
+//
+// The first binding wrote the agy gate into ~/.gemini/settings.json because that
+// file declares BeforeTool. It is Gemini CLI's file. agy reads
+// ~/.gemini/config/hooks.json, so the hook never ran under agy, and had it run,
+// the payload would not have parsed.
+func TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry(t *testing.T) {
+	home, raw := agyBindFixture(t, liveShapedAgyHooks, liveShapedGeminiSettings)
+	dotf := hookBinaryToken(raw, runtime.GOOS)
+	hooksPath := filepath.Join(home, ".gemini", "config", "hooks.json")
+	settingsPath := filepath.Join(home, ".gemini", "settings.json")
+	orcaBefore, _ := json.Marshal(readJSONFile(t, hooksPath)["orca-status"])
+
+	stdout, err := bindAgy(t, home, raw)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	if !containsSub(stdout, "bind agy: .gemini/config/hooks.json") {
+		t.Errorf("the emission was not reported: %q", stdout)
+	}
+	if !containsSub(stdout, "retire agy: .gemini/settings.json") {
+		t.Errorf("the retirement was not reported: %q", stdout)
+	}
+
+	// hooks.json: ours beside Orca's, Orca's untouched.
+	doc := readJSONFile(t, hooksPath)
+	orcaAfter, _ := json.Marshal(doc["orca-status"])
+	if string(orcaBefore) != string(orcaAfter) {
+		t.Errorf("Orca's group was altered:\nbefore %s\nafter  %s", orcaBefore, orcaAfter)
+	}
+	ours, _ := doc["dotfiles-harness"].(map[string]any)
+	groups, _ := ours["PreToolUse"].([]any)
+	if len(groups) != 1 {
+		t.Fatalf("the gate was not emitted under our name: %v", doc)
+	}
+	handler := groups[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)
+	if handler["command"] != dotf+" harness gate --harness agy" {
+		t.Errorf("command = %v, want the gate on the binary bind was told about", handler["command"])
+	}
+	if handler["timeout"] != float64(5) {
+		t.Errorf("timeout = %v, want 5: an unbounded hook stalls every tool call", handler["timeout"])
+	}
+	if runtime.GOOS != "windows" {
+		if fi, err := os.Stat(hooksPath); err != nil || fi.Mode().Perm() != 0o664 {
+			t.Errorf("a file shared with another tool keeps its mode, got %v (err %v)", fi.Mode().Perm(), err)
+		}
+	}
+
+	// settings.json: the old gate is gone, everything else of Gemini CLI's stays.
+	settings := readJSONFile(t, settingsPath)
+	if cmds := hookCommands(t, settings, "BeforeTool"); len(cmds) != 1 || cmds[0] != "sh /o/gemini-hook.sh" {
+		t.Errorf("BeforeTool should hold only Orca's hook after retirement, got %v", cmds)
+	}
+	if cmds := hookCommands(t, settings, "AfterTool"); len(cmds) != 1 {
+		t.Errorf("an event we never touched was altered: %v", cmds)
+	}
+	if settings["theme"] != "dark" {
+		t.Errorf("an unrelated setting was lost: %v", settings)
+	}
+}
+
+func TestBindAgyIsIdempotent(t *testing.T) {
+	home, raw := agyBindFixture(t, liveShapedAgyHooks, liveShapedGeminiSettings)
+	if _, err := bindAgy(t, home, raw); err != nil {
+		t.Fatalf("first bind: %v", err)
+	}
+	read := func() (string, string) {
+		h, _ := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json"))
+		s, _ := os.ReadFile(filepath.Join(home, ".gemini", "settings.json"))
+		return string(h), string(s)
+	}
+	h1, s1 := read()
+
+	stdout, err := bindAgy(t, home, raw)
+	if err != nil {
+		t.Fatalf("second bind: %v", err)
+	}
+	h2, s2 := read()
+	if h1 != h2 || s1 != s2 {
+		t.Errorf("a re-run rewrote a file")
+	}
+	if !containsSub(stdout, "already current") {
+		t.Errorf("a no-op run did not say so: %q", stdout)
+	}
+	if containsSub(stdout, "retire") {
+		t.Errorf("nothing is left to retire on a re-run: %q", stdout)
+	}
+}
+
+func TestBindAgyBootstrapsAnAbsentHooksFileAndCreatesNothingToRetire(t *testing.T) {
+	home, raw := agyBindFixture(t, "", "")
+	if _, err := bindAgy(t, home, raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	doc := readJSONFile(t, filepath.Join(home, ".gemini", "config", "hooks.json"))
+	if len(doc) != 1 || doc["dotfiles-harness"] == nil {
+		t.Errorf("a new file should hold only our hook, got %v", doc)
+	}
+	// Retiring must never bring a file into being.
+	if _, err := os.Stat(filepath.Join(home, ".gemini", "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("settings.json must not be created just to retire something from it (err %v)", err)
+	}
+}
+
+// The new home is written before the old entry is retired. If it cannot be
+// written, the old entry must still be there: a gate briefly doubled is the
+// smaller harm than one that is briefly absent.
+func TestBindAgyDoesNotRetireWhenTheNewHomeCannotBeWritten(t *testing.T) {
+	home, raw := agyBindFixture(t, "{ this is not json", liveShapedGeminiSettings)
+	settingsPath := filepath.Join(home, ".gemini", "settings.json")
+	before, _ := os.ReadFile(settingsPath)
+
+	if _, err := bindAgy(t, home, raw); err == nil {
+		t.Fatal("an unparseable hooks.json must be refused, not overwritten")
+	}
+	after, _ := os.ReadFile(settingsPath)
+	if string(before) != string(after) {
+		t.Error("the old entry was retired although the new home was never written")
+	}
+	if b, _ := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json")); string(b) != "{ this is not json" {
+		t.Errorf("a file someone is editing was overwritten: %q", b)
+	}
+}
+
+func TestBindAgyDryRunWritesNothing(t *testing.T) {
+	home, raw := agyBindFixture(t, liveShapedAgyHooks, liveShapedGeminiSettings)
+	hooksBefore, _ := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json"))
+	settingsBefore, _ := os.ReadFile(filepath.Join(home, ".gemini", "settings.json"))
+
+	stdout, err := bindAgy(t, home, raw, "--dry-run")
+	if err != nil {
+		t.Fatalf("bind --dry-run: %v", err)
+	}
+	if !containsSub(stdout, "would update agy") || !containsSub(stdout, "would retire agy") {
+		t.Errorf("a dry run must say what it would do: %q", stdout)
+	}
+	hooksAfter, _ := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json"))
+	settingsAfter, _ := os.ReadFile(filepath.Join(home, ".gemini", "settings.json"))
+	if string(hooksBefore) != string(hooksAfter) || string(settingsBefore) != string(settingsAfter) {
+		t.Error("a dry run wrote a file")
+	}
+}
+
+// An unknown format is a refusal. The previous default arm handed it to claude's
+// merge, which is how a format this code did not know would have been written into
+// a file of another shape.
+func TestBindOneRefusesAFormatItDoesNotKnow(t *testing.T) {
+	home := t.TempDir()
+	target := harness.BindTarget{
+		Agent: "future", File: ".future/hooks.json", Format: "hooks-yaml", Matcher: true,
+		EmitHooks: []harness.EmitHook{{ID: "gate", Event: "PreToolUse", Command: "harness gate", Timeout: 5}},
+	}
+	if _, _, err := bindOne(target, home, "/opt/dotf", false); err == nil || !containsSub(err.Error(), "unsupported bind format") {
+		t.Fatalf("want an unsupported-format refusal, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".future", "hooks.json")); !os.IsNotExist(err) {
+		t.Errorf("a refused format must not create a file (err %v)", err)
+	}
+}
