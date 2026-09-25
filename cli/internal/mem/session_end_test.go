@@ -242,3 +242,45 @@ func TestSessionEndArchivesPerWorktreeRatherThanOverEachOther(t *testing.T) {
 		t.Errorf("archive name %q diverges from JournalName %q", filepath.Base(wroteA), want)
 	}
 }
+
+// TestSessionEndLeavesAnAuthoredJournalByteIdentical is #1620. The hook and the
+// /handoff skill name the same file (JournalName, on purpose: one record per
+// session), and the hook wrote it with a truncating os.WriteFile. So every
+// session that ran /handoff lost its journal to a copy of the MEMORY block when
+// it ended, and the result looked like success. The hook is the fallback for a
+// session that wrote no journal; it never replaces one. The other half of the
+// contract, a session with no journal still getting its record, is
+// TestSessionEnd_HappyPath.
+func TestSessionEndLeavesAnAuthoredJournalByteIdentical(t *testing.T) {
+	vault := t.TempDir()
+	writeMemory(t, vault, "# P\n\n## Session Handoff\n\n**Last task:** shipped.\n")
+	sessions := filepath.Join(vault, "10_projects", "proj", "sessions")
+	if err := os.MkdirAll(sessions, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cwd := "/home/me/proj"
+	journal := filepath.Join(sessions, JournalName(fixedNow.Format("2006-01-02"), "proj", "claude", ThreadKey(cwd)))
+	authored := "---\nid: session-2026-06-23-proj-claude\ntype: session\nstatus: active\n---\n\n## Context & Objectives\n\nWritten by /handoff.\n"
+	if err := os.WriteFile(journal, []byte(authored), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	payload, err := json.Marshal(map[string]string{"cwd": cwd, "session_id": "sid-9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	written, err := SessionEnd(payload, vault, fixedNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if written != "" {
+		t.Errorf("SessionEnd reported writing %q over a journal that already existed", written)
+	}
+	got, err := os.ReadFile(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != authored {
+		t.Errorf("the authored journal was changed:\n--- got ---\n%s\n--- want ---\n%s", got, authored)
+	}
+}
