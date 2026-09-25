@@ -72,22 +72,44 @@ func ParseTriggers(data []byte) (*TriggerConfig, error) {
 	return &cfg, nil
 }
 
-// MatchPaths evaluates paths against trigger rules and returns sorted unique pattern IDs.
-func MatchPaths(triggers []TriggerRule, paths []string) []string {
-	matched := make(map[string]struct{})
+// matchedPathRules returns every rule with a glob matching at least one of the
+// paths, once each, in declaration order.
+//
+// Rules are the unit here, not patterns: two rules may name the same pattern
+// (`pattern-language-standards` serves both the complexity rule and the Go
+// rule), and a caller that only learns the PATTERN cannot tell which rule
+// matched.
+func matchedPathRules(triggers []TriggerRule, paths []string) []TriggerRule {
+	var matched []TriggerRule
+	seen := make(map[int]struct{})
 	for _, p := range paths {
 		norm := filepath.ToSlash(strings.TrimSpace(p))
 		norm = strings.TrimPrefix(strings.TrimPrefix(norm, "./"), "/")
 		if norm == "" || norm == "/dev/null" || norm == "dev/null" {
 			continue
 		}
-		for _, rule := range triggers {
+		for i, rule := range triggers {
+			if _, done := seen[i]; done {
+				continue
+			}
 			for _, glob := range rule.Globs {
 				if MatchGlob(glob, norm) {
-					matched[rule.Pattern] = struct{}{}
+					seen[i] = struct{}{}
+					matched = append(matched, rule)
 					break
 				}
 			}
+		}
+	}
+	return matched
+}
+
+// MatchPaths evaluates paths against trigger rules and returns sorted unique pattern IDs.
+func MatchPaths(triggers []TriggerRule, paths []string) []string {
+	matched := make(map[string]struct{})
+	for _, rule := range matchedPathRules(triggers, paths) {
+		if rule.Pattern != "" {
+			matched[rule.Pattern] = struct{}{}
 		}
 	}
 
@@ -280,13 +302,19 @@ func SuggestWithDeps(triggers []TriggerRule, prompt string, paths []string, deps
 		skillMap[s] = struct{}{}
 	}
 
-	// Also link skills mapped to triggered patterns
-	for _, rule := range triggers {
-		if _, ok := patMap[rule.Pattern]; ok {
-			for _, sk := range rule.Skills {
-				if sk != "" {
-					skillMap[sk] = struct{}{}
-				}
+	// Skills follow the RULES that matched, never the patterns those rules name.
+	// A prompt match already carries its own rule's skills (MatchPrompt); a path
+	// match is a rule too, so it contributes its own.
+	//
+	// This used to link every rule whose pattern had matched. That was the same
+	// thing only while each rule had a pattern to itself. Once two rules share
+	// one - a Go rule and a complexity rule both pointing at the language
+	// standards - a Python refactor prompt would also suggest golang-pro, because
+	// the sibling rule's pattern was "triggered".
+	for _, rule := range matchedPathRules(triggers, paths) {
+		for _, sk := range rule.Skills {
+			if sk != "" {
+				skillMap[sk] = struct{}{}
 			}
 		}
 	}
