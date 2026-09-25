@@ -17,10 +17,10 @@ created: "2026-09-25"
 
 ## S1 - doctrine and ASCII (AC1)
 
-- [ ] [AC1] Failing budget test on the committed records
-- [ ] [AC1] Slim `pr-stewardship`, `pr-sizing` and `secrets-never-in-output` to their binding rules in the vault and refresh the records
-- [ ] [AC1] Fold every capped surface to pure ASCII; name a character the fold does not know by its bytes
-- [ ] [AC1] Migrate the old em-dash preamble without touching a user's own lines
+- [x] [AC1] Failing budget test on the committed records
+- [x] [AC1] Slim `pr-stewardship`, `pr-sizing` and `secrets-never-in-output` to their binding rules in the vault and refresh the records
+- [x] [AC1] Fold every capped surface to pure ASCII; name a character the fold does not know by its bytes
+- [x] [AC1] Migrate the old em-dash preamble without touching a user's own lines
 
 ## S2 - triggers (AC2), after S1
 

@@ -17,7 +17,12 @@ Each slice PR fills its own section below and nothing else.
 
 ## S1 evidence
 
-_Filled by the S1 PR._
+- `go build`, `go vet` (linux and windows), `go test -count=1 ./...` (25 packages), `golangci-lint`, `shellcheck --severity=error`, `compile-harness.sh --check`, `check-bats-names.sh` and `check-doc-paths.sh`: all pass.
+- `bats tests/*.bats`, serial: 1597 run, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine.
+- AC1: `doctrine: the committed records keep the capped agy surface under 8000 characters` passes. The deployed `~/.gemini/GEMINI.md` is 7,798 characters and 7,798 bytes, down from 11,977 and 11,986.
+- Mutation: with `migrate_legacy_preamble` disabled, `doctrine: the old em-dash preamble is migrated ...` fails; restored, it passes.
+- `guard-bats-negation` caught a bare `!` assertion in this slice's first version of that test; it now uses `refute_grep_fixed`.
+- Executable production lines: `scripts/compile-harness.sh` +48 / -15 (comments and blank lines excluded).
 
 ## S2 evidence
 
