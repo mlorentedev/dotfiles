@@ -12,7 +12,7 @@
   },
   "autoCompactEnabled": true,
   "precomputeCompactionEnabled": true,
-  "autoCompactWindow": 800000,
+  "autoCompactWindow": 300000,
   "autoContinueAtUsageLimit": true,
   "cleanupPeriodDays": 90,
   "env": {
