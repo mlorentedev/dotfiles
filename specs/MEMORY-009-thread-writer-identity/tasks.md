@@ -15,12 +15,12 @@ created: "2026-09-25"
 
 ## Slice 1 - the stamp and the fork (one PR)
 
-- [ ] [AC4] Pin today's output first: a write with no agent is byte-identical to `WriteThread`'s
-- [ ] [AC3] Failing test, then implementation: a write by an agent stamps `(writer: <agent>)`, and a rewrite by the same agent replaces its own block in place
-- [ ] [AC1] Failing test, then implementation: another agent's stamped block is kept, and the write lands in `<key>+<agent>`
-- [ ] [AC1] Failing test, then implementation: an unstamped block whose `Journal:` line names another agent is kept the same way
-- [ ] [AC3] Failing test, then implementation: an unstamped block with no known writer is replaced in place and stamped
-- [ ] [AC2] Failing test, then implementation: `handoff-write --agent` names the key and both agents on stderr when it forks
+- [x] [AC4] Pin today's output first: a write with no agent is byte-identical to `WriteThread`'s
+- [x] [AC3] Failing test, then implementation: a write by an agent stamps `(writer: <agent>)`, and a rewrite by the same agent replaces its own block in place
+- [x] [AC1] Failing test, then implementation: another agent's stamped block is kept, and the write lands in `<key>+<agent>`
+- [x] [AC1] Failing test, then implementation: an unstamped block whose `Journal:` line names another agent is kept the same way
+- [x] [AC3] Failing test, then implementation: an unstamped block with no known writer is replaced in place and stamped
+- [x] [AC2] Failing test, then implementation: `handoff-write --agent` names the key and both agents on stderr when it forks
 
 ## Slice 2 - the skill passes the flag (after a release carrying `--agent` is installed)
 
@@ -29,9 +29,9 @@ created: "2026-09-25"
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks and lint pass
-- [ ] No unrelated changes in the diff
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks and lint pass
+- [x] No unrelated changes in the diff
 - [ ] `verification.md` filled in
 - [ ] Independent review before archiving (a change that closes a spec)
 
