@@ -44,7 +44,7 @@ created: "2026-09-25"
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] Independent review before archiving (a change that closes a spec)
+- [x] Independent review before archiving (a change that closes a spec)
 
 ## Machine-readable features
 

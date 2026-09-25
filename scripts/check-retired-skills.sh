@@ -47,6 +47,7 @@ files="$(list '[.agents.presence[]?.file, .skills.catalog.file?, .doctrine.deplo
 agent_dirs="$(list '.agents.deploy[]? | select(.render == "agent-md") | .dir')"
 [ -n "$deploy" ] || fail "the manifest declares no skills.deploy target, so nothing would be checked"
 [ -n "$files" ] || fail "the manifest declares no instruction file, so nothing would be checked"
+[ -n "$agent_dirs" ] || fail "the manifest renders no agent definition (agents.deploy, agent-md), so none would be checked"
 
 found=0
 while IFS=$'\t' read -r render dir; do

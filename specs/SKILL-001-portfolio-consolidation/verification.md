@@ -18,7 +18,7 @@ created: "2026-09-25"
 
 - `go build ./...`, `go vet ./...` (linux and windows), `go test -count=1 ./...`: pass.
 - `golangci-lint run ./...` (0 issues), `shellcheck --severity=error scripts/compile-harness.sh`, `compile-harness.sh --check` (no harness drift), `check-bats-names.sh`, `check-doc-paths.sh`, `check-md-escapes.sh`: all pass.
-- `bats tests/*.bats`, serial, re-run after the round-3 fixes: 1,607 run, 1,606 pass, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine. The five files this change touches were re-run on the final tree: 192 run, 0 failures (`verify-setup.bats` skips outside its integration container, so CI's container job is where its edited assertions run).
+- `bats tests/*.bats`, serial, re-run after the round-3 fixes: 1,607 run, 1,606 pass, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine. The bats files this change touches, the six f5 runs plus `verify-setup.bats`, were re-run at the round-4 fix: 201 run, 0 failures (`verify-setup.bats` skips outside its integration container, so CI's container job is where its edited assertions run).
 - Vault: `vault-validate.py` reports the same 65 issues on master and on this change; none is new.
 - TDD: `TestEverySkillTheRouterNamesHasARecord` was written first and failed, naming `project-maturation`, `writing-plans`, `audit`, `verification-before-completion`, `executing-plans` (all in `DefaultSkillDependencies`) and `enrich-us` (trigger `task-and-ticket-tracking`). It passed after the remap.
 - `TestRoleJoinDrift` (HARNESS-110) went red on the slimmed builder roster: 12 of 18 rules resolved, against a floor of 16. See the first decision below; after it, 16 of 18 resolve again. `TestResolveRoles` now expects `pr-review-triage` to resolve to reviewer and shipper.
@@ -107,6 +107,16 @@ Verdict **FAIL**, from nan/qwen3.8-flash on 2026-09-25. The review ran from 14:1
 | 6 | Minor, THEORETICAL. `pr-review-triage` at `enforce: warn` on the reviewer warns even when there is no PR to triage. | **Kept, as AC3 specifies.** Flattening it would switch off the gate on the reviewer's third duty, and a warning is not a block, so a surplus warning costs a line of output. |
 | 7 | Question. The routing guard counts how many rules resolve, not which ones. | **Accepted.** The schema-level exit is HARNESS-154 (#1713). |
 | 8 | Minor, SPECULATIVE. The hook names the domain skill first only because it sorts first. | **Recorded, no change.** The entry skill is advisory. Since HARNESS-147 (#1714) it is chosen through the prerequisites, and the alphabetical fallback is documented in `entrySkill`. |
+
+## Independent review, round 4
+
+Verdict **PASS-WITH-GAPS**, from nan/glm5.3-flash on 2026-09-25. It is the first round launched under HARNESS-152's deadline (#1721): the reviewer was told to aim for 16:30 and would have been stopped at 16:45. It ran from 16:00 to 16:17. The review found that round 3's minimum set was met, and it re-proved each arm with its own mutations. It judged the archive advisable once finding 1 was dispositioned.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Minor, THEORETICAL. The check guarded two of its three target lists against being empty, but not the rendered agent definitions. The bats case for that surface skipped when it found none. | **Applied** after the review, outside the contract set, as the review recommended. The check exits 2 when the manifest renders no agent definition. That case now fails instead of skipping, and a new case pins the exit. |
+| 2 | Minor, SPECULATIVE. The count of the touched bats files was stale. | **Applied.** It is now 201 run and 0 failures. |
+| 3 | Question. Three residuals carried from round 3: the post-merge redeploy, `warn` on a reviewer with no PR, and the count-only routing guard. | **Tracked**, as recorded under round 3. The redeploy happens after this merges. |
 
 ## Decisions made during implementation
 

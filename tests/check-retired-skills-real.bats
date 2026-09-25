@@ -93,9 +93,19 @@ copy_repo() {
 
 @test "SKILL-001 check: a rendered agent definition that names a retired skill is found" {
     dir="$(jq -r '.agents.deploy[]? | select(.render == "agent-md") | .dir' "$MANIFEST" | head -1)"
-    [ -n "$dir" ] || skip "the manifest renders no agent definitions"
+    [ -n "$dir" ] || { echo "the manifest renders no agent definitions, so this surface is unchecked"; return 1; }
     mkdir -p "$FAKEHOME/$dir"
     printf 'MUST consume: [adversarial-review, audit]\n' > "$FAKEHOME/$dir/reviewer.md"
     run env HOME="$FAKEHOME" "$SCRIPT" audit
     [ "$status" -eq 1 ]
+}
+
+@test "SKILL-001 check: a manifest that renders no agent definition fails instead of passing" {
+    mkdir -p "$FAKEHOME/.claude/agents"
+    printf 'MUST consume: [adversarial-review, audit]\n' > "$FAKEHOME/.claude/agents/reviewer.md"
+    copy_repo
+    jq '.agents.deploy = []' "$MANIFEST" > "$COPY/harness/manifest.json"
+    run env HOME="$FAKEHOME" "$COPY/scripts/check-retired-skills.sh" audit
+    rm -rf "$COPY"
+    [ "$status" -eq 2 ]
 }
