@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: bc33e6d633f459ca
+generated_sha: 8416f176868419d9
 id: handoff-skill
 type: skill
 status: active
@@ -67,7 +67,7 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
   ```
 
   `<agent>` is your own harness name, one lower-case word: `claude`, `pi`, `agy`,
-  `copilot`, `opencode` or `codex`. Use the same word as in your journal's name. It stamps your thread
+  `antigravity`, `copilot`, `opencode`, `codex` or `gemini`. Use the same word as in your journal's name. It stamps your thread
   (`### thread: <key> (writer: <agent>)`). If another agent wrote the block under
   the same key, the command keeps it: your write goes to `<key>+<agent>`, and
   stderr says so. Report that fork in your summary. Never pass another agent's

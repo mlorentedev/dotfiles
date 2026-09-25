@@ -43,6 +43,18 @@ The commits between them on main belong to other specs (#1714, #1715, #1716, #17
   - Without `--agent`, the block is gone, as before this change (0 occurrences of its text).
 - No regressions in the existing suite: yes.
 
+## Independent review
+
+Verdict **PASS-WITH-GAPS**, from nan/glm5.3-flash on 2026-09-25. The review ran from 17:17 to 17:27 under HARNESS-152's deadline, with a 30m target. It found no Blockers and no Majors, and judged the archive advisable once the findings below have a disposition.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Minor, THEORETICAL. No named test covers the legacy migration and a fork happening in one write. The reviewer's probe found it correct. | **Applied.** `TestAnAgentWriteMigratesTheLegacyBlockAndForksFromAnotherAgent` uses the reviewer's seed case. |
+| 2 | Minor, THEORETICAL. The skill's agent list omitted `antigravity` and `gemini`, both of which `journalAgents` knows. | **Applied** (vault `38fec1aa`, record refreshed). The skill now names every agent the writer attributes. |
+| 3 | Minor, SPECULATIVE. A hand-edited stamp such as `(writer: Claude)` reads as a different writer, so `claude` forks from it. | **Declined.** The write path cannot produce it, since `writerName` refuses capitals, and the cost is one extra thread, never a loss. |
+| 4 | Minor, SPECULATIVE. The journal heuristic can misattribute when a project word equals an agent name. | **Declined.** This is the risk the proposal already accepts: a wrong attribution costs one extra thread, and no vault project name contains an agent's. |
+| 5 | Question. The live dry run could not be reproduced. | **Recorded.** The reviewer looked for `~/Projects/knowledge/memory/MEMORY.md`; the file is at `~/Projects/knowledge/10_projects/knowledge/memory/MEMORY.md`. The named unit tests carry the mechanism either way. |
+
 ## Decisions made during implementation
 
 - `WriteThreadAs` is a new entry point, and `WriteThread` is unchanged in signature and output. So AC4 holds by construction and is also pinned by a test.
