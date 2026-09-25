@@ -288,15 +288,14 @@ func TestParseRegistry_BwFolder_MustMatchPlane_Symmetric(t *testing.T) {
 }
 
 // TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder closes the plane rule
-// for the planes the taxonomy does not cover. planeFolder names a folder for app
-// and infra only, and a plane missing from it used to fall through to the
-// ratified-set check, so a floor or personal secret could claim either managed
-// folder and reconcile would move its item there (CLI-078 review round 4).
-// Absence denies: a plane gets a folder by being given one, never by omission.
+// for the planes the taxonomy does not cover. planeFolder names a folder for app,
+// infra and personal, and a plane missing from it used to fall through to the
+// ratified-set check, so a floor secret could claim any managed folder and
+// reconcile would move its item there (CLI-078 review round 4). Absence denies: a
+// plane gets a folder by being given one, never by omission.
 func TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder(t *testing.T) {
 	cases := map[string]string{
 		"floor convenience copy": `{id: root, plane: floor, backend: file-authority, bw: {item: it, field: notes%s}, expose: {file: {var: K, path: "~/k", mode: "0600"}}}`,
-		"personal":               `{id: p, plane: personal, backend: bw, bw: {item: it, field: password%s}, expose: {env: P}}`,
 	}
 	for name, entry := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -305,7 +304,7 @@ func TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder(t *testing.T) {
 			if _, err := ParseRegistry([]byte("version: 1\nsecrets:\n  - " + fmt.Sprintf(entry, "") + "\n")); err != nil {
 				t.Fatalf("control without a folder must parse: %v", err)
 			}
-			for _, folder := range []string{"Dotfiles/apps", "Dotfiles/infra"} {
+			for _, folder := range []string{"Dotfiles/apps", "Dotfiles/infra", "Dotfiles/personal"} {
 				yml := "version: 1\nsecrets:\n  - " + fmt.Sprintf(entry, ", folder: "+folder) + "\n"
 				_, err := ParseRegistry([]byte(yml))
 				if err == nil {
@@ -317,6 +316,30 @@ func TestParseRegistry_BwFolder_RefusedOnAPlaneWithNoFolder(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestParseRegistry_BwFolder_PersonalPlane: the personal plane has its folder
+// (ADR-028 §6, amended 2026-09-24): folder = plane, so a personal secret declares
+// Dotfiles/personal and only that, and no other plane may borrow it.
+func TestParseRegistry_BwFolder_PersonalPlane(t *testing.T) {
+	entry := func(plane, folder string) string {
+		return "version: 1\nsecrets:\n  - {id: p, plane: " + plane +
+			", backend: bw, bw: {item: it, field: password, folder: " + folder + "}, expose: {env: P}}\n"
+	}
+	if _, err := ParseRegistry([]byte(entry("personal", "Dotfiles/personal"))); err != nil {
+		t.Fatalf("a personal secret in Dotfiles/personal must parse: %v", err)
+	}
+	for _, bad := range [][2]string{
+		{"personal", "Dotfiles/apps"},
+		{"personal", "Dotfiles/infra"},
+		{"app", "Dotfiles/personal"},
+		{"infra", "Dotfiles/personal"},
+	} {
+		_, err := ParseRegistry([]byte(entry(bad[0], bad[1])))
+		if err == nil || !strings.Contains(err.Error(), "does not match plane") {
+			t.Errorf("plane %s in %s must be refused as a plane mismatch, got %v", bad[0], bad[1], err)
+		}
 	}
 }
 

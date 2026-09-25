@@ -1,8 +1,8 @@
 [
   {
     "id": "SEC-001-secrets-run-guard-f1",
-    "behavior": "AC1-AC5: secrets run refuses an environment dump given directly, by path, or inside a shell snippet (path, redirect, quotes, backslashes, a line continuation, any case), and runs legitimate tools",
-    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestAssertSafeChildCommand|TestRunChildPTY_HonoursTheIntrospectionGuard' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "behavior": "AC1-AC5: secrets run refuses an environment dump before decrypting anything, whether given directly, by path (POSIX or Windows, with or without .exe), through busybox, or inside a shell snippet anywhere after the c flag (fail closed), whatever its spelling (path, redirect, quotes, backslashes, a line continuation, any case), and runs legitimate tools",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestAssertSafeChildCommand|TestRunChildPTY_HonoursTheIntrospectionGuard|TestSecretsRun_RefusesBeforeResolvingSecrets|TestSnippetGuard_RefusesEveryShapeTheRealShellRuns' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
   },
@@ -15,8 +15,8 @@
   },
   {
     "id": "SEC-001-secrets-run-guard-f3",
-    "behavior": "AC9: secrets show masks on a TTY, prints only with --reveal, copies with --clip, and refuses in an agent session, detected by any declared marker including CLAUDECODE",
-    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestSecretsShow_(RejectsAgentSession|TTYMasking|RevealFlag|ClipFlag)|TestDetectAgentSession' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "behavior": "AC9: secrets show masks on a TTY, prints only with --reveal, copies with --clip, and refuses in an agent session, detected by a marker every harness in harness/model-map.json exports",
+    "verification": "cd cli && out=$(go test ./internal/cmd/ -run 'TestSecretsShow_(RejectsAgentSession|TTYMasking|RevealFlag|ClipFlag)|TestDetectAgentSession|TestAgentSessionMarkers_CoverEveryHarness' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
   },
@@ -36,8 +36,8 @@
   },
   {
     "id": "SEC-001-secrets-run-guard-f6",
-    "behavior": "AC6 and AC10: the Claude settings template denies sudo, git clean, secrets show and pipe-to-shell, and the pi catalog registers openrouter",
-    "verification": "jq -e '.permissions.deny as $d | [\"Bash(sudo:*)\", \"Bash(git clean -f*:*)\", \"Bash(*dotf secrets show*:*)\", \"Bash(curl *|*sh*)\"] | all(. as $r | $d | index($r))' ai/claude/settings.json && jq -e '.providers.openrouter.baseUrl' ai/pi/models.json",
+    "behavior": "AC6 and AC10 (template-scoped; the deploy is #1339): the Claude settings template denies env, printenv, export -p, sudo, git clean, secrets show and pipe-to-shell, and the pi catalog registers openrouter",
+    "verification": "jq -e '.permissions.deny as $d | [\"Bash(env:*)\", \"Bash(printenv:*)\", \"Bash(export -p:*)\", \"Bash(sudo:*)\", \"Bash(git clean -f*:*)\", \"Bash(*dotf secrets show*:*)\", \"Bash(curl *|*sh*)\"] | all(. as $r | $d | index($r))' ai/claude/settings.json && jq -e '.providers.openrouter.baseUrl' ai/pi/models.json",
     "state": "pending",
     "evidence": ""
   },
