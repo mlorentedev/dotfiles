@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.59.0](https://github.com/mlorentedev/dotfiles/compare/v0.58.0...v0.59.0) (2026-09-25)
+
+
+### Features
+
+* automate Windows SSH key recovery ([#1659](https://github.com/mlorentedev/dotfiles/issues/1659)) ([8636c58](https://github.com/mlorentedev/dotfiles/commit/8636c5847109c8599b2e2a5b00f10bdc9eb19111))
+* **harness:** slim three persona rosters and fold eight skills into the ones that remain ([#1694](https://github.com/mlorentedev/dotfiles/issues/1694)) ([3c2e393](https://github.com/mlorentedev/dotfiles/commit/3c2e393e9fdfbc3b3aa89f2e0b40f90cb62aae4f))
+* **mem:** handoff-write --agent keeps another agent's thread and forks the write ([#1711](https://github.com/mlorentedev/dotfiles/issues/1711)) ([6436c71](https://github.com/mlorentedev/dotfiles/commit/6436c7167dccef33704c01de2d9f26cc9dd81b7c))
+* **mem:** read a handoff thread into its canonical fields and warn on the ones it lacks ([#1716](https://github.com/mlorentedev/dotfiles/issues/1716)) ([ffe5c44](https://github.com/mlorentedev/dotfiles/commit/ffe5c44b515eee92ba8e245c1ca10f73537443ea))
+
+
+### Bug Fixes
+
+* **deploy:** finish AI-042 trusted folder rendering ([#1723](https://github.com/mlorentedev/dotfiles/issues/1723)) ([cb0313a](https://github.com/mlorentedev/dotfiles/commit/cb0313a0ee9c23c8da967dca71af0ff50a6e7789))
+* **harness:** read skill prerequisites from the deployed records instead of the map compiled into the binary ([#1714](https://github.com/mlorentedev/dotfiles/issues/1714)) ([b543552](https://github.com/mlorentedev/dotfiles/commit/b543552b189736cc44c643add14e2260cf5f0256))
+* **harness:** the gate reserves the unparsed journal's name as it reserves the unscoped one ([#1707](https://github.com/mlorentedev/dotfiles/issues/1707)) ([1c33456](https://github.com/mlorentedev/dotfiles/commit/1c334560147cda30240c0d9b4e7c98f598e09e8c))
+* **harness:** the trigger guards refuse a file they could not read or that names no pattern ([#1706](https://github.com/mlorentedev/dotfiles/issues/1706)) ([355a784](https://github.com/mlorentedev/dotfiles/commit/355a784e0e1c0211c3c81fa18a8f3801c013f96b))
+* **mem:** handoff-write moves an un-threaded handoff block into a legacy thread ([#1703](https://github.com/mlorentedev/dotfiles/issues/1703)) ([221e0da](https://github.com/mlorentedev/dotfiles/commit/221e0daf8bea47d1412d852214a07871992f01b9))
+* **mem:** handoff-write refuses a thread key read from another repository ([#1702](https://github.com/mlorentedev/dotfiles/issues/1702)) ([8ce4bcd](https://github.com/mlorentedev/dotfiles/commit/8ce4bcd4f01ea3bac10c91e521e02cee6f1a45ad))
+* **mem:** session-end writes its record only where no journal exists ([#1701](https://github.com/mlorentedev/dotfiles/issues/1701)) ([9603e9a](https://github.com/mlorentedev/dotfiles/commit/9603e9acb1a3e9796425579f79d09a32f41c125d))
+* **spec:** bound every reviewer runner with the review deadline and tell the reviewer its time budget ([#1721](https://github.com/mlorentedev/dotfiles/issues/1721)) ([58fb872](https://github.com/mlorentedev/dotfiles/commit/58fb8726985758778ffb65ac873f7f58c1b3d9b9))
+* **spec:** the contract digest folds the lifecycle status the archive writes ([#1709](https://github.com/mlorentedev/dotfiles/issues/1709)) ([29947d1](https://github.com/mlorentedev/dotfiles/commit/29947d1a9976656c60e28a7e9b665d23981d2be2))
+
 ## [0.58.0](https://github.com/mlorentedev/dotfiles/compare/v0.57.0...v0.58.0) (2026-09-25)
 
 
