@@ -172,16 +172,12 @@ type Suggestion struct {
 
 // DefaultSkillDependencies maps composite skills to their declared prerequisite skills.
 var DefaultSkillDependencies = map[string][]string{
-	"spec":                    {"adversarial-review", "verification-before-completion"},
-	"adversarial-review":      {"verification-before-completion"},
-	"executing-plans":         {"systematic-debugging", "test-driven-development", "verification-before-completion"},
-	"writing-plans":           {"executing-plans"},
+	"spec":                    {"adversarial-review"},
 	"architecture-session":    {"read-all-adrs", "spec"},
-	"project-maturation":      {"audit", "test", "verification-before-completion"},
 	"vault-doctor":            {"insights"},
 	"test-driven-development": {"test"},
-	"handoff":                 {"verification-before-completion"},
-	"pr-review-triage":        {"verification-before-completion"},
+	"handoff":                 {"adversarial-review"},
+	"pr-review-triage":        {"adversarial-review"},
 }
 
 // ResolveDependencies computes the transitive closure of required skills,

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 3d9fe0d9040d312d
+generated_sha: c7e81534f6563444
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -211,4 +211,4 @@ Either way the `## Review triage` comment lands on the PR (step 7). The conversa
 - [[pattern-track-or-fix]] — the two-exits rule this applies to someone else's findings
 - [[pattern-change-lifecycle]] — the Definition of Done whose **Review** item this executes
 - [[pattern-git-workflow]] — merge policy: human-reviewed, never automatic
-- `verification-before-completion` — evidence before claiming the triage is done
+- `adversarial-review`, "Evidence before claims" — evidence before claiming the triage is done

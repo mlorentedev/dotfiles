@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/creating-skills/SKILL.md
-generated_sha: b612568284c4718c
+generated_sha: 04d8792f0c5fb245
 id: creating-skills-skill
 type: skill
 status: active
@@ -129,7 +129,7 @@ description: Use when tests have race conditions or pass/fail inconsistently
 ### Naming Conventions
 
 - Use active voice, verb-first: `creating-skills` not `skill-creation`
-- Gerunds (-ing) for processes: `writing-plans`, `dispatching-parallel-agents`
+- Gerunds (-ing) for processes: `using-git-worktrees`, `creating-skills`
 - Hyphens only (no parentheses, special chars)
 
 ### Keyword Coverage
@@ -194,7 +194,7 @@ Applies to NEW skills AND EDITS to existing skills. Write skill before testing? 
 
 ### Discipline Skills (rules/requirements)
 
-**Examples:** TDD, verification-before-completion
+**Examples:** TDD, the evidence rule in `adversarial-review`
 **Test with:** Pressure scenarios combining time + sunk cost + exhaustion
 **Success criteria:** Agent follows rule under maximum pressure
 

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pattern-loader/SKILL.md
-generated_sha: 1b2c8b9e354b82cf
+generated_sha: 3223c3a83a948b42
 id: pattern-loader-skill
 type: skill
 status: active
@@ -138,4 +138,4 @@ After applying a pattern:
 
 - Pattern catalog: `vault/00_meta/patterns/`
 - Pattern format: see any file in `00_meta/patterns/pattern-*.md`
-- Related: `00_meta/skills/verification-before-completion/SKILL.md` (always verify after applying)
+- Related: `00_meta/skills/adversarial-review/SKILL.md`, "Evidence before claims" (always verify after applying)

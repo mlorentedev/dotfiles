@@ -112,7 +112,8 @@
       ],
       "description": "Triggered when modifying Python packaging, async code, or dependencies",
       "skills": [
-        "async-python-patterns"
+        "async-python-patterns",
+        "test"
       ],
       "keywords": [
         "python",
@@ -186,7 +187,8 @@
       ],
       "description": "Triggered when modifying Go codebase, dependencies, or modules",
       "skills": [
-        "golang-pro"
+        "golang-pro",
+        "test"
       ],
       "keywords": [
         "golang",
@@ -212,8 +214,7 @@
       ],
       "description": "Triggered when performing security, performance, or quality audits",
       "skills": [
-        "audit",
-        "project-maturation"
+        "adversarial-review"
       ],
       "keywords": [
         "security",
@@ -264,8 +265,7 @@
       "description": "Triggered when managing bitacora tickets or user stories",
       "skills": [
         "new-ticket",
-        "prd-to-issues",
-        "enrich-us"
+        "prd-to-issues"
       ],
       "keywords": [
         "ticket",
@@ -322,7 +322,8 @@
       ],
       "description": "Triggered when troubleshooting hardware, firmware, or embedded devices (nearest existing pattern; no dedicated hardware-debugging pattern yet)",
       "skills": [
-        "debug-hardware"
+        "debug-hardware",
+        "systematic-debugging"
       ],
       "keywords": [
         "hardware",
@@ -348,8 +349,7 @@
       ],
       "description": "Triggered when creating or executing structured implementation plans",
       "skills": [
-        "writing-plans",
-        "executing-plans"
+        "spec"
       ],
       "keywords": [
         "plan",
@@ -402,7 +402,8 @@
         "**/mcp_*.go"
       ],
       "skills": [
-        "mcp-builder"
+        "mcp-builder",
+        "test"
       ],
       "description": "Triggered when modifying MCP server configurations or tools",
       "keywords": [
