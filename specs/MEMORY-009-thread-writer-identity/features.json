@@ -32,6 +32,6 @@
     "behavior": "The handoff skill's command passes --agent",
     "verification": "grep -qE 'dotf mem handoff-write .*--agent' harness/skills/handoff/SKILL.md",
     "state": "passing",
-    "evidence": "exit 0 on 2026-09-25 at 280af58: the refreshed handoff record passes --agent to handoff-write (vault 27a2c9c8)"
+    "evidence": "exit 0 on 2026-09-25 at ffc1442: the refreshed handoff record passes --agent to handoff-write (vault 27a2c9c8)"
   }
 ]
