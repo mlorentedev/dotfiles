@@ -39,6 +39,10 @@ Each slice PR fills its own section below and nothing else.
   | continuation lines dropped | two tests |
   | an empty `Next action` accepted | the warnings test |
 
+- **Found along the way: `handoff-write` narrowed the mode of the file it replaced.** `os.CreateTemp` creates the temp file 0600, and the rename carried that mode onto MEMORY.md. On 2026-09-25, 9 of the vault's 21 MEMORY.md files were 0600, the ones this command had written; the rest were 0664.
+  - Fix: the temp file takes the replaced file's mode before the rename, as `harness bind` does for settings files. Test: `TestMemHandoffWriteKeepsTheFileMode`, which failed at 600 before the fix.
+  - The write now lives in `replaceMemoryFile`. That brings `newMemHandoffWriteCmd` from 17 (after #1711 and this slice's warnings) down to 14.
+- Rebased onto #1711. Its `TestMemHandoffWriteWithoutAgentSaysWhatItAlwaysSaid` expected an empty stderr with a body that has no `Next action`, which this slice now warns about. The test now passes a body with one, so it still checks only what `--agent` could add.
 - **Probe over every thread in the vault's `10_projects/*/memory/MEMORY.md`** (a throwaway test, not committed):
   - 34 threads parsed, with 0 lines lost.
   - 1 thread has no `Next action`.
