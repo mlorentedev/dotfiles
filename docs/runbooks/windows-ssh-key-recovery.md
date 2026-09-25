@@ -38,6 +38,24 @@ firewall rule, adds the committed public key exactly once, preserves unrelated
 keys, protects the administrator key store ACL, and restarts `sshd` only when the
 key store changed.
 
+Before accepting either SSH alias's host key, obtain the authoritative server
+host-key fingerprint through this authenticated console or RDP channel:
+
+```powershell
+ssh-keygen -lf "$env:ProgramData\ssh\ssh_host_ed25519_key.pub"
+```
+
+Compare that server host-key fingerprint with each untrusted network response
+before accepting it:
+
+```powershell
+ssh-keyscan -T 5 -t ed25519 acemagic-office | ssh-keygen -lf -
+ssh-keyscan -T 5 -t ed25519 acemagic-office-lan | ssh-keygen -lf -
+```
+
+Only proceed when both results match the console/RDP fingerprint. The dedicated
+client-key fingerprint is unrelated and must not be used for server trust.
+
 ## Normal reconciliation
 
 Re-run the same host command after an OpenSSH repair or policy change. A repeated
@@ -48,7 +66,7 @@ On the client, materialize and validate the private key:
 ```powershell
 dotf secrets run --only ACEMAGIC_OFFICE_SSH_KEY -- `
   pwsh -NoProfile -File .\scripts\windows-ssh-client-key.ps1
-ssh acemagic-office hostname
+ssh -o PreferredAuthentications=publickey -o BatchMode=yes acemagic-office hostname
 ```
 
 This dedicated automation key must not require an interactive passphrase. Its
@@ -56,7 +74,8 @@ protection comes from Bitwarden at rest plus the protected current-owner and
 SYSTEM Windows ACL after materialization. The client guard rejects an encrypted
 key rather than allowing SSH to fail later during signing.
 
-Use `ssh acemagic-office-lan` when directly connected to the dock LAN.
+Use `ssh -o PreferredAuthentications=publickey -o BatchMode=yes
+acemagic-office-lan hostname` when directly connected to the dock LAN.
 
 ## Clean-machine recovery
 
@@ -66,13 +85,15 @@ Use `ssh acemagic-office-lan` when directly connected to the dock LAN.
 3. The client guard compares private and committed-public fingerprints and
    verifies non-interactive signing, then replaces inherited ACLs with
    current-owner and SYSTEM access.
-4. Verify both aliases with `hostname`; never verify by printing key material.
+4. Verify both aliases with `ssh -o PreferredAuthentications=publickey -o
+   BatchMode=yes <alias> hostname`; never verify by printing key material.
 
 ## Rotation and revocation
 
 1. Generate a new dedicated keypair without a passphrase at a temporary local
    path: `ssh-keygen -t ed25519 -N '' -f <temporary-path>`.
-2. Replace the committed `.pub` file and review the fingerprint change.
+2. Replace the committed `.pub` file, review the fingerprint change, and update
+   the expected public fingerprint in this runbook.
 3. Reconcile the host through the existing authenticated channel before replacing
    the Bitwarden private key.
 4. Write the new private key with `dotf secrets set
@@ -95,8 +116,8 @@ not independently duplicated in git or another ad-hoc file.
 
 ```powershell
 ssh-keygen -lf .\ssh\id_ed25519_ts_bridge_acemagic.pub
-ssh acemagic-office hostname
-ssh acemagic-office-lan hostname
+ssh -o PreferredAuthentications=publickey -o BatchMode=yes acemagic-office hostname
+ssh -o PreferredAuthentications=publickey -o BatchMode=yes acemagic-office-lan hostname
 ```
 
 Expected public fingerprint:

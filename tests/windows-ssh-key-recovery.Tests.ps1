@@ -11,6 +11,7 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
         $script:Registry = Join-Path $script:Repo 'secrets\registry.yaml'
         $script:SshConfig = Join-Path $script:Repo 'ssh\config'
         $script:Runbook = Join-Path $script:Repo 'docs\runbooks\windows-ssh-key-recovery.md'
+        $script:Features = Join-Path $script:Repo 'specs\OPS-048-windows-ssh-key-recovery\features.json'
         $script:Sandbox = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-ops048-$PID"
         New-Item -ItemType Directory -Path $script:Sandbox -Force | Out-Null
     }
@@ -82,6 +83,21 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
                 $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
             } | Sort-Object -Unique)
             $sids | Should -Be @($ownerSid, 'S-1-5-18' | Sort-Object)
+        }
+
+        It 'repairs the private key ACL before loading the key' {
+            . $script:ClientScript
+            $calls = [Collections.Generic.List[string]]::new()
+            $key = Join-Path $script:Sandbox 'reconcile-order'
+            Set-Content -LiteralPath $key -Value 'synthetic-private-key' -Encoding ascii
+
+            Mock Set-PrivateKeyAcl { $calls.Add('acl') }
+            Mock Assert-SshKeyPair { $calls.Add('pair'); 'SHA256:test' }
+            Mock Assert-NonInteractivePrivateKey { $calls.Add('interactive') }
+
+            Invoke-SshClientKeyReconciliation -PrivateKeyPath $key -PublicKeyPath "$key.pub"
+
+            $calls | Should -Be @('acl', 'pair', 'interactive')
         }
     }
 
@@ -180,6 +196,20 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             }
             $runbook | Should -Match 'already authenticated administrative channel'
             $runbook | Should -Match 'never.*private key.*command argument'
+            $runbook | Should -Match 'PreferredAuthentications=publickey'
+            $runbook | Should -Match 'BatchMode=yes'
+            $runbook | Should -Match 'server host-key fingerprint'
+            $runbook | Should -Match 'Update\s+the expected public fingerprint'
+        }
+
+        It 'requires Windows Pester evidence for every acceptance criterion' {
+            $features = Get-Content -LiteralPath $script:Features -Raw | ConvertFrom-Json
+
+            foreach ($feature in $features) {
+                $feature.verification | Should -Match '\$IsWindows'
+                $feature.verification | Should -Match 'PassedCount'
+                $feature.verification | Should -Match 'throw'
+            }
         }
     }
 }

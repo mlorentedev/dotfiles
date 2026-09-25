@@ -119,12 +119,15 @@ function Invoke-SshClientKeyReconciliation {
         [switch]$SkipAcl
     )
 
-    $fingerprint = Assert-SshKeyPair -PrivateKeyPath $PrivateKeyPath -PublicKeyPath $PublicKeyPath
-    Assert-NonInteractivePrivateKey -PrivateKeyPath $PrivateKeyPath
+    if (-not (Test-Path -LiteralPath $PrivateKeyPath -PathType Leaf)) {
+        throw "Private key not found: $PrivateKeyPath"
+    }
     if (-not $SkipAcl) {
         $ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
         Set-PrivateKeyAcl -Path $PrivateKeyPath -OwnerSid $ownerSid
     }
+    $fingerprint = Assert-SshKeyPair -PrivateKeyPath $PrivateKeyPath -PublicKeyPath $PublicKeyPath
+    Assert-NonInteractivePrivateKey -PrivateKeyPath $PrivateKeyPath
     Write-Host "SSH client key reconciled: $fingerprint"
 }
 
