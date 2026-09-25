@@ -45,15 +45,24 @@ detached HEAD falls back to worktree@host rather than guessing.
 Pass --thread to override — a session that switches branches mid-flight re-keys
 otherwise, and the line of work may well be the one it started on.
 
+Run from a repository that is not the project --memory belongs to (the vault
+checkout writing a project's MEMORY.md), the current branch names no line of work
+there, so handoff-write refuses without --thread and names the key it would have
+used (#1606).
+
 Skills should call this instead of instructing an Edit: the merge is the part that
 was being got wrong, and it belongs where it can be tested.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if thread == "" {
-				thread = mem.ThreadKeyForCwd()
-			}
 			if memoryPath == "" {
 				return fmt.Errorf("--memory is required (the project's MEMORY.md)")
+			}
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("resolve the current directory: %w", err)
+			}
+			if thread, err = mem.HandoffThread(thread, memoryPath, wd); err != nil {
+				return err
 			}
 
 			body, err := io.ReadAll(cmd.InOrStdin())
