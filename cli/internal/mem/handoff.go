@@ -274,6 +274,50 @@ func ThreadKeyForCwd() string {
 	return ThreadKey(wd)
 }
 
+// HandoffThread is the thread key handoff-write uses for memoryPath (#1606).
+//
+// An explicit key is taken as given. Otherwise the key is the cwd's, but only
+// when the cwd's repository is the project memoryPath belongs to. A branch names
+// a line of work in ITS repository: the vault's `master` says nothing about
+// dotfiles, and keying dotfiles' MEMORY.md with it replaced another session's
+// `master@<host>` block while reporting success. A MEMORY.md outside the vault's
+// `10_projects/<project>/memory/` layout names no project to compare against, so
+// there the cwd key stands, as it always did.
+func HandoffThread(explicit, memoryPath, cwd string) (string, error) {
+	if explicit != "" {
+		return explicit, nil
+	}
+	key := ThreadKey(cwd)
+	project, ok := memoryProject(memoryPath)
+	if !ok {
+		return key, nil
+	}
+	id, inRepo := RepoIdentity(cwd)
+	if inRepo && id.Project == project {
+		return key, nil
+	}
+	here := "no repository"
+	if inRepo {
+		here = fmt.Sprintf("repository %q", id.Project)
+	}
+	return "", fmt.Errorf("%s belongs to project %q, but the current directory is in %s, "+
+		"whose branch names no line of work there (it would have keyed %q); "+
+		"pass --thread with the branch the work is on", memoryPath, project, here, key)
+}
+
+// memoryProject returns <project> for a path ending in
+// 10_projects/<project>/memory/MEMORY.md, the vault's project layout.
+func memoryProject(memoryPath string) (string, bool) {
+	p := filepath.Clean(memoryPath)
+	memDir := filepath.Dir(p)
+	projDir := filepath.Dir(memDir)
+	if filepath.Base(p) != "MEMORY.md" || filepath.Base(memDir) != "memory" ||
+		filepath.Base(filepath.Dir(projDir)) != "10_projects" {
+		return "", false
+	}
+	return filepath.Base(projDir), true
+}
+
 // JournalName is the session record filename for a thread, so "my journal" is
 // derivable from the working directory rather than remembered.
 // The thread is appended ONLY when it disambiguates. A single-checkout session

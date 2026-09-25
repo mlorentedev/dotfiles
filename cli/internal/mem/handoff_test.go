@@ -357,3 +357,62 @@ func TestThreadKeyPrefersGitOverAConventionalLookingSubdirectory(t *testing.T) {
 		t.Errorf("a look-alike directory inside a main checkout got its own thread %q — git said main", got)
 	}
 }
+
+// A THREAD KEY NAMES A LINE OF WORK IN ONE REPOSITORY (#1606).
+//
+// handoff-write took the key from the current directory's branch whatever
+// MEMORY.md it was told to write. Run from the vault checkout (branch master)
+// with dotfiles' MEMORY.md, it keyed the thread `master@<host>` and replaced
+// another session's block of that name, reporting success. A key read from one
+// repository says nothing about work in another, so HandoffThread refuses it and
+// names the key it would have used; an explicit --thread is always taken.
+func TestHandoffThreadRefusesAKeyFromAnotherRepository(t *testing.T) {
+	vault := mainFixture(t, "knowledge", "master")
+	memory := filepath.Join(vault, "10_projects", "dotfiles", "memory", "MEMORY.md")
+
+	got, err := HandoffThread("", memory, vault)
+	if err == nil {
+		t.Fatalf("a vault checkout keyed a dotfiles thread %q; want a refusal", got)
+	}
+	for _, want := range []string{"--thread", `"knowledge"`, `"dotfiles"`, ThreadKey(vault)} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not name %s:\n%v", want, err)
+		}
+	}
+}
+
+func TestHandoffThreadRefusesOutsideAnyRepository(t *testing.T) {
+	memory := filepath.Join(t.TempDir(), "10_projects", "dotfiles", "memory", "MEMORY.md")
+	if got, err := HandoffThread("", memory, t.TempDir()); err == nil {
+		t.Fatalf("a directory in no repository keyed a dotfiles thread %q; want a refusal", got)
+	}
+}
+
+func TestHandoffThreadTakesAnExplicitKeyFromAnywhere(t *testing.T) {
+	vault := mainFixture(t, "knowledge", "master")
+	memory := filepath.Join(vault, "10_projects", "dotfiles", "memory", "MEMORY.md")
+	got, err := HandoffThread("fix-harness-remediation", memory, vault)
+	if err != nil || got != "fix-harness-remediation" {
+		t.Fatalf("an explicit --thread must be taken as given: got %q, %v", got, err)
+	}
+}
+
+func TestHandoffThreadIsTheBranchInsideTheProject(t *testing.T) {
+	wt := gitFixture(t, "dotfiles", "dotfiles-wt-x", "feat/x")
+	memory := filepath.Join(t.TempDir(), "10_projects", "dotfiles", "memory", "MEMORY.md")
+	got, err := HandoffThread("", memory, wt)
+	if err != nil || got != "feat-x" {
+		t.Fatalf("a worktree of the project must key its own branch: got %q, %v", got, err)
+	}
+}
+
+// A MEMORY.md outside the vault's project layout names no project, so there is
+// nothing to compare the repository against; the key stays the cwd's, as before.
+func TestHandoffThreadKeepsTheCwdKeyOutsideTheProjectLayout(t *testing.T) {
+	vault := mainFixture(t, "knowledge", "master")
+	memory := filepath.Join(t.TempDir(), "MEMORY.md")
+	got, err := HandoffThread("", memory, vault)
+	if err != nil || got != ThreadKey(vault) {
+		t.Fatalf("want the cwd key %q for a path outside the layout, got %q, %v", ThreadKey(vault), got, err)
+	}
+}

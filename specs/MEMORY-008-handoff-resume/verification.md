@@ -16,6 +16,12 @@ created: "2026-09-25"
 
 Each slice PR fills its own section below and nothing else.
 
+## Slice 0 evidence (prerequisite bugs, each on its own issue)
+
+- #1620, `session-end` replaced an authored journal: PR #1701. `TestSessionEndLeavesAnAuthoredJournalByteIdentical` fails on main and passes with the fix.
+- #1606, `handoff-write` keyed a thread from another repository: branch `fix/handoff-thread-from-project`. `TestHandoffThreadRefusesAKeyFromAnotherRepository` and `TestMemHandoffWriteFromAnotherRepositoryTouchesNoThread` fail on main (the first cannot build there, the second finds the other session's thread replaced) and pass with the fix.
+- #1651, the legacy block stays in front: pending.
+
 ## Slice 1 evidence
 
 ## Slice 2 evidence
