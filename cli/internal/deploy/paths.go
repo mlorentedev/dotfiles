@@ -74,7 +74,7 @@ func expandPaths(src []byte, form, home string, resolve func(string) string) ([]
 		if form == PathsNative {
 			return filepath.FromSlash(expanded)
 		}
-		return filepath.ToSlash(expanded)
+		return strings.ReplaceAll(filepath.ToSlash(expanded), `\`, "/")
 	}
 	doc = walkStrings(doc, render)
 	if len(bad) > 0 {
