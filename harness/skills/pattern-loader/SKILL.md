@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pattern-loader/SKILL.md
-generated_sha: a8a92aa7f9b3e312
+generated_sha: 1b2c8b9e354b82cf
 id: pattern-loader-skill
 type: skill
 status: active
@@ -25,7 +25,7 @@ When a task matches a known workflow pattern, load it from the vault pattern cat
 
 ## When to use
 
-- A task matches a known pattern name or category (e.g., "backup", "debug", "spec", "handoff")
+- A task matches a known pattern name or category (e.g., "docker", "secrets", "git workflow", "spec")
 - Manu says "use the [pattern-name] pattern"
 - A workflow feels familiar but you're not sure of the exact steps
 - Starting a session and you want to check which patterns are relevant
@@ -40,10 +40,10 @@ When a task matches a known workflow pattern, load it from the vault pattern cat
 
 ### Step 1 — Search the pattern catalog
 
-Prefer Hive MCP — it is path-agnostic and always reads the live vault:
+The categorized catalog is `00_meta/patterns/_index.md` (one line per pattern). To search by keyword, prefer Hive MCP — it is path-agnostic and always reads the live vault. `scope` names a vault zone (`meta`, `projects`, `work`, `agents`), never `patterns`; `type_filter` narrows the hits to pattern files:
 
 ```
-vault_search(project="_meta", query="<keyword>", scope="patterns")
+vault_search(query="<keyword>", scope="meta", type_filter="pattern", ranked=True)
 ```
 
 If Hive is unavailable, fall back to a file search against your local vault
@@ -62,11 +62,11 @@ Read the most relevant pattern file(s). Each pattern has frontmatter:
 
 ```yaml
 ---
-id: pattern-backup
+id: pattern-<name>
 type: pattern
 status: active
-created: "2026-05-14"
-tags: [backup, ops, infrastructure]
+created: "<YYYY-MM-DD>"
+tags: [<topic>, <topic>]
 ---
 ```
 
@@ -94,25 +94,28 @@ Pattern applied: pattern-<name>.md
 
 This is for audit trail — not for long-term memory.
 
-### Step 5 — Cache only if frequent
+### Step 5 — Never cache content
 
-If the same pattern is used >1x/week, cache it in memory (not in vault). Otherwise, always re-read from vault.
+However often a pattern recurs, memory may hold its name (a pointer), never a copy of its content. Always re-read the pattern from the vault, so a change to it is picked up.
 
 ## Pattern categories
 
-The pattern catalog is organized by category. Use these as search hints:
+The categorized catalog is `00_meta/patterns/_index.md`. These filename clusters exist on disk today and make good search hints; when one drifts, the index and the directory listing win over this table:
 
-| Category | What it covers | Examples |
-|----------|---------------|----------|
-| `pattern-backup` | Backup procedures, restore, verification | Full backup, selective restore, test-restore |
-| `pattern-debug-*` | Debugging methodologies | Systematic debugging, hardware debug, session debug |
-| `pattern-spec-*` | Spec-Driven Development | SDD flow, spec init, spec archive, adversarial review |
-| `pattern-git-*` | Git workflows | Worktrees, clean history, safe force |
-| `pattern-security-*` | Security procedures | Credential handling, audit, threat modeling |
-| `pattern-decision-*` | Decision persistence | ADR format, decision logging, crystallization |
-| `pattern-agent-*` | Agent workflows | Handoff, delegation, session start, pattern loader |
-| `pattern-dev-*` | Development workflows | TDD, test-driven, planning, execution |
-| `pattern-ops-*` | Operations | Server setup, monitoring, incident response |
+| Cluster | What it covers | Examples |
+|---------|---------------|----------|
+| `pattern-git-*`, `pattern-github-*` | Git and GitHub workflow | pattern-git-workflow, pattern-github-branch-hygiene, pattern-github-repo-bootstrap |
+| `pattern-secrets-*` | Secrets storage, use, rotation | pattern-secrets-security, pattern-secrets-rotation |
+| `pattern-testing-*`, `pattern-*-testing` | Test conventions and suite strength | pattern-testing-standards, pattern-integration-testing, pattern-mutation-testing |
+| `pattern-mcp-*` | MCP servers and tool use | pattern-mcp-tool-design, pattern-mcp-server-distribution, pattern-mcp-context7 |
+| `pattern-spec-*`, `pattern-*-lifecycle` | Spec-Driven Development, change lifecycle | pattern-spec-driven-development, pattern-change-lifecycle, pattern-three-layer-proposal-lifecycle |
+| `pattern-agent-*`, `pattern-cross-agent-*` | Agent workflows and pipelines | pattern-agent-orchestration, pattern-cross-agent-skill-pipeline |
+| `pattern-docker-*`, `pattern-container-*` | Containers and image lifecycle | pattern-container-workflow, pattern-docker-tag-lifecycle |
+| `pattern-shell-*` | Shell scripting | pattern-shell-standards, pattern-shell-advanced |
+| `pattern-python-*` | Python CLIs and packaging | pattern-python-cli, pattern-python-pypi-pipeline |
+| `pattern-verif*`, `pattern-detection-*` | Verification and enforcement | pattern-verification-fails-toward-unproven, pattern-verify-state-before-acting, pattern-detection-vs-enforcement |
+| `pattern-knowledge-*`, `pattern-*memory*` | Where knowledge lives, memory | pattern-knowledge-placement, pattern-dual-memory, pattern-memory-consolidation |
+| `pattern-release-*`, `pattern-version-*` | Releases and versioning | pattern-release-please-ci, pattern-version-single-source |
 
 ## Pitfalls
 
@@ -129,7 +132,7 @@ After applying a pattern:
 1. Re-read the pattern's **Verification** section
 2. Execute the verification steps
 3. Report results to Manu
-4. If verification fails, log it as a lesson in `clients/` or `sessions/`
+4. If verification fails, record it with `capture_lesson`
 
 ## References
 
