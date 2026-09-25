@@ -110,11 +110,14 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             . $script:HostScript
             $authorized = Join-Path $script:Sandbox 'administrators_authorized_keys'
             $other = 'ssh-ed25519 AAAAC3NzaOtherKey operator@example'
+            $aclRunner = { param([string[]]$Arguments) $null = $Arguments; 0 }
             Set-Content -LiteralPath $authorized -Value $other -Encoding ascii
             $dedicated = (Get-Content -LiteralPath $script:PublicKey -Raw).Trim()
 
-            Update-AuthorizedKeyFile -Path $authorized -PublicKey $dedicated | Should -BeTrue
-            Update-AuthorizedKeyFile -Path $authorized -PublicKey $dedicated | Should -BeFalse
+            Update-AuthorizedKeyFile -Path $authorized -PublicKey $dedicated `
+                -AclCommandRunner $aclRunner | Should -BeTrue
+            Update-AuthorizedKeyFile -Path $authorized -PublicKey $dedicated `
+                -AclCommandRunner $aclRunner | Should -BeFalse
 
             $lines = @(Get-Content -LiteralPath $authorized)
             $lines | Should -Contain $other
@@ -126,15 +129,31 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             $authorized = Join-Path $script:Sandbox 'rotated_authorized_keys'
             $previous = 'ssh-ed25519 AAAAC3NzaPrevious ts-bridge-acemagic-admin'
             $other = 'ssh-ed25519 AAAAC3NzaOtherKey operator@example'
+            $aclRunner = { param([string[]]$Arguments) $null = $Arguments; 0 }
             Set-Content -LiteralPath $authorized -Value @($previous, $other) -Encoding ascii
             $replacement = (Get-Content -LiteralPath $script:PublicKey -Raw).Trim()
 
-            Update-AuthorizedKeyFile -Path $authorized -PublicKey $replacement | Should -BeTrue
+            Update-AuthorizedKeyFile -Path $authorized -PublicKey $replacement `
+                -AclCommandRunner $aclRunner | Should -BeTrue
 
             $lines = @(Get-Content -LiteralPath $authorized)
             $lines | Should -Not -Contain $previous
             $lines | Should -Contain $other
             $lines | Should -Contain $replacement
+        }
+
+        It 'preserves an already authorized key regardless of its position' {
+            . $script:HostScript
+            $authorized = Join-Path $script:Sandbox 'ordered_authorized_keys'
+            $dedicated = (Get-Content -LiteralPath $script:PublicKey -Raw).Trim()
+            $other = 'ssh-ed25519 AAAAC3NzaOtherKey operator@example'
+            $aclRunner = { param([string[]]$Arguments) $null = $Arguments; 0 }
+            Set-Content -LiteralPath $authorized -Value @($dedicated, $other) -Encoding ascii
+
+            Update-AuthorizedKeyFile -Path $authorized -PublicKey $dedicated `
+                -AclCommandRunner $aclRunner | Should -BeFalse
+
+            @(Get-Content -LiteralPath $authorized) | Should -Be @($dedicated, $other)
         }
 
         It 'rejects private material instead of writing it as an authorized key' {
@@ -159,6 +178,57 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             $flat | Should -Match '/inheritance:r'
             $flat | Should -Match '\*S-1-5-32-544:F'
             $flat | Should -Match '\*S-1-5-18:F'
+        }
+
+        It 'protects the replacement file before writing authorized key content' {
+            $source = Get-Content -LiteralPath $script:HostScript -Raw
+            $aclIndex = $source.IndexOf('Set-AdministratorAuthorizedKeysAcl -Path $temporary')
+            $writeIndex = $source.IndexOf('Set-Content -LiteralPath $temporary')
+
+            $aclIndex | Should -BeGreaterThan -1
+            $aclIndex | Should -BeLessThan $writeIndex
+        }
+
+        It 'installs the OpenSSH service and firewall when they are absent' {
+            . $script:HostScript
+            Mock Get-WindowsCapability {
+                [pscustomobject]@{
+                    State = 'NotPresent'
+                    Name = 'OpenSSH.Server~~~~0.0.1.0'
+                }
+            }
+            Mock Add-WindowsCapability {}
+            Mock Set-Service {}
+            Mock Get-Service { [pscustomobject]@{ Status = 'Stopped' } }
+            Mock Start-Service {}
+            Mock Get-NetFirewallRule { $null }
+            Mock New-NetFirewallRule {}
+
+            Enable-WindowsOpenSshServer
+
+            Assert-MockCalled Add-WindowsCapability -Times 1 -Exactly
+            Assert-MockCalled Set-Service -Times 1 -Exactly -ParameterFilter {
+                $Name -eq 'sshd' -and $StartupType -eq 'Automatic'
+            }
+            Assert-MockCalled Start-Service -Times 1 -Exactly -ParameterFilter { $Name -eq 'sshd' }
+            Assert-MockCalled New-NetFirewallRule -Times 1 -Exactly -ParameterFilter {
+                $Name -eq 'OpenSSH-Server-In-TCP' -and $LocalPort -eq 22
+            }
+        }
+
+        It 'does not restart sshd after authorizing a key' {
+            . $script:HostScript
+            $authorized = Join-Path $script:Sandbox 'restart_authorized_keys'
+
+            Mock Enable-WindowsOpenSshServer {}
+            Mock Update-AuthorizedKeyFile { $true }
+            Mock Set-AdministratorAuthorizedKeysAcl {}
+            Mock Restart-Service {}
+
+            Invoke-OpenSshHostReconciliation -PublicKeyPath $script:PublicKey `
+                -AuthorizedKeysPath $authorized
+
+            Assert-MockCalled Restart-Service -Times 0 -Exactly
         }
     }
 

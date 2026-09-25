@@ -34,7 +34,8 @@ function Get-PublicKeyComment {
 function Update-AuthorizedKeyFile {
     param(
         [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)][string]$PublicKey
+        [Parameter(Mandatory)][string]$PublicKey,
+        [scriptblock]$AclCommandRunner
     )
 
     $key = Assert-PublicKey -PublicKey $PublicKey
@@ -45,17 +46,30 @@ function Update-AuthorizedKeyFile {
     } else {
         @()
     }
-    $preserved = @($existing | Where-Object {
+    $preserved = [Collections.Generic.List[string]]::new()
+    $managedPresent = $false
+    foreach ($line in $existing) {
         try {
-            $sameIdentity = (Get-PublicKeyIdentity -PublicKey $_) -eq $identity
+            if ($line -eq $key -and -not $managedPresent) {
+                $preserved.Add($line)
+                $managedPresent = $true
+                continue
+            }
+
+            $sameIdentity = (Get-PublicKeyIdentity -PublicKey $line) -eq $identity
             $sameManagedComment = $comment -and
-                (Get-PublicKeyComment -PublicKey $_) -eq $comment
-            -not ($sameIdentity -or $sameManagedComment)
+                (Get-PublicKeyComment -PublicKey $line) -eq $comment
+            if (-not ($sameIdentity -or $sameManagedComment)) {
+                $preserved.Add($line)
+            }
         } catch {
-            $true
+            $preserved.Add($line)
         }
-    })
-    $desired = @($preserved + $key)
+    }
+    if (-not $managedPresent) {
+        $preserved.Add($key)
+    }
+    $desired = @($preserved)
     if (($existing -join "`n") -eq ($desired -join "`n")) {
         return $false
     }
@@ -63,6 +77,8 @@ function Update-AuthorizedKeyFile {
     $directory = Split-Path -Parent $Path
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     $temporary = Join-Path $directory ".$([IO.Path]::GetFileName($Path)).$PID.tmp"
+    New-Item -ItemType File -Path $temporary -Force | Out-Null
+    Set-AdministratorAuthorizedKeysAcl -Path $temporary -CommandRunner $AclCommandRunner
     Set-Content -LiteralPath $temporary -Value $desired -Encoding ascii
     Move-Item -LiteralPath $temporary -Destination $Path -Force
     $true
@@ -168,9 +184,6 @@ function Invoke-OpenSshHostReconciliation {
     $changed = Update-AuthorizedKeyFile -Path $AuthorizedKeysPath -PublicKey $key
     if (-not $SkipAcl) {
         Set-AdministratorAuthorizedKeysAcl -Path $AuthorizedKeysPath
-    }
-    if (-not $SkipSystemConfiguration -and $changed) {
-        Restart-Service -Name sshd
     }
     Write-Host "OpenSSH host reconciled (authorized key changed: $changed)"
 }

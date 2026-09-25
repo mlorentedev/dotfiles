@@ -35,8 +35,8 @@ pwsh -NoProfile -File .\scripts\windows-openssh-authorize.ps1
 
 The script installs and enables OpenSSH Server, creates or enables the port 22
 firewall rule, adds the committed public key exactly once, preserves unrelated
-keys, protects the administrator key store ACL, and restarts `sshd` only when the
-key store changed.
+keys, and protects the administrator key store ACL without interrupting active
+SSH sessions.
 
 Before accepting either SSH alias's host key, obtain the authoritative server
 host-key fingerprint through this authenticated console or RDP channel:
