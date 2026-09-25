@@ -53,7 +53,9 @@ func TestMemHandoffWriteWithoutAgentSaysWhatItAlwaysSaid(t *testing.T) {
 	var out, errOut bytes.Buffer
 	cmd := newMemCmd()
 	cmd.SetArgs([]string{"handoff-write", "--memory", memory, "--thread", "master@msi"})
-	cmd.SetIn(bytes.NewBufferString("new\n"))
+	// A body with a Next action, so the shape warnings (MEMORY-008) stay silent
+	// and stderr holds only what --agent could have added.
+	cmd.SetIn(bytes.NewBufferString("**Next action:** new.\n"))
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
 	if err := cmd.Execute(); err != nil {

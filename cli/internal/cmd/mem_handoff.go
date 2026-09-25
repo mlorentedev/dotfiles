@@ -80,6 +80,9 @@ was being got wrong, and it belongs where it can be tested.`,
 			if len(body) == 0 {
 				return fmt.Errorf("empty handoff body — refusing to blank a thread, which is the clobber this command exists to prevent")
 			}
+			for _, w := range mem.ThreadWarnings(string(body)) {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning    %s\n", w)
+			}
 
 			current, err := os.ReadFile(memoryPath) // #nosec G304 -- operator-supplied path
 			if err != nil {
