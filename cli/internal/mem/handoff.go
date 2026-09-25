@@ -46,6 +46,109 @@ const ThreadPrefix = "### thread: "
 // archival keeps working unchanged. A second boundary rule here would be the
 // fifth silently-divergent parser this repository has found in a week.
 func WriteThread(content, threadKey, body string) (string, bool, error) {
+	return writeThread(content, threadKey, "", body)
+}
+
+// ThreadWrite is what WriteThreadAs did.
+type ThreadWrite struct {
+	Content string // the document after the write
+	Key     string // the thread written: the key asked for, or its fork
+	Kept    string // the agent whose block the key held, when the write forked
+	Changed bool
+}
+
+// writerName is the shape of a writer, one word, because the stamp is read
+// back out of the heading.
+var writerName = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+
+// writerStamp is the stamp a thread heading carries after its key.
+var writerStamp = regexp.MustCompile(`\(writer: ([^()\s]+)\)`)
+
+// WriteThreadAs is WriteThread for a named writer, and it never replaces a block
+// another agent wrote (MEMORY-009, #1690).
+//
+// On a default branch the key is `master@<host>`, which says nothing about WHO
+// writes it, so two agents on one host shared one block and the later replaced
+// the earlier. Four weeks of vault history hold three such losses, written 1.3,
+// 22 and 71 hours after the block they erased: identity, not age, is what tells
+// a session updating its own handoff from one erasing somebody else's.
+//
+// So the writer is stamped into the heading, and a block another agent wrote is
+// left where it is: the write goes to `<key>+<agent>` and the caller reports the
+// fork. A block written before stamps existed is attributed by the journal it
+// points at. A block nothing attributes is replaced as it always was, the one
+// case this cannot protect, and the stamp closes it for every block written from
+// now on. With no agent this is WriteThread, byte for byte.
+func WriteThreadAs(content, threadKey, agent, body string) (ThreadWrite, error) {
+	if agent == "" {
+		out, changed, err := WriteThread(content, threadKey, body)
+		return ThreadWrite{Content: out, Key: threadKey, Changed: changed}, err
+	}
+	if !writerName.MatchString(agent) {
+		return ThreadWrite{}, fmt.Errorf("agent %q: a writer is one lower-case word, such as claude or pi, because the heading's stamp is read back", agent)
+	}
+	key, kept := threadKey, ""
+	if w := threadWriter(content, threadKey, agent); w != "" && w != agent {
+		key, kept = threadKey+"+"+agent, w
+	}
+	out, changed, err := writeThread(content, key, " (writer: "+agent+")", body)
+	return ThreadWrite{Content: out, Key: key, Kept: kept, Changed: changed}, err
+}
+
+// threadWriter names the agent that wrote key's block: its heading's stamp, or
+// else the agent named by the journal the block points at. Empty when there is
+// no such block or nothing names its writer.
+func threadWriter(content, key, self string) string {
+	lines := strings.Split(content, "\n")
+	start, end := handoffSection(lines)
+	if start < 0 {
+		return ""
+	}
+	s, e := threadSpan(lines, start, end, key)
+	if s < 0 {
+		return ""
+	}
+	if m := writerStamp.FindStringSubmatch(lines[s]); m != nil {
+		return m[1]
+	}
+	for _, l := range lines[s+1 : e] {
+		if w := journalWriter(l, self); w != "" {
+			return w
+		}
+	}
+	return ""
+}
+
+// journalFile captures a Journal line's file name after its date, which
+// JournalName builds as <project>-<agent>[-<thread>].
+var journalFile = regexp.MustCompile(`^\s*(?:>\s*)?Journal:.*?\d{4}-\d{2}-\d{2}-([^\s/()\[\]]+?)\.md`)
+
+// journalAgents are the agents that write journals: every one the vault's
+// journal names held on 2026-09-25 (claude, pi, antigravity, agy, copilot) and
+// the harness's other targets. No project name contains one, so the first
+// match after the date is the writer, ahead of the thread's words. An agent
+// missing here reads as unknown, and an unknown writer's block is replaced as it
+// always was.
+var journalAgents = map[string]bool{
+	"agy": true, "antigravity": true, "claude": true, "codex": true,
+	"copilot": true, "gemini": true, "opencode": true, "pi": true,
+}
+
+func journalWriter(line, self string) string {
+	m := journalFile.FindStringSubmatch(line)
+	if m == nil {
+		return ""
+	}
+	for _, word := range strings.Split(m[1], "-") {
+		if word == self || journalAgents[word] {
+			return word
+		}
+	}
+	return ""
+}
+
+// writeThread is WriteThread with a stamp after the key in the heading it writes.
+func writeThread(content, threadKey, stamp, body string) (string, bool, error) {
 	if strings.TrimSpace(threadKey) == "" {
 		return "", false, fmt.Errorf("thread key is empty — a handoff with no thread is the shared slot this replaces")
 	}
@@ -71,7 +174,7 @@ func WriteThread(content, threadKey, body string) (string, bool, error) {
 		start, end = handoffSection(lines)
 	}
 
-	want := renderThread(threadKey, body)
+	want := renderThread(threadKey+stamp, body)
 	tStart, tEnd := threadSpan(lines, start, end, threadKey)
 
 	var out []string
