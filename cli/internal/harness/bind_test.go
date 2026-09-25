@@ -134,22 +134,23 @@ func TestMergeHooksSurvivesAForeignGroupAtIndexZero(t *testing.T) {
 	}
 }
 
-// agy's groups carry NO matcher key (measured against ~/.gemini/settings.json).
-// Emitting claude's shape there would be assuming a schema from a family
-// resemblance.
+// Gemini CLI's groups (~/.gemini/settings.json) carry NO matcher key. Emitting
+// claude's shape there would be assuming a schema from a family resemblance,
+// which is how a hook came to be bound into that file for agy, a different
+// product that never reads it.
 func TestMergeHooksOmitsMatcherWhenTheHarnessHasNone(t *testing.T) {
 	doc := decode(t, `{"hooks":{}}`)
 	out, _, err := MergeHooks(doc, []HookCommand{{
 		ID:      "gate",
 		Event:   "BeforeTool",
-		Command: "dotf harness gate --harness agy --role reviewer",
+		Command: "dotf harness gate --harness gemini --role reviewer",
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	groups := out["hooks"].(map[string]any)["BeforeTool"].([]any)
 	if _, has := groups[0].(map[string]any)["matcher"]; has {
-		t.Error("agy's group must not carry a matcher key")
+		t.Error("a harness whose groups carry no matcher must not be given one")
 	}
 }
 
@@ -354,6 +355,9 @@ func TestEveryInteractiveHookIsBounded(t *testing.T) {
 		"PreToolUse": true, "PostToolUse": true,
 		"UserPromptSubmit": true, "BeforeTool": true,
 	}
+	// agy's PreToolUse is in the set above; PreInvocation is the other event a
+	// person waits on, since it runs before every model call.
+	interactive["PreInvocation"] = true
 
 	checked := 0
 	for _, target := range targets {
@@ -369,6 +373,10 @@ func TestEveryInteractiveHookIsBounded(t *testing.T) {
 				continue
 			}
 			checked++
+			if target.Format == NamedHooksFormat {
+				assertNamedHookCarriesItsTimeout(t, target.Agent, c)
+				continue
+			}
 			assertHookCarriesItsTimeout(t, target.Agent, c)
 		}
 	}
@@ -433,4 +441,377 @@ func assertHookCarriesItsTimeout(t *testing.T, agent string, c HookCommand) {
 	if !found {
 		t.Errorf("%s hook %q never reached the emitted settings at all: %s", agent, c.ID, raw)
 	}
+}
+
+// assertNamedHookCarriesItsTimeout is assertHookCarriesItsTimeout for a target
+// whose file is a document of named hooks. It goes through MergeNamedHooks for
+// the same reason: the emitted document, not the declaration, is what a harness
+// reads, and its shape differs by event (grouped for the tool events, flat for
+// the rest).
+func assertNamedHookCarriesItsTimeout(t *testing.T, agent string, c HookCommand) {
+	t.Helper()
+	if c.Timeout <= 0 {
+		t.Errorf("%s hook %q (%s) is unbounded: an interactive hook with no timeout stalls the user",
+			agent, c.ID, c.Event)
+		return
+	}
+	merged, _, err := MergeNamedHooks(map[string]any{}, BindMarker, []HookCommand{c})
+	if err != nil {
+		t.Fatalf("MergeNamedHooks for %q: %v", c.ID, err)
+	}
+	raw, err := json.Marshal(merged[BindMarker])
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var doc map[string][]struct {
+		Command string `json:"command"`
+		Timeout *int   `json:"timeout"`
+		Hooks   []struct {
+			Command string `json:"command"`
+			Timeout *int   `json:"timeout"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("emitted hooks for %q are not the expected shape: %v (%s)", c.ID, err, raw)
+	}
+	found := false
+	check := func(command string, timeout *int) {
+		if command != c.Command {
+			return
+		}
+		found = true
+		if timeout == nil {
+			t.Errorf("%s hook %q reaches hooks.json with no timeout: %s", agent, c.ID, raw)
+		} else if *timeout != c.Timeout {
+			t.Errorf("%s hook %q emits timeout %d, manifest declares %d", agent, c.ID, *timeout, c.Timeout)
+		}
+	}
+	for _, entry := range doc[c.Event] {
+		check(entry.Command, entry.Timeout)
+		for _, h := range entry.Hooks {
+			check(h.Command, h.Timeout)
+		}
+	}
+	if !found {
+		t.Errorf("%s hook %q never reached the emitted hooks at all: %s", agent, c.ID, raw)
+	}
+}
+
+// A trimmed copy of ~/.gemini/config/hooks.json measured 2026-09-24. Orca's group
+// is the only thing in it: five events, two grouped and three flat, which is the
+// split agy's own documentation draws. It is agy's file, not Gemini CLI's
+// settings.json, that agy reads its hooks from.
+const deployedAgyHooks = `{
+  "orca-status": {
+    "PreInvocation":  [{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}],
+    "PostInvocation": [{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}],
+    "Stop":           [{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}],
+    "PreToolUse":     [{"matcher":"*","hooks":[{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}]}],
+    "PostToolUse":    [{"matcher":"*","hooks":[{"type":"command","command":"sh /o/antigravity-hook.sh","timeout":10}]}]
+  }
+}`
+
+func agyGate() HookCommand {
+	return HookCommand{
+		Event: "PreToolUse", ID: "gate", UseMatcher: true, Timeout: 5,
+		Command: "/home/x/.local/bin/dotf harness gate --harness agy",
+	}
+}
+
+// The constraint the whole design turns on, restated for agy: its file is shared
+// with Orca, so ours must appear beside its group and leave it byte for byte.
+func TestMergeNamedHooksLeavesEveryForeignNamedHookUntouched(t *testing.T) {
+	doc := decode(t, deployedAgyHooks)
+	orcaBefore, _ := json.Marshal(doc["orca-status"])
+
+	out, changed, err := MergeNamedHooks(doc, BindMarker, []HookCommand{agyGate()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Error("adding our hook must report changed")
+	}
+	orcaAfter, _ := json.Marshal(out["orca-status"])
+	if string(orcaBefore) != string(orcaAfter) {
+		t.Errorf("Orca's group was altered:\nbefore %s\nafter  %s", orcaBefore, orcaAfter)
+	}
+
+	ours, _ := out[BindMarker].(map[string]any)
+	groups, _ := ours["PreToolUse"].([]any)
+	if len(groups) != 1 {
+		t.Fatalf("want exactly one PreToolUse group under our name, got %v", ours)
+	}
+	group := groups[0].(map[string]any)
+	if group["matcher"] != "*" {
+		t.Errorf("a tool event's group needs a matcher; agy documents \"*\" as every tool, got %v", group["matcher"])
+	}
+	handler := group["hooks"].([]any)[0].(map[string]any)
+	if handler["type"] != "command" || handler["command"] != agyGate().Command || handler["timeout"] != 5 {
+		t.Errorf("handler = %v", handler)
+	}
+	// Ownership is by NAME: a sidecar field inside a handler is not known to be
+	// tolerated by agy's decoder, and a rejected file would drop Orca's hooks too.
+	raw, _ := json.Marshal(out[BindMarker])
+	if strings.Contains(string(raw), managedKey) {
+		t.Errorf("a named hook must not carry the %s sidecar: %s", managedKey, raw)
+	}
+}
+
+func TestMergeNamedHooksIsIdempotentAndReplacesAChangedCommand(t *testing.T) {
+	doc := decode(t, deployedAgyHooks)
+	first, _, err := MergeNamedHooks(doc, BindMarker, []HookCommand{agyGate()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Round-trip through JSON: a re-run reads the file back, where numbers are
+	// float64 and maps are decoded fresh, and must still report no change.
+	raw, _ := json.Marshal(first)
+	second, changed, err := MergeNamedHooks(decode(t, string(raw)), BindMarker, []HookCommand{agyGate()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		t.Error("an unchanged run must report changed=false, so nothing is rewritten")
+	}
+	again, _ := json.Marshal(second)
+	if string(raw) != string(again) {
+		t.Errorf("a re-run altered the document:\n%s\n%s", raw, again)
+	}
+
+	moved := agyGate()
+	moved.Command = "/opt/other/dotf harness gate --harness agy"
+	third, changed, err := MergeNamedHooks(second, BindMarker, []HookCommand{moved})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Error("a changed command must report changed")
+	}
+	groups := third[BindMarker].(map[string]any)["PreToolUse"].([]any)
+	if len(groups) != 1 {
+		t.Errorf("a changed command must replace our entry, not accumulate a second: %v", groups)
+	}
+}
+
+// agy documents two shapes and the wrong one is not an error, it is a hook that
+// never fires: the tool events take a matcher group, the rest a flat list.
+func TestMergeNamedHooksUsesTheShapeEachEventTakes(t *testing.T) {
+	out, _, err := MergeNamedHooks(map[string]any{}, BindMarker, []HookCommand{
+		{Event: "PreInvocation", ID: "a", Command: "x", Timeout: 3},
+		{Event: "Stop", ID: "b", Command: "y"},
+		{Event: "PostToolUse", ID: "c", Command: "z", Matcher: "run_command", UseMatcher: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ours := out[BindMarker].(map[string]any)
+
+	flat := ours["PreInvocation"].([]any)[0].(map[string]any)
+	if flat["command"] != "x" || flat["type"] != "command" {
+		t.Errorf("a flat event carries its handler directly, got %v", flat)
+	}
+	if _, wrapped := flat["hooks"]; wrapped {
+		t.Error("a flat event must not wrap its handler in a group")
+	}
+	if _, has := ours["Stop"].([]any)[0].(map[string]any)["timeout"]; has {
+		t.Error("a zero timeout is omitted so agy applies its own default")
+	}
+
+	group := ours["PostToolUse"].([]any)[0].(map[string]any)
+	if group["matcher"] != "run_command" {
+		t.Errorf("a declared matcher is kept, got %v", group["matcher"])
+	}
+}
+
+// agy's /hooks command toggles `enabled`. Switching a hook back on that a person
+// switched off would override an explicit choice.
+func TestMergeNamedHooksKeepsAPersonsDisableSwitch(t *testing.T) {
+	doc := decode(t, `{"dotfiles-harness":{"enabled":false,"PreToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"old"}]}]}}`)
+	out, changed, err := MergeNamedHooks(doc, BindMarker, []HookCommand{agyGate()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Error("the stale command must still be brought up to date")
+	}
+	ours := out[BindMarker].(map[string]any)
+	if ours["enabled"] != false {
+		t.Errorf("enabled was reset: %v", ours["enabled"])
+	}
+	fresh, _, _ := MergeNamedHooks(map[string]any{}, BindMarker, []HookCommand{agyGate()})
+	if _, has := fresh[BindMarker].(map[string]any)["enabled"]; has {
+		t.Error("a first emission must not invent an enabled field")
+	}
+}
+
+func TestMergeNamedHooksRefusesWhatCannotBeEmitted(t *testing.T) {
+	if _, _, err := MergeNamedHooks(map[string]any{}, "", []HookCommand{agyGate()}); err == nil {
+		t.Error("a hook with no name would be unowned")
+	}
+	if _, _, err := MergeNamedHooks(map[string]any{}, BindMarker, []HookCommand{{Event: "PreToolUse"}}); err == nil {
+		t.Error("a hook with no command must be refused, not emitted empty")
+	}
+}
+
+// The gate moved from Gemini CLI's file to agy's. Retiring the old entry removes
+// exactly ours and nothing beside it.
+func TestRetireHooksRemovesOnlyOurEntry(t *testing.T) {
+	doc := decode(t, `{"hooks":{
+	  "BeforeTool":[
+	    {"hooks":[{"type":"command","command":"sh /o/gemini-hook.sh"}]},
+	    {"hooks":[{"_managed":"dotfiles-harness:gate","type":"command","command":"dotf harness gate --harness agy"}]},
+	    {"hooks":[{"type":"command","command":"sh /o/mixed.sh"},{"_managed":"dotfiles-harness:gate","type":"command","command":"dotf harness gate --harness agy"}]}
+	  ],
+	  "AfterTool":[{"hooks":[{"type":"command","command":"sh /o/gemini-hook.sh"}]}]
+	}}`)
+	foreignBefore := ForeignHookCount(doc)
+
+	out, changed := RetireHooks(doc, "BeforeTool", "gate")
+	if !changed {
+		t.Fatal("our entries were present, so this must report changed")
+	}
+	if got := ForeignHookCount(out); got != foreignBefore {
+		t.Errorf("foreign hooks went from %d to %d", foreignBefore, got)
+	}
+	raw, _ := json.Marshal(out)
+	if strings.Contains(string(raw), "harness gate") {
+		t.Errorf("one of our entries survived: %s", raw)
+	}
+	groups := out["hooks"].(map[string]any)["BeforeTool"].([]any)
+	if len(groups) != 2 {
+		t.Errorf("the group that held only ours goes; the mixed one stays with its foreign hook: %v", groups)
+	}
+	if _, again := RetireHooks(out, "BeforeTool", "gate"); again {
+		t.Error("a second retirement must find nothing to do")
+	}
+}
+
+// An event with nothing left goes with it, so the file does not accumulate empty
+// arrays, and an event we never touched is left exactly as it was.
+func TestRetireHooksDropsAnEventItEmptied(t *testing.T) {
+	doc := decode(t, `{"hooks":{
+	  "BeforeTool":[{"hooks":[{"_managed":"dotfiles-harness:gate","type":"command","command":"x"}]}],
+	  "AfterTool":[{"hooks":[{"type":"command","command":"keep"}]}]
+	}}`)
+	out, changed := RetireHooks(doc, "BeforeTool", "gate")
+	if !changed {
+		t.Fatal("expected a change")
+	}
+	hooks := out["hooks"].(map[string]any)
+	if _, has := hooks["BeforeTool"]; has {
+		t.Error("an emptied event must be removed")
+	}
+	if _, has := hooks["AfterTool"]; !has {
+		t.Error("an event we did not touch was removed")
+	}
+	if _, changed := RetireHooks(decode(t, `{"other":1}`), "BeforeTool", "gate"); changed {
+		t.Error("a document with no hooks key has nothing to retire")
+	}
+}
+
+// TestBindKeyHoldsOnlyFormatsAnOlderBinaryUnderstands is the guard for a skew that
+// was reproduced, not imagined.
+//
+// The manifest is mirrored by setup as soon as it merges; the binary is released
+// separately. A binary from before the hooks-json format existed reads
+// `agents.bind`, ignores every key it does not know, and treats every target in it
+// as claude's shape. dotf 0.57.0 given a manifest with the agy target in `bind`
+// wrote a top-level `hooks` key, with a `_managed` sidecar inside a handler, into a
+// copy of the real ~/.gemini/config/hooks.json: a file agy decodes as protojson and
+// shares with Orca.
+//
+// So a format an older binary does not know must live where it never looks. This
+// asserts that on the REAL manifest, by consequence: every format found in `bind`
+// is one every released binary handles, and the agy target is present under
+// `bind_named`, so the guard cannot pass on a manifest that lost the target.
+func TestBindKeyHoldsOnlyFormatsAnOlderBinaryUnderstands(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", ManifestFile))
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+	var m struct {
+		Agents struct {
+			Bind []struct {
+				Agent  string `json:"agent"`
+				File   string `json:"file"`
+				Format string `json:"format"`
+			} `json:"bind"`
+			BindNamed []struct {
+				Agent  string `json:"agent"`
+				Format string `json:"format"`
+			} `json:"bind_named"`
+		} `json:"agents"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("parse manifest: %v", err)
+	}
+
+	// The formats dotf could emit BEFORE hooks-json existed.
+	understoodByOlderBinaries := map[string]bool{"command-hook": true, "ts-extension": true}
+	if len(m.Agents.Bind) == 0 {
+		t.Fatal("no agents.bind targets were checked; the manifest moved and this guard silently stopped guarding")
+	}
+	for _, b := range m.Agents.Bind {
+		if !understoodByOlderBinaries[b.Format] {
+			t.Errorf("agents.bind target %q has format %q, which an older binary would emit as claude's shape into %s; "+
+				"declare it under agents.bind_named", b.Agent, b.Format, b.File)
+		}
+	}
+
+	found := false
+	for _, b := range m.Agents.BindNamed {
+		if b.Agent == "agy" && b.Format == NamedHooksFormat {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("the agy target is not under agents.bind_named; either it was lost or it moved to a key an older binary reads")
+	}
+}
+
+// LoadBindTargets refuses a target in the wrong key when the manifest loads, so a
+// misplaced entry cannot reach an emitter at all.
+func TestLoadBindTargetsRefusesAFormatInTheWrongKey(t *testing.T) {
+	write := func(t *testing.T, body string) string {
+		t.Helper()
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "harness"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, ManifestFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return root
+	}
+	claude := `{"agent":"claude","file":".claude/settings.json","format":"command-hook"}`
+	agy := `{"agent":"agy","file":".gemini/config/hooks.json","format":"hooks-json"}`
+
+	t.Run("both keys are read and merged", func(t *testing.T) {
+		root := write(t, `{"agents":{"bind":[`+claude+`],"bind_named":[`+agy+`]}}`)
+		got, err := LoadBindTargets(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 2 || got[0].Agent != "claude" || got[1].Agent != "agy" {
+			t.Errorf("targets = %+v, want claude then agy", got)
+		}
+	})
+	t.Run("a hooks-json target under bind is refused", func(t *testing.T) {
+		root := write(t, `{"agents":{"bind":[`+claude+`,`+agy+`]}}`)
+		if _, err := LoadBindTargets(root); err == nil || !strings.Contains(err.Error(), "bind_named") {
+			t.Errorf("want a refusal naming bind_named, got %v", err)
+		}
+	})
+	t.Run("another format under bind_named is refused", func(t *testing.T) {
+		root := write(t, `{"agents":{"bind":[`+claude+`],"bind_named":[{"agent":"x","file":"f","format":"command-hook"}]}}`)
+		if _, err := LoadBindTargets(root); err == nil {
+			t.Error("a claude-shaped target under bind_named must be refused")
+		}
+	})
+	t.Run("an empty bind is still an error", func(t *testing.T) {
+		root := write(t, `{"agents":{"bind_named":[`+agy+`]}}`)
+		if _, err := LoadBindTargets(root); err == nil {
+			t.Error("no bind targets must stay an error: it is indistinguishable from a manifest that moved")
+		}
+	})
 }

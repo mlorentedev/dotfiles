@@ -26,16 +26,17 @@ const managedKey = "_managed"
 
 // HookCommand is one emitted hook.
 type HookCommand struct {
-	// Event is the harness's event name (PreToolUse, BeforeTool, ...).
+	// Event is the harness's event name (PreToolUse, PreInvocation, BeforeTool, ...).
 	Event string
 	// Command is the shell line the harness runs. It calls `dotf harness gate`;
 	// nothing else belongs here, because logic in a hook is logic that cannot be
 	// tested without the harness.
 	Command string
 	// Matcher is emitted only when the harness's schema carries one. Claude's
-	// groups have `matcher`; agy's — measured against ~/.gemini/settings.json —
-	// do not. Emitting claude's shape into agy would be assuming a schema from a
-	// family resemblance.
+	// groups have `matcher`, and so do agy's hooks.json groups for the two tool
+	// events; Gemini CLI's settings.json groups do not. Emitting one harness's
+	// shape into another is assuming a schema from a family resemblance, which is
+	// how the agy binding came to be written against Gemini CLI's file.
 	Matcher string
 	// UseMatcher distinguishes "matcher is empty" from "this harness has no
 	// matcher key at all".
@@ -222,4 +223,136 @@ func ForeignHookCount(doc map[string]any) int {
 		}
 	}
 	return n
+}
+
+// NamedHooksFormat is the `format` of a target whose file is a document of NAMED
+// hooks - agy's hooks.json - rather than claude's `hooks` key of events.
+const NamedHooksFormat = "hooks-json"
+
+// namedGroupedEvents are the hooks.json events whose handlers sit inside a group
+// carrying a `matcher`. Every other event takes its handlers as a flat list.
+// agy's documentation draws the line here: "Grouped (uses matcher & hooks
+// wrapper)" for PreToolUse and PostToolUse, "Flat (list of handler objects
+// directly)" for PreInvocation, PostInvocation and Stop.
+var namedGroupedEvents = map[string]bool{"PreToolUse": true, "PostToolUse": true}
+
+// MergeNamedHooks writes our hooks into a document of named hooks, returning the
+// new document and whether anything changed.
+//
+// THE SHAPE IS NOT claude's, so MergeHooks cannot serve it: the top-level keys
+// are hook NAMES, each mapping to an object of events, and there is no `hooks`
+// key at all. The file is shared - Orca owns `orca-status` in the same document -
+// and agy merges every named hook for an event and runs them in turn, so ours
+// coexists as a sibling key.
+//
+// OWNERSHIP IS BY NAME, which is what the format offers. There is deliberately no
+// `_managed` sidecar inside a handler: agy decodes these files as protojson, an
+// unknown field in a handler is not known to be tolerated, and a rejected
+// hooks.json would silently drop every hook in it, Orca's included. We own the
+// whole value under our name and replace it when it differs; nothing else in the
+// document is read or written.
+//
+// The one field carried over is `enabled`. agy's `/hooks` command toggles it, and
+// switching a hook back on that a person switched off would override an explicit
+// choice. Identical bytes report changed=false, so a re-run writes nothing.
+func MergeNamedHooks(doc map[string]any, name string, cmds []HookCommand) (map[string]any, bool, error) {
+	if name == "" {
+		return nil, false, fmt.Errorf("a named hook needs a name: it is the only thing that marks it ours")
+	}
+	if doc == nil {
+		doc = map[string]any{}
+	}
+
+	// Sorted by event for byte-stable output; stable, so two hooks on one event
+	// keep their declared order.
+	sorted := append([]HookCommand(nil), cmds...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Event < sorted[j].Event })
+
+	want := map[string]any{}
+	for _, c := range sorted {
+		if c.Event == "" || c.Command == "" {
+			return nil, false, fmt.Errorf("hook for event %q has no command", c.Event)
+		}
+		handler := map[string]any{"type": "command", "command": c.Command}
+		if c.Timeout > 0 {
+			handler["timeout"] = c.Timeout
+		}
+		entries, _ := want[c.Event].([]any)
+		if namedGroupedEvents[c.Event] {
+			matcher := c.Matcher
+			if matcher == "" {
+				matcher = "*"
+			}
+			entries = append(entries, map[string]any{"matcher": matcher, "hooks": []any{handler}})
+		} else {
+			entries = append(entries, handler)
+		}
+		want[c.Event] = entries
+	}
+
+	if current, ok := doc[name].(map[string]any); ok {
+		if enabled, has := current["enabled"]; has {
+			want["enabled"] = enabled
+		}
+	}
+
+	if got, ok := doc[name].(map[string]any); ok && sameHook(got, want) {
+		return doc, false, nil
+	}
+	doc[name] = want
+	return doc, true, nil
+}
+
+// RetireHooks removes OUR entry for (event, id) from a claude-shaped settings
+// document, reporting whether anything changed.
+//
+// It is for a hook that moved to another file. Leaving the old entry would keep it
+// firing wherever the old file is still read, with a payload shape it no longer
+// parses - the agy gate sat in Gemini CLI's settings.json for exactly that
+// reason. Only what isOurs recognises is removed; a group that ours emptied goes
+// with it, and an event with no groups left goes too, while a foreign hook in the
+// same group, or a foreign group on the same event, is never touched.
+func RetireHooks(doc map[string]any, event, id string) (map[string]any, bool) {
+	hooks, _ := doc["hooks"].(map[string]any)
+	groups, _ := hooks[event].([]any)
+	if len(groups) == 0 {
+		return doc, false
+	}
+
+	changed := false
+	kept := make([]any, 0, len(groups))
+	for _, g := range groups {
+		group, ok := g.(map[string]any)
+		if !ok {
+			kept = append(kept, g)
+			continue
+		}
+		inner, _ := group["hooks"].([]any)
+		left := make([]any, 0, len(inner))
+		for _, h := range inner {
+			if obj, ok := h.(map[string]any); ok && isOurs(obj, id) {
+				changed = true
+				continue
+			}
+			left = append(left, h)
+		}
+		switch {
+		case len(left) == len(inner):
+			kept = append(kept, g) // nothing of ours in it: leave the group exactly as it was
+		case len(left) == 0:
+			// the group held only our entry: drop it whole
+		default:
+			group["hooks"] = left
+			kept = append(kept, group)
+		}
+	}
+	if !changed {
+		return doc, false
+	}
+	if len(kept) == 0 {
+		delete(hooks, event)
+	} else {
+		hooks[event] = kept
+	}
+	return doc, true
 }
