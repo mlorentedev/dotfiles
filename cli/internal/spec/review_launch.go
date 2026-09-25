@@ -10,20 +10,23 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/shellsafe"
 )
 
-// DefaultReviewerTimeout bounds a reviewer subprocess.
+// DefaultReviewerTimeout bounds a reviewer subprocess, on every runner
+// (HARNESS-152): the launcher wraps each one in `dotf spec deadline`.
 //
-// It has to clear a real review — BUG-074's third round took roughly 25 minutes
-// of wall clock, reading the spec, running the suite and mutation-testing the
-// change — while staying short enough that a STUCK reviewer is noticed rather
-// than waited on. An earlier draft used 90m, which is the wrong end of that
-// trade: a hung run held for an hour and a half before anyone could tell it
-// apart from a slow one, and slow-versus-hung is precisely the distinction a
-// deadline exists to make.
+// It has to clear a real review while staying short enough that a STUCK
+// reviewer is noticed rather than waited on. An earlier draft used 90m, which is
+// the wrong end of that trade: a hung run held for an hour and a half before
+// anyone could tell it apart from a slow one.
 //
-// agy's own --print-timeout defaults to 5m, well under a real review, so this is
-// always passed explicitly rather than inherited. Override per run with
-// `dotf spec review --timeout` when a spec genuinely warrants longer.
-const DefaultReviewerTimeout = 30 * time.Minute
+// It was 30m, and it bound only agy, as its own --print-timeout; pi ran with no
+// deadline at all. Measured on pi: BUG-074's third round took about 25 minutes,
+// and the three SKILL-001 rounds took 31, 39 and more than 63. So the deadline is
+// 45m, and the reviewer's prompt gives it two thirds of that, 30m, as the time to
+// aim for (TimeBudget), so a slow review writes what it verified instead of
+// being stopped with no verdict. agy still gets the same value as its
+// --print-timeout, whose own default of 5m is far shorter than a review.
+// Override per run with `dotf spec review --timeout`.
+const DefaultReviewerTimeout = 45 * time.Minute
 
 // TranscriptFile is where a launched review's machine-readable event stream is
 // written, beside the review.md it produces.
