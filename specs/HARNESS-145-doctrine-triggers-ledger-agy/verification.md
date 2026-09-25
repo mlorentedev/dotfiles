@@ -30,7 +30,11 @@ _Filled by the S2 PR._
 
 ## S3 evidence
 
-_Filled by the S3 PR._
+- `go build`, `go vet` (linux and windows), `go test -count=1 ./...` (25 packages), `golangci-lint`, `shellcheck --severity=error`, `compile-harness.sh --check`, `check-bats-names.sh` and `check-doc-paths.sh`: all pass.
+- `bats tests/*.bats`: 1593 run, 1 failure, the environmental oh-my-zsh snapshot (#1641), which is also red on plain main on this machine.
+- AC3: `TestSessionsWithNoIDShareNoLedger` drives two payload shapes end to end (a `--role` override and an agent-id-only payload) and fails on the old code; restoring the digest-of-nothing key fails both subtests.
+- `TestAnEmptyScopeHasNoStateFile`, `TestDecisionPathNeverFallsBackToTheDigestOfNothing` and `TestConsumptionScopeNeedsASession` pin the pieces the end-to-end test stands on.
+- Executable production lines: +45 / -7 across `gate.go`, `dispatch.go`, `decision.go` and `harness_gate.go` (comments and blank lines excluded).
 
 ## S4 evidence
 

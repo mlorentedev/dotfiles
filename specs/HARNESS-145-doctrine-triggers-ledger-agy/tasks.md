@@ -31,8 +31,8 @@ created: "2026-09-25"
 
 ## S3 - ledger (AC3)
 
-- [ ] [AC3] Failing end-to-end test: two payloads with no session id share one ledger
-- [ ] [AC3] No session id means no storage: allow and journal `session-unscoped`
+- [x] [AC3] Failing end-to-end test: two payloads with no session id share one ledger
+- [x] [AC3] No session id means no storage: allow and journal `session-unscoped`
 
 ## S4 - agy (AC4), after S3
 
