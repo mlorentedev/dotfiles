@@ -86,6 +86,11 @@ was being got wrong, and it belongs where it can be tested.`,
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", thread)
 				return nil
 			}
+			// A block nobody wrote this session moves, so say so (#1651). On stderr,
+			// because under --dry-run stdout is the document itself.
+			if legacy, ok := mem.LegacyThreadKey(string(current)); ok {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
+			}
 			if dryRun {
 				_, _ = fmt.Fprint(cmd.OutOrStdout(), updated)
 				return nil
