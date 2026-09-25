@@ -150,3 +150,39 @@ func TestSuggestFromHookNeverExitsNonZero(t *testing.T) {
 		})
 	}
 }
+
+// HARNESS-147: the hook resolves prerequisites from the records beside its
+// triggers, not from the map compiled into the binary. Measured on 2026-09-25:
+// an installed 0.58.0 kept suggesting a skill SKILL-001 had retired, because the
+// retirement reached the records at deploy and the compiled map only at release.
+func TestSuggestFromHookReadsPrerequisitesFromTheRecords(t *testing.T) {
+	root := repoRootForTest(t)
+	alt := t.TempDir()
+	if err := os.CopyFS(filepath.Join(alt, "harness", "agents"), os.DirFS(filepath.Join(root, "harness", "agents"))); err != nil {
+		t.Fatal(err)
+	}
+	triggers, err := os.ReadFile(filepath.Join(root, "harness", "triggers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(alt, "harness", "triggers.json"), triggers, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rec := filepath.Join(alt, "harness", "skills", "test-driven-development")
+	if err := os.MkdirAll(rec, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rec, "SKILL.md"),
+		[]byte("---\nname: test-driven-development\nrequires: [test, only-in-the-records]\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := executeStdin(t, `{"prompt":"add tests for this and use TDD"}`,
+		"harness", "suggest", "--from-hook", "--repo-root", alt)
+	if err != nil {
+		t.Fatalf("from-hook must never error: %v (stderr %s)", err, stderr)
+	}
+	if !strings.Contains(stdout, "only-in-the-records") {
+		t.Errorf("the record's requires: did not reach the suggestion:\n%s", stdout)
+	}
+}
