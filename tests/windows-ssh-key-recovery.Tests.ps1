@@ -11,7 +11,7 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
         $script:Registry = Join-Path $script:Repo 'secrets\registry.yaml'
         $script:SshConfig = Join-Path $script:Repo 'ssh\config'
         $script:Runbook = Join-Path $script:Repo 'docs\runbooks\windows-ssh-key-recovery.md'
-        $script:Features = Join-Path $script:Repo 'specs\OPS-048-windows-ssh-key-recovery\features.json'
+        $script:Features = Join-Path $script:Repo 'specs\archive\OPS-048-windows-ssh-key-recovery\features.json'
         $script:Sandbox = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-ops048-$PID"
         New-Item -ItemType Directory -Path $script:Sandbox -Force | Out-Null
     }
@@ -270,6 +270,10 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             $runbook | Should -Match 'BatchMode=yes'
             $runbook | Should -Match 'server host-key fingerprint'
             $runbook | Should -Match 'Update\s+the expected public fingerprint'
+        }
+
+        It 'retains the archived feature contract' {
+            $script:Features | Should -Exist
         }
 
         It 'requires Windows Pester evidence for every acceptance criterion' {
