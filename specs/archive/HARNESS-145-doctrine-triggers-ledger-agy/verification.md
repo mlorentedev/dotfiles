@@ -93,7 +93,7 @@ Run on 2026-09-25 after all four slices and release 0.58.0 merged (`e1c5754`), f
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-145-doctrine-triggers-ledger-agy/` -> `specs/archive/HARNESS-145-doctrine-triggers-ledger-agy/`
-- [ ] Bitácora board ticket moved to Done / closed with the closing PR (ADR-018)
-- [ ] Promotions above executed
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-145-doctrine-triggers-ledger-agy/` -> `specs/archive/HARNESS-145-doctrine-triggers-ledger-agy/`
+- [x] Bitácora board ticket closed by the closing PR: the archive PR carries `Closes #1682`, and the board moves it to Done on merge (ADR-018)
+- [x] Promotions above executed: lessons 292 and 293, the ADR-027 amendment and the ADR-010 row, all in S4 (#1688)
