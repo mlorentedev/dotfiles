@@ -15,6 +15,15 @@ created: "2026-09-25"
   - The skill's `handoff-write` command passes `--agent <agent>`, with the agent's own harness name, and says what a fork means.
   - The same edit fixes the skill's other agent-specific line: `dotf mem thread … --agent claude` became `--agent <agent>`. Before it, a pi, agy, Copilot, opencode or Codex session following the skill named its journal as claude's, and its `Journal:` line then attributed its block to claude, which is the attribution this spec reads.
 
+## Review scope
+
+This spec's change is two pieces:
+
+- slice 1, merged to main as #1711 (`6436c71`);
+- slice 2, this branch's commits after `280af58`.
+
+The commits between them on main belong to other specs (#1714, #1715, #1716, #1721, #1724 and the 0.59.0 release). The review base the launcher resolves spans them too, so judge only the files this spec names: `cli/internal/mem/handoff.go`, `cli/internal/cmd/mem_handoff.go`, their tests, `harness/skills/handoff/SKILL.md` and this folder.
+
 ## Test status
 
 - `go build ./... && go vet ./... && go test ./... -count=1` in `cli/`: every package ok.
