@@ -372,13 +372,13 @@ func TestReviewerCommandGivesPiThePromptAsATrailingPositional(t *testing.T) {
 // review is killed mid-flight; too long and a stuck run is indistinguishable
 // from a working one for as long as it lasts.
 //
-// This bounds the default from both sides. The floor is the ~25 minutes
-// BUG-074's third round actually took; the ceiling is the mistake this replaced,
-// a 90m default under which a hung reviewer held for an hour and a half before
-// anyone could tell.
+// This bounds the default from both sides. The floor keeps the reviewer's target,
+// two thirds of the deadline (TimeBudget), at or above the ~25 minutes a real
+// review has taken. The ceiling is the mistake this replaced: a 90m default under
+// which a hung reviewer held for an hour and a half before anyone could tell.
 func TestDefaultReviewerTimeoutIsBoundedFromBothSides(t *testing.T) {
-	if DefaultReviewerTimeout < 26*time.Minute {
-		t.Errorf("too short: a real review took ~25m, got %s", DefaultReviewerTimeout)
+	if DefaultReviewerTimeout*2/3 < 25*time.Minute {
+		t.Errorf("too short: the target, two thirds of %s, is under the ~25m a real review took", DefaultReviewerTimeout)
 	}
 	if DefaultReviewerTimeout > 45*time.Minute {
 		t.Errorf("too long: a stuck reviewer must be noticed, not waited on, got %s", DefaultReviewerTimeout)
