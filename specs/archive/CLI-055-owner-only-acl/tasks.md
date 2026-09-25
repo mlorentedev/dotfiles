@@ -36,7 +36,7 @@ Reviewed at the landing commit `3f554ad` (#1380) by `nan/deepseek-v4-flash`. Eve
 - [x] F1: every verifier that names a Windows-only test runs it on Windows and, elsewhere, requires it to exist and compile, so a missing test fails the verifier
 - [x] f4 names its platform, and says why it exits 1 elsewhere
 - [x] F7: the account premise matches CI (an administrator on the hosted runner, a domain account on the box)
-- [x] Round 3 review passes before archive (PASS WITH GAPS, `nan/glm5.3-flash`)
+- [x] Round 3 review passes before archive
 
 ## Closing
 

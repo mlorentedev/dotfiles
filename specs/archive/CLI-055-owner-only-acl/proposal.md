@@ -1,7 +1,7 @@
 ---
 id: "CLI-055-owner-only-acl"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-29"
 issue: "mlorentedev/dotfiles#1302"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -80,3 +80,5 @@ Observable outcomes. Each must be testable.
 
 - Bitácora board: #1302. Related: #987 (declared modes), CLI-039.
 - `cli/internal/deploy/deploy.go` (`stage`, `commit`), `cli/internal/secrets/render.go` (`AtomicWriteMode`), `golang.org/x/sys/windows` (already a direct dependency).
+
+<!-- archived 2026-09-24 — PR: https://github.com/mlorentedev/dotfiles/pull/1681 -->
