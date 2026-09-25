@@ -64,6 +64,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+list_tracked_markdown() {
+    if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git -C "$REPO_ROOT" ls-files '*.md'
+        return
+    fi
+    if command -v git.exe >/dev/null 2>&1; then
+        (
+            cd "$REPO_ROOT"
+            git.exe ls-files '*.md'
+        )
+    fi
+}
+
 if [ "$#" -eq 0 ]; then
     # Auto-discover instruction files when invoked without arguments (BUG-088, #1021).
     # Governed files: all active agent instructions and READMEs.
@@ -79,10 +92,10 @@ if [ "$#" -eq 0 ]; then
     #              documented above owns it, not this exclusion.
     #   specs/   — per-feature historical proposals and archived logs, not standing instructions
     #   docs/    — historical decision records/lessons mentioning retired scripts by design
-    if command -v git >/dev/null 2>&1 && { [ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ]; }; then
+    if { [ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ]; }; then
         while IFS= read -r _f; do
             [ -n "$_f" ] && set -- "$@" "$_f"
-        done < <(git -C "$REPO_ROOT" ls-files '*.md' 2>/dev/null \
+        done < <(list_tracked_markdown 2>/dev/null \
             | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md|README\.md)$' \
             | grep -vE '^harness/|^specs/|^docs/' || true)
     fi

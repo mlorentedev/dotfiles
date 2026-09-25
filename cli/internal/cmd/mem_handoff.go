@@ -27,6 +27,7 @@ func newMemHandoffWriteCmd() *cobra.Command {
 	var (
 		memoryPath string
 		thread     string
+		agent      string
 		dryRun     bool
 	)
 
@@ -45,15 +46,31 @@ detached HEAD falls back to worktree@host rather than guessing.
 Pass --thread to override — a session that switches branches mid-flight re-keys
 otherwise, and the line of work may well be the one it started on.
 
+Run from a repository that is not the project --memory belongs to (the vault
+checkout writing a project's MEMORY.md), the current branch names no line of work
+there, so handoff-write refuses without --thread and names the key it would have
+used (#1606).
+
+Pass --agent to name the writer. It is stamped into the heading as
+"(writer: <agent>)", and a block another agent wrote under the same key is kept:
+this write goes to <thread>+<agent> instead, and stderr names both agents and the
+key. An unstamped block's writer is read from its Journal line; a block nothing
+attributes is replaced as before. Without --agent nothing is stamped or forked
+(#1690).
+
 Skills should call this instead of instructing an Edit: the merge is the part that
 was being got wrong, and it belongs where it can be tested.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if thread == "" {
-				thread = mem.ThreadKeyForCwd()
-			}
 			if memoryPath == "" {
 				return fmt.Errorf("--memory is required (the project's MEMORY.md)")
+			}
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("resolve the current directory: %w", err)
+			}
+			if thread, err = mem.HandoffThread(thread, memoryPath, wd); err != nil {
+				return err
 			}
 
 			body, err := io.ReadAll(cmd.InOrStdin())
@@ -63,54 +80,85 @@ was being got wrong, and it belongs where it can be tested.`,
 			if len(body) == 0 {
 				return fmt.Errorf("empty handoff body — refusing to blank a thread, which is the clobber this command exists to prevent")
 			}
+			for _, w := range mem.ThreadWarnings(string(body)) {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning    %s\n", w)
+			}
 
 			current, err := os.ReadFile(memoryPath) // #nosec G304 -- operator-supplied path
 			if err != nil {
 				return fmt.Errorf("read %s: %w", memoryPath, err)
 			}
 
-			updated, changed, err := mem.WriteThread(string(current), thread, string(body))
+			res, err := mem.WriteThreadAs(string(current), thread, agent, string(body))
 			if err != nil {
 				return err
 			}
-			if !changed {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", thread)
+			updated := res.Content
+			// The one outcome where the handoff is not where its writer asked,
+			// so it is said every time, written or unchanged (#1690).
+			if res.Kept != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
+					thread, res.Kept, agent, res.Key)
+			}
+			if !res.Changed {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
 				return nil
+			}
+			// A block nobody wrote this session moves, so say so (#1651). On stderr,
+			// because under --dry-run stdout is the document itself.
+			if legacy, ok := mem.LegacyThreadKey(string(current)); ok {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
 			}
 			if dryRun {
 				_, _ = fmt.Fprint(cmd.OutOrStdout(), updated)
 				return nil
 			}
-			// Written through a temp file in the same directory: a half-written
-			// MEMORY.md is the one outcome worse than a clobbered one, and the
-			// file is read at the start of every session.
-			tmp, err := os.CreateTemp(filepath.Dir(memoryPath), ".handoff-*")
-			if err != nil {
-				return fmt.Errorf("stage the write: %w", err)
+			if err := replaceMemoryFile(memoryPath, updated); err != nil {
+				return err
 			}
-			tmpName := tmp.Name()
-			if _, err := tmp.WriteString(updated); err != nil {
-				_ = tmp.Close()
-				_ = os.Remove(tmpName)
-				return fmt.Errorf("stage the write: %w", err)
-			}
-			if err := tmp.Close(); err != nil {
-				_ = os.Remove(tmpName)
-				return fmt.Errorf("stage the write: %w", err)
-			}
-			if err := os.Rename(tmpName, memoryPath); err != nil {
-				_ = os.Remove(tmpName)
-				return fmt.Errorf("replace %s: %w", memoryPath, err)
-			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", thread, memoryPath)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, memoryPath)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&memoryPath, "memory", "", "path to the project's MEMORY.md")
 	cmd.Flags().StringVar(&thread, "thread", "", "thread key (default: this checkout's branch)")
+	cmd.Flags().StringVar(&agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the result instead of writing it")
 	return cmd
+}
+
+// replaceMemoryFile writes content over path through a temp file in the same
+// directory: a half-written MEMORY.md is the one outcome worse than a clobbered
+// one, and the file is read at the start of every session.
+//
+// The file keeps the mode it had. os.CreateTemp makes the temp file 0600, and
+// renaming it over MEMORY.md used to narrow every file this command wrote; a
+// file shared with other tools is not ours to re-permission, the rule harness
+// bind follows for settings files.
+func replaceMemoryFile(path, content string) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".handoff-*")
+	if err != nil {
+		return fmt.Errorf("stage the write: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("stage the write: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("stage the write: %w", err)
+	}
+	if fi, err := os.Stat(path); err == nil {
+		if err := os.Chmod(tmpName, fi.Mode().Perm()); err != nil {
+			return fmt.Errorf("stage the write: %w", err)
+		}
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("replace %s: %w", path, err)
+	}
+	return nil
 }
 
 // newMemThreadCmd prints this session's thread key and journal filename, so a

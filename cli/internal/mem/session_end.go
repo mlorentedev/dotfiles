@@ -10,7 +10,9 @@ package mem
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,9 +26,11 @@ type sessionEndPayload struct {
 }
 
 // SessionEnd archives the "## Session Handoff" block that /handoff wrote into the
-// project's MEMORY.md (under vaultPath) into an append-only, timestamped record at
+// project's MEMORY.md (under vaultPath) into a session record at
 //
-//	<vaultPath>/10_projects/<project>/sessions/<date>-<project>-claude.md
+//	<vaultPath>/10_projects/<project>/sessions/<JournalName(...)>
+//
+// unless a journal already exists there, which it never touches (#1620).
 //
 // It is the Go port of session-handoff.{sh,ps1} (MEMORY-001, ADR-014). The agent
 // authors the handoff (via /handoff, with reasoning); this only persists it.
@@ -105,8 +109,28 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	// different one, so the hook's archive and the skill's journal would drift
 	// into two files per session. Sharing JournalName removes the second
 	// convention rather than documenting it.
+	//
+	// ONLY A FALLBACK, NEVER A REPLACEMENT (#1620). Sharing the name is what made
+	// the truncating write destructive: /handoff writes the authored journal to
+	// this same path, and the session's end replaced it with a copy of the MEMORY
+	// block, reporting success. O_EXCL makes the hook write only where no journal
+	// exists yet. A later session on the same day and thread keeps the first
+	// record; the block it would have copied is still in MEMORY.md and its history.
 	out := filepath.Join(outDir, JournalName(date, project, "claude", ThreadKey(p.Cwd)))
-	if err := os.WriteFile(out, []byte(buildRecord(date, project, sid, block)), 0o644); err != nil {
+	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if errors.Is(err, fs.ErrExist) {
+		return "", nil // a journal is already there: not ours to replace
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.WriteString(buildRecord(date, project, sid, block)); err != nil {
+		_ = f.Close()
+		_ = os.Remove(out) // never leave a half-written record where a journal belongs
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(out)
 		return "", err
 	}
 	return out, nil

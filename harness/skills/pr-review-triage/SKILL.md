@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: c7e81534f6563444
+generated_sha: 412771d21d35ded3
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -20,6 +20,7 @@ allowed-tools: [Bash, Read, Grep]
 keywords: [pr review triage, triage pr, review bot comments, revisa comentarios pr,
   ci triage]
 paths: [.github/workflows/**]
+requires: [adversarial-review]
 ---
 # /pr-review-triage — dispose of what the PR came back with
 

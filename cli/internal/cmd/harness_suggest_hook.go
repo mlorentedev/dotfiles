@@ -73,14 +73,17 @@ func runSuggestFromHook(cmd *cobra.Command, repoRoot string) error {
 		return nil
 	}
 
-	sugg := harness.Suggest(cfg.Triggers, prompt, nil)
+	// Prerequisites come from the records at the same root (HARNESS-147), so they
+	// change when the records deploy, not when a new binary is installed.
+	deps := harness.SkillDependencies(root)
+	sugg := harness.SuggestWithDeps(cfg.Triggers, prompt, nil, deps)
 	roles := harness.ResolveRoles(sugg, personas)
 
 	rule := ""
 	if len(sugg.Patterns) > 0 {
 		rule = sugg.Patterns[0]
 	}
-	if out := harness.FormatSuggestion(roles, rule, sugg.Skills); out != "" {
+	if out := harness.FormatSuggestion(roles, rule, sugg.Skills, deps); out != "" {
 		_, _ = fmt.Fprint(cmd.OutOrStdout(), out)
 	}
 	return nil

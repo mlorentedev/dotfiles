@@ -34,6 +34,7 @@ func newSpecCmd() *cobra.Command {
 	cmd.AddCommand(newSpecArchiveCmd())
 	cmd.AddCommand(newSpecAuditCmd())
 	cmd.AddCommand(newSpecTranscriptSinkCmd())
+	cmd.AddCommand(newSpecDeadlineCmd())
 	return cmd
 }
 
@@ -203,8 +204,7 @@ is the only record of how.`,
 					"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
 			}
 
-			prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA)
-			argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
+			argv, err := reviewerArgv(chosen, id, repoRoot, skill, baseSHA, timeout)
 			if err != nil {
 				return err
 			}
@@ -293,7 +293,7 @@ is the only record of how.`,
 	cmd.Flags().BoolVar(&foreground, "foreground", false, "run in this terminal instead of a detached tmux session")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command that would run, and exit")
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
-		"how long the reviewer may run before it is killed; a stuck run should be noticed, not waited on")
+		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
 	return cmd
 }
 
@@ -318,6 +318,67 @@ growing length (#995).`,
 			return spec.SinkTranscript(cmd.InOrStdin(), cmd.OutOrStdout(), args[0])
 		},
 	}
+}
+
+// reviewerArgv is the pooled runner's command with its prompt, the time budget
+// included, under the deadline every runner gets in both modes (HARNESS-152).
+// Only agy used to be bounded, through its own --print-timeout.
+func reviewerArgv(chosen spec.ReviewerEntry, id, repoRoot, skill, baseSHA string, timeout time.Duration) ([]string, error) {
+	if timeout <= 0 {
+		timeout = spec.DefaultReviewerTimeout
+	}
+	prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA) +
+		"\n" + spec.TimeBudget(time.Now(), timeout)
+	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	return deadlineWrap(timeout, argv), nil
+}
+
+// newSpecDeadlineCmd is plumbing, like transcript-sink: `spec review` runs every
+// reviewer under it, so the --timeout it promises binds whichever runner the
+// pool drew (HARNESS-152).
+func newSpecDeadlineCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "deadline <duration> -- <command> [args...]",
+		Short: "Internal: run a reviewer and stop it, with every process it started, at a deadline",
+		Long: `Run the command, and stop it and every process it started when the duration
+passes. A stopped run exits 124 and says so on stderr: the time limit ended it,
+not a verdict. Otherwise the command's own exit status passes through.`,
+		Hidden:        true,
+		Args:          cobra.MinimumNArgs(2),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			limit, err := time.ParseDuration(args[0])
+			if err != nil || limit <= 0 {
+				return fmt.Errorf("deadline %q: want a positive duration such as 45m", args[0])
+			}
+			code, stopped, err := spec.RunWithDeadline(limit, args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+			if err != nil {
+				return err
+			}
+			if stopped {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
+			}
+			if code != 0 {
+				return withExitCode(code, fmt.Errorf("exit %d", code))
+			}
+			return nil
+		},
+	}
+}
+
+// deadlineWrap runs argv under this binary's `spec deadline`, resolved by
+// absolute path for the reason transcriptSink gives: the command runs detached,
+// and a `dotf` found on PATH may be a build without the subcommand.
+var deadlineWrap = func(timeout time.Duration, argv []string) []string {
+	self, err := os.Executable()
+	if err != nil {
+		self = "dotf"
+	}
+	return append([]string{self, "spec", "deadline", timeout.String(), "--"}, argv...)
 }
 
 // transcriptSink names the command the reviewer's stdout is piped into.

@@ -1,7 +1,7 @@
 ---
 id: "AI-042-trusted-folders-render"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-29"
 issue: "mlorentedev/dotfiles#1334"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, copilot, agy, deploy, windows]
@@ -40,8 +40,10 @@ starts with a trust prompt. `tests/antigravity.bats` guards this class for one f
 - `ai/copilot/config.json` → four templated entries (`{HOME}/Projects`, `{HOME}/Projects/*`,
   `{HOME}/Projects/Workspace`, `{HOME}/Projects/Workspace/*`), one list for both OSes.
   `ai/agy/settings.json` → two templated `trustedWorkspaces`, and the file becomes a manifest entry
-  (`agy-settings`, replace, `paths: slash`, `requires: agy`) instead of a `deploy_file` /
-  `Copy-Item` in each setup — the third twin ADR-020 says to collapse on touch.
+  (`agy-settings`, merge, `paths: slash`, `requires: agy`) instead of a `deploy_file` /
+  `Copy-Item` in each setup. Its nested objects and lists merge without removing
+  agy's runtime-created trust and permission entries — the third twin ADR-020
+  says to collapse on touch.
 - `tests/copilot-config.bats` (renamed scope: Copilot + agy trust lists) refutes any `/home/<user>`,
   `C:\Users\<user>` or `C:/Users/<user>` literal across `ai/**/*.json`, and asserts the templates.
 - `dotf doctor`'s manifest check needs nothing new: `PlanConfig` expands before comparing.
@@ -68,8 +70,9 @@ starts with a trust prompt. `tests/antigravity.bats` guards this class for one f
 
 Observable outcomes. Each must be testable.
 
-- [ ] AC1 — `paths: native` expands `{HOME}` inside JSON string values and renders those strings with
-  the OS separator; `paths: slash` renders them with `/`; strings without a token are untouched;
+- [ ] AC1 — `paths: native` expands `{HOME}` inside JSON string values and renders strings that
+  begin with a token with the OS separator; `paths: slash` renders those paths with `/`; tokens in
+  longer strings such as URLs expand without converting the surrounding separators; strings without a token are untouched;
   the output is valid JSON (a Windows path is escaped by the encoder); an unknown `paths` value and
   a non-JSON source with `paths` are rejected naming the entry.
 - [ ] AC2 — `paths` composes with `merge` (expansion before the merge, unmanaged destination keys

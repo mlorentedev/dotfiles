@@ -12,14 +12,14 @@ created: "2026-09-25"
 ## Setup
 
 - [x] Ticket `mlorentedev/dotfiles#1689` filed and on the board
-- [ ] `proposal.md` reviewed on the spec PR (the design options it takes from the research note are confirmed or overruled)
-- [ ] #1606, #1620 and #1651 merged (slice 0: they lose or misplace data in the source `resume` reads)
+- [x] `proposal.md` reviewed on the spec PR (the design options it takes from the research note are confirmed or overruled)
+- [x] #1606, #1620 and #1651 merged (slice 0: they lose or misplace data in the source `resume` reads)
 
 ## Slice 1 - thread schema (depends on slice 0)
 
-- [ ] [AC2] Failing test: `ParseThread` reads every canonical label, maps `Verify at start` and `Judgment calls left open` to `Verify` and `Awaiting Manu`, and keeps an unknown label rather than dropping it
-- [ ] [AC2] Implement `ParseThread` and the canonical label set in `cli/internal/mem`
-- [ ] Failing test, then implementation: `handoff-write` names a missing `Next action` or an unknown label on stderr and still writes
+- [x] [AC2] Failing test: `ParseThread` reads every canonical label, maps `Verify at start` and `Judgment calls left open` to `Verify` and `Awaiting Manu`, and keeps an unknown label rather than dropping it
+- [x] [AC2] Implement `ParseThread` and the canonical label set in `cli/internal/mem`
+- [x] Failing test, then implementation: `handoff-write` names a missing `Next action` or an unknown label on stderr and still writes
 
 ## Slice 2 - per-thread store and derived index entry (depends on slice 1)
 
