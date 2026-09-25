@@ -3,35 +3,35 @@
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f1",
     "behavior": "The committed records keep the capped agy surface under 8000 characters and pure ASCII",
     "verification": "bats tests/compile-harness.bats --filter 'committed records keep the capped agy surface under 8000 characters'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "1 bats test (1..1) passes on main e1c5754; the deployed GEMINI.md is 7,798 characters and 7,798 bytes"
   },
   {
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f2",
     "behavior": "A trigger naming an absent pattern is refused at refresh and reported by doctor",
     "verification": "bats tests/compile-harness.bats --filter 'refresh fails naming the trigger and pattern' && (cd cli && go test ./internal/doctor -run TestCheckTriggerTargets_DanglingTriggerFailsAndIsNamed)",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "the bats test (1..1) and TestCheckTriggerTargets_DanglingTriggerFailsAndIsNamed pass on main e1c5754"
   },
   {
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f3",
     "behavior": "Two payloads with no session id share no ledger, and a payload that claims the reserved journal name is read as naming no session",
     "verification": "cd cli && go test ./internal/cmd -run 'TestSessionsWithNoIDShareNoLedger|TestTheReservedJournalNameIsNotASession'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestSessionsWithNoIDShareNoLedger and TestTheReservedJournalNameIsNotASession pass on main e1c5754"
   },
   {
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f4",
     "behavior": "An agy payload is parsed, answered in agy's protocol and bound in hooks.json; an older binary emits nothing wrong",
     "verification": "cd cli && go test ./internal/cmd ./internal/harness -run 'TestAgyAnswersInItsOwnProtocol|TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry|TestBindKeyHoldsOnlyFormatsAnOlderBinaryUnderstands'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestAgyAnswersInItsOwnProtocol, TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry and TestBindKeyHoldsOnlyFormatsAnOlderBinaryUnderstands pass on main e1c5754"
   },
   {
     "id": "HARNESS-145-doctrine-triggers-ledger-agy-f5",
-    "behavior": "A real agy tool call leaves a recognised decision record that names a conversation id",
-    "verification": "grep -h '\"harness\":\"agy\"' ~/.local/state/dotfiles/gate/*.decisions.jsonl | grep '\"session\":\"[^\"]\\+\"' | grep -qv '\"outcome\":\"payload-unrecognised\"'",
-    "state": "pending",
-    "evidence": ""
+    "behavior": "A real agy tool call leaves a recognised decision record that names a real conversation id",
+    "verification": "grep -h '\"harness\":\"agy\"' ~/.local/state/dotfiles/gate/*.decisions.jsonl | grep -E '\"session\":\"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\"' | grep -qv '\"outcome\":\"payload-unrecognised\"'",
+    "state": "passing",
+    "evidence": "exit 0 after the operational tail: the record for conversation 8917b453-b620-4c9d-9d0e-ac1c21991bd9 (view_file, 2026-09-25T08:25:03Z). Exit 1 on four negative controls: a synthetic session id, no session, payload-unrecognised, another harness. The previous verifier also accepted the synthetic test-1 and test-2 records"
   }
 ]
