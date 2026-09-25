@@ -95,3 +95,46 @@ func TestWriteThreadNamesAnUndatedLegacyBlockAndNeverCollides(t *testing.T) {
 		t.Error("a section with no un-threaded text reported a legacy block")
 	}
 }
+
+// MEMORY-010 (#1725): the section may open with a standing preamble that is not
+// a handoff: the pointers to superseded blocks, the size rule, and a list of
+// live items every thread points at. The dotfiles MEMORY.md has exactly this
+// shape, and #1703 moved it into a "legacy-undated" thread, filing the live
+// items as superseded and leaving "only LIVE items below" pointing at nothing.
+const memoryWithAStandingPreamble = `# Project Memory
+
+## Session Handoff
+
+> Superseded blocks: [pre-2026-08-11](archive/superseded-handoffs-pre-2026-08-11.md)
+> **Only LIVE items below; keep this file under ~17KB.** Anything past the read cap is invisible.
+
+### Live items carried forward
+
+- **#1334 reopened** — its fix commits are not in main.
+- Also open: #1251, #1265.
+
+### thread: feat-harness-hardening
+
+**Last task:** hardening.
+**Next action:** merge it.
+`
+
+func TestWriteThreadLeavesAStandingPreambleInPlace(t *testing.T) {
+	if key, ok := LegacyThreadKey(memoryWithAStandingPreamble); ok {
+		t.Errorf("a standing preamble was read as a legacy handoff, to be moved into %q", key)
+	}
+	out, _, err := WriteThread(memoryWithAStandingPreamble, "feat-x", "**Next action:** new work.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "### thread: legacy-") {
+		t.Errorf("the preamble was moved into a legacy thread:\n%s", out)
+	}
+	preamble := memoryWithAStandingPreamble[strings.Index(memoryWithAStandingPreamble, "## Session Handoff"):strings.Index(memoryWithAStandingPreamble, "### thread:")]
+	if !strings.Contains(out, preamble) {
+		t.Errorf("the preamble did not stay where it was:\n%s", out)
+	}
+	if strings.Index(out, "### Live items carried forward") > strings.Index(out, "### thread: feat-harness-hardening") {
+		t.Error("the live items moved below the threads")
+	}
+}
