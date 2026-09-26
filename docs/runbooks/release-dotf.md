@@ -14,6 +14,19 @@ This runbook covers going from a merged release PR to a verified `dotf` on a mac
 - Run every step from the main checkout (`~/Projects/dotfiles`, on `main`, pulled). Never run them from a worktree whose branch predates main (HARNESS-153).
 - Never edit `~/.dotfiles` by hand.
 
+## When to cut a release
+
+release-please keeps one release PR open and adds every merged change to it. Merging that PR cuts the release, so leaving it open is how changes accumulate, at no cost.
+
+Merge the release PR when one of these holds:
+
+1. **A next step needs the binary installed.** A merged change under `cli/` takes effect only once installed: a check that `dotf` runs, or a subcommand someone is about to use.
+2. **A merged fix removes a live hazard that has no workaround.** The hazard must be one that sessions hit with the installed binary.
+
+Otherwise, let it accumulate. Skill records, doctrine, CI, scripts and documentation need no release. They reach every agent through `dotf harness mirror` and `scripts/compile-harness.sh --deploy`, run from main.
+
+While a fix waits, tell live peers about the hazard and its workaround. For #1725, that was a `--dry-run` before `dotf mem handoff-write`.
+
 ## Steps
 
 1. **Merge the release PR** (`chore(main): release X.Y.Z`). Manu merges it; an agent does not.
