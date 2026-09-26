@@ -28,7 +28,18 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
       Red/green proven against two real fixtures: this machine's pre-fix `~/.claude/agents`
       (**RED**, `checked=7`, all seven named) and a deploy from this tree (**GREEN**,
       `checked=7`). Neither is vacuous.
-- [ ] **AC4** -> **still open, with a named blocker rather than a vague one.** The deployed
+- [x] **AC4** -> **met by a real dispatch, measured 2026-09-25** (during the retroactive review).
+      In Claude Code session `ecf54655-fb1c-42b2-8dcb-570d05a5825f` (kubelab, started after the
+      deploy), a background subagent whose `meta.json` says `"agentType":"reviewer"`
+      (`agent-af16cbb2229fa45fb`, "Adversarial review of role path fix") invoked the `Skill` tool
+      with `adversarial-review` (a second, `agent-ad881183ccc4a5da6`, invoked another skill), and the
+      gate wrote `skill-consumed` records carrying `"agent_type":"reviewer"` for that session,
+      e.g. `{"ts":"2026-09-25T02:11:11Z","session":"ecf54655-…","agent_type":"reviewer",
+      "skill":"adversarial-review","outcome":"skill-consumed"}`. The blocker recorded below (agent
+      definitions frozen at session start) is what a session started after the deploy removes.
+      f4 now checks exactly this join, ledger record to subagent transcript, so the
+      `printf` into the gate that the first retroactive review used to pass the old grep exits 1.
+      Earlier note, kept for the record: the deployed
       `~/.claude/agents/reviewer.md` carries `Skill` after the deploy, and a dispatched reviewer
       nonetheless reported its tools as `Read, Bash, advisor`. That matches the roster loaded at
       the *dispatching session's* start, not the file on disk. **Agent definitions are frozen at
@@ -109,6 +120,39 @@ it shipped, by looking at it, and was invisible to the exit code, the stderr and
 alike. It also generalises lesson 255 — **both** identity fields are caller-influenced, not just
 `agent_id`.
 
+## Retroactive review (2026-09-25, W1.4 of #1625)
+
+Reviewed from a detached worktree at `8fecec6` (#1435), with that commit's own `dotf` first on
+`PATH`. The launcher's scope was `16d8f96^...HEAD`, which covers both of this spec's PRs (#1428,
+#1435) and also #1433 (OPS-040), which merged between them. All nine `features.json` verifiers
+passed there before either round. f8 deploys into a throwaway `HOME`.
+
+**Round 1, `nan/deepseek-v4-flash`, FAIL.** Transcript kept outside the repo
+(`~/.local/state/dotf/review-transcripts/HARNESS-106-r1.jsonl`). Dispositions:
+
+| Finding | Disposition |
+|---|---|
+| Major: f4 passed on one line printed into the gate, although AC4 says "proven by a dispatch" | **Applied** in the contract fix the sweep commit "fix(spec): HARNESS-106's AC4 is verified by a dispatch, not by a line anyone can write", reviewed as `617cbaf`: f4 joins each record to Claude Code's subagent transcript of that session, and the forged line now exits 1. AC4 is met by the dispatch recorded under AC4 above. |
+| Major (inherited): a named dispatch resolves no persona and turns enforcement off | Already **#1434**, now closed. Not introduced by this diff. |
+| Minor: `tasks.md` left AC5-AC7 unticked and miscounted the entries; this file said "AC4-AC7 are open" | **Applied** in the sweep commit "fix(spec): HARNESS-106's AC4 is verified by a dispatch, not by a line anyone can write" |
+| Minor: the unknown-verb message gives wrong advice | **Ticketed**: #1749 (HARNESS-163) |
+| Minor: the `role-unresolved` record's `reason` hides that enforcement is off | **Ticketed**: #1749 |
+| Minor: the `compile-harness.sh` stale-binary probe has no test | **Ticketed**: #1749 |
+| Minor: the hooks/personas lesson collided on number 256 and was unindexed | **Declined**: already paid on `main`, where it is lesson 271 and indexed |
+| Minor: `RunE` of `newHarnessGateCmd` is about 133 lines, CC about 11 | **Ticketed**: #1749 |
+| Minor: the reviewed range carries OPS-040's #1433 | **Declined**: an artifact of reviewing a landed two-PR range (#1645). #1433 has its own spec. |
+
+**Round 2, `nan/mimo-v2.5`, PASS WITH GAPS**, at `617cbaf` (`8fecec6` plus the contract fix).
+`review.md` and `review-request.json` are this round's. Dispositions:
+
+| Finding | Disposition |
+|---|---|
+| Major: the range carries OPS-040's work, while `tasks.md` says "no unrelated changes in the diff" | **Declined**: that line describes this spec's two PRs, whose diffs carry no unrelated change. The mix comes from the launcher's base spanning #1433, disclosed above. Editing the line would stale this review for a disclosure that belongs here. |
+| Major: f4 is `pending` with empty `evidence` while this file records AC4 as met | **Declined**: `state` and `evidence` are harness-owned. An agent may not promote them, and nothing runs verifiers yet (#1680, SDD-044). f4's verifier exits 0 on this box, and the evidence is recorded under AC4. |
+| Minor: `RunE` length and complexity | **Ticketed**: #1749 |
+| Minor: this change amended HARNESS-045's proposal to record that its AC3 and AC4 were falsified | **Declined**: that is correct knowledge placement, as the reviewer notes |
+| Question: is #1434 tracked? | Yes, and it is closed |
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
@@ -129,6 +173,6 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
 
-> **Not archivable yet.** AC4–AC7 are open, so #1420 stays open and this PR references it
+> **Not archivable yet** (as of the landing PR). AC4 was open then, so #1420 stayed open and this PR references it
 > without a closing keyword. The archive gate additionally requires an independent adversarial
 > review by a model that is not the implementer's.

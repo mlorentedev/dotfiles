@@ -250,3 +250,20 @@ func TestVerifyReviewProducedIsSilentWithoutASidecar(t *testing.T) {
 		t.Errorf("no sidecar must not be an error, got %v", err)
 	}
 }
+
+// TestWriteReviewRequestReportsAFailedWrite is GUARD-005 AC8's first half: a
+// sidecar that cannot be written is an error the launcher sees, never a silent
+// success. The launcher turns it into a warning and still launches, because
+// refusing to review over a sidecar would make the guard a liability. A path
+// that is a file, not a directory, fails on every OS and under root, where a
+// read-only directory does not.
+func TestWriteReviewRequestReportsAFailedWrite(t *testing.T) {
+	notADir := filepath.Join(t.TempDir(), "spec")
+	if err := os.WriteFile(notADir, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := WriteReviewRequest(notADir, "abc", "nan/x", "")
+	if err == nil || !strings.Contains(err.Error(), ReviewRequestFile) {
+		t.Fatalf("want an error naming %s, got %v", ReviewRequestFile, err)
+	}
+}

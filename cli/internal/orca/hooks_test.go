@@ -161,3 +161,36 @@ func TestTuneHooks_UnrecognisedPostIsLeftAlone(t *testing.T) {
 		t.Fatal("an unrecognised script must be byte-identical")
 	}
 }
+
+// TestTuneScript_WritesTheRetiredScriptsBlockByteForByte pins the whole
+// HttpWebRequest block, not a line of it. The block was copied from
+// scripts/orca-hook-tune.ps1, and a box that script already tuned must read as
+// clean; a regressed line here would still pass the Invoke-WebRequest drift
+// check and ship a broken hook. The expected text is the retired script's
+// block (its lines 148-161 at 4718e46^), each line carrying the captured
+// indentation, in the file's own CRLF endings.
+func TestTuneScript_WritesTheRetiredScriptsBlockByteForByte(t *testing.T) {
+	const want = "param()\r\n$body = '{}'\r\n" +
+		"    $uri = 'http://127.0.0.1:' + $env:ORCA_AGENT_HOOK_PORT + '/hook/copilot'\r\n" +
+		"    $req = [System.Net.HttpWebRequest]::Create($uri)\r\n" +
+		"    $req.Method = 'POST'\r\n" +
+		"    $req.ContentType = 'application/json'\r\n" +
+		"    $req.Headers.Add('X-Orca-Agent-Hook-Token', $env:ORCA_AGENT_HOOK_TOKEN)\r\n" +
+		"    $req.Timeout = 2000\r\n" +
+		"    $req.ReadWriteTimeout = 2000\r\n" +
+		"    $reqBytes = [System.Text.Encoding]::UTF8.GetBytes($body)\r\n" +
+		"    $req.ContentLength = $reqBytes.Length\r\n" +
+		"    $reqStream = $req.GetRequestStream()\r\n" +
+		"    $reqStream.Write($reqBytes, 0, $reqBytes.Length)\r\n" +
+		"    $reqStream.Close()\r\n" +
+		"    $resp = $req.GetResponse()\r\n" +
+		"    $resp.Close()\r\n" +
+		"exit 0\r\n"
+	got, ok := TuneScript([]byte(copilotHookIWR))
+	if !ok {
+		t.Fatal("the fixture's POST line must be recognised")
+	}
+	if string(got) != want {
+		t.Fatalf("tuned script differs from the retired script's block:\n got %q\nwant %q", got, want)
+	}
+}

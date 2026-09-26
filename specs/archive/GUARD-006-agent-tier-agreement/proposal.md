@@ -1,7 +1,7 @@
 ---
 id: "GUARD-006-agent-tier-agreement"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-22"
 issue: "mlorentedev/dotfiles#1164"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, doctor, harness, guard, model-map]
@@ -82,3 +82,5 @@ about a map that could not be read would be noise on top of a failure already re
 - `specs/archive/HARNESS-076-model-map-tier-render/` — the change that made this drift expensive
 - `docs/adr/adr-035-model-map-routing-registry.md` — the registry and its doctor-check precedent
 - Related: #1170 (copilot's tier gap, deliberately not reported here), #1172 (the capability half)
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1174 -->

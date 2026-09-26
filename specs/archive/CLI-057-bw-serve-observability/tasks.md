@@ -34,4 +34,4 @@ created: "2026-08-27"
 - [x] `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./... && golangci-lint run ./...` clean
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder; `## Review triage` posted; `dotf pr triage-queue` exit 0
+- [x] PR opened referencing this spec folder; `## Review triage` posted; `dotf pr triage-queue` exit 0

@@ -46,10 +46,10 @@ created: "2026-09-01"
 
 ### The decision record — deferred, tracked here
 
-- [ ] [AC5] `dotf harness gate` writes a durable record for every decision, including `allow` and `role did not resolve`
-- [ ] [AC6] A `warn` decision is readable from that record after the session ends
-- [ ] [AC7] `agent_type` is carried in the record, converting the standing inference into a measurement
-- [ ] [AC4] Re-run a real dispatch and confirm a consumption record — the criterion AC5–AC7 exist to make provable
+- [x] [AC5] `dotf harness gate` writes a durable record for every decision, including `allow` and `role did not resolve`
+- [x] [AC6] A `warn` decision is readable from that record after the session ends
+- [x] [AC7] `agent_type` is carried in the record, converting the standing inference into a measurement
+- [x] [AC4] Re-run a real dispatch and confirm a consumption record — the criterion AC5–AC7 exist to make provable
 
 ## Closing
 
@@ -67,7 +67,8 @@ This spec emits a sibling `features.json` (alongside this file) following [[patt
 
 **Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
 
-The nine entries map 1:1 onto the nine acceptance criteria. Five are
-`implemented` (code landed, harness has not run them); four are `pending` and
-their verification commands are red, which is the honest state for a criterion
-whose implementation is deferred — not a vacuous `exit 1`.
+The nine entries map 1:1 onto the nine acceptance criteria. Eight are
+`implemented` (code landed, harness has not run them). f4 is `pending`: AC4 is
+proven by a real dispatch on a box, not by code, so its verification joins the
+gate ledger to Claude Code's own subagent transcripts, and a journal line
+written by hand does not pass it.

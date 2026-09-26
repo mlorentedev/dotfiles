@@ -1,7 +1,7 @@
 ---
 id: "CLI-057-bw-serve-observability"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1315"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -57,3 +57,5 @@ Observable outcomes. Each must be testable.
 - Related: #1293 (WIN-012 acceptance, the death this makes visible), #1316 (CLI-056, stacked)
 - Related ADR: `docs/adr/adr-028-secrets-two-tier-bitwarden-age.md` (the facade the daemon serves)
 - Related lessons: 237 (`CREATE_NEW_PROCESS_GROUP` is not detachment), 235 ("I cannot reproduce it" is a statement about the instrument)
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1348 -->

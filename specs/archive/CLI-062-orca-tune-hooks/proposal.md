@@ -1,7 +1,7 @@
 ---
 id: "CLI-062-orca-tune-hooks"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-29"
 issue: "mlorentedev/dotfiles#1338"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -69,3 +69,5 @@ Observable outcomes. Each must be testable.
 ## References
 
 - Bitácora board: #1338. #1274 (`dotf orca tune`), #442, DX-006 (lesson 111), ADR-020 §5, `docs/adr/audit-007-cli-convergence-state.md:109`.
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1384 -->

@@ -1,7 +1,7 @@
 ---
 id: "GUARD-005-review-verdict-provenance"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-21"
 issue: "mlorentedev/dotfiles#1157"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, guard, review, provenance, archive]
@@ -108,3 +108,5 @@ disposable.
   beats transcript parsing
 - Related: #1153 (merged-vs-reviewed sha, builds on this sidecar), #1010 (transcript lifecycle),
   #1156 (the fallback arm that could not cover the primary's silent failures)
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1178 -->

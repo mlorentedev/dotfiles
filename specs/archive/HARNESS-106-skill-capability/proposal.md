@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-106-skill-capability"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-01"
 issue: "mlorentedev/dotfiles#1420"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -119,7 +119,7 @@ Concretely, after this:
       distinguishable from "unmapped" in both the schema and the failure message.
 - [x] **AC3** — Every persona record declaring `skills:` also declares the
       capability, asserted by a guard that fails red when one does not.
-- [ ] **AC4** — A dispatched persona **can invoke a skill**, proven by a dispatch
+- [x] **AC4** — A dispatched persona **can invoke a skill**, proven by a dispatch
       that writes a consumption record — never by a config file containing a key.
 - [x] **AC5** — `dotf harness gate` writes a durable record for every decision it
       takes, including `allow` and `role did not resolve`, reachable without
@@ -148,3 +148,5 @@ Concretely, after this:
 - `docs/lessons/lesson-255-truncation-not-hostile-input-made-the-digest-load-bearing.md`
 - Adjacent, deliberately separate: #1421 (hook binding scope), #1422 (triage
   queue), #1418 (setup/doctor repo-root mismatch)
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1435 -->
