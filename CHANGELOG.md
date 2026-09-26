@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.60.0](https://github.com/mlorentedev/dotfiles/compare/v0.59.0...v0.60.0) (2026-09-26)
+
+
+### Features
+
+* **forge:** apply declared branch protection, and require spec-gate on dotfiles ([#1746](https://github.com/mlorentedev/dotfiles/issues/1746)) ([60de574](https://github.com/mlorentedev/dotfiles/commit/60de5746ef7fd7247ff0cc272cdcf4ee0676993c))
+* **harness:** add a knowledge gate that checks a PR names its lesson, ADR and runbook ([#1732](https://github.com/mlorentedev/dotfiles/issues/1732)) ([6ceebd4](https://github.com/mlorentedev/dotfiles/commit/6ceebd46e4869bf5c98a32d358eddba7a4ed6496))
+* **harness:** the handoff skill passes the calling agent's own name, and MEMORY-009 archives ([#1729](https://github.com/mlorentedev/dotfiles/issues/1729)) ([b2364ab](https://github.com/mlorentedev/dotfiles/commit/b2364ab3ff2ac4b445575fc4983688189e2624bc))
+
+
+### Bug Fixes
+
+* **ci:** the release PR body closes nothing ([#1734](https://github.com/mlorentedev/dotfiles/issues/1734)) ([57f81c7](https://github.com/mlorentedev/dotfiles/commit/57f81c75260e4d9e33c5642e94579bf9524545f5))
+* **lessons:** stop the index check reporting indexed lessons as missing at random ([#1736](https://github.com/mlorentedev/dotfiles/issues/1736)) ([f9d5b25](https://github.com/mlorentedev/dotfiles/commit/f9d5b25e9aea30612347c1f581c4ccc93a04067b))
+* **mem:** move text before the first thread only when it reads as a handoff ([#1726](https://github.com/mlorentedev/dotfiles/issues/1726)) ([c17c4ce](https://github.com/mlorentedev/dotfiles/commit/c17c4ceeebb73fca242627048df9ab6eba4134db))
+
 ## [0.59.0](https://github.com/mlorentedev/dotfiles/compare/v0.58.0...v0.59.0) (2026-09-25)
 
 
