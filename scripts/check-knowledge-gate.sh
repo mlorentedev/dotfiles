@@ -106,22 +106,32 @@ fi
 # The body without fenced code blocks, so a section quoted as an example does
 # not count. Unlike spec-gate's _strip_markdown_code, inline code stays: paths
 # are usually written as `docs/lessons/...`, and stripping spans would erase
-# the very answer being checked.
+# the very answer being checked. With --open-line it prints instead the line of
+# a fence that never closes: GitHub renders everything after one as code, so a
+# section below it is really absent, and the author needs to be told why.
 _strip_fences() {
-    local line marker fence=""
+    local mode="${2:-}" line marker fence="" n=0 opened=0
     local fence_re='^[[:space:]]{0,3}(`{3,}|~{3,})'
     while IFS= read -r line; do
+        n=$((n + 1))
         if [[ "$line" =~ $fence_re ]]; then
             marker="${BASH_REMATCH[1]}"
             if [[ -z "$fence" ]]; then
                 fence="$marker"
+                opened=$n
             elif [[ "${marker:0:1}" == "${fence:0:1}" && ${#marker} -ge ${#fence} ]]; then
                 fence=""
             fi
             continue
         fi
-        [[ -z "$fence" ]] && printf '%s\n' "$line"
+        if [[ -z "$fence" && -z "$mode" ]]; then
+            printf '%s\n' "$line"
+        fi
     done <<< "$1"
+    if [[ -n "$mode" && -n "$fence" ]]; then
+        printf '%s\n' "$opened"
+    fi
+    return 0
 }
 
 # The body without HTML comments, which GitHub does not render: a template's
@@ -161,7 +171,12 @@ body=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" | _strip_comments)
 problems=()
 
 if ! section=$(printf '%s\n' "$body" | _section); then
-    problems+=('the PR body has no "## Knowledge" section')
+    open_line=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" --open-line)
+    if [[ -n "$open_line" ]]; then
+        problems+=("the PR body has no \"## Knowledge\" section outside code: the code fence opened at line $open_line is never closed, so everything after it is code")
+    else
+        problems+=('the PR body has no "## Knowledge" section')
+    fi
 fi
 
 if [[ ${#problems[@]} -eq 0 ]]; then

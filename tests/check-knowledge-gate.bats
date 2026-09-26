@@ -28,15 +28,19 @@ _commit() {
 
 # Every case runs under zsh and bash, which must agree: the repo's scripts run
 # under both (.claude/CLAUDE.md), and bash-only constructs fail silently in zsh.
-_gate() {
-    run zsh "$SCRIPTS_DIR/check-knowledge-gate.sh" --base-ref main --head-ref feature "$@"
+_both() {
+    run zsh "$SCRIPTS_DIR/check-knowledge-gate.sh" "$@"
     local zsh_status="$status" zsh_output="$output"
-    run bash "$SCRIPTS_DIR/check-knowledge-gate.sh" --base-ref main --head-ref feature "$@"
+    run bash "$SCRIPTS_DIR/check-knowledge-gate.sh" "$@"
     if [ "$status" != "$zsh_status" ] || [ "$output" != "$zsh_output" ]; then
         printf 'bash (%s) and zsh (%s) disagree\n--- bash\n%s\n--- zsh\n%s\n' \
             "$status" "$zsh_status" "$output" "$zsh_output"
         return 1
     fi
+}
+
+_gate() {
+    _both --base-ref main --head-ref feature "$@"
 }
 
 # A body whose Lesson line is $1; ADR and Runbook are reasoned nones.
@@ -60,7 +64,7 @@ _add_lesson() {
 }
 
 @test "--help shows usage and exits 0" {
-    run "$SCRIPTS_DIR/check-knowledge-gate.sh" --help
+    _both --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"Usage"* ]]
     [[ "$output" == *"## Knowledge"* ]]
@@ -68,12 +72,12 @@ _add_lesson() {
 
 @test "exits 2 when --base-ref is missing" {
     export SDD_PR_BODY="x"
-    run "$SCRIPTS_DIR/check-knowledge-gate.sh" --head-ref feature
+    _both --head-ref feature
     [ "$status" -eq 2 ]
 }
 
 @test "exits 2 on an unknown argument" {
-    run "$SCRIPTS_DIR/check-knowledge-gate.sh" --bogus
+    _both --bogus
     [ "$status" -eq 2 ]
     [[ "$output" == *"Unknown"* ]]
 }
@@ -86,7 +90,7 @@ _add_lesson() {
 
 @test "exits 2 when the range cannot be diffed" {
     _body_with_lesson "none: nothing learned"
-    run "$SCRIPTS_DIR/check-knowledge-gate.sh" --base-ref no-such-ref --head-ref feature
+    _both --base-ref no-such-ref --head-ref feature
     [ "$status" -eq 2 ]
 }
 
@@ -270,6 +274,23 @@ The shape the gate wants:
     _gate
     [ "$status" -eq 1 ]
     [[ "$output" == *"## Knowledge"* ]]
+}
+
+@test "a fence left open says so, instead of only reporting a missing section" {
+    SDD_PR_BODY='## Summary
+
+```bash
+make test
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure'
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"line 3"* ]]
+    [[ "$output" == *"never closed"* ]]
 }
 
 @test "lines inside an HTML comment do not count: GitHub does not render them" {
