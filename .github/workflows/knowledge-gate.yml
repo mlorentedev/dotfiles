@@ -1,0 +1,52 @@
+name: knowledge-gate
+
+# HARNESS-024: every PR names, in a "## Knowledge" section of its body, the
+# lesson, ADR and runbook it wrote, or why none. The rules live in
+# scripts/check-knowledge-gate.sh; this file only runs it.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # As in spec-gate.yml (BUG-066): a metadata-only event must not cancel a run
+  # in flight. Editing the body is how this gate is cleared, so the `edited`
+  # run is the one that has to survive to completion.
+  cancel-in-progress: ${{ !contains(fromJSON('["labeled", "unlabeled", "edited"]'), github.event.action) }}
+
+permissions:
+  contents: read
+  pull-requests: read # live body, labels and author (BUG-066); an explicit block zeroes the rest
+
+jobs:
+  knowledge-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base ref
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        # Full fetch: the three-dot diff needs the merge-base (see spec-gate.yml).
+        run: git fetch --no-tags --prune origin "$BASE_REF"
+
+      # The body is read live by the adapter, never from the event payload: a
+      # re-run replays the payload, and this gate is cleared by editing the body.
+      - name: Run knowledge gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          ./scripts/spec-gate-pr.sh \
+            --gate check-knowledge-gate.sh \
+            --pr "$PR_NUMBER" \
+            --base-ref "origin/$BASE_REF" \
+            --head-ref HEAD \
+            --explain
