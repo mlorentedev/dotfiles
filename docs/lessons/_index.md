@@ -323,3 +323,4 @@ tags: [lessons, index, dotfiles]
 | [305 - systemd-run expands ${VAR} in its own arguments before the shell sees them](lesson-305-systemd-run-expands-dollar-braces-in-its-own-arguments.md) | 2026-09-25 |  |
 | [306 - "Proven by a dispatch" is a join to the harness's own record, never a grep of a log anyone can write](lesson-306-proven-by-a-dispatch-means-joined-to-the-harness-record.md) | 2026-09-25 |  |
 | [302 - `producer \| grep -q` under `pipefail` fails at random](lesson-302-grep-q-in-a-pipe-under-pipefail-fails-at-random.md) | 2026-09-25 |  |
+| [301 - Knowledge goes where a mechanism asks for it](lesson-301-knowledge-goes-where-a-mechanism-asks-for-it.md) | 2026-09-25 |  |
