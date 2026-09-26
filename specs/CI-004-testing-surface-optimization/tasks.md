@@ -74,6 +74,7 @@ The bats verifications need two files so `setup_suite` loads; `tests/guard-lesso
 - [ ] No unrelated changes in any PR (no scope creep); every PR body states "no `.sh`/`.ps1` setup script touched"
 - [ ] `verification.md` filled in, with before and after numbers per row
 - [ ] Independent review through `dotf spec review CI-004-testing-surface-optimization` before archive
+- [ ] Lesson in `docs/lessons/` (PR 1): `bats -f` with a filter that matches nothing prints `1..0` and exits 0, so a feature check that selects a test by name passes before the test exists. Measured while writing this spec; the checks require the `ok N <name>` line instead
 
 ## Machine-readable features
 
