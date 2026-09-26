@@ -52,6 +52,37 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **The script is retired, not just undeployed.** It moved from `$deployedScripts` to `$retiredScripts` so a copy left in `~\.dotfiles\scripts` by an earlier setup is swept (WIN-013's mechanism), and the bats asserts both lists.
 - **`orca-tune.sh` deleted with no port needed**: `dotf orca tune` has been that function since #1274; the script had no caller.
 
+## Retroactive review (2026-09-25, W1.4 of #1625)
+
+Reviewed from a detached worktree at the landing commit `4718e46` (#1384) plus the f5 contract fix
+already on `main` (`03ab22d`, a box-only check that now names its platform), with that commit's own
+`dotf` first on `PATH`, so the reviewer's scope was `4718e46^...HEAD`. At that tree f1-f4 passed,
+and f5 exits 1 off Windows, as its `behavior` declares.
+
+**Round 1, `nan/glm5.3-flash`, FAIL.** Transcript kept outside the repo
+(`~/.local/state/dotf/review-transcripts/CLI-062-r1.jsonl`). Dispositions:
+
+| Finding | Disposition |
+|---|---|
+| Major: `doctor --fix`'s script half (`checkOrcaHook` through `orca.TuneScriptFile`) had no test | **Applied** in `2d5dae7`: `TestCheckOrcaHook_FixTunesTheScript` and `TestCheckOrcaHook_FixLeavesAnUnrecognisedPostAndFails`. The reviewer's mutant (a wrong path to `TuneScriptFile`) now fails. |
+| Major: only one of the 14 `HttpWebRequest` block lines was pinned, although the proposal says the block is pinned by a test | **Applied** in `2d5dae7`: `TestTuneScript_WritesTheRetiredScriptsBlockByteForByte` compares the tuned script byte for byte with the retired script's block (its lines 148-161 at `4718e46^`), with the captured indentation and CRLF. The reviewer's mutant (`Timeout = 9999`) now fails. Until this commit, the proposal's claim was true for one line only. |
+| Minor: apply mode printed "in sync" right after saying an unrecognised script was left unchanged | **Applied** in `2d5dae7`: no in-sync line in that case. The exit stays 0, as the retired script's did; `--check` is the gate. `TestRunOrcaTuneHooksUnrecognisedIsNotInSync` is the first cmd-level test. |
+| Minor: `TestMergeAgainstTheRealDeployedSettings` reads the live `~/.claude/settings.json` and failed on the reviewer's run | **Declined**: pre-existing, in a package CLI-062 does not touch, and it passes on `main` today (25 of 25 packages ok on this branch). The `FAIL_COUNT=0` line above describes the landing run. |
+| Minor THEORETICAL: `writeTuned`'s fixed `.tmp` path could race between two concurrent tuners | **Ticketed**: #1748 (CLI-086) |
+| Question: the EOL is chosen per file, and `TuneTimeout` normalises the spacing of the key it replaces | **No action**: both are inherited from the retired script, and the real Orca files are uniform |
+
+**Round 2, `nan/mimo-v2.5`, PASS WITH GAPS**, at `b1ae0c9` (the landing commit, the f5 fix, and
+`2d5dae7`). `review.md` and `review-request.json` are this round's. The reviewer left the four
+retired twins **staged** in the reviewed tree. They were removed before anything was copied, and
+the instance is recorded on #1649. Dispositions:
+
+| Finding | Disposition |
+|---|---|
+| `checkOrcaHook` CC 15, `runOrcaTuneHooks` 14, `TuneHooks` 12, against the limit of 10 | **Ticketed**: #1748 |
+| `writeTuned`'s predictable `.tmp` path | **Ticketed**: #1748 (as in round 1) |
+| `ScriptUsesInvokeWebRequest` compiles its regexp per call | **Ticketed**: #1748 |
+| `doctor --fix`'s JSON half writes without a backup; the script half backs up | **Declined**, as the reviewer recommends: pre-existing, and `dotf orca tune-hooks`, the primary entry point, backs up both |
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
