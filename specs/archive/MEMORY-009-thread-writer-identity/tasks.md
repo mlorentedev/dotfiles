@@ -24,16 +24,16 @@ created: "2026-09-25"
 
 ## Slice 2 - the skill passes the flag (after a release carrying `--agent` is installed)
 
-- [ ] [AC5] Vault `handoff` skill: its command passes `--agent`; the record is refreshed
+- [x] [AC5] Vault `handoff` skill: its command passes `--agent`; the record is refreshed
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test (AC5 by f5's check of the record)
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
 - [x] Type checks and lint pass
 - [x] No unrelated changes in the diff
-- [ ] `verification.md` filled in
-- [ ] Independent review before archiving (a change that closes a spec)
+- [x] `verification.md` filled in
+- [x] Independent review before archiving (a change that closes a spec)
 
 ## Machine-readable features
 
