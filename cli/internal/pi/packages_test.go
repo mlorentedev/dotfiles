@@ -32,10 +32,12 @@ func manifestRepo(t *testing.T, body string) string {
 // because an empty want-list would remove every live package.
 func TestLoadManifestRefusesWhatItCannotRead(t *testing.T) {
 	cases := map[string]string{
-		"not json":        `{"packages": [`,
-		"no packages":     `{"version": 1, "packages": []}`,
-		"an empty source": `{"packages": [{"source": "", "why": "x"}]}`,
-		"a duplicate":     `{"packages": [{"source": "npm:a@1", "why": "x"}, {"source": "npm:a@2", "why": "y"}]}`,
+		"not json":         `{"packages": [`,
+		"no packages":      `{"version": 1, "packages": []}`,
+		"an empty source":  `{"packages": [{"source": "", "why": "x"}]}`,
+		"a duplicate":      `{"packages": [{"source": "npm:a@1", "why": "x"}, {"source": "npm:a@2", "why": "y"}]}`,
+		"a retire escapes": `{"packages": [{"source": "npm:a@1", "why": "x"}], "retire": [{"path": "../x", "why": "y"}]}`,
+		"a retire archive": `{"packages": [{"source": "npm:a@1", "why": "x"}], "retire": [{"path": "archive", "why": "y"}]}`,
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -107,7 +109,7 @@ func manifestOf(sources ...string) Manifest {
 // the same package (measured on pi 0.87.1).
 func TestNewPlan(t *testing.T) {
 	m := manifestOf("npm:keep@1", "npm:bump@2", "npm:new@1")
-	p := NewPlan(m, []string{"npm:keep@1", "npm:bump@1", "npm:gone@3"})
+	p := NewPlan(m, []string{"npm:keep@1", "npm:bump@1", "npm:gone@3"}, t.TempDir())
 	if !reflect.DeepEqual(p.Remove, []string{"npm:gone@3"}) {
 		t.Errorf("remove = %v", p.Remove)
 	}
@@ -117,7 +119,7 @@ func TestNewPlan(t *testing.T) {
 	if p.Empty() {
 		t.Error("a plan with work is not empty")
 	}
-	if !NewPlan(m, []string{"npm:keep@1", "npm:bump@2", "npm:new@1"}).Empty() {
+	if !NewPlan(m, []string{"npm:keep@1", "npm:bump@2", "npm:new@1"}, t.TempDir()).Empty() {
 		t.Error("live equal to the manifest is an empty plan")
 	}
 }
@@ -164,14 +166,14 @@ func agentDirWith(t *testing.T, live string) (agentDir, settings string) {
 }
 
 func TestApplyConvergesAndASecondRunCallsNothing(t *testing.T) {
-	_, settings := agentDirWith(t, `{"packages": ["npm:keep@1", "npm:bump@1", "npm:gone@3"]}`)
+	agentDir, settings := agentDirWith(t, `{"packages": ["npm:keep@1", "npm:bump@1", "npm:gone@3"]}`)
 	m := manifestOf("npm:keep@1", "npm:bump@2", "npm:new@1")
 	f := &fakePi{t: t, settings: settings}
 	var log strings.Builder
 	opt := Options{Log: &log, SlowAfter: time.Hour}
 
 	live, _ := LiveSources(settings)
-	res := Apply(NewPlan(m, live), opt, f.run)
+	res := Apply(NewPlan(m, live, agentDir), opt, f.run)
 	if res.Failed != 0 || res.Changed() != 3 {
 		t.Fatalf("want 3 changes and no failure, got %+v\n%s", res, log.String())
 	}
@@ -180,7 +182,7 @@ func TestApplyConvergesAndASecondRunCallsNothing(t *testing.T) {
 	}
 
 	live, _ = LiveSources(settings)
-	again := NewPlan(m, live)
+	again := NewPlan(m, live, agentDir)
 	if !again.Empty() {
 		t.Fatalf("the second plan must be empty, got %+v", again)
 	}
@@ -193,10 +195,10 @@ func TestApplyConvergesAndASecondRunCallsNothing(t *testing.T) {
 // AC3: every call's elapsed time is logged, and a failed or slow one prints
 // its captured output inside a fence, so empty output is itself legible.
 func TestApplyLogsTimeAndFencesTheOutputOfAFailure(t *testing.T) {
-	_, settings := agentDirWith(t, `{"packages": []}`)
+	agentDir, settings := agentDirWith(t, `{"packages": []}`)
 	f := &fakePi{t: t, settings: settings, fail: map[string]bool{"npm:bad@1": true}}
 	var log strings.Builder
-	res := Apply(NewPlan(manifestOf("npm:ok@1", "npm:bad@1"), nil), Options{Log: &log, SlowAfter: time.Hour}, f.run)
+	res := Apply(NewPlan(manifestOf("npm:ok@1", "npm:bad@1"), nil, agentDir), Options{Log: &log, SlowAfter: time.Hour}, f.run)
 	out := log.String()
 	if res.Failed != 1 || res.Changed() != 1 {
 		t.Fatalf("want one failure and one install, got %+v", res)
@@ -213,11 +215,55 @@ func TestApplyLogsTimeAndFencesTheOutputOfAFailure(t *testing.T) {
 
 // The threshold gates verbosity only: a slow success still installs.
 func TestApplySlowSuccessIsFencedAndStillCounted(t *testing.T) {
-	_, settings := agentDirWith(t, `{"packages": []}`)
+	agentDir, settings := agentDirWith(t, `{"packages": []}`)
 	f := &fakePi{t: t, settings: settings}
 	var log strings.Builder
-	res := Apply(NewPlan(manifestOf("npm:slow@1"), nil), Options{Log: &log, SlowAfter: -1}, f.run)
+	res := Apply(NewPlan(manifestOf("npm:slow@1"), nil, agentDir), Options{Log: &log, SlowAfter: -1}, f.run)
 	if res.Changed() != 1 || !strings.Contains(log.String(), "--- pi install npm:slow@1") {
 		t.Fatalf("want the install counted and its output fenced, got %+v\n%s", res, log.String())
+	}
+}
+
+// AC5: a retired path moves under archive/ with its contents, is never
+// deleted, and a second run moves nothing.
+func TestApplyMovesRetiredPathsIntact(t *testing.T) {
+	agentDir, settings := agentDirWith(t, `{"packages": ["npm:a@1"]}`)
+	writeJSON(t, filepath.Join(agentDir, "memory", "daily", "d.md"), "note")
+	m := manifestOf("npm:a@1")
+	m.Retire = []Retired{{Path: "memory", Why: "purged"}, {Path: "absent", Why: "never existed"}}
+	now := func() time.Time { return time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC) }
+	f := &fakePi{t: t, settings: settings}
+
+	p := NewPlan(m, []string{"npm:a@1"}, agentDir)
+	if len(p.Retire) != 1 {
+		t.Fatalf("only an existing path is planned, got %+v", p.Retire)
+	}
+	res := Apply(p, Options{Log: &strings.Builder{}, Now: now}, f.run)
+	moved := filepath.Join(agentDir, "archive", "memory-20260925", "daily", "d.md")
+	if b, err := os.ReadFile(moved); err != nil || string(b) != "note" || res.Changed() != 1 {
+		t.Fatalf("want the tree moved intact, got %q %v %+v", b, err, res)
+	}
+	if _, err := os.Stat(filepath.Join(agentDir, "memory")); !os.IsNotExist(err) {
+		t.Fatal("the retired path must be gone from its old place")
+	}
+	if p := NewPlan(m, []string{"npm:a@1"}, agentDir); !p.Empty() {
+		t.Fatalf("a second run has nothing to move, got %+v", p)
+	}
+}
+
+// A second retirement on the same day must not overwrite the first archive.
+func TestApplyNeverOverwritesAnArchive(t *testing.T) {
+	agentDir, settings := agentDirWith(t, `{"packages": []}`)
+	writeJSON(t, filepath.Join(agentDir, "archive", "memory-20260925", "old.md"), "first")
+	writeJSON(t, filepath.Join(agentDir, "memory", "new.md"), "second")
+	m := manifestOf("npm:a@1")
+	m.Retire = []Retired{{Path: "memory", Why: "purged"}}
+	now := func() time.Time { return time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC) }
+	Apply(Plan{Retire: m.Retire, agentDir: agentDir}, Options{Log: &strings.Builder{}, Now: now}, (&fakePi{t: t, settings: settings}).run)
+	if b, _ := os.ReadFile(filepath.Join(agentDir, "archive", "memory-20260925", "old.md")); string(b) != "first" {
+		t.Fatal("the earlier archive was overwritten")
+	}
+	if b, _ := os.ReadFile(filepath.Join(agentDir, "archive", "memory-20260925-2", "new.md")); string(b) != "second" {
+		t.Fatal("the second retirement must land beside the first")
 	}
 }
