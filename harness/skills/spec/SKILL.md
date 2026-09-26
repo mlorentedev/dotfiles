@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: 0b08115b7a5da034
+generated_sha: 51bf549e04c005e0
 id: spec-skill
 type: skill
 status: active
@@ -296,10 +296,10 @@ Both `--force-*` flags require `--reason`. An override is **recorded**: the arch
    - **Review check (CLI-034):** the folder must contain `review.md` with a `verdict:` of `PASS` or `PASS-WITH-GAPS`, whose `spec:` matches the folder and whose contract (`proposal.md` / `tasks.md` / `features.json`) still matches the content digests the review launcher recorded in `review-request.json` (SDD-042). Content, not commits: a squash-merge or rebase of the reviewed commit does not stale a review, and ticking checkboxes or the harness filling `state`/`evidence` is not a contract change. Reviews launched before SDD-042 fall back to comparing against `reviewed_sha`. A missing, malformed, failing, foreign or stale review REFUSES the archive. Produce it with `adversarial-review` — ideally from a **different session or agent** than the implementer, since independence is the point. Two declared escapes, never a judgment call in the moment: `review: waived` + a non-empty `review_waived_reason:` in `proposal.md` frontmatter, or `--force-without-review --reason "<why>"`, which is recorded as `review_bypass:`.
      - The two checks answer different questions: the tag check asks whether the spec is *finished being written*; the review check asks whether anyone *independently argued against it*.
    - Count unchecked acceptance criteria. If >0, warn: "N criteria still unchecked. Continue?" Ask.
-   - If `--abandoned` flag: skip step 2 entirely, mark as `status: abandoned`, route to `specs/archive/_abandoned/<id>/` in step 3.
+   - If `--abandoned` flag: mark as `status: abandoned`, route to `specs/archive/_abandoned/<id>/` in step 3. Step 2 still applies: an abandoned spec answers its promotion lines too, usually `no: abandoned because <why>`.
 
-2. **Promotion candidates (always interactive — never autoparse):**
-   For each of the three promotion types, ASK the user regardless of `verification.md` marker (the marker is a hint, not authoritative):
+2. **Promotion candidates (interactive; the archive checks the answers):**
+   For each of the three promotion types, ASK the user regardless of what `verification.md` already says. Write the promoted file first, then record the answer on its line in `verification.md` as `yes: <path of the promoted file>` or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault (HARNESS-160, ADR-039).
     - **Lesson?** "Any non-obvious lesson worth recording? 2-sentence summary, or `no`."
       - If non-`no`: compose lesson entry -> save as the **repo's** `docs/lessons/lesson-NNN-<slug>.md` and register in `docs/lessons/_index.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]; fallback: `docs/lessons/`). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
    - **ADR-worthy?** "Any architectural decision that future-you needs to remember? ADR title, or `no`."
