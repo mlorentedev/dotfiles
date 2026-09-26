@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-106-skill-capability"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-01"
 issue: "mlorentedev/dotfiles#1420"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -148,3 +148,5 @@ Concretely, after this:
 - `docs/lessons/lesson-255-truncation-not-hostile-input-made-the-digest-load-bearing.md`
 - Adjacent, deliberately separate: #1421 (hook binding scope), #1422 (triage
   queue), #1418 (setup/doctor repo-root mismatch)
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1435 -->
