@@ -3,15 +3,15 @@
     "id": "HARNESS-024-knowledge-capture-gate-f1",
     "behavior": "AC1: check-knowledge-gate.sh passes a body whose Lesson/ADR/Runbook lines are counting paths or reasoned nones, fails each defect naming it, ignores a fenced section, and exits 2 on an unset body or an undiffable range",
     "verification": "bats tests/check-knowledge-gate.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 8867dbc: 29 cases; 10 mutations of the checker each killed by its own case"
   },
   {
     "id": "HARNESS-024-knowledge-capture-gate-f2",
     "behavior": "AC2: a dependency-bot PR with the dependencies label is skipped, a human one is judged, and the bot list equals spec-gate's",
     "verification": "bats --filter 'dependenc' tests/check-knowledge-gate.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 8867dbc: bot skip, human and unlabeled judged, list equal to spec-gate's"
   },
   {
     "id": "HARNESS-024-knowledge-capture-gate-f3",
