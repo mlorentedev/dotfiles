@@ -29,3 +29,31 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # CI-005 (#1668): the release PR body must close nothing. The changelog
+      # template renders every reference a commit carries as ", closes [#N]",
+      # `Refs #N` included, and merging the release PR then closes each one
+      # (0.57.0 closed three open issues this way). An issue that should close
+      # was already closed by its own PR, so every GitHub closing keyword in
+      # this body is rewritten to "refs". release-please regenerates the body on
+      # each push, so this runs on each push too. CHANGELOG.md keeps its wording:
+      # only a PR body or a commit message closes anything.
+      # Guarded by tests/release-pr-body-refs.bats, which runs this script.
+      - name: Neutralise closing keywords in the release PR body
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          keyword='(close[sd]?|fix(e[sd])?|resolve[sd]?)'
+          reference='\[?(([[:alnum:]_.-]+/[[:alnum:]_.-]+)?#[0-9]+|https://github\.com/[^[:space:]]+/issues/[0-9]+)'
+          gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+            --jq '.[] | select(any(.labels[]; .name == "autorelease: pending")) | .number' |
+            while read -r pr; do
+              gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq .body >"$RUNNER_TEMP/body.md"
+              sed -E "s~\\b${keyword}:?([[:space:]]+${reference})~refs\\3~gI" \
+                "$RUNNER_TEMP/body.md" >"$RUNNER_TEMP/body.new"
+              if ! cmp -s "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/body.new"; then
+                gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$pr" -F "body=@$RUNNER_TEMP/body.new" >/dev/null
+                echo "release PR #$pr: closing keywords rewritten to refs"
+              fi
+            done

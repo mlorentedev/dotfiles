@@ -14,6 +14,19 @@ This runbook covers going from a merged release PR to a verified `dotf` on a mac
 - Run every step from the main checkout (`~/Projects/dotfiles`, on `main`, pulled). Never run them from a worktree whose branch predates main (HARNESS-153).
 - Never edit `~/.dotfiles` by hand.
 
+## When to cut a release
+
+release-please keeps one release PR open and adds every merged change to it. Merging that PR cuts the release, so leaving it open is how changes accumulate, at no cost.
+
+Merge the release PR when one of these holds:
+
+1. **A next step needs the binary installed.** A merged change under `cli/` takes effect only once installed: a check that `dotf` runs, or a subcommand someone is about to use.
+2. **A merged fix removes a live hazard that has no workaround.** The hazard must be one that sessions hit with the installed binary.
+
+Otherwise, let it accumulate. Skill records, doctrine, CI, scripts and documentation need no release. They reach every agent through `dotf harness mirror` and `scripts/compile-harness.sh --deploy`, run from main.
+
+While a fix waits, tell live peers about the hazard and its workaround. For #1725, that was a `--dry-run` before `dotf mem handoff-write`.
+
 ## Steps
 
 1. **Merge the release PR** (`chore(main): release X.Y.Z`). Manu merges it; an agent does not.
@@ -44,7 +57,7 @@ This runbook covers going from a merged release PR to a verified `dotf` on a mac
 
 7. **Verify by effect, not by the version string alone:**
    - `dotf version` prints `X.Y.Z`.
-   - The prompt hook names only live skills:
+   - The prompt hook suggests no retired skill. Run it with a prompt that routed to a retired skill before the release (the one below is an example), and check that none of the skills it prints is on the retirement's list:
 
      ```bash
      printf '%s' '{"prompt":"rebase the branch on main"}' | dotf harness suggest --from-hook

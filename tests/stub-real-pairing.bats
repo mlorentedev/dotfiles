@@ -47,6 +47,7 @@ setup() {
 #                             to a test's own stub.
 #   hermes-setup              stubs remote installers — a real run provisions an agent host
 #   install-dotf              stubs the release download — a real run fetches from GitHub releases
+#   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
 #   vault-health              stubs `hive` — a real run needs the daemon and a live vault
@@ -61,7 +62,7 @@ setup() {
 #                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
 EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup guard-memory-sink guard-no-gui
-hermes-setup install-dotf shell-profile skills-pipeline vault-health vault-health-go-parity
+hermes-setup install-dotf release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
 vault-health-golden vault-maintenance-weekly"
 
 exempt() {

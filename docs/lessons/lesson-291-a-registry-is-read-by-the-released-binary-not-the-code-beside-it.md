@@ -22,7 +22,7 @@ $ dotf secrets ls
 Error: secret "ZOHO_APP_PASSWORDS": bw.folder "Dotfiles/personal" is not in the ratified taxonomy (Dotfiles/apps, Dotfiles/infra)
 ```
 
-Once merged, every `dotf secrets` command run by the installed release against `main` would have failed, including `hive.service`, which starts through `dotf secrets run`. CI would have been green, because CI builds `dotf` from the same commit.
+Once merged, every `dotf secrets` command that loads the registry (`ls`, `run`, `drift`, `sync` and the rest; `backup`, `unlock` and `lock` do not read it) would have failed when run by the installed release against `main`, including `hive.service`, which starts through `dotf secrets run`. CI would have been green, because CI builds `dotf` from the same commit.
 
 ## Why it happens
 
