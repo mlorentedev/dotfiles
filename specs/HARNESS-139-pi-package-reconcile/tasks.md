@@ -31,10 +31,10 @@ created: "2026-09-25"
 
 ### Retired paths and the doctor check (PR-B)
 
-- [ ] [P] [AC5] Failing tests: a declared `retire` path moves under `archive/` intact, a second run moves nothing, and nothing is ever deleted
-- [ ] [AC5] `retire` in the manifest schema and in `Apply`
-- [ ] [P] [AC6] Failing tests: a package whose `requires` does not resolve FAILs; the shipped manifest PASSes
-- [ ] [AC6] The doctor check, on the reconciler's loader
+- [x] [P] [AC5] Failing tests: a declared `retire` path moves under `archive/` intact, a second run moves nothing, and nothing is ever deleted
+- [x] [AC5] `retire` in the manifest schema and in `Apply`
+- [x] [P] [AC6] Failing tests: a package whose `requires` does not resolve FAILs; the shipped manifest PASSes
+- [x] [AC6] The doctor check, on the reconciler's loader
 
 ### The command and the twins
 
@@ -42,7 +42,7 @@ created: "2026-09-25"
 - [x] [AC1] `dotf pi packages apply [--dry-run]`, with its exit contract tested
 - [x] [AC7] Replace both setup blocks with one `dotf pi packages apply` call; retire the shell-block tests in `tests/pi-packages.bats` (keeping the manifest-level ones) and add the twin-calls-the-command test
 - [x] [AC7] Extend the CI pi path filter to `cli/internal/pi/**`
-- [ ] Remove `npm:pi-memory@0.4.2` from `ai/pi/packages.json` (PR-A); declare `retire: memory` (PR-B)
+- [x] Remove `npm:pi-memory@0.4.2` from `ai/pi/packages.json` (PR-A); declare `retire: memory` (PR-B)
 
 ### Live (msi)
 

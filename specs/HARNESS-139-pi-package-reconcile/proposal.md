@@ -73,7 +73,7 @@ The spec spans both and archives with PR-B.
 - [ ] **AC5** (PR-B) — A declared `retire` path is moved under `~/.pi/agent/archive/` with its contents intact and is never deleted, and a second run moves nothing.
 - [ ] **AC6** (PR-B) — The doctor check FAILs on a fixture that declares a package whose `requires` does not resolve, and PASSes on the shipped manifest.
 - [ ] **AC7** — Both setup twins call `dotf pi packages apply`, and neither carries the reconcile loop any more. The CI path filter that selects the pi job covers `cli/internal/pi/**` as well as the manifest and both twins.
-- [ ] **AC8** (live, msi) — After `apply`: `jq '.packages' ~/.pi/agent/settings.json | grep -c pi-memory` is `0`, `~/.pi/agent/memory` is under `~/.pi/agent/archive/`, a fresh `pi` session registers no `memory_*` tool, and a second `apply` reports `changed=0`.
+- [ ] **AC8** (live, msi) — After `apply`: `jq '.packages' ~/.pi/agent/settings.json | grep -c pi-memory` is `0`, `~/.pi/agent/memory` is under `~/.pi/agent/archive/`, a fresh `pi` session registers no `memory_*` tool (by consequence: `printf '{"type":"get_state"}\n' | pi --mode rpc --no-session | grep -c memory_search` gives `0`; it gives `1` while pi-memory is installed, from its startup notice that `memory_search requires qmd`), and a second `apply` reports `changed=0`.
 
 ## References
 
