@@ -46,4 +46,4 @@ The spec archive had the same gap. `dotf spec archive` printed that promotion "m
 - The author judges their own work. The gate makes the decision visible, and the review and the human merge judge it.
 - The check is honoured by the human merge, as `spec-gate` is, until GUARD-017 (#1451) gives `forge/branch-protection.json` an apply. Then it is declared required.
 - Other repositories get the gate by GUARD-016's delivery path (#1627), not by copying the workflow.
-- Lesson 301 records the failure this answers. The spec is `HARNESS-024-knowledge-capture-gate`.
+- Lesson 301 records the failure this answers. The spec is `HARNESS-160-knowledge-capture-gate`.

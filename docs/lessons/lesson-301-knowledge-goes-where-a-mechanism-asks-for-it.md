@@ -32,4 +32,4 @@ When a kind of record stops being written, look first for what asks for it, not 
 
 The check needs a cheap way out that still makes the author decide. For this one, that is `none: <reason>`, one sentence per line.
 
-Refs: HARNESS-024 (#387), ADR-039.
+Refs: HARNESS-160 (#387), ADR-039.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Shape of .github/workflows/knowledge-gate.yml (HARNESS-024). Declarative config
+# Shape of .github/workflows/knowledge-gate.yml (HARNESS-160). Declarative config
 # cannot be executed, so it is asserted against spec-gate.yml, whose triggers and
 # concurrency already carry BUG-066's fix: a copy that drifts from them would
 # bring the bug back to the gate that is cleared by editing the body.
