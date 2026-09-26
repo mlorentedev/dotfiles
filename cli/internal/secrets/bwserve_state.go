@@ -224,19 +224,32 @@ func markStart(w io.Writer, pid int, now time.Time) {
 	_, _ = fmt.Fprintf(w, "==== dotf: started bw serve pid %d at %s ====\n", pid, now.UTC().Format(time.RFC3339))
 }
 
+// traceAlive is the liveness check Trace consults, a variable so a test can
+// pin it without a real process.
+var traceAlive = ProcessAlive
+
 // Trace names where the daemon left its trace, for `dotf secrets unlock` and
 // `lock` to print beside their confirmation: an operator who reads "unlocked"
-// also learns where to look when the daemon is gone by the next call. A daemon
-// this dotf did not start has no pid file, and that is said rather than
-// guessed at.
+// also learns where to look when the daemon is gone by the next call.
+//
+// It says what it knows and no more. A daemon this dotf did not start has no
+// pid file. A pid file that does not parse is said to be unreadable, as doctor
+// says. A recorded pid whose process is gone means the daemon answering now was
+// started by something else (a hand-started instrumented `bw serve`, or the
+// winner of a concurrent start), so that pid is never presented as its own.
 func (d *BWServeDaemon) Trace() string {
 	logPath := d.State.LogPath()
 	if logPath == "" {
 		return "no state dir — pid and log not recorded"
 	}
 	pid, err := d.State.ReadPID()
-	if err != nil {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
 		return fmt.Sprintf("pid unknown — not started by this dotf; log %s", logPath)
+	case err != nil:
+		return fmt.Sprintf("pid unknown — its pid file is unreadable (%v); log %s", err, logPath)
+	case !traceAlive(pid):
+		return fmt.Sprintf("pid %d recorded, but that process is gone — the daemon answering was not started by this dotf; log %s", pid, logPath)
 	}
 	return fmt.Sprintf("pid %d, log %s", pid, logPath)
 }
