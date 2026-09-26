@@ -43,12 +43,12 @@ created: "2026-09-25"
 
 ## Slice 3: promotions at archive (PR 3)
 
-- [ ] [AC5] Failing Go tests in `cli/internal/spec`:
+- [x] [AC5] Failing Go tests in `cli/internal/spec`:
   - refusals: a line unanswered, the template placeholder left, a `no` without a reason, a `yes` without a path, a `yes` whose path is missing;
   - a pattern `yes` resolves against the vault root, and refuses when the vault root is unresolvable;
   - valid answers archive.
-- [ ] [AC5] Implement the pre-flight in `spec.Archive`, next to the review pre-flight.
-- [ ] [AC6] Change the answer grammar in `cli/internal/spec/templates/verification.md` to `yes: <path>` or `no: <reason>`.
+- [x] [AC5] Implement the pre-flight in `spec.Archive`, next to the review pre-flight.
+- [x] [AC6] Change the answer grammar in `cli/internal/spec/templates/verification.md` to `yes: <path>` or `no: <reason>`.
 
 ## Slice 4: required (waits on #1451)
 
