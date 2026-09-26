@@ -4,7 +4,7 @@
     "behavior": "AC1: check-knowledge-gate.sh passes a body whose Lesson/ADR/Runbook lines are counting paths or reasoned nones, fails each defect naming it, ignores a fenced section, and exits 2 on an unset body or an undiffable range",
     "verification": "bats tests/check-knowledge-gate.bats",
     "state": "passing",
-    "evidence": "exit 0 on 2026-09-25 at 98eafc6: 30 cases; 11 mutations of the checker each killed by its own case"
+    "evidence": "exit 0 on 2026-09-25 at e986c17: 31 cases; 12 mutations of the checker each killed by its own case"
   },
   {
     "id": "HARNESS-024-knowledge-capture-gate-f2",
