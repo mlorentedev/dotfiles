@@ -365,3 +365,24 @@ Example:
     [ -n "$spec" ]
     [ "$spec" = "$knowledge" ]
 }
+
+@test "release-please footer: a release PR passes on the section its footer carries" {
+    footer=$(jq -r '."pull-request-footer" // empty' "$BATS_TEST_DIRNAME/../release-please-config.json")
+    [ -n "$footer" ]
+    SDD_PR_BODY=":robot: I have created a release *beep* *boop*
+---
+
+
+## [0.60.0](https://github.com/mlorentedev/dotfiles/compare/v0.59.0...v0.60.0) (2026-09-26)
+
+
+### Bug Fixes
+
+* **mem:** a fix ([#1726](https://github.com/mlorentedev/dotfiles/issues/1726))
+
+---
+$footer"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ]
+}
