@@ -45,6 +45,37 @@ golangci-lint run ./...   → 0 issues.   (2.12.2, the versions.conf pin)
 - **`Refs #1315`, not `Closes`.** Closing trips the archive gate, and `dotf spec archive` needs an adversarial review that runs `dotf secrets run` against the live daemon this session must not touch. Review + archive are deferred to the owner — a stated Definition-of-Done skip, not a silent one.
 - **Info → Warn, never Fail.** The shellout fallback still works; `reportAgentLaunchability` already prices an absent daemon for the wrappers.
 
+## Retroactive review (2026-09-25, W1.4 of #1625)
+
+Reviewed from a detached worktree at the landing commit `097318e` (#1348), with that commit's own
+`dotf` first on `PATH`, so the reviewer's scope was `097318e^...HEAD`. All six `features.json`
+verifiers passed there first, and each runs at least one test. f4's test runs on every OS and
+exercises the Windows start path on the Windows CI leg.
+
+**Round 1, `nan/deepseek-v4-flash`, FAIL.** Transcript kept outside the repo
+(`~/.local/state/dotf/review-transcripts/CLI-057-r1.jsonl`). Dispositions:
+
+| Finding | Disposition |
+|---|---|
+| Major REAL: `Trace()` printed a dead recorded pid as the answering daemon's (reproduced) | **Applied** in the sweep commit "fix(secrets): unlock and lock never present a dead recorded pid as the daemon's": `Trace()` checks the pid is alive and says the process is gone when it is not. `TestTrace_AStalePIDIsSaidNotGuessed` is the reviewer's reproduction as a test, and the mutant without the check fails it. |
+| Minor REAL: `Trace()` called an unparseable pid file "not started by this dotf" | **Applied** in the same commit: it now says the pid file is unreadable, as doctor does |
+| Major THEORETICAL: two concurrent starts can leave the pid file naming the loser | **Applied** in effect by the same fix: the reader checks liveness, so a stale pid is never presented, whichever start won |
+| Minor REAL: doctor's last lines can belong to a previous daemon, and three lines land on stack frames | **Ticketed**: #1750 (CLI-087) |
+| Minor THEORETICAL: `state/bw-serve.pid` is not ignored, and the "beside the DR-drill marker" comment is wrong | **Ticketed**: #1750 |
+| Minor SPECULATIVE: the log-to-stdout channel has no content guard (0 secret-shaped strings in 176,340 bytes measured) | **Ticketed**: #1750, a sentinel test |
+| Minor THEORETICAL: the log is bounded at start only; `proposal.md` says "bound its growth" | **Declined**: AC2 says "at start time" and is met. A contract edit for prose would stale the review. |
+| Minor SPECULATIVE: a nil `ProcessAlive` seam reads as "gone" | **Declined**: production always sets it, and `TestCheckBWServeDaemon_NilProcessAliveReadsAsGone` documents the choice |
+| Question: AC4 on Windows rests on the implementer's run | The Windows CI leg (`test (windows-latest)`) runs the same tests on every PR |
+
+**Round 2, `nan/mimo-v2.5`, PASS**, at `f6826da` (`097318e` plus the fix). `review.md` and
+`review-request.json` are this round's. Its Minors, dispositioned:
+
+| Finding | Disposition |
+|---|---|
+| Two concurrent unlocks rotate the log twice, and the second start fails at the port | **Declined**: the log stays intact, and the winner's pid is the one recorded |
+| pid reuse between `ReadPID` and the liveness check | **Declined**: accepted risk, named in the proposal's Risks |
+| The closing `tasks.md` box was unticked | **Applied**: ticked, and only the box. #1348 carries its `## Review triage`. |
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`: yes — lesson 242 (in this PR).
