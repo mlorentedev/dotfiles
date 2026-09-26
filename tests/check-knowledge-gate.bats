@@ -26,8 +26,17 @@ _commit() {
     git commit -q -m "${1:-change}"
 }
 
+# Every case runs under zsh and bash, which must agree: the repo's scripts run
+# under both (.claude/CLAUDE.md), and bash-only constructs fail silently in zsh.
 _gate() {
-    run "$SCRIPTS_DIR/check-knowledge-gate.sh" --base-ref main --head-ref feature "$@"
+    run zsh "$SCRIPTS_DIR/check-knowledge-gate.sh" --base-ref main --head-ref feature "$@"
+    local zsh_status="$status" zsh_output="$output"
+    run bash "$SCRIPTS_DIR/check-knowledge-gate.sh" --base-ref main --head-ref feature "$@"
+    if [ "$status" != "$zsh_status" ] || [ "$output" != "$zsh_output" ]; then
+        printf 'bash (%s) and zsh (%s) disagree\n--- bash\n%s\n--- zsh\n%s\n' \
+            "$status" "$zsh_status" "$output" "$zsh_output"
+        return 1
+    fi
 }
 
 # A body whose Lesson line is $1; ADR and Runbook are reasoned nones.
@@ -107,6 +116,16 @@ _add_lesson() {
 @test "accepts bold labels, inline-code paths and CRLF line endings" {
     _add_lesson
     SDD_PR_BODY=$'## Knowledge\r\n\r\n- **Lesson:** `docs/lessons/lesson-002-new.md`\r\n- **ADR:** none: no decision\r\n- **Runbook**: none: no procedure\r\n'
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ]
+}
+
+@test "labels and none are read in any letter case" {
+    SDD_PR_BODY="## knowledge
+- lesson: None: nothing learned
+- adr: NONE: no decision
+- RUNBOOK: none: no procedure"
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 0 ]

@@ -31,6 +31,13 @@
 
 set -euo pipefail
 
+# The repo's scripts run under bash and zsh (.claude/CLAUDE.md). zsh matches
+# bash here with 0-based arrays and BASH_REMATCH filled by =~; no case-folding
+# option is used, since shopt is bash-only.
+if [ -n "${ZSH_VERSION:-}" ]; then
+    setopt KSH_ARRAYS BASH_REMATCH
+fi
+
 usage() {
     cat <<'EOF'
 Usage: check-knowledge-gate.sh --base-ref REF --head-ref REF [--explain]
@@ -165,6 +172,12 @@ if [[ ${#problems[@]} -eq 0 ]]; then
     fi
 fi
 
+# A regex matching WORD in any letter case, as [Ww][Oo]...: portable where
+# bash's nocasematch and zsh's (#i) are not.
+_ci() {
+    printf '%s' "$1" | awk '{ for (i = 1; i <= length($0); i++) { c = substr($0, i, 1); printf "[%s%s]", toupper(c), tolower(c) } }'
+}
+
 # The directory a kind's paths must sit under.
 _dir_for() {
     case "$1" in
@@ -176,8 +189,9 @@ _dir_for() {
 
 # Judges one line's value for a kind, appending what is wrong to problems.
 _judge() {
-    local kind="$1" dir="$2" value="$3" path token
-    local none_re='^none[[:space:]]*(:[[:space:]]*(.*))?$'
+    local kind="$1" dir="$2" value="$3" target token
+    local none_re
+    none_re="^$(_ci none)[[:space:]]*(:[[:space:]]*(.*))?\$"
     value="${value//\`/}"
     if [[ "$value" =~ $none_re ]]; then
         local reason="${BASH_REMATCH[2]}"
@@ -195,13 +209,14 @@ _judge() {
         return 0
     fi
     while IFS= read -r token; do
-        path="${token#./}"
-        if [[ "$path" != "$dir"* ]]; then
-            problems+=("$kind: $path is not under $dir")
-        elif [[ "${path##*/}" == "_index.md" ]]; then
-            problems+=("$kind: $path is an index, not a $kind")
-        elif ! grep -qxF -- "$path" <<< "$changed"; then
-            problems+=("$kind: $path is not changed by this PR (added, modified or renamed)")
+        # Not "path": in zsh that name is tied to $PATH (.claude/CLAUDE.md).
+        target="${token#./}"
+        if [[ "$target" != "$dir"* ]]; then
+            problems+=("$kind: $target is not under $dir")
+        elif [[ "${target##*/}" == "_index.md" ]]; then
+            problems+=("$kind: $target is an index, not a $kind")
+        elif ! grep -qxF -- "$target" <<< "$changed"; then
+            problems+=("$kind: $target is not changed by this PR (added, modified or renamed)")
         fi
     done <<< "$tokens"
 }
@@ -209,9 +224,8 @@ _judge() {
 summary=()
 
 if [[ ${#problems[@]} -eq 0 ]]; then
-    shopt -s nocasematch
     for kind in Lesson ADR Runbook; do
-        line_re="^[[:space:]]*([-*+][[:space:]]+)?${kind}[[:space:]]*:[[:space:]]*(.*)$"
+        line_re="^[[:space:]]*([-*+][[:space:]]+)?$(_ci "$kind")[[:space:]]*:[[:space:]]*(.*)\$"
         values=()
         while IFS= read -r line; do
             line="${line//\*\*/}"
@@ -226,7 +240,6 @@ if [[ ${#problems[@]} -eq 0 ]]; then
             *) problems+=("$kind: the line appears ${#values[@]} times; give one answer") ;;
         esac
     done
-    shopt -u nocasematch
 fi
 
 if [[ ${#problems[@]} -eq 0 ]]; then
