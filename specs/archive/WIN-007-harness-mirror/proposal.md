@@ -1,7 +1,7 @@
 ---
 id: "WIN-007-harness-mirror"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1288"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -50,3 +50,5 @@ Measured 2026-08-27 on the Windows work box: after a clean `.\setup-windows.ps1`
 - Bitácora: #1288 (WIN-007); parent port: #495 (CLI-026), #909 (CLI-035); Linux precedent: #1200 (the mirror evaluated a target setup never copied).
 - ADR-020 (strangler-fig on contact), ADR-030 (checkout-first precedence), #802 (doctor --fix prunes, setup only copies).
 - `00_meta/patterns/pattern-setup-script-idempotence.md`.
+
+<!-- archived 2026-09-25 — PR: https://github.com/mlorentedev/dotfiles/pull/1305 -->

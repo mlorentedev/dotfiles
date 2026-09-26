@@ -38,7 +38,7 @@ created: "2026-08-27"
 - [x] Lint passes (`golangci-lint run ./...` pinned 2.12.2; `shellcheck setup-linux.sh`; PowerShell parser + ASCII-only on the `.ps1` insert)
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 
