@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-024-knowledge-capture-gate-f1",
+    "behavior": "AC1: check-knowledge-gate.sh passes a body whose Lesson/ADR/Runbook lines are counting paths or reasoned nones, fails each defect naming it, ignores a fenced section, and exits 2 on an unset body or an undiffable range",
+    "verification": "bats tests/check-knowledge-gate.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-knowledge-capture-gate-f2",
+    "behavior": "AC2: a dependency-bot PR with the dependencies label is skipped, a human one is judged, and the bot list equals spec-gate's",
+    "verification": "bats --filter 'dependenc' tests/check-knowledge-gate.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-knowledge-capture-gate-f3",
+    "behavior": "AC3: spec-gate-pr.sh --gate runs the named checker, and knowledge-gate.yml triggers and concurrency equal spec-gate.yml's",
+    "verification": "bats tests/spec-gate-pr.bats tests/knowledge-gate-workflow.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-knowledge-capture-gate-f4",
+    "behavior": "AC4: the release-please footer's Knowledge section passes the checker",
+    "verification": "bats --filter 'release-please footer' tests/check-knowledge-gate.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-knowledge-capture-gate-f5",
+    "behavior": "AC5: dotf spec archive refuses an unanswered promotion line, a reasonless no, or a yes whose path does not exist, and archives valid answers",
+    "verification": "cd cli && go test ./internal/spec -run 'Promotion' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-024-knowledge-capture-gate-f6",
+    "behavior": "AC6: the PR template and the verification.md template describe the section and the answer grammar",
+    "verification": "grep -q '^## Knowledge' .github/pull_request_template.md && grep -q 'yes: <path>' cli/internal/spec/templates/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
