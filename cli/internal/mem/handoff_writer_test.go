@@ -206,3 +206,28 @@ func TestAnAgentWriteStillMovesTheLegacyBlock(t *testing.T) {
 		}
 	}
 }
+
+// The two moves of a write can meet: the un-threaded block is migrated, and the
+// key holds another agent's block, so the write forks. Both have to happen,
+// with the other agent's block untouched (MEMORY-009 closing review).
+func TestAnAgentWriteMigratesTheLegacyBlockAndForksFromAnotherAgent(t *testing.T) {
+	doc := "# M\n\n## Session Handoff\n> Updated: 2026-09-05  \n**Next action:** merge #412.\n\n" +
+		"### thread: master@msi (writer: pi)\n\n**Next action:** pi's step.\n"
+	res, err := WriteThreadAs(doc, "master@msi", "claude", "**Next action:** claude's step.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Key != "master@msi+claude" || res.Kept != "pi" {
+		t.Errorf("the write went to %q keeping %q, want master@msi+claude keeping pi", res.Key, res.Kept)
+	}
+	for _, want := range []string{
+		"### thread: master@msi (writer: pi)\n\n**Next action:** pi's step.\n",
+		"### thread: master@msi+claude (writer: claude)",
+		"### thread: legacy-2026-09-05",
+		"merge #412.",
+	} {
+		if !strings.Contains(res.Content, want) {
+			t.Errorf("missing %q:\n%s", want, res.Content)
+		}
+	}
+}
