@@ -119,7 +119,7 @@ Concretely, after this:
       distinguishable from "unmapped" in both the schema and the failure message.
 - [x] **AC3** — Every persona record declaring `skills:` also declares the
       capability, asserted by a guard that fails red when one does not.
-- [ ] **AC4** — A dispatched persona **can invoke a skill**, proven by a dispatch
+- [x] **AC4** — A dispatched persona **can invoke a skill**, proven by a dispatch
       that writes a consumption record — never by a config file containing a key.
 - [x] **AC5** — `dotf harness gate` writes a durable record for every decision it
       takes, including `allow` and `role did not resolve`, reachable without

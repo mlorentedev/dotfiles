@@ -28,7 +28,18 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
       Red/green proven against two real fixtures: this machine's pre-fix `~/.claude/agents`
       (**RED**, `checked=7`, all seven named) and a deploy from this tree (**GREEN**,
       `checked=7`). Neither is vacuous.
-- [ ] **AC4** -> **still open, with a named blocker rather than a vague one.** The deployed
+- [x] **AC4** -> **met by a real dispatch, measured 2026-09-25** (during the retroactive review).
+      In Claude Code session `ecf54655-fb1c-42b2-8dcb-570d05a5825f` (kubelab, started after the
+      deploy), a background subagent whose `meta.json` says `"agentType":"reviewer"`
+      (`agent-af16cbb2229fa45fb`, "Adversarial review of role path fix") invoked the `Skill` tool
+      with `adversarial-review` (a second, `agent-ad881183ccc4a5da6`, invoked another skill), and the
+      gate wrote `skill-consumed` records carrying `"agent_type":"reviewer"` for that session,
+      e.g. `{"ts":"2026-09-25T02:11:11Z","session":"ecf54655-…","agent_type":"reviewer",
+      "skill":"adversarial-review","outcome":"skill-consumed"}`. The blocker recorded below (agent
+      definitions frozen at session start) is what a session started after the deploy removes.
+      f4 now checks exactly this join, ledger record to subagent transcript, so the
+      `printf` into the gate that the first retroactive review used to pass the old grep exits 1.
+      Earlier note, kept for the record: the deployed
       `~/.claude/agents/reviewer.md` carries `Skill` after the deploy, and a dispatched reviewer
       nonetheless reported its tools as `Read, Bash, advisor`. That matches the roster loaded at
       the *dispatching session's* start, not the file on disk. **Agent definitions are frozen at
@@ -129,6 +140,6 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
 
-> **Not archivable yet.** AC4–AC7 are open, so #1420 stays open and this PR references it
+> **Not archivable yet** (as of the landing PR). AC4 was open then, so #1420 stayed open and this PR references it
 > without a closing keyword. The archive gate additionally requires an independent adversarial
 > review by a model that is not the implementer's.
