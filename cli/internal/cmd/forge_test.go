@@ -94,3 +94,50 @@ func TestForgeProtectionCheckRepoFilter(t *testing.T) {
 		t.Fatal("--repo naming an undeclared repository must be refused")
 	}
 }
+
+const protectedRepo = `"o/r":{"branch":"main","protection":{"required_status_checks":null,"required_pull_request_reviews":null,` +
+	`"enforce_admins":true,"required_signatures":false,"required_linear_history":false,"allow_force_pushes":false,` +
+	`"allow_deletions":false,"block_creations":false,"required_conversation_resolution":false,"lock_branch":false,"allow_fork_syncing":false}}`
+
+func TestForgeProtectionApplyDryRunPlansAndWritesNothing(t *testing.T) {
+	root := makeRepo(t)
+	seedForge(t, root, protectedRepo)
+	var writes []string
+	stubForgeGH(t, func(args ...string) (string, string, error) {
+		if len(args) > 1 && args[1] == "-X" {
+			writes = append(writes, strings.Join(args, " "))
+		}
+		return `{"enforce_admins":{"enabled":false}}`, "", nil
+	})
+	out, _, err := execute(t, "forge", "protection", "apply", "--dry-run")
+	if err != nil || !strings.Contains(out, "[PLANNED] o/r") || !strings.Contains(out, "enforce_admins: false -> true") {
+		t.Fatalf("a dry run plans the change and exits 0: err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "changed=1") || len(writes) != 0 {
+		t.Fatalf("want changed=1 and no write, got writes=%v\n%s", writes, out)
+	}
+}
+
+func TestForgeProtectionApplyUnchangedExitsClean(t *testing.T) {
+	root := makeRepo(t)
+	seedForge(t, root, protectedRepo)
+	stubForgeGH(t, func(args ...string) (string, string, error) {
+		return `{"enforce_admins":{"enabled":true}}`, "", nil
+	})
+	out, _, err := execute(t, "forge", "protection", "apply")
+	if err != nil || !strings.Contains(out, "[UNCHANGED] o/r") || !strings.Contains(out, "changed=0") {
+		t.Fatalf("a converged repository reports changed=0 and exits 0: err=%v\n%s", err, out)
+	}
+}
+
+func TestForgeProtectionApplyExitsNonZeroWhenAReadFails(t *testing.T) {
+	root := makeRepo(t)
+	seedForge(t, root, protectedRepo)
+	stubForgeGH(t, func(...string) (string, string, error) {
+		return "", "error connecting to api.github.com\n", errors.New("exit status 1")
+	})
+	out, _, err := execute(t, "forge", "protection", "apply")
+	if err == nil || !strings.Contains(out, "[FAILED] o/r") {
+		t.Fatalf("a failed read must never exit 0: err=%v\n%s", err, out)
+	}
+}

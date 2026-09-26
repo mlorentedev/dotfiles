@@ -49,7 +49,24 @@ Everything was run on 2026-09-23 in `dotfiles-wt-protection-as-code` (branch `fe
 
 ## Evidence: PR-B (apply)
 
-Pending.
+Run on 2026-09-25 in `dotfiles-wt-protection-apply` (branch `feat/protection-apply`, base `origin/main` `81940a8`).
+
+- [x] **AC5**, against a stateful fake forge (`cli/internal/forge/apply_test.go`, 12 tests): a PUT replaces what the next GET returns, as GitHub's does.
+  - `TestProtectionApplySendsCompleteBodyAndConverges`: the PUT body carries exactly the 11 keys the endpoint takes, `restrictions` as an explicit null; the result is re-read; the second run reports `unchanged` and writes nothing.
+  - `TestProtectionApplyFailsWhenTheReReadDisagrees`: a write the forge accepts and does not apply is a FAIL naming the field.
+  - `TestProtectionApplyRefusesUnreportedContext`, four ways: never reported, reported by another app, reported only outside the last 5 merged pull requests, reported only on a pull request that never merged. Nothing is written in any of them.
+  - A context reported as a commit status counts (`review-attestation` is one). Contexts already required are not re-checked. `--dry-run` writes nothing and still runs the preflight. `required_signatures`, which PUT does not accept, goes to its own endpoint. Declared states are skipped without a call; apply never removes protection.
+  - CLI exit contract: `TestForgeProtectionApply{DryRunPlansAndWritesNothing,UnchangedExitsClean,ExitsNonZeroWhenAReadFails}`.
+- [x] **Mutation battery**: 9 mutants, one per run, each killed by a test failure: `restrictions` made omitempty, the re-read check disabled, `--dry-run` ignored, the preflight disabled, the source app ignored, unmerged pull requests counted, the 5-PR window unbounded, the signatures call dropped, an unprotected branch not counted as a change.
+- [x] **Live, read-only**, before the declaration changed: `dotf forge protection apply --dry-run` over all 14 declared repositories reported `changed=0 (0 applied, 0 planned), 9 unchanged, 5 skipped, 0 refused, 0 failed`, exit 0. The declaration and the forge agree on every field of every protected repository.
+- [x] **Live, read-only**, after declaring `spec-gate` on `mlorentedev/dotfiles`: the same command plans exactly one field, `required_status_checks.checks`, adding `spec-gate@15368`, and the preflight passes, because `spec-gate` reported on the recent merged pull requests. Exit 0; nothing was written.
+- [ ] **AC6**, owner-run after merge: `dotf forge protection apply --repo mlorentedev/dotfiles`, then `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` includes `spec-gate`, and a second `apply --dry-run` reports `changed=0`. Until then, `dotf forge protection check` and `dotf doctor` report that one field as drift, which is the declaration being ahead of the forge on purpose.
+
+## Test status: PR-B
+
+- `go build ./... && go vet ./... && GOOS=windows go vet ./...`: clean. `go test -p 1 ./... -count=1`: 25 packages ok, exit 0. `golangci-lint run ./...` at the pinned 2.12.2: `0 issues.`
+- **LOC.** About 300 executable production lines by a heuristic count (declarations, help text and brace-only lines excluded): `apply.go` 109, `preflight.go` 106, `cmd/forge.go` 87, of which 20 move existing code into `loadForgeDecl`. Excluded: 39 declaration lines, 21 lines of `--help` text, 17 braces.
+- **No shell or PowerShell script was touched, and nothing was written to any forge.** Every live call was a GET.
 
 ## Promotion candidates
 
