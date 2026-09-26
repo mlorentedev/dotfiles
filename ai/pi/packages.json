@@ -36,6 +36,14 @@
     "  why     what it is for. An entry nobody can justify is one to delete, and",
     "          this is where that question gets asked.",
     "",
+    "  requires  optional: executables the package needs on PATH. `dotf doctor`",
+    "          FAILs when one does not resolve -- a feature that reads as present",
+    "          and cannot work is worse than none (pi-memory without qmd).",
+    "",
+    "retire: paths under ~/.pi/agent that a removed package left behind. apply",
+    "moves each existing one to ~/.pi/agent/archive/<name>-<date>/ and never",
+    "deletes it.",
+    "",
     "Docs: https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md"
   ],
   "version": 1,
@@ -75,6 +83,12 @@
     {
       "source": "npm:pi-mcp-client@0.8.0",
       "why": "Model Context Protocol client for Pi; exposes Hive, context7, and sequential-thinking tools."
+    }
+  ],
+  "retire": [
+    {
+      "path": "memory",
+      "why": "pi-memory's data. The package was purged (HARNESS-139, decision D-2 on #1625): its retrieval dependency qmd was never provisioned, and a third memory store sits outside the single sink (GUARD-001)."
     }
   ]
 }
