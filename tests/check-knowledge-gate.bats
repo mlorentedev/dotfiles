@@ -253,6 +253,28 @@ The shape the gate wants:
     [[ "$output" == *"## Knowledge"* ]]
 }
 
+@test "lines inside an HTML comment do not count: GitHub does not render them" {
+    SDD_PR_BODY="## Knowledge
+
+<!--
+Example:
+- Lesson: none: an example in the template
+-->
+- Lesson: <!-- a lesson path --> none: nothing learned here
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ]
+    SDD_PR_BODY="## Knowledge
+<!-- - Lesson: none: only in a comment -->
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    _gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Lesson: the line is missing"* ]]
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned

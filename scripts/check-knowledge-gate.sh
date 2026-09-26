@@ -117,6 +117,27 @@ _strip_fences() {
     done <<< "$1"
 }
 
+# The body without HTML comments, which GitHub does not render: a template's
+# guidance, or an example inside one, is not an answer the author gave.
+_strip_comments() {
+    awk '
+        {
+            line = $0; out = ""
+            while (line != "") {
+                if (inside) {
+                    i = index(line, "-->")
+                    if (i == 0) { line = "" } else { line = substr(line, i + 3); inside = 0 }
+                } else {
+                    i = index(line, "<!--")
+                    if (i == 0) { out = out line; line = "" }
+                    else { out = out substr(line, 1, i - 1); line = substr(line, i + 4); inside = 1 }
+                }
+            }
+            print out
+        }
+    '
+}
+
 # The lines under "## Knowledge", up to the next heading of level 1 or 2.
 _section() {
     awk '
@@ -128,7 +149,7 @@ _section() {
 }
 
 # CR first: a body saved from GitHub's web editor has CRLF line endings.
-body=$(_strip_fences "${SDD_PR_BODY//$'\r'/}")
+body=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" | _strip_comments)
 
 problems=()
 
