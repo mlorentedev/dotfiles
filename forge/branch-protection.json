@@ -28,6 +28,10 @@
               "app_id": 15368
             },
             {
+              "context": "spec-gate",
+              "app_id": 15368
+            },
+            {
               "context": "test",
               "app_id": 15368
             },
