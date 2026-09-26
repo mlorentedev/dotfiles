@@ -318,3 +318,4 @@ tags: [lessons, index, dotfiles]
 | [298 - A wrapped runner is a grandchild: bound its process group](lesson-298-a-wrapped-runner-is-a-grandchild-bound-its-process-group.md) | 2026-09-25 |  |
 | [299 - Tell the reviewer its time budget; a deadline alone only kills](lesson-299-tell-the-reviewer-its-time-budget.md) | 2026-09-25 |  |
 | [300 - A migration checks the shape of what it moves, not only where it sits](lesson-300-a-migration-checks-the-shape-of-what-it-moves.md) | 2026-09-25 |  |
+| [302 - `producer \| grep -q` under `pipefail` fails at random](lesson-302-grep-q-in-a-pipe-under-pipefail-fails-at-random.md) | 2026-09-25 |  |
