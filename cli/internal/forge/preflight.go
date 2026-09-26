@@ -3,6 +3,8 @@ package forge
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"time"
 )
 
 // unreportedContexts returns the contexts d would newly require that did not
@@ -56,16 +58,22 @@ func newChecks(declared *Protection, live Protection) []Check {
 	return added
 }
 
-// mergedHeads returns the head SHAs of the branch's most recent merged pull
-// requests, newest first. A closed pull request that never merged is skipped:
-// what reported on an abandoned change says nothing about what reports now.
+// mergedHeads returns the head SHAs of the branch's most recently MERGED pull
+// requests, newest merge first. The API cannot sort by merge time, so the
+// newest-updated page is read and ordered by merged_at here: sorting by update
+// alone would let an old pull request that was merely commented on stand in
+// for a recent merge. Every merge updates its pull request, so the newest
+// merges are on that page unless 100 pull requests were closed or touched
+// since the fifth-newest one. A closed pull request that never merged is
+// skipped: what reported on an abandoned change says nothing about what
+// reports now.
 func mergedHeads(repo, branch string, run Runner) ([]string, error) {
-	out, errOut, err := run("api", fmt.Sprintf("repos/%s/pulls?state=closed&base=%s&sort=updated&direction=desc&per_page=30", repo, branch))
+	out, errOut, err := run("api", fmt.Sprintf("repos/%s/pulls?state=closed&base=%s&sort=updated&direction=desc&per_page=100", repo, branch))
 	if err != nil {
 		return nil, fmt.Errorf("list merged pull requests: %s", unanswerable(errOut, err))
 	}
 	var pulls []struct {
-		MergedAt *string `json:"merged_at"`
+		MergedAt *time.Time `json:"merged_at"`
 		Head     struct {
 			SHA string `json:"sha"`
 		} `json:"head"`
@@ -73,11 +81,19 @@ func mergedHeads(repo, branch string, run Runner) ([]string, error) {
 	if err := json.Unmarshal([]byte(out), &pulls); err != nil {
 		return nil, fmt.Errorf("unexpected pull request list: %w", err)
 	}
-	var heads []string
+	merged := pulls[:0]
 	for _, p := range pulls {
-		if p.MergedAt != nil && len(heads) < reportWindow {
-			heads = append(heads, p.Head.SHA)
+		if p.MergedAt != nil {
+			merged = append(merged, p)
 		}
+	}
+	sort.SliceStable(merged, func(i, j int) bool { return merged[i].MergedAt.After(*merged[j].MergedAt) })
+	var heads []string
+	for _, p := range merged {
+		if len(heads) == reportWindow {
+			break
+		}
+		heads = append(heads, p.Head.SHA)
 	}
 	return heads, nil
 }

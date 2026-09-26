@@ -130,12 +130,12 @@ func orEmpty(s, empty string) string {
 	return s
 }
 
-// mergedPulls renders n merged pull requests with heads sha0..sha<n-1>, plus
-// one closed-unmerged PR that must never count.
+// mergedPulls renders n merged pull requests with heads sha0..sha<n-1>, sha0
+// merged most recently, plus one closed-unmerged PR that must never count.
 func mergedPulls(n int) string {
 	items := []string{`{"merged_at":null,"head":{"sha":"unmerged"}}`}
 	for i := 0; i < n; i++ {
-		items = append(items, fmt.Sprintf(`{"merged_at":"2026-09-2%dT00:00:00Z","head":{"sha":"sha%d"}}`, i, i))
+		items = append(items, fmt.Sprintf(`{"merged_at":"2026-09-%02dT00:00:00Z","head":{"sha":"sha%d"}}`, 28-i, i))
 	}
 	return "[" + strings.Join(items, ",") + "]"
 }
@@ -219,6 +219,18 @@ func TestProtectionApplyRefusesUnreportedContext(t *testing.T) {
 				t.Fatalf("want refused naming spec-gate with no write, got %+v (puts=%d)", r, len(f.puts))
 			}
 		})
+	}
+}
+
+// The list comes in update order. An old pull request that was only commented
+// on recently sits first there, and must not stand in for a recent merge.
+func TestProtectionApplyWindowIsTheNewestMergesNotTheNewestUpdates(t *testing.T) {
+	pulls := `[{"merged_at":"2026-01-01T00:00:00Z","head":{"sha":"old"}}` + strings.TrimPrefix(mergedPulls(5), "[")
+	pulls = strings.Replace(pulls, `}{`, `},{`, 1)
+	f := &forgeFake{t: t, live: string(fixture(t, "get-dotfiles.json")), pulls: pulls,
+		reported: map[string]string{"old": checkRun("spec-gate", 15368)}}
+	if r := ApplyRepo(dotRepo, withSpecGate(t), f.run, false); r.Status != ApplyRefused {
+		t.Fatalf("a report on an old merge must not satisfy the window, got %+v", r)
 	}
 }
 
