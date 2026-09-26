@@ -99,6 +99,8 @@ func TestAgentTiersResolve(t *testing.T) {
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\n---",
 			wantFail:     true,
 			wantSubs:     []string{"top", "opencode", "AGENT.md"},
+			// A FAIL beside an OK line for the same check is a contradiction.
+			wantNot: []string{"checked)"},
 		},
 		{
 			// Declaring no tier is not an error: the render emits no model line.
@@ -132,6 +134,20 @@ func TestAgentTiersResolve(t *testing.T) {
 			deployAgents: []string{"claude"},
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: ultra\ntargets:\n  - claude\n---",
 			wantNot:      []string{"checked"},
+		},
+		{
+			// The render's awk stops at the first `targets:` line.
+			name:         "the first of two targets lines is the one judged",
+			deployAgents: []string{"claude", "opencode"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\ntargets: [claude]\ntargets: [opencode]\n---",
+			wantSubs:     []string{"(1 checked)"},
+		},
+		{
+			// An indented key belongs to a nested block, not to the record.
+			name:         "an indented model key is not the record's tier",
+			deployAgents: []string{"claude"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmeta:\n  model: ultra\n---",
+			wantNot:      []string{"ultra", "checked"},
 		},
 		{
 			name:         "a tier no tier block declares at all",
@@ -215,6 +231,21 @@ func TestAgentTiersMissingInputsAreNotFailures(t *testing.T) {
 			t.Errorf("nothing renders agent definitions, so there is no tier to disagree about")
 		}
 	})
+}
+
+// TestAgentTiersDefaultRecordDir pins the manifest default: no record_dir
+// means harness/agents, the render's own default.
+func TestAgentTiersDefaultRecordDir(t *testing.T) {
+	cfg := agentTierFixture(t, []string{"claude"}, "---\nname: curator\nmodel: ultra\n---")
+	mustWrite(t, filepath.Join(cfg.DotfilesDir, "harness", "manifest.json"),
+		`{"version":1,"agents":{"deploy":[{"agent":"claude"}]}}`)
+	var buf bytes.Buffer
+	rep := NewReport(&buf, false)
+	rep.Section("test")
+	checkAgentTiersResolve(cfg, tierMap, rep)
+	if rep.Failures() != 1 {
+		t.Errorf("the default record dir must be read, so the undeclared tier fails:\n%s", buf.String())
+	}
 }
 
 // TestRecordTargetsDefaultsToEveryHarness pins the direction that, inverted,
