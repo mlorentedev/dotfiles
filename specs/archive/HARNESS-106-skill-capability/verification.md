@@ -132,9 +132,9 @@ passed there before either round. f8 deploys into a throwaway `HOME`.
 
 | Finding | Disposition |
 |---|---|
-| Major: f4 passed on one line printed into the gate, although AC4 says "proven by a dispatch" | **Applied** in the contract fix `c5209ed`, reviewed as `617cbaf`: f4 joins each record to Claude Code's subagent transcript of that session, and the forged line now exits 1. AC4 is met by the dispatch recorded under AC4 above. |
+| Major: f4 passed on one line printed into the gate, although AC4 says "proven by a dispatch" | **Applied** in the contract fix the sweep commit "fix(spec): HARNESS-106's AC4 is verified by a dispatch, not by a line anyone can write", reviewed as `617cbaf`: f4 joins each record to Claude Code's subagent transcript of that session, and the forged line now exits 1. AC4 is met by the dispatch recorded under AC4 above. |
 | Major (inherited): a named dispatch resolves no persona and turns enforcement off | Already **#1434**, now closed. Not introduced by this diff. |
-| Minor: `tasks.md` left AC5-AC7 unticked and miscounted the entries; this file said "AC4-AC7 are open" | **Applied** in `c5209ed` |
+| Minor: `tasks.md` left AC5-AC7 unticked and miscounted the entries; this file said "AC4-AC7 are open" | **Applied** in the sweep commit "fix(spec): HARNESS-106's AC4 is verified by a dispatch, not by a line anyone can write" |
 | Minor: the unknown-verb message gives wrong advice | **Ticketed**: #1749 (HARNESS-163) |
 | Minor: the `role-unresolved` record's `reason` hides that enforcement is off | **Ticketed**: #1749 |
 | Minor: the `compile-harness.sh` stale-binary probe has no test | **Ticketed**: #1749 |

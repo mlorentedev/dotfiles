@@ -68,10 +68,10 @@ since. All 7 `features.json` verifiers passed at the landing commit before eithe
 
 | Finding | Disposition |
 |---|---|
-| Major: `recordTargets` matched entries exactly; the render matches the harness name anywhere on the first `targets:` line, so a quoted entry hid drift and a block-style list raised a false FAIL | **Applied** in `d85d951`: the check uses the render's rule, and `TestRecordTargetsAgreesWithTheRender` runs the real `skill_targets_agent` against it. The render's rule itself is #1733 (HARNESS-159). |
-| Major: AC1's count had no test | **Applied** in `d85d951`: `(1 checked)` and `(2 checked)` asserted |
-| Minor: the unparseable-manifest branch had no test | **Applied** in `d85d951` |
-| Minor: `checkAgentTiersResolve` was ~70 lines, CC ≈ 14 | **Applied** in `d85d951`: split into three functions |
+| Major: `recordTargets` matched entries exactly; the render matches the harness name anywhere on the first `targets:` line, so a quoted entry hid drift and a block-style list raised a false FAIL | **Applied** in the sweep commit "fix(doctor): the agent-tier check reads targets the way the render does": the check uses the render's rule, and `TestRecordTargetsAgreesWithTheRender` runs the real `skill_targets_agent` against it. The render's rule itself is #1733 (HARNESS-159). |
+| Major: AC1's count had no test | **Applied** in the sweep commit "fix(doctor): the agent-tier check reads targets the way the render does": `(1 checked)` and `(2 checked)` asserted |
+| Minor: the unparseable-manifest branch had no test | **Applied** in the sweep commit "fix(doctor): the agent-tier check reads targets the way the render does" |
+| Minor: `checkAgentTiersResolve` was ~70 lines, CC ≈ 14 | **Applied** in the sweep commit "fix(doctor): the agent-tier check reads targets the way the render does": split into three functions |
 | Minor: `copilot` contains `pi` in the render's substring match | **Ticketed**: #1733, together with the block-style defect |
 | Minor: the unparseable manifest is a WARN where the proposal says the check stays silent | **Declined**: AC7 requires no FAIL, and a WARN is not one. Saying the check did not run is what keeps silence from reading as a pass; `TestAgentTiersMissingInputsAreNotFailures` now pins both halves. |
 | Minor: the landing commit removed a trailing blank line in `report.go` | **Declined**: it was gofmt debt (#1154) paid in passing; recorded under Test status above |
@@ -85,9 +85,9 @@ limit (HTTP 429). Dispositions:
 | Finding | Disposition |
 |---|---|
 | Major THEORETICAL: the `model:` reader disagrees with the render's `skill_field` on CRLF, `model : top` and an indented `---` | **Ticketed**: #1740 (GUARD-020). Fixing it changes the reader, so it gets its own reviewed change rather than landing unreviewed after this verdict. |
-| Major THEORETICAL: first-wins on a repeated key had no test | **Applied** in `62806cb`; the last-wins mutant now fails |
-| Minor THEORETICAL: the indent guard and the `record_dir` default had no test | **Applied** in `62806cb`; both mutants now fail |
-| Minor THEORETICAL: nothing asserted that a FAIL suppresses the pass line | **Applied** in `62806cb`; the mutant now fails |
+| Major THEORETICAL: first-wins on a repeated key had no test | **Applied** in the sweep commit "test(doctor): pin four agent-tier rules the second review found unguarded"; the last-wins mutant now fails |
+| Minor THEORETICAL: the indent guard and the `record_dir` default had no test | **Applied** in the sweep commit "test(doctor): pin four agent-tier rules the second review found unguarded"; both mutants now fail |
+| Minor THEORETICAL: nothing asserted that a FAIL suppresses the pass line | **Applied** in the sweep commit "test(doctor): pin four agent-tier rules the second review found unguarded"; the mutant now fails |
 | Minor REAL: the gofmt sentence above was stale | **Applied**: corrected above |
 | Minor REAL: the count does not cover the zero case | **Applied** to the wording above; **declined** as a code change, because at zero pairs silence is deliberate and is not a pass line |
 

@@ -79,7 +79,7 @@ verifiers passed there first, each asserting a named `--- PASS:` line.
 | Finding | Disposition |
 |---|---|
 | A reviewer that rewrites a byte-identical `review.md` is read as having written nothing | **Declined**: two rounds producing the same bytes is not a realistic event, the refusal names its escape, and treating "the file did not change" as "no verdict" is the guard's whole point |
-| AC8, a sidecar write failure warns and still launches, has no test | **Applied** in `fbeb7a7`: `TestWriteReviewRequestReportsAFailedWrite` pins that the write reports its failure (the mutant that swallows it now fails). The launcher's handling is three lines of `PrintErrf` on that error. |
+| AC8, a sidecar write failure warns and still launches, has no test | **Applied** in the sweep commit "test(spec): a review sidecar that cannot be written is an error the launcher sees": `TestWriteReviewRequestReportsAFailedWrite` pins that the write reports its failure (the mutant that swallows it now fails). The launcher's handling is three lines of `PrintErrf` on that error. |
 | `review-request.json` carries `base_sha` and `contract_digests`, which the struct at the landing commit does not read | **Declined**: an artifact of the retroactive method. Today's launcher wrote the sidecar into a tree at the landing commit; the fields are SDD-042's, and `ReviewRequest` on `main` declares both. |
 
 ## Promotion candidates
