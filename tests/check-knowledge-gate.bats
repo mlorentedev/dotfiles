@@ -168,6 +168,13 @@ No knowledge section here."
     [[ "$output" == *"reason"* ]]
 }
 
+@test "fails on the template's placeholder reason copied verbatim" {
+    _body_with_lesson "none: <reason>"
+    _gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"placeholder"* ]]
+}
+
 @test "fails when a line is neither a path nor a reasoned none" {
     _body_with_lesson "yes, see the PR"
     _gate

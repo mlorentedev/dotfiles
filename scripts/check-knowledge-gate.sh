@@ -159,8 +159,11 @@ _judge() {
     local none_re='^none[[:space:]]*(:[[:space:]]*(.*))?$'
     value="${value//\`/}"
     if [[ "$value" =~ $none_re ]]; then
-        if [[ -z "${BASH_REMATCH[2]// /}" ]]; then
+        local reason="${BASH_REMATCH[2]}"
+        if [[ -z "${reason// /}" ]]; then
             problems+=("$kind: \"none\" needs a reason, as \"none: <reason>\"")
+        elif [[ "$reason" =~ ^\<[^\>]*\>$ ]]; then
+            problems+=("$kind: \"$reason\" is the template's placeholder; write the reason")
         fi
         return 0
     fi
