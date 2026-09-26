@@ -15,23 +15,22 @@ name: pr-agent
 
 on:
   pull_request:
-    # `synchronize` is here so a push is reviewed, and it is NOT handled by
-    # pr_actions — see handle_push_trigger below. #1053 removed it because the
-    # workflow fired and PR-Agent declined to act, publishing a `review: SUCCESS`
-    # that read as "the reviewer looked at your new commits" and meant "the
-    # action started and did nothing". That finding stands; what changes is which
-    # side of it moves.
+    # `synchronize` is here so a fix pushed after a review is read too. It is NOT
+    # handled by pr_actions; see handle_push_trigger below.
     #
-    # It moves because an enforced doctrine line depended on the behaviour that
-    # was removed. `harness/enforced/pr-stewardship.md`, injected into every
-    # agent's instructions, says *"pushing a fix reopens it, because the reviewer
-    # re-reviews"* — and after #1053 that was false. A reviewer that does not
-    # re-review a fix leaves the second half of every PR unread, so the machinery
-    # matches the doctrine rather than the doctrine being softened.
+    # What a push gets is bounded (TOOL-023, ADR-040). A full review on every push
+    # (#1053) measured 39 reviews across 18 PRs in one week, up to 7 on one PR.
+    # Each was one request to a NaN pool of 5 shared slots, and each re-review
+    # reopened the triage queue. A push is now reviewed incrementally, for the
+    # commits since the previous review. It runs only once 3 non-merge commits
+    # are newer than that review, as the "push gate" step decides. Below that,
+    # nothing runs, so nothing reports a review that did not happen: #1053's
+    # finding. The field does the same: Copilot and Codex review once,
+    # CodeRabbit reviews incrementally and pauses. Iterate on a draft, which this
+    # job skips, and mark the PR ready when it is.
     #
-    # The rebase burst is already paid for: #1042's concurrency group is keyed on
-    # the event name with cancel-in-progress, so push-vs-push still cancels and a
-    # burst of three pushes collapses to ONE review of the settled state.
+    # A burst still collapses: #1042's concurrency group is keyed on the event
+    # name with cancel-in-progress, so push-vs-push cancels.
     types: [opened, synchronize, reopened, ready_for_review]
   # Slash commands (/review, /describe, /improve) on an existing PR.
   issue_comment:
@@ -224,8 +223,40 @@ jobs:
           else
             echo "reviewable=true" >> "$GITHUB_OUTPUT"
           fi
+      # TOOL-023: the push gate decides BEFORE PR-Agent starts. A push PR-Agent
+      # skipped would publish nothing, and the guard below would read that as a
+      # failed inference. The job has no other checkout. The gate script is
+      # fetched from the PR's merge ref, the same trust as this workflow file,
+      # and forks never reach this job.
+      - name: Check out the push gate
+        if: github.event.action == 'synchronize'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: scripts/pr-agent-push-gate.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Decide whether this push is reviewed
+        id: push_gate
+        if: github.event.action == 'synchronize'
+        # Fails OPEN. A read that fails leaves no file, and the gate reviews on
+        # unreadable input. A step that fails leaves no output, and PR-Agent
+        # runs. A review is skipped only when the data justifies it.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SENDER_TYPE: ${{ github.event.sender.type }}
+        run: |
+          set -o pipefail
+          dir=$(mktemp -d)
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            | jq -s 'add // []' > "$dir/comments.json" || rm -f "$dir/comments.json"
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/commits" --paginate \
+            | jq -s 'add // []' > "$dir/commits.json" || rm -f "$dir/commits.json"
+          ./scripts/pr-agent-push-gate.sh --comments "$dir/comments.json" \
+            --commits "$dir/commits.json" --sender-type "${SENDER_TYPE}" | tee -a "$GITHUB_OUTPUT"
       - name: PR-Agent
-        if: steps.reviewable.outputs.reviewable != 'false'
+        if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move `v0.42.0` decides what runs here, and what runs here holds
         # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
@@ -269,12 +300,13 @@ jobs:
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
           # The push path, which is what actually reviews a new commit.
           github_action_config.handle_push_trigger: "true"
-          # `/review` ONLY, and the omission is the point: upstream's default is
-          # ['/describe', '/review'], so enabling the push trigger without saying
-          # this would silently reinstate describe on every push and undo the
-          # decision recorded below. A default that quietly re-enables a thing
-          # you turned off elsewhere is the same defect one layer down.
-          github_action_config.push_commands: '["/review"]'
+          # `/review -i` ONLY. Incremental: the commits since the previous review,
+          # never the whole PR again (TOOL-023). The push gate above decides
+          # whether it runs, so PR-Agent's own incremental thresholds stay at
+          # their defaults and the bound lives in one tested place. And nothing
+          # else: upstream's default is ['/describe', '/review'], so leaving this
+          # unsaid would reinstate describe on every push.
+          github_action_config.push_commands: '["/review -i"]'
           # Merge commits and bot pushes are not a human asking for another look.
           github_action_config.push_trigger_ignore_bot_commits: "true"
           github_action_config.push_trigger_ignore_merge_commits: "true"
@@ -331,9 +363,12 @@ jobs:
         # wrong NaN-concurrency diagnosis on top of the remedy; skip it in that case.
         # And skip it when the step above found nothing PR-Agent may read: no review
         # was possible, and the NaN diagnosis below would be false (#1618).
+        # And skip it when the push gate held a push below its threshold: no review
+        # was asked for (TOOL-023).
         if: >
           always() && steps.credential.outcome != 'failure'
             && steps.reviewable.outputs.reviewable != 'false'
+            && steps.push_gate.outputs.run != 'false'
             && (github.event_name == 'pull_request'
               || (github.event_name == 'issue_comment'
                   && contains(github.event.comment.body, '/review')))
@@ -351,30 +386,34 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
         run: |
           set -euo pipefail
-          read_marker() { # $1 = ref; prints the marker or nothing; never aborts the step
+          # Every declared marker, as a JSON array: a full review carries "## PR
+          # Reviewer Guide", an incremental one "## Incremental PR Reviewer Guide"
+          # (TOOL-023). Prints nothing when none is declared; never aborts the step.
+          read_markers() { # $1 = ref
             gh api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=$1" \
               --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
-              | jq -r '.reviewers[] | select(.login == "github-actions") | .review_markers[0] // empty' 2>/dev/null || true
+              | jq -c '[.reviewers[] | select(.login == "github-actions") | .review_markers[]?]
+                       | select(length > 0)' 2>/dev/null || true
           }
-          marker=$(read_marker "${BASE_REF}")
-          if [ -z "$marker" ] && [ -z "${HEAD_SHA:-}" ]; then
+          markers=$(read_markers "${BASE_REF}")
+          if [ -z "$markers" ] && [ -z "${HEAD_SHA:-}" ]; then
             # issue_comment events carry no pull_request payload; ask the API for the head.
             HEAD_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null || true)
           fi
-          if [ -z "$marker" ] && [ -n "${HEAD_SHA:-}" ]; then
+          if [ -z "$markers" ] && [ -n "${HEAD_SHA:-}" ]; then
             # The default branch has no github-actions entry yet: this is the PR that
             # introduces it. The head registry only proves the entry EXISTS; the marker
             # itself is PR-Agent's own heading, never text a PR could choose (a head-
             # supplied marker such as "#" would match any bot comment, CWE-345). Author
             # and start-stamp binding below still apply. Without this fallback the
             # bootstrap PR of every repository failed with a bare "exit code 1".
-            if [ -n "$(read_marker "${HEAD_SHA}")" ]; then
-              marker="PR Reviewer Guide"
+            if [ -n "$(read_markers "${HEAD_SHA}")" ]; then
+              markers='["PR Reviewer Guide"]'
               echo "::notice::reviewer registry entry found only on the PR head;" \
                 "using PR-Agent's own heading as the marker"
             fi
           fi
-          if [ -z "$marker" ] || [ "$marker" = "null" ]; then
+          if [ -z "$markers" ]; then
             echo "::error::no review marker declared for github-actions in" \
               "harness/review-attestation.json (checked ${BASE_REF} and the PR head)"
             exit 1
@@ -383,16 +422,16 @@ jobs:
           # array of arrays so the count spans every page (gh's own --slurp flag is
           # not present on the runner's gh 2.46 and printed usage instead).
           found=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
-            | jq -s --arg started "${STARTED}" --arg marker "${marker}" \
+            | jq -s --arg started "${STARTED}" --argjson markers "${markers}" \
                 '[.[][] | select(.user.login == "github-actions[bot]"
                                  and (.updated_at >= $started)
-                                 and (.body | contains($marker)))] | length')
+                                 and (.body as $b | any($markers[]; . as $m | $b | contains($m))))] | length')
           if [ "$found" -gt 0 ]; then
-            echo "review published (marker: ${marker})"
+            echo "review published (markers: ${markers})"
             exit 0
           fi
           echo "::error::PR-Agent reported success but published no review" \
-            "(no github-actions[bot] comment updated since ${STARTED} carries \"${marker}\")."
+            "(no github-actions[bot] comment updated since ${STARTED} carries any of ${markers})."
           echo "::error::Most likely cause: NaN concurrency exhaustion — the cluster allows 5 simultaneous"
           echo "::error::requests, shared with pi, qq and hive embeddings. See #1107."
           exit 1

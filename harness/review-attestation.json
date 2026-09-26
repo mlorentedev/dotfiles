@@ -88,7 +88,8 @@
       "login": "github-actions",
       "declined_markers": [],
       "review_markers": [
-        "## PR Reviewer Guide"
+        "## PR Reviewer Guide",
+        "## Incremental PR Reviewer Guide"
       ],
       "why": "PR-Agent (TOOL-013, #786/#1032) posts as github-actions via GITHUB_TOKEN and publishes through the comments API, not the reviews API — so reviews[] is empty on a PR it genuinely reviewed. Measured on #1037 (Guide at 00:05:21) and #1042 (00:16:58), both reading `reviews[]: 0`. The marker is the `review` command's own heading; `## PR Code Suggestions` (the `improve` command) is deliberately NOT here — suggestions are not a review."
     }
