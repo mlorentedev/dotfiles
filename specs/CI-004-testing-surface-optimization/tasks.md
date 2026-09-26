@@ -17,7 +17,7 @@ created: "2026-09-25"
 - [x] Worktree `../dotfiles-wt-ci-004`, branch `feat/ci-004-testing-surface` from `origin/main` (`f42c212`)
 - [x] `proposal.md` complete, with measured baselines for every criterion
 - [ ] Owner approves the plan (proposal + this file) before any code
-- [ ] Out-of-scope rows recorded where they now live: P0.4 and P1.4 on #1628, P1.2 on #1478, P1.1 and P2.x as new tickets
+- [x] Out-of-scope rows recorded where they now live: P0.4 and P1.4 on #1628, P1.2 on #1478, P1.1 as #1741 (CI-005), P2.1–P2.4 as #1742–#1745 (CI-006 to CI-009)
 
 Heavy runs go through `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapMax=0`. The box has ~3 GB free.
 The bats verifications need two files so `setup_suite` loads; `tests/guard-lesson-numbers-unique.bats` is the cheap companion.
