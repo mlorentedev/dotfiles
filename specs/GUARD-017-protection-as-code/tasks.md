@@ -15,7 +15,7 @@ created: "2026-09-23"
 
 - [x] Branch created from main: `feat/protection-as-code` (worktree `dotfiles-wt-protection-as-code`)
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [ ] Owner confirms the declaration path (`forge/`), the one open question in `proposal.md`
+- [x] Owner confirms the declaration path (`forge/`), the one open question in `proposal.md`
 
 ## Implementation: PR-A (declare and detect, read-only)
 
@@ -30,8 +30,8 @@ created: "2026-09-23"
 
 ## Implementation: PR-B (apply)
 
-- [ ] [AC5] Failing tests against a fake forge: complete PUT body, re-read assert, `changed=0` on the second run → `TestProtectionApply*`
-- [ ] [AC5] Reported-context preflight → `TestProtectionApplyRefusesUnreportedContext`
+- [x] [AC5] Failing tests against a fake forge: complete PUT body, re-read assert, `changed=0` on the second run → `TestProtectionApply*`
+- [x] [AC5] Reported-context preflight → `TestProtectionApplyRefusesUnreportedContext`
 - [ ] [AC6] Declare `spec-gate` on dotfiles `main`; the owner runs `apply`
 
 ## Closing
