@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: ff6047f74e5bcbcc
+generated_sha: 8416f176868419d9
 id: handoff-skill
 type: skill
 status: active
@@ -63,8 +63,15 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 
   ```bash
   dotf mem thread                       # which session am I: wt-<slug>, or main
-  printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD"
+  printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD" --agent <agent>
   ```
+
+  `<agent>` is your own harness name, one lower-case word: `claude`, `pi`, `agy`,
+  `antigravity`, `copilot`, `opencode`, `codex` or `gemini`. Use the same word as in your journal's name. It stamps your thread
+  (`### thread: <key> (writer: <agent>)`). If another agent wrote the block under
+  the same key, the command keeps it: your write goes to `<key>+<agent>`, and
+  stderr says so. Report that fork in your summary. Never pass another agent's
+  name to write into its block (MEMORY-009, #1690).
 
   The section holds **one sub-block per thread**, keyed by worktree and marked
   (`### thread: wt-pi-harness`). The command replaces only *your* thread and
@@ -112,7 +119,7 @@ In ADDITION to the replaced-in-place continuity block, record the session journa
 - **Path:** `<target-repo-area>/sessions/<YYYY-MM-DD>-<target-repo>-<agent>-<thread>.md`, where `<thread>` is what `dotf mem thread` prints. Ask for the whole name rather than assembling it:
 
   ```bash
-  dotf mem thread --date "$(date +%F)" --project <repo> --agent claude
+  dotf mem thread --date "$(date +%F)" --project <repo> --agent <agent>
   ```
 
   **The thread is in the name because the collision it prevents already
