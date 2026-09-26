@@ -137,7 +137,7 @@ STUB
 }
 
 @test "spec-gate-pr: a --gate value with a path separator exits 2 and runs nothing" {
-    run "$ADAPTER" --pr 877 --gate ../check-spec-gate.sh --base-ref origin/main --head-ref HEAD
+    run "$ADAPTER" --pr 877 --gate ../bin/check-spec-gate.sh --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 2 ]
     [[ "$output" == *"--gate"* ]]
     [ ! -f "$GATE_LOG" ]
