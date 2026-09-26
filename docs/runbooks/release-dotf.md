@@ -44,7 +44,7 @@ This runbook covers going from a merged release PR to a verified `dotf` on a mac
 
 7. **Verify by effect, not by the version string alone:**
    - `dotf version` prints `X.Y.Z`.
-   - The prompt hook names only live skills:
+   - The prompt hook suggests no retired skill. Run it with a prompt that routed to a retired skill before the release (the one below is an example), and check that none of the skills it prints is on the retirement's list:
 
      ```bash
      printf '%s' '{"prompt":"rebase the branch on main"}' | dotf harness suggest --from-hook
