@@ -88,6 +88,8 @@ jobs:
               - 'setup-windows.ps1'
               - 'versions.conf'
               - 'tests/pi-*.bats'
+              - 'cli/internal/pi/**'
+              - 'cli/internal/cmd/pi.go'
 
   lint:
     runs-on: ubuntu-latest

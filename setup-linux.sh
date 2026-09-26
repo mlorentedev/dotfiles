@@ -834,134 +834,28 @@ if [ -f "$PI_SETTINGS_DST" ] && [ -f "$PI_SETTINGS_SRC" ]; then
     fi
 fi
 
-# pi packages (AI-030, #1224): reconcile ai/pi/packages.json against what the
-# live settings.json already declares, and install the difference.
-#
-# This runs AFTER the seed above and writes through `pi install`, never by
-# editing settings.json here. Two reasons, and neither is style. First, that
-# file is seed-if-missing precisely because pi owns it — writing the array from
-# setup would reintroduce the clobber #754 removed. Second, `pi install` also
-# unpacks the package under ~/.pi/agent/npm/, so an array entry this script
-# wrote by hand would name a package that is not on disk.
-#
-# `$PI_BIN`, never `pi`. The shell function of that name is a `dotf secrets run`
-# wrapper that resolves a Bitwarden item first, so it FAILS on a locked vault —
-# and setup must not require an unlocked vault to install an extension. The
-# version check above already reaches for $PI_BIN for the same reason.
-#
-# Idempotent by set difference, so a second run installs nothing and says so.
-#
-# DOTFILES_SKIP_PI_PACKAGES exists for one caller: a throwaway CI runner whose
-# diff cannot change what this block does (CI-002, #1478). The reconcile is
-# 883-2200s of a 20-45 minute job — measured across four runs of the same nine
-# pinned packages — and it reinstalls the same manifest whether or not the PR
-# went near it. Set it and the block is skipped LOUDLY; the coverage does not
-# move to a schedule nobody reads, it stays on pushes to the default branch
-# where a failure is somewhere people already look.
-#
-# It is deliberately not a config key or a flag in packages.json. A durable
-# switch would let a real machine end up permanently unconverged, which is the
-# opposite of what this script is for. An environment variable is scoped to the
-# one process that sets it and dies with it.
-PI_PACKAGES_SRC="$CURRENT_DIR/ai/pi/packages.json"
-if [ -f "$PI_PACKAGES_SRC" ]; then
-    if [ -n "${DOTFILES_SKIP_PI_PACKAGES:-}" ]; then
-        # Loud, and it says what was NOT verified rather than only what was
-        # skipped: a line reading "skipped" is indistinguishable from "fine".
-        log_warning "DOTFILES_SKIP_PI_PACKAGES set — pi package reconcile skipped (nothing installed, nothing verified)"
-    elif [ ! -x "$PI_BIN" ]; then
-        log_warning "pi not installed — skipping pi package reconcile (re-run setup after pi installs)"
-    elif ! command -v npm >/dev/null 2>&1; then
-        # `pi install` shells out to npm. Without this, the loop runs and every
-        # entry fails individually, so a missing Node toolchain is reported nine
-        # times as nine package failures instead of once as its actual cause.
-        # Reported by the PR reviewer on #1226 against the acceptance criterion
-        # that asked for both guards; the block above this one already gates
-        # pi's own install on npm for the same reason.
-        log_warning "npm not found — skipping pi package reconcile (install Node.js, then re-run setup)"
-    elif ! command -v jq >/dev/null 2>&1; then
-        log_warning "jq not found — skipping pi package reconcile"
-    else
-        # Declared. A malformed manifest must be loud, not silently empty: an
-        # empty want-list installs nothing and reads exactly like "all present".
-        PI_PKG_WANTED=$(jq -er '.packages[].source' "$PI_PACKAGES_SRC" 2>/dev/null) || PI_PKG_WANTED=""
-        if [ -z "$PI_PKG_WANTED" ]; then
-            log_warning "ai/pi/packages.json declares no readable packages — not reconciling"
-        else
-            # Present. Entries are strings or objects carrying `source`; the
-            # object form is what upstream uses for per-resource filtering, and
-            # a reader that handled only strings would reinstall those forever.
-            PI_PKG_PRESENT=""
-            if [ -f "$PI_SETTINGS_DST" ]; then
-                PI_PKG_PRESENT=$(jq -r '(.packages // [])[] | if type == "object" then (.source // empty) else . end' \
-                    "$PI_SETTINGS_DST" 2>/dev/null) || PI_PKG_PRESENT=""
-            fi
-
-            pi_pkg_added=0
-            pi_pkg_failed=0
-            pi_pkg_present=0
-            # A VERBOSITY threshold, not a bound. Nothing is killed for crossing
-            # it; it only decides whose captured output is worth printing. Being
-            # wrong therefore costs log lines, never a broken install — which is
-            # why it is a literal here and not a knob. Sized from the measured
-            # distribution on the Windows runner (#1486): normal installs land
-            # at 35-345s and the anomaly at 421 ±1s, so there is no clean gap to
-            # sit in, and this deliberately errs toward printing too much.
-            PI_INSTALL_SLOW_SECONDS=120
-            while IFS= read -r pi_pkg; do
-                [ -n "$pi_pkg" ] || continue
-                if printf '%s\n' "$PI_PKG_PRESENT" | grep -Fxq "$pi_pkg"; then
-                    pi_pkg_present=$((pi_pkg_present + 1))
-                    continue
-                fi
-                log_info "Installing pi package $pi_pkg ..."
-                # Both the elapsed time and the output used to be discarded here
-                # (`>/dev/null 2>&1`), and #1486 is what that cost: nine installs
-                # whose durations could only be reconstructed from GitHub's own
-                # line timestamps, and whose 421s outliers cannot be told apart
-                # from a slow success even in hindsight. The machine had the
-                # diagnostic in its hands and threw it away, then told the reader
-                # to reproduce it by hand.
-                pi_pkg_started=$(date +%s)
-                if pi_pkg_out=$("$PI_BIN" install "$pi_pkg" 2>&1); then
-                    pi_pkg_rc=0
-                else
-                    pi_pkg_rc=$?
-                fi
-                pi_pkg_elapsed=$(( $(date +%s) - pi_pkg_started ))
-
-                if [ "$pi_pkg_rc" -eq 0 ]; then
-                    pi_pkg_added=$((pi_pkg_added + 1))
-                    if [ "$pi_pkg_elapsed" -ge "$PI_INSTALL_SLOW_SECONDS" ]; then
-                        log_warning "pi install $pi_pkg took ${pi_pkg_elapsed}s — over the ${PI_INSTALL_SLOW_SECONDS}s diagnostic threshold, output follows"
-                    else
-                        log_info "pi package $pi_pkg installed in ${pi_pkg_elapsed}s"
-                    fi
-                else
-                    pi_pkg_failed=$((pi_pkg_failed + 1))
-                    log_warning "pi install $pi_pkg failed after ${pi_pkg_elapsed}s (exit $pi_pkg_rc) — output follows"
-                fi
-
-                # Fenced, so that EMPTY output is itself legible. "The install
-                # printed nothing at all" is a finding; a bare dump makes it
-                # indistinguishable from "we never captured anything".
-                if [ "$pi_pkg_rc" -ne 0 ] || [ "$pi_pkg_elapsed" -ge "$PI_INSTALL_SLOW_SECONDS" ]; then
-                    printf '%s\n' "--- pi install $pi_pkg (exit $pi_pkg_rc, ${pi_pkg_elapsed}s) ---"
-                    printf '%s\n' "$pi_pkg_out"
-                    printf '%s\n' "--- end pi install $pi_pkg ---"
-                fi
-            done <<EOF
-$PI_PKG_WANTED
-EOF
-
-            if [ "$pi_pkg_added" -eq 0 ] && [ "$pi_pkg_failed" -eq 0 ]; then
-                log_info "pi packages already reconciled ($pi_pkg_present declared, 0 changed)"
-            else
-                log_success "pi packages: $pi_pkg_added installed, $pi_pkg_present already present, $pi_pkg_failed failed"
-            fi
-        fi
-    fi
+# pi packages (HARNESS-139, #1628): `dotf pi packages apply` converges pi on
+# ai/pi/packages.json in BOTH directions -- installs what is declared, removes
+# what is not, and archives the paths the manifest retires -- through pi's own
+# CLI, never by writing settings.json (pi owns it, #754). It replaced a loop
+# here that only ever installed, so a package dropped from the manifest stayed
+# on every machine. The Go command keeps what that loop established: captured
+# output, elapsed time on every outcome, the DOTFILES_SKIP_PI_PACKAGES skip
+# (CI-002, #1478), and a warning rather than a failure without pi or npm.
+# `--pi "$PI_BIN"`, never the `pi` shell function, which wraps `dotf secrets run`
+# and fails on a locked vault.
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then
+    _dotf="dotf"
+elif [ -x "$HOME/.local/bin/dotf" ]; then
+    _dotf="$HOME/.local/bin/dotf"
 fi
+if [ -n "$_dotf" ]; then
+    "$_dotf" pi packages apply --repo "$CURRENT_DIR" --pi "$PI_BIN" || log_warning "pi package reconcile reported a failure (above) -- run 'dotf pi packages check'"
+else
+    log_warning "dotf not found (PATH or ~/.local/bin) -- pi packages not reconciled"
+fi
+unset _dotf
 
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
 # Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
