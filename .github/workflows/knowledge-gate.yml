@@ -1,6 +1,6 @@
 name: knowledge-gate
 
-# HARNESS-024: every PR names, in a "## Knowledge" section of its body, the
+# HARNESS-160: every PR names, in a "## Knowledge" section of its body, the
 # lesson, ADR and runbook it wrote, or why none. The rules live in
 # scripts/check-knowledge-gate.sh; this file only runs it.
 

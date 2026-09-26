@@ -2,7 +2,7 @@
 
 # spec-gate-pr.sh: CI adapter that runs a PR gate against LIVE PR metadata.
 # The gate is check-spec-gate.sh, or the script --gate names beside this one
-# (check-knowledge-gate.sh, HARNESS-024): both read the same three variables.
+# (check-knowledge-gate.sh, HARNESS-160): both read the same three variables.
 #
 # check-spec-gate.sh reads its PR context from SDD_LABELS / SDD_PR_BODY /
 # SDD_PR_AUTHOR. The workflow used to fill those from github.event.pull_request.*,
