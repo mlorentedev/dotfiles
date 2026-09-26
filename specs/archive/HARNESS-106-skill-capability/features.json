@@ -1,0 +1,65 @@
+[
+  {
+    "id": "HARNESS-106-skill-capability-f1",
+    "behavior": "AC1 — a neutral skill-invocation verb exists in the map vocabulary and resolves to claude's native tool",
+    "verification": "cd cli && go test ./internal/harness/ -run TestShippedMapGrantsTheSkillCapabilityWhereItExists",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f2",
+    "behavior": "AC2 — a harness with no native equivalent declares it explicitly; the loader rejects a verb that is both mapped and unsupported, and one declared unsupported outside the vocabulary",
+    "verification": "cd cli && go test ./internal/harness/ -run TestCapabilityMapFailsLoudWhenUnreadable",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f3",
+    "behavior": "AC3 — every persona record declaring skills also declares the capability, and the deployed agent's tools: actually names Skill; both guards fail red when broken",
+    "verification": "cd cli && go test ./internal/harness/ -run TestEveryPersonaDeclaringSkillsCanInvokeThem && grep -q 'every deployed persona can invoke the skills its own gate demands' ../tests/verify-setup.bats",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f4",
+    "behavior": "AC4, Claude box only (it reads this machine's gate ledger and Claude Code's subagent transcripts, so it exits 1 on a box where no persona has been dispatched): a gate skill-consumed record carrying agent_type is matched by a subagent transcript of that session whose meta.json names the same agentType and which invoked that skill. A record written by hand has no such transcript, so it does not pass.",
+    "verification": "L=\"${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/gate\"; jq -r 'select(.outcome == \"skill-consumed\" and (.agent_type // \"\") != \"\") | \"\\(.session) \\(.agent_type) \\(.skill)\"' \"$L\"/*.decisions.jsonl 2>/dev/null | sort -u | while read -r s a k; do for m in \"$HOME\"/.claude/projects/*/\"$s\"/subagents/*.meta.json; do [ -f \"$m\" ] && jq -e --arg a \"$a\" '.agentType == $a' \"$m\" >/dev/null && grep -q \"\\\"skill\\\":\\\"$k\\\"\" \"${m%.meta.json}.jsonl\" && echo dispatched; done; done | grep -q dispatched",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f5",
+    "behavior": "AC5 — every gate path writes a durable record, including allow and 'role did not resolve', independent of stderr and exit code",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestEveryGateDecisionLeavesADurableRecord",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f6",
+    "behavior": "AC6 — a warn decision is readable from the record alone after the session ends, naming the skills",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestAWarnIsReadableAfterTheSessionEnds",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f7",
+    "behavior": "AC7 — agent_type is carried in the record, on the skill path too, separate from the role requested and the role resolved",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestGateRecordCarriesAgentType|TestTheRecordSeparatesWhatWasAskedForFromWhatResolved'",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f8",
+    "behavior": "AC8 — the change propagates by deploy from the vault SSOT plus the repo map alone, and a re-run reports changed=0",
+    "verification": "S=$(mktemp -d) && mkdir -p \"$S/home\" && HOME=\"$S/home\" bash scripts/compile-harness.sh --deploy >/dev/null 2>&1 && cp -a \"$S/home\" \"$S/snap\" && HOME=\"$S/home\" bash scripts/compile-harness.sh --deploy >/dev/null 2>&1 && diff -rq \"$S/snap\" \"$S/home\"",
+    "state": "implemented",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-106-skill-capability-f9",
+    "behavior": "AC9 — every new check has a red-direction test that fails when the thing it guards is broken",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCapabilityMapFailsLoudWhenUnreadable|TestEveryPersonaDeclaringSkillsCanInvokeThem|TestShippedMapGrantsTheSkillCapabilityWhereItExists'",
+    "state": "implemented",
+    "evidence": ""
+  }
+]

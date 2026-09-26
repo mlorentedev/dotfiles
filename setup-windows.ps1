@@ -1268,151 +1268,19 @@ if ((Test-Path -LiteralPath $piSettingsDst -PathType Leaf) -and (Test-Path -Lite
     }
 }
 
-# pi packages (AI-030, #1224): reconcile ai\pi\packages.json against what the
-# live settings.json already declares, and install the difference.
-# Linux parity: the "pi packages" block in setup-linux.sh.
-#
-# Written through `pi install`, never by editing settings.json here. That file
-# is seed-if-missing because pi owns it, and `pi install` also unpacks the
-# package under the agent's npm dir, so an entry written by hand would name a
-# package that is not on disk.
-#
-# DOTFILES_SKIP_PI_PACKAGES exists for one caller: a throwaway CI runner whose
-# diff cannot change what this block does (CI-002, #1478). The reconcile is
-# 883-2200s of a 20-45 minute job -- measured across four runs of the same nine
-# pinned packages -- and it reinstalls the same manifest whether or not the PR
-# went near it. Set it and the block is skipped LOUDLY; the coverage does not
-# move to a schedule nobody reads, it stays on pushes to the default branch
-# where a failure is somewhere people already look.
-#
-# Linux parity: the same guard in setup-linux.sh.
-#
-# It is deliberately not a config key or an entry in packages.json. A durable
-# switch would let a real machine end up permanently unconverged, which is the
-# opposite of what this script is for. An environment variable is scoped to the
-# one process that sets it and dies with it.
-$piPackagesSrc = Join-Path $DotfilesDir 'ai\pi\packages.json'
-if (Test-Path -LiteralPath $piPackagesSrc -PathType Leaf) {
-    if ($env:DOTFILES_SKIP_PI_PACKAGES) {
-        # Loud, and it says what was NOT verified rather than only what was
-        # skipped: a line reading "skipped" is indistinguishable from "fine".
-        Write-Warn "DOTFILES_SKIP_PI_PACKAGES set - pi package reconcile skipped (nothing installed, nothing verified)"
-    } elseif (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
-        Write-Warn "pi not installed - skipping pi package reconcile (re-run setup after pi installs)"
-    } elseif (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        # `pi install` shells out to npm. Without this the loop runs and every
-        # entry fails individually, reporting a missing Node toolchain nine
-        # times as nine package failures instead of once as its actual cause.
-        # Linux parity: the same guard in setup-linux.sh.
-        Write-Warn "npm not available - skipping pi package reconcile (install Node.js then re-run)"
-    } else {
-        # A malformed manifest must be loud, not silently empty: an empty
-        # want-list installs nothing and reads exactly like "all present".
-        $piWanted = @()
-        try {
-            $piManifest = Get-Content -LiteralPath $piPackagesSrc -Raw | ConvertFrom-Json
-            $piWanted = @($piManifest.packages | ForEach-Object { $_.source } | Where-Object { $_ })
-        } catch {
-            Write-Warn "ai\pi\packages.json is not readable JSON - not reconciling"
-        }
-        if ($piWanted.Count -eq 0) {
-            Write-Warn "ai\pi\packages.json declares no readable packages - not reconciling"
-        } else {
-            # Entries are strings or objects carrying `source`; the object form
-            # is upstream's per-resource filtering shape, and a reader handling
-            # only strings would reinstall those on every run.
-            $piPresent = @()
-            if (Test-Path -LiteralPath $piSettingsDst -PathType Leaf) {
-                try {
-                    $piLive = Get-Content -LiteralPath $piSettingsDst -Raw | ConvertFrom-Json
-                    $piPresent = @($piLive.packages | ForEach-Object {
-                        if ($_ -is [string]) { $_ } else { $_.source }
-                    } | Where-Object { $_ })
-                } catch {
-                    $piPresent = @()
-                }
-            }
-
-            $piAdded = 0
-            $piFailed = 0
-            $piAlready = 0
-            # A VERBOSITY threshold, not a bound. Nothing is killed for crossing
-            # it; it only decides whose captured output is worth printing. Being
-            # wrong therefore costs log lines, never a broken install - which is
-            # why it is a literal here and not a knob. Sized from the measured
-            # distribution on this runner (#1486): normal installs land at
-            # 35-345s and the anomaly at 421 +/-1s, so there is no clean gap to
-            # sit in, and this deliberately errs toward printing too much.
-            $piSlowSeconds = 120
-            foreach ($piPkgName in $piWanted) {
-                if ($piPresent -contains $piPkgName) {
-                    $piAlready++
-                    continue
-                }
-                Write-Info "Installing pi package $piPkgName ..."
-                # Both the elapsed time and the output used to be discarded here
-                # (`2>$null | Out-Null`), and #1486 is what that cost: nine
-                # installs whose durations could only be reconstructed from
-                # GitHub's own line timestamps, and whose 421s outliers cannot be
-                # told apart from a slow success even in hindsight. The machine
-                # had the diagnostic in its hands and threw it away, then told the
-                # reader to reproduce it by hand.
-                $piSw = [System.Diagnostics.Stopwatch]::StartNew()
-                # `2>&1` on a NATIVE command turns its stderr lines into
-                # ErrorRecords, and under $ErrorActionPreference = 'Stop' those
-                # terminate - so a noisy-but-successful install would abort setup.
-                # The redirect this replaces avoided that by discarding stderr
-                # rather than by handling it. Pinned to Continue and restored.
-                # Initialised to FAILURE, before the try, for two reasons that both
-                # end badly. If the call throws, `$piRc` is never assigned and the
-                # read below is of an unassigned variable -- which under
-                # `Set-StrictMode -Version Latest` (scripts\utils.ps1:11) is itself
-                # a terminating error, one thrown outside the try that was meant to
-                # contain it. And on any iteration after the first it would not even
-                # be unassigned: it would still hold the PREVIOUS package's result,
-                # so a broken install would be counted as whatever the last one did.
-                # An unknown outcome is a failure here, never a success.
-                $piRc = 1
-                $piPrevEap = $ErrorActionPreference
-                $ErrorActionPreference = 'Continue'
-                try {
-                    $piOut = (& pi install $piPkgName 2>&1 | Out-String)
-                    $piRc = $LASTEXITCODE
-                } finally {
-                    $ErrorActionPreference = $piPrevEap
-                }
-                $piSw.Stop()
-                $piElapsed = [int][math]::Round($piSw.Elapsed.TotalSeconds)
-
-                if ($piRc -eq 0) {
-                    $piAdded++
-                    if ($piElapsed -ge $piSlowSeconds) {
-                        Write-Warn "pi install $piPkgName took ${piElapsed}s - over the ${piSlowSeconds}s diagnostic threshold, output follows"
-                    } else {
-                        Write-Info "pi package $piPkgName installed in ${piElapsed}s"
-                    }
-                } else {
-                    $piFailed++
-                    Write-Warn "pi install $piPkgName failed after ${piElapsed}s (exit $piRc) - output follows"
-                }
-
-                # Fenced, so that EMPTY output is itself legible. "The install
-                # printed nothing at all" is a finding; a bare dump makes it
-                # indistinguishable from "we never captured anything".
-                if ($piRc -ne 0 -or $piElapsed -ge $piSlowSeconds) {
-                    Write-Host "--- pi install $piPkgName (exit $piRc, ${piElapsed}s) ---"
-                    Write-Host $piOut
-                    Write-Host "--- end pi install $piPkgName ---"
-                }
-            }
-
-            if ($piAdded -eq 0 -and $piFailed -eq 0) {
-                Write-Info "pi packages already reconciled ($piAlready declared, 0 changed)"
-            } else {
-                Write-Success "pi packages: $piAdded installed, $piAlready already present, $piFailed failed"
-            }
-        }
+# pi packages (HARNESS-139, #1628): `dotf pi packages apply` converges pi on
+# ai\pi\packages.json in BOTH directions -- installs what is declared, removes
+# what is not, and archives the paths the manifest retires -- through pi's own
+# CLI. It replaced a loop here that only ever installed. The Go command keeps
+# the captured output, the elapsed time, the DOTFILES_SKIP_PI_PACKAGES skip
+# (CI-002, #1478), and a warning rather than a failure without pi or npm.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    dotf pi packages apply --repo $DotfilesDir
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "pi package reconcile reported a failure (above); run 'dotf pi packages check'"
     }
+} else {
+    Write-Warn "dotf not found - pi packages not reconciled"
 }
 
 # Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).

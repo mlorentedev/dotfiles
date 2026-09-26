@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -73,11 +76,20 @@ func TestAgentTiersResolve(t *testing.T) {
 		frontmatter  string
 		wantFail     bool
 		wantSubs     []string
+		wantNot      []string
 	}{
 		{
 			name:         "a tier the deploy target can answer",
 			deployAgents: []string{"claude"},
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\n---",
+			// The count tells "everything resolved" from "nothing was looked at".
+			wantSubs: []string{"(1 checked)"},
+		},
+		{
+			name:         "every pair counts toward the pass line",
+			deployAgents: []string{"claude", "opencode"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: mid\n---",
+			wantSubs:     []string{"(2 checked)"},
 		},
 		{
 			// The drift this check exists for. `top` names only claude, so a
@@ -87,6 +99,8 @@ func TestAgentTiersResolve(t *testing.T) {
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\n---",
 			wantFail:     true,
 			wantSubs:     []string{"top", "opencode", "AGENT.md"},
+			// A FAIL beside an OK line for the same check is a contradiction.
+			wantNot: []string{"checked)"},
 		},
 		{
 			// Declaring no tier is not an error: the render emits no model line.
@@ -101,6 +115,39 @@ func TestAgentTiersResolve(t *testing.T) {
 			name:         "a record scoped by targets is judged only against those",
 			deployAgents: []string{"claude", "opencode"},
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\ntargets: [claude]\n---",
+			wantSubs:     []string{"(1 checked)"},
+		},
+		{
+			// A quoted entry still targets its harness in the render, so the
+			// drift behind it must not go silent.
+			name:         "a quoted targets entry is judged like a bare one",
+			deployAgents: []string{"claude", "opencode"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\ntargets: [\"opencode\"]\n---",
+			wantFail:     true,
+			wantSubs:     []string{"top", "opencode"},
+		},
+		{
+			// The render reads only the `targets:` line, which names nobody in
+			// the block form, so the record deploys nowhere and cannot fail a
+			// render. A FAIL here would be the false positive on correct data.
+			name:         "a block-style targets list is judged as the render reads it",
+			deployAgents: []string{"claude"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: ultra\ntargets:\n  - claude\n---",
+			wantNot:      []string{"checked"},
+		},
+		{
+			// The render's awk stops at the first `targets:` line.
+			name:         "the first of two targets lines is the one judged",
+			deployAgents: []string{"claude", "opencode"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\ntargets: [claude]\ntargets: [opencode]\n---",
+			wantSubs:     []string{"(1 checked)"},
+		},
+		{
+			// An indented key belongs to a nested block, not to the record.
+			name:         "an indented model key is not the record's tier",
+			deployAgents: []string{"claude"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmeta:\n  model: ultra\n---",
+			wantNot:      []string{"ultra", "checked"},
 		},
 		{
 			name:         "a tier no tier block declares at all",
@@ -115,7 +162,8 @@ func TestAgentTiersResolve(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := agentTierFixture(t, tt.deployAgents, tt.frontmatter)
 			var buf bytes.Buffer
-			rep := NewReport(&buf, false)
+			// Verbose, so the pass line and its count are in the output.
+			rep := NewReport(&buf, true)
 			rep.Section("test")
 			checkAgentTiersResolve(cfg, tierMap, rep)
 
@@ -129,6 +177,11 @@ func TestAgentTiersResolve(t *testing.T) {
 			for _, sub := range tt.wantSubs {
 				if !strings.Contains(text, sub) {
 					t.Errorf("report does not name %q, so the operator cannot tell which record or harness:\n%s", sub, text)
+				}
+			}
+			for _, sub := range tt.wantNot {
+				if strings.Contains(text, sub) {
+					t.Errorf("report says %q, but the render deploys this record nowhere:\n%s", sub, text)
 				}
 			}
 		})
@@ -150,6 +203,22 @@ func TestAgentTiersMissingInputsAreNotFailures(t *testing.T) {
 		}
 	})
 
+	t.Run("an unparseable manifest", func(t *testing.T) {
+		dir := t.TempDir()
+		mustMkdir(t, filepath.Join(dir, "harness"))
+		mustWrite(t, filepath.Join(dir, "harness", "manifest.json"), `{"agents": `)
+		var buf bytes.Buffer
+		rep := NewReport(&buf, false)
+		rep.Section("test")
+		checkAgentTiersResolve(&Config{DotfilesDir: dir}, tierMap, rep)
+		if rep.Failures() != 0 {
+			t.Errorf("a manifest that does not parse is checkCompileHarnessDrift's failure, not this check's")
+		}
+		if !strings.Contains(buf.String(), "does not parse") {
+			t.Errorf("the check must say it did not run, or silence reads as a pass:\n%s", buf.String())
+		}
+	})
+
 	t.Run("a manifest with no deploy targets", func(t *testing.T) {
 		dir := t.TempDir()
 		mustMkdir(t, filepath.Join(dir, "harness"))
@@ -164,23 +233,90 @@ func TestAgentTiersMissingInputsAreNotFailures(t *testing.T) {
 	})
 }
 
+// TestAgentTiersDefaultRecordDir pins the manifest default: no record_dir
+// means harness/agents, the render's own default.
+func TestAgentTiersDefaultRecordDir(t *testing.T) {
+	cfg := agentTierFixture(t, []string{"claude"}, "---\nname: curator\nmodel: ultra\n---")
+	mustWrite(t, filepath.Join(cfg.DotfilesDir, "harness", "manifest.json"),
+		`{"version":1,"agents":{"deploy":[{"agent":"claude"}]}}`)
+	var buf bytes.Buffer
+	rep := NewReport(&buf, false)
+	rep.Section("test")
+	checkAgentTiersResolve(cfg, tierMap, rep)
+	if rep.Failures() != 1 {
+		t.Errorf("the default record dir must be read, so the undeclared tier fails:\n%s", buf.String())
+	}
+}
+
 // TestRecordTargetsDefaultsToEveryHarness pins the direction that, inverted,
 // turns correct data into noise: an ABSENT targets list means ALL harnesses.
+// A PRESENT one is read as the render reads it (see recordTargets).
 func TestRecordTargetsDefaultsToEveryHarness(t *testing.T) {
 	tests := []struct {
-		raw, agent string
-		want       bool
+		raw      string
+		declared bool
+		agent    string
+		want     bool
 	}{
-		{"", "claude", true},
-		{"   ", "opencode", true},
-		{"[claude]", "claude", true},
-		{"[claude]", "opencode", false},
-		{"[claude, opencode]", "opencode", true},
-		{"[opencode]", "claude", false},
+		{"", false, "claude", true},
+		{"", false, "opencode", true},
+		{"[claude]", true, "claude", true},
+		{"[claude]", true, "opencode", false},
+		{"[claude, opencode]", true, "opencode", true},
+		{"[opencode]", true, "claude", false},
+		{`["opencode"]`, true, "opencode", true},
+		{"", true, "claude", false}, // block style: the key line names nobody
 	}
 	for _, tt := range tests {
-		if got := recordTargets(tt.raw, tt.agent); got != tt.want {
-			t.Errorf("recordTargets(%q, %q) = %v, want %v", tt.raw, tt.agent, got, tt.want)
+		if got := recordTargets(tt.raw, tt.declared, tt.agent); got != tt.want {
+			t.Errorf("recordTargets(%q, %v, %q) = %v, want %v", tt.raw, tt.declared, tt.agent, got, tt.want)
+		}
+	}
+}
+
+// TestRecordTargetsAgreesWithTheRender runs the render's own predicate,
+// `skill_targets_agent` from scripts/compile-harness.sh, against the same
+// records the check reads. The check exists to predict the render, so a rule
+// that is merely more reasonable than the render's is a check that is wrong.
+func TestRecordTargetsAgreesWithTheRender(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil || runtime.GOOS == "windows" {
+		t.Skip("needs bash to run the render's predicate")
+	}
+	script, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "compile-harness.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn := regexp.MustCompile(`(?ms)^skill_targets_agent\(\) \{\n.*?^\}\n`).Find(script)
+	if fn == nil {
+		t.Fatal("skill_targets_agent not found in compile-harness.sh; this test must follow it")
+	}
+
+	records := []string{
+		"model: top",
+		"model: top\ntargets: [claude]",
+		"model: top\ntargets: [claude, opencode]",
+		"model: top\ntargets: [\"opencode\"]",
+		"model: top\ntargets:\n  - claude",
+		"model: top\ntargets: []",
+		"model: top\ntargets: [copilot]",
+	}
+	agents := []string{"claude", "opencode", "copilot", "codex", "pi", "agy"}
+	for _, body := range records {
+		path := filepath.Join(t.TempDir(), "AGENT.md")
+		mustWrite(t, path, "---\nname: x\n"+body+"\n---\n\nBody.\n")
+		fm, err := readAgentFrontmatter(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targets, declared := fm["targets"]
+		for _, agent := range agents {
+			// #nosec G204 -- the script text is this repository's own file
+			cmd := exec.Command(bash, "-c", string(fn)+`skill_targets_agent "$1" "$2"`, "_", path, agent)
+			render := cmd.Run() == nil
+			if got := recordTargets(targets, declared, agent); got != render {
+				t.Errorf("record %q, harness %s: check says targeted=%v, render says %v", body, agent, got, render)
+			}
 		}
 	}
 }

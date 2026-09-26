@@ -13,8 +13,10 @@
     "the contract in both setup scripts). Declaring packages there would reach a",
     "fresh machine and never an existing one, which is the opposite of what a",
     "repository that is redeployed on every update needs. So: this file is the",
-    "declaration, `pi install` is the only writer of the live array, and setup",
-    "reconciles one against the other on every run.",
+    "declaration, pi's own CLI is the only writer of the live array, and setup",
+    "runs `dotf pi packages apply`, which converges the live array on this file",
+    "in BOTH directions (HARNESS-139): it installs what is declared and removes",
+    "what is not.",
     "",
     "EVERY ENTRY CARRIES A VERSION, and that is not tidiness. Upstream states it",
     "plainly: 'Pi packages run with full system access -- extensions execute",
@@ -61,10 +63,6 @@
     {
       "source": "npm:pi-subagents@0.56.0",
       "why": "Single-agent delegation and scripted multi-agent runs. Adjacent to CLI-042's executor seam -- worth comparing before either hardens."
-    },
-    {
-      "source": "npm:pi-memory@0.4.2",
-      "why": "Semantic memory. NOT a second memory sink: GUARD-001 makes the vault the only sink for agent memory, so this stays session-scoped recall."
     },
     {
       "source": "npm:pi-cc-extensions@0.8.67",

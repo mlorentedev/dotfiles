@@ -28,12 +28,37 @@ import (
 // harness nothing deploys to is a real question (see #1170 for copilot's) but it
 // is not drift, and reporting it here would train the reader to ignore this line.
 func checkAgentTiersResolve(cfg *Config, parsed map[string]any, rep *Report) {
-	manifestPath := filepath.Join(cfg.DotfilesDir, "harness", "manifest.json")
-	raw, err := os.ReadFile(manifestPath)
+	recordDir, deploy, ok := agentDeployTargets(cfg, rep)
+	if !ok {
+		return
+	}
+	entries, err := os.ReadDir(filepath.Join(cfg.DotfilesDir, recordDir))
+	if err != nil {
+		return
+	}
+
+	checked, failed := 0, 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		c, f := checkRecordTier(cfg, parsed, rep, filepath.Join(recordDir, e.Name(), "AGENT.md"), deploy)
+		checked, failed = checked+c, failed+f
+	}
+
+	if checked > 0 && failed == 0 {
+		rep.Pass(fmt.Sprintf("every declared agent tier resolves for its deploy targets (%d checked)", checked))
+	}
+}
+
+// agentDeployTargets reads the manifest's agent record dir and the harnesses
+// `agents.deploy` renders to. ok is false when there is nothing to check.
+func agentDeployTargets(cfg *Config, rep *Report) (recordDir string, deploy []string, ok bool) {
+	raw, err := os.ReadFile(filepath.Join(cfg.DotfilesDir, "harness", "manifest.json"))
 	if err != nil {
 		// Not a failure of this check: the deploy dir simply may not carry a
 		// manifest yet. checkCompileHarnessDrift owns that diagnosis.
-		return
+		return "", nil, false
 	}
 	var manifest struct {
 		Agents struct {
@@ -45,54 +70,45 @@ func checkAgentTiersResolve(cfg *Config, parsed map[string]any, rep *Report) {
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		rep.Warn(fmt.Sprintf("harness/manifest.json does not parse, so agent tiers were not checked: %v", err))
-		return
+		return "", nil, false
 	}
-	if len(manifest.Agents.Deploy) == 0 {
-		return
+	for _, d := range manifest.Agents.Deploy {
+		deploy = append(deploy, d.Agent)
 	}
-	recordDir := manifest.Agents.RecordDir
+	recordDir = manifest.Agents.RecordDir
 	if recordDir == "" {
 		recordDir = "harness/agents"
 	}
+	return recordDir, deploy, len(deploy) > 0
+}
 
-	entries, err := os.ReadDir(filepath.Join(cfg.DotfilesDir, recordDir))
+// checkRecordTier resolves one record's tier for every harness it targets, and
+// returns how many pairs it checked and how many failed.
+func checkRecordTier(cfg *Config, parsed map[string]any, rep *Report, record string, deploy []string) (checked, failed int) {
+	fm, err := readAgentFrontmatter(filepath.Join(cfg.DotfilesDir, record))
 	if err != nil {
-		return
+		return 0, 0
 	}
-
-	checked, failed := 0, 0
-	for _, e := range entries {
-		if !e.IsDir() {
+	tier := fm["model"]
+	if tier == "" {
+		// Declaring no tier is not an error; the render emits no model line.
+		return 0, 0
+	}
+	targets, declared := fm["targets"]
+	for _, agent := range deploy {
+		if !recordTargets(targets, declared, agent) {
 			continue
 		}
-		recPath := filepath.Join(cfg.DotfilesDir, recordDir, e.Name(), "AGENT.md")
-		fm, err := readAgentFrontmatter(recPath)
-		if err != nil {
-			continue
-		}
-		tier := fm["model"]
-		if tier == "" {
-			// Declaring no tier is not an error; the render emits no model line.
-			continue
-		}
-		for _, d := range manifest.Agents.Deploy {
-			if !recordTargets(fm["targets"], d.Agent) {
-				continue
-			}
-			checked++
-			if _, err := harness.ResolveTier(parsed, tier, d.Agent); err != nil {
-				failed++
-				rep.Fail(fmt.Sprintf(
-					"agent record %s declares model tier %q, which %s cannot answer for harness %q — "+
-						"the render will fail on the next deploy",
-					filepath.Join(recordDir, e.Name(), "AGENT.md"), tier, harness.ModelMapFile, d.Agent))
-			}
+		checked++
+		if _, err := harness.ResolveTier(parsed, tier, agent); err != nil {
+			failed++
+			rep.Fail(fmt.Sprintf(
+				"agent record %s declares model tier %q, which %s cannot answer for harness %q — "+
+					"the render will fail on the next deploy",
+				record, tier, harness.ModelMapFile, agent))
 		}
 	}
-
-	if checked > 0 && failed == 0 {
-		rep.Pass(fmt.Sprintf("every declared agent tier resolves for its deploy targets (%d checked)", checked))
-	}
+	return checked, failed
 }
 
 // readAgentFrontmatter reads the single-line frontmatter values an agent record
@@ -127,7 +143,11 @@ func readAgentFrontmatter(path string) (map[string]string, error) {
 		if !found || strings.HasPrefix(key, " ") || strings.HasPrefix(key, "\t") {
 			continue
 		}
-		out[strings.TrimSpace(key)] = strings.TrimSpace(value)
+		// The first occurrence wins, as it does in the render's awk (`exit` on
+		// the first match).
+		if k := strings.TrimSpace(key); !seen(out, k) {
+			out[k] = strings.TrimSpace(value)
+		}
 	}
 	if err := sc.Err(); err != nil {
 		return nil, err
@@ -135,23 +155,33 @@ func readAgentFrontmatter(path string) (map[string]string, error) {
 	return out, nil
 }
 
-// recordTargets answers whether a record applies to one harness.
+func seen(m map[string]string, k string) bool {
+	_, ok := m[k]
+	return ok
+}
+
+// recordTargets answers whether the render deploys a record to one harness.
 //
-// An ABSENT targets list means every harness — the same default the render uses.
-// Getting this backwards would make a persona scoped to one harness fail this
-// check against every other, which is a false positive on correct data and the
-// fastest way to make an operator stop reading a diagnostic.
-func recordTargets(raw, agent string) bool {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+// It is the render's rule, not a better one, because this check exists to
+// predict what the next deploy does. The render (`skill_targets_agent` in
+// scripts/compile-harness.sh) reads the first frontmatter line that starts
+// with `targets:` and treats the record as targeting a harness when that line
+// CONTAINS the harness name:
+//
+//   - key absent: every harness. Getting this backwards would make a persona
+//     scoped to one harness fail against every other, a false positive on
+//     correct data and the fastest way to make an operator stop reading.
+//   - key present: a substring match, so `["opencode"]` targets opencode, and
+//     a block-style list (`targets:` with the entries on later lines) targets
+//     nobody, because its first line names no harness.
+//
+// The substring rule is imprecise (`copilot` contains `pi`), and a block list
+// silently deploying nowhere is a render defect. Both are tracked in #1733
+// (HARNESS-159); TestRecordTargetsAgreesWithTheRender holds this function to
+// the render until then.
+func recordTargets(raw string, declared bool, agent string) bool {
+	if !declared {
 		return true
 	}
-	raw = strings.TrimPrefix(raw, "[")
-	raw = strings.TrimSuffix(raw, "]")
-	for _, t := range strings.Split(raw, ",") {
-		if strings.TrimSpace(t) == agent {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(raw, agent)
 }
