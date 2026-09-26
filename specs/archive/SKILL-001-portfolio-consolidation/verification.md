@@ -46,6 +46,16 @@ Run on 2026-09-25 from `~/Projects/dotfiles` at main `3c2e393` (#1694 merged). E
 - **After.** f6 exits 0: no retired skill in any deploy target, the Copilot catalog or a presence line. `dotf harness resolve-skills` on the deployed builder, planner and reviewer records prints the slimmed rosters. Doctor's unset-severity warning reads 13 of 27 persona skills, down from 21 of 36.
 - **What doctor still reports.** Re-run at the round-3 fixes: 172 passed, 13 failed, 7 warned, 8 skipped. None of the failures comes from this change. Six are zombie specs (#1626). Seven are deploy-dir drift that only setup refreshes: the four known files, `.bashrc` and `.zshrc` (whose comments this change edited), and `ssh/config` (from #1659, merged the same day).
 
+## Post-merge deploy (round-3 finding 4)
+
+Run on 2026-09-25 from `~/Projects/dotfiles` at main `280af58`, the 0.59.0 release. Live peers were told before and after.
+
+- `dotf harness mirror`: 4 updated, 64 unchanged.
+- `compile-harness.sh --deploy`: exit 0.
+- All six rendered copies of `adversarial-review` (claude, pi, gemini skill and prompt, copilot, opencode) carry the round-2 wording, "since the last change it covers".
+- `scripts/check-retired-skills.sh`, with the eight retired names, exits 0 against the real HOME.
+- `dotf` 0.59.0 is installed, and the prompt hook's `skills:` line for a git-workflow prompt no longer names `verification-before-completion`.
+
 ## Size of what a persona is told to consume
 
 Sum of the roster's `SKILL.md` files; tokens estimated at 4 characters each. Reference files a skill loads on demand are not counted.

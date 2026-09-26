@@ -240,7 +240,7 @@ func LegacyThreadKey(content string) (string, bool) {
 }
 
 // legacyBlock returns the span between the section heading and its first marked
-// thread when that span holds any non-blank text.
+// thread when that span reads as a handoff written before threads existed.
 func legacyBlock(lines []string, start, end int) (int, int, bool) {
 	first := end
 	for i := start + 1; i < end; i++ {
@@ -249,12 +249,25 @@ func legacyBlock(lines []string, start, end int) (int, int, bool) {
 			break
 		}
 	}
-	for i := start + 1; i < first; i++ {
-		if strings.TrimSpace(lines[i]) != "" {
-			return start + 1, first, true
-		}
+	if !isHandoffShaped(lines[start+1 : first]) {
+		return 0, 0, false
 	}
-	return 0, 0, false
+	return start + 1, first, true
+}
+
+// isHandoffShaped reports whether text carries a handoff's own fields, a Last
+// task or a Next action (MEMORY-010, #1725).
+//
+// Not all text before the first thread is a handoff. The section can open with
+// a standing preamble: pointers to superseded blocks, the size rule, and a list
+// of live items that every thread points at. #1703 moved any such text into a
+// legacy thread, which filed the live items as superseded and left "only LIVE
+// items below" pointing at nothing. Text without the fields stays where it is.
+func isHandoffShaped(lines []string) bool {
+	th := ParseThread(strings.Join(lines, "\n"))
+	_, last := th.Get("Last task")
+	_, next := th.Get("Next action")
+	return last || next
 }
 
 // legacyThreadKey names the moved block by its own Updated date, so the thread
