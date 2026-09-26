@@ -9,7 +9,7 @@
   {
     "id": "CI-004-f2",
     "behavior": "AC2/AC3 — skills-pipeline.bats deploys at most 6 times per run, and a write into a shared setup_file home fails",
-    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats tests/skills-pipeline.bats tests/guard-lesson-numbers-unique.bats",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && out=$(~/.local/bin/bats tests/skills-pipeline.bats tests/guard-lesson-numbers-unique.bats) || exit 1; printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ skills-pipeline deploys at most 6 times per run' && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ a write into a shared setup_file home fails'",
     "state": "pending",
     "evidence": ""
   },
@@ -23,7 +23,7 @@
   {
     "id": "CI-004-f4",
     "behavior": "AC5 — the stray detector reports a process in its own run's tmpdir and ignores one in another run's",
-    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f 'stray detector' tests/guard-no-gui.bats tests/guard-lesson-numbers-unique.bats",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && out=$(~/.local/bin/bats tests/guard-no-gui.bats tests/guard-lesson-numbers-unique.bats) || exit 1; printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ guard: the stray detector ignores a test-shaped process from another bats run' && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ guard: the stray detector matches a test-shaped GUI process'",
     "state": "pending",
     "evidence": ""
   },
@@ -37,7 +37,7 @@
   {
     "id": "CI-004-f6",
     "behavior": "AC7 — no two workflow jobs share a display name, so exactly one reports `lint`",
-    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f 'unique across workflows' tests/*.bats",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && out=$(~/.local/bin/bats tests/workflow-job-names.bats tests/guard-lesson-numbers-unique.bats) || exit 1; printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ workflow job display names are unique across workflows'",
     "state": "pending",
     "evidence": ""
   },
