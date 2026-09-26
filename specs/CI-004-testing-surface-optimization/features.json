@@ -1,0 +1,65 @@
+[
+  {
+    "id": "CI-004-f1",
+    "behavior": "AC1 — guard-no-gui.bats finishes in under 5 s with setup_suite loaded (baseline 30.9 s)",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && s=$(date +%s) && ~/.local/bin/bats tests/guard-no-gui.bats tests/guard-lesson-numbers-unique.bats >/dev/null && [ $(( $(date +%s) - s )) -lt 5 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f2",
+    "behavior": "AC2/AC3 — skills-pipeline.bats deploys at most 6 times per run, and a write into a shared setup_file home fails",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats tests/skills-pipeline.bats tests/guard-lesson-numbers-unique.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f3",
+    "behavior": "AC4 — test-windows declares a 20-minute ceiling",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && awk '/^  test-windows:/{f=1;next} /^  [a-z-]+:$/{f=0} f && /timeout-minutes:/{print $2; exit}' .github/workflows/ci.yml | grep -qx 20",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f4",
+    "behavior": "AC5 — the stray detector reports a process in its own run's tmpdir and ignores one in another run's",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f 'stray detector' tests/guard-no-gui.bats tests/guard-lesson-numbers-unique.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f5",
+    "behavior": "AC6 — CI runs the Linux bats suite with --jobs and without parallelizing within files",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && grep -Eq 'bats --jobs [^ ]+ --no-parallelize-within-files' .github/workflows/ci.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f6",
+    "behavior": "AC7 — no two workflow jobs share a display name, so exactly one reports `lint`",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && ~/.local/bin/bats -f 'unique across workflows' tests/*.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f7",
+    "behavior": "AC8 — the test-windows doctor-gate step carries GH_TOKEN",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && awk '/name: Post-setup doctor gate/{f=1} f && /name: Run Pester/{exit} f' .github/workflows/ci.yml | grep -q 'GH_TOKEN: \\${{ github.token }}'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f8",
+    "behavior": "AC9 — the integration image build reuses a layer cache",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && grep -q 'cache-from' .github/workflows/ci.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-004-f9",
+    "behavior": "AC10 — P1.5 shipped or declined, with the critical-path measurement recorded",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && grep -q 'P1.5' specs/CI-004-testing-surface-optimization/verification.md && grep -Eq 'P1\\.5.*(shipped|declined)' specs/CI-004-testing-surface-optimization/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
