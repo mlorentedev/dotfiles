@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# check-knowledge-gate.sh: every PR names where its knowledge went (HARNESS-024).
+# check-knowledge-gate.sh: every PR names where its knowledge went (HARNESS-160).
 #
 # The PR body carries a "## Knowledge" section with three lines:
 #

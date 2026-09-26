@@ -3,7 +3,7 @@ tags: [spec, verification, templates]
 created: "2026-09-25"
 ---
 
-# Verification - HARNESS-024-knowledge-capture-gate
+# Verification - HARNESS-160-knowledge-capture-gate
 
 ## Evidence
 
@@ -37,6 +37,6 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-024-knowledge-capture-gate/` -> `specs/archive/HARNESS-024-knowledge-capture-gate/`
+- [ ] Folder moved: `specs/HARNESS-160-knowledge-capture-gate/` -> `specs/archive/HARNESS-160-knowledge-capture-gate/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)

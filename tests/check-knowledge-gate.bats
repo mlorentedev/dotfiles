@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for scripts/check-knowledge-gate.sh (HARNESS-024): every PR names, in a
+# Tests for scripts/check-knowledge-gate.sh (HARNESS-160): every PR names, in a
 # "## Knowledge" section, the lesson, ADR and runbook it wrote, or why none.
 
 setup() {

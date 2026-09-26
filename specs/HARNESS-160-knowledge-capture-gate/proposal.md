@@ -1,5 +1,5 @@
 ---
-id: "HARNESS-024-knowledge-capture-gate"
+id: "HARNESS-160-knowledge-capture-gate"
 type: spec
 status: draft # draft | implementing | verifying | archived
 created: "2026-09-25"
@@ -8,7 +8,7 @@ tags: [spec, proposal, harness, lessons, adr, ci]
 template_version: "1.0"
 ---
 
-# HARNESS-024: the PR that produces knowledge names where it went
+# HARNESS-160: the PR that produces knowledge names where it went
 
 ## Why
 

@@ -3,7 +3,7 @@ tags: [spec, tasks, templates]
 created: "2026-09-25"
 ---
 
-# Tasks - HARNESS-024-knowledge-capture-gate
+# Tasks - HARNESS-160-knowledge-capture-gate
 
 > TDD order. One task = one focused commit. `[P]` = no dependency on another unchecked task; `[AC<n>]` = serves acceptance criterion n.
 
