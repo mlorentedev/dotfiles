@@ -107,6 +107,11 @@ func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, c
 	if rep.ScriptUnrecognised {
 		_, _ = fmt.Fprintf(w, "unchanged  %s has Invoke-WebRequest but the POST line is unrecognised — review it by hand (DX-006)\n", hookScript)
 	}
+	if rep.Changed == 0 && rep.ScriptUnrecognised {
+		// Not "in sync": the line above says a file still needs a hand. The
+		// exit stays 0, as the retired script's did; --check is the gate.
+		return nil
+	}
 	if rep.Changed == 0 {
 		_, _ = fmt.Fprintln(w, "in sync   Orca's Copilot hooks already tuned (DX-006)")
 		return nil

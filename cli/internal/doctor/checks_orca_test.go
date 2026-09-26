@@ -80,3 +80,53 @@ func TestCheckOrcaHook_Fix(t *testing.T) {
 		t.Fatalf("expected orca.json to be tuned to >= 30, got: %s", string(content))
 	}
 }
+
+// TestCheckOrcaHook_FixTunesTheScript covers the script half of `doctor --fix`,
+// which goes through orca.TuneScriptFile: the POST is swapped, a backup is
+// written beside the file, and the report says Fix, not Pass.
+func TestCheckOrcaHook_FixTunesTheScript(t *testing.T) {
+	home := t.TempDir()
+	hook := filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
+	writeFile(t, hook, "param()\r\n    Invoke-WebRequest -Uri $u -Method POST -Body $body | Out-Null\r\n")
+	sys := newSys(map[string]string{"HOME": home}, nil, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkOrcaHook(sys, rep, true)
+
+	if rep.Failures() != 0 || !strings.Contains(buf.String(), "Invoke-WebRequest -> HttpWebRequest") {
+		t.Fatalf("want a Fix line and no failure:\n%s", buf.String())
+	}
+	content, err := os.ReadFile(hook)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(content), "Invoke-WebRequest") || !strings.Contains(string(content), "[System.Net.HttpWebRequest]::Create($uri)") {
+		t.Fatalf("the script was not tuned:\n%s", content)
+	}
+	baks, _ := filepath.Glob(hook + ".bak.*")
+	if len(baks) != 1 {
+		t.Fatalf("want one backup beside the script, got %v", baks)
+	}
+}
+
+// An Invoke-WebRequest the swap does not recognise is left byte-identical and
+// reported as a FAIL: never a guessed rewrite, never a Fix.
+func TestCheckOrcaHook_FixLeavesAnUnrecognisedPostAndFails(t *testing.T) {
+	home := t.TempDir()
+	hook := filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
+	const body = "$r = Invoke-WebRequest -Uri $u -Method POST\r\n"
+	writeFile(t, hook, body)
+	sys := newSys(map[string]string{"HOME": home}, nil, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkOrcaHook(sys, rep, true)
+
+	if rep.Failures() != 1 || !strings.Contains(buf.String(), "unrecognised") {
+		t.Fatalf("want one FAIL naming the unrecognised line:\n%s", buf.String())
+	}
+	if content, _ := os.ReadFile(hook); string(content) != body {
+		t.Fatalf("an unrecognised script must be left unchanged, got %q", content)
+	}
+}
