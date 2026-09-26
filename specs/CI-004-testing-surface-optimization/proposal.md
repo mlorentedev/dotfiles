@@ -55,8 +55,8 @@ evidence can be traced; the order follows readiness.
 
 - **P0.4 and P1.4** (the pi CLI install's discarded output, fanning out the pi package installs). Both edit the setup twins, and new logic does not go into `setup-*.sh`/`.ps1` while the reconciler is being ported to Go (#1628, owner decision on #1625). They are recorded on #1628.
 - **P1.2** (splitting the `code` path filter). CI-002 (#1478) declares it as its own PR 2.
-- **P1.1** (a Windows PR fast path without the OS bootstrap). It reduces TEST-003's end-to-end coverage, so it needs its own spec and an ADR.
-- **P2.x** (`dotf test <tier>`, the grep-to-Go migration, a duration budget guard, parity ports). Filed as separate tickets.
+- **P1.1** (a Windows PR fast path without the OS bootstrap). It reduces TEST-003's end-to-end coverage, so it needs its own spec and an ADR: #1741 (CI-005).
+- **P2.x**: `dotf test <tier>` #1742 (CI-006), the grep-to-Go migration #1743 (CI-007), a duration budget guard #1744 (CI-008), parity ports #1745 (CI-009).
 - Adding `cli-lint` to the required contexts. That is an edit to `forge/branch-protection.json` applied through GUARD-017 PR-B, and it is the owner's decision.
 
 ## Risks / open questions
