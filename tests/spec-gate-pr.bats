@@ -122,6 +122,68 @@ teardown() {
     [[ "$output" == *"forwarded"* ]]
 }
 
+@test "spec-gate-pr: --gate runs the named checker beside it instead of check-spec-gate.sh" {
+    cat > "$FIX/bin/check-knowledge-gate.sh" <<'STUB'
+#!/usr/bin/env bash
+printf 'KNOWLEDGE ARGS=[%s] BODY=[%s]\n' "$*" "${SDD_PR_BODY-<unset>}" >> "$GATE_LOG"
+STUB
+    chmod +x "$FIX/bin/check-knowledge-gate.sh"
+    export STUB_PR_JSON='{"labels":[],"body":"## Knowledge","author":{"login":"mlorentedev"}}'
+    run "$ADAPTER" --pr 877 --gate check-knowledge-gate.sh --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'KNOWLEDGE ARGS=[--base-ref origin/main --head-ref HEAD] BODY=[## Knowledge]' "$GATE_LOG"
+    run grep -c '^ARGS=' "$GATE_LOG"
+    [ "$output" -eq 0 ]
+}
+
+@test "spec-gate-pr: a --gate value with a path separator exits 2 and runs nothing" {
+    run "$ADAPTER" --pr 877 --gate ../check-spec-gate.sh --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"--gate"* ]]
+    [ ! -f "$GATE_LOG" ]
+}
+
+@test "spec-gate-pr: a --gate naming no executable beside the adapter exits 2" {
+    run "$ADAPTER" --pr 877 --gate no-such-gate.sh --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 2 ]
+    [ ! -f "$GATE_LOG" ]
+}
+
+@test "spec-gate-pr: --gate without a value exits 2" {
+    run "$ADAPTER" --pr 877 --base-ref origin/main --head-ref HEAD --gate
+    [ "$status" -eq 2 ]
+    [ ! -f "$GATE_LOG" ]
+}
+
+# End to end through the REAL knowledge checker: proves the env names the
+# adapter exports are the ones the checker reads, and that its verdict survives.
+_knowledge_repo() {
+    cp "$SCRIPTS_DIR/check-knowledge-gate.sh" "$FIX/bin/"
+    mkdir -p "$FIX/repo" && cd "$FIX/repo" || return 1
+    git init -q -b main && git config user.email t@t && git config user.name t
+    git config commit.gpgsign false
+    echo seed > README.md && git add -A && git commit -q -m seed
+    git checkout -q -b feature
+    mkdir -p docs/lessons && echo new > docs/lessons/lesson-002-new.md
+    git add -A && git commit -q -m lesson
+}
+
+@test "spec-gate-pr: a live body with its Knowledge section passes the real checker" {
+    _knowledge_repo
+    export STUB_PR_JSON='{"labels":[],"body":"## Knowledge\r\n- Lesson: docs/lessons/lesson-002-new.md\r\n- ADR: none: no decision\r\n- Runbook: none: no procedure","author":{"login":"mlorentedev"}}'
+    run "$ADAPTER" --pr 1 --gate check-knowledge-gate.sh --base-ref main --head-ref feature
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[OK] knowledge-gate"* ]]
+}
+
+@test "spec-gate-pr: a live body without the section fails the real checker" {
+    _knowledge_repo
+    export STUB_PR_JSON='{"labels":[],"body":null,"author":{"login":"mlorentedev"}}'
+    run "$ADAPTER" --pr 1 --gate check-knowledge-gate.sh --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"## Knowledge"* ]]
+}
+
 @test "spec-gate workflow: no PR metadata is sourced from the event payload" {
     run grep -c 'SDD_LABELS\|SDD_PR_BODY\|SDD_PR_AUTHOR' "$WORKFLOW"
     [ "$output" -eq 0 ]
