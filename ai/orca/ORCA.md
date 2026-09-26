@@ -12,7 +12,7 @@
   * `dotf orca export`: Extracts in-app keybindings and clean settings from `orca-data.json` into `ai/orca/`.
   * `dotf orca tune [--dry-run]`: Applies baseline performance and privacy defaults (`experimentalAgentHibernation`, `agentHibernationIdleMs`, `refreshLocalBaseRefOnWorktreeCreate`, `telemetry.optedIn=false`).
 
-<!-- BEGIN HARNESS GENERATED (sha256:9267b05eab30898c) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
+<!-- BEGIN HARNESS GENERATED (sha256:e9d564fc479442cc) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
 - No bot-style emojis or "Generated with" footers.
@@ -53,6 +53,7 @@ Any of the five may be skipped, but only as a stated decision naming which one a
 
 - **`dotf pr triage-queue`**: run at session start and before reporting PR work complete, in a repository with a reviewer registry. A non-zero exit means pending work or an unanswerable queue: read it, never treat it as empty.
 - **`## Review triage` comment**: record the dispositions on the PR under that heading, even "CI green, no review findings"; unwritten reads as nobody having looked.
+- **Draft while iterating**: open the PR as a draft (`gh pr create --draft`) while you are still pushing to it, and mark it ready (`gh pr ready`) when it is. Reviewers skip drafts, so the review reads the finished change, not each intermediate push.
 
 Wire `dotf pr triage-queue` into any session-start hook the harness offers.
 
