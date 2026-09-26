@@ -23,6 +23,15 @@ func seedSpec(t *testing.T, root, id, proposal string) {
 	if err := os.WriteFile(filepath.Join(dir, "review.md"), []byte(review), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Answered promotions, so these cases pass the promotion pre-flight
+	// (HARNESS-160); internal/spec's promotion_test.go covers its refusals.
+	promotions := "## Promotion candidates\n\n" +
+		"- [x] Lesson for the repo's `docs/lessons/`? no: a fixture\n" +
+		"- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a fixture\n" +
+		"- [x] New pattern candidate for `00_meta/patterns/`? no: a fixture\n"
+	if err := os.WriteFile(filepath.Join(dir, "verification.md"), []byte(promotions), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestSpecArchiveListedInSpecHelp(t *testing.T) {
@@ -120,5 +129,41 @@ func TestSpecArchiveMissingSpecFails(t *testing.T) {
 	_, _, err := execute(t, "spec", "archive", "NOPE-1")
 	if err == nil {
 		t.Fatalf("expected error for a missing spec")
+	}
+}
+
+// The command hands the archive the real vault resolver, so a promoted pattern
+// is checked where it lives: in $VAULT_PATH, not in the repository.
+func TestSpecArchiveChecksAPromotedPatternInTheVault(t *testing.T) {
+	root := makeRepo(t)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	verification := "## Promotion candidates\n\n" +
+		"- [x] Lesson for the repo's `docs/lessons/`? no: a fixture\n" +
+		"- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a fixture\n" +
+		"- [x] New pattern candidate for `00_meta/patterns/`? yes: 00_meta/patterns/pattern-promotion-test.md\n"
+	if err := os.WriteFile(filepath.Join(root, "specs", "AI-001-x", "verification.md"), []byte(verification), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vaultDir := t.TempDir()
+	t.Setenv("VAULT_PATH", vaultDir)
+
+	if _, _, err := execute(t, "spec", "archive", "AI-001-x"); err == nil ||
+		!strings.Contains(err.Error(), "pattern-promotion-test.md does not exist in the vault") {
+		t.Fatalf("a pattern missing from the vault should refuse the archive, got %v", err)
+	}
+
+	pattern := filepath.Join(vaultDir, "00_meta", "patterns", "pattern-promotion-test.md")
+	if err := os.MkdirAll(filepath.Dir(pattern), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pattern, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err := execute(t, "spec", "archive", "AI-001-x")
+	if err != nil {
+		t.Fatalf("with the pattern in the vault, the archive should pass: %v", err)
+	}
+	if !strings.Contains(stdout, "promotions: every candidate in verification.md is answered") {
+		t.Errorf("the archive should report the promotion check:\n%s", stdout)
 	}
 }

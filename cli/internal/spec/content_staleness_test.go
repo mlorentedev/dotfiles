@@ -47,6 +47,7 @@ func reviewedBranch(t *testing.T, afterReview func(root string)) (root, reviewed
 	csWrite(t, root, "specs/"+csID+"/proposal.md", csProposal)
 	csWrite(t, root, "specs/"+csID+"/tasks.md", csTasks)
 	csWrite(t, root, "specs/"+csID+"/features.json", csFeatures)
+	csWrite(t, root, "specs/"+csID+"/verification.md", answeredPromotions)
 	csWrite(t, root, "cli/feature.go", "package cli\n")
 	gitRun(t, root, "add", "-A")
 	gitRun(t, root, "commit", "-qm", "spec and base")

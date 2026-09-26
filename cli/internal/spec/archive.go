@@ -144,6 +144,11 @@ type ArchiveOptions struct {
 	// Staleness overrides how a review's freshness is decided. nil uses the
 	// repository's git history; tests inject a fake to avoid building one.
 	Staleness StalenessChecker
+
+	// VaultRoot resolves the knowledge vault, where a promoted pattern lives.
+	// It is called only when a promotion answer names a 00_meta/ path; nil
+	// refuses such a path rather than passing it unchecked.
+	VaultRoot func() (string, error)
 }
 
 // ReviewStateFiles are the files the REVIEW machinery writes into a spec
@@ -252,8 +257,10 @@ func setStatus(content, newStatus string) string {
 // Archive performs the mechanical spec archive, the Go twin of archive-spec.sh:
 // id validation, a tag pre-flight, a no-clobber move into the archive (or
 // _abandoned) tree, a proposal status rewrite, and an optional PR provenance
-// comment. It returns the absolute target directory on success. Vault promotion
-// and backlog ticks are out of scope — do those via "/spec archive" in an agent.
+// comment. It returns the absolute target directory on success. Promotions are
+// checked, not performed: each candidate in verification.md must be answered,
+// and each "yes" must name a file that exists (CheckPromotions). Writing the
+// lesson, ADR or pattern, and the backlog tick, happen before the archive.
 //
 // id is validated first: ValidateID's grammar admits no path separators or "..",
 // so it doubles as the guard that keeps a crafted id (e.g. "../../etc") from
@@ -329,10 +336,11 @@ func checkBypassRequest(specDir string, opts ArchiveOptions) (bool, error) {
 	return true, nil
 }
 
-// runPreflights runs both pre-flights — the tag scan ("is the spec finished
-// being written?") and the review gate (CLI-034: "did anyone independently
-// argue against it?") — and returns the refusal of each one a Force flag
-// overrode. A bypassed check is still RUN, so the record says what was
+// runPreflights runs the pre-flights — the tag scan ("is the spec finished
+// being written?"), the review gate (CLI-034: "did anyone independently argue
+// against it?") and the promotion answers (HARNESS-160: "did the knowledge
+// land?") — and returns the refusal of each one a Force flag overrode. No flag
+// overrides the promotion check: the way past it is answering the line. A bypassed check is still RUN, so the record says what was
 // overridden rather than which flag was typed: --force-without-review used to
 // be recorded, if at all, as "without review" when what it skipped was a
 // perfectly good review's freshness (#998).
@@ -356,6 +364,11 @@ func runPreflights(repoRoot, id, specDir string, opts ArchiveOptions) ([]string,
 		}
 		headline, _, _ := strings.Cut(gateErr.Error(), "\n")
 		overrode = append(overrode, headline)
+	}
+	if problems := CheckPromotions(repoRoot, specDir, opts.VaultRoot); len(problems) > 0 {
+		return nil, fmt.Errorf("promotion candidates in verification.md are not all answered:\n  %s\n"+
+			`answer each as "yes: <path of the promoted file>" or "no: <reason>"; no flag skips this check`,
+			strings.Join(problems, "\n  "))
 	}
 	return overrode, nil
 }
