@@ -15,30 +15,30 @@ created: "2026-09-25"
 
 ## Slice 1: the checker (PR 1)
 
-- [ ] [AC1] Failing cases in `tests/check-knowledge-gate.bats`, on a real git fixture repo:
+- [x] [AC1] Failing cases in `tests/check-knowledge-gate.bats`, on a real git fixture repo:
   - a valid body passes;
   - each failure fails, naming its cause: the section missing, a line missing, a bare `none`, a path not in the diff, a path outside its kind's directory, `_index.md`, a duplicated line;
   - a section inside a fenced code block does not count;
   - an unset body, or refs that cannot be diffed, exit 2.
-- [ ] [AC1] `scripts/check-knowledge-gate.sh` makes them pass.
-- [ ] [AC2] Failing cases:
+- [x] [AC1] `scripts/check-knowledge-gate.sh` makes them pass.
+- [x] [AC2] Failing cases:
   - a dependency bot with the `dependencies` label passes;
   - a human with the label is judged;
   - the bot list equals `spec-gate`'s.
-- [ ] [AC2] Implement the skip.
-- [ ] `shellcheck` clean; features f1 and f2 recorded.
+- [x] [AC2] Implement the skip.
+- [x] `shellcheck` clean; features f1 and f2 recorded.
 
 ## Slice 2: wiring (PR 2, which runs the gate on itself)
 
-- [ ] [AC3] Failing cases in `tests/spec-gate-pr.bats`:
+- [x] [AC3] Failing cases in `tests/spec-gate-pr.bats`:
   - `--gate check-knowledge-gate.sh` execs that script;
   - a `--gate` value with a `/` exits 2;
   - no `--gate` still runs `check-spec-gate.sh`.
-- [ ] [AC3] Add `--gate` to `scripts/spec-gate-pr.sh`.
-- [ ] [AC3] Add `.github/workflows/knowledge-gate.yml`. A test asserts its triggers and its `cancel-in-progress` expression equal `spec-gate.yml`'s.
-- [ ] [AC4] Add the release-please `pull-request-footer`. A case runs the checker on the footer text.
-- [ ] [AC6] Add the section to the PR template, and to DoD §2: the vault's `pattern-change-lifecycle.md`, then the compiled render.
-- [ ] [AC7] Write ADR-039 (knowledge is asked for by the PR that produces it) and lesson-301 (knowledge goes where a mechanism asks for it). This PR's own section names them.
+- [x] [AC3] Add `--gate` to `scripts/spec-gate-pr.sh`.
+- [x] [AC3] Add `.github/workflows/knowledge-gate.yml`. A test asserts its triggers and its `cancel-in-progress` expression equal `spec-gate.yml`'s.
+- [x] [AC4] Add the release-please `pull-request-footer`. A case runs the checker on the footer text.
+- [x] [AC6] Add the section to the PR template, and to DoD §2: the vault's `pattern-change-lifecycle.md`, then the compiled render.
+- [x] [AC7] Write ADR-039 (knowledge is asked for by the PR that produces it) and lesson-301 (knowledge goes where a mechanism asks for it). This PR's own section names them.
 - [ ] Before the merge: tell live peers, and add the section to the bodies of open PRs.
 
 ## Slice 3: promotions at archive (PR 3)
@@ -52,7 +52,7 @@ created: "2026-09-25"
 
 ## Slice 4: required (waits on #1451)
 
-- [ ] Add `knowledge-gate` (app 15368) to dotfiles' required checks in `forge/branch-protection.json`, and apply it with #1451's apply. `dotf forge protection check` is then clean.
+- [ ] Add `knowledge-gate` (app 15368) to dotfiles' required checks in `forge/branch-protection.json`, and apply it with `dotf forge protection apply` (#1746, merged). Its preflight refuses a context that has not reported on one of the last 5 merged PRs, so this waits until the wiring has run. `dotf forge protection check` is then clean.
 
 ## Closing
 
